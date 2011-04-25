@@ -18,6 +18,10 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 
 //****************************
 // Simple Functions
@@ -53,3 +57,7 @@ LZ4_compressCtx :
 	Use different pointers for different threads when doing multi-threading.
 */
 
+
+#if defined (__cplusplus)
+}
+#endif
