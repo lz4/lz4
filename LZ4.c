@@ -1,20 +1,29 @@
 /*
    LZ4 - Fast LZ compression algorithm
-   Copyright (C) Yann Collet 2011,
+   Copyright (C) 2011, Yann Collet.
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+  
+       * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+       * Redistributions in binary form must reproduce the above
+   copyright notice, this list of conditions and the following disclaimer
+   in the documentation and/or other materials provided with the
+   distribution.
+  
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 //**************************************
@@ -46,7 +55,7 @@
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
 
-#define HASH_LOG 17
+#define HASH_LOG 17                        // <--- Lower this value to lower memory usage. N->2^(N+2) Bytes (ex : 17 -> 512KB)
 #define HASHTABLESIZE (1 << HASH_LOG)
 #define HASH_MASK (HASHTABLESIZE - 1)
 
@@ -87,6 +96,17 @@ int LZ4_compress(char* source,
 	free(ctx);
 
 	return result;
+}
+
+
+
+int LZ4_singleThread_compress(
+				char* source, 
+				char* dest,
+				int isize)
+{
+	static void* ctx = NULL;
+	return LZ4_compressCtx(&ctx, source, dest, isize);
 }
 
 
@@ -133,11 +153,7 @@ int LZ4_compressCtx(void** ctx,
 		// Min Match
 		if (( ((ip-ref) >> MAXD_LOG) != 0) || (*(U32*)ref != sequence))
 		{ 
-			if (ip-anchor>limit) 
-			{ 
-				limit<<=1; 
-				step += 1 + (step>>2); 
-			}
+			if (ip-anchor>limit) { limit<<=1; step += 1 + (step>>2); }
 			ip+=step; 
 			continue; 
 		}	
@@ -169,8 +185,7 @@ int LZ4_compressCtx(void** ctx,
 		// Start Counting
 		ip+=MINMATCH;  ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (*ref == *ip) { ip++; ref++; }   // Ends at *ip!=*ref
-		if (ip>iend) ip=iend;
+		while ((ip<iend) && (*ref == *ip)) { ip++; ref++; }   // Ends at *ip!=*ref
 		len = (ip - anchor);
 		
 		// Encode MatchLength
@@ -184,15 +199,11 @@ int LZ4_compressCtx(void** ctx,
 
 	// Encode Last Literals
 	len = length = iend - anchor;
-//	if (length > 0) 
-	{
-	    orun=op++;
-	    if (len>(RUN_MASK-1))
-	      { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE) len; } 
-		else *orun = (len<<ML_BITS);
-		for(;length>0;length-=4) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
-		op += length;    // correction
-	}
+    orun=op++;
+    if (len>(RUN_MASK-1)) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE) len; } 
+	else *orun = (len<<ML_BITS);
+	for(;length>0;length-=4) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
+	op += length;    // correction
 
 	// End
 
@@ -229,6 +240,10 @@ int LZ4_decode ( char* source,
 
 		// copy literals
 		ref = op+length;
+#ifdef SAFEWRITEBUFFER
+		if (ref>iend-4) { while(op<iend-3) { *(U32*)op=*(U32*)ip; op+=4; ip+=4; } while(op<ref) *op++=*ip++; } 
+		else
+#endif
 		while (op<ref) { *(U32*)op = *(U32*)ip; op+=4; ip+=4; }
 		ip-=(op-ref); op=ref;	// correction
 		if (ip>=iend) break;    // Check EOF
@@ -250,6 +265,10 @@ int LZ4_decode ( char* source,
 			*op++ = *ref++;
 			ref -= dec[op-ref];
 		}
+#ifdef SAFEWRITEBUFFER
+		if (cpy>iend-4) { while(op<iend-3) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; } while(op<cpy) *op++=*ref++; } 
+		else
+#endif
 		while(op<cpy) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
 		op=cpy;		// correction
 	}

@@ -84,9 +84,8 @@ compress_file(char* input_filename, char* output_filename)
 	if ( foutput==0) { printf("Pb opening %s\n", output_filename); return 3; }
 
 	// Allocate Memory
-	in_buff = malloc(CHUNKSIZE + CACHELINE);
+	in_buff = malloc(CHUNKSIZE);
 	out_buff = malloc(OUT_CHUNKSIZE);
-	{ int i; int prime = PRIME; for (i=CHUNKSIZE; i<CHUNKSIZE+CACHELINE; i++) { prime *= prime; in_buff[i] = prime; } }
 	
 	// Write Archive Header
 	* (unsigned long*) out_buff = ARCHIVE_MAGICNUMBER;
