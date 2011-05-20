@@ -47,8 +47,6 @@
 //**************************************
 // Constants
 //**************************************
-#define MAXTHREADS 32
-
 #define MINMATCH 4
 #define INCOMPRESSIBLE 128
 
@@ -100,17 +98,6 @@ int LZ4_compress(char* source,
 
 
 
-int LZ4_singleThread_compress(
-				char* source, 
-				char* dest,
-				int isize)
-{
-	static void* ctx = NULL;
-	return LZ4_compressCtx(&ctx, source, dest, isize);
-}
-
-
-
 int LZ4_compressCtx(void** ctx,
 				 char* source, 
 				 char* dest,
@@ -119,12 +106,12 @@ int LZ4_compressCtx(void** ctx,
 	struct refTables *srt = (struct refTables *) (*ctx);
 	BYTE**  HashTable;
 
-	BYTE	*ip = source,      /* input pointer */ 
-			*anchor = source,
-			*iend = source + isize,
+	BYTE	*ip = (BYTE*) source,      /* input pointer */ 
+			*anchor = (BYTE*) source,
+			*iend = (BYTE*) source + isize,
 			*ilimit = iend - MINMATCH - 1;
 
-	BYTE	*op = dest,  /* output pointer */
+	BYTE	*op = (BYTE*) dest,  /* output pointer */
 			*ref,
 			*orun, *l_end;
 	
@@ -206,8 +193,7 @@ int LZ4_compressCtx(void** ctx,
 	op += length;    // correction
 
 	// End
-
-	return op-dest;
+	return (int) (((char*)op)-dest);
 }
 
 
@@ -220,10 +206,10 @@ int LZ4_decode ( char* source,
 				 int isize)
 {	
 	// Local Variables
-	BYTE	*ip = source,      
-			*iend = source + isize;
+	BYTE	*ip = (BYTE*) source,      
+			*iend = (BYTE*) source + isize;
 
-	BYTE	*op = dest, 
+	BYTE	*op = (BYTE*) dest, 
 			*ref, *cpy,
 			runcode;
 	
@@ -274,7 +260,7 @@ int LZ4_decode ( char* source,
 	}
 
 	// end of decoding
-	return op-dest;
+	return (int) (((char*)op)-dest);
 }
 
 

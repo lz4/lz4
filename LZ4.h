@@ -36,7 +36,7 @@ extern "C" {
 // Instructions
 //****************************
 
-// Uncomment next line to ensure that LZ4_Decode will never write beyond dest + originalSize
+// Uncomment next line to ensure that LZ4_Decode will never write in destination buffer more than "originalSize" bytes
 // If commented, the decoder may write up to 3 bytes more than originalSize, so provide extra room in dest buffer for that
 // Recommendation : commented, for improved performance; ensure that destination buffer is at least originalSize + 3 Bytes
 // #define SAFEWRITEBUFFER
@@ -62,24 +62,19 @@ LZ4_decode :
 //****************************
 // Advanced Functions
 //****************************
-int LZ4_singleThread_compress (char* source, char* dest, int isize);
+
 int LZ4_compressCtx(void** ctx, char* source,  char* dest, int isize);
 
 /*
-LZ4_singleThread_compress :
-	Same as LZ4_compress, but avoids re-allocation effect between each call.
-	Better performance, but only use it in single-threading scenario !
-	note : performance difference is only noticeable when repetitively calling the compression algorithm on many small data packets.
-
 LZ4_compressCtx :
-	This function explicitly handle the CTX memory structure.
-	It avoids allocating/deallocating memory between each call, improving performance.
+	This function explicitly handles the CTX memory structure.
+	It avoids allocating/deallocating memory between each call, improving performance when malloc is time-consuming.
 
 	On first call : provide a *ctx=NULL; It will be automatically allocated.
 	On next calls : reuse the same ctx pointer.
 	Use different pointers for different threads when doing multi-threading.
 
-	note : performance difference is only noticeable when repetitively calling the compression algorithm on many small data packets.
+	note : performance difference is small, mostly noticeable when repetitively calling the compression algorithm on many small segments.
 */
 
 
