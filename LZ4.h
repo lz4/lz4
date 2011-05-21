@@ -2,6 +2,7 @@
    LZ4 - Fast LZ compression algorithm
    Header File
    Copyright (C) 2011, Yann Collet.
+   BSD License
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -36,9 +37,9 @@ extern "C" {
 // Instructions
 //****************************
 
-// Uncomment next line to ensure that LZ4_Decode will never write in destination buffer more than "originalSize" bytes
-// If commented, the decoder may write up to 3 bytes more than originalSize, so provide extra room in dest buffer for that
-// Recommendation : commented, for improved performance; ensure that destination buffer is at least originalSize + 3 Bytes
+// Uncomment next line to ensure that LZ4_Decode will never write in destination buffer more than "decompressedSize" bytes
+// If commented, the decoder may write up to 3 bytes more than decompressedSize, so provide extra room in dest buffer for that
+// Recommendation : keep commented, for improved performance; ensure that destination buffer is at least decompressedSize + 3 Bytes
 // #define SAFEWRITEBUFFER
  
 
@@ -52,10 +53,13 @@ int LZ4_decode   (char* source, char* dest, int isize);
 /*
 LZ4_compress :
 	return : the number of bytes in compressed buffer dest
-	note   : this simple function explicitly allocate/deallocate memory **at each call**
+	note : destination buffer must be already allocated. 
+		To avoid any problem, size it to handle worst cases situations (input data not compressible)
+		Worst case size is : "inputsize + 0.4%", with "0.4%" being at least 8 bytes.
 
 LZ4_decode :
 	return : the number of bytes in decoded buffer dest
+	note : destination buffer must be already allocated. 
 */
 
 

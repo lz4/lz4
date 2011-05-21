@@ -1,6 +1,5 @@
 /*
-   LZ4 Demo program
-   Main file I/O
+   Demo compression program using LZ4 compression
    Copyright (C) Yann Collet 2011,
 
    This program is free software; you can redistribute it and/or modify
@@ -17,7 +16,12 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
-
+/*
+	Note : this is *only* a demo program, an example to show how LZ4 can be used.
+	It is not considered part of LZ4 compression library.
+	The license of the demo program is GPL.
+	The license of LZ4 is BSD.
+*/
 
 //****************************
 // Includes
@@ -30,7 +34,7 @@
 //****************************
 // Constants
 //****************************
-#define COMPRESSOR_NAME "LZ4 - Demo program"
+#define COMPRESSOR_NAME "Demo compression program using LZ4"
 #define COMPRESSOR_VERSION "v1.0"
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
@@ -41,7 +45,6 @@
 #define CHUNKSIZE (8<<20)    // 8 MB
 #define CACHELINE 64
 #define OUT_CHUNKSIZE (CHUNKSIZE + CHUNKSIZE/256 + CACHELINE)
-#define PRIME 181
 #define ARCHIVE_MAGICNUMBER 0x184C2102
 #define ARCHIVE_MAGICNUMBER_SIZE 4
 
@@ -103,7 +106,7 @@ compress_file(char* input_filename, char* output_filename)
 		// Compress Block
 		outSize = LZ4_compress(in_buff, out_buff+4, inSize);
 		* (unsigned long*) out_buff = outSize;
-		compressedfilesize += outSize;
+		compressedfilesize += outSize+4;
 
 		// Write Block
 		fwrite(out_buff, 1, outSize+4, foutput);
@@ -206,7 +209,6 @@ int main(int argc, char** argv)
 		// Forced Decoding 
 		if( argument[0] =='d' )
 		  { decode=1; continue; }
-
 	}
 
 	// first provided filename is input
