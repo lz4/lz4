@@ -59,7 +59,10 @@ LZ4_compress :
 
 LZ4_decode :
 	return : the number of bytes in decoded buffer dest
-	note : destination buffer must be already allocated. 
+	note 1 : isize is the input size, therefore the compressed size
+	note 2 : destination buffer must be already allocated. 
+			The program calling the decoder must know in advance the size of decoded stream to properly allocate the destination buffer
+			Note that, in fast mode, the destination buffer size must be at least "decompressedSize + 3 Bytes"
 */
 
 

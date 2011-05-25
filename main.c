@@ -31,6 +31,25 @@
 #include "lz4.h"
 
 
+//**************************************
+// Basic Types
+//**************************************
+#if defined(_MSC_VER) || defined(_WIN32) || defined(__WIN32__)
+#define BYTE	unsigned __int8
+#define U16		unsigned __int16
+#define U32		unsigned __int32
+#define S32		__int32
+#define U64		unsigned __int64
+#else
+#include <stdint.h>
+#define BYTE	uint8_t
+#define U16		uint16_t
+#define U32		uint32_t
+#define S32		int32_t
+#define U64		uint64_t
+#endif
+
+
 //****************************
 // Constants
 //****************************
@@ -74,10 +93,10 @@ int badusage()
 }
 
 
-compress_file(char* input_filename, char* output_filename)
+int compress_file(char* input_filename, char* output_filename)
 {
-	long long filesize = 0;
-	long long compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
+	U64 filesize = 0;
+	U64 compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
 	char* in_buff;
 	char* out_buff;
 	FILE* finput = fopen( input_filename, "rb" ); 
@@ -91,7 +110,7 @@ compress_file(char* input_filename, char* output_filename)
 	out_buff = malloc(OUT_CHUNKSIZE);
 	
 	// Write Archive Header
-	* (unsigned long*) out_buff = ARCHIVE_MAGICNUMBER;
+	*(U32*)out_buff = ARCHIVE_MAGICNUMBER;
 	fwrite(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, foutput);
 
 	// Main Loop
@@ -99,13 +118,13 @@ compress_file(char* input_filename, char* output_filename)
 	{	
 		int outSize;
 		// Read Block
-	    int inSize = fread( in_buff, 1, CHUNKSIZE, finput );
+	    int inSize = fread(in_buff, 1, CHUNKSIZE, finput);
 		if( inSize<=0 ) break;
 		filesize += inSize;
 
 		// Compress Block
 		outSize = LZ4_compress(in_buff, out_buff+4, inSize);
-		* (unsigned long*) out_buff = outSize;
+		* (U32*) out_buff = outSize;
 		compressedfilesize += outSize+4;
 
 		// Write Block
@@ -113,7 +132,8 @@ compress_file(char* input_filename, char* output_filename)
 	}
 
 	// Status
-	printf("Compressed %llu bytes into %llu bytes ==> %.2f%%\n", filesize, compressedfilesize, (double)compressedfilesize/filesize*100);
+	printf("Compressed %llu bytes into %llu bytes ==> %.2f%%\n", 
+		(unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
 
 	fclose(finput);
 	fclose(foutput);
@@ -122,34 +142,35 @@ compress_file(char* input_filename, char* output_filename)
 }
 
 
-decode_file(char* input_filename, char* output_filename)
+int decode_file(char* input_filename, char* output_filename)
 {
-	long long filesize = 0;
+	U64 filesize = 0;
 	char* in_buff;
 	char* out_buff;
 	FILE* finput = fopen( input_filename, "rb" ); 
 	FILE* foutput = fopen( output_filename, "wb" ); 
+	size_t uselessRet;
 	
-	if ( finput==0 ) { printf("Pb opening %s\n", input_filename);  return 2; }
-	if ( foutput==0) { printf("Pb opening %s\n", output_filename); return 3; }
+	if (finput==0 ) { printf("Pb opening %s\n", input_filename);  return 2; }
+	if (foutput==0) { printf("Pb opening %s\n", output_filename); return 3; }
 
 	// Allocate Memory
 	in_buff = malloc(OUT_CHUNKSIZE);
 	out_buff = malloc(CHUNKSIZE + CACHELINE);
 	
 	// Check Archive Header
-	fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
-	if (* (unsigned long*) out_buff != ARCHIVE_MAGICNUMBER) { printf("Wrong file : cannot be decoded\n"); return 4; }
+	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
+	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { printf("Wrong file : cannot be decoded\n"); return 4; }
 
 	// Main Loop
 	while (1) 
 	{	
 		int outSize;
 		// Read Block
-	    int inSize = fread( in_buff, 1, 4, finput );
+	    U32 inSize = (U32) fread(in_buff, 1, 4, finput);
 		if( inSize<=0 ) break;
-		inSize = (int) * (unsigned long*) in_buff;
-	    fread( in_buff, 1, inSize, finput );
+		inSize = *(U32*)in_buff;
+	    uselessRet = fread( in_buff, 1, inSize, finput);
 
 		// Decode Block
 		outSize = LZ4_decode(in_buff, out_buff, inSize);
@@ -160,7 +181,7 @@ decode_file(char* input_filename, char* output_filename)
 	}
 
 	// Status
-	printf("Successfully decoded %llu bytes \n", filesize);
+	printf("Successfully decoded %llu bytes \n", (unsigned long long)filesize);
 
 	fclose(finput);
 	fclose(foutput);
@@ -179,7 +200,7 @@ int main(int argc, char** argv)
 
   // Welcome message
   printf(WELCOME_MESSAGE);
-  
+
   //printf("Nb argument = %i \n", argc);
   if (argc<2) { badusage(); return 1; }
 
@@ -206,7 +227,7 @@ int main(int argc, char** argv)
 		if( argument[0] =='c' )
 		  { compression=1; continue; }
 
-		// Forced Decoding 
+		// Forced Decoding
 		if( argument[0] =='d' )
 		  { decode=1; continue; }
 	}
@@ -228,7 +249,7 @@ int main(int argc, char** argv)
 
   if (compression) return compress_file(input_filename, output_filename);
 
-  badusage(); 
+  badusage();
 
   return 0;
 }

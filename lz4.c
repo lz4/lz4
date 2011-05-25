@@ -38,11 +38,18 @@
 //**************************************
 // Basic Types
 //**************************************
-#define BYTE	unsigned char
-#define U16		unsigned short
-#define U32		unsigned long
-#define S32		signed long
-#define U64		unsigned long long
+#if defined(_MSC_VER) || defined(_WIN32) || defined(__WIN32__)
+#define BYTE	unsigned __int8
+#define U16		unsigned __int16
+#define U32		unsigned __int32
+#define S32		__int32
+#else
+#include <stdint.h>
+#define BYTE	uint8_t
+#define U16		uint16_t
+#define U32		uint32_t
+#define S32		int32_t
+#endif
 
 
 //**************************************
@@ -76,7 +83,7 @@ struct refTables
 //**************************************
 // Macros
 //**************************************
-#define HASH_FUNCTION(i)	((i * 2654435761) >> ((MINMATCH*8)-HASH_LOG))
+#define HASH_FUNCTION(i)	((i * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
 #define HASH_VALUE(p)		HASH_FUNCTION(*(U32*)p)
 #define HASH_POINTER(p)		HashTable[HASH_VALUE(p)]
 
