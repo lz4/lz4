@@ -88,7 +88,6 @@ int badusage()
 {
 	printf("Wrong parameters\n");
 	usage();
-	printf(" --- type any key to exit ---\n");
 	return 0;
 }
 
@@ -151,8 +150,8 @@ int decode_file(char* input_filename, char* output_filename)
 	FILE* foutput = fopen( output_filename, "wb" ); 
 	size_t uselessRet;
 	
-	if (finput==0 ) { printf("Pb opening %s\n", input_filename);  return 2; }
-	if (foutput==0) { printf("Pb opening %s\n", output_filename); return 3; }
+	if (finput==0 ) { printf("Pb opening %s\n", input_filename);  return 4; }
+	if (foutput==0) { printf("Pb opening %s\n", output_filename); return 5; }
 
 	// Allocate Memory
 	in_buff = malloc(OUT_CHUNKSIZE);
@@ -160,7 +159,7 @@ int decode_file(char* input_filename, char* output_filename)
 	
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
-	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { printf("Wrong file : cannot be decoded\n"); return 4; }
+	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { printf("Wrong file : cannot be decoded\n"); return 6; }
 
 	// Main Loop
 	while (1) 
@@ -201,7 +200,6 @@ int main(int argc, char** argv)
   // Welcome message
   printf(WELCOME_MESSAGE);
 
-  //printf("Nb argument = %i \n", argc);
   if (argc<2) { badusage(); return 1; }
 
   for(i=1; i<argc; i++)
@@ -212,7 +210,6 @@ int main(int argc, char** argv)
     if(!argument) continue;   // Protection if argument empty
 
 	if (argument[0]=='-') command++;  // valid command trigger
-	if (argument[0]=='/') command++;  // valid command trigger
 
 	// Select command
 	if (command)
