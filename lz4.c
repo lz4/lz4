@@ -36,6 +36,16 @@
 
 
 //**************************************
+// Performance parameter                <---------------------------------------------------------
+//**************************************
+// Lowering this value reduce memory usage
+// It may also improve speed, especially if you reach L1 cache size (32KB for Intel, 64KB for AMD)
+// Expanding memory usage typically improves compression ratio
+// Memory usage formula : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
+#define HASH_LOG 17                        
+
+
+//**************************************
 // Basic Types
 //**************************************
 #if defined(_MSC_VER) || defined(_WIN32) || defined(__WIN32__)
@@ -61,7 +71,6 @@
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
 
-#define HASH_LOG 17                        // <--- Lower this value to lower memory usage. N->2^(N+2) Bytes (ex : 17 -> 512KB)
 #define HASHTABLESIZE (1 << HASH_LOG)
 #define HASH_MASK (HASHTABLESIZE - 1)
 
@@ -145,27 +154,21 @@ int LZ4_compressCtx(void** ctx,
 		ref = HashTable[h];
 		HashTable[h] = ip;
 
-		// Min Match
+		// Check Min Match
 		if (( ((ip-ref) >> MAXD_LOG) != 0) || (*(U32*)ref != sequence))
 		{ 
-			if (ip-anchor>limit) { limit<<=1; step += 1 + (step>>2); }
-			ip+=step; 
+			if (ip-anchor>limit) { limit <<= 1; step += 1 + (step>>2); }
+			ip += step; 
 			continue; 
 		}	
 
 		// catch up
-		if (step>1) 
-		{ 
-			HashTable[h] = ref;
-			ip -= (step-1);
-			step=1; 
-			continue;
-		}
-		limit=INCOMPRESSIBLE; 
+		if (step>1) { HashTable[h] = ref; ip -= (step-1); step=1; continue; }
+		limit = INCOMPRESSIBLE; 
 
 		// Encode Literal length
 		len = length = ip - anchor;
-		orun=op++;
+		orun = op++;
 		if (len>(RUN_MASK-1)) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; } 
 		else *orun = (len<<ML_BITS);
 
@@ -191,14 +194,16 @@ int LZ4_compressCtx(void** ctx,
 		anchor = ip; 
 	}
 
-
 	// Encode Last Literals
 	len = length = iend - anchor;
-    orun=op++;
-    if (len>(RUN_MASK-1)) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE) len; } 
-	else *orun = (len<<ML_BITS);
-	for(;length>0;length-=4) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
-	op += length;    // correction
+	if (length)
+	{
+		orun=op++;
+		if (len>(RUN_MASK-1)) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE) len; } 
+		else *orun = (len<<ML_BITS);
+		for(;length>0;length-=4) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
+		op += length;    // correction
+	}
 
 	// End
 	return (int) (((char*)op)-dest);
@@ -209,15 +214,168 @@ int LZ4_compressCtx(void** ctx,
 //****************************
 // Decompression CODE
 //****************************
+int LZ4_uncompress(char* source, 
+				 char* dest,
+				 int osize)
+{	
+	// Local Variables
+	BYTE	*ip = (BYTE*) source;
+
+	BYTE	*op = (BYTE*) dest, 
+			*oend=(BYTE*) dest + osize,
+			*ref, *cpy,
+			runcode;
+	
+	U32		dec[4]={0, 3, 2, 3};
+	int		len, length;
+
+
+	// Main Loop
+	while (1)
+	{
+		// get runlength
+		runcode = *ip++;
+		if ((length=(runcode>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
+
+		// copy literals
+		ref = op+length;
+		if (ref>oend-4) 
+		{ 
+			if (ref > oend) goto _output_error;
+			while(op<oend-3) { *(U32*)op=*(U32*)ip; op+=4; ip+=4; } 
+			while(op<ref) *op++=*ip++; 
+			break;    // Necessarily EOF
+		}
+		while (op<ref) { *(U32*)op = *(U32*)ip; op+=4; ip+=4; }
+		ip-=(op-ref); op=ref;	// correction
+
+		// get offset
+		ref -= *(U16*)ip; ip+=2;
+
+		// get matchlength
+		if ((length=(runcode&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
+		length += MINMATCH;
+
+		// copy repeated sequence
+		cpy = op + length;
+		if (op-ref<4)
+		{
+			*op++ = *ref++;
+			*op++ = *ref++;
+			*op++ = *ref++;
+			*op++ = *ref++;
+			ref -= dec[op-ref];
+		}
+		if (cpy>oend-4)
+		{
+			if (cpy > oend) goto _output_error;
+			while(op<cpy-3) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+			while(op<cpy) *op++=*ref++;
+			if (op>=oend) break;    // Check EOF
+			continue;
+		}
+		while(op<cpy) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+		op=cpy;		// correction
+	}
+
+	// end of decoding
+	return (int) (((char*)ip)-source);
+
+	// write overflow error detected
+_output_error:
+	return (int) (-(((char*)ip)-source));
+}
+
+
+int LZ4_uncompress_unknownOutputSize(
+				char* source, 
+				char* dest,
+				int isize,
+				int maxOutputSize)
+{	
+	// Local Variables
+	BYTE	*ip = (BYTE*) source,
+			*iend = ip + isize;
+
+	BYTE	*op = (BYTE*) dest, 
+			*oend = op + maxOutputSize,
+			*ref, *cpy,
+			runcode;
+	
+	U32		dec[4]={0, 3, 2, 3};
+	int		len, length;
+
+
+	// Main Loop
+	while (ip<iend)
+	{
+		// get runlength
+		runcode = *ip++;
+		if ((length=(runcode>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
+
+		// copy literals
+		ref = op+length;
+		if (ref>oend-4) 
+		{ 
+			if (ref > oend) goto _output_error;
+			while(op<oend-3) { *(U32*)op=*(U32*)ip; op+=4; ip+=4; } 
+			while(op<ref) *op++=*ip++; 
+			break;    // Necessarily EOF
+		}
+		while (op<ref) { *(U32*)op = *(U32*)ip; op+=4; ip+=4; }
+		ip-=(op-ref); op=ref;	// correction
+		if (ip>=iend) break;    // check EOF
+
+		// get offset
+		ref -= *(U16*)ip; ip+=2;
+
+		// get matchlength
+		if ((length=(runcode&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
+		length += MINMATCH;
+
+		// copy repeated sequence
+		cpy = op + length;
+		if (op-ref<4)
+		{
+			*op++ = *ref++;
+			*op++ = *ref++;
+			*op++ = *ref++;
+			*op++ = *ref++;
+			ref -= dec[op-ref];
+		}
+		if (cpy>oend-4)
+		{
+			if (cpy > oend) goto _output_error;
+			while(op<cpy-3) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+			while(op<cpy) *op++=*ref++;
+			if (op>=oend) break;    // Check EOF
+			continue;
+		}
+		while(op<cpy) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+		op=cpy;		// correction
+	}
+
+	// end of decoding
+	return (int) (((char*)op)-dest);
+
+	// write overflow error detected
+_output_error:
+	return (int) (-(((char*)ip)-source));
+}
+
+
+//****************************
+// Deprecated functions
+//****************************
 int LZ4_decode ( char* source, 
 				 char* dest,
 				 int isize)
 {	
 	// Local Variables
-	BYTE	*ip = (BYTE*) source,      
-			*iend = (BYTE*) source + isize;
+	BYTE	*ip = (BYTE*)source,      
+			*iend = ip + isize;
 
-	BYTE	*op = (BYTE*) dest, 
+	BYTE	*op = (BYTE*)dest, 
 			*ref, *cpy,
 			runcode;
 	
@@ -233,11 +391,7 @@ int LZ4_decode ( char* source,
 		if ((length=(runcode>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
 
 		// copy literals
-		ref = op+length;
-#ifdef SAFEWRITEBUFFER
-		if (ref>iend-4) { while(op<iend-3) { *(U32*)op=*(U32*)ip; op+=4; ip+=4; } while(op<ref) *op++=*ip++; } 
-		else
-#endif
+		ref=op+length;
 		while (op<ref) { *(U32*)op = *(U32*)ip; op+=4; ip+=4; }
 		ip-=(op-ref); op=ref;	// correction
 		if (ip>=iend) break;    // Check EOF
@@ -259,10 +413,6 @@ int LZ4_decode ( char* source,
 			*op++ = *ref++;
 			ref -= dec[op-ref];
 		}
-#ifdef SAFEWRITEBUFFER
-		if (cpy>iend-4) { while(op<iend-3) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; } while(op<cpy) *op++=*ref++; } 
-		else
-#endif
 		while(op<cpy) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
 		op=cpy;		// correction
 	}
@@ -270,6 +420,3 @@ int LZ4_decode ( char* source,
 	// end of decoding
 	return (int) (((char*)op)-dest);
 }
-
-
-

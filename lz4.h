@@ -34,21 +34,11 @@ extern "C" {
 
 
 //****************************
-// Instructions
-//****************************
-
-// Uncomment next line to ensure that LZ4_Decode will never write in destination buffer more than "decompressedSize" bytes
-// If commented, the decoder may write up to 3 bytes more than decompressedSize, so provide extra room in dest buffer for that
-// Recommendation : keep commented, for improved performance; ensure that destination buffer is at least decompressedSize + 3 Bytes
-// #define SAFEWRITEBUFFER
- 
-
-//****************************
 // Simple Functions
 //****************************
 
-int LZ4_compress (char* source, char* dest, int isize);
-int LZ4_decode   (char* source, char* dest, int isize);
+int LZ4_compress   (char* source, char* dest, int isize);
+int LZ4_uncompress (char* source, char* dest, int osize);
 
 /*
 LZ4_compress :
@@ -57,18 +47,31 @@ LZ4_compress :
 		To avoid any problem, size it to handle worst cases situations (input data not compressible)
 		Worst case size is : "inputsize + 0.4%", with "0.4%" being at least 8 bytes.
 
-LZ4_decode :
-	return : the number of bytes in decoded buffer dest
-	note 1 : isize is the input size, therefore the compressed size
-	note 2 : destination buffer must be already allocated. 
-			The program calling the decoder must know in advance the size of decoded stream to properly allocate the destination buffer
-			Note that, in fast mode, the destination buffer size must be at least "decompressedSize + 3 Bytes"
+LZ4_uncompress :
+	return : the number of bytes read in the source buffer
+			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
+			 This version never writes beyond dest + osize, and is therefore protected against malicious data packets
+	note 1 : osize is the output size, therefore the original size
+	note 2 : destination buffer must be already allocated
 */
 
 
 //****************************
 // Advanced Functions
 //****************************
+
+int LZ4_uncompress_unknownOutputSize (char* source, char* dest, int isize, int maxOutputSize);
+
+/*
+LZ4_uncompress :
+	return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
+			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
+			 This version never writes beyond dest + osize, and is therefore protected against malicious data packets
+	note 1 : isize is the input size, therefore the compressed size
+	note 2 : destination buffer must be already allocated
+	note 3 : this version is slower by up to 10%, and is therefore not recommended for general use
+*/
+
 
 int LZ4_compressCtx(void** ctx, char* source,  char* dest, int isize);
 
@@ -82,6 +85,24 @@ LZ4_compressCtx :
 	Use different pointers for different threads when doing multi-threading.
 
 	note : performance difference is small, mostly noticeable when repetitively calling the compression algorithm on many small segments.
+*/
+
+
+//****************************
+// Deprecated Functions
+//****************************
+
+int LZ4_decode   (char* source, char* dest, int isize);
+
+/*
+LZ4_decode :
+	return : the number of bytes in decoded buffer dest
+	note 1 : isize is the input size, therefore the compressed size
+	note 2 : destination buffer must be already allocated. 
+			The program calling the decoder must know in advance the size of decoded stream to properly allocate the destination buffer
+			The destination buffer size must be at least "decompressedSize + 3 Bytes"
+			This version is unprotected against malicious data packets designed to create buffer overflow errors.
+			It is therefore deprecated, but still present in this version for compatibility.
 */
 
 

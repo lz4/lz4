@@ -63,7 +63,7 @@
 
 #define CHUNKSIZE (8<<20)    // 8 MB
 #define CACHELINE 64
-#define OUT_CHUNKSIZE (CHUNKSIZE + CHUNKSIZE/256 + CACHELINE)
+#define OUT_CHUNKSIZE (CHUNKSIZE + (CHUNKSIZE>>8) + CACHELINE)
 #define ARCHIVE_MAGICNUMBER 0x184C2102
 #define ARCHIVE_MAGICNUMBER_SIZE 4
 
@@ -149,6 +149,8 @@ int decode_file(char* input_filename, char* output_filename)
 	FILE* finput = fopen( input_filename, "rb" ); 
 	FILE* foutput = fopen( output_filename, "wb" ); 
 	size_t uselessRet;
+	int sinkint;
+	U32 nextSize;
 	
 	if (finput==0 ) { printf("Pb opening %s\n", input_filename);  return 4; }
 	if (foutput==0) { printf("Pb opening %s\n", output_filename); return 5; }
@@ -160,24 +162,32 @@ int decode_file(char* input_filename, char* output_filename)
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
 	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { printf("Wrong file : cannot be decoded\n"); return 6; }
+	uselessRet = fread(in_buff, 1, 4, finput);
+	nextSize = *(U32*)in_buff;
 
 	// Main Loop
 	while (1) 
 	{	
-		int outSize;
 		// Read Block
-	    U32 inSize = (U32) fread(in_buff, 1, 4, finput);
-		if( inSize<=0 ) break;
-		inSize = *(U32*)in_buff;
-	    uselessRet = fread( in_buff, 1, inSize, finput);
+	    uselessRet = fread(in_buff, 1, nextSize, finput);
+
+		// Check Next Block
+		uselessRet = (U32) fread(&nextSize, 1, 4, finput);
+		if( uselessRet==0 ) break;
 
 		// Decode Block
-		outSize = LZ4_decode(in_buff, out_buff, inSize);
-		filesize += outSize;
+		sinkint = LZ4_uncompress(in_buff, out_buff, CHUNKSIZE);
+		filesize += CHUNKSIZE;
 
 		// Write Block
-		fwrite(out_buff, 1, outSize, foutput);
+		fwrite(out_buff, 1, CHUNKSIZE, foutput);
 	}
+
+	// Last Block
+    uselessRet = fread(in_buff, 1, nextSize, finput);
+	sinkint = LZ4_uncompress_unknownOutputSize(in_buff, out_buff, nextSize, CHUNKSIZE);
+	filesize += sinkint;
+	fwrite(out_buff, 1, sinkint, foutput);
 
 	// Status
 	printf("Successfully decoded %llu bytes \n", (unsigned long long)filesize);
