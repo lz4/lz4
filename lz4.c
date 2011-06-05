@@ -36,13 +36,13 @@
 
 
 //**************************************
-// Performance parameter                <---------------------------------------------------------
+// Performance parameter               
 //**************************************
 // Lowering this value reduce memory usage
 // It may also improve speed, especially if you reach L1 cache size (32KB for Intel, 64KB for AMD)
 // Expanding memory usage typically improves compression ratio
 // Memory usage formula : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
-#define HASH_LOG 17                        
+#define HASH_LOG 12
 
 
 //**************************************
@@ -125,6 +125,7 @@ int LZ4_compressCtx(void** ctx,
 
 	BYTE	*ip = (BYTE*) source,      /* input pointer */ 
 			*anchor = (BYTE*) source,
+			*incompressible = anchor + INCOMPRESSIBLE,
 			*iend = (BYTE*) source + isize,
 			*ilimit = iend - MINMATCH - 1;
 
@@ -134,7 +135,6 @@ int LZ4_compressCtx(void** ctx,
 	
 	int		len, length, sequence, h;
 	U32		step=1;
-	S32		limit=INCOMPRESSIBLE;
 
 
 	// Init 
@@ -154,23 +154,23 @@ int LZ4_compressCtx(void** ctx,
 		ref = HashTable[h];
 		HashTable[h] = ip;
 
-		// Check Min Match
-		if (( ((ip-ref) >> MAXD_LOG) != 0) || (*(U32*)ref != sequence))
+		// Min Match
+		if (( ((ip-ref) >> MAXD_LOG)) || (*(U32*)ref != sequence))
 		{ 
-			if (ip-anchor>limit) { limit <<= 1; step += 1 + (step>>2); }
-			ip += step; 
+			if (ip>incompressible) { incompressible += INCOMPRESSIBLE << (step >> 1); step++; }
+			ip+=step; 
 			continue; 
-		}	
+		}
+		step=1;
 
-		// catch up
-		if (step>1) { HashTable[h] = ref; ip -= (step-1); step=1; continue; }
-		limit = INCOMPRESSIBLE; 
+		// Catch up
+		while ((ip>anchor) && (*(ip-1)==*(ref-1))) { ip--; ref--; }  
 
 		// Encode Literal length
-		len = length = ip - anchor;
+		length = ip - anchor;
 		orun = op++;
-		if (len>(RUN_MASK-1)) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; } 
-		else *orun = (len<<ML_BITS);
+		if (length>(RUN_MASK-1)) { *orun=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; } 
+		else *orun = (length<<ML_BITS);
 
 		// Copy Literals
 		l_end = op + length;
@@ -183,7 +183,16 @@ int LZ4_compressCtx(void** ctx,
 		// Start Counting
 		ip+=MINMATCH;  ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while ((ip<iend) && (*ref == *ip)) { ip++; ref++; }   // Ends at *ip!=*ref
+		while (ip<(iend-3))
+		{
+			if (*(U32*)ref == *(U32*)ip) { ip+=4; ref+=4; continue; }   
+			if (*(U16*)ref == *(U16*)ip) { ip+=2; ref+=2; }
+			if (*ref == *ip) ip++;
+			goto _endCount;
+		}
+		if ((ip<(iend-1)) && (*(U16*)ref == *(U16*)ip)) { ip+=2; ref+=2; }
+		if ((ip<iend) && (*ref == *ip)) ip++;
+_endCount:
 		len = (ip - anchor);
 		
 		// Encode MatchLength
@@ -192,6 +201,7 @@ int LZ4_compressCtx(void** ctx,
 
 		// Prepare next loop
 		anchor = ip; 
+		incompressible = anchor + INCOMPRESSIBLE;
 	}
 
 	// Encode Last Literals
@@ -222,7 +232,7 @@ int LZ4_uncompress(char* source,
 	BYTE	*ip = (BYTE*) source;
 
 	BYTE	*op = (BYTE*) dest, 
-			*oend=(BYTE*) dest + osize,
+			*oend= op + osize,
 			*ref, *cpy,
 			runcode;
 	

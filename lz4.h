@@ -66,9 +66,9 @@ int LZ4_uncompress_unknownOutputSize (char* source, char* dest, int isize, int m
 LZ4_uncompress :
 	return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
-			 This version never writes beyond dest + osize, and is therefore protected against malicious data packets
+			 This version never writes beyond dest + maxOutputSize, and is therefore protected against malicious data packets
 	note 1 : isize is the input size, therefore the compressed size
-	note 2 : destination buffer must be already allocated
+	note 2 : destination buffer must already be allocated, with at least maxOutputSize bytes
 	note 3 : this version is slower by up to 10%, and is therefore not recommended for general use
 */
 
@@ -88,20 +88,21 @@ LZ4_compressCtx :
 */
 
 
-//****************************
-// Deprecated Functions
-//****************************
+//*********************************
+// Faster Decoding function
+//*********************************
 
-int LZ4_decode   (char* source, char* dest, int isize);
+#define LZ4_uncompress_fast LZ4_decode
+int LZ4_decode (char* source, char* dest, int isize);
 
 /*
-LZ4_decode :
+LZ4_decode : This version is the fastest one, besting LZ4_uncompress by a few %.
 	return : the number of bytes in decoded buffer dest
 	note 1 : isize is the input size, therefore the compressed size
 	note 2 : destination buffer must be already allocated. 
 			The program calling the decoder must know in advance the size of decoded stream to properly allocate the destination buffer
 			The destination buffer size must be at least "decompressedSize + 3 Bytes"
-			This version is unprotected against malicious data packets designed to create buffer overflow errors.
+			This version is **unprotected** against malicious data packets designed to create buffer overflow errors.
 			It is therefore deprecated, but still present in this version for compatibility.
 */
 
