@@ -157,7 +157,7 @@ int decode_file(char* input_filename, char* output_filename)
 
 	// Allocate Memory
 	in_buff = malloc(OUT_CHUNKSIZE);
-	out_buff = malloc(CHUNKSIZE + CACHELINE);
+	out_buff = malloc(CHUNKSIZE);
 	
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);

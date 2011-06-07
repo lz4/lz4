@@ -63,7 +63,7 @@ LZ4_uncompress :
 int LZ4_uncompress_unknownOutputSize (char* source, char* dest, int isize, int maxOutputSize);
 
 /*
-LZ4_uncompress :
+LZ4_uncompress_unknownOutputSize :
 	return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
 			 This version never writes beyond dest + maxOutputSize, and is therefore protected against malicious data packets
@@ -89,21 +89,21 @@ LZ4_compressCtx :
 
 
 //*********************************
-// Faster Decoding function
+// Deprecated decoding function
 //*********************************
 
-#define LZ4_uncompress_fast LZ4_decode
 int LZ4_decode (char* source, char* dest, int isize);
 
 /*
-LZ4_decode : This version is the fastest one, besting LZ4_uncompress by a few %.
+LZ4_decode : This version is faster, but deprecated
 	return : the number of bytes in decoded buffer dest
 	note 1 : isize is the input size, therefore the compressed size
 	note 2 : destination buffer must be already allocated. 
 			The program calling the decoder must know in advance the size of decoded stream to properly allocate the destination buffer
 			The destination buffer size must be at least "decompressedSize + 3 Bytes"
 			This version is **unprotected** against malicious data packets designed to create buffer overflow errors.
-			It is therefore deprecated, but still present in this version for compatibility.
+			It is therefore not recommended in unsecure situations, such as Internet communications.
+			This function is deprecated.
 */
 
 
