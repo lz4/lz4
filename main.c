@@ -54,7 +54,7 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "Demo compression program using LZ4"
-#define COMPRESSOR_VERSION "v1.0"
+#define COMPRESSOR_VERSION ""
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
 #define BINARY_NAME "LZ4.exe"
@@ -75,7 +75,7 @@
 int usage()
 {
 	printf("Usage :\n");
-	printf("      %s [arg] input [output]\n",BINARY_NAME);
+	printf("      %s [arg] input output\n",BINARY_NAME);
 	printf("Arguments :\n");
 	printf(" -c : force compression (default)\n");
 	printf(" -d : force decompression \n");
@@ -227,16 +227,13 @@ int main(int argc, char** argv)
 		argument += command;
 		
 		// display help on usage
-		if( argument[0] =='h' )
-		  { usage(); return 0; }
+		if ( argument[0] =='h' ) { usage(); return 0; }
 
 		// Forced Compression (default)
-		if( argument[0] =='c' )
-		  { compression=1; continue; }
+		if ( argument[0] =='c' ) { compression=1; continue; }
 
 		// Forced Decoding
-		if( argument[0] =='d' )
-		  { decode=1; continue; }
+		if ( argument[0] =='d' ) { decode=1; continue; }
 	}
 
 	// first provided filename is input

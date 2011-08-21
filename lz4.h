@@ -92,18 +92,9 @@ LZ4_compressCtx :
 // Deprecated decoding function
 //*********************************
 
-int LZ4_decode (char* source, char* dest, int isize);
-
 /*
-LZ4_decode : This version is faster, but deprecated
-	return : the number of bytes in decoded buffer dest
-	note 1 : isize is the input size, therefore the compressed size
-	note 2 : destination buffer must be already allocated. 
-			The program calling the decoder must know in advance the size of decoded stream to properly allocate the destination buffer
-			The destination buffer size must be at least "decompressedSize + 3 Bytes"
-			This version is **unprotected** against malicious data packets designed to create buffer overflow errors.
-			It is therefore not recommended in unsecure situations, such as Internet communications.
-			This function is deprecated.
+LZ4_decode : Starting with r12, LZ4_decode() is no longer provided in LZ4 source code.
+			If you need to provide "isize" instead of "osize" to the decoder, please use LZ4_uncompress_unknownOutputSize(), which is safer.
 */
 
 
