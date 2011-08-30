@@ -41,7 +41,7 @@
 // Lowering this value reduce memory usage
 // It may also improve speed, especially if you reach L1 cache size (32KB for Intel, 64KB for AMD)
 // Expanding memory usage typically improves compression ratio
-// Memory usage formula : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
+// Memory usage formula for 32 bits systems : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
 #define HASH_LOG 12
 
 

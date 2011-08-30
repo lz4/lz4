@@ -26,8 +26,9 @@
 //****************************
 // Includes
 //****************************
-#include <stdio.h>     // printf, fopen, fread
+#include <stdio.h>     // fprintf, fopen, fread
 #include <stdlib.h>    // malloc
+#include <string.h>    // strcmp
 #include "lz4.h"
 
 
@@ -74,19 +75,21 @@
 //****************************
 int usage()
 {
-	printf("Usage :\n");
-	printf("      %s [arg] input output\n",BINARY_NAME);
-	printf("Arguments :\n");
-	printf(" -c : force compression (default)\n");
-	printf(" -d : force decompression \n");
-	printf(" -h : help (this text)\n");	
+	fprintf(stderr, "Usage :\n");
+	fprintf(stderr, "      %s [arg] input output\n",BINARY_NAME);
+	fprintf(stderr, "Arguments :\n");
+	fprintf(stderr, " -c : force compression (default)\n");
+	fprintf(stderr, " -d : force decompression \n");
+	fprintf(stderr, " -h : help (this text)\n");	
+	fprintf(stderr, "input  : can be 'stdin' (pipe)  or a filename\n");
+	fprintf(stderr, "output : can be 'stdout' (pipe) or a filename\n");
 	return 0;
 }
 
 
 int badusage()
 {
-	printf("Wrong parameters\n");
+	fprintf(stderr, "Wrong parameters\n");
 	usage();
 	return 0;
 }
@@ -98,11 +101,27 @@ int compress_file(char* input_filename, char* output_filename)
 	U64 compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
 	char* in_buff;
 	char* out_buff;
-	FILE* finput = fopen( input_filename, "rb" ); 
-	FILE* foutput = fopen( output_filename, "wb" ); 
+	FILE* finput;
+	FILE* foutput;
+	char stdinmark[] = "stdin";
+	char stdoutmark[] = "stdout";
+
+	if (!strcmp (input_filename, stdinmark)) {
+		fprintf(stderr, "Using stdin for input\n");
+		finput = stdin;
+	} else {
+		finput = fopen( input_filename, "rb" );
+	}
+
+	if (!strcmp (output_filename, stdoutmark)) {
+		fprintf(stderr, "Using stdout for output\n");
+		foutput = stdout;
+	} else {
+		foutput = fopen( output_filename, "wb" );
+	}
 	
-	if ( finput==0 ) { printf("Pb opening %s\n", input_filename);  return 2; }
-	if ( foutput==0) { printf("Pb opening %s\n", output_filename); return 3; }
+	if ( finput==0 ) { fprintf(stderr, "Pb opening %s\n", input_filename);  return 2; }
+	if ( foutput==0) { fprintf(stderr, "Pb opening %s\n", output_filename); return 3; }
 
 	// Allocate Memory
 	in_buff = malloc(CHUNKSIZE);
@@ -131,7 +150,7 @@ int compress_file(char* input_filename, char* output_filename)
 	}
 
 	// Status
-	printf("Compressed %llu bytes into %llu bytes ==> %.2f%%\n", 
+	fprintf(stderr, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n", 
 		(unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
 
 	fclose(finput);
@@ -146,14 +165,27 @@ int decode_file(char* input_filename, char* output_filename)
 	U64 filesize = 0;
 	char* in_buff;
 	char* out_buff;
-	FILE* finput = fopen( input_filename, "rb" ); 
-	FILE* foutput = fopen( output_filename, "wb" ); 
 	size_t uselessRet;
 	int sinkint;
 	U32 nextSize;
-	
-	if (finput==0 ) { printf("Pb opening %s\n", input_filename);  return 4; }
-	if (foutput==0) { printf("Pb opening %s\n", output_filename); return 5; }
+	FILE* finput;
+	FILE* foutput;
+	char stdinmark[] = "stdin";
+	char stdoutmark[] = "stdout";
+
+	if (!strcmp (input_filename, stdinmark)) {
+		fprintf(stderr, "Using stdin for input\n");
+		finput = stdin;
+	} else {
+		finput = fopen( input_filename, "rb" );
+	}
+
+	if (!strcmp (output_filename, stdoutmark)) {
+		fprintf(stderr, "Using stdout for output\n");
+		foutput = stdout;
+	} else {
+		foutput = fopen( output_filename, "wb" );
+	}
 
 	// Allocate Memory
 	in_buff = malloc(OUT_CHUNKSIZE);
@@ -161,7 +193,7 @@ int decode_file(char* input_filename, char* output_filename)
 	
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
-	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { printf("Wrong file : cannot be decoded\n"); return 6; }
+	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { fprintf(stderr,"Wrong file : cannot be decoded\n"); return 6; }
 	uselessRet = fread(in_buff, 1, 4, finput);
 	nextSize = *(U32*)in_buff;
 
@@ -190,7 +222,7 @@ int decode_file(char* input_filename, char* output_filename)
 	fwrite(out_buff, 1, sinkint, foutput);
 
 	// Status
-	printf("Successfully decoded %llu bytes \n", (unsigned long long)filesize);
+	fprintf(stderr, "Successfully decoded %llu bytes \n", (unsigned long long)filesize);
 
 	fclose(finput);
 	fclose(foutput);
@@ -208,7 +240,7 @@ int main(int argc, char** argv)
 	   *output_filename=0;
 
   // Welcome message
-  printf(WELCOME_MESSAGE);
+  fprintf(stderr, WELCOME_MESSAGE);
 
   if (argc<2) { badusage(); return 1; }
 
