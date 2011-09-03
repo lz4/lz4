@@ -29,6 +29,10 @@
 #include <stdio.h>     // fprintf, fopen, fread
 #include <stdlib.h>    // malloc
 #include <string.h>    // strcmp
+#ifdef _WIN32 
+#include <io.h>		   // _setmode
+#include <fcntl.h>	   // _O_BINARY
+#endif
 #include "lz4.h"
 
 
@@ -54,7 +58,7 @@
 //****************************
 // Constants
 //****************************
-#define COMPRESSOR_NAME "Demo compression program using LZ4"
+#define COMPRESSOR_NAME "Compression CLI using LZ4 algorithm"
 #define COMPRESSOR_VERSION ""
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
@@ -109,6 +113,9 @@ int compress_file(char* input_filename, char* output_filename)
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
 		finput = stdin;
+#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+		_setmode( _fileno( stdin ), _O_BINARY );
+#endif
 	} else {
 		finput = fopen( input_filename, "rb" );
 	}
@@ -116,6 +123,9 @@ int compress_file(char* input_filename, char* output_filename)
 	if (!strcmp (output_filename, stdoutmark)) {
 		fprintf(stderr, "Using stdout for output\n");
 		foutput = stdout;
+#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+		_setmode( _fileno( stdout ), _O_BINARY );
+#endif
 	} else {
 		foutput = fopen( output_filename, "wb" );
 	}
@@ -176,6 +186,9 @@ int decode_file(char* input_filename, char* output_filename)
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
 		finput = stdin;
+#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+		_setmode( _fileno( stdin ), _O_BINARY );
+#endif
 	} else {
 		finput = fopen( input_filename, "rb" );
 	}
@@ -183,6 +196,9 @@ int decode_file(char* input_filename, char* output_filename)
 	if (!strcmp (output_filename, stdoutmark)) {
 		fprintf(stderr, "Using stdout for output\n");
 		foutput = stdout;
+#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+		_setmode( _fileno( stdout ), _O_BINARY );
+#endif
 	} else {
 		foutput = fopen( output_filename, "wb" );
 	}
