@@ -48,7 +48,7 @@
 //**************************************
 // Basic Types
 //**************************************
-#if defined(_MSC_VER) || defined(_WIN32) || defined(__WIN32__)
+#if defined(_MSC_VER) 
 #define BYTE	unsigned __int8
 #define U16		unsigned __int16
 #define U32		unsigned __int32
@@ -161,7 +161,7 @@ int LZ4_compressCtx(void** ctx,
 		step=1;
 
 		// Catch up
-		while ((ip>anchor) && (ip[-1]==ref[-1])) { ip--; ref--; }  
+		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }  
 
 		// Encode Literal length
 		length = ip - anchor;
@@ -221,6 +221,13 @@ _endCount:
 //****************************
 // Decompression CODE
 //****************************
+
+// Note : The decoding functions LZ4_uncompress() and LZ4_uncompress_unknownOutputSize() 
+//		are safe against "buffer overflow" attack type
+//		since they will *never* write outside of the provided output buffer :
+//		they both check this condition *before* writing anything.
+//		A corrupted packet however can make them *read* within the first 64K before the output buffer.
+
 int LZ4_uncompress(char* source, 
 				 char* dest,
 				 int osize)
