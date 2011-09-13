@@ -66,7 +66,7 @@
 // Constants
 //**************************************
 #define MINMATCH 4
-#define INCOMPRESSIBLE 128
+#define SKIPSTRENGTH 6
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -85,7 +85,7 @@
 //**************************************
 struct refTables
 {
-	BYTE* hashTable[HASHTABLESIZE];
+	const BYTE* hashTable[HASHTABLESIZE];
 };
 
 
@@ -107,20 +107,21 @@ int LZ4_compressCtx(void** ctx,
 				 int isize)
 {	
 	struct refTables *srt = (struct refTables *) (*ctx);
-	BYTE**  HashTable;
+	const BYTE**  HashTable;
 
-	BYTE	*ip = (BYTE*) source,       
-			*anchor = ip,
-			*incompressible = anchor + INCOMPRESSIBLE,
-			*iend = ip + isize,
-			*ilimit = iend - MINMATCH;
+	const BYTE* ip = (BYTE*) source;       
+	const BYTE* anchor = ip;
+	const BYTE* ref;
+	const BYTE* const iend = ip + isize;
+	const BYTE* const ilimit = iend - MINMATCH;
 
-	BYTE	*op = (BYTE*) dest,  
-			*ref,
-			*orun, *l_end;
+	BYTE* op = (BYTE*) dest;
+	BYTE* orun;
+	BYTE* l_end;
 	
-	int		len, length;
-	U32		step=1;
+	int len, length;
+	const int skipStrength = SKIPSTRENGTH;
+	U32 skipped = 1U << skipStrength;
 
 
 	// Init 
@@ -133,19 +134,14 @@ int LZ4_compressCtx(void** ctx,
 	memset(HashTable, 0, sizeof(srt->hashTable));
 
 	// Main Loop
-	while (ip < ilimit)
+	while (ip < ilimit+1)
 	{
 		ref = HashTable[HASH_VALUE(ip)];
 		HashTable[HASH_VALUE(ip)] = ip;
 
 		// Min Match
-		if ((ref < ip - MAX_DISTANCE) || (*(U32*)ref != *(U32*)ip))
-		{ 
-			if (ip>incompressible) { incompressible += INCOMPRESSIBLE << (step >> 1); step++; }
-			ip+=step; 
-			continue; 
-		}
-		step=1;
+		if ((ref < ip - MAX_DISTANCE) || (*(U32*)ref != *(U32*)ip)) { ip += (skipped++) >> skipStrength ; continue; }
+		skipped = (1U << skipStrength) + 3;
 
 		// Catch up
 		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }  
@@ -161,6 +157,7 @@ int LZ4_compressCtx(void** ctx,
 		do { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; } while (op<l_end) ;
 		op = l_end;
 
+_next_match:
 		// Encode Offset
 		*(U16*)op = (ip-ref); op+=2;
 
@@ -181,11 +178,18 @@ _endCount:
 		
 		// Encode MatchLength
 		if (len>=(int)ML_MASK) { *orun+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
-		else *orun += len;			
+		else *orun += len;	
+
+		// Test end of chunk
+		if (ip > ilimit) { anchor = ip;  break; }
+
+		// Test next position
+		ref = HashTable[HASH_VALUE(ip)];
+		HashTable[HASH_VALUE(ip)] = ip;
+		if ((ref > ip - (MAX_DISTANCE + 1)) && (*(U32*)ref == *(U32*)ip)) { orun = op++; *orun=0; goto _next_match; }
 
 		// Prepare next loop
-		anchor = ip; 
-		incompressible = anchor + INCOMPRESSIBLE;
+		anchor = ip++; 
 	}
 
 	// Encode Last Literals
@@ -202,6 +206,7 @@ _endCount:
 	// End
 	return (int) (((char*)op)-dest);
 }
+
 
 
 int LZ4_compress(char* source, 
