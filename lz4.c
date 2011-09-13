@@ -92,27 +92,14 @@ struct refTables
 //**************************************
 // Macros
 //**************************************
-#define HASH_FUNCTION(i)	((i * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define HASH_VALUE(p)		HASH_FUNCTION(*(U32*)p)
+#define HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
+#define HASH_VALUE(p)		HASH_FUNCTION(*(U32*)(p))
 
 
 
 //****************************
 // Compression CODE
 //****************************
-
-int LZ4_compress(char* source, 
-				 char* dest,
-				 int isize)
-{
-	void* ctx = malloc(sizeof(struct refTables));
-	int result = LZ4_compressCtx(&ctx, source, dest, isize);
-	free(ctx);
-
-	return result;
-}
-
-
 
 int LZ4_compressCtx(void** ctx,
 				 char* source, 
@@ -214,6 +201,18 @@ _endCount:
 
 	// End
 	return (int) (((char*)op)-dest);
+}
+
+
+int LZ4_compress(char* source, 
+				 char* dest,
+				 int isize)
+{
+	void* ctx = malloc(sizeof(struct refTables));
+	int result = LZ4_compressCtx(&ctx, source, dest, isize);
+	free(ctx);
+
+	return result;
 }
 
 
