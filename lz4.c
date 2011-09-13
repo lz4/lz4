@@ -122,13 +122,13 @@ int LZ4_compressCtx(void** ctx,
 	struct refTables *srt = (struct refTables *) (*ctx);
 	BYTE**  HashTable;
 
-	BYTE	*ip = (BYTE*) source,      /* input pointer */ 
+	BYTE	*ip = (BYTE*) source,       
 			*anchor = ip,
 			*incompressible = anchor + INCOMPRESSIBLE,
 			*iend = ip + isize,
 			*ilimit = iend - MINMATCH;
 
-	BYTE	*op = (BYTE*) dest,  /* output pointer */
+	BYTE	*op = (BYTE*) dest,  
 			*ref,
 			*orun, *l_end;
 	
@@ -171,7 +171,7 @@ int LZ4_compressCtx(void** ctx,
 
 		// Copy Literals
 		l_end = op + length;
-		while (op<l_end)  { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
+		do { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; } while (op<l_end) ;
 		op = l_end;
 
 		// Encode Offset
