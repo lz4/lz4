@@ -1,20 +1,24 @@
 /*
-   Demo compression program using LZ4 compression
-   Copyright (C) Yann Collet 2011,
+    LZ4Demo - Demo CLI program using LZ4 compression
+    Copyright (C) Yann Collet 2011,
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+	You can contact the author at :
+	- LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
+	- LZ4 source repository : http://code.google.com/p/lz4/
 */
 /*
 	Note : this is *only* a demo program, an example to show how LZ4 can be used.
@@ -186,7 +190,7 @@ int decode_file(char* input_filename, char* output_filename)
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
 		finput = stdin;
-#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+#ifdef _WIN32 // need to set stdin/stdout to binary mode
 		_setmode( _fileno( stdin ), _O_BINARY );
 #endif
 	} else {
@@ -196,7 +200,7 @@ int decode_file(char* input_filename, char* output_filename)
 	if (!strcmp (output_filename, stdoutmark)) {
 		fprintf(stderr, "Using stdout for output\n");
 		foutput = stdout;
-#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+#ifdef _WIN32 // need to set stdin/stdout to binary mode
 		_setmode( _fileno( stdout ), _O_BINARY );
 #endif
 	} else {
