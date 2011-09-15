@@ -193,14 +193,14 @@ _endCount:
 	}
 
 	// Encode Last Literals
-	len = length = iend - anchor;
-	if (length)
+	len = iend - anchor;
+	if (len)
 	{
 		orun=op++;
 		if (len>=(int)RUN_MASK) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE) len; } 
 		else *orun = (len<<ML_BITS);
-		for(;length>0;length-=4) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
-		op += length;    // correction
+		while (anchor < iend - 3) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
+		while (anchor < iend ) *op++ = *anchor++;
 	}
 
 	// End
