@@ -111,7 +111,6 @@ int LZ4_compressCtx(void** ctx,
 
 	const BYTE* ip = (BYTE*) source;       
 	const BYTE* anchor = ip;
-	const BYTE* ref;
 	const BYTE* const iend = ip + isize;
 	const BYTE* const ilimit = iend - MINMATCH;
 
@@ -121,7 +120,7 @@ int LZ4_compressCtx(void** ctx,
 	
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
-	U32 skipped = 1U << skipStrength;
+	U32 forwardH;
 
 
 	// Init 
@@ -131,17 +130,34 @@ int LZ4_compressCtx(void** ctx,
 		*ctx = (void*) srt;
 	}
 	HashTable = srt->hashTable;
-	memset(HashTable, 0, sizeof(srt->hashTable));
+	memset((void*)HashTable, 0, sizeof(srt->hashTable));
 
+
+	// First Byte
+	HashTable[HASH_VALUE(ip)] = ip++;
+	forwardH = HASH_VALUE(ip);
+	
 	// Main Loop
-	while (ip < ilimit+1)
+    for ( ; ; ) 
 	{
-		ref = HashTable[HASH_VALUE(ip)];
-		HashTable[HASH_VALUE(ip)] = ip;
+		int segmentSize = (1U << skipStrength) + 3;
+		const BYTE* forwardIp = ip;
+		const BYTE* ref;
 
-		// Min Match
-		if ((ref < ip - MAX_DISTANCE) || (*(U32*)ref != *(U32*)ip)) { ip += (skipped++) >> skipStrength ; continue; }
-		skipped = (1U << skipStrength) + 3;
+		// Find a match
+		do {
+			U32 h = forwardH;
+			int skipped = segmentSize++ >> skipStrength;
+			ip = forwardIp;
+			forwardIp = ip + skipped;
+
+			if (forwardIp > ilimit) { goto _last_literals; }
+
+			forwardH = HASH_VALUE(forwardIp);
+			ref = HashTable[h];
+			HashTable[h] = ip;
+
+		} while ((ref < ip - MAX_DISTANCE) || (*(U32*)ref != *(U32*)ip));
 
 		// Catch up
 		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }  
@@ -190,15 +206,16 @@ _endCount:
 
 		// Prepare next loop
 		anchor = ip++; 
+		forwardH = HASH_VALUE(ip);
 	}
 
+_last_literals:
 	// Encode Last Literals
-	len = iend - anchor;
-	if (len)
+	if (anchor < iend)
 	{
-		orun=op++;
-		if (len>=(int)RUN_MASK) { *orun=(RUN_MASK<<ML_BITS); len-=RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE) len; } 
-		else *orun = (len<<ML_BITS);
+		int lastLitRun = iend - anchor;
+		if (lastLitRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastLitRun-=RUN_MASK; for(; lastLitRun > 254 ; lastLitRun-=255) *op++ = 255; *op++ = (BYTE) lastLitRun; } 
+		else *op++ = (lastLitRun<<ML_BITS);
 		while (anchor < iend - 3) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
 		while (anchor < iend ) *op++ = *anchor++;
 	}
