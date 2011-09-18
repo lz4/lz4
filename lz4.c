@@ -134,8 +134,8 @@ int LZ4_compressCtx(void** ctx,
 
 
 	// First Byte
-	HashTable[HASH_VALUE(ip)] = ip++;
-	forwardH = HASH_VALUE(ip);
+	HashTable[HASH_VALUE(ip)] = ip;
+	ip++; forwardH = HASH_VALUE(ip);
 	
 	// Main Loop
     for ( ; ; ) 
