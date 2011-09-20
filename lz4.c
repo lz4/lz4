@@ -67,6 +67,7 @@
 //**************************************
 #define MINMATCH 4
 #define SKIPSTRENGTH 6
+#define HEAPLIMIT 13
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -106,8 +107,12 @@ int LZ4_compressCtx(void** ctx,
 				 char* dest,
 				 int isize)
 {	
+#if HASH_LOG>HEAPLIMIT
 	struct refTables *srt = (struct refTables *) (*ctx);
 	const BYTE**  HashTable;
+#else
+	const BYTE* HashTable[HASHTABLESIZE] = {0};
+#endif
 
 	const BYTE* ip = (BYTE*) source;       
 	const BYTE* anchor = ip;
@@ -124,6 +129,7 @@ int LZ4_compressCtx(void** ctx,
 
 
 	// Init 
+#if HASH_LOG>HEAPLIMIT
 	if (*ctx == NULL) 
 	{
 		srt = (struct refTables *) malloc ( sizeof(struct refTables) );
@@ -131,6 +137,7 @@ int LZ4_compressCtx(void** ctx,
 	}
 	HashTable = srt->hashTable;
 	memset((void*)HashTable, 0, sizeof(srt->hashTable));
+#endif
 
 
 	// First Byte
@@ -230,12 +237,16 @@ int LZ4_compress(char* source,
 				 char* dest,
 				 int isize)
 {
+#if HASH_LOG>HEAPLIMIT
 	void* ctx = malloc(sizeof(struct refTables));
 	int result = LZ4_compressCtx(&ctx, source, dest, isize);
 	free(ctx);
-
 	return result;
+#else
+	return LZ4_compressCtx(NULL, source, dest, isize);
+#endif
 }
+
 
 
 
