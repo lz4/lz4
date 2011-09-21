@@ -67,7 +67,8 @@
 //**************************************
 #define MINMATCH 4
 #define SKIPSTRENGTH 6
-#define HEAPLIMIT 13
+#define STACKLIMIT 13
+#define HEAPMODE (HASH_LOG>STACKLIMIT)  // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -107,7 +108,7 @@ int LZ4_compressCtx(void** ctx,
 				 char* dest,
 				 int isize)
 {	
-#if HASH_LOG>HEAPLIMIT
+#if HEAPMODE
 	struct refTables *srt = (struct refTables *) (*ctx);
 	const BYTE**  HashTable;
 #else
@@ -120,7 +121,7 @@ int LZ4_compressCtx(void** ctx,
 	const BYTE* const ilimit = iend - MINMATCH;
 
 	BYTE* op = (BYTE*) dest;
-	BYTE* orun;
+	BYTE* token;
 	BYTE* l_end;
 	
 	int len, length;
@@ -129,7 +130,7 @@ int LZ4_compressCtx(void** ctx,
 
 
 	// Init 
-#if HASH_LOG>HEAPLIMIT
+#if HEAPMODE
 	if (*ctx == NULL) 
 	{
 		srt = (struct refTables *) malloc ( sizeof(struct refTables) );
@@ -137,6 +138,8 @@ int LZ4_compressCtx(void** ctx,
 	}
 	HashTable = srt->hashTable;
 	memset((void*)HashTable, 0, sizeof(srt->hashTable));
+#else
+	(void) ctx;
 #endif
 
 
@@ -147,16 +150,16 @@ int LZ4_compressCtx(void** ctx,
 	// Main Loop
     for ( ; ; ) 
 	{
-		int segmentSize = (1U << skipStrength) + 3;
+		int findMatchAttempts = (1U << skipStrength) + 3;
 		const BYTE* forwardIp = ip;
 		const BYTE* ref;
 
 		// Find a match
 		do {
 			U32 h = forwardH;
-			int skipped = segmentSize++ >> skipStrength;
+			int step = findMatchAttempts++ >> skipStrength;
 			ip = forwardIp;
-			forwardIp = ip + skipped;
+			forwardIp = ip + step;
 
 			if (forwardIp > ilimit) { goto _last_literals; }
 
@@ -171,9 +174,9 @@ int LZ4_compressCtx(void** ctx,
 
 		// Encode Literal length
 		length = ip - anchor;
-		orun = op++;
-		if (length>=(int)RUN_MASK) { *orun=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; } 
-		else *orun = (length<<ML_BITS);
+		token = op++;
+		if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; } 
+		else *token = (length<<ML_BITS);
 
 		// Copy Literals
 		l_end = op + length;
@@ -200,8 +203,8 @@ _endCount:
 		len = (ip - anchor);
 		
 		// Encode MatchLength
-		if (len>=(int)ML_MASK) { *orun+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
-		else *orun += len;	
+		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
+		else *token += len;	
 
 		// Test end of chunk
 		if (ip > ilimit) { anchor = ip;  break; }
@@ -209,7 +212,7 @@ _endCount:
 		// Test next position
 		ref = HashTable[HASH_VALUE(ip)];
 		HashTable[HASH_VALUE(ip)] = ip;
-		if ((ref > ip - (MAX_DISTANCE + 1)) && (*(U32*)ref == *(U32*)ip)) { orun = op++; *orun=0; goto _next_match; }
+		if ((ref > ip - (MAX_DISTANCE + 1)) && (*(U32*)ref == *(U32*)ip)) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
 		anchor = ip++; 
@@ -237,7 +240,7 @@ int LZ4_compress(char* source,
 				 char* dest,
 				 int isize)
 {
-#if HASH_LOG>HEAPLIMIT
+#if HEAPMODE
 	void* ctx = malloc(sizeof(struct refTables));
 	int result = LZ4_compressCtx(&ctx, source, dest, isize);
 	free(ctx);
@@ -265,12 +268,14 @@ int LZ4_uncompress(char* source,
 				 int osize)
 {	
 	// Local Variables
-	BYTE	*ip = (BYTE*) source;
+	const BYTE* ip = (const BYTE*) source;
+	BYTE* ref;
 
-	BYTE	*op = (BYTE*) dest, 
-			*olimit = op + osize - 4,
-			*ref, *cpy,
-			runcode;
+	BYTE* op = (BYTE*) dest;
+	BYTE* const olimit = op + osize - 4;
+	BYTE* cpy;
+
+	BYTE token;
 	
 	U32		dec[4]={0, 3, 2, 3};
 	int		length;
@@ -280,8 +285,8 @@ int LZ4_uncompress(char* source,
 	while (1)
 	{
 		// get runlength
-		runcode = *ip++;
-		if ((length=(runcode>>ML_BITS)) == RUN_MASK)  { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
+		token = *ip++;
+		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
 
 		// copy literals
 		ref = op+length;
@@ -293,13 +298,13 @@ int LZ4_uncompress(char* source,
 			break;    // Necessarily EOF
 		}
 		do { *(U32*)op = *(U32*)ip; op+=4; ip+=4; } while (op<ref) ;
-		ip-=(op-ref); op=ref;	// correction
+		ip -= (op-ref); op = ref;	// correction
 
 		// get offset
 		ref -= *(U16*)ip; ip+=2;
 
 		// get matchlength
-		if ((length=(runcode&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
+		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
 		length += MINMATCH;
 
 		// copy repeated sequence
@@ -340,13 +345,15 @@ int LZ4_uncompress_unknownOutputSize(
 				int maxOutputSize)
 {	
 	// Local Variables
-	BYTE	*ip = (BYTE*) source,
-			*iend = ip + isize;
+	const BYTE* ip = (const BYTE*) source;
+	const BYTE* const iend = ip + isize;
+	BYTE* ref;
 
-	BYTE	*op = (BYTE*) dest, 
-			*oend = op + maxOutputSize,
-			*ref, *cpy,
-			runcode;
+	BYTE* op = (BYTE*) dest;
+	BYTE* const oend = op + maxOutputSize;
+	BYTE* cpy;
+
+	BYTE token;
 	
 	U32		dec[4]={0, 3, 2, 3};
 	int		len, length;
@@ -356,8 +363,8 @@ int LZ4_uncompress_unknownOutputSize(
 	while (ip<iend)
 	{
 		// get runlength
-		runcode = *ip++;
-		if ((length=(runcode>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
+		token = *ip++;
+		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
 
 		// copy literals
 		ref = op+length;
@@ -376,7 +383,7 @@ int LZ4_uncompress_unknownOutputSize(
 		ref -= *(U16*)ip; ip+=2;
 
 		// get matchlength
-		if ((length=(runcode&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
+		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
 		length += MINMATCH;
 
 		// copy repeated sequence
