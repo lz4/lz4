@@ -66,6 +66,7 @@
 // Constants
 //**************************************
 #define MINMATCH 4
+#define MINLENGTH 6
 #define SKIPSTRENGTH 6
 #define STACKLIMIT 13
 #define HEAPMODE (HASH_LOG>STACKLIMIT)  // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
@@ -118,7 +119,8 @@ int LZ4_compressCtx(void** ctx,
 	const BYTE* ip = (BYTE*) source;       
 	const BYTE* anchor = ip;
 	const BYTE* const iend = ip + isize;
-	const BYTE* const ilimit = iend - MINMATCH;
+	const BYTE* const ilm = iend - 1;
+	const BYTE* const ilimit = iend - MINMATCH - 1;
 
 	BYTE* op = (BYTE*) dest;
 	BYTE* token;
@@ -130,6 +132,7 @@ int LZ4_compressCtx(void** ctx,
 
 
 	// Init 
+	if (isize<MINLENGTH) goto _last_literals;
 #if HEAPMODE
 	if (*ctx == NULL) 
 	{
@@ -190,15 +193,15 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (ip<(iend-3))
+		while (ip<(iend-4))
 		{
 			if (*(U32*)ref == *(U32*)ip) { ip+=4; ref+=4; continue; }
 			if (*(U16*)ref == *(U16*)ip) { ip+=2; ref+=2; }
 			if (*ref == *ip) ip++;
 			goto _endCount;
 		}
-		if ((ip<(iend-1)) && (*(U16*)ref == *(U16*)ip)) { ip+=2; ref+=2; }
-		if ((ip<iend) && (*ref == *ip)) ip++;
+		if ((ip<(iend-2)) && (*(U16*)ref == *(U16*)ip)) { ip+=2; ref+=2; }
+		if ((ip<iend-1) && (*ref == *ip)) ip++;
 _endCount:
 		len = (ip - anchor);
 		
@@ -207,7 +210,7 @@ _endCount:
 		else *token += len;	
 
 		// Test end of chunk
-		if (ip > ilimit) { anchor = ip;  break; }
+		if (ip > ilimit-1) { anchor = ip;  break; }
 
 		// Test next position
 		ref = HashTable[HASH_VALUE(ip)];
@@ -221,14 +224,13 @@ _endCount:
 
 _last_literals:
 	// Encode Last Literals
-	if (anchor < iend)
 	{
 		int lastLitRun = iend - anchor;
 		if (lastLitRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastLitRun-=RUN_MASK; for(; lastLitRun > 254 ; lastLitRun-=255) *op++ = 255; *op++ = (BYTE) lastLitRun; } 
 		else *op++ = (lastLitRun<<ML_BITS);
 		while (anchor < iend - 3) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
 		while (anchor < iend ) *op++ = *anchor++;
-	}
+	} 
 
 	// End
 	return (int) (((char*)op)-dest);
