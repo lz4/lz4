@@ -66,10 +66,14 @@
 // Constants
 //**************************************
 #define MINMATCH 4
-#define MINLENGTH 6
 #define SKIPSTRENGTH 6
 #define STACKLIMIT 13
 #define HEAPMODE (HASH_LOG>STACKLIMIT)  // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
+#define COPYTOKEN 4
+#define COPYLENGTH 8
+#define LASTLITERALS 5
+#define MFLIMIT 12
+#define MINLENGTH 13
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -95,8 +99,11 @@ struct refTables
 //**************************************
 // Macros
 //**************************************
-#define HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define HASH_VALUE(p)		HASH_FUNCTION(*(U32*)(p))
+#define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
+#define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(*(U32*)(p))
+#define LZ4_COPYPACKET(s,d)		*(U32*)d = *(U32*)s; d+=4; s+=4; *(U32*)d = *(U32*)s; d+=4; s+=4;
+#define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
+#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 
 
 
@@ -119,12 +126,10 @@ int LZ4_compressCtx(void** ctx,
 	const BYTE* ip = (BYTE*) source;       
 	const BYTE* anchor = ip;
 	const BYTE* const iend = ip + isize;
-	const BYTE* const ilm = iend - 1;
-	const BYTE* const ilimit = iend - MINMATCH - 1;
+	const BYTE* const mflimit = iend - MFLIMIT;
+#define matchlimit (iend - LASTLITERALS)
 
 	BYTE* op = (BYTE*) dest;
-	BYTE* token;
-	BYTE* l_end;
 	
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
@@ -147,8 +152,8 @@ int LZ4_compressCtx(void** ctx,
 
 
 	// First Byte
-	HashTable[HASH_VALUE(ip)] = ip;
-	ip++; forwardH = HASH_VALUE(ip);
+	HashTable[LZ4_HASH_VALUE(ip)] = ip;
+	ip++; forwardH = LZ4_HASH_VALUE(ip);
 	
 	// Main Loop
     for ( ; ; ) 
@@ -156,6 +161,7 @@ int LZ4_compressCtx(void** ctx,
 		int findMatchAttempts = (1U << skipStrength) + 3;
 		const BYTE* forwardIp = ip;
 		const BYTE* ref;
+		BYTE* token;
 
 		// Find a match
 		do {
@@ -164,9 +170,9 @@ int LZ4_compressCtx(void** ctx,
 			ip = forwardIp;
 			forwardIp = ip + step;
 
-			if (forwardIp > ilimit) { goto _last_literals; }
+			if (forwardIp > mflimit) { goto _last_literals; }
 
-			forwardH = HASH_VALUE(forwardIp);
+			forwardH = LZ4_HASH_VALUE(forwardIp);
 			ref = HashTable[h];
 			HashTable[h] = ip;
 
@@ -182,9 +188,8 @@ int LZ4_compressCtx(void** ctx,
 		else *token = (length<<ML_BITS);
 
 		// Copy Literals
-		l_end = op + length;
-		do { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; } while (op<l_end) ;
-		op = l_end;
+		LZ4_BLINDCOPY(anchor, op, length);
+
 
 _next_match:
 		// Encode Offset
@@ -193,15 +198,15 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (ip<(iend-4))
+		while (ip<matchlimit-3)
 		{
 			if (*(U32*)ref == *(U32*)ip) { ip+=4; ref+=4; continue; }
 			if (*(U16*)ref == *(U16*)ip) { ip+=2; ref+=2; }
 			if (*ref == *ip) ip++;
 			goto _endCount;
 		}
-		if ((ip<(iend-2)) && (*(U16*)ref == *(U16*)ip)) { ip+=2; ref+=2; }
-		if ((ip<iend-1) && (*ref == *ip)) ip++;
+		if ((ip<(matchlimit-1)) && (*(U16*)ref == *(U16*)ip)) { ip+=2; ref+=2; }
+		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
 		len = (ip - anchor);
 		
@@ -210,26 +215,26 @@ _endCount:
 		else *token += len;	
 
 		// Test end of chunk
-		if (ip > ilimit-1) { anchor = ip;  break; }
+		if (ip > mflimit) { anchor = ip;  break; }
 
 		// Test next position
-		ref = HashTable[HASH_VALUE(ip)];
-		HashTable[HASH_VALUE(ip)] = ip;
+		ref = HashTable[LZ4_HASH_VALUE(ip)];
+		HashTable[LZ4_HASH_VALUE(ip)] = ip;
 		if ((ref > ip - (MAX_DISTANCE + 1)) && (*(U32*)ref == *(U32*)ip)) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
 		anchor = ip++; 
-		forwardH = HASH_VALUE(ip);
+		forwardH = LZ4_HASH_VALUE(ip);
 	}
 
 _last_literals:
 	// Encode Last Literals
 	{
-		int lastLitRun = iend - anchor;
-		if (lastLitRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastLitRun-=RUN_MASK; for(; lastLitRun > 254 ; lastLitRun-=255) *op++ = 255; *op++ = (BYTE) lastLitRun; } 
-		else *op++ = (lastLitRun<<ML_BITS);
-		while (anchor < iend - 3) { *(U32*)op = *(U32*)anchor; op+=4; anchor+=4; }
-		while (anchor < iend ) *op++ = *anchor++;
+		int lastRun = iend - anchor;
+		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
+		else *op++ = (lastRun<<ML_BITS);
+		memcpy(op, anchor, iend - anchor);
+		op += iend-anchor;
 	} 
 
 	// End
@@ -271,21 +276,22 @@ int LZ4_uncompress(char* source,
 {	
 	// Local Variables
 	const BYTE* ip = (const BYTE*) source;
-	BYTE* ref;
 
 	BYTE* op = (BYTE*) dest;
-	BYTE* const olimit = op + osize - 4;
-	BYTE* cpy;
+	BYTE* const oend = op + osize;
+	BYTE* const olimit = op + osize - COPYLENGTH;
 
-	BYTE token;
-	
-	U32		dec[4]={0, 3, 2, 3};
-	int		length;
+	int	dec[4]={0, 3, 2, 3};
 
 
 	// Main Loop
 	while (1)
 	{
+		int	length;
+		BYTE token;
+		BYTE* ref;
+		BYTE* cpy;
+
 		// get runlength
 		token = *ip++;
 		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
@@ -294,12 +300,11 @@ int LZ4_uncompress(char* source,
 		ref = op+length;
 		if (ref > olimit) 
 		{ 
-			if (ref > olimit+4) goto _output_error;
-			while(op <= olimit) { *(U32*)op=*(U32*)ip; op+=4; ip+=4; } 
-			while(op < ref) *op++=*ip++; 
+			if (ref > oend) goto _output_error;
+			memcpy(op, ip, length);
 			break;    // Necessarily EOF
 		}
-		do { *(U32*)op = *(U32*)ip; op+=4; ip+=4; } while (op<ref) ;
+		LZ4_WILDCOPY(ip, op, ref);
 		ip -= (op-ref); op = ref;	// correction
 
 		// get offset
@@ -307,27 +312,28 @@ int LZ4_uncompress(char* source,
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
-		length += MINMATCH;
 
 		// copy repeated sequence
-		cpy = op + length;
-		if (op-ref<4)
+		if (op-ref<COPYTOKEN)
 		{
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
+			*(U32*)op=*(U32*)ref; 
 		} else { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+		cpy = op + length;
 		if (cpy > olimit)
 		{
-			if (cpy > olimit+4) goto _output_error;
-			while(op < cpy-3) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
-			while(op < cpy) *op++=*ref++;
-			if (op >= olimit+4) break;    // Check EOF
+			if (cpy > oend) goto _output_error;	
+			LZ4_WILDCOPY(ref, op, olimit);
+			while(op<cpy) *op++=*ref++;
+			op=cpy;
+			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		do { *(U32*)op = *(U32*)ref; op+=4; ref+=4; } while (op<cpy) ;
+		LZ4_WILDCOPY(ref, op, cpy);
 		op=cpy;		// correction
 	}
 
