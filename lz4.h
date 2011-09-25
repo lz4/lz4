@@ -48,10 +48,10 @@ LZ4_compress :
 		Worst case size is : "inputsize + 0.4%", with "0.4%" being at least 8 bytes.
 
 LZ4_uncompress :
+	osize  : is the output size, therefore the original size
 	return : the number of bytes read in the source buffer
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
 			 This version never writes beyond dest + osize, and is therefore protected against malicious data packets
-	note 1 : osize is the output size, therefore the original size
 	note 2 : destination buffer must be already allocated
 */
 
@@ -64,12 +64,12 @@ int LZ4_uncompress_unknownOutputSize (char* source, char* dest, int isize, int m
 
 /*
 LZ4_uncompress_unknownOutputSize :
+	isize  : is the input size, therefore the compressed size
+	maxOutputSize : is the size of the destination buffer (which must be already allocated)
 	return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
 			 This version never writes beyond dest + maxOutputSize, and is therefore protected against malicious data packets
-	note 1 : isize is the input size, therefore the compressed size
-	note 2 : destination buffer must already be allocated, with at least maxOutputSize bytes
-	note 3 : this version is slower by up to 10%, and is therefore not recommended for general use
+	note   : This version is slower than LZ4_uncompress, and is therefore not recommended for general use
 */
 
 
@@ -85,16 +85,6 @@ LZ4_compressCtx :
 	Use different pointers for different threads when doing multi-threading.
 
 	note : performance difference is small, mostly noticeable when repetitively calling the compression algorithm on many small segments.
-*/
-
-
-//*********************************
-// Deprecated decoding function
-//*********************************
-
-/*
-LZ4_decode : Starting with r12, LZ4_decode() is no longer provided in LZ4 source code.
-			If you need to provide "isize" instead of "osize" to the decoder, please use LZ4_uncompress_unknownOutputSize(), which is safer.
 */
 
 

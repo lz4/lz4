@@ -30,12 +30,12 @@
 //****************************
 // Includes
 //****************************
-#include <stdio.h>     // fprintf, fopen, fread
-#include <stdlib.h>    // malloc
-#include <string.h>    // strcmp
+#include <stdio.h>		// fprintf, fopen, fread
+#include <stdlib.h>		// malloc
+#include <string.h>		// strcmp
 #ifdef _WIN32 
-#include <io.h>		   // _setmode
-#include <fcntl.h>	   // _O_BINARY
+#include <io.h>			// _setmode
+#include <fcntl.h>		// _O_BINARY
 #endif
 #include "lz4.h"
 
@@ -86,11 +86,12 @@ int usage()
 	fprintf(stderr, "Usage :\n");
 	fprintf(stderr, "      %s [arg] input output\n",BINARY_NAME);
 	fprintf(stderr, "Arguments :\n");
-	fprintf(stderr, " -c : force compression (default)\n");
-	fprintf(stderr, " -d : force decompression \n");
+	fprintf(stderr, " -c : compression (default)\n");
+	fprintf(stderr, " -d : decompression \n");
+	fprintf(stderr, " -t : test compressed file \n");
 	fprintf(stderr, " -h : help (this text)\n");	
 	fprintf(stderr, "input  : can be 'stdin' (pipe) or a filename\n");
-	fprintf(stderr, "output : can be 'stdout'(pipe) or a filename or 'nul'\n");
+	fprintf(stderr, "output : can be 'stdout'(pipe) or a filename or 'null'\n");
 	return 0;
 }
 
@@ -113,7 +114,6 @@ int compress_file(char* input_filename, char* output_filename)
 	FILE* foutput;
 	char stdinmark[] = "stdin";
 	char stdoutmark[] = "stdout";
-	char nulmark[] = "nul";
 
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
@@ -131,9 +131,6 @@ int compress_file(char* input_filename, char* output_filename)
 #ifdef _WIN32 // Need to set stdin/stdout to binary mode specifically for windows
 		_setmode( _fileno( stdout ), _O_BINARY );
 #endif
-	} else if (!strcmp (input_filename, nulmark)) {
-		fprintf(stderr, "Sending output to nul\n");
-		foutput = NULL;
 	} else {
 		foutput = fopen( output_filename, "wb" );
 	}
@@ -190,7 +187,6 @@ int decode_file(char* input_filename, char* output_filename)
 	FILE* foutput;
 	char stdinmark[] = "stdin";
 	char stdoutmark[] = "stdout";
-	char nulmark[] = "nul";
 
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
@@ -208,9 +204,6 @@ int decode_file(char* input_filename, char* output_filename)
 #ifdef _WIN32 // need to set stdin/stdout to binary mode
 		_setmode( _fileno( stdout ), _O_BINARY );
 #endif
-	} else if (!strcmp (input_filename, nulmark)) {
-		fprintf(stderr, "Sending output to nul\n");
-		foutput = NULL;
 	} else {
 		foutput = fopen( output_filename, "wb" );
 	}
@@ -221,7 +214,7 @@ int decode_file(char* input_filename, char* output_filename)
 	
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
-	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { fprintf(stderr,"Wrong file : cannot be decoded\n"); return 6; }
+	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { fprintf(stderr,"Unrecognized header : file cannot be decoded\n"); return 6; }
 	uselessRet = fread(in_buff, 1, 4, finput);
 	nextSize = *(U32*)in_buff;
 
@@ -264,8 +257,14 @@ int main(int argc, char** argv)
   int i,
 	  compression=1,   // default action if no argument
 	  decode=0;
-  char *input_filename=0,
-	   *output_filename=0;
+  char* input_filename=0;
+  char* output_filename=0;
+#ifdef _WIN32 
+  char nulmark[] = "nul";
+#else
+  char nulmark[] = "/dev/null";
+#endif
+  char nullinput[] = "null";
 
   // Welcome message
   fprintf(stderr, WELCOME_MESSAGE);
@@ -286,21 +285,29 @@ int main(int argc, char** argv)
 	{
 		argument += command;
 		
-		// display help on usage
+		// Display help on usage
 		if ( argument[0] =='h' ) { usage(); return 0; }
 
-		// Forced Compression (default)
+		// Compression (default)
 		if ( argument[0] =='c' ) { compression=1; continue; }
 
-		// Forced Decoding
+		// Decoding
 		if ( argument[0] =='d' ) { decode=1; continue; }
+
+		// Test
+		if ( argument[0] =='t' ) { decode=1; output_filename=nulmark; continue; }
 	}
 
 	// first provided filename is input
     if (!input_filename) { input_filename=argument; continue; }
 
 	// second provided filename is output
-    if (!output_filename) { output_filename=argument; continue; }
+    if (!output_filename) 
+	{ 
+		output_filename=argument; 
+		if (!strcmp (output_filename, nullinput)) output_filename = nulmark;
+		continue; 
+	}
   }
 
   // No input filename ==> Error
