@@ -72,8 +72,8 @@
 #define COPYTOKEN 4
 #define COPYLENGTH 8
 #define LASTLITERALS 5
-#define MFLIMIT 12
-#define MINLENGTH 13
+#define MFLIMIT (COPYLENGTH+MINMATCH)
+#define MINLENGTH (MFLIMIT+1)
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -302,6 +302,7 @@ int LZ4_uncompress(char* source,
 		{ 
 			if (ref > oend) goto _output_error;
 			memcpy(op, ip, length);
+			ip+=length;
 			break;    // Necessarily EOF
 		}
 		LZ4_WILDCOPY(ip, op, ref);

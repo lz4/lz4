@@ -89,8 +89,8 @@ int usage()
 	fprintf(stderr, " -c : force compression (default)\n");
 	fprintf(stderr, " -d : force decompression \n");
 	fprintf(stderr, " -h : help (this text)\n");	
-	fprintf(stderr, "input  : can be 'stdin' (pipe)  or a filename\n");
-	fprintf(stderr, "output : can be 'stdout' (pipe) or a filename\n");
+	fprintf(stderr, "input  : can be 'stdin' (pipe) or a filename\n");
+	fprintf(stderr, "output : can be 'stdout'(pipe) or a filename or 'nul'\n");
 	return 0;
 }
 
@@ -113,11 +113,12 @@ int compress_file(char* input_filename, char* output_filename)
 	FILE* foutput;
 	char stdinmark[] = "stdin";
 	char stdoutmark[] = "stdout";
+	char nulmark[] = "nul";
 
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
 		finput = stdin;
-#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+#ifdef _WIN32 // Need to set stdin/stdout to binary mode specifically for windows
 		_setmode( _fileno( stdin ), _O_BINARY );
 #endif
 	} else {
@@ -127,9 +128,12 @@ int compress_file(char* input_filename, char* output_filename)
 	if (!strcmp (output_filename, stdoutmark)) {
 		fprintf(stderr, "Using stdout for output\n");
 		foutput = stdout;
-#ifdef _WIN32 /* We need to set stdin/stdout to binary mode. Damn windows. */
+#ifdef _WIN32 // Need to set stdin/stdout to binary mode specifically for windows
 		_setmode( _fileno( stdout ), _O_BINARY );
 #endif
+	} else if (!strcmp (input_filename, nulmark)) {
+		fprintf(stderr, "Sending output to nul\n");
+		foutput = NULL;
 	} else {
 		foutput = fopen( output_filename, "wb" );
 	}
@@ -186,6 +190,7 @@ int decode_file(char* input_filename, char* output_filename)
 	FILE* foutput;
 	char stdinmark[] = "stdin";
 	char stdoutmark[] = "stdout";
+	char nulmark[] = "nul";
 
 	if (!strcmp (input_filename, stdinmark)) {
 		fprintf(stderr, "Using stdin for input\n");
@@ -203,6 +208,9 @@ int decode_file(char* input_filename, char* output_filename)
 #ifdef _WIN32 // need to set stdin/stdout to binary mode
 		_setmode( _fileno( stdout ), _O_BINARY );
 #endif
+	} else if (!strcmp (input_filename, nulmark)) {
+		fprintf(stderr, "Sending output to nul\n");
+		foutput = NULL;
 	} else {
 		foutput = fopen( output_filename, "wb" );
 	}
