@@ -38,9 +38,9 @@
 //**************************************
 // Performance parameter               
 //**************************************
-// Increasing this value improves compression ratio
-// Lowering this value reduces memory usage
-// Lowering may also improve speed, typically on reaching cache size limits (L1 32KB for Intel, 64KB for AMD)
+// Lowering this value reduce memory usage
+// It may also improve speed, especially if you reach L1 cache size (32KB for Intel, 64KB for AMD)
+// Expanding memory usage typically improves compression ratio
 // Memory usage formula for 32 bits systems : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
 #define HASH_LOG 12
 
@@ -72,8 +72,8 @@
 #define COPYTOKEN 4
 #define COPYLENGTH 8
 #define LASTLITERALS 5
-#define MFLIMIT (COPYLENGTH+MINMATCH)
-#define MINLENGTH (MFLIMIT+1)
+#define MFLIMIT 12
+#define MINLENGTH 13
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -102,6 +102,7 @@ struct refTables
 #define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
 #define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(*(U32*)(p))
 #define LZ4_COPYPACKET(s,d)		*(U32*)d = *(U32*)s; d+=4; s+=4; *(U32*)d = *(U32*)s; d+=4; s+=4;
+#define LZ4_COPY(s,d,e)			while (d<e) { LZ4_COPYPACKET(s,d) }
 #define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 
@@ -118,7 +119,7 @@ int LZ4_compressCtx(void** ctx,
 {	
 #if HEAPMODE
 	struct refTables *srt = (struct refTables *) (*ctx);
-	const BYTE**  HashTable;
+	const BYTE** HashTable;
 #else
 	const BYTE* HashTable[HASHTABLESIZE] = {0};
 #endif
@@ -276,37 +277,36 @@ int LZ4_uncompress(char* source,
 {	
 	// Local Variables
 	const BYTE* ip = (const BYTE*) source;
+	BYTE* ref;
 
 	BYTE* op = (BYTE*) dest;
 	BYTE* const oend = op + osize;
-	BYTE* const olimit = op + osize - COPYLENGTH;
+	BYTE* cpy;
 
-	int	dec[4]={0, 3, 2, 3};
+	BYTE token;
+	
+	U32		dec[4]={0, 3, 2, 3};
+	int		len, length;
 
 
 	// Main Loop
 	while (1)
 	{
-		int	length;
-		BYTE token;
-		BYTE* ref;
-		BYTE* cpy;
-
 		// get runlength
 		token = *ip++;
-		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
+		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
 
 		// copy literals
 		ref = op+length;
-		if (ref > olimit) 
+		if (ref>oend-COPYLENGTH) 
 		{ 
 			if (ref > oend) goto _output_error;
 			memcpy(op, ip, length);
-			ip+=length;
+			ip += length;
 			break;    // Necessarily EOF
 		}
-		LZ4_WILDCOPY(ip, op, ref);
-		ip -= (op-ref); op = ref;	// correction
+		LZ4_WILDCOPY(ip, op, ref); ip -= (op-ref); op = ref;
+
 
 		// get offset
 		ref -= *(U16*)ip; ip+=2;
@@ -325,10 +325,10 @@ int LZ4_uncompress(char* source,
 			*(U32*)op=*(U32*)ref; 
 		} else { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
 		cpy = op + length;
-		if (cpy > olimit)
+		if (cpy > oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY(ref, op, olimit);
+			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
@@ -377,43 +377,44 @@ int LZ4_uncompress_unknownOutputSize(
 
 		// copy literals
 		ref = op+length;
-		if (ref>oend-4) 
+		if (ref>oend-COPYLENGTH) 
 		{ 
 			if (ref > oend) goto _output_error;
-			while(op<oend-3) { *(U32*)op=*(U32*)ip; op+=4; ip+=4; } 
-			while(op<ref) *op++=*ip++; 
+			memcpy(op, ip, length);
+			ip += length;
 			break;    // Necessarily EOF
 		}
-		do { *(U32*)op = *(U32*)ip; op+=4; ip+=4; } while (op<ref) ;
-		ip-=(op-ref); op=ref;	// correction
+		LZ4_WILDCOPY(ip, op, ref); ip -= (op-ref); op = ref;
 		if (ip>=iend) break;    // check EOF
+
 
 		// get offset
 		ref -= *(U16*)ip; ip+=2;
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
-		length += MINMATCH;
 
 		// copy repeated sequence
-		cpy = op + length;
-		if (op-ref<4)
+		if (op-ref<COPYTOKEN)
 		{
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
+			*(U32*)op=*(U32*)ref; 
 		} else { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
-		if (cpy>oend-4)
+		cpy = op + length;
+		if (cpy>oend-COPYLENGTH)
 		{
-			if (cpy > oend) goto _output_error;
-			while(op<cpy-3) { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+			if (cpy > oend) goto _output_error;	
+			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
-			if (op>=oend) break;    // Check EOF
+			op=cpy;
+			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		do { *(U32*)op = *(U32*)ref; op+=4; ref+=4; } while (op<cpy) ;
+		LZ4_WILDCOPY(ref, op, cpy);
 		op=cpy;		// correction
 	}
 
