@@ -38,9 +38,9 @@
 //**************************************
 // Performance parameter               
 //**************************************
-// Lowering this value reduce memory usage
-// It may also improve speed, especially if you reach L1 cache size (32KB for Intel, 64KB for AMD)
-// Expanding memory usage typically improves compression ratio
+// Increasing this value improves compression ratio
+// Lowering this value reduces memory usage
+// Lowering may also improve speed, typically on reaching cache size limits (L1 32KB for Intel, 64KB for AMD)
 // Memory usage formula for 32 bits systems : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
 #define HASH_LOG 12
 
@@ -72,8 +72,8 @@
 #define COPYTOKEN 4
 #define COPYLENGTH 8
 #define LASTLITERALS 5
-#define MFLIMIT 12
-#define MINLENGTH 13
+#define MFLIMIT (COPYLENGTH+MINMATCH)
+#define MINLENGTH (MFLIMIT+1)
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -102,7 +102,6 @@ struct refTables
 #define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
 #define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(*(U32*)(p))
 #define LZ4_COPYPACKET(s,d)		*(U32*)d = *(U32*)s; d+=4; s+=4; *(U32*)d = *(U32*)s; d+=4; s+=4;
-#define LZ4_COPY(s,d,e)			while (d<e) { LZ4_COPYPACKET(s,d) }
 #define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 
@@ -285,8 +284,8 @@ int LZ4_uncompress(char* source,
 
 	BYTE token;
 	
-	U32		dec[4]={0, 3, 2, 3};
-	int		len, length;
+	U32	dec[4]={0, 3, 2, 3};
+	int	len, length;
 
 
 	// Main Loop
@@ -364,8 +363,8 @@ int LZ4_uncompress_unknownOutputSize(
 
 	BYTE token;
 	
-	U32		dec[4]={0, 3, 2, 3};
-	int		len, length;
+	U32	dec[4]={0, 3, 2, 3};
+	int	len, length;
 
 
 	// Main Loop
