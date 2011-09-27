@@ -169,7 +169,7 @@ int compress_file(char* input_filename, char* output_filename)
 
 		// Compress Block
 		outSize = LZ4_compress(in_buff, out_buff+4, inSize);
-		* (unsigned long*) out_buff = outSize;
+		* (unsigned int*) out_buff = outSize;
 		compressedfilesize += outSize+4;
 
 		// Write Block
@@ -202,7 +202,7 @@ int decode_file(char* input_filename, char* output_filename)
 	char* out_buff;
 	size_t uselessRet;
 	int sinkint;
-	unsigned long nextSize;
+	unsigned int nextSize;
 	FILE* finput;
 	FILE* foutput;
 	clock_t start, end;
