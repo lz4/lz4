@@ -33,6 +33,7 @@
 #include <stdio.h>		// fprintf, fopen, fread
 #include <stdlib.h>		// malloc
 #include <string.h>		// strcmp
+#include <time.h>		// clock
 #ifdef _WIN32 
 #include <io.h>			// _setmode
 #include <fcntl.h>		// _O_BINARY
@@ -43,20 +44,7 @@
 //**************************************
 // Basic Types
 //**************************************
-#if defined(_MSC_VER) || defined(_WIN32) || defined(__WIN32__)
-#define BYTE	unsigned __int8
-#define U16		unsigned __int16
-#define U32		unsigned __int32
-#define S32		__int32
-#define U64		unsigned __int64
-#else
-#include <stdint.h>
-#define BYTE	uint8_t
-#define U16		uint16_t
-#define U32		uint32_t
-#define S32		int32_t
-#define U64		uint64_t
-#endif
+
 
 
 //****************************
@@ -66,7 +54,7 @@
 #define COMPRESSOR_VERSION ""
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
-#define BINARY_NAME "LZ4.exe"
+#define BINARY_NAME "lz4demo.exe"
 #define EXTENSION ".lz4"
 #define WELCOME_MESSAGE "*** %s %s, by %s (%s) ***\n", COMPRESSOR_NAME, COMPRESSOR_VERSION, AUTHOR, COMPILED
 
@@ -77,73 +65,97 @@
 #define ARCHIVE_MAGICNUMBER_SIZE 4
 
 
+//**************************************
+// MACRO
+//**************************************
+#define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
+
+
 
 //****************************
 // Functions
 //****************************
 int usage()
 {
-	fprintf(stderr, "Usage :\n");
-	fprintf(stderr, "      %s [arg] input output\n",BINARY_NAME);
-	fprintf(stderr, "Arguments :\n");
-	fprintf(stderr, " -c : compression (default)\n");
-	fprintf(stderr, " -d : decompression \n");
-	fprintf(stderr, " -t : test compressed file \n");
-	fprintf(stderr, " -h : help (this text)\n");	
-	fprintf(stderr, "input  : can be 'stdin' (pipe) or a filename\n");
-	fprintf(stderr, "output : can be 'stdout'(pipe) or a filename or 'null'\n");
+	DISPLAY( "Usage :\n");
+	DISPLAY( "      %s [arg] input output\n",BINARY_NAME);
+	DISPLAY( "Arguments :\n");
+	DISPLAY( " -c : compression (default)\n");
+	DISPLAY( " -d : decompression \n");
+	DISPLAY( " -t : test compressed file \n");
+	DISPLAY( " -h : help (this text)\n");	
+	DISPLAY( "input  : can be 'stdin' (pipe) or a filename\n");
+	DISPLAY( "output : can be 'stdout'(pipe) or a filename or 'null'\n");
 	return 0;
 }
 
 
 int badusage()
 {
-	fprintf(stderr, "Wrong parameters\n");
+	DISPLAY("Wrong parameters\n");
 	usage();
 	return 0;
 }
 
 
-int compress_file(char* input_filename, char* output_filename)
+
+int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, FILE** pfoutput)
 {
-	U64 filesize = 0;
-	U64 compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
-	char* in_buff;
-	char* out_buff;
-	FILE* finput;
-	FILE* foutput;
 	char stdinmark[] = "stdin";
 	char stdoutmark[] = "stdout";
 
 	if (!strcmp (input_filename, stdinmark)) {
-		fprintf(stderr, "Using stdin for input\n");
-		finput = stdin;
+		DISPLAY( "Using stdin for input\n");
+		*pfinput = stdin;
 #ifdef _WIN32 // Need to set stdin/stdout to binary mode specifically for windows
 		_setmode( _fileno( stdin ), _O_BINARY );
 #endif
 	} else {
-		finput = fopen( input_filename, "rb" );
+		*pfinput = fopen( input_filename, "rb" );
 	}
 
 	if (!strcmp (output_filename, stdoutmark)) {
-		fprintf(stderr, "Using stdout for output\n");
-		foutput = stdout;
+		DISPLAY( "Using stdout for output\n");
+		*pfoutput = stdout;
 #ifdef _WIN32 // Need to set stdin/stdout to binary mode specifically for windows
 		_setmode( _fileno( stdout ), _O_BINARY );
 #endif
 	} else {
-		foutput = fopen( output_filename, "wb" );
+		*pfoutput = fopen( output_filename, "wb" );
 	}
 	
-	if ( finput==0 ) { fprintf(stderr, "Pb opening %s\n", input_filename);  return 2; }
-	if ( foutput==0) { fprintf(stderr, "Pb opening %s\n", output_filename); return 3; }
+	if ( *pfinput==0 ) { DISPLAY( "Pb opening %s\n", input_filename);  return 2; }
+	if ( *pfoutput==0) { DISPLAY( "Pb opening %s\n", output_filename); return 3; }
 
+	return 0;
+}
+
+
+
+int compress_file(char* input_filename, char* output_filename)
+{
+	unsigned long long filesize = 0;
+	unsigned long long compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
+	char* in_buff;
+	char* out_buff;
+	FILE* finput;
+	FILE* foutput;
+	int r;
+	clock_t start, end;
+
+
+	// Init
+	start = clock();
+	r = get_fileHandle(input_filename, output_filename, &finput, &foutput);
+	if (r) return r;
+	
 	// Allocate Memory
-	in_buff = malloc(CHUNKSIZE);
-	out_buff = malloc(OUT_CHUNKSIZE);
+	in_buff = (char*)malloc(CHUNKSIZE);
+	out_buff = (char*)malloc(OUT_CHUNKSIZE);
+	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 8; }
 	
 	// Write Archive Header
-	*(U32*)out_buff = ARCHIVE_MAGICNUMBER;
+	*(unsigned long*)out_buff = ARCHIVE_MAGICNUMBER;
 	fwrite(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, foutput);
 
 	// Main Loop
@@ -157,7 +169,7 @@ int compress_file(char* input_filename, char* output_filename)
 
 		// Compress Block
 		outSize = LZ4_compress(in_buff, out_buff+4, inSize);
-		* (U32*) out_buff = outSize;
+		* (unsigned long*) out_buff = outSize;
 		compressedfilesize += outSize+4;
 
 		// Write Block
@@ -165,9 +177,17 @@ int compress_file(char* input_filename, char* output_filename)
 	}
 
 	// Status
-	fprintf(stderr, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n", 
+	end = clock();
+	DISPLAY( "Compressed %llu bytes into %llu bytes ==> %.2f%%\n", 
 		(unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
+	{
+		double seconds = (double)(end - start)/CLOCKS_PER_SEC;
+		DISPLAY( "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
+	}
 
+	// Close & Free
+	free(in_buff);
+	free(out_buff);
 	fclose(finput);
 	fclose(foutput);
 
@@ -177,46 +197,33 @@ int compress_file(char* input_filename, char* output_filename)
 
 int decode_file(char* input_filename, char* output_filename)
 {
-	U64 filesize = 0;
+	unsigned long long filesize = 0;
 	char* in_buff;
 	char* out_buff;
 	size_t uselessRet;
 	int sinkint;
-	U32 nextSize;
+	unsigned long nextSize;
 	FILE* finput;
 	FILE* foutput;
-	char stdinmark[] = "stdin";
-	char stdoutmark[] = "stdout";
+	clock_t start, end;
+	int r;
 
-	if (!strcmp (input_filename, stdinmark)) {
-		fprintf(stderr, "Using stdin for input\n");
-		finput = stdin;
-#ifdef _WIN32 // need to set stdin/stdout to binary mode
-		_setmode( _fileno( stdin ), _O_BINARY );
-#endif
-	} else {
-		finput = fopen( input_filename, "rb" );
-	}
 
-	if (!strcmp (output_filename, stdoutmark)) {
-		fprintf(stderr, "Using stdout for output\n");
-		foutput = stdout;
-#ifdef _WIN32 // need to set stdin/stdout to binary mode
-		_setmode( _fileno( stdout ), _O_BINARY );
-#endif
-	} else {
-		foutput = fopen( output_filename, "wb" );
-	}
+	// Init
+	start = clock();
+	r = get_fileHandle(input_filename, output_filename, &finput, &foutput);
+	if (r) return r;
 
 	// Allocate Memory
-	in_buff = malloc(OUT_CHUNKSIZE);
-	out_buff = malloc(CHUNKSIZE);
+	in_buff = (char*)malloc(OUT_CHUNKSIZE);
+	out_buff = (char*)malloc(CHUNKSIZE);
+	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 7; }
 	
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
-	if (*(U32*)out_buff != ARCHIVE_MAGICNUMBER) { fprintf(stderr,"Unrecognized header : file cannot be decoded\n"); return 6; }
+	if (*(unsigned long*)out_buff != ARCHIVE_MAGICNUMBER) { DISPLAY("Unrecognized header : file cannot be decoded\n"); return 6; }
 	uselessRet = fread(in_buff, 1, 4, finput);
-	nextSize = *(U32*)in_buff;
+	nextSize = *(unsigned long*)in_buff;
 
 	// Main Loop
 	while (1) 
@@ -225,7 +232,7 @@ int decode_file(char* input_filename, char* output_filename)
 	    uselessRet = fread(in_buff, 1, nextSize, finput);
 
 		// Check Next Block
-		uselessRet = (U32) fread(&nextSize, 1, 4, finput);
+		uselessRet = (unsigned long) fread(&nextSize, 1, 4, finput);
 		if( uselessRet==0 ) break;
 
 		// Decode Block
@@ -243,8 +250,16 @@ int decode_file(char* input_filename, char* output_filename)
 	fwrite(out_buff, 1, sinkint, foutput);
 
 	// Status
-	fprintf(stderr, "Successfully decoded %llu bytes \n", (unsigned long long)filesize);
+	end = clock();
+	DISPLAY( "Successfully decoded %llu bytes \n", (unsigned long long)filesize);
+	{
+		double seconds = (double)(end - start)/CLOCKS_PER_SEC;
+		DISPLAY( "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
+	}
 
+	// Close & Free
+	free(in_buff);
+	free(out_buff);
 	fclose(finput);
 	fclose(foutput);
 
@@ -267,7 +282,7 @@ int main(int argc, char** argv)
   char nullinput[] = "null";
 
   // Welcome message
-  fprintf(stderr, WELCOME_MESSAGE);
+  DISPLAY( WELCOME_MESSAGE);
 
   if (argc<2) { badusage(); return 1; }
 

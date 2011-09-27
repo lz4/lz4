@@ -95,13 +95,32 @@ struct refTables
 	const BYTE* hashTable[HASHTABLESIZE];
 };
 
+#ifdef __GNUC__
+#  define _PACKED __attribute__ ((packed))
+#else
+#  define _PACKED
+#endif
+
+typedef struct _U32_S
+{
+	U32 v;
+} _PACKED U32_S;
+
+typedef struct _U16_S
+{
+	U16 v;
+} _PACKED U16_S;
+
+#define A32(x) (((U32_S *)(x))->v)
+#define A16(x) (((U16_S *)(x))->v)
+
 
 //**************************************
 // Macros
 //**************************************
 #define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(*(U32*)(p))
-#define LZ4_COPYPACKET(s,d)		*(U32*)d = *(U32*)s; d+=4; s+=4; *(U32*)d = *(U32*)s; d+=4; s+=4;
+#define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(A32(p))
+#define LZ4_COPYPACKET(s,d)		A32(d) = A32(s); d+=4; s+=4; A32(d) = A32(s); d+=4; s+=4;
 #define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 
@@ -176,7 +195,7 @@ int LZ4_compressCtx(void** ctx,
 			ref = HashTable[h];
 			HashTable[h] = ip;
 
-		} while ((ref < ip - MAX_DISTANCE) || (*(U32*)ref != *(U32*)ip));
+		} while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
 
 		// Catch up
 		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }  
@@ -193,19 +212,19 @@ int LZ4_compressCtx(void** ctx,
 
 _next_match:
 		// Encode Offset
-		*(U16*)op = (ip-ref); op+=2;
+		A16(op) = (ip-ref); op+=2;
 
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
 		while (ip<matchlimit-3)
 		{
-			if (*(U32*)ref == *(U32*)ip) { ip+=4; ref+=4; continue; }
-			if (*(U16*)ref == *(U16*)ip) { ip+=2; ref+=2; }
+			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
+			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
 			if (*ref == *ip) ip++;
 			goto _endCount;
 		}
-		if ((ip<(matchlimit-1)) && (*(U16*)ref == *(U16*)ip)) { ip+=2; ref+=2; }
+		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
 		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
 		len = (ip - anchor);
@@ -220,7 +239,7 @@ _endCount:
 		// Test next position
 		ref = HashTable[LZ4_HASH_VALUE(ip)];
 		HashTable[LZ4_HASH_VALUE(ip)] = ip;
-		if ((ref > ip - (MAX_DISTANCE + 1)) && (*(U32*)ref == *(U32*)ip)) { token = op++; *token=0; goto _next_match; }
+		if ((ref > ip - (MAX_DISTANCE + 1)) && (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
 		anchor = ip++; 
@@ -308,7 +327,7 @@ int LZ4_uncompress(char* source,
 
 
 		// get offset
-		ref -= *(U16*)ip; ip+=2;
+		ref -= A16(ip); ip+=2;
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
@@ -321,8 +340,8 @@ int LZ4_uncompress(char* source,
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
-			*(U32*)op=*(U32*)ref; 
-		} else { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+			A32(op)=A32(ref); 
+		} else { A32(op)=A32(ref); op+=4; ref+=4; }
 		cpy = op + length;
 		if (cpy > oend-COPYLENGTH)
 		{
@@ -388,7 +407,7 @@ int LZ4_uncompress_unknownOutputSize(
 
 
 		// get offset
-		ref -= *(U16*)ip; ip+=2;
+		ref -= A16(ip); ip+=2;
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
@@ -401,8 +420,8 @@ int LZ4_uncompress_unknownOutputSize(
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
-			*(U32*)op=*(U32*)ref; 
-		} else { *(U32*)op=*(U32*)ref; op+=4; ref+=4; }
+			A32(op)=A32(ref); 
+		} else { A32(op)=A32(ref); op+=4; ref+=4; }
 		cpy = op + length;
 		if (cpy>oend-COPYLENGTH)
 		{
