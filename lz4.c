@@ -236,6 +236,9 @@ _endCount:
 		// Test end of chunk
 		if (ip > mflimit) { anchor = ip;  break; }
 
+		// Fill table
+		HashTable[LZ4_HASH_VALUE(ip-2)] = ip-2;
+
 		// Test next position
 		ref = HashTable[LZ4_HASH_VALUE(ip)];
 		HashTable[LZ4_HASH_VALUE(ip)] = ip;
@@ -262,16 +265,157 @@ _last_literals:
 
 
 
+// Note : this function is valid only if isize < LZ4_64KLIMIT
+#define LZ4_64KLIMIT ((1U<<16) + (MFLIMIT-1))
+#define HASHLOG64K (HASH_LOG+1)
+#define LZ4_HASH64K_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASHLOG64K))
+#define LZ4_HASH64K_VALUE(p)	LZ4_HASH64K_FUNCTION(A32(p))
+int LZ4_compress64kCtx(void** ctx,
+				 char* source, 
+				 char* dest,
+				 int isize)
+{	
+#if HEAPMODE
+	struct refTables *srt = (struct refTables *) (*ctx);
+	U16* HashTable;
+#else
+	U16 HashTable[HASHTABLESIZE<<1] = {0};
+#endif
+
+	const BYTE* ip = (BYTE*) source;       
+	const BYTE* anchor = ip;
+	const BYTE* const base = ip;
+	const BYTE* const iend = ip + isize;
+	const BYTE* const mflimit = iend - MFLIMIT;
+#define matchlimit (iend - LASTLITERALS)
+
+	BYTE* op = (BYTE*) dest;
+	
+	int len, length;
+	const int skipStrength = SKIPSTRENGTH;
+	U32 forwardH;
+
+
+	// Init 
+	if (isize<MINLENGTH) goto _last_literals;
+#if HEAPMODE
+	if (*ctx == NULL) 
+	{
+		srt = (struct refTables *) malloc ( sizeof(struct refTables) );
+		*ctx = (void*) srt;
+	}
+	HashTable = (U16*)(srt->hashTable);
+	memset((void*)HashTable, 0, sizeof(srt->hashTable));
+#else
+	(void) ctx;
+#endif
+
+
+	// First Byte
+	ip++; forwardH = LZ4_HASH64K_VALUE(ip);
+	
+	// Main Loop
+    for ( ; ; ) 
+	{
+		int findMatchAttempts = (1U << skipStrength) + 3;
+		const BYTE* forwardIp = ip;
+		const BYTE* ref;
+		BYTE* token;
+
+		// Find a match
+		do {
+			U32 h = forwardH;
+			int step = findMatchAttempts++ >> skipStrength;
+			ip = forwardIp;
+			forwardIp = ip + step;
+
+			if (forwardIp > mflimit) { goto _last_literals; }
+
+			forwardH = LZ4_HASH64K_VALUE(forwardIp);
+			ref = base + HashTable[h];
+			HashTable[h] = ip - base;
+
+		} while (A32(ref) != A32(ip));
+
+		// Catch up
+		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }  
+
+		// Encode Literal length
+		length = ip - anchor;
+		token = op++;
+		if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; } 
+		else *token = (length<<ML_BITS);
+
+		// Copy Literals
+		LZ4_BLINDCOPY(anchor, op, length);
+
+
+_next_match:
+		// Encode Offset
+		A16(op) = (ip-ref); op+=2;
+
+		// Start Counting
+		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
+		anchor = ip;
+		while (ip<matchlimit-3)
+		{
+			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
+			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
+			if (*ref == *ip) ip++;
+			goto _endCount;
+		}
+		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
+		if ((ip<matchlimit) && (*ref == *ip)) ip++;
+_endCount:
+		len = (ip - anchor);
+		
+		// Encode MatchLength
+		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
+		else *token += len;	
+
+		// Test end of chunk
+		if (ip > mflimit) { anchor = ip;  break; }
+
+		// Test next position
+		ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
+		HashTable[LZ4_HASH64K_VALUE(ip)] = ip - base;
+		if ((ref > ip - (MAX_DISTANCE + 1)) && (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
+
+		// Prepare next loop
+		anchor = ip++; 
+		forwardH = LZ4_HASH64K_VALUE(ip);
+	}
+
+_last_literals:
+	// Encode Last Literals
+	{
+		int lastRun = iend - anchor;
+		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
+		else *op++ = (lastRun<<ML_BITS);
+		memcpy(op, anchor, iend - anchor);
+		op += iend-anchor;
+	} 
+
+	// End
+	return (int) (((char*)op)-dest);
+}
+
+
+
 int LZ4_compress(char* source, 
 				 char* dest,
 				 int isize)
 {
 #if HEAPMODE
 	void* ctx = malloc(sizeof(struct refTables));
-	int result = LZ4_compressCtx(&ctx, source, dest, isize);
+	int result;
+	if (isize < LZ4_64KLIMIT)
+		result = LZ4_compress64kCtx(&ctx, source, dest, isize);
+	else result = LZ4_compressCtx(&ctx, source, dest, isize);
 	free(ctx);
 	return result;
 #else
+	if (isize < (int)LZ4_64KLIMIT) return LZ4_compress64kCtx(NULL, source, dest, isize);
 	return LZ4_compressCtx(NULL, source, dest, isize);
 #endif
 }

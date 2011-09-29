@@ -79,6 +79,8 @@ int LZ4_compressCtx(void** ctx, char* source,  char* dest, int isize);
 LZ4_compressCtx :
 	This function explicitly handles the CTX memory structure.
 	It avoids allocating/deallocating memory between each call, improving performance when malloc is time-consuming.
+	Note : when memory is allocated into the stack (default mode), there is no "malloc" penalty.
+	Therefore, this function is mostly useful when memory is allocated into the heap (it requires increasing HASH_LOG value beyond STACK_LIMIT)
 
 	On first call : provide a *ctx=NULL; It will be automatically allocated.
 	On next calls : reuse the same ctx pointer.
