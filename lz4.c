@@ -217,16 +217,13 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (ip<matchlimit-3)
+		while (A32(ref) == A32(ip))
 		{
-			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
-			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
-			if (*ref == *ip) ip++;
-			goto _endCount;
+			ip+=4; ref+=4;
+			if (ip>matchlimit-4) { ref -= ip - (matchlimit-3); ip = matchlimit-3; break; }
 		}
-		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
-		if ((ip<matchlimit) && (*ref == *ip)) ip++;
-_endCount:
+		if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
+		if (*ref == *ip) ip++;
 		len = (ip - anchor);
 		
 		// Encode MatchLength
@@ -526,7 +523,7 @@ int LZ4_uncompress_unknownOutputSize(
 
 	BYTE token;
 	
-	U32	dec[4]={0, 3, 2, 3};
+	U32	dec[COPYTOKEN]={0, 3, 2, 3};
 	int	len, length;
 
 
