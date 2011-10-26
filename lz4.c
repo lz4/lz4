@@ -540,7 +540,7 @@ int LZ4_uncompress_unknownOutputSize(
 		{ 
 			if (ref > oend) goto _output_error;
 			memcpy(op, ip, length);
-			ip += length;
+			op += length;
 			break;    // Necessarily EOF
 		}
 		LZ4_WILDCOPY(ip, op, ref); ip -= (op-ref); op = ref;
