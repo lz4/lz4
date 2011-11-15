@@ -41,13 +41,13 @@ int LZ4_compress   (char* source, char* dest, int isize);
 int LZ4_uncompress (char* source, char* dest, int osize);
 
 /*
-LZ4_compress :
+LZ4_compress() :
 	return : the number of bytes in compressed buffer dest
 	note : destination buffer must be already allocated. 
 		To avoid any problem, size it to handle worst cases situations (input data not compressible)
 		Worst case size is : "inputsize + 0.4%", with "0.4%" being at least 8 bytes.
 
-LZ4_uncompress :
+LZ4_uncompress() :
 	osize  : is the output size, therefore the original size
 	return : the number of bytes read in the source buffer
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
@@ -63,20 +63,20 @@ LZ4_uncompress :
 int LZ4_uncompress_unknownOutputSize (char* source, char* dest, int isize, int maxOutputSize);
 
 /*
-LZ4_uncompress_unknownOutputSize :
+LZ4_uncompress_unknownOutputSize() :
 	isize  : is the input size, therefore the compressed size
 	maxOutputSize : is the size of the destination buffer (which must be already allocated)
 	return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
 			 This version never writes beyond dest + maxOutputSize, and is therefore protected against malicious data packets
-	note   : This version is slower than LZ4_uncompress, and is therefore not recommended for general use
+	note   : This version is a bit slower than LZ4_uncompress
 */
 
 
 int LZ4_compressCtx(void** ctx, char* source,  char* dest, int isize);
 
 /*
-LZ4_compressCtx :
+LZ4_compressCtx() :
 	This function explicitly handles the CTX memory structure.
 	It avoids allocating/deallocating memory between each call, improving performance when malloc is time-consuming.
 	Note : when memory is allocated into the stack (default mode), there is no "malloc" penalty.
@@ -86,7 +86,7 @@ LZ4_compressCtx :
 	On next calls : reuse the same ctx pointer.
 	Use different pointers for different threads when doing multi-threading.
 
-	note : performance difference is small, mostly noticeable when repetitively calling the compression algorithm on many small segments.
+	note : performance difference is small, mostly noticeable in HeapMode when repetitively calling the compression function over many small segments.
 */
 
 

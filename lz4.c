@@ -48,17 +48,19 @@
 //**************************************
 // Basic Types
 //**************************************
-#if defined(_MSC_VER) 
+#if defined(_MSC_VER)    // Visual Studio does not support 'stdint' natively
 #define BYTE	unsigned __int8
 #define U16		unsigned __int16
 #define U32		unsigned __int32
 #define S32		__int32
+#define restrict         // Visual Studio does not support 'restrict' keyword either
 #else
 #include <stdint.h>
 #define BYTE	uint8_t
 #define U16		uint16_t
 #define U32		uint32_t
 #define S32		int32_t
+#define restrict restrict
 #endif
 
 
@@ -435,10 +437,10 @@ int LZ4_uncompress(char* source,
 				 int osize)
 {	
 	// Local Variables
-	const BYTE* ip = (const BYTE*) source;
-	BYTE* ref;
+	const BYTE* restrict ip = (const BYTE*) source;
+	const BYTE* restrict ref;
 
-	BYTE* op = (BYTE*) dest;
+	BYTE* restrict op = (BYTE*) dest;
 	BYTE* const oend = op + osize;
 	BYTE* cpy;
 
@@ -456,19 +458,19 @@ int LZ4_uncompress(char* source,
 		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
 
 		// copy literals
-		ref = op+length;
-		if (ref>oend-COPYLENGTH) 
+		cpy = op+length;
+		if (cpy>oend-COPYLENGTH) 
 		{ 
-			if (ref > oend) goto _output_error;
+			if (cpy > oend) goto _output_error;
 			memcpy(op, ip, length);
 			ip += length;
 			break;    // Necessarily EOF
 		}
-		LZ4_WILDCOPY(ip, op, ref); ip -= (op-ref); op = ref;
+		LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
 
 
 		// get offset
-		ref -= A16(ip); ip+=2;
+		ref = cpy - A16(ip); ip+=2;
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
@@ -513,17 +515,17 @@ int LZ4_uncompress_unknownOutputSize(
 				int maxOutputSize)
 {	
 	// Local Variables
-	const BYTE* ip = (const BYTE*) source;
+	const BYTE* restrict ip = (const BYTE*) source;
 	const BYTE* const iend = ip + isize;
-	BYTE* ref;
+	const BYTE* restrict ref;
 
-	BYTE* op = (BYTE*) dest;
+	BYTE* restrict op = (BYTE*) dest;
 	BYTE* const oend = op + maxOutputSize;
 	BYTE* cpy;
 
 	BYTE token;
 	
-	U32	dec[COPYTOKEN]={0, 3, 2, 3};
+	U32	dec[4]={0, 3, 2, 3};
 	int	len, length;
 
 
@@ -535,20 +537,20 @@ int LZ4_uncompress_unknownOutputSize(
 		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; } 
 
 		// copy literals
-		ref = op+length;
-		if (ref>oend-COPYLENGTH) 
+		cpy = op+length;
+		if (cpy>oend-COPYLENGTH) 
 		{ 
-			if (ref > oend) goto _output_error;
+			if (cpy > oend) goto _output_error;
 			memcpy(op, ip, length);
 			op += length;
 			break;    // Necessarily EOF
 		}
-		LZ4_WILDCOPY(ip, op, ref); ip -= (op-ref); op = ref;
+		LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
 		if (ip>=iend) break;    // check EOF
 
 
 		// get offset
-		ref -= A16(ip); ip+=2;
+		ref = cpy - A16(ip); ip+=2;
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
@@ -584,5 +586,4 @@ int LZ4_uncompress_unknownOutputSize(
 _output_error:
 	return (int) (-(((char*)ip)-source));
 }
-
 
