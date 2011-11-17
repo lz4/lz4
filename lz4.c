@@ -378,7 +378,7 @@ _endCount:
 		// Test next position
 		ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
 		HashTable[LZ4_HASH64K_VALUE(ip)] = ip - base;
-		if ((ref > ip - (MAX_DISTANCE + 1)) && (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
+		if (A32(ref) == A32(ip)) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
 		anchor = ip++; 
