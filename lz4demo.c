@@ -30,7 +30,7 @@
 //****************************
 // Includes
 //****************************
-#include <stdio.h>		// fprintf, fopen, fread
+#include <stdio.h>		// fprintf, fopen, fread, _fileno(?)
 #include <stdlib.h>		// malloc
 #include <string.h>		// strcmp
 #include <time.h>		// clock

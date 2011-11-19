@@ -28,6 +28,16 @@
 */
 
 //**************************************
+// Compilation Directives
+//**************************************
+#if __STDC_VERSION__ >= 199901L
+  /* "restrict" is a known keyword */
+#else
+#define restrict  // Disable restrict
+#endif
+
+
+//**************************************
 // Includes
 //**************************************
 #include <stdlib.h>   // for malloc
@@ -53,14 +63,12 @@
 #define U16		unsigned __int16
 #define U32		unsigned __int32
 #define S32		__int32
-#define restrict         // Visual Studio does not support 'restrict' keyword either
 #else
 #include <stdint.h>
 #define BYTE	uint8_t
 #define U16		uint16_t
 #define U32		uint32_t
 #define S32		int32_t
-#define restrict restrict
 #endif
 
 
