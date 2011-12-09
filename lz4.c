@@ -230,9 +230,15 @@ _next_match:
 		anchor = ip;
 		while (ip<matchlimit-3)
 		{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 			int diff = A32(ref) ^ A32(ip);
 			if (!diff) { ip+=4; ref+=4; continue; }
 			ip += DeBruijnBytePos[((U32)((diff & -diff) * 0x077CB531U)) >> 27];
+#else
+			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
+			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
+			if (*ref == *ip) ip++;
+#endif
 			goto _endCount;
 		}
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
@@ -371,9 +377,15 @@ _next_match:
 		anchor = ip;
 		while (ip<matchlimit-3)
 		{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 			int diff = A32(ref) ^ A32(ip);
 			if (!diff) { ip+=4; ref+=4; continue; }
 			ip += DeBruijnBytePos[((U32)((diff & -diff) * 0x077CB531U)) >> 27];
+#else
+			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
+			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
+			if (*ref == *ip) ip++;
+#endif
 			goto _endCount;
 		}
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
