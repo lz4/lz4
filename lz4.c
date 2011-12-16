@@ -160,7 +160,9 @@ int LZ4_compressCtx(void** ctx,
 
 	BYTE* op = (BYTE*) dest;
 	
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 	const size_t DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+#endif
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
 	U32 forwardH;
@@ -223,7 +225,11 @@ int LZ4_compressCtx(void** ctx,
 
 _next_match:
 		// Encode Offset
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		A16(op) = (ip-ref); op+=2;
+#else
+		{ int delta = ip-ref; *op++ = delta; *op++ = delta>>8; }
+#endif
 
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
@@ -308,7 +314,9 @@ int LZ4_compress64kCtx(void** ctx,
 
 	BYTE* op = (BYTE*) dest;
 	
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 	const size_t DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+#endif
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
 	U32 forwardH;
@@ -370,7 +378,11 @@ int LZ4_compress64kCtx(void** ctx,
 
 _next_match:
 		// Encode Offset
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		A16(op) = (ip-ref); op+=2;
+#else
+		{ int delta = ip-ref; *op++ = delta; *op++ = delta>>8; }
+#endif
 
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
@@ -495,7 +507,11 @@ int LZ4_uncompress(char* source,
 
 
 		// get offset
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		ref = cpy - A16(ip); ip+=2;
+#else
+		{ int delta = *ip++; delta += *ip++ << 8; ref = cpy - delta; }
+#endif
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
@@ -573,9 +589,12 @@ int LZ4_uncompress_unknownOutputSize(
 		LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
 		if (ip>=iend) break;    // check EOF
 
-
 		// get offset
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		ref = cpy - A16(ip); ip+=2;
+#else
+		{ int delta = *ip++; delta += *ip++ << 8; ref = cpy - delta; }
+#endif
 
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
