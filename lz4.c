@@ -1,7 +1,7 @@
 /*
    LZ4 - Fast LZ compression algorithm
-   Copyright (C) 2011, Yann Collet.
-   BSD License
+   Copyright (C) 2011-2012, Yann Collet.
+   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -36,6 +36,11 @@
 #define restrict  // Disable restrict
 #endif
 
+#ifdef _MSC_VER
+#define inline __forceinline
+#endif
+
+
 
 //**************************************
 // Includes
@@ -53,6 +58,8 @@
 // Lowering may also improve speed, typically on reaching cache size limits (L1 32KB for Intel, 64KB for AMD)
 // Memory usage formula for 32 bits systems : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
 #define HASH_LOG 12
+
+//#define _FORCE_SW_LOWBITCOUNT   // Uncomment for better performance if target platform has no hardware support for LowBitCount
 
 
 //**************************************
@@ -140,6 +147,21 @@ typedef struct _U16_S
 // Compression CODE
 //****************************
 
+inline static int LZ4_NbCommonBytes_LittleEndian( register U32 val )
+{
+    #if defined(_MSC_VER) && !defined(_FORCE_SW_LOWBITCOUNT)
+    unsigned long b = 0;
+    _BitScanForward( &b, val );
+    return (int)(b>>3);
+    #elif defined(__GNUC__)  && !defined(_FORCE_SW_LOWBITCOUNT)
+    return (__builtin_ctz(val) >> 3); 
+    #else
+	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+	return DeBruijnBytePos[((U32)((val & -val) * 0x077CB531U)) >> 27];
+    #endif
+}
+
+
 int LZ4_compressCtx(void** ctx,
 				 char* source, 
 				 char* dest,
@@ -160,9 +182,6 @@ int LZ4_compressCtx(void** ctx,
 
 	BYTE* op = (BYTE*) dest;
 	
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	const size_t DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
-#endif
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
 	U32 forwardH;
@@ -237,9 +256,9 @@ _next_match:
 		while (ip<matchlimit-3)
 		{
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-			int diff = A32(ref) ^ A32(ip);
+			U32 diff = A32(ref) ^ A32(ip);
 			if (!diff) { ip+=4; ref+=4; continue; }
-			ip += DeBruijnBytePos[((U32)((diff & -diff) * 0x077CB531U)) >> 27];
+			ip += LZ4_NbCommonBytes_LittleEndian(diff);
 #else
 			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
 			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
@@ -250,9 +269,9 @@ _next_match:
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
 		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
-		len = (ip - anchor);
-		
+
 		// Encode MatchLength
+		len = (ip - anchor);
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
 		else *token += len;	
 
@@ -314,9 +333,6 @@ int LZ4_compress64kCtx(void** ctx,
 
 	BYTE* op = (BYTE*) dest;
 	
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	const size_t DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
-#endif
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
 	U32 forwardH;
@@ -390,9 +406,9 @@ _next_match:
 		while (ip<matchlimit-3)
 		{
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-			int diff = A32(ref) ^ A32(ip);
+			U32 diff = A32(ref) ^ A32(ip);
 			if (!diff) { ip+=4; ref+=4; continue; }
-			ip += DeBruijnBytePos[((U32)((diff & -diff) * 0x077CB531U)) >> 27];
+			ip += LZ4_NbCommonBytes_LittleEndian(diff);
 #else
 			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
 			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
@@ -403,14 +419,17 @@ _next_match:
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
 		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
-		len = (ip - anchor);
 		
 		// Encode MatchLength
+		len = (ip - anchor);
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
 		else *token += len;	
 
 		// Test end of chunk
 		if (ip > mflimit) { anchor = ip;  break; }
+
+		// Fill table
+		HashTable[LZ4_HASH64K_VALUE(ip-2)] = ip - 2 - base;
 
 		// Test next position
 		ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
