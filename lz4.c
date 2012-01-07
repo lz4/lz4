@@ -40,6 +40,7 @@
 #define inline __forceinline
 #endif
 
+#define ARCH64 (__x86_64__ || __ppc64__ || _WIN64 || __LP64__)   // Detect 64 bits mode
 
 
 //**************************************
@@ -70,12 +71,14 @@
 #define U16		unsigned __int16
 #define U32		unsigned __int32
 #define S32		__int32
+#define U64		unsigned __int64
 #else
 #include <stdint.h>
 #define BYTE	uint8_t
 #define U16		uint16_t
 #define U32		uint32_t
 #define S32		int32_t
+#define U64		uint64_t
 #endif
 
 
@@ -118,6 +121,11 @@ struct refTables
 #  define _PACKED
 #endif
 
+typedef struct _U64_S
+{
+	U64 v;
+} _PACKED U64_S;
+
 typedef struct _U32_S
 {
 	U32 v;
@@ -128,6 +136,7 @@ typedef struct _U16_S
 	U16 v;
 } _PACKED U16_S;
 
+#define A64(x) (((U64_S *)(x))->v)
 #define A32(x) (((U32_S *)(x))->v)
 #define A16(x) (((U16_S *)(x))->v)
 
@@ -137,10 +146,16 @@ typedef struct _U16_S
 //**************************************
 #define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
 #define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(A32(p))
-#define LZ4_COPYPACKET(s,d)		A32(d) = A32(s); d+=4; s+=4; A32(d) = A32(s); d+=4; s+=4;
-#define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
+#define LZ4_COPYPACKET32(s,d)	A32(d) = A32(s); d+=4; s+=4; A32(d) = A32(s); d+=4; s+=4;
+#define LZ4_COPYPACKET64(s,d)	A64(d) = A64(s); d+=8; s+=8;
+#define LZ4_WILDCOPY32(s,d,e)	do { LZ4_COPYPACKET32(s,d) } while (d<e);
+#define LZ4_WILDCOPY64(s,d,e)	do { LZ4_COPYPACKET64(s,d) } while (d<e);
+#if ARCH64
+#define LZ4_WILDCOPY LZ4_WILDCOPY64
+#else
+#define LZ4_WILDCOPY LZ4_WILDCOPY32
+#endif
 #define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
-
 
 
 //****************************
@@ -549,13 +564,13 @@ int LZ4_uncompress(char* source,
 		if (cpy > oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
+			LZ4_WILDCOPY32(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		LZ4_WILDCOPY(ref, op, cpy);
+		LZ4_WILDCOPY32(ref, op, cpy);
 		op=cpy;		// correction
 	}
 
@@ -632,13 +647,13 @@ int LZ4_uncompress_unknownOutputSize(
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
+			LZ4_WILDCOPY32(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		LZ4_WILDCOPY(ref, op, cpy);
+		LZ4_WILDCOPY32(ref, op, cpy);
 		op=cpy;		// correction
 	}
 
