@@ -39,6 +39,7 @@
 #include <fcntl.h>		// _O_BINARY
 #endif
 #include "lz4.h"
+#include "bench.h"
 
 
 //**************************************
@@ -82,7 +83,8 @@ int usage()
 	DISPLAY( "Arguments :\n");
 	DISPLAY( " -c : compression (default)\n");
 	DISPLAY( " -d : decompression \n");
-	DISPLAY( " -t : test compressed file \n");
+	DISPLAY( " -b : benchmark with files\n");
+	DISPLAY( " -t : check compressed file \n");
 	DISPLAY( " -h : help (this text)\n");	
 	DISPLAY( "input  : can be 'stdin' (pipe) or a filename\n");
 	DISPLAY( "output : can be 'stdout'(pipe) or a filename or 'null'\n");
@@ -271,7 +273,8 @@ int main(int argc, char** argv)
 {
   int i,
 	  compression=1,   // default action if no argument
-	  decode=0;
+	  decode=0,
+	  bench=0;
   char* input_filename=0;
   char* output_filename=0;
 #ifdef _WIN32 
@@ -309,6 +312,9 @@ int main(int argc, char** argv)
 		// Decoding
 		if ( argument[0] =='d' ) { decode=1; continue; }
 
+		// Bench
+		if ( argument[0] =='b' ) { bench=1; continue; }
+
 		// Test
 		if ( argument[0] =='t' ) { decode=1; output_filename=nulmark; continue; }
 	}
@@ -327,6 +333,8 @@ int main(int argc, char** argv)
 
   // No input filename ==> Error
   if(!input_filename) { badusage(); return 1; }
+
+  if (bench) return BMK_benchFile(argv+2, argc-2);
 
   // No output filename 
   if (!output_filename) { badusage(); return 1; }
