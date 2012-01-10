@@ -95,7 +95,6 @@
 #define SKIPSTRENGTH 6
 #define STACKLIMIT 13
 #define HEAPMODE (HASH_LOG>STACKLIMIT)  // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
-#define COPYTOKEN 4
 #define COPYLENGTH 8
 #define LASTLITERALS 5
 #define MFLIMIT (COPYLENGTH+MINMATCH)
@@ -142,49 +141,68 @@ typedef struct _U16_S
 
 
 //**************************************
-// Macros
-//**************************************
-#define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(A32(p))
-#define LZ4_COPYPACKET32(s,d)	A32(d) = A32(s); d+=4; s+=4; A32(d) = A32(s); d+=4; s+=4;
-#define LZ4_COPYPACKET64(s,d)	A64(d) = A64(s); d+=8; s+=8;
-#define LZ4_WILDCOPY32(s,d,e)	do { LZ4_COPYPACKET32(s,d) } while (d<e);
-#define LZ4_WILDCOPY64(s,d,e)	do { LZ4_COPYPACKET64(s,d) } while (d<e);
-
-
-//**************************************
 // Architecture-specific macros
 //**************************************
 #if ARCH64	// 64-bit
-#define LZ4_WILDCOPY LZ4_WILDCOPY64
-#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
+#define COPYSTEP 8
+#define LZ4_COPYSTEP(s,d)		A64(d) = A64(s); d+=8; s+=8;
+#define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d)
 #else		// 32-bit
-#define LZ4_WILDCOPY LZ4_WILDCOPY32
-#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
+#define COPYSTEP 4
+#define LZ4_COPYSTEP(s,d)		A32(d) = A32(s); d+=4; s+=4;
+#define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
 #endif
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = s - A16(p); }
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { A16(p) = v; p+=2; }
+#define LZ4_NbCommonBytes LZ4_NbCommonBytes_LittleEndian
 #else		// Big Endian
 #define LZ4_READ_LITTLEENDIAN_16(d,s,p) { int delta = p[0]; delta += p[1] << 8; d = s - delta; }
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { int delta = v; *p++ = delta; *op++ = delta>>8; }
+#define LZ4_NbCommonBytes LZ4_NbCommonBytes_BigEndian
 #endif
+
+
+//**************************************
+// Macros
+//**************************************
+#define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
+#define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(A32(p))
+#define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
+#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
+
 
 //****************************
 // Private functions
 //****************************
-inline static int LZ4_NbCommonBytes_LittleEndian( register U32 val )
+inline static int LZ4_NbCommonBytes_LittleEndian (register U32 val)
 {
     #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
-    unsigned long b = 0;
-    _BitScanForward( &b, val );
-    return (int)(b>>3);
+    unsigned long r = 0;
+    _BitScanForward( &r, val );
+    return (int)(r>>3);
     #elif defined(__GNUC__)  && !defined(_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3); 
     #else
 	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
 	return DeBruijnBytePos[((U32)((val & -val) * 0x077CB531U)) >> 27];
+    #endif
+}
+
+inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
+{
+    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
+    unsigned long r = 0;
+    _BitScanReverse( &r, val );
+    return (int)(r>>3);
+    #elif defined(__GNUC__)  && !defined(_FORCE_SW_BITCOUNT)
+    return (__builtin_clz(val) >> 3); 
+    #else
+	int r;
+	if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
+	r += (!val);
+	return r;
     #endif
 }
 
@@ -281,15 +299,9 @@ _next_match:
 		anchor = ip;
 		while (ip<matchlimit-3)
 		{
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 			U32 diff = A32(ref) ^ A32(ip);
 			if (!diff) { ip+=4; ref+=4; continue; }
-			ip += LZ4_NbCommonBytes_LittleEndian(diff);
-#else
-			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
-			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
-			if (*ref == *ip) ip++;
-#endif
+			ip += LZ4_NbCommonBytes(diff);
 			goto _endCount;
 		}
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
@@ -427,15 +439,9 @@ _next_match:
 		anchor = ip;
 		while (ip<matchlimit-3)
 		{
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 			U32 diff = A32(ref) ^ A32(ip);
 			if (!diff) { ip+=4; ref+=4; continue; }
-			ip += LZ4_NbCommonBytes_LittleEndian(diff);
-#else
-			if (A32(ref) == A32(ip)) { ip+=4; ref+=4; continue; }
-			if (A16(ref) == A16(ip)) { ip+=2; ref+=2; }
-			if (*ref == *ip) ip++;
-#endif
+			ip += LZ4_NbCommonBytes(diff);
 			goto _endCount;
 		}
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
@@ -501,14 +507,13 @@ int LZ4_compress(char* source,
 
 
 //****************************
-// Decompression CODE
+// Decompression functions
 //****************************
 
 // Note : The decoding functions LZ4_uncompress() and LZ4_uncompress_unknownOutputSize() 
 //		are safe against "buffer overflow" attack type.
-//		They will *never* write nor read outside of the provided input and output buffer :
-//		they both check this condition *before* writing anything.
-//		A corrupted packet will trigger an error result, a negative int, indicating the position of the error within input stream.
+//		They will never write nor read outside of the provided input and output buffers.
+//		A corrupted input will produce an error result, a negative int, indicating the position of the error within input stream.
 
 int LZ4_uncompress(char* source, 
 				 char* dest,
@@ -525,10 +530,7 @@ int LZ4_uncompress(char* source,
 	BYTE token;
 	
 	int	len, length;
-	size_t dec1[] ={0, 3, 2, 3, 0, 0, 0, 0};
-#if ARCH64
-	size_t dec2[]={0, 4, 4, 3, 4, 5, 6, 7};
-#endif
+	size_t dec[] ={0, 3, 2, 3, 0, 0, 0, 0};
 
 
 	// Main Loop
@@ -557,53 +559,34 @@ int LZ4_uncompress(char* source,
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
 
 		// copy repeated sequence
+		if (op-ref<COPYSTEP)
+		{
 #if ARCH64
-		if (op-ref<8)
-		{
-			int tmp = dec2[op-ref];
-			*op++ = *ref++;
-			*op++ = *ref++;
-			*op++ = *ref++;
-			*op++ = *ref++;
-			ref -= dec1[op-ref];
-			A32(op)=A32(ref); op += 4; ref += 4;
-			ref -= tmp;
-		} else { LZ4_COPYPACKET64(ref,op); }
-		cpy = op + length - 4;
-		if (cpy > oend-COPYLENGTH)
-		{
-			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY64(ref, op, (oend-COPYLENGTH));
-			while(op<cpy) *op++=*ref++;
-			op=cpy;
-			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
-			continue;
-		}
-		LZ4_WILDCOPY64(ref, op, cpy);
-		op=cpy;		// correction
+			size_t dec2table[]={0, 4, 4, 3, 4, 5, 6, 7};
+			size_t dec2 = dec2table[op-ref];
 #else
-		if (op-ref<COPYTOKEN)
-		{
+			int dec2 = 0;
+#endif
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
-			ref -= dec1[op-ref];
-			A32(op)=A32(ref); 
-		} else { A32(op)=A32(ref); op+=4; ref+=4; }
-		cpy = op + length;
+			ref -= dec[op-ref];
+			A32(op)=A32(ref); op += COPYSTEP-4; ref += COPYSTEP-4;
+			ref -= dec2;
+		} else { LZ4_COPYSTEP(ref,op); }
+		cpy = op + length - (COPYSTEP-4);
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY32(ref, op, (oend-COPYLENGTH));
+			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		LZ4_WILDCOPY32(ref, op, cpy);
+		LZ4_WILDCOPY(ref, op, cpy);
 		op=cpy;		// correction
-#endif
 	}
 
 	// end of decoding
@@ -633,10 +616,7 @@ int LZ4_uncompress_unknownOutputSize(
 	BYTE token;
 	
 	int	len, length;
-	size_t dec1[] ={0, 3, 2, 3, 0, 0, 0, 0};
-#if ARCH64
-	size_t dec2[]={0, 4, 4, 3, 4, 5, 6, 7};
-#endif
+	size_t dec[] ={0, 3, 2, 3, 0, 0, 0, 0};
 
 
 	// Main Loop
@@ -660,59 +640,40 @@ int LZ4_uncompress_unknownOutputSize(
 
 		// get offset
 		LZ4_READ_LITTLEENDIAN_16(ref,cpy,ip); ip+=2;
-		if (ref < (BYTE* const)dest) goto _output_error;		
+		if (ref < (BYTE* const)dest) goto _output_error;
+
 		// get matchlength
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
 
 		// copy repeated sequence
+		if (op-ref<COPYSTEP)
+		{
 #if ARCH64
-		if (op-ref<8)
-		{
-			int tmp = dec2[op-ref];
-			*op++ = *ref++;
-			*op++ = *ref++;
-			*op++ = *ref++;
-			*op++ = *ref++;
-			ref -= dec1[op-ref];
-			A32(op)=A32(ref); op += 4; ref += 4;
-			ref -= tmp;
-		} else { LZ4_COPYPACKET64(ref,op); }
-		cpy = op + length - 4;
-		if (cpy > oend-COPYLENGTH)
-		{
-			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY64(ref, op, (oend-COPYLENGTH));
-			while(op<cpy) *op++=*ref++;
-			op=cpy;
-			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
-			continue;
-		}
-		LZ4_WILDCOPY64(ref, op, cpy);
-		op=cpy;		// correction
+			size_t dec2table[]={0, 4, 4, 3, 4, 5, 6, 7};
+			size_t dec2 = dec2table[op-ref];
 #else
-		if (op-ref<COPYTOKEN)
-		{
+			int dec2 = 0;
+#endif
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
-			ref -= dec1[op-ref];
-			A32(op)=A32(ref); 
-		} else { A32(op)=A32(ref); op+=4; ref+=4; }
-		cpy = op + length;
+			ref -= dec[op-ref];
+			A32(op)=A32(ref); op += COPYSTEP-4; ref += COPYSTEP-4;
+			ref -= dec2;
+		} else { LZ4_COPYSTEP(ref,op); }
+		cpy = op + length - (COPYSTEP-4);
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY32(ref, op, (oend-COPYLENGTH));
+			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		LZ4_WILDCOPY32(ref, op, cpy);
+		LZ4_WILDCOPY(ref, op, cpy);
 		op=cpy;		// correction
-#endif
-
 	}
 
 	// end of decoding
