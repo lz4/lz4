@@ -290,6 +290,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		{
 		  // Compression 
 		  DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, infilename, (int)benchedsize);
+		  { size_t i; for (i=0; i<benchedsize; i++) out_buff[i]=(char)i; }     // warmimg up memory
 		  
 		  nb_loops = 0;
 		  milliTime = BMK_GetMilliStart();

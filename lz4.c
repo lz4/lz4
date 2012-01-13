@@ -46,7 +46,11 @@
 #define _PACKED
 #endif
 
-#define ARCH64 (__x86_64__ || __ppc64__ || _WIN64 || __LP64__)   // Detect 64 bits mode
+#if (__x86_64__ || __ppc64__ || _WIN64 || __LP64__)   // Detect 64 bits mode
+#define ARCH64 1
+#else
+#define ARCH64 0
+#endif
 
 
 //**************************************
@@ -144,11 +148,15 @@ typedef struct _U16_S
 // Architecture-specific macros
 //**************************************
 #if ARCH64	// 64-bit
-#define COPYSTEP 8
+#define STEPSIZE 8
+#define UARCH U64
+#define AARCH A64
 #define LZ4_COPYSTEP(s,d)		A64(d) = A64(s); d+=8; s+=8;
 #define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d)
 #else		// 32-bit
-#define COPYSTEP 4
+#define STEPSIZE 4
+#define UARCH U32
+#define AARCH A32
 #define LZ4_COPYSTEP(s,d)		A32(d) = A32(s); d+=4; s+=4;
 #define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
 #endif
@@ -176,13 +184,48 @@ typedef struct _U16_S
 //****************************
 // Private functions
 //****************************
+#if ARCH64
+
+inline static int LZ4_NbCommonBytes_LittleEndian (register U64 val)
+{
+    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
+    unsigned long r = 0;
+    _BitScanForward64( &r, val );
+    return (int)(r>>3);
+    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
+    return (__builtin_ctzll(val) >> 3); 
+    #else
+	static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+	return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
+    #endif
+}
+
+inline static int LZ4_NbCommonBytes_BigEndian (register U64 val)
+{
+    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
+    unsigned long r = 0;
+    _BitScanReverse64( &r, val );
+    return (int)(r>>3);
+    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
+    return (__builtin_clzll(val) >> 3); 
+    #else
+	int r;
+	if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+	if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
+	r += (!val);
+	return r;
+    #endif
+}
+
+#else
+
 inline static int LZ4_NbCommonBytes_LittleEndian (register U32 val)
 {
     #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanForward( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__)  && !defined(_FORCE_SW_BITCOUNT)
+    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3); 
     #else
 	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
@@ -196,7 +239,7 @@ inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
     unsigned long r = 0;
     _BitScanReverse( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__)  && !defined(_FORCE_SW_BITCOUNT)
+    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
     return (__builtin_clz(val) >> 3); 
     #else
 	int r;
@@ -205,6 +248,8 @@ inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
 	return r;
     #endif
 }
+
+#endif
 
 
 //******************************
@@ -289,7 +334,6 @@ int LZ4_compressCtx(void** ctx,
 		// Copy Literals
 		LZ4_BLINDCOPY(anchor, op, length);
 
-
 _next_match:
 		// Encode Offset
 		LZ4_WRITE_LITTLEENDIAN_16(op,ip-ref);
@@ -297,13 +341,14 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (ip<matchlimit-3)
+		while (ip<matchlimit-(STEPSIZE-1))
 		{
-			U32 diff = A32(ref) ^ A32(ip);
-			if (!diff) { ip+=4; ref+=4; continue; }
+			UARCH diff = AARCH(ref) ^ AARCH(ip);
+			if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
 			ip += LZ4_NbCommonBytes(diff);
 			goto _endCount;
 		}
+		if (ARCH64) if ((ip<(matchlimit-3)) && (A32(ref) == A32(ip))) { ip+=4; ref+=4; }
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
 		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
@@ -429,7 +474,6 @@ int LZ4_compress64kCtx(void** ctx,
 		// Copy Literals
 		LZ4_BLINDCOPY(anchor, op, length);
 
-
 _next_match:
 		// Encode Offset
 		LZ4_WRITE_LITTLEENDIAN_16(op,ip-ref);
@@ -437,13 +481,14 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (ip<matchlimit-3)
+		while (ip<matchlimit-(STEPSIZE-1))
 		{
-			U32 diff = A32(ref) ^ A32(ip);
-			if (!diff) { ip+=4; ref+=4; continue; }
+			UARCH diff = AARCH(ref) ^ AARCH(ip);
+			if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
 			ip += LZ4_NbCommonBytes(diff);
 			goto _endCount;
 		}
+		if (ARCH64) if ((ip<(matchlimit-3)) && (A32(ref) == A32(ip))) { ip+=4; ref+=4; }
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
 		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
@@ -559,23 +604,23 @@ int LZ4_uncompress(char* source,
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; } 
 
 		// copy repeated sequence
-		if (op-ref<COPYSTEP)
+		if (op-ref<STEPSIZE)
 		{
 #if ARCH64
 			size_t dec2table[]={0, 4, 4, 3, 4, 5, 6, 7};
 			size_t dec2 = dec2table[op-ref];
 #else
-			int dec2 = 0;
+			const int dec2 = 0;
 #endif
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
-			A32(op)=A32(ref); op += COPYSTEP-4; ref += COPYSTEP-4;
+			A32(op)=A32(ref); op += STEPSIZE-4; ref += STEPSIZE-4;
 			ref -= dec2;
 		} else { LZ4_COPYSTEP(ref,op); }
-		cpy = op + length - (COPYSTEP-4);
+		cpy = op + length - (STEPSIZE-4);
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
@@ -646,23 +691,23 @@ int LZ4_uncompress_unknownOutputSize(
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
 
 		// copy repeated sequence
-		if (op-ref<COPYSTEP)
+		if (op-ref<STEPSIZE)
 		{
 #if ARCH64
 			size_t dec2table[]={0, 4, 4, 3, 4, 5, 6, 7};
 			size_t dec2 = dec2table[op-ref];
 #else
-			int dec2 = 0;
+			const int dec2 = 0;
 #endif
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
-			A32(op)=A32(ref); op += COPYSTEP-4; ref += COPYSTEP-4;
+			A32(op)=A32(ref); op += STEPSIZE-4; ref += STEPSIZE-4;
 			ref -= dec2;
 		} else { LZ4_COPYSTEP(ref,op); }
-		cpy = op + length - (COPYSTEP-4);
+		cpy = op + length - (STEPSIZE-4);
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
