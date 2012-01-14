@@ -153,21 +153,25 @@ typedef struct _U16_S
 #define AARCH A64
 #define LZ4_COPYSTEP(s,d)		A64(d) = A64(s); d+=8; s+=8;
 #define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d)
+#define HTYPE U32
+#define INITBASE(base)			const BYTE* const base = ip
 #else		// 32-bit
 #define STEPSIZE 4
 #define UARCH U32
 #define AARCH A32
 #define LZ4_COPYSTEP(s,d)		A32(d) = A32(s); d+=4; s+=4;
 #define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
+#define HTYPE const BYTE*
+#define INITBASE(base)			const int base = 0
 #endif
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = s - A16(p); }
+#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { A16(p) = v; p+=2; }
 #define LZ4_NbCommonBytes LZ4_NbCommonBytes_LittleEndian
 #else		// Big Endian
-#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { int delta = p[0]; delta += p[1] << 8; d = s - delta; }
-#define LZ4_WRITE_LITTLEENDIAN_16(p,v) { int delta = v; *p++ = delta; *op++ = delta>>8; }
+#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { int delta = p[0]; delta += p[1] << 8; d = (s) - delta; }
+#define LZ4_WRITE_LITTLEENDIAN_16(p,v) { int delta = v; *p++ = delta; *p++ = delta>>8; }
 #define LZ4_NbCommonBytes LZ4_NbCommonBytes_BigEndian
 #endif
 
@@ -178,7 +182,7 @@ typedef struct _U16_S
 #define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
 #define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(A32(p))
 #define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
-#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
+#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=(d)+l; LZ4_WILDCOPY(s,d,e); d=e; }
 
 
 //****************************
@@ -255,6 +259,7 @@ inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
 //******************************
 // Public Compression functions
 //******************************
+
 int LZ4_compressCtx(void** ctx,
 				 char* source, 
 				 char* dest,
@@ -262,12 +267,13 @@ int LZ4_compressCtx(void** ctx,
 {	
 #if HEAPMODE
 	struct refTables *srt = (struct refTables *) (*ctx);
-	const BYTE** HashTable;
+	HTYPE* HashTable;
 #else
-	const BYTE* HashTable[HASHTABLESIZE] = {0};
+	HTYPE HashTable[HASHTABLESIZE] = {0};
 #endif
 
 	const BYTE* ip = (BYTE*) source;       
+	INITBASE(base);
 	const BYTE* anchor = ip;
 	const BYTE* const iend = ip + isize;
 	const BYTE* const mflimit = iend - MFLIMIT;
@@ -288,7 +294,7 @@ int LZ4_compressCtx(void** ctx,
 		srt = (struct refTables *) malloc ( sizeof(struct refTables) );
 		*ctx = (void*) srt;
 	}
-	HashTable = srt->hashTable;
+	HashTable = (HTYPE*)(srt->hashTable);
 	memset((void*)HashTable, 0, sizeof(srt->hashTable));
 #else
 	(void) ctx;
@@ -296,7 +302,7 @@ int LZ4_compressCtx(void** ctx,
 
 
 	// First Byte
-	HashTable[LZ4_HASH_VALUE(ip)] = ip;
+	HashTable[LZ4_HASH_VALUE(ip)] = ip - base;
 	ip++; forwardH = LZ4_HASH_VALUE(ip);
 	
 	// Main Loop
@@ -317,8 +323,8 @@ int LZ4_compressCtx(void** ctx,
 			if (forwardIp > mflimit) { goto _last_literals; }
 
 			forwardH = LZ4_HASH_VALUE(forwardIp);
-			ref = HashTable[h];
-			HashTable[h] = ip;
+			ref = base + HashTable[h];
+			HashTable[h] = ip - base;
 
 		} while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
 
@@ -352,7 +358,7 @@ _next_match:
 		if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
 		if ((ip<matchlimit) && (*ref == *ip)) ip++;
 _endCount:
-
+		
 		// Encode MatchLength
 		len = (ip - anchor);
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; } 
@@ -362,11 +368,11 @@ _endCount:
 		if (ip > mflimit) { anchor = ip;  break; }
 
 		// Fill table
-		HashTable[LZ4_HASH_VALUE(ip-2)] = ip-2;
+		HashTable[LZ4_HASH_VALUE(ip-2)] = ip - 2 - base;
 
 		// Test next position
-		ref = HashTable[LZ4_HASH_VALUE(ip)];
-		HashTable[LZ4_HASH_VALUE(ip)] = ip;
+		ref = base + HashTable[LZ4_HASH_VALUE(ip)];
+		HashTable[LZ4_HASH_VALUE(ip)] = ip - base;
 		if ((ref > ip - (MAX_DISTANCE + 1)) && (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
@@ -391,8 +397,9 @@ _last_literals:
 
 
 // Note : this function is valid only if isize < LZ4_64KLIMIT
-#define LZ4_64KLIMIT ((1U<<16) + (MFLIMIT-1))
+#define LZ4_64KLIMIT ((1<<16) + (MFLIMIT-1))
 #define HASHLOG64K (HASH_LOG+1)
+#define HASH64KTABLESIZE (1U<<HASHLOG64K)
 #define LZ4_HASH64K_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASHLOG64K))
 #define LZ4_HASH64K_VALUE(p)	LZ4_HASH64K_FUNCTION(A32(p))
 int LZ4_compress64kCtx(void** ctx,
@@ -404,7 +411,7 @@ int LZ4_compress64kCtx(void** ctx,
 	struct refTables *srt = (struct refTables *) (*ctx);
 	U16* HashTable;
 #else
-	U16 HashTable[HASHTABLESIZE<<1] = {0};
+	U16 HashTable[HASH64KTABLESIZE] = {0};
 #endif
 
 	const BYTE* ip = (BYTE*) source;       
