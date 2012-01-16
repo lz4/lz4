@@ -153,6 +153,7 @@ typedef struct _U16_S
 #define AARCH A64
 #define LZ4_COPYSTEP(s,d)		A64(d) = A64(s); d+=8; s+=8;
 #define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d)
+#define LZ4_SECURECOPY(s,d,e)	if (d<e) LZ4_WILDCOPY(s,d,e)
 #define HTYPE U32
 #define INITBASE(base)			const BYTE* const base = ip
 #else		// 32-bit
@@ -161,6 +162,7 @@ typedef struct _U16_S
 #define AARCH A32
 #define LZ4_COPYSTEP(s,d)		A32(d) = A32(s); d+=4; s+=4;
 #define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
+#define LZ4_SECURECOPY			LZ4_WILDCOPY
 #define HTYPE const BYTE*
 #define INITBASE(base)			const int base = 0
 #endif
@@ -631,13 +633,13 @@ int LZ4_uncompress(char* source,
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
+			LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		LZ4_WILDCOPY(ref, op, cpy);
+		LZ4_SECURECOPY(ref, op, cpy);
 		op=cpy;		// correction
 	}
 
@@ -718,13 +720,13 @@ int LZ4_uncompress_unknownOutputSize(
 		if (cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;	
-			LZ4_WILDCOPY(ref, op, (oend-COPYLENGTH));
+			LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
 			while(op<cpy) *op++=*ref++;
 			op=cpy;
 			if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
 			continue;
 		}
-		LZ4_WILDCOPY(ref, op, cpy);
+		LZ4_SECURECOPY(ref, op, cpy);
 		op=cpy;		// correction
 	}
 
