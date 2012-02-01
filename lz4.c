@@ -28,16 +28,30 @@
 */
 
 //**************************************
-// Compilation Directives
+// Tuning parameters
 //**************************************
-#if __STDC_VERSION__ >= 199901L
+// Increasing this value improves compression ratio
+// Lowering this value reduces memory usage
+// Reduced memory usage typically improves speed, due to cache effect (ex : L1 32KB for Intel, L1 64KB for AMD)
+// Memory usage formula : N->2^(N+2) Bytes (examples : 12 -> 16KB ; 17 -> 512KB)
+#define COMPRESSIONLEVEL 12
+
+// Uncomment this parameter if your target system does not support hardware bit count
+//#define _FORCE_SW_BITCOUNT
+
+
+
+//**************************************
+// Compiler Options
+//**************************************
+#if __STDC_VERSION__ >= 199901L    // C99
   /* "restrict" is a known keyword */
 #else
 #define restrict  // Disable restrict
 #endif
 
 #ifdef _MSC_VER
-#define inline __forceinline
+#define inline __forceinline    // Visual is not C99, but supports inline
 #endif
 
 #ifdef __GNUC__
@@ -46,10 +60,10 @@
 #define _PACKED
 #endif
 
-#if (__x86_64__ || __ppc64__ || _WIN64 || __LP64__)   // Detect 64 bits mode
-#define ARCH64 1
+#ifdef _MSC_VER  // Visual Studio
+#define bswap16(i) _byteswap_ushort(i)
 #else
-#define ARCH64 0
+#define bswap16(i) (((i)>>8) | ((i)<<8))
 #endif
 
 
@@ -59,18 +73,6 @@
 #include <stdlib.h>   // for malloc
 #include <string.h>   // for memset
 #include "lz4.h"
-
-
-//**************************************
-// Performance parameter               
-//**************************************
-// Increasing this value improves compression ratio
-// Lowering this value reduces memory usage
-// Lowering may also improve speed, typically on reaching cache size limits (L1 32KB for Intel, 64KB for AMD)
-// Memory usage formula for 32 bits systems : N->2^(N+2) Bytes (examples : 17 -> 512KB ; 12 -> 16KB)
-#define HASH_LOG 12
-
-//#define _FORCE_SW_BITCOUNT   // Uncomment for better performance if target platform has no hardware support for LowBitCount
 
 
 //**************************************
@@ -107,6 +109,7 @@
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
 
+#define HASH_LOG COMPRESSIONLEVEL
 #define HASHTABLESIZE (1 << HASH_LOG)
 #define HASH_MASK (HASHTABLESIZE - 1)
 
@@ -147,6 +150,19 @@ typedef struct _U16_S
 //**************************************
 // Architecture-specific macros
 //**************************************
+#if (__x86_64__ || __x86_64 || __amd64__ || __amd64 || __ppc64__ || _WIN64 || __LP64__ || _LP64)   // Detects 64 bits mode
+#define ARCH64 1
+#else
+#define ARCH64 0
+#endif
+
+// The following macro auto-detects Big-endian CPU. You can manually override it in case of bad detection.
+#if (__BIG_ENDIAN__ || _BIG_ENDIAN || _ARCH_PPC || __PPC__ || __PPC || PPC || __powerpc__ || __powerpc || powerpc || ((defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))) )
+#define CPU_BIG_ENDIAN 1
+#else
+// Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
+#endif
+
 #if ARCH64	// 64-bit
 #define STEPSIZE 8
 #define UARCH U64
@@ -167,14 +183,14 @@ typedef struct _U16_S
 #define INITBASE(base)			const int base = 0
 #endif
 
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#if CPU_BIG_ENDIAN
+#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { U16 v = A16(p); v = bswap16(v); d = (s) - v; }
+#define LZ4_WRITE_LITTLEENDIAN_16(p,i) { U16 v = (U16)(i); v = bswap16(v); A16(p) = v; p+=2; }
+#define LZ4_NbCommonBytes LZ4_NbCommonBytes_BigEndian
+#else		// Little Endian
 #define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { A16(p) = v; p+=2; }
 #define LZ4_NbCommonBytes LZ4_NbCommonBytes_LittleEndian
-#else		// Big Endian
-#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { int delta = p[0]; delta += p[1] << 8; d = (s) - delta; }
-#define LZ4_WRITE_LITTLEENDIAN_16(p,v) { int delta = v; *p++ = delta; *p++ = delta>>8; }
-#define LZ4_NbCommonBytes LZ4_NbCommonBytes_BigEndian
 #endif
 
 
@@ -616,7 +632,7 @@ int LZ4_uncompress(char* source,
 		if (op-ref<STEPSIZE)
 		{
 #if ARCH64
-			size_t dec2table[]={0, 4, 4, 3, 4, 5, 6, 7};
+			size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
 			size_t dec2 = dec2table[op-ref];
 #else
 			const int dec2 = 0;
@@ -626,7 +642,7 @@ int LZ4_uncompress(char* source,
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
-			A32(op)=A32(ref); op += STEPSIZE-4; ref += STEPSIZE-4;
+			A32(op)=A32(ref); op += STEPSIZE-4;
 			ref -= dec2;
 		} else { LZ4_COPYSTEP(ref,op); }
 		cpy = op + length - (STEPSIZE-4);
@@ -703,7 +719,7 @@ int LZ4_uncompress_unknownOutputSize(
 		if (op-ref<STEPSIZE)
 		{
 #if ARCH64
-			size_t dec2table[]={0, 4, 4, 3, 4, 5, 6, 7};
+			size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
 			size_t dec2 = dec2table[op-ref];
 #else
 			const int dec2 = 0;
@@ -713,7 +729,7 @@ int LZ4_uncompress_unknownOutputSize(
 			*op++ = *ref++;
 			*op++ = *ref++;
 			ref -= dec[op-ref];
-			A32(op)=A32(ref); op += STEPSIZE-4; ref += STEPSIZE-4;
+			A32(op)=A32(ref); op += STEPSIZE-4;
 			ref -= dec2;
 		} else { LZ4_COPYSTEP(ref,op); }
 		cpy = op + length - (STEPSIZE-4);

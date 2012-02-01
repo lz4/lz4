@@ -43,9 +43,13 @@
 
 
 //**************************************
-// Basic Types
+// Compiler functions
 //**************************************
-
+#if defined(_MSC_VER)    // Visual Studio 
+#define swap32 _byteswap_ulong
+#else    // GCC assumed
+#define swap32 __builtin_bswap32
+#endif
 
 
 //****************************
@@ -67,10 +71,18 @@
 
 
 //**************************************
-// MACRO
+// Architecture Macros
+//**************************************
+static const int one = 1;
+#define CPU_LITTLE_ENDIAN (*(char*)(&one))
+#define CPU_BIG_ENDIAN (!CPU_LITTLE_ENDIAN)
+#define LITTLE_ENDIAN32(i)   if (CPU_BIG_ENDIAN) { i = swap32(i); }
+
+
+//**************************************
+// Macros
 //**************************************
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
-
 
 
 //****************************
@@ -79,7 +91,7 @@
 int usage()
 {
 	DISPLAY( "Usage :\n");
-	DISPLAY( "      %s [arg] input output\n",BINARY_NAME);
+	DISPLAY( "      %s [arg] input output\n", BINARY_NAME);
 	DISPLAY( "Arguments :\n");
 	DISPLAY( " -c : compression (default)\n");
 	DISPLAY( " -d : decompression \n");
@@ -138,6 +150,7 @@ int compress_file(char* input_filename, char* output_filename)
 {
 	unsigned long long filesize = 0;
 	unsigned long long compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
+	unsigned int u32var;
 	char* in_buff;
 	char* out_buff;
 	FILE* finput;
@@ -157,7 +170,9 @@ int compress_file(char* input_filename, char* output_filename)
 	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 8; }
 	
 	// Write Archive Header
-	*(unsigned long*)out_buff = ARCHIVE_MAGICNUMBER;
+	u32var = ARCHIVE_MAGICNUMBER;
+	LITTLE_ENDIAN32(u32var);
+	*(unsigned int*)out_buff = u32var;
 	fwrite(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, foutput);
 
 	// Main Loop
@@ -171,10 +186,12 @@ int compress_file(char* input_filename, char* output_filename)
 
 		// Compress Block
 		outSize = LZ4_compress(in_buff, out_buff+4, inSize);
-		* (unsigned int*) out_buff = outSize;
 		compressedfilesize += outSize+4;
 
 		// Write Block
+		LITTLE_ENDIAN32(outSize);
+		* (unsigned int*) out_buff = outSize;
+		LITTLE_ENDIAN32(outSize);
 		fwrite(out_buff, 1, outSize+4, foutput);
 	}
 
@@ -223,9 +240,15 @@ int decode_file(char* input_filename, char* output_filename)
 	
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
-	if (*(unsigned long*)out_buff != ARCHIVE_MAGICNUMBER) { DISPLAY("Unrecognized header : file cannot be decoded\n"); return 6; }
+	nextSize = *(unsigned int*)out_buff;
+	LITTLE_ENDIAN32(nextSize);
+	if (nextSize != ARCHIVE_MAGICNUMBER) { DISPLAY("Unrecognized header : file cannot be decoded\n"); return 6; }
+
+	// First Block
+	*(unsigned int*)in_buff = 0;
 	uselessRet = fread(in_buff, 1, 4, finput);
-	nextSize = *(unsigned long*)in_buff;
+	nextSize = *(unsigned int*)in_buff;
+	LITTLE_ENDIAN32(nextSize);
 
 	// Main Loop
 	while (1) 
@@ -234,18 +257,20 @@ int decode_file(char* input_filename, char* output_filename)
 	    uselessRet = fread(in_buff, 1, nextSize, finput);
 
 		// Check Next Block
-		uselessRet = (unsigned long) fread(&nextSize, 1, 4, finput);
-		if( uselessRet==0 ) break;
+		uselessRet = (size_t) fread(&nextSize, 1, 4, finput);
+		if( uselessRet==0 ) break;   // Nothing read : file read is completed
+		LITTLE_ENDIAN32(nextSize);
 
 		// Decode Block
 		sinkint = LZ4_uncompress(in_buff, out_buff, CHUNKSIZE);
+		if (sinkint < 0) { DISPLAY("Decoding Failed ! Corrupted input !\n"); return 9; }
 		filesize += CHUNKSIZE;
 
 		// Write Block
 		fwrite(out_buff, 1, CHUNKSIZE, foutput);
 	}
 
-	// Last Block
+	// Last Block (which size is <= CHUNKSIZE, but let LZ4 figure that out)
     uselessRet = fread(in_buff, 1, nextSize, finput);
 	sinkint = LZ4_uncompress_unknownOutputSize(in_buff, out_buff, nextSize, CHUNKSIZE);
 	filesize += sinkint;

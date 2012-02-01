@@ -29,7 +29,7 @@
 //**************************************
 // Includes
 //**************************************
-#include <stdio.h>      // printf, fopen, fseeko64, ftello64
+#include <stdio.h>      // fprintf, fopen, ftello64
 #include <stdlib.h>     // malloc
 #include <sys/timeb.h>  // timeb
 #include "lz4.h"
@@ -167,11 +167,11 @@ static U64 BMK_GetFileSize(FILE* f)
 {
 	U64 r;
 #ifdef _MSC_VER
-	_fseeki64(f, 0L, SEEK_END);
+	r = _fseeki64(f, 0L, SEEK_END);
 	r = (U64) _ftelli64(f);
 	_fseeki64(f, 0L, SEEK_SET);
 #else
-	fseeko64(f, 0LL, SEEK_END);
+	r = (U64) fseeko64(f, 0LL, SEEK_END);
 	r = (U64) ftello64(f);
 	fseeko64(f, 0LL, SEEK_SET);
 #endif
@@ -269,7 +269,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 
 	  if(readSize != benchedsize)
 	  {
-		printf("\nError: problem reading file '%s' !!    \n", infilename);
+		DISPLAY("\nError: problem reading file '%s' !!    \n", infilename);
 		free(in_buff);
 		free(out_buff);
 		return 13;
@@ -326,6 +326,10 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 
 		  if ((double)milliTime < fastestD*nb_loops) fastestD = (double)milliTime/nb_loops;
 		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+		  
+		  // CRC Checking
+		  crcd = BMK_checksum(in_buff, benchedsize);
+		  if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); break; }
 		}
 
 	    DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
@@ -333,10 +337,6 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		totalz += cSize;
 		totalc += fastestC;
 		totald += fastestD;
-
-		// CRC Checking
-		crcd = BMK_checksum(in_buff, benchedsize);
-		if (crcc!=crcd) printf("!!! WARNING !!! Invalid Checksum : %x != %x\n", (unsigned)crcc, (unsigned)crcd);
 	  }
 
 	  free(in_buff);
