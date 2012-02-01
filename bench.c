@@ -80,8 +80,8 @@ struct chunkParameters
 
 struct compressionParameters
 {
-	int (*compressionFunction)(char*, char*, int);
-	int (*decompressionFunction)(char*, char*, int);
+	int (*compressionFunction)(const char*, char*, int);
+	int (*decompressionFunction)(const char*, char*, int);
 };
 
 

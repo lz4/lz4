@@ -279,7 +279,7 @@ inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
 //******************************
 
 int LZ4_compressCtx(void** ctx,
-				 char* source, 
+				 const char* source, 
 				 char* dest,
 				 int isize)
 {	
@@ -421,7 +421,7 @@ _last_literals:
 #define LZ4_HASH64K_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASHLOG64K))
 #define LZ4_HASH64K_VALUE(p)	LZ4_HASH64K_FUNCTION(A32(p))
 int LZ4_compress64kCtx(void** ctx,
-				 char* source, 
+				 const char* source, 
 				 char* dest,
 				 int isize)
 {	
@@ -555,7 +555,7 @@ _last_literals:
 
 
 
-int LZ4_compress(char* source, 
+int LZ4_compress(const char* source, 
 				 char* dest,
 				 int isize)
 {
@@ -585,7 +585,7 @@ int LZ4_compress(char* source,
 //		They will never write nor read outside of the provided input and output buffers.
 //		A corrupted input will produce an error result, a negative int, indicating the position of the error within input stream.
 
-int LZ4_uncompress(char* source, 
+int LZ4_uncompress(const char* source, 
 				 char* dest,
 				 int osize)
 {	
@@ -669,7 +669,7 @@ _output_error:
 
 
 int LZ4_uncompress_unknownOutputSize(
-				char* source, 
+				const char* source, 
 				char* dest,
 				int isize,
 				int maxOutputSize)
