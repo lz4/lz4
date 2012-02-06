@@ -30,11 +30,52 @@
 //**************************************
 // Tuning parameters
 //**************************************
+// COMPRESSIONLEVEL :
 // Increasing this value improves compression ratio
 // Lowering this value reduces memory usage
 // Reduced memory usage typically improves speed, due to cache effect (ex : L1 32KB for Intel, L1 64KB for AMD)
 // Memory usage formula : N->2^(N+2) Bytes (examples : 12 -> 16KB ; 17 -> 512KB)
 #define COMPRESSIONLEVEL 12
+
+// NONCOMPRESSIBLE_CONFIRMATION :
+// Decreasing this value will make the algorithm skip faster data segments considered "incompressible"
+// This may decrease compression ratio dramatically, but will be faster on incompressible data
+// Increasing this value will make the algorithm search more before declaring a segment "incompressible"
+// This could improve compression a bit, but will be slower on incompressible data
+// The default value (6) is recommended
+#define NONCOMPRESSIBLE_CONFIRMATION 6
+
+// BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
+// This will provide a boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
+// You can set this option to 1 in situations where data will stay within closed environment
+// This option is useless on Little_Endian CPU (such as x86)
+//#define BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE 1
+
+
+
+//**************************************
+// CPU Feature Detection
+//**************************************
+// 32 or 64 bits ?
+#if (__x86_64__ || __x86_64 || __amd64__ || __amd64 || __ppc64__ || _WIN64 || __LP64__ || _LP64)   // Detects 64 bits mode
+#define ARCH64 1
+#else
+#define ARCH64 0
+#endif
+
+// Little Endian or Big Endian ? 
+#if (__BIG_ENDIAN__ || _BIG_ENDIAN || _ARCH_PPC || __PPC__ || __PPC || PPC || __powerpc__ || __powerpc || powerpc || ((defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))) )
+#define CPU_BIG_ENDIAN 1
+#else
+// Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
+#endif
+
+// Unaligned memory access ?
+// This feature is automatically enabled for "common" CPU, such as x86.
+// For others CPU, you may want to force this option manually to improve performance if your target CPU supports unaligned memory access
+#if (__ARM_FEATURE_UNALIGNED)
+#define CPU_UNALIGNED_ACCESS 1
+#endif
 
 // Uncomment this parameter if your target system does not support hardware bit count
 //#define _FORCE_SW_BITCOUNT
@@ -54,7 +95,7 @@
 #define inline __forceinline    // Visual is not C99, but supports inline
 #endif
 
-#ifdef __GNUC__
+#if (defined(__GNUC__) && (!(CPU_UNALIGNED_ACCESS)))
 #define _PACKED __attribute__ ((packed))
 #else
 #define _PACKED
@@ -98,7 +139,7 @@
 // Constants
 //**************************************
 #define MINMATCH 4
-#define SKIPSTRENGTH 6
+#define SKIPSTRENGTH (NONCOMPRESSIBLE_CONFIRMATION>2?NONCOMPRESSIBLE_CONFIRMATION:2)
 #define STACKLIMIT 13
 #define HEAPMODE (HASH_LOG>STACKLIMIT)  // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
 #define COPYLENGTH 8
@@ -150,19 +191,6 @@ typedef struct _U16_S
 //**************************************
 // Architecture-specific macros
 //**************************************
-#if (__x86_64__ || __x86_64 || __amd64__ || __amd64 || __ppc64__ || _WIN64 || __LP64__ || _LP64)   // Detects 64 bits mode
-#define ARCH64 1
-#else
-#define ARCH64 0
-#endif
-
-// The following macro auto-detects Big-endian CPU. You can manually override it in case of bad detection.
-#if (__BIG_ENDIAN__ || _BIG_ENDIAN || _ARCH_PPC || __PPC__ || __PPC || PPC || __powerpc__ || __powerpc || powerpc || ((defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))) )
-#define CPU_BIG_ENDIAN 1
-#else
-// Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
-#endif
-
 #if ARCH64	// 64-bit
 #define STEPSIZE 8
 #define UARCH U64
@@ -183,14 +211,12 @@ typedef struct _U16_S
 #define INITBASE(base)			const int base = 0
 #endif
 
-#if CPU_BIG_ENDIAN
+#if ((CPU_BIG_ENDIAN) && !(BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE))
 #define LZ4_READ_LITTLEENDIAN_16(d,s,p) { U16 v = A16(p); v = bswap16(v); d = (s) - v; }
 #define LZ4_WRITE_LITTLEENDIAN_16(p,i) { U16 v = (U16)(i); v = bswap16(v); A16(p) = v; p+=2; }
-#define LZ4_NbCommonBytes LZ4_NbCommonBytes_BigEndian
 #else		// Little Endian
 #define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { A16(p) = v; p+=2; }
-#define LZ4_NbCommonBytes LZ4_NbCommonBytes_LittleEndian
 #endif
 
 
@@ -208,22 +234,9 @@ typedef struct _U16_S
 //****************************
 #if ARCH64
 
-inline static int LZ4_NbCommonBytes_LittleEndian (register U64 val)
+inline static int LZ4_NbCommonBytes (register U64 val)
 {
-    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
-    _BitScanForward64( &r, val );
-    return (int)(r>>3);
-    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
-    return (__builtin_ctzll(val) >> 3); 
-    #else
-	static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
-	return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
-    #endif
-}
-
-inline static int LZ4_NbCommonBytes_BigEndian (register U64 val)
-{
+#if CPU_BIG_ENDIAN
     #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanReverse64( &r, val );
@@ -237,26 +250,25 @@ inline static int LZ4_NbCommonBytes_BigEndian (register U64 val)
 	r += (!val);
 	return r;
     #endif
+#else
+    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
+    unsigned long r = 0;
+    _BitScanForward64( &r, val );
+    return (int)(r>>3);
+    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
+    return (__builtin_ctzll(val) >> 3); 
+    #else
+	static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+	return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
+    #endif
+#endif
 }
 
 #else
 
-inline static int LZ4_NbCommonBytes_LittleEndian (register U32 val)
+inline static int LZ4_NbCommonBytes (register U32 val)
 {
-    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
-    _BitScanForward( &r, val );
-    return (int)(r>>3);
-    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
-    return (__builtin_ctz(val) >> 3); 
-    #else
-	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
-	return DeBruijnBytePos[((U32)((val & -val) * 0x077CB531U)) >> 27];
-    #endif
-}
-
-inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
-{
+#if CPU_BIG_ENDIAN
     #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanReverse( &r, val );
@@ -269,6 +281,18 @@ inline static int LZ4_NbCommonBytes_BigEndian (register U32 val)
 	r += (!val);
 	return r;
     #endif
+#else
+    #if defined(_MSC_VER) && !defined(_FORCE_SW_BITCOUNT)
+    unsigned long r = 0;
+    _BitScanForward( &r, val );
+    return (int)(r>>3);
+    #elif defined(__GNUC__) && !defined(_FORCE_SW_BITCOUNT)
+    return (__builtin_ctz(val) >> 3); 
+    #else
+	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+	return DeBruijnBytePos[((U32)((val & -val) * 0x077CB531U)) >> 27];
+    #endif
+#endif
 }
 
 #endif
