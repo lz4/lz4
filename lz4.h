@@ -61,6 +61,18 @@ LZ4_uncompress() :
 // Advanced Functions
 //****************************
 
+int LZ4_compressBound(int isize);
+
+/*
+LZ4_compressBound() :
+	Provides the maximum size that LZ4 may output in a "worst case" scenario, for memory allocation of output buffer.
+
+	isize  : is the input size
+	return : maximum size that LZ4 may output in a "worst case" scenario
+	note : this function is limited by "int" range
+*/
+
+
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
 /*

@@ -22,8 +22,16 @@
 */
 
 //**************************************
-// Compilation Directives
+// Compiler Options
 //**************************************
+
+// Under Linux at least, pull in the *64 commands
+#define _LARGEFILE64_SOURCE
+
+// MSVC does not support S_ISREG
+#ifndef S_ISREG
+#define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#endif
 
 
 //**************************************
@@ -32,6 +40,8 @@
 #include <stdio.h>      // fprintf, fopen, ftello64
 #include <stdlib.h>     // malloc
 #include <sys/timeb.h>  // timeb
+#include <sys/types.h>  // stat64
+#include <sys/stat.h>   // stat64
 #include "lz4.h"
 
 
@@ -65,7 +75,7 @@
 #define CHUNKSIZE   (8<<20)
 #define MAX_NB_CHUNKS ((MAX_MEM / CHUNKSIZE) + 1)
 
- 
+
 //**************************************
 // Local structures
 //**************************************
@@ -95,7 +105,6 @@ struct compressionParameters
 //*********************************************************
 //  Private functions
 //*********************************************************
-
 
 static int BMK_GetMilliStart()
 {
@@ -163,19 +172,18 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 }
 
 
-static U64 BMK_GetFileSize(FILE* f)
+static U64 BMK_GetFileSize(char* infilename)
 {
-	U64 r;
-#ifdef _MSC_VER
-	r = _fseeki64(f, 0L, SEEK_END);
-	r = (U64) _ftelli64(f);
-	_fseeki64(f, 0L, SEEK_SET);
+	int r;
+#if defined(_MSC_VER)
+	struct _stat64 statbuf;
+	r = _stat64(infilename, &statbuf);
 #else
-	r = (U64) fseeko64(f, 0LL, SEEK_END);
-	r = (U64) ftello64(f);
-	fseeko64(f, 0LL, SEEK_SET);
+	struct stat statbuf;
+	r = stat(infilename, &statbuf);
 #endif
-	return r;
+	if (r || !S_ISREG(statbuf.st_mode)) return 0;   // No good...
+	return (U64)statbuf.st_size;
 }
 
 
@@ -183,7 +191,7 @@ static U64 BMK_GetFileSize(FILE* f)
 //  Public function
 //*********************************************************
 
-int BMK_benchFile(char** fileNamesTable, int nbFiles) 
+int BMK_benchFile(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
   FILE* fileIn;
@@ -203,7 +211,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
   U64 totalz = 0;
   double totalc = 0.;
   double totald = 0.;
-  
+
 
   // Init
   compP.compressionFunction = LZ4_compress;
@@ -222,7 +230,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 	  }
 
 	  // Memory allocation & restrictions
-	  largefilesize = BMK_GetFileSize(fileIn);
+	  largefilesize = BMK_GetFileSize(infilename);
 	  benchedsize = (size_t) BMK_findMaxMem(largefilesize) / 2;
 	  if ((U64)benchedsize > largefilesize) benchedsize = (size_t)largefilesize;
 	  if (benchedsize < largefilesize)
@@ -233,7 +241,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 	  // Alloc
 	  in_buff = malloc((size_t )benchedsize);
 	  nbChunks = (benchedsize / CHUNKSIZE) + 1;
-	  maxCChunkSize = CHUNKSIZE + CHUNKSIZE/255 + 64;
+	  maxCChunkSize = LZ4_compressBound(CHUNKSIZE);
 	  out_buff_size = nbChunks * maxCChunkSize;
 	  out_buff = malloc((size_t )out_buff_size);
 
@@ -288,10 +296,10 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 
 		for (loopNb = 1; loopNb <= NBLOOPS; loopNb++)
 		{
-		  // Compression 
+		  // Compression
 		  DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, infilename, (int)benchedsize);
 		  { size_t i; for (i=0; i<benchedsize; i++) out_buff[i]=(char)i; }     // warmimg up memory
-		  
+
 		  nb_loops = 0;
 		  milliTime = BMK_GetMilliStart();
 		  while(BMK_GetMilliStart() == milliTime);
@@ -299,13 +307,13 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		  while(BMK_GetMilliSpan(milliTime) < TIMELOOP) 
 		  {
 			for (chunkNb=0; chunkNb<nbChunks; chunkNb++) 
-				chunkP[chunkNb].outputSize = compP.compressionFunction(chunkP[chunkNb].inputBuffer, chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputSize);  
+				chunkP[chunkNb].outputSize = compP.compressionFunction(chunkP[chunkNb].inputBuffer, chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputSize);
 			nb_loops++;
 		  }
 		  milliTime = BMK_GetMilliSpan(milliTime);
 
 		  if ((double)milliTime < fastestC*nb_loops) fastestC = (double)milliTime/nb_loops;
-		  cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].outputSize; 
+		  cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].outputSize;
 
 		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000.);
 
@@ -316,17 +324,17 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		  milliTime = BMK_GetMilliStart();
 		  while(BMK_GetMilliStart() == milliTime);
 		  milliTime = BMK_GetMilliStart();
-		  while(BMK_GetMilliSpan(milliTime) < TIMELOOP) 
+		  while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
 		  {
-			for (chunkNb=0; chunkNb<nbChunks; chunkNb++) 
-				chunkP[chunkNb].outputSize = compP.decompressionFunction(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].inputSize);  
+			for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
+				chunkP[chunkNb].outputSize = compP.decompressionFunction(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].inputSize);
 			nb_loops++;
 		  }
 		  milliTime = BMK_GetMilliSpan(milliTime);
 
 		  if ((double)milliTime < fastestD*nb_loops) fastestD = (double)milliTime/nb_loops;
 		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
-		  
+
 		  // CRC Checking
 		  crcd = BMK_checksum(in_buff, benchedsize);
 		  if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); break; }

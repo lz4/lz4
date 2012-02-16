@@ -65,7 +65,6 @@
 
 #define CHUNKSIZE (8<<20)    // 8 MB
 #define CACHELINE 64
-#define OUT_CHUNKSIZE (CHUNKSIZE + (CHUNKSIZE/255) + CACHELINE)
 #define ARCHIVE_MAGICNUMBER 0x184C2102
 #define ARCHIVE_MAGICNUMBER_SIZE 4
 
@@ -166,7 +165,7 @@ int compress_file(char* input_filename, char* output_filename)
 	
 	// Allocate Memory
 	in_buff = (char*)malloc(CHUNKSIZE);
-	out_buff = (char*)malloc(OUT_CHUNKSIZE);
+	out_buff = (char*)malloc(LZ4_compressBound(CHUNKSIZE));
 	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 8; }
 	
 	// Write Archive Header
@@ -234,7 +233,7 @@ int decode_file(char* input_filename, char* output_filename)
 	if (r) return r;
 
 	// Allocate Memory
-	in_buff = (char*)malloc(OUT_CHUNKSIZE);
+	in_buff = (char*)malloc(LZ4_compressBound(CHUNKSIZE));
 	out_buff = (char*)malloc(CHUNKSIZE);
 	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 7; }
 	
