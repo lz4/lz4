@@ -298,7 +298,8 @@ int main(int argc, char** argv)
   int i,
 	  compression=1,   // default action if no argument
 	  decode=0,
-	  bench=0;
+	  bench=0,
+	  filenamesStart=2;
   char* input_filename=0;
   char* output_filename=0;
 #ifdef _WIN32 
@@ -316,16 +317,13 @@ int main(int argc, char** argv)
   for(i=1; i<argc; i++)
   {
     char* argument = argv[i];
-	char command = 0;
 
     if(!argument) continue;   // Protection if argument empty
 
-	if (argument[0]=='-') command++;  // valid command trigger
-
 	// Select command
-	if (command)
+	if (argument[0]=='-')
 	{
-		argument += command;
+		argument ++;
 		
 		// Display help on usage
 		if ( argument[0] =='h' ) { usage(); return 0; }
@@ -339,12 +337,15 @@ int main(int argc, char** argv)
 		// Bench
 		if ( argument[0] =='b' ) { bench=1; continue; }
 
+		// Modify Block Size (benchmark only)
+		if ( argument[0] =='B' ) { int B = argument[1] - '0'; int S = 1 << (10 + 2*B); BMK_SetBlocksize(S); continue; }
+
 		// Test
 		if ( argument[0] =='t' ) { decode=1; output_filename=nulmark; continue; }
 	}
 
 	// first provided filename is input
-    if (!input_filename) { input_filename=argument; continue; }
+    if (!input_filename) { input_filename=argument; filenamesStart=i; continue; }
 
 	// second provided filename is output
     if (!output_filename) 
@@ -358,7 +359,7 @@ int main(int argc, char** argv)
   // No input filename ==> Error
   if(!input_filename) { badusage(); return 1; }
 
-  if (bench) return BMK_benchFile(argv+2, argc-2);
+  if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart);
 
   // No output filename 
   if (!output_filename) { badusage(); return 1; }

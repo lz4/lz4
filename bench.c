@@ -33,6 +33,11 @@
 #define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
 
+// GCC on does not support _rotl outside of Windows
+#if defined(__GNUC__)
+#define _rotl(x,r) ((x << r) | (x >> (32 - r)))
+#endif
+
 
 //**************************************
 // Includes
@@ -72,8 +77,7 @@
 
 #define KNUTH		2654435761U
 #define MAX_MEM		(1984<<20)
-#define CHUNKSIZE   (8<<20)
-#define MAX_NB_CHUNKS ((MAX_MEM / CHUNKSIZE) + 1)
+#define DEFAULT_CHUNKSIZE   (8<<20)
 
 
 //**************************************
@@ -102,6 +106,17 @@ struct compressionParameters
 
 
 
+//**************************************
+// Private Parameters
+//**************************************
+static int chunkSize = DEFAULT_CHUNKSIZE;
+
+void BMK_SetBlocksize(int bsize)
+{
+	chunkSize = bsize;
+	DISPLAY("Using Block Size of %i KB... ", chunkSize>>10);
+}
+
 //*********************************************************
 //  Private functions
 //*********************************************************
@@ -128,28 +143,53 @@ static int BMK_GetMilliSpan( int nTimeStart )
 }
 
 
-static U32 BMK_checksum(char* buff, U32 length)
+static U32 BMK_checksum_MMH3A (char* buff, U32 length)
 {
-	BYTE* p = (BYTE*)buff;
-	BYTE* bEnd = p + length;
-	BYTE* limit = bEnd - 3;
-	U32 idx = 1;
-	U32 crc = KNUTH;
-	
-	while (p<limit)
-	{
-		crc += ((*(U32*)p) + idx++);
-		crc *= KNUTH;
-		p+=4;
-	}
-	while (p<bEnd)
-	{
-		crc += ((*p) + idx++);
-		crc *= KNUTH;
-		p++;
-	}
-	return crc;
-}
+  const BYTE* data = (const BYTE*)buff;
+  const int nblocks = length >> 2;
+
+  U32 h1 = KNUTH;
+  U32 c1 = 0xcc9e2d51;
+  U32 c2 = 0x1b873593;
+
+  const U32* blocks = (const U32*)(data + nblocks*4);
+  int i;
+
+  for(i = -nblocks; i; i++)
+  {
+    U32 k1 = blocks[i];
+
+    k1 *= c1;
+    k1 = _rotl(k1,15);
+    k1 *= c2;
+    
+    h1 ^= k1;
+    h1 = _rotl(h1,13); 
+    h1 = h1*5+0xe6546b64;
+  }
+
+  {
+	  const BYTE* tail = (const BYTE*)(data + nblocks*4);
+	  U32 k1 = 0;
+
+	  switch(length & 3)
+	  {
+	  case 3: k1 ^= tail[2] << 16;
+	  case 2: k1 ^= tail[1] << 8;
+	  case 1: k1 ^= tail[0];
+			  k1 *= c1; k1 = _rotl(k1,15); k1 *= c2; h1 ^= k1;
+	  };
+  }
+
+  h1 ^= length;
+  h1 ^= h1 >> 16;
+  h1 *= 0x85ebca6b;
+  h1 ^= h1 >> 13;
+  h1 *= 0xc2b2ae35;
+  h1 ^= h1 >> 16;
+
+  return h1;
+} 
 
 
 static size_t BMK_findMaxMem(U64 requiredMem)
@@ -203,7 +243,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
   size_t readSize;
   char* in_buff;
   char* out_buff; int out_buff_size;
-  struct chunkParameters chunkP[MAX_NB_CHUNKS];
+  struct chunkParameters* chunkP;
   U32 crcc, crcd;
   struct compressionParameters compP;
 
@@ -239,11 +279,13 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 	  }
 
 	  // Alloc
+	  chunkP = (struct chunkParameters*) malloc(((benchedsize / chunkSize)+1) * sizeof(struct chunkParameters));
 	  in_buff = malloc((size_t )benchedsize);
-	  nbChunks = (benchedsize / CHUNKSIZE) + 1;
-	  maxCChunkSize = LZ4_compressBound(CHUNKSIZE);
+	  nbChunks = (benchedsize / chunkSize) + 1;
+	  maxCChunkSize = LZ4_compressBound(chunkSize);
 	  out_buff_size = nbChunks * maxCChunkSize;
 	  out_buff = malloc((size_t )out_buff_size);
+
 
 	  if(!in_buff || !out_buff)
 	  {
@@ -263,8 +305,8 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		  for (i=0; i<nbChunks; i++)
 		  {
 			  chunkP[i].id = i;
-			  chunkP[i].inputBuffer = in; in += CHUNKSIZE;
-			  if (remaining > CHUNKSIZE) { chunkP[i].inputSize = CHUNKSIZE; remaining -= CHUNKSIZE; } else { chunkP[i].inputSize = remaining; remaining = 0; }
+			  chunkP[i].inputBuffer = in; in += chunkSize;
+			  if ((int)remaining > chunkSize) { chunkP[i].inputSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].inputSize = remaining; remaining = 0; }
 			  chunkP[i].outputBuffer = out; out += maxCChunkSize;
 			  chunkP[i].outputSize = 0;
 		  }
@@ -284,7 +326,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 	  }
 
 	  // Calculating input Checksum
-	  crcc = BMK_checksum(in_buff, benchedsize);
+	  crcc = BMK_checksum_MMH3A(in_buff, benchedsize);
 
 
 	  // Bench
@@ -336,7 +378,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
 
 		  // CRC Checking
-		  crcd = BMK_checksum(in_buff, benchedsize);
+		  crcd = BMK_checksum_MMH3A(in_buff, benchedsize);
 		  if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); break; }
 		}
 
@@ -349,6 +391,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 
 	  free(in_buff);
 	  free(out_buff);
+	  free(chunkP);
   }
 
   if (nbFiles > 1)

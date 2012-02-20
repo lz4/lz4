@@ -29,6 +29,9 @@ extern "C" {
 
 int BMK_benchFile(char** fileNamesTable, int nbFiles) ;
 
+// Parameters
+void BMK_SetBlocksize(int bsize);
+
 
 
 #if defined (__cplusplus)
