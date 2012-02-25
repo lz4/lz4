@@ -45,6 +45,13 @@
 // The default value (6) is recommended
 #define NOTCOMPRESSIBLE_CONFIRMATION 6
 
+// LZ4_COMPRESSMIN :
+// Compression function will *fail* if it is not successful at compressing input by at least LZ4_COMPRESSMIN bytes
+// Since the compression function stops working prematurely, it results in a speed gain
+// The output however is unusable. Compression function result will be zero.
+// Default : 0 = disabled
+#define LZ4_COMPRESSMIN 0
+
 // BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
 // This will provide a boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
 // You can set this option to 1 in situations where data will stay within closed environment
@@ -92,13 +99,13 @@
 #endif
 
 #ifdef _MSC_VER
-#define inline __forceinline    // Visual is not C99, but supports inline
+#define inline __forceinline    // Visual is not C99, but supports some kind of inline
 #endif
 
 #ifdef _MSC_VER  // Visual Studio
-#define bswap16(i) _byteswap_ushort(i)
+#define bswap16(x) _byteswap_ushort(x)
 #else
-#define bswap16(i) (((i)>>8) | ((i)<<8))
+#define bswap16(x)  ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
 #endif
 
 
@@ -429,6 +436,7 @@ _last_literals:
 	// Encode Last Literals
 	{
 		int lastRun = iend - anchor;
+		if ((LZ4_COMPRESSMIN>0) && (((op - (BYTE*)dest) + lastRun + 1 + ((lastRun-15)/255)) > isize - LZ4_COMPRESSMIN)) return 0;
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
 		else *op++ = (lastRun<<ML_BITS);
 		memcpy(op, anchor, iend - anchor);
@@ -570,6 +578,7 @@ _last_literals:
 	// Encode Last Literals
 	{
 		int lastRun = iend - anchor;
+		if ((LZ4_COMPRESSMIN>0) && (((op - (BYTE*)dest) + lastRun + 1 + ((lastRun-15)/255)) > isize - LZ4_COMPRESSMIN)) return 0;
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
 		else *op++ = (lastRun<<ML_BITS);
 		memcpy(op, anchor, iend - anchor);
