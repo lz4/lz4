@@ -33,8 +33,8 @@
 #define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
 
-// GCC on does not support _rotl outside of Windows
-#if defined(__GNUC__)
+// GCC does not support _rotl outside of Windows
+#if !defined(_WIN32)
 #define _rotl(x,r) ((x << r) | (x >> (32 - r)))
 #endif
 
@@ -42,8 +42,8 @@
 //**************************************
 // Includes
 //**************************************
-#include <stdio.h>      // fprintf, fopen, ftello64
 #include <stdlib.h>     // malloc
+#include <stdio.h>      // fprintf, fopen, ftello64
 #include <sys/timeb.h>  // timeb
 #include <sys/types.h>  // stat64
 #include <sys/stat.h>   // stat64
@@ -370,6 +370,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		  {
 			for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
 				chunkP[chunkNb].outputSize = compP.decompressionFunction(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].inputSize);
+				//LZ4_uncompress_unknownOutputSize(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].outputSize, chunkP[chunkNb].inputSize);  // For testing
 			nb_loops++;
 		  }
 		  milliTime = BMK_GetMilliSpan(milliTime);

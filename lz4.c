@@ -92,20 +92,21 @@
 //**************************************
 // Compiler Options
 //**************************************
-#if __STDC_VERSION__ >= 199901L    // C99
-  /* "restrict" is a known keyword */
+#if __STDC_VERSION__ >= 199901L // C99
+/* "restrict" is a known keyword */
 #else
-#define restrict  // Disable restrict
-#endif
-
-#ifdef _MSC_VER
-#define inline __forceinline    // Visual is not C99, but supports some kind of inline
+#define restrict // Disable restrict
 #endif
 
 #ifdef _MSC_VER  // Visual Studio
+#define inline __forceinline // Visual is not C99, but supports some kind of inline
+#include <intrin.h>          // _BitScanForward
+#endif
+
+#ifdef _MSC_VER 
 #define bswap16(x) _byteswap_ushort(x)
 #else
-#define bswap16(x)  ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
+#define bswap16(x) ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
 #endif
 
 
@@ -209,6 +210,14 @@ typedef struct _U64_S { U64 v; } U64_S;
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { A16(p) = v; p+=2; }
 #endif
 
+#if __GNUC__ >= 3
+# define expect(expr,value)         __builtin_expect ((expr),(value))
+#else
+# define expect(expr,value)         (expr)
+#endif
+
+#define expect_true(expr)  expect ((expr) != 0, 1)
+#define expect_false(expr) expect ((expr) != 0, 0)
 
 //**************************************
 // Local structures
@@ -372,7 +381,7 @@ int LZ4_compressCtx(void** ctx,
 			ip = forwardIp;
 			forwardIp = ip + step;
 
-			if (forwardIp > mflimit) { goto _last_literals; }
+			if (expect_false(forwardIp > mflimit)) { goto _last_literals; }
 
 			forwardH = LZ4_HASH_VALUE(forwardIp);
 			ref = base + HashTable[h];
@@ -381,7 +390,7 @@ int LZ4_compressCtx(void** ctx,
 		} while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
 
 		// Catch up
-		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }
+		while ((expect_false(ip>anchor) && expect_false(ref>(BYTE*)source) && (ip[-1]==ref[-1]))) { ip--; ref--; }
 
 		// Encode Literal length
 		length = ip - anchor;
@@ -399,7 +408,7 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (ip<matchlimit-(STEPSIZE-1))
+		while (expect_true(ip<matchlimit-(STEPSIZE-1)))
 		{
 			UARCH diff = AARCH(ref) ^ AARCH(ip);
 			if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
@@ -523,7 +532,7 @@ int LZ4_compress64kCtx(void** ctx,
 		} while (A32(ref) != A32(ip));
 
 		// Catch up
-		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }
+		while (((ip>anchor) && expect_false(ref>(BYTE*)source) && (ip[-1]==ref[-1]))) { ip--; ref--; }
 
 		// Encode Literal length
 		length = ip - anchor;
@@ -567,7 +576,7 @@ _endCount:
 		// Test next position
 		ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
 		HashTable[LZ4_HASH64K_VALUE(ip)] = ip - base;
-		if (A32(ref) == A32(ip)) { token = op++; *token=0; goto _next_match; }
+		if (expect_true(A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
 		anchor = ip++;
@@ -618,7 +627,8 @@ int LZ4_compress(const char* source,
 
 // Note : The decoding functions LZ4_uncompress() and LZ4_uncompress_unknownOutputSize()
 //		are safe against "buffer overflow" attack type.
-//		They will never write nor read outside of the provided input and output buffers.
+//		They will never write nor read outside of the provided output buffers.
+//      LZ4_uncompress_unknownOutputSize() also insures that it will never read outside of the input buffer.
 //		A corrupted input will produce an error result, a negative int, indicating the position of the error within input stream.
 
 int LZ4_uncompress(const char* source,
@@ -648,7 +658,7 @@ int LZ4_uncompress(const char* source,
 
 		// copy literals
 		cpy = op+length;
-		if (cpy>oend-COPYLENGTH)
+		if (expect_false(cpy>oend-COPYLENGTH))
 		{
 			if (cpy > oend) goto _output_error;
 			memcpy(op, ip, length);
@@ -665,7 +675,7 @@ int LZ4_uncompress(const char* source,
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; }
 
 		// copy repeated sequence
-		if (op-ref<STEPSIZE)
+		if (expect_false(op-ref<STEPSIZE))
 		{
 #if LZ4_ARCH64
 			size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
@@ -719,40 +729,42 @@ int LZ4_uncompress_unknownOutputSize(
 	BYTE* const oend = op + maxOutputSize;
 	BYTE* cpy;
 
-	BYTE token;
-	
-	int	len, length;
 	size_t dec[] ={0, 3, 2, 3, 0, 0, 0, 0};
 
 
 	// Main Loop
 	while (ip<iend)
 	{
+		BYTE token;
+		int length;
+
 		// get runlength
 		token = *ip++;
-		if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; }
+		if ((length=(token>>ML_BITS)) == RUN_MASK) { int s=255; while ((ip<iend) && (s==255)) { s=*ip++; length += s; } }
 
 		// copy literals
 		cpy = op+length;
-		if (cpy>oend-COPYLENGTH)
+		if ((cpy>oend-COPYLENGTH) || (ip+length>iend-COPYLENGTH))
 		{
 			if (cpy > oend) goto _output_error;
+			if (ip+length > iend) goto _output_error;
 			memcpy(op, ip, length);
 			op += length;
-			break;    // Necessarily EOF
+			ip += length;
+			if (ip<iend) goto _output_error;
+			break;    // Necessarily EOF, due to parsing restrictions
 		}
 		LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
-		if (ip>=iend) break;    // check EOF
 
 		// get offset
 		LZ4_READ_LITTLEENDIAN_16(ref,cpy,ip); ip+=2;
 		if (ref < (BYTE* const)dest) goto _output_error;
 
 		// get matchlength
-		if ((length=(token&ML_MASK)) == ML_MASK) { for (;(len=*ip++)==255;length+=255){} length += len; }
+		if ((length=(token&ML_MASK)) == ML_MASK) { while (ip<iend) { int s = *ip++; length +=s; if (s==255) continue; break; } }
 
 		// copy repeated sequence
-		if (op-ref<STEPSIZE)
+		if (expect_false(op-ref<STEPSIZE))
 		{
 #if LZ4_ARCH64
 			size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};

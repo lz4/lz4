@@ -1,23 +1,25 @@
 LZ4 Format Description
-Last revised: 2012-02-12
+Last revised: 2012-02-27
 Author : Y. Collet
 
 
 
-This is not a formal specification, but intents to provide enough information
-to anyone willing to produce LZ4-compatible compressed streams.
+This small specification intents to provide enough information
+to anyone willing to produce LZ4-compatible compressed streams
+using any programming language.
 
 LZ4 is an LZ77-type compressor with a fixed, byte-oriented encoding.
-There is no entropy encoder backend nor framing layer -- the latter is
-assumed to be handled by other parts of the system.
-
-This document only describes the format, not how the LZ4 compressor nor
-decompressor actually works. The correctness of the decompressor should not
-depend on implementation details of the compressor, and vice versa.
-
 The most important design principle behind LZ4 is simplicity.
-It is meant to create an easy to read and maintain source code.
+It helps to create an easy to read and maintain source code.
 It also helps later on for optimisations, compactness, and speed.
+There is no entropy encoder backend nor framing layer.
+The latter is assumed to be handled by other parts of the system.
+
+This document only describes the format,
+not how the LZ4 compressor nor decompressor actually work.
+The correctness of the decompressor should not depend
+on implementation details of the compressor, and vice versa.
+
 
 
 -- Compressed stream format --
@@ -32,8 +34,8 @@ Therefore each field ranges from 0 to 15.
 
 The first field uses the 4 high-bits of the token.
 It provides the length of literals to follow.
-A literal is a not-compressed byte.
-If it is 0, then there is no literal.
+(Note : a literal is a not-compressed byte).
+If the field value is 0, then there is no literal.
 If it is 15, then we need to add some more bytes to indicate the full length.
 Each additionnal byte then represent a value from 0 to 255,
 which is added to the previous value to produce a total length.
@@ -107,7 +109,7 @@ and stops right after literals.
 
 There is no assumption nor limits to the way the compressor
 searches and selects matches within the source stream.
-It could be a fast scan,  a multi-probe, a full search using BST,
+It could be a fast scan, a multi-probe, a full search using BST,
 standard hash chains or MMC, well whatever.
 
 Advanced parsing strategies can also be implemented, such as lazy match,
@@ -115,5 +117,5 @@ or full optimal parsing.
 
 All these trade-off offer distinctive speed/memory/compression advantages.
 Whatever the method used by the compressor, its result will be decodable
-by any LZ4 decoder if it follows the format described above.
+by any LZ4 decoder if it follows the format specification described above.
 
