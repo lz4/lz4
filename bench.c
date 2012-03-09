@@ -47,7 +47,10 @@
 #include <sys/timeb.h>  // timeb
 #include <sys/types.h>  // stat64
 #include <sys/stat.h>   // stat64
+
 #include "lz4.h"
+#define DEFAULTCOMPRESSOR LZ4_compress
+
 
 
 //**************************************
@@ -107,15 +110,23 @@ struct compressionParameters
 
 
 //**************************************
-// Private Parameters
+// Benchmark Parameters
 //**************************************
 static int chunkSize = DEFAULT_CHUNKSIZE;
+static int nbIterations = NBLOOPS;
 
 void BMK_SetBlocksize(int bsize)
 {
 	chunkSize = bsize;
-	DISPLAY("Using Block Size of %i KB... ", chunkSize>>10);
+	DISPLAY("-Using Block Size of %i KB-", chunkSize>>10);
 }
+
+void BMK_SetNbIterations(int nbLoops)
+{
+	nbIterations = nbLoops;
+	DISPLAY("- %i iterations-", nbIterations);
+}
+
 
 //*********************************************************
 //  Private functions
@@ -231,7 +242,7 @@ static U64 BMK_GetFileSize(char* infilename)
 //  Public function
 //*********************************************************
 
-int BMK_benchFile(char** fileNamesTable, int nbFiles)
+int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 {
   int fileIdx=0;
   FILE* fileIn;
@@ -244,7 +255,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
   char* in_buff;
   char* out_buff; int out_buff_size;
   struct chunkParameters* chunkP;
-  U32 crcc, crcd;
+  U32 crcc, crcd=0;
   struct compressionParameters compP;
 
   U64 totals = 0;
@@ -254,7 +265,13 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 
 
   // Init
-  compP.compressionFunction = LZ4_compress;
+  switch (cLevel)
+  {
+#ifdef COMPRESSOR0
+  case 0 : compP.compressionFunction = COMPRESSOR0; break;
+#endif
+  default : compP.compressionFunction = DEFAULTCOMPRESSOR;
+  }
   compP.decompressionFunction = LZ4_uncompress;
 
   // Loop for each file
@@ -313,7 +330,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 	  }
 
 	  // Fill input buffer
-	  DISPLAY("Loading %s...    \r", infilename);
+	  DISPLAY("Loading %s...       \r", infilename);
 	  readSize = fread(in_buff, 1, benchedsize, fileIn);
 	  fclose(fileIn);
 
@@ -332,11 +349,13 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 	  // Bench
 	  {
 		int loopNb, nb_loops, chunkNb;
-		size_t cSize;
+		size_t cSize=0;
 	    int milliTime;
 		double fastestC = 100000000., fastestD = 100000000.;
+		double ratio=0.;
 
-		for (loopNb = 1; loopNb <= NBLOOPS; loopNb++)
+		DISPLAY("\r%79s\r", "");
+		for (loopNb = 1; loopNb <= nbIterations; loopNb++)
 		{
 		  // Compression
 		  DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, infilename, (int)benchedsize);
@@ -356,8 +375,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 
 		  if ((double)milliTime < fastestC*nb_loops) fastestC = (double)milliTime/nb_loops;
 		  cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].outputSize;
+		  ratio = (double)cSize/(double)benchedsize*100.;
 
-		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000.);
+		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000.);
 
 		  // Decompression 
 		  { size_t i; for (i=0; i<benchedsize; i++) in_buff[i]=0; }     // zeroing area, for CRC checking
@@ -370,20 +390,25 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles)
 		  {
 			for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
 				chunkP[chunkNb].outputSize = compP.decompressionFunction(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].inputSize);
-				//LZ4_uncompress_unknownOutputSize(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].outputSize, chunkP[chunkNb].inputSize);  // For testing
 			nb_loops++;
 		  }
 		  milliTime = BMK_GetMilliSpan(milliTime);
 
 		  if ((double)milliTime < fastestD*nb_loops) fastestD = (double)milliTime/nb_loops;
-		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
 
 		  // CRC Checking
 		  crcd = BMK_checksum_MMH3A(in_buff, benchedsize);
 		  if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); break; }
 		}
 
-	    DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", infilename, (int)benchedsize, (int)cSize, (double)cSize/(double)benchedsize*100., (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+	    if (crcc==crcd) 
+		{
+			if (ratio<100.)
+				DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+			else
+				DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%), %6.1f MB/s , %6.1f MB/s \n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+		}
 		totals += benchedsize;
 		totalz += cSize;
 		totalc += fastestC;

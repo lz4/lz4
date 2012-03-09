@@ -23,8 +23,8 @@
 /*
 	Note : this is *only* a demo program, an example to show how LZ4 can be used.
 	It is not considered part of LZ4 compression library.
-	The license of the demo program is GPL.
 	The license of LZ4 is BSD.
+	The license of the demo program is GPL.
 */
 
 //****************************
@@ -340,6 +340,9 @@ int main(int argc, char** argv)
 		// Modify Block Size (benchmark only)
 		if ( argument[0] =='B' ) { int B = argument[1] - '0'; int S = 1 << (10 + 2*B); BMK_SetBlocksize(S); continue; }
 
+		// Modify Nb Iterations (benchmark only)
+		if ( argument[0] =='i' ) { int iters = argument[1] - '0'; BMK_SetNbIterations(iters); continue; }
+
 		// Test
 		if ( argument[0] =='t' ) { decode=1; output_filename=nulmark; continue; }
 	}
@@ -359,7 +362,7 @@ int main(int argc, char** argv)
   // No input filename ==> Error
   if(!input_filename) { badusage(); return 1; }
 
-  if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart);
+  if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, 0);
 
   // No output filename 
   if (!output_filename) { badusage(); return 1; }

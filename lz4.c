@@ -98,6 +98,8 @@
 #define restrict // Disable restrict
 #endif
 
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+
 #ifdef _MSC_VER  // Visual Studio
 #define inline __forceinline // Visual is not C99, but supports some kind of inline
 #include <intrin.h>          // _BitScanForward
@@ -108,6 +110,15 @@
 #else
 #define bswap16(x) ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
 #endif
+
+#if (GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
+# define expect(expr,value)    (__builtin_expect ((expr),(value)) )
+#else
+# define expect(expr,value)    (expr)
+#endif
+
+#define likely(expr)     expect((expr) != 0, 1)
+#define unlikely(expr)   expect((expr) != 0, 0)
 
 
 //**************************************
@@ -210,14 +221,6 @@ typedef struct _U64_S { U64 v; } U64_S;
 #define LZ4_WRITE_LITTLEENDIAN_16(p,v) { A16(p) = v; p+=2; }
 #endif
 
-#if __GNUC__ >= 3
-# define expect(expr,value)         __builtin_expect ((expr),(value))
-#else
-# define expect(expr,value)         (expr)
-#endif
-
-#define expect_true(expr)  expect ((expr) != 0, 1)
-#define expect_false(expr) expect ((expr) != 0, 0)
 
 //**************************************
 // Local structures
@@ -249,7 +252,7 @@ inline static int LZ4_NbCommonBytes (register U64 val)
     unsigned long r = 0;
     _BitScanReverse64( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clzll(val) >> 3); 
     #else
 	int r;
@@ -263,7 +266,7 @@ inline static int LZ4_NbCommonBytes (register U64 val)
     unsigned long r = 0;
     _BitScanForward64( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctzll(val) >> 3); 
     #else
 	static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
@@ -281,7 +284,7 @@ inline static int LZ4_NbCommonBytes (register U32 val)
     unsigned long r = 0;
     _BitScanReverse( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clz(val) >> 3); 
     #else
 	int r;
@@ -294,7 +297,7 @@ inline static int LZ4_NbCommonBytes (register U32 val)
     unsigned long r = 0;
     _BitScanForward( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3); 
     #else
 	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
@@ -381,7 +384,7 @@ int LZ4_compressCtx(void** ctx,
 			ip = forwardIp;
 			forwardIp = ip + step;
 
-			if (expect_false(forwardIp > mflimit)) { goto _last_literals; }
+			if unlikely(forwardIp > mflimit) { goto _last_literals; }
 
 			forwardH = LZ4_HASH_VALUE(forwardIp);
 			ref = base + HashTable[h];
@@ -390,7 +393,7 @@ int LZ4_compressCtx(void** ctx,
 		} while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
 
 		// Catch up
-		while ((expect_false(ip>anchor) && expect_false(ref>(BYTE*)source) && (ip[-1]==ref[-1]))) { ip--; ref--; }
+		while ((ip>anchor) && (ref>(BYTE*)source) && unlikely(ip[-1]==ref[-1])) { ip--; ref--; }
 
 		// Encode Literal length
 		length = ip - anchor;
@@ -408,7 +411,7 @@ _next_match:
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
 		anchor = ip;
-		while (expect_true(ip<matchlimit-(STEPSIZE-1)))
+		while likely(ip<matchlimit-(STEPSIZE-1))
 		{
 			UARCH diff = AARCH(ref) ^ AARCH(ip);
 			if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
@@ -532,7 +535,7 @@ int LZ4_compress64kCtx(void** ctx,
 		} while (A32(ref) != A32(ip));
 
 		// Catch up
-		while (((ip>anchor) && expect_false(ref>(BYTE*)source) && (ip[-1]==ref[-1]))) { ip--; ref--; }
+		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }
 
 		// Encode Literal length
 		length = ip - anchor;
@@ -576,7 +579,7 @@ _endCount:
 		// Test next position
 		ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
 		HashTable[LZ4_HASH64K_VALUE(ip)] = ip - base;
-		if (expect_true(A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
+		if (A32(ref) == A32(ip)) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
 		anchor = ip++;
@@ -658,7 +661,7 @@ int LZ4_uncompress(const char* source,
 
 		// copy literals
 		cpy = op+length;
-		if (expect_false(cpy>oend-COPYLENGTH))
+		if unlikely(cpy>oend-COPYLENGTH)
 		{
 			if (cpy > oend) goto _output_error;
 			memcpy(op, ip, length);
@@ -675,7 +678,7 @@ int LZ4_uncompress(const char* source,
 		if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; }
 
 		// copy repeated sequence
-		if (expect_false(op-ref<STEPSIZE))
+		if unlikely(op-ref<STEPSIZE)
 		{
 #if LZ4_ARCH64
 			size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
@@ -764,7 +767,7 @@ int LZ4_uncompress_unknownOutputSize(
 		if ((length=(token&ML_MASK)) == ML_MASK) { while (ip<iend) { int s = *ip++; length +=s; if (s==255) continue; break; } }
 
 		// copy repeated sequence
-		if (expect_false(op-ref<STEPSIZE))
+		if unlikely(op-ref<STEPSIZE)
 		{
 #if LZ4_ARCH64
 			size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
