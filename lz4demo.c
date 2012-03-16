@@ -45,10 +45,19 @@
 //**************************************
 // Compiler functions
 //**************************************
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+
 #if defined(_MSC_VER)    // Visual Studio 
 #define swap32 _byteswap_ulong
-#else    // GCC assumed
+#elif GCC_VERSION >= 402
 #define swap32 __builtin_bswap32
+#else
+static inline unsigned int swap32(unsigned int x) {
+			return	((x << 24) & 0xff000000 ) |
+				((x <<  8) & 0x00ff0000 ) |
+				((x >>  8) & 0x0000ff00 ) |
+				((x >> 24) & 0x000000ff );
+		 }
 #endif
 
 
