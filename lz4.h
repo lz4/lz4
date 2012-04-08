@@ -7,14 +7,14 @@
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
    met:
-  
+
        * Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
        * Redistributions in binary form must reproduce the above
    copyright notice, this list of conditions and the following disclaimer
    in the documentation and/or other materials provided with the
    distribution.
-  
+
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -46,7 +46,7 @@ LZ4_compress() :
 	isize  : is the input size. Max supported value is ~1.9GB
 	return : the number of bytes written in buffer dest
 			 or 0 if the compression fails (if LZ4_COMPRESSMIN is set)
-	note : destination buffer must be already allocated. 
+	note : destination buffer must be already allocated.
 		destination buffer must be sized to handle worst cases situations (input data not compressible)
 		worst case size evaluation is provided by function LZ4_compressBound()
 

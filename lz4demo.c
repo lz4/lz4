@@ -34,7 +34,7 @@
 #include <stdlib.h>		// malloc
 #include <string.h>		// strcmp
 #include <time.h>		// clock
-#ifdef _WIN32 
+#ifdef _WIN32
 #include <io.h>			// _setmode
 #include <fcntl.h>		// _O_BINARY
 #endif
@@ -47,7 +47,7 @@
 //**************************************
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
-#if defined(_MSC_VER)    // Visual Studio 
+#if defined(_MSC_VER)    // Visual Studio
 #define swap32 _byteswap_ulong
 #elif GCC_VERSION >= 402
 #define swap32 __builtin_bswap32
@@ -105,7 +105,7 @@ int usage()
 	DISPLAY( " -d : decompression \n");
 	DISPLAY( " -b : benchmark with files\n");
 	DISPLAY( " -t : check compressed file \n");
-	DISPLAY( " -h : help (this text)\n");	
+	DISPLAY( " -h : help (this text)\n");
 	DISPLAY( "input  : can be 'stdin' (pipe) or a filename\n");
 	DISPLAY( "output : can be 'stdout'(pipe) or a filename or 'null'\n");
 	return 0;
@@ -145,7 +145,7 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
 	} else {
 		*pfoutput = fopen( output_filename, "wb" );
 	}
-	
+
 	if ( *pfinput==0 ) { DISPLAY( "Pb opening %s\n", input_filename);  return 2; }
 	if ( *pfoutput==0) { DISPLAY( "Pb opening %s\n", output_filename); return 3; }
 
@@ -171,12 +171,12 @@ int compress_file(char* input_filename, char* output_filename)
 	start = clock();
 	r = get_fileHandle(input_filename, output_filename, &finput, &foutput);
 	if (r) return r;
-	
+
 	// Allocate Memory
 	in_buff = (char*)malloc(CHUNKSIZE);
 	out_buff = (char*)malloc(LZ4_compressBound(CHUNKSIZE));
 	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 8; }
-	
+
 	// Write Archive Header
 	u32var = ARCHIVE_MAGICNUMBER;
 	LITTLE_ENDIAN32(u32var);
@@ -184,8 +184,8 @@ int compress_file(char* input_filename, char* output_filename)
 	fwrite(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, foutput);
 
 	// Main Loop
-	while (1) 
-	{	
+	while (1)
+	{
 		int outSize;
 		// Read Block
 	    int inSize = fread(in_buff, 1, CHUNKSIZE, finput);
@@ -205,7 +205,7 @@ int compress_file(char* input_filename, char* output_filename)
 
 	// Status
 	end = clock();
-	DISPLAY( "Compressed %llu bytes into %llu bytes ==> %.2f%%\n", 
+	DISPLAY( "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
 		(unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
 	{
 		double seconds = (double)(end - start)/CLOCKS_PER_SEC;
@@ -245,7 +245,7 @@ int decode_file(char* input_filename, char* output_filename)
 	in_buff = (char*)malloc(LZ4_compressBound(CHUNKSIZE));
 	out_buff = (char*)malloc(CHUNKSIZE);
 	if (!in_buff || !out_buff) { DISPLAY("Allocation error : not enough memory\n"); return 7; }
-	
+
 	// Check Archive Header
 	uselessRet = fread(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, finput);
 	nextSize = *(unsigned int*)out_buff;
@@ -259,8 +259,8 @@ int decode_file(char* input_filename, char* output_filename)
 	LITTLE_ENDIAN32(nextSize);
 
 	// Main Loop
-	while (1) 
-	{	
+	while (1)
+	{
 		// Read Block
 	    uselessRet = fread(in_buff, 1, nextSize, finput);
 
@@ -302,7 +302,7 @@ int decode_file(char* input_filename, char* output_filename)
 }
 
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
   int i,
 	  compression=1,   // default action if no argument
@@ -311,7 +311,7 @@ int main(int argc, char** argv)
 	  filenamesStart=2;
   char* input_filename=0;
   char* output_filename=0;
-#ifdef _WIN32 
+#ifdef _WIN32
   char nulmark[] = "nul";
 #else
   char nulmark[] = "/dev/null";
@@ -333,7 +333,7 @@ int main(int argc, char** argv)
 	if (argument[0]=='-')
 	{
 		argument ++;
-		
+
 		// Display help on usage
 		if ( argument[0] =='h' ) { usage(); return 0; }
 
@@ -360,11 +360,11 @@ int main(int argc, char** argv)
     if (!input_filename) { input_filename=argument; filenamesStart=i; continue; }
 
 	// second provided filename is output
-    if (!output_filename) 
-	{ 
-		output_filename=argument; 
+    if (!output_filename)
+	{
+		output_filename=argument;
 		if (!strcmp (output_filename, nullinput)) output_filename = nulmark;
-		continue; 
+		continue;
 	}
   }
 
@@ -373,7 +373,7 @@ int main(int argc, char** argv)
 
   if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, 0);
 
-  // No output filename 
+  // No output filename
   if (!output_filename) { badusage(); return 1; }
 
   if (decode) return decode_file(input_filename, output_filename);

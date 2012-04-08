@@ -173,9 +173,9 @@ static U32 BMK_checksum_MMH3A (char* buff, U32 length)
     k1 *= c1;
     k1 = _rotl(k1,15);
     k1 *= c2;
-    
+
     h1 ^= k1;
-    h1 = _rotl(h1,13); 
+    h1 = _rotl(h1,13);
     h1 = h1*5+0xe6546b64;
   }
 
@@ -200,7 +200,7 @@ static U32 BMK_checksum_MMH3A (char* buff, U32 length)
   h1 ^= h1 >> 16;
 
   return h1;
-} 
+}
 
 
 static size_t BMK_findMaxMem(U64 requiredMem)
@@ -365,9 +365,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  milliTime = BMK_GetMilliStart();
 		  while(BMK_GetMilliStart() == milliTime);
 		  milliTime = BMK_GetMilliStart();
-		  while(BMK_GetMilliSpan(milliTime) < TIMELOOP) 
+		  while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
 		  {
-			for (chunkNb=0; chunkNb<nbChunks; chunkNb++) 
+			for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
 				chunkP[chunkNb].outputSize = compP.compressionFunction(chunkP[chunkNb].inputBuffer, chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputSize);
 			nb_loops++;
 		  }
@@ -379,7 +379,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
 		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000.);
 
-		  // Decompression 
+		  // Decompression
 		  { size_t i; for (i=0; i<benchedsize; i++) in_buff[i]=0; }     // zeroing area, for CRC checking
 
 		  nb_loops = 0;
@@ -402,7 +402,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); break; }
 		}
 
-	    if (crcc==crcd) 
+	    if (crcc==crcd)
 		{
 			if (ratio<100.)
 				DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
