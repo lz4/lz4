@@ -85,7 +85,8 @@ LZ4_uncompress_unknownOutputSize() :
 	return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
 			 If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
 			 This function never writes beyond dest + maxOutputSize, and is therefore protected against malicious data packets
-	note   : This version is slightly slower than LZ4_uncompress()
+	note   : Destination buffer must be already allocated.
+	         This version is slightly slower than LZ4_uncompress()
 */
 
 
