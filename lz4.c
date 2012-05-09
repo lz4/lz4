@@ -85,9 +85,10 @@
 #  define LZ4_FORCE_UNALIGNED_ACCESS 1
 #endif
 
-// Uncomment this parameter if your target system or compiler does not support hardware bit count
-//#define LZ4_FORCE_SW_BITCOUNT
-
+// Define this parameter if your target system or compiler does not support hardware bit count
+#if defined(_MSC_VER) && defined(_WIN32_WCE)            // Visual Studio for Windows CE does not support Hardware bit count
+#  define LZ4_FORCE_SW_BITCOUNT
+#endif
 
 
 //**************************************
@@ -103,7 +104,6 @@
 
 #ifdef _MSC_VER  // Visual Studio
 #  define inline __forceinline           // Visual is not C99, but supports some kind of inline
-#  include <intrin.h>                    // _BitScanForward
 #  if LZ4_ARCH64	// 64-bit
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005

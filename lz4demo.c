@@ -28,6 +28,12 @@
 */
 
 //****************************
+// Warning messages
+//****************************
+#define _CRT_SECURE_NO_WARNINGS    // Visual (must be first line)
+
+
+//****************************
 // Includes
 //****************************
 #include <stdio.h>		// fprintf, fopen, fread, _fileno(?)
