@@ -24,6 +24,8 @@
 //**************************************
 // Compiler Options
 //**************************************
+// Visual warning messages
+#define _CRT_SECURE_NO_WARNINGS
 
 // Under Linux at least, pull in the *64 commands
 #define _LARGEFILE64_SOURCE
