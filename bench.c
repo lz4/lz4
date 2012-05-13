@@ -1,6 +1,7 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
     Copyright (C) Yann Collet 2012
+	GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,6 +52,9 @@
 #include <sys/stat.h>   // stat64
 
 #include "lz4.h"
+#define COMPRESSOR0 LZ4_compress
+#include "lz4hc.h"
+#define COMPRESSOR1 LZ4_compressHC
 #define DEFAULTCOMPRESSOR LZ4_compress
 
 
@@ -271,6 +275,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   {
 #ifdef COMPRESSOR0
   case 0 : compP.compressionFunction = COMPRESSOR0; break;
+#endif
+#ifdef COMPRESSOR1
+  case 1 : compP.compressionFunction = COMPRESSOR1; break;
 #endif
   default : compP.compressionFunction = DEFAULTCOMPRESSOR;
   }

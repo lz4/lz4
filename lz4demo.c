@@ -1,6 +1,7 @@
 /*
     LZ4Demo - Demo CLI program using LZ4 compression
-    Copyright (C) Yann Collet 2011,
+    Copyright (C) Yann Collet 2011-2012
+	GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -45,6 +46,7 @@
 #include <fcntl.h>		// _O_BINARY
 #endif
 #include "lz4.h"
+#include "lz4hc.h"
 #include "bench.h"
 
 
@@ -106,9 +108,10 @@ int usage(char* exename)
 	DISPLAY( "Usage :\n");
 	DISPLAY( "      %s [arg] input output\n", exename);
 	DISPLAY( "Arguments :\n");
-	DISPLAY( " -c : compression (default)\n");
+	DISPLAY( " -c0: Fast compression (default) \n");
+	DISPLAY( " -c1: High compression \n");
 	DISPLAY( " -d : decompression \n");
-	DISPLAY( " -b : benchmark with files\n");
+	DISPLAY( " -b#: Benchmark files, using # compression level\n");
 	DISPLAY( " -t : check compressed file \n");
 	DISPLAY( " -h : help (this text)\n");
 	DISPLAY( "input  : can be 'stdin' (pipe) or a filename\n");
@@ -159,8 +162,9 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
 
 
 
-int compress_file(char* input_filename, char* output_filename)
+int compress_file(char* input_filename, char* output_filename, int compressionlevel)
 {
+	int (*compressionFunction)(const char*, char*, int);
 	unsigned long long filesize = 0;
 	unsigned long long compressedfilesize = ARCHIVE_MAGICNUMBER_SIZE;
 	unsigned int u32var;
@@ -169,10 +173,17 @@ int compress_file(char* input_filename, char* output_filename)
 	FILE* finput;
 	FILE* foutput;
 	int r;
+	int displayLevel = (compressionlevel>0);
 	clock_t start, end;
 
 
 	// Init
+	switch (compressionlevel)
+	{
+	case 0 : compressionFunction = LZ4_compress; break;
+	case 1 : compressionFunction = LZ4_compressHC; break;
+	default : compressionFunction = LZ4_compress;
+	}
 	start = clock();
 	r = get_fileHandle(input_filename, output_filename, &finput, &foutput);
 	if (r) return r;
@@ -196,10 +207,12 @@ int compress_file(char* input_filename, char* output_filename)
 	    int inSize = fread(in_buff, 1, CHUNKSIZE, finput);
 		if( inSize<=0 ) break;
 		filesize += inSize;
+		if (displayLevel) DISPLAY("Read : %i MB  \r", (int)(filesize>>20));
 
 		// Compress Block
-		outSize = LZ4_compress(in_buff, out_buff+4, inSize);
+		outSize = compressionFunction(in_buff, out_buff+4, inSize);
 		compressedfilesize += outSize+4;
+		if (displayLevel) DISPLAY("Read : %i MB  ==> %.2f%%\r", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
 		// Write Block
 		LITTLE_ENDIAN32(outSize);
@@ -300,7 +313,7 @@ int decode_file(char* input_filename, char* output_filename)
 int main(int argc, char** argv)
 {
   int i,
-	  compression=1,   // default action if no argument
+	  cLevel=0,
 	  decode=0,
 	  bench=0,
 	  filenamesStart=2;
@@ -334,13 +347,13 @@ int main(int argc, char** argv)
 		if ( argument[0] =='h' ) { usage(exename); return 0; }
 
 		// Compression (default)
-		if ( argument[0] =='c' ) { compression=1; continue; }
+		if ( argument[0] =='c' ) { if (argument[1] >='0') cLevel=argument[1] - '0'; continue; }
 
 		// Decoding
 		if ( argument[0] =='d' ) { decode=1; continue; }
 
 		// Bench
-		if ( argument[0] =='b' ) { bench=1; continue; }
+		if ( argument[0] =='b' ) { bench=1; if (argument[1] >= '0') cLevel=argument[1] - '0'; continue; } 
 
 		// Modify Block Size (benchmark only)
 		if ( argument[0] =='B' ) { int B = argument[1] - '0'; int S = 1 << (10 + 2*B); BMK_SetBlocksize(S); continue; }
@@ -367,16 +380,13 @@ int main(int argc, char** argv)
   // No input filename ==> Error
   if(!input_filename) { badusage(exename); return 1; }
 
-  if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, 0);
+  if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, cLevel);
 
-  // No output filename
+  // No output filename ==> Error
   if (!output_filename) { badusage(exename); return 1; }
 
   if (decode) return decode_file(input_filename, output_filename);
 
-  if (compression) return compress_file(input_filename, output_filename);
+  return compress_file(input_filename, output_filename, cLevel);   // Compression is 'default' action
 
-  badusage(exename);
-
-  return 0;
 }
