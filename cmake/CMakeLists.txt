@@ -18,7 +18,7 @@ ENDIF()
 
 
 set(SRC_DIR ../)
-set(LZ4_SRCS_LIB ${SRC_DIR}lz4.c ${SRC_DIR}lz4.h )
+set(LZ4_SRCS_LIB ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h )
 set(LZ4_SRCS ${LZ4_SRCS_LIB} ${SRC_DIR}bench.c ${SRC_DIR}lz4demo.c )
 
 # EXECUTABLES FOR 32 Bit and 64 versions
