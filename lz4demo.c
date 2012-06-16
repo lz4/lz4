@@ -57,7 +57,7 @@
 
 #if defined(_MSC_VER)    // Visual Studio
 #define swap32 _byteswap_ulong
-#elif GCC_VERSION >= 402
+#elif GCC_VERSION >= 430
 #define swap32 __builtin_bswap32
 #else
 static inline unsigned int swap32(unsigned int x) {
