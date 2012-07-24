@@ -34,12 +34,12 @@
 //**************************************
 // Tuning parameters
 //**************************************
-// COMPRESSIONLEVEL :
-// Increasing this value improves compression ratio
-// Lowering this value reduces memory usage
-// Reduced memory usage typically improves speed, due to cache effect (ex : L1 32KB for Intel, L1 64KB for AMD)
-// Memory usage formula : N->2^(N+2) Bytes (examples : 12 -> 16KB ; 17 -> 512KB)
-#define COMPRESSIONLEVEL 12
+// MEMORY_USAGE :
+// Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
+// Increasing memory usage improves compression ratio
+// Reduced memory usage can improve speed, due to cache effect
+// Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
+#define MEMORY_USAGE 14
 
 // NOTCOMPRESSIBLE_CONFIRMATION :
 // Decreasing this value will make the algorithm skip faster data segments considered "incompressible"
@@ -57,8 +57,8 @@
 #define LZ4_COMPRESSMIN 0
 
 // BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
-// This will provide a boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
-// You can set this option to 1 in situations where data will stay within closed environment
+// This will provide a small boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
+// You can set this option to 1 in situations where data will remain within closed environment
 // This option is useless on Little_Endian CPU (such as x86)
 //#define BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE 1
 
@@ -181,7 +181,7 @@ typedef struct _U64_S { U64 v; } U64_S;
 //**************************************
 #define MINMATCH 4
 
-#define HASH_LOG COMPRESSIONLEVEL
+#define HASH_LOG (MEMORY_USAGE-2)
 #define HASHTABLESIZE (1 << HASH_LOG)
 #define HASH_MASK (HASHTABLESIZE - 1)
 
