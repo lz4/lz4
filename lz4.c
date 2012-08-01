@@ -319,6 +319,12 @@ inline int LZ4_NbCommonBytes (register U32 val)
 // Compression functions
 //******************************
 
+// LZ4_compressCtx :
+// -----------------
+// Compress 'isize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+// If it cannot achieve it, compression will stop, and result of the function will be zero.
+// return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+
 inline int LZ4_compressCtx(void** ctx,
 				 const char* source,
 				 char* dest,
@@ -446,7 +452,7 @@ _last_literals:
 	// Encode Last Literals
 	{
 		int lastRun = iend - anchor;
-		if (op + lastRun + 1 + ((lastRun-15)/255) >= oend) return 0;
+		if (((char*)op - dest) + lastRun + 1 + ((lastRun-15)/255) >= maxOutputSize) return 0;
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
 		else *op++ = (lastRun<<ML_BITS);
 		memcpy(op, anchor, iend - anchor);
@@ -591,7 +597,7 @@ _last_literals:
 	// Encode Last Literals
 	{
 		int lastRun = iend - anchor;
-		if (op + lastRun + 1 + ((lastRun-15)/255) >= oend) return 0;
+		if (((char*)op - dest) + lastRun + 1 + ((lastRun)>>8) >= maxOutputSize) return 0;
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
 		else *op++ = (lastRun<<ML_BITS);
 		memcpy(op, anchor, iend - anchor);

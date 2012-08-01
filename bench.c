@@ -386,7 +386,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].outputSize;
 		  ratio = (double)cSize/(double)benchedsize*100.;
 
-		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000.);
+		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000.);
 
 		  // Decompression
 		  { size_t i; for (i=0; i<benchedsize; i++) in_buff[i]=0; }     // zeroing area, for CRC checking
@@ -404,7 +404,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  milliTime = BMK_GetMilliSpan(milliTime);
 
 		  if ((double)milliTime < fastestD*nb_loops) fastestD = (double)milliTime/nb_loops;
-		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
 
 		  // CRC Checking
 		  crcd = BMK_checksum_MMH3A(in_buff, benchedsize);
@@ -414,9 +414,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 	    if (crcc==crcd)
 		{
 			if (ratio<100.)
-				DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+				DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
 			else
-				DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%), %6.1f MB/s , %6.1f MB/s \n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
+				DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s \n", infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
 		}
 		totals += benchedsize;
 		totalz += cSize;
