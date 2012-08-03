@@ -49,7 +49,7 @@ int LZ4_uncompress (const char* source, char* dest, int osize);
 LZ4_compress() :
 	Compresses 'isize' bytes from 'source' into 'dest'.
 	Destination buffer must be already allocated,
-	its minimum size must handle worst cases situations (input data not compressible)
+	and must be sized to handle worst cases situations (input data not compressible)
 	Worst case size evaluation is provided by macro LZ4_compressBound()
 
 	isize  : is the input size. Max supported value is ~1.9GB

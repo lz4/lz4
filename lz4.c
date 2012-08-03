@@ -402,8 +402,27 @@ inline int LZ4_compressCtx(void** ctx,
 		length = ip - anchor;
 		token = op++;
 		if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
+#ifdef _MSC_VER
+		if (length>=(int)RUN_MASK) 
+		{ 
+			int len = length-RUN_MASK; 
+			*token=(RUN_MASK<<ML_BITS); 
+			if (len>254)
+			{
+				do { *op++ = 255; len -= 255; } while (len>254);
+				*op++ = (BYTE)len; 
+				memcpy(op, anchor, length);
+				op += length;
+				goto _next_match;
+			}
+			else
+			*op++ = (BYTE)len; 
+		}
+		else *token = (length<<ML_BITS);
+#else
 		if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; }
 		else *token = (length<<ML_BITS);
+#endif
 
 		// Copy Literals
 		LZ4_BLINDCOPY(anchor, op, length);
@@ -547,8 +566,27 @@ inline int LZ4_compress64kCtx(void** ctx,
 		length = ip - anchor;
 		token = op++;
 		if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
+#ifdef _MSC_VER
+		if (length>=(int)RUN_MASK) 
+		{ 
+			int len = length-RUN_MASK; 
+			*token=(RUN_MASK<<ML_BITS); 
+			if (len>254)
+			{
+				do { *op++ = 255; len -= 255; } while (len>254);
+				*op++ = (BYTE)len; 
+				memcpy(op, anchor, length);
+				op += length;
+				goto _next_match;
+			}
+			else
+			*op++ = (BYTE)len; 
+		}
+		else *token = (length<<ML_BITS);
+#else
 		if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; }
 		else *token = (length<<ML_BITS);
+#endif
 
 		// Copy Literals
 		LZ4_BLINDCOPY(anchor, op, length);
