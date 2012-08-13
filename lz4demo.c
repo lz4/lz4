@@ -28,10 +28,12 @@
 	The license of the demo program is GPL.
 */
 
-//****************************
-// Warning messages
-//****************************
-#define _CRT_SECURE_NO_WARNINGS    // Visual (must be first line)
+//**************************************
+// Compiler Options
+//**************************************
+// Disable some Visual warning messages
+#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_DEPRECATE     // VS2005
 
 
 //****************************
@@ -204,7 +206,7 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 	{
 		int outSize;
 		// Read Block
-	    int inSize = fread(in_buff, 1, CHUNKSIZE, finput);
+	    int inSize = (int) fread(in_buff, (size_t)1, (size_t)CHUNKSIZE, finput);
 		if( inSize<=0 ) break;
 		filesize += inSize;
 		if (displayLevel) DISPLAY("Read : %i MB  \r", (int)(filesize>>20));

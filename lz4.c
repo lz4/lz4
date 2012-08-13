@@ -101,6 +101,7 @@
 
 #ifdef _MSC_VER  // Visual Studio
 #  define inline __forceinline           // Visual is not C99, but supports some kind of inline
+#  include <intrin.h>   // For Visual 2005
 #  if LZ4_ARCH64	// 64-bit
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
@@ -399,7 +400,7 @@ static inline int LZ4_compressCtx(void** ctx,
 		while ((ip>anchor) && (ref>(BYTE*)source) && unlikely(ip[-1]==ref[-1])) { ip--; ref--; }
 
 		// Encode Literal length
-		length = ip - anchor;
+		length = (int)(ip - anchor);
 		token = op++;
 		if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
 #ifdef _MSC_VER
@@ -429,7 +430,7 @@ static inline int LZ4_compressCtx(void** ctx,
 
 _next_match:
 		// Encode Offset
-		LZ4_WRITE_LITTLEENDIAN_16(op,ip-ref);
+		LZ4_WRITE_LITTLEENDIAN_16(op,(U16)(ip-ref));
 
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
@@ -447,7 +448,7 @@ _next_match:
 _endCount:
 
 		// Encode MatchLength
-		len = (ip - anchor);
+		len = (int)(ip - anchor);
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
 		else *token += len;
 
@@ -470,7 +471,7 @@ _endCount:
 _last_literals:
 	// Encode Last Literals
 	{
-		int lastRun = iend - anchor;
+		int lastRun = (int)(iend - anchor);
 		if (((char*)op - dest) + lastRun + 1 + ((lastRun-15)/255) >= maxOutputSize) return 0;
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
 		else *op++ = (lastRun<<ML_BITS);
@@ -555,7 +556,7 @@ static inline int LZ4_compress64kCtx(void** ctx,
 
 			forwardH = LZ4_HASH64K_VALUE(forwardIp);
 			ref = base + HashTable[h];
-			HashTable[h] = ip - base;
+			HashTable[h] = (U16)(ip - base);
 
 		} while (A32(ref) != A32(ip));
 
@@ -563,7 +564,7 @@ static inline int LZ4_compress64kCtx(void** ctx,
 		while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }
 
 		// Encode Literal length
-		length = ip - anchor;
+		length = (int)(ip - anchor);
 		token = op++;
 		if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
 #ifdef _MSC_VER
@@ -593,7 +594,7 @@ static inline int LZ4_compress64kCtx(void** ctx,
 
 _next_match:
 		// Encode Offset
-		LZ4_WRITE_LITTLEENDIAN_16(op,ip-ref);
+		LZ4_WRITE_LITTLEENDIAN_16(op,(U16)(ip-ref));
 
 		// Start Counting
 		ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
@@ -611,7 +612,7 @@ _next_match:
 _endCount:
 
 		// Encode MatchLength
-		len = (ip - anchor);
+		len = (int)(ip - anchor);
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
 		else *token += len;
 
@@ -619,11 +620,11 @@ _endCount:
 		if (ip > mflimit) { anchor = ip;  break; }
 
 		// Fill table
-		HashTable[LZ4_HASH64K_VALUE(ip-2)] = ip - 2 - base;
+		HashTable[LZ4_HASH64K_VALUE(ip-2)] = (U16)(ip - 2 - base);
 
 		// Test next position
 		ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
-		HashTable[LZ4_HASH64K_VALUE(ip)] = ip - base;
+		HashTable[LZ4_HASH64K_VALUE(ip)] = (U16)(ip - base);
 		if (A32(ref) == A32(ip)) { token = op++; *token=0; goto _next_match; }
 
 		// Prepare next loop
@@ -634,7 +635,7 @@ _endCount:
 _last_literals:
 	// Encode Last Literals
 	{
-		int lastRun = iend - anchor;
+		int lastRun = (int)(iend - anchor);
 		if (((char*)op - dest) + lastRun + 1 + ((lastRun)>>8) >= maxOutputSize) return 0;
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
 		else *op++ = (lastRun<<ML_BITS);

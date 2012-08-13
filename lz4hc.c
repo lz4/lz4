@@ -68,6 +68,14 @@
 
 #ifdef _MSC_VER
 #define inline __forceinline    // Visual is not C99, but supports some kind of inline
+#include <intrin.h>             // For Visual 2005
+#  if LZ4_ARCH64	// 64-bit
+#    pragma intrinsic(_BitScanForward64) // For Visual 2005
+#    pragma intrinsic(_BitScanReverse64) // For Visual 2005
+#  else
+#    pragma intrinsic(_BitScanForward)   // For Visual 2005
+#    pragma intrinsic(_BitScanReverse)   // For Visual 2005
+#  endif
 #endif
 
 #ifdef _MSC_VER  // Visual Studio
@@ -350,7 +358,7 @@ inline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const
 			if ((ipt<matchlimit) && (*reft == *ipt)) ipt++;
 _endCount:
 
-			if (ipt-ip > ml) { ml = ipt-ip; *matchpos = ref; }
+			if (ipt-ip > ml) { ml = (int)(ipt-ip); *matchpos = ref; }
 		}
 		ref = GETNEXT(ref);
 	}
@@ -366,7 +374,7 @@ inline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const
 	INITBASE(base,hc4->base);
 	const BYTE*  ref;
 	int nbAttempts = MAX_NB_ATTEMPTS;
-	int delta = ip-startLimit;
+	int delta = (int)(ip-startLimit);
 
 	// First Match
 	LZ4HC_Insert(hc4, ip);
@@ -399,7 +407,7 @@ _endCount:
 
 			if ((ipt-startt) > longest)
 			{
-				longest = ipt-startt;
+				longest = (int)(ipt-startt);
 				*matchpos = reft;
 				*startpos = startt;
 			}
@@ -417,7 +425,7 @@ inline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** an
 	BYTE* token;
 
 	// Encode Literal length
-	length = *ip - *anchor;
+	length = (int)(*ip - *anchor);
 	token = (*op)++;
 	if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; } 
 	else *token = (length<<ML_BITS);
@@ -426,7 +434,7 @@ inline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** an
 	LZ4_BLINDCOPY(*anchor, *op, length);
 
 	// Encode Offset
-	LZ4_WRITE_LITTLEENDIAN_16(*op,*ip-ref);
+	LZ4_WRITE_LITTLEENDIAN_16(*op,(U16)(*ip-ref));
 
 	// Encode MatchLength
 	len = (int)(ml-MINMATCH);
@@ -519,8 +527,8 @@ _Search3:
 			int correction;
 			int new_ml = ml;
 			if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-			if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = start2 - ip + ml2 - MINMATCH;
-			correction = new_ml - (start2 - ip);
+			if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
+			correction = new_ml - (int)(start2 - ip);
 			if (correction > 0)
 			{
 				start2 += correction;
@@ -543,8 +551,8 @@ _Search3:
 				{
 					int correction;
 					if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-					if (ip+ml > start2 + ml2 - MINMATCH) ml = start2 - ip + ml2 - MINMATCH;
-					correction = ml - (start2 - ip);
+					if (ip+ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
+					correction = ml - (int)(start2 - ip);
 					if (correction > 0)
 					{
 						start2 += correction;
@@ -554,7 +562,7 @@ _Search3:
 				}
 				else
 				{
-					ml = start2 - ip;
+					ml = (int)(start2 - ip);
 				}
 			}
 			// Now, encode 2 sequences
@@ -570,7 +578,7 @@ _Search3:
 			{
 				if (start2 < ip+ml)
 				{
-					int correction = (ip+ml) - start2;
+					int correction = (int)(ip+ml - start2);
 					start2 += correction;
 					ref2 += correction;
 					ml2 -= correction;
@@ -607,8 +615,8 @@ _Search3:
 			{
 				int correction;
 				if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-				if (ip + ml > start2 + ml2 - MINMATCH) ml = start2 - ip + ml2 - MINMATCH;
-				correction = ml - (start2 - ip);
+				if (ip + ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
+				correction = ml - (int)(start2 - ip);
 				if (correction > 0)
 				{
 					start2 += correction;
@@ -618,7 +626,7 @@ _Search3:
 			}
 			else
 			{
-				ml = start2 - ip;
+				ml = (int)(start2 - ip);
 			}
 		}
 		LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
@@ -637,7 +645,7 @@ _Search3:
 
 	// Encode Last Literals
 	{
-		int lastRun = iend - anchor;
+		int lastRun = (int)(iend - anchor);
 		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
 		else *op++ = (lastRun<<ML_BITS);
 		memcpy(op, anchor, iend - anchor);

@@ -25,8 +25,9 @@
 //**************************************
 // Compiler Options
 //**************************************
-// Visual warning messages
+// Disable some Visual warning messages
 #define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_DEPRECATE     // VS2005
 
 // Under Linux at least, pull in the *64 commands
 #define _LARGEFILE64_SOURCE
@@ -146,7 +147,7 @@ static int BMK_GetMilliStart()
   struct timeb tb;
   int nCount;
   ftime( &tb );
-  nCount = tb.millitm + (tb.time & 0xfffff) * 1000;
+  nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
   return nCount;
 }
 
@@ -307,7 +308,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 	  // Alloc
 	  chunkP = (struct chunkParameters*) malloc(((benchedsize / chunkSize)+1) * sizeof(struct chunkParameters));
 	  in_buff = malloc((size_t )benchedsize);
-	  nbChunks = (benchedsize / chunkSize) + 1;
+	  nbChunks = (int) (benchedsize / chunkSize) + 1;
 	  maxCChunkSize = LZ4_compressBound(chunkSize);
 	  out_buff_size = nbChunks * maxCChunkSize;
 	  out_buff = malloc((size_t )out_buff_size);
@@ -332,7 +333,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  {
 			  chunkP[i].id = i;
 			  chunkP[i].inputBuffer = in; in += chunkSize;
-			  if ((int)remaining > chunkSize) { chunkP[i].inputSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].inputSize = remaining; remaining = 0; }
+			  if ((int)remaining > chunkSize) { chunkP[i].inputSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].inputSize = (int)remaining; remaining = 0; }
 			  chunkP[i].outputBuffer = out; out += maxCChunkSize;
 			  chunkP[i].outputSize = 0;
 		  }
@@ -352,7 +353,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 	  }
 
 	  // Calculating input Checksum
-	  crcc = BMK_checksum_MMH3A(in_buff, benchedsize);
+	  crcc = BMK_checksum_MMH3A(in_buff, (unsigned int)benchedsize);
 
 
 	  // Bench
@@ -407,7 +408,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, infilename, (int)benchedsize, (int)cSize, ratio, (double)benchedsize / fastestC / 1000., (double)benchedsize / fastestD / 1000.);
 
 		  // CRC Checking
-		  crcd = BMK_checksum_MMH3A(in_buff, benchedsize);
+		  crcd = BMK_checksum_MMH3A(in_buff, (unsigned int)benchedsize);
 		  if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); break; }
 		}
 
