@@ -449,6 +449,7 @@ _endCount:
 
 		// Encode MatchLength
 		len = (int)(ip - anchor);
+		if unlikely(op + (1 + LASTLITERALS) + (len>>8) >= oend) return 0; 		// Check output limit
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
 		else *token += len;
 
@@ -613,6 +614,7 @@ _endCount:
 
 		// Encode MatchLength
 		len = (int)(ip - anchor);
+		if unlikely(op + (1 + LASTLITERALS) + (len>>8) >= oend) return 0; 		// Check output limit
 		if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
 		else *token += len;
 
