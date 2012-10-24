@@ -402,7 +402,7 @@ static inline int LZ4_compressCtx(void** ctx,
         // Encode Literal length
         length = (int)(ip - anchor);
         token = op++;
-        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
+        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
 #ifdef _MSC_VER
         if (length>=(int)RUN_MASK) 
         { 
@@ -449,7 +449,7 @@ _endCount:
 
         // Encode MatchLength
         len = (int)(ip - anchor);
-        if unlikely(op + (1 + LASTLITERALS) + (len>>8) >= oend) return 0; 		// Check output limit
+        if unlikely(op + (1 + LASTLITERALS) + (len>>8) > oend) return 0; 		// Check output limit
         if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
         else *token += len;
 
@@ -473,7 +473,7 @@ _last_literals:
     // Encode Last Literals
     {
         int lastRun = (int)(iend - anchor);
-        if (((char*)op - dest) + lastRun + 1 + ((lastRun-15)/255) >= maxOutputSize) return 0;
+        if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
@@ -567,7 +567,7 @@ static inline int LZ4_compress64kCtx(void** ctx,
         // Encode Literal length
         length = (int)(ip - anchor);
         token = op++;
-        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
+        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
 #ifdef _MSC_VER
         if (length>=(int)RUN_MASK) 
         { 
@@ -614,7 +614,7 @@ _endCount:
 
         // Encode MatchLength
         len = (int)(ip - anchor);
-        if unlikely(op + (1 + LASTLITERALS) + (len>>8) >= oend) return 0; 		// Check output limit
+        if unlikely(op + (1 + LASTLITERALS) + (len>>8) > oend) return 0; 		// Check output limit
         if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
         else *token += len;
 
@@ -638,7 +638,7 @@ _last_literals:
     // Encode Last Literals
     {
         int lastRun = (int)(iend - anchor);
-        if (((char*)op - dest) + lastRun + 1 + ((lastRun)>>8) >= maxOutputSize) return 0;
+		if (op + lastRun + 1 + (lastRun-RUN_MASK+255)/255 > oend) return 0;
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
@@ -757,7 +757,7 @@ int LZ4_uncompress(const char* source,
             LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
             while(op<cpy) *op++=*ref++;
             op=cpy;
-            if (op == oend) break;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
+            if (op == oend) goto _output_error;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
             continue;
         }
         LZ4_SECURECOPY(ref, op, cpy);
@@ -842,11 +842,11 @@ int LZ4_uncompress_unknownOutputSize(
         cpy = op + length - (STEPSIZE-4);
         if (cpy>oend-COPYLENGTH)
         {
-            if (cpy > oend) goto _output_error;       // Error : request to write outside of destination buffer
+            if (cpy > oend) goto _output_error;    // Error : request to write outside of destination buffer
             LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
             while(op<cpy) *op++=*ref++;
             op=cpy;
-            if (op == oend) goto _output_error;       // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
+            if (op == oend) goto _output_error;    // Check EOF (should never happen, since last 5 bytes are supposed to be literals)
             continue;
         }
         LZ4_SECURECOPY(ref, op, cpy);
