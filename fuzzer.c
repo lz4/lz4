@@ -97,11 +97,10 @@ int main() {
         unsigned long long bytes = 0;
         unsigned long long cbytes = 0;
         unsigned char buf[LEN];
-#       undef  max
-#       define max   LZ4_compressBound(LEN)
-#       define avail ROUND_PAGE(max)
-        const int off_full = avail - max;
-        unsigned char cbuf[avail + PAGE_SIZE];
+#       define FUZ_max   LZ4_compressBound(LEN)
+#       define FUZ_avail ROUND_PAGE(FUZ_max)
+        const int off_full = FUZ_avail - FUZ_max;
+        unsigned char cbuf[FUZ_avail + PAGE_SIZE];
 		unsigned int seed, cur_seq, seeds[NUM_SEQ], timestamp=FUZ_GetMilliStart();
         int i, j, k, ret, len;
 		char userInput[30] = {0};
@@ -117,7 +116,7 @@ int main() {
 		printf("Seed = %u\n", seed);
 
         for (i = 0; i < 2048; i++)
-                cbuf[avail + i] = cbuf[avail + 2048 + i] = FUZ_rand(&seed) >> 16;
+                cbuf[FUZ_avail + i] = cbuf[FUZ_avail + 2048 + i] = FUZ_rand(&seed) >> 16;
 
         for (i = 0; i < NB_ATTEMPTS; i++) {
 			printf("\r%7i /%7i\r", i, NB_ATTEMPTS);
@@ -137,24 +136,18 @@ int main() {
                     }
                     buf[j] = FUZ_rand(&cur_seq) >> 16;
             }
-            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[off_full], LEN, max);
+            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[off_full], LEN, FUZ_max);
             len = ret;
 
 			// Test compression with output size being exactly what's necessary
-            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[avail-len], LEN, len);
-            if (!test_canary(&cbuf[avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d\n", seed, LEN, len); return 1; }
+            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-len], LEN, len);
+            if (!test_canary(&cbuf[FUZ_avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d\n", seed, LEN, len); return 1; }
             if (ret == 0) { printf("compression failed despite sufficient space: seed %u, len %d\n", seed, LEN); return 1; }
 
-			// Test compression with just one missing byte into output buffer => should fail
-            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[avail-(len-1)], LEN, len-1);
+			// Test compression with just one missing byte into output buffer => must fail
+            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-(len-1)], LEN, len-1);
             if (ret) { printf("compression overran output buffer: seed %u, len %d, olen %d => ret %d", seed, LEN, len-1, ret); return 1; }
-            if (!test_canary(&cbuf[avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d", seed, LEN, len-1); return 1; }
-
-			/* No longer useful
-			// Test compression with not enough output size
-            ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[avail-len/2], LEN, len/2);
-            if (!test_canary(&cbuf[avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d", seed, LEN, len/2); return 1; }
-			*/
+            if (!test_canary(&cbuf[FUZ_avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d", seed, LEN, len-1); return 1; }
 
 			bytes += LEN;
             cbytes += len;
