@@ -33,8 +33,9 @@
 #define _LARGEFILE64_SOURCE
 
 // MSVC does not support S_ISREG
-#ifndef S_ISREG
-#define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#if defined(_MSC_VER)
+#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#  define BMK_LEGACY_TIMER 1
 #endif
 
 // GCC does not support _rotl outside of Windows
@@ -46,11 +47,17 @@
 //**************************************
 // Includes
 //**************************************
-#include <stdlib.h>     // malloc
-#include <stdio.h>      // fprintf, fopen, ftello64
-#include <sys/timeb.h>  // timeb
-#include <sys/types.h>  // stat64
-#include <sys/stat.h>   // stat64
+#include <stdlib.h>      // malloc
+#include <stdio.h>       // fprintf, fopen, ftello64
+#include <sys/types.h>   // stat64
+#include <sys/stat.h>    // stat64
+
+// Use ftime() if gettimeofday() is not available on your target
+#if defined(BMK_LEGACY_TIMER)   
+#  include <sys/timeb.h>   // timeb, ftime
+#else
+#  include <sys/time.h>    // gettimeofday
+#endif
 
 #include "lz4.h"
 #define COMPRESSOR0 LZ4_compress
@@ -139,9 +146,11 @@ void BMK_SetNbIterations(int nbLoops)
 //  Private functions
 //*********************************************************
 
+#if defined(BMK_LEGACY_TIMER)
+
 static int BMK_GetMilliStart()
 {
-  // Supposed to be portable
+  // Based on Legacy ftime()
   // Rolls over every ~ 12.1 days (0x100000/24/60/60)
   // Use GetMilliSpan to correct for rollover
   struct timeb tb;
@@ -150,6 +159,21 @@ static int BMK_GetMilliStart()
   nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
   return nCount;
 }
+
+#else
+
+static int BMK_GetMilliStart()
+{
+  // Based on newer gettimeofday()
+  // Use GetMilliSpan to correct for rollover
+  struct timeval tv;
+  int nCount;
+  gettimeofday(&tv, NULL);
+  nCount = (int) (tv.tv_usec/1000 + (tv.tv_sec & 0xfffff) * 1000);
+  return nCount;
+}
+
+#endif
 
 
 static int BMK_GetMilliSpan( int nTimeStart )
