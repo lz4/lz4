@@ -29,10 +29,15 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_DEPRECATE     // VS2005
 
-// Under Linux at least, pull in the *64 commands
-#define _LARGEFILE64_SOURCE
+// Unix Large Files support (>4GB)
+#if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
+#  define _LARGEFILE_SOURCE 
+#  define FILE_OFFSET_BITS=64
+#else
+#  define _LARGEFILE64_SOURCE
+#endif
 
-// MSVC does not support S_ISREG
+// S_ISREG & gettimeofday() are not supported by MSVC
 #if defined(_MSC_VER)
 #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #  define BMK_LEGACY_TIMER 1
@@ -40,7 +45,7 @@
 
 // GCC does not support _rotl outside of Windows
 #if !defined(_WIN32)
-#define _rotl(x,r) ((x << r) | (x >> (32 - r)))
+#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
 #endif
 
 

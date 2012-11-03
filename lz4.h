@@ -60,7 +60,7 @@ LZ4_uncompress() :
     osize  : is the output size, therefore the original size
     return : the number of bytes read in the source buffer
              If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
-             This function never writes beyond dest + osize, and is therefore protected against malicious data packets
+             This function never writes outside of provided buffers, and never modifies input buffer.
     note : destination buffer must be already allocated.
            its size must be a minimum of 'osize' bytes.
 */

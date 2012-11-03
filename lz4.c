@@ -719,10 +719,10 @@ int LZ4_uncompress(const char* source,
         cpy = op+length;
         if unlikely(cpy>oend-COPYLENGTH)
         {
-            if (cpy > oend) goto _output_error;          // Error : request to write beyond destination buffer
+            if (cpy != oend) goto _output_error;         // Error : we must necessarily stand at EOF
             memcpy(op, ip, length);
             ip += length;
-            break;    // Necessarily EOF
+            break;                                       // EOF
         }
         LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
 
@@ -805,13 +805,13 @@ int LZ4_uncompress_unknownOutputSize(
         cpy = op+length;
         if ((cpy>oend-COPYLENGTH) || (ip+length>iend-COPYLENGTH))
         {
-            if (cpy > oend) goto _output_error;          // Error : request to write beyond destination buffer
+            if (cpy != oend) goto _output_error;         // Error : we must necessarily stand at EOF
             if (ip+length > iend) goto _output_error;    // Error : request to read beyond source buffer
             memcpy(op, ip, length);
             op += length;
             ip += length;
             if (ip<iend) goto _output_error;             // Error : LZ4 format violation
-            break;    // Necessarily EOF, due to parsing restrictions
+            break;                                       // Necessarily EOF, due to parsing restrictions
         }
         LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
 
