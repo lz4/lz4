@@ -190,8 +190,8 @@ typedef struct _U64_S { U64 v; } U64_S;
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
 
-#define ML_BITS 4
-#define ML_MASK ((1U<<ML_BITS)-1)
+#define ML_BITS  4
+#define ML_MASK  ((1U<<ML_BITS)-1)
 #define RUN_BITS (8-ML_BITS)
 #define RUN_MASK ((1U<<RUN_BITS)-1)
 
@@ -203,20 +203,20 @@ typedef struct _U64_S { U64 v; } U64_S;
 #  define STEPSIZE 8
 #  define UARCH U64
 #  define AARCH A64
-#  define LZ4_COPYSTEP(s,d)		A64(d) = A64(s); d+=8; s+=8;
-#  define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d)
-#  define LZ4_SECURECOPY(s,d,e)	if (d<e) LZ4_WILDCOPY(s,d,e)
-#  define HTYPE U32
-#  define INITBASE(base)			const BYTE* const base = ip
+#  define LZ4_COPYSTEP(s,d)       A64(d) = A64(s); d+=8; s+=8;
+#  define LZ4_COPYPACKET(s,d)     LZ4_COPYSTEP(s,d)
+#  define LZ4_SECURECOPY(s,d,e)   if (d<e) LZ4_WILDCOPY(s,d,e)
+#  define HTYPE                   U32
+#  define INITBASE(base)          const BYTE* const base = ip
 #else		// 32-bit
 #  define STEPSIZE 4
 #  define UARCH U32
 #  define AARCH A32
-#  define LZ4_COPYSTEP(s,d)		A32(d) = A32(s); d+=4; s+=4;
-#  define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
-#  define LZ4_SECURECOPY			LZ4_WILDCOPY
-#  define HTYPE const BYTE*
-#  define INITBASE(base)			const int base = 0
+#  define LZ4_COPYSTEP(s,d)       A32(d) = A32(s); d+=4; s+=4;
+#  define LZ4_COPYPACKET(s,d)     LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
+#  define LZ4_SECURECOPY          LZ4_WILDCOPY
+#  define HTYPE                   const BYTE*
+#  define INITBASE(base)          const int base = 0
 #endif
 
 #if (defined(LZ4_BIG_ENDIAN) && !defined(BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE))
@@ -638,7 +638,7 @@ _last_literals:
     // Encode Last Literals
     {
         int lastRun = (int)(iend - anchor);
-		if (op + lastRun + 1 + (lastRun-RUN_MASK+255)/255 > oend) return 0;
+        if (op + lastRun + 1 + (lastRun-RUN_MASK+255)/255 > oend) return 0;
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
@@ -805,12 +805,11 @@ int LZ4_uncompress_unknownOutputSize(
         cpy = op+length;
         if ((cpy>oend-COPYLENGTH) || (ip+length>iend-COPYLENGTH))
         {
-            if (cpy != oend) goto _output_error;         // Error : we must necessarily stand at EOF
-            if (ip+length > iend) goto _output_error;    // Error : request to read beyond source buffer
+            if (cpy > oend) goto _output_error;          // Error : writes beyond output buffer
+            if (ip+length != iend) goto _output_error;   // Error : LZ4 format requires to consume all input at this stage
             memcpy(op, ip, length);
             op += length;
-            ip += length;
-            if (ip<iend) goto _output_error;             // Error : LZ4 format violation
+            ip = iend;
             break;                                       // Necessarily EOF, due to parsing restrictions
         }
         LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
