@@ -91,7 +91,7 @@
 //**************************************
 // Compiler Options
 //**************************************
-#if __STDC_VERSION__ >= 199901L // C99
+#if __STDC_VERSION__ >= 199901L   // C99
 /* "restrict" is a known keyword */
 #else
 #  define restrict // Disable restrict
@@ -100,7 +100,6 @@
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
 #ifdef _MSC_VER  // Visual Studio
-#  define inline __forceinline           // Visual is not C99, but supports some kind of inline
 #  include <intrin.h>   // For Visual 2005
 #  if LZ4_ARCH64	// 64-bit
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005

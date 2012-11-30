@@ -33,7 +33,7 @@
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
 #  define _LARGEFILE_SOURCE 
 #  define FILE_OFFSET_BITS=64
-#else
+#elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
 #  define _LARGEFILE64_SOURCE
 #endif
 

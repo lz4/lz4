@@ -53,7 +53,7 @@
 
 
 //**************************************
-// Compiler functions
+// Compiler-specific functions
 //**************************************
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
@@ -91,9 +91,9 @@ static inline unsigned int swap32(unsigned int x) {
 // Architecture Macros
 //**************************************
 static const int one = 1;
-#define CPU_LITTLE_ENDIAN (*(char*)(&one))
-#define CPU_BIG_ENDIAN (!CPU_LITTLE_ENDIAN)
-#define LITTLE_ENDIAN32(i)   if (CPU_BIG_ENDIAN) { i = swap32(i); }
+#define CPU_LITTLE_ENDIAN  (*(char*)(&one))
+#define CPU_BIG_ENDIAN     (!CPU_LITTLE_ENDIAN)
+#define LITTLE_ENDIAN32(i) if (CPU_BIG_ENDIAN) { i = swap32(i); }
 
 
 //**************************************
@@ -177,6 +177,7 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 	int r;
 	int displayLevel = (compressionlevel>0);
 	clock_t start, end;
+	size_t sizeCheck;
 
 
 	// Init
@@ -199,7 +200,8 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 	u32var = ARCHIVE_MAGICNUMBER;
 	LITTLE_ENDIAN32(u32var);
 	*(unsigned int*)out_buff = u32var;
-	fwrite(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, foutput);
+	sizeCheck = fwrite(out_buff, 1, ARCHIVE_MAGICNUMBER_SIZE, foutput);
+	if (sizeCheck!=ARCHIVE_MAGICNUMBER_SIZE) { DISPLAY("write error\n"); return 10; }
 
 	// Main Loop
 	while (1)
@@ -220,7 +222,8 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 		LITTLE_ENDIAN32(outSize);
 		* (unsigned int*) out_buff = outSize;
 		LITTLE_ENDIAN32(outSize);
-		fwrite(out_buff, 1, outSize+4, foutput);
+		sizeCheck = fwrite(out_buff, 1, outSize+4, foutput);
+		if (sizeCheck!=(size_t)(outSize+4)) { DISPLAY("write error\n"); return 11; }
 	}
 
 	// Status
@@ -254,6 +257,7 @@ int decode_file(char* input_filename, char* output_filename)
 	FILE* foutput;
 	clock_t start, end;
 	int r;
+	size_t sizeCheck;
 
 
 	// Init
@@ -291,7 +295,8 @@ int decode_file(char* input_filename, char* output_filename)
 		filesize += sinkint;
 
 		// Write Block
-		fwrite(out_buff, 1, sinkint, foutput);
+		sizeCheck = fwrite(out_buff, 1, sinkint, foutput);
+		if (sizeCheck != (size_t)sinkint) { DISPLAY("write error\n"); return 12; }
 	}
 
 	// Status

@@ -337,7 +337,7 @@ inline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const
 	// HC4 match finder
 	LZ4HC_Insert(hc4, ip);
 	ref = HASH_POINTER(ip);
-	while ((ref > (ip-MAX_DISTANCE)) && (nbAttempts))
+	while ((ref >= (ip-MAX_DISTANCE)) && (nbAttempts))
 	{
 		nbAttempts--;
 		if (*(ref+ml) == *(ip+ml))
@@ -380,7 +380,7 @@ inline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const
 	LZ4HC_Insert(hc4, ip);
 	ref = HASH_POINTER(ip);
 
-	while ((ref > ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
+	while ((ref >= ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
 	{
 		nbAttempts--;
 		if (*(startLimit + longest) == *(ref - delta + longest))

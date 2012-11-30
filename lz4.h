@@ -38,6 +38,14 @@ extern "C" {
 #endif
 
 
+//**************************************
+// Compiler Options
+//**************************************
+#ifdef _MSC_VER   // Visual Studio
+#  define inline __inline           // Visual is not C99, but supports some kind of inline
+#endif
+
+
 //****************************
 // Simple Functions
 //****************************
@@ -50,7 +58,7 @@ LZ4_compress() :
     Compresses 'isize' bytes from 'source' into 'dest'.
     Destination buffer must be already allocated,
     and must be sized to handle worst cases situations (input data not compressible)
-    Worst case size evaluation is provided by macro LZ4_compressBound()
+    Worst case size evaluation is provided by function LZ4_compressBound()
 
     isize  : is the input size. Max supported value is ~1.9GB
     return : the number of bytes written in buffer dest
@@ -70,12 +78,15 @@ LZ4_uncompress() :
 // Advanced Functions
 //****************************
 
-#define LZ4_compressBound(isize)   (isize + (isize/255) + 16)
+static inline int LZ4_compressBound(int isize)   { return ((isize) + ((isize)/255) + 16); }
+#define           LZ4_COMPRESSBOUND(    isize)            ((isize) + ((isize)/255) + 16)
 
 /*
 LZ4_compressBound() :
     Provides the maximum size that LZ4 may output in a "worst case" scenario (input data not compressible)
     primarily useful for memory allocation of output buffer.
+	inline function is recommended for the general case,
+	but macro is also provided when results need to be evaluated at compile time (such as table size allocation).
 
     isize  : is the input size. Max supported value is ~1.9GB
     return : maximum output size in a "worst case" scenario
