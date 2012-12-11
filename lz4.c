@@ -701,10 +701,13 @@ int LZ4_uncompress(const char* source,
     BYTE* const oend = op + osize;
     BYTE* cpy;
 
-    BYTE token;
+    unsigned token;
 
-    int	len, length;
-    size_t dec[] ={0, 3, 2, 3, 0, 0, 0, 0};
+    size_t length;
+    size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
+#if LZ4_ARCH64
+    size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+#endif
 
 
     // Main Loop
@@ -712,7 +715,7 @@ int LZ4_uncompress(const char* source,
     {
         // get runlength
         token = *ip++;
-        if ((length=(token>>ML_BITS)) == RUN_MASK)  { for (;(len=*ip++)==255;length+=255){} length += len; }
+        if ((length=(token>>ML_BITS)) == RUN_MASK)  { size_t len; for (;(len=*ip++)==255;length+=255){} length += len; }
 
         // copy literals
         cpy = op+length;
@@ -727,27 +730,26 @@ int LZ4_uncompress(const char* source,
 
         // get offset
         LZ4_READ_LITTLEENDIAN_16(ref,cpy,ip); ip+=2;
-        if (ref < (BYTE* const)dest) goto _output_error;   // Error : offset create reference outside destination buffer
+        if unlikely(ref < (BYTE* const)dest) goto _output_error;   // Error : offset create reference outside destination buffer
 
         // get matchlength
         if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; }
 
         // copy repeated sequence
-        if unlikely(op-ref<STEPSIZE)
+        if unlikely((op-ref)<STEPSIZE)
         {
 #if LZ4_ARCH64
-            size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
-            size_t dec2 = dec2table[op-ref];
+            size_t dec64 = dec64table[op-ref];
 #else
-            const int dec2 = 0;
+            const int dec64 = 0;
 #endif
-            *op++ = *ref++;
-            *op++ = *ref++;
-            *op++ = *ref++;
-            *op++ = *ref++;
-            ref -= dec[op-ref];
-            A32(op)=A32(ref); op += STEPSIZE-4;
-            ref -= dec2;
+			op[0] = ref[0];
+            op[1] = ref[1];
+            op[2] = ref[2];
+            op[3] = ref[3];
+            op += 4, ref += 4; ref -= dec32table[op-ref];
+            A32(op) = A32(ref); 
+			op += STEPSIZE-4; ref -= dec64;
         } else { LZ4_COPYSTEP(ref,op); }
         cpy = op + length - (STEPSIZE-4);
         if (cpy>oend-COPYLENGTH)
@@ -787,14 +789,17 @@ int LZ4_uncompress_unknownOutputSize(
     BYTE* const oend = op + maxOutputSize;
     BYTE* cpy;
 
-    size_t dec[] ={0, 3, 2, 3, 0, 0, 0, 0};
+    size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
+#if LZ4_ARCH64
+    size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+#endif
 
 
     // Main Loop
     while (ip<iend)
     {
-        BYTE token;
-        int length;
+        unsigned token;
+        size_t length;
 
         // get runlength
         token = *ip++;
@@ -808,7 +813,6 @@ int LZ4_uncompress_unknownOutputSize(
             if (ip+length != iend) goto _output_error;   // Error : LZ4 format requires to consume all input at this stage
             memcpy(op, ip, length);
             op += length;
-            ip = iend;
             break;                                       // Necessarily EOF, due to parsing restrictions
         }
         LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
@@ -824,18 +828,17 @@ int LZ4_uncompress_unknownOutputSize(
         if unlikely(op-ref<STEPSIZE)
         {
 #if LZ4_ARCH64
-            size_t dec2table[]={0, 0, 0, -1, 0, 1, 2, 3};
-            size_t dec2 = dec2table[op-ref];
+            size_t dec64 = dec64table[op-ref];
 #else
-            const int dec2 = 0;
+            const int dec64 = 0;
 #endif
-            *op++ = *ref++;
-            *op++ = *ref++;
-            *op++ = *ref++;
-            *op++ = *ref++;
-            ref -= dec[op-ref];
-            A32(op)=A32(ref); op += STEPSIZE-4;
-            ref -= dec2;
+			op[0] = ref[0];
+            op[1] = ref[1];
+            op[2] = ref[2];
+            op[3] = ref[3];
+            op += 4, ref += 4; ref -= dec32table[op-ref];
+            A32(op) = A32(ref); 
+			op += STEPSIZE-4; ref -= dec64;
         } else { LZ4_COPYSTEP(ref,op); }
         cpy = op + length - (STEPSIZE-4);
         if (cpy>oend-COPYLENGTH)
