@@ -37,23 +37,39 @@
 //**************************************
 // 32 or 64 bits ?
 #if (defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) || defined(__ppc64__) || defined(_WIN64) || defined(__LP64__) || defined(_LP64) )   // Detects 64 bits mode
-#define LZ4_ARCH64 1
+#  define LZ4_ARCH64 1
 #else
-#define LZ4_ARCH64 0
+#  define LZ4_ARCH64 0
 #endif
 
-// Little Endian or Big Endian ? 
-#if (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN) || defined(_ARCH_PPC) || defined(__PPC__) || defined(__PPC) || defined(PPC) || defined(__powerpc__) || defined(__powerpc) || defined(powerpc) || ((defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))) )
-#define LZ4_BIG_ENDIAN 1
+// Little Endian or Big Endian ?
+// Overwrite the #define below if you know your architecture endianess
+#if defined (__GLIBC__)
+#  include <endian.h>
+#  if (__BYTE_ORDER == __BIG_ENDIAN)
+#     define LZ4_BIG_ENDIAN 1
+#  endif
+#elif (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN)) && !(defined(__LITTLE_ENDIAN__) || defined(__LITTLE_ENDIAN) || defined(_LITTLE_ENDIAN))
+#  define LZ4_BIG_ENDIAN 1
+#elif defined(__sparc) || defined(__sparc__) \
+   || defined(__ppc__) || defined(_POWER) || defined(__powerpc__) || defined(_ARCH_PPC) || defined(__PPC__) || defined(__PPC) || defined(PPC) || defined(__powerpc__) || defined(__powerpc) || defined(powerpc) \
+   || defined(__hpux)  || defined(__hppa) \
+   || defined(_MIPSEB) || defined(__s390__)
+#  define LZ4_BIG_ENDIAN 1
 #else
 // Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
 #endif
 
 // Unaligned memory access is automatically enabled for "common" CPU, such as x86.
 // For others CPU, the compiler will be more cautious, and insert extra code to ensure aligned access is respected
-// If you know your target CPU supports unaligned memory access, you may want to force this option manually to improve performance
+// If you know your target CPU supports unaligned memory access, you want to force this option manually to improve performance
 #if defined(__ARM_FEATURE_UNALIGNED)
-#define LZ4_FORCE_UNALIGNED_ACCESS 1
+#  define LZ4_FORCE_UNALIGNED_ACCESS 1
+#endif
+
+// Define this parameter if your target system or compiler does not support hardware bit count
+#if defined(_MSC_VER) && defined(_WIN32_WCE)            // Visual Studio for Windows CE does not support Hardware bit count
+#  define LZ4_FORCE_SW_BITCOUNT
 #endif
 
 
@@ -63,7 +79,7 @@
 #if __STDC_VERSION__ >= 199901L    // C99
   /* "restrict" is a known keyword */
 #else
-#define restrict  // Disable restrict
+#  define restrict  // Disable restrict
 #endif
 
 #ifdef _MSC_VER

@@ -68,8 +68,18 @@
 #endif
 
 // Little Endian or Big Endian ?
-// Note : overwrite the below #define if you know your architecture endianess
-#if (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN) || defined(_ARCH_PPC) || defined(__PPC__) || defined(__PPC) || defined(PPC) || defined(__powerpc__) || defined(__powerpc) || defined(powerpc) || ((defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))) )
+// Overwrite the #define below if you know your architecture endianess
+#if defined (__GLIBC__)
+#  include <endian.h>
+#  if (__BYTE_ORDER == __BIG_ENDIAN)
+#     define LZ4_BIG_ENDIAN 1
+#  endif
+#elif (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN)) && !(defined(__LITTLE_ENDIAN__) || defined(__LITTLE_ENDIAN) || defined(_LITTLE_ENDIAN))
+#  define LZ4_BIG_ENDIAN 1
+#elif defined(__sparc) || defined(__sparc__) \
+   || defined(__ppc__) || defined(_POWER) || defined(__powerpc__) || defined(_ARCH_PPC) || defined(__PPC__) || defined(__PPC) || defined(PPC) || defined(__powerpc__) || defined(__powerpc) || defined(powerpc) \
+   || defined(__hpux)  || defined(__hppa) \
+   || defined(_MIPSEB) || defined(__s390__)
 #  define LZ4_BIG_ENDIAN 1
 #else
 // Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
@@ -77,7 +87,7 @@
 
 // Unaligned memory access is automatically enabled for "common" CPU, such as x86.
 // For others CPU, the compiler will be more cautious, and insert extra code to ensure aligned access is respected
-// If you know your target CPU supports unaligned memory access, you may want to force this option manually to improve performance
+// If you know your target CPU supports unaligned memory access, you want to force this option manually to improve performance
 #if defined(__ARM_FEATURE_UNALIGNED)
 #  define LZ4_FORCE_UNALIGNED_ACCESS 1
 #endif
@@ -721,7 +731,7 @@ int LZ4_uncompress(const char* source,
         cpy = op+length;
         if unlikely(cpy>oend-COPYLENGTH)
         {
-            if (cpy != oend) goto _output_error;         // Error : we must necessarily stand at EOF
+            if (cpy != oend) goto _output_error;         // Error : not enough place for another match (min 4) + 5 literals
             memcpy(op, ip, length);
             ip += length;
             break;                                       // EOF
@@ -743,13 +753,13 @@ int LZ4_uncompress(const char* source,
 #else
             const int dec64 = 0;
 #endif
-			op[0] = ref[0];
+            op[0] = ref[0];
             op[1] = ref[1];
             op[2] = ref[2];
             op[3] = ref[3];
             op += 4, ref += 4; ref -= dec32table[op-ref];
             A32(op) = A32(ref); 
-			op += STEPSIZE-4; ref -= dec64;
+            op += STEPSIZE-4; ref -= dec64;
         } else { LZ4_COPYSTEP(ref,op); }
         cpy = op + length - (STEPSIZE-4);
         if (cpy>oend-COPYLENGTH)
@@ -832,13 +842,13 @@ int LZ4_uncompress_unknownOutputSize(
 #else
             const int dec64 = 0;
 #endif
-			op[0] = ref[0];
+            op[0] = ref[0];
             op[1] = ref[1];
             op[2] = ref[2];
             op[3] = ref[3];
             op += 4, ref += 4; ref -= dec32table[op-ref];
             A32(op) = A32(ref); 
-			op += STEPSIZE-4; ref -= dec64;
+            op += STEPSIZE-4; ref -= dec64;
         } else { LZ4_COPYSTEP(ref,op); }
         cpy = op + length - (STEPSIZE-4);
         if (cpy>oend-COPYLENGTH)

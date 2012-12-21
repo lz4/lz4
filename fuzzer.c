@@ -92,6 +92,29 @@ int test_canary(unsigned char *buf) {
         return 1;
 }
 
+int FUZ_SecurityTest()
+{
+  char* output;
+  char* input;
+  int i, r;
+
+  printf("Starting security tests...");
+  input = (char*) malloc (20<<20);
+  output = (char*) malloc (20<<20);
+  input[0] = 0x0F;
+  input[1] = 0x00;
+  input[2] = 0x00;
+  for(i = 3; i < 16840000; i++)
+    input[i] = 0xff;
+  r = LZ4_uncompress(input, output, 20<<20);
+
+  free(input);
+  free(output);
+  printf(" Completed (r=%i)\n",r);
+  return 0;
+}
+
+
 //int main(int argc, char *argv[]) {
 int main() {
         unsigned long long bytes = 0;
@@ -116,7 +139,9 @@ int main() {
 		}
 		printf("Seed = %u\n", seed);
 
-        for (i = 0; i < 2048; i++)
+		FUZ_SecurityTest();
+
+		for (i = 0; i < 2048; i++)
                 cbuf[FUZ_avail + i] = cbuf[FUZ_avail + 2048 + i] = FUZ_rand(&seed) >> 16;
 
         for (i = 0; i < NB_ATTEMPTS; i++) {
