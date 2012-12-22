@@ -224,7 +224,7 @@ typedef struct
 #define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 #define HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define HASH_VALUE(p)		HASH_FUNCTION(*(U32*)(p))
+#define HASH_VALUE(p)		HASH_FUNCTION(A32(p))
 #define HASH_POINTER(p)		(HashTable[HASH_VALUE(p)] + base)
 #define DELTANEXT(p)		chainTable[(size_t)(p) & MAXD_MASK] 
 #define GETNEXT(p)			((p) - (size_t)DELTANEXT(p))
@@ -357,7 +357,7 @@ inline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const
 	{
 		nbAttempts--;
 		if (*(ref+ml) == *(ip+ml))
-		if (*(U32*)ref == *(U32*)ip)
+		if (A32(ref) == A32(ip))
 		{
 			const BYTE* reft = ref+MINMATCH;
 			const BYTE* ipt = ip+MINMATCH;
@@ -400,7 +400,7 @@ inline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const
 	{
 		nbAttempts--;
 		if (*(startLimit + longest) == *(ref - delta + longest))
-		if (*(U32*)ref == *(U32*)ip)
+		if (A32(ref) == A32(ip))
 		{
 			const BYTE* reft = ref+MINMATCH;
 			const BYTE* ipt = ip+MINMATCH;
