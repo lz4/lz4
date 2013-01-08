@@ -32,6 +32,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel);
 // Parameters
 void BMK_SetBlocksize(int bsize);
 void BMK_SetNbIterations(int nbLoops);
+void BMK_SetPause();
 
 
 

@@ -83,14 +83,21 @@
 #endif
 
 #ifdef _MSC_VER
-#define inline __forceinline    // Visual is not C99, but supports some kind of inline
-#include <intrin.h>             // For Visual 2005
+#  define inline __inline             // Visual is not C99, but supports some kind of inline
+#  define forceinline __forceinline   
+#  include <intrin.h>                 // For Visual 2005
 #  if LZ4_ARCH64	// 64-bit
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
 #  else
 #    pragma intrinsic(_BitScanForward)   // For Visual 2005
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
+#  endif
+#else 
+#  ifdef __GNUC__
+#    define forceinline inline __attribute__((always_inline))
+#  else
+#    define forceinline inline
 #  endif
 #endif
 
@@ -211,24 +218,23 @@ typedef struct _U64_S { U64 v; } U64_S;
 //************************************************************
 typedef struct 
 {
-	const BYTE* base;
-	HTYPE hashTable[HASHTABLESIZE];
-	U16 chainTable[MAXD];
-	const BYTE* nextToUpdate;
+    const BYTE* base;
+    HTYPE hashTable[HASHTABLESIZE];
+    U16 chainTable[MAXD];
+    const BYTE* nextToUpdate;
 } LZ4HC_Data_Structure;
 
 
 //**************************************
 // Macros
 //**************************************
-#define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
-#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
-#define HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define HASH_VALUE(p)		HASH_FUNCTION(A32(p))
-#define HASH_POINTER(p)		(HashTable[HASH_VALUE(p)] + base)
-#define DELTANEXT(p)		chainTable[(size_t)(p) & MAXD_MASK] 
-#define GETNEXT(p)			((p) - (size_t)DELTANEXT(p))
-#define ADD_HASH(p)			{ size_t delta = (p) - HASH_POINTER(p); if (delta>MAX_DISTANCE) delta = MAX_DISTANCE; DELTANEXT(p) = (U16)delta; HashTable[HASH_VALUE(p)] = (p) - base; }
+#define LZ4_WILDCOPY(s,d,e)    do { LZ4_COPYPACKET(s,d) } while (d<e);
+#define LZ4_BLINDCOPY(s,d,l)   { BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
+#define HASH_FUNCTION(i)	   (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
+#define HASH_VALUE(p)		   HASH_FUNCTION(A32(p))
+#define HASH_POINTER(p)		   (HashTable[HASH_VALUE(p)] + base)
+#define DELTANEXT(p)		   chainTable[(size_t)(p) & MAXD_MASK] 
+#define GETNEXT(p)			   ((p) - (size_t)DELTANEXT(p))
 
 
 //**************************************
@@ -246,11 +252,11 @@ inline static int LZ4_NbCommonBytes (register U64 val)
     #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clzll(val) >> 3); 
     #else
-	int r;
-	if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
-	if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
-	r += (!val);
-	return r;
+    int r;
+    if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+    if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
+    r += (!val);
+    return r;
     #endif
 #else
     #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -260,8 +266,8 @@ inline static int LZ4_NbCommonBytes (register U64 val)
     #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctzll(val) >> 3); 
     #else
-	static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
-	return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
+    static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+    return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
     #endif
 #endif
 }
@@ -272,27 +278,27 @@ inline static int LZ4_NbCommonBytes (register U32 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
     #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
+    unsigned long r;
     _BitScanReverse( &r, val );
     return (int)(r>>3);
     #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clz(val) >> 3); 
     #else
-	int r;
-	if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
-	r += (!val);
-	return r;
+    int r;
+    if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
+    r += (!val);
+    return r;
     #endif
 #else
     #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
+    unsigned long r;
     _BitScanForward( &r, val );
     return (int)(r>>3);
     #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3); 
     #else
-	static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
-	return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
+    static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+    return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
     #endif
 #endif
 }
@@ -302,166 +308,211 @@ inline static int LZ4_NbCommonBytes (register U32 val)
 
 inline static int LZ4HC_Init (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
-	MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
-	MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
-	hc4->nextToUpdate = base + LZ4_ARCH64;
-	hc4->base = base;
-	return 1;
+    MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
+    MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
+    hc4->nextToUpdate = base + LZ4_ARCH64;
+    hc4->base = base;
+    return 1;
 }
 
 
 inline static void* LZ4HC_Create (const BYTE* base)
 {
-	void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
+    void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
 
-	LZ4HC_Init (hc4, base);
-	return hc4;
+    LZ4HC_Init ((LZ4HC_Data_Structure*)hc4, base);
+    return hc4;
 }
 
 
 inline static int LZ4HC_Free (void** LZ4HC_Data)
 {
-	FREEMEM(*LZ4HC_Data);
-	*LZ4HC_Data = NULL;
-	return (1);
+    FREEMEM(*LZ4HC_Data);
+    *LZ4HC_Data = NULL;
+    return (1);
 }
 
 
-inline static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
+// Update chains up to ip (excluded)
+forceinline static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 {
-	U16*   chainTable = hc4->chainTable;
-	HTYPE* HashTable  = hc4->hashTable;
-	INITBASE(base,hc4->base);
+    U16*   chainTable = hc4->chainTable;
+    HTYPE* HashTable  = hc4->hashTable;
+    INITBASE(base,hc4->base);
 
-	while(hc4->nextToUpdate < ip)
-	{
-		ADD_HASH(hc4->nextToUpdate);
-		hc4->nextToUpdate++;
-	}
+    while(hc4->nextToUpdate < ip)
+    {
+        const BYTE* p = hc4->nextToUpdate;
+        size_t delta = (p) - HASH_POINTER(p); 
+        if (delta>MAX_DISTANCE) delta = MAX_DISTANCE; 
+        DELTANEXT(p) = (U16)delta; 
+        HashTable[HASH_VALUE(p)] = (p) - base;
+        hc4->nextToUpdate++;
+    }
 }
 
 
-inline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* const matchlimit, const BYTE** matchpos)
+forceinline static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const matchlimit)
 {
-	U16* const chainTable = hc4->chainTable;
-	HTYPE* const HashTable = hc4->hashTable;
-	const BYTE* ref;
-	INITBASE(base,hc4->base);
-	int nbAttempts=MAX_NB_ATTEMPTS;
-	int ml=0;
+    const BYTE* p1t = p1;
 
-	// HC4 match finder
-	LZ4HC_Insert(hc4, ip);
-	ref = HASH_POINTER(ip);
-	while ((ref >= (ip-MAX_DISTANCE)) && (nbAttempts))
-	{
-		nbAttempts--;
-		if (*(ref+ml) == *(ip+ml))
-		if (A32(ref) == A32(ip))
-		{
-			const BYTE* reft = ref+MINMATCH;
-			const BYTE* ipt = ip+MINMATCH;
+    while (p1t<matchlimit-(STEPSIZE-1))
+    {
+        UARCH diff = AARCH(p2) ^ AARCH(p1t);
+        if (!diff) { p1t+=STEPSIZE; p2+=STEPSIZE; continue; }
+        p1t += LZ4_NbCommonBytes(diff);
+        return (p1t - p1);
+    }
+    if (LZ4_ARCH64) if ((p1t<(matchlimit-3)) && (A32(p2) == A32(p1t))) { p1t+=4; p2+=4; }
+    if ((p1t<(matchlimit-1)) && (A16(p2) == A16(p1t))) { p1t+=2; p2+=2; }
+    if ((p1t<matchlimit) && (*p2 == *p1t)) p1t++;
+    return (p1t - p1);
+}
 
-			while (ipt<matchlimit-(STEPSIZE-1))
-			{
-				UARCH diff = AARCH(reft) ^ AARCH(ipt);
-				if (!diff) { ipt+=STEPSIZE; reft+=STEPSIZE; continue; }
-				ipt += LZ4_NbCommonBytes(diff);
-				goto _endCount;
-			}
-			if (LZ4_ARCH64) if ((ipt<(matchlimit-3)) && (A32(reft) == A32(ipt))) { ipt+=4; reft+=4; }
-			if ((ipt<(matchlimit-1)) && (A16(reft) == A16(ipt))) { ipt+=2; reft+=2; }
-			if ((ipt<matchlimit) && (*reft == *ipt)) ipt++;
+
+forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* const matchlimit, const BYTE** matchpos)
+{
+    U16* const chainTable = hc4->chainTable;
+    HTYPE* const HashTable = hc4->hashTable;
+    const BYTE* ref;
+    INITBASE(base,hc4->base);
+    int nbAttempts=MAX_NB_ATTEMPTS;
+    size_t ml=0;
+
+    // HC4 match finder
+    LZ4HC_Insert(hc4, ip);
+    ref = HASH_POINTER(ip);
+
+#if 1
+    if (ref >= ip-4)               // potential repetition
+    {
+        if (A32(ref) == A32(ip))   // confirmed
+        {
+            const U16 delta = (U16)(ip-ref);
+            const BYTE* ptr = ip;
+            const BYTE* end;
+            ml  = LZ4HC_CommonLength(ip+MINMATCH, ref+MINMATCH, matchlimit) + MINMATCH;
+            end = ip + ml - (MINMATCH-1);
+            while(ptr < end-delta)
+            {
+                DELTANEXT(ptr) = delta;    // Pre-Load
+                ptr++;
+            }
+            do
+            {
+                DELTANEXT(ptr) = delta;    
+                HashTable[HASH_VALUE(ptr)] = (ptr) - base;     // Head of chain
+                ptr++;
+            } while(ptr < end);
+            hc4->nextToUpdate = end;
+            *matchpos = ref;
+        }
+        ref = GETNEXT(ref);
+    }
+#endif
+
+    while ((ref >= (ip-MAX_DISTANCE)) && (nbAttempts))
+    {
+        nbAttempts--;
+        if (*(ref+ml) == *(ip+ml))
+        if (A32(ref) == A32(ip))
+        {
+            size_t mlt = LZ4HC_CommonLength(ip+MINMATCH, ref+MINMATCH, matchlimit) + MINMATCH;
+            if (mlt > ml) { ml = mlt; *matchpos = ref; }
+        }
+        ref = GETNEXT(ref);
+    }
+
+    return (int)ml;
+}
+
+
+forceinline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* startLimit, const BYTE* matchlimit, int longest, const BYTE** matchpos, const BYTE** startpos)
+{
+    U16* const  chainTable = hc4->chainTable;
+    HTYPE* const HashTable = hc4->hashTable;
+    INITBASE(base,hc4->base);
+    const BYTE*  ref;
+    int nbAttempts = MAX_NB_ATTEMPTS;
+    int delta = (int)(ip-startLimit);
+
+    // First Match
+    LZ4HC_Insert(hc4, ip);
+    ref = HASH_POINTER(ip);
+
+    while ((ref >= ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
+    {
+        nbAttempts--;
+        if (*(startLimit + longest) == *(ref - delta + longest))
+        if (A32(ref) == A32(ip))
+        {
+#if 1
+            const BYTE* reft = ref+MINMATCH;
+            const BYTE* ipt = ip+MINMATCH;
+            const BYTE* startt = ip;
+
+            while (ipt<matchlimit-(STEPSIZE-1))
+            {
+                UARCH diff = AARCH(reft) ^ AARCH(ipt);
+                if (!diff) { ipt+=STEPSIZE; reft+=STEPSIZE; continue; }
+                ipt += LZ4_NbCommonBytes(diff);
+                goto _endCount;
+            }
+            if (LZ4_ARCH64) if ((ipt<(matchlimit-3)) && (A32(reft) == A32(ipt))) { ipt+=4; reft+=4; }
+            if ((ipt<(matchlimit-1)) && (A16(reft) == A16(ipt))) { ipt+=2; reft+=2; }
+            if ((ipt<matchlimit) && (*reft == *ipt)) ipt++;
 _endCount:
+            reft = ref;
+#else
+            // Easier for code maintenance, but unfortunately slower too
+            const BYTE* startt = ip;
+            const BYTE* reft = ref;
+            const BYTE* ipt = ip + MINMATCH + LZ4HC_CommonLength(ip+MINMATCH, ref+MINMATCH, matchlimit);
+#endif
 
-			if (ipt-ip > ml) { ml = (int)(ipt-ip); *matchpos = ref; }
-		}
-		ref = GETNEXT(ref);
-	}
+            while ((startt>startLimit) && (reft > hc4->base) && (startt[-1] == reft[-1])) {startt--; reft--;}
 
-	return ml;
+            if ((ipt-startt) > longest)
+            {
+                longest = (int)(ipt-startt);
+                *matchpos = reft;
+                *startpos = startt;
+            }
+        }
+        ref = GETNEXT(ref);
+    }
+
+    return longest;
 }
 
 
-inline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* startLimit, const BYTE* matchlimit, int longest, const BYTE** matchpos, const BYTE** startpos)
+forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** anchor, int ml, const BYTE* ref)
 {
-	U16* const  chainTable = hc4->chainTable;
-	HTYPE* const HashTable = hc4->hashTable;
-	INITBASE(base,hc4->base);
-	const BYTE*  ref;
-	int nbAttempts = MAX_NB_ATTEMPTS;
-	int delta = (int)(ip-startLimit);
+    int length, len; 
+    BYTE* token;
 
-	// First Match
-	LZ4HC_Insert(hc4, ip);
-	ref = HASH_POINTER(ip);
+    // Encode Literal length
+    length = (int)(*ip - *anchor);
+    token = (*op)++;
+    if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; } 
+    else *token = (length<<ML_BITS);
 
-	while ((ref >= ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
-	{
-		nbAttempts--;
-		if (*(startLimit + longest) == *(ref - delta + longest))
-		if (A32(ref) == A32(ip))
-		{
-			const BYTE* reft = ref+MINMATCH;
-			const BYTE* ipt = ip+MINMATCH;
-			const BYTE* startt = ip;
+    // Copy Literals
+    LZ4_BLINDCOPY(*anchor, *op, length);
 
-			while (ipt<matchlimit-(STEPSIZE-1))
-			{
-				UARCH diff = AARCH(reft) ^ AARCH(ipt);
-				if (!diff) { ipt+=STEPSIZE; reft+=STEPSIZE; continue; }
-				ipt += LZ4_NbCommonBytes(diff);
-				goto _endCount;
-			}
-			if (LZ4_ARCH64) if ((ipt<(matchlimit-3)) && (A32(reft) == A32(ipt))) { ipt+=4; reft+=4; }
-			if ((ipt<(matchlimit-1)) && (A16(reft) == A16(ipt))) { ipt+=2; reft+=2; }
-			if ((ipt<matchlimit) && (*reft == *ipt)) ipt++;
-_endCount:
+    // Encode Offset
+    LZ4_WRITE_LITTLEENDIAN_16(*op,(U16)(*ip-ref));
 
-			reft = ref;
-			while ((startt>startLimit) && (reft > hc4->base) && (startt[-1] == reft[-1])) {startt--; reft--;}
+    // Encode MatchLength
+    len = (int)(ml-MINMATCH);
+    if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (len > 254) { len-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)len; } 
+    else *token += len;	
 
-			if ((ipt-startt) > longest)
-			{
-				longest = (int)(ipt-startt);
-				*matchpos = reft;
-				*startpos = startt;
-			}
-		}
-		ref = GETNEXT(ref);
-	}
+    // Prepare next loop
+    *ip += ml;
+    *anchor = *ip; 
 
-	return longest;
-}
-
-
-inline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** anchor, int ml, const BYTE* ref)
-{
-	int length, len; 
-	BYTE* token;
-
-	// Encode Literal length
-	length = (int)(*ip - *anchor);
-	token = (*op)++;
-	if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; } 
-	else *token = (length<<ML_BITS);
-
-	// Copy Literals
-	LZ4_BLINDCOPY(*anchor, *op, length);
-
-	// Encode Offset
-	LZ4_WRITE_LITTLEENDIAN_16(*op,(U16)(*ip-ref));
-
-	// Encode MatchLength
-	len = (int)(ml-MINMATCH);
-	if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (len > 254) { len-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)len; } 
-	else *token += len;	
-
-	// Prepare next loop
-	*ip += ml;
-	*anchor = *ip; 
-
-	return 0;
+    return 0;
 }
 
 
@@ -470,218 +521,218 @@ inline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** an
 //****************************
 
 int LZ4_compressHCCtx(LZ4HC_Data_Structure* ctx,
-				 const char* source, 
-				 char* dest,
-				 int isize)
+                 const char* source, 
+                 char* dest,
+                 int isize)
 {	
-	const BYTE* ip = (const BYTE*) source;
-	const BYTE* anchor = ip;
-	const BYTE* const iend = ip + isize;
-	const BYTE* const mflimit = iend - MFLIMIT;
-	const BYTE* const matchlimit = (iend - LASTLITERALS);
+    const BYTE* ip = (const BYTE*) source;
+    const BYTE* anchor = ip;
+    const BYTE* const iend = ip + isize;
+    const BYTE* const mflimit = iend - MFLIMIT;
+    const BYTE* const matchlimit = (iend - LASTLITERALS);
 
-	BYTE* op = (BYTE*) dest;
+    BYTE* op = (BYTE*) dest;
 
-	int	ml, ml2, ml3, ml0;
-	const BYTE* ref=NULL;
-	const BYTE* start2=NULL;
-	const BYTE* ref2=NULL;
-	const BYTE* start3=NULL;
-	const BYTE* ref3=NULL;
-	const BYTE* start0;
-	const BYTE* ref0;
+    int	ml, ml2, ml3, ml0;
+    const BYTE* ref=NULL;
+    const BYTE* start2=NULL;
+    const BYTE* ref2=NULL;
+    const BYTE* start3=NULL;
+    const BYTE* ref3=NULL;
+    const BYTE* start0;
+    const BYTE* ref0;
 
-	ip++;
+    ip++;
 
-	// Main Loop
-	while (ip < mflimit)
-	{
-		ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, (&ref));
-		if (!ml) { ip++; continue; }
+    // Main Loop
+    while (ip < mflimit)
+    {
+        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, (&ref));
+        if (!ml) { ip++; continue; }
 
-		// saved, in case we would skip too much
-		start0 = ip;
-		ref0 = ref;
-		ml0 = ml;
+        // saved, in case we would skip too much
+        start0 = ip;
+        ref0 = ref;
+        ml0 = ml;
 
 _Search2:
-		if (ip+ml < mflimit)
-			ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 1, matchlimit, ml, &ref2, &start2);
-		else ml2=ml;
+        if (ip+ml < mflimit)
+            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 1, matchlimit, ml, &ref2, &start2);
+        else ml2=ml;
 
-		if (ml2 == ml)  // No better match
-		{
-			LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
-			continue;
-		}
+        if (ml2 == ml)  // No better match
+        {
+            LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+            continue;
+        }
 
-		if (start0 < ip)
-		{
-			if (start2 < ip + ml0)   // empirical
-			{
-				ip = start0;
-				ref = ref0;
-				ml = ml0;
-			}
-		}
+        if (start0 < ip)
+        {
+            if (start2 < ip + ml0)   // empirical
+            {
+                ip = start0;
+                ref = ref0;
+                ml = ml0;
+            }
+        }
 
-		// Here, start0==ip
-		if ((start2 - ip) < 3)   // First Match too small : removed
-		{
-			ml = ml2;
-			ip = start2;
-			ref =ref2;
-			goto _Search2;
-		}
+        // Here, start0==ip
+        if ((start2 - ip) < 3)   // First Match too small : removed
+        {
+            ml = ml2;
+            ip = start2;
+            ref =ref2;
+            goto _Search2;
+        }
 
 _Search3:
-		// Currently we have :
-		// ml2 > ml1, and
-		// ip1+3 <= ip2 (usually < ip1+ml1)
-		if ((start2 - ip) < OPTIMAL_ML)
-		{
-			int correction;
-			int new_ml = ml;
-			if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-			if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
-			correction = new_ml - (int)(start2 - ip);
-			if (correction > 0)
-			{
-				start2 += correction;
-				ref2 += correction;
-				ml2 -= correction;
-			}
-		}
-		// Now, we have start2 = ip+new_ml, with new_ml=min(ml, OPTIMAL_ML=18)
+        // Currently we have :
+        // ml2 > ml1, and
+        // ip1+3 <= ip2 (usually < ip1+ml1)
+        if ((start2 - ip) < OPTIMAL_ML)
+        {
+            int correction;
+            int new_ml = ml;
+            if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
+            if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
+            correction = new_ml - (int)(start2 - ip);
+            if (correction > 0)
+            {
+                start2 += correction;
+                ref2 += correction;
+                ml2 -= correction;
+            }
+        }
+        // Now, we have start2 = ip+new_ml, with new_ml=min(ml, OPTIMAL_ML=18)
 
-		if (start2 + ml2 < mflimit)
-			ml3 = LZ4HC_InsertAndGetWiderMatch(ctx, start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3);
-		else ml3=ml2;
+        if (start2 + ml2 < mflimit)
+            ml3 = LZ4HC_InsertAndGetWiderMatch(ctx, start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3);
+        else ml3=ml2;
 
-		if (ml3 == ml2) // No better match : 2 sequences to encode
-		{
-			// ip & ref are known; Now for ml
-			if (start2 < ip+ml)
-			{
-				if ((start2 - ip) < OPTIMAL_ML)
-				{
-					int correction;
-					if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-					if (ip+ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
-					correction = ml - (int)(start2 - ip);
-					if (correction > 0)
-					{
-						start2 += correction;
-						ref2 += correction;
-						ml2 -= correction;
-					}
-				}
-				else
-				{
-					ml = (int)(start2 - ip);
-				}
-			}
-			// Now, encode 2 sequences
-			LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
-			ip = start2;
-			LZ4_encodeSequence(&ip, &op, &anchor, ml2, ref2);
-			continue;
-		}
+        if (ml3 == ml2) // No better match : 2 sequences to encode
+        {
+            // ip & ref are known; Now for ml
+            if (start2 < ip+ml)
+            {
+                if ((start2 - ip) < OPTIMAL_ML)
+                {
+                    int correction;
+                    if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
+                    if (ip+ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
+                    correction = ml - (int)(start2 - ip);
+                    if (correction > 0)
+                    {
+                        start2 += correction;
+                        ref2 += correction;
+                        ml2 -= correction;
+                    }
+                }
+                else
+                {
+                    ml = (int)(start2 - ip);
+                }
+            }
+            // Now, encode 2 sequences
+            LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+            ip = start2;
+            LZ4_encodeSequence(&ip, &op, &anchor, ml2, ref2);
+            continue;
+        }
 
-		if (start3 < ip+ml+3) // Not enough space for match 2 : remove it
-		{
-			if (start3 >= (ip+ml)) // can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1
-			{
-				if (start2 < ip+ml)
-				{
-					int correction = (int)(ip+ml - start2);
-					start2 += correction;
-					ref2 += correction;
-					ml2 -= correction;
-					if (ml2 < MINMATCH)
-					{
-						start2 = start3;
-						ref2 = ref3;
-						ml2 = ml3;
-					}
-				}
+        if (start3 < ip+ml+3) // Not enough space for match 2 : remove it
+        {
+            if (start3 >= (ip+ml)) // can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1
+            {
+                if (start2 < ip+ml)
+                {
+                    int correction = (int)(ip+ml - start2);
+                    start2 += correction;
+                    ref2 += correction;
+                    ml2 -= correction;
+                    if (ml2 < MINMATCH)
+                    {
+                        start2 = start3;
+                        ref2 = ref3;
+                        ml2 = ml3;
+                    }
+                }
 
-				LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
-				ip  = start3;
-				ref = ref3;
-				ml  = ml3;
+                LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+                ip  = start3;
+                ref = ref3;
+                ml  = ml3;
 
-				start0 = start2;
-				ref0 = ref2;
-				ml0 = ml2;
-				goto _Search2;
-			}
+                start0 = start2;
+                ref0 = ref2;
+                ml0 = ml2;
+                goto _Search2;
+            }
 
-			start2 = start3;
-			ref2 = ref3;
-			ml2 = ml3;
-			goto _Search3;
-		}
+            start2 = start3;
+            ref2 = ref3;
+            ml2 = ml3;
+            goto _Search3;
+        }
 
-		// OK, now we have 3 ascending matches; let's write at least the first one
-		// ip & ref are known; Now for ml
-		if (start2 < ip+ml)
-		{
-			if ((start2 - ip) < (int)ML_MASK)
-			{
-				int correction;
-				if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-				if (ip + ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
-				correction = ml - (int)(start2 - ip);
-				if (correction > 0)
-				{
-					start2 += correction;
-					ref2 += correction;
-					ml2 -= correction;
-				}
-			}
-			else
-			{
-				ml = (int)(start2 - ip);
-			}
-		}
-		LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+        // OK, now we have 3 ascending matches; let's write at least the first one
+        // ip & ref are known; Now for ml
+        if (start2 < ip+ml)
+        {
+            if ((start2 - ip) < (int)ML_MASK)
+            {
+                int correction;
+                if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
+                if (ip + ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
+                correction = ml - (int)(start2 - ip);
+                if (correction > 0)
+                {
+                    start2 += correction;
+                    ref2 += correction;
+                    ml2 -= correction;
+                }
+            }
+            else
+            {
+                ml = (int)(start2 - ip);
+            }
+        }
+        LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
 
-		ip = start2;
-		ref = ref2;
-		ml = ml2;
+        ip = start2;
+        ref = ref2;
+        ml = ml2;
 
-		start2 = start3;
-		ref2 = ref3;
-		ml2 = ml3;
+        start2 = start3;
+        ref2 = ref3;
+        ml2 = ml3;
 
-		goto _Search3;
+        goto _Search3;
 
-	}
+    }
 
-	// Encode Last Literals
-	{
-		int lastRun = (int)(iend - anchor);
-		if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
-		else *op++ = (lastRun<<ML_BITS);
-		memcpy(op, anchor, iend - anchor);
-		op += iend-anchor;
-	} 
+    // Encode Last Literals
+    {
+        int lastRun = (int)(iend - anchor);
+        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
+        else *op++ = (lastRun<<ML_BITS);
+        memcpy(op, anchor, iend - anchor);
+        op += iend-anchor;
+    } 
 
-	// End
-	return (int) (((char*)op)-dest);
+    // End
+    return (int) (((char*)op)-dest);
 }
 
 
 int LZ4_compressHC(const char* source, 
-				 char* dest,
-				 int isize)
+                 char* dest,
+                 int isize)
 {
-	void* ctx = LZ4HC_Create((const BYTE*)source);
-	int result = LZ4_compressHCCtx(ctx, source, dest, isize);
-	LZ4HC_Free (&ctx);
+    void* ctx = LZ4HC_Create((const BYTE*)source);
+    int result = LZ4_compressHCCtx(ctx, source, dest, isize);
+    LZ4HC_Free (&ctx);
 
-	return result;
+    return result;
 }
 
 

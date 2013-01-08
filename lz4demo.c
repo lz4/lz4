@@ -368,7 +368,10 @@ int main(int argc, char** argv)
 		// Modify Nb Iterations (benchmark only)
 		if ( argument[0] =='i' ) { int iters = argument[1] - '0'; BMK_SetNbIterations(iters); continue; }
 
-		// Test
+		// Pause at the end (benchmark only)
+		if ( argument[0] =='p' ) { BMK_SetPause(); continue; }
+
+        // Test
 		if ( argument[0] =='t' ) { decode=1; output_filename=nulmark; continue; }
 	}
 
