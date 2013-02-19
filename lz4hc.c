@@ -411,7 +411,7 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
     }
 #endif
 
-    while ((ref >= (ip-MAX_DISTANCE)) && (nbAttempts))
+    while ((ref >= ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
     {
         nbAttempts--;
         if (*(ref+ml) == *(ip+ml))
@@ -558,7 +558,7 @@ int LZ4_compressHCCtx(LZ4HC_Data_Structure* ctx,
 _Search2:
         if (ip+ml < mflimit)
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 1, matchlimit, ml, &ref2, &start2);
-        else ml2=ml;
+        else ml2 = ml;
 
         if (ml2 == ml)  // No better match
         {
@@ -603,35 +603,16 @@ _Search3:
                 ml2 -= correction;
             }
         }
-        // Now, we have start2 = ip+new_ml, with new_ml=min(ml, OPTIMAL_ML=18)
+        // Now, we have start2 = ip+new_ml, with new_ml = min(ml, OPTIMAL_ML=18)
 
         if (start2 + ml2 < mflimit)
             ml3 = LZ4HC_InsertAndGetWiderMatch(ctx, start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3);
-        else ml3=ml2;
+        else ml3 = ml2;
 
         if (ml3 == ml2) // No better match : 2 sequences to encode
         {
             // ip & ref are known; Now for ml
-            if (start2 < ip+ml)
-            {
-                if ((start2 - ip) < OPTIMAL_ML)
-                {
-                    int correction;
-                    if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-                    if (ip+ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
-                    correction = ml - (int)(start2 - ip);
-                    if (correction > 0)
-                    {
-                        start2 += correction;
-                        ref2 += correction;
-                        ml2 -= correction;
-                    }
-                }
-                else
-                {
-                    ml = (int)(start2 - ip);
-                }
-            }
+            if (start2 < ip+ml)  ml = (int)(start2 - ip);
             // Now, encode 2 sequences
             LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
             ip = start2;
