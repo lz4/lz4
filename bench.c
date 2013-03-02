@@ -433,7 +433,8 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 		  while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
 		  {
 			for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-				chunkP[chunkNb].outputSize = compP.decompressionFunction(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].inputSize);
+				chunkP[chunkNb].outputSize = LZ4_uncompress(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].inputSize);
+				//chunkP[chunkNb].inputSize = LZ4_uncompress_unknownOutputSize(chunkP[chunkNb].outputBuffer, chunkP[chunkNb].inputBuffer, chunkP[chunkNb].outputSize, chunkSize);
 			nb_loops++;
 		  }
 		  milliTime = BMK_GetMilliSpan(milliTime);

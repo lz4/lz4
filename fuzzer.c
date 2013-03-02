@@ -144,7 +144,8 @@ int main() {
 		for (i = 0; i < 2048; i++)
                 cbuf[FUZ_avail + i] = cbuf[FUZ_avail + 2048 + i] = FUZ_rand(&seed) >> 16;
 
-        for (i = 0; i < NB_ATTEMPTS; i++) {
+        for (i = 0; i < NB_ATTEMPTS; i++) 
+        {
 			printf("\r%7i /%7i\r", i, NB_ATTEMPTS);
 			
 			FUZ_rand(&seed);
@@ -171,7 +172,7 @@ int main() {
 
 			// Test decoding with output size being exactly what's necessary => must work
 			ret = LZ4_uncompress((char*)&cbuf[off_full], (char*)testOut, LEN);
-			if (ret<0) { printf("decompression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
+			if (ret<0) { printf("decompression failed despite correct space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 
 			// Test decoding with one byte missing => must fail
 			ret = LZ4_uncompress((char*)&cbuf[off_full], (char*)testOut, LEN-1);
@@ -185,7 +186,7 @@ int main() {
 			ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len, LEN+1);
 			if (ret<0) { printf("decompression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 
-			// Test decoding with output size being exactly what's necessary => should work
+			// Test decoding with output size being exactly what's necessary => must work
 			ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len, LEN);
 			if (ret<0) { printf("decompression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 

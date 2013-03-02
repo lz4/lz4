@@ -377,41 +377,29 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
     const BYTE* ref;
     INITBASE(base,hc4->base);
     int nbAttempts=MAX_NB_ATTEMPTS;
-    size_t ml=0;
+    size_t repl=0, ml=0;
+    U16 delta;
 
     // HC4 match finder
     LZ4HC_Insert(hc4, ip);
     ref = HASH_POINTER(ip);
 
-#if 1
+#define REPEAT_OPTIMIZATION
+#ifdef REPEAT_OPTIMIZATION
+    // Detect repetitive sequences of length <= 4
     if (ref >= ip-4)               // potential repetition
     {
         if (A32(ref) == A32(ip))   // confirmed
         {
-            const U16 delta = (U16)(ip-ref);
-            const BYTE* ptr = ip;
-            const BYTE* end;
-            ml  = LZ4HC_CommonLength(ip+MINMATCH, ref+MINMATCH, matchlimit) + MINMATCH;
-            end = ip + ml - (MINMATCH-1);
-            while(ptr < end-delta)
-            {
-                DELTANEXT(ptr) = delta;    // Pre-Load
-                ptr++;
-            }
-            do
-            {
-                DELTANEXT(ptr) = delta;    
-                HashTable[HASH_VALUE(ptr)] = (ptr) - base;     // Head of chain
-                ptr++;
-            } while(ptr < end);
-            hc4->nextToUpdate = end;
+            delta = (U16)(ip-ref);
+            repl = ml  = LZ4HC_CommonLength(ip+MINMATCH, ref+MINMATCH, matchlimit) + MINMATCH;
             *matchpos = ref;
         }
         ref = GETNEXT(ref);
     }
 #endif
 
-    while ((ref >= ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
+    while ((ref >= ip-MAX_DISTANCE) && (nbAttempts))
     {
         nbAttempts--;
         if (*(ref+ml) == *(ip+ml))
@@ -422,6 +410,29 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
         }
         ref = GETNEXT(ref);
     }
+
+#ifdef REPEAT_OPTIMIZATION
+    // Complete table
+    if (repl)
+    {
+        const BYTE* ptr = ip;
+        const BYTE* end;
+
+        end = ip + repl - (MINMATCH-1);
+        while(ptr < end-delta)
+        {
+            DELTANEXT(ptr) = delta;    // Pre-Load
+            ptr++;
+        }
+        do
+        {
+            DELTANEXT(ptr) = delta;    
+            HashTable[HASH_VALUE(ptr)] = (ptr) - base;     // Head of chain
+            ptr++;
+        } while(ptr < end);
+        hc4->nextToUpdate = end;
+    }
+#endif 
 
     return (int)ml;
 }
@@ -440,7 +451,7 @@ forceinline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, 
     LZ4HC_Insert(hc4, ip);
     ref = HASH_POINTER(ip);
 
-    while ((ref >= ip-MAX_DISTANCE) && (ref >= hc4->base) && (nbAttempts))
+    while ((ref >= ip-MAX_DISTANCE) && (nbAttempts))
     {
         nbAttempts--;
         if (*(startLimit + longest) == *(ref - delta + longest))
