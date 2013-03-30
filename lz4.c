@@ -710,6 +710,7 @@ int LZ4_compress(const char* source,
 //		are safe against "buffer overflow" attack type.
 //		They will never write nor read outside of the provided output buffers.
 //      LZ4_uncompress_unknownOutputSize() also insures that it will never read outside of the input buffer.
+//      LZ4_uncompress() guarantees that it will never read before source, nor beyond source + LZ4_compressBound(osize)
 //		A corrupted input will produce an error result, a negative int, indicating the position of the error within input stream.
 
 int LZ4_uncompress(const char* source,

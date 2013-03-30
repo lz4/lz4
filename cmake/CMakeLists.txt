@@ -83,6 +83,12 @@ if(BUILD_SHARED_LIBS)
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
     )
+    
+    install(FILES
+        ${SRC_DIR}/lz4.h
+        ${SRC_DIR}/lz4hc.h
+        DESTINATION include)
+            
 endif(BUILD_SHARED_LIBS)
 
 

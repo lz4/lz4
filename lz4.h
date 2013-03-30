@@ -66,7 +66,7 @@ LZ4_compress() :
 
 LZ4_uncompress() :
     osize  : is the output size, therefore the original size
-    return : the number of bytes read in the source buffer
+    return : the number of bytes read in the source buffer (in other words, the compressed size)
              If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
              This function never writes outside of provided buffers, and never modifies input buffer.
     note : destination buffer must be already allocated.
