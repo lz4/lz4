@@ -1,6 +1,6 @@
 /*
     fuzzer.c - Fuzzer test tool for LZ4
-    Copyright (C) Andrew Mahone - Yann Collet 2012
+    Copyright (C) Andrew Mahone - Yann Collet 2012-2013
     Original code by Andrew Mahone / Modified by Yann Collet
     GPL v2 License
 
@@ -99,7 +99,7 @@ int FUZ_SecurityTest()
   char* input;
   int i, r;
 
-  printf("Starting security tests...");
+  printf("Starting security tests (issue 52)...");
   input = (char*) malloc (20<<20);
   output = (char*) malloc (20<<20);
   input[0] = 0x0F;

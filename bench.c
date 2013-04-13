@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012
+    Copyright (C) Yann Collet 2012-2013
 	GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -138,13 +138,13 @@ static int BMK_pause = 0;
 void BMK_SetBlocksize(int bsize)
 {
 	chunkSize = bsize;
-	DISPLAY("-Using Block Size of %i KB-", chunkSize>>10);
+	DISPLAY("-Using Block Size of %i KB-\n", chunkSize>>10);
 }
 
 void BMK_SetNbIterations(int nbLoops)
 {
 	nbIterations = nbLoops;
-	DISPLAY("- %i iterations-", nbIterations);
+	DISPLAY("- %i iterations-\n", nbIterations);
 }
 
 void BMK_SetPause()

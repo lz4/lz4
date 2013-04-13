@@ -5,7 +5,7 @@ Author : Y. Collet
 
 
 This small specification intents to provide enough information
-to anyone willing to produce LZ4-compatible compressed streams
+to anyone willing to produce LZ4-compatible compressed data blocks
 using any programming language.
 
 LZ4 is an LZ77-type compressor with a fixed, byte-oriented encoding.
@@ -22,9 +22,9 @@ on implementation details of the compressor, and vice versa.
 
 
 
--- Compressed stream format --
+-- Compressed block format --
 
-An LZ4 compressed stream is composed of sequences.
+An LZ4 compressed block is composed of sequences.
 Schematically, a sequence is a suite of literals, followed by a match copy.
 
 Each sequence starts with a token.
@@ -41,7 +41,7 @@ Each additionnal byte then represent a value from 0 to 255,
 which is added to the previous value to produce a total length.
 When the byte value is 255, another byte is output.
 There can be any number of bytes following the token. There is no "size limit".
-(Sidenote this is why a not-compressible input stream is expanded by 0.4%).
+(Sidenote this is why a not-compressible input block is expanded by 0.4%).
 
 Example 1 : A length of 48 will be represented as :
 - 15 : value for the 4-bits High field
@@ -64,8 +64,7 @@ It's possible that there are zero literal.
 Following the literals is the match copy operation.
 
 It starts by the offset.
-This is a 2 bytes value, in little endian format :
-the lower byte is the first one in the stream.
+This is a 2 bytes value, in little endian format.
 
 The offset represents the position of the match to be copied from.
 1 means "current position - 1 byte".
@@ -96,8 +95,8 @@ and therefore start another one.
 There are specific parsing rules to respect in order to remain compatible
 with assumptions made by the decoder :
 1) The last 5 bytes are always literals
-2) The last match must start at least 12 bytes before end of stream
-Consequently, a file with less than 13 bytes cannot be compressed.
+2) The last match must start at least 12 bytes before end of block
+Consequently, a block with less than 13 bytes cannot be compressed.
 These rules are in place to ensure that the decoder
 will never read beyond the input buffer, nor write beyond the output buffer.
 
@@ -108,7 +107,7 @@ and stops right after literals.
 -- Additional notes --
 
 There is no assumption nor limits to the way the compressor
-searches and selects matches within the source stream.
+searches and selects matches within the source data block.
 It could be a fast scan, a multi-probe, a full search using BST,
 standard hash chains or MMC, well whatever.
 

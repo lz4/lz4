@@ -1,7 +1,7 @@
 /*
    LZ4 - Fast LZ compression algorithm
    Header File
-   Copyright (C) 2011-2012, Yann Collet.
+   Copyright (C) 2011-2013, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -50,27 +50,26 @@ extern "C" {
 // Simple Functions
 //****************************
 
-int LZ4_compress   (const char* source, char* dest, int isize);
-int LZ4_uncompress (const char* source, char* dest, int osize);
+int LZ4_compress   (const char* source, char* dest, int input_size);
+int LZ4_uncompress (const char* source, char* dest, int output_size);
 
 /*
 LZ4_compress() :
-    Compresses 'isize' bytes from 'source' into 'dest'.
+    Compresses 'input_size' bytes from 'source' into 'dest'.
     Destination buffer must be already allocated,
     and must be sized to handle worst cases situations (input data not compressible)
     Worst case size evaluation is provided by function LZ4_compressBound()
-
-    isize  : is the input size. Max supported value is ~1.9GB
+    input_size : Max supported value is ~1.9GB
     return : the number of bytes written in buffer dest
-
+             or 0 if the compression fails
 
 LZ4_uncompress() :
-    osize  : is the output size, therefore the original size
+    output_size : is the original (uncompressed) size
     return : the number of bytes read in the source buffer (in other words, the compressed size)
-             If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction
-             This function never writes outside of provided buffers, and never modifies input buffer.
-    note : destination buffer must be already allocated.
-           its size must be a minimum of 'osize' bytes.
+             If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction.
+    note : This function never writes outside of provided buffers, and never modifies input buffer.
+           Destination buffer must be already allocated.
+           Its size must be a minimum of 'output_size' bytes.
 */
 
 

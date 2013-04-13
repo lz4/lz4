@@ -1,6 +1,6 @@
 /*
    LZ4 HC - High Compression Mode of LZ4
-   Copyright (C) 2011-2012, Yann Collet.
+   Copyright (C) 2011-2013, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -93,6 +93,8 @@
 #    pragma intrinsic(_BitScanForward)   // For Visual 2005
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
 #  endif
+#  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
+#  pragma warning(disable : 4701)        // disable: C4701: potentially uninitialized local variable used
 #else 
 #  ifdef __GNUC__
 #    define forceinline inline __attribute__((always_inline))
@@ -346,7 +348,7 @@ forceinline static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
         size_t delta = (p) - HASH_POINTER(p); 
         if (delta>MAX_DISTANCE) delta = MAX_DISTANCE; 
         DELTANEXT(p) = (U16)delta; 
-        HashTable[HASH_VALUE(p)] = (p) - base;
+        HashTable[HASH_VALUE(p)] = (HTYPE)((p) - base);
         hc4->nextToUpdate++;
     }
 }
@@ -427,7 +429,7 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
         do
         {
             DELTANEXT(ptr) = delta;    
-            HashTable[HASH_VALUE(ptr)] = (ptr) - base;     // Head of chain
+            HashTable[HASH_VALUE(ptr)] = (HTYPE)((ptr) - base);     // Head of chain
             ptr++;
         } while(ptr < end);
         hc4->nextToUpdate = end;
@@ -506,7 +508,7 @@ forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE
     length = (int)(*ip - *anchor);
     token = (*op)++;
     if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; } 
-    else *token = (length<<ML_BITS);
+    else *token = (BYTE)(length<<ML_BITS);
 
     // Copy Literals
     LZ4_BLINDCOPY(*anchor, *op, length);
@@ -517,7 +519,7 @@ forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE
     // Encode MatchLength
     len = (int)(ml-MINMATCH);
     if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (len > 254) { len-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)len; } 
-    else *token += len;	
+    else *token += (BYTE)len;	
 
     // Prepare next loop
     *ip += ml;
@@ -706,7 +708,7 @@ _Search3:
     {
         int lastRun = (int)(iend - anchor);
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
-        else *op++ = (lastRun<<ML_BITS);
+        else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
         op += iend-anchor;
     } 

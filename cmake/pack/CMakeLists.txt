@@ -42,21 +42,21 @@ INCLUDE_DIRECTORIES (${SRC_DIR})
 
 
 set(LZ4_SRCS_LIB ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h ${SRC_DIR}lz4_format_description.txt)
-set(LZ4_SRCS ${LZ4_SRCS_LIB} ${SRC_DIR}bench.c ${SRC_DIR}lz4demo.c )
-set(FIZZER_SRCS ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h ${SRC_DIR}fuzzer.c)
+set(LZ4_SRCS ${LZ4_SRCS_LIB} ${SRC_DIR}xxhash.c ${SRC_DIR}bench.c ${SRC_DIR}lz4c.c )
+set(FUZZER_SRCS ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h ${SRC_DIR}fuzzer.c)
 
 # EXECUTABLES FOR 32 Bit and 64 versions
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "64bit")
-	add_executable(lz4demo32 ${LZ4_SRCS})
-	install(TARGETS lz4demo32 RUNTIME DESTINATION "./")
-SET_TARGET_PROPERTIES(lz4demo32 PROPERTIES
+	add_executable(lz4c32 ${LZ4_SRCS})
+	install(TARGETS lz4c32 RUNTIME DESTINATION "./")
+SET_TARGET_PROPERTIES(lz4c32 PROPERTIES
 	COMPILE_FLAGS PROPERTIES COMPILE_FLAGS "-m32 -Os" LINK_FLAGS "-m32")
 endif()
 
-add_executable(lz4demo ${LZ4_SRCS})
-install(TARGETS lz4demo RUNTIME DESTINATION "./")
+add_executable(lz4c ${LZ4_SRCS})
+install(TARGETS lz4c RUNTIME DESTINATION "./")
 
-add_executable(fuzzer ${FIZZER_SRCS})
+add_executable(fuzzer ${FUZZER_SRCS})
 install(TARGETS fuzzer RUNTIME DESTINATION "./")
 
 #target_link_libraries(lz4 ${LZ4_SRCS_LIB})
