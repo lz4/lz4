@@ -39,7 +39,7 @@ extern "C" {
 #endif
 
 
-int LZ4_compressHC (const char* source, char* dest, int isize);
+int LZ4_compressHC (const char* source, char* dest, int inputSize);
 
 /*
 LZ4_compressHC :
@@ -47,6 +47,20 @@ LZ4_compressHC :
 	note : destination buffer must be already allocated. 
 		To avoid any problem, size it to handle worst cases situations (input data not compressible)
 		Worst case size evaluation is provided by function LZ4_compressBound() (see "lz4.h")
+*/
+
+int LZ4_compressHC_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
+
+/*
+LZ4_compress_limitedOutput() :
+    Compress 'inputSize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+    If it cannot achieve it, compression will stop, and result of the function will be zero.
+    This function never writes outside of provided output buffer.
+
+    inputSize  : Max supported value is ~1.9GB
+    maxOutputSize : is maximum allowed size into the destination buffer (which must be already allocated)
+    return : the number of output bytes written in buffer 'dest'
+             or 0 if the compression fails
 */
 
 

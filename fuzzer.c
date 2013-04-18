@@ -42,7 +42,7 @@
 //**************************************
 // Constants
 //**************************************
-#define NB_ATTEMPTS (1<<18)
+#define NB_ATTEMPTS (1<<17)
 #define LEN ((1<<15))
 #define SEQ_POW 2
 #define NUM_SEQ (1 << SEQ_POW)
@@ -99,7 +99,7 @@ int FUZ_SecurityTest()
   char* input;
   int i, r;
 
-  printf("Starting security tests (issue 52)...");
+  printf("Starting overflow tests (issue 52)...");
   input = (char*) malloc (20<<20);
   output = (char*) malloc (20<<20);
   input[0] = 0x0F;
@@ -111,7 +111,7 @@ int FUZ_SecurityTest()
 
   free(input);
   free(output);
-  printf(" Completed (return = %i < 0)\n",r);
+  printf(" Passed (return = %i < 0)\n",r);
   return 0;
 }
 
@@ -120,6 +120,7 @@ int FUZ_SecurityTest()
 int main() {
         unsigned long long bytes = 0;
         unsigned long long cbytes = 0;
+        unsigned long long hcbytes = 0;
         unsigned char buf[LEN];
         unsigned char testOut[LEN+1];
 #       define FUZ_max   LZ4_COMPRESSBOUND(LEN)
@@ -127,7 +128,7 @@ int main() {
         const int off_full = FUZ_avail - FUZ_max;
         unsigned char cbuf[FUZ_avail + PAGE_SIZE];
         unsigned int seed, cur_seq=PRIME3, seeds[NUM_SEQ], timestamp=FUZ_GetMilliStart();
-        int i, j, k, ret, len;
+        int i, j, k, ret, len, lenHC;
         char userInput[30] = {0};
 
         printf("starting LZ4 fuzzer\n");
@@ -165,6 +166,11 @@ int main() {
                     }
                     buf[j] = FUZ_rand(&cur_seq) >> 16;
             }
+
+            // Test compression HC
+            ret = LZ4_compressHC_limitedOutput((const char*)buf, (char*)&cbuf[off_full], LEN, FUZ_max);
+            if (ret == 0) { printf("HC compression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
+            lenHC = ret;
 
             // Test compression
             ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[off_full], LEN, FUZ_max);
@@ -208,17 +214,27 @@ int main() {
             if (!test_canary(&cbuf[FUZ_avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d\n", seed, LEN, len); goto _output_error; }
             if (ret == 0) { printf("compression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 
+            // Test HC compression with output size being exactly what's necessary (should work)
+            ret = LZ4_compressHC_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-len], LEN, lenHC);
+            if (ret == 0) { printf("HC compression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
+
             // Test compression with just one missing byte into output buffer => must fail
             ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-(len-1)], LEN, len-1);
             if (ret) { printf("compression overran output buffer: seed %u, len %d, olen %d => ret %d", seed, LEN, len-1, ret); goto _output_error; }
             if (!test_canary(&cbuf[FUZ_avail])) { printf("compression overran output buffer: seed %u, len %d, olen %d", seed, LEN, len-1); goto _output_error; }
 
+            // Test HC compression with just one missing byte into output buffer => must fail
+            ret = LZ4_compressHC_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-(len-1)], LEN, lenHC-1);
+            if (ret) { printf("HC compression overran output buffer: seed %u, len %d, olen %d => ret %d", seed, LEN, lenHC-1, ret); goto _output_error; }
+
             bytes += LEN;
             cbytes += len;
+            hcbytes += lenHC;
         }
 
         printf("all tests completed successfully \n");
         printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
+        printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
         getchar();
         return 0;
 

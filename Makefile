@@ -18,7 +18,7 @@ lz4c: lz4.c lz4hc.c bench.c xxhash.c lz4c.c
 lz4c32: lz4.c lz4hc.c bench.c xxhash.c lz4c.c
 	$(CC) -m32 -Os -march=native $(CFLAGS) $^ -o $@$(EXT)
 
-fuzzer : lz4.c fuzzer.c
+fuzzer : lz4.c lz4hc.c fuzzer.c
 	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
 	
 clean:

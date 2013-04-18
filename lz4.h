@@ -50,21 +50,21 @@ extern "C" {
 // Simple Functions
 //****************************
 
-int LZ4_compress   (const char* source, char* dest, int input_size);
-int LZ4_uncompress (const char* source, char* dest, int output_size);
+int LZ4_compress   (const char* source, char* dest, int inputSize);
+int LZ4_uncompress (const char* source, char* dest, int outputSize);
 
 /*
 LZ4_compress() :
-    Compresses 'input_size' bytes from 'source' into 'dest'.
+    Compresses 'inputSize' bytes from 'source' into 'dest'.
     Destination buffer must be already allocated,
     and must be sized to handle worst cases situations (input data not compressible)
     Worst case size evaluation is provided by function LZ4_compressBound()
-    input_size : Max supported value is ~1.9GB
+    inputSize : Max supported value is ~1.9GB
     return : the number of bytes written in buffer dest
              or 0 if the compression fails
 
 LZ4_uncompress() :
-    output_size : is the original (uncompressed) size
+    outputSize : is the original (uncompressed) size
     return : the number of bytes read in the source buffer (in other words, the compressed size)
              If the source stream is malformed, the function will stop decoding and return a negative result, indicating the byte position of the faulty instruction.
     note : This function never writes outside of provided buffers, and never modifies input buffer.

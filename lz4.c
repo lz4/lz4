@@ -181,16 +181,10 @@ typedef struct _U64_S { U64 v; } U64_S;
 #define HASHTABLESIZE (1 << HASH_LOG)
 #define HASH_MASK (HASHTABLESIZE - 1)
 
-// NOTCOMPRESSIBLE_DETECTIONLEVEL :
-// Decreasing this value will make the algorithm skip faster data segments considered "incompressible"
-// This may decrease compression ratio dramatically, but will be faster on incompressible data
-// Increasing this value will make the algorithm search more before declaring a segment "incompressible"
-// This could improve compression a bit, but will be slower on incompressible data
-// The default value (6) is recommended
-#define NOTCOMPRESSIBLE_DETECTIONLEVEL 6
+#define NOTCOMPRESSIBLE_DETECTIONLEVEL 6 // Increasing this value will make the algorithm slower on incompressible data
 #define SKIPSTRENGTH (NOTCOMPRESSIBLE_DETECTIONLEVEL>2?NOTCOMPRESSIBLE_DETECTIONLEVEL:2)
 #define STACKLIMIT 13
-#define HEAPMODE (HASH_LOG>STACKLIMIT)  // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
+#define HEAPMODE (HASH_LOG>STACKLIMIT)   // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
 #define COPYLENGTH 8
 #define LASTLITERALS 5
 #define MFLIMIT (COPYLENGTH+MINMATCH)
@@ -338,7 +332,7 @@ static inline int LZ4_NbCommonBytes (register U32 val)
 static inline int LZ4_compressCtx(void** ctx,
                  const char* source,
                  char* dest,
-                 int isize,
+                 int inputSize,
                  int maxOutputSize)
 {
 #if HEAPMODE
@@ -351,7 +345,7 @@ static inline int LZ4_compressCtx(void** ctx,
     const BYTE* ip = (BYTE*) source;
     INITBASE(base);
     const BYTE* anchor = ip;
-    const BYTE* const iend = ip + isize;
+    const BYTE* const iend = ip + inputSize;
     const BYTE* const mflimit = iend - MFLIMIT;
 #define matchlimit (iend - LASTLITERALS)
 
@@ -364,7 +358,7 @@ static inline int LZ4_compressCtx(void** ctx,
 
 
     // Init
-    if (isize<MINLENGTH) goto _last_literals;
+    if (inputSize<MINLENGTH) goto _last_literals;
 #if HEAPMODE
     if (*ctx == NULL)
     {
@@ -496,7 +490,7 @@ _last_literals:
     // Encode Last Literals
     {
         int lastRun = (int)(iend - anchor);
-        if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;
+        if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;  // Check output limit
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);

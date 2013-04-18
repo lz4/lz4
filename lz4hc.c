@@ -116,6 +116,7 @@
 #include <stdlib.h>   // calloc, free
 #include <string.h>   // memset, memcpy
 #include "lz4hc.h"
+#include "lz4.h"
 
 #define ALLOCATOR(s) calloc(1,s)
 #define FREEMEM free
@@ -499,7 +500,7 @@ _endCount:
 }
 
 
-forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** anchor, int ml, const BYTE* ref)
+forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** anchor, int matchLength, const BYTE* ref, BYTE* oend)
 {
     int length, len; 
     BYTE* token;
@@ -507,6 +508,7 @@ forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE
     // Encode Literal length
     length = (int)(*ip - *anchor);
     token = (*op)++;
+    if ((*op + length + (2 + 1 + LASTLITERALS) + (length>>8)) > oend) return 1; 		// Check output limit
     if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; } 
     else *token = (BYTE)(length<<ML_BITS);
 
@@ -517,12 +519,13 @@ forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE
     LZ4_WRITE_LITTLEENDIAN_16(*op,(U16)(*ip-ref));
 
     // Encode MatchLength
-    len = (int)(ml-MINMATCH);
+    len = (int)(matchLength-MINMATCH);
+    if (*op + (1 + LASTLITERALS) + (length>>8) > oend) return 1; 		// Check output limit
     if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (len > 254) { len-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)len; } 
     else *token += (BYTE)len;	
 
     // Prepare next loop
-    *ip += ml;
+    *ip += matchLength;
     *anchor = *ip; 
 
     return 0;
@@ -536,15 +539,17 @@ forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE
 int LZ4_compressHCCtx(LZ4HC_Data_Structure* ctx,
                  const char* source, 
                  char* dest,
-                 int isize)
+                 int inputSize,
+                 int maxOutputSize)
 {	
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
-    const BYTE* const iend = ip + isize;
+    const BYTE* const iend = ip + inputSize;
     const BYTE* const mflimit = iend - MFLIMIT;
     const BYTE* const matchlimit = (iend - LASTLITERALS);
 
     BYTE* op = (BYTE*) dest;
+    BYTE* const oend = op + maxOutputSize;
 
     int	ml, ml2, ml3, ml0;
     const BYTE* ref=NULL;
@@ -575,7 +580,7 @@ _Search2:
 
         if (ml2 == ml)  // No better match
         {
-            LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+            if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
             continue;
         }
 
@@ -627,9 +632,9 @@ _Search3:
             // ip & ref are known; Now for ml
             if (start2 < ip+ml)  ml = (int)(start2 - ip);
             // Now, encode 2 sequences
-            LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+            if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
             ip = start2;
-            LZ4_encodeSequence(&ip, &op, &anchor, ml2, ref2);
+            if (LZ4_encodeSequence(&ip, &op, &anchor, ml2, ref2, oend)) return 0;
             continue;
         }
 
@@ -651,7 +656,7 @@ _Search3:
                     }
                 }
 
-                LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+                if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
                 ip  = start3;
                 ref = ref3;
                 ml  = ml3;
@@ -690,7 +695,7 @@ _Search3:
                 ml = (int)(start2 - ip);
             }
         }
-        LZ4_encodeSequence(&ip, &op, &anchor, ml, ref);
+        if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
 
         ip = start2;
         ref = ref2;
@@ -707,6 +712,7 @@ _Search3:
     // Encode Last Literals
     {
         int lastRun = (int)(iend - anchor);
+        if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;  // Check output limit
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
         else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
@@ -718,15 +724,23 @@ _Search3:
 }
 
 
-int LZ4_compressHC(const char* source, 
+int LZ4_compressHC_limitedOutput(const char* source, 
                  char* dest,
-                 int isize)
+                 int inputSize,
+                 int maxOutputSize)
 {
     void* ctx = LZ4HC_Create((const BYTE*)source);
-    int result = LZ4_compressHCCtx(ctx, source, dest, isize);
+    int result = LZ4_compressHCCtx(ctx, source, dest, inputSize, maxOutputSize);
     LZ4HC_Free (&ctx);
 
     return result;
 }
 
+
+int LZ4_compressHC(const char* source, 
+                 char* dest,
+                 int inputSize)
+{
+    return LZ4_compressHC_limitedOutput(source, dest, inputSize, LZ4_compressBound(inputSize)+1);
+}
 

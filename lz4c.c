@@ -92,6 +92,9 @@
 #define LZ4S_BLOCKSIZEID_DEFAULT 7
 #define LZ4S_CHECKSUM_SEED 0
 
+#define LZ4S_SKIPPABLE0    0x184D2A50
+#define LZ4S_SKIPPABLEMASK 0xFFFFFFF0
+
 #define LEGACY_MAGICNUMBER 0x184C2102
 #define LEGACY_BLOCKSIZE (8<<20)          // 8 MB
 
@@ -134,8 +137,8 @@ char nulmark[] = "/dev/null";
 //**************************************
 static int overwrite = 0;
 static int blockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
-static int blockChecksum = 1;
-
+static int blockChecksum = 0;
+static int streamChecksum = 1;
 
 //**************************************
 // Exceptions
@@ -163,16 +166,23 @@ int usage(char* exename)
     DISPLAY( "Arguments :\n");
     DISPLAY( " -c0/-c : Fast compression (default) \n");
     DISPLAY( " -c1/-hc: High compression \n");
-    DISPLAY( " -B#    : Block size [4-7](default:7)\n");
-    DISPLAY( " -x     : disable checksum\n");
-    DISPLAY( " -y     : overwrite without prompting \n");
     DISPLAY( " -d     : decompression \n");
-    DISPLAY( " -t     : check compressed file \n");
-    DISPLAY( " -b#    : benchmark files, using # [0-1] compression level\n");
-    DISPLAY( " -i#    : nb of loops [1-9](default : 3), benchmark mode only\n");
-    DISPLAY( " -H     : Help (this text)\n");
+    DISPLAY( " -y     : overwrite without prompting \n");
+    DISPLAY( " -H     : Help (this text + advanced options)\n");
     DISPLAY( "input   : can be 'stdin' (pipe) or a filename\n");
     DISPLAY( "output  : can be 'stdout'(pipe) or a filename or 'null'\n");
+    return 0;
+}
+
+int usage_advanced()
+{
+    DISPLAY( "\nAdvanced options :\n");
+    DISPLAY( " -t     : test compressed file \n");
+    DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
+    DISPLAY( " -x     : enable block checksum (default:disabled)\n");
+    DISPLAY( " -nx    : disable stream checksum (default:enabled)\n");
+    DISPLAY( " -b#    : benchmark files, using # [0-1] compression level\n");
+    DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
     return 0;
 }
 
@@ -317,7 +327,7 @@ int legacy_compress_file(char* input_filename, char* output_filename, int compre
 
 int compress_file(char* input_filename, char* output_filename, int compressionlevel)
 {
-    int (*compressionFunction)(const char*, char*, int);
+    int (*compressionFunction)(const char*, char*, int, int);
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
     unsigned int checkbits;
@@ -330,15 +340,16 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
     clock_t start, end;
     int blockSize;
     size_t sizeCheck, header_size;
+    void* streamChecksumState=NULL;
 
 
     // Init
     start = clock();
     switch (compressionlevel)
     {
-    case 0 : compressionFunction = LZ4_compress; break;
-    case 1 : compressionFunction = LZ4_compressHC; break;
-    default : compressionFunction = LZ4_compress;
+    case 0 : compressionFunction = LZ4_compress_limitedOutput; break;
+    case 1 : compressionFunction = LZ4_compressHC_limitedOutput; break;
+    default : compressionFunction = LZ4_compress_limitedOutput;
     }
     errorcode = get_fileHandle(input_filename, output_filename, &finput, &foutput);
     if (errorcode) return errorcode;
@@ -346,13 +357,15 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 
     // Allocate Memory
     in_buff  = (char*)malloc(blockSize);
-    out_buff = (char*)malloc(LZ4_compressBound(blockSize));
+    out_buff = (char*)malloc(blockSize+CACHELINE);
     if (!in_buff || !out_buff) EXM_THROW(31, "Allocation error : not enough memory");
+    if (streamChecksum) streamChecksumState = XXH32_init(LZ4S_CHECKSUM_SEED);
 
     // Write Archive Header
      *(unsigned int*)out_buff = LITTLE_ENDIAN_32(LZ4S_MAGICNUMBER);   // Magic Number, in Little Endian convention    
     *(out_buff+4)  = 0x60;                    // Version("01"), Block independence
     *(out_buff+4) |= blockChecksum << 4;     
+    *(out_buff+4) |= streamChecksum << 2;     
     *(out_buff+5)  = (char)(blockSizeId<<4);  // Block Size
     checkbits = XXH32((out_buff+4), 2, LZ4S_CHECKSUM_SEED);
     checkbits = LZ4S_GetCheckBits_FromXXH(checkbits);
@@ -371,15 +384,16 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
         if( inSize<=0 ) break;
         filesize += inSize;
         if (displayLevel) DISPLAY("Read : %i MB  \r", (int)(filesize>>20));
+        if (streamChecksum) XXH32_update(streamChecksumState, in_buff, inSize);
 
         // Compress Block
-        outSize = compressionFunction(in_buff, out_buff+4, inSize);
-        if (outSize < inSize) compressedfilesize += outSize+4; else compressedfilesize += inSize+4;
+        outSize = compressionFunction(in_buff, out_buff+4, inSize, inSize-1);
+        if (outSize > 0) compressedfilesize += outSize+4; else compressedfilesize += inSize+4;
         if (blockChecksum) compressedfilesize+=4;
         if (displayLevel) DISPLAY("Read : %i MB  ==> %.2f%%\r", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         // Write Block
-        if (outSize < inSize)
+        if (outSize > 0)
         {
             unsigned int checksum;
             int sizeToWrite;
@@ -417,6 +431,14 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
     sizeCheck = fwrite(out_buff, 1, 4, foutput);
     if (sizeCheck!=(size_t)(4)) EXM_THROW(37, "Write error : cannot write end of stream");
     compressedfilesize += 4;
+    if (streamChecksum)
+    {
+        unsigned int checksum = XXH32_digest(streamChecksumState);
+        * (unsigned int*) out_buff = LITTLE_ENDIAN_32(checksum);
+        sizeCheck = fwrite(out_buff, 1, 4, foutput);
+        if (sizeCheck!=(size_t)(4)) EXM_THROW(37, "Write error : cannot write stream checksum");
+        compressedfilesize += 4;
+    }
 
     // Status
     end = clock();
@@ -497,7 +519,8 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     int decodedBytes;
     unsigned int maxBlockSize;
     size_t sizeCheck;
-    int blockChecksumFlag;
+    int blockChecksumFlag, streamChecksumFlag;
+    void* streamChecksumState=NULL;
 
     // Decode stream descriptor
     nbReadBytes = fread(descriptor, 1, 3, finput);
@@ -506,7 +529,7 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         int version       = (descriptor[0] >> 6) & _2BITS;
         int independance  = (descriptor[0] >> 5) & _1BIT;
         int streamSize    = (descriptor[0] >> 3) & _1BIT;
-        int reserved1     = (descriptor[0] >> 1) & _2BITS;
+        int reserved1     = (descriptor[0] >> 1) & _1BIT;
         int dictionary    = (descriptor[0] >> 0) & _1BIT;
 
         int reserved2     = (descriptor[1] >> 7) & _1BIT;
@@ -516,6 +539,7 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         int checkBits_xxh32;
 
         blockChecksumFlag = (descriptor[0] >> 4) & _1BIT;
+        streamChecksumFlag= (descriptor[0] >> 2) & _1BIT;
 
         if (version != 1)       EXM_THROW(62, "Wrong version number");
         if (independance != 1)  EXM_THROW(63, "Does not support block inter-dependence");
@@ -537,6 +561,7 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     in_buff = (char*)malloc(maxBlockSize);
     out_buff = (char*)malloc(maxBlockSize);
     if (!in_buff || !out_buff) EXM_THROW(70, "Allocation error : not enough memory");
+    if (streamChecksumFlag) streamChecksumState = XXH32_init(LZ4S_CHECKSUM_SEED);
 
     // Main Loop
     while (1)
@@ -561,10 +586,10 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         {
             unsigned int checksum = XXH32(in_buff, blockSize, LZ4S_CHECKSUM_SEED);
             unsigned int readChecksum;
-            nbReadBytes = fread(&readChecksum, 1, 4, finput);
-            if( nbReadBytes != 4 ) EXM_THROW(74, "Read error : cannot read next block size");
+            sizeCheck = fread(&readChecksum, 1, 4, finput);
+            if( sizeCheck != 4 ) EXM_THROW(74, "Read error : cannot read next block size");
             readChecksum = LITTLE_ENDIAN_32(readChecksum);   // Convert to little endian
-            if (checksum != readChecksum) EXM_THROW(75, "Error : invalid checksum detected");
+            if (checksum != readChecksum) EXM_THROW(75, "Error : invalid block checksum detected");
         }
 
         if (uncompressedFlag)
@@ -573,6 +598,7 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             sizeCheck = fwrite(in_buff, 1, blockSize, foutput);
             if (sizeCheck != (size_t)blockSize) EXM_THROW(76, "Write error : cannot write data block");
             filesize += blockSize;
+            if (streamChecksumFlag) XXH32_update(streamChecksumState, in_buff, blockSize);
         }
         else
         {
@@ -580,11 +606,23 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             decodedBytes = LZ4_uncompress_unknownOutputSize(in_buff, out_buff, blockSize, maxBlockSize);
             if (decodedBytes < 0) EXM_THROW(77, "Decoding Failed ! Corrupted input detected !");
             filesize += decodedBytes;
+            if (streamChecksumFlag) XXH32_update(streamChecksumState, out_buff, decodedBytes);
 
             // Write Block
             sizeCheck = fwrite(out_buff, 1, decodedBytes, foutput);
             if (sizeCheck != (size_t)decodedBytes) EXM_THROW(78, "Write error : cannot write decoded block\n");
         }
+    }
+
+    // Stream Checksum
+    if (streamChecksumFlag)
+    {
+        unsigned int checksum = XXH32_digest(streamChecksumState);
+        unsigned int readChecksum;
+        sizeCheck = fread(&readChecksum, 1, 4, finput);
+        if (sizeCheck != 4) EXM_THROW(74, "Read error : cannot read stream checksum");
+        readChecksum = LITTLE_ENDIAN_32(readChecksum);   // Convert to little endian
+        if (checksum != readChecksum) EXM_THROW(75, "Error : invalid stream checksum detected");
     }
 
     // Free
@@ -597,7 +635,8 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
 
 unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
 {
-    unsigned int magicNumber;
+    unsigned int magicNumber, size;
+    int errorNb;
     size_t nbReadBytes;
 
     // Check Archive Header
@@ -605,6 +644,8 @@ unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     if (nbReadBytes==0) return 0;                    // EOF
     if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(41, "Unrecognized header : Magic Number unreadable");
     magicNumber = LITTLE_ENDIAN_32(magicNumber);     // Convert to Little Endian format
+    if ((magicNumber & LZ4S_SKIPPABLEMASK) == LZ4S_SKIPPABLE0) magicNumber = LZ4S_SKIPPABLE0;  // fold skippable magic numbers
+
     switch(magicNumber)
     {
     case LZ4S_MAGICNUMBER:
@@ -612,8 +653,15 @@ unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     case LEGACY_MAGICNUMBER:
         DISPLAY("Detected : Legacy format \n");
         return decodeLegacyStream(finput, foutput);
+    case LZ4S_SKIPPABLE0:
+        nbReadBytes = fread(&size, 1, 4, finput);
+        if (nbReadBytes != 4) EXM_THROW(42, "Stream error : skippable size unreadable");
+        size = LITTLE_ENDIAN_32(size);     // Convert to Little Endian format
+        errorNb = fseek(finput, size, SEEK_CUR);
+        if (errorNb != 0) EXM_THROW(43, "Stream error : cannot skip skippable area");
+        return selectDecoder(finput, foutput);
     default:
-        if (ftell(finput) == MAGICNUMBER_SIZE) EXM_THROW(42,"Unrecognized header : file cannot be decoded");
+        if (ftell(finput) == MAGICNUMBER_SIZE) EXM_THROW(44,"Unrecognized header : file cannot be decoded");  // Wrong magic number at the beginning of 1st stream
         DISPLAY("Stream followed by unrecognized data\n");
         return 0;        
     }
@@ -691,14 +739,15 @@ int main(int argc, char** argv)
                 switch(argument[0])
                 {
                     // Display help on usage
-                case 'H': usage(exename); return 0;
+                case 'H': usage(exename); usage_advanced(); return 0;
 
                     // Compression (default)
                 case 'c': if ((argument[1] >='0') && (argument[1] <='1')) { cLevel=argument[1] - '0'; argument++; } break;
                 case 'h': if (argument[1]=='c') { cLevel=1; argument++; } break;
 
-                    // disable checksum
-                case 'x': blockChecksum=0; break;
+                    // Checksum management
+                case 'x': blockChecksum=1; break;
+                case 'n': if (argument[1]=='x') { streamChecksum=0; argument++; break; } else { badusage(exename); return 1; }
 
                     // Use Legacy format (hidden option)
                 case 'l': legacy_format=1; break;
