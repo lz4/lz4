@@ -31,6 +31,10 @@
    - LZ4 source repository : http://code.google.com/p/lz4/
 */
 
+/*
+Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
+*/
+
 //**************************************
 // Tuning parameters
 //**************************************
@@ -40,6 +44,12 @@
 // Reduced memory usage can improve speed, due to cache effect
 // Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
 #define MEMORY_USAGE 14
+
+// HEAPMODE :
+// Select if compression algorithm will allocate space for its tables
+// in memory stack (0:default, fastest), or in memory heap (1:requires memory allocation (malloc)).
+// Default allocation strategy is to use stack (HEAPMODE 0)
+#define HEAPMODE 0
 
 // BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
 // This will provide a small boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
@@ -175,20 +185,17 @@ typedef struct _U64_S { U64 v; } U64_S;
 //**************************************
 // Constants
 //**************************************
+#define HASHTABLESIZE (1 << MEMORY_USAGE)
+
 #define MINMATCH 4
 
-#define HASH_LOG (MEMORY_USAGE-2)
-#define HASHTABLESIZE (1 << HASH_LOG)
-#define HASH_MASK (HASHTABLESIZE - 1)
-
-#define NOTCOMPRESSIBLE_DETECTIONLEVEL 6 // Increasing this value will make the algorithm slower on incompressible data
-#define SKIPSTRENGTH (NOTCOMPRESSIBLE_DETECTIONLEVEL>2?NOTCOMPRESSIBLE_DETECTIONLEVEL:2)
-#define STACKLIMIT 13
-#define HEAPMODE (HASH_LOG>STACKLIMIT)   // Defines if memory is allocated into the stack (local variable), or into the heap (malloc()).
 #define COPYLENGTH 8
 #define LASTLITERALS 5
 #define MFLIMIT (COPYLENGTH+MINMATCH)
 #define MINLENGTH (MFLIMIT+1)
+
+#define LZ4_64KLIMIT ((1<<16) + (MFLIMIT-1))
+#define SKIPSTRENGTH 6     // Increasing this value will make the compression run slower on incompressible data
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -232,19 +239,8 @@ typedef struct _U64_S { U64 v; } U64_S;
 
 
 //**************************************
-// Local structures
-//**************************************
-struct refTables
-{
-    HTYPE hashTable[HASHTABLESIZE];
-};
-
-
-//**************************************
 // Macros
 //**************************************
-#define LZ4_HASH_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define LZ4_HASH_VALUE(p)		LZ4_HASH_FUNCTION(A32(p))
 #define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=(d)+l; LZ4_WILDCOPY(s,d,e); d=e; }
 
@@ -289,29 +285,29 @@ static inline int LZ4_NbCommonBytes (register U64 val)
 static inline int LZ4_NbCommonBytes (register U32 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanReverse( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clz(val) >> 3);
-    #else
+#  else
     int r;
     if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
     r += (!val);
     return r;
-    #endif
+#  endif
 #else
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r;
     _BitScanForward( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3);
-    #else
+#  else
     static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
     return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
-    #endif
+#  endif
 #endif
 }
 
@@ -323,581 +319,282 @@ static inline int LZ4_NbCommonBytes (register U32 val)
 // Compression functions
 //******************************
 
-// LZ4_compressCtx :
-// -----------------
-// Compress 'isize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
-// If it cannot achieve it, compression will stop, and result of the function will be zero.
-// return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+/*
+int LZ4_compress_stack(
+                 const char* source,
+                 char* dest,
+                 int inputSize)
 
-static inline int LZ4_compressCtx(void** ctx,
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest'.
+Destination buffer must be already allocated, and sized at a minimum of LZ4_compressBound(inputSize).
+return : the number of bytes written in buffer 'dest'
+*/
+#define FUNCTION_NAME LZ4_compress_stack
+#include "lz4_encoder.h"
+
+
+/*
+int LZ4_compress_stack_limitedOutput(
                  const char* source,
                  char* dest,
                  int inputSize,
                  int maxOutputSize)
-{
-#if HEAPMODE
-    struct refTables *srt = (struct refTables *) (*ctx);
-    HTYPE* HashTable;
-#else
-    HTYPE HashTable[HASHTABLESIZE] = {0};
-#endif
 
-    const BYTE* ip = (BYTE*) source;
-    INITBASE(base);
-    const BYTE* anchor = ip;
-    const BYTE* const iend = ip + inputSize;
-    const BYTE* const mflimit = iend - MFLIMIT;
-#define matchlimit (iend - LASTLITERALS)
-
-    BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
-
-    int length;
-    const int skipStrength = SKIPSTRENGTH;
-    U32 forwardH;
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+If it cannot achieve it, compression will stop, and result of the function will be zero.
+return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+*/
+#define FUNCTION_NAME LZ4_compress_stack_limitedOutput
+#define LIMITED_OUTPUT
+#include "lz4_encoder.h"
 
 
-    // Init
-    if (inputSize<MINLENGTH) goto _last_literals;
-#if HEAPMODE
-    if (*ctx == NULL)
-    {
-        srt = (struct refTables *) malloc ( sizeof(struct refTables) );
-        *ctx = (void*) srt;
-    }
-    HashTable = (HTYPE*)(srt->hashTable);
-    memset((void*)HashTable, 0, sizeof(srt->hashTable));
-#else
-    (void) ctx;
-#endif
-
-
-    // First Byte
-    HashTable[LZ4_HASH_VALUE(ip)] = (HTYPE)(ip - base);
-    ip++; forwardH = LZ4_HASH_VALUE(ip);
-
-    // Main Loop
-    for ( ; ; )
-    {
-        int findMatchAttempts = (1U << skipStrength) + 3;
-        const BYTE* forwardIp = ip;
-        const BYTE* ref;
-        BYTE* token;
-
-        // Find a match
-        do {
-            U32 h = forwardH;
-            int step = findMatchAttempts++ >> skipStrength;
-            ip = forwardIp;
-            forwardIp = ip + step;
-
-            if unlikely(forwardIp > mflimit) { goto _last_literals; }
-
-            forwardH = LZ4_HASH_VALUE(forwardIp);
-            ref = base + HashTable[h];
-            HashTable[h] = (HTYPE)(ip - base);
-
-        } while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
-
-        // Catch up
-        while ((ip>anchor) && (ref>(BYTE*)source) && unlikely(ip[-1]==ref[-1])) { ip--; ref--; }
-
-        // Encode Literal length
-        length = (int)(ip - anchor);
-        token = op++;
-        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
-#ifdef _MSC_VER
-        if (length>=(int)RUN_MASK) 
-        { 
-            int len = length-RUN_MASK; 
-            *token=(RUN_MASK<<ML_BITS); 
-            if (len>254)
-            {
-                do { *op++ = 255; len -= 255; } while (len>254);
-                *op++ = (BYTE)len; 
-                memcpy(op, anchor, length);
-                op += length;
-                goto _next_match;
-            }
-            else
-            *op++ = (BYTE)len; 
-        }
-        else *token = (BYTE)(length<<ML_BITS);
-#else
-        if (length>=(int)RUN_MASK) 
-        { 
-            int len;
-            *token=(RUN_MASK<<ML_BITS); 
-            len = length-RUN_MASK; 
-            for(; len > 254 ; len-=255) *op++ = 255; 
-            *op++ = (BYTE)len; 
-        }
-        else *token = (length<<ML_BITS);
-#endif
-
-        // Copy Literals
-        LZ4_BLINDCOPY(anchor, op, length);
-
-_next_match:
-        // Encode Offset
-        LZ4_WRITE_LITTLEENDIAN_16(op,(U16)(ip-ref));
-
-        // Start Counting
-        ip+=MINMATCH; ref+=MINMATCH;    // MinMatch already verified
-        anchor = ip;
-        while likely(ip<matchlimit-(STEPSIZE-1))
-        {
-            UARCH diff = AARCH(ref) ^ AARCH(ip);
-            if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
-            ip += LZ4_NbCommonBytes(diff);
-            goto _endCount;
-        }
-        if (LZ4_ARCH64) if ((ip<(matchlimit-3)) && (A32(ref) == A32(ip))) { ip+=4; ref+=4; }
-        if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
-        if ((ip<matchlimit) && (*ref == *ip)) ip++;
-_endCount:
-
-        // Encode MatchLength
-        length = (int)(ip - anchor);
-        if unlikely(op + (1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
-        if (length>=(int)ML_MASK) 
-        { 
-            *token += ML_MASK; 
-            length -= ML_MASK; 
-            for (; length > 509 ; length-=510) { *op++ = 255; *op++ = 255; } 
-            if (length > 254) { length-=255; *op++ = 255; } 
-            *op++ = (BYTE)length; 
-        }
-        else *token += (BYTE)length;
-
-        // Test end of chunk
-        if (ip > mflimit) { anchor = ip;  break; }
-
-        // Fill table
-        HashTable[LZ4_HASH_VALUE(ip-2)] = (HTYPE)(ip - 2 - base);
-
-        // Test next position
-        ref = base + HashTable[LZ4_HASH_VALUE(ip)];
-        HashTable[LZ4_HASH_VALUE(ip)] = (HTYPE)(ip - base);
-        if ((ref > ip - (MAX_DISTANCE + 1)) && (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
-
-        // Prepare next loop
-        anchor = ip++;
-        forwardH = LZ4_HASH_VALUE(ip);
-    }
-
-_last_literals:
-    // Encode Last Literals
-    {
-        int lastRun = (int)(iend - anchor);
-        if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;  // Check output limit
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
-        else *op++ = (BYTE)(lastRun<<ML_BITS);
-        memcpy(op, anchor, iend - anchor);
-        op += iend-anchor;
-    }
-
-    // End
-    return (int) (((char*)op)-dest);
-}
-
-
-
-// Note : this function is valid only if isize < LZ4_64KLIMIT
-#define LZ4_64KLIMIT ((1<<16) + (MFLIMIT-1))
-#define HASHLOG64K (HASH_LOG+1)
-#define HASH64KTABLESIZE (1U<<HASHLOG64K)
-#define LZ4_HASH64K_FUNCTION(i)	(((i) * 2654435761U) >> ((MINMATCH*8)-HASHLOG64K))
-#define LZ4_HASH64K_VALUE(p)	LZ4_HASH64K_FUNCTION(A32(p))
-static inline int LZ4_compress64kCtx(void** ctx,
+/*
+int LZ4_compress64k_stack(
                  const char* source,
                  char* dest,
-                 int isize,
+                 int inputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest'.
+This function compresses better than LZ4_compress_stack(), on the condition that
+'inputSize' must be < to LZ4_64KLIMIT, or the function will fail.
+Destination buffer must be already allocated, and sized at a minimum of LZ4_compressBound(inputSize).
+return : the number of bytes written in buffer 'dest', or 0 if compression fails
+*/
+#define FUNCTION_NAME LZ4_compress64k_stack
+#define COMPRESS_64K
+#include "lz4_encoder.h"
+
+
+/*
+int LZ4_compress64k_stack_limitedOutput(
+                 const char* source,
+                 char* dest,
+                 int inputSize,
                  int maxOutputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+This function compresses better than LZ4_compress_stack_limitedOutput(), on the condition that
+'inputSize' must be < to LZ4_64KLIMIT, or the function will fail.
+If it cannot achieve it, compression will stop, and result of the function will be zero.
+return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+*/
+#define FUNCTION_NAME LZ4_compress64k_stack_limitedOutput
+#define COMPRESS_64K
+#define LIMITED_OUTPUT
+#include "lz4_encoder.h"
+
+
+/*
+void* LZ4_createHeapMemory();
+int LZ4_freeHeapMemory(void* ctx);
+
+Used to allocate and free hashTable memory 
+to be used by the LZ4_compress_heap* family of functions.
+LZ4_createHeapMemory() returns NULL is memory allocation fails.
+*/
+void* LZ4_create() { return malloc(HASHTABLESIZE); }
+int LZ4_free(void* ctx) { free(ctx); return 0; }
+
+
+/*
+int LZ4_compress_heap(
+                 void* ctx,
+                 const char* source,
+                 char* dest,
+                 int inputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest'.
+The memory used for compression must be created by LZ4_createHeapMemory() and provided by pointer 'ctx'.
+Destination buffer must be already allocated, and sized at a minimum of LZ4_compressBound(inputSize).
+return : the number of bytes written in buffer 'dest'
+*/
+#define FUNCTION_NAME LZ4_compress_heap
+#define USE_HEAPMEMORY
+#include "lz4_encoder.h"
+
+
+/*
+int LZ4_compress_heap_limitedOutput(
+                 void* ctx,
+                 const char* source,
+                 char* dest,
+                 int inputSize,
+                 int maxOutputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+If it cannot achieve it, compression will stop, and result of the function will be zero.
+The memory used for compression must be created by LZ4_createHeapMemory() and provided by pointer 'ctx'.
+return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+*/
+#define FUNCTION_NAME LZ4_compress_heap_limitedOutput
+#define LIMITED_OUTPUT
+#define USE_HEAPMEMORY
+#include "lz4_encoder.h"
+
+
+/*
+int LZ4_compress64k_heap(
+                 void* ctx,
+                 const char* source,
+                 char* dest,
+                 int inputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest'.
+The memory used for compression must be created by LZ4_createHeapMemory() and provided by pointer 'ctx'.
+'inputSize' must be < to LZ4_64KLIMIT, or the function will fail.
+Destination buffer must be already allocated, and sized at a minimum of LZ4_compressBound(inputSize).
+return : the number of bytes written in buffer 'dest'
+*/
+#define FUNCTION_NAME LZ4_compress64k_heap
+#define COMPRESS_64K
+#define USE_HEAPMEMORY
+#include "lz4_encoder.h"
+
+
+/*
+int LZ4_compress64k_heap_limitedOutput(
+                 void* ctx,
+                 const char* source,
+                 char* dest,
+                 int inputSize,
+                 int maxOutputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+If it cannot achieve it, compression will stop, and result of the function will be zero.
+The memory used for compression must be created by LZ4_createHeapMemory() and provided by pointer 'ctx'.
+'inputSize' must be < to LZ4_64KLIMIT, or the function will fail.
+return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+*/
+#define FUNCTION_NAME LZ4_compress64k_heap_limitedOutput
+#define COMPRESS_64K
+#define LIMITED_OUTPUT
+#define USE_HEAPMEMORY
+#include "lz4_encoder.h"
+
+
+int LZ4_compress(const char* source, char* dest, int inputSize)
 {
 #if HEAPMODE
-    struct refTables *srt = (struct refTables *) (*ctx);
-    U16* HashTable;
-#else
-    U16 HashTable[HASH64KTABLESIZE] = {0};
-#endif
-
-    const BYTE* ip = (BYTE*) source;
-    const BYTE* anchor = ip;
-    const BYTE* const base = ip;
-    const BYTE* const iend = ip + isize;
-    const BYTE* const mflimit = iend - MFLIMIT;
-#define matchlimit (iend - LASTLITERALS)
-
-    BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
-
-    int len, length;
-    const int skipStrength = SKIPSTRENGTH;
-    U32 forwardH;
-
-
-    // Init
-    if (isize<MINLENGTH) goto _last_literals;
-#if HEAPMODE
-    if (*ctx == NULL)
-    {
-        srt = (struct refTables *) malloc ( sizeof(struct refTables) );
-        *ctx = (void*) srt;
-    }
-    HashTable = (U16*)(srt->hashTable);
-    memset((void*)HashTable, 0, sizeof(srt->hashTable));
-#else
-    (void) ctx;
-#endif
-
-
-    // First Byte
-    ip++; forwardH = LZ4_HASH64K_VALUE(ip);
-
-    // Main Loop
-    for ( ; ; )
-    {
-        int findMatchAttempts = (1U << skipStrength) + 3;
-        const BYTE* forwardIp = ip;
-        const BYTE* ref;
-        BYTE* token;
-
-        // Find a match
-        do {
-            U32 h = forwardH;
-            int step = findMatchAttempts++ >> skipStrength;
-            ip = forwardIp;
-            forwardIp = ip + step;
-
-            if (forwardIp > mflimit) { goto _last_literals; }
-
-            forwardH = LZ4_HASH64K_VALUE(forwardIp);
-            ref = base + HashTable[h];
-            HashTable[h] = (U16)(ip - base);
-
-        } while (A32(ref) != A32(ip));
-
-        // Catch up
-        while ((ip>anchor) && (ref>(BYTE*)source) && (ip[-1]==ref[-1])) { ip--; ref--; }
-
-        // Encode Literal length
-        length = (int)(ip - anchor);
-        token = op++;
-        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
-#ifdef _MSC_VER
-        if (length>=(int)RUN_MASK) 
-        { 
-            int len = length-RUN_MASK; 
-            *token=(RUN_MASK<<ML_BITS); 
-            if (len>254)
-            {
-                do { *op++ = 255; len -= 255; } while (len>254);
-                *op++ = (BYTE)len; 
-                memcpy(op, anchor, length);
-                op += length;
-                goto _next_match;
-            }
-            else
-            *op++ = (BYTE)len; 
-        }
-        else *token = (BYTE)(length<<ML_BITS);
-#else
-        if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *op++ = 255; *op++ = (BYTE)len; }
-        else *token = (length<<ML_BITS);
-#endif
-
-        // Copy Literals
-        LZ4_BLINDCOPY(anchor, op, length);
-
-_next_match:
-        // Encode Offset
-        LZ4_WRITE_LITTLEENDIAN_16(op,(U16)(ip-ref));
-
-        // Start Counting
-        ip+=MINMATCH; ref+=MINMATCH;   // MinMatch verified
-        anchor = ip;
-        while (ip<matchlimit-(STEPSIZE-1))
-        {
-            UARCH diff = AARCH(ref) ^ AARCH(ip);
-            if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
-            ip += LZ4_NbCommonBytes(diff);
-            goto _endCount;
-        }
-        if (LZ4_ARCH64) if ((ip<(matchlimit-3)) && (A32(ref) == A32(ip))) { ip+=4; ref+=4; }
-        if ((ip<(matchlimit-1)) && (A16(ref) == A16(ip))) { ip+=2; ref+=2; }
-        if ((ip<matchlimit) && (*ref == *ip)) ip++;
-_endCount:
-
-        // Encode MatchLength
-        len = (int)(ip - anchor);
-        if unlikely(op + (1 + LASTLITERALS) + (len>>8) > oend) return 0; 		// Check output limit
-        if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *op++ = 255; *op++ = 255; } if (len > 254) { len-=255; *op++ = 255; } *op++ = (BYTE)len; }
-        else *token += (BYTE)len;
-
-        // Test end of chunk
-        if (ip > mflimit) { anchor = ip;  break; }
-
-        // Fill table
-        HashTable[LZ4_HASH64K_VALUE(ip-2)] = (U16)(ip - 2 - base);
-
-        // Test next position
-        ref = base + HashTable[LZ4_HASH64K_VALUE(ip)];
-        HashTable[LZ4_HASH64K_VALUE(ip)] = (U16)(ip - base);
-        if (A32(ref) == A32(ip)) { token = op++; *token=0; goto _next_match; }
-
-        // Prepare next loop
-        anchor = ip++;
-        forwardH = LZ4_HASH64K_VALUE(ip);
-    }
-
-_last_literals:
-    // Encode Last Literals
-    {
-        int lastRun = (int)(iend - anchor);
-        if (op + lastRun + 1 + (lastRun-RUN_MASK+255)/255 > oend) return 0;
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
-        else *op++ = (BYTE)(lastRun<<ML_BITS);
-        memcpy(op, anchor, iend - anchor);
-        op += iend-anchor;
-    }
-
-    // End
-    return (int) (((char*)op)-dest);
-}
-
-
-int LZ4_compress_limitedOutput(const char* source, 
-                               char* dest, 
-                               int isize, 
-                               int maxOutputSize)
-{
-#if HEAPMODE
-    void* ctx = malloc(sizeof(struct refTables));
+    void* ctx = LZ4_create();
     int result;
     if (ctx == NULL) return 0;    // Failed allocation => compression not done
-    if (isize < LZ4_64KLIMIT)
-        result = LZ4_compress64kCtx(&ctx, source, dest, isize, maxOutputSize);
-    else result = LZ4_compressCtx(&ctx, source, dest, isize, maxOutputSize);
-    free(ctx);
+    if (inputSize < LZ4_64KLIMIT)
+        result = LZ4_compress64k_heap(ctx, source, dest, inputSize);
+    else result = LZ4_compress_heap(ctx, source, dest, inputSize);
+    LZ4_free(ctx);
     return result;
 #else
-    if (isize < (int)LZ4_64KLIMIT) return LZ4_compress64kCtx(NULL, source, dest, isize, maxOutputSize);
-    return LZ4_compressCtx(NULL, source, dest, isize, maxOutputSize);
+    if (inputSize < (int)LZ4_64KLIMIT) return LZ4_compress64k_stack(source, dest, inputSize);
+    return LZ4_compress_stack(source, dest, inputSize);
 #endif
 }
 
 
-int LZ4_compress(const char* source,
-                 char* dest,
-                 int isize)
+int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
-    return LZ4_compress_limitedOutput(source, dest, isize, LZ4_compressBound(isize));
+#if HEAPMODE
+    void* ctx = LZ4_create();
+    int result;
+    if (ctx == NULL) return 0;    // Failed allocation => compression not done
+    if (inputSize < LZ4_64KLIMIT)
+        result = LZ4_compress64k_heap_limitedOutput(ctx, source, dest, inputSize, maxOutputSize);
+    else result = LZ4_compress_heap_limitedOutput(ctx, source, dest, inputSize, maxOutputSize);
+    LZ4_free(ctx);
+    return result;
+#else
+    if (inputSize < (int)LZ4_64KLIMIT) return LZ4_compress64k_stack_limitedOutput(source, dest, inputSize, maxOutputSize);
+    return LZ4_compress_stack_limitedOutput(source, dest, inputSize, maxOutputSize);
+#endif
 }
-
-
 
 
 //****************************
 // Decompression functions
 //****************************
 
-// Note : The decoding functions LZ4_uncompress() and LZ4_uncompress_unknownOutputSize()
-//		are safe against "buffer overflow" attack type.
-//		They will never write nor read outside of the provided output buffers.
-//      LZ4_uncompress_unknownOutputSize() also insures that it will never read outside of the input buffer.
-//      LZ4_uncompress() guarantees that it will never read before source, nor beyond source + LZ4_compressBound(osize)
-//		A corrupted input will produce an error result, a negative int, indicating the position of the error within input stream.
+/*
+int LZ4_decompress_safe(const char* source,
+                        char* dest,
+                        int inputSize,
+                        int maxOutputSize);
 
-int LZ4_uncompress(const char* source,
-                 char* dest,
-                 int osize)
-{
-    // Local Variables
-    const BYTE* restrict ip = (const BYTE*) source;
-    const BYTE* ref;
-
-    BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + osize;
-    BYTE* cpy;
-
-    unsigned token;
-
-    size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
-#if LZ4_ARCH64
-    size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
-#endif
+LZ4_decompress_safe() guarantees it will never write nor read outside of the provided output buffers.
+This function is safe against "buffer overflow" attacks.
+A corrupted input will produce an error result, a negative int.
+*/
+#define FUNCTION_NAME LZ4_decompress_safe
+#define EXITCONDITION_INPUTSIZE
+#include "lz4_decoder.h"
 
 
-    // Main Loop
-    while (1)
-    {
-        size_t length;
+/*
+int LZ4_decompress_safe_withPrefix64k(
+                        const char* source,
+                        char* dest,
+                        int inputSize,
+                        int maxOutputSize);
 
-        // get runlength
-        token = *ip++;
-        if ((length=(token>>ML_BITS)) == RUN_MASK)  { size_t len; for (;(len=*ip++)==255;length+=255){} length += len; }
-
-        // copy literals
-        cpy = op+length;
-        if (cpy>oend-COPYLENGTH)
-        {
-            if (cpy != oend) goto _output_error;         // Error : not enough place for another match (min 4) + 5 literals
-            memcpy(op, ip, length);
-            ip += length;
-            break;                                       // EOF
-        }
-        LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
-
-        // get offset
-        LZ4_READ_LITTLEENDIAN_16(ref,cpy,ip); ip+=2;
-        if unlikely(ref < (BYTE* const)dest) goto _output_error;   // Error : offset outside destination buffer
-
-        // get matchlength
-        if ((length=(token&ML_MASK)) == ML_MASK) { for (;*ip==255;length+=255) {ip++;} length += *ip++; }
-
-        // copy repeated sequence
-        if unlikely((op-ref)<STEPSIZE)
-        {
-#if LZ4_ARCH64
-            size_t dec64 = dec64table[op-ref];
-#else
-            const int dec64 = 0;
-#endif
-            op[0] = ref[0];
-            op[1] = ref[1];
-            op[2] = ref[2];
-            op[3] = ref[3];
-            op += 4, ref += 4; ref -= dec32table[op-ref];
-            A32(op) = A32(ref); 
-            op += STEPSIZE-4; ref -= dec64;
-        } else { LZ4_COPYSTEP(ref,op); }
-        cpy = op + length - (STEPSIZE-4);
-
-        if unlikely(cpy>oend-(COPYLENGTH)-(STEPSIZE-4))
-        {
-            if (cpy > oend-LASTLITERALS) goto _output_error;    // Error : last 5 bytes must be literals
-            LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
-            while(op<cpy) *op++=*ref++;
-            op=cpy;
-            continue;
-        }
-        
-        LZ4_WILDCOPY(ref, op, cpy);
-        op=cpy;		// correction
-    }
-
-    // end of decoding
-    return (int) (((char*)ip)-source);
-
-    // write overflow error detected
-_output_error:
-    return (int) (-(((char*)ip)-source));
-}
+Same as LZ4_decompress_safe(), but will also use 64K of memory before the beginning of input buffer.
+Typically used to decode streams of inter-dependant blocks.
+Note : the 64K of memory before pointer 'source' must be allocated and read-allowed.
+*/
+#define FUNCTION_NAME LZ4_decompress_safe_withPrefix64k
+#define EXITCONDITION_INPUTSIZE
+#define PREFIX_64K
+#include "lz4_decoder.h"
 
 
-int LZ4_uncompress_unknownOutputSize(
-                const char* source,
-                char* dest,
-                int isize,
-                int maxOutputSize)
-{
-    // Local Variables
-    const BYTE* restrict ip = (const BYTE*) source;
-    const BYTE* const iend = ip + isize;
-    const BYTE* ref;
+/*
+int LZ4_decompress_safe_partial(
+                        const char* source,
+                        char* dest,
+                        int inputSize,
+                        int targetOutputSize,
+                        int maxOutputSize);
 
-    BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
-    BYTE* cpy;
+LZ4_decompress_safe_partial() objective is to decompress only a part of the compressed input block provided.
+The decoding process stops as soon as 'targetOutputSize' bytes have been decoded, reducing decoding time.
+The result of the function is the number of bytes decoded.
+LZ4_decompress_safe_partial() may decode less than 'targetOutputSize' if input doesn't contain enough bytes to decode.
+Always verify how many bytes were decoded to ensure there are as many as wanted into the output buffer 'dest'.
+A corrupted input will produce an error result, a negative int.
+*/
+#define FUNCTION_NAME LZ4_decompress_safe_partial
+#define EXITCONDITION_INPUTSIZE
+#define PARTIAL_DECODING
+#include "lz4_decoder.h"
 
-    size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
-#if LZ4_ARCH64
-    size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
-#endif
+
+/*
+int LZ4_decompress_fast(const char* source,
+                        char* dest,
+                        int outputSize);
+
+This function is faster than LZ4_decompress_safe().
+LZ4_decompress_fast() guarantees it will never write nor read outside of output buffer.
+Since LZ4_decompress_fast() doesn't know the size of input buffer.
+it can only guarantee that it will never write into the input buffer, and will never read before its beginning.
+To be used preferably in a controlled environment (when the compressed data to be decoded is from a trusted source).
+A detected corrupted input will produce an error result, a negative int.
+*/
+#define FUNCTION_NAME LZ4_decompress_fast
+#include "lz4_decoder.h"
 
 
-    // Special case
-    if unlikely(ip==iend) goto _output_error;    // A correctly formed null-compressed LZ4 must have at least one byte (token=0)
+/*
+int LZ4_decompress_fast_withPrefix64k(
+                        const char* source,
+                        char* dest,
+                        int inputSize
+                        int maxOutputSize);
 
-    // Main Loop
-    while (1) 
-    {
-        unsigned token;
-        size_t length;
+Same as LZ4_decompress_fast(), but will use the 64K of memory before the beginning of input buffer.
+Typically used to decode streams of dependant inter-blocks.
+Note : the 64K of memory before pointer 'source' must be allocated and read-allowed.
+*/
+#define FUNCTION_NAME LZ4_decompress_fast_withPrefix64k
+#define PREFIX_64K
+#include "lz4_decoder.h"
 
-        // get runlength
-        token = *ip++;
-        if ((length=(token>>ML_BITS)) == RUN_MASK) 
-        { 
-            int s=255; 
-            while (likely(ip<iend) && (s==255)) { s=*ip++; length += s; } 
-        }
-
-        // copy literals
-        cpy = op+length;
-        if ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS)))
-        {
-            if (cpy > oend) goto _output_error;          // Error : writes beyond output buffer
-            if (ip+length != iend) goto _output_error;   // Error : LZ4 format requires to consume all input at this stage (no match within the last 11 bytes, and at least 8 remaining input bytes for another match+literals)
-            memcpy(op, ip, length);
-            op += length;
-            break;                                       // Necessarily EOF, due to parsing restrictions
-        }
-        LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
-
-        // get offset
-        LZ4_READ_LITTLEENDIAN_16(ref,cpy,ip); ip+=2;
-        if unlikely(ref < (BYTE* const)dest) goto _output_error;   // Error : offset outside of destination buffer
-
-        // get matchlength
-        if ((length=(token&ML_MASK)) == ML_MASK)    
-        { 
-            while likely(ip<iend-(LASTLITERALS+1))    // Error : a minimum input bytes must remain for LASTLITERALS + token
-            { 
-                int s = *ip++; 
-                length +=s; 
-                if (s==255) continue; 
-                break; 
-            } 
-        }
-
-        // copy repeated sequence
-        if unlikely(op-ref<STEPSIZE)
-        {
-#if LZ4_ARCH64
-            size_t dec64 = dec64table[op-ref];
-#else
-            const int dec64 = 0;
-#endif
-            op[0] = ref[0];
-            op[1] = ref[1];
-            op[2] = ref[2];
-            op[3] = ref[3];
-            op += 4, ref += 4; ref -= dec32table[op-ref];
-            A32(op) = A32(ref); 
-            op += STEPSIZE-4; ref -= dec64;
-        } else { LZ4_COPYSTEP(ref,op); }
-        cpy = op + length - (STEPSIZE-4);
-
-        if unlikely(cpy>oend-(COPYLENGTH+(STEPSIZE-4)))
-        {
-            if (cpy > oend-LASTLITERALS) goto _output_error;    // Error : last 5 bytes must be literals
-            LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
-            while(op<cpy) *op++=*ref++;
-            op=cpy;
-            continue;
-        }
-
-        LZ4_WILDCOPY(ref, op, cpy);
-        op=cpy;		// correction
-    }
-
-    // end of decoding
-    return (int) (((char*)op)-dest);
-
-    // write overflow error detected
-_output_error:
-    return (int) (-(((char*)ip)-source));
-}
 

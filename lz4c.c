@@ -169,8 +169,6 @@ int usage(char* exename)
     DISPLAY( " -d     : decompression \n");
     DISPLAY( " -y     : overwrite without prompting \n");
     DISPLAY( " -H     : Help (this text + advanced options)\n");
-    DISPLAY( "input   : can be 'stdin' (pipe) or a filename\n");
-    DISPLAY( "output  : can be 'stdout'(pipe) or a filename or 'null'\n");
     return 0;
 }
 
@@ -183,6 +181,9 @@ int usage_advanced()
     DISPLAY( " -nx    : disable stream checksum (default:enabled)\n");
     DISPLAY( " -b#    : benchmark files, using # [0-1] compression level\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
+    DISPLAY( "input   : can be 'stdin' (pipe) or a filename\n");
+    DISPLAY( "output  : can be 'stdout'(pipe) or a filename or 'null'\n");
+    DISPLAY( "          example : lz4c -hc stdin compressedfile.lz4");
     return 0;
 }
 
@@ -492,7 +493,7 @@ unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
         uselessRet = fread(in_buff, 1, blockSize, finput);
 
         // Decode Block
-        sinkint = LZ4_uncompress_unknownOutputSize(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
+        sinkint = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
         if (sinkint < 0) EXM_THROW(52, "Decoding Failed ! Corrupted input detected !");
         filesize += sinkint;
 
@@ -603,7 +604,7 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         else
         {
             // Decode Block
-            decodedBytes = LZ4_uncompress_unknownOutputSize(in_buff, out_buff, blockSize, maxBlockSize);
+            decodedBytes = LZ4_decompress_safe(in_buff, out_buff, blockSize, maxBlockSize);
             if (decodedBytes < 0) EXM_THROW(77, "Decoding Failed ! Corrupted input detected !");
             filesize += decodedBytes;
             if (streamChecksumFlag) XXH32_update(streamChecksumState, out_buff, decodedBytes);

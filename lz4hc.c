@@ -31,6 +31,10 @@
    - LZ4 source repository : http://code.google.com/p/lz4/
 */
 
+/*
+Note : this source file requires "lz4hc_encoder.h"
+*/
+
 
 //**************************************
 // CPU Feature Detection
@@ -319,7 +323,7 @@ inline static int LZ4HC_Init (LZ4HC_Data_Structure* hc4, const BYTE* base)
 }
 
 
-inline static void* LZ4HC_Create (const BYTE* base)
+inline static void* LZ4HC_create (const BYTE* base)
 {
     void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
 
@@ -328,7 +332,7 @@ inline static void* LZ4HC_Create (const BYTE* base)
 }
 
 
-inline static int LZ4HC_Free (void** LZ4HC_Data)
+inline static int LZ4HC_free (void** LZ4HC_Data)
 {
     FREEMEM(*LZ4HC_Data);
     *LZ4HC_Data = NULL;
@@ -500,247 +504,37 @@ _endCount:
 }
 
 
-forceinline static int LZ4_encodeSequence(const BYTE** ip, BYTE** op, const BYTE** anchor, int matchLength, const BYTE* ref, BYTE* oend)
-{
-    int length, len; 
-    BYTE* token;
 
-    // Encode Literal length
-    length = (int)(*ip - *anchor);
-    token = (*op)++;
-    if ((*op + length + (2 + 1 + LASTLITERALS) + (length>>8)) > oend) return 1; 		// Check output limit
-    if (length>=(int)RUN_MASK) { *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; } 
-    else *token = (BYTE)(length<<ML_BITS);
+//**************************************
+// Compression functions
+//**************************************
 
-    // Copy Literals
-    LZ4_BLINDCOPY(*anchor, *op, length);
-
-    // Encode Offset
-    LZ4_WRITE_LITTLEENDIAN_16(*op,(U16)(*ip-ref));
-
-    // Encode MatchLength
-    len = (int)(matchLength-MINMATCH);
-    if (*op + (1 + LASTLITERALS) + (length>>8) > oend) return 1; 		// Check output limit
-    if (len>=(int)ML_MASK) { *token+=ML_MASK; len-=ML_MASK; for(; len > 509 ; len-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (len > 254) { len-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)len; } 
-    else *token += (BYTE)len;	
-
-    // Prepare next loop
-    *ip += matchLength;
-    *anchor = *ip; 
-
-    return 0;
-}
-
-
-//****************************
-// Compression CODE
-//****************************
-
-int LZ4_compressHCCtx(LZ4HC_Data_Structure* ctx,
-                 const char* source, 
-                 char* dest,
-                 int inputSize,
-                 int maxOutputSize)
-{	
-    const BYTE* ip = (const BYTE*) source;
-    const BYTE* anchor = ip;
-    const BYTE* const iend = ip + inputSize;
-    const BYTE* const mflimit = iend - MFLIMIT;
-    const BYTE* const matchlimit = (iend - LASTLITERALS);
-
-    BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
-
-    int	ml, ml2, ml3, ml0;
-    const BYTE* ref=NULL;
-    const BYTE* start2=NULL;
-    const BYTE* ref2=NULL;
-    const BYTE* start3=NULL;
-    const BYTE* ref3=NULL;
-    const BYTE* start0;
-    const BYTE* ref0;
-
-    ip++;
-
-    // Main Loop
-    while (ip < mflimit)
-    {
-        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, (&ref));
-        if (!ml) { ip++; continue; }
-
-        // saved, in case we would skip too much
-        start0 = ip;
-        ref0 = ref;
-        ml0 = ml;
-
-_Search2:
-        if (ip+ml < mflimit)
-            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 1, matchlimit, ml, &ref2, &start2);
-        else ml2 = ml;
-
-        if (ml2 == ml)  // No better match
-        {
-            if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
-            continue;
-        }
-
-        if (start0 < ip)
-        {
-            if (start2 < ip + ml0)   // empirical
-            {
-                ip = start0;
-                ref = ref0;
-                ml = ml0;
-            }
-        }
-
-        // Here, start0==ip
-        if ((start2 - ip) < 3)   // First Match too small : removed
-        {
-            ml = ml2;
-            ip = start2;
-            ref =ref2;
-            goto _Search2;
-        }
-
-_Search3:
-        // Currently we have :
-        // ml2 > ml1, and
-        // ip1+3 <= ip2 (usually < ip1+ml1)
-        if ((start2 - ip) < OPTIMAL_ML)
-        {
-            int correction;
-            int new_ml = ml;
-            if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-            if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
-            correction = new_ml - (int)(start2 - ip);
-            if (correction > 0)
-            {
-                start2 += correction;
-                ref2 += correction;
-                ml2 -= correction;
-            }
-        }
-        // Now, we have start2 = ip+new_ml, with new_ml = min(ml, OPTIMAL_ML=18)
-
-        if (start2 + ml2 < mflimit)
-            ml3 = LZ4HC_InsertAndGetWiderMatch(ctx, start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3);
-        else ml3 = ml2;
-
-        if (ml3 == ml2) // No better match : 2 sequences to encode
-        {
-            // ip & ref are known; Now for ml
-            if (start2 < ip+ml)  ml = (int)(start2 - ip);
-            // Now, encode 2 sequences
-            if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
-            ip = start2;
-            if (LZ4_encodeSequence(&ip, &op, &anchor, ml2, ref2, oend)) return 0;
-            continue;
-        }
-
-        if (start3 < ip+ml+3) // Not enough space for match 2 : remove it
-        {
-            if (start3 >= (ip+ml)) // can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1
-            {
-                if (start2 < ip+ml)
-                {
-                    int correction = (int)(ip+ml - start2);
-                    start2 += correction;
-                    ref2 += correction;
-                    ml2 -= correction;
-                    if (ml2 < MINMATCH)
-                    {
-                        start2 = start3;
-                        ref2 = ref3;
-                        ml2 = ml3;
-                    }
-                }
-
-                if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
-                ip  = start3;
-                ref = ref3;
-                ml  = ml3;
-
-                start0 = start2;
-                ref0 = ref2;
-                ml0 = ml2;
-                goto _Search2;
-            }
-
-            start2 = start3;
-            ref2 = ref3;
-            ml2 = ml3;
-            goto _Search3;
-        }
-
-        // OK, now we have 3 ascending matches; let's write at least the first one
-        // ip & ref are known; Now for ml
-        if (start2 < ip+ml)
-        {
-            if ((start2 - ip) < (int)ML_MASK)
-            {
-                int correction;
-                if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-                if (ip + ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
-                correction = ml - (int)(start2 - ip);
-                if (correction > 0)
-                {
-                    start2 += correction;
-                    ref2 += correction;
-                    ml2 -= correction;
-                }
-            }
-            else
-            {
-                ml = (int)(start2 - ip);
-            }
-        }
-        if (LZ4_encodeSequence(&ip, &op, &anchor, ml, ref, oend)) return 0;
-
-        ip = start2;
-        ref = ref2;
-        ml = ml2;
-
-        start2 = start3;
-        ref2 = ref3;
-        ml2 = ml3;
-
-        goto _Search3;
-
-    }
-
-    // Encode Last Literals
-    {
-        int lastRun = (int)(iend - anchor);
-        if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;  // Check output limit
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; } 
-        else *op++ = (BYTE)(lastRun<<ML_BITS);
-        memcpy(op, anchor, iend - anchor);
-        op += iend-anchor;
-    } 
-
-    // End
-    return (int) (((char*)op)-dest);
-}
-
-
-int LZ4_compressHC_limitedOutput(const char* source, 
-                 char* dest,
-                 int inputSize,
-                 int maxOutputSize)
-{
-    void* ctx = LZ4HC_Create((const BYTE*)source);
-    int result = LZ4_compressHCCtx(ctx, source, dest, inputSize, maxOutputSize);
-    LZ4HC_Free (&ctx);
-
-    return result;
-}
-
-
-int LZ4_compressHC(const char* source, 
+/*
+int LZ4_compressHC(
+                 const char* source,
                  char* dest,
                  int inputSize)
-{
-    return LZ4_compressHC_limitedOutput(source, dest, inputSize, LZ4_compressBound(inputSize)+1);
-}
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest'.
+Destination buffer must be already allocated, and sized at a minimum of LZ4_compressBound(inputSize).
+return : the number of bytes written in buffer 'dest'
+*/
+#define FUNCTION_NAME LZ4_compressHC
+#include "lz4hc_encoder.h"
+
+
+/*
+int LZ4_compressHC_limitedOutput(
+                 const char* source,
+                 char* dest,
+                 int inputSize,
+                 int maxOutputSize)
+
+Compress 'inputSize' bytes from 'source' into an output buffer 'dest' of maximum size 'maxOutputSize'.
+If it cannot achieve it, compression will stop, and result of the function will be zero.
+return : the number of bytes written in buffer 'dest', or 0 if the compression fails
+*/
+#define FUNCTION_NAME LZ4_compressHC_limitedOutput
+#define LIMITED_OUTPUT
+#include "lz4hc_encoder.h"
 

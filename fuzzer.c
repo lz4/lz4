@@ -107,7 +107,7 @@ int FUZ_SecurityTest()
   input[2] = 0x00;
   for(i = 3; i < 16840000; i++)
     input[i] = 0xff;
-  r = LZ4_uncompress(input, output, 20<<20);
+  r = LZ4_decompress_fast(input, output, 20<<20);
 
   free(input);
   free(output);
@@ -178,35 +178,35 @@ int main() {
             len = ret;
 
             // Test decoding with output size being exactly what's necessary => must work
-            ret = LZ4_uncompress((char*)&cbuf[off_full], (char*)testOut, LEN);
+            ret = LZ4_decompress_fast((char*)&cbuf[off_full], (char*)testOut, LEN);
             if (ret<0) { printf("decompression failed despite correct space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with one byte missing => must fail
-            ret = LZ4_uncompress((char*)&cbuf[off_full], (char*)testOut, LEN-1);
+            ret = LZ4_decompress_fast((char*)&cbuf[off_full], (char*)testOut, LEN-1);
             if (ret>=0) { printf("decompression should have failed, due to Output Size being too small : seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with one byte too much => must fail
-            ret = LZ4_uncompress((char*)&cbuf[off_full], (char*)testOut, LEN+1);
+            ret = LZ4_decompress_fast((char*)&cbuf[off_full], (char*)testOut, LEN+1);
             if (ret>=0) { printf("decompression should have failed, due to Output Size being too large : seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with enough output size => must work
-            ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len, LEN+1);
+            ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len, LEN+1);
             if (ret<0) { printf("decompression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with output size being exactly what's necessary => must work
-            ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len, LEN);
+            ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len, LEN);
             if (ret<0) { printf("decompression failed despite sufficient space: seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with output size being one byte too short => must fail
-            ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len, LEN-1);
+            ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len, LEN-1);
             if (ret>=0) { printf("decompression should have failed, due to Output Size being too small : seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with input size being one byte too short => must fail
-            ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len-1, LEN);
+            ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len-1, LEN);
             if (ret>=0) { printf("decompression should have failed, due to input size being too small : seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test decoding with input size being one byte too large => must fail
-            ret = LZ4_uncompress_unknownOutputSize((char*)&cbuf[off_full], (char*)testOut, len+1, LEN);
+            ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len+1, LEN);
             if (ret>=0) { printf("decompression should have failed, due to input size being too large : seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test compression with output size being exactly what's necessary (should work)
