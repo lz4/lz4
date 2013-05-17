@@ -46,9 +46,10 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 #define MEMORY_USAGE 14
 
 // HEAPMODE :
-// Select if compression algorithm will allocate space for its tables
+// Select how default compression function will allocate memory for its hash table,
 // in memory stack (0:default, fastest), or in memory heap (1:requires memory allocation (malloc)).
 // Default allocation strategy is to use stack (HEAPMODE 0)
+// Note : explicit functions *_stack* and *_heap* are unaffected by this setting
 #define HEAPMODE 0
 
 // BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
@@ -63,7 +64,9 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 // CPU Feature Detection
 //**************************************
 // 32 or 64 bits ?
-#if (defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) || defined(__ppc64__) || defined(_WIN64) || defined(__LP64__) || defined(_LP64) )   // Detects 64 bits mode
+#if (defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) \
+  || defined(__ppc64__) || defined(_WIN64) || defined(__LP64__) || defined(_LP64) \
+  || defined(__ia64__) )   // Detects 64 bits mode
 #  define LZ4_ARCH64 1
 #else
 #  define LZ4_ARCH64 0
@@ -103,7 +106,7 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 //**************************************
 // Compiler Options
 //**************************************
-#if __STDC_VERSION__ >= 199901L   // C99
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 /* "restrict" is a known keyword */
 #else
 #  define restrict // Disable restrict
@@ -150,30 +153,36 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 //**************************************
 // Basic Types
 //**************************************
-#if defined(_MSC_VER)    // Visual Studio does not support 'stdint' natively
-#  define BYTE	unsigned __int8
-#  define U16	unsigned __int16
-#  define U32	unsigned __int32
-#  define S32	__int32
-#  define U64	unsigned __int64
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+# include <stdint.h>
+  typedef uint8_t  BYTE;
+  typedef uint16_t U16;
+  typedef uint32_t U32;
+  typedef  int32_t S32;
+  typedef uint64_t U64;
 #else
-#  include <stdint.h>
-#  define BYTE	uint8_t
-#  define U16	uint16_t
-#  define U32	uint32_t
-#  define S32	int32_t
-#  define U64	uint64_t
+  typedef unsigned char       BYTE;
+  typedef unsigned short      U16;
+  typedef unsigned int        U32;
+  typedef   signed int        S32;
+  typedef unsigned long long  U64;
 #endif
 
-#ifndef LZ4_FORCE_UNALIGNED_ACCESS
+#if defined(__GNUC__)  && !defined(LZ4_FORCE_UNALIGNED_ACCESS)
+#  define _PACKED __attribute__ ((packed))
+#else
+#  define _PACKED
+#endif
+
+#if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
 #  pragma pack(push, 1)
 #endif
 
-typedef struct _U16_S { U16 v; } U16_S;
-typedef struct _U32_S { U32 v; } U32_S;
-typedef struct _U64_S { U64 v; } U64_S;
+typedef struct _U16_S { U16 v; } _PACKED U16_S;
+typedef struct _U32_S { U32 v; } _PACKED U32_S;
+typedef struct _U64_S { U64 v; } _PACKED U64_S;
 
-#ifndef LZ4_FORCE_UNALIGNED_ACCESS
+#if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
 #  pragma pack(pop)
 #endif
 
@@ -241,8 +250,8 @@ typedef struct _U64_S { U64 v; } U64_S;
 //**************************************
 // Macros
 //**************************************
-#define LZ4_WILDCOPY(s,d,e)		do { LZ4_COPYPACKET(s,d) } while (d<e);
-#define LZ4_BLINDCOPY(s,d,l)	{ BYTE* e=(d)+l; LZ4_WILDCOPY(s,d,e); d=e; }
+#define LZ4_WILDCOPY(s,d,e)     do { LZ4_COPYPACKET(s,d) } while (d<e);
+#define LZ4_BLINDCOPY(s,d,l)    { BYTE* e=(d)+(l); LZ4_WILDCOPY(s,d,e); d=e; }
 
 
 //****************************

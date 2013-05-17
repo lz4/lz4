@@ -332,6 +332,7 @@ int FUNCTION_NAME (const char* source,
 
 // Locally Generated
 #undef ENCODE_SEQUENCE
+#undef ENCODE_SEQUENCE_NAME
 
 // Optional defines
 #ifdef LIMITED_OUTPUT

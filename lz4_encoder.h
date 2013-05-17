@@ -150,36 +150,16 @@ int FUNCTION_NAME(
         length = (int)(ip - anchor);
         token = op++;
 #ifdef LIMITED_OUTPUT
-        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
+        if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend) return 0;   // Check output limit
 #endif
-#ifdef _MSC_VER
         if (length>=(int)RUN_MASK) 
         { 
             int len = length-RUN_MASK; 
             *token=(RUN_MASK<<ML_BITS); 
-            if (len>254)
-            {
-                do { *op++ = 255; len -= 255; } while (len>254);
-                *op++ = (BYTE)len; 
-                memcpy(op, anchor, length);
-                op += length;
-                goto _next_match;
-            }
-            else
+            for(; len >= 255 ; len-=255) *op++ = 255; 
             *op++ = (BYTE)len; 
         }
         else *token = (BYTE)(length<<ML_BITS);
-#else
-        if (length>=(int)RUN_MASK) 
-        { 
-            int len;
-            *token=(RUN_MASK<<ML_BITS); 
-            len = length-RUN_MASK; 
-            for(; len > 254 ; len-=255) *op++ = 255; 
-            *op++ = (BYTE)len; 
-        }
-        else *token = (length<<ML_BITS);
-#endif
 
         // Copy Literals
         LZ4_BLINDCOPY(anchor, op, length);
@@ -206,14 +186,14 @@ _endCount:
         // Encode MatchLength
         length = (int)(ip - anchor);
 #ifdef LIMITED_OUTPUT
-        if unlikely(op + (1 + LASTLITERALS) + (length>>8) > oend) return 0; 		// Check output limit
+        if unlikely(op + (1 + LASTLITERALS) + (length>>8) > oend) return 0;    // Check output limit
 #endif
         if (length>=(int)ML_MASK) 
         { 
             *token += ML_MASK; 
             length -= ML_MASK; 
             for (; length > 509 ; length-=510) { *op++ = 255; *op++ = 255; } 
-            if (length > 254) { length-=255; *op++ = 255; } 
+            if (length >= 255) { length-=255; *op++ = 255; } 
             *op++ = (BYTE)length; 
         }
         else *token += (BYTE)length;
@@ -241,7 +221,7 @@ _last_literals:
 #ifdef LIMITED_OUTPUT
         if (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) return 0;  // Check output limit
 #endif
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
+        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun >= 255 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
         op += iend-anchor;

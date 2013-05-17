@@ -24,9 +24,9 @@
 /*
   Note : this is stand-alone program.
   It is not part of LZ4 compression library, it is a user program of LZ4 library.
-  The license of LZ4 is BSD.
-  The license of xxHash is BSD.
-  The license of the compression program is GPLv2.
+  The license of LZ4 library is BSD.
+  The license of xxHash library is BSD.
+  The license of this compression CLI program is GPLv2.
 */
 
 //**************************************
@@ -162,7 +162,7 @@ static int streamChecksum = 1;
 int usage(char* exename)
 {
     DISPLAY( "Usage :\n");
-    DISPLAY( "      %s [arg] input output\n", exename);
+    DISPLAY( "      %s [arg] input [output]\n", exename);
     DISPLAY( "Arguments :\n");
     DISPLAY( " -c0/-c : Fast compression (default) \n");
     DISPLAY( " -c1/-hc: High compression \n");
@@ -819,7 +819,7 @@ int main(int argc, char** argv)
     // No output filename ==> build one automatically (for compression only)
     if (!output_filename) 
     { 
-        if (!decode)
+        if (!decode)   // compression
         {
             int i=0, l=0;
             while (input_filename[l]!=0) l++;
@@ -829,9 +829,15 @@ int main(int argc, char** argv)
         }
         else
         {
-            badusage(exename); 
-            return 1; 
+            int inl=0,outl;
+            while (input_filename[inl]!=0) inl++;
+            output_filename = (char*)calloc(1,inl+1);
+            for (outl=0;outl<inl;outl++) output_filename[outl] = input_filename[outl];
+            if (inl>4)
+                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) output_filename[outl--]=0;
+            if (outl != inl-5) output_filename = NULL;
         }
+        if (!output_filename) { badusage(exename); return 1; }
     }
 
     if (decode) return decodeFile(input_filename, output_filename);

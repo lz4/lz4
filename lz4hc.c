@@ -37,10 +37,22 @@ Note : this source file requires "lz4hc_encoder.h"
 
 
 //**************************************
+// Memory routines
+//**************************************
+#include <stdlib.h>   // calloc, free
+#define ALLOCATOR(s)  calloc(1,s)
+#define FREEMEM       free
+#include <string.h>   // memset, memcpy
+#define MEM_INIT      memset
+
+
+//**************************************
 // CPU Feature Detection
 //**************************************
 // 32 or 64 bits ?
-#if (defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) || defined(__ppc64__) || defined(_WIN64) || defined(__LP64__) || defined(_LP64) )   // Detects 64 bits mode
+#if (defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) \
+  || defined(__ppc64__) || defined(_WIN64) || defined(__LP64__) || defined(_LP64) \
+  || defined(__ia64__) )   // Detects 64 bits mode
 #  define LZ4_ARCH64 1
 #else
 #  define LZ4_ARCH64 0
@@ -80,7 +92,7 @@ Note : this source file requires "lz4hc_encoder.h"
 //**************************************
 // Compiler Options
 //**************************************
-#if __STDC_VERSION__ >= 199901L    // C99
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
   /* "restrict" is a known keyword */
 #else
 #  define restrict  // Disable restrict
@@ -117,44 +129,44 @@ Note : this source file requires "lz4hc_encoder.h"
 //**************************************
 // Includes
 //**************************************
-#include <stdlib.h>   // calloc, free
-#include <string.h>   // memset, memcpy
 #include "lz4hc.h"
 #include "lz4.h"
-
-#define ALLOCATOR(s) calloc(1,s)
-#define FREEMEM free
-#define MEM_INIT memset
 
 
 //**************************************
 // Basic Types
 //**************************************
-#if defined(_MSC_VER)    // Visual Studio does not support 'stdint' natively
-#define BYTE	unsigned __int8
-#define U16		unsigned __int16
-#define U32		unsigned __int32
-#define S32		__int32
-#define U64		unsigned __int64
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+# include <stdint.h>
+  typedef uint8_t  BYTE;
+  typedef uint16_t U16;
+  typedef uint32_t U32;
+  typedef  int32_t S32;
+  typedef uint64_t U64;
 #else
-#include <stdint.h>
-#define BYTE	uint8_t
-#define U16		uint16_t
-#define U32		uint32_t
-#define S32		int32_t
-#define U64		uint64_t
+  typedef unsigned char       BYTE;
+  typedef unsigned short      U16;
+  typedef unsigned int        U32;
+  typedef   signed int        S32;
+  typedef unsigned long long  U64;
 #endif
 
-#ifndef LZ4_FORCE_UNALIGNED_ACCESS
-#pragma pack(push, 1) 
+#if defined(__GNUC__)  && !defined(LZ4_FORCE_UNALIGNED_ACCESS)
+#  define _PACKED __attribute__ ((packed))
+#else
+#  define _PACKED
 #endif
 
-typedef struct _U16_S { U16 v; } U16_S;
-typedef struct _U32_S { U32 v; } U32_S;
-typedef struct _U64_S { U64 v; } U64_S;
+#if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
+#  pragma pack(push, 1)
+#endif
 
-#ifndef LZ4_FORCE_UNALIGNED_ACCESS
-#pragma pack(pop) 
+typedef struct _U16_S { U16 v; } _PACKED U16_S;
+typedef struct _U32_S { U32 v; } _PACKED U32_S;
+typedef struct _U64_S { U64 v; } _PACKED U64_S;
+
+#if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
+#  pragma pack(pop)
 #endif
 
 #define A64(x) (((U64_S *)(x))->v)
@@ -193,30 +205,30 @@ typedef struct _U64_S { U64 v; } U64_S;
 //**************************************
 // Architecture-specific macros
 //**************************************
-#if LZ4_ARCH64	// 64-bit
-#define STEPSIZE 8
-#define LZ4_COPYSTEP(s,d)		A64(d) = A64(s); d+=8; s+=8;
-#define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d)
-#define UARCH U64
-#define AARCH A64
-#define HTYPE					U32
-#define INITBASE(b,s)			const BYTE* const b = s
-#else		// 32-bit
-#define STEPSIZE 4
-#define LZ4_COPYSTEP(s,d)		A32(d) = A32(s); d+=4; s+=4;
-#define LZ4_COPYPACKET(s,d)		LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
-#define UARCH U32
-#define AARCH A32
-#define HTYPE					const BYTE*
-#define INITBASE(b,s)		    const int b = 0
+#if LZ4_ARCH64   // 64-bit
+#  define STEPSIZE 8
+#  define LZ4_COPYSTEP(s,d)     A64(d) = A64(s); d+=8; s+=8;
+#  define LZ4_COPYPACKET(s,d)   LZ4_COPYSTEP(s,d)
+#  define UARCH U64
+#  define AARCH A64
+#  define HTYPE                 U32
+#  define INITBASE(b,s)         const BYTE* const b = s
+#else   // 32-bit
+#  define STEPSIZE 4
+#  define LZ4_COPYSTEP(s,d)     A32(d) = A32(s); d+=4; s+=4;
+#  define LZ4_COPYPACKET(s,d)   LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
+#  define UARCH U32
+#  define AARCH A32
+#  define HTYPE                 const BYTE*
+#  define INITBASE(b,s)         const int b = 0
 #endif
 
 #if defined(LZ4_BIG_ENDIAN)
-#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { U16 v = A16(p); v = lz4_bswap16(v); d = (s) - v; }
-#define LZ4_WRITE_LITTLEENDIAN_16(p,i)  { U16 v = (U16)(i); v = lz4_bswap16(v); A16(p) = v; p+=2; }
-#else		// Little Endian
-#define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
-#define LZ4_WRITE_LITTLEENDIAN_16(p,v)  { A16(p) = v; p+=2; }
+#  define LZ4_READ_LITTLEENDIAN_16(d,s,p) { U16 v = A16(p); v = lz4_bswap16(v); d = (s) - v; }
+#  define LZ4_WRITE_LITTLEENDIAN_16(p,i)  { U16 v = (U16)(i); v = lz4_bswap16(v); A16(p) = v; p+=2; }
+#else   // Little Endian
+#  define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
+#  define LZ4_WRITE_LITTLEENDIAN_16(p,v)  { A16(p) = v; p+=2; }
 #endif
 
 
@@ -237,11 +249,11 @@ typedef struct
 //**************************************
 #define LZ4_WILDCOPY(s,d,e)    do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)   { BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
-#define HASH_FUNCTION(i)	   (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define HASH_VALUE(p)		   HASH_FUNCTION(A32(p))
-#define HASH_POINTER(p)		   (HashTable[HASH_VALUE(p)] + base)
-#define DELTANEXT(p)		   chainTable[(size_t)(p) & MAXD_MASK] 
-#define GETNEXT(p)			   ((p) - (size_t)DELTANEXT(p))
+#define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
+#define HASH_VALUE(p)          HASH_FUNCTION(A32(p))
+#define HASH_POINTER(p)        (HashTable[HASH_VALUE(p)] + base)
+#define DELTANEXT(p)           chainTable[(size_t)(p) & MAXD_MASK] 
+#define GETNEXT(p)             ((p) - (size_t)DELTANEXT(p))
 
 
 //**************************************
@@ -252,30 +264,30 @@ typedef struct
 inline static int LZ4_NbCommonBytes (register U64 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanReverse64( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clzll(val) >> 3); 
-    #else
+#  else
     int r;
     if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
     if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
     r += (!val);
     return r;
-    #endif
+#  endif
 #else
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanForward64( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctzll(val) >> 3); 
-    #else
+#  else
     static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
     return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
-    #endif
+#  endif
 #endif
 }
 
@@ -284,29 +296,29 @@ inline static int LZ4_NbCommonBytes (register U64 val)
 inline static int LZ4_NbCommonBytes (register U32 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r;
     _BitScanReverse( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clz(val) >> 3); 
-    #else
+#  else
     int r;
     if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
     r += (!val);
     return r;
-    #endif
+#  endif
 #else
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r;
     _BitScanForward( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3); 
-    #else
+#  else
     static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
     return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
-    #endif
+#  endif
 #endif
 }
 

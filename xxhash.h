@@ -121,6 +121,18 @@ Memory will be freed by XXH32_digest().
 */
 
 
+int           XXH32_sizeofState();
+XXH_errorcode XXH32_resetState(void* state_in, unsigned int seed);
+/*
+These functions are the basic elements of XXH32_init();
+The objective is to allow user application to make its own allocation.
+
+XXH32_sizeofState() is used to know how much space must be allocated by the application.
+This space must be referenced by a void* pointer.
+This pointer must be provided as 'state_in' into XXH32_resetState(), which initializes the state.
+*/
+
+
 unsigned int XXH32_intermediateDigest (void* state);
 /*
 This function does the same as XXH32_digest(), generating a 32-bit hash,
