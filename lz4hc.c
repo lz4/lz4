@@ -201,6 +201,9 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 #define MINLENGTH (MFLIMIT+1)
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
 
+#define KB *(1U<<10)
+#define MB *(1U<<20)
+#define GB *(1U<<30)
 
 //**************************************
 // Architecture-specific macros
@@ -219,8 +222,10 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 #  define LZ4_COPYPACKET(s,d)   LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
 #  define UARCH U32
 #  define AARCH A32
-#  define HTYPE                 const BYTE*
-#  define INITBASE(b,s)         const int b = 0
+//#  define HTYPE                 const BYTE*
+//#  define INITBASE(b,s)         const int b = 0
+#  define HTYPE                 U32
+#  define INITBASE(b,s)         const BYTE* const b = s
 #endif
 
 #if defined(LZ4_BIG_ENDIAN)
@@ -237,7 +242,9 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 //************************************************************
 typedef struct 
 {
+    const BYTE* inputBuffer;
     const BYTE* base;
+    const BYTE* end;
     HTYPE hashTable[HASHTABLESIZE];
     U16 chainTable[MAXD];
     const BYTE* nextToUpdate;
@@ -325,35 +332,35 @@ inline static int LZ4_NbCommonBytes (register U32 val)
 #endif
 
 
-inline static int LZ4HC_Init (LZ4HC_Data_Structure* hc4, const BYTE* base)
+static inline int LZ4_InitHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
-    hc4->nextToUpdate = base + LZ4_ARCH64;
+    hc4->nextToUpdate = base + 1;
     hc4->base = base;
+    hc4->inputBuffer = base;
+    hc4->end = base;
     return 1;
 }
 
 
-inline static void* LZ4HC_create (const BYTE* base)
+extern inline void* LZ4_createHC (const char* slidingInputBuffer)
 {
     void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
-
-    LZ4HC_Init ((LZ4HC_Data_Structure*)hc4, base);
+    LZ4_InitHC ((LZ4HC_Data_Structure*)hc4, (const BYTE*)slidingInputBuffer);
     return hc4;
 }
 
 
-inline static int LZ4HC_free (void** LZ4HC_Data)
+extern inline int LZ4_freeHC (void* LZ4HC_Data)
 {
-    FREEMEM(*LZ4HC_Data);
-    *LZ4HC_Data = NULL;
-    return (1);
+    FREEMEM(LZ4HC_Data);
+    return (0);
 }
 
 
 // Update chains up to ip (excluded)
-forceinline static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
+static forceinline void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 {
     U16*   chainTable = hc4->chainTable;
     HTYPE* HashTable  = hc4->hashTable;
@@ -361,7 +368,7 @@ forceinline static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 
     while(hc4->nextToUpdate < ip)
     {
-        const BYTE* p = hc4->nextToUpdate;
+        const BYTE* const p = hc4->nextToUpdate;
         size_t delta = (p) - HASH_POINTER(p); 
         if (delta>MAX_DISTANCE) delta = MAX_DISTANCE; 
         DELTANEXT(p) = (U16)delta; 
@@ -371,7 +378,27 @@ forceinline static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 }
 
 
-forceinline static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const matchlimit)
+char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
+{
+    LZ4HC_Data_Structure* hc4 = (LZ4HC_Data_Structure*)LZ4HC_Data;
+    U32 distance = (U32)(hc4->end - hc4->inputBuffer) - 64 KB;
+    distance = (distance >> 16) << 16;   // Must be a multiple of 64 KB
+    LZ4HC_Insert(hc4, hc4->end - MINMATCH);
+    memcpy((void*)(hc4->end - 64 KB - distance), (const void*)(hc4->end - 64 KB), 64 KB);
+    hc4->nextToUpdate -= distance;
+    hc4->base -= distance;
+    if ((U32)(hc4->inputBuffer - hc4->base) > 1 GB + 64 KB)   // Avoid overflow
+    {
+        int i;
+        hc4->base += 1 GB;
+        for (i=0; i<HASHTABLESIZE; i++) hc4->hashTable[i] -= 1 GB;
+    }
+    hc4->end -= distance;
+    return (char*)(hc4->end);
+}
+
+
+static forceinline size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const matchlimit)
 {
     const BYTE* p1t = p1;
 
@@ -389,7 +416,7 @@ forceinline static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, co
 }
 
 
-forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* const matchlimit, const BYTE** matchpos)
+static forceinline int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* const matchlimit, const BYTE** matchpos)
 {
     U16* const chainTable = hc4->chainTable;
     HTYPE* const HashTable = hc4->hashTable;
@@ -397,7 +424,7 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
     INITBASE(base,hc4->base);
     int nbAttempts=MAX_NB_ATTEMPTS;
     size_t repl=0, ml=0;
-    U16 delta;
+    U16 delta=0;  // useless assignment, to remove an uninitialization warning
 
     // HC4 match finder
     LZ4HC_Insert(hc4, ip);
@@ -406,7 +433,7 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
 #define REPEAT_OPTIMIZATION
 #ifdef REPEAT_OPTIMIZATION
     // Detect repetitive sequences of length <= 4
-    if (ref >= ip-4)               // potential repetition
+    if ((U32)(ip-ref) <= 4)        // potential repetition
     {
         if (A32(ref) == A32(ip))   // confirmed
         {
@@ -418,7 +445,7 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
     }
 #endif
 
-    while ((ref >= ip-MAX_DISTANCE) && (nbAttempts))
+    while (((U32)(ip-ref) <= MAX_DISTANCE) && (nbAttempts))
     {
         nbAttempts--;
         if (*(ref+ml) == *(ip+ml))
@@ -457,7 +484,7 @@ forceinline static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
 }
 
 
-forceinline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* startLimit, const BYTE* matchlimit, int longest, const BYTE** matchpos, const BYTE** startpos)
+static forceinline int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* startLimit, const BYTE* matchlimit, int longest, const BYTE** matchpos, const BYTE** startpos)
 {
     U16* const  chainTable = hc4->chainTable;
     HTYPE* const HashTable = hc4->hashTable;
@@ -470,7 +497,7 @@ forceinline static int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, 
     LZ4HC_Insert(hc4, ip);
     ref = HASH_POINTER(ip);
 
-    while ((ref >= ip-MAX_DISTANCE) && (nbAttempts))
+    while (((U32)(ip-ref) <= MAX_DISTANCE) && (nbAttempts))
     {
         nbAttempts--;
         if (*(startLimit + longest) == *(ref - delta + longest))
@@ -500,7 +527,7 @@ _endCount:
             const BYTE* ipt = ip + MINMATCH + LZ4HC_CommonLength(ip+MINMATCH, ref+MINMATCH, matchlimit);
 #endif
 
-            while ((startt>startLimit) && (reft > hc4->base) && (startt[-1] == reft[-1])) {startt--; reft--;}
+            while ((startt>startLimit) && (reft > hc4->inputBuffer) && (startt[-1] == reft[-1])) {startt--; reft--;}
 
             if ((ipt-startt) > longest)
             {

@@ -99,7 +99,7 @@ int FUZ_SecurityTest()
   char* input;
   int i, r;
 
-  printf("Starting overflow tests (issue 52)...");
+  printf("Overflow test (issue 52)...");
   input = (char*) malloc (20<<20);
   output = (char*) malloc (20<<20);
   input[0] = 0x0F;

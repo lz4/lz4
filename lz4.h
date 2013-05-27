@@ -135,12 +135,23 @@ LZ4_decompress_safe_partial() :
 */
 
 
+int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outputSize);
+
+/*
+*_withPrefix64k() :
+    These decoding functions work the same as their "normal name" versions,
+    but will potentially use up to 64KB of data in front of 'char* dest'.
+    These functions are used for decoding inter-dependant blocks.
+*/
+
+
 //****************************
 // Obsolete Functions
 //****************************
 
-inline int LZ4_uncompress (const char* source, char* dest, int outputSize)   { return LZ4_decompress_fast(source, dest, outputSize); }
-inline int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize)   { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
+static inline int LZ4_uncompress (const char* source, char* dest, int outputSize)   { return LZ4_decompress_fast(source, dest, outputSize); }
+static inline int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize)   { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
 
 /* 
 These functions are deprecated and should no longer be used.

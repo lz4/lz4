@@ -107,8 +107,8 @@ forceinline static int ENCODE_SEQUENCE_NAME (
 }
 
 
-int COMBINED_NAME(FUNCTION_NAME,ctx) (
-                 LZ4HC_Data_Structure* ctx,
+int COMBINED_NAME(FUNCTION_NAME,_continue) (
+                 void* ctxvoid,
                  const char* source, 
                  char* dest,
                  int inputSize
@@ -116,7 +116,8 @@ int COMBINED_NAME(FUNCTION_NAME,ctx) (
                 ,int maxOutputSize
 #endif
                 )
-{	
+{
+    LZ4HC_Data_Structure* ctx = (LZ4HC_Data_Structure*) ctxvoid;
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
     const BYTE* const iend = ip + inputSize;
@@ -136,6 +137,10 @@ int COMBINED_NAME(FUNCTION_NAME,ctx) (
     const BYTE* ref3=NULL;
     const BYTE* start0;
     const BYTE* ref0;
+
+    // Ensure blocks follow each other
+    if (ip != ctx->end) return 0;
+    ctx->end += inputSize;
 
     ip++;
 
@@ -311,13 +316,15 @@ int FUNCTION_NAME (const char* source,
 #endif
                 )
 {
-    void* ctx = LZ4HC_create((const BYTE*)source);
+    void* ctx = LZ4_createHC(source);
+    int result;
+    if (ctx==NULL) return 0;
 #ifdef LIMITED_OUTPUT
-    int result = COMBINED_NAME(FUNCTION_NAME,ctx) (ctx, source, dest, inputSize, maxOutputSize);
+    result = COMBINED_NAME(FUNCTION_NAME,_continue) (ctx, source, dest, inputSize, maxOutputSize);
 #else
-    int result = COMBINED_NAME(FUNCTION_NAME,ctx) (ctx, source, dest, inputSize);
+    result = COMBINED_NAME(FUNCTION_NAME,_continue) (ctx, source, dest, inputSize);
 #endif
-    LZ4HC_free (&ctx);
+    LZ4_freeHC(ctx);
 
     return result;
 }

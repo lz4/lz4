@@ -114,9 +114,9 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
-#ifdef _MSC_VER  // Visual Studio
+#ifdef _MSC_VER    // Visual Studio
 #  include <intrin.h>   // For Visual 2005
-#  if LZ4_ARCH64	// 64-bit
+#  if LZ4_ARCH64   // 64-bit
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
 #  else
@@ -403,7 +403,7 @@ to be used by the LZ4_compress_heap* family of functions.
 LZ4_createHeapMemory() returns NULL is memory allocation fails.
 */
 void* LZ4_create() { return malloc(HASHTABLESIZE); }
-int LZ4_free(void* ctx) { free(ctx); return 0; }
+int   LZ4_free(void* ctx) { free(ctx); return 0; }
 
 
 /*

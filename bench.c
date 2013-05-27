@@ -32,7 +32,7 @@
 // Unix Large Files support (>4GB)
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
 #  define _LARGEFILE_SOURCE 
-#  define FILE_OFFSET_BITS=64
+#  define _FILE_OFFSET_BITS 64
 #elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
 #  define _LARGEFILE64_SOURCE
 #endif
@@ -96,11 +96,11 @@
 //**************************************
 // Constants
 //**************************************
-#define NBLOOPS		3
-#define TIMELOOP	2000
+#define NBLOOPS    3
+#define TIMELOOP   2000
 
-#define KNUTH		2654435761U
-#define MAX_MEM		(1984<<20)
+#define KNUTH      2654435761U
+#define MAX_MEM    (1984<<20)
 #define DEFAULT_CHUNKSIZE   (4<<20)
 
 
