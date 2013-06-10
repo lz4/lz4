@@ -27,8 +27,8 @@
    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-	You can contact the author at :
-	- xxHash source repository : http://code.google.com/p/xxhash/
+   You can contact the author at :
+   - xxHash source repository : http://code.google.com/p/xxhash/
 */
 
 /* Notice extracted from xxHash homepage :
@@ -67,7 +67,7 @@ extern "C" {
 //****************************
 // Type
 //****************************
-typedef enum { OK=0, XXH_ERROR } XXH_errorcode;
+typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
 
 
 
@@ -79,13 +79,13 @@ unsigned int XXH32 (const void* input, int len, unsigned int seed);
 
 /*
 XXH32() :
-	Calculate the 32-bits hash of sequence of length "len" stored at memory address "input".
+    Calculate the 32-bits hash of sequence of length "len" stored at memory address "input".
     The memory between input & input+len must be valid (allocated and read-accessible).
-	"seed" can be used to alter the result predictably.
-	This function successfully passes all SMHasher tests.
-	Speed on Core 2 Duo @ 3 GHz (single thread, SMHasher benchmark) : 5.4 GB/s
-	Note that "len" is type "int", which means it is limited to 2^31-1.
-	If your data is larger, use the advanced functions below.
+    "seed" can be used to alter the result predictably.
+    This function successfully passes all SMHasher tests.
+    Speed on Core 2 Duo @ 3 GHz (single thread, SMHasher benchmark) : 5.4 GB/s
+    Note that "len" is type "int", which means it is limited to 2^31-1.
+    If your data is larger, use the advanced functions below.
 */
 
 
@@ -122,14 +122,19 @@ Memory will be freed by XXH32_digest().
 
 
 int           XXH32_sizeofState();
-XXH_errorcode XXH32_resetState(void* state_in, unsigned int seed);
-/*
-These functions are the basic elements of XXH32_init();
-The objective is to allow user application to make its own allocation.
+XXH_errorcode XXH32_resetState(void* state, unsigned int seed);
 
-XXH32_sizeofState() is used to know how much space must be allocated by the application.
-This space must be referenced by a void* pointer.
-This pointer must be provided as 'state_in' into XXH32_resetState(), which initializes the state.
+#define       XXH32_SIZEOFSTATE 48
+typedef struct { long long ll[(XXH32_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)]; } XXH32_stateSpace_t;
+/*
+These functions allow user application to make its own allocation for state.
+
+XXH32_sizeofState() is used to know how much space must be allocated for the xxHash 32-bits state.
+Note that the state must be aligned to access 'long long' fields. Memory must be allocated and referenced by a pointer.
+This pointer must then be provided as 'state' into XXH32_resetState(), which initializes the state.
+
+For static allocation purposes (such as allocation on stack, or freestanding systems without malloc()),
+use the structure XXH32_stateSpace_t, which will ensure that memory space is large enough and correctly aligned to access 'long long' fields.
 */
 
 
@@ -138,7 +143,7 @@ unsigned int XXH32_intermediateDigest (void* state);
 This function does the same as XXH32_digest(), generating a 32-bit hash,
 but preserve memory context.
 This way, it becomes possible to generate intermediate hashes, and then continue feeding data with XXH32_update().
-To free memory context, use XXH32_digest().
+To free memory context, use XXH32_digest(), or free().
 */
 
 

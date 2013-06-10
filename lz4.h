@@ -42,7 +42,7 @@ extern "C" {
 // Compiler Options
 //**************************************
 #if defined(_MSC_VER) && !defined(__cplusplus)   // Visual Studio
-#  define inline __inline           // Visual is not C99, but supports some kind of inline
+#  define inline __forceinline           // Visual C is not C99, but supports some kind of inline. Note : we *do* want to force inline
 #endif
 
 
@@ -66,8 +66,8 @@ LZ4_compress() :
 LZ4_decompress_safe() :
     maxOutputSize : is the size of the destination buffer (which must be already allocated)
     return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
-             If the source stream is malformed, the function will stop decoding and return a negative result.
-             This function never writes outside of output buffer, and never reads outside of input buffer. It is therefore protected against malicious data packets
+             If the source stream is malformed or too large, the function will stop decoding and return a negative result.
+             This function is protected against any kind of buffer overflow attemps (never writes outside of output buffer, and never reads outside of input buffer). It is therefore protected against malicious data packets
 */
 
 
@@ -150,8 +150,8 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outpu
 // Obsolete Functions
 //****************************
 
-static inline int LZ4_uncompress (const char* source, char* dest, int outputSize)   { return LZ4_decompress_fast(source, dest, outputSize); }
-static inline int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize)   { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
+static inline int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4_decompress_fast(source, dest, outputSize); }
+static inline int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
 
 /* 
 These functions are deprecated and should no longer be used.

@@ -32,7 +32,7 @@
 */
 
 /*
-Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
+Note : this source file requires "lz4_encoder.h"
 */
 
 //**************************************
@@ -64,9 +64,10 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 // CPU Feature Detection
 //**************************************
 // 32 or 64 bits ?
-#if (defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) \
-  || defined(__ppc64__) || defined(_WIN64) || defined(__LP64__) || defined(_LP64) \
-  || defined(__ia64__) )   // Detects 64 bits mode
+#if (defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
+  || defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) \
+  || defined(__64BIT__) || defined(_LP64) || defined(__LP64__) \
+  || defined(__ia64) || defined(__itanium__) || defined(_M_IA64) )   // Detects 64 bits mode
 #  define LZ4_ARCH64 1
 #else
 #  define LZ4_ARCH64 0
@@ -82,7 +83,7 @@ Note : this source file requires "lz4_encoder.h" and "lz4_decoder.h"
 #elif (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN)) && !(defined(__LITTLE_ENDIAN__) || defined(__LITTLE_ENDIAN) || defined(_LITTLE_ENDIAN))
 #  define LZ4_BIG_ENDIAN 1
 #elif defined(__sparc) || defined(__sparc__) \
-   || defined(__ppc__) || defined(_POWER) || defined(__powerpc__) || defined(_ARCH_PPC) || defined(__PPC__) || defined(__PPC) || defined(PPC) || defined(__powerpc__) || defined(__powerpc) || defined(powerpc) \
+   || defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) \
    || defined(__hpux)  || defined(__hppa) \
    || defined(_MIPSEB) || defined(__s390__)
 #  define LZ4_BIG_ENDIAN 1
@@ -218,7 +219,7 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 //**************************************
 // Architecture-specific macros
 //**************************************
-#if LZ4_ARCH64	// 64-bit
+#if LZ4_ARCH64   // 64-bit
 #  define STEPSIZE 8
 #  define UARCH U64
 #  define AARCH A64
@@ -227,7 +228,7 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 #  define LZ4_SECURECOPY(s,d,e)   if (d<e) LZ4_WILDCOPY(s,d,e)
 #  define HTYPE                   U32
 #  define INITBASE(base)          const BYTE* const base = ip
-#else		// 32-bit
+#else      // 32-bit
 #  define STEPSIZE 4
 #  define UARCH U32
 #  define AARCH A32
@@ -241,7 +242,7 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 #if (defined(LZ4_BIG_ENDIAN) && !defined(BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE))
 #  define LZ4_READ_LITTLEENDIAN_16(d,s,p) { U16 v = A16(p); v = lz4_bswap16(v); d = (s) - v; }
 #  define LZ4_WRITE_LITTLEENDIAN_16(p,i)  { U16 v = (U16)(i); v = lz4_bswap16(v); A16(p) = v; p+=2; }
-#else		// Little Endian
+#else      // Little Endian
 #  define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
 #  define LZ4_WRITE_LITTLEENDIAN_16(p,v)  { A16(p) = v; p+=2; }
 #endif
@@ -522,88 +523,168 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 // Decompression functions
 //****************************
 
-/*
-int LZ4_decompress_safe(const char* source,
-                        char* dest,
-                        int inputSize,
-                        int maxOutputSize);
-
-LZ4_decompress_safe() guarantees it will never write nor read outside of the provided output buffers.
-This function is safe against "buffer overflow" attacks.
-A corrupted input will produce an error result, a negative int.
-*/
-#define FUNCTION_NAME LZ4_decompress_safe
-#define EXITCONDITION_INPUTSIZE
-#include "lz4_decoder.h"
+typedef enum { noPrefix = 0, withPrefix = 1 } prefix64k_directive;
+typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } end_directive;
+typedef enum { full = 0, partial = 1 } exit_directive;
 
 
-/*
-int LZ4_decompress_safe_withPrefix64k(
-                        const char* source,
-                        char* dest,
-                        int inputSize,
-                        int maxOutputSize);
+// This generic decompression function cover all use cases.
+// It shall be instanciated several times, using different sets of directives
+// Note that it is essential this generic function is really inlined, 
+// in order to remove useless branches during compilation optimisation.
+static inline int LZ4_decompress_generic(
+                 const char* source,
+                 char* dest,
+                 int inputSize,          //
+                 int outputSize,         // OutputSize must be != 0; if endOnInput==endOnInputSize, this value is the max size of Output Buffer.
 
-Same as LZ4_decompress_safe(), but will also use 64K of memory before the beginning of input buffer.
-Typically used to decode streams of inter-dependant blocks.
-Note : the 64K of memory before pointer 'source' must be allocated and read-allowed.
-*/
-#define FUNCTION_NAME LZ4_decompress_safe_withPrefix64k
-#define EXITCONDITION_INPUTSIZE
-#define PREFIX_64K
-#include "lz4_decoder.h"
+                 int endOnInput,         // endOnOutputSize, endOnInputSize
+                 int prefix64k,          // noPrefix, withPrefix
+                 int partialDecoding,    // full, partial
+                 int targetOutputSize    // only used if partialDecoding==partial
+                 )
+{
+    // Local Variables
+    const BYTE* restrict ip = (const BYTE*) source;
+    const BYTE* ref;
+    const BYTE* const iend = ip + inputSize;
 
+    BYTE* op = (BYTE*) dest;
+    BYTE* const oend = op + outputSize;
+    BYTE* cpy;
+    BYTE* oexit = op + targetOutputSize;
 
-/*
-int LZ4_decompress_safe_partial(
-                        const char* source,
-                        char* dest,
-                        int inputSize,
-                        int targetOutputSize,
-                        int maxOutputSize);
-
-LZ4_decompress_safe_partial() objective is to decompress only a part of the compressed input block provided.
-The decoding process stops as soon as 'targetOutputSize' bytes have been decoded, reducing decoding time.
-The result of the function is the number of bytes decoded.
-LZ4_decompress_safe_partial() may decode less than 'targetOutputSize' if input doesn't contain enough bytes to decode.
-Always verify how many bytes were decoded to ensure there are as many as wanted into the output buffer 'dest'.
-A corrupted input will produce an error result, a negative int.
-*/
-#define FUNCTION_NAME LZ4_decompress_safe_partial
-#define EXITCONDITION_INPUTSIZE
-#define PARTIAL_DECODING
-#include "lz4_decoder.h"
+    size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
+#if LZ4_ARCH64
+    size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
+#endif
 
 
-/*
-int LZ4_decompress_fast(const char* source,
-                        char* dest,
-                        int outputSize);
-
-This function is faster than LZ4_decompress_safe().
-LZ4_decompress_fast() guarantees it will never write nor read outside of output buffer.
-Since LZ4_decompress_fast() doesn't know the size of input buffer.
-it can only guarantee that it will never write into the input buffer, and will never read before its beginning.
-To be used preferably in a controlled environment (when the compressed data to be decoded is from a trusted source).
-A detected corrupted input will produce an error result, a negative int.
-*/
-#define FUNCTION_NAME LZ4_decompress_fast
-#include "lz4_decoder.h"
+    // Special case
+    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;   // targetOutputSize too large, better decode everything
+    if unlikely(outputSize==0) goto _output_error;                          // Empty output buffer
 
 
-/*
-int LZ4_decompress_fast_withPrefix64k(
-                        const char* source,
-                        char* dest,
-                        int inputSize
-                        int maxOutputSize);
+    // Main Loop
+    while (1)
+    {
+        unsigned token;
+        size_t length;
 
-Same as LZ4_decompress_fast(), but will use the 64K of memory before the beginning of input buffer.
-Typically used to decode streams of dependant inter-blocks.
-Note : the 64K of memory before pointer 'source' must be allocated and read-allowed.
-*/
-#define FUNCTION_NAME LZ4_decompress_fast_withPrefix64k
-#define PREFIX_64K
-#include "lz4_decoder.h"
+        // get runlength
+        token = *ip++;
+        if ((length=(token>>ML_BITS)) == RUN_MASK)  
+        { 
+            unsigned s=255; 
+            while (((endOnInput)?ip<iend:1) && (s==255)) 
+            { 
+                s = *ip++; 
+                length += s; 
+            } 
+        }
 
+        // copy literals
+        cpy = op+length;
+        if (((endOnInput) && ((cpy>(partialDecoding?oexit:oend-MFLIMIT)) || (ip+length>iend-(2+1+LASTLITERALS))) )
+            || ((!endOnInput) && (cpy>oend-COPYLENGTH)))
+        {
+            if (partialDecoding)
+            {
+                if (cpy > oend) goto _output_error;                            // Error : write attempt beyond end of output buffer
+                if ((endOnInput) && (ip+length > iend)) goto _output_error;    // Error : read attempt beyond end of input buffer
+            }
+            else
+            {
+                if ((!endOnInput) && (cpy != oend)) goto _output_error;        // Error : block decoding must stop exactly there, due to parsing restrictions
+                if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) goto _output_error;   // Error : not enough place for another match (min 4) + 5 literals
+            }
+            memcpy(op, ip, length);
+            ip += length;
+            op += length;
+            break;                                       // Necessarily EOF, due to parsing restrictions
+        }
+        LZ4_WILDCOPY(ip, op, cpy); ip -= (op-cpy); op = cpy;
+
+        // get offset
+        LZ4_READ_LITTLEENDIAN_16(ref,cpy,ip); ip+=2;
+        if ((prefix64k==noPrefix) && unlikely(ref < (BYTE* const)dest)) goto _output_error;   // Error : offset outside destination buffer
+
+        // get matchlength
+        if ((length=(token&ML_MASK)) == ML_MASK) 
+        { 
+            while (endOnInput ? ip<iend-(LASTLITERALS+1) : 1)    // A minimum nb of input bytes must remain for LASTLITERALS + token
+            { 
+                unsigned s = *ip++; 
+                length += s; 
+                if (s==255) continue; 
+                break; 
+            } 
+        }
+
+        // copy repeated sequence
+        if unlikely((op-ref)<STEPSIZE)
+        {
+#if LZ4_ARCH64
+            size_t dec64 = dec64table[op-ref];
+#else
+            const size_t dec64 = 0;
+#endif
+            op[0] = ref[0];
+            op[1] = ref[1];
+            op[2] = ref[2];
+            op[3] = ref[3];
+            op += 4, ref += 4; ref -= dec32table[op-ref];
+            A32(op) = A32(ref); 
+            op += STEPSIZE-4; ref -= dec64;
+        } else { LZ4_COPYSTEP(ref,op); }
+        cpy = op + length - (STEPSIZE-4);
+
+        if unlikely(cpy>oend-(COPYLENGTH)-(STEPSIZE-4))
+        {
+            if (cpy > oend-LASTLITERALS) goto _output_error;    // Error : last 5 bytes must be literals
+            LZ4_SECURECOPY(ref, op, (oend-COPYLENGTH));
+            while(op<cpy) *op++=*ref++;
+            op=cpy;
+            continue;
+        }
+        LZ4_WILDCOPY(ref, op, cpy);
+        op=cpy;   // correction
+    }
+
+    // end of decoding
+    if (endOnInput)
+       return (int) (((char*)op)-dest);     // Nb of output bytes decoded
+    else
+       return (int) (((char*)ip)-source);   // Nb of input bytes read
+
+    // Overflow error detected
+_output_error:
+    return (int) (-(((char*)ip)-source))-1;
+}
+
+
+int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    return LZ4_decompress_generic(source, dest, inputSize, maxOutputSize, endOnInputSize, noPrefix, full, 0);
+}
+
+int LZ4_decompress_fast(const char* source, char* dest, int outputSize)
+{
+    return LZ4_decompress_generic(source, dest, 0, outputSize, endOnOutputSize, noPrefix, full, 0);
+}
+
+int LZ4_decompress_safe_withPrefix64k(const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    return LZ4_decompress_generic(source, dest, inputSize, maxOutputSize, endOnInputSize, withPrefix, full, 0);
+}
+
+int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int outputSize)
+{
+    return LZ4_decompress_generic(source, dest, 0, outputSize, endOnOutputSize, withPrefix, full, 0);
+}
+
+int LZ4_decompress_safe_partial(const char* source, char* dest, int inputSize, int targetOutputSize, int maxOutputSize)
+{
+    return LZ4_decompress_generic(source, dest, inputSize, maxOutputSize, endOnInputSize, noPrefix, partial, targetOutputSize);
+}
 

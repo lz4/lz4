@@ -10,7 +10,7 @@ endif
 
 default: lz4c
 
-all: lz4c lz4c32 fuzzer
+all: lz4c lz4c32 fuzzer fullbench
 
 lz4c: lz4.c lz4hc.c bench.c xxhash.c lz4c.c
 	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
@@ -21,5 +21,8 @@ lz4c32: lz4.c lz4hc.c bench.c xxhash.c lz4c.c
 fuzzer : lz4.c lz4hc.c fuzzer.c
 	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
 	
+fullbench : lz4.c lz4hc.c xxhash.c fullbench.c
+	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
+
 clean:
-	rm -f core *.o lz4c$(EXT) lz4c32$(EXT) fuzzer$(EXT)
+	rm -f core *.o lz4c$(EXT) lz4c32$(EXT) fuzzer$(EXT) fullbench$(EXT)

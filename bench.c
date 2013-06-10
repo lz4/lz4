@@ -65,7 +65,6 @@
 #endif
 
 #include "lz4.h"
-//int LZ4_compress_stack(const char* in, char* out, int size);
 #define COMPRESSOR0 LZ4_compress
 #include "lz4hc.h"
 #define COMPRESSOR1 LZ4_compressHC
@@ -209,7 +208,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     while (!testmem)
     {
         requiredMem -= step;
-        testmem = malloc ((size_t)requiredMem);
+        testmem = (BYTE*) malloc ((size_t)requiredMem);
     }
 
     free (testmem);
@@ -294,11 +293,11 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
       // Alloc
       chunkP = (struct chunkParameters*) malloc(((benchedSize / chunkSize)+1) * sizeof(struct chunkParameters));
-      orig_buff = malloc((size_t )benchedSize);
+      orig_buff = (char*)malloc((size_t )benchedSize);
       nbChunks = (int) (benchedSize / chunkSize) + 1;
       maxCChunkSize = LZ4_compressBound(chunkSize);
       compressed_buff_size = nbChunks * maxCChunkSize;
-      compressed_buff = malloc((size_t )compressed_buff_size);
+      compressed_buff = (char*)malloc((size_t )compressed_buff_size);
 
 
       if(!orig_buff || !compressed_buff)
@@ -386,10 +385,11 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
           {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].origSize = LZ4_decompress_safe(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
-                //chunkP[chunkNb].compressedSize = LZ4_decompress_fast(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
+                //chunkP[chunkNb].origSize = LZ4_decompress_safe(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
+                chunkP[chunkNb].compressedSize = LZ4_decompress_fast(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
                 //chunkP[chunkNb].compressedSize = LZ4_decompress_fast_withPrefix64k(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
                 //chunkP[chunkNb].origSize = LZ4_decompress_safe_withPrefix64k(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
+                //chunkP[chunkNb].origSize = LZ4_decompress_safe_partial(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize-5, chunkSize);
                 //chunkP[chunkNb].compressedSize = LZ4_uncompress(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
                 //chunkP[chunkNb].origSize = LZ4_uncompress_unknownOutputSize(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
             nb_loops++;
@@ -423,9 +423,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   }
 
   if (nbFiles > 1)
-        printf("%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL", (long long unsigned int)totals, (long long unsigned int)totalz, (double)totalz/(double)totals*100., (double)totals/totalc/1000., (double)totals/totald/1000.);
+        DISPLAY("%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL", (long long unsigned int)totals, (long long unsigned int)totalz, (double)totalz/(double)totals*100., (double)totals/totalc/1000., (double)totals/totald/1000.);
 
-  if (BMK_pause) { printf("press enter...\n"); getchar(); }
+  if (BMK_pause) { DISPLAY("press enter...\n"); getchar(); }
 
   return 0;
 }
