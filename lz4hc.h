@@ -68,8 +68,7 @@ Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD l
 */
 
 
-/* Advanced Functions
-*/
+/* Advanced Functions */
 
 void* LZ4_createHC (const char* slidingInputBuffer);
 int   LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize);

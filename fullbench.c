@@ -135,6 +135,8 @@ struct chunkParameters
 static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
+static int compressionTest = 1;
+static int decompressionTest = 1;
 
 void BMK_SetBlocksize(int bsize)
 {
@@ -279,7 +281,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
   struct chunkParameters* chunkP;
   U32 crcc, crcd=0;
 # define NB_COMPRESSION_ALGORITHMS 4
-  static char* compressionNames[] = { "LZ4_compress", "LZ4_compressHC", "LZ4_compressHC_limitedOutput", "LZ4_compress_limitedOutput" };
+  static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput", "LZ4_compressHC", "LZ4_compressHC_limitedOutput" };
   double totalCTime[NB_COMPRESSION_ALGORITHMS] = {0};
   double totalCSize[NB_COMPRESSION_ALGORITHMS] = {0};
 # define NB_DECOMPRESSION_ALGORITHMS 5
@@ -371,7 +373,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         DISPLAY(" %s : \n", infilename);
 
         // Compression Algorithms
-        for (cAlgNb=0; cAlgNb < NB_COMPRESSION_ALGORITHMS; cAlgNb++)
+        for (cAlgNb=0; (cAlgNb < NB_COMPRESSION_ALGORITHMS) && (compressionTest); cAlgNb++)
         {
             char* cName = compressionNames[cAlgNb];
             int (*compressionFunction)(const char*, char*, int);
@@ -380,9 +382,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             switch(cAlgNb)
             {
             case 0: compressionFunction = LZ4_compress; break;
-            case 1: compressionFunction = LZ4_compressHC; break;
-            case 2: compressionFunction = local_LZ4_compressHC_limitedOutput; break;
-            case 3: compressionFunction = local_LZ4_compress_limitedOutput; break;
+            case 1: compressionFunction = local_LZ4_compress_limitedOutput; break;
+            case 2: compressionFunction = LZ4_compressHC; break;
+            case 3: compressionFunction = local_LZ4_compressHC_limitedOutput; break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); return 1;
             }
 
@@ -425,10 +427,16 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             totalCSize[cAlgNb] += cSize;
         }
 
-        { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
+        // Prepare layout for decompression
+        for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
+        {
+            chunkP[chunkNb].compressedSize = LZ4_compress(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
+            if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", compressionNames[0]), exit(1);
+        }
+        { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing source area, for CRC checking
 
         // Decompression Algorithms
-        for (dAlgNb=0; dAlgNb < NB_DECOMPRESSION_ALGORITHMS; dAlgNb++)
+        for (dAlgNb=0; (dAlgNb < NB_DECOMPRESSION_ALGORITHMS) && (decompressionTest); dAlgNb++)
         {
             char* dName = decompressionNames[dAlgNb];
             int (*decompressionFunction)(const char*, char*, int, int);
@@ -492,13 +500,13 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
   {
       int AlgNb;
 
-      DISPLAY(" TOTAL : \n");
-      for (AlgNb = 0; AlgNb < NB_COMPRESSION_ALGORITHMS; AlgNb ++)
+      DISPLAY(" ** TOTAL ** : \n");
+      for (AlgNb = 0; (AlgNb < NB_COMPRESSION_ALGORITHMS) && (compressionTest); AlgNb ++)
       {
           char* cName = compressionNames[AlgNb];
           DISPLAY("%-21.21s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s\n", cName, (long long unsigned int)totals, (long long unsigned int)totalCSize[AlgNb], (double)totalCSize[AlgNb]/(double)totals*100., (double)totals/totalCTime[AlgNb]/1000.);
       }
-      for (AlgNb = 0; AlgNb < NB_DECOMPRESSION_ALGORITHMS; AlgNb ++)
+      for (AlgNb = 0; (AlgNb < NB_DECOMPRESSION_ALGORITHMS) && (decompressionTest); AlgNb ++)
       {
           char* dName = decompressionNames[AlgNb];
           DISPLAY("%-21.21s :%10llu -> %6.1f MB/s\n", dName, (long long unsigned int)totals, (double)totals/totalDTime[AlgNb]/1000.);
@@ -516,6 +524,8 @@ int usage(char* exename)
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [arg] file1 file2 ... fileX\n", exename);
     DISPLAY( "Arguments :\n");
+    DISPLAY( " -c     : compression tests only\n");
+    DISPLAY( " -d     : decompression tests only\n");
     DISPLAY( " -H     : Help (this text + advanced options)\n");
     return 0;
 }
@@ -563,6 +573,12 @@ int main(int argc, char** argv)
 
                 switch(argument[0])
                 {
+                    // Select compression algorithm only
+                case 'c': decompressionTest = 0; break;
+
+                    // Select decompression algorithm only
+                case 'd': compressionTest = 0; break;
+
                     // Display help on usage
                 case 'H': usage(exename); usage_advanced(); return 0;
 
@@ -588,7 +604,7 @@ int main(int argc, char** argv)
 _exit_blockProperties:
                     break;
 
-                    // Modify Nb Iterations (benchmark only)
+                    // Modify Nb Iterations
                 case 'i': 
                     if ((argument[1] >='1') && (argument[1] <='9'))
                     {
@@ -598,7 +614,7 @@ _exit_blockProperties:
                     }
                     break;
 
-                    // Pause at the end (benchmark only) (hidden option)
+                    // Pause at the end (hidden option)
                 case 'p': BMK_SetPause(); break;
 
                     // Unrecognised command

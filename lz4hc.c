@@ -102,10 +102,10 @@ Note : this source file requires "lz4hc_encoder.h"
 #ifdef _MSC_VER
 #  define forceinline __forceinline
 #  include <intrin.h>                 // For Visual 2005
-#  if LZ4_ARCH64	// 64-bit
+#  if LZ4_ARCH64     // 64-bits
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
-#  else
+#  else              // 32-bits
 #    pragma intrinsic(_BitScanForward)   // For Visual 2005
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
 #  endif
@@ -158,7 +158,11 @@ Note : this source file requires "lz4hc_encoder.h"
 #endif
 
 #if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  pragma pack(push, 1)
+#  ifdef __IBMC__
+#    pragma pack(1)
+#  else
+#    pragma pack(push, 1)
+#  endif
 #endif
 
 typedef struct _U16_S { U16 v; } _PACKED U16_S;
@@ -345,7 +349,7 @@ static inline int LZ4_InitHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
 }
 
 
-extern inline void* LZ4_createHC (const char* slidingInputBuffer)
+void* LZ4_createHC (const char* slidingInputBuffer)
 {
     void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
     LZ4_InitHC ((LZ4HC_Data_Structure*)hc4, (const BYTE*)slidingInputBuffer);
@@ -353,7 +357,7 @@ extern inline void* LZ4_createHC (const char* slidingInputBuffer)
 }
 
 
-extern inline int LZ4_freeHC (void* LZ4HC_Data)
+int LZ4_freeHC (void* LZ4HC_Data)
 {
     FREEMEM(LZ4HC_Data);
     return (0);

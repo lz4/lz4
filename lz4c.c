@@ -390,7 +390,7 @@ int compress_file_blockDependency(char* input_filename, char* output_filename, i
     *(out_buff+4) |= (blockIndependence & _1BIT) << 5;
     *(out_buff+4) |= (blockChecksum & _1BIT) << 4;
     *(out_buff+4) |= (streamChecksum & _1BIT) << 2;
-    *(out_buff+5)  = (blockSizeId & _3BITS) << 4;
+    *(out_buff+5)  = (char)((blockSizeId & _3BITS) << 4);
     checkbits = XXH32((out_buff+4), 2, LZ4S_CHECKSUM_SEED);
     checkbits = LZ4S_GetCheckBits_FromXXH(checkbits);
     *(out_buff+6)  = (unsigned char) checkbits;
@@ -531,7 +531,7 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
     *(out_buff+4) |= (blockIndependence & _1BIT) << 5;
     *(out_buff+4) |= (blockChecksum & _1BIT) << 4;
     *(out_buff+4) |= (streamChecksum & _1BIT) << 2;
-    *(out_buff+5)  = (blockSizeId & _3BITS) <<4;
+    *(out_buff+5)  = (char)((blockSizeId & _3BITS) << 4);
     checkbits = XXH32((out_buff+4), 2, LZ4S_CHECKSUM_SEED);
     checkbits = LZ4S_GetCheckBits_FromXXH(checkbits);
     *(out_buff+6)  = (unsigned char) checkbits;

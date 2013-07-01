@@ -116,15 +116,22 @@ Note : this source file requires "lz4_encoder.h"
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
 #ifdef _MSC_VER    // Visual Studio
-#  include <intrin.h>   // For Visual 2005
-#  if LZ4_ARCH64   // 64-bit
+#  define forceinline static __forceinline
+#  include <intrin.h>                 // For Visual 2005
+#  if LZ4_ARCH64     // 64-bits
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
-#  else
+#  else              // 32-bits
 #    pragma intrinsic(_BitScanForward)   // For Visual 2005
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
 #  endif
 #  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
+#else 
+#  ifdef __GNUC__
+#    define forceinline static inline __attribute__((always_inline))
+#  else
+#    define forceinline static inline
+#  endif
 #endif
 
 #ifdef _MSC_VER
@@ -176,7 +183,11 @@ Note : this source file requires "lz4_encoder.h"
 #endif
 
 #if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  pragma pack(push, 1)
+#  ifdef __IBMC__
+#    pragma pack(1)
+#  else
+#    pragma pack(push, 1)
+#  endif
 #endif
 
 typedef struct _U16_S { U16 v; } _PACKED U16_S;
@@ -260,7 +271,7 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 //****************************
 #if LZ4_ARCH64
 
-static inline int LZ4_NbCommonBytes (register U64 val)
+forceinline int LZ4_NbCommonBytes (register U64 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
     #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -292,7 +303,7 @@ static inline int LZ4_NbCommonBytes (register U64 val)
 
 #else
 
-static inline int LZ4_NbCommonBytes (register U32 val)
+forceinline int LZ4_NbCommonBytes (register U32 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
 #  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -532,7 +543,7 @@ typedef enum { full = 0, partial = 1 } exit_directive;
 // It shall be instanciated several times, using different sets of directives
 // Note that it is essential this generic function is really inlined, 
 // in order to remove useless branches during compilation optimisation.
-static inline int LZ4_decompress_generic(
+forceinline int LZ4_decompress_generic(
                  const char* source,
                  char* dest,
                  int inputSize,          //
@@ -561,8 +572,9 @@ static inline int LZ4_decompress_generic(
 
 
     // Special case
-    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;   // targetOutputSize too large, better decode everything
-    if unlikely(outputSize==0) goto _output_error;                          // Empty output buffer
+    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;                        // targetOutputSize too high => decode everything
+    if ((endOnInput) && unlikely(outputSize==0)) return ((inputSize==1) && (*ip==0)) ? 0 : -1;   // Empty output buffer
+    if ((!endOnInput) && unlikely(outputSize==0)) return (*ip==0?1:-1);
 
 
     // Main Loop
@@ -573,10 +585,10 @@ static inline int LZ4_decompress_generic(
 
         // get runlength
         token = *ip++;
-        if ((length=(token>>ML_BITS)) == RUN_MASK)  
+        if ((length=(token>>ML_BITS)) == RUN_MASK)
         { 
             unsigned s=255; 
-            while (((endOnInput)?ip<iend:1) && (s==255)) 
+            while (((endOnInput)?ip<iend:1) && (s==255))
             { 
                 s = *ip++; 
                 length += s; 
@@ -595,8 +607,8 @@ static inline int LZ4_decompress_generic(
             }
             else
             {
-                if ((!endOnInput) && (cpy != oend)) goto _output_error;        // Error : block decoding must stop exactly there, due to parsing restrictions
-                if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) goto _output_error;   // Error : not enough place for another match (min 4) + 5 literals
+                if ((!endOnInput) && (cpy != oend)) goto _output_error;        // Error : block decoding must stop exactly there
+                if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) goto _output_error;   // Error : input must be consumed
             }
             memcpy(op, ip, length);
             ip += length;
@@ -612,13 +624,13 @@ static inline int LZ4_decompress_generic(
         // get matchlength
         if ((length=(token&ML_MASK)) == ML_MASK) 
         { 
-            while (endOnInput ? ip<iend-(LASTLITERALS+1) : 1)    // A minimum nb of input bytes must remain for LASTLITERALS + token
-            { 
+            for ( ; (!endOnInput) || (ip<iend-(LASTLITERALS+1)) ; )   // Ensure enough bytes remain for LASTLITERALS + token
+            {
                 unsigned s = *ip++; 
                 length += s; 
                 if (s==255) continue; 
                 break; 
-            } 
+            }
         }
 
         // copy repeated sequence

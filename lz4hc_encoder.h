@@ -97,7 +97,7 @@ forceinline static int ENCODE_SEQUENCE_NAME (
     if (*op + (1 + LASTLITERALS) + (length>>8) > oend) return 1; 		// Check output limit
 #endif
     if (length>=(int)ML_MASK) { *token+=ML_MASK; length-=ML_MASK; for(; length > 509 ; length-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (length > 254) { length-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)length; } 
-    else *token += (BYTE)length;	
+    else *token += (BYTE)(length);	
 
     // Prepare next loop
     *ip += matchLength;

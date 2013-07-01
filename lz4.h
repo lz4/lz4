@@ -42,7 +42,7 @@ extern "C" {
 // Compiler Options
 //**************************************
 #if defined(_MSC_VER) && !defined(__cplusplus)   // Visual Studio
-#  define inline __forceinline           // Visual C is not C99, but supports some kind of inline. Note : we *do* want to force inline
+#  define inline __inline           // Visual C is not C99, but supports some kind of inline
 #endif
 
 
@@ -66,8 +66,8 @@ LZ4_compress() :
 LZ4_decompress_safe() :
     maxOutputSize : is the size of the destination buffer (which must be already allocated)
     return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
-             If the source stream is malformed or too large, the function will stop decoding and return a negative result.
-             This function is protected against any kind of buffer overflow attemps (never writes outside of output buffer, and never reads outside of input buffer). It is therefore protected against malicious data packets
+             If the source stream is detected malformed, the function will stop decoding and return a negative result.
+             This function is protected against buffer overflow exploits (never writes outside of output buffer, and never reads outside of input buffer). Therefore, it is protected against malicious data packets
 */
 
 
@@ -82,8 +82,8 @@ static inline int LZ4_compressBound(int isize)   { return ((isize) + ((isize)/25
 LZ4_compressBound() :
     Provides the maximum size that LZ4 may output in a "worst case" scenario (input data not compressible)
     primarily useful for memory allocation of output buffer.
-	inline function is recommended for the general case,
-	macro is also provided when result needs to be evaluated at compile time (such as table size allocation).
+    inline function is recommended for the general case,
+    macro is also provided when result needs to be evaluated at compilation (such as table size allocation).
 
     isize  : is the input size. Max supported value is ~1.9GB
     return : maximum output size in a "worst case" scenario
@@ -128,8 +128,8 @@ LZ4_decompress_safe_partial() :
     The function stops decompressing operation as soon as 'targetOutputSize' has been reached,
     reducing decompression time.
     return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
-       Note : this number might be < 'targetOutputSize' if the number of bytes to decode into the compressed block is not enough.
-             Always control how many bytes were  decoded.
+       Note : this number can be < 'targetOutputSize' should the compressed block to decode be smaller.
+             Always control how many bytes were decoded.
              If the source stream is malformed, the function will stop decoding and return a negative result.
              This function never writes outside of output buffer, and never reads outside of input buffer. It is therefore protected against malicious data packets
 */
@@ -153,7 +153,7 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outpu
 static inline int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4_decompress_fast(source, dest, outputSize); }
 static inline int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
 
-/* 
+/*
 These functions are deprecated and should no longer be used.
 They are provided here for compatibility with existing user programs.
 */

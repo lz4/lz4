@@ -196,7 +196,7 @@ _endCount:
             if (length >= 255) { length-=255; *op++ = 255; } 
             *op++ = (BYTE)length; 
         }
-        else *token += (BYTE)length;
+        else *token += (BYTE)(length);
 
         // Test end of chunk
         if (ip > mflimit) { anchor = ip;  break; }
