@@ -52,13 +52,6 @@ Note : this source file requires "lz4_encoder.h"
 // Note : explicit functions *_stack* and *_heap* are unaffected by this setting
 #define HEAPMODE 0
 
-// BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
-// This will provide a small boost to performance for big endian cpu, but the resulting compressed stream will be incompatible with little-endian CPU.
-// You can set this option to 1 in situations where data will remain within closed environment
-// This option is useless on Little_Endian CPU (such as x86)
-//#define BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE 1
-
-
 
 //**************************************
 // CPU Feature Detection
@@ -92,7 +85,7 @@ Note : this source file requires "lz4_encoder.h"
 #endif
 
 // Unaligned memory access is automatically enabled for "common" CPU, such as x86.
-// For others CPU, the compiler will be more cautious, and insert extra code to ensure aligned access is respected
+// For others CPU, such as ARM, the compiler may be more cautious, inserting unnecessary extra code to ensure aligned access property
 // If you know your target CPU supports unaligned memory access, you want to force this option manually to improve performance
 #if defined(__ARM_FEATURE_UNALIGNED)
 #  define LZ4_FORCE_UNALIGNED_ACCESS 1
@@ -103,25 +96,29 @@ Note : this source file requires "lz4_encoder.h"
 #  define LZ4_FORCE_SW_BITCOUNT
 #endif
 
+// BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE :
+// This option may provide a small boost to performance for some big endian cpu, although probably modest.
+// You may set this option to 1 if data will remain within closed environment.
+// This option is useless on Little_Endian CPU (such as x86)
+//#define BIG_ENDIAN_NATIVE_BUT_INCOMPATIBLE 1
+
 
 //**************************************
 // Compiler Options
 //**************************************
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   // C99
 /* "restrict" is a known keyword */
 #else
 #  define restrict // Disable restrict
 #endif
 
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
 #ifdef _MSC_VER    // Visual Studio
 #  define forceinline static __forceinline
-#  include <intrin.h>                 // For Visual 2005
-#  if LZ4_ARCH64     // 64-bits
+#  include <intrin.h>                    // For Visual 2005
+#  if LZ4_ARCH64   // 64-bits
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
-#  else              // 32-bits
+#  else            // 32-bits
 #    pragma intrinsic(_BitScanForward)   // For Visual 2005
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
 #  endif
@@ -139,6 +136,8 @@ Note : this source file requires "lz4_encoder.h"
 #else
 #  define lz4_bswap16(x) ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
 #endif
+
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
 #if (GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
@@ -163,7 +162,7 @@ Note : this source file requires "lz4_encoder.h"
 //**************************************
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
-  typedef uint8_t  BYTE;
+  typedef  uint8_t BYTE;
   typedef uint16_t U16;
   typedef uint32_t U32;
   typedef  int32_t S32;
@@ -190,17 +189,19 @@ Note : this source file requires "lz4_encoder.h"
 #  endif
 #endif
 
-typedef struct _U16_S { U16 v; } _PACKED U16_S;
-typedef struct _U32_S { U32 v; } _PACKED U32_S;
-typedef struct _U64_S { U64 v; } _PACKED U64_S;
+typedef struct { U16 v; }  _PACKED U16_S;
+typedef struct { U32 v; }  _PACKED U32_S;
+typedef struct { U64 v; }  _PACKED U64_S;
+typedef struct {size_t v;} _PACKED size_t_S;
 
 #if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
 #  pragma pack(pop)
 #endif
 
-#define A64(x) (((U64_S *)(x))->v)
-#define A32(x) (((U32_S *)(x))->v)
-#define A16(x) (((U16_S *)(x))->v)
+#define A16(x)   (((U16_S *)(x))->v)
+#define A32(x)   (((U32_S *)(x))->v)
+#define A64(x)   (((U64_S *)(x))->v)
+#define AARCH(x) (((size_t_S *)(x))->v)
 
 
 //**************************************
@@ -230,22 +231,15 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 //**************************************
 // Architecture-specific macros
 //**************************************
+#define STEPSIZE                  sizeof(size_t)
+#define LZ4_COPYSTEP(s,d)         { AARCH(d) = AARCH(s); d+=STEPSIZE; s+=STEPSIZE; }
+#define LZ4_COPY8(s,d)            { LZ4_COPYSTEP(s,d); if (STEPSIZE<8) LZ4_COPYSTEP(s,d); }
+#define LZ4_SECURECOPY(s,d,e)     { if ((STEPSIZE==8)&&(d<e)) LZ4_WILDCOPY(s,d,e); }
+
 #if LZ4_ARCH64   // 64-bit
-#  define STEPSIZE 8
-#  define UARCH U64
-#  define AARCH A64
-#  define LZ4_COPYSTEP(s,d)       A64(d) = A64(s); d+=8; s+=8;
-#  define LZ4_COPYPACKET(s,d)     LZ4_COPYSTEP(s,d)
-#  define LZ4_SECURECOPY(s,d,e)   if (d<e) LZ4_WILDCOPY(s,d,e)
 #  define HTYPE                   U32
 #  define INITBASE(base)          const BYTE* const base = ip
-#else      // 32-bit
-#  define STEPSIZE 4
-#  define UARCH U32
-#  define AARCH A32
-#  define LZ4_COPYSTEP(s,d)       A32(d) = A32(s); d+=4; s+=4;
-#  define LZ4_COPYPACKET(s,d)     LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
-#  define LZ4_SECURECOPY          LZ4_WILDCOPY
+#else            // 32-bit
 #  define HTYPE                   const BYTE*
 #  define INITBASE(base)          const int base = 0
 #endif
@@ -262,7 +256,7 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 //**************************************
 // Macros
 //**************************************
-#define LZ4_WILDCOPY(s,d,e)     do { LZ4_COPYPACKET(s,d) } while (d<e);
+#define LZ4_WILDCOPY(s,d,e)     { do { LZ4_COPY8(s,d) } while (d<e); }
 #define LZ4_BLINDCOPY(s,d,l)    { BYTE* e=(d)+(l); LZ4_WILDCOPY(s,d,e); d=e; }
 
 
@@ -273,63 +267,63 @@ typedef struct _U64_S { U64 v; } _PACKED U64_S;
 
 forceinline int LZ4_NbCommonBytes (register U64 val)
 {
-#if defined(LZ4_BIG_ENDIAN)
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+# if defined(LZ4_BIG_ENDIAN)
+#   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanReverse64( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clzll(val) >> 3);
-    #else
+#   else
     int r;
     if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
     if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
     r += (!val);
     return r;
-    #endif
-#else
-    #if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#   endif
+# else
+#   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanForward64( &r, val );
     return (int)(r>>3);
-    #elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctzll(val) >> 3);
-    #else
+#   else
     static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
-    return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
-    #endif
-#endif
+    return DeBruijnBytePos[((U64)((val & -(long long)val) * 0x0218A392CDABBD3FULL)) >> 58];
+#   endif
+# endif
 }
 
 #else
 
 forceinline int LZ4_NbCommonBytes (register U32 val)
 {
-#if defined(LZ4_BIG_ENDIAN)
-#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+# if defined(LZ4_BIG_ENDIAN)
+#   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r = 0;
     _BitScanReverse( &r, val );
     return (int)(r>>3);
-#  elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_clz(val) >> 3);
-#  else
+#   else
     int r;
     if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
     r += (!val);
     return r;
-#  endif
-#else
-#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#   endif
+# else
+#   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
     unsigned long r;
     _BitScanForward( &r, val );
     return (int)(r>>3);
-#  elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#   elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
     return (__builtin_ctz(val) >> 3);
-#  else
+#   else
     static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
     return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
-#  endif
-#endif
+#   endif
+# endif
 }
 
 #endif
@@ -535,8 +529,8 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 //****************************
 
 typedef enum { noPrefix = 0, withPrefix = 1 } prefix64k_directive;
-typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } end_directive;
-typedef enum { full = 0, partial = 1 } exit_directive;
+typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } endCondition_directive;
+typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 
 
 // This generic decompression function cover all use cases.
@@ -571,7 +565,7 @@ forceinline int LZ4_decompress_generic(
 #endif
 
 
-    // Special case
+    // Special cases
     if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;                        // targetOutputSize too high => decode everything
     if ((endOnInput) && unlikely(outputSize==0)) return ((inputSize==1) && (*ip==0)) ? 0 : -1;   // Empty output buffer
     if ((!endOnInput) && unlikely(outputSize==0)) return (*ip==0?1:-1);
@@ -602,12 +596,12 @@ forceinline int LZ4_decompress_generic(
         {
             if (partialDecoding)
             {
-                if (cpy > oend) goto _output_error;                            // Error : write attempt beyond end of output buffer
-                if ((endOnInput) && (ip+length > iend)) goto _output_error;    // Error : read attempt beyond end of input buffer
+                if (cpy > oend) goto _output_error;                           // Error : write attempt beyond end of output buffer
+                if ((endOnInput) && (ip+length > iend)) goto _output_error;   // Error : read attempt beyond end of input buffer
             }
             else
             {
-                if ((!endOnInput) && (cpy != oend)) goto _output_error;        // Error : block decoding must stop exactly there
+                if ((!endOnInput) && (cpy != oend)) goto _output_error;       // Error : block decoding must stop exactly there
                 if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) goto _output_error;   // Error : input must be consumed
             }
             memcpy(op, ip, length);
@@ -634,7 +628,7 @@ forceinline int LZ4_decompress_generic(
         }
 
         // copy repeated sequence
-        if unlikely((op-ref)<STEPSIZE)
+        if unlikely((op-ref)<(int)STEPSIZE)
         {
 #if LZ4_ARCH64
             size_t dec64 = dec64table[op-ref];

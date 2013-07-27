@@ -16,9 +16,9 @@
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-	You can contact the author at :
-	- LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
-	- LZ4 source repository : http://code.google.com/p/lz4/
+    You can contact the author at :
+    - LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
+    - LZ4 source repository : http://code.google.com/p/lz4/
 */
 #pragma once
 

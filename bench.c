@@ -30,22 +30,16 @@
 #define _CRT_SECURE_NO_DEPRECATE     // VS2005
 
 // Unix Large Files support (>4GB)
+#define _FILE_OFFSET_BITS 64
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
 #  define _LARGEFILE_SOURCE 
-#  define _FILE_OFFSET_BITS 64
 #elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
 #  define _LARGEFILE64_SOURCE
 #endif
 
 // S_ISREG & gettimeofday() are not supported by MSVC
-#if defined(_MSC_VER)
-#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#if defined(_MSC_VER) || defined(_WIN32)
 #  define BMK_LEGACY_TIMER 1
-#endif
-
-// GCC does not support _rotl outside of Windows
-#if !defined(_WIN32)
-#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
 #endif
 
 
@@ -71,6 +65,19 @@
 #define DEFAULTCOMPRESSOR COMPRESSOR0
 
 #include "xxhash.h"
+
+
+//**************************************
+// Compiler specifics
+//**************************************
+#if !defined(S_ISREG)
+#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#endif
+
+// GCC does not support _rotl outside of Windows
+#if !defined(_WIN32)
+#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
+#endif
 
 
 //**************************************
@@ -152,6 +159,7 @@ void BMK_SetPause()
 {
     BMK_pause = 1;
 }
+
 
 //*********************************************************
 //  Private functions
@@ -300,11 +308,12 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
       compressed_buff = (char*)malloc((size_t )compressed_buff_size);
 
 
-      if(!orig_buff || !compressed_buff)
+      if (!orig_buff || !compressed_buff)
       {
         DISPLAY("\nError: not enough memory!\n");
         free(orig_buff);
         free(compressed_buff);
+        free(chunkP);
         fclose(fileIn);
         return 12;
       }
@@ -330,11 +339,12 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
       readSize = fread(orig_buff, 1, benchedSize, fileIn);
       fclose(fileIn);
 
-      if(readSize != benchedSize)
+      if (readSize != benchedSize)
       {
         DISPLAY("\nError: problem reading file '%s' !!    \n", infilename);
         free(orig_buff);
         free(compressed_buff);
+        free(chunkP);
         return 13;
       }
 

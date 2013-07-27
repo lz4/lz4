@@ -110,7 +110,7 @@ int FUNCTION_NAME(
     // Init
     if (inputSize<MINLENGTH) goto _last_literals;
 #ifdef COMPRESS_64K
-    if (inputSize>LZ4_64KLIMIT) return 0;   // Size too large (not within 64K limit)
+    if (inputSize>=LZ4_64KLIMIT) return 0;   // Size too large (not within 64K limit)
 #endif
 #ifdef USE_HEAPMEMORY
     memset((void*)HashTable, 0, HASHTABLESIZE);
@@ -173,7 +173,7 @@ _next_match:
         anchor = ip;
         while likely(ip<matchlimit-(STEPSIZE-1))
         {
-            UARCH diff = AARCH(ref) ^ AARCH(ip);
+            size_t diff = AARCH(ref) ^ AARCH(ip);
             if (!diff) { ip+=STEPSIZE; ref+=STEPSIZE; continue; }
             ip += LZ4_NbCommonBytes(diff);
             goto _endCount;

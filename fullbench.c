@@ -38,14 +38,8 @@
 #endif
 
 // S_ISREG & gettimeofday() are not supported by MSVC
-#if defined(_MSC_VER)
-#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#if defined(_MSC_VER) || defined(_WIN32)
 #  define BMK_LEGACY_TIMER 1
-#endif
-
-// GCC does not support _rotl outside of Windows
-#if !defined(_WIN32)
-#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
 #endif
 
 
@@ -71,6 +65,20 @@
 #define DEFAULTCOMPRESSOR COMPRESSOR0
 
 #include "xxhash.h"
+
+
+//**************************************
+// Compiler Options
+//**************************************
+// S_ISREG & gettimeofday() are not supported by MSVC
+#if !defined(S_ISREG)
+#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#endif
+
+// GCC does not support _rotl outside of Windows
+#if !defined(_WIN32)
+#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
+#endif
 
 
 //**************************************
@@ -326,6 +334,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         DISPLAY("\nError: not enough memory!\n");
         free(orig_buff);
         free(compressed_buff);
+        free(chunkP);
         fclose(fileIn);
         return 12;
       }
@@ -356,6 +365,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         DISPLAY("\nError: problem reading file '%s' !!    \n", infilename);
         free(orig_buff);
         free(compressed_buff);
+        free(chunkP);
         return 13;
       }
 
@@ -385,7 +395,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 1: compressionFunction = local_LZ4_compress_limitedOutput; break;
             case 2: compressionFunction = LZ4_compressHC; break;
             case 3: compressionFunction = local_LZ4_compressHC_limitedOutput; break;
-            default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); return 1;
+            default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 
             for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -449,7 +459,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 2: decompressionFunction = LZ4_decompress_safe; break;
             case 3: decompressionFunction = LZ4_decompress_safe_withPrefix64k; break;
             case 4: decompressionFunction = local_LZ4_decompress_safe_partial; break;
-            default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); return 1;
+            default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 
             for (loopNb = 1; loopNb <= nbIterations; loopNb++)

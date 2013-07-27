@@ -99,13 +99,13 @@ Note : this source file requires "lz4hc_encoder.h"
 #  define restrict  // Disable restrict
 #endif
 
-#ifdef _MSC_VER
-#  define forceinline __forceinline
-#  include <intrin.h>                 // For Visual 2005
-#  if LZ4_ARCH64     // 64-bits
+#ifdef _MSC_VER    // Visual Studio
+#  define forceinline static __forceinline
+#  include <intrin.h>                    // For Visual 2005
+#  if LZ4_ARCH64   // 64-bits
 #    pragma intrinsic(_BitScanForward64) // For Visual 2005
 #    pragma intrinsic(_BitScanReverse64) // For Visual 2005
-#  else              // 32-bits
+#  else            // 32-bits
 #    pragma intrinsic(_BitScanForward)   // For Visual 2005
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
 #  endif
@@ -113,16 +113,16 @@ Note : this source file requires "lz4hc_encoder.h"
 #  pragma warning(disable : 4701)        // disable: C4701: potentially uninitialized local variable used
 #else 
 #  ifdef __GNUC__
-#    define forceinline inline __attribute__((always_inline))
+#    define forceinline static inline __attribute__((always_inline))
 #  else
-#    define forceinline inline
+#    define forceinline static inline
 #  endif
 #endif
 
 #ifdef _MSC_VER  // Visual Studio
-#define lz4_bswap16(x) _byteswap_ushort(x)
+#  define lz4_bswap16(x) _byteswap_ushort(x)
 #else
-#define lz4_bswap16(x)  ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
+#  define lz4_bswap16(x)  ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
 #endif
 
 
@@ -273,7 +273,7 @@ typedef struct
 //**************************************
 #if LZ4_ARCH64
 
-inline static int LZ4_NbCommonBytes (register U64 val)
+forceinline int LZ4_NbCommonBytes (register U64 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
 #  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -305,7 +305,7 @@ inline static int LZ4_NbCommonBytes (register U64 val)
 
 #else
 
-inline static int LZ4_NbCommonBytes (register U32 val)
+forceinline int LZ4_NbCommonBytes (register U32 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
 #  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -337,7 +337,7 @@ inline static int LZ4_NbCommonBytes (register U32 val)
 #endif
 
 
-static inline int LZ4_InitHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
+forceinline int LZ4_InitHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
@@ -365,7 +365,7 @@ int LZ4_freeHC (void* LZ4HC_Data)
 
 
 // Update chains up to ip (excluded)
-static forceinline void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
+forceinline void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 {
     U16*   chainTable = hc4->chainTable;
     HTYPE* HashTable  = hc4->hashTable;
@@ -403,7 +403,7 @@ char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 }
 
 
-static forceinline size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const matchlimit)
+forceinline size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const matchlimit)
 {
     const BYTE* p1t = p1;
 
@@ -421,7 +421,7 @@ static forceinline size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, co
 }
 
 
-static forceinline int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* const matchlimit, const BYTE** matchpos)
+forceinline int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* const matchlimit, const BYTE** matchpos)
 {
     U16* const chainTable = hc4->chainTable;
     HTYPE* const HashTable = hc4->hashTable;
@@ -489,7 +489,7 @@ static forceinline int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4, 
 }
 
 
-static forceinline int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* startLimit, const BYTE* matchlimit, int longest, const BYTE** matchpos, const BYTE** startpos)
+forceinline int LZ4HC_InsertAndGetWiderMatch (LZ4HC_Data_Structure* hc4, const BYTE* ip, const BYTE* startLimit, const BYTE* matchlimit, int longest, const BYTE** matchpos, const BYTE** startpos)
 {
     U16* const  chainTable = hc4->chainTable;
     HTYPE* const HashTable = hc4->hashTable;

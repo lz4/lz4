@@ -62,7 +62,7 @@
 // Function code
 //****************************
 
-forceinline static int ENCODE_SEQUENCE_NAME (
+forceinline int ENCODE_SEQUENCE_NAME (
                        const BYTE** ip, 
                        BYTE** op, 
                        const BYTE** anchor, 

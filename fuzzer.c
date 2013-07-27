@@ -132,7 +132,7 @@ int main() {
         unsigned int seed, randState, cur_seq=PRIME3, seeds[NUM_SEQ], timestamp=FUZ_GetMilliStart();
         int i, j, k, ret, len, lenHC, attemptNb;
         char userInput[30] = {0};
-#       define FUZ_CHECKTEST(cond, message) testNb++; if (cond) { printf("Test %i : %s : seed %u, cycle %u \n", testNb, message, seed, attemptNb); goto _output_error; }
+#       define FUZ_CHECKTEST(cond, message) testNb++; if (cond) { printf("Test %i : %s : seed %u, cycle %i \n", testNb, message, seed, attemptNb); goto _output_error; }
 
         printf("starting LZ4 fuzzer\n");
         printf("Select an Initialisation number (default : random) : ");

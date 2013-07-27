@@ -31,7 +31,6 @@ You can contact the author at :
 */
 
 
-
 //**************************************
 // Tuning parameters
 //**************************************
@@ -44,8 +43,8 @@ You can contact the author at :
 #endif
 
 // XXH_ACCEPT_NULL_INPUT_POINTER :
-// If the input pointer is a null pointer, xxHash default behavior is to crash, since it is a bad input.
-// If this option is enabled, xxHash output for null input pointers will be the same as a null-length input.
+// If the input pointer is a null pointer, xxHash default behavior is to trigger a memory access error, since it is a bad pointer.
+// When this option is enabled, xxHash output for null input pointers will be the same as a null-length input.
 // This option has a very small performance cost (only measurable on small inputs).
 // By default, this option is disabled. To enable it, uncomment below define :
 //#define XXH_ACCEPT_NULL_INPUT_POINTER 1
@@ -54,17 +53,28 @@ You can contact the author at :
 // By default, xxHash library provides endian-independant Hash values, based on little-endian convention.
 // Results are therefore identical for little-endian and big-endian CPU.
 // This comes at a performance cost for big-endian CPU, since some swapping is required to emulate little-endian format.
-// Should endian-independance be of no importance for your application, you may uncomment the #define below.
+// Should endian-independance be of no importance for your application, you may set the #define below to 1.
 // It will improve speed for Big-endian CPU.
 // This option has no impact on Little_Endian CPU.
-//#define XXH_FORCE_NATIVE_FORMAT 1
+#define XXH_FORCE_NATIVE_FORMAT 0
 
 
 //**************************************
-// Compiler Options
+// Compiler Specific Options
 //**************************************
-#if defined(_MSC_VER) && !defined(__cplusplus)   // Visual Studio
-#  define inline __inline           // Visual C is not C99, but supports some kind of inline
+// Disable some Visual warning messages
+#ifdef _MSC_VER  // Visual Studio
+#  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
+#endif
+
+#ifdef _MSC_VER    // Visual Studio
+#  define forceinline static __forceinline
+#else 
+#  ifdef __GNUC__
+#    define forceinline static inline __attribute__((always_inline))
+#  else
+#    define forceinline static inline
+#  endif
 #endif
 
 
@@ -75,39 +85,11 @@ You can contact the author at :
 // Modify the local functions below should you wish to use some other memory related routines
 // for malloc(), free()
 #include <stdlib.h>
-static inline void* XXH_malloc(size_t s) { return malloc(s); }
-static inline void  XXH_free  (void* p)  { free(p); }
+forceinline void* XXH_malloc(size_t s) { return malloc(s); }
+forceinline void  XXH_free  (void* p)  { free(p); }
 // for memcpy()
 #include <string.h>
-static inline void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcpy(dest,src,size); }
-
-
-//**************************************
-// CPU Feature Detection
-//**************************************
-// Little Endian or Big Endian ?
-// You can overwrite the #define below if you know your architecture endianess
-#if defined(XXH_FORCE_NATIVE_FORMAT) && (XXH_FORCE_NATIVE_FORMAT==1)
-// Force native format. The result will be endian dependant.
-#  define XXH_BIG_ENDIAN 0
-#elif defined (__GLIBC__)
-#  include <endian.h>
-#  if (__BYTE_ORDER == __BIG_ENDIAN)
-#     define XXH_BIG_ENDIAN 1
-#  endif
-#elif (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN)) && !(defined(__LITTLE_ENDIAN__) || defined(__LITTLE_ENDIAN) || defined(_LITTLE_ENDIAN))
-#  define XXH_BIG_ENDIAN 1
-#elif defined(__sparc)  || defined(__sparc__) \
-    || defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) \
-    || defined(__hpux)  || defined(__hppa) \
-    || defined(_MIPSEB) || defined(__s390__)
-#  define XXH_BIG_ENDIAN 1
-#endif
-
-#if !defined(XXH_BIG_ENDIAN)
-// Little Endian assumed. PDP Endian and other very rare endian format are unsupported.
-#  define XXH_BIG_ENDIAN 0
-#endif
+forceinline void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcpy(dest,src,size); }
 
 
 //**************************************
@@ -135,7 +117,11 @@ static inline void* XXH_memcpy(void* dest, const void* src, size_t size) { retur
 #endif
 
 #if !defined(XXH_USE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  pragma pack(push, 1)
+#  ifdef __IBMC__
+#    pragma pack(1)
+#  else
+#    pragma pack(push, 1)
+#  endif
 #endif
 
 typedef struct _U32_S { U32 v; } _PACKED U32_S;
@@ -183,89 +169,53 @@ static inline U32 XXH_swap32 (U32 x) {
 
 
 //**************************************
+// Architecture Macros
+//**************************************
+typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianess;
+#ifndef XXH_CPU_LITTLE_ENDIAN   // It is possible to define XXH_CPU_LITTLE_ENDIAN externally, for example using a compiler switch
+    static const int one = 1;
+#   define XXH_CPU_LITTLE_ENDIAN   (*(char*)(&one))
+#endif
+
+
+//**************************************
 // Macros
 //**************************************
-#define XXH_STATIC_ASSERT(c) { enum { XXH_static_assert = 1/(!!(c)) }; }    // use only *after* variable declarations
-#define XXH_LE32(p)          (XXH_BIG_ENDIAN ? XXH_swap32(A32(p))     : A32(p))
-#define XXH_alignedLE32(p)   (XXH_BIG_ENDIAN ? XXH_swap32(*(U32*)(p)) : *(U32*)(p))
+#define XXH_STATIC_ASSERT(c)   { enum { XXH_static_assert = 1/(!!(c)) }; }    // use only *after* variable declarations
 
+
+//****************************
+// Memory reads
+//****************************
+typedef enum { XXH_aligned, XXH_unaligned } XXH_alignment;
+
+forceinline U32 XXH_readLE32_align(const U32* ptr, XXH_endianess endian, XXH_alignment align)
+{ 
+    if (align==XXH_unaligned)
+        return endian==XXH_littleEndian ? A32(ptr) : XXH_swap32(A32(ptr)); 
+    else
+        return endian==XXH_littleEndian ? *ptr : XXH_swap32(*ptr); 
+}
+
+forceinline U32 XXH_readLE32(const U32* ptr, XXH_endianess endian) { return XXH_readLE32_align(ptr, endian, XXH_unaligned); }
 
 
 //****************************
 // Simple Hash Functions
 //****************************
-
-#if !defined(XXH_USE_UNALIGNED_ACCESS)
-// Specific version, for aligned 32-bits input. Useless for CPU supporting unaligned access.
-static U32 XXH32_alignedInput(const void* input, int len, U32 seed)
+forceinline U32 XXH32_endian_align(const void* input, int len, U32 seed, XXH_endianess endian, XXH_alignment align)
 {
-    const BYTE* p = (const BYTE*)input;
-    const BYTE* const bEnd = p + len;
-    U32 h32;
-
-    if (len>=16)
-    {
-        const BYTE* const limit = bEnd - 16;
-        U32 v1 = seed + PRIME32_1 + PRIME32_2;
-        U32 v2 = seed + PRIME32_2;
-        U32 v3 = seed + 0;
-        U32 v4 = seed - PRIME32_1;
-        do
-        {
-            v1 += XXH_alignedLE32(p) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
-            v2 += XXH_alignedLE32(p) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
-            v3 += XXH_alignedLE32(p) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
-            v4 += XXH_alignedLE32(p) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
-        } while (p<=limit);
-        h32 = XXH_rotl32(v1, 1) + XXH_rotl32(v2, 7) + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18);
-    }
-    else { h32  = seed + PRIME32_5; }
-    h32 += (U32) len;
-    while (p<=bEnd-4)
-    {
-        h32 += XXH_alignedLE32(p) * PRIME32_3;
-        h32 = XXH_rotl32(h32, 17) * PRIME32_4 ;
-        p+=4;
-    }
-    while (p<bEnd)
-    {
-        h32 += (*p) * PRIME32_5;
-        h32 = XXH_rotl32(h32, 11) * PRIME32_1 ;
-        p++;
-    }
-    h32 ^= h32 >> 15;
-    h32 *= PRIME32_2;
-    h32 ^= h32 >> 13;
-    h32 *= PRIME32_3;
-    h32 ^= h32 >> 16;
-    return h32;
-}
-#endif
-
-U32 XXH32(const void* input, int len, U32 seed)
-{
-#if 0
-    // Simple version, good for code maintenance, but unfortunately slow for small inputs
-    void* state = XXH32_init(seed);
-    XXH32_update(state, input, len);
-    return XXH32_digest(state);
-#else
-
     const BYTE* p = (const BYTE*)input;
     const BYTE* const bEnd = p + len;
     U32 h32;
 
 #ifdef XXH_ACCEPT_NULL_INPUT_POINTER
-    if (p==NULL) { len=0; p=(const BYTE*)16; }
-#endif
-
-#if !defined(XXH_USE_UNALIGNED_ACCESS)
-    if ((((U32)p) & 3) == 0) return XXH32_alignedInput(input, len, seed);   // Input is aligned, let's leverage the speed advantage
+    if (p==NULL) { len=0; p=(const BYTE*)(size_t)16; }
 #endif
 
     if (len>=16)
     {
-        const BYTE* const limit = bEnd - 16;
+        const BYTE* const limit = bEnd - 32;
         U32 v1 = seed + PRIME32_1 + PRIME32_2;
         U32 v2 = seed + PRIME32_2;
         U32 v3 = seed + 0;
@@ -273,10 +223,10 @@ U32 XXH32(const void* input, int len, U32 seed)
 
         do
         {
-            v1 += XXH_LE32(p) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
-            v2 += XXH_LE32(p) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
-            v3 += XXH_LE32(p) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
-            v4 += XXH_LE32(p) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
+            v1 += XXH_readLE32_align((const U32*)p, endian, align) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
+            v2 += XXH_readLE32_align((const U32*)p, endian, align) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
+            v3 += XXH_readLE32_align((const U32*)p, endian, align) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
+            v4 += XXH_readLE32_align((const U32*)p, endian, align) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
         } while (p<=limit);
 
         h32 = XXH_rotl32(v1, 1) + XXH_rotl32(v2, 7) + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18);
@@ -290,8 +240,8 @@ U32 XXH32(const void* input, int len, U32 seed)
 
     while (p<=bEnd-4)
     {
-        h32 += XXH_LE32(p) * PRIME32_3;
-        h32 = XXH_rotl32(h32, 17) * PRIME32_4 ;
+        h32 += XXH_readLE32_align((const U32*)p, endian, align) * PRIME32_3;
+        h32  = XXH_rotl32(h32, 17) * PRIME32_4 ;
         p+=4;
     }
 
@@ -309,7 +259,33 @@ U32 XXH32(const void* input, int len, U32 seed)
     h32 ^= h32 >> 16;
 
     return h32;
+}
 
+
+U32 XXH32(const void* input, int len, U32 seed)
+{
+#if 0
+    // Simple version, good for code maintenance, but unfortunately slow for small inputs
+    void* state = XXH32_init(seed);
+    XXH32_update(state, input, len);
+    return XXH32_digest(state);
+#else
+    XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
+
+#  if !defined(XXH_USE_UNALIGNED_ACCESS)
+    if ((((size_t)input) & 3))   // Input is aligned, let's leverage the speed advantage
+    {
+        if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+            return XXH32_endian_align(input, len, seed, XXH_littleEndian, XXH_aligned);
+        else
+            return XXH32_endian_align(input, len, seed, XXH_bigEndian, XXH_aligned);
+    }
+#  endif
+
+    if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+        return XXH32_endian_align(input, len, seed, XXH_littleEndian, XXH_unaligned);
+    else
+        return XXH32_endian_align(input, len, seed, XXH_bigEndian, XXH_unaligned);
 #endif
 }
 
@@ -360,7 +336,7 @@ void* XXH32_init (U32 seed)
 }
 
 
-XXH_errorcode XXH32_update (void* state_in, const void* input, int len)
+forceinline XXH_errorcode XXH32_update_endian (void* state_in, const void* input, int len, XXH_endianess endian)
 {
     struct XXH_state32_t * state = (struct XXH_state32_t *) state_in;
     const BYTE* p = (const BYTE*)input;
@@ -384,10 +360,10 @@ XXH_errorcode XXH32_update (void* state_in, const void* input, int len)
         XXH_memcpy(state->memory + state->memsize, input, 16-state->memsize);
         {
             const U32* p32 = (const U32*)state->memory;
-            state->v1 += XXH_LE32(p32) * PRIME32_2; state->v1 = XXH_rotl32(state->v1, 13); state->v1 *= PRIME32_1; p32++;
-            state->v2 += XXH_LE32(p32) * PRIME32_2; state->v2 = XXH_rotl32(state->v2, 13); state->v2 *= PRIME32_1; p32++; 
-            state->v3 += XXH_LE32(p32) * PRIME32_2; state->v3 = XXH_rotl32(state->v3, 13); state->v3 *= PRIME32_1; p32++;
-            state->v4 += XXH_LE32(p32) * PRIME32_2; state->v4 = XXH_rotl32(state->v4, 13); state->v4 *= PRIME32_1; p32++;
+            state->v1 += XXH_readLE32(p32, endian) * PRIME32_2; state->v1 = XXH_rotl32(state->v1, 13); state->v1 *= PRIME32_1; p32++;
+            state->v2 += XXH_readLE32(p32, endian) * PRIME32_2; state->v2 = XXH_rotl32(state->v2, 13); state->v2 *= PRIME32_1; p32++; 
+            state->v3 += XXH_readLE32(p32, endian) * PRIME32_2; state->v3 = XXH_rotl32(state->v3, 13); state->v3 *= PRIME32_1; p32++;
+            state->v4 += XXH_readLE32(p32, endian) * PRIME32_2; state->v4 = XXH_rotl32(state->v4, 13); state->v4 *= PRIME32_1; p32++;
         }
         p += 16-state->memsize;
         state->memsize = 0;
@@ -403,10 +379,10 @@ XXH_errorcode XXH32_update (void* state_in, const void* input, int len)
 
         do
         {
-            v1 += XXH_LE32(p) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
-            v2 += XXH_LE32(p) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
-            v3 += XXH_LE32(p) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
-            v4 += XXH_LE32(p) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
+            v1 += XXH_readLE32((const U32*)p, endian) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
+            v2 += XXH_readLE32((const U32*)p, endian) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
+            v3 += XXH_readLE32((const U32*)p, endian) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
+            v4 += XXH_readLE32((const U32*)p, endian) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
         } while (p<=limit);
 
         state->v1 = v1;
@@ -424,11 +400,22 @@ XXH_errorcode XXH32_update (void* state_in, const void* input, int len)
     return XXH_OK;
 }
 
+XXH_errorcode XXH32_update (void* state_in, const void* input, int len)
+{
+    XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
+    
+    if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+        return XXH32_update_endian(state_in, input, len, XXH_littleEndian);
+    else
+        return XXH32_update_endian(state_in, input, len, XXH_bigEndian);
+}
 
-U32 XXH32_intermediateDigest (void* state_in)
+
+
+forceinline U32 XXH32_intermediateDigest_endian (void* state_in, XXH_endianess endian)
 {
     struct XXH_state32_t * state = (struct XXH_state32_t *) state_in;
-    BYTE * p   = (BYTE*)state->memory;
+    const BYTE * p = (const BYTE*)state->memory;
     BYTE* bEnd = (BYTE*)state->memory + state->memsize;
     U32 h32;
 
@@ -445,8 +432,8 @@ U32 XXH32_intermediateDigest (void* state_in)
 
     while (p<=bEnd-4)
     {
-        h32 += XXH_LE32(p) * PRIME32_3;
-        h32 = XXH_rotl32(h32, 17) * PRIME32_4;
+        h32 += XXH_readLE32((const U32*)p, endian) * PRIME32_3;
+        h32  = XXH_rotl32(h32, 17) * PRIME32_4;
         p+=4;
     }
 
@@ -464,6 +451,17 @@ U32 XXH32_intermediateDigest (void* state_in)
     h32 ^= h32 >> 16;
 
     return h32;
+}
+
+
+U32 XXH32_intermediateDigest (void* state_in)
+{
+    XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
+    
+    if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
+        return XXH32_intermediateDigest_endian(state_in, XXH_littleEndian);
+    else
+        return XXH32_intermediateDigest_endian(state_in, XXH_bigEndian);
 }
 
 
