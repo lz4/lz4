@@ -215,7 +215,7 @@ forceinline U32 XXH32_endian_align(const void* input, int len, U32 seed, XXH_end
 
     if (len>=16)
     {
-        const BYTE* const limit = bEnd - 32;
+        const BYTE* const limit = bEnd - 16;
         U32 v1 = seed + PRIME32_1 + PRIME32_2;
         U32 v2 = seed + PRIME32_2;
         U32 v3 = seed + 0;

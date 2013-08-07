@@ -256,3 +256,7 @@ _last_literals:
 #ifdef USE_HEAPMEMORY
 #undef USE_HEAPMEMORY
 #endif
+
+#ifdef COMPRESS_64K
+#undef COMPRESS_64K
+#endif
