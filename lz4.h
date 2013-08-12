@@ -114,7 +114,7 @@ LZ4_decompress_fast() :
     return : the number of bytes read from the source buffer (in other words, the compressed size)
              If the source stream is malformed, the function will stop decoding and return a negative result.
     note : This function is a bit faster than LZ4_decompress_safe()
-           This function never writes outside of output buffers, and never read before input buffer, but may read beyond input buffer (since it doesn't know its size) in case of malicious data packet.
+           This function never writes outside of output buffers, but may read beyond input buffer in case of malicious data packet.
            Use this function preferably into a trusted environment (data to decode comes from a trusted source).
            Destination buffer must be already allocated. Its size must be a minimum of 'outputSize' bytes.
 */

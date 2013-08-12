@@ -116,6 +116,9 @@
 #define MAX_MEM    (1984<<20)
 #define DEFAULT_CHUNKSIZE   (4<<20)
 
+#define ALL_COMPRESSORS -1
+#define ALL_DECOMPRESSORS -1
+
 
 //**************************************
 // Local structures
@@ -145,6 +148,8 @@ static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 static int compressionTest = 1;
 static int decompressionTest = 1;
+static int compressionAlgo = ALL_COMPRESSORS;
+static int decompressionAlgo = ALL_DECOMPRESSORS;
 
 void BMK_SetBlocksize(int bsize)
 {
@@ -277,22 +282,16 @@ static inline int local_LZ4_decompress_safe_partial(const char* in, char* out, i
 int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
-  FILE* fileIn;
-  char* infilename;
-  U64 largefilesize;
-  size_t benchedSize;
-  int nbChunks;
-  int maxCChunkSize;
-  size_t readSize;
   char* orig_buff;
-  char* compressed_buff; int compressed_buff_size;
-  struct chunkParameters* chunkP;
-  U32 crcc, crcd=0;
 # define NB_COMPRESSION_ALGORITHMS 4
+# define MINCOMPRESSIONCHAR '0'
+# define MAXCOMPRESSIONCHAR '3'
   static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput", "LZ4_compressHC", "LZ4_compressHC_limitedOutput" };
   double totalCTime[NB_COMPRESSION_ALGORITHMS] = {0};
   double totalCSize[NB_COMPRESSION_ALGORITHMS] = {0};
 # define NB_DECOMPRESSION_ALGORITHMS 5
+# define MINDECOMPRESSIONCHAR '0'
+# define MAXDECOMPRESSIONCHAR '4'
   static char* decompressionNames[] = { "LZ4_decompress_fast", "LZ4_decompress_fast_withPrefix64k", "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_partial" };
   double totalDTime[NB_DECOMPRESSION_ALGORITHMS] = {0};
 
@@ -302,31 +301,42 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
   // Loop for each file
   while (fileIdx<nbFiles)
   {
+      FILE* inFile;
+      char* inFileName;
+      U64   inFileSize;
+      size_t benchedSize;
+      int nbChunks;
+      int maxCompressedChunkSize;
+      struct chunkParameters* chunkP;
+      size_t readSize;
+      char* compressed_buff; int compressedBuffSize;
+      U32 crcOriginal;
+
       // Check file existence
-      infilename = fileNamesTable[fileIdx++];
-      fileIn = fopen( infilename, "rb" );
-      if (fileIn==NULL)
+      inFileName = fileNamesTable[fileIdx++];
+      inFile = fopen( inFileName, "rb" );
+      if (inFile==NULL)
       {
-        DISPLAY( "Pb opening %s\n", infilename);
+        DISPLAY( "Pb opening %s\n", inFileName);
         return 11;
       }
 
       // Memory allocation & restrictions
-      largefilesize = BMK_GetFileSize(infilename);
-      benchedSize = (size_t) BMK_findMaxMem(largefilesize) / 2;
-      if ((U64)benchedSize > largefilesize) benchedSize = (size_t)largefilesize;
-      if (benchedSize < largefilesize)
+      inFileSize = BMK_GetFileSize(inFileName);
+      benchedSize = (size_t) BMK_findMaxMem(inFileSize) / 2;
+      if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
+      if (benchedSize < inFileSize)
       {
-          DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", infilename, (int)(benchedSize>>20));
+          DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
       }
 
       // Alloc
       chunkP = (struct chunkParameters*) malloc(((benchedSize / chunkSize)+1) * sizeof(struct chunkParameters));
       orig_buff = (char*) malloc((size_t)benchedSize);
       nbChunks = (int) (benchedSize / chunkSize) + 1;
-      maxCChunkSize = LZ4_compressBound(chunkSize);
-      compressed_buff_size = nbChunks * maxCChunkSize;
-      compressed_buff = (char*)malloc((size_t)compressed_buff_size);
+      maxCompressedChunkSize = LZ4_compressBound(chunkSize);
+      compressedBuffSize = nbChunks * maxCompressedChunkSize;
+      compressed_buff = (char*)malloc((size_t)compressedBuffSize);
 
 
       if(!orig_buff || !compressed_buff)
@@ -335,7 +345,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         free(orig_buff);
         free(compressed_buff);
         free(chunkP);
-        fclose(fileIn);
+        fclose(inFile);
         return 12;
       }
 
@@ -350,19 +360,19 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
               chunkP[i].id = i;
               chunkP[i].origBuffer = in; in += chunkSize;
               if ((int)remaining > chunkSize) { chunkP[i].origSize = chunkSize; remaining -= chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
-              chunkP[i].compressedBuffer = out; out += maxCChunkSize;
+              chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
               chunkP[i].compressedSize = 0;
           }
       }
 
       // Fill input buffer
-      DISPLAY("Loading %s...       \r", infilename);
-      readSize = fread(orig_buff, 1, benchedSize, fileIn);
-      fclose(fileIn);
+      DISPLAY("Loading %s...       \r", inFileName);
+      readSize = fread(orig_buff, 1, benchedSize, inFile);
+      fclose(inFile);
 
       if(readSize != benchedSize)
       {
-        DISPLAY("\nError: problem reading file '%s' !!    \n", infilename);
+        DISPLAY("\nError: problem reading file '%s' !!    \n", inFileName);
         free(orig_buff);
         free(compressed_buff);
         free(chunkP);
@@ -370,7 +380,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       }
 
       // Calculating input Checksum
-      crcc = XXH32(orig_buff, (unsigned int)benchedSize,0);
+      crcOriginal = XXH32(orig_buff, (unsigned int)benchedSize,0);
 
 
       // Bench
@@ -380,7 +390,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         double ratio=0.;
 
         DISPLAY("\r%79s\r", "");
-        DISPLAY(" %s : \n", infilename);
+        DISPLAY(" %s : \n", inFileName);
 
         // Compression Algorithms
         for (cAlgNb=0; (cAlgNb < NB_COMPRESSION_ALGORITHMS) && (compressionTest); cAlgNb++)
@@ -388,6 +398,8 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             char* cName = compressionNames[cAlgNb];
             int (*compressionFunction)(const char*, char*, int);
             double bestTime = 100000000.;
+
+            if ((compressionAlgo != ALL_COMPRESSORS) && (compressionAlgo != cAlgNb)) continue;
 
             switch(cAlgNb)
             {
@@ -452,6 +464,8 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             int (*decompressionFunction)(const char*, char*, int, int);
             double bestTime = 100000000.;
 
+            if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != dAlgNb)) continue;
+
             switch(dAlgNb)
             {
             case 0: decompressionFunction = local_LZ4_decompress_fast; break;
@@ -466,8 +480,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             {
                 double averageTime;
                 int milliTime;
+                U32 crcDecoded;
 
-                DISPLAY("%1i-%-19.19s : %9i ->\r", loopNb, dName, (int)benchedSize);
+                DISPLAY("%1i-%-24.24s :%10i ->\r", loopNb, dName, (int)benchedSize);
 
                 nb_loops = 0;
                 milliTime = BMK_GetMilliStart();
@@ -487,13 +502,14 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 averageTime = (double)milliTime / nb_loops;
                 if (averageTime < bestTime) bestTime = averageTime;
 
-                DISPLAY("%1i-%-19.19s : %9i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%1i-%-24.24s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+
+                // CRC Checking
+                crcDecoded = XXH32(orig_buff, (int)benchedSize, 0);
+                if (crcOriginal!=crcDecoded) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOriginal, (unsigned)crcDecoded); exit(1); }
             }
 
-            // CRC Checking
-            crcd = XXH32(orig_buff, (int)benchedSize, 0);
-            if (crcc!=crcd) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", infilename, (unsigned)crcc, (unsigned)crcd); exit(1); }
-            DISPLAY("%-21.21s : %9i -> %7.1f MB/s\n", dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%-26.26s :%10i -> %7.1f MB/s\n", dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
 
             totalDTime[dAlgNb] += bestTime;
         }
@@ -514,11 +530,13 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       for (AlgNb = 0; (AlgNb < NB_COMPRESSION_ALGORITHMS) && (compressionTest); AlgNb ++)
       {
           char* cName = compressionNames[AlgNb];
+          if ((compressionAlgo != ALL_COMPRESSORS) && (compressionAlgo != AlgNb)) continue;
           DISPLAY("%-21.21s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s\n", cName, (long long unsigned int)totals, (long long unsigned int)totalCSize[AlgNb], (double)totalCSize[AlgNb]/(double)totals*100., (double)totals/totalCTime[AlgNb]/1000.);
       }
       for (AlgNb = 0; (AlgNb < NB_DECOMPRESSION_ALGORITHMS) && (decompressionTest); AlgNb ++)
       {
           char* dName = decompressionNames[AlgNb];
+          if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != AlgNb)) continue;
           DISPLAY("%-21.21s :%10llu -> %6.1f MB/s\n", dName, (long long unsigned int)totals, (double)totals/totalDTime[AlgNb]/1000.);
       }
   }
@@ -536,16 +554,18 @@ int usage(char* exename)
     DISPLAY( "Arguments :\n");
     DISPLAY( " -c     : compression tests only\n");
     DISPLAY( " -d     : decompression tests only\n");
-    DISPLAY( " -H     : Help (this text + advanced options)\n");
+    DISPLAY( " -H/-h  : Help (this text + advanced options)\n");
     return 0;
 }
 
 int usage_advanced()
 {
     DISPLAY( "\nAdvanced options :\n");
+    DISPLAY( " -c#    : test only compression function # [%c-%c]\n", MINCOMPRESSIONCHAR, MAXCOMPRESSIONCHAR);
+    DISPLAY( " -d#    : test only compression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
+    DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     //DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
-    DISPLAY( " -i#    : iteration loops [1-9](default : 6)\n");
     return 0;
 }
 
@@ -584,12 +604,21 @@ int main(int argc, char** argv)
                 switch(argument[0])
                 {
                     // Select compression algorithm only
-                case 'c': decompressionTest = 0; break;
+                case 'c': 
+                    decompressionTest = 0; 
+                    if ((argument[1]>= MINCOMPRESSIONCHAR) && (argument[1]<= MAXCOMPRESSIONCHAR))
+                       compressionAlgo = argument[1] - '0', argument++;
+                    break;
 
                     // Select decompression algorithm only
-                case 'd': compressionTest = 0; break;
+                case 'd': 
+                    compressionTest = 0;
+                    if ((argument[1]>= MINDECOMPRESSIONCHAR) && (argument[1]<= MAXDECOMPRESSIONCHAR))
+                       decompressionAlgo = argument[1] - '0', argument++;
+                    break;
 
                     // Display help on usage
+                case 'h' :
                 case 'H': usage(exename); usage_advanced(); return 0;
 
                     // Modify Block Properties

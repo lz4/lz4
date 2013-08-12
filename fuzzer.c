@@ -101,7 +101,7 @@ int FUZ_SecurityTest()
   char* input;
   int i, r;
 
-  printf("Overflow test (issue 52)...");
+  printf("Overflow test (issue 52)...\n");
   input = (char*) malloc (20<<20);
   output = (char*) malloc (20<<20);
   input[0] = 0x0F;
@@ -132,7 +132,8 @@ int main() {
         unsigned int seed, randState, cur_seq=PRIME3, seeds[NUM_SEQ], timestamp=FUZ_GetMilliStart();
         int i, j, k, ret, len, lenHC, attemptNb;
         char userInput[30] = {0};
-#       define FUZ_CHECKTEST(cond, message) testNb++; if (cond) { printf("Test %i : %s : seed %u, cycle %i \n", testNb, message, seed, attemptNb); goto _output_error; }
+#       define FUZ_CHECKTEST(cond, message) if (cond) { printf("Test %i : %s : seed %u, cycle %i \n", testNb, message, seed, attemptNb); goto _output_error; }
+#       define FUZ_DISPLAYTEST              testNb++; printf("%2i\b\b", testNb);
 
         printf("starting LZ4 fuzzer\n");
         printf("Select an Initialisation number (default : random) : ");
@@ -145,7 +146,7 @@ int main() {
         printf("Seed = %u\n", seed);
         randState = seed;
 
-        FUZ_SecurityTest();
+        //FUZ_SecurityTest();
 
         for (i = 0; i < 2048; i++)
                 cbuf[FUZ_avail + i] = cbuf[FUZ_avail + 2048 + i] = FUZ_rand(&randState) >> 16;
@@ -154,7 +155,7 @@ int main() {
         {
             int testNb = 0;
 
-            printf("\r%7i /%7i\r", attemptNb, NB_ATTEMPTS);
+            printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
             
             for (j = 0; j < NUM_SEQ; j++) {
                     seeds[j] = FUZ_rand(&randState) << 8;
@@ -173,71 +174,87 @@ int main() {
             }
 
             // Test compression HC
+            FUZ_DISPLAYTEST;   // 1
             ret = LZ4_compressHC_limitedOutput((const char*)buf, (char*)&cbuf[off_full], LEN, FUZ_max);
             FUZ_CHECKTEST(ret==0, "HC compression failed despite sufficient space");
             lenHC = ret;
 
             // Test compression
+            FUZ_DISPLAYTEST;   // 2
             ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[off_full], LEN, FUZ_max);
             FUZ_CHECKTEST(ret==0, "compression failed despite sufficient space");
             len = ret;
 
             // Test decoding with output size being exactly what's necessary => must work
+            FUZ_DISPLAYTEST;   // 3
             ret = LZ4_decompress_fast((char*)&cbuf[off_full], (char*)testOut, LEN);
-            FUZ_CHECKTEST(ret<0, "decompression failed despite correct space");
+            FUZ_CHECKTEST(ret<0, "LZ4_decompress_fast failed despite correct space");
 
             // Test decoding with one byte missing => must fail
+            FUZ_DISPLAYTEST;   // 4
             ret = LZ4_decompress_fast((char*)&cbuf[off_full], (char*)testOut, LEN-1);
-            FUZ_CHECKTEST(ret>=0, "decompression should have failed, due to Output Size being too small");
+            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too small");
 
             // Test decoding with one byte too much => must fail
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_fast((char*)&cbuf[off_full], (char*)testOut, LEN+1);
-            FUZ_CHECKTEST(ret>=0, "decompression should have failed, due to Output Size being too large");
+            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
 
             // Test decoding with enough output size => must work
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len, LEN+1);
-            FUZ_CHECKTEST(ret<0, "decompression failed despite sufficient space");
+            FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe failed despite sufficient space");
 
             // Test decoding with output size being exactly what's necessary => must work
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len, LEN);
-            FUZ_CHECKTEST(ret<0, "decompression failed despite sufficient space");
+            FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe failed despite sufficient space");
 
             // Test decoding with output size being one byte too short => must fail
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len, LEN-1);
             FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to Output Size being one byte too short");
 
             // Test decoding with input size being one byte too short => must fail
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len-1, LEN);
             FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to input size being one byte too short");
 
             // Test decoding with input size being one byte too large => must fail
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe((char*)&cbuf[off_full], (char*)testOut, len+1, LEN);
-            FUZ_CHECKTEST(ret>=0, "decompression should have failed, due to input size being too large");
+            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to input size being too large");
             //if (ret>=0) { printf("Test 10 : decompression should have failed, due to input size being too large : seed %u, len %d\n", seed, LEN); goto _output_error; }
 
             // Test partial decoding with target output size being max/2 => must work
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe_partial((char*)&cbuf[off_full], (char*)testOut, len, LEN/2, LEN);
-            FUZ_CHECKTEST(ret<0, "partial decompression failed despite sufficient space");
+            FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe_partial failed despite sufficient space");
 
             // Test partial decoding with target output size being just below max => must work
+            FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe_partial((char*)&cbuf[off_full], (char*)testOut, len, LEN-3, LEN);
-            FUZ_CHECKTEST(ret<0, "partial decompression failed despite sufficient space");
+            FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe_partial failed despite sufficient space");
 
             // Test compression with output size being exactly what's necessary (should work)
+            FUZ_DISPLAYTEST;
             ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-len], LEN, len);
             FUZ_CHECKTEST(!test_canary(&cbuf[FUZ_avail]), "compression overran output buffer");
             FUZ_CHECKTEST(ret==0, "compression failed despite sufficient space");
 
             // Test HC compression with output size being exactly what's necessary (should work)
+            FUZ_DISPLAYTEST;
             ret = LZ4_compressHC_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-len], LEN, lenHC);
             FUZ_CHECKTEST(ret==0, "HC compression failed despite sufficient space");
 
             // Test compression with just one missing byte into output buffer => must fail
+            FUZ_DISPLAYTEST;
             ret = LZ4_compress_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-(len-1)], LEN, len-1);
             FUZ_CHECKTEST(ret, "compression overran output buffer");
             FUZ_CHECKTEST(!test_canary(&cbuf[FUZ_avail]), "compression overran output buffer");
 
             // Test HC compression with just one missing byte into output buffer => must fail
+            FUZ_DISPLAYTEST;
             ret = LZ4_compressHC_limitedOutput((const char*)buf, (char*)&cbuf[FUZ_avail-(len-1)], LEN, lenHC-1);
             FUZ_CHECKTEST(ret, "HC compression overran output buffer");
 
