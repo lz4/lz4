@@ -146,6 +146,47 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outpu
 */
 
 
+
+//****************************
+// Stream Functions
+//****************************
+
+void* LZ4_create (const char* inputBuffer);
+int   LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int inputSize);
+int   LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize);
+char* LZ4_slideInputBuffer (void* LZ4_Data);
+int   LZ4_free (void* LZ4_Data);
+
+/* 
+These functions allow the compression of dependent blocks, where each block benefits from prior 64 KB within preceding blocks.
+In order to achieve this, it is necessary to start creating the LZ4 Data Structure, thanks to the function :
+
+void* LZ4_create (const char* inputBuffer);
+The result of the function is the (void*) pointer on the LZ4 Data Structure.
+This pointer will be needed in all other functions.
+If the pointer returned is NULL, then the allocation has failed, and compression must be aborted.
+The only parameter 'const char* inputBuffer' must, obviously, point at the beginning of input buffer.
+The input buffer must be already allocated, and size at least 192KB.
+'inputBuffer' will also be the 'const char* source' of the first block.
+
+All blocks are expected to lay next to each other within the input buffer, starting from 'inputBuffer'.
+To compress each block, use either LZ4_compress_continue() or LZ4_compress_limitedOutput_continue().
+Their behavior are identical to LZ4_compress() or LZ4_compress_limitedOutput(), 
+but require the LZ4 Data Structure as their first argument, and check that each block starts right after the previous one.
+If next block does not begin immediately after the previous one, the compression will fail (return 0).
+
+When it's no longer possible to lay the next block after the previous one (not enough space left into input buffer), a call to : 
+char* LZ4_slideInputBuffer(void* LZ4_Data);
+must be performed. It will typically copy the latest 64KB of input at the beginning of input buffer.
+Note that, for this function to work properly, minimum size of an input buffer must be 192KB.
+==> The memory position where the next input data block must start is provided as the result of the function.
+
+Compression can then resume, using LZ4_compress_continue() or LZ4_compress_limitedOutput_continue(), as usual.
+
+When compression is completed, a call to LZ4_free() will release the memory used by the LZ4 Data Structure.
+*/
+
+
 //****************************
 // Obsolete Functions
 //****************************

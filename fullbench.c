@@ -255,9 +255,30 @@ static inline int local_LZ4_compress_limitedOutput(const char* in, char* out, in
     return LZ4_compress_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
 }
 
+static void* ctx;
+static inline int local_LZ4_compress_continue(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_continue(ctx, in, out, inSize);
+}
+
+static inline int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
+}
+
 static inline int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
+}
+
+static inline int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
+{
+    return LZ4_compressHC_continue(ctx, in, out, inSize);
+}
+
+static inline int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
+{
+    return LZ4_compressHC_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static inline int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
@@ -283,15 +304,15 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
   char* orig_buff;
-# define NB_COMPRESSION_ALGORITHMS 4
+# define NB_COMPRESSION_ALGORITHMS 8
 # define MINCOMPRESSIONCHAR '0'
-# define MAXCOMPRESSIONCHAR '3'
-  static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput", "LZ4_compressHC", "LZ4_compressHC_limitedOutput" };
+# define MAXCOMPRESSIONCHAR (MINCOMPRESSIONCHAR + NB_COMPRESSION_ALGORITHMS)
+  static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput", "LZ4_compress_continue", "LZ4_compress_limitedOutput_continue", "LZ4_compressHC", "LZ4_compressHC_limitedOutput", "LZ4_compressHC_continue", "LZ4_compressHC_limitedOutput_continue" };
   double totalCTime[NB_COMPRESSION_ALGORITHMS] = {0};
   double totalCSize[NB_COMPRESSION_ALGORITHMS] = {0};
 # define NB_DECOMPRESSION_ALGORITHMS 5
 # define MINDECOMPRESSIONCHAR '0'
-# define MAXDECOMPRESSIONCHAR '4'
+# define MAXDECOMPRESSIONCHAR (MINDECOMPRESSIONCHAR + NB_DECOMPRESSION_ALGORITHMS)
   static char* decompressionNames[] = { "LZ4_decompress_fast", "LZ4_decompress_fast_withPrefix64k", "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_partial" };
   double totalDTime[NB_DECOMPRESSION_ALGORITHMS] = {0};
 
@@ -397,6 +418,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         {
             char* cName = compressionNames[cAlgNb];
             int (*compressionFunction)(const char*, char*, int);
+            void* (*initFunction)(const char*) = NULL;
             double bestTime = 100000000.;
 
             if ((compressionAlgo != ALL_COMPRESSORS) && (compressionAlgo != cAlgNb)) continue;
@@ -405,8 +427,12 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             {
             case 0: compressionFunction = LZ4_compress; break;
             case 1: compressionFunction = local_LZ4_compress_limitedOutput; break;
-            case 2: compressionFunction = LZ4_compressHC; break;
-            case 3: compressionFunction = local_LZ4_compressHC_limitedOutput; break;
+            case 2: compressionFunction = local_LZ4_compress_continue; initFunction = LZ4_create; break;
+            case 3: compressionFunction = local_LZ4_compress_limitedOutput_continue; initFunction = LZ4_create; break;
+            case 4: compressionFunction = LZ4_compressHC; break;
+            case 5: compressionFunction = local_LZ4_compressHC_limitedOutput; break;
+            case 6: compressionFunction = local_LZ4_compressHC_continue; initFunction = LZ4_createHC; break;
+            case 7: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 
@@ -424,11 +450,13 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 milliTime = BMK_GetMilliStart();
                 while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
                 {
+                    if (initFunction!=NULL) ctx = initFunction(chunkP[0].origBuffer);
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                     {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
                         if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", cName), exit(1);
                     }
+                    if (initFunction!=NULL) free(ctx);
                     nb_loops++;
                 }
                 milliTime = BMK_GetMilliSpan(milliTime);

@@ -378,7 +378,7 @@ int compress_file_blockDependency(char* input_filename, char* output_filename, i
     char* out_buff;
     FILE* finput;
     FILE* foutput;
-    int displayLevel = (compressionlevel>0);
+    int displayLevel = ((compressionlevel>0) && (!silence)) || (verbose);
     clock_t start, end;
     unsigned int blockSize, inputBufferSize;
     size_t sizeCheck, header_size;
@@ -390,6 +390,11 @@ int compress_file_blockDependency(char* input_filename, char* output_filename, i
     switch (compressionlevel)
     {
     case 0 :
+        initFunction = LZ4_create;
+        compressionFunction = LZ4_compress_limitedOutput_continue;
+        translateFunction = LZ4_slideInputBuffer;
+        freeFunction = LZ4_free;
+        break;
     case 1 :
     default:
         initFunction = LZ4_createHC;

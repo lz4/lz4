@@ -144,10 +144,18 @@
 
 
 //**************************************
+// Memory routines
+//**************************************
+#include <stdlib.h>   // malloc, calloc, free
+#define ALLOCATOR(n,s) calloc(n,s)
+#define FREEMEM        free
+#include <string.h>   // memset, memcpy
+#define MEM_INIT       memset
+
+
+//**************************************
 // Includes
 //**************************************
-#include <stdlib.h>   // for malloc
-#include <string.h>   // for memset
 #include "lz4.h"
 
 
@@ -203,14 +211,16 @@ typedef struct {size_t v;} _PACKED size_t_S;
 //**************************************
 // Constants
 //**************************************
+#define LZ4_HASHLOG   (MEMORY_USAGE-2)
 #define HASHTABLESIZE (1 << MEMORY_USAGE)
+#define HASHNBCELLS4  (1 << LZ4_HASHLOG)
 
 #define MINMATCH 4
 
 #define COPYLENGTH 8
 #define LASTLITERALS 5
 #define MFLIMIT (COPYLENGTH+MINMATCH)
-#define MINLENGTH (MFLIMIT+1)
+const int LZ4_minLength = (MFLIMIT+1);
 
 #define LZ4_64KLIMIT ((1<<16) + (MFLIMIT-1))
 #define SKIPSTRENGTH 6     // Increasing this value will make the compression run slower on incompressible data
@@ -222,6 +232,30 @@ typedef struct {size_t v;} _PACKED size_t_S;
 #define ML_MASK  ((1U<<ML_BITS)-1)
 #define RUN_BITS (8-ML_BITS)
 #define RUN_MASK ((1U<<RUN_BITS)-1)
+
+#define KB *(1U<<10)
+#define MB *(1U<<20)
+#define GB *(1U<<30)
+
+
+//**************************************
+// Structures and local types
+//**************************************
+
+typedef struct {
+    U32 hashTable[HASHNBCELLS4];
+    Ptr bufferStart;
+    Ptr base;
+    Ptr nextBlock;
+} LZ4_Data_Structure;
+
+typedef enum { notLimited = 0, limited = 1 } limitedOutput_directive;
+typedef enum { byPtr, byU32, byU16 } tableType_t;
+
+typedef enum { noPrefix = 0, withPrefix = 1 } prefix64k_directive;
+
+typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } endCondition_directive;
+typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 
 
 //**************************************
@@ -327,10 +361,6 @@ FORCE_INLINE int LZ4_NbCommonBytes (register U32 val)
 //****************************
 // Compression functions
 //****************************
-#define LZ4_HASHLOG (MEMORY_USAGE-2)
-typedef enum { notLimited = 0, limited = 1 } limitedOutput_directive;
-typedef enum { byPtr, byU32, byU16 } tableType_t;
-
 FORCE_INLINE int LZ4_hashSequence(U32 sequence, tableType_t tableType)
 {
     if (tableType == byU16)
@@ -379,10 +409,12 @@ FORCE_INLINE int LZ4_compress_generic(
                  int maxOutputSize,
 
                  limitedOutput_directive limitedOutput,
-                 tableType_t tableType)
+                 tableType_t tableType,
+                 prefix64k_directive prefix)
 {
     Ptr ip = (Ptr) source;
-    Ptr const base = (Ptr) source;
+    Ptr const base = (prefix==withPrefix) ? ((LZ4_Data_Structure*)ctx)->base : (Ptr) source;
+    Ptr const lowLimit = ((prefix==withPrefix) ? ((LZ4_Data_Structure*)ctx)->bufferStart : (Ptr)source);
     Ptr anchor = (Ptr) source;
     Ptr const iend = ip + inputSize;
     Ptr const mflimit = iend - MFLIMIT;
@@ -396,8 +428,10 @@ FORCE_INLINE int LZ4_compress_generic(
     U32 forwardH;
 
     // Init conditions
-    if (inputSize<MINLENGTH) goto _last_literals;
-    if ((tableType == byU16) && (inputSize>=LZ4_64KLIMIT)) return 0;   // Size too large (not within 64K limit)
+    if ((prefix==withPrefix) && (ip != ((LZ4_Data_Structure*)ctx)->nextBlock)) return 0;   // must continue from end of previous block
+    if (prefix==withPrefix) ((LZ4_Data_Structure*)ctx)->nextBlock=iend;                    // do it now, due to potential early exit
+    if ((tableType == byU16) && (inputSize>=LZ4_64KLIMIT)) return 0;                       // Size too large (not within 64K limit)
+    if (inputSize<LZ4_minLength) goto _last_literals;                                      // Input too small, no compression (all literals)
 
     // First Byte
     LZ4_putPosition(ip, ctx, tableType, base);
@@ -427,7 +461,7 @@ FORCE_INLINE int LZ4_compress_generic(
         } while ((ref + MAX_DISTANCE < ip) || (A32(ref) != A32(ip)));
 
         // Catch up
-        while ((ip>anchor) && (ref>(BYTE*)source) && unlikely(ip[-1]==ref[-1])) { ip--; ref--; }
+        while ((ip>anchor) && (ref > lowLimit) && unlikely(ip[-1]==ref[-1])) { ip--; ref--; }
 
         // Encode Literal length
         length = (int)(ip - anchor);
@@ -512,54 +546,111 @@ _last_literals:
 int LZ4_compress(const char* source, char* dest, int inputSize)
 {
 #if (HEAPMODE)
-    void* ctx = calloc(1U<<(MEMORY_USAGE-2), 4);   // Aligned on 4-bytes boundaries
+    void* ctx = ALLOCATOR(HASHNBCELLS4, 4);   // Aligned on 4-bytes boundaries
 #else
     U32 ctx[1U<<(MEMORY_USAGE-2)] = {0};           // Ensure data is aligned on 4-bytes boundaries
 #endif
     int result;
 
     if (inputSize < (int)LZ4_64KLIMIT)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noPrefix);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, (sizeof(void*)==8) ? byU32 : byPtr);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, (sizeof(void*)==8) ? byU32 : byPtr, noPrefix);
 
 #if (HEAPMODE)
-    free(ctx);
+    FREEMEM(ctx);
 #endif
     return result;
+}
+
+int LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, 0, notLimited, byU32, withPrefix);
 }
 
 
 int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
 #if (HEAPMODE)
-    void* ctx = calloc(1U<<(MEMORY_USAGE-2), 4);   // Aligned on 4-bytes boundaries
+    void* ctx = ALLOCATOR(HASHNBCELLS4, 4);   // Aligned on 4-bytes boundaries
 #else
     U32 ctx[1U<<(MEMORY_USAGE-2)] = {0};           // Ensure data is aligned on 4-bytes boundaries
 #endif
     int result;
 
     if (inputSize < (int)LZ4_64KLIMIT)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limited, byU16);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limited, byU16, noPrefix);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limited, (sizeof(void*)==8) ? byU32 : byPtr);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limited, (sizeof(void*)==8) ? byU32 : byPtr, noPrefix);
 
 #if (HEAPMODE)
-    free(ctx);
+    FREEMEM(ctx);
 #endif
     return result;
 }
 
+int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limited, byU32, withPrefix);
+}
+
+
+//****************************
+// Stream functions
+//****************************
+
+FORCE_INLINE void LZ4_init(LZ4_Data_Structure* lz4ds, Ptr base)
+{
+    MEM_INIT(lz4ds->hashTable, 0, sizeof(lz4ds->hashTable));
+    lz4ds->bufferStart = base;
+    lz4ds->base = base;
+    lz4ds->nextBlock = base;
+}
+
+
+void* LZ4_create (const char* inputBuffer)
+{
+    void* lz4ds = ALLOCATOR(1, sizeof(LZ4_Data_Structure));
+    LZ4_init ((LZ4_Data_Structure*)lz4ds, (Ptr)inputBuffer);
+    return lz4ds;
+}
+
+
+int LZ4_free (void* LZ4_Data)
+{
+    FREEMEM(LZ4_Data);
+    return (0);
+}
+
+
+char* LZ4_slideInputBuffer (void* LZ4_Data)
+{
+    LZ4_Data_Structure* lz4ds = (LZ4_Data_Structure*)LZ4_Data;
+    size_t delta = lz4ds->nextBlock - (lz4ds->bufferStart + 64 KB);
+
+    if(lz4ds->base - delta > lz4ds->base)   // underflow control
+    {
+        size_t newBaseDelta = (lz4ds->nextBlock - 64 KB) - lz4ds->base;
+        int nH;
+
+        for (nH=0; nH < HASHNBCELLS4; nH++)
+        {
+            if (lz4ds->hashTable[nH] < (U32)newBaseDelta) lz4ds->hashTable[nH] = 0;
+            else lz4ds->hashTable[nH] -= newBaseDelta;
+        }
+        lz4ds->base += newBaseDelta;
+    }
+    memcpy((void*)(lz4ds->bufferStart), (const void*)(lz4ds->nextBlock - 64 KB), 64 KB);
+    lz4ds->nextBlock -= delta;
+    lz4ds->base -= delta;
+
+    return (char*)(lz4ds->nextBlock);
+}
 
 
 //****************************
 // Decompression functions
 //****************************
-
-typedef enum { noPrefix = 0, withPrefix = 1 } prefix64k_directive;
-typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } endCondition_directive;
-typedef enum { full = 0, partial = 1 } earlyEnd_directive;
-
 
 // This generic decompression function cover all use cases.
 // It shall be instanciated several times, using different sets of directives

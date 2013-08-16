@@ -70,7 +70,7 @@ Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD l
 
 /* Advanced Functions */
 
-void* LZ4_createHC (const char* slidingInputBuffer);
+void* LZ4_createHC (const char* inputBuffer);
 int   LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize);
 int   LZ4_compressHC_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize);
 char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
@@ -80,15 +80,15 @@ int   LZ4_freeHC (void* LZ4HC_Data);
 These functions allow the compression of dependent blocks, where each block benefits from prior 64 KB within preceding blocks.
 In order to achieve this, it is necessary to start creating the LZ4HC Data Structure, thanks to the function :
 
-void* LZ4_createHC (const char* slidingInputBuffer);
+void* LZ4_createHC (const char* inputBuffer);
 The result of the function is the (void*) pointer on the LZ4HC Data Structure.
 This pointer will be needed in all other functions.
 If the pointer returned is NULL, then the allocation has failed, and compression must be aborted.
-The only parameter 'const char* slidingInputBuffer' must, obviously, point at the beginning of input buffer.
+The only parameter 'const char* inputBuffer' must, obviously, point at the beginning of input buffer.
 The input buffer must be already allocated, and size at least 192KB.
-'slidingInputBuffer' will also be the 'const char* source' of the first block.
+'inputBuffer' will also be the 'const char* source' of the first block.
 
-All blocks are expected to lay next to each other within the input buffer, starting from 'slidingInputBuffer'.
+All blocks are expected to lay next to each other within the input buffer, starting from 'inputBuffer'.
 To compress each block, use either LZ4_compressHC_continue() or LZ4_compressHC_limitedOutput_continue().
 Their behavior are identical to LZ4_compressHC() or LZ4_compressHC_limitedOutput(), 
 but require the LZ4HC Data Structure as their first argument, and check that each block starts right after the previous one.

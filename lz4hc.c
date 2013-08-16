@@ -332,7 +332,7 @@ FORCE_INLINE int LZ4_NbCommonBytes (register U32 val)
 #endif
 
 
-FORCE_INLINE int LZ4_InitHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
+FORCE_INLINE void LZ4_initHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
@@ -340,14 +340,13 @@ FORCE_INLINE int LZ4_InitHC (LZ4HC_Data_Structure* hc4, const BYTE* base)
     hc4->base = base;
     hc4->inputBuffer = base;
     hc4->end = base;
-    return 1;
 }
 
 
-void* LZ4_createHC (const char* slidingInputBuffer)
+void* LZ4_createHC (const char* inputBuffer)
 {
     void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
-    LZ4_InitHC ((LZ4HC_Data_Structure*)hc4, (const BYTE*)slidingInputBuffer);
+    LZ4_initHC ((LZ4HC_Data_Structure*)hc4, (const BYTE*)inputBuffer);
     return hc4;
 }
 
