@@ -32,7 +32,7 @@ endif()
 
 set(SRC_DIR ../)
 set(LZ4_SRCS_LIB ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h )
-set(LZ4_SRCS ${SRC_DIR}xxhash.c ${SRC_DIR}bench.c ${SRC_DIR}lz4c.c)
+set(LZ4_SRCS ${SRC_DIR}xxhash.c ${SRC_DIR}bench.c ${SRC_DIR}lz4cli.c)
 
 if(NOT BUILD_SHARED_LIBS)
     set(LZ4_SRCS ${LZ4_SRCS} ${LZ4_SRCS_LIB})

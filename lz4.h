@@ -83,7 +83,7 @@ LZ4_compressBound() :
     Provides the maximum size that LZ4 may output in a "worst case" scenario (input data not compressible)
     primarily useful for memory allocation of output buffer.
     inline function is recommended for the general case,
-    macro is also provided when result needs to be evaluated at compilation (such as table size allocation).
+    macro is also provided when result needs to be evaluated at compilation (such as stack memory allocation).
 
     isize  : is the input size. Max supported value is ~1.9GB
     return : maximum output size in a "worst case" scenario
@@ -130,21 +130,9 @@ LZ4_decompress_safe_partial() :
     return : the number of bytes decoded in the destination buffer (necessarily <= maxOutputSize)
        Note : this number can be < 'targetOutputSize' should the compressed block to decode be smaller.
              Always control how many bytes were decoded.
-             If the source stream is malformed, the function will stop decoding and return a negative result.
+             If the source stream is detected malformed, the function will stop decoding and return a negative result.
              This function never writes outside of output buffer, and never reads outside of input buffer. It is therefore protected against malicious data packets
 */
-
-
-int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int inputSize, int maxOutputSize);
-int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outputSize);
-
-/*
-*_withPrefix64k() :
-    These decoding functions work the same as their "normal name" versions,
-    but will potentially use up to 64KB of data in front of 'char* dest'.
-    These functions are used for decoding inter-dependant blocks.
-*/
-
 
 
 //****************************
@@ -184,6 +172,17 @@ Note that, for this function to work properly, minimum size of an input buffer m
 Compression can then resume, using LZ4_compress_continue() or LZ4_compress_limitedOutput_continue(), as usual.
 
 When compression is completed, a call to LZ4_free() will release the memory used by the LZ4 Data Structure.
+*/
+
+
+int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outputSize);
+
+/*
+*_withPrefix64k() :
+    These decoding functions work the same as their "normal name" versions,
+    but can use up to 64KB of data in front of 'char* dest'.
+    These functions are necessary to decode inter-dependant blocks.
 */
 
 

@@ -143,11 +143,7 @@ static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 
-void BMK_SetBlocksize(int bsize)
-{
-    chunkSize = bsize;
-    DISPLAY("-Using Block Size of %i KB-\n", chunkSize>>10);
-}
+void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
 
 void BMK_SetNbIterations(int nbLoops)
 {

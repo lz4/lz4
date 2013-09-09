@@ -103,11 +103,11 @@
 //****************************
 // Constants
 //****************************
-#define COMPRESSOR_NAME "Full LZ4 speed analyzer"
+#define COMPRESSOR_NAME "LZ4 speed analyzer"
 #define COMPRESSOR_VERSION ""
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %s, by %s (%s) ***\n", COMPRESSOR_NAME, COMPRESSOR_VERSION, AUTHOR, COMPILED
+#define WELCOME_MESSAGE "*** %s %s %i-bits, by %s (%s) ***\n", COMPRESSOR_NAME, COMPRESSOR_VERSION, (int)(sizeof(void*)*8), AUTHOR, COMPILED
 
 #define NBLOOPS    6
 #define TIMELOOP   2500

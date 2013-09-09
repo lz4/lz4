@@ -42,7 +42,7 @@ INCLUDE_DIRECTORIES (${SRC_DIR})
 
 
 set(LZ4_SRCS_LIB ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h ${SRC_DIR}lz4_format_description.txt)
-set(LZ4_SRCS ${LZ4_SRCS_LIB} ${SRC_DIR}xxhash.c ${SRC_DIR}bench.c ${SRC_DIR}lz4c.c )
+set(LZ4_SRCS ${LZ4_SRCS_LIB} ${SRC_DIR}xxhash.c ${SRC_DIR}bench.c ${SRC_DIR}lz4cli.c )
 set(FUZZER_SRCS ${SRC_DIR}lz4.c ${SRC_DIR}lz4hc.c ${SRC_DIR}lz4.h ${SRC_DIR}fuzzer.c)
 
 # EXECUTABLES FOR 32 Bit and 64 versions

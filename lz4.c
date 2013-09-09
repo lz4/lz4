@@ -177,8 +177,6 @@
   typedef unsigned long long  U64;
 #endif
 
-typedef const BYTE* Ptr;
-
 #if defined(__GNUC__)  && !defined(LZ4_FORCE_UNALIGNED_ACCESS)
 #  define _PACKED __attribute__ ((packed))
 #else
@@ -186,7 +184,7 @@ typedef const BYTE* Ptr;
 #endif
 
 #if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  ifdef __IBMC__
+#  if defined(__IBMC__) || defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 #    pragma pack(1)
 #  else
 #    pragma pack(push, 1)
@@ -199,7 +197,11 @@ typedef struct { U64 v; }  _PACKED U64_S;
 typedef struct {size_t v;} _PACKED size_t_S;
 
 #if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  pragma pack(pop)
+#  if defined(__SUNPRO_C) || defined(__SUNPRO_CC)
+#    pragma pack(0)
+#  else
+#    pragma pack(pop)
+#  endif
 #endif
 
 #define A16(x)   (((U16_S *)(x))->v)
@@ -244,9 +246,9 @@ const int LZ4_minLength = (MFLIMIT+1);
 
 typedef struct {
     U32 hashTable[HASHNBCELLS4];
-    Ptr bufferStart;
-    Ptr base;
-    Ptr nextBlock;
+    const BYTE* bufferStart;
+    const BYTE* base;
+    const BYTE* nextBlock;
 } LZ4_Data_Structure;
 
 typedef enum { notLimited = 0, limited = 1 } limitedOutput_directive;
@@ -268,9 +270,9 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 
 #if LZ4_ARCH64   // 64-bit
 #  define HTYPE                   U32
-#  define INITBASE(base)          Ptr const base = ip
+#  define INITBASE(base)          const BYTE* const base = ip
 #else            // 32-bit
-#  define HTYPE                   Ptr
+#  define HTYPE                   const BYTE*
 #  define INITBASE(base)          const int base = 0
 #endif
 
@@ -369,32 +371,32 @@ FORCE_INLINE int LZ4_hashSequence(U32 sequence, tableType_t tableType)
         return (((sequence) * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
 }
 
-FORCE_INLINE int LZ4_hashPosition(Ptr p, tableType_t tableType) { return LZ4_hashSequence(A32(p), tableType); }
+FORCE_INLINE int LZ4_hashPosition(const BYTE* p, tableType_t tableType) { return LZ4_hashSequence(A32(p), tableType); }
 
-FORCE_INLINE void LZ4_putPositionOnHash(Ptr p, U32 h, void* tableBase, tableType_t tableType, Ptr srcBase)
+FORCE_INLINE void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     switch (tableType)
     {
-    case byPtr: { Ptr* hashTable = (Ptr*) tableBase; hashTable[h] = p; break; }
-    case byU32: { U32* hashTable = (U32*) tableBase; hashTable[h] = p-srcBase; break; }
+    case byPtr: { const BYTE** hashTable = (const BYTE**) tableBase; hashTable[h] = p; break; }
+    case byU32: { U32* hashTable = (U32*) tableBase; hashTable[h] = (U32)(p-srcBase); break; }
     case byU16: { U16* hashTable = (U16*) tableBase; hashTable[h] = (U16)(p-srcBase); break; }
     }
 }
 
-FORCE_INLINE void LZ4_putPosition(Ptr p, void* tableBase, tableType_t tableType, Ptr srcBase)
+FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 h = LZ4_hashPosition(p, tableType);
     LZ4_putPositionOnHash(p, h, tableBase, tableType, srcBase);
 }
 
-FORCE_INLINE Ptr LZ4_getPositionOnHash(U32 h, void* tableBase, tableType_t tableType, Ptr srcBase)
+FORCE_INLINE const BYTE* LZ4_getPositionOnHash(U32 h, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
-    if (tableType == byPtr) { Ptr* hashTable = (Ptr*) tableBase; return hashTable[h]; }
+    if (tableType == byPtr) { const BYTE** hashTable = (const BYTE**) tableBase; return hashTable[h]; }
     if (tableType == byU32) { U32* hashTable = (U32*) tableBase; return hashTable[h] + srcBase; }
     { U16* hashTable = (U16*) tableBase; return hashTable[h] + srcBase; }   // default, to ensure a return
 }
 
-FORCE_INLINE Ptr LZ4_getPosition(Ptr p, void* tableBase, tableType_t tableType, Ptr srcBase)
+FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 h = LZ4_hashPosition(p, tableType);
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
@@ -412,13 +414,13 @@ FORCE_INLINE int LZ4_compress_generic(
                  tableType_t tableType,
                  prefix64k_directive prefix)
 {
-    Ptr ip = (Ptr) source;
-    Ptr const base = (prefix==withPrefix) ? ((LZ4_Data_Structure*)ctx)->base : (Ptr) source;
-    Ptr const lowLimit = ((prefix==withPrefix) ? ((LZ4_Data_Structure*)ctx)->bufferStart : (Ptr)source);
-    Ptr anchor = (Ptr) source;
-    Ptr const iend = ip + inputSize;
-    Ptr const mflimit = iend - MFLIMIT;
-    Ptr const matchlimit = iend - LASTLITERALS;
+    const BYTE* ip = (const BYTE*) source;
+    const BYTE* const base = (prefix==withPrefix) ? ((LZ4_Data_Structure*)ctx)->base : (const BYTE*) source;
+    const BYTE* const lowLimit = ((prefix==withPrefix) ? ((LZ4_Data_Structure*)ctx)->bufferStart : (const BYTE*)source);
+    const BYTE* anchor = (const BYTE*) source;
+    const BYTE* const iend = ip + inputSize;
+    const BYTE* const mflimit = iend - MFLIMIT;
+    const BYTE* const matchlimit = iend - LASTLITERALS;
 
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + maxOutputSize;
@@ -441,8 +443,8 @@ FORCE_INLINE int LZ4_compress_generic(
     for ( ; ; )
     {
         int findMatchAttempts = (1U << skipStrength) + 3;
-        Ptr forwardIp = ip;
-        Ptr ref;
+        const BYTE* forwardIp = ip;
+        const BYTE* ref;
         BYTE* token;
 
         // Find a match
@@ -599,7 +601,7 @@ int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, cha
 // Stream functions
 //****************************
 
-FORCE_INLINE void LZ4_init(LZ4_Data_Structure* lz4ds, Ptr base)
+FORCE_INLINE void LZ4_init(LZ4_Data_Structure* lz4ds, const BYTE* base)
 {
     MEM_INIT(lz4ds->hashTable, 0, sizeof(lz4ds->hashTable));
     lz4ds->bufferStart = base;
@@ -611,7 +613,7 @@ FORCE_INLINE void LZ4_init(LZ4_Data_Structure* lz4ds, Ptr base)
 void* LZ4_create (const char* inputBuffer)
 {
     void* lz4ds = ALLOCATOR(1, sizeof(LZ4_Data_Structure));
-    LZ4_init ((LZ4_Data_Structure*)lz4ds, (Ptr)inputBuffer);
+    LZ4_init ((LZ4_Data_Structure*)lz4ds, (const BYTE*)inputBuffer);
     return lz4ds;
 }
 
@@ -636,7 +638,7 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
         for (nH=0; nH < HASHNBCELLS4; nH++)
         {
             if (lz4ds->hashTable[nH] < (U32)newBaseDelta) lz4ds->hashTable[nH] = 0;
-            else lz4ds->hashTable[nH] -= newBaseDelta;
+            else lz4ds->hashTable[nH] -= (U32)newBaseDelta;
         }
         lz4ds->base += newBaseDelta;
     }
@@ -660,7 +662,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                  const char* source,
                  char* dest,
                  int inputSize,          //
-                 int outputSize,         // OutputSize must be != 0; if endOnInput==endOnInputSize, this value is the max size of Output Buffer.
+                 int outputSize,         // If endOnInput==endOnInputSize, this value is the max size of Output Buffer.
 
                  int endOnInput,         // endOnOutputSize, endOnInputSize
                  int prefix64k,          // noPrefix, withPrefix
@@ -669,19 +671,17 @@ FORCE_INLINE int LZ4_decompress_generic(
                  )
 {
     // Local Variables
-    Ptr restrict ip = (Ptr) source;
-    Ptr ref;
-    Ptr const iend = ip + inputSize;
+    const BYTE* restrict ip = (const BYTE*) source;
+    const BYTE* ref;
+    const BYTE* const iend = ip + inputSize;
 
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + outputSize;
     BYTE* cpy;
     BYTE* oexit = op + targetOutputSize;
 
-    size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
-#if LZ4_ARCH64
-    size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
-#endif
+    const size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};   // static reduces speed for LZ4_decompress_safe() on GCC64
+    static const size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
 
 
     // Special cases
@@ -749,11 +749,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         // copy repeated sequence
         if unlikely((op-ref)<(int)STEPSIZE)
         {
-#if LZ4_ARCH64
-            size_t dec64 = dec64table[op-ref];
-#else
-            const size_t dec64 = 0;
-#endif
+            const size_t dec64 = dec64table[(sizeof(void*)==4) ? 0 : op-ref];
             op[0] = ref[0];
             op[1] = ref[1];
             op[2] = ref[2];
@@ -803,6 +799,11 @@ int LZ4_decompress_safe_partial(const char* source, char* dest, int inputSize, i
     return LZ4_decompress_generic(source, dest, inputSize, maxOutputSize, endOnInputSize, noPrefix, partial, targetOutputSize);
 }
 
+int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int outputSize)
+{
+    return LZ4_decompress_generic(source, dest, 0, outputSize, endOnOutputSize, withPrefix, full, 0);
+}
+
 int LZ4_decompress_fast(const char* source, char* dest, int outputSize)
 {
 #ifdef _MSC_VER   // This version is faster with Visual
@@ -810,10 +811,5 @@ int LZ4_decompress_fast(const char* source, char* dest, int outputSize)
 #else
     return LZ4_decompress_generic(source, dest, 0, outputSize, endOnOutputSize, withPrefix, full, 0);
 #endif
-}
-
-int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int outputSize)
-{
-    return LZ4_decompress_generic(source, dest, 0, outputSize, endOnOutputSize, withPrefix, full, 0);
 }
 
