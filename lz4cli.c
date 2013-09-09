@@ -61,7 +61,6 @@
 #include <time.h>     // clock
 #include "lz4.h"
 #include "lz4hc.h"
-#include "lz4stream.h"
 #include "bench.h"
 #include "xxhash.h"
 
@@ -104,7 +103,7 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
-#define COMPRESSOR_VERSION "1.0.3"
+#define COMPRESSOR_VERSION "1.0.4"
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
 #define EXTENSION ".lz4"
