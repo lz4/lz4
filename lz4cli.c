@@ -18,8 +18,8 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
-  - LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
   - LZ4 source repository : http://code.google.com/p/lz4/
+  - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
   Note : this is stand-alone program.
@@ -57,12 +57,12 @@
 //****************************
 #include <stdio.h>    // fprintf, fopen, fread, _fileno, stdin, stdout
 #include <stdlib.h>   // malloc
-#include <string.h>   // strcmp
+#include <string.h>   // strcmp, strlen
 #include <time.h>     // clock
 #include "lz4.h"
 #include "lz4hc.h"
-#include "bench.h"
 #include "xxhash.h"
+#include "bench.h"
 
 
 //****************************
@@ -103,11 +103,11 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
-#define COMPRESSOR_VERSION "1.0.4"
+#define COMPRESSOR_VERSION "v1.0.5"
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
-#define EXTENSION ".lz4"
-#define WELCOME_MESSAGE "*** %s %s %i-bits, by %s (%s) ***\n", COMPRESSOR_NAME, COMPRESSOR_VERSION, (int)(sizeof(void*)*8), AUTHOR, COMPILED
+#define LZ4_EXTENSION ".lz4"
+#define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), COMPRESSOR_VERSION, AUTHOR, COMPILED
 
 #define KB *(1U<<10)
 #define MB *(1U<<20)
@@ -119,7 +119,7 @@
 #define _4BITS 0x0F
 #define _8BITS 0xFF
 
-#define MAGICNUMBER_SIZE 4
+#define MAGICNUMBER_SIZE   4
 #define LZ4S_MAGICNUMBER   0x184D2204
 #define LZ4S_SKIPPABLE0    0x184D2A50
 #define LZ4S_SKIPPABLEMASK 0xFFFFFFF0
@@ -183,12 +183,21 @@ static int blockIndependence = 1;
 #define EXM_THROW(error, ...)                                             \
 {                                                                         \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                        \
-    DISPLAYLEVEL(1, __VA_ARGS__);                                                 \
-    DISPLAYLEVEL(1, "\n");                                                        \
+    DISPLAYLEVEL(1, "Error %i : ", error);                                \
+    DISPLAYLEVEL(1, __VA_ARGS__);                                         \
+    DISPLAYLEVEL(1, "\n");                                                \
     exit(error);                                                          \
 }
 
+
+//**************************************
+// Version modifiers
+//**************************************
+#define EXTENDED_ARGUMENTS
+#define EXTENDED_HELP
+#define EXTENDED_FORMAT
+#define DEFAULT_COMPRESSOR   compress_file
+#define DEFAULT_DECOMPRESSOR decodeLZ4S
 
 
 //****************************
@@ -204,7 +213,8 @@ int usage()
     DISPLAY( "Arguments :\n");
     DISPLAY( " -1     : Fast compression (default) \n");
     DISPLAY( " -9     : High compression \n");
-    DISPLAY( " -d     : decompression \n");
+    DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
+    DISPLAY( " -z     : force compression\n");
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -h/-H  : display help/long help and exit\n");
     return 0;
@@ -221,7 +231,6 @@ int usage_advanced()
     DISPLAY( " -q     : suppress warnings; specify twice to suppress errors too\n");
     DISPLAY( " -c     : force write to standard output, even if it is the console\n");
     DISPLAY( " -t     : test compressed file integrity\n");
-    DISPLAY( " -z     : force compression\n");
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
     DISPLAY( " -BX    : enable block checksum (default:disabled)\n");
@@ -237,6 +246,7 @@ int usage_advanced()
     DISPLAY( " -y     : overwrite output without prompting \n");
     DISPLAY( " -s     : suppress warnings \n");
 #endif // DISABLE_LZ4C_LEGACY_OPTIONS
+    EXTENDED_HELP;
     return 0;
 }
 
@@ -250,9 +260,9 @@ int usage_longhelp()
     DISPLAY( "[output] can be left empty. In this case, it receives the following value : \n");
     DISPLAY( "          - if stdout is not the console, then [output] = stdout \n");
     DISPLAY( "          - if stdout is console : \n");
-    DISPLAY( "               + if compression selected, output to filename%s \n", EXTENSION);
-    DISPLAY( "               + if decompression selected, output to filename without '%s'\n", EXTENSION);
-    DISPLAY( "                    > if input filename has no '%s' extension : error\n", EXTENSION);
+    DISPLAY( "               + if compression selected, output to filename%s \n", LZ4_EXTENSION);
+    DISPLAY( "               + if decompression selected, output to filename without '%s'\n", LZ4_EXTENSION);
+    DISPLAY( "                    > if input filename has no '%s' extension : error\n", LZ4_EXTENSION);
     DISPLAY( "\n");
     DISPLAY( "Compression levels : \n");
     DISPLAY( "There are technically 2 accessible compression levels.\n");
@@ -367,12 +377,7 @@ int legacy_compress_file(char* input_filename, char* output_filename, int compre
 
 
     // Init
-    switch (compressionlevel)
-    {
-    case 0 : compressionFunction = LZ4_compress; break;
-    case 1 : compressionFunction = LZ4_compressHC; break;
-    default: compressionFunction = LZ4_compress;
-    }
+    if (compressionlevel < 3) compressionFunction = LZ4_compress; else compressionFunction = LZ4_compressHC;
     start = clock();
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
     if ((displayLevel==2) && (compressionlevel==1)) displayLevel=3;
@@ -395,12 +400,12 @@ int legacy_compress_file(char* input_filename, char* output_filename, int compre
         int inSize = (int) fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
         if( inSize<=0 ) break;
         filesize += inSize;
-        DISPLAYLEVEL(3, "Read : %i MB  \r", (int)(filesize>>20));
+        DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
 
         // Compress Block
         outSize = compressionFunction(in_buff, out_buff+4, inSize);
         compressedfilesize += outSize+4;
-        DISPLAYLEVEL(3, "Read : %i MB  ==> %.2f%%\r", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYLEVEL(3, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         // Write Block
         * (unsigned int*) out_buff = LITTLE_ENDIAN_32(outSize);
@@ -449,21 +454,20 @@ int compress_file_blockDependency(char* input_filename, char* output_filename, i
 
     // Init
     start = clock();
-    if ((displayLevel==2) && (compressionlevel==1)) displayLevel=3;
-    switch (compressionlevel)
+    if ((displayLevel==2) && (compressionlevel>=3)) displayLevel=3;
+    if (compressionlevel>=3)
     {
-    case 0 :
-        initFunction = LZ4_create;
-        compressionFunction = LZ4_compress_limitedOutput_continue;
-        translateFunction = LZ4_slideInputBuffer;
-        freeFunction = LZ4_free;
-        break;
-    case 1 :
-    default:
         initFunction = LZ4_createHC;
         compressionFunction = LZ4_compressHC_limitedOutput_continue;
         translateFunction = LZ4_slideInputBufferHC;
         freeFunction = LZ4_freeHC;
+    }
+    else
+    {
+        initFunction = LZ4_create;
+        compressionFunction = LZ4_compress_limitedOutput_continue;
+        translateFunction = LZ4_slideInputBuffer;
+        freeFunction = LZ4_free;
     }
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
     blockSize = LZ4S_GetBlockSize_FromBlockId (blockSizeId);
@@ -503,14 +507,14 @@ int compress_file_blockDependency(char* input_filename, char* output_filename, i
         inSize = (unsigned int) fread(in_start, (size_t)1, (size_t)blockSize, finput);
         if( inSize==0 ) break;   // No more input : end of compression
         filesize += inSize;
-        DISPLAYLEVEL(3, "Read : %i MB  \r", (int)(filesize>>20));
+        DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
         if (streamChecksum) XXH32_update(streamChecksumState, in_start, inSize);
 
         // Compress Block
         outSize = compressionFunction(ctx, in_start, out_buff+4, inSize, inSize-1);
         if (outSize > 0) compressedfilesize += outSize+4; else compressedfilesize += inSize+4;
         if (blockChecksum) compressedfilesize+=4;
-        DISPLAYLEVEL(3, "Read : %i MB  ==> %.2f%%\r", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYLEVEL(3, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         // Write Block
         if (outSize > 0)
@@ -600,13 +604,8 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 
     // Init
     start = clock();
-    if ((displayLevel==2) && (compressionlevel==1)) displayLevel=3;
-    switch (compressionlevel)
-    {
-    case 0 : compressionFunction = LZ4_compress_limitedOutput; break;
-    case 1 : compressionFunction = LZ4_compressHC_limitedOutput; break;
-    default: compressionFunction = LZ4_compress_limitedOutput;
-    }
+    if ((displayLevel==2) && (compressionlevel>=3)) displayLevel=3;
+    if (compressionlevel < 3) compressionFunction = LZ4_compress_limitedOutput; else compressionFunction = LZ4_compressHC_limitedOutput;
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
     blockSize = LZ4S_GetBlockSize_FromBlockId (blockSizeId);
 
@@ -643,14 +642,14 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
         unsigned int outSize;
 
         filesize += readSize;
-        DISPLAYLEVEL(3, "Read : %i MB  \r", (int)(filesize>>20));
+        DISPLAYLEVEL(3, "\rRead : %i MB   ", (int)(filesize>>20));
         if (streamChecksum) XXH32_update(streamChecksumState, in_buff, (int)readSize);
 
         // Compress Block
         outSize = compressionFunction(in_buff, out_buff+4, (int)readSize, (int)readSize-1);
         if (outSize > 0) compressedfilesize += outSize+4; else compressedfilesize += readSize+4;
         if (blockChecksum) compressedfilesize+=4;
-        DISPLAYLEVEL(3, "Read : %i MB  ==> %.2f%%\r", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYLEVEL(3, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         // Write Block
         if (outSize > 0)
@@ -736,13 +735,12 @@ unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
     // Main Loop
     while (1)
     {
-        size_t uselessRet;
-        int sinkint;
+        int decodeSize;
         size_t sizeCheck;
 
         // Block Size
-        uselessRet = fread(&blockSize, 1, 4, finput);
-        if( uselessRet==0 ) break;                 // Nothing to read : file read is completed
+        sizeCheck = fread(&blockSize, 1, 4, finput);
+        if (sizeCheck==0) break;                   // Nothing to read : file read is completed
         blockSize = LITTLE_ENDIAN_32(blockSize);   // Convert to Little Endian
         if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) 
         {   // Cannot read next block : maybe new stream ?
@@ -751,16 +749,16 @@ unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
         }
 
         // Read Block
-        uselessRet = fread(in_buff, 1, blockSize, finput);
+        sizeCheck = fread(in_buff, 1, blockSize, finput);
 
         // Decode Block
-        sinkint = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
-        if (sinkint < 0) EXM_THROW(52, "Decoding Failed ! Corrupted input detected !");
-        filesize += sinkint;
+        decodeSize = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
+        if (decodeSize < 0) EXM_THROW(52, "Decoding Failed ! Corrupted input detected !");
+        filesize += decodeSize;
 
         // Write Block
-        sizeCheck = fwrite(out_buff, 1, sinkint, foutput);
-        if (sizeCheck != (size_t)sinkint) EXM_THROW(53, "Write error : cannot write decoded block into output\n");
+        sizeCheck = fwrite(out_buff, 1, decodeSize, foutput);
+        if (sizeCheck != (size_t)decodeSize) EXM_THROW(53, "Write error : cannot write decoded block into output\n");
     }
 
     // Free
@@ -905,7 +903,7 @@ unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         if (!blockIndependenceFlag)
         {
             out_start += decodedBytes;
-            if (out_start + maxBlockSize > out_end) 
+            if ((size_t)(out_end - out_start) < (size_t)maxBlockSize) 
             {
                 memcpy(out_buff, out_start - prefix64k, prefix64k); 
                 out_start = out_buff + prefix64k; 
@@ -948,7 +946,7 @@ unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     switch(magicNumber)
     {
     case LZ4S_MAGICNUMBER:
-        return decodeLZ4S(finput, foutput);
+        return DEFAULT_DECOMPRESSOR(finput, foutput);
     case LEGACY_MAGICNUMBER:
         DISPLAYLEVEL(4, "Detected : Legacy format \n");
         return decodeLegacyStream(finput, foutput);
@@ -960,6 +958,7 @@ unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
         errorNb = fseek(finput, size, SEEK_CUR);
         if (errorNb != 0) EXM_THROW(43, "Stream error : cannot skip skippable area");
         return selectDecoder(finput, foutput);
+    EXTENDED_FORMAT;
     default:
         if (ftell(finput) == MAGICNUMBER_SIZE) EXM_THROW(44,"Unrecognized header : file cannot be decoded");   // Wrong magic number at the beginning of 1st stream
         DISPLAYLEVEL(2, "Stream followed by unrecognized data\n");
@@ -989,7 +988,7 @@ int decodeFile(char* input_filename, char* output_filename)
 
     // Final Status
     end = clock();
-    DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
+    DISPLAYLEVEL(2, "Successfully decoded %llu bytes                           \n", filesize);
     {
         double seconds = (double)(end - start)/CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
@@ -1004,6 +1003,13 @@ int decodeFile(char* input_filename, char* output_filename)
 }
 
 
+void waitEnter()
+{
+    DISPLAY("Press enter to continue...\n");
+    getchar();
+}
+
+
 int main(int argc, char** argv)
 {
     int i,
@@ -1012,11 +1018,13 @@ int main(int argc, char** argv)
         bench=0,
         filenamesStart=2,
         legacy_format=0,
-        forceStdout=0;
+        forceStdout=0,
+        forceCompress=0,
+        pause=0;
     char* input_filename=0;
     char* output_filename=0;
     char nullOutput[] = NULL_OUTPUT;
-    char extension[] = EXTENSION;
+    char extension[] = LZ4_EXTENSION;
 
     // Init
     programName = argv[0];
@@ -1042,14 +1050,12 @@ int main(int argc, char** argv)
                 argument ++;
 
 #if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
-                // Legacy options (-c0, -c1, -hc, -y, -s, -b0, -b1)
+                // Legacy options (-c0, -c1, -hc, -y, -s)
                 if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }          // -c0 (fast compression)
-                if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=1; argument++; continue; }          // -c1 (high compression)
-                if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=1; argument++; continue; }          // -hc (high compression)
+                if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }          // -c1 (high compression)
+                if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }          // -hc (high compression)
                 if (*argument=='y') { overwrite=1; continue; }                                             // -y (answer 'yes' to overwrite permission)
                 if (*argument=='s') { displayLevel=1; continue; }                                          // -s (silent mode)
-                if ((argument[0]=='b') && (argument[1]=='0')) { bench=1; cLevel=0; argument++; continue; } // -b0 (fast bench)
-                if ((argument[0]=='b') && (argument[1]=='1')) { bench=1; cLevel=1; argument++; continue; } // -b1 (HC bench)
 #endif // DISABLE_LZ4C_LEGACY_OPTIONS
 
                 switch(argument[0])
@@ -1060,19 +1066,19 @@ int main(int argc, char** argv)
                 case 'H': usage_advanced(); usage_longhelp(); return 0;
 
                     // Compression (default)
-                case 'z': break;
+                case 'z': forceCompress = 1; break;
 
                     // Compression level
                 case '0': 
                 case '1':
-                case '2': cLevel=0; break;
+                case '2':
                 case '3':
                 case '4':
                 case '5':
                 case '6':
                 case '7':
                 case '8':
-                case '9': cLevel=1; break;
+                case '9': cLevel=*argument -'0'; break;
 
                     // Use Legacy format (hidden option)
                 case 'l': legacy_format=1; break;
@@ -1141,8 +1147,10 @@ int main(int argc, char** argv)
                     }
                     break;
 
-                    // Pause at the end (benchmark only) (hidden option)
-                case 'p': BMK_SetPause(); break;
+                    // Pause at the end (hidden option)
+                case 'p': pause=1; BMK_SetPause(); break;
+
+                EXTENDED_ARGUMENTS;
 
                     // Unrecognised command
                 default : badusage();
@@ -1163,59 +1171,72 @@ int main(int argc, char** argv)
         }
     }
 
-    DISPLAYLEVEL(4, WELCOME_MESSAGE);
+    DISPLAYLEVEL(3, WELCOME_MESSAGE);
     DISPLAYLEVEL(4, "Blocks size : %i KB\n", (1 << ((blockSizeId*2)-2)));
 
     // No input filename ==> use stdin
     if(!input_filename) { input_filename=stdinmark; }
 
+    // Check if input or output are defined as console; trigger an error in this case
+    if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
+
     // Check if benchmark is selected
     if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, cLevel);
 
-    // No output filename ==> select one automatically (when possible)
-    if (!output_filename) 
+    // No output filename ==> try to select one automatically (when possible)
+    while (!output_filename) 
     {
-        if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; }
-        else if (!decode)   // compression
+        if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   // Default to stdout whenever possible (i.e. not a console)
+        if ((!decode) && !(forceCompress))   // auto-determine compression or decompression, based on file extension
         {
-            int i=0, l=0;
-            while (input_filename[l]!=0) l++;
-            output_filename = (char*)calloc(1,l+5);
-            for (i=0;i<l;i++) output_filename[i] = input_filename[i];
-            for (i=l;i<l+4;i++) output_filename[i] = extension[i-l];
-            DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
+            size_t l = strlen(input_filename);
+            if (!strcmp(input_filename+(l-4), LZ4_EXTENSION)) decode=1;
         }
-        else                // decompression (input file must respect format extension ".lz4")
+        if (!decode)   // compression to file
         {
-            int inl=0,outl;
-            while (input_filename[inl]!=0) inl++;
+            size_t l = strlen(input_filename);
+            output_filename = (char*)calloc(1,l+5);
+            strcpy(output_filename, input_filename);
+            strcpy(output_filename+l, LZ4_EXTENSION);
+            DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
+            break;
+        }
+        // decompression to file (automatic name will work only if input filename has format extension ".lz4")
+        {
+            size_t outl;
+            size_t inl = strlen(input_filename);
             output_filename = (char*)calloc(1,inl+1);
-            for (outl=0;outl<inl;outl++) output_filename[outl] = input_filename[outl];
+            strcpy(output_filename, input_filename);
+            outl = inl;
             if (inl>4)
                 while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) output_filename[outl--]=0;
-            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot automatically decide an output filename\n"); badusage(); }
+            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(); }
             DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
         }
     }
 
     // No warning message in pure pipe mode (stdin + stdout)
-    if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel>1)  && (displayLevel<4)) displayLevel=1;
+    if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
 
     // Check if input or output are defined as console; trigger an error in this case
     if (!strcmp(input_filename, stdinmark)  && IS_CONSOLE(stdin)                 ) badusage();
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) badusage();
 
     // Decompress input if selected
-    if (decode) return decodeFile(input_filename, output_filename);
-
-    // compression is default action
-    if (legacy_format)
-    {
-        DISPLAYLEVEL(2, "! Generating compressed LZ4 using Legacy format (deprecated !) ! \n");
-        return legacy_compress_file(input_filename, output_filename, cLevel);   
-    }
+    if (decode) decodeFile(input_filename, output_filename);
     else
+    // compression is default action
     {
-        return compress_file(input_filename, output_filename, cLevel);
+        if (legacy_format)
+        {
+            DISPLAYLEVEL(2, "! Generating compressed LZ4 using Legacy format (deprecated !) ! \n");
+            legacy_compress_file(input_filename, output_filename, cLevel);
+        }
+        else
+        {
+            DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
+        }
     }
+
+    if (pause) waitEnter();
 }

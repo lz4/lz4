@@ -105,9 +105,13 @@
 #define NBLOOPS    3
 #define TIMELOOP   2000
 
-#define KNUTH      2654435761U
-#define MAX_MEM    (1984<<20)
-#define DEFAULT_CHUNKSIZE   (4<<20)
+#define KB *(1U<<10)
+#define MB *(1U<<20)
+#define GB *(1U<<30)
+
+#define KNUTH               2654435761U
+#define MAX_MEM             (2 GB - 64 MB)
+#define DEFAULT_CHUNKSIZE   (4 MB)
 
 
 //**************************************
@@ -151,10 +155,7 @@ void BMK_SetNbIterations(int nbLoops)
     DISPLAY("- %i iterations -\n", nbIterations);
 }
 
-void BMK_SetPause()
-{
-    BMK_pause = 1;
-}
+void BMK_SetPause() { BMK_pause = 1; }
 
 
 //*********************************************************
@@ -202,10 +203,10 @@ static int BMK_GetMilliSpan( int nTimeStart )
 
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
-    size_t step = (64U<<20);   // 64 MB
+    size_t step = (64 MB);
     BYTE* testmem=NULL;
 
-    requiredMem = (((requiredMem >> 25) + 1) << 26);
+    requiredMem = (((requiredMem >> 26) + 1) << 26);
     if (requiredMem > MAX_MEM) requiredMem = MAX_MEM;
 
     requiredMem += 2*step;
@@ -244,6 +245,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   int fileIdx=0;
   char* orig_buff;
   struct compressionParameters compP;
+  int cfunctionId;
 
   U64 totals = 0;
   U64 totalz = 0;
@@ -252,7 +254,8 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
 
   // Init
-  switch (cLevel)
+  if (cLevel <3) cfunctionId = 0; else cfunctionId = 1;
+  switch (cfunctionId)
   {
 #ifdef COMPRESSOR0
   case 0 : compP.compressionFunction = COMPRESSOR0; break;
@@ -395,13 +398,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
           {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                //chunkP[chunkNb].origSize = LZ4_decompress_safe(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
                 chunkP[chunkNb].compressedSize = LZ4_decompress_fast(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
-                //chunkP[chunkNb].compressedSize = LZ4_decompress_fast_withPrefix64k(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
-                //chunkP[chunkNb].origSize = LZ4_decompress_safe_withPrefix64k(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
-                //chunkP[chunkNb].origSize = LZ4_decompress_safe_partial(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize-5, chunkSize);
-                //chunkP[chunkNb].compressedSize = LZ4_uncompress(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
-                //chunkP[chunkNb].origSize = LZ4_uncompress_unknownOutputSize(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkSize);
             nbLoops++;
           }
           milliTime = BMK_GetMilliSpan(milliTime);

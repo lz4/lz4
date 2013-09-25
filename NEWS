@@ -1,0 +1,6 @@
+r105 :
+Makefile : New install script and man page, contributed by Prasad Pandit
+lz4cli.c : Minor modifications, for easier extensibility
+COPYING : added license file
+LZ4_Streaming_Format.odt : modified file name to remove white space characters
+exe : .exe suffix now properly added only for Windows target
