@@ -1,3 +1,7 @@
+r106 :
+Makefile : make dist modify text files in the package to respect Unix EoL convention
+lz4cli : corrected small display bug in HC mode
+
 r105 :
 Makefile : New install script and man page, contributed by Prasad Pandit
 lz4cli.c : Minor modifications, for easier extensibility

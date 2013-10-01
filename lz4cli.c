@@ -103,7 +103,7 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
-#define COMPRESSOR_VERSION "v1.0.5"
+#define COMPRESSOR_VERSION "v1.0.6"
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
 #define LZ4_EXTENSION ".lz4"
@@ -344,7 +344,7 @@ int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, 
             if (!overwrite)
             {
                 char ch;
-                DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename); 
+                DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
                 DISPLAYLEVEL(2, "Overwrite ? (Y/N) : ");
                 if (displayLevel <= 1) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   // No interaction possible
                 ch = (char)getchar();
@@ -415,6 +415,7 @@ int legacy_compress_file(char* input_filename, char* output_filename, int compre
 
     // Status
     end = clock();
+    DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
     {
@@ -565,6 +566,7 @@ int compress_file_blockDependency(char* input_filename, char* output_filename, i
 
     // Status
     end = clock();
+    DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
     {
@@ -708,6 +710,7 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 
     // Final Status
     end = clock();
+    DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
     {
@@ -988,6 +991,7 @@ int decodeFile(char* input_filename, char* output_filename)
 
     // Final Status
     end = clock();
+    DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Successfully decoded %llu bytes                           \n", filesize);
     {
         double seconds = (double)(end - start)/CLOCKS_PER_SEC;

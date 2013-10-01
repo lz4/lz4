@@ -30,11 +30,11 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r105
+RELEASE=r106
 PREFIX=/usr
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
-DISTNAME=lz4-$(RELEASE).tar.gz
+DISTRIBNAME=lz4-$(RELEASE).tar.gz
 CC=gcc
 CFLAGS=-I. -std=c99 -Wall -W -Wundef -Wno-implicit-function-declaration
 
@@ -46,12 +46,14 @@ else
 EXT =
 endif
 
-SOURCES = bench.c bench.h fullbench.c fuzzer.c lz4.1 lz4.c lz4cli.c \
+TEXT = bench.c bench.h fullbench.c fuzzer.c lz4.1 lz4.c lz4cli.c \
 	lz4_format_description.txt lz4.h lz4hc.c lz4hc.h \
-	LZ4_Streaming_Format.odt Makefile xxhash.c xxhash.h \
+	Makefile xxhash.c xxhash.h \
 	NEWS COPYING \
 	cmake/CMakeLists.txt cmake/pack/release_COPYING.txt \
 	cmake/pack/CMakeLists.txt
+NONTEXT = LZ4_Streaming_Format.odt
+SOURCES = $(TEXT) $(NONTEXT)
 
 
 default: lz4 lz4c
@@ -99,11 +101,16 @@ uninstall:
 
 dist: clean
 	@install -dD -m 700 lz4-$(RELEASE)/cmake/pack/
-	@for f in $(SOURCES); do \
+	@for f in $(TEXT); do \
+		tr -d '\r' < $$f > .tmp; \
+		install -m 600 .tmp lz4-$(RELEASE)/$$f; \
+	done
+	@rm .tmp
+	@for f in $(NONTEXT); do \
 		install -m 600 $$f lz4-$(RELEASE)/$$f; \
 	done
-	@tar -czf $(DISTNAME) lz4-$(RELEASE)/
+	@tar -czf $(DISTRIBNAME) lz4-$(RELEASE)/
 	@rm -rf lz4-$(RELEASE)
-	@echo Distribution $(DISTNAME) built
+	@echo Distribution $(DISTRIBNAME) built
 
 endif
