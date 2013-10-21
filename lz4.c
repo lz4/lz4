@@ -430,6 +430,7 @@ FORCE_INLINE int LZ4_compress_generic(
     U32 forwardH;
 
     // Init conditions
+    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;                                // Unsupported input size, too large (or negative)
     if ((prefix==withPrefix) && (ip != ((LZ4_Data_Structure*)ctx)->nextBlock)) return 0;   // must continue from end of previous block
     if (prefix==withPrefix) ((LZ4_Data_Structure*)ctx)->nextBlock=iend;                    // do it now, due to potential early exit
     if ((tableType == byU16) && (inputSize>=LZ4_64KLIMIT)) return 0;                       // Size too large (not within 64K limit)

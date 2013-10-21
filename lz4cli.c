@@ -48,9 +48,8 @@
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
 #endif
 
-// Large file support on 32-bits unix
-#define _FILE_OFFSET_BITS 64
-
+#define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
+#define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
 //****************************
 // Includes
@@ -71,9 +70,13 @@
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>    // _O_BINARY
 #  include <io.h>       // _setmode, _isatty
+#  ifdef __MINGW32__
+   int _fileno(FILE *stream);   // MINGW somehow forgets to include this windows declaration into <stdio.h>
+#  endif
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
+#  include <unistd.h>   // isatty
 #  define SET_BINARY_MODE(file)
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
 #endif
@@ -103,7 +106,7 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
-#define COMPRESSOR_VERSION "v1.0.6"
+#define COMPRESSOR_VERSION "v1.0.7"
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
 #define LZ4_EXTENSION ".lz4"

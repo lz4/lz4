@@ -30,13 +30,14 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r106
-PREFIX=/usr
+RELEASE=r107
+DESTDIR=
+PREFIX=${DESTDIR}/usr
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 CC=gcc
-CFLAGS=-I. -std=c99 -Wall -W -Wundef -Wno-implicit-function-declaration
+CFLAGS=-I. -std=c99 -Wall -W -Wundef
 
 # Define *.exe as extension for Windows systems
 # ifeq ($(OS),Windows_NT)
@@ -90,13 +91,15 @@ clean:
 
 ifeq ($(shell uname),Linux)
 
-install: lz4
+install: lz4 lz4c
 	@install -d -m 755 $(BINDIR)/ $(MANDIR)/
 	@install -m 755 lz4 $(BINDIR)/lz4
+	@install -m 755 lz4c $(BINDIR)/lz4c
 	@install -m 644 lz4.1 $(MANDIR)/lz4.1
 
 uninstall:
 	[ -x $(BINDIR)/lz4 ] && rm -f $(BINDIR)/lz4
+	[ -x $(BINDIR)/lz4c ] && rm -f $(BINDIR)/lz4c
 	[ -f $(MANDIR)/lz4.1 ] && rm -f $(MANDIR)/lz4.1
 
 dist: clean

@@ -207,9 +207,9 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     BYTE* testmem=NULL;
 
     requiredMem = (((requiredMem >> 26) + 1) << 26);
+    requiredMem += 2*step;
     if (requiredMem > MAX_MEM) requiredMem = MAX_MEM;
 
-    requiredMem += 2*step;
     while (!testmem)
     {
         requiredMem -= step;
@@ -292,7 +292,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
       // Memory allocation & restrictions
       inFileSize = BMK_GetFileSize(inFileName);
-      benchedSize = (size_t) BMK_findMaxMem(inFileSize) / 2;
+      benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
       {

@@ -1,3 +1,16 @@
+r107 :
+Makefile : support DESTDIR for staged installs. Thanks Jorge Aparicio.
+Makefile : make install installs both lz4 and lz4c (Jorge Aparicio)
+Makefile : removed -Wno-implicit-declaration compilation switch
+lz4cli.c : include <stduni.h> for isatty() (Luca Barbato)
+lz4.h : introduced LZ4_MAX_INPUT_SIZE constant (Shay Green)
+lz4.h : LZ4_compressBound() : unified macro and inline definitions (Shay Green)
+lz4.h : LZ4_decompressSafe_partial() : clarify comments (Shay Green)
+lz4.c : LZ4_compress() verify input size condition (Shay Green)
+bench.c : corrected a bug in free memory size evaluation
+cmake : install into bin/ directory (Richard Yao)
+cmake : check for just C compiler (Elan Ruusamae)
+
 r106 :
 Makefile : make dist modify text files in the package to respect Unix EoL convention
 lz4cli : corrected small display bug in HC mode
