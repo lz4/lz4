@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r107
+RELEASE=r108
 DESTDIR=
 PREFIX=${DESTDIR}/usr
 BINDIR=$(PREFIX)/bin

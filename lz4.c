@@ -631,21 +631,27 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
     LZ4_Data_Structure* lz4ds = (LZ4_Data_Structure*)LZ4_Data;
     size_t delta = lz4ds->nextBlock - (lz4ds->bufferStart + 64 KB);
 
-    if(lz4ds->base - delta > lz4ds->base)   // underflow control
+    if ( (lz4ds->base - delta > lz4ds->base)                          // underflow control
+       || ((size_t)(lz4ds->nextBlock - lz4ds->base) > 0xE0000000) )   // close to 32-bits limit
     {
-        size_t newBaseDelta = (lz4ds->nextBlock - 64 KB) - lz4ds->base;
+        size_t deltaLimit = (lz4ds->nextBlock - 64 KB) - lz4ds->base;
         int nH;
 
         for (nH=0; nH < HASHNBCELLS4; nH++)
         {
-            if (lz4ds->hashTable[nH] < (U32)newBaseDelta) lz4ds->hashTable[nH] = 0;
-            else lz4ds->hashTable[nH] -= (U32)newBaseDelta;
+            if ((size_t)(lz4ds->hashTable[nH]) < deltaLimit) lz4ds->hashTable[nH] = 0;
+            else lz4ds->hashTable[nH] -= (U32)deltaLimit;
         }
-        lz4ds->base += newBaseDelta;
+        memcpy((void*)(lz4ds->bufferStart), (const void*)(lz4ds->nextBlock - 64 KB), 64 KB);
+        lz4ds->base = lz4ds->bufferStart;
+        lz4ds->nextBlock = lz4ds->base + 64 KB;
     }
-    memcpy((void*)(lz4ds->bufferStart), (const void*)(lz4ds->nextBlock - 64 KB), 64 KB);
-    lz4ds->nextBlock -= delta;
-    lz4ds->base -= delta;
+    else
+    {
+		memcpy((void*)(lz4ds->bufferStart), (const void*)(lz4ds->nextBlock - 64 KB), 64 KB);
+		lz4ds->nextBlock -= delta;
+		lz4ds->base -= delta;
+	}
 
     return (char*)(lz4ds->nextBlock);
 }

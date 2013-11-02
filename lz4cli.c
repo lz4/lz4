@@ -49,7 +49,8 @@
 #endif
 
 #define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
-#define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
+#define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
+
 
 //****************************
 // Includes
@@ -106,7 +107,7 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
-#define COMPRESSOR_VERSION "v1.0.7"
+#define COMPRESSOR_VERSION "v1.0.8"
 #define COMPILED __DATE__
 #define AUTHOR "Yann Collet"
 #define LZ4_EXTENSION ".lz4"

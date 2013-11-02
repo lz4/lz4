@@ -1,3 +1,6 @@
+r108 :
+lz4.c : corrected compression efficiency issue 97 in 64-bits chained mode (-BD) for streams > 4 GB (thanks Roman Strashkin for reporting)
+
 r107 :
 Makefile : support DESTDIR for staged installs. Thanks Jorge Aparicio.
 Makefile : make install installs both lz4 and lz4c (Jorge Aparicio)
@@ -13,11 +16,11 @@ cmake : check for just C compiler (Elan Ruusamae)
 
 r106 :
 Makefile : make dist modify text files in the package to respect Unix EoL convention
-lz4cli : corrected small display bug in HC mode
+lz4cli.c : corrected small display bug in HC mode
 
 r105 :
 Makefile : New install script and man page, contributed by Prasad Pandit
 lz4cli.c : Minor modifications, for easier extensibility
-COPYING : added license file
+COPYING  : added license file
 LZ4_Streaming_Format.odt : modified file name to remove white space characters
-exe : .exe suffix now properly added only for Windows target
+Makefile : .exe suffix now properly added only for Windows target
