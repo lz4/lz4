@@ -30,14 +30,14 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r108
+RELEASE=r109
 DESTDIR=
 PREFIX=${DESTDIR}/usr
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 CC=gcc
-CFLAGS=-I. -std=c99 -Wall -W -Wundef
+CFLAGS=-I. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"v1.0.9\"
 
 # Define *.exe as extension for Windows systems
 # ifeq ($(OS),Windows_NT)

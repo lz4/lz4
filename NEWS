@@ -1,3 +1,7 @@
+r109 :
+lz4.c : corrected issue 98 (LZ4_compress_limitedOutput())
+Makefile : can specify version number from makefile
+
 r108 :
 lz4.c : corrected compression efficiency issue 97 in 64-bits chained mode (-BD) for streams > 4 GB (thanks Roman Strashkin for reporting)
 

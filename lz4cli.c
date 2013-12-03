@@ -107,11 +107,12 @@
 // Constants
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
-#define COMPRESSOR_VERSION "v1.0.8"
-#define COMPILED __DATE__
+#ifndef LZ4_VERSION
+#  define LZ4_VERSION "v1.0.9"
+#endif
 #define AUTHOR "Yann Collet"
+#define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
 #define LZ4_EXTENSION ".lz4"
-#define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), COMPRESSOR_VERSION, AUTHOR, COMPILED
 
 #define KB *(1U<<10)
 #define MB *(1U<<20)

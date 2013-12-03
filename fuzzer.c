@@ -42,6 +42,10 @@
 //**************************************
 // Constants
 //**************************************
+#ifndef LZ4_VERSION
+#  define LZ4_VERSION ""
+#endif
+
 #define NB_ATTEMPTS (1<<17)
 #define LEN ((1<<15))
 #define SEQ_POW 2
@@ -135,7 +139,7 @@ int main() {
 #       define FUZ_CHECKTEST(cond, message) if (cond) { printf("Test %i : %s : seed %u, cycle %i \n", testNb, message, seed, attemptNb); goto _output_error; }
 #       define FUZ_DISPLAYTEST              testNb++; printf("%2i\b\b", testNb);
 
-        printf("starting LZ4 fuzzer\n");
+        printf("starting LZ4 fuzzer (%s)\n", LZ4_VERSION);
         printf("Select an Initialisation number (default : random) : ");
         fflush(stdout);
         if ( fgets(userInput, sizeof userInput, stdin) )

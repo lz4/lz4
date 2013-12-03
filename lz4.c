@@ -469,7 +469,7 @@ FORCE_INLINE int LZ4_compress_generic(
         // Encode Literal length
         length = (int)(ip - anchor);
         token = op++;
-        if ((limitedOutput) && unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) > oend)) return 0;   // Check output limit
+        if ((limitedOutput) && unlikely(op + length + (2 + 1 + LASTLITERALS) + (length/255) > oend)) return 0;   // Check output limit
         if (length>=(int)RUN_MASK) 
         { 
             int len = length-RUN_MASK; 
@@ -534,7 +534,7 @@ _last_literals:
     // Encode Last Literals
     {
         int lastRun = (int)(iend - anchor);
-        if ((limitedOutput) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;  // Check output limit
+        if ((limitedOutput) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;   // Check output limit
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun >= 255 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
@@ -648,10 +648,10 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
     }
     else
     {
-		memcpy((void*)(lz4ds->bufferStart), (const void*)(lz4ds->nextBlock - 64 KB), 64 KB);
-		lz4ds->nextBlock -= delta;
-		lz4ds->base -= delta;
-	}
+        memcpy((void*)(lz4ds->bufferStart), (const void*)(lz4ds->nextBlock - 64 KB), 64 KB);
+        lz4ds->nextBlock -= delta;
+        lz4ds->base -= delta;
+    }
 
     return (char*)(lz4ds->nextBlock);
 }
