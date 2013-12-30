@@ -30,14 +30,14 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r109
+RELEASE=r110
 DESTDIR=
 PREFIX=${DESTDIR}/usr
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 CC=gcc
-CFLAGS=-I. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"v1.0.9\"
+CFLAGS=-I. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
 
 # Define *.exe as extension for Windows systems
 # ifeq ($(OS),Windows_NT)
@@ -85,7 +85,8 @@ fullbench32: lz4.c lz4hc.c xxhash.c fullbench.c
 
 clean:
 	@rm -f core *.o lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT)
+        fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) \
+        $(DISTRIBNAME)
 	@echo Cleaning completed
 
 

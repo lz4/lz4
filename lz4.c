@@ -117,7 +117,7 @@
 #    pragma intrinsic(_BitScanReverse)   // For Visual 2005
 #  endif
 #  pragma warning(disable : 4127)        // disable: C4127: conditional expression is constant
-#else 
+#else
 #  ifdef __GNUC__
 #    define FORCE_INLINE static inline __attribute__((always_inline))
 #  else
@@ -470,12 +470,12 @@ FORCE_INLINE int LZ4_compress_generic(
         length = (int)(ip - anchor);
         token = op++;
         if ((limitedOutput) && unlikely(op + length + (2 + 1 + LASTLITERALS) + (length/255) > oend)) return 0;   // Check output limit
-        if (length>=(int)RUN_MASK) 
-        { 
-            int len = length-RUN_MASK; 
-            *token=(RUN_MASK<<ML_BITS); 
-            for(; len >= 255 ; len-=255) *op++ = 255; 
-            *op++ = (BYTE)len; 
+        if (length>=(int)RUN_MASK)
+        {
+            int len = length-RUN_MASK;
+            *token=(RUN_MASK<<ML_BITS);
+            for(; len >= 255 ; len-=255) *op++ = 255;
+            *op++ = (BYTE)len;
         }
         else *token = (BYTE)(length<<ML_BITS);
 
@@ -504,13 +504,13 @@ _endCount:
         // Encode MatchLength
         length = (int)(ip - anchor);
         if ((limitedOutput) && unlikely(op + (1 + LASTLITERALS) + (length>>8) > oend)) return 0;    // Check output limit
-        if (length>=(int)ML_MASK) 
-        { 
-            *token += ML_MASK; 
-            length -= ML_MASK; 
-            for (; length > 509 ; length-=510) { *op++ = 255; *op++ = 255; } 
-            if (length >= 255) { length-=255; *op++ = 255; } 
-            *op++ = (BYTE)length; 
+        if (length>=(int)ML_MASK)
+        {
+            *token += ML_MASK;
+            length -= ML_MASK;
+            for (; length > 509 ; length-=510) { *op++ = 255; *op++ = 255; }
+            if (length >= 255) { length-=255; *op++ = 255; }
+            *op++ = (BYTE)length;
         }
         else *token += (BYTE)(length);
 
@@ -521,7 +521,7 @@ _endCount:
         LZ4_putPosition(ip-2, ctx, tableType, base);
 
         // Test next position
-        ref = LZ4_getPosition(ip, ctx, tableType, base); 
+        ref = LZ4_getPosition(ip, ctx, tableType, base);
         LZ4_putPosition(ip, ctx, tableType, base);
         if ((ref + MAX_DISTANCE >= ip) && (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
 
@@ -551,7 +551,7 @@ int LZ4_compress(const char* source, char* dest, int inputSize)
 #if (HEAPMODE)
     void* ctx = ALLOCATOR(HASHNBCELLS4, 4);   // Aligned on 4-bytes boundaries
 #else
-    U32 ctx[1U<<(MEMORY_USAGE-2)] = {0};           // Ensure data is aligned on 4-bytes boundaries
+    U32 ctx[1U<<(MEMORY_USAGE-2)] = {0};      // Ensure data is aligned on 4-bytes boundaries
 #endif
     int result;
 
@@ -566,18 +566,12 @@ int LZ4_compress(const char* source, char* dest, int inputSize)
     return result;
 }
 
-int LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int inputSize)
-{
-    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, 0, notLimited, byU32, withPrefix);
-}
-
-
 int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
 #if (HEAPMODE)
     void* ctx = ALLOCATOR(HASHNBCELLS4, 4);   // Aligned on 4-bytes boundaries
 #else
-    U32 ctx[1U<<(MEMORY_USAGE-2)] = {0};           // Ensure data is aligned on 4-bytes boundaries
+    U32 ctx[1U<<(MEMORY_USAGE-2)] = {0};      // Ensure data is aligned on 4-bytes boundaries
 #endif
     int result;
 
@@ -592,15 +586,46 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
     return result;
 }
 
-int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize)
+
+//*****************************
+// Using an external allocation
+//*****************************
+
+int LZ4_sizeofState() { return 1 << MEMORY_USAGE; }
+
+
+int LZ4_compress_withState (void* state, const char* source, char* dest, int inputSize)
 {
-    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limited, byU32, withPrefix);
+    if (((size_t)(state)&3) != 0) return 0;   // Error : state is not aligned on 4-bytes boundary
+    MEM_INIT(state, 0, LZ4_sizeofState());
+
+    if (inputSize < (int)LZ4_64KLIMIT)
+        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noPrefix);
+    else
+        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, (sizeof(void*)==8) ? byU32 : byPtr, noPrefix);
+}
+
+
+int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    if (((size_t)(state)&3) != 0) return 0;   // Error : state is not aligned on 4-bytes boundary
+    MEM_INIT(state, 0, LZ4_sizeofState());
+
+    if (inputSize < (int)LZ4_64KLIMIT)
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limited, byU16, noPrefix);
+    else
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limited, (sizeof(void*)==8) ? byU32 : byPtr, noPrefix);
 }
 
 
 //****************************
 // Stream functions
 //****************************
+
+int LZ4_sizeofStreamState()
+{
+    return sizeof(LZ4_Data_Structure);
+}
 
 FORCE_INLINE void LZ4_init(LZ4_Data_Structure* lz4ds, const BYTE* base)
 {
@@ -610,6 +635,12 @@ FORCE_INLINE void LZ4_init(LZ4_Data_Structure* lz4ds, const BYTE* base)
     lz4ds->nextBlock = base;
 }
 
+int LZ4_resetStreamState(void* state, const char* inputBuffer)
+{
+    if ((((size_t)state) & 3) != 0) return 1;   // Error : pointer is not aligned on 4-bytes boundary
+    LZ4_init((LZ4_Data_Structure*)state, (const BYTE*)inputBuffer);
+    return 0;
+}
 
 void* LZ4_create (const char* inputBuffer)
 {
@@ -657,13 +688,25 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
 }
 
 
+int LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, 0, notLimited, byU32, withPrefix);
+}
+
+
+int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limited, byU32, withPrefix);
+}
+
+
 //****************************
 // Decompression functions
 //****************************
 
 // This generic decompression function cover all use cases.
 // It shall be instanciated several times, using different sets of directives
-// Note that it is essential this generic function is really inlined, 
+// Note that it is essential this generic function is really inlined,
 // in order to remove useless branches during compilation optimisation.
 FORCE_INLINE int LZ4_decompress_generic(
                  const char* source,
@@ -706,13 +749,13 @@ FORCE_INLINE int LZ4_decompress_generic(
         // get runlength
         token = *ip++;
         if ((length=(token>>ML_BITS)) == RUN_MASK)
-        { 
-            unsigned s=255; 
+        {
+            unsigned s=255;
             while (((endOnInput)?ip<iend:1) && (s==255))
-            { 
-                s = *ip++; 
-                length += s; 
-            } 
+            {
+                s = *ip++;
+                length += s;
+            }
         }
 
         // copy literals
@@ -742,14 +785,14 @@ FORCE_INLINE int LZ4_decompress_generic(
         if ((prefix64k==noPrefix) && unlikely(ref < (BYTE* const)dest)) goto _output_error;   // Error : offset outside destination buffer
 
         // get matchlength
-        if ((length=(token&ML_MASK)) == ML_MASK) 
-        { 
+        if ((length=(token&ML_MASK)) == ML_MASK)
+        {
             while ((!endOnInput) || (ip<iend-(LASTLITERALS+1)))   // Ensure enough bytes remain for LASTLITERALS + token
             {
-                unsigned s = *ip++; 
-                length += s; 
-                if (s==255) continue; 
-                break; 
+                unsigned s = *ip++;
+                length += s;
+                if (s==255) continue;
+                break;
             }
         }
 
@@ -762,7 +805,7 @@ FORCE_INLINE int LZ4_decompress_generic(
             op[2] = ref[2];
             op[3] = ref[3];
             op += 4, ref += 4; ref -= dec32table[op-ref];
-            A32(op) = A32(ref); 
+            A32(op) = A32(ref);
             op += STEPSIZE-4; ref -= dec64;
         } else { LZ4_COPYSTEP(op,ref); }
         cpy = op + length - (STEPSIZE-4);

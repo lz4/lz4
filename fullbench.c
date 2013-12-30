@@ -31,7 +31,7 @@
 
 // Unix Large Files support (>4GB)
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
-#  define _LARGEFILE_SOURCE 
+#  define _LARGEFILE_SOURCE
 #  define _FILE_OFFSET_BITS 64
 #elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
 #  define _LARGEFILE64_SOURCE
@@ -256,6 +256,17 @@ static inline int local_LZ4_compress_limitedOutput(const char* in, char* out, in
     return LZ4_compress_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
 }
 
+static void* stateLZ4;
+static inline int local_LZ4_compress_withState(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_withState(stateLZ4, in, out, inSize);
+}
+
+static inline int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_limitedOutput_withState(stateLZ4, in, out, inSize, LZ4_compressBound(inSize));
+}
+
 static void* ctx;
 static inline int local_LZ4_compress_continue(const char* in, char* out, int inSize)
 {
@@ -265,6 +276,17 @@ static inline int local_LZ4_compress_continue(const char* in, char* out, int inS
 static inline int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
+}
+
+static void* stateLZ4HC;
+static inline int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_withState(stateLZ4HC, in, out, inSize);
+}
+
+static inline int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_limitedOutput_withState(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static inline int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
@@ -305,10 +327,15 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
   char* orig_buff;
-# define NB_COMPRESSION_ALGORITHMS 8
+# define NB_COMPRESSION_ALGORITHMS 12
 # define MINCOMPRESSIONCHAR '0'
 # define MAXCOMPRESSIONCHAR (MINCOMPRESSIONCHAR + NB_COMPRESSION_ALGORITHMS)
-  static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput", "LZ4_compress_continue", "LZ4_compress_limitedOutput_continue", "LZ4_compressHC", "LZ4_compressHC_limitedOutput", "LZ4_compressHC_continue", "LZ4_compressHC_limitedOutput_continue" };
+  static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput",
+                                      "LZ4_compress_withState", "LZ4_compress_limitedOutput_withState",
+                                      "LZ4_compress_continue", "LZ4_compress_limitedOutput_continue",
+                                      "LZ4_compressHC", "LZ4_compressHC_limitedOutput",
+                                      "LZ4_compressHC_withStateHC", "LZ4_compressHC_limitedOutput_withStateHC",
+                                      "LZ4_compressHC_continue", "LZ4_compressHC_limitedOutput_continue" };
   double totalCTime[NB_COMPRESSION_ALGORITHMS] = {0};
   double totalCSize[NB_COMPRESSION_ALGORITHMS] = {0};
 # define NB_DECOMPRESSION_ALGORITHMS 5
@@ -333,6 +360,11 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       size_t readSize;
       char* compressed_buff; int compressedBuffSize;
       U32 crcOriginal;
+
+
+      // Init
+      stateLZ4   = malloc(LZ4_sizeofState());
+      stateLZ4HC = malloc(LZ4_sizeofStateHC());
 
       // Check file existence
       inFileName = fileNamesTable[fileIdx++];
@@ -426,14 +458,18 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
             switch(cAlgNb)
             {
-            case 0: compressionFunction = LZ4_compress; break;
-            case 1: compressionFunction = local_LZ4_compress_limitedOutput; break;
-            case 2: compressionFunction = local_LZ4_compress_continue; initFunction = LZ4_create; break;
-            case 3: compressionFunction = local_LZ4_compress_limitedOutput_continue; initFunction = LZ4_create; break;
-            case 4: compressionFunction = LZ4_compressHC; break;
-            case 5: compressionFunction = local_LZ4_compressHC_limitedOutput; break;
-            case 6: compressionFunction = local_LZ4_compressHC_continue; initFunction = LZ4_createHC; break;
-            case 7: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; break;
+            case 0 : compressionFunction = LZ4_compress; break;
+            case 1 : compressionFunction = local_LZ4_compress_limitedOutput; break;
+            case 2 : compressionFunction = local_LZ4_compress_withState; break;
+            case 3 : compressionFunction = local_LZ4_compress_limitedOutput_withState; break;
+            case 4 : compressionFunction = local_LZ4_compress_continue; initFunction = LZ4_create; break;
+            case 5 : compressionFunction = local_LZ4_compress_limitedOutput_continue; initFunction = LZ4_create; break;
+            case 6 : compressionFunction = LZ4_compressHC; break;
+            case 7 : compressionFunction = local_LZ4_compressHC_limitedOutput; break;
+            case 8 : compressionFunction = local_LZ4_compressHC_withStateHC; break;
+            case 9 : compressionFunction = local_LZ4_compressHC_limitedOutput_withStateHC; break;
+            case 10: compressionFunction = local_LZ4_compressHC_continue; initFunction = LZ4_createHC; break;
+            case 11: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 
@@ -633,14 +669,14 @@ int main(int argc, char** argv)
                 switch(argument[0])
                 {
                     // Select compression algorithm only
-                case 'c': 
-                    decompressionTest = 0; 
+                case 'c':
+                    decompressionTest = 0;
                     if ((argument[1]>= MINCOMPRESSIONCHAR) && (argument[1]<= MAXCOMPRESSIONCHAR))
                        compressionAlgo = argument[1] - '0', argument++;
                     break;
 
                     // Select decompression algorithm only
-                case 'd': 
+                case 'd':
                     compressionTest = 0;
                     if ((argument[1]>= MINDECOMPRESSIONCHAR) && (argument[1]<= MAXDECOMPRESSIONCHAR))
                        decompressionAlgo = argument[1] - '0', argument++;
@@ -659,10 +695,10 @@ int main(int argc, char** argv)
                     case '5':
                     case '6':
                     case '7':
-                    { 
-                        int B = argument[1] - '0'; 
-                        int S = 1 << (8 + 2*B); 
-                        BMK_SetBlocksize(S); 
+                    {
+                        int B = argument[1] - '0';
+                        int S = 1 << (8 + 2*B);
+                        BMK_SetBlocksize(S);
                         argument++;
                         break;
                     }
@@ -673,11 +709,11 @@ _exit_blockProperties:
                     break;
 
                     // Modify Nb Iterations
-                case 'i': 
+                case 'i':
                     if ((argument[1] >='1') && (argument[1] <='9'))
                     {
-                        int iters = argument[1] - '0'; 
-                        BMK_SetNbIterations(iters); 
+                        int iters = argument[1] - '0';
+                        BMK_SetNbIterations(iters);
                         argument++;
                     }
                     break;

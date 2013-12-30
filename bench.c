@@ -432,7 +432,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   if (nbFiles > 1)
         DISPLAY("%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL", (long long unsigned int)totals, (long long unsigned int)totalz, (double)totalz/(double)totals*100., (double)totals/totalc/1000., (double)totals/totald/1000.);
 
-  if (BMK_pause) { DISPLAY("press enter...\n"); getchar(); }
+  if (BMK_pause) { DISPLAY("\npress enter...\n"); getchar(); }
 
   return 0;
 }

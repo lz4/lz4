@@ -1,3 +1,11 @@
+r110 :
+lz4 & lz4hc : added capability to allocate state & stream state with custom allocator (issue 99)
+fuzzer & fullbench : updated to test new functions
+man : documented -l command (Legacy format, for Linux kernel compression) (issue 102)
+cmake : improved version by Mika Attila, building programs and libraries (issue 100)
+xxHash : updated to r33
+Makefile : clean also delete local package .tar.gz
+
 r109 :
 lz4.c : corrected issue 98 (LZ4_compress_limitedOutput())
 Makefile : can specify version number from makefile
