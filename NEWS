@@ -1,3 +1,7 @@
+r111 :
+Makefile : added capability to install libraries
+Modified Directory tree, to better separate libraries from programs.
+
 r110 :
 lz4 & lz4hc : added capability to allocate state & stream state with custom allocator (issue 99)
 fuzzer & fullbench : updated to test new functions
