@@ -30,11 +30,11 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r111
+RELEASE=r112
 DESTDIR=
 PREFIX=/usr
 CC=gcc
-CFLAGS+= -I. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS+= -I.. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
 
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1

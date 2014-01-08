@@ -30,7 +30,7 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-RELEASE=r111
+RELEASE=r112
 DESTDIR=
 PREFIX=/usr
 CC=gcc
@@ -61,6 +61,7 @@ SOURCES = $(TEXT) $(NONTEXT)
 
 
 default: liblz4
+	@cd $(PRGDIR); make
 
 all: liblz4 lz4programs
 
@@ -73,8 +74,8 @@ liblz4.a: lz4.c lz4hc.c
 	$(CC) -O3 -c $(CFLAGS) $^
 	ar rcs liblz4.a lz4.o lz4hc.o
 
-liblz4.so: lz4.c lz4hc.c lz4.h
-	$(CC) -shared -fPIC -Wl,--soname=liblz4.so.1 $(CFLAGS) -o $@
+liblz4.so: lz4.c lz4hc.c
+	$(CC) -shared -fPIC -Wl,--soname=liblz4.so.1 $(CFLAGS) $^ -o $@
 
 clean:
 	@rm -f core *.o *.a *.so $(DISTRIBNAME)
@@ -97,8 +98,8 @@ install: liblz4
 uninstall:
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.so ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.so
-	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@echo lz4 libraries successfully uninstalled
 	@cd $(PRGDIR); make uninstall
 
