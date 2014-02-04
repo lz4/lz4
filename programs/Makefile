@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r112
+RELEASE=r113
 DESTDIR=
 PREFIX=/usr
 CC=gcc
@@ -53,13 +53,13 @@ default: lz4 lz4c
 
 all: lz4 lz4c lz4c32 fuzzer fuzzer32 fullbench fullbench32
 
-lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4cli.c
+lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC)      -O3 $(CFLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4cli.c
+lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
 
-lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4cli.c
+lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC) -m32 -O3 $(CFLAGS) $^ -o $@$(EXT)
 
 fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c

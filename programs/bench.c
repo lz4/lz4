@@ -59,9 +59,10 @@
 #endif
 
 #include "lz4.h"
-#define COMPRESSOR0 LZ4_compress
+#define COMPRESSOR0 LZ4_compress_local
+static int LZ4_compress_local(const char* src, char* dst, int size, int clevel) { (void)clevel; return LZ4_compress(src, dst, size); }
 #include "lz4hc.h"
-#define COMPRESSOR1 LZ4_compressHC
+#define COMPRESSOR1 LZ4_compressHC2
 #define DEFAULTCOMPRESSOR COMPRESSOR0
 
 #include "xxhash.h"
@@ -128,7 +129,7 @@ struct chunkParameters
 
 struct compressionParameters
 {
-    int (*compressionFunction)(const char*, char*, int);
+    int (*compressionFunction)(const char*, char*, int, int);
     int (*decompressionFunction)(const char*, char*, int);
 };
 
@@ -137,7 +138,6 @@ struct compressionParameters
 // MACRO
 //**************************************
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
-
 
 
 //**************************************
@@ -254,7 +254,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
 
   // Init
-  if (cLevel <3) cfunctionId = 0; else cfunctionId = 1;
+  if (cLevel <= 3) cfunctionId = 0; else cfunctionId = 1;
   switch (cfunctionId)
   {
 #ifdef COMPRESSOR0
@@ -377,7 +377,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
           {
             for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = compP.compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
+                chunkP[chunkNb].compressedSize = compP.compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize, cLevel);
             nbLoops++;
           }
           milliTime = BMK_GetMilliSpan(milliTime);

@@ -30,7 +30,7 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-RELEASE=r112
+RELEASE=r113
 DESTDIR=
 PREFIX=/usr
 CC=gcc
@@ -53,6 +53,7 @@ TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
 	lz4_format_description.txt Makefile NEWS LICENSE \
 	cmake_unofficial/CMakeLists.txt \
 	$(PRGDIR)/fullbench.c $(PRGDIR)/fuzzer.c $(PRGDIR)/lz4cli.c \
+	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
 	$(PRGDIR)/xxhash.c $(PRGDIR)/xxhash.h \
 	$(PRGDIR)/lz4.1 $(PRGDIR)/Makefile $(PRGDIR)/COPYING

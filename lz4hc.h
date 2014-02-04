@@ -63,17 +63,30 @@ LZ4_compress_limitedOutput() :
 */
 
 
+int LZ4_compressHC2 (const char* source, char* dest, int inputSize, int compressionLevel);
+int LZ4_compressHC2_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+/*
+    Same functions as above, but with programmable 'compressionLevel'.
+    Recommended values are between 4 and 9, although any value between 0 and 16 will work.
+    'compressionLevel'==0 means use default 'compressionLevel' value.
+    Values above 16 behave the same as 16.
+    Equivalent variants exist for all other compression functions below.
+*/
+
 /* Note :
 Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD license)
 */
 
 
-//*****************************
-// Using an external allocation
-//*****************************
+/**************************************
+   Using an external allocation
+**************************************/
 int LZ4_sizeofStateHC();
 int LZ4_compressHC_withStateHC               (void* state, const char* source, char* dest, int inputSize);
 int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+
+int LZ4_compressHC2_withStateHC              (void* state, const char* source, char* dest, int inputSize, int compressionLevel);
+int LZ4_compressHC2_limitedOutput_withStateHC(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
 
 /*
 These functions are provided should you prefer to allocate memory for compression tables with your own allocation methods.
@@ -88,15 +101,17 @@ They just use the externally allocated memory area instead of allocating their o
 */
 
 
-//****************************
-// Streaming Functions
-//****************************
-
+/**************************************
+   Streaming Functions
+**************************************/
 void* LZ4_createHC (const char* inputBuffer);
 int   LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize);
 int   LZ4_compressHC_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize);
 char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
 int   LZ4_freeHC (void* LZ4HC_Data);
+
+int   LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
+int   LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
 
 /*
 These functions allow the compression of dependent blocks, where each block benefits from prior 64 KB within preceding blocks.

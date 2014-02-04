@@ -1,7 +1,6 @@
 /*
     fuzzer.c - Fuzzer test tool for LZ4
-    Copyright (C) Yann Collet - Andrew Mahone 2012-2013
-    Code started by Andrew Mahone, modified by Yann Collet
+    Copyright (C) Yann Collet - Andrew Mahone 2012-2014
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -26,7 +25,7 @@
 //**************************************
 // Remove Visual warning messages
 //**************************************
-#define _CRT_SECURE_NO_WARNINGS  // fgets
+#define _CRT_SECURE_NO_WARNINGS   // fgets
 
 
 //**************************************
