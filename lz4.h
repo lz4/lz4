@@ -84,7 +84,6 @@ LZ4_decompress_safe() :
 **************************************/
 #define LZ4_MAX_INPUT_SIZE        0x7E000000   /* 2 113 929 216 bytes */
 #define LZ4_COMPRESSBOUND(isize)  ((unsigned int)(isize) > (unsigned int)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
-static inline int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 
 /*
 LZ4_compressBound() :
@@ -97,9 +96,8 @@ LZ4_compressBound() :
     return : maximum output size in a "worst case" scenario
              or 0, if input size is too large ( > LZ4_MAX_INPUT_SIZE)
 */
+int LZ4_compressBound(int isize);
 
-
-int LZ4_compress_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
 LZ4_compress_limitedOutput() :
@@ -112,13 +110,12 @@ LZ4_compress_limitedOutput() :
     return : the number of bytes written in buffer 'dest'
              or 0 if the compression fails
 */
+int LZ4_compress_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
 
-
-int LZ4_decompress_fast (const char* source, char* dest, int outputSize);
 
 /*
 LZ4_decompress_fast() :
-    outputSize : is the original (uncompressed) size
+    originalSize : is the original and therefore uncompressed size
     return : the number of bytes read from the source buffer (in other words, the compressed size)
              If the source stream is malformed, the function will stop decoding and return a negative result.
     note : This function is a bit faster than LZ4_decompress_safe()
@@ -126,8 +123,8 @@ LZ4_decompress_fast() :
            Use this function preferably into a trusted environment (data to decode comes from a trusted source).
            Destination buffer must be already allocated. Its size must be a minimum of 'outputSize' bytes.
 */
+int LZ4_decompress_fast (const char* source, char* dest, int originalSize);
 
-int LZ4_decompress_safe_partial (const char* source, char* dest, int inputSize, int targetOutputSize, int maxOutputSize);
 
 /*
 LZ4_decompress_safe_partial() :
@@ -141,11 +138,8 @@ LZ4_decompress_safe_partial() :
              If the source stream is detected malformed, the function will stop decoding and return a negative result.
              This function never writes outside of output buffer, and never reads outside of input buffer. It is therefore protected against malicious data packets
 */
+int LZ4_decompress_safe_partial (const char* source, char* dest, int inputSize, int targetOutputSize, int maxOutputSize);
 
-
-int LZ4_sizeofState();
-int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
-int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
 These functions are provided should you prefer to allocate memory for compression tables with your own allocation methods.
@@ -158,6 +152,9 @@ The allocated memory can be provided to the compressions functions using 'void* 
 LZ4_compress_withState() and LZ4_compress_limitedOutput_withState() are equivalent to previously described functions.
 They just use the externally allocated memory area instead of allocating their own (on stack, or on heap).
 */
+int LZ4_sizeofState(void);
+int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
+int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 
 /**************************************
@@ -198,7 +195,8 @@ Compression can then resume, using LZ4_compress_continue() or LZ4_compress_limit
 When compression is completed, a call to LZ4_free() will release the memory used by the LZ4 Data Structure.
 */
 
-int LZ4_sizeofStreamState();
+
+int LZ4_sizeofStreamState(void);
 int LZ4_resetStreamState(void* state, const char* inputBuffer);
 
 /*
@@ -241,9 +239,8 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outpu
 These functions are deprecated and should no longer be used.
 They are provided here for compatibility with existing user programs.
 */
-static inline int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4_decompress_fast(source, dest, outputSize); }
-static inline int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
-
+int LZ4_uncompress (const char* source, char* dest, int outputSize);
+int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
 
 #if defined (__cplusplus)

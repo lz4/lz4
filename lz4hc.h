@@ -81,7 +81,7 @@ Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD l
 /**************************************
    Using an external allocation
 **************************************/
-int LZ4_sizeofStateHC();
+int LZ4_sizeofStateHC(void);
 int LZ4_compressHC_withStateHC               (void* state, const char* source, char* dest, int inputSize);
 int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
@@ -142,7 +142,7 @@ Compression can then resume, using LZ4_compressHC_continue() or LZ4_compressHC_l
 When compression is completed, a call to LZ4_freeHC() will release the memory used by the LZ4HC Data Structure.
 */
 
-int LZ4_sizeofStreamStateHC();
+int LZ4_sizeofStreamStateHC(void);
 int LZ4_resetStreamStateHC(void* state, const char* inputBuffer);
 
 /*

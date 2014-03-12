@@ -121,7 +121,7 @@ Memory will be freed by XXH32_digest().
 */
 
 
-int           XXH32_sizeofState();
+int           XXH32_sizeofState(void);
 XXH_errorcode XXH32_resetState(void* state, unsigned int seed);
 
 #define       XXH32_SIZEOFSTATE 48

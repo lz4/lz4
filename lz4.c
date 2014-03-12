@@ -369,6 +369,8 @@ FORCE_INLINE int LZ4_NbCommonBytes (register U32 val)
 /****************************
    Compression functions
 ****************************/
+int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
+
 FORCE_INLINE int LZ4_hashSequence(U32 sequence, tableType_t tableType)
 {
     if (tableType == byU16)
@@ -709,7 +711,6 @@ int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, cha
 /****************************
    Decompression functions
 ****************************/
-
 /*
  * This generic decompression function cover all use cases.
  * It shall be instanciated several times, using different sets of directives
@@ -875,3 +876,5 @@ int LZ4_decompress_fast(const char* source, char* dest, int outputSize)
 #endif
 }
 
+int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4_decompress_fast(source, dest, outputSize); }
+int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }

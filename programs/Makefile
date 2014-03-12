@@ -30,11 +30,11 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r113
+RELEASE=r114
 DESTDIR=
 PREFIX=/usr
-CC=gcc
-CFLAGS+= -I.. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
+CC:=$(CC)
+CFLAGS+= -I.. -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
 
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
@@ -54,26 +54,25 @@ default: lz4 lz4c
 all: lz4 lz4c lz4c32 fuzzer fuzzer32 fullbench fullbench32
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
-	$(CC)      -O3 $(CFLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
+	$(CC)      $(CFLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
 lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
-	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC)      $(CFLAGS) $^ -o $@$(EXT)
 
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
-	$(CC) -m32 -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -m32 $(CFLAGS) $^ -o $@$(EXT)
 
 fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c
-	@echo fuzzer is a test tool to check lz4 integrity on target platform
-	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC)      $(CFLAGS) $^ -o $@$(EXT)
 
 fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c
-	$(CC) -m32 -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -m32 $(CFLAGS) $^ -o $@$(EXT)
 
 fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
-	$(CC)      -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC)      $(CFLAGS) $^ -o $@$(EXT)
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
-	$(CC) -m32 -O3 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -m32 $(CFLAGS) $^ -o $@$(EXT)
 
 clean:
 	@rm -f core *.o \

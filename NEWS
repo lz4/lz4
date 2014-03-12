@@ -1,3 +1,12 @@
+r114:
+Makefile : library correctly compiled with -O3 switch (issue 114)
+Makefile : library compilation compatible with clang
+Makefile : library is versioned and linked (issue 119)
+lz4.h : no more static inline prototypes (issue 116)
+man : improved header/footer (issue 111)
+Makefile : Use system default $(CC) & $(MAKE) variables (issue 112)
+xxhash : updated to r34
+
 r113:
 Large decompression speed improvement for GCC 32-bits. Thanks to Valery Croizier !
 LZ4HC : Compression Level is now a programmable parameter (CLI from 4 to 9)

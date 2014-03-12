@@ -30,11 +30,16 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-RELEASE=r113
+export RELEASE=r114
+LIBVER_MAJOR=1
+LIBVER_MINOR=0
+LIBVER_PATCH=0
+LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
+
 DESTDIR=
 PREFIX=/usr
-CC=gcc
-CFLAGS+= -I. -std=c99 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
+CC:=$(CC)
+CFLAGS+= -I. -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
 
 LIBDIR=$(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -62,34 +67,38 @@ SOURCES = $(TEXT) $(NONTEXT)
 
 
 default: liblz4
-	@cd $(PRGDIR); make
+	@cd $(PRGDIR); $(MAKE) -e
 
 all: liblz4 lz4programs
 
 liblz4: liblz4.a liblz4.so
 
 lz4programs: lz4.c lz4hc.c
-	@cd $(PRGDIR); make all
+	@cd $(PRGDIR); $(MAKE) -e all
 
 liblz4.a: lz4.c lz4hc.c
-	$(CC) -O3 -c $(CFLAGS) $^
+	$(CC) $(CFLAGS) -c $^
 	ar rcs liblz4.a lz4.o lz4hc.o
 
 liblz4.so: lz4.c lz4hc.c
-	$(CC) -shared -fPIC -Wl,--soname=liblz4.so.1 $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) -shared $^ -fPIC -Wl,-soname=liblz4.so.$(LIBVER_MAJOR) -o $@.$(LIBVER)
+	@ln -s $@.$(LIBVER) $@.$(LIBVER_MAJOR)
+	@ln -s $@.$(LIBVER) $@
 
 clean:
-	@rm -f core *.o *.a *.so $(DISTRIBNAME)
+	@rm -f core *.o *.a *.so *.so.* $(DISTRIBNAME)
 	@cd $(PRGDIR); make clean
 	@echo Cleaning completed
 
 
-#ifeq ($(shell uname),Linux)
+#make install option is reserved to Linux & OSX targets
 ifneq (,$(filter $(shell uname),Linux Darwin))
 
 install: liblz4
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/ $(DESTDIR)$(INCLUDEDIR)/
 	@install -m 755 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@install -m 755 liblz4.so.$(LIBVER) $(DESTDIR)$(LIBDIR)/liblz4.so.$(LIBVER)
+	@install -m 755 liblz4.so.$(LIBVER_MAJOR) $(DESTDIR)$(LIBDIR)/liblz4.so.$(LIBVER_MAJOR)
 	@install -m 755 liblz4.so $(DESTDIR)$(LIBDIR)/liblz4.so
 	@install -m 755 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@install -m 755 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
@@ -98,6 +107,8 @@ install: liblz4
 
 uninstall:
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
+	[ -x $(DESTDIR)$(LIBDIR)/liblz4.so.$(LIBVER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.so.$(LIBVER)
+	[ -x $(DESTDIR)$(LIBDIR)/liblz4.so.$(LIBVER_MAJOR) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.so.$(LIBVER_MAJOR)
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.so ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.so
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h

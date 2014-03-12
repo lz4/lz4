@@ -145,7 +145,7 @@ int main() {
         fflush(stdout);
         if ( fgets(userInput, sizeof userInput, stdin) )
         {
-            if ( sscanf(userInput, "%d", &seed) == 1 ) {}
+            if ( sscanf(userInput, "%u", &seed) == 1 ) {}
             else seed = FUZ_GetMilliSpan(timestamp);
         }
         printf("Seed = %u\n", seed);
