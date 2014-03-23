@@ -86,11 +86,13 @@ ifneq (,$(filter $(shell uname),Linux Darwin))
 install: lz4 lz4c
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
 	@install -m 755 lz4   $(DESTDIR)$(BINDIR)/lz4
+	@ln -s $(DESTDIR)$(BINDIR)/lz4 $(DESTDIR)$(BINDIR)/lz4cat
 	@install -m 755 lz4c  $(DESTDIR)$(BINDIR)/lz4c
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@echo lz4 installation completed
 
 uninstall:
+	rm -f $(DESTDIR)$(BINDIR)/lz4cat
 	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
 	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1

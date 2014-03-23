@@ -109,11 +109,12 @@
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "v1.1.3"
+#  define LZ4_VERSION "v1.1.5"
 #endif
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
 #define LZ4_EXTENSION ".lz4"
+#define LZ4_CAT "lz4cat"
 
 #define KB *(1U<<10)
 #define MB *(1U<<20)
@@ -310,6 +311,10 @@ int main(int argc, char** argv)
     LZ4IO_setOverwrite(0);
     blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
 
+    // lz4cat behavior
+    if (!strcmp(programName, LZ4_CAT)) { decode=1; forceStdout=1; output_filename=stdoutmark; displayLevel=1; }
+
+    // command switches
     for(i=1; i<argc; i++)
     {
         char* argument = argv[i];
@@ -335,7 +340,7 @@ int main(int argc, char** argv)
                 if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }          // -c0 (fast compression)
                 if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }          // -c1 (high compression)
                 if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }          // -hc (high compression)
-                if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                                             // -y (answer 'yes' to overwrite permission)
+                if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                                   // -y (answer 'yes' to overwrite permission)
                 if (*argument=='s') { displayLevel=1; continue; }                                          // -s (silent mode)
 #endif // DISABLE_LZ4C_LEGACY_OPTIONS
 
