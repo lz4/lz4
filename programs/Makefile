@@ -30,11 +30,12 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r114
+RELEASE=r116
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
-CFLAGS+= -I.. -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS+= -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
+FLAGS= -I.. $(CFLAGS)
 
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
@@ -54,25 +55,25 @@ default: lz4 lz4c
 all: lz4 lz4c lz4c32 fuzzer fuzzer32 fullbench fullbench32
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
-	$(CC)      $(CFLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
+	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
 lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
-	$(CC)      $(CFLAGS) $^ -o $@$(EXT)
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
-	$(CC) -m32 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
 fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c
-	$(CC)      $(CFLAGS) $^ -o $@$(EXT)
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c
-	$(CC) -m32 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
 fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
-	$(CC)      $(CFLAGS) $^ -o $@$(EXT)
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
-	$(CC) -m32 $(CFLAGS) $^ -o $@$(EXT)
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
 clean:
 	@rm -f core *.o \
@@ -86,7 +87,7 @@ ifneq (,$(filter $(shell uname),Linux Darwin))
 install: lz4 lz4c
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
 	@install -m 755 lz4   $(DESTDIR)$(BINDIR)/lz4
-	@ln -s $(DESTDIR)$(BINDIR)/lz4 $(DESTDIR)$(BINDIR)/lz4cat
+	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
 	@install -m 755 lz4c  $(DESTDIR)$(BINDIR)/lz4c
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@echo lz4 installation completed

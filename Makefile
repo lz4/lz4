@@ -30,7 +30,7 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-export RELEASE=r115
+export RELEASE=r116
 LIBVER_MAJOR=1
 LIBVER_MINOR=0
 LIBVER_PATCH=0
@@ -59,9 +59,13 @@ endif
 ifeq ($(shell uname), Darwin)
 	SONAME_FLAGS =
 	SHARED_EXT = dylib
+	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
+	SHARED_EXT_VER = $(LIBVER).$(SHARED_EXT)
 else
 	SONAME_FLAGS = -Wl,-soname=liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
 	SHARED_EXT = so
+	SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
+	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
 TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
@@ -81,19 +85,18 @@ default: liblz4
 
 all: liblz4 lz4programs
 
-liblz4: liblz4.a liblz4.$(SHARED_EXT)
-
 lz4programs: lz4.c lz4hc.c
 	@cd $(PRGDIR); $(MAKE) -e all
 
-liblz4.a: lz4.c lz4hc.c
-	$(CC) $(CFLAGS) -c $^
-	ar rcs liblz4.a lz4.o lz4hc.o
-
-liblz4.$(SHARED_EXT): lz4.c lz4hc.c
-	$(CC) $(CFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(LIBVER)
-	@ln -s $@.$(LIBVER) $@.$(LIBVER_MAJOR)
-	@ln -s $@.$(LIBVER) $@
+liblz4: lz4.c lz4hc.c
+	@echo compiling static library
+	@$(CC) $(CFLAGS) -c $^
+	@ar rcs liblz4.a lz4.o lz4hc.o
+	@echo compiling dynamic library
+	@$(CC) $(CFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
+	@echo creating versioned links
+	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
+	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
 
 clean:
 	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* $(DISTRIBNAME) *.sha1
@@ -107,8 +110,8 @@ ifneq (,$(filter $(shell uname),Linux Darwin))
 install: liblz4
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/ $(DESTDIR)$(INCLUDEDIR)/
 	@install -m 755 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
-	@install -m 755 liblz4.$(SHARED_EXT).$(LIBVER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT).$(LIBVER)
-	@cp -a liblz4.$(SHARED_EXT).$(LIBVER_MAJOR) $(DESTDIR)$(LIBDIR)
+	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
+	@cp -a liblz4.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)
 	@cp -a liblz4.$(SHARED_EXT) $(DESTDIR)$(LIBDIR)
 	@install -m 755 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@install -m 755 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
@@ -118,8 +121,8 @@ install: liblz4
 uninstall:
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
-	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
-	[ -x $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT).$(LIBVER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT).$(LIBVER)
+	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
+	[ -x $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@echo lz4 libraries successfully uninstalled

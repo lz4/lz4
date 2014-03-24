@@ -1,3 +1,6 @@
+r116:
+hotfix (issue 124 & 125)
+
 r115:
 Added : lz4cat utility, installed on POSX systems (issue 118)
 OS-X compatible compilation of dynamic library (issue 115)
