@@ -69,7 +69,7 @@ else
 endif
 
 TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
-	lz4_format_description.txt Makefile NEWS LICENSE \
+	lz4_format_description.txt Makefile NEWS LICENSE README.md \
 	cmake_unofficial/CMakeLists.txt \
 	$(PRGDIR)/fullbench.c $(PRGDIR)/fuzzer.c $(PRGDIR)/lz4cli.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
