@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2013
+    Copyright (C) Yann Collet 2012-2014
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -281,12 +281,12 @@ static inline int local_LZ4_compress_limitedOutput_continue(const char* in, char
 static void* stateLZ4HC;
 static inline int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_withState(stateLZ4HC, in, out, inSize);
+    return LZ4_compressHC_withStateHC(stateLZ4HC, in, out, inSize);
 }
 
 static inline int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_limitedOutput_withState(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
+    return LZ4_compressHC_limitedOutput_withStateHC(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static inline int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
@@ -627,7 +627,7 @@ int usage_advanced()
 {
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -c#    : test only compression function # [%c-%c]\n", MINCOMPRESSIONCHAR, MAXCOMPRESSIONCHAR);
-    DISPLAY( " -d#    : test only compression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
+    DISPLAY( " -d#    : test only decompression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
     DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     //DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
