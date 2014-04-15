@@ -1,4 +1,5 @@
 r117:
+Added : man pages for lz4c and lz4cat
 fix : block-dependency command line (issue 127)
 fix : lz4fullbench (issue 128)
 

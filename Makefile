@@ -75,7 +75,8 @@ TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
 	$(PRGDIR)/xxhash.c $(PRGDIR)/xxhash.h \
-	$(PRGDIR)/lz4.1 $(PRGDIR)/Makefile $(PRGDIR)/COPYING
+	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
+	$(PRGDIR)/Makefile $(PRGDIR)/COPYING
 NONTEXT = LZ4_Streaming_Format.odt
 SOURCES = $(TEXT) $(NONTEXT)
 

@@ -1,0 +1,34 @@
+\"
+\" lz4cat.1: This is a manual page for 'lz4cat' program. This file is part of
+\" the lz4 <https://code.google.com/p/lz4/> project.
+\"
+
+\" No hyphenation
+.hy 0
+.nr HY 0
+
+.TH lz4cat "1" "2014-04-15" "lz4cat" "User Commands"
+.SH NAME
+\fBlz4cat\fR - Extremely fast compression algorithm
+
+.SH SYNOPSIS
+.TP 5
+\fBlz4cat\fR [\fBOPTIONS\fR] [-|INPUT-FILE] <OUTPUT-FILE>
+
+.SH DESCRIPTION
+.PP
+\fBlz4\fR is an extremely fast lossless compression algorithm.
+
+\fBlz4cat\fR is an utility based on \fBlz4\fR.
+
+\fBlz4cat\fR is equivalent to \fBlz4 -cd\fR,
+which forces decompression and redirect its output to the console.
+
+All other options are the same as \fBlz4\fR ones (man lz4).
+
+
+.SH BUGS
+Report bugs at:- https://code.google.com/p/lz4/
+
+.SH AUTHOR
+Yann Collet
