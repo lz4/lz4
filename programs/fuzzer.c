@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <stdio.h>      // fgets, sscanf
 #include <sys/timeb.h>  // timeb
+#include <string.h>     // strcmp
 #include "lz4.h"
 #include "lz4hc.h"
 
@@ -121,8 +122,8 @@ int FUZ_SecurityTest()
 }
 
 
-//int main(int argc, char *argv[]) {
-int main() {
+int main(int argc, char** argv) {
+        const int no_prompt = (argc > 1) && (!strcmp(argv[1], "--no-prompt"));
         unsigned long long bytes = 0;
         unsigned long long cbytes = 0;
         unsigned long long hcbytes = 0;
@@ -136,14 +137,14 @@ int main() {
         int i, j, k, ret, len, lenHC, attemptNb;
         char userInput[30] = {0};
 #       define FUZ_CHECKTEST(cond, message) if (cond) { printf("Test %i : %s : seed %u, cycle %i \n", testNb, message, seed, attemptNb); goto _output_error; }
-#       define FUZ_DISPLAYTEST              testNb++; printf("%2i\b\b", testNb);
+#       define FUZ_DISPLAYTEST              testNb++; no_prompt ? 0 : printf("%2i\b\b", testNb);
         void* stateLZ4   = malloc(LZ4_sizeofState());
         void* stateLZ4HC = malloc(LZ4_sizeofStateHC());
 
         printf("starting LZ4 fuzzer (%s)\n", LZ4_VERSION);
         printf("Select an Initialisation number (default : random) : ");
         fflush(stdout);
-        if ( fgets(userInput, sizeof userInput, stdin) )
+        if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
         {
             if ( sscanf(userInput, "%u", &seed) == 1 ) {}
             else seed = FUZ_GetMilliSpan(timestamp);
@@ -160,7 +161,17 @@ int main() {
         {
             int testNb = 0;
 
-            printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
+            // note : promptThrottle is throtting stdout to prevent
+            //        Travis-CI's output limit (10MB) and false hangup detection.
+            const int promptThrottle = (attemptNb % (NB_ATTEMPTS / 100) == 0);
+            if (!no_prompt || attemptNb == 0 || promptThrottle)
+            {
+                printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
+                if (no_prompt)
+                {
+                    fflush(stdout);
+                }
+            }
 
             for (j = 0; j < NUM_SEQ; j++) {
                     seeds[j] = FUZ_rand(&randState) << 8;
@@ -293,10 +304,10 @@ int main() {
         printf("all tests completed successfully \n");
         printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
         printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
-        getchar();
+        if(!no_prompt) getchar();
         return 0;
 
 _output_error:
-        getchar();
+        if(!no_prompt) getchar();
         return 1;
 }
