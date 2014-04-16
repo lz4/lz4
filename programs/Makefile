@@ -41,6 +41,7 @@ BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
 LZ4DIR=..
 
+TEST_FILES = COPYING
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -102,5 +103,25 @@ uninstall:
 	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
 	@echo lz4 successfully uninstalled
+
+test: test-lz4 test-lz4c test-lz4c32 test-fuzzer test-fuzzer32 test-fullbench test-fullbench32
+
+test-lz4:
+
+test-lz4c:
+
+test-lz4c32:
+
+test-fuzzer: fuzzer
+	./fuzzer --no-prompt
+
+test-fuzzer32: fuzzer32
+	./fuzzer32 --no-prompt
+
+test-fullbench: fullbench
+	./fullbench --no-prompt $(TEST_FILES)
+
+test-fullbench32: fullbench32
+	./fullbench32 --no-prompt $(TEST_FILES)
 
 endif
