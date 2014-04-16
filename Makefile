@@ -145,4 +145,7 @@ dist: clean
 	@sha1sum $(DISTRIBNAME) > $(DISTRIBNAME).sha1
 	@echo Distribution $(DISTRIBNAME) built
 
+test: lz4programs
+	@cd $(PRGDIR); $(MAKE) -e $@
+
 endif
