@@ -1,6 +1,6 @@
 /*
   LZ4cli.c - LZ4 Command Line Interface
-  Copyright (C) Yann Collet 2011-2013
+  Copyright (C) Yann Collet 2011-2014
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -407,11 +407,11 @@ int main(int argc, char** argv)
                             int B = argument[1] - '0';
                             int S = 1 << (8 + 2*B);
                             BMK_SetBlocksize(S);
-                            LZ4IO_setBlockSizeID(B);
+                            blockSize = LZ4IO_setBlockSizeID(B);
                             argument++;
                             break;
                         }
-                        case 'D': LZ4IO_setBlockMode(independentBlocks); argument++; break;
+                        case 'D': LZ4IO_setBlockMode(chainedBlocks); argument++; break;
                         case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;
                         default : exitBlockProperties=1;
                         }

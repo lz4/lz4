@@ -1,3 +1,9 @@
+r117:
+Added : man pages for lz4c and lz4cat
+Added : automated tests on Travis, thanks to Takayuki Matsuoka !
+fix : block-dependency command line (issue 127)
+fix : lz4fullbench (issue 128)
+
 r116:
 hotfix (issue 124 & 125)
 

@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2013
+    Copyright (C) Yann Collet 2012-2014
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -50,6 +50,7 @@
 #include <stdio.h>       // fprintf, fopen, ftello64
 #include <sys/types.h>   // stat64
 #include <sys/stat.h>    // stat64
+#include <string.h>      // strcmp
 
 // Use ftime() if gettimeofday() is not available on your target
 #if defined(BMK_LEGACY_TIMER)
@@ -138,6 +139,7 @@ struct chunkParameters
 // MACRO
 //**************************************
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
+#define PROGRESS(...) no_prompt ? 0 : DISPLAY(__VA_ARGS__)
 
 
 
@@ -151,6 +153,7 @@ static int compressionTest = 1;
 static int decompressionTest = 1;
 static int compressionAlgo = ALL_COMPRESSORS;
 static int decompressionAlgo = ALL_DECOMPRESSORS;
+static int no_prompt = 0;
 
 void BMK_SetBlocksize(int bsize)
 {
@@ -281,12 +284,12 @@ static inline int local_LZ4_compress_limitedOutput_continue(const char* in, char
 static void* stateLZ4HC;
 static inline int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_withState(stateLZ4HC, in, out, inSize);
+    return LZ4_compressHC_withStateHC(stateLZ4HC, in, out, inSize);
 }
 
 static inline int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_limitedOutput_withState(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
+    return LZ4_compressHC_limitedOutput_withStateHC(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static inline int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
@@ -478,7 +481,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 double averageTime;
                 int milliTime;
 
-                DISPLAY("%1i-%-19.19s : %9i ->\r", loopNb, cName, (int)benchedSize);
+                PROGRESS("%1i-%-19.19s : %9i ->\r", loopNb, cName, (int)benchedSize);
                 { size_t i; for (i=0; i<benchedSize; i++) compressed_buff[i]=(char)i; }     // warmimg up memory
 
                 nb_loops = 0;
@@ -502,7 +505,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 if (averageTime < bestTime) bestTime = averageTime;
                 cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
                 ratio = (double)cSize/(double)benchedSize*100.;
-                DISPLAY("%1i-%-19.19s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, cName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i-%-19.19s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, cName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
             }
 
             if (ratio<100.)
@@ -547,7 +550,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 int milliTime;
                 U32 crcDecoded;
 
-                DISPLAY("%1i-%-24.24s :%10i ->\r", loopNb, dName, (int)benchedSize);
+                PROGRESS("%1i-%-24.24s :%10i ->\r", loopNb, dName, (int)benchedSize);
 
                 nb_loops = 0;
                 milliTime = BMK_GetMilliStart();
@@ -567,7 +570,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 averageTime = (double)milliTime / nb_loops;
                 if (averageTime < bestTime) bestTime = averageTime;
 
-                DISPLAY("%1i-%-24.24s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i-%-24.24s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
 
                 // CRC Checking
                 crcDecoded = XXH32(orig_buff, (int)benchedSize, 0);
@@ -627,7 +630,7 @@ int usage_advanced()
 {
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -c#    : test only compression function # [%c-%c]\n", MINCOMPRESSIONCHAR, MAXCOMPRESSIONCHAR);
-    DISPLAY( " -d#    : test only compression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
+    DISPLAY( " -d#    : test only decompression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
     DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     //DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
@@ -658,6 +661,11 @@ int main(int argc, char** argv)
         char* argument = argv[i];
 
         if(!argument) continue;   // Protection if argument empty
+        if (!strcmp(argument, "--no-prompt"))
+        {
+            no_prompt = 1;
+            continue;
+        }
 
         // Decode command (note : aggregated commands are allowed)
         if (argument[0]=='-')

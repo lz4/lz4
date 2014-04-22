@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2013
+    Copyright (C) Yann Collet 2012-2014
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify

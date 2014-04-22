@@ -30,7 +30,7 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-export RELEASE=r116
+export RELEASE=r117
 LIBVER_MAJOR=1
 LIBVER_MINOR=0
 LIBVER_PATCH=0
@@ -69,13 +69,14 @@ else
 endif
 
 TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
-	lz4_format_description.txt Makefile NEWS LICENSE \
+	lz4_format_description.txt Makefile NEWS LICENSE README.md \
 	cmake_unofficial/CMakeLists.txt \
 	$(PRGDIR)/fullbench.c $(PRGDIR)/fuzzer.c $(PRGDIR)/lz4cli.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
 	$(PRGDIR)/xxhash.c $(PRGDIR)/xxhash.h \
-	$(PRGDIR)/lz4.1 $(PRGDIR)/Makefile $(PRGDIR)/COPYING
+	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
+	$(PRGDIR)/Makefile $(PRGDIR)/COPYING
 NONTEXT = LZ4_Streaming_Format.odt
 SOURCES = $(TEXT) $(NONTEXT)
 
@@ -143,5 +144,8 @@ dist: clean
 	@rm -rf lz4-$(RELEASE)
 	@sha1sum $(DISTRIBNAME) > $(DISTRIBNAME).sha1
 	@echo Distribution $(DISTRIBNAME) built
+
+test: lz4programs
+	@cd $(PRGDIR); $(MAKE) -e $@
 
 endif
