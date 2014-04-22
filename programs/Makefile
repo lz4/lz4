@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r116
+RELEASE=rc118
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
@@ -102,9 +102,11 @@ uninstall:
 	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
 	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
+	[ -f $(DESTDIR)$(MANDIR)/lz4c.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4c.1
+	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
 	@echo lz4 successfully uninstalled
 
-test: test-lz4 test-lz4c test-lz4c32 test-fuzzer test-fuzzer32 test-fullbench test-fullbench32
+test: test-lz4 test-lz4c test-lz4c32 test-fullbench test-fullbench32 test-fuzzer test-fuzzer32
 
 test-lz4:
 
@@ -112,16 +114,17 @@ test-lz4c:
 
 test-lz4c32:
 
+test-fullbench: fullbench
+	./fullbench --no-prompt $(TEST_FILES)
+
+test-fullbench32: fullbench32
+	./fullbench32 --no-prompt $(TEST_FILES)
+
 test-fuzzer: fuzzer
 	./fuzzer --no-prompt
 
 test-fuzzer32: fuzzer32
 	./fuzzer32 --no-prompt
 
-test-fullbench: fullbench
-	./fullbench --no-prompt $(TEST_FILES)
-
-test-fullbench32: fullbench32
-	./fullbench32 --no-prompt $(TEST_FILES)
 
 endif

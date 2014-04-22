@@ -46,7 +46,7 @@
 #  define LZ4_VERSION ""
 #endif
 
-#define NB_ATTEMPTS (1<<17)
+#define NB_ATTEMPTS (1<<16)
 #define LEN ((1<<15))
 #define SEQ_POW 2
 #define NUM_SEQ (1 << SEQ_POW)
