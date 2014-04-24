@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
         void* stateLZ4   = malloc(LZ4_sizeofState());
         void* stateLZ4HC = malloc(LZ4_sizeofStateHC());
 
-        printf("starting LZ4 fuzzer (%s)\n", LZ4_VERSION);
+        printf("starting LZ4 fuzzer (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
         printf("Select an Initialisation number (default : random) : ");
         fflush(stdout);
         if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
 
             // note : promptThrottle is throtting stdout to prevent
             //        Travis-CI's output limit (10MB) and false hangup detection.
-            const int promptThrottle = (attemptNb % (NB_ATTEMPTS / 100) == 0);
+            const int promptThrottle = ((attemptNb % (NB_ATTEMPTS / 100)) == 0);
             if (!no_prompt || attemptNb == 0 || promptThrottle)
             {
                 printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
@@ -301,6 +301,7 @@ int main(int argc, char** argv) {
             FUZ_rand(&randState);
         }
 
+        printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
         printf("all tests completed successfully \n");
         printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
         printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
