@@ -105,10 +105,15 @@ static int FUZ_GetMilliSpan( int nTimeStart )
 }
 
 
+#  define FUZ_rotl32(x,r) ((x << r) | (x >> (32 - r)))
 unsigned int FUZ_rand(unsigned int* src)
 {
-    *src = XXH32(&src, sizeof(src), 0);
-    return *src;
+    U32 rand32 = *src;
+    rand32 *= PRIME1;
+    rand32 += PRIME2;
+    rand32  = FUZ_rotl32(rand32, 13);
+    *src = rand32;
+    return rand32;
 }
 
 
