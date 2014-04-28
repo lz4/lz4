@@ -64,10 +64,10 @@ lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c
+fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c 
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c fuzzer.c
+fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
 fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c

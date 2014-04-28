@@ -118,8 +118,8 @@
 #define MAX_MEM    (1984<<20)
 #define DEFAULT_CHUNKSIZE   (4<<20)
 
-#define ALL_COMPRESSORS -1
-#define ALL_DECOMPRESSORS -1
+#define ALL_COMPRESSORS 0
+#define ALL_DECOMPRESSORS 0
 
 
 //**************************************
@@ -250,9 +250,9 @@ static U64 BMK_GetFileSize(char* infilename)
 }
 
 
-//*********************************************************
-//  Public function
-//*********************************************************
+/*********************************************************
+  Benchmark function
+*********************************************************/
 
 static inline int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
 {
@@ -457,7 +457,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             void* (*initFunction)(const char*) = NULL;
             double bestTime = 100000000.;
 
-            if ((compressionAlgo != ALL_COMPRESSORS) && (compressionAlgo != cAlgNb)) continue;
+            if ((compressionAlgo != ALL_COMPRESSORS) && (compressionAlgo != cAlgNb+1)) continue;
 
             switch(cAlgNb)
             {
@@ -532,7 +532,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             int (*decompressionFunction)(const char*, char*, int, int);
             double bestTime = 100000000.;
 
-            if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != dAlgNb)) continue;
+            if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != dAlgNb+1)) continue;
 
             switch(dAlgNb)
             {
@@ -629,8 +629,8 @@ int usage(char* exename)
 int usage_advanced()
 {
     DISPLAY( "\nAdvanced options :\n");
-    DISPLAY( " -c#    : test only compression function # [%c-%c]\n", MINCOMPRESSIONCHAR, MAXCOMPRESSIONCHAR);
-    DISPLAY( " -d#    : test only decompression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
+    DISPLAY( " -c#    : test only compression function # [1-%i]\n", NB_COMPRESSION_ALGORITHMS);
+    DISPLAY( " -d#    : test only decompression function # [1-%i]\n", NB_DECOMPRESSION_ALGORITHMS);
     DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     //DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
@@ -679,15 +679,23 @@ int main(int argc, char** argv)
                     // Select compression algorithm only
                 case 'c':
                     decompressionTest = 0;
-                    if ((argument[1]>= MINCOMPRESSIONCHAR) && (argument[1]<= MAXCOMPRESSIONCHAR))
-                       compressionAlgo = argument[1] - '0', argument++;
+                    while ((argument[1]>= '0') && (argument[1]<= '9'))
+                    {
+                        compressionAlgo *= 10;
+                        compressionAlgo += argument[1] - '0';
+                        argument++;
+                    }
                     break;
 
                     // Select decompression algorithm only
                 case 'd':
                     compressionTest = 0;
-                    if ((argument[1]>= MINDECOMPRESSIONCHAR) && (argument[1]<= MAXDECOMPRESSIONCHAR))
-                       decompressionAlgo = argument[1] - '0', argument++;
+                    while ((argument[1]>= '0') && (argument[1]<= '9'))
+                    {
+                        decompressionAlgo *= 10;
+                        decompressionAlgo += argument[1] - '0';
+                        argument++;
+                    }
                     break;
 
                     // Display help on usage

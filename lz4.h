@@ -42,8 +42,8 @@ extern "C" {
    Version
 **************************************/
 #define LZ4_VERSION_MAJOR    1    /* for major interface/format changes  */
-#define LZ4_VERSION_MINOR    1    /* for minor interface/format changes  */
-#define LZ4_VERSION_RELEASE  3    /* for tweaks, bug-fixes, or development */
+#define LZ4_VERSION_MINOR    2    /* for minor interface/format changes  */
+#define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
 
 /**************************************
@@ -59,7 +59,7 @@ extern "C" {
 **************************************/
 
 int LZ4_compress        (const char* source, char* dest, int inputSize);
-int LZ4_decompress_safe (const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_decompress_safe (const char* source, char* dest, int compressedSize, int maxOutputSize);
 
 /*
 LZ4_compress() :
@@ -128,7 +128,7 @@ int LZ4_decompress_fast (const char* source, char* dest, int originalSize);
 
 /*
 LZ4_decompress_safe_partial() :
-    This function decompress a compressed block of size 'inputSize' at position 'source'
+    This function decompress a compressed block of size 'compressedSize' at position 'source'
     into output buffer 'dest' of size 'maxOutputSize'.
     The function tries to stop decompressing operation as soon as 'targetOutputSize' has been reached,
     reducing decompression time.
@@ -138,7 +138,7 @@ LZ4_decompress_safe_partial() :
              If the source stream is detected malformed, the function will stop decoding and return a negative result.
              This function never writes outside of output buffer, and never reads outside of input buffer. It is therefore protected against malicious data packets
 */
-int LZ4_decompress_safe_partial (const char* source, char* dest, int inputSize, int targetOutputSize, int maxOutputSize);
+int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize);
 
 
 /*
@@ -150,7 +150,7 @@ Note that tables must be aligned on 4-bytes boundaries, otherwise compression wi
 
 The allocated memory can be provided to the compressions functions using 'void* state' parameter.
 LZ4_compress_withState() and LZ4_compress_limitedOutput_withState() are equivalent to previously described functions.
-They just use the externally allocated memory area instead of allocating their own (on stack, or on heap).
+They just use the externally allocated memory area instead of allocating their own one (on stack, or on heap).
 */
 int LZ4_sizeofState(void);
 int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
@@ -167,7 +167,7 @@ char* LZ4_slideInputBuffer (void* LZ4_Data);
 int   LZ4_free (void* LZ4_Data);
 
 /*
-These functions allow the compression of dependent blocks, where each block benefits from prior 64 KB within preceding blocks.
+These functions allow the compression of chained blocks, where each block benefits from prior 64 KB within preceding blocks.
 In order to achieve this, it is necessary to start creating the LZ4 Data Structure, thanks to the function :
 
 void* LZ4_create (const char* inputBuffer);
@@ -196,11 +196,8 @@ When compression is completed, a call to LZ4_free() will release the memory used
 */
 
 
-int LZ4_sizeofStreamState(void);
-int LZ4_resetStreamState(void* state, const char* inputBuffer);
-
 /*
-These functions achieve the same result as :
+The following functions achieve the same result as :
 void* LZ4_create (const char* inputBuffer);
 
 They are provided here to allow the user program to allocate memory using its own routines.
@@ -219,17 +216,33 @@ The same space can be re-used multiple times, just by initializing it each time 
 return value of LZ4_resetStreamState() must be 0 is OK.
 Any other value means there was an error (typically, pointer is not aligned on 4-bytes boundaries).
 */
+int LZ4_sizeofStreamState(void);
+int LZ4_resetStreamState(void* state, const char* inputBuffer);
 
-
-int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int inputSize, int maxOutputSize);
-int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int outputSize);
 
 /*
 *_withPrefix64k() :
-    These decoding functions work the same as their "normal name" versions,
-    but can use up to 64KB of data in front of 'char* dest'.
-    These functions are necessary to decode inter-dependant blocks.
+    These decoding functions work the same as their "normal" versions,
+    but can also use up to 64KB of data in front of 'char* dest'
+    to decode chained blocks.
+    The last 64KB of previous block must be present there.
 */
+int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int compressedSize, int maxOutputSize);
+int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int originalSize);
+
+
+/**************************************
+   Experimental Functions
+**************************************/
+/*
+*_withDict() :
+    These decoding functions work the same as their "normal" versions,
+    but can also use up to 64KB of dictionary data
+    to decode chained blocks.
+*/
+int LZ4_decompress_safe_withDict (const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize);
+int LZ4_decompress_fast_withDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
+
 
 
 /**************************************
