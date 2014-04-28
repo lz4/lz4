@@ -107,7 +107,7 @@ static int FUZ_GetMilliSpan( int nTimeStart )
 
 unsigned int FUZ_rand(unsigned int* src)
 {
-    *src = XXH32(src, sizeof(src), 0);
+    *src = XXH32(&src, sizeof(src), 0);
     return *src;
 }
 
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
         char* decodedBuffer;
 #       define FUZ_max   LZ4_COMPRESSBOUND(LEN)
 #       define FUZ_avail ROUND_PAGE(FUZ_max)
-        unsigned int seed, randState, timestamp=FUZ_GetMilliStart();
+        unsigned int seed=0, randState=0, timestamp=FUZ_GetMilliStart();
         int ret, attemptNb;
         char userInput[30] = {0};
 #       define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %i : ", testNb); printf(__VA_ARGS__); \
@@ -462,10 +462,18 @@ int main(int argc, char** argv) {
         printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
         printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
         printf("ratio with dict: %0.3f%%\n", (double)ccbytes/bytes*100);
+
+        // unalloc
         if(!no_prompt) getchar();
+        free(CNBuffer);
+        free(compressedBuffer);
+        free(decodedBuffer);
         return 0;
 
 _output_error:
         if(!no_prompt) getchar();
+        free(CNBuffer);
+        free(compressedBuffer);
+        free(decodedBuffer);
         return 1;
 }
