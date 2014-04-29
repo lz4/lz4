@@ -70,14 +70,7 @@
 #define COMPRESSIBLE_NOISE_LENGTH (1 << 21)
 #define FUZ_MAX_BLOCK_SIZE (1 << 17)
 #define FUZ_MAX_DICT_SIZE  (1 << 15)
-#define LEN ((1<<15))
-#define SEQ_POW 2
-#define NUM_SEQ (1 << SEQ_POW)
-#define SEQ_MSK ((NUM_SEQ) - 1)
-#define MOD_SEQ(x) ((((x) >> 8) & 255) == 0)
-#define NEW_SEQ(x) ((((x) >> 10) %10) == 0)
-#define PAGE_SIZE 4096
-#define ROUND_PAGE(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
+#define FUZ_COMPRESSIBILITY_DEFAULT 50
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
 #define PRIME3   3266489917U
@@ -194,7 +187,7 @@ int FUZ_SecurityTest()
 
 #define FUZ_MAX(a,b) (a>b?a:b)
 
-int FUZ_test(U32 seed, int nbTests) {
+int FUZ_test(U32 seed, int nbTests, double compressibility) {
         unsigned long long bytes = 0;
         unsigned long long cbytes = 0;
         unsigned long long hcbytes = 0;
@@ -203,8 +196,7 @@ int FUZ_test(U32 seed, int nbTests) {
         char* compressedBuffer;
         char* decodedBuffer;
 #       define FUZ_max   LZ4_COMPRESSBOUND(LEN)
-#       define FUZ_avail ROUND_PAGE(FUZ_max)
-        unsigned int randState=0;
+        unsigned int randState=seed;
         int ret, attemptNb;
 #       define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %i : ", testNb); printf(__VA_ARGS__); \
                                         printf(" (seed %u, cycle %i) \n", seed, attemptNb); goto _output_error; }
@@ -214,14 +206,10 @@ int FUZ_test(U32 seed, int nbTests) {
         void* LZ4continue;
         U32 crcOrig, crcCheck;
 
-        // Get Seed
-        randState = seed;
-
-        //FUZ_SecurityTest();
 
         // Create compressible test buffer
         CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
-        FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 0.5, &randState);
+        FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
         compressedBuffer = malloc(LZ4_compressBound(FUZ_MAX_BLOCK_SIZE));
         decodedBuffer = malloc(FUZ_MAX_DICT_SIZE + FUZ_MAX_BLOCK_SIZE);
 
@@ -501,6 +489,7 @@ int FUZ_usage()
     DISPLAY( "Arguments :\n");
     DISPLAY( " -i#    : Nb of tests (default:%i) \n", NB_ATTEMPTS);
     DISPLAY( " -s#    : Select seed (default:prompt user)\n");
+    DISPLAY( " -p#    : Select compressibility in %% (default:%i%%)\n", FUZ_COMPRESSIBILITY_DEFAULT);
     DISPLAY( " -h     : display help and exit\n");
     return 0;
 }
@@ -513,6 +502,7 @@ int main(int argc, char** argv) {
     int seedset=0;
     int argNb;
     int nbTests = NB_ATTEMPTS;
+    int proba = FUZ_COMPRESSIBILITY_DEFAULT;
 
     // Check command line
     programName = argv[0];
@@ -554,6 +544,18 @@ int main(int argc, char** argv) {
                         argument++;
                     }
                     break;
+                case 'p':
+                    argument++;
+                    proba=0;
+                    while ((*argument>='0') && (*argument<='9'))
+                    {
+                        proba *= 10;
+                        proba += *argument - '0';
+                        argument++;
+                    }
+                    if (proba<0) proba=0;
+                    if (proba>100) proba=100;
+                    break;
                 default: ;
                 }
             }
@@ -575,10 +577,11 @@ int main(int argc, char** argv) {
         }
     }
     printf("Seed = %u\n", seed);
+    if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
     //FUZ_SecurityTest();
 
     if (nbTests<=0) nbTests=1;
 
-    return FUZ_test(seed, nbTests);
+    return FUZ_test(seed, nbTests, ((double)proba) / 100);
 }
