@@ -83,6 +83,20 @@
 #define PRIME3   3266489917U
 
 
+//**************************************
+// Macros
+//**************************************
+#define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
+#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+
+
+//**************************************
+// Local Parameters
+//**************************************
+static int no_prompt = 0;
+static char* programName;
+
+
 /*********************************************************
   Fuzzer functions
 *********************************************************/
@@ -178,9 +192,9 @@ int FUZ_SecurityTest()
   return 0;
 }
 
+#define FUZ_MAX(a,b) (a>b?a:b)
 
-int main(int argc, char** argv) {
-        const int no_prompt = (argc > 1) && (!strcmp(argv[1], "--no-prompt"));
+int FUZ_test(U32 seed, int nbTests) {
         unsigned long long bytes = 0;
         unsigned long long cbytes = 0;
         unsigned long long hcbytes = 0;
@@ -190,9 +204,8 @@ int main(int argc, char** argv) {
         char* decodedBuffer;
 #       define FUZ_max   LZ4_COMPRESSBOUND(LEN)
 #       define FUZ_avail ROUND_PAGE(FUZ_max)
-        unsigned int seed=0, randState=0, timestamp=FUZ_GetMilliStart();
+        unsigned int randState=0;
         int ret, attemptNb;
-        char userInput[30] = {0};
 #       define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %i : ", testNb); printf(__VA_ARGS__); \
                                         printf(" (seed %u, cycle %i) \n", seed, attemptNb); goto _output_error; }
 #       define FUZ_DISPLAYTEST          testNb++; no_prompt ? 0 : printf("%2i\b\b", testNb);
@@ -202,15 +215,6 @@ int main(int argc, char** argv) {
         U32 crcOrig, crcCheck;
 
         // Get Seed
-        printf("Starting LZ4 fuzzer (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
-        printf("Select an Initialisation number (default : random) : ");
-        fflush(stdout);
-        if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
-        {
-            if ( sscanf(userInput, "%u", &seed) == 1 ) {}
-            else seed = FUZ_GetMilliSpan(timestamp);
-        }
-        printf("Seed = %u\n", seed);
         randState = seed;
 
         //FUZ_SecurityTest();
@@ -219,10 +223,10 @@ int main(int argc, char** argv) {
         CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
         FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 0.5, &randState);
         compressedBuffer = malloc(LZ4_compressBound(FUZ_MAX_BLOCK_SIZE));
-        decodedBuffer = malloc(LZ4_compressBound(FUZ_MAX_BLOCK_SIZE));
+        decodedBuffer = malloc(FUZ_MAX_DICT_SIZE + FUZ_MAX_BLOCK_SIZE);
 
         // Test loop
-        for (attemptNb = 0; attemptNb < NB_ATTEMPTS; attemptNb++)
+        for (attemptNb = 0; attemptNb < nbTests; attemptNb++)
         {
             int testNb = 0;
             char* dict;
@@ -232,10 +236,11 @@ int main(int argc, char** argv) {
 
             // note : promptThrottle is throtting stdout to prevent
             //        Travis-CI's output limit (10MB) and false hangup detection.
-            const int promptThrottle = ((attemptNb % (NB_ATTEMPTS / 100)) == 0);
+            const int step = FUZ_MAX(1, nbTests / 100);
+            const int promptThrottle = ((attemptNb % step) == 0);
             if (!no_prompt || attemptNb == 0 || promptThrottle)
             {
-                printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
+                printf("\r%7i /%7i   - ", attemptNb, nbTests);
                 if (no_prompt) fflush(stdout);
             }
 
@@ -462,7 +467,7 @@ int main(int argc, char** argv) {
             ccbytes += blockContinueCompressedSize;
         }
 
-        printf("\r%7i /%7i   - ", attemptNb, NB_ATTEMPTS);
+        printf("\r%7i /%7i   - ", attemptNb, nbTests);
         printf("all tests completed successfully \n");
         printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
         printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
@@ -473,6 +478,8 @@ int main(int argc, char** argv) {
         free(CNBuffer);
         free(compressedBuffer);
         free(decodedBuffer);
+        free(stateLZ4);
+        free(stateLZ4HC);
         return 0;
 
 _output_error:
@@ -480,5 +487,98 @@ _output_error:
         free(CNBuffer);
         free(compressedBuffer);
         free(decodedBuffer);
+        free(stateLZ4);
+        free(stateLZ4HC);
         return 1;
+}
+
+
+int FUZ_usage()
+{
+    DISPLAY( "Usage :\n");
+    DISPLAY( "      %s [args]\n", programName);
+    DISPLAY( "\n");
+    DISPLAY( "Arguments :\n");
+    DISPLAY( " -i#    : Nb of tests (default:%i) \n", NB_ATTEMPTS);
+    DISPLAY( " -s#    : Select seed (default:prompt user)\n");
+    DISPLAY( " -h     : display help and exit\n");
+    return 0;
+}
+
+
+int main(int argc, char** argv) {
+    char userInput[50] = {0};
+    U32 timestamp = FUZ_GetMilliStart();
+    U32 seed=0;
+    int seedset=0;
+    int argNb;
+    int nbTests = NB_ATTEMPTS;
+
+    // Check command line
+    programName = argv[0];
+    for(argNb=1; argNb<argc; argNb++)
+    {
+        char* argument = argv[argNb];
+
+        if(!argument) continue;   // Protection if argument empty
+
+        // Decode command (note : aggregated commands are allowed)
+        if (argument[0]=='-')
+        {
+            if (!strcmp(argument, "--no-prompt")) { no_prompt=1; seedset=1; continue; }
+
+            while (argument[1]!=0)
+            {
+                argument++;
+                switch(*argument)
+                {
+                case 'h':
+                    return FUZ_usage();
+                case 'i':
+                    argument++;
+                    nbTests=0;
+                    while ((*argument>='0') && (*argument<='9'))
+                    {
+                        nbTests *= 10;
+                        nbTests += *argument - '0';
+                        argument++;
+                    }
+                    break;
+                case 's':
+                    argument++;
+                    seed=0; seedset=1;
+                    while ((*argument>='0') && (*argument<='9'))
+                    {
+                        seed *= 10;
+                        seed += *argument - '0';
+                        argument++;
+                    }
+                    break;
+                default: ;
+                }
+            }
+
+        }
+    }
+
+    // Get Seed
+    printf("Starting LZ4 fuzzer (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
+
+    if (!seedset)
+    {
+        printf("Select an Initialisation number (default : random) : ");
+        fflush(stdout);
+        if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
+        {
+            if ( sscanf(userInput, "%u", &seed) == 1 ) {}
+            else seed = FUZ_GetMilliSpan(timestamp);
+        }
+    }
+    printf("Seed = %u\n", seed);
+
+    //FUZ_SecurityTest();
+
+    if (nbTests<=0) nbTests=1;
+
+    return FUZ_test(seed, nbTests);
 }
