@@ -42,6 +42,15 @@ MANDIR=$(PREFIX)/share/man/man1
 LZ4DIR=..
 
 TEST_FILES = COPYING
+TEST_TARGETS=test-32 test-64
+
+# Minimize test target for Travis CI's Build Matrix
+ifeq ($(LZ4_TRAVIS_CI_ENV),-m32)
+TEST_TARGETS=test-32
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-m64)
+TEST_TARGETS=test-64
+endif
+
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -106,7 +115,11 @@ uninstall:
 	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
 	@echo lz4 successfully uninstalled
 
-test: test-lz4 test-lz4c test-lz4c32 test-fullbench test-fullbench32 test-fuzzer test-fuzzer32
+test: $(TEST_TARGETS)
+
+test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32
+
+test-64: test-lz4 test-lz4c test-fullbench test-fuzzer
 
 test-lz4:
 
