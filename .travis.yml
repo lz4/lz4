@@ -4,3 +4,10 @@ script: make test
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq gcc-multilib
+
+env:
+  - LZ4_TRAVIS_CI_ENV=-m32
+  - LZ4_TRAVIS_CI_ENV=-m64
+
+matrix:
+  fast_finish: true
