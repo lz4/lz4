@@ -118,10 +118,11 @@ LZ4_decompress_fast() :
     originalSize : is the original and therefore uncompressed size
     return : the number of bytes read from the source buffer (in other words, the compressed size)
              If the source stream is malformed, the function will stop decoding and return a negative result.
+             Destination buffer must be already allocated. Its size must be a minimum of 'originalSize' bytes.
     note : This function is a bit faster than LZ4_decompress_safe()
-           This function never writes outside of output buffers, but may read beyond input buffer in case of malicious data packet.
-           Use this function preferably into a trusted environment (data to decode comes from a trusted source).
-           Destination buffer must be already allocated. Its size must be a minimum of 'outputSize' bytes.
+           It provides fast decompression and fully respect memory boundaries for properly formed compressed data.
+           It does not provide full protection against intentionnally modified data stream.
+           Use this function in a trusted environment (data to decode comes from a trusted source).
 */
 int LZ4_decompress_fast (const char* source, char* dest, int originalSize);
 
