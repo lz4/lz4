@@ -1,10 +1,13 @@
 LZ4 - Extremely fast compression
 ================================
 
-[![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4)
-
 LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core, scalable with multi-cores CPU. It also features an extremely fast decoder, with speed in multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
 A high compression derivative, called LZ4_HC, is also provided. It trades CPU time for compression ratio.
+
+|Branch      |Status   |
+|------------|---------|
+|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) |
+|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) |
 
 This is an official mirror of LZ4 project, [hosted on Google Code](http://code.google.com/p/lz4/).
 The intention is to offer github's capabilities to lz4 users, such as cloning, branch, or source download.
