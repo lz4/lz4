@@ -321,17 +321,17 @@ static inline int local_LZ4_decompress_fast_withPrefix64k(const char* in, char* 
     return outSize;
 }
 
-static inline int local_LZ4_decompress_fast_withDict(const char* in, char* out, int inSize, int outSize)
+static inline int local_LZ4_decompress_fast_usingDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
-    LZ4_decompress_fast_withDict(in, out, outSize, in - 65536, 65536);
+    LZ4_decompress_fast_usingDict(in, out, outSize, in - 65536, 65536);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_safe_withDict(const char* in, char* out, int inSize, int outSize)
+static inline int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
-    LZ4_decompress_safe_withDict(in, out, inSize, outSize, in - 65536, 65536);
+    LZ4_decompress_safe_usingDict(in, out, inSize, outSize, in - 65536, 65536);
     return outSize;
 }
 
@@ -358,8 +358,8 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 # define NB_DECOMPRESSION_ALGORITHMS 7
 # define MINDECOMPRESSIONCHAR '0'
 # define MAXDECOMPRESSIONCHAR (MINDECOMPRESSIONCHAR + NB_DECOMPRESSION_ALGORITHMS)
-  static char* decompressionNames[] = { "LZ4_decompress_fast", "LZ4_decompress_fast_withPrefix64k", "LZ4_decompress_fast_withDict",
-                                        "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_withDict", "LZ4_decompress_safe_partial" };
+  static char* decompressionNames[] = { "LZ4_decompress_fast", "LZ4_decompress_fast_withPrefix64k", "LZ4_decompress_fast_usingDict",
+                                        "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_usingDict", "LZ4_decompress_safe_partial" };
   double totalDTime[NB_DECOMPRESSION_ALGORITHMS] = {0};
 
   U64 totals = 0;
@@ -553,10 +553,10 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             {
             case 0: decompressionFunction = local_LZ4_decompress_fast; break;
             case 1: decompressionFunction = local_LZ4_decompress_fast_withPrefix64k; break;
-            case 2: decompressionFunction = local_LZ4_decompress_fast_withDict; break;
+            case 2: decompressionFunction = local_LZ4_decompress_fast_usingDict; break;
             case 3: decompressionFunction = LZ4_decompress_safe; break;
             case 4: decompressionFunction = LZ4_decompress_safe_withPrefix64k; break;
-            case 5: decompressionFunction = local_LZ4_decompress_safe_withDict; break;
+            case 5: decompressionFunction = local_LZ4_decompress_safe_usingDict; break;
             case 6: decompressionFunction = local_LZ4_decompress_safe_partial; break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }

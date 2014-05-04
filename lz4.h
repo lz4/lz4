@@ -241,8 +241,8 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int origi
     but can also use up to 64KB of dictionary data
     to decode chained blocks.
 */
-int LZ4_decompress_safe_withDict (const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize);
-int LZ4_decompress_fast_withDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
+int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize);
+int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
 
 
 

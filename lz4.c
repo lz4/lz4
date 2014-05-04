@@ -888,29 +888,19 @@ int LZ4_decompress_safe(const char* source, char* dest, int compressedSize, int 
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, noDict, NULL, 0);
 }
 
-int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize)
-{
-    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, partial, targetOutputSize, noDict, NULL, 0);
-}
-
 int LZ4_decompress_safe_withPrefix64k(const char* source, char* dest, int compressedSize, int maxOutputSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, withPrefix64k, NULL, 0);
 }
 
-int LZ4_decompress_safe_withDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
+int LZ4_decompress_safe_usingDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, withExtDict, dictStart, dictSize);
 }
 
-int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int originalSize)
+int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize)
 {
-    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, NULL, 0);
-}
-
-int LZ4_decompress_fast_withDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
-{
-    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withExtDict, dictStart, dictSize);
+    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, partial, targetOutputSize, noDict, NULL, 0);
 }
 
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
@@ -922,6 +912,15 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 #endif
 }
 
+int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int originalSize)
+{
+    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, NULL, 0);
+}
+
+int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
+{
+    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withExtDict, dictStart, dictSize);
+}
 
 
 /**************************************
