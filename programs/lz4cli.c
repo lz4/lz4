@@ -405,9 +405,8 @@ int main(int argc, char** argv)
                         case '7':
                         {
                             int B = argument[1] - '0';
-                            int S = 1 << (8 + 2*B);
-                            BMK_SetBlocksize(S);
                             blockSize = LZ4IO_setBlockSizeID(B);
+                            BMK_SetBlocksize(blockSize);
                             argument++;
                             break;
                         }
