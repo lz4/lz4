@@ -254,103 +254,103 @@ static U64 BMK_GetFileSize(char* infilename)
   Benchmark function
 *********************************************************/
 
-static inline int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
+static int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static void* stateLZ4;
-static inline int local_LZ4_compress_withState(const char* in, char* out, int inSize)
+static int local_LZ4_compress_withState(const char* in, char* out, int inSize)
 {
     return LZ4_compress_withState(stateLZ4, in, out, inSize);
 }
 
-static inline int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
+static int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput_withState(stateLZ4, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static void* ctx;
-static inline int local_LZ4_compress_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compress_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_continue(ctx, in, out, inSize);
 }
 
-static inline int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 
 LZ4_dict_t LZ4_dict;
-static inline void* local_LZ4_resetDictT(const char* fake)
+static void* local_LZ4_resetDictT(const char* fake)
 {
     (void)fake;
     memset(&LZ4_dict, 0, sizeof(LZ4_dict_t));
     return NULL;
 }
 
-static inline int local_LZ4_compress_usingDict(const char* in, char* out, int inSize)
+static int local_LZ4_compress_usingDict(const char* in, char* out, int inSize)
 {
     return LZ4_compress_usingDict(&LZ4_dict, in, out, inSize);
 }
 
 
 static void* stateLZ4HC;
-static inline int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_withStateHC(stateLZ4HC, in, out, inSize);
 }
 
-static inline int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput_withStateHC(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static inline int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static inline int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_continue(ctx, in, out, inSize);
 }
 
-static inline int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static inline int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_fast(in, out, outSize);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_fast_withPrefix64k(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast_withPrefix64k(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_fast_withPrefix64k(in, out, outSize);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_fast_usingDict(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast_usingDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_fast_usingDict(in, out, outSize, in - 65536, 65536);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_safe_usingDict(in, out, inSize, outSize, in - 65536, 65536);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
 {
     return LZ4_decompress_safe_partial(in, out, inSize, outSize - 5, outSize);
 }

@@ -492,10 +492,8 @@ int LZ4_compress_generic(
         while ((ip>anchor) && (ref > lowLimit) && (unlikely(ip[-1]==ref[-1]))) { ip--; ref--; }
 
         {
-            unsigned litLength;
-
             /* Encode Literal length */
-            litLength = (ip - anchor);
+            unsigned litLength = (unsigned)(ip - anchor);
             token = op++;
             if ((limitedOutput) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > oend))) return 0;   /* Check output limit */
             if (litLength>=RUN_MASK)
@@ -768,7 +766,6 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
                     matchLength = LZ4_count(ip+MINMATCH, ref+MINMATCH, matchlimit);
                 else
                 {
-                    matchLength = 0;
                     const BYTE* dicLimit = ip + (dictEnd - ref);
                     if (dicLimit > matchlimit) dicLimit = matchlimit;
                     matchLength = LZ4_count(ip+MINMATCH, ref+MINMATCH, dicLimit);
