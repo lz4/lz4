@@ -181,11 +181,17 @@ typedef struct { unsigned int table[LZ4_DICTSIZE_U32]; } LZ4_dict_t;
 
 /*
  * LZ4_compress_usingDict
- * Compress data block 'source', using blocks compressed before (with the same function) to improve compression ratio
+ * Compress data block 'source', using blocks compressed before to improve compression ratio
  * Previous data blocks are assumed to still be present at their previous location.
  */
 int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize);
-//int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize, int maxOutputSize);
+
+/*
+ * LZ4_compress_limitedOutput_usingDict
+ * Same as before, but also specify a maximum target compressed size (maxOutputSize)
+ * If it cannot be met, compression exits, and return a zero.
+ */
+int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
  * LZ4_setDictPos

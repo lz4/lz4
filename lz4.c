@@ -250,7 +250,7 @@ typedef struct {
     U32  dictSize;
 } LZ4_dict_t_internal;
 
-typedef enum { notLimited = 0, limited = 1 } limitedOutput_directive;
+typedef enum { notLimited = 0, limitedOutput = 1 } limitedOutput_directive;
 typedef enum { byPtr, byU32, byU16 } tableType_t;
 
 typedef enum { noDict = 0, withPrefix64k = 1, usingDict = 2 } dict_directive;
@@ -425,7 +425,7 @@ int LZ4_compress_generic(
                  int inputSize,
                  int maxOutputSize,
 
-                 limitedOutput_directive limitedOutput,
+                 limitedOutput_directive outputLimited,
                  tableType_t tableType,
                  dict_directive dict)
 {
@@ -495,7 +495,7 @@ int LZ4_compress_generic(
             /* Encode Literal length */
             unsigned litLength = (unsigned)(ip - anchor);
             token = op++;
-            if ((limitedOutput) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > oend))) return 0;   /* Check output limit */
+            if ((outputLimited) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > oend))) return 0;   /* Check output limit */
             if (litLength>=RUN_MASK)
             {
                 int len = (int)litLength-RUN_MASK;
@@ -519,7 +519,7 @@ _next_match:
             ip += matchLength + MINMATCH;
             if (matchLength>=ML_MASK)
             {
-                if ((limitedOutput) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > oend))) return 0;    /* Check output limit */
+                if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > oend))) return 0;    /* Check output limit */
                 *token += ML_MASK;
                 matchLength -= ML_MASK;
                 for (; matchLength > 509 ; matchLength-=510) { *op++ = 255; *op++ = 255; }
@@ -550,7 +550,7 @@ _last_literals:
     /* Encode Last Literals */
     {
         int lastRun = (int)(iend - anchor);
-        if ((limitedOutput) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;   /* Check output limit */
+        if ((outputLimited) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;   /* Check output limit */
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun >= 255 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
@@ -592,9 +592,9 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
     int result;
 
     if (inputSize < (int)LZ4_64KLIMIT)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limited, byU16, noDict);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limited, (sizeof(void*)==8) ? byU32 : byPtr, noDict);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, (sizeof(void*)==8) ? byU32 : byPtr, noDict);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
@@ -628,15 +628,15 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
     MEM_INIT(state, 0, LZ4_sizeofState());
 
     if (inputSize < (int)LZ4_64KLIMIT)
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limited, byU16, noDict);
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict);
     else
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limited, (sizeof(void*)==8) ? byU32 : byPtr, noDict);
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, (sizeof(void*)==8) ? byU32 : byPtr, noDict);
 }
 
 
-/***************************************
+/*****************************************
    Experimental : Streaming functions
-***************************************/
+*****************************************/
 
 void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const char* source)
 {
@@ -656,11 +656,11 @@ void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const char* source)
 }
 
 
-int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize)
+static int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
+    const char* source, char* dest, int inputSize, int maxOutputSize,
+    limitedOutput_directive outputLimited)
 {
     LZ4_dict_t_internal* const streamPtr = (LZ4_dict_t_internal*)LZ4_dict;
-    const int maxOutputSize = 0;
-    const limitedOutput_directive limitedOutput = notLimited;
     const tableType_t tableType = byU32;
     U32 currentOffset;
     const U32 dictSize = streamPtr->dictSize;
@@ -742,7 +742,7 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
                 unsigned litLength = (unsigned)(ip - anchor);
 
                 token = op++;
-                if ((limitedOutput) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > oend))) return 0;   /* Check output limit */
+                if ((outputLimited) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > oend))) return 0;   /* Check output limit */
                 if (litLength>=RUN_MASK)
                 {
                     unsigned remaininglength = litLength - RUN_MASK;
@@ -775,7 +775,7 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
                 ip += matchLength + MINMATCH;
                 if (matchLength>=ML_MASK)
                 {
-                    if ((limitedOutput) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > oend))) return 0;    /* Check output limit */
+                    if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > oend))) return 0;    /* Check output limit */
                     *token += ML_MASK;
                     matchLength -= ML_MASK;
                     for (; matchLength > 509 ; matchLength-=510) { *op++ = 255; *op++ = 255; }
@@ -798,7 +798,7 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
         /* Encode Last Literals */
         {
             int lastRun = (int)(iend - anchor);
-            if ((limitedOutput) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;   /* Check output limit */
+            if ((outputLimited) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;   /* Check output limit */
             if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun >= 255 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
             else *op++ = (BYTE)(lastRun<<ML_BITS);
             memcpy(op, anchor, iend - anchor);
@@ -808,6 +808,17 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
         /* End */
         return (int) (((char*)op)-dest);
     }
+}
+
+
+int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_usingDict_generic(LZ4_dict, source, dest, inputSize, 0, notLimited);
+}
+
+int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    return LZ4_compress_usingDict_generic(LZ4_dict, source, dest, inputSize, maxOutputSize, limitedOutput);
 }
 
 
@@ -1150,5 +1161,5 @@ int LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int i
 
 int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
-    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limited, byU32, withPrefix64k);
+    return LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, withPrefix64k);
 }
