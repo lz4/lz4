@@ -92,7 +92,7 @@ lz4programs: lz4.c lz4hc.c
 liblz4: lz4.c lz4hc.c
 	@echo compiling static library
 	@$(CC) $(CFLAGS) -c $^
-	@ar rcs liblz4.a lz4.o lz4hc.o
+	@$(AR) rcs liblz4.a lz4.o lz4hc.o
 	@echo compiling dynamic library
 	@$(CC) $(CFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links

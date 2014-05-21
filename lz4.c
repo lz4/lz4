@@ -418,7 +418,7 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pRef, const BYTE* pInLimi
 }
 
 
-int LZ4_compress_generic(
+static int LZ4_compress_generic(
                  void* ctx,
                  const char* source,
                  char* dest,
@@ -638,10 +638,9 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
    Experimental : Streaming functions
 *****************************************/
 
-void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const char* source)
+void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict)
 {
-    if ((source - LZ4_dict->currentOffset > source)
-        || (LZ4_dict->currentOffset > 0x80000000))
+    if (LZ4_dict->currentOffset > 0x80000000)
     {
         /* rescale hash table */
         U32 delta = LZ4_dict->currentOffset - 64 KB;
@@ -656,24 +655,20 @@ void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const char* source)
 }
 
 
-static int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
+static inline int LZ4_compress_2_generic (LZ4_dict_t* LZ4_dict,
     const char* source, char* dest, int inputSize, int maxOutputSize,
-    limitedOutput_directive outputLimited)
+    const limitedOutput_directive outputLimited,
+    const dict_directive dict)
 {
     LZ4_dict_t_internal* const streamPtr = (LZ4_dict_t_internal*)LZ4_dict;
     const tableType_t tableType = byU32;
-    U32 currentOffset;
+    const U32 currentOffset = streamPtr->currentOffset;
     const U32 dictSize = streamPtr->dictSize;
     const BYTE* const dictionary = streamPtr->dictionary;
 
-    if (streamPtr->initCheck) return 0;   /* structure not initialized */
-
-    LZ4_renormDictT(streamPtr, source);
-    currentOffset = streamPtr->currentOffset;
-
     streamPtr->dictionary = (const BYTE*)source;
     streamPtr->dictSize = (U32)inputSize;
-    streamPtr->currentOffset += inputSize;
+    streamPtr->currentOffset += (U32)inputSize;
 
     {
         U32 ipIndex = currentOffset;
@@ -721,7 +716,7 @@ static int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
                 if (unlikely(ipIndex > indexLimit)) goto _last_literals;
 
                 ip = base + ipIndex;
-                if (refIndex < currentOffset)
+                if ((dict==usingDict) && (refIndex < currentOffset))
                 {
                     ref = dictBase + refIndex;
                     lowLimit = dictionary;
@@ -729,13 +724,13 @@ static int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
                 else
                 {
                     ref = base + refIndex;
-                    lowLimit = (const BYTE*)source;
+                    if (dict==usingDict) lowLimit = (const BYTE*)source;
                 }
 
             } while ((refIndex + MAX_DISTANCE < ipIndex) || (A32(ref) != A32(ip)));
 
             /* Catch up */
-            while ((ip>anchor) && (ref>lowLimit) && (unlikely(ip[-1]==ref[-1]))) { ip--; ref--; }
+            while ((ip>anchor) && ((dict==usingDict)?(ref>lowLimit):1) && (unlikely(ip[-1]==ref[-1]))) { ip--; ref--; }
 
             {
                 /* Encode Literal length */
@@ -762,15 +757,17 @@ static int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
             /* Encode MatchLength */
             {
                 unsigned matchLength;
-                if (refIndex >= currentOffset)
-                    matchLength = LZ4_count(ip+MINMATCH, ref+MINMATCH, matchlimit);
-                else
+                if ((dict==usingDict) && (refIndex < currentOffset))
                 {
                     const BYTE* dicLimit = ip + (dictEnd - ref);
                     if (dicLimit > matchlimit) dicLimit = matchlimit;
                     matchLength = LZ4_count(ip+MINMATCH, ref+MINMATCH, dicLimit);
                     if (ref + MINMATCH + matchLength == dictEnd)
                         matchLength += LZ4_count(ip+MINMATCH+matchLength, (const BYTE*)source, matchlimit);
+                }
+                else
+                {
+                    matchLength = LZ4_count(ip+MINMATCH, ref+MINMATCH, matchlimit);
                 }
                 ip += matchLength + MINMATCH;
                 if (matchLength>=ML_MASK)
@@ -811,6 +808,22 @@ static int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
 }
 
 
+static inline int LZ4_compress_usingDict_generic (LZ4_dict_t* LZ4_dict,
+    const char* source, char* dest, int inputSize, int maxOutputSize,
+    const limitedOutput_directive outputLimited)
+{
+    LZ4_dict_t_internal* const streamPtr = (LZ4_dict_t_internal*)LZ4_dict;
+
+    if (streamPtr->initCheck) return 0;   /* structure not initialized */
+    LZ4_renormDictT(streamPtr);
+
+    if ((streamPtr->dictionary + streamPtr->dictSize == (const BYTE*)source)  && (streamPtr->dictSize >= 64 KB))
+    return LZ4_compress_2_generic(LZ4_dict, source, dest, inputSize, maxOutputSize, outputLimited, withPrefix64k);
+    else
+    return LZ4_compress_2_generic(LZ4_dict, source, dest, inputSize, maxOutputSize, outputLimited, usingDict);
+}
+
+
 int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize)
 {
     return LZ4_compress_usingDict_generic(LZ4_dict, source, dest, inputSize, 0, notLimited);
@@ -819,6 +832,12 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
 int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     return LZ4_compress_usingDict_generic(LZ4_dict, source, dest, inputSize, maxOutputSize, limitedOutput);
+}
+
+// Debug function only, to measure performance differences
+int LZ4_compress_forceDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_2_generic(LZ4_dict, source, dest, inputSize, 0, notLimited, usingDict);
 }
 
 
@@ -833,7 +852,22 @@ int LZ4_setDictPos (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 
-int LZ4_loadDict   (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize)
+int LZ4_moveDict (LZ4_dict_t* LZ4_dict, char* safeBuffer, int dictSize)
+{
+    LZ4_dict_t_internal* dict = (LZ4_dict_t_internal*) LZ4_dict;
+    const BYTE* previousDictEnd = dict->dictionary + dict->dictSize;
+
+    if ((U32)dictSize > 64 KB) dictSize = 64 KB;   /* useless to define a dictionary > 64 KB */
+    if ((U32)dictSize > dict->dictSize) dictSize = dict->dictSize;
+
+    memcpy(safeBuffer, previousDictEnd - dictSize, dictSize);
+    dict->dictSize = (U32)dictSize;
+
+    return 1;
+}
+
+
+int LZ4_loadDict (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize)
 {
     LZ4_dict_t_internal* dict = (LZ4_dict_t_internal*) LZ4_dict;
     const BYTE* p = (const BYTE*)dictionary;
