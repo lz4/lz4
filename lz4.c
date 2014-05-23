@@ -666,9 +666,17 @@ static inline int LZ4_compress_2_generic (LZ4_dict_t* LZ4_dict,
     const U32 dictSize = streamPtr->dictSize;
     const BYTE* const dictionary = streamPtr->dictionary;
 
-    streamPtr->dictionary = (const BYTE*)source;
-    streamPtr->dictSize = (U32)inputSize;
-    streamPtr->currentOffset += (U32)inputSize;
+    if (dict == usingDict)
+    {
+        streamPtr->dictionary = (const BYTE*)source;
+        streamPtr->dictSize = (U32)inputSize;
+        streamPtr->currentOffset += (U32)inputSize;
+    }
+    else
+    {
+        streamPtr->dictSize += (U32)inputSize;
+        streamPtr->currentOffset += (U32)inputSize;
+    }
 
     {
         U32 ipIndex = currentOffset;
@@ -697,19 +705,21 @@ static inline int LZ4_compress_2_generic (LZ4_dict_t* LZ4_dict,
         /* Main Loop */
         for ( ; ; )
         {
-            int searchMatchNb = (1U << skipStrength) - 1;
+            int searchMatchNb = (1U << skipStrength);
             const BYTE* ref;
             const BYTE* lowLimit;
             BYTE* token;
             U32 refIndex;
-            ipIndex = (U32)(ip - base);
+            U32 forwardH = LZ4_hashPosition(ip, tableType);
+            U32 forwardIpIndex = (U32)(ip - base);
 
             /* Find a match */
             do {
-                U32 h;
+                U32 h = forwardH;
+                ipIndex = forwardIpIndex;
+                forwardIpIndex += searchMatchNb++ >> skipStrength;
+                forwardH = LZ4_hashPosition(base + forwardIpIndex, tableType);
 
-                ipIndex += searchMatchNb++ >> skipStrength;
-                h = LZ4_hashPosition(base + ipIndex, tableType);
                 refIndex = streamPtr->hashTable[h];
                 streamPtr->hashTable[h] = ipIndex;
 
@@ -767,7 +777,8 @@ static inline int LZ4_compress_2_generic (LZ4_dict_t* LZ4_dict,
                 }
                 else
                 {
-                    matchLength = LZ4_count(ip+MINMATCH, ref+MINMATCH, matchlimit);
+                    matchLength = base + ipIndex - ip;
+                    matchLength += LZ4_count(base+ipIndex+MINMATCH, base+refIndex+MINMATCH, matchlimit);
                 }
                 ip += matchLength + MINMATCH;
                 if (matchLength>=ML_MASK)
@@ -834,7 +845,7 @@ int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* sour
     return LZ4_compress_usingDict_generic(LZ4_dict, source, dest, inputSize, maxOutputSize, limitedOutput);
 }
 
-// Debug function only, to measure performance differences
+// Hidden debug function, to force separate dictionary mode
 int LZ4_compress_forceDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize)
 {
     return LZ4_compress_2_generic(LZ4_dict, source, dest, inputSize, 0, notLimited, usingDict);
