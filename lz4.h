@@ -175,9 +175,17 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
 /*
  * LZ4_dict_t
  * information structure to track an LZ4 stream
- * set it to zero (memset()) before first use/
+ * use LZ4_loadDict() (or set it to zero) to init it before first use.
  */
 typedef struct { unsigned int table[LZ4_DICTSIZE_U32]; } LZ4_dict_t;
+
+/*
+ * LZ4_loadDict
+ * Use this function to load a static dictionary into LZ4_dict.
+ * You can load a size of 0 to init an LZ4_dict_t structure
+ * Return : 1 if OK, 0 if error
+ */
+int LZ4_loadDict (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize);
 
 /*
  * LZ4_compress_usingDict
@@ -194,21 +202,13 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
 int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
- * LZ4_setDictPos
- * If previous data blocks cannot be guaranteed to remain at their previous location in memory
- * save them into a safe place, and
- * use this function to indicate where to find them.
+ * LZ4_moveDict
+ * If previous data block cannot be guaranteed to remain at its previous location in memory
+ * save it into a safe place (char* safeBuffer)
+ * before calling again LZ4_compress_usingDict()
  * Return : 1 if OK, 0 if error
  */
-int LZ4_setDictPos (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize);
-
-/*
- * LZ4_loadDict
- * Use this function to load a static dictionary into LZ4_dict.
- * It will be used to improve compression of next chained block.
- * Return : 1 if OK, 0 if error
- */
-int LZ4_loadDict   (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize);
+int LZ4_moveDict (LZ4_dict_t* LZ4_dict, char* safeBuffer, int dictSize);
 
 
 /*

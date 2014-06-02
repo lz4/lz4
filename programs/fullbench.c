@@ -300,10 +300,10 @@ static int local_LZ4_compress_limitedOutput_usingDict(const char* in, char* out,
     return LZ4_compress_limitedOutput_usingDict(&LZ4_dict, in, out, inSize, LZ4_compressBound(inSize));
 }
 
-int LZ4_compress_forceDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize);
+int LZ4_compress_forceExtDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize);
 static int local_LZ4_compress_forceDict(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_forceDict(&LZ4_dict, in, out, inSize);
+    return LZ4_compress_forceExtDict(&LZ4_dict, in, out, inSize);
 }
 
 

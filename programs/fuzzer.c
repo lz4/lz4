@@ -410,7 +410,14 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             ret = LZ4_decompress_fast_withPrefix64k(compressedBuffer, decodedBuffer+dictSize, blockSize);
             FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_decompress_fast_withPrefix64k did not read all compressed block input");
             crcCheck = XXH32(decodedBuffer+dictSize, blockSize, 0);
-            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast_withPrefix64k corrupted decoded data");
+            if (crcCheck!=crcOrig)
+            {
+                int i=0;
+                while (block[i]==decodedBuffer[i]) i++;
+                printf("Wrong Byte at position %i/%i\n", i, blockSize);
+
+            }
+            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast_withPrefix64k corrupted decoded data (dict %i)", dictSize);
 
             FUZ_DISPLAYTEST;
             ret = LZ4_decompress_safe_withPrefix64k(compressedBuffer, decodedBuffer+dictSize, blockContinueCompressedSize, blockSize);
@@ -453,7 +460,7 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
                 printf("Wrong Byte at position %i/%i\n", i, blockSize);
 
             }
-            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast_usingDict corrupted decoded data");
+            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast_usingDict corrupted decoded data (dict %i)", dictSize);
 
             FUZ_DISPLAYTEST;
             decodedBuffer[blockSize] = 0;
