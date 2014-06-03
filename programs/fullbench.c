@@ -581,7 +581,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 4: decompressionFunction = LZ4_decompress_safe_withPrefix64k; break;
             case 5: decompressionFunction = local_LZ4_decompress_safe_usingDict; break;
             case 6: decompressionFunction = local_LZ4_decompress_safe_partial; break;
-            default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
+            default : DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); free(chunkP); return 1;
             }
 
             for (loopNb = 1; loopNb <= nbIterations; loopNb++)

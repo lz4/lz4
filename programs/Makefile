@@ -58,14 +58,16 @@ endif
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
 EXT =.exe
+VOID = nul
 else
 EXT =
+VOID = /dev/null
 endif
 
 
 default: lz4 lz4c
 
-all: lz4 lz4c lz4c32 fuzzer fuzzer32 fullbench fullbench32
+all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 datagen
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
@@ -76,22 +78,27 @@ lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c 
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
-
-fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
-	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
-
 fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
+fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c 
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
+fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
+
+datagen : datagen.c
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
+
 clean:
 	@rm -f core *.o \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) 
+        fullbench$(EXT) fullbench32$(EXT) \
+        fuzzer$(EXT) fuzzer32$(EXT) datagen$(EXT)
 	@echo Cleaning completed
 
 
@@ -124,11 +131,17 @@ test-64: test-lz4 test-lz4c test-fullbench test-fuzzer
 
 test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32
 
-test-lz4:
+test-lz4: lz4 datagen
+	./datagen | ./lz4 | ./lz4 -vdq > $(VOID)
+	./datagen -g256MB | ./lz4 -B4D | ./lz4 -vdq > $(VOID)
+	./datagen -g6GB | ./lz4 -vqBD | ./lz4 -vdq > $(VOID)
 
-test-lz4c:
+test-lz4c: lz4c datagen
 
-test-lz4c32:
+test-lz4c32: lz4c32 datagen
+	./datagen | ./lz4c32 | ./lz4c32 -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c32 -B4D | ./lz4c32 -vdq > $(VOID)
+	./datagen -g6GB | ./lz4c32 -vqBD | ./lz4c32 -vdq > $(VOID)
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(BENCH_NB) $(TEST_FILES)
