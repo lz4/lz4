@@ -718,9 +718,10 @@ int LZ4_loadDict (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 
-void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict)
+void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const BYTE* src)
 {
-    if (LZ4_dict->currentOffset > 0x80000000)
+    if ((LZ4_dict->currentOffset > 0x80000000) ||
+        (src - LZ4_dict->currentOffset > src))   /* address space overflow */
     {
         /* rescale hash table */
         U32 delta = LZ4_dict->currentOffset - 64 KB;
@@ -731,6 +732,7 @@ void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict)
             else LZ4_dict->hashTable[i] -= delta;
         }
         LZ4_dict->currentOffset = 64 KB;
+        LZ4_dict->dictionary = src - 64 KB;
     }
 }
 
@@ -807,7 +809,7 @@ int LZ4_moveDict (LZ4_dict_t* LZ4_dict, char* safeBuffer, int dictSize)
     dict->dictionary = (const BYTE*)safeBuffer;
     dict->dictSize = (U32)dictSize;
 
-    LZ4_renormDictT(dict);
+    LZ4_renormDictT(dict, (const BYTE*)safeBuffer);
 
     return 1;
 }
@@ -1087,7 +1089,10 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
 int LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int inputSize)
 {
     LZ4_dict_t_internal* streamPtr = (LZ4_dict_t_internal*)LZ4_Data;
-    int result = LZ4_compress_generic(LZ4_Data, source, dest, inputSize, 0, notLimited, byU32, withPrefix64k);
+    int result;
+
+    LZ4_renormDictT(streamPtr, (const BYTE*) source);
+    result = LZ4_compress_generic(LZ4_Data, source, dest, inputSize, 0, notLimited, byU32, withPrefix64k);
 
     if (streamPtr->dictSize == 0) streamPtr->dictionary = (const BYTE*)source;
     streamPtr->dictSize += (U32)inputSize;
@@ -1099,7 +1104,10 @@ int LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int i
 int LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     LZ4_dict_t_internal* streamPtr = (LZ4_dict_t_internal*)LZ4_Data;
-    int result = LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, withPrefix64k);
+    int result;
+
+    LZ4_renormDictT(streamPtr, (const BYTE*) source);
+    result = LZ4_compress_generic(LZ4_Data, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, withPrefix64k);
 
     if (streamPtr->dictSize == 0) streamPtr->dictionary = (const BYTE*)source;
     streamPtr->dictSize += (U32)inputSize;
