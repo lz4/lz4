@@ -742,6 +742,10 @@ int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest
     LZ4_dict_t_internal* streamPtr = (LZ4_dict_t_internal*)LZ4_dict;
     const BYTE* const dictEnd = streamPtr->dictionary + streamPtr->dictSize;
 
+    const BYTE* smallest = dictEnd;
+    if (smallest > (const BYTE*) source) smallest = (const BYTE*) source;
+    LZ4_renormDictT((LZ4_dict_t_internal*)LZ4_dict, smallest);
+
     if (dictEnd == (const BYTE*)source)
     {
         int result = LZ4_compress_generic(LZ4_dict, source, dest, inputSize, 0, notLimited, byU32, withPrefix64k);
@@ -763,6 +767,10 @@ int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* sour
 {
     LZ4_dict_t_internal* streamPtr = (LZ4_dict_t_internal*)LZ4_dict;
     const BYTE* const dictEnd = streamPtr->dictionary + streamPtr->dictSize;
+
+    const BYTE* smallest = dictEnd;
+    if (smallest > (const BYTE*) source) smallest = (const BYTE*) source;
+    LZ4_renormDictT((LZ4_dict_t_internal*)LZ4_dict, smallest);
 
     if (dictEnd == (const BYTE*)source)
     {
