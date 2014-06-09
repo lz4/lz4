@@ -1076,37 +1076,31 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 /* Obsolete Streaming functions */
 
-typedef struct {
-    LZ4_dict_t_internal dict;
-    const BYTE* bufferStart;
-} LZ4_Data_Structure;
+int LZ4_sizeofStreamState() { return LZ4_DICTSIZE; }
 
-int LZ4_sizeofStreamState() { return sizeof(LZ4_Data_Structure); }
-
-void LZ4_init(LZ4_Data_Structure* lz4ds, const BYTE* base)
+void LZ4_init(LZ4_dict_t_internal* lz4ds, const BYTE* base)
 {
-    MEM_INIT(lz4ds->dict.hashTable, 0, sizeof(lz4ds->dict.hashTable));
+    MEM_INIT(lz4ds->hashTable, 0, LZ4_DICTSIZE);
     lz4ds->bufferStart = base;
 }
 
 int LZ4_resetStreamState(void* state, const char* inputBuffer)
 {
     if ((((size_t)state) & 3) != 0) return 1;   /* Error : pointer is not aligned on 4-bytes boundary */
-    LZ4_init((LZ4_Data_Structure*)state, (const BYTE*)inputBuffer);
+    LZ4_init((LZ4_dict_t_internal*)state, (const BYTE*)inputBuffer);
     return 0;
 }
 
 void* LZ4_create (const char* inputBuffer)
 {
-    void* lz4ds = ALLOCATOR(1, sizeof(LZ4_Data_Structure));
-    LZ4_init ((LZ4_Data_Structure*)lz4ds, (const BYTE*)inputBuffer);
+    void* lz4ds = ALLOCATOR(4, LZ4_DICTSIZE_U32);
+    LZ4_init ((LZ4_dict_t_internal*)lz4ds, (const BYTE*)inputBuffer);
     return lz4ds;
 }
 
-
 char* LZ4_slideInputBuffer (void* LZ4_Data)
 {
-    LZ4_Data_Structure* lz4ds = (LZ4_Data_Structure*)LZ4_Data;
+    LZ4_dict_t_internal* lz4ds = (LZ4_dict_t_internal*)LZ4_Data;
 
     LZ4_moveDict((LZ4_dict_t*)LZ4_Data, (char*)lz4ds->bufferStart, 64 KB);
 
