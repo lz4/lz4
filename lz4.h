@@ -170,14 +170,22 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
    Experimental Streaming Functions
 **************************************/
 
-#define LZ4_DICTSIZE_U32 ((1 << (LZ4_MEMORY_USAGE-2)) + 6)
+#define LZ4_DICTSIZE_U32 ((1 << (LZ4_MEMORY_USAGE-2)) + 8)
 #define LZ4_DICTSIZE     (LZ4_DICTSIZE_U32 * sizeof(unsigned int))
 /*
  * LZ4_dict_t
- * information structure to track an LZ4 stream
- * use LZ4_loadDict() (or set it to zero) to init it before first use.
+ * information structure to track an LZ4 stream.
+ * set it to zero, or use LZ4_loadDict() to init it before first use.
  */
 typedef struct { unsigned int table[LZ4_DICTSIZE_U32]; } LZ4_dict_t;
+
+
+/*
+ * LZ4_createStream
+ * provides a pointer (void*) towards an initialized LZ4_dict_t structure
+ */
+void* LZ4_createStream();
+int   LZ4_free (void* LZ4_stream);
 
 /*
  * LZ4_loadDict
@@ -185,30 +193,31 @@ typedef struct { unsigned int table[LZ4_DICTSIZE_U32]; } LZ4_dict_t;
  * You can load a size of 0 to init an LZ4_dict_t structure
  * Return : 1 if OK, 0 if error
  */
-int LZ4_loadDict (LZ4_dict_t* LZ4_dict, const char* dictionary, int dictSize);
+int LZ4_loadDict (void* LZ4_stream, const char* dictionary, int dictSize);
 
 /*
  * LZ4_compress_usingDict
  * Compress data block 'source', using blocks compressed before to improve compression ratio
  * Previous data blocks are assumed to still be present at their previous location.
  */
-int LZ4_compress_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize);
+int LZ4_compress_usingDict (void* LZ4_stream, const char* source, char* dest, int inputSize);
 
 /*
  * LZ4_compress_limitedOutput_usingDict
  * Same as before, but also specify a maximum target compressed size (maxOutputSize)
  * If it cannot be met, compression exits, and return a zero.
  */
-int LZ4_compress_limitedOutput_usingDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_compress_limitedOutput_usingDict (void* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
  * LZ4_moveDict
- * If previous data block cannot be guaranteed to remain at its previous location in memory
+ * If previously compressed data block is not guaranteed to remain at its previous memory location
  * save it into a safe place (char* safeBuffer)
  * before calling again LZ4_compress_usingDict()
  * Return : 1 if OK, 0 if error
+ * Note : any dictSize > 64 KB will be interpreted as 64KB.
  */
-int LZ4_moveDict (LZ4_dict_t* LZ4_dict, char* safeBuffer, int dictSize);
+int LZ4_moveDict (void* LZ4_stream, char* safeBuffer, int dictSize);
 
 
 /*
@@ -235,8 +244,10 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int origi
    Obsolete Functions
 **************************************/
 /*
-These functions are deprecated and should no longer be used.
-They are provided here for compatibility with existing user programs.
+These function names are deprecated and should no longer be used.
+They are only provided here for compatibility with older user programs.
+- LZ4_uncompress is totally equivalent to LZ4_decompress_fast
+- LZ4_uncompress_unknownOutputSize is totally equivalent to LZ4_decompress_safe
 */
 int   LZ4_uncompress (const char* source, char* dest, int outputSize);
 int   LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
@@ -248,7 +259,6 @@ int   LZ4_resetStreamState(void* state, const char* inputBuffer);
 int   LZ4_compress_continue (void* LZ4_Data, const char* source, char* dest, int inputSize);
 int   LZ4_compress_limitedOutput_continue (void* LZ4_Data, const char* source, char* dest, int inputSize, int maxOutputSize);
 char* LZ4_slideInputBuffer (void* LZ4_Data);
-int   LZ4_free (void* LZ4_Data);
 
 
 #if defined (__cplusplus)

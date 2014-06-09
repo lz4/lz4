@@ -105,25 +105,25 @@ clean:
 	@echo Cleaning completed
 
 
-#make install option is reserved to Linux & OSX targets
+#make install option is designed for Linux & OSX targets only
 ifneq (,$(filter $(shell uname),Linux Darwin))
 
 install: liblz4
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/ $(DESTDIR)$(INCLUDEDIR)/
-	@install -m 755 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
 	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	@cp -a liblz4.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)
 	@cp -a liblz4.$(SHARED_EXT) $(DESTDIR)$(LIBDIR)
-	@install -m 755 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@install -m 755 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@echo lz4 static and shared library installed
 	@cd $(PRGDIR); $(MAKE) -e install
 
 uninstall:
-	[ -x $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
+	[ -f $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@echo lz4 libraries successfully uninstalled

@@ -127,21 +127,21 @@ uninstall:
 
 test: $(TEST_TARGETS)
 
-test-64: test-lz4 test-lz4c test-fullbench test-fuzzer
+test-64: test-lz4 test-lz4c test-fullbench test-fuzzer test-mem
 
-test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32
+test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
 
 test-lz4: lz4 datagen
 	./datagen | ./lz4 | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -B4D | ./lz4 -vdq > $(VOID)
-	./datagen -g6GB | ./lz4 -vqBD | ./lz4 -vdq > $(VOID)
+	./datagen -g6GB | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 
 test-lz4c: lz4c datagen
 
 test-lz4c32: lz4c32 datagen
 	./datagen | ./lz4c32 | ./lz4c32 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4c32 -B4D | ./lz4c32 -vdq > $(VOID)
-	./datagen -g6GB | ./lz4c32 -vqBD | ./lz4c32 -vdq > $(VOID)
+	./datagen -g6GB | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(BENCH_NB) $(TEST_FILES)
@@ -155,5 +155,12 @@ test-fuzzer: fuzzer
 test-fuzzer32: fuzzer32
 	./fuzzer32 --no-prompt
 
+test-mem: lz4 datagen
+	./datagen -g256M > tmp
+	valgrind ./lz4 -B4D -f tmp /dev/null
+	rm tmp
+
+test-mem32: lz4c32 datagen
+# unfortunately, valgrind doesn't work with non-native binary. If someone knows how to valgrind-test a 32-bits exe on a 64-bits system...
 
 endif
