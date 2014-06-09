@@ -411,6 +411,7 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pRef, const BYTE* pInLimi
     return (unsigned)(pIn - pStart);
 }
 
+
 static int LZ4_compress_generic(
                  void* ctx,
                  const char* source,
@@ -436,11 +437,11 @@ static int LZ4_compress_generic(
     const BYTE* const matchlimit = iend - LASTLITERALS;
 
     BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
+    BYTE* const olimit = op + maxOutputSize;
 
     const int skipStrength = SKIPSTRENGTH;
     U32 forwardH;
-    size_t delta=0;
+    size_t refDelta=0;
 
     /* Init conditions */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;          /* Unsupported input size, too large (or negative) */
@@ -486,30 +487,31 @@ static int LZ4_compress_generic(
             ref = LZ4_getPositionOnHash(h, ctx, tableType, base);
             if (dict==usingExtDict)
             {
-                delta = (ip-ref);
                 if (ref<(const BYTE*)source)
                 {
-                    ref += dictDelta;
+                    refDelta = dictDelta;
                     lowLimit = dictionary;
                 }
-                else lowLimit = (const BYTE*)source;
+                else
+                {
+                    refDelta = 0;
+                    lowLimit = (const BYTE*)source;
+                }
             }
             if (unlikely(ip > mflimit)) goto _last_literals;
             forwardH = LZ4_hashPosition(forwardIp, tableType);
             LZ4_putPositionOnHash(ip, h, ctx, tableType, base);
 
-        } while (((dict==usingExtDict) && (delta>MAX_DISTANCE)) ||
-                 ((dict!=usingExtDict) && (ref + MAX_DISTANCE < ip)) ||
-                 (A32(ref) != A32(ip)) );
+        } while ( ((tableType==byU16)? 0 : (ref + MAX_DISTANCE < ip)) || (A32(ref+refDelta) != A32(ip)) );
 
         /* Catch up */
-        while ((ip>anchor) && (ref > lowLimit) && (unlikely(ip[-1]==ref[-1]))) { ip--; ref--; }
+        while ((ip>anchor) && (ref+refDelta > lowLimit) && (unlikely(ip[-1]==ref[refDelta-1]))) { ip--; ref--; }   // refDelta costs some performance
 
         {
             /* Encode Literal length */
             unsigned litLength = (unsigned)(ip - anchor);
             token = op++;
-            if ((outputLimited) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > oend))) return 0;   /* Check output limit */
+            if ((outputLimited) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit))) return 0;   /* Check output limit */
             if (litLength>=RUN_MASK)
             {
                 int len = (int)litLength-RUN_MASK;
@@ -525,10 +527,10 @@ static int LZ4_compress_generic(
 
 _next_match:
         /* Encode Offset */
-        if (dict==usingExtDict) LZ4_WRITE_LITTLEENDIAN_16(op, delta)
-        else LZ4_WRITE_LITTLEENDIAN_16(op,(U16)(ip-ref));
+        LZ4_WRITE_LITTLEENDIAN_16(op,(U16)(ip-ref));
 
         /* Encode MatchLength */
+        ref += refDelta;
         {
             unsigned matchLength;
 
@@ -553,7 +555,7 @@ _next_match:
 
             if (matchLength>=ML_MASK)
             {
-                if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > oend))) return 0;    /* Check output limit */
+                if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > olimit))) return 0;    /* Check output limit */
                 *token += ML_MASK;
                 matchLength -= ML_MASK;
                 for (; matchLength > 509 ; matchLength-=510) { *op++ = 255; *op++ = 255; }
@@ -575,18 +577,19 @@ _next_match:
         ref = LZ4_getPosition(ip, ctx, tableType, base);
         if (dict==usingExtDict)
         {
-            delta = ip-ref;
             if (ref<(const BYTE*)source)
             {
-                ref += dictDelta;
+                refDelta = dictDelta;
                 lowLimit = dictionary;
             }
-            else lowLimit = (const BYTE*)source;
+            else
+            {
+                refDelta = 0;
+                lowLimit = (const BYTE*)source;
+            }
         }
         LZ4_putPosition(ip, ctx, tableType, base);
-        if ((((dict==usingExtDict) && (delta<=MAX_DISTANCE)) ||
-            ((dict!=usingExtDict) && (ref + MAX_DISTANCE >= ip))) &&
-            (A32(ref) == A32(ip))) { token = op++; *token=0; goto _next_match; }
+        if ( (ref+MAX_DISTANCE>=ip) && (A32(ref+refDelta)==A32(ip)) ) { token=op++; *token=0; goto _next_match; }
 
         /* Prepare next loop */
         forwardH = LZ4_hashPosition(++ip, tableType);
