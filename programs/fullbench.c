@@ -282,15 +282,15 @@ static int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, 
 }
 
 
-LZ4_dict_t LZ4_dict;
+LZ4_stream_t LZ4_dict;
 static void* local_LZ4_resetDictT(const char* fake)
 {
     (void)fake;
-    memset(&LZ4_dict, 0, sizeof(LZ4_dict_t));
+    memset(&LZ4_dict, 0, sizeof(LZ4_stream_t));
     return NULL;
 }
 
-int LZ4_compress_forceExtDict (LZ4_dict_t* LZ4_dict, const char* source, char* dest, int inputSize);
+int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int inputSize);
 static int local_LZ4_compress_forceDict(const char* in, char* out, int inSize)
 {
     return LZ4_compress_forceExtDict(&LZ4_dict, in, out, inSize);

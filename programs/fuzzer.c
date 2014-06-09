@@ -205,7 +205,7 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
         void* stateLZ4   = malloc(LZ4_sizeofState());
         void* stateLZ4HC = malloc(LZ4_sizeofStateHC());
         void* LZ4continue;
-        LZ4_dict_t LZ4dict;
+        LZ4_stream_t LZ4dict;
         U32 crcOrig, crcCheck;
         int displayRefresh;
 
@@ -436,19 +436,19 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             FUZ_DISPLAYTEST;
             dict -= 9;
             if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
-            memset(&LZ4dict, 0, sizeof(LZ4_dict_t));
+            memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             blockContinueCompressedSize = LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_usingDict failed");
 
             FUZ_DISPLAYTEST;
-            memset(&LZ4dict, 0, sizeof(LZ4_dict_t));
+            memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             ret = LZ4_compress_limitedOutput_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize-1);
             FUZ_CHECKTEST(ret>0, "LZ4_compress_limitedOutput_usingDict should fail : one missing byte for output buffer");
 
             FUZ_DISPLAYTEST;
-            memset(&LZ4dict, 0, sizeof(LZ4_dict_t));
+            memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             ret = LZ4_compress_limitedOutput_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_limitedOutput_usingDict should work : enough size available within output buffer");

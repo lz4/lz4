@@ -88,6 +88,13 @@ LZ4_decompress_safe() :
 */
 
 
+/*
+Note :
+    Should you prefer to explicitly allocate compression-table memory using your own allocation method,
+    use the streaming functions provided below, simply reset the memory area between each call to LZ4_compress_continue()
+*/
+
+
 /**************************************
    Advanced Functions
 **************************************/
@@ -150,39 +157,24 @@ LZ4_decompress_safe_partial() :
 int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize);
 
 
-/*
-The following functions are provided should you prefer to allocate table memory using your own allocation methods.
-int LZ4_sizeofState();
-provides the size to allocate for compression tables.
-
-Tables must be aligned on 4-bytes boundaries, otherwise compression will fail (return code 0).
-
-The allocated memory can be provided to the compressions functions using 'void* state' parameter.
-LZ4_compress_withState() and LZ4_compress_limitedOutput_withState() are equivalent to previously described functions.
-They just use the externally allocated memory area instead of allocating their own one (on stack, or on heap).
-*/
-int LZ4_sizeofState(void);
-int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
-int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
-
-
 /**************************************
    Experimental Streaming Functions
 **************************************/
 
-#define LZ4_DICTSIZE_U32 ((1 << (LZ4_MEMORY_USAGE-2)) + 8)
-#define LZ4_DICTSIZE     (LZ4_DICTSIZE_U32 * sizeof(unsigned int))
+#define LZ4_STREAMSIZE_U32 ((1 << (LZ4_MEMORY_USAGE-2)) + 8)
+#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U32 * sizeof(unsigned int))
 /*
- * LZ4_dict_t
+ * LZ4_stream_t
  * information structure to track an LZ4 stream.
  * set it to zero, or use LZ4_loadDict() to init it before first use.
  */
-typedef struct { unsigned int table[LZ4_DICTSIZE_U32]; } LZ4_dict_t;
+typedef struct { unsigned int table[LZ4_STREAMSIZE_U32]; } LZ4_stream_t;
 
 
 /*
+ * If you prefer dynamic allocation methods,
  * LZ4_createStream
- * provides a pointer (void*) towards an initialized LZ4_dict_t structure
+ * provides a pointer (void*) towards an initialized LZ4_stream_t structure.
  * LZ4_free just frees it.
  */
 void* LZ4_createStream();
@@ -190,8 +182,8 @@ int   LZ4_free (void* LZ4_stream);
 
 /*
  * LZ4_loadDict
- * Use this function to load a static dictionary into LZ4_dict.
- * Loading a size of 0 is allowed and init the LZ4_dict_t structure.
+ * Use this function to load a static dictionary into LZ4_stream.
+ * Loading a size of 0 is allowed and init the LZ4_stream_t structure.
  * Return : 1 if OK, 0 if error
  */
 int LZ4_loadDict (void* LZ4_stream, const char* dictionary, int dictSize);
@@ -246,13 +238,19 @@ int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int origi
    Obsolete Functions
 **************************************/
 /*
+Obsolete decompression functions
 These function names are deprecated and should no longer be used.
 They are only provided here for compatibility with older user programs.
 - LZ4_uncompress is the same as LZ4_decompress_fast
 - LZ4_uncompress_unknownOutputSize is the same as LZ4_decompress_safe
 */
-int   LZ4_uncompress (const char* source, char* dest, int outputSize);
-int   LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
+int LZ4_uncompress (const char* source, char* dest, int outputSize);
+int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
+
+/* Obsolete external allocation functions */
+int LZ4_sizeofState(void);
+int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
+int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /* Obsolete streaming functions */
 void* LZ4_create (const char* inputBuffer);
