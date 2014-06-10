@@ -454,7 +454,7 @@ static int LZ4_compress_generic(
         break;
     case withPrefix64k:
         base = (const BYTE*)source - dictPtr->currentOffset;
-        lowLimit = (const BYTE*)source - 64 KB;
+        lowLimit = (const BYTE*)source - dictPtr->dictSize;
         if (lowLimit < base) lowLimit = base;
         break;
     case usingExtDict:
@@ -687,7 +687,7 @@ int LZ4_loadDict (void* LZ4_dict, const char* dictionary, int dictSize)
 
     if (dictSize < MINMATCH)
     {
-        dict->dictionary = (const BYTE*)dictionary-1;
+        dict->dictionary = NULL;
         dict->dictSize = 0;
         return 1;
     }
@@ -711,7 +711,7 @@ int LZ4_loadDict (void* LZ4_dict, const char* dictionary, int dictSize)
 void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const BYTE* src)
 {
     if ((LZ4_dict->currentOffset > 0x80000000) ||
-        (src - LZ4_dict->currentOffset > src))   /* address space overflow */
+        ((size_t)LZ4_dict->currentOffset > (size_t)src))   /* address space overflow */
     {
         /* rescale hash table */
         U32 delta = LZ4_dict->currentOffset - 64 KB;
@@ -723,7 +723,7 @@ void LZ4_renormDictT(LZ4_dict_t_internal* LZ4_dict, const BYTE* src)
         }
         LZ4_dict->currentOffset = 64 KB;
         LZ4_dict->dictionary = LZ4_dict->dictionary + LZ4_dict->dictSize - 64 KB;
-        LZ4_dict->dictSize =  64 KB;
+        LZ4_dict->dictSize = 64 KB;
     }
 }
 
@@ -733,8 +733,8 @@ int LZ4_compress_continue (void* LZ4_stream, const char* source, char* dest, int
     LZ4_dict_t_internal* streamPtr = (LZ4_dict_t_internal*)LZ4_stream;
     const BYTE* const dictEnd = streamPtr->dictionary + streamPtr->dictSize;
 
-    const BYTE* smallest = dictEnd;
-    if (smallest > (const BYTE*) source) smallest = (const BYTE*) source;
+    const BYTE* smallest = (const BYTE*) source;
+    if ((streamPtr->dictSize>0) && (smallest > dictEnd)) smallest = dictEnd;
     LZ4_renormDictT(streamPtr, smallest);
 
     if (dictEnd == (const BYTE*)source)
@@ -759,9 +759,9 @@ int LZ4_compress_limitedOutput_continue (void* LZ4_stream, const char* source, c
     LZ4_dict_t_internal* streamPtr = (LZ4_dict_t_internal*)LZ4_stream;
     const BYTE* const dictEnd = streamPtr->dictionary + streamPtr->dictSize;
 
-    const BYTE* smallest = dictEnd;
-    if (smallest > (const BYTE*) source) smallest = (const BYTE*) source;
-    LZ4_renormDictT((LZ4_dict_t_internal*)LZ4_stream, smallest);
+    const BYTE* smallest = (const BYTE*) source;
+    if ((streamPtr->dictSize>0) && (smallest>dictEnd)) smallest = dictEnd;
+    LZ4_renormDictT(streamPtr, smallest);
 
     if (dictEnd == (const BYTE*)source)
     {
@@ -814,8 +814,6 @@ int LZ4_moveDict (void* LZ4_dict, char* safeBuffer, int dictSize)
 
     dict->dictionary = (const BYTE*)safeBuffer;
     dict->dictSize = (U32)dictSize;
-
-    LZ4_renormDictT(dict, (const BYTE*)safeBuffer);
 
     return 1;
 }
