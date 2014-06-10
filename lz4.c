@@ -472,40 +472,45 @@ static int LZ4_compress_generic(
     /* Main Loop */
     for ( ; ; )
     {
-        int searchMatchNb = (1U << skipStrength) + 3;
         const BYTE* forwardIp = ip;
         const BYTE* ref;
         BYTE* token;
+        {
+            int step=1;
+            int searchMatchNb = (1U << skipStrength) + 3;
 
-        /* Find a match */
-        do {
-            int step = searchMatchNb++ >> skipStrength;
-            U32 h = forwardH;
-            ip = forwardIp;
-            forwardIp += step;
+            /* Find a match */
+            do {
+                U32 h = forwardH;
+                ip = forwardIp;
+                forwardIp += step;
+                step = searchMatchNb++ >> skipStrength;
+                if (unlikely (step>8)) step=8;   // slows down uncompressible data; required for valid forwardIp
 
-            ref = LZ4_getPositionOnHash(h, ctx, tableType, base);
-            if (dict==usingExtDict)
-            {
-                if (ref<(const BYTE*)source)
+                if (unlikely(ip > mflimit)) goto _last_literals;
+
+                ref = LZ4_getPositionOnHash(h, ctx, tableType, base);
+                if (dict==usingExtDict)
                 {
-                    refDelta = dictDelta;
-                    lowLimit = dictionary;
+                    if (ref<(const BYTE*)source)
+                    {
+                        refDelta = dictDelta;
+                        lowLimit = dictionary;
+                    }
+                    else
+                    {
+                        refDelta = 0;
+                        lowLimit = (const BYTE*)source;
+                    }
                 }
-                else
-                {
-                    refDelta = 0;
-                    lowLimit = (const BYTE*)source;
-                }
-            }
-            if (unlikely(ip > mflimit)) goto _last_literals;
-            forwardH = LZ4_hashPosition(forwardIp, tableType);
-            LZ4_putPositionOnHash(ip, h, ctx, tableType, base);
+                forwardH = LZ4_hashPosition(forwardIp, tableType);
+                LZ4_putPositionOnHash(ip, h, ctx, tableType, base);
 
-        } while ( ((tableType==byU16)? 0 : (ref + MAX_DISTANCE < ip)) || (A32(ref+refDelta) != A32(ip)) );
+            } while ( ((tableType==byU16)? 0 : (ref + MAX_DISTANCE < ip)) || (A32(ref+refDelta) != A32(ip)) );
+        }
 
         /* Catch up */
-        while ((ip>anchor) && (ref+refDelta > lowLimit) && (unlikely(ip[-1]==ref[refDelta-1]))) { ip--; ref--; }   // refDelta costs some performance
+        while ((ip>anchor) && (ref+refDelta > lowLimit) && (unlikely(ip[-1]==ref[refDelta-1]))) { ip--; ref--; }
 
         {
             /* Encode Literal length */
@@ -558,7 +563,7 @@ _next_match:
                 if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > olimit))) return 0;    /* Check output limit */
                 *token += ML_MASK;
                 matchLength -= ML_MASK;
-                for (; matchLength > 509 ; matchLength-=510) { *op++ = 255; *op++ = 255; }
+                for (; matchLength >= 510 ; matchLength-=510) { *op++ = 255; *op++ = 255; }
                 if (matchLength >= 255) { matchLength-=255; *op++ = 255; }
                 *op++ = (BYTE)matchLength;
             }

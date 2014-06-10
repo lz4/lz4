@@ -370,11 +370,12 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
     void* (*initFunction)       ();
     int   (*compressionFunction)(void*, const char*, char*, int, int);
     int   (*freeFunction)       (void*);
+    int   (*nextBlockFunction)  (void*, char*, int);
     void* ctx;
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
     unsigned int checkbits;
-    char* in_buff, *in_blockStart, *in_end;
+    char* in_buff, *in_blockStart;
     char* out_buff;
     FILE* finput;
     FILE* foutput;
@@ -389,18 +390,18 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
 
     initFunction = LZ4_createStream;
     compressionFunction = LZ4_compress_limitedOutput_continue;
+    nextBlockFunction = LZ4_moveDict;
     freeFunction = LZ4_free;
 
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
     blockSize = LZ4S_GetBlockSize_FromBlockId (blockSizeId);
 
     // Allocate Memory
-    inputBufferSize = blockSize + 64 KB;
-    if (inputBufferSize < MIN_STREAM_BUFSIZE) inputBufferSize = MIN_STREAM_BUFSIZE;
+    inputBufferSize = 64 KB + blockSize;
     in_buff  = (char*)malloc(inputBufferSize);
     out_buff = (char*)malloc(blockSize+CACHELINE);
     if (!in_buff || !out_buff) EXM_THROW(31, "Allocation error : not enough memory");
-    in_blockStart = in_buff; in_end = in_buff + inputBufferSize;
+    in_blockStart = in_buff + 64 KB;
     if (streamChecksum) streamChecksumState = XXH32_init(LZ4S_CHECKSUM_SEED);
     ctx = initFunction();
 
@@ -426,7 +427,6 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
         unsigned int inSize;
 
         // Read Block
-        if ((in_blockStart+blockSize) > in_end) in_blockStart = in_buff;
         inSize = (unsigned int) fread(in_blockStart, (size_t)1, (size_t)blockSize, finput);
         if( inSize==0 ) break;   // No more input : end of compression
         filesize += inSize;
@@ -468,7 +468,11 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
                 if (sizeCheck!=(size_t)(4)) EXM_THROW(36, "Write error : cannot write block checksum");
             }
         }
-        in_blockStart += inSize;
+        {
+            size_t sizeToMove = 64 KB;
+            if (inSize < 64 KB) sizeToMove = inSize;
+            nextBlockFunction(ctx, in_blockStart - sizeToMove, sizeToMove);
+        }
     }
 
     // End of Stream mark

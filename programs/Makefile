@@ -133,15 +133,17 @@ test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
 
 test-lz4: lz4 datagen
 	./datagen | ./lz4 | ./lz4 -vdq > $(VOID)
-	./datagen -g256MB | ./lz4 -B4D | ./lz4 -vdq > $(VOID)
-	./datagen -g6GB | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
+	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
+	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 
 test-lz4c: lz4c datagen
 
-test-lz4c32: lz4c32 datagen
+test-lz4c32: lz4c32 lz4 datagen
 	./datagen | ./lz4c32 | ./lz4c32 -vdq > $(VOID)
-	./datagen -g256MB | ./lz4c32 -B4D | ./lz4c32 -vdq > $(VOID)
-	./datagen -g6GB | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
+	./datagen | ./lz4c32 | ./lz4    -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -vdq > $(VOID)
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(BENCH_NB) $(TEST_FILES)

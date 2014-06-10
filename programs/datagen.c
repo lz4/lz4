@@ -109,30 +109,58 @@ static unsigned int CDG_rand(U32* src)
 #define CDG_RANDCHAR    (((CDG_rand(seed) >> 9) & 63) + '0')
 static void CDG_generate(U64 size, U32* seed, double proba)
 {
-    BYTE buff[128 KB + 1];
+    BYTE fullbuff[32 KB + 128 KB + 1];
+    BYTE* buff = fullbuff + 32 KB;
     U64 total=0;
     U32 P32 = (U32)(32768 * proba);
     U32 pos=0;
     U32 genBlockSize = 128 KB;
 
+    // Build initial prefix
+    while (pos<32 KB)
+    {
+        // Select : Literal (char) or Match (within 32K)
+        if (CDG_RAND15BITS < P32)
+        {
+            // Copy (within 64K)
+            U32 d;
+            int ref;
+            int length = CDG_RANDLENGTH + 4;
+            U32 offset = CDG_RAND15BITS + 1;
+            if (offset > pos) offset = pos;
+            ref = pos - offset;
+            d = pos + length;
+            while (pos < d) fullbuff[pos++] = fullbuff[ref++];
+        }
+        else
+        {
+            // Literal (noise)
+            U32 d;
+            int length = CDG_RANDLENGTH;
+            d = pos + length;
+            while (pos < d) fullbuff[pos++] = CDG_RANDCHAR;
+        }
+    }
+
+    // Generate compressible data
+    pos = 0;
     while (total < size)
     {
         if (size-total < 128 KB) genBlockSize = (U32)(size-total);
         total += genBlockSize;
         buff[genBlockSize] = 0;
-        *buff = CDG_RANDCHAR;
-        pos = 1;
+        pos = 0;
         while (pos<genBlockSize)
         {
             // Select : Literal (char) or Match (within 32K)
             if (CDG_RAND15BITS < P32)
             {
                 // Copy (within 64K)
-                U32 ref, d;
+                int ref;
+                U32 d;
                 int length = CDG_RANDLENGTH + 4;
                 U32 offset = CDG_RAND15BITS + 1;
-                if (offset > pos) offset = pos;
-                if (pos + length > 128 KB ) length = 128 KB - pos;
+                if (pos + length > genBlockSize ) length = genBlockSize - pos;
                 ref = pos - offset;
                 d = pos + length;
                 while (pos < d) buff[pos++] = buff[ref++];
@@ -142,7 +170,7 @@ static void CDG_generate(U64 size, U32* seed, double proba)
                 // Literal (noise)
                 U32 d;
                 int length = CDG_RANDLENGTH;
-                if (pos + length > 128 KB) length = 128 KB - pos;
+                if (pos + length > genBlockSize) length = genBlockSize - pos;
                 d = pos + length;
                 while (pos < d) buff[pos++] = CDG_RANDCHAR;
             }
@@ -150,6 +178,8 @@ static void CDG_generate(U64 size, U32* seed, double proba)
         pos=0;
         for (;pos+512<=genBlockSize;pos+=512) printf("%512.512s", buff+pos);
         for (;pos<genBlockSize;pos++) printf("%c", buff[pos]);
+        // Regenerate prefix
+        memcpy(fullbuff, buff + 96 KB, 32 KB);
     }
 }
 
