@@ -42,27 +42,32 @@ MANDIR=$(PREFIX)/share/man/man1
 LZ4DIR=..
 
 TEST_FILES = COPYING
-TEST_TARGETS=test-32 test-64
+TEST_TARGETS=test-64 test-32
+BENCH_NB=-i5
 
 # Minimize test target for Travis CI's Build Matrix
 ifeq ($(LZ4_TRAVIS_CI_ENV),-m32)
 TEST_TARGETS=test-32
+BENCH_NB=-i1
 else ifeq ($(LZ4_TRAVIS_CI_ENV),-m64)
 TEST_TARGETS=test-64
+BENCH_NB=-i1
 endif
 
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
 EXT =.exe
+VOID = nul
 else
 EXT =
+VOID = /dev/null
 endif
 
 
 default: lz4 lz4c
 
-all: lz4 lz4c lz4c32 fuzzer fuzzer32 fullbench fullbench32
+all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 datagen
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
@@ -73,22 +78,27 @@ lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c 
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
-
-fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
-	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
-
 fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
+fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c 
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
+fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
+
+datagen : datagen.c
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
+
 clean:
 	@rm -f core *.o \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) fullbench$(EXT) fullbench32$(EXT) 
+        fullbench$(EXT) fullbench32$(EXT) \
+        fuzzer$(EXT) fuzzer32$(EXT) datagen$(EXT)
 	@echo Cleaning completed
 
 
@@ -117,21 +127,29 @@ uninstall:
 
 test: $(TEST_TARGETS)
 
-test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32
+test-64: test-lz4 test-lz4c test-fullbench test-fuzzer test-mem
 
-test-64: test-lz4 test-lz4c test-fullbench test-fuzzer
+test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
 
-test-lz4:
+test-lz4: lz4 datagen
+	./datagen | ./lz4 | ./lz4 -vdq > $(VOID)
+	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
+	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 
-test-lz4c:
+test-lz4c: lz4c datagen
 
-test-lz4c32:
+test-lz4c32: lz4c32 lz4 datagen
+	./datagen | ./lz4c32 | ./lz4c32 -vdq > $(VOID)
+	./datagen | ./lz4c32 | ./lz4    -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -vdq > $(VOID)
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
 
 test-fullbench: fullbench
-	./fullbench --no-prompt $(TEST_FILES)
+	./fullbench --no-prompt $(BENCH_NB) $(TEST_FILES)
 
 test-fullbench32: fullbench32
-	./fullbench32 --no-prompt $(TEST_FILES)
+	./fullbench32 --no-prompt $(BENCH_NB) $(TEST_FILES)
 
 test-fuzzer: fuzzer
 	./fuzzer --no-prompt
@@ -139,5 +157,14 @@ test-fuzzer: fuzzer
 test-fuzzer32: fuzzer32
 	./fuzzer32 --no-prompt
 
+test-mem: lz4 datagen
+	./datagen -g256MB > tmp
+	valgrind ./lz4 -B4D -f tmp /dev/null
+	./datagen -g16MB > tmp
+	valgrind ./lz4 -9 -B5D -f tmp /dev/null
+	rm tmp
+
+test-mem32: lz4c32 datagen
+# unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
 
 endif

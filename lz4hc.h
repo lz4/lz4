@@ -104,6 +104,7 @@ They just use the externally allocated memory area instead of allocating their o
 /**************************************
    Streaming Functions
 **************************************/
+/* Note : these streaming functions still follows the older model */
 void* LZ4_createHC (const char* inputBuffer);
 int   LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize);
 int   LZ4_compressHC_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize);

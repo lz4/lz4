@@ -109,7 +109,7 @@
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "v1.1.5"
+#  define LZ4_VERSION "v1.1.8"
 #endif
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
@@ -344,6 +344,19 @@ int main(int argc, char** argv)
                 if (*argument=='s') { displayLevel=1; continue; }                                          // -s (silent mode)
 #endif // DISABLE_LZ4C_LEGACY_OPTIONS
 
+                if ((*argument>='0') && (*argument<='9'))
+                {
+                    cLevel = 0;
+                    while ((*argument >= '0') && (*argument <= '9'))
+                    {
+                        cLevel *= 10;
+                        cLevel += *argument - '0';
+                        argument++;
+                    }
+                    argument--;
+                    continue;
+                }
+
                 switch(argument[0])
                 {
                     // Display help
@@ -353,20 +366,6 @@ int main(int argc, char** argv)
 
                     // Compression (default)
                 case 'z': forceCompress = 1; break;
-
-                    // Compression level
-                case '0':
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9':
-                case 'A':   /* non documented (hidden) */
-                    cLevel=*argument -'0'; break;
 
                     // Use Legacy format (for Linux kernel compression)
                 case 'l': legacy_format=1; break;
@@ -405,9 +404,8 @@ int main(int argc, char** argv)
                         case '7':
                         {
                             int B = argument[1] - '0';
-                            int S = 1 << (8 + 2*B);
-                            BMK_SetBlocksize(S);
                             blockSize = LZ4IO_setBlockSizeID(B);
+                            BMK_SetBlocksize(blockSize);
                             argument++;
                             break;
                         }
