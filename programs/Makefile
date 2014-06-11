@@ -165,6 +165,6 @@ test-mem: lz4 datagen
 	rm tmp
 
 test-mem32: lz4c32 datagen
-# unfortunately, valgrind doesn't work with non-native binary. If someone knows how to valgrind-test a 32-bits exe on a 64-bits system...
+# unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
 
 endif
