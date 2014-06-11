@@ -365,12 +365,32 @@ int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, i
 }
 
 
-static int compress_file_blockDependency2(char* input_filename, char* output_filename, int compressionlevel)
+static void* LZ4IO_LZ4_createStream (const char* inputBuffer)
 {
-    void* (*initFunction)       ();
-    int   (*compressionFunction)(void*, const char*, char*, int, int);
-    int   (*freeFunction)       (void*);
+    (void)inputBuffer;
+    return LZ4_createStream();
+}
+
+static int LZ4IO_LZ4_compress_limitedOutput_continue (void* ctx, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel)
+{
+    (void)compressionLevel;
+    return LZ4_compress_limitedOutput_continue(ctx, source, dest, inputSize, maxOutputSize);
+}
+
+static int LZ4IO_LZ4_slideInputBufferHC (void* ctx, char* buffer, int size)
+{
+    (void)size; (void)buffer;
+    LZ4_slideInputBufferHC (ctx);
+    return 1;
+}
+
+
+static int compress_file_blockDependency(char* input_filename, char* output_filename, int compressionlevel)
+{
+    void* (*initFunction)       (const char*);
+    int   (*compressionFunction)(void*, const char*, char*, int, int, int);
     int   (*nextBlockFunction)  (void*, char*, int);
+    int   (*freeFunction)       (void*);
     void* ctx;
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -388,10 +408,20 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
     start = clock();
     if ((displayLevel==2) && (compressionlevel>=3)) displayLevel=3;
 
-    initFunction = LZ4_createStream;
-    compressionFunction = LZ4_compress_limitedOutput_continue;
-    nextBlockFunction = LZ4_moveDict;
-    freeFunction = LZ4_free;
+    if (compressionlevel<3)
+    {
+        initFunction = LZ4IO_LZ4_createStream;
+        compressionFunction = LZ4IO_LZ4_compress_limitedOutput_continue;
+        nextBlockFunction = LZ4_moveDict;
+        freeFunction = LZ4_free;
+    }
+    else
+    {
+        initFunction = LZ4_createHC;
+        compressionFunction = LZ4_compressHC2_limitedOutput_continue;
+        nextBlockFunction = LZ4IO_LZ4_slideInputBufferHC;
+        freeFunction = LZ4_free;
+    }
 
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
     blockSize = LZ4S_GetBlockSize_FromBlockId (blockSizeId);
@@ -402,8 +432,9 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
     out_buff = (char*)malloc(blockSize+CACHELINE);
     if (!in_buff || !out_buff) EXM_THROW(31, "Allocation error : not enough memory");
     in_blockStart = in_buff + 64 KB;
+    if (compressionlevel>=3) in_blockStart = in_buff;
     if (streamChecksum) streamChecksumState = XXH32_init(LZ4S_CHECKSUM_SEED);
-    ctx = initFunction();
+    ctx = initFunction(in_buff);
 
     // Write Archive Header
     *(unsigned int*)out_buff = LITTLE_ENDIAN_32(LZ4S_MAGICNUMBER);   // Magic Number, in Little Endian convention
@@ -434,7 +465,7 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
         if (streamChecksum) XXH32_update(streamChecksumState, in_blockStart, inSize);
 
         // Compress Block
-        outSize = compressionFunction(ctx, in_blockStart, out_buff+4, inSize, inSize-1);
+        outSize = compressionFunction(ctx, in_blockStart, out_buff+4, inSize, inSize-1, compressionlevel);
         if (outSize > 0) compressedfilesize += outSize+4; else compressedfilesize += inSize+4;
         if (blockChecksum) compressedfilesize+=4;
         DISPLAYLEVEL(3, "==> %.2f%%   ", (double)compressedfilesize/filesize*100);
@@ -472,6 +503,7 @@ static int compress_file_blockDependency2(char* input_filename, char* output_fil
             size_t sizeToMove = 64 KB;
             if (inSize < 64 KB) sizeToMove = inSize;
             nextBlockFunction(ctx, in_blockStart - sizeToMove, sizeToMove);
+            if (compressionlevel>=3) in_blockStart = in_buff + 64 KB;
         }
     }
 
@@ -530,7 +562,7 @@ int LZ4IO_compressFilename(char* input_filename, char* output_filename, int comp
     void* streamChecksumState=NULL;
 
     // Branch out
-    if (blockIndependence==0) return compress_file_blockDependency2(input_filename, output_filename, compressionLevel);
+    if (blockIndependence==0) return compress_file_blockDependency(input_filename, output_filename, compressionLevel);
 
     // Init
     start = clock();

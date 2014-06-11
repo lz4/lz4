@@ -47,8 +47,9 @@
 **************************************/
 /* 32 or 64 bits ? */
 #if (defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
-  || defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) \
-  || defined(__64BIT__) || defined(_LP64) || defined(__LP64__) \
+  || defined(__powerpc64__) || defined(__powerpc64le__) \
+  || defined(__ppc64__) || defined(__ppc64le__) \
+  || defined(__PPC64__) || defined(__PPC64LE__) \
   || defined(__ia64) || defined(__itanium__) || defined(_M_IA64) )   /* Detects 64 bits mode */
 #  define LZ4_ARCH64 1
 #else
@@ -59,6 +60,7 @@
  * Little Endian or Big Endian ?
  * Overwrite the #define below if you know your architecture endianess
  */
+#include <stdlib.h>   /* Apparently required to detect endianess */
 #if defined (__GLIBC__)
 #  include <endian.h>
 #  if (__BYTE_ORDER == __BIG_ENDIAN)

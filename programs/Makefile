@@ -158,8 +158,10 @@ test-fuzzer32: fuzzer32
 	./fuzzer32 --no-prompt
 
 test-mem: lz4 datagen
-	./datagen -g256M > tmp
+	./datagen -g256MB > tmp
 	valgrind ./lz4 -B4D -f tmp /dev/null
+	./datagen -g16MB > tmp
+	valgrind ./lz4 -9 -B5D -f tmp /dev/null
 	rm tmp
 
 test-mem32: lz4c32 datagen
