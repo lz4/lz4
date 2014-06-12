@@ -111,6 +111,7 @@
 #endif
 
 #ifdef _MSC_VER    /* Visual Studio */
+#  define FORCE_INLINE static __forceinline
 #  include <intrin.h>                    /* For Visual 2005 */
 #  if LZ4_ARCH64   /* 64-bits */
 #    pragma intrinsic(_BitScanForward64) /* For Visual 2005 */
@@ -120,6 +121,15 @@
 #    pragma intrinsic(_BitScanReverse)   /* For Visual 2005 */
 #  endif
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
+#else
+#  ifdef __GNUC__
+#    define FORCE_INLINE static inline __attribute__((always_inline))
+#  else
+#    define FORCE_INLINE static inline
+#  endif
+#endif
+
+#ifdef _MSC_VER  /* Visual Studio */
 #  define lz4_bswap16(x) _byteswap_ushort(x)
 #else
 #  define lz4_bswap16(x) ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
@@ -831,7 +841,7 @@ int LZ4_moveDict (void* LZ4_dict, char* safeBuffer, int dictSize)
  * Note that it is essential this generic function is really inlined,
  * in order to remove useless branches during compilation optimisation.
  */
-static int LZ4_decompress_generic(
+FORCE_INLINE int LZ4_decompress_generic(
                  const char* source,
                  char* dest,
                  int inputSize,
@@ -855,17 +865,18 @@ static int LZ4_decompress_generic(
     BYTE* cpy;
     BYTE* oexit = op + targetOutputSize;
 
-    const BYTE* const dictEnd = (dict==usingExtDict) ? (const BYTE*)dictStart + dictSize : NULL;
+    const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
 
-    const size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};   /* static reduces speed for LZ4_decompress_safe() on GCC64 */
+    /*const size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};   / static reduces speed for LZ4_decompress_safe() on GCC64 */
+    const size_t dec32table[] = {4-0, 4-3, 4-2, 4-3, 4-0, 4-0, 4-0, 4-0};   /* static reduces speed for LZ4_decompress_safe() on GCC64 */
     static const size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
 
 
     /* Special cases */
-    (void)dictStart; (void)dictSize;
-    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;   /* targetOutputSize too high => decode everything */
+    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
     if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;   /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
+
 
     /* Main Loop */
     while (1)
@@ -878,7 +889,11 @@ static int LZ4_decompress_generic(
         if ((length=(token>>ML_BITS)) == RUN_MASK)
         {
             unsigned s=255;
-            while (((endOnInput)?ip<iend:1) && (s==255)) { s = *ip++; length += s; }
+            while (((endOnInput)?ip<iend:1) && (s==255))
+            {
+                s = *ip++;
+                length += s;
+            }
         }
 
         /* copy literals */
@@ -910,17 +925,13 @@ static int LZ4_decompress_generic(
         /* get matchlength */
         if ((length=(token&ML_MASK)) == ML_MASK)
         {
-            _readNextMLByte:
-            if ((!endOnInput) || (ip<iend-(LASTLITERALS+1)))   /* Ensure enough bytes remain for LASTLITERALS + token */
+            unsigned s;
+            do
             {
-                unsigned s = *ip++;
+                if (endOnInput && (ip > iend-LASTLITERALS)) goto _output_error;
+                s = *ip++;
                 length += s;
-                if (s==255) goto _readNextMLByte;
-            }
-            else
-            {
-                goto _output_error;
-            }
+            } while (s==255);
         }
 
         /* check external dictionary */
@@ -963,9 +974,12 @@ static int LZ4_decompress_generic(
             op[1] = ref[1];
             op[2] = ref[2];
             op[3] = ref[3];
-            op += 4, ref += 4; ref -= dec32table[op-ref];
+            /*op += 4, ref += 4; ref -= dec32table[op-ref];
             A32(op) = A32(ref);
-            op += STEPSIZE-4; ref -= dec64;
+            op += STEPSIZE-4; ref -= dec64;*/
+            ref += dec32table[op-ref];
+            A32(op+4) = A32(ref);
+            op += STEPSIZE; ref -= dec64;
         } else { LZ4_COPYSTEP(op,ref); }
         cpy = op + length - (STEPSIZE-4);
 
@@ -1015,11 +1029,7 @@ int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSi
 
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
-#ifdef _MSC_VER   /* This version is faster with Visual */
-    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, noDict, NULL, 0);
-#else
     return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, NULL, 0);
-#endif
 }
 
 int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int originalSize)
@@ -1086,7 +1096,7 @@ int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
 int LZ4_compress_withState (void* state, const char* source, char* dest, int inputSize)
 {
     if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
-    MEM_INIT(state, 0, LZ4_sizeofState());
+    MEM_INIT(state, 0, LZ4_STREAMSIZE);
 
     if (inputSize < (int)LZ4_64KLIMIT)
         return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict);
@@ -1097,7 +1107,7 @@ int LZ4_compress_withState (void* state, const char* source, char* dest, int inp
 int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
-    MEM_INIT(state, 0, LZ4_sizeofState());
+    MEM_INIT(state, 0, LZ4_STREAMSIZE);
 
     if (inputSize < (int)LZ4_64KLIMIT)
         return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict);
