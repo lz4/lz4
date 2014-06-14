@@ -755,10 +755,10 @@ int LZ4_compress_continue (void* LZ4_stream, const char* source, char* dest, int
         const BYTE* sourceEnd = (const BYTE*) source + inputSize;
         if ((sourceEnd > streamPtr->dictionary) && (sourceEnd < dictEnd))
         {
-            streamPtr->dictionary = sourceEnd;
             streamPtr->dictSize = dictEnd - sourceEnd;
             if (streamPtr->dictSize > 64 KB) streamPtr->dictSize = 64 KB;
             if (streamPtr->dictSize < 4) streamPtr->dictSize = 0;
+            streamPtr->dictionary = dictEnd - streamPtr->dictSize;
         }
     }
 
@@ -794,10 +794,10 @@ int LZ4_compress_limitedOutput_continue (void* LZ4_stream, const char* source, c
         const BYTE* sourceEnd = (const BYTE*) source + inputSize;
         if ((sourceEnd > streamPtr->dictionary) && (sourceEnd < dictEnd))
         {
-            streamPtr->dictionary = sourceEnd;
             streamPtr->dictSize = dictEnd - sourceEnd;
             if (streamPtr->dictSize > 64 KB) streamPtr->dictSize = 64 KB;
             if (streamPtr->dictSize < 4) streamPtr->dictSize = 0;
+            streamPtr->dictionary = dictEnd - streamPtr->dictSize;
         }
     }
 
