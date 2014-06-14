@@ -157,19 +157,18 @@ LZ4_decompress_safe_partial() :
 int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize);
 
 
-/**************************************
-   Experimental Streaming Functions
-**************************************/
+/***********************************************
+   Experimental Streaming Compression Functions
+***********************************************/
 
 #define LZ4_STREAMSIZE_U32 ((1 << (LZ4_MEMORY_USAGE-2)) + 8)
 #define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U32 * sizeof(unsigned int))
 /*
  * LZ4_stream_t
  * information structure to track an LZ4 stream.
- * set it to zero, or use LZ4_loadDict() to init it before first use.
+ * important : set this structure content to zero before first use !
  */
 typedef struct { unsigned int table[LZ4_STREAMSIZE_U32]; } LZ4_stream_t;
-
 
 /*
  * If you prefer dynamic allocation methods,
@@ -180,10 +179,12 @@ typedef struct { unsigned int table[LZ4_STREAMSIZE_U32]; } LZ4_stream_t;
 void* LZ4_createStream();
 int   LZ4_free (void* LZ4_stream);
 
+
 /*
  * LZ4_loadDict
  * Use this function to load a static dictionary into LZ4_stream.
- * Loading a size of 0 is allowed and init the LZ4_stream_t structure.
+ * Any previous data will be forgotten, only 'dictionary' will remain in memory.
+ * Loading a size of 0 is allowed (same effect as init).
  * Return : 1 if OK, 0 if error
  */
 int LZ4_loadDict (void* LZ4_stream, const char* dictionary, int dictSize);
@@ -198,7 +199,7 @@ int LZ4_compress_continue (void* LZ4_stream, const char* source, char* dest, int
 /*
  * LZ4_compress_limitedOutput_continue
  * Same as before, but also specify a maximum target compressed size (maxOutputSize)
- * If it cannot be met, compression exits, and return a zero.
+ * If objective cannot be met, compression exits, and returns a zero.
  */
 int LZ4_compress_limitedOutput_continue (void* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize);
 
@@ -212,6 +213,10 @@ int LZ4_compress_limitedOutput_continue (void* LZ4_stream, const char* source, c
  */
 int LZ4_moveDict (void* LZ4_stream, char* safeBuffer, int dictSize);
 
+
+/************************************************
+  Experimental Streaming Decompression Functions
+************************************************/
 
 /*
 *_usingDict() :
@@ -247,12 +252,12 @@ They are only provided here for compatibility with older user programs.
 int LZ4_uncompress (const char* source, char* dest, int outputSize);
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
-/* Obsolete external allocation functions */
+/* Obsolete functions for externally allocated state; use streaming interface instead */
 int LZ4_sizeofState(void);
 int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
 int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
-/* Obsolete streaming functions */
+/* Obsolete streaming functions; use new streaming interface whenever possible */
 void* LZ4_create (const char* inputBuffer);
 int   LZ4_sizeofStreamState(void);
 int   LZ4_resetStreamState(void* state, const char* inputBuffer);

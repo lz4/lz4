@@ -30,9 +30,10 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-export RELEASE=rc118
+# Version numbers
+export RELEASE=r118
 LIBVER_MAJOR=1
-LIBVER_MINOR=0
+LIBVER_MINOR=2
 LIBVER_PATCH=0
 LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
