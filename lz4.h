@@ -241,7 +241,7 @@ int   LZ4_free (void* LZ4_stream);   /* yes, it's the same one as compression */
 *_continue() :
     These decoding functions allow decompression of multiple blocks in "streaming" mode.
     Previously decoded blocks must still be available at the memory position where they were decoded.
-    If it's not possible, save the relevant part of decoded data before it disappears,
+    If it's not possible, save the relevant part of decoded data into a safe buffer,
     and indicate where it stands using LZ4_setDictDecode()
 */
 int LZ4_decompress_safe_continue (void* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxOutputSize);
@@ -249,9 +249,9 @@ int LZ4_decompress_fast_continue (void* LZ4_streamDecode, const char* source, ch
 
 /*
  * LZ4_setDictDecode
- * Use this function to instruct where to find the dictionary
- * This function is not necessary if previous data is still available where it was decoded.
- * Loading a size of 0 is allowed (same effect as no dictionary).
+ * Use this function to instruct where to find the dictionary.
+ * This function is not necessary if previous data is still available where it was already decoded.
+ * Setting a size of 0 is allowed (same effect as no dictionary).
  * Return : 1 if OK, 0 if error
  */
 int LZ4_setDictDecode (void* LZ4_streamDecode, const char* dictionary, int dictSize);

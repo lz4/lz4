@@ -439,19 +439,19 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             blockContinueCompressedSize = LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
-            FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_usingDict failed");
+            FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
 
             FUZ_DISPLAYTEST;
             memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             ret = LZ4_compress_limitedOutput_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize-1);
-            FUZ_CHECKTEST(ret>0, "LZ4_compress_limitedOutput_usingDict should fail : one missing byte for output buffer");
+            FUZ_CHECKTEST(ret>0, "LZ4_compress_limitedOutput_continue should fail : one missing byte for output buffer");
 
             FUZ_DISPLAYTEST;
             memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             ret = LZ4_compress_limitedOutput_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize);
-            FUZ_CHECKTEST(ret<=0, "LZ4_compress_limitedOutput_usingDict should work : enough size available within output buffer");
+            FUZ_CHECKTEST(ret<=0, "LZ4_compress_limitedOutput_continue should work : enough size available within output buffer");
 
             // Decompress with dictionary as external
             FUZ_DISPLAYTEST;
