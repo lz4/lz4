@@ -506,7 +506,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 double averageTime;
                 int milliTime;
 
-                PROGRESS("%1i-%-25.25s : %9i ->\r", loopNb, compressorName, (int)benchedSize);
+                PROGRESS("%1i-%-26.26s : %9i ->\r", loopNb, compressorName, (int)benchedSize);
                 { size_t i; for (i=0; i<benchedSize; i++) compressed_buff[i]=(char)i; }     // warmimg up memory
 
                 nb_loops = 0;
@@ -530,13 +530,13 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 if (averageTime < bestTime) bestTime = averageTime;
                 cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
                 ratio = (double)cSize/(double)benchedSize*100.;
-                PROGRESS("%1i-%-25.25s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i-%-26.26s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
             }
 
             if (ratio<100.)
-                DISPLAY("%-27.27s : %9i -> %9i (%5.2f%%),%7.1f MB/s\n", compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%-28.28s : %9i -> %9i (%5.2f%%),%7.1f MB/s\n", compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
             else
-                DISPLAY("%-27.27s : %9i -> %9i (%5.1f%%),%7.1f MB/s\n", compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%-28.28s : %9i -> %9i (%5.1f%%),%7.1f MB/s\n", compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
 
             totalCTime[cAlgNb] += bestTime;
             totalCSize[cAlgNb] += cSize;

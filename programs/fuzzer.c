@@ -210,6 +210,9 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
         int displayRefresh;
 
 
+        // init
+        memset(&LZ4dict, 0, sizeof(LZ4dict));
+
         // Create compressible test buffer
         CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
         FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
@@ -221,16 +224,30 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
         {
         case 0: displayRefresh = nbCycles+1; break;
         case 1: displayRefresh=FUZ_MAX(1, nbCycles / 100); break;
-        case 2: displayRefresh=99; break;
+        case 2: displayRefresh=89; break;
         default : displayRefresh=1;
         }
 
         // move to startCycle
         for (cycleNb = 0; cycleNb < startCycle; cycleNb++)
         {
-            FUZ_rand(&randState);
-            FUZ_rand(&randState);
-            FUZ_rand(&randState);
+            // synd rand & dict
+            int dictSize, blockSize, blockStart;
+            char* dict;
+            char* block;
+
+            blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
+            blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
+            dictSize   = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
+            if (dictSize > blockStart) dictSize = blockStart;
+            block = ((char*)CNBuffer) + blockStart;
+            dict = block - dictSize;
+            LZ4_loadDict(&LZ4dict, dict, dictSize);
+            LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
+            LZ4_loadDict(&LZ4dict, dict, dictSize);
+            LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
+            LZ4_loadDict(&LZ4dict, dict, dictSize);
+            LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
         }
 
         // Test loop
@@ -432,25 +449,23 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             crcCheck = XXH32(decodedBuffer+dictSize, blockSize, 0);
             FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe_withPrefix64k corrupted decoded data");
 
-            // Compress using dictionary
+            // Compress using External dictionary
             FUZ_DISPLAYTEST;
-            dict -= 9;
+            dict -= 9;   // Separation, so it is an ExtDict
             if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
-            memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             blockContinueCompressedSize = LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
 
             FUZ_DISPLAYTEST;
-            memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             ret = LZ4_compress_limitedOutput_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize-1);
-            FUZ_CHECKTEST(ret>0, "LZ4_compress_limitedOutput_continue should fail : one missing byte for output buffer");
+            FUZ_CHECKTEST(ret>0, "LZ4_compress_limitedOutput_continue using ExtDict should fail : one missing byte for output buffer");
 
             FUZ_DISPLAYTEST;
-            memset(&LZ4dict, 0, sizeof(LZ4_stream_t));
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             ret = LZ4_compress_limitedOutput_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize);
+            FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_limitedOutput_compressed size is different (%i != %i)", ret, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_limitedOutput_continue should work : enough size available within output buffer");
 
             // Decompress with dictionary as external
@@ -494,7 +509,7 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             {
                 decodedBuffer[blockSize-10] = 0;
                 ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize-10, dict, dictSize);
-                FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : not enough output size (-10 byte)");
+                FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : output buffer too small (-10 byte)");
                 FUZ_CHECKTEST(decodedBuffer[blockSize-10], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-10 byte) (blockSize=%i)", blockSize);
             }
 
