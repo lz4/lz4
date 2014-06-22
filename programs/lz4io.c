@@ -754,7 +754,6 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
 
     // init
     memset(&ctx, 0, sizeof(ctx));
-    (void)blockIndependenceFlag;
 
     // Decode stream descriptor
     nbReadBytes = fread(descriptor, 1, 3, finput);
@@ -838,7 +837,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             if (sizeCheck != (size_t)blockSize) EXM_THROW(76, "Write error : cannot write data block");
             filesize += blockSize;
             if (streamChecksumFlag) XXH32_update(streamChecksumState, in_buff, blockSize);
-            if (!independentBlocks)
+            if (!blockIndependenceFlag)
             {
                 // handle dictionary for streaming
                 memcpy(in_buff + blockSize - 64 KB, out_buff, 64 KB);

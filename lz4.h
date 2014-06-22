@@ -235,7 +235,7 @@ typedef struct { unsigned int table[LZ4_STREAMDECODESIZE_U32]; } LZ4_streamDecod
  * LZ4_free just frees it.
  */
 void* LZ4_createStreamDecode();
-int   LZ4_free (void* LZ4_stream);   /* yes, it's the same one as compression */
+int   LZ4_free (void* LZ4_stream);   /* yes, it's the same one as for compression */
 
 /*
 *_continue() :
@@ -250,7 +250,8 @@ int LZ4_decompress_fast_continue (void* LZ4_streamDecode, const char* source, ch
 /*
  * LZ4_setDictDecode
  * Use this function to instruct where to find the dictionary.
- * This function is not necessary if previous data is still available where it was already decoded.
+ * This function can be used to specify a static dictionary,
+ * or to instruct where to find some previously decoded data saved into a different memory space.
  * Setting a size of 0 is allowed (same effect as no dictionary).
  * Return : 1 if OK, 0 if error
  */
@@ -260,8 +261,10 @@ int LZ4_setDictDecode (void* LZ4_streamDecode, const char* dictionary, int dictS
 /*
 Advanced decoding functions :
 *_usingDict() :
-    These decoding functions work the same as "_continue" ones,
-    the dictionary must be explicitly provided within parameters
+    These decoding functions work the same as
+    a combination of LZ4_setDictDecode() followed by LZ4_decompress_x_continue()
+    all together into a single function call.
+    It doesn't use nor update an LZ4_streamDecode_t structure.
 */
 int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize);
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);

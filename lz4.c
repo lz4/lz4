@@ -915,12 +915,14 @@ FORCE_INLINE int LZ4_decompress_generic(
         token = *ip++;
         if ((length=(token>>ML_BITS)) == RUN_MASK)
         {
-            unsigned s=255;
-            while (((endOnInput)?ip<iend:1) && (s==255))
+            unsigned s;
+            do
             {
                 s = *ip++;
                 length += s;
             }
+            while (likely((endOnInput)?ip<iend-RUN_MASK:1) && (s==255));
+            if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
         }
 
         /* copy literals */
@@ -959,6 +961,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                 s = *ip++;
                 length += s;
             } while (s==255);
+            if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
         }
 
         /* check external dictionary */
@@ -1175,7 +1178,7 @@ int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
 
 void LZ4_init(LZ4_stream_t_internal* lz4ds, const BYTE* base)
 {
-    MEM_INIT(lz4ds->hashTable, 0, LZ4_STREAMSIZE);
+    MEM_INIT(lz4ds, 0, LZ4_STREAMSIZE);
     lz4ds->bufferStart = base;
 }
 

@@ -371,8 +371,6 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                                         "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_usingDict", "LZ4_decompress_safe_partial" };
   double totalDTime[NB_DECOMPRESSION_ALGORITHMS+1] = {0};
 
-  U64 totals = 0;
-
 
   // Loop for each file
   while (fileIdx<nbFiles)
@@ -609,7 +607,6 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             totalDTime[dAlgNb] += bestTime;
         }
 
-        totals += benchedSize;
       }
 
       free(orig_buff);

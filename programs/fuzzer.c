@@ -121,7 +121,7 @@ unsigned int FUZ_rand(unsigned int* src)
     rand32 += PRIME2;
     rand32  = FUZ_rotl32(rand32, 13);
     *src = rand32;
-    return rand32;
+    return rand32 >> 3;
 }
 
 
@@ -170,7 +170,8 @@ int FUZ_SecurityTest()
   char* input;
   int i, r;
 
-  printf("Overflow test (issue 52)...\n");
+  // Overflow test, by Ludwig Strigeus
+  printf("Overflow test (issue 52)...");
   input = (char*) malloc (20<<20);
   output = (char*) malloc (20<<20);
   input[0] = 0x0F;
@@ -564,7 +565,6 @@ int FUZ_usage()
 
 
 int main(int argc, char** argv) {
-    char userInput[50] = {0};
     U32 timestamp = FUZ_GetMilliStart();
     U32 seed=0;
     int seedset=0;
@@ -651,6 +651,7 @@ int main(int argc, char** argv) {
 
     if (!seedset)
     {
+        char userInput[50] = {0};
         printf("Select an Initialisation number (default : random) : ");
         fflush(stdout);
         if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
@@ -662,7 +663,7 @@ int main(int argc, char** argv) {
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
-    //FUZ_SecurityTest();
+    FUZ_SecurityTest();
 
     if (nbTests<=0) nbTests=1;
 
