@@ -118,8 +118,8 @@
 #define MAX_MEM    (1984<<20)
 #define DEFAULT_CHUNKSIZE   (4<<20)
 
-#define ALL_COMPRESSORS -1
-#define ALL_DECOMPRESSORS -1
+#define ALL_COMPRESSORS 0
+#define ALL_DECOMPRESSORS 0
 
 
 //**************************************
@@ -250,78 +250,108 @@ static U64 BMK_GetFileSize(char* infilename)
 }
 
 
-//*********************************************************
-//  Public function
-//*********************************************************
+/*********************************************************
+  Benchmark function
+*********************************************************/
 
-static inline int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
+static int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static void* stateLZ4;
-static inline int local_LZ4_compress_withState(const char* in, char* out, int inSize)
+static int local_LZ4_compress_withState(const char* in, char* out, int inSize)
 {
     return LZ4_compress_withState(stateLZ4, in, out, inSize);
 }
 
-static inline int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
+static int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput_withState(stateLZ4, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static void* ctx;
-static inline int local_LZ4_compress_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compress_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_continue(ctx, in, out, inSize);
 }
 
-static inline int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
+
+LZ4_stream_t LZ4_dict;
+static void* local_LZ4_resetDictT(const char* fake)
+{
+    (void)fake;
+    memset(&LZ4_dict, 0, sizeof(LZ4_stream_t));
+    return NULL;
+}
+
+int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int inputSize);
+static int local_LZ4_compress_forceDict(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_forceExtDict(&LZ4_dict, in, out, inSize);
+}
+
+
 static void* stateLZ4HC;
-static inline int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_withStateHC(stateLZ4HC, in, out, inSize);
 }
 
-static inline int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput_withStateHC(stateLZ4HC, in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static inline int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput(in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static inline int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_continue(ctx, in, out, inSize);
 }
 
-static inline int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static inline int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_fast(in, out, outSize);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_fast_withPrefix64k(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast_withPrefix64k(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_fast_withPrefix64k(in, out, outSize);
     return outSize;
 }
 
-static inline int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast_usingDict(const char* in, char* out, int inSize, int outSize)
+{
+    (void)inSize;
+    LZ4_decompress_fast_usingDict(in, out, outSize, in - 65536, 65536);
+    return outSize;
+}
+
+static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int inSize, int outSize)
+{
+    (void)inSize;
+    LZ4_decompress_safe_usingDict(in, out, inSize, outSize, in - 65536, 65536);
+    return outSize;
+}
+
+static int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
 {
     return LZ4_decompress_safe_partial(in, out, inSize, outSize - 5, outSize);
 }
@@ -330,24 +360,16 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
   char* orig_buff;
-# define NB_COMPRESSION_ALGORITHMS 12
+# define NB_COMPRESSION_ALGORITHMS 13
 # define MINCOMPRESSIONCHAR '0'
-# define MAXCOMPRESSIONCHAR (MINCOMPRESSIONCHAR + NB_COMPRESSION_ALGORITHMS)
-  static char* compressionNames[] = { "LZ4_compress", "LZ4_compress_limitedOutput",
-                                      "LZ4_compress_withState", "LZ4_compress_limitedOutput_withState",
-                                      "LZ4_compress_continue", "LZ4_compress_limitedOutput_continue",
-                                      "LZ4_compressHC", "LZ4_compressHC_limitedOutput",
-                                      "LZ4_compressHC_withStateHC", "LZ4_compressHC_limitedOutput_withStateHC",
-                                      "LZ4_compressHC_continue", "LZ4_compressHC_limitedOutput_continue" };
-  double totalCTime[NB_COMPRESSION_ALGORITHMS] = {0};
-  double totalCSize[NB_COMPRESSION_ALGORITHMS] = {0};
-# define NB_DECOMPRESSION_ALGORITHMS 5
+  double totalCTime[NB_COMPRESSION_ALGORITHMS+1] = {0};
+  double totalCSize[NB_COMPRESSION_ALGORITHMS+1] = {0};
+# define NB_DECOMPRESSION_ALGORITHMS 7
 # define MINDECOMPRESSIONCHAR '0'
 # define MAXDECOMPRESSIONCHAR (MINDECOMPRESSIONCHAR + NB_DECOMPRESSION_ALGORITHMS)
-  static char* decompressionNames[] = { "LZ4_decompress_fast", "LZ4_decompress_fast_withPrefix64k", "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_partial" };
-  double totalDTime[NB_DECOMPRESSION_ALGORITHMS] = {0};
-
-  U64 totals = 0;
+  static char* decompressionNames[] = { "LZ4_decompress_fast", "LZ4_decompress_fast_withPrefix64k", "LZ4_decompress_fast_usingDict",
+                                        "LZ4_decompress_safe", "LZ4_decompress_safe_withPrefix64k", "LZ4_decompress_safe_usingDict", "LZ4_decompress_safe_partial" };
+  double totalDTime[NB_DECOMPRESSION_ALGORITHMS+1] = {0};
 
 
   // Loop for each file
@@ -450,9 +472,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         DISPLAY(" %s : \n", inFileName);
 
         // Compression Algorithms
-        for (cAlgNb=0; (cAlgNb < NB_COMPRESSION_ALGORITHMS) && (compressionTest); cAlgNb++)
+        for (cAlgNb=1; (cAlgNb <= NB_COMPRESSION_ALGORITHMS) && (compressionTest); cAlgNb++)
         {
-            char* cName = compressionNames[cAlgNb];
+            char* compressorName;
             int (*compressionFunction)(const char*, char*, int);
             void* (*initFunction)(const char*) = NULL;
             double bestTime = 100000000.;
@@ -461,18 +483,19 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
             switch(cAlgNb)
             {
-            case 0 : compressionFunction = LZ4_compress; break;
-            case 1 : compressionFunction = local_LZ4_compress_limitedOutput; break;
-            case 2 : compressionFunction = local_LZ4_compress_withState; break;
-            case 3 : compressionFunction = local_LZ4_compress_limitedOutput_withState; break;
-            case 4 : compressionFunction = local_LZ4_compress_continue; initFunction = LZ4_create; break;
-            case 5 : compressionFunction = local_LZ4_compress_limitedOutput_continue; initFunction = LZ4_create; break;
-            case 6 : compressionFunction = LZ4_compressHC; break;
-            case 7 : compressionFunction = local_LZ4_compressHC_limitedOutput; break;
-            case 8 : compressionFunction = local_LZ4_compressHC_withStateHC; break;
-            case 9 : compressionFunction = local_LZ4_compressHC_limitedOutput_withStateHC; break;
-            case 10: compressionFunction = local_LZ4_compressHC_continue; initFunction = LZ4_createHC; break;
-            case 11: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; break;
+            case 1 : compressionFunction = LZ4_compress; compressorName = "LZ4_compress"; break;
+            case 2 : compressionFunction = local_LZ4_compress_limitedOutput; compressorName = "LZ4_compress_limitedOutput"; break;
+            case 3 : compressionFunction = local_LZ4_compress_withState; compressorName = "LZ4_compress_withState"; break;
+            case 4 : compressionFunction = local_LZ4_compress_limitedOutput_withState; compressorName = "LZ4_compress_limitedOutput_withState"; break;
+            case 5 : compressionFunction = local_LZ4_compress_continue; initFunction = LZ4_create; compressorName = "LZ4_compress_continue"; break;
+            case 6 : compressionFunction = local_LZ4_compress_limitedOutput_continue; initFunction = LZ4_create; compressorName = "LZ4_compress_limitedOutput_continue"; break;
+            case 7 : compressionFunction = LZ4_compressHC; compressorName = "LZ4_compressHC"; break;
+            case 8 : compressionFunction = local_LZ4_compressHC_limitedOutput; compressorName = "LZ4_compressHC_limitedOutput"; break;
+            case 9 : compressionFunction = local_LZ4_compressHC_withStateHC; compressorName = "LZ4_compressHC_withStateHC"; break;
+            case 10: compressionFunction = local_LZ4_compressHC_limitedOutput_withStateHC; compressorName = "LZ4_compressHC_limitedOutput_withStateHC"; break;
+            case 11: compressionFunction = local_LZ4_compressHC_continue; initFunction = LZ4_createHC; compressorName = "LZ4_compressHC_continue"; break;
+            case 12: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; compressorName = "LZ4_compressHC_limitedOutput_continue"; break;
+            case 13: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 
@@ -481,7 +504,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 double averageTime;
                 int milliTime;
 
-                PROGRESS("%1i-%-19.19s : %9i ->\r", loopNb, cName, (int)benchedSize);
+                PROGRESS("%1i-%-26.26s : %9i ->\r", loopNb, compressorName, (int)benchedSize);
                 { size_t i; for (i=0; i<benchedSize; i++) compressed_buff[i]=(char)i; }     // warmimg up memory
 
                 nb_loops = 0;
@@ -494,7 +517,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                     {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
-                        if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", cName), exit(1);
+                        if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", compressorName), exit(1);
                     }
                     if (initFunction!=NULL) free(ctx);
                     nb_loops++;
@@ -505,13 +528,13 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 if (averageTime < bestTime) bestTime = averageTime;
                 cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
                 ratio = (double)cSize/(double)benchedSize*100.;
-                PROGRESS("%1i-%-19.19s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, cName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i-%-26.26s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
             }
 
             if (ratio<100.)
-                DISPLAY("%-21.21s : %9i -> %9i (%5.2f%%),%7.1f MB/s\n", cName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%-28.28s : %9i -> %9i (%5.2f%%),%7.1f MB/s\n", compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
             else
-                DISPLAY("%-21.21s : %9i -> %9i (%5.1f%%),%7.1f MB/s\n", cName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%-28.28s : %9i -> %9i (%5.1f%%),%7.1f MB/s\n", compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
 
             totalCTime[cAlgNb] += bestTime;
             totalCSize[cAlgNb] += cSize;
@@ -521,7 +544,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
         {
             chunkP[chunkNb].compressedSize = LZ4_compress(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
-            if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", compressionNames[0]), exit(1);
+            if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress"), exit(1);
         }
         { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing source area, for CRC checking
 
@@ -532,16 +555,18 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             int (*decompressionFunction)(const char*, char*, int, int);
             double bestTime = 100000000.;
 
-            if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != dAlgNb)) continue;
+            if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != dAlgNb+1)) continue;
 
             switch(dAlgNb)
             {
             case 0: decompressionFunction = local_LZ4_decompress_fast; break;
             case 1: decompressionFunction = local_LZ4_decompress_fast_withPrefix64k; break;
-            case 2: decompressionFunction = LZ4_decompress_safe; break;
-            case 3: decompressionFunction = LZ4_decompress_safe_withPrefix64k; break;
-            case 4: decompressionFunction = local_LZ4_decompress_safe_partial; break;
-            default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
+            case 2: decompressionFunction = local_LZ4_decompress_fast_usingDict; break;
+            case 3: decompressionFunction = LZ4_decompress_safe; break;
+            case 4: decompressionFunction = LZ4_decompress_safe_withPrefix64k; break;
+            case 5: decompressionFunction = local_LZ4_decompress_safe_usingDict; break;
+            case 6: decompressionFunction = local_LZ4_decompress_safe_partial; break;
+            default : DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); free(chunkP); return 1;
             }
 
             for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -550,7 +575,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 int milliTime;
                 U32 crcDecoded;
 
-                PROGRESS("%1i-%-24.24s :%10i ->\r", loopNb, dName, (int)benchedSize);
+                PROGRESS("%1i-%-29.29s :%10i ->\r", loopNb, dName, (int)benchedSize);
 
                 nb_loops = 0;
                 milliTime = BMK_GetMilliStart();
@@ -570,43 +595,23 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 averageTime = (double)milliTime / nb_loops;
                 if (averageTime < bestTime) bestTime = averageTime;
 
-                PROGRESS("%1i-%-24.24s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i-%-29.29s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
 
                 // CRC Checking
                 crcDecoded = XXH32(orig_buff, (int)benchedSize, 0);
                 if (crcOriginal!=crcDecoded) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOriginal, (unsigned)crcDecoded); exit(1); }
             }
 
-            DISPLAY("%-26.26s :%10i -> %7.1f MB/s\n", dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%-31.31s :%10i -> %7.1f MB/s\n", dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
 
             totalDTime[dAlgNb] += bestTime;
         }
 
-        totals += benchedSize;
       }
 
       free(orig_buff);
       free(compressed_buff);
       free(chunkP);
-  }
-
-  if (nbFiles > 1)
-  {
-      int AlgNb;
-
-      DISPLAY(" ** TOTAL ** : \n");
-      for (AlgNb = 0; (AlgNb < NB_COMPRESSION_ALGORITHMS) && (compressionTest); AlgNb ++)
-      {
-          char* cName = compressionNames[AlgNb];
-          if ((compressionAlgo != ALL_COMPRESSORS) && (compressionAlgo != AlgNb)) continue;
-          DISPLAY("%-21.21s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s\n", cName, (long long unsigned int)totals, (long long unsigned int)totalCSize[AlgNb], (double)totalCSize[AlgNb]/(double)totals*100., (double)totals/totalCTime[AlgNb]/1000.);
-      }
-      for (AlgNb = 0; (AlgNb < NB_DECOMPRESSION_ALGORITHMS) && (decompressionTest); AlgNb ++)
-      {
-          char* dName = decompressionNames[AlgNb];
-          if ((decompressionAlgo != ALL_DECOMPRESSORS) && (decompressionAlgo != AlgNb)) continue;
-          DISPLAY("%-21.21s :%10llu -> %6.1f MB/s\n", dName, (long long unsigned int)totals, (double)totals/totalDTime[AlgNb]/1000.);
-      }
   }
 
   if (BMK_pause) { printf("press enter...\n"); getchar(); }
@@ -629,8 +634,8 @@ int usage(char* exename)
 int usage_advanced()
 {
     DISPLAY( "\nAdvanced options :\n");
-    DISPLAY( " -c#    : test only compression function # [%c-%c]\n", MINCOMPRESSIONCHAR, MAXCOMPRESSIONCHAR);
-    DISPLAY( " -d#    : test only decompression function # [%c-%c]\n", MINDECOMPRESSIONCHAR, MAXDECOMPRESSIONCHAR);
+    DISPLAY( " -c#    : test only compression function # [1-%i]\n", NB_COMPRESSION_ALGORITHMS);
+    DISPLAY( " -d#    : test only decompression function # [1-%i]\n", NB_DECOMPRESSION_ALGORITHMS);
     DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     //DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
@@ -652,7 +657,7 @@ int main(int argc, char** argv)
     char* input_filename=0;
 
     // Welcome message
-    DISPLAY( WELCOME_MESSAGE);
+    DISPLAY(WELCOME_MESSAGE);
 
     if (argc<2) { badusage(exename); return 1; }
 
@@ -679,15 +684,23 @@ int main(int argc, char** argv)
                     // Select compression algorithm only
                 case 'c':
                     decompressionTest = 0;
-                    if ((argument[1]>= MINCOMPRESSIONCHAR) && (argument[1]<= MAXCOMPRESSIONCHAR))
-                       compressionAlgo = argument[1] - '0', argument++;
+                    while ((argument[1]>= '0') && (argument[1]<= '9'))
+                    {
+                        compressionAlgo *= 10;
+                        compressionAlgo += argument[1] - '0';
+                        argument++;
+                    }
                     break;
 
                     // Select decompression algorithm only
                 case 'd':
                     compressionTest = 0;
-                    if ((argument[1]>= MINDECOMPRESSIONCHAR) && (argument[1]<= MAXDECOMPRESSIONCHAR))
-                       decompressionAlgo = argument[1] - '0', argument++;
+                    while ((argument[1]>= '0') && (argument[1]<= '9'))
+                    {
+                        decompressionAlgo *= 10;
+                        decompressionAlgo += argument[1] - '0';
+                        argument++;
+                    }
                     break;
 
                     // Display help on usage

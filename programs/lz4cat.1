@@ -7,24 +7,22 @@
 .hy 0
 .nr HY 0
 
-.TH lz4cat "1" "2014-04-15" "lz4cat" "User Commands"
+.TH lz4cat "1" "2014-06-20" "lz4cat" "User Commands"
 .SH NAME
-\fBlz4cat\fR - Extremely fast compression algorithm
+\fBlz4cat\fR - Utility based on LZ4
 
 .SH SYNOPSIS
 .TP 5
-\fBlz4cat\fR [\fBOPTIONS\fR] [-|INPUT-FILE] <OUTPUT-FILE>
+\fBlz4cat\fR [\fBOPTIONS\fR] [-|INPUT-FILE]
 
 .SH DESCRIPTION
 .PP
-\fBlz4\fR is an extremely fast lossless compression algorithm.
+\fBlz4cat\fR is an utility based on \fBlz4\fR, an extremely fast lossless compression algorithm.
 
-\fBlz4cat\fR is an utility based on \fBlz4\fR.
+\fBlz4cat\fR decompress input file or stream, redirecting its output to the console.
+It is equivalent to \fBlz4 -cd\fR,
 
-\fBlz4cat\fR is equivalent to \fBlz4 -cd\fR,
-which forces decompression and redirect its output to the console.
-
-All other options are the same as \fBlz4\fR ones (man lz4).
+Available options are the same as \fBlz4\fR ones (man lz4).
 
 
 .SH BUGS

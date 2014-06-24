@@ -30,20 +30,21 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-export RELEASE=r117
+# Version numbers
+export RELEASE=r118
 LIBVER_MAJOR=1
-LIBVER_MINOR=0
+LIBVER_MINOR=2
 LIBVER_PATCH=0
 LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
 DESTDIR=
-PREFIX=/usr
-CC:=$(CC)
+PREFIX = /usr
+CC    := $(CC)
 CFLAGS+= -I. -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
 
-LIBDIR=$(PREFIX)/lib
+LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
-PRGDIR=programs
+PRGDIR = programs
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 
 
@@ -92,7 +93,7 @@ lz4programs: lz4.c lz4hc.c
 liblz4: lz4.c lz4hc.c
 	@echo compiling static library
 	@$(CC) $(CFLAGS) -c $^
-	@ar rcs liblz4.a lz4.o lz4hc.o
+	@$(AR) rcs liblz4.a lz4.o lz4hc.o
 	@echo compiling dynamic library
 	@$(CC) $(CFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
@@ -105,25 +106,25 @@ clean:
 	@echo Cleaning completed
 
 
-#make install option is reserved to Linux & OSX targets
+#make install option is designed for Linux & OSX targets only
 ifneq (,$(filter $(shell uname),Linux Darwin))
 
 install: liblz4
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/ $(DESTDIR)$(INCLUDEDIR)/
-	@install -m 755 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
 	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	@cp -a liblz4.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)
 	@cp -a liblz4.$(SHARED_EXT) $(DESTDIR)$(LIBDIR)
-	@install -m 755 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@install -m 755 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@echo lz4 static and shared library installed
 	@cd $(PRGDIR); $(MAKE) -e install
 
 uninstall:
-	[ -x $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
+	[ -f $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@echo lz4 libraries successfully uninstalled
