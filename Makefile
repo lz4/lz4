@@ -38,13 +38,13 @@ LIBVER_PATCH=0
 LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
 DESTDIR=
-PREFIX=/usr
-CC:=$(CC)
+PREFIX = /usr
+CC    := $(CC)
 CFLAGS+= -I. -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
 
-LIBDIR=$(PREFIX)/lib
+LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
-PRGDIR=programs
+PRGDIR = programs
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 
 
