@@ -983,9 +983,9 @@ FORCE_INLINE int LZ4_decompress_generic(
                 copySize = length+MINMATCH - copySize;
                 if (copySize > (size_t)((char*)op-dest))   /* overlap */
                 {
-                    BYTE* const cpy = op + copySize;
-                    const BYTE* ref = (BYTE*)dest;
-                    while (op < cpy) *op++ = *ref++;
+                    BYTE* const cpy2 = op + copySize;
+                    const BYTE* ref2 = (BYTE*)dest;
+                    while (op < cpy2) *op++ = *ref2++;
                 }
                 else
                 {
