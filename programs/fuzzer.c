@@ -220,9 +220,9 @@ int FUZ_Issue134()
         free(buffers[i]);
       return 0;
     }
-    if ((size_t)buffers[nbBuff] > (size_t) 0x80000000)
+    if ((size_t)buffers[nbBuff] > 0) // (size_t) 0x80000000)
     {
-      printf("Found high memory buffer : %X \n", (U32)(size_t)(buffers[nbBuff]));
+      printf("Testing memory buffer address %X , ", (U32)(size_t)(buffers[nbBuff]));
       printf("Creating a payload designed to fail\n");
       buffers[++nbBuff] = (char*)malloc(64 MB);
       if (buffers[nbBuff]==NULL)
@@ -236,13 +236,18 @@ int FUZ_Issue134()
         char* input = buffers[nbBuff-1];
         char* output = buffers[nbBuff];
         int r;
-        input[0] = 0x0F;
+        input[0] = 0x0F;   // Match length overflow
         input[1] = 0x00;
         input[2] = 0x00;
-        for(i = 3; (size_t)i <= nbOf255; i++) input[i] = 0xff;
-        r = LZ4_decompress_safe(input, output, 64 MB, 64 MB);
+        for(i = 3; (size_t)i <= nbOf255+3; i++) input[i] = 0xff;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, 64 MB);
         printf(" Passed (return = %i < 0)\n",r);
-        break;
+        input[0] = 0xF0;   // Literal length overflow
+        input[1] = 0xFF;
+        input[2] = 0xFF;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, 64 MB);
+        printf(" Passed (return = %i < 0)\n",r);
+        free (buffers[nbBuff]); nbBuff--;
       }
     }
   }
