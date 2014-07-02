@@ -193,7 +193,8 @@ int FUZ_Issue52()
 }
 
 
-#define MAX_NB_BUFF_I134 36
+#define MAX_NB_BUFF_I134 150
+#define BLOCKSIZE_I134 64 MB
 int FUZ_Issue134()
 {
   char* buffers[MAX_NB_BUFF_I134+1] = {0};
@@ -212,22 +213,22 @@ int FUZ_Issue134()
   for (nbBuff=0; nbBuff < MAX_NB_BUFF_I134; nbBuff++)
   {
     printf("\b\b\b\b%3i ", nbBuff);
-    buffers[nbBuff] = (char*)malloc(64 MB);
+    buffers[nbBuff] = (char*)malloc(BLOCKSIZE_I134);
     if (buffers[nbBuff]==NULL)
     {
-      printf(" : unable to allocate memory above 0x80000000h \n");
-      for (i=0 ; i<nbBuff; i++)
-        free(buffers[i]);
+      printf(" : unable to allocate more memory\n");
+      for (i=0 ; i<nbBuff; i++) free(buffers[i]);
       return 0;
     }
     if ((size_t)buffers[nbBuff] > 0) // (size_t) 0x80000000)
     {
       printf("Testing memory buffer address %X , ", (U32)(size_t)(buffers[nbBuff]));
       printf("Creating a payload designed to fail\n");
-      buffers[++nbBuff] = (char*)malloc(64 MB);
+      buffers[++nbBuff] = (char*)malloc(BLOCKSIZE_I134);
       if (buffers[nbBuff]==NULL)
       {
-        printf("failed to test (lack of memory)\n");
+        printf("failed to test (no more memory)\n");
+        for (i=0 ; i<nbBuff; i++) free(buffers[i]);
         return 0;
       }
       {
@@ -236,24 +237,42 @@ int FUZ_Issue134()
         char* input = buffers[nbBuff-1];
         char* output = buffers[nbBuff];
         int r;
-        input[0] = 0x0F;   // Match length overflow
-        input[1] = 0x00;
-        input[2] = 0x00;
-        for(i = 3; (size_t)i <= nbOf255+3; i++) input[i] = 0xff;
-        r = LZ4_decompress_safe(input, output, nbOf255+64, 64 MB);
-        printf(" Passed (return = %i < 0)\n",r);
         input[0] = 0xF0;   // Literal length overflow
         input[1] = 0xFF;
         input[2] = 0xFF;
-        r = LZ4_decompress_safe(input, output, nbOf255+64, 64 MB);
-        printf(" Passed (return = %i < 0)\n",r);
-        free (buffers[nbBuff]); nbBuff--;
+        input[3] = 0xFF;
+        for(i = 3; (size_t)i <= nbOf255+4; i++) input[i] = 0xff;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+        printf(" Literal overflow passed (return = %i < 0)\n",r);
+        input[0] = 0x1F;   // Match length overflow
+        input[1] = 0x01;
+        input[2] = 0x01;
+        input[3] = 0x00;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+        printf(" Match overflow passed (return = %i < 0)\n",r);
+        if (nbBuff>=2)
+        {
+            output = buffers[nbBuff-2];
+            memset(input, 0, BLOCKSIZE_I134);
+            input[0] = 0xF0;   // Literal length overflow
+            input[1] = 0xFF;
+            input[2] = 0xFF;
+            input[3] = 0xFF;
+            r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+            printf(" Literal overflow passed (return = %i < 0)\n",r);
+            input[0] = 0x1F;   // Match length overflow
+            input[1] = 0x01;
+            input[2] = 0x01;
+            input[3] = 0x00;
+            r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+            printf(" Match overflow passed (return = %i < 0)\n",r);
+        }
       }
+      free (buffers[nbBuff]); nbBuff--;
     }
   }
 
-  for (i=0 ; i<nbBuff; i++)
-    free(buffers[i]);
+  for (i=0 ; i<nbBuff; i++) free(buffers[i]);
   printf("\n");
   return 0;
 }
