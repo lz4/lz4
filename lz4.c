@@ -922,7 +922,9 @@ FORCE_INLINE int LZ4_decompress_generic(
                 length += s;
             }
             while (likely((endOnInput)?ip<iend-RUN_MASK:1) && (s==255));
-            if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            //if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            if ((sizeof(void*)==4) && unlikely(op+length<op)) goto _output_error;   /* quickfix issue 134 */
+            if (endOnInput && (sizeof(void*)==4) && unlikely(ip+length<ip)) goto _output_error;   /* quickfix issue 134 */
         }
 
         /* copy literals */
@@ -961,7 +963,8 @@ FORCE_INLINE int LZ4_decompress_generic(
                 s = *ip++;
                 length += s;
             } while (s==255);
-            if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            //if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            if ((sizeof(void*)==4) && unlikely(op+length<op)) goto _output_error;   /* quickfix issue 134 */
         }
 
         /* check external dictionary */
