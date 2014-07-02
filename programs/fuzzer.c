@@ -26,6 +26,9 @@
  Remove Visual warning messages
 **************************************/
 #define _CRT_SECURE_NO_WARNINGS   // fgets
+#ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
+#endif
 
 
 /**************************************
@@ -232,7 +235,7 @@ int FUZ_Issue134()
         return 0;
       }
       {
-        size_t sizeToGenerateOverflow = - ((size_t)buffers[nbBuff-1]) + 512;
+        size_t sizeToGenerateOverflow = (size_t)(- ((size_t)buffers[nbBuff-1]) + 512);
         size_t nbOf255 = (sizeToGenerateOverflow / 255) + 1;
         char* input = buffers[nbBuff-1];
         char* output = buffers[nbBuff];
@@ -243,13 +246,13 @@ int FUZ_Issue134()
         input[3] = 0xFF;
         for(i = 3; (size_t)i <= nbOf255+4; i++) input[i] = 0xff;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-        printf(" Literal overflow passed (return = %i < 0)\n",r);
+        printf(" Literal overflow detected (return = %i < 0)\n",r);
         input[0] = 0x1F;   // Match length overflow
         input[1] = 0x01;
         input[2] = 0x01;
         input[3] = 0x00;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-        printf(" Match overflow passed (return = %i < 0)\n",r);
+        printf(" Match overflow detected (return = %i < 0)\n",r);
         if (nbBuff>=2)
         {
             output = buffers[nbBuff-2];
@@ -259,13 +262,13 @@ int FUZ_Issue134()
             input[2] = 0xFF;
             input[3] = 0xFF;
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-            printf(" Literal overflow passed (return = %i < 0)\n",r);
+            printf(" Literal overflow detected (return = %i < 0)\n",r);
             input[0] = 0x1F;   // Match length overflow
             input[1] = 0x01;
             input[2] = 0x01;
             input[3] = 0x00;
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-            printf(" Match overflow passed (return = %i < 0)\n",r);
+            printf(" Match overflow detected (return = %i < 0)\n",r);
         }
       }
       free (buffers[nbBuff]); nbBuff--;

@@ -1,3 +1,6 @@
+r119:
+Fix : overflow address, 32-bits mode (issue 134)
+
 r118:
 New : LZ4 Streaming API (Fast version), special thanks to Takayuki Matsuoka
 New : datagen : parametrable synthetic data generator for tests

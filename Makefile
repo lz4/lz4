@@ -31,7 +31,7 @@
 # ################################################################
 
 # Version numbers
-export RELEASE=rc119
+export RELEASE=r119
 LIBVER_MAJOR=1
 LIBVER_MINOR=2
 LIBVER_PATCH=0
