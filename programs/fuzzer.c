@@ -26,6 +26,9 @@
  Remove Visual warning messages
 **************************************/
 #define _CRT_SECURE_NO_WARNINGS   // fgets
+#ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
+#endif
 
 
 /**************************************
@@ -74,6 +77,11 @@
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
 #define PRIME3   3266489917U
+
+#define KB *(1U<<10)
+#define MB *(1U<<20)
+#define GB *(1U<<30)
+
 
 
 //**************************************
@@ -164,7 +172,7 @@ void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba,
 }
 
 
-int FUZ_SecurityTest()
+int FUZ_Issue52()
 {
   char* output;
   char* input;
@@ -179,13 +187,100 @@ int FUZ_SecurityTest()
   input[2] = 0x00;
   for(i = 3; i < 16840000; i++)
     input[i] = 0xff;
-  r = LZ4_decompress_fast(input, output, 20<<20);
+  r = LZ4_decompress_safe(input, output, 20<<20, 20<<20);
 
   free(input);
   free(output);
   printf(" Passed (return = %i < 0)\n",r);
   return 0;
 }
+
+
+#define MAX_NB_BUFF_I134 150
+#define BLOCKSIZE_I134 64 MB
+int FUZ_Issue134()
+{
+  char* buffers[MAX_NB_BUFF_I134+1] = {0};
+  int i, nbBuff;
+
+  printf("Overflow test issue 134 : ");
+
+  // Only possible in 32-bits
+  if (sizeof(void*)==8)
+  {
+    printf("64 bits mode : not applicable \n");
+    return 0;
+  }
+
+  printf("    ");
+  for (nbBuff=0; nbBuff < MAX_NB_BUFF_I134; nbBuff++)
+  {
+    printf("\b\b\b\b%3i ", nbBuff);
+    buffers[nbBuff] = (char*)malloc(BLOCKSIZE_I134);
+    if (buffers[nbBuff]==NULL)
+    {
+      printf(" : unable to allocate more memory\n");
+      for (i=0 ; i<nbBuff; i++) free(buffers[i]);
+      return 0;
+    }
+    if ((size_t)buffers[nbBuff] > 0) // (size_t) 0x80000000)
+    {
+      printf("Testing memory buffer address %X , ", (U32)(size_t)(buffers[nbBuff]));
+      printf("Creating a payload designed to fail\n");
+      buffers[++nbBuff] = (char*)malloc(BLOCKSIZE_I134);
+      if (buffers[nbBuff]==NULL)
+      {
+        printf("failed to test (no more memory)\n");
+        for (i=0 ; i<nbBuff; i++) free(buffers[i]);
+        return 0;
+      }
+      {
+        size_t sizeToGenerateOverflow = (size_t)(- ((size_t)buffers[nbBuff-1]) + 512);
+        size_t nbOf255 = (sizeToGenerateOverflow / 255) + 1;
+        char* input = buffers[nbBuff-1];
+        char* output = buffers[nbBuff];
+        int r;
+        input[0] = 0xF0;   // Literal length overflow
+        input[1] = 0xFF;
+        input[2] = 0xFF;
+        input[3] = 0xFF;
+        for(i = 3; (size_t)i <= nbOf255+4; i++) input[i] = 0xff;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+        printf(" Literal overflow detected (return = %i < 0)\n",r);
+        input[0] = 0x1F;   // Match length overflow
+        input[1] = 0x01;
+        input[2] = 0x01;
+        input[3] = 0x00;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+        printf(" Match overflow detected (return = %i < 0)\n",r);
+        if (nbBuff>=2)
+        {
+            output = buffers[nbBuff-2];
+            memset(input, 0, BLOCKSIZE_I134);
+            input[0] = 0xF0;   // Literal length overflow
+            input[1] = 0xFF;
+            input[2] = 0xFF;
+            input[3] = 0xFF;
+            r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+            printf(" Literal overflow detected (return = %i < 0)\n",r);
+            input[0] = 0x1F;   // Match length overflow
+            input[1] = 0x01;
+            input[2] = 0x01;
+            input[3] = 0x00;
+            r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+            printf(" Match overflow detected (return = %i < 0)\n",r);
+        }
+      }
+      free (buffers[nbBuff]); nbBuff--;
+    }
+  }
+
+  for (i=0 ; i<nbBuff; i++) free(buffers[i]);
+  printf("\n");
+  return 0;
+}
+
+
 
 #define FUZ_MAX(a,b) (a>b?a:b)
 
@@ -642,7 +737,6 @@ int main(int argc, char** argv) {
                 default: ;
                 }
             }
-
         }
     }
 
@@ -663,7 +757,8 @@ int main(int argc, char** argv) {
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
-    FUZ_SecurityTest();
+    FUZ_Issue52();
+    FUZ_Issue134();
 
     if (nbTests<=0) nbTests=1;
 

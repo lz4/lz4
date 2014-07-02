@@ -922,7 +922,9 @@ FORCE_INLINE int LZ4_decompress_generic(
                 length += s;
             }
             while (likely((endOnInput)?ip<iend-RUN_MASK:1) && (s==255));
-            if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            //if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            if ((sizeof(void*)==4) && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* quickfix issue 134 */
+            if ((endOnInput) && (sizeof(void*)==4) && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* quickfix issue 134 */
         }
 
         /* copy literals */
@@ -957,11 +959,12 @@ FORCE_INLINE int LZ4_decompress_generic(
             unsigned s;
             do
             {
-                if (endOnInput && (ip > iend-LASTLITERALS)) goto _output_error;
+                if ((endOnInput) && (ip > iend-LASTLITERALS)) goto _output_error;
                 s = *ip++;
                 length += s;
             } while (s==255);
-            if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            //if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
+            if ((sizeof(void*)==4) && unlikely((size_t)(op+length)<(size_t)op)) goto _output_error;   /* quickfix issue 134 */
         }
 
         /* check external dictionary */
