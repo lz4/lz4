@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ################################################################
 
-RELEASE=r119
+RELEASE=rc120
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)

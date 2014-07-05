@@ -1,5 +1,5 @@
 r119:
-Fix : overflow address, 32-bits mode (issue 134)
+Fix : Issue 134 : extended malicious address space overflow in 32-bits mode for some specific configurations
 
 r118:
 New : LZ4 Streaming API (Fast version), special thanks to Takayuki Matsuoka
