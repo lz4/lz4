@@ -376,6 +376,11 @@ static int LZ4IO_LZ4_compress_limitedOutput_continue (void* ctx, const char* sou
     return LZ4_compress_limitedOutput_continue(ctx, source, dest, inputSize, maxOutputSize);
 }
 
+static int LZ4IO_LZ4_saveDict (void* LZ4_stream, char* safeBuffer, int dictSize)
+{
+    return LZ4_saveDict ((LZ4_stream_t*) LZ4_stream, safeBuffer, dictSize);
+}
+
 static int LZ4IO_LZ4_slideInputBufferHC (void* ctx, char* buffer, int size)
 {
     (void)size; (void)buffer;
@@ -411,7 +416,7 @@ static int compress_file_blockDependency(char* input_filename, char* output_file
     {
         initFunction = LZ4IO_LZ4_createStream;
         compressionFunction = LZ4IO_LZ4_compress_limitedOutput_continue;
-        nextBlockFunction = LZ4_saveDict;
+        nextBlockFunction = LZ4IO_LZ4_saveDict;
         freeFunction = LZ4_free;
     }
     else

@@ -684,10 +684,21 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
    Experimental : Streaming functions
 *****************************************/
 
-void* LZ4_createStream()
+/*
+ * LZ4_initStream
+ * Use this function once, to init a newly allocated LZ4_stream_t structure
+ * Return : 1 if OK, 0 if error
+ */
+void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
+{
+    MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
+}
+
+
+void* LZ4_createStream(void)
 {
     void* lz4s = ALLOCATOR(4, LZ4_STREAMSIZE_U32);
-    MEM_INIT(lz4s, 0, LZ4_STREAMSIZE);
+    LZ4_resetStream(lz4s);
     return lz4s;
 }
 
@@ -698,15 +709,15 @@ int LZ4_free (void* LZ4_stream)
 }
 
 
-int LZ4_loadDict (void* LZ4_dict, const char* dictionary, int dictSize)
+int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 {
     LZ4_stream_t_internal* dict = (LZ4_stream_t_internal*) LZ4_dict;
     const BYTE* p = (const BYTE*)dictionary;
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
-    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));      /* A compilation error here means LZ4_STREAMSIZE is not large enough */
-    if (dict->initCheck) MEM_INIT(dict, 0, sizeof(LZ4_stream_t_internal));   /* Uninitialized structure detected */
+    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
+    if (dict->initCheck) LZ4_resetStream(LZ4_dict);                         /* Uninitialized structure detected */
 
     if (dictSize < MINMATCH)
     {
@@ -803,12 +814,12 @@ FORCE_INLINE int LZ4_compress_continue_generic (void* LZ4_stream, const char* so
 }
 
 
-int LZ4_compress_continue (void* LZ4_stream, const char* source, char* dest, int inputSize)
+int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize)
 {
     return LZ4_compress_continue_generic(LZ4_stream, source, dest, inputSize, 0, notLimited);
 }
 
-int LZ4_compress_limitedOutput_continue (void* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize)
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     return LZ4_compress_continue_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limitedOutput);
 }
@@ -835,7 +846,7 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
 }
 
 
-int LZ4_saveDict (void* LZ4_dict, char* safeBuffer, int dictSize)
+int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 {
     LZ4_stream_t_internal* dict = (LZ4_stream_t_internal*) LZ4_dict;
     const BYTE* previousDictEnd = dict->dictionary + dict->dictSize;
