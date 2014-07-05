@@ -1,4 +1,4 @@
-# ################################################################
+# ##########################################################################
 # LZ4 programs - Makefile
 # Copyright (C) Yann Collet 2011-2014
 # GPL v2 License
@@ -20,7 +20,7 @@
 # You can contact the author at :
 #  - LZ4 source repository : http://code.google.com/p/lz4/
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
-# ################################################################
+# ##########################################################################
 # lz4 : Command Line Utility, supporting gzip-like arguments
 # lz4c  : CLU, supporting also legacy lz4demo arguments
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
@@ -28,13 +28,13 @@
 # fuzzer32: Same as fuzzer, but forced to compile in 32-bits mode
 # fullbench  : Precisely measure speed for each LZ4 function variant
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
-# ################################################################
+# ##########################################################################
 
 RELEASE=rc120
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
-CFLAGS+= -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS+= -std=c99 -O3 -Wall -Wextra -Wundef -Wshadow -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS= -I.. $(CFLAGS)
 
 BINDIR=$(PREFIX)/bin

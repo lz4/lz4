@@ -149,7 +149,7 @@ static const int one = 1;
 //**************************************
 static int displayLevel = 0;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 static int overwrite = 1;
-static int blockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
+static int globalBlockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
 static int blockChecksum = 0;
 static int streamChecksum = 1;
 static int blockIndependence = 1;
@@ -198,8 +198,8 @@ int LZ4IO_setBlockSizeID(int bsid)
 {
     static const int blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
     if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return -1;
-    blockSizeId = bsid;
-    return blockSizeTable[blockSizeId-minBlockSizeID];
+    globalBlockSizeId = bsid;
+    return blockSizeTable[globalBlockSizeId-minBlockSizeID];
 }
 
 
@@ -303,7 +303,6 @@ int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, i
     char* out_buff;
     FILE* finput;
     FILE* foutput;
-    int displayLevel = (compressionlevel>0);
     clock_t start, end;
     size_t sizeCheck;
 
@@ -424,7 +423,7 @@ static int compress_file_blockDependency(char* input_filename, char* output_file
     }
 
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
-    blockSize = LZ4S_GetBlockSize_FromBlockId (blockSizeId);
+    blockSize = LZ4S_GetBlockSize_FromBlockId (globalBlockSizeId);
 
     // Allocate Memory
     inputBufferSize = 64 KB + blockSize;
@@ -442,7 +441,7 @@ static int compress_file_blockDependency(char* input_filename, char* output_file
     *(out_buff+4) |= (blockIndependence & _1BIT) << 5;
     *(out_buff+4) |= (blockChecksum & _1BIT) << 4;
     *(out_buff+4) |= (streamChecksum & _1BIT) << 2;
-    *(out_buff+5)  = (char)((blockSizeId & _3BITS) << 4);
+    *(out_buff+5)  = (char)((globalBlockSizeId & _3BITS) << 4);
     checkbits = XXH32((out_buff+4), 2, LZ4S_CHECKSUM_SEED);
     checkbits = LZ4S_GetCheckBits_FromXXH(checkbits);
     *(out_buff+6)  = (unsigned char) checkbits;
@@ -570,7 +569,7 @@ int LZ4IO_compressFilename(char* input_filename, char* output_filename, int comp
     if (compressionLevel <= 3) compressionFunction = LZ4_compress_limitedOutput_local;
     else { compressionFunction = LZ4_compressHC2_limitedOutput; }
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
-    blockSize = LZ4S_GetBlockSize_FromBlockId (blockSizeId);
+    blockSize = LZ4S_GetBlockSize_FromBlockId (globalBlockSizeId);
 
     // Allocate Memory
     in_buff  = (char*)malloc(blockSize);
@@ -585,7 +584,7 @@ int LZ4IO_compressFilename(char* input_filename, char* output_filename, int comp
     *(headerBuffer+4) |= (blockIndependence & _1BIT) << 5;
     *(headerBuffer+4) |= (blockChecksum & _1BIT) << 4;
     *(headerBuffer+4) |= (streamChecksum & _1BIT) << 2;
-    *(headerBuffer+5)  = (char)((blockSizeId & _3BITS) << 4);
+    *(headerBuffer+5)  = (char)((globalBlockSizeId & _3BITS) << 4);
     checkbits = XXH32((headerBuffer+4), 2, LZ4S_CHECKSUM_SEED);
     checkbits = LZ4S_GetCheckBits_FromXXH(checkbits);
     *(headerBuffer+6)  = (unsigned char) checkbits;
