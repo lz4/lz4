@@ -202,13 +202,11 @@ int LZ4IO_setBlockSizeID(int bsid)
     return blockSizeTable[globalBlockSizeId-minBlockSizeID];
 }
 
-
 int LZ4IO_setBlockMode(blockMode_t blockMode)
 {
     blockIndependence = (blockMode == independentBlocks);
     return blockIndependence;
 }
-
 
 /* Default setting : no checksum */
 int LZ4IO_setBlockChecksumMode(int xxhash)
@@ -217,14 +215,12 @@ int LZ4IO_setBlockChecksumMode(int xxhash)
     return blockChecksum;
 }
 
-
 /* Default setting : checksum enabled */
 int LZ4IO_setStreamChecksumMode(int xxhash)
 {
     streamChecksum = (xxhash != 0);
     return streamChecksum;
 }
-
 
 /* Default setting : 0 (no notification) */
 int LZ4IO_setNotificationLevel(int level)
@@ -367,7 +363,7 @@ int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, i
 static void* LZ4IO_LZ4_createStream (const char* inputBuffer)
 {
     (void)inputBuffer;
-    return LZ4_createStream();
+    return calloc(4, LZ4_STREAMSIZE_U32);
 }
 
 static int LZ4IO_LZ4_compress_limitedOutput_continue (void* ctx, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel)
@@ -388,6 +384,12 @@ static int LZ4IO_LZ4_slideInputBufferHC (void* ctx, char* buffer, int size)
     return 1;
 }
 
+
+static int LZ4IO_free (void* ptr)
+{
+    free(ptr);
+    return 0;
+}
 
 static int compress_file_blockDependency(char* input_filename, char* output_filename, int compressionlevel)
 {
@@ -417,14 +419,14 @@ static int compress_file_blockDependency(char* input_filename, char* output_file
         initFunction = LZ4IO_LZ4_createStream;
         compressionFunction = LZ4IO_LZ4_compress_limitedOutput_continue;
         nextBlockFunction = LZ4IO_LZ4_saveDict;
-        freeFunction = LZ4_free;
+        freeFunction = LZ4IO_free;
     }
     else
     {
         initFunction = LZ4_createHC;
         compressionFunction = LZ4_compressHC2_limitedOutput_continue;
         nextBlockFunction = LZ4IO_LZ4_slideInputBufferHC;
-        freeFunction = LZ4_free;
+        freeFunction = LZ4IO_free;
     }
 
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
@@ -753,7 +755,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     size_t sizeCheck;
     int blockChecksumFlag, streamChecksumFlag, blockIndependenceFlag;
     void* streamChecksumState=NULL;
-    int (*decompressionFunction)(void* ctx, const char* src, char* dst, int cSize, int maxOSize) = LZ4_decompress_safe_continue;
+    int (*decompressionFunction)(LZ4_streamDecode_t* ctx, const char* src, char* dst, int cSize, int maxOSize) = LZ4_decompress_safe_continue;
     LZ4_streamDecode_t ctx;
 
     // init
@@ -845,7 +847,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             {
                 // handle dictionary for streaming
                 memcpy(in_buff + blockSize - 64 KB, out_buff, 64 KB);
-                LZ4_setDictDecode(&ctx, out_buff, 64 KB);
+                LZ4_setStreamDecode(&ctx, out_buff, 64 KB);
                 out_start = out_buff + 64 KB;
             }
         }

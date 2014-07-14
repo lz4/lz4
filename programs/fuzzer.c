@@ -67,7 +67,7 @@
  Constants
 **************************************/
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "rc118"
+#  define LZ4_VERSION ""
 #endif
 
 #define NB_ATTEMPTS (1<<16)
@@ -527,7 +527,7 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             LZ4_compress_continue (LZ4continue, dict, compressedBuffer, dictSize);   // Just to fill hash tables
             blockContinueCompressedSize = LZ4_compress_continue (LZ4continue, block, compressedBuffer, blockSize);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
-            LZ4_free (LZ4continue);
+            free (LZ4continue);
 
             // Decompress with dictionary as prefix
             FUZ_DISPLAYTEST;
