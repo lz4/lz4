@@ -40,7 +40,7 @@ LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 DESTDIR=
 PREFIX = /usr
 CC    := $(CC)
-CFLAGS+= -I. -std=c99 -O3 -Wall -Wextra -Wundef -Wshadow -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS+= -I. -std=c99 -O3 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include

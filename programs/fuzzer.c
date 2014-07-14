@@ -103,7 +103,7 @@ static int displayLevel = 2;
 /*********************************************************
   Fuzzer functions
 *********************************************************/
-static int FUZ_GetMilliStart()
+static int FUZ_GetMilliStart(void)
 {
    struct timeb tb;
    int nCount;
@@ -174,7 +174,7 @@ void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba,
 
 
 // No longer useful; included into issue 134
-int FUZ_Issue52()
+int FUZ_Issue52(void)
 {
   char* output;
   char* input;
@@ -199,7 +199,7 @@ int FUZ_Issue52()
 
 #define MAX_NB_BUFF_I134 150
 #define BLOCKSIZE_I134   (32 MB)
-int FUZ_Issue134()
+int FUZ_Issue134(void)
 {
   char* buffers[MAX_NB_BUFF_I134+1] = {0};
   int i, nbBuff=0;
@@ -648,7 +648,7 @@ _output_error:
 }
 
 
-int FUZ_usage()
+int FUZ_usage(void)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [args]\n", programName);

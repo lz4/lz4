@@ -34,7 +34,7 @@ RELEASE=rc120
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
-CFLAGS+= -std=c99 -O3 -Wall -Wextra -Wundef -Wshadow -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS+= -std=c99 -O3 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS= -I.. $(CFLAGS)
 
 BINDIR=$(PREFIX)/bin

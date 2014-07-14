@@ -300,7 +300,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 ****************************/
 #if LZ4_ARCH64
 
-int LZ4_NbCommonBytes (register U64 val)
+static int LZ4_NbCommonBytes (register U64 val)
 {
 # if defined(LZ4_BIG_ENDIAN)
 #   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -332,7 +332,7 @@ int LZ4_NbCommonBytes (register U64 val)
 
 #else
 
-int LZ4_NbCommonBytes (register U32 val)
+static int LZ4_NbCommonBytes (register U32 val)
 {
 # if defined(LZ4_BIG_ENDIAN)
 #   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -742,7 +742,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 
-void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, const BYTE* src)
+static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, const BYTE* src)
 {
     if ((LZ4_dict->currentOffset > 0x80000000) ||
         ((size_t)LZ4_dict->currentOffset > (size_t)src))   /* address space overflow */
@@ -1180,7 +1180,7 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
 
-void LZ4_init(LZ4_stream_t_internal* lz4ds, const BYTE* base)
+static void LZ4_init(LZ4_stream_t_internal* lz4ds, const BYTE* base)
 {
     MEM_INIT(lz4ds, 0, LZ4_STREAMSIZE);
     lz4ds->bufferStart = base;
