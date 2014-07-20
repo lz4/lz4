@@ -72,7 +72,7 @@ LZ4_compress() :
     Destination buffer must be already allocated,
     and must be sized to handle worst cases situations (input data not compressible)
     Worst case size evaluation is provided by function LZ4_compressBound()
-    inputSize : Max supported value is LZ4_MAX_INPUT_VALUE
+    inputSize : Max supported value is LZ4_MAX_INPUT_SIZE
     return : the number of bytes written in buffer dest
              or 0 if the compression fails
 
@@ -126,6 +126,17 @@ LZ4_compress_limitedOutput() :
              or 0 if the compression fails
 */
 int LZ4_compress_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
+
+
+/*
+LZ4_compress_withState() :
+    Same compression functions, but using an externally allocated memory space to store compression state.
+    Use LZ4_sizeofState() to know how much memory must be allocated,
+    and then, provide it as 'void* state' to compression functions.
+*/
+int LZ4_sizeofState(void);
+int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
+int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 
 /*
@@ -288,11 +299,6 @@ These function prototypes are now disabled; uncomment them if you really need th
 It is highly recommended to stop using these functions and migrated to newer ones */
 /* int LZ4_uncompress (const char* source, char* dest, int outputSize); */
 /* int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize); */
-
-/* Obsolete functions for externally allocated state; use streaming interface instead */
-int LZ4_sizeofState(void);
-int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
-int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
  * If you prefer dynamic allocation methods,
