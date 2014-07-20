@@ -31,7 +31,8 @@
 # ################################################################
 
 # Version numbers
-export RELEASE=rc120
+VERSION=120
+export RELEASE=r$(VERSION)
 LIBVER_MAJOR=1
 LIBVER_MINOR=3
 LIBVER_PATCH=0
@@ -101,19 +102,29 @@ liblz4: lz4.c lz4hc.c
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
 
 clean:
-	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* $(DISTRIBNAME) *.sha1
+	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* $(DISTRIBNAME) *.sha1 liblz4.pc
 	@cd $(PRGDIR); $(MAKE) clean
 	@echo Cleaning completed
 
 
+#------------------------------------------------------------------------
 #make install option is designed for Linux & OSX targets only
+
 ifneq (,$(filter $(shell uname),Linux Darwin))
 
-install: liblz4
-	@install -d -m 755 $(DESTDIR)$(LIBDIR)/ $(DESTDIR)$(INCLUDEDIR)/
+liblz4.pc: liblz4.pc.in Makefile
+	sed -e 's|@PREFIX@|$(PREFIX)|' \
+            -e 's|@LIBDIR@|$(LIBDIR)|' \
+            -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
+            -e 's|@VERSION@|$(VERSION)|' \
+             $< >$@
+
+install: liblz4 liblz4.pc
+	@install -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/ $(DESTDIR)$(INCLUDEDIR)/
 	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	@cp -a liblz4.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)
 	@cp -a liblz4.$(SHARED_EXT) $(DESTDIR)$(LIBDIR)
+	@cp -a liblz4.pc $(DESTDIR)$(LIBDIR)/pkgconfig/
 	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
 	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
@@ -123,6 +134,7 @@ install: liblz4
 uninstall:
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
+	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
 	[ -x $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	[ -f $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
 	[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
