@@ -367,6 +367,7 @@ static int LZ4_NbCommonBytes (register U32 val)
 /********************************
    Compression functions
 ********************************/
+int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 
 static int LZ4_hashSequence(U32 sequence, tableType_t tableType)
