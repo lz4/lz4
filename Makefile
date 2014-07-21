@@ -41,7 +41,8 @@ LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 DESTDIR=
 PREFIX = /usr
 CC    := $(CC)
-CFLAGS+= -I. -std=c99 -O3 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS?= -O3
+CFLAGS+= -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -93,10 +94,10 @@ lz4programs: lz4.c lz4hc.c
 
 liblz4: lz4.c lz4hc.c
 	@echo compiling static library
-	@$(CC) $(CFLAGS) -c $^
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs liblz4.a lz4.o lz4hc.o
 	@echo compiling dynamic library
-	@$(CC) $(CFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
@@ -158,7 +159,10 @@ dist: clean
 	@sha1sum $(DISTRIBNAME) > $(DISTRIBNAME).sha1
 	@echo Distribution $(DISTRIBNAME) built
 
-test: lz4programs
+test:
+	@cd $(PRGDIR); $(MAKE) -e $@
+
+test-travis: lz4programs
 	@cd $(PRGDIR); $(MAKE) -e $@
 
 endif
