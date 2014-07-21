@@ -32,7 +32,7 @@
 // Unix Large Files support (>4GB)
 #define _FILE_OFFSET_BITS 64
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
-#  define _LARGEFILE_SOURCE 
+#  define _LARGEFILE_SOURCE
 #elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
 #  define _LARGEFILE64_SOURCE
 #endif
@@ -155,7 +155,7 @@ void BMK_SetNbIterations(int nbLoops)
     DISPLAY("- %i iterations -\n", nbIterations);
 }
 
-void BMK_SetPause() { BMK_pause = 1; }
+void BMK_SetPause(void) { BMK_pause = 1; }
 
 
 //*********************************************************
@@ -178,7 +178,7 @@ static int BMK_GetMilliStart()
 
 #else
 
-static int BMK_GetMilliStart()
+static int BMK_GetMilliStart(void)
 {
   // Based on newer gettimeofday()
   // Use GetMilliSpan to correct for rollover

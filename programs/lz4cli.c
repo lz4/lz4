@@ -175,7 +175,7 @@ int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, i
 //****************************
 // Functions
 //****************************
-int usage()
+int usage(void)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [arg] [input] [output]\n", programName);
@@ -192,7 +192,7 @@ int usage()
     return 0;
 }
 
-int usage_advanced()
+int usage_advanced(void)
 {
     DISPLAY(WELCOME_MESSAGE);
     usage();
@@ -223,7 +223,7 @@ int usage_advanced()
     return 0;
 }
 
-int usage_longhelp()
+int usage_longhelp(void)
 {
     DISPLAY( "\n");
     DISPLAY( "Which values can get [output] ? \n");
@@ -273,7 +273,7 @@ int usage_longhelp()
     return 0;
 }
 
-int badusage()
+int badusage(void)
 {
     DISPLAYLEVEL(1, "Incorrect parameters\n");
     if (displayLevel >= 1) usage();
@@ -281,7 +281,7 @@ int badusage()
 }
 
 
-void waitEnter()
+void waitEnter(void)
 {
     DISPLAY("Press enter to continue...\n");
     getchar();

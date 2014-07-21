@@ -1,12 +1,17 @@
+r120:
+Fix : OS-X : library install name, thanks to Clemens Lang
+Updated : Makefile : stricter compilation flags
+Updated : xxHash to r35
+
 r119:
-Fix : overflow address, 32-bits mode (issue 134)
+Fix : Issue 134 : extended malicious address space overflow in 32-bits mode for some specific configurations
 
 r118:
 New : LZ4 Streaming API (Fast version), special thanks to Takayuki Matsuoka
 New : datagen : parametrable synthetic data generator for tests
 Improved : fuzzer, support more test cases, more parameters, ability to jump to specific test
 fix : support ppc64le platform (issue 131)
-fix : Issue 52 (malicious address space overflow in 32-bits mode when using custom format)
+fix : Issue 52 (malicious address space overflow in 32-bits mode when using large custom format)
 fix : Makefile : minor issue 130 : header files permissions
 
 r117:

@@ -55,6 +55,8 @@
 #else
 #  define LZ4_ARCH64 0
 #endif
+#define LZ4_32BITS (sizeof(void*)==4)
+#define LZ4_64BITS (sizeof(void*)==8)
 
 /*
  * Little Endian or Big Endian ?
@@ -298,7 +300,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 ****************************/
 #if LZ4_ARCH64
 
-int LZ4_NbCommonBytes (register U64 val)
+static int LZ4_NbCommonBytes (register U64 val)
 {
 # if defined(LZ4_BIG_ENDIAN)
 #   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -330,7 +332,7 @@ int LZ4_NbCommonBytes (register U64 val)
 
 #else
 
-int LZ4_NbCommonBytes (register U32 val)
+static int LZ4_NbCommonBytes (register U32 val)
 {
 # if defined(LZ4_BIG_ENDIAN)
 #   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
@@ -417,7 +419,7 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pRef, const BYTE* pInLimi
         pIn += LZ4_NbCommonBytes(diff);
         return (unsigned)(pIn - pStart);
     }
-    if (sizeof(void*)==8) if ((pIn<(pInLimit-3)) && (A32(pRef) == A32(pIn))) { pIn+=4; pRef+=4; }
+    if (LZ4_64BITS) if ((pIn<(pInLimit-3)) && (A32(pRef) == A32(pIn))) { pIn+=4; pRef+=4; }
     if ((pIn<(pInLimit-1)) && (A16(pRef) == A16(pIn))) { pIn+=2; pRef+=2; }
     if ((pIn<pInLimit) && (*pRef == *pIn)) pIn++;
 
@@ -499,7 +501,6 @@ static int LZ4_compress_generic(
                 ip = forwardIp;
                 forwardIp += step;
                 step = searchMatchNb++ >> skipStrength;
-                //if (step>8) step=8;   // required for valid forwardIp ; slows down uncompressible data a bit
 
                 if (unlikely(forwardIp > mflimit)) goto _last_literals;
 
@@ -651,7 +652,7 @@ int LZ4_compress(const char* source, char* dest, int inputSize)
     if (inputSize < (int)LZ4_64KLIMIT)
         result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, (sizeof(void*)==8) ? byU32 : byPtr, noDict, noDictIssue);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64BITS ? byU32 : byPtr, noDict, noDictIssue);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
@@ -671,7 +672,7 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
     if (inputSize < (int)LZ4_64KLIMIT)
         result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, (sizeof(void*)==8) ? byU32 : byPtr, noDict, noDictIssue);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64BITS ? byU32 : byPtr, noDict, noDictIssue);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
@@ -684,29 +685,39 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
    Experimental : Streaming functions
 *****************************************/
 
-void* LZ4_createStream()
+/*
+ * LZ4_initStream
+ * Use this function once, to init a newly allocated LZ4_stream_t structure
+ * Return : 1 if OK, 0 if error
+ */
+void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
-    void* lz4s = ALLOCATOR(4, LZ4_STREAMSIZE_U32);
-    MEM_INIT(lz4s, 0, LZ4_STREAMSIZE);
+    MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
+}
+
+LZ4_stream_t* LZ4_createStream(void)
+{
+    LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOCATOR(4, LZ4_STREAMSIZE_U32);
+    LZ4_resetStream(lz4s);
     return lz4s;
 }
 
-int LZ4_free (void* LZ4_stream)
+int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     FREEMEM(LZ4_stream);
     return (0);
 }
 
 
-int LZ4_loadDict (void* LZ4_dict, const char* dictionary, int dictSize)
+int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 {
     LZ4_stream_t_internal* dict = (LZ4_stream_t_internal*) LZ4_dict;
     const BYTE* p = (const BYTE*)dictionary;
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
-    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));      /* A compilation error here means LZ4_STREAMSIZE is not large enough */
-    if (dict->initCheck) MEM_INIT(dict, 0, sizeof(LZ4_stream_t_internal));   /* Uninitialized structure detected */
+    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
+    if (dict->initCheck) LZ4_resetStream(LZ4_dict);                         /* Uninitialized structure detected */
 
     if (dictSize < MINMATCH)
     {
@@ -731,7 +742,7 @@ int LZ4_loadDict (void* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 
-void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, const BYTE* src)
+static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, const BYTE* src)
 {
     if ((LZ4_dict->currentOffset > 0x80000000) ||
         ((size_t)LZ4_dict->currentOffset > (size_t)src))   /* address space overflow */
@@ -802,19 +813,18 @@ FORCE_INLINE int LZ4_compress_continue_generic (void* LZ4_stream, const char* so
     }
 }
 
-
-int LZ4_compress_continue (void* LZ4_stream, const char* source, char* dest, int inputSize)
+int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize)
 {
     return LZ4_compress_continue_generic(LZ4_stream, source, dest, inputSize, 0, notLimited);
 }
 
-int LZ4_compress_limitedOutput_continue (void* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize)
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     return LZ4_compress_continue_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limitedOutput);
 }
 
 
-// Hidden debug function, to force separate dictionary mode
+/* Hidden debug function, to force separate dictionary mode */
 int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int inputSize)
 {
     LZ4_stream_t_internal* streamPtr = (LZ4_stream_t_internal*)LZ4_dict;
@@ -835,7 +845,7 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
 }
 
 
-int LZ4_saveDict (void* LZ4_dict, char* safeBuffer, int dictSize)
+int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 {
     LZ4_stream_t_internal* dict = (LZ4_stream_t_internal*) LZ4_dict;
     const BYTE* previousDictEnd = dict->dictionary + dict->dictSize;
@@ -888,20 +898,16 @@ FORCE_INLINE int LZ4_decompress_generic(
     const BYTE* const lowLimit = (const BYTE*)dest - dictSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-//#define OLD
-#ifdef OLD
-    const size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};   /* static reduces speed for LZ4_decompress_safe() on GCC64 */
-#else
-    const size_t dec32table[] = {4-0, 4-3, 4-2, 4-3, 4-0, 4-0, 4-0, 4-0};   /* static reduces speed for LZ4_decompress_safe() on GCC64 */
-#endif
+    const size_t dec32table[] = {4-0, 4-3, 4-2, 4-3, 4-0, 4-0, 4-0, 4-0};   /* note : static reduces speed for LZ4_decompress_safe() on GCC64 */
     static const size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
 
-    const int checkOffset = (endOnInput) && (dictSize < (int)(64 KB));
+    const int safeDecode = (endOnInput==endOnInputSize);
+    const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
 
 
     /* Special cases */
-    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
-    if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;   /* Empty output buffer */
+    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;                         /* targetOutputSize too high => decode everything */
+    if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
 
@@ -922,9 +928,8 @@ FORCE_INLINE int LZ4_decompress_generic(
                 length += s;
             }
             while (likely((endOnInput)?ip<iend-RUN_MASK:1) && (s==255));
-            //if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
-            if ((sizeof(void*)==4) && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* quickfix issue 134 */
-            if ((endOnInput) && (sizeof(void*)==4) && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* quickfix issue 134 */
+            if ((safeDecode) && LZ4_32BITS && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* overflow detection */
+            if ((safeDecode) && LZ4_32BITS && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* overflow detection */
         }
 
         /* copy literals */
@@ -945,7 +950,7 @@ FORCE_INLINE int LZ4_decompress_generic(
             memcpy(op, ip, length);
             ip += length;
             op += length;
-            break;                                       /* Necessarily EOF, due to parsing restrictions */
+            break;     /* Necessarily EOF, due to parsing restrictions */
         }
         LZ4_WILDCOPY(op, ip, cpy); ip -= (op-cpy); op = cpy;
 
@@ -963,8 +968,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                 s = *ip++;
                 length += s;
             } while (s==255);
-            //if ((sizeof(void*)==4) && unlikely(length>LZ4_MAX_INPUT_SIZE)) goto _output_error;   /* overflow detection */
-            if ((sizeof(void*)==4) && unlikely((size_t)(op+length)<(size_t)op)) goto _output_error;   /* quickfix issue 134 */
+            if ((safeDecode) && LZ4_32BITS && unlikely((size_t)(op+length)<(size_t)op)) goto _output_error;   /* overflow detection */
         }
 
         /* check external dictionary */
@@ -986,9 +990,9 @@ FORCE_INLINE int LZ4_decompress_generic(
                 copySize = length+MINMATCH - copySize;
                 if (copySize > (size_t)((char*)op-dest))   /* overlap */
                 {
-                    BYTE* const cpy = op + copySize;
-                    const BYTE* ref = (BYTE*)dest;
-                    while (op < cpy) *op++ = *ref++;
+                    BYTE* const endOfMatch = op + copySize;
+                    const BYTE* copyFrom = (BYTE*)dest;
+                    while (op < endOfMatch) *op++ = *copyFrom++;
                 }
                 else
                 {
@@ -1002,20 +1006,14 @@ FORCE_INLINE int LZ4_decompress_generic(
         /* copy repeated sequence */
         if (unlikely((op-ref)<(int)STEPSIZE))
         {
-            const size_t dec64 = dec64table[(sizeof(void*)==4) ? 0 : op-ref];
+            const size_t dec64 = dec64table[LZ4_32BITS ? 0 : op-ref];
             op[0] = ref[0];
             op[1] = ref[1];
             op[2] = ref[2];
             op[3] = ref[3];
-#ifdef OLD
-            op += 4, ref += 4; ref -= dec32table[op-ref];
-            A32(op) = A32(ref);
-            op += STEPSIZE-4; ref -= dec64;
-#else
             ref += dec32table[op-ref];
             A32(op+4) = A32(ref);
             op += STEPSIZE; ref -= dec64;
-#endif
         } else { LZ4_COPYSTEP(op,ref); }
         cpy = op + length - (STEPSIZE-4);
 
@@ -1043,26 +1041,23 @@ _output_error:
 }
 
 
-int LZ4_decompress_safe(const char* source, char* dest, int compressedSize, int maxOutputSize)
+int LZ4_decompress_safe(const char* source, char* dest, int compressedSize, int maxDecompressedSize)
 {
-    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, noDict, NULL, 0);
+    return LZ4_decompress_generic(source, dest, compressedSize, maxDecompressedSize, endOnInputSize, full, 0, noDict, NULL, 0);
 }
 
-int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize)
+int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSize, int targetOutputSize, int maxDecompressedSize)
 {
-    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, partial, targetOutputSize, noDict, NULL, 0);
+    return LZ4_decompress_generic(source, dest, compressedSize, maxDecompressedSize, endOnInputSize, partial, targetOutputSize, noDict, NULL, 0);
 }
 
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
-    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, NULL, 0);
+    return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, NULL, 64 KB);
 }
 
 /* streaming decompression functions */
 
-//#define LZ4_STREAMDECODESIZE_U32 4
-//#define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U32 * sizeof(unsigned int))
-//typedef struct { unsigned int table[LZ4_STREAMDECODESIZE_U32]; } LZ4_streamDecode_t;
 typedef struct
 {
     const char* dictionary;
@@ -1074,21 +1069,27 @@ typedef struct
  * LZ4_createStreamDecode()
  * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
  */
-void* LZ4_createStreamDecode()
+LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
-    void* lz4s = ALLOCATOR(sizeof(U32), LZ4_STREAMDECODESIZE_U32);
+    LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(sizeof(U32), LZ4_STREAMDECODESIZE_U32);
     MEM_INIT(lz4s, 0, LZ4_STREAMDECODESIZE);
     return lz4s;
 }
 
+int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
+{
+    FREEMEM(LZ4_stream);
+    return 0;
+}
+
 /*
- * LZ4_setDictDecode
+ * LZ4_setStreamDecode
  * Use this function to instruct where to find the dictionary
  * This function is not necessary if previous data is still available where it was decoded.
  * Loading a size of 0 is allowed (same effect as no dictionary).
  * Return : 1 if OK, 0 if error
  */
-int LZ4_setDictDecode (void* LZ4_streamDecode, const char* dictionary, int dictSize)
+int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize)
 {
     LZ4_streamDecode_t_internal* lz4sd = (LZ4_streamDecode_t_internal*) LZ4_streamDecode;
     lz4sd->dictionary = dictionary;
@@ -1103,7 +1104,7 @@ int LZ4_setDictDecode (void* LZ4_streamDecode, const char* dictionary, int dictS
     If it's not possible, save the relevant part of decoded data into a safe buffer,
     and indicate where it stands using LZ4_setDictDecode()
 */
-int LZ4_decompress_safe_continue (void* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxOutputSize)
+int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxOutputSize)
 {
     LZ4_streamDecode_t_internal* lz4sd = (LZ4_streamDecode_t_internal*) LZ4_streamDecode;
     int result;
@@ -1123,7 +1124,7 @@ int LZ4_decompress_safe_continue (void* LZ4_streamDecode, const char* source, ch
     return result;
 }
 
-int LZ4_decompress_fast_continue (void* LZ4_streamDecode, const char* source, char* dest, int originalSize)
+int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize)
 {
     LZ4_streamDecode_t_internal* lz4sd = (LZ4_streamDecode_t_internal*) LZ4_streamDecode;
     int result;
@@ -1179,7 +1180,7 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
 
-void LZ4_init(LZ4_stream_t_internal* lz4ds, const BYTE* base)
+static void LZ4_init(LZ4_stream_t_internal* lz4ds, const BYTE* base)
 {
     MEM_INIT(lz4ds, 0, LZ4_STREAMSIZE);
     lz4ds->bufferStart = base;
@@ -1220,7 +1221,7 @@ int LZ4_compress_withState (void* state, const char* source, char* dest, int inp
     if (inputSize < (int)LZ4_64KLIMIT)
         return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue);
     else
-        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, (sizeof(void*)==8) ? byU32 : byPtr, noDict, noDictIssue);
+        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64BITS ? byU32 : byPtr, noDict, noDictIssue);
 }
 
 int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize)
@@ -1231,7 +1232,7 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
     if (inputSize < (int)LZ4_64KLIMIT)
         return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue);
     else
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, (sizeof(void*)==8) ? byU32 : byPtr, noDict, noDictIssue);
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64BITS ? byU32 : byPtr, noDict, noDictIssue);
 }
 
 /* Obsolete streaming decompression functions */
