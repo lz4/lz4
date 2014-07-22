@@ -33,9 +33,9 @@
 # Version numbers
 VERSION=120
 export RELEASE=r$(VERSION)
-LIBVER_MAJOR=1
-LIBVER_MINOR=3
-LIBVER_PATCH=0
+LIBVER_MAJOR=`sed -n '/LZ4_VERSION_MAJOR/s/.*\s\+\([0-9]\+\).*/\1/p' < lz4.h`
+LIBVER_MINOR=`sed -n '/LZ4_VERSION_MINOR/s/.*\s\+\([0-9]\+\).*/\1/p' < lz4.h`
+LIBVER_PATCH=`sed -n '/LZ4_VERSION_RELEASE/s/.*\s\+\([0-9]\+\).*/\1/p' < lz4.h`
 LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
 DESTDIR=
