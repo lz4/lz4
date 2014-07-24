@@ -1,6 +1,6 @@
 language: c
 compiler: gcc
-script: make test
+script: make test-travis
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq gcc-multilib

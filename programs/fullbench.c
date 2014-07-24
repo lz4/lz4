@@ -167,7 +167,7 @@ void BMK_SetNbIterations(int nbLoops)
     DISPLAY("- %i iterations -\n", nbIterations);
 }
 
-void BMK_SetPause()
+void BMK_SetPause(void)
 {
     BMK_pause = 1;
 }
@@ -192,7 +192,7 @@ static int BMK_GetMilliStart()
 
 #else
 
-static int BMK_GetMilliStart()
+static int BMK_GetMilliStart(void)
 {
   // Based on newer gettimeofday()
   // Use GetMilliSpan to correct for rollover
@@ -631,7 +631,7 @@ int usage(char* exename)
     return 0;
 }
 
-int usage_advanced()
+int usage_advanced(void)
 {
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -c#    : test only compression function # [1-%i]\n", NB_COMPRESSION_ALGORITHMS);

@@ -1,4 +1,4 @@
-# ################################################################
+# ##########################################################################
 # LZ4 programs - Makefile
 # Copyright (C) Yann Collet 2011-2014
 # GPL v2 License
@@ -20,7 +20,7 @@
 # You can contact the author at :
 #  - LZ4 source repository : http://code.google.com/p/lz4/
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
-# ################################################################
+# ##########################################################################
 # lz4 : Command Line Utility, supporting gzip-like arguments
 # lz4c  : CLU, supporting also legacy lz4demo arguments
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
@@ -28,29 +28,30 @@
 # fuzzer32: Same as fuzzer, but forced to compile in 32-bits mode
 # fullbench  : Precisely measure speed for each LZ4 function variant
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
-# ################################################################
+# ##########################################################################
 
-RELEASE=r119
+RELEASE=r120
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
-CFLAGS+= -std=c99 -O3 -Wall -W -Wundef -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS= -I.. $(CFLAGS)
+CFLAGS?= -O3
+CFLAGS+= -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+FLAGS= -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
 LZ4DIR=..
 
 TEST_FILES = COPYING
-TEST_TARGETS=test-64 test-32
+TEST_TARGETS=test
 BENCH_NB=-i5
 
 # Minimize test target for Travis CI's Build Matrix
 ifeq ($(LZ4_TRAVIS_CI_ENV),-m32)
-TEST_TARGETS=test-32
+TEST_TARGETS=test-force32
 BENCH_NB=-i1
 else ifeq ($(LZ4_TRAVIS_CI_ENV),-m64)
-TEST_TARGETS=test-64
+TEST_TARGETS=test
 BENCH_NB=-i1
 endif
 
@@ -125,11 +126,13 @@ uninstall:
 	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
 	@echo lz4 successfully uninstalled
 
-test: $(TEST_TARGETS)
+test: test-lz4 test-lz4c test-fullbench test-fuzzer test-mem
 
-test-64: test-lz4 test-lz4c test-fullbench test-fuzzer test-mem
+test-force32: test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
 
-test-32: test-lz4 test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
+test-all: test test-force32
+
+test-travis: $(TEST_TARGETS)
 
 test-lz4: lz4 datagen
 	./datagen | ./lz4 | ./lz4 -vdq > $(VOID)
@@ -138,7 +141,7 @@ test-lz4: lz4 datagen
 
 test-lz4c: lz4c datagen
 
-test-lz4c32: lz4c32 lz4 datagen
+test-lz4c32: lz4 lz4c32 lz4 datagen
 	./datagen | ./lz4c32 | ./lz4c32 -vdq > $(VOID)
 	./datagen | ./lz4c32 | ./lz4    -vdq > $(VOID)
 	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -vdq > $(VOID)

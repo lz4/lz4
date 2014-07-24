@@ -184,7 +184,7 @@ static void CDG_generate(U64 size, U32* seed, double proba)
 }
 
 
-int CDG_usage()
+int CDG_usage(void)
 {
     DISPLAY( "Compressible data generator\n");
     DISPLAY( "Usage :\n");

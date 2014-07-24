@@ -28,6 +28,7 @@
 #define _CRT_SECURE_NO_WARNINGS   // fgets
 #ifdef _MSC_VER    /* Visual Studio */
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
+#  pragma warning(disable : 4146)        /* disable: C4146: minus unsigned expression */
 #endif
 
 
@@ -66,7 +67,7 @@
  Constants
 **************************************/
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "rc118"
+#  define LZ4_VERSION ""
 #endif
 
 #define NB_ATTEMPTS (1<<16)
@@ -102,7 +103,7 @@ static int displayLevel = 2;
 /*********************************************************
   Fuzzer functions
 *********************************************************/
-static int FUZ_GetMilliStart()
+static int FUZ_GetMilliStart(void)
 {
    struct timeb tb;
    int nCount;
@@ -172,7 +173,8 @@ void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba,
 }
 
 
-int FUZ_Issue52()
+// No longer useful; included into issue 134
+int FUZ_Issue52(void)
 {
   char* output;
   char* input;
@@ -185,8 +187,7 @@ int FUZ_Issue52()
   input[0] = 0x0F;
   input[1] = 0x00;
   input[2] = 0x00;
-  for(i = 3; i < 16840000; i++)
-    input[i] = 0xff;
+  for(i = 3; i < 16840000; i++) input[i] = 0xff;
   r = LZ4_decompress_safe(input, output, 20<<20, 20<<20);
 
   free(input);
@@ -197,46 +198,48 @@ int FUZ_Issue52()
 
 
 #define MAX_NB_BUFF_I134 150
-#define BLOCKSIZE_I134 64 MB
-int FUZ_Issue134()
+#define BLOCKSIZE_I134   (32 MB)
+int FUZ_Issue134(void)
 {
   char* buffers[MAX_NB_BUFF_I134+1] = {0};
-  int i, nbBuff;
+  int i, nbBuff=0;
+  int highAddress = 0;
 
-  printf("Overflow test issue 134 : ");
+  printf("Overflow tests : ");
 
   // Only possible in 32-bits
   if (sizeof(void*)==8)
   {
-    printf("64 bits mode : not applicable \n");
+    printf("64 bits mode : no overflow \n");
+    fflush(stdout);
     return 0;
   }
 
-  printf("    ");
-  for (nbBuff=0; nbBuff < MAX_NB_BUFF_I134; nbBuff++)
+  buffers[0] = (char*)malloc(BLOCKSIZE_I134);
+  buffers[1] = (char*)malloc(BLOCKSIZE_I134);
+  if ((!buffers[0]) || (!buffers[1]))
   {
-    printf("\b\b\b\b%3i ", nbBuff);
+    printf("not enough memory for tests \n");
+    return 0;
+  }
+  for (nbBuff=2; nbBuff < MAX_NB_BUFF_I134; nbBuff++)
+  {
+    printf("%3i \b\b\b\b", nbBuff);
     buffers[nbBuff] = (char*)malloc(BLOCKSIZE_I134);
-    if (buffers[nbBuff]==NULL)
+    //printf("%08X ", (U32)(size_t)(buffers[nbBuff]));
+    fflush(stdout);
+
+    if (((size_t)buffers[nbBuff] > (size_t)0x80000000) && (!highAddress))
     {
-      printf(" : unable to allocate more memory\n");
-      for (i=0 ; i<nbBuff; i++) free(buffers[i]);
-      return 0;
+        printf("high address detected : ");
+        fflush(stdout);
+        highAddress=1;
     }
-    if ((size_t)buffers[nbBuff] > 0) // (size_t) 0x80000000)
+    if (buffers[nbBuff]==NULL) goto _endOfTests;
+
     {
-      printf("Testing memory buffer address %X , ", (U32)(size_t)(buffers[nbBuff]));
-      printf("Creating a payload designed to fail\n");
-      buffers[++nbBuff] = (char*)malloc(BLOCKSIZE_I134);
-      if (buffers[nbBuff]==NULL)
-      {
-        printf("failed to test (no more memory)\n");
-        for (i=0 ; i<nbBuff; i++) free(buffers[i]);
-        return 0;
-      }
-      {
         size_t sizeToGenerateOverflow = (size_t)(- ((size_t)buffers[nbBuff-1]) + 512);
-        size_t nbOf255 = (sizeToGenerateOverflow / 255) + 1;
+        int nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
         char* input = buffers[nbBuff-1];
         char* output = buffers[nbBuff];
         int r;
@@ -244,40 +247,42 @@ int FUZ_Issue134()
         input[1] = 0xFF;
         input[2] = 0xFF;
         input[3] = 0xFF;
-        for(i = 3; (size_t)i <= nbOf255+4; i++) input[i] = 0xff;
+        for(i = 4; i <= nbOf255+4; i++) input[i] = 0xff;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-        printf(" Literal overflow detected (return = %i < 0)\n",r);
+        if (r>0) goto _overflowError;
         input[0] = 0x1F;   // Match length overflow
         input[1] = 0x01;
         input[2] = 0x01;
         input[3] = 0x00;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-        printf(" Match overflow detected (return = %i < 0)\n",r);
-        if (nbBuff>=2)
-        {
-            output = buffers[nbBuff-2];
-            memset(input, 0, BLOCKSIZE_I134);
-            input[0] = 0xF0;   // Literal length overflow
-            input[1] = 0xFF;
-            input[2] = 0xFF;
-            input[3] = 0xFF;
-            r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-            printf(" Literal overflow detected (return = %i < 0)\n",r);
-            input[0] = 0x1F;   // Match length overflow
-            input[1] = 0x01;
-            input[2] = 0x01;
-            input[3] = 0x00;
-            r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-            printf(" Match overflow detected (return = %i < 0)\n",r);
-        }
-      }
-      free (buffers[nbBuff]); nbBuff--;
+        if (r>0) goto _overflowError;
+
+        output = buffers[nbBuff-2];   // Reverse in/out pointer order
+        input[0] = 0xF0;   // Literal length overflow
+        input[1] = 0xFF;
+        input[2] = 0xFF;
+        input[3] = 0xFF;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+        if (r>0) goto _overflowError;
+        input[0] = 0x1F;   // Match length overflow
+        input[1] = 0x01;
+        input[2] = 0x01;
+        input[3] = 0x00;
+        r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
+        if (r>0) goto _overflowError;
     }
   }
 
+  nbBuff++;
+_endOfTests:
   for (i=0 ; i<nbBuff; i++) free(buffers[i]);
-  printf("\n");
+  if (!highAddress) printf("high address not possible \n");
+  else printf("all overflows correctly detected \n");
   return 0;
+
+_overflowError:
+  printf("Address space overflow error !! \n");
+  exit(1);
 }
 
 
@@ -319,8 +324,8 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
         switch(displayLevel)
         {
         case 0: displayRefresh = nbCycles+1; break;
-        case 1: displayRefresh=FUZ_MAX(1, nbCycles / 100); break;
-        case 2: displayRefresh=89; break;
+        case 1: displayRefresh = FUZ_MAX(1, nbCycles / 100); break;
+        case 2: displayRefresh = 89; break;
         default : displayRefresh=1;
         }
 
@@ -522,7 +527,7 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             LZ4_compress_continue (LZ4continue, dict, compressedBuffer, dictSize);   // Just to fill hash tables
             blockContinueCompressedSize = LZ4_compress_continue (LZ4continue, block, compressedBuffer, blockSize);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
-            LZ4_free (LZ4continue);
+            free (LZ4continue);
 
             // Decompress with dictionary as prefix
             FUZ_DISPLAYTEST;
@@ -643,7 +648,7 @@ _output_error:
 }
 
 
-int FUZ_usage()
+int FUZ_usage(void)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [args]\n", programName);
@@ -757,7 +762,7 @@ int main(int argc, char** argv) {
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
-    FUZ_Issue52();
+    //FUZ_Issue52();
     FUZ_Issue134();
 
     if (nbTests<=0) nbTests=1;
