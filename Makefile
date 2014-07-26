@@ -31,7 +31,7 @@
 # ################################################################
 
 # Version numbers
-VERSION=120
+VERSION=121
 export RELEASE=r$(VERSION)
 LIBVER_MAJOR=`sed -n '/LZ4_VERSION_MAJOR/s/.*\s\+\([0-9]\+\).*/\1/p' < lz4.h`
 LIBVER_MINOR=`sed -n '/LZ4_VERSION_MINOR/s/.*\s\+\([0-9]\+\).*/\1/p' < lz4.h`
@@ -109,9 +109,8 @@ clean:
 
 
 #------------------------------------------------------------------------
-#make install option is designed for Linux & OSX targets only
-
-ifneq (,$(filter $(shell uname),Linux Darwin))
+#make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
 liblz4.pc: liblz4.pc.in Makefile
 	sed -e 's|@PREFIX@|$(PREFIX)|' \

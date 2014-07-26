@@ -1,3 +1,6 @@
+r121:
+Added : Makefile : install for kFreeBSD and Hurd (Nobuhiro Iwamatsu)
+
 r120:
 Modified : Streaming API, using strong types
 Added : LZ4_versionNumber(), thanks to Takayuki Matsuoka

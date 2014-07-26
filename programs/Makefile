@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r120
+RELEASE=rc121
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
@@ -103,7 +103,9 @@ clean:
 	@echo Cleaning completed
 
 
-ifneq (,$(filter $(shell uname),Linux Darwin))
+#------------------------------------------------------------------------
+#make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
 install: lz4 lz4c
 	@echo Installing binaries
