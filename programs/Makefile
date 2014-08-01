@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=rc121
+RELEASE=r121
 DESTDIR=
 PREFIX=/usr
 CC:=$(CC)
@@ -137,15 +137,18 @@ test-all: test test-force32
 test-travis: $(TEST_TARGETS)
 
 test-lz4: lz4 datagen
-	./datagen | ./lz4 | ./lz4 -vdq > $(VOID)
+	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
+	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 
 test-lz4c: lz4c datagen
 
 test-lz4c32: lz4 lz4c32 lz4 datagen
-	./datagen | ./lz4c32 | ./lz4c32 -vdq > $(VOID)
-	./datagen | ./lz4c32 | ./lz4    -vdq > $(VOID)
+	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -vdq > $(VOID)
+	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -vdq > $(VOID)
+	./datagen         | ./lz4c32        | ./lz4c32 -vdq > $(VOID)
+	./datagen         | ./lz4c32        | ./lz4    -vdq > $(VOID)
 	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
@@ -163,10 +166,12 @@ test-fuzzer32: fuzzer32
 	./fuzzer32 --no-prompt
 
 test-mem: lz4 datagen
-	./datagen -g256MB > tmp
-	valgrind ./lz4 -B4D -f tmp /dev/null
+	./datagen -g16KB > tmp
+	valgrind ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp
 	valgrind ./lz4 -9 -B5D -f tmp /dev/null
+	./datagen -g256MB > tmp
+	valgrind ./lz4 -B4D -f tmp /dev/null
 	rm tmp
 
 test-mem32: lz4c32 datagen
