@@ -1,5 +1,6 @@
 r121:
 Added : Makefile : install for kFreeBSD and Hurd (Nobuhiro Iwamatsu)
+Fix : Makefile : install for OS-X and BSD, thanks to Takayuki Matsuoka
 
 r120:
 Modified : Streaming API, using strong types
