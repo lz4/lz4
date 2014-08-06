@@ -155,7 +155,7 @@ use the structure XXHnn_stateSpace_t, which will ensure that memory space is lar
 unsigned int       XXH32_intermediateDigest (void* state);
 unsigned long long XXH64_intermediateDigest (void* state);
 /*
-This function does the same as XXHnn_digest(), generating a nn-bit hash,
+These functions do the same as XXHnn_digest(), generating a nn-bit hash,
 but preserve memory context.
 This way, it becomes possible to generate intermediate hashes, and then continue feeding data with XXHnn_update().
 To free memory context, use XXHnn_digest(), or free().

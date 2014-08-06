@@ -374,8 +374,6 @@ FORCE_INLINE U64 XXH64_endian_align(const void* input, unsigned int len, U64 see
     	p+=8;
     }
 
-#if 1
-
     if (p<=bEnd-4)
     {
     	h64 ^= (U64)(XXH_get32bits(p)) * PRIME64_1;
@@ -389,30 +387,6 @@ FORCE_INLINE U64 XXH64_endian_align(const void* input, unsigned int len, U64 see
         h64 = XXH_rotl64(h64, 11) * PRIME64_1;
         p++;
     }
-
-#else
-
-    if( p<bEnd )
-    {
-        // Copy the remaining bytes
-        U64 k1 = PRIME64_5;
-        BYTE* _k1 = (BYTE*)&k1;
-        switch( (size_t)(bEnd-p))  // Yes, I tried multiple ways of doing this memcopy
-        {
-        case 7:	*_k1++ = *p++;
-        case 6:	*_k1++ = *p++;
-        case 5:	*_k1++ = *p++;
-        case 4:	*_k1++ = *p++;
-        case 3:	*_k1++ = *p++;
-        case 2:	*_k1++ = *p++;
-        case 1:	*_k1++ = *p++;
-        }
-
-        k1 *= PRIME64_5; k1 = XXH_rotl64(k1,31); k1 *= PRIME64_3; h64 ^= k1;
-        h64 = XXH_rotl64(h64, 11) * PRIME64_1 + PRIME64_4;
-    }
-
-#endif
 
     h64 ^= h64 >> 33;
     h64 *= PRIME64_2;
