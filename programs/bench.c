@@ -164,7 +164,7 @@ void BMK_SetPause(void) { BMK_pause = 1; }
 
 #if defined(BMK_LEGACY_TIMER)
 
-static int BMK_GetMilliStart()
+static int BMK_GetMilliStart(void)
 {
   // Based on Legacy ftime()
   // Rolls over every ~ 12.1 days (0x100000/24/60/60)
