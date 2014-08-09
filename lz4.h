@@ -170,11 +170,7 @@ int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedS
 
 
 /***********************************************
-   Experimental Continuous Block Mode
-
-   These functions allow the compression of continuous blocks,
-   where each block benefits from prior 64 KB within preceding blocks to achieve better compression ratio.
-   A flow of multiple continuous blocks is called a "stream".
+   Experimental Streaming Compression Functions
 ***********************************************/
 
 #define LZ4_STREAMSIZE_U32 ((1 << (LZ4_MEMORY_USAGE-2)) + 8)
@@ -237,7 +233,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_stream, char* safeBuffer, int dictSize);
 
 
 /************************************************
-  Experimental CBM Decompression Functions
+  Experimental Streaming Decompression Functions
 ************************************************/
 
 #define LZ4_STREAMDECODESIZE_U32 4
@@ -305,8 +301,16 @@ It is highly recommended to stop using these functions and migrated to newer one
 /* int LZ4_uncompress (const char* source, char* dest, int outputSize); */
 /* int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize); */
 
+/*
+ * If you prefer dynamic allocation methods,
+ * LZ4_createStreamDecode()
+ * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
+ * LZ4_free just frees it.
+ */
+/* void* LZ4_createStreamDecode(void); */
+/*int   LZ4_free (void* LZ4_stream);    yes, it's the same one as for compression */
 
-/* Obsolete CBM functions; use new CBM interface whenever possible */
+/* Obsolete streaming functions; use new streaming interface whenever possible */
 void* LZ4_create (const char* inputBuffer);
 int   LZ4_sizeofStreamState(void);
 int   LZ4_resetStreamState(void* state, const char* inputBuffer);

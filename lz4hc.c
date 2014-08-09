@@ -870,9 +870,9 @@ int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, c
 { return LZ4_compressHC2_limitedOutput_withStateHC (state, source, dest, inputSize, maxOutputSize, 0); }
 
 
-/**************************************
-   Experimental Continuous Block Mode
-**************************************/
+/****************************
+   Stream functions
+****************************/
 
 int LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize)
 {

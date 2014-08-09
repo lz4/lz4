@@ -683,7 +683,7 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 
 
 /*****************************************
-   Experimental Continuous Block Mode
+   Experimental : Streaming functions
 *****************************************/
 
 /*
@@ -1177,7 +1177,7 @@ int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
 
 
-/* Obsolete CBM functions */
+/* Obsolete Streaming functions */
 
 int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
 
@@ -1236,7 +1236,7 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
         return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64BITS ? byU32 : byPtr, noDict, noDictIssue);
 }
 
-/* Obsolete CBM decompression functions */
+/* Obsolete streaming decompression functions */
 
 int LZ4_decompress_safe_withPrefix64k(const char* source, char* dest, int compressedSize, int maxOutputSize)
 {
