@@ -30,13 +30,14 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r121
-DESTDIR=
-PREFIX=/usr
-CC:=$(CC)
-CFLAGS?= -O3
-CFLAGS+= -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS= -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+RELEASE=r122
+
+DESTDIR?=
+PREFIX ?= /usr
+CC     := $(CC)
+CFLAGS ?= -O3
+CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+FLAGS   = -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
