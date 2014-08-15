@@ -267,7 +267,7 @@ FORCE_INLINE U32 XXH32_endian_align(const void* input, unsigned int len, U32 see
 
     h32 += (U32) len;
 
-    while (p<=bEnd-4)
+    while (p+4<=bEnd)
     {
         h32 += XXH_get32bits(p) * PRIME32_3;
         h32  = XXH_rotl32(h32, 17) * PRIME32_4 ;
@@ -366,7 +366,7 @@ FORCE_INLINE U64 XXH64_endian_align(const void* input, unsigned int len, U64 see
 
     h64 += (U64) len;
 
-    while (p<=bEnd-8)
+    while (p+8<=bEnd)
     {
     	U64 k1 = XXH_get64bits(p);
     	k1 *= PRIME64_2; k1 = XXH_rotl64(k1,31); k1 *= PRIME64_1; h64 ^= k1;
@@ -374,7 +374,7 @@ FORCE_INLINE U64 XXH64_endian_align(const void* input, unsigned int len, U64 see
     	p+=8;
     }
 
-    if (p<=bEnd-4)
+    if (p+4<=bEnd)
     {
     	h64 ^= (U64)(XXH_get32bits(p)) * PRIME64_1;
         h64 = XXH_rotl64(h64, 23) * PRIME64_2 + PRIME64_3;
@@ -490,14 +490,14 @@ XXH_errorcode XXH64_resetState(void* state_in, unsigned long long seed)
 void* XXH32_init (U32 seed)
 {
     void* state = XXH_malloc (sizeof(struct XXH_state32_t));
-    XXH32_resetState(state, seed);
+    if (state != NULL) XXH32_resetState(state, seed);
     return state;
 }
 
 void* XXH64_init (unsigned long long seed)
 {
     void* state = XXH_malloc (sizeof(struct XXH_state64_t));
-    XXH64_resetState(state, seed);
+    if (state != NULL) XXH64_resetState(state, seed);
     return state;
 }
 
@@ -596,7 +596,7 @@ FORCE_INLINE U32 XXH32_intermediateDigest_endian (void* state_in, XXH_endianess 
 
     h32 += (U32) state->total_len;
 
-    while (p<=bEnd-4)
+    while (p+4<=bEnd)
     {
         h32 += XXH_readLE32((const U32*)p, endian) * PRIME32_3;
         h32  = XXH_rotl32(h32, 17) * PRIME32_4;
@@ -674,7 +674,7 @@ FORCE_INLINE XXH_errorcode XXH64_update_endian (void* state_in, const void* inpu
         state->memsize = 0;
     }
 
-    if (p <= bEnd-32)
+    if (p+32 <= bEnd)
     {
         const BYTE* const limit = bEnd - 32;
         U64 v1 = state->v1;
@@ -752,7 +752,7 @@ FORCE_INLINE U64 XXH64_intermediateDigest_endian (void* state_in, XXH_endianess 
 
     h64 += (U64) state->total_len;
 
-    while (p<=bEnd-8)
+    while (p+8<=bEnd)
     {
     	U64 k1 = XXH_readLE64((const U64*)p, endian);
     	k1 *= PRIME64_2; k1 = XXH_rotl64(k1,31); k1 *= PRIME64_1; h64 ^= k1;
@@ -760,7 +760,7 @@ FORCE_INLINE U64 XXH64_intermediateDigest_endian (void* state_in, XXH_endianess 
     	p+=8;
     }
 
-    if (p<=bEnd-4)
+    if (p+4<=bEnd)
     {
     	h64 ^= (U64)(XXH_readLE32((const U32*)p, endian)) * PRIME64_1;
         h64 = XXH_rotl64(h64, 23) * PRIME64_2 + PRIME64_3;
