@@ -1,5 +1,5 @@
 /*
-   LZ4 Frame - Auto-framing for LZ4
+   LZ4 auto-framing library
    Header File
    Copyright (C) 2011-2014, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
@@ -38,6 +38,12 @@ extern "C" {
 #endif
 
 
+/**************************************
+   Error management
+**************************************/
+typedef enum { ERROR_GENERIC =-1U, ERROR_MIN = -2U } LZ4F_errorCode_t;
+int LZ4F_isError(size_t code);
+
 
 /**************************************
    Framing compression functions
@@ -45,9 +51,9 @@ extern "C" {
 
 typedef void LZ4F_compressionContext_t;
 
-typedef enum { default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} maxBlockSize_t;
-typedef enum { default=0, blockLinked, blockIndependent} blockMode_t;
-typedef enum { default=0, contentChecksumEnabled, contentNoChecksum} contentChecksum_t;
+typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} maxBlockSize_t;
+typedef enum { LZ4F_default=0, blockLinked, blockIndependent} blockMode_t;
+typedef enum { LZ4F_default=0, contentChecksumEnabled, contentNoChecksum} contentChecksum_t;
 
 typedef struct {
   maxBlockSize_t    maxBlockSize;
@@ -56,17 +62,16 @@ typedef struct {
 } LZ4F_preferences_t;
 
 
-LZ4F_compressionContext_t* LZ4F_createCompressionContext(void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferences);
+size_t LZ4F_createCompressionContext(LZ4F_compressionContext_t** compressionContextPtr, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferences);
 
-size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferences);
+size_t LZ4F_compressBound(size_t srcSize,    const LZ4F_preferences_t* preferences);
+size_t LZ4F_getMaxSrcSize(size_t maxDstSize, const LZ4F_preferences_t* preferences);
 
-size_t LZ4F_compress(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, LZ4F_compressionContext_t* compressionContext);
+size_t LZ4F_compress(LZ4F_compressionContext_t* compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize);
        
-size_t LZ4F_flush(void* dstBuffer, size_t dstMaxSize, LZ4F_compressionContext_t* compressionContext);
+size_t LZ4F_flush(LZ4F_compressionContext_t* compressionContext, void* dstBuffer, size_t dstMaxSize);
        
 void   LZ4F_freeCompressionContext(LZ4F_compressionContext_t* compressionContext);
-
-
 
 
 #if defined (__cplusplus)
