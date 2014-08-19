@@ -57,7 +57,7 @@ int LZ4F_isError(size_t code);
    Framing compression functions
 **************************************/
 
-typedef void LZ4F_compressionContext_t;
+typedef void* LZ4F_compressionContext_t;
 
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} maxBlockSize_t;
 typedef enum { LZ4F_default=0, blockLinked, blockIndependent} blockMode_t;
@@ -81,8 +81,8 @@ size_t LZ4F_getMaxSrcSize(size_t maxDstSize, const LZ4F_preferences_t* preferenc
 
 /* Main compression functions */
 
-size_t LZ4F_compressInit(LZ4F_compressionContext_t** compressionContextPtr, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferences);
-/* LZ4F_compress_Init() :
+size_t LZ4F_compressInit(LZ4F_compressionContext_t* compressionContextPtr, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferences);
+/* LZ4F_compressInit() :
  * The first thing to do is to create a compressionContext object.
  * This is achieved using LZ4F_compressInit(), which takes as argument a dstBuffer and a LZ4F_preferences_t structure.
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
@@ -91,7 +91,7 @@ size_t LZ4F_compressInit(LZ4F_compressionContext_t** compressionContextPtr, void
  * The result of the function is the number of bytes written into dstBuffer for the header, or an error code (can be tested using LZ4F_isError())
  */
 
-size_t LZ4F_compress(LZ4F_compressionContext_t* compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptions);
+size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptions);
 /* LZ4F_compress()
  * You can then call LZ4F_compress() repetitively to compress as much data as necessary.
  * The most important rule to keep in mind is that dstBuffer must be large enough (dstMaxSize) to ensure compression completion.
@@ -103,7 +103,7 @@ size_t LZ4F_compress(LZ4F_compressionContext_t* compressionContext, void* dstBuf
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  */
        
-size_t LZ4F_flush(LZ4F_compressionContext_t* compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptions);
+size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptions);
 /* LZ4F_flush()
  * Should you need to create compressed data immediately, without waiting for a block to be filled,
  * you can call LZ4_flush(), which will immediately compress any remaining data stored within compressionContext.
@@ -112,7 +112,7 @@ size_t LZ4F_flush(LZ4F_compressionContext_t* compressionContext, void* dstBuffer
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  */
        
-size_t LZ4F_compressEnd(LZ4F_compressionContext_t* compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptions);
+size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptions);
 /* LZ4F_compressEnd()
  * When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
  * It will flush whatever data remained within compressionContext (like LZ4_flush())
