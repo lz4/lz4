@@ -45,6 +45,7 @@
 #  endif
 #endif
 
+#define _LARGE_FILES           // Large file support on 32-bits AIX
 #define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
 #define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
