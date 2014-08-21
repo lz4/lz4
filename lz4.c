@@ -46,7 +46,7 @@
    CPU Feature Detection
 **************************************/
 /* 32 or 64 bits ? */
-#if (defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
+#if (defined(__64BIT__) || defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
   || defined(__powerpc64__) || defined(__powerpc64le__) \
   || defined(__ppc64__) || defined(__ppc64le__) \
   || defined(__PPC64__) || defined(__PPC64LE__) \
