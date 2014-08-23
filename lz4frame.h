@@ -71,31 +71,55 @@ typedef struct {
 } LZ4F_preferences_t;
 
 typedef struct {
-  int compressionLevel;   /* default is compressionLevel value passed within preferences */
   int autoFlush;          /* default is 0 = no autoflush */
+  int stableSrc;          /* unused for the time being, must be 0 */
 } LZ4F_compressOptions_t;
 
 size_t LZ4F_compressBound(size_t srcSize,    const LZ4F_preferences_t* preferences);
-size_t LZ4F_getMaxSrcSize(size_t maxDstSize, const LZ4F_preferences_t* preferences);
-
-
-/* Main compression functions */
-
-size_t LZ4F_compressInit(LZ4F_compressionContext_t* compressionContextPtr, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferences);
-/* LZ4F_compressInit() :
- * The first thing to do is to create a compressionContext object.
- * This is achieved using LZ4F_compressInit(), which takes as argument a dstBuffer and a LZ4F_preferences_t structure.
+size_t LZ4F_getMaxSrcSize(size_t dstMaxSize, const LZ4F_preferences_t* preferences);
+/* LZ4F_compressBound() : gives the size of Dst buffer given a srcSize to handle worst case situations.
+ * LZ4F_getMaxSrcSize() : gives max allowed srcSize given dstMaxSize to handle worst case situations.
+ *                        You can use dstMaxSize==0 to know the "natural" srcSize instead (block size).
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
- * The dstBuffer is required : LZ4F_compressInit() will write the frame header into it.
+ */
+
+
+/* *********************************
+ * Compression functions 
+ * *********************************/
+
+/* Resource Management */
+
+#define LZ4F_VERSION 100
+LZ4F_compressionContext_t LZ4F_createCompressionContext(int version, const LZ4F_preferences_t* preferences);
+void                      LZ4F_freeCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContext);
+/* LZ4F_createCompressionContext() :
+ * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
+ * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version and an LZ4F_preferences_t structure.
+ * The version provided MUST be LZ4F_VERSION.
+ * It is intended to track potential version differences between a program and an external dynamic library.
+ * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
+ * The result of the function is a pointer to the LZ4F_compressionContext_t object.
+ * If the pointer is NULL, there was an error during context creation.
+ * Object can release its memory using LZ4F_freeCompressionContext();
+ */
+
+
+/* Compression */
+
+size_t LZ4F_compressBegin(LZ4F_compressionContext_t* compressionContextPtr, void* dstBuffer, size_t dstMaxSize);
+/* LZ4F_compressBegin() :
+ * will write the frame header into dstBuffer.
  * dstBuffer must be large enough to accomodate a header (dstMaxSize). Maximum header size is 15 bytes.
- * The result of the function is the number of bytes written into dstBuffer for the header, or an error code (can be tested using LZ4F_isError())
+ * The result of the function is the number of bytes written into dstBuffer for the header
+ * or an error code (can be tested using LZ4F_isError())
  */
 
 size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptions);
 /* LZ4F_compress()
  * You can then call LZ4F_compress() repetitively to compress as much data as necessary.
- * The most important rule to keep in mind is that dstBuffer must be large enough (dstMaxSize) to ensure compression completion.
- * You can know the minimum size of dstMaxSize by using LZ4F_compressBound()
+ * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
+ * You can get the minimum value of dstMaxSize by using LZ4F_compressBound()
  * Conversely, given a fixed dstMaxSize value, you can know the maximum srcSize authorized using LZ4F_getMaxSrcSize()
  * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode)
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
@@ -107,7 +131,8 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
 /* LZ4F_flush()
  * Should you need to create compressed data immediately, without waiting for a block to be filled,
  * you can call LZ4_flush(), which will immediately compress any remaining data stored within compressionContext.
- * The result of the function is the number of bytes written into dstBuffer (it can be zero there was no data left within compressionContext)
+ * The result of the function is the number of bytes written into dstBuffer 
+ * (it can be zero, this means there was no data left within compressionContext)
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  */
@@ -117,10 +142,10 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
  * When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
  * It will flush whatever data remained within compressionContext (like LZ4_flush())
  * but also properly finalize the frame, with an endMark and a checksum.
- * It will also free compressionContext memory, so you can't call LZ4F_compress() anymore afterwards.
  * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark size))
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
+ * compressionContext can then be used again, starting with LZ4F_compressBegin(). The preferences will remain the same.
  */
 
 
