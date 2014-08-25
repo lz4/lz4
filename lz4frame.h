@@ -57,8 +57,6 @@ int LZ4F_isError(size_t code);
    Framing compression functions
 **************************************/
 
-typedef void* LZ4F_compressionContext_t;
-
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} maxBlockSize_t;
 typedef enum { LZ4F_default=0, blockLinked, blockIndependent} blockMode_t;
 typedef enum { LZ4F_default=0, contentChecksumEnabled, contentNoChecksum} contentChecksum_t;
@@ -68,10 +66,37 @@ typedef struct {
   maxBlockSize_t    maxBlockSize;
   blockMode_t       blockMode;
   contentChecksum_t contentChecksumFlag;
+  int               autoFlush;
 } LZ4F_preferences_t;
 
+
+
+/**********************************
+ * Simple functions 
+ * *********************************/
+size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferences);
+
+size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferences);
+/* LZ4F_compressFrame()
+ * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.4.1, in a single step.
+ * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
+ * You can get the minimum value of dstMaxSize by using LZ4F_compressFrameBound()
+ * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode)
+ * The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+ * The result of the function is the number of bytes written into dstBuffer.
+ * The function outputs an error code if it fails (can be tested using LZ4F_isError())
+ */
+
+
+
+
+/**********************************
+ * Advanced functions 
+ * *********************************/
+
+typedef void* LZ4F_compressionContext_t;
+
 typedef struct {
-  int autoFlush;          /* default is 0 = no autoflush */
   int stableSrc;          /* unused for the time being, must be 0 */
 } LZ4F_compressOptions_t;
 
@@ -83,24 +108,18 @@ size_t LZ4F_getMaxSrcSize(size_t dstMaxSize, const LZ4F_preferences_t* preferenc
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
  */
 
-
-/* *********************************
- * Compression functions 
- * *********************************/
-
 /* Resource Management */
 
 #define LZ4F_VERSION 100
-LZ4F_compressionContext_t LZ4F_createCompressionContext(int version, const LZ4F_preferences_t* preferences);
-void                      LZ4F_freeCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContext);
+LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContext, int version, const LZ4F_preferences_t* preferences);
+LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_compressionContext);
 /* LZ4F_createCompressionContext() :
  * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
  * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version and an LZ4F_preferences_t structure.
- * The version provided MUST be LZ4F_VERSION.
- * It is intended to track potential version differences between a program and an external dynamic library.
+ * The version provided MUST be LZ4F_VERSION. It is intended to track potential version differences between different binaries.
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
- * The result of the function is a pointer to the LZ4F_compressionContext_t object.
- * If the pointer is NULL, there was an error during context creation.
+ * The function will provide a pointer to a fully allocated LZ4F_compressionContext_t object.
+ * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
  * Object can release its memory using LZ4F_freeCompressionContext();
  */
 
