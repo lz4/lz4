@@ -97,9 +97,9 @@ LZ4_decompress_safe() :
 
 /*
 LZ4_compressBound() :
-    Provides the maximum size that LZ4 may output in a "worst case" scenario (input data not compressible)
-    primarily useful for memory allocation of output buffer.
-    macro is also provided when result needs to be evaluated at compilation (such as stack memory allocation).
+    Provides the maximum size that LZ4 compression may output in a "worst case" scenario (input data not compressible)
+    This function is primarily useful for memory allocation purposes (output buffer size).
+    Macro LZ4_COMPRESSBOUND() is also provided for compilation-time evaluation (stack memory allocation for example).
 
     isize  : is the input size. Max supported value is LZ4_MAX_INPUT_SIZE
     return : maximum output size in a "worst case" scenario
