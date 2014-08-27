@@ -31,6 +31,13 @@
    - LZ4 source repository : http://code.google.com/p/lz4/
    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
+
+/* LZ4F is a stand-alone API to create LZ4-compressed frames
+ * fully conformant to specification v1.4.1.
+ * All related operations, including memory management, are handled by the library.
+ * You don't need lz4.h when using lz4frame.h.
+ * */
+ 
 #pragma once
 
 #if defined (__cplusplus)
@@ -60,20 +67,20 @@ int LZ4F_isError(size_t code);
 
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} maxBlockSize_t;
 typedef enum { LZ4F_default=0, blockLinked, blockIndependent} blockMode_t;
-typedef enum { LZ4F_default=0, contentChecksumEnabled, contentNoChecksum} contentChecksum_t;
+typedef enum { LZ4F_default=0, contentChecksumEnabled, noContentChecksum} contentChecksum_t;
 
 typedef struct {
-  int               compressionLevel;   /* valid values are >= 0 */
+  unsigned          compressionLevel;
   maxBlockSize_t    maxBlockSize;
   blockMode_t       blockMode;
   contentChecksum_t contentChecksumFlag;
-  int               autoFlush;
+  unsigned          autoFlush;
 } LZ4F_preferences_t;
 
 
 
 /**********************************
- * Simple compression functions
+ * Simple compression function
  * *********************************/
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferences);
 
@@ -178,23 +185,54 @@ typedef struct {
   int stableDst;          /* unused for the time being, must be 0 */
 } LZ4F_decompressOptions_t;
 
+/* Resource management */
+
 LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContext);
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_decompressionContext);
+/* LZ4F_createDecompressionContext() :
+ * The first thing to do is to create a decompressionContext object, which will be used in all decompression operations.
+ * This is achieved using LZ4F_createDecompressionContext().
+ * The function will provide a pointer to a fully allocated and initialised LZ4F_decompressionContext object.
+ * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
+ * Object can release its memory using LZ4F_freeDecompressionContext();
+ */
 	
-LZ4F_errorCode_t LZ4F_decompressBegin(LZ4F_decompressionContext_t* decompressionContextPtr, void* srcBuffer, size_t* srcSize);
+/* Header information */
+
+LZ4F_errorCode_t LZ4F_analyzeHeader(LZ4F_decompressionContext_t* decompressionContextPtr, void* srcBuffer, size_t* srcSize);
+/* LZ4F_analyzeHeader()
+ * 
+ * This function decodes header information, such as blockSize.
+ * LZ4F_analyzeHeader() is not compulsory. You could start instead by calling directly LZ4F_decompress.
+ * The objective is to only extract useful header information, without starting decompression.
+ * 
+ * The number of bytes read from srcBuffer will be provided within *srcSize (necessarily <= original value).
+ * 
+ * The function result is an error code which can be tested using LZ4F_isError().
+ */
+
 size_t           LZ4F_getBlockSize(LZ4F_decompressionContext_t decompressionContext);
+/* LZ4F_getBlockSize()
+ * Provides the maximum size of a (decompressed) block within previously analyzed frame.
+ * Primarily useful for memory allocation purposes.
+ * Header must be previously analyzed, using LZ4F_analyzeHeader().
+ * 
+ * The result is the maximum size of a single block,
+ * or an error code which can be tested using LZ4F_isError() in case of failure.
+ */
+
+/* Decompression */
+
 LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSize, const void* srcBuffer, size_t* srcSize, const LZ4F_decompressOptions_t* decompressOptions);
 /* LZ4F_decompress()
- * You can then call LZ4F_decompress() repetitively to regenerate as much data as necessary.
- * The function will attempt to decode *srcSize from srcBuffer into dstBuffer, of maximum size *dstSize.
+ * LZ4F_decompress() will be called repetitively to regenerate as much data as necessary.
+ * The function will attempt to decode *srcSize from srcBuffer, into dstBuffer of maximum size *dstSize.
  *
  * The number of bytes generated into dstBuffer will be provided within *dstSize (necessarily <= original value).
- * If dstBuffer is not large enough to hold at least one data block, the function may fail (result is an errorCode).
- * You can know the size of one full block by using LZ4F_getBlockSize();
  * 
  * The number of bytes effectively read from srcBuffer will be provided within *srcSize (necessarily <= original value).
  * If the number of bytes read is < number of bytes provided, then the function could not complete decompression operation.
- * You will have call it again.
+ * You will have to call it again, using the same src arguments (but eventually different dst arguments).
  * 
  * The function result is an error code which can be tested using LZ4F_isError().
  */
