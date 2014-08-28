@@ -107,6 +107,7 @@ liblz4: lz4.c lz4hc.c
 clean:
 	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* $(DISTRIBNAME) *.sha1 liblz4.pc
 	@cd $(PRGDIR); $(MAKE) clean
+	@cd examples; $(MAKE) clean
 	@echo Cleaning completed
 
 
@@ -162,9 +163,7 @@ dist: clean
 	@echo Distribution $(DISTRIBNAME) built
 
 test:
-	@cd $(PRGDIR); $(MAKE) -e $@
-
-test-travis: lz4programs
+	@cd examples; $(MAKE) -e $@
 	@cd $(PRGDIR); $(MAKE) -e $@
 
 endif
