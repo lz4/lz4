@@ -47,6 +47,7 @@
 **************************************/
 /* 32 or 64 bits ? */
 #if (defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
+  || defined(__64BIT__)  || defined(__mips64) \
   || defined(__powerpc64__) || defined(__powerpc64le__) \
   || defined(__ppc64__) || defined(__ppc64le__) \
   || defined(__PPC64__) || defined(__PPC64LE__) \
@@ -899,8 +900,8 @@ FORCE_INLINE int LZ4_decompress_generic(
     const BYTE* const lowLimit = (const BYTE*)dest - dictSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const size_t dec32table[] = {4-0, 4-3, 4-2, 4-3, 4-0, 4-0, 4-0, 4-0};   /* note : static reduces speed for LZ4_decompress_safe() on GCC64 */
-    static const size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
+    const size_t dec32table[] = {4, 1, 2, 1, 4, 4, 4, 4};
+    const size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
@@ -971,24 +972,25 @@ FORCE_INLINE int LZ4_decompress_generic(
             } while (s==255);
             if ((safeDecode) && LZ4_32BITS && unlikely((size_t)(op+length)<(size_t)op)) goto _output_error;   /* overflow detection */
         }
+        length += MINMATCH;
 
         /* check external dictionary */
         if ((dict==usingExtDict) && (ref < (BYTE* const)dest))
         {
-            if (unlikely(op+length+MINMATCH > oend-LASTLITERALS)) goto _output_error;
+            if (unlikely(op+length > oend-LASTLITERALS)) goto _output_error;
 
-            if (length+MINMATCH <= (size_t)(dest-(char*)ref))
+            if (length <= (size_t)(dest-(char*)ref))
             {
                 ref = dictEnd - (dest-(char*)ref);
-                memcpy(op, ref, length+MINMATCH);
-                op += length+MINMATCH;
+                memcpy(op, ref, length);
+                op += length;
             }
             else
             {
                 size_t copySize = (size_t)(dest-(char*)ref);
                 memcpy(op, dictEnd - copySize, copySize);
                 op += copySize;
-                copySize = length+MINMATCH - copySize;
+                copySize = length - copySize;
                 if (copySize > (size_t)((char*)op-dest))   /* overlap */
                 {
                     BYTE* const endOfMatch = op + copySize;
@@ -1005,28 +1007,26 @@ FORCE_INLINE int LZ4_decompress_generic(
         }
 
         /* copy repeated sequence */
+        cpy = op + length;
         if (unlikely((op-ref)<(int)STEPSIZE))
         {
-            const size_t dec64 = dec64table[LZ4_32BITS ? 0 : op-ref];
+            const size_t dec64 = dec64table[op-ref];
             op[0] = ref[0];
             op[1] = ref[1];
             op[2] = ref[2];
             op[3] = ref[3];
             ref += dec32table[op-ref];
             A32(op+4) = A32(ref);
-            op += STEPSIZE; ref -= dec64;
-        } else { LZ4_COPYSTEP(op,ref); }
-        cpy = op + length - (STEPSIZE-4);
+            op += 8; ref -= dec64;
+        } else { LZ4_COPY8(op,ref); }
 
-        if (unlikely(cpy>oend-COPYLENGTH-(STEPSIZE-4)))
+        if (unlikely(cpy>oend-12))
         {
             if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last 5 bytes must be literals */
             if (op<oend-COPYLENGTH) LZ4_WILDCOPY(op, ref, (oend-COPYLENGTH));
             while(op<cpy) *op++=*ref++;
-            op=cpy;
-            continue;
         }
-        LZ4_WILDCOPY(op, ref, cpy);
+        else LZ4_WILDCOPY(op, ref, cpy);
         op=cpy;   /* correction */
     }
 

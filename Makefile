@@ -31,18 +31,18 @@
 # ################################################################
 
 # Version numbers
-VERSION=121
+VERSION=122
 export RELEASE=r$(VERSION)
 LIBVER_MAJOR=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER_MINOR=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER_PATCH=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
-DESTDIR=
-PREFIX = /usr
-CC    := $(CC)
-CFLAGS?= -O3
-CFLAGS+= -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+DESTDIR?=
+PREFIX ?= /usr
+CC     := $(CC)
+CFLAGS ?= -O3
+CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -107,6 +107,7 @@ liblz4: lz4.c lz4hc.c
 clean:
 	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* $(DISTRIBNAME) *.sha1 liblz4.pc
 	@cd $(PRGDIR); $(MAKE) clean
+	@cd examples; $(MAKE) clean
 	@echo Cleaning completed
 
 
@@ -162,9 +163,7 @@ dist: clean
 	@echo Distribution $(DISTRIBNAME) built
 
 test:
-	@cd $(PRGDIR); $(MAKE) -e $@
-
-test-travis: lz4programs
+	@cd examples; $(MAKE) -e $@
 	@cd $(PRGDIR); $(MAKE) -e $@
 
 endif
