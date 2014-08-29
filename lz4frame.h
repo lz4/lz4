@@ -48,18 +48,17 @@ extern "C" {
 /**************************************
    Error management
 **************************************/
-typedef enum { 
-	OK_NoError                     =  0,
-	OK_FrameEnd                    =  1,
-	ERROR_GENERIC                  = -1U, 
-	ERROR_maxDstSize_tooSmall      = -2U,
-    ERROR_compressionLevel_invalid = -3U,
-    ERROR_maxBlockSize_invalid     = -4U,
-    ERROR_blockMode_invalid        = -5U,
-    ERROR_contentChecksumFlag_invalid = -6U,
-	ERROR_MIN = -7U 
-	} LZ4F_errorCode_t;
-int LZ4F_isError(size_t code);
+typedef size_t LZ4F_errorCode_t;
+typedef enum { OK_NoError = 0, OK_FrameEnd = 1 } LZ4F_successCodes;
+typedef enum { OK_NoError = 0, ERROR_GENERIC = 1, 
+    ERROR_maxBlockSize_invalid, ERROR_blockMode_invalid, ERROR_contentChecksumFlag_invalid,
+    ERROR_compressionLevel_invalid,
+	ERROR_srcSize_tooLarge, ERROR_maxDstSize_tooSmall,
+	ERROR_maxCode
+	} LZ4F_errorCodes;   /* error codes are negative unsigned values. 
+							Compare function result to (-specificCode) */
+
+int LZ4F_isError(LZ4F_errorCode_t code);   /* Basically : code > -ERROR_maxCode */
 
 
 /**************************************
@@ -71,11 +70,15 @@ typedef enum { LZ4F_default=0, blockLinked, blockIndependent} blockMode_t;
 typedef enum { LZ4F_default=0, contentChecksumEnabled, noContentChecksum} contentChecksum_t;
 
 typedef struct {
-  unsigned          compressionLevel;       /* from 0 to 16 */
   maxBlockSize_t    maxBlockSize;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
   blockMode_t       blockMode;              /* blockLinked, blockIndependent ; 0 == default */
   contentChecksum_t contentChecksumFlag;    /* contentChecksumEnabled, noContentChecksum ; 0 == default */
-  unsigned          autoFlush;              /* 1 == automatic flush after each call to LZ4F_compress() */
+} LZ4F_frameInfo_t;
+
+typedef struct {
+  LZ4F_frameInfo_t frameInfo
+  unsigned         compressionLevel;       /* from 0 to 16 */
+  unsigned         autoFlush;              /* 1 == automatic flush after each call to LZ4F_compress() */
 } LZ4F_preferences_t;
 
 
@@ -83,7 +86,7 @@ typedef struct {
 /**********************************
  * Simple compression function
  * *********************************/
-size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferences);
+size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_frameInfo_t* frameInfo);
 
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferences);
 /* LZ4F_compressFrame()
@@ -134,8 +137,8 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t* compressionContextPtr, void
  * or an error code (can be tested using LZ4F_isError())
  */
 
-size_t LZ4F_compressBound(size_t srcSize,    const LZ4F_preferences_t* preferences);
-size_t LZ4F_getMaxSrcSize(size_t dstMaxSize, const LZ4F_preferences_t* preferences);
+size_t LZ4F_compressBound(size_t srcSize,    const LZ4F_frameInfo_t* frameInfo);
+size_t LZ4F_getMaxSrcSize(size_t dstMaxSize, const LZ4F_frameInfo_t* frameInfo);
 /* LZ4F_compressBound() : gives the size of Dst buffer given a srcSize to handle worst case situations.
  * LZ4F_getMaxSrcSize() : gives max allowed srcSize given dstMaxSize to handle worst case situations.
  *                        You can use dstMaxSize==0 to know the "natural" srcSize instead (block size).
@@ -200,12 +203,12 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_de
 	
 /* Decompression */
 
-LZ4F_errorCode_t LZ4F_getHeaderInfo(LZ4F_preferences_t headerInfo, LZ4F_decompressionContext_t* decompressionContextPtr, void* srcBuffer, size_t* srcSize);
-/* LZ4F_getHeaderInfo()
- * This function decodes header information, such as blockSize.
- * LZ4F_getHeaderInfo() is optional : you could start instead by calling directly LZ4F_decompress.
+LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_frameInfo_t frameInfo, LZ4F_decompressionContext_t* decompressionContextPtr, void* srcBuffer, size_t* srcSize);
+/* LZ4F_getFrameInfo()
+ * This function decodes frame header information, such as blockSize.
+ * It is optional : you could start by calling directly LZ4F_decompress() instead.
  * The objective is to extract header information without starting decompression, typically for allocation purposes.
- * LZ4F_getHeaderInfo() could also be used *after* starting decompression, on a valid frame decompression context.
+ * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
  * The number of bytes read from srcBuffer will be provided within *srcSize (necessarily <= original value).
  * The function result is an error code which can be tested using LZ4F_isError().
  */
@@ -222,7 +225,7 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
  * You will have to call it again, using the same src arguments (but eventually different dst arguments).
  * 
  * The function result is an error code which can be tested using LZ4F_isError().
- * You'll be informed the frame is fully decoded on receiving result OK_FrameEnd(=1).
+ * When the frame is fully decoded, the function result will be OK_FrameEnd(=1).
  */
 
 
