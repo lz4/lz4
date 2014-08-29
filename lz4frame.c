@@ -141,6 +141,8 @@ typedef struct {size_t v;} _PACKED size_t_S;
 #define MB *(1<<20)
 #define GB *(1<<30)
 
+#define LZ4F_BLOCKSIZEID_DEFAULT 4
+
 
 /**************************************
    Structures and local types
@@ -159,6 +161,7 @@ static size_t LZ4F_getBlockSize(unsigned blockSizeID)
 {
 	static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
 	
+	if (blockSizeID == 0) blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
 	blockSizeID -= 4;
 	if (blockSizeID > 3) return ERROR_maxBlockSize_invalid;
 	return blockSizes[blockSizeID];
