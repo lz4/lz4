@@ -85,9 +85,9 @@
 
 
 
-//**************************************
-// Macros
-//**************************************
+/*****************************************
+   Macros
+*****************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 
@@ -135,7 +135,7 @@ unsigned int FUZ_rand(unsigned int* src)
 
 
 #define FUZ_RAND15BITS  ((FUZ_rand(seed) >> 3) & 32767)
-#define FUZ_RANDLENGTH  ( ((FUZ_rand(seed) >> 7) & 3) ? (FUZ_rand(seed) % 14) : (FUZ_rand(seed) & 511) + 15)
+#define FUZ_RANDLENGTH  ( ((FUZ_rand(seed) >> 7) & 3) ? (FUZ_rand(seed) % 15) : (FUZ_rand(seed) % 510) + 15)
 void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba, U32* seed)
 {
     BYTE* BBuffer = (BYTE*)buffer;
@@ -173,33 +173,9 @@ void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba,
 }
 
 
-// No longer useful; included into issue 134
-int FUZ_Issue52(void)
-{
-  char* output;
-  char* input;
-  int i, r;
-
-  // Overflow test, by Ludwig Strigeus
-  printf("Overflow test (issue 52)...");
-  input = (char*) malloc (20<<20);
-  output = (char*) malloc (20<<20);
-  input[0] = 0x0F;
-  input[1] = 0x00;
-  input[2] = 0x00;
-  for(i = 3; i < 16840000; i++) input[i] = 0xff;
-  r = LZ4_decompress_safe(input, output, 20<<20, 20<<20);
-
-  free(input);
-  free(output);
-  printf(" Passed (return = %i < 0)\n",r);
-  return 0;
-}
-
-
 #define MAX_NB_BUFF_I134 150
 #define BLOCKSIZE_I134   (32 MB)
-int FUZ_Issue134(void)
+int FUZ_AddressOverflow(void)
 {
   char* buffers[MAX_NB_BUFF_I134+1] = {0};
   int i, nbBuff=0;
@@ -762,8 +738,7 @@ int main(int argc, char** argv) {
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
-    //FUZ_Issue52();
-    FUZ_Issue134();
+    FUZ_AddressOverflow();
 
     if (nbTests<=0) nbTests=1;
 
