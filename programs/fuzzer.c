@@ -219,31 +219,31 @@ int FUZ_AddressOverflow(void)
         char* input = buffers[nbBuff-1];
         char* output = buffers[nbBuff];
         int r;
-        input[0] = 0xF0;   // Literal length overflow
-        input[1] = 0xFF;
-        input[2] = 0xFF;
-        input[3] = 0xFF;
-        for(i = 4; i <= nbOf255+4; i++) input[i] = 0xff;
+        input[0] = (char)0xF0;   // Literal length overflow
+        input[1] = (char)0xFF;
+        input[2] = (char)0xFF;
+        input[3] = (char)0xFF;
+        for(i = 4; i <= nbOf255+4; i++) input[i] = (char)0xff;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
         if (r>0) goto _overflowError;
-        input[0] = 0x1F;   // Match length overflow
-        input[1] = 0x01;
-        input[2] = 0x01;
-        input[3] = 0x00;
+        input[0] = (char)0x1F;   // Match length overflow
+        input[1] = (char)0x01;
+        input[2] = (char)0x01;
+        input[3] = (char)0x00;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
         if (r>0) goto _overflowError;
 
         output = buffers[nbBuff-2];   // Reverse in/out pointer order
-        input[0] = 0xF0;   // Literal length overflow
-        input[1] = 0xFF;
-        input[2] = 0xFF;
-        input[3] = 0xFF;
+        input[0] = (char)0xF0;   // Literal length overflow
+        input[1] = (char)0xFF;
+        input[2] = (char)0xFF;
+        input[3] = (char)0xFF;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
         if (r>0) goto _overflowError;
-        input[0] = 0x1F;   // Match length overflow
-        input[1] = 0x01;
-        input[2] = 0x01;
-        input[3] = 0x00;
+        input[0] = (char)0x1F;   // Match length overflow
+        input[1] = (char)0x01;
+        input[2] = (char)0x01;
+        input[3] = (char)0x00;
         r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
         if (r>0) goto _overflowError;
     }
