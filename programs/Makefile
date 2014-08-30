@@ -30,13 +30,13 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r122
+RELEASE=r123
 
 DESTDIR?=
 PREFIX ?= /usr
 CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -Wpedantic -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   = -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 BINDIR=$(PREFIX)/bin
@@ -68,7 +68,7 @@ endif
 
 default: lz4 lz4c
 
-all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 datagen
+all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest datagen
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
@@ -91,6 +91,9 @@ fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
 fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
+frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c frametest.c 
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
 datagen : datagen.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
@@ -99,7 +102,8 @@ clean:
 	@rm -f core *.o \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) datagen$(EXT)
+        fuzzer$(EXT) fuzzer32$(EXT) \
+        frametest$(EXT) datagen$(EXT)
 	@echo Cleaning completed
 
 
