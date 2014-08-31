@@ -36,7 +36,7 @@ DESTDIR?=
 PREFIX ?= /usr
 CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -Wpedantic -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   = -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 BINDIR=$(PREFIX)/bin

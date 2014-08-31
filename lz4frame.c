@@ -252,7 +252,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
         dstPtr += errorCode;
 	}
 
-	errorCode = LZ4F_compressEnd(cctx, dstPtr, dstMaxSize, NULL);   /* flush last block, and generate suffix */
+	errorCode = LZ4F_compressEnd(cctx, dstPtr, dstBlockSize, NULL);   /* flush last block, and generate suffix */
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;
 

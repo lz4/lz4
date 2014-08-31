@@ -30,6 +30,11 @@
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4146)        /* disable: C4146: minus unsigned expression */
 #endif
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+#ifdef __GNUC__
+#  pragma GCC diagnostic ignored "-Wmissing-braces"   /* GCC bug 53119 : doesn't accept { 0 } as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
+#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"   /* GCC bug 53119 : doesn't accept { 0 } as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
+#endif
 
 
 /**************************************
@@ -132,11 +137,11 @@ unsigned int FUZ_rand(unsigned int* src)
 
 
 #define FUZ_RAND15BITS  ((FUZ_rand(seed) >> 3) & 32767)
-#define FUZ_RANDLENGTH  ( ((FUZ_rand(seed) >> 7) & 3) ? (FUZ_rand(seed) % 14) : (FUZ_rand(seed) & 511) + 15)
-void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba, U32* seed)
+#define FUZ_RANDLENGTH  ( ((FUZ_rand(seed) >> 7) & 3) ? (FUZ_rand(seed) % 15) : (FUZ_rand(seed) % 510) + 15)
+static void FUZ_fillCompressibleNoiseBuffer(void* buffer, unsigned bufferSize, double proba, U32* seed)
 {
     BYTE* BBuffer = (BYTE*)buffer;
-    int pos = 0;
+    unsigned pos = 0;
     U32 P32 = (U32)(32768 * proba);
 
     // First Byte
@@ -148,23 +153,23 @@ void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba,
         if (FUZ_RAND15BITS < P32)
         {
             // Copy (within 64K)
-            int ref, d;
-            int length = FUZ_RANDLENGTH + 4;
-            int offset = FUZ_RAND15BITS + 1;
+            unsigned match, end;
+            unsigned length = FUZ_RANDLENGTH + 4;
+            unsigned offset = FUZ_RAND15BITS + 1;
             if (offset > pos) offset = pos;
             if (pos + length > bufferSize) length = bufferSize - pos;
-            ref = pos - offset;
-            d = pos + length;
-            while (pos < d) BBuffer[pos++] = BBuffer[ref++];
+            match = pos - offset;
+            end = pos + length;
+            while (pos < end) BBuffer[pos++] = BBuffer[match++];
         }
         else
         {
             // Literal (noise)
-            int d;
-            int length = FUZ_RANDLENGTH;
+            unsigned end;
+            unsigned length = FUZ_RANDLENGTH;
             if (pos + length > bufferSize) length = bufferSize - pos;
-            d = pos + length;
-            while (pos < d) BBuffer[pos++] = (BYTE)(FUZ_rand(seed) >> 5);
+            end = pos + length;
+            while (pos < end) BBuffer[pos++] = (BYTE)(FUZ_rand(seed) >> 5);
         }
     }
 }
@@ -180,7 +185,8 @@ int frameTest(U32 seed, int nbCycles, int startCycle, double compressibility)
 	void* compressedBuffer;
 	void* decodedBuffer;
 	U32 randState = seed;
-	size_t cSize;
+	size_t cSize, testSize;
+	LZ4F_preferences_t prefs = { 0 };
 
 	(void)nbCycles; (void)startCycle;
 	// Create compressible test buffer
@@ -189,10 +195,64 @@ int frameTest(U32 seed, int nbCycles, int startCycle, double compressibility)
 	compressedBuffer = malloc(LZ4F_compressFrameBound(COMPRESSIBLE_NOISE_LENGTH, NULL));
 	decodedBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
 
-	// Trivial test : one-step frame, all default
-	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(64 KB, NULL), CNBuffer, 64 KB, NULL);
+	// Trivial tests : one-step frame
+	testSize = COMPRESSIBLE_NOISE_LENGTH;
+	DISPLAY("Using NULL preferences : \n");
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
 	if (LZ4F_isError(cSize)) goto _output_error;
-	DISPLAY("Compressed %i bytes into a %i bytes frame \n", 64 KB, (int)cSize);
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("Using 64 KB block : \n");
+	prefs.frameInfo.blockSizeID = max64KB;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("without checksum : \n");
+	prefs.frameInfo.contentChecksumFlag = noContentChecksum;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("Using 256 KB block : \n");
+	prefs.frameInfo.blockSizeID = max256KB;
+	prefs.frameInfo.contentChecksumFlag = contentChecksumEnabled;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("without checksum : \n");
+	prefs.frameInfo.contentChecksumFlag = noContentChecksum;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("Using 1 MB block : \n");
+	prefs.frameInfo.blockSizeID = max1MB;
+	prefs.frameInfo.contentChecksumFlag = contentChecksumEnabled;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("without checksum : \n");
+	prefs.frameInfo.contentChecksumFlag = noContentChecksum;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("Using 4 MB block : \n");
+	prefs.frameInfo.blockSizeID = max4MB;
+	prefs.frameInfo.contentChecksumFlag = contentChecksumEnabled;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("without checksum : \n");
+	prefs.frameInfo.contentChecksumFlag = noContentChecksum;
+	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, &(prefs.frameInfo)), CNBuffer, testSize, &prefs);
+	if (LZ4F_isError(cSize)) goto _output_error;
+	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
 
 _end:
 	free(CNBuffer);
