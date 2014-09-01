@@ -73,18 +73,19 @@
 #  define LZ4_VERSION ""
 #endif
 
-#define NB_ATTEMPTS (1<<16)
-#define COMPRESSIBLE_NOISE_LENGTH (1 << 21)
-#define FUZ_MAX_BLOCK_SIZE (1 << 17)
-#define FUZ_MAX_DICT_SIZE  (1 << 15)
+#define KB *(1U<<10)
+#define MB *(1U<<20)
+#define GB *(1U<<30)
+
+#define NB_ATTEMPTS (64 KB)
+#define COMPRESSIBLE_NOISE_LENGTH (2 MB)
+#define FUZ_MAX_BLOCK_SIZE (128 KB)
+#define FUZ_MAX_DICT_SIZE  (32 KB)
 #define FUZ_COMPRESSIBILITY_DEFAULT 50
 #define PRIME1   2654435761U
 #define PRIME2   2246822519U
 #define PRIME3   3266489917U
 
-#define KB *(1U<<10)
-#define MB *(1U<<20)
-#define GB *(1U<<30)
 
 
 /**************************************
@@ -114,7 +115,7 @@ static int FUZ_GetMilliStart(void)
    return nCount;
 }
 
-
+/*
 static int FUZ_GetMilliSpan( int nTimeStart )
 {
    int nSpan = FUZ_GetMilliStart() - nTimeStart;
@@ -122,6 +123,7 @@ static int FUZ_GetMilliSpan( int nTimeStart )
       nSpan += 0x100000 * 1000;
    return nSpan;
 }
+*/
 
 
 #  define FUZ_rotl32(x,r) ((x << r) | (x >> (32 - r)))
@@ -175,8 +177,6 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, unsigned bufferSize, d
 }
 
 
-
-#define FUZ_MAX(a,b) (a>b?a:b)
 
 int frameTest(U32 seed, int nbCycles, int startCycle, double compressibility)
 {
@@ -283,8 +283,8 @@ int FUZ_usage(void)
 }
 
 
-int main(int argc, char** argv) {
-    U32 timestamp = FUZ_GetMilliStart();
+int main(int argc, char** argv)
+{
     U32 seed=0;
     int seedset=0;
     int argNb;
@@ -367,17 +367,7 @@ int main(int argc, char** argv) {
     // Get Seed
     printf("Starting lz4frame tester (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
 
-    if (!seedset)
-    {
-        char userInput[50] = {0};
-        printf("Select an Initialisation number (default : random) : ");
-        fflush(stdout);
-        if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
-        {
-            if ( sscanf(userInput, "%u", &seed) == 1 ) {}
-            else seed = FUZ_GetMilliSpan(timestamp);
-        }
-    }
+    if (!seedset) seed = FUZ_GetMilliStart() % 10000;
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 

@@ -37,7 +37,7 @@
  * All related operations, including memory management, are handled by the library.
  * You don't need lz4.h when using lz4frame.h.
  * */
- 
+
 #pragma once
 
 #if defined (__cplusplus)
@@ -56,13 +56,13 @@ extern "C" {
 **************************************/
 typedef size_t LZ4F_errorCode_t;
 typedef enum { OK_FrameEnd = 1 } LZ4F_successCodes;
-typedef enum { OK_NoError = 0, ERROR_GENERIC = 1, 
+typedef enum { OK_NoError = 0, ERROR_GENERIC = 1,
     ERROR_maxBlockSize_invalid, ERROR_blockMode_invalid, ERROR_contentChecksumFlag_invalid,
 	ERROR_srcSize_tooLarge, ERROR_dstMaxSize_tooSmall,
 	ERROR_allocation_failed,
     ERROR_compressionLevel_invalid,
 	ERROR_maxCode
-	} LZ4F_errorCodes;   /* error codes are negative unsigned values. 
+	} LZ4F_errorCodes;   /* error codes are negative unsigned values.
 							Compare function result to (-specificCode) */
 
 int LZ4F_isError(LZ4F_errorCode_t code);   /* Basically : code > -ERROR_maxCode */
@@ -109,7 +109,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 
 
 /**********************************
- * Advanced compression functions 
+ * Advanced compression functions
  * *********************************/
 
 typedef void* LZ4F_compressionContext_t;
@@ -163,17 +163,17 @@ size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuff
  * The result of the function is the number of bytes written into dstBuffer (it can be zero, meaning input data is just stored within compressionContext for a future block to complete)
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  */
-       
+
 size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr);
 /* LZ4F_flush()
  * Should you need to create compressed data immediately, without waiting for a block to be filled,
  * you can call LZ4_flush(), which will immediately compress any remaining data stored within compressionContext.
- * The result of the function is the number of bytes written into dstBuffer 
+ * The result of the function is the number of bytes written into dstBuffer
  * (it can be zero, this means there was no data left within compressionContext)
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  */
-       
+
 size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr);
 /* LZ4F_compressEnd()
  * When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
@@ -186,8 +186,8 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
  */
 
 
-/**********************************
- * Decompression functions 
+/***********************************
+ * Decompression functions
  * *********************************/
 
 typedef void* LZ4F_decompressionContext_t;
@@ -207,7 +207,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_de
  * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
  * Object can release its memory using LZ4F_freeDecompressionContext();
  */
-	
+
 /* Decompression */
 
 LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSize);
@@ -226,11 +226,11 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
  * The function will attempt to decode *srcSize from srcBuffer, into dstBuffer of maximum size *dstSize.
  *
  * The number of bytes generated into dstBuffer will be provided within *dstSize (necessarily <= original value).
- * 
+ *
  * The number of bytes effectively read from srcBuffer will be provided within *srcSize (necessarily <= original value).
  * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
  * You will have to call it again, using the same src arguments (but eventually different dst arguments).
- * 
+ *
  * The function result is an error code which can be tested using LZ4F_isError().
  * When the frame is fully decoded, the function result will be OK_FrameEnd(=1).
  */
