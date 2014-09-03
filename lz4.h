@@ -37,6 +37,11 @@
 extern "C" {
 #endif
 
+/*
+ * lz4.h provides raw compression format functions, for optimal performance and integration into programs.
+ * If you need to generate data using an inter-operable format (respecting the framing specification),
+ * please use lz4frame.h instead.
+*/
 
 /**************************************
    Version
@@ -142,7 +147,7 @@ LZ4_decompress_fast() :
              Destination buffer must be already allocated. Its size must be a minimum of 'originalSize' bytes.
     note : This function fully respect memory boundaries for properly formed compressed data.
            It is a bit faster than LZ4_decompress_safe().
-           However, it does not provide any protection against intentionnally modified data stream (malicious input).
+           However, it does not provide any protection against intentionally modified data stream (malicious input).
            Use this function in trusted environment only (data to decode comes from a trusted source).
 */
 int LZ4_decompress_fast (const char* source, char* dest, int originalSize);
@@ -178,8 +183,7 @@ typedef struct { unsigned int table[LZ4_STREAMSIZE_U32]; } LZ4_stream_t;
 
 /*
  * LZ4_resetStream
- * Use this function to init a newly allocated LZ4_stream_t structure
- * You can also reset an existing LZ4_stream_t structure
+ * Use this function to init an allocated LZ4_stream_t structure
  */
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream);
 
@@ -273,8 +277,7 @@ Advanced decoding functions :
 *_usingDict() :
     These decoding functions work the same as
     a combination of LZ4_setDictDecode() followed by LZ4_decompress_x_continue()
-    all together into a single function call.
-    It doesn't use nor update an LZ4_streamDecode_t structure.
+    They don't use nor update an LZ4_streamDecode_t structure.
 */
 int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize);
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);

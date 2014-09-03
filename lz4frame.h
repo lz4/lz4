@@ -73,7 +73,7 @@ int LZ4F_isError(LZ4F_errorCode_t code);   /* Basically : code > -ERROR_maxCode 
 **************************************/
 
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} blockSizeID_t;
-typedef enum {                 blockLinked=1, blockIndependent} blockMode_t;
+typedef enum { blockLinked=0, blockIndependent} blockMode_t;
 typedef enum { contentChecksumEnabled, noContentChecksum} contentChecksum_t;
 
 typedef struct {
@@ -203,7 +203,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_de
 /* LZ4F_createDecompressionContext() :
  * The first thing to do is to create a decompressionContext object, which will be used in all decompression operations.
  * This is achieved using LZ4F_createDecompressionContext().
- * The function will provide a pointer to a fully allocated and initialised LZ4F_decompressionContext object.
+ * The function will provide a pointer to a fully allocated and initialized LZ4F_decompressionContext object.
  * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
  * Object can release its memory using LZ4F_freeDecompressionContext();
  */
@@ -227,12 +227,14 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
  *
  * The number of bytes generated into dstBuffer will be provided within *dstSize (necessarily <= original value).
  *
- * The number of bytes effectively read from srcBuffer will be provided within *srcSize (necessarily <= original value).
+ * The number of bytes effectively used from srcBuffer will be provided within *srcSize (necessarily <= original value).
  * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
- * You will have to call it again, using the same src arguments (but eventually different dst arguments).
+ * This typically happens when dstBuffer is not large enough to contain all decoded data.
+ * LZ4F_decompress() will have to be called again, using the same src arguments (but eventually different dst arguments).
+ * dstBuffer is supposed to be flushed between calls to the function, since its content will be rewritten.
  *
  * The function result is an error code which can be tested using LZ4F_isError().
- * When the frame is fully decoded, the function result will be OK_FrameEnd(=1).
+ * When a frame is fully decoded, the function result will be OK_FrameEnd(=1).
  */
 
 

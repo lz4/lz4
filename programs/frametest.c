@@ -187,6 +187,7 @@ int frameTest(U32 seed, int nbCycles, int startCycle, double compressibility)
 	U32 randState = seed;
 	size_t cSize, testSize;
 	LZ4F_preferences_t prefs = { 0 };
+	LZ4F_decompressionContext_t dCtx;
 
 	(void)nbCycles; (void)startCycle;
 	// Create compressible test buffer
@@ -201,6 +202,19 @@ int frameTest(U32 seed, int nbCycles, int startCycle, double compressibility)
 	cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
 	if (LZ4F_isError(cSize)) goto _output_error;
 	DISPLAY("Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
+
+	DISPLAY("Decompression test : \n");
+	{
+        LZ4F_errorCode_t errorCode = LZ4F_createDecompressionContext(&dCtx);
+        size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
+        size_t compressedBufferSize = cSize;
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &compressedBufferSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        DISPLAY("Regenerated %i bytes \n", (int)decodedBufferSize);
+        errorCode = LZ4F_freeDecompressionContext(dCtx);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+	}
 
 	DISPLAY("Using 64 KB block : \n");
 	prefs.frameInfo.blockSizeID = max64KB;
@@ -262,6 +276,7 @@ _end:
 
 _output_error:
 	testResult = 1;
+	DISPLAY("Error detected ! \n");
 	if(!no_prompt) getchar();
 	goto _end;
 }
