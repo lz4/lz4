@@ -205,13 +205,33 @@ int frameTest(U32 seed, int nbCycles, int startCycle, double compressibility)
 
 	DISPLAY("Decompression test : \n");
 	{
-        LZ4F_errorCode_t errorCode = LZ4F_createDecompressionContext(&dCtx);
         size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
         size_t compressedBufferSize = cSize;
+        BYTE* op = (BYTE*)decodedBuffer;
+        BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
+        BYTE* ip = (BYTE*)compressedBuffer;
+        BYTE* const iend = (BYTE*)compressedBuffer + cSize;
+        LZ4F_errorCode_t errorCode = LZ4F_createDecompressionContext(&dCtx);
         if (LZ4F_isError(errorCode)) goto _output_error;
+
+        DISPLAY("Single Block : \n");
         errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &compressedBufferSize, NULL);
         if (LZ4F_isError(errorCode)) goto _output_error;
         DISPLAY("Regenerated %i bytes \n", (int)decodedBufferSize);
+
+        DISPLAY("Byte after byte : \n");
+        while (ip < iend)
+        {
+            size_t oSize = oend-op;
+            size_t iSize = 1;
+            //DISPLAY("%7i \n", (int)(ip-(BYTE*)compressedBuffer));
+            errorCode = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
+            if (LZ4F_isError(errorCode)) goto _output_error;
+            op += oSize;
+            ip += iSize;
+        }
+        DISPLAY("Regenerated %i bytes \n", (int)decodedBufferSize);
+
         errorCode = LZ4F_freeDecompressionContext(dCtx);
         if (LZ4F_isError(errorCode)) goto _output_error;
 	}

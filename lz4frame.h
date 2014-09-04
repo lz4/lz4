@@ -74,7 +74,7 @@ int LZ4F_isError(LZ4F_errorCode_t code);   /* Basically : code > -ERROR_maxCode 
 
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7} blockSizeID_t;
 typedef enum { blockLinked=0, blockIndependent} blockMode_t;
-typedef enum { contentChecksumEnabled, noContentChecksum} contentChecksum_t;
+typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
 
 typedef struct {
   blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
@@ -220,18 +220,20 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionCont
  * The function result is an error code which can be tested using LZ4F_isError().
  */
 
-LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSize, const void* srcBuffer, size_t* srcSize, const LZ4F_decompressOptions_t* decompressOptionsPtr);
+LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSizePtr, const void* srcBuffer, size_t* srcSizePtr, const LZ4F_decompressOptions_t* decompressOptionsPtr);
 /* LZ4F_decompress()
  * Call this function repetitively to regenerate data compressed within srcBuffer.
- * The function will attempt to decode *srcSize from srcBuffer, into dstBuffer of maximum size *dstSize.
+ * The function will attempt to decode *srcSizePtr bytes from srcBuffer, into dstBuffer of maximum size *dstSizePtr.
  *
- * The number of bytes generated into dstBuffer will be provided within *dstSize (necessarily <= original value).
+ * The number of bytes generated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
  *
- * The number of bytes effectively used from srcBuffer will be provided within *srcSize (necessarily <= original value).
+ * The number of bytes effectively used from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
  * This typically happens when dstBuffer is not large enough to contain all decoded data.
- * LZ4F_decompress() will have to be called again, using the same src arguments (but eventually different dst arguments).
+ * LZ4F_decompress() will have to be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
+ * The function will check this condition, and refuse to continue if it is not respected.
  * dstBuffer is supposed to be flushed between calls to the function, since its content will be rewritten.
+ * Different dst arguments can be used.
  *
  * The function result is an error code which can be tested using LZ4F_isError().
  * When a frame is fully decoded, the function result will be OK_FrameEnd(=1).
