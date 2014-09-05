@@ -80,12 +80,14 @@ typedef struct {
   blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
   blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
   contentChecksum_t contentChecksumFlag;   /* contentChecksumEnabled (default), noContentChecksum ; */
+  unsigned          reserved[3];
 } LZ4F_frameInfo_t;
 
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   unsigned         compressionLevel;       /* from 0 to 16 */
   unsigned         autoFlush;              /* 1 == automatic flush after each call to LZ4F_compress() */
+  unsigned         reserved[4];
 } LZ4F_preferences_t;
 
 
@@ -115,7 +117,8 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 typedef void* LZ4F_compressionContext_t;
 
 typedef struct {
-  int stableSrc;          /* unused for the time being, must be 0 */
+  unsigned stableSrc;          /* unused for the time being, must be 0 */
+  unsigned reserved[5];
 } LZ4F_compressOptions_t;
 
 /* Resource Management */
@@ -193,12 +196,13 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 typedef void* LZ4F_decompressionContext_t;
 
 typedef struct {
-  int stableDst;          /* unused for the time being, must be 0 */
+  unsigned stableDst;       /* unused for the time being, must be 0 */
+  unsigned reserved[5];
 } LZ4F_decompressOptions_t;
 
 /* Resource management */
 
-LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr);
+LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber);
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_decompressionContext);
 /* LZ4F_createDecompressionContext() :
  * The first thing to do is to create a decompressionContext object, which will be used in all decompression operations.

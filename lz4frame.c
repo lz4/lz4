@@ -122,6 +122,23 @@ typedef struct {
 	size_t tmpInSize;
 } LZ4F_cctx_internal_t;
 
+typedef struct {
+    LZ4F_frameInfo_t frameInfo;
+	unsigned version;
+	unsigned dStage;
+	size_t maxBlockSize;
+	XXH32_stateSpace_t xxh;
+	size_t sizeToDecode;
+	const BYTE* srcExpect;
+	BYTE*  tmpIn;
+	size_t tmpInSize;
+	size_t tmpInTarget;
+	BYTE*  tmpOut;
+	size_t tmpOutSize;
+	size_t tmpOutStart;
+	BYTE   header[7];
+} LZ4F_dctx_internal_t;
+
 
 /**************************************
    Macros
@@ -572,22 +589,6 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
  * Decompression functions
  * *********************************/
 
-typedef struct {
-    LZ4F_frameInfo_t frameInfo;
-	unsigned dStage;
-	size_t maxBlockSize;
-	size_t sizeToDecode;
-	const BYTE* srcExpect;
-	size_t srcConsumed;
-	BYTE*  tmpIn;
-	size_t tmpInSize;
-	size_t tmpInTarget;
-	BYTE*  tmpOut;
-	size_t tmpOutSize;
-	size_t tmpOutStart;
-} LZ4F_dctx_internal_t;
-
-
 /* Resource management */
 
 /* LZ4F_createDecompressionContext() :
@@ -597,13 +598,14 @@ typedef struct {
  * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
  * Object can release its memory using LZ4F_freeDecompressionContext();
  */
-LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr)
+LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber)
 {
     LZ4F_dctx_internal_t* dctxPtr;
 
     dctxPtr = ALLOCATOR(sizeof(LZ4F_dctx_internal_t));
     if (dctxPtr==NULL) return -ERROR_GENERIC;
 
+    dctxPtr->version = versionNumber;
     *LZ4F_decompressionContextPtr = (LZ4F_compressionContext_t)dctxPtr;
     return OK_NoError;
 }
@@ -620,7 +622,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_de
 
 /* Decompression */
 
-static size_t LZ4F_decodeHeader(LZ4F_frameInfo_t* frameInfoPtr, const BYTE* srcPtr, size_t srcSize)
+static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const BYTE* srcPtr, size_t srcSize)
 {
     BYTE FLG, BD, HC;
     unsigned version, blockMode, blockChecksumFlag, contentSizeFlag, contentChecksumFlag, dictFlag, blockSizeID;
@@ -659,27 +661,25 @@ static size_t LZ4F_decodeHeader(LZ4F_frameInfo_t* frameInfoPtr, const BYTE* srcP
     if (((BD>>0)&_4BITS) != 0) return -ERROR_GENERIC;   /* Reserved bits */
 
     /* save */
-    frameInfoPtr->blockMode = blockMode;
-    frameInfoPtr->contentChecksumFlag = contentChecksumFlag;
-    frameInfoPtr->blockSizeID = blockSizeID;
+    dctxPtr->frameInfo.blockMode = blockMode;
+    dctxPtr->frameInfo.contentChecksumFlag = contentChecksumFlag;
+    dctxPtr->frameInfo.blockSizeID = blockSizeID;
 
-    return 7;
-}
+    /* init */
+    if (contentChecksumFlag) XXH32_resetState(&(dctxPtr->xxh), 0);
 
-static LZ4F_errorCode_t LZ4F_checkBuffer(LZ4F_dctx_internal_t* dctxPtr)
-{
-    size_t newBlockSize = LZ4F_getBlockSize(dctxPtr->frameInfo.blockSizeID);
-    if (newBlockSize != dctxPtr->maxBlockSize)   /* tmp buffers already allocated ; consider > test instead */
+    if (LZ4F_getBlockSize(blockSizeID) > dctxPtr->maxBlockSize)   /* tmp buffers too small */
     {
         FREEMEM(dctxPtr->tmpIn);
         FREEMEM(dctxPtr->tmpOut);
-        dctxPtr->tmpIn = ALLOCATOR(newBlockSize);
+        dctxPtr->tmpIn = ALLOCATOR(LZ4F_getBlockSize(blockSizeID));
         if (dctxPtr->tmpIn == NULL) return -ERROR_GENERIC;
-        dctxPtr->tmpOut= ALLOCATOR(newBlockSize);
+        dctxPtr->tmpOut= ALLOCATOR(LZ4F_getBlockSize(blockSizeID));
         if (dctxPtr->tmpOut== NULL) return -ERROR_GENERIC;
-        dctxPtr->maxBlockSize = newBlockSize;
+        dctxPtr->maxBlockSize = LZ4F_getBlockSize(blockSizeID);
     }
-    return OK_NoError;
+
+    return 7;
 }
 
 
@@ -704,11 +704,9 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionCont
 
     if (dctxPtr->dStage==0)
     {
-        LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(frameInfoPtr, srcBuffer, *srcSize);
+        LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, srcBuffer, *srcSize);
         if (LZ4F_isError(errorCode)) return errorCode;
         *srcSize = errorCode;
-        errorCode = LZ4F_checkBuffer(dctxPtr);
-        if (LZ4F_isError(errorCode)) return errorCode;
         dctxPtr->dStage = dstage_getCBlockSize;
         return OK_NoError;
     }
@@ -763,7 +761,7 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
         {
         case dstage_getHeader:
             {
-                if ((srcEnd-srcPtr)>7)
+                if (srcEnd-srcPtr >= 7)
                 {
                     selectedIn = srcPtr;
                     srcPtr += 7;
@@ -778,20 +776,18 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
             {
                 size_t sizeToCopy = 7 - dctxPtr->tmpInSize;
                 if (sizeToCopy > (size_t)(srcEnd - srcPtr)) sizeToCopy =  srcEnd - srcPtr;
-                memcpy(dctxPtr->tmpIn + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
+                memcpy(dctxPtr->header + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 dctxPtr->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
                 if (dctxPtr->tmpInSize < 7) break;   /* src completed; come back later for more */
-                selectedIn = dctxPtr->tmpIn;
+                selectedIn = dctxPtr->header;
                 dctxPtr->dStage = dstage_decodeHeader;
                 /* break;   useless because it follows */
             }
         case dstage_decodeHeader:
 goto_decodeHeader:
             {
-                LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(&(dctxPtr->frameInfo), selectedIn, 7);
-                if (LZ4F_isError(errorCode)) return errorCode;
-                errorCode = LZ4F_checkBuffer(dctxPtr);
+                LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, selectedIn, 7);
                 if (LZ4F_isError(errorCode)) return errorCode;
                 /* dctxPtr->dStage = dstage_getCBlockSize; break;     no need to change stage nor break : dstage_getCBlockSize is next stage, and stage will be modified */
             }
@@ -890,6 +886,8 @@ goto_getCBlock:
                 {
                     decodedSize = LZ4_decompress_safe((const char*)selectedIn, (char*)dctxPtr->tmpOut, (int)dctxPtr->sizeToDecode, (int)dctxPtr->maxBlockSize);
                     if (decodedSize < 0) return -ERROR_GENERIC;   /* decompression failed */
+                    if (dctxPtr->frameInfo.contentChecksumFlag)
+                        XXH32_update(&(dctxPtr->xxh), dctxPtr->tmpOut, decodedSize);
                     dctxPtr->tmpOutSize = decodedSize;
                     dctxPtr->tmpOutStart = 0;
                     dctxPtr->dStage = dstage_flushOut;
@@ -897,6 +895,8 @@ goto_getCBlock:
                 }
                 decodedSize = LZ4_decompress_safe((const char*)selectedIn, (char*)dstPtr, (int)dctxPtr->sizeToDecode, (int)dctxPtr->maxBlockSize);
                 if (decodedSize < 0) return -ERROR_GENERIC;   /* decompression failed */
+                if (dctxPtr->frameInfo.contentChecksumFlag)
+                    XXH32_update(&(dctxPtr->xxh), dstPtr, decodedSize);
                 dstPtr += decodedSize;
                 dctxPtr->dStage = dstage_getCBlockSize;
                 break;
@@ -927,11 +927,11 @@ goto_getSuffix:
                     selectedIn = srcPtr;
                     srcPtr += 4;
                     dctxPtr->dStage = dstage_checkSuffix;
-                    break;
+                    goto goto_checkSuffix;   /* break risks leaving the while loop */
                 }
                 dctxPtr->tmpInSize = 0;
                 dctxPtr->dStage = dstage_storeSuffix;
-                break;
+                /* break;   useless, it follow */
             }
         case dstage_storeSuffix:
             {
@@ -946,8 +946,11 @@ goto_getSuffix:
                 break;
             }
         case dstage_checkSuffix:
+goto_checkSuffix:
             {
-                /* To do */
+                U32 readCRC = LZ4F_readLE32(selectedIn);
+                U32 resultCRC = XXH32_intermediateDigest(&(dctxPtr->xxh));
+                if (readCRC != resultCRC) return -ERROR_GENERIC;
                 goodResult = OK_FrameEnd;
                 dctxPtr->dStage = dstage_getHeader;
                 goto _end;
