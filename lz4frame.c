@@ -866,7 +866,7 @@ goto_getCBlock:
                 selectedIn = srcPtr;
                 srcPtr += nextCBlockSize;
                 dctxPtr->dStage = dstage_decodeCBlock;
-                break;
+                goto goto_decodeCBlock;   /* break risks leaving the while loop */
             }
         case dstage_storeCBlock:
             {
@@ -881,6 +881,7 @@ goto_getCBlock:
                 /* break;   break unnecessary because it follows */
             }
         case dstage_decodeCBlock:
+goto_decodeCBlock:
             {
                 int decodedSize;
                 if ((size_t)(dstEnd-dstPtr) < dctxPtr->maxBlockSize)   /* not enough room : decode into tmpOut */
@@ -937,14 +938,14 @@ goto_getSuffix:
         case dstage_storeSuffix:
             {
                 size_t sizeToCopy = 4 - dctxPtr->tmpInSize;
-                if (sizeToCopy < (size_t)(srcEnd - srcPtr)) sizeToCopy = srcEnd - srcPtr;
+                if (sizeToCopy > (size_t)(srcEnd - srcPtr)) sizeToCopy = srcEnd - srcPtr;
                 memcpy(dctxPtr->tmpIn + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dctxPtr->tmpInSize += sizeToCopy;
                 if (dctxPtr->tmpInSize < 4) break;   /* not enough input to read suffix */
                 selectedIn = dctxPtr->tmpIn;
                 dctxPtr->dStage = dstage_checkSuffix;
-                break;
+                /* break;   useless, it follows; would need a goto anyway */
             }
         case dstage_checkSuffix:
 goto_checkSuffix:

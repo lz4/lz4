@@ -362,7 +362,7 @@ _output_error:
 
 static const U32 srcDataLength = 4 MB;
 
-int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibility)
+int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibility)
 {
 	unsigned testResult = 0;
 	unsigned testNb = 0;
@@ -374,7 +374,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %i)  \n", seed, testNb); goto _output_error; }
 
-	(void)startCycle;
+	(void)startTest;
 	// Create compressible test buffer
 	LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
 	srcBuffer = malloc(srcDataLength);
@@ -395,17 +395,40 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
         U64 crcOrig, crcDecoded;
         size_t result;
 
-        DISPLAYUPDATE(2, "%5i \r", testNb);
+        DISPLAYUPDATE(2, "\r%5i   ", testNb);
         result = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, &(prefs.frameInfo)), srcBuffer+srcStart, srcSize, &prefs );
-        CHECK(LZ4F_isError(result), "Compression failed");
+        CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
         crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
 
         cSize = result;
         decodedSize = srcDataLength;
         result = LZ4F_decompress(dCtx, decodedBuffer, &decodedSize, compressedBuffer, &cSize, NULL);
-        CHECK(result!=OK_FrameEnd, "Decompression failed");
+        CHECK(result!=OK_FrameEnd, "Decompression failed (error %i)", (int)result);
         crcDecoded = XXH64(decodedBuffer, decodedSize, 1);
         CHECK(crcDecoded != crcOrig, "Decompression corruption");
+
+        {
+            const BYTE* ip = compressedBuffer;
+            const BYTE* const iend = ip + cSize;
+            BYTE* op = decodedBuffer;
+            BYTE* const oend = op + srcDataLength;
+            unsigned segRand = randState ^ PRIME1;
+            unsigned maxBits = FUZ_highbit(decodedSize);
+            while (ip < iend)
+            {
+                unsigned nbBitsSeg = FUZ_rand(&segRand) % maxBits;
+                size_t iSize = (FUZ_rand(&segRand) & ((1<<nbBitsSeg)-1)) + 1;
+                size_t oSize = oend-op;
+                if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
+                result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
+                CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
+                op += oSize;
+                ip += iSize;
+            }
+            CHECK(result != OK_FrameEnd, "Frame decompression failed (error %i)", (int)result);
+            crcDecoded = XXH64(decodedBuffer, decodedSize, 1);
+            CHECK(crcDecoded != crcOrig, "Decompression corruption");
+        }
     }
 
 	DISPLAYLEVEL(2, "All tests completed   \n");
