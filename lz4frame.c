@@ -842,6 +842,7 @@ goto_decodeCBlockSize:
                 if ((size_t)(srcEnd-srcPtr) < sizeToCopy) sizeToCopy = srcEnd-srcPtr;  /* not enough input to read full block */
                 if ((size_t)(dstEnd-dstPtr) < sizeToCopy) sizeToCopy = dstEnd - dstPtr;
                 memcpy(dstPtr, srcPtr, sizeToCopy);
+                if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dstPtr += sizeToCopy;
                 if (sizeToCopy == dctxPtr->sizeToDecode)   /* all copied */

@@ -103,7 +103,7 @@ static int g_time = 0;
 *****************************************/
 static int no_prompt = 0;
 static char* programName;
-static int displayLevel = 3;
+static int displayLevel = 2;
 
 
 /*********************************************************
@@ -340,6 +340,7 @@ int basicTests(U32 seed, int nbCycles, int startCycle, double compressibility)
 	if (LZ4F_isError(cSize)) goto _output_error;
 	DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
 
+	DISPLAY("Basic tests completed \n");
 _end:
 	free(CNBuffer);
 	free(compressedBuffer);
@@ -364,10 +365,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
 	void* compressedBuffer;
 	void* decodedBuffer;
 	U32 randState = seed;
-	LZ4F_preferences_t prefs = { 0 };
 	LZ4F_decompressionContext_t dCtx;
 
-	(void)nbTests; (void)startCycle; (void)prefs;
+	(void)startCycle;
 	// Create compressible test buffer
 	LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
 	srcBuffer = malloc(srcDataLength);
@@ -378,10 +378,13 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
     // Select components of compression test
     for (testNb=0; testNb < nbTests; testNb++)
     {
+        unsigned CCflag = FUZ_rand(&randState) & 1;
+        unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
+        LZ4F_preferences_t prefs = { { BSId, 0, CCflag, 0,0,0 }, 0,0, 0,0,0,0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
-        size_t cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, NULL), srcBuffer+srcStart, srcSize, NULL);
+        size_t cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, &(prefs.frameInfo)), srcBuffer+srcStart, srcSize, &prefs );
         U64 crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
         U64 crcRes;
         LZ4F_errorCode_t err;
