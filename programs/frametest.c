@@ -366,6 +366,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
 	void* decodedBuffer;
 	U32 randState = seed;
 	LZ4F_decompressionContext_t dCtx;
+	size_t result;
 
 	(void)startCycle;
 	// Create compressible test buffer
@@ -384,20 +385,21 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
-        size_t cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, &(prefs.frameInfo)), srcBuffer+srcStart, srcSize, &prefs );
-        U64 crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
-        U64 crcRes;
-        LZ4F_errorCode_t err;
-        size_t outSize;
+        size_t cSize, decodedSize;
+        U64 crcOrig, crcDecoded;
+
         DISPLAYUPDATE(2, "%5i \r", testNb);
-        //DISPLAYLEVEL(2, "%5i \n", testNb);
-        if (LZ4F_isError(cSize)) goto _output_error;
-        outSize = srcDataLength;
-        err = LZ4F_decompress(dCtx, decodedBuffer, &outSize, compressedBuffer, &cSize, NULL);
-        if (LZ4F_isError(err)) goto _output_error;
-        if (outSize != srcSize) goto _output_error;
-        crcRes = XXH64(decodedBuffer, srcSize, 1);
-        if (crcRes != crcOrig) goto _output_error;
+        result = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, &(prefs.frameInfo)), srcBuffer+srcStart, srcSize, &prefs );
+        if (LZ4F_isError(result)) goto _output_error;
+        crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
+
+        cSize = result;
+        decodedSize = srcDataLength;
+        result = LZ4F_decompress(dCtx, decodedBuffer, &decodedSize, compressedBuffer, &cSize, NULL);
+        if (LZ4F_isError(result)) goto _output_error;
+        if (decodedSize != srcSize) goto _output_error;
+        crcDecoded = XXH64(decodedBuffer, srcSize, 1);
+        if (crcDecoded != crcOrig) goto _output_error;
     }
 
 	DISPLAYLEVEL(2, "All tests completed   \n");
