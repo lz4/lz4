@@ -94,39 +94,44 @@
 **************************************/
 #define DISPLAY(...)          fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...)  if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-#define DISPLAYUPDATE(l, ...) if (displayLevel>=l) { if (FUZ_GetMilliStart() > g_time + 200) { g_time = FUZ_GetMilliStart(); DISPLAY(__VA_ARGS__); } }
-static int g_time = 0;
+#define DISPLAYUPDATE(l, ...) if (displayLevel>=l) { \
+            if ((FUZ_GetMilliSpan(g_time) > refreshRate) || (displayLevel>=4)) \
+            { g_time = FUZ_GetMilliStart(); DISPLAY(__VA_ARGS__); \
+            if (displayLevel>=4) fflush(stdout); } }
+static const U32 refreshRate = 150;
+static U32 g_time = 0;
 
 
 /*****************************************
   Local Parameters
 *****************************************/
-static int no_prompt = 0;
+static U32 no_prompt = 0;
 static char* programName;
-static int displayLevel = 2;
+static U32 displayLevel = 2;
 
 
 /*********************************************************
   Fuzzer functions
 *********************************************************/
-static int FUZ_GetMilliStart(void)
+static U32 FUZ_GetMilliStart(void)
 {
    struct timeb tb;
-   int nCount;
+   U32 nCount;
    ftime( &tb );
-   nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
+   nCount = (U32) (((tb.time & 0xfffff) * 1000) +  tb.millitm);
    return nCount;
 }
 
-/*
-static int FUZ_GetMilliSpan( int nTimeStart )
+
+static U32 FUZ_GetMilliSpan(U32 nTimeStart)
 {
-   int nSpan = FUZ_GetMilliStart() - nTimeStart;
-   if ( nSpan < 0 )
+   U32 nCurrent = FUZ_GetMilliStart();
+   U32 nSpan = nCurrent - nTimeStart;
+   if (nTimeStart > nCurrent)
       nSpan += 0x100000 * 1000;
    return nSpan;
 }
-*/
+
 
 
 #  define FUZ_rotl32(x,r) ((x << r) | (x >> (32 - r)))
@@ -366,7 +371,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
 	void* decodedBuffer;
 	U32 randState = seed;
 	LZ4F_decompressionContext_t dCtx;
-	size_t result;
+#   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                            DISPLAY(" (seed %u, test nb %i)  \n", seed, testNb); goto _output_error; }
 
 	(void)startCycle;
 	// Create compressible test buffer
@@ -387,24 +393,25 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startCycle, double compressibili
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
         size_t cSize, decodedSize;
         U64 crcOrig, crcDecoded;
+        size_t result;
 
         DISPLAYUPDATE(2, "%5i \r", testNb);
         result = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, &(prefs.frameInfo)), srcBuffer+srcStart, srcSize, &prefs );
-        if (LZ4F_isError(result)) goto _output_error;
+        CHECK(LZ4F_isError(result), "Compression failed");
         crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
 
         cSize = result;
         decodedSize = srcDataLength;
         result = LZ4F_decompress(dCtx, decodedBuffer, &decodedSize, compressedBuffer, &cSize, NULL);
-        if (LZ4F_isError(result)) goto _output_error;
-        if (decodedSize != srcSize) goto _output_error;
-        crcDecoded = XXH64(decodedBuffer, srcSize, 1);
-        if (crcDecoded != crcOrig) goto _output_error;
+        CHECK(result!=OK_FrameEnd, "Decompression failed");
+        crcDecoded = XXH64(decodedBuffer, decodedSize, 1);
+        CHECK(crcDecoded != crcOrig, "Decompression corruption");
     }
 
 	DISPLAYLEVEL(2, "All tests completed   \n");
 
 _end:
+    LZ4F_freeDecompressionContext(dCtx);
 	free(srcBuffer);
 	free(compressedBuffer);
 	free(decodedBuffer);
@@ -412,8 +419,6 @@ _end:
 
 _output_error:
 	testResult = 1;
-	DISPLAY("Error detected ! \n");
-	if(!no_prompt) getchar();
 	goto _end;
 }
 
