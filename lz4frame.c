@@ -354,6 +354,7 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 	if (cctxPtr->maxBufferSize < cctxPtr->maxBlockSize)
     {
         cctxPtr->maxBufferSize = cctxPtr->maxBlockSize;
+        FREEMEM(cctxPtr->tmpIn);
         cctxPtr->tmpIn = ALLOCATOR(cctxPtr->maxBlockSize);
         if (cctxPtr->tmpIn == NULL) return -ERROR_allocation_failed;
     }
