@@ -393,11 +393,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
         size_t result;
 
         DISPLAYUPDATE(2, "\r%5i   ", testNb);
-
-        result = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, &(prefs.frameInfo)), srcBuffer+srcStart, srcSize, &prefs );
-        CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
         crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
-        cSize = result;
 
         {
             const BYTE* ip = srcBuffer + srcStart;
@@ -428,6 +424,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
             op += result;
             result = LZ4F_freeCompressionContext(cctx);
             CHECK(LZ4F_isError(result), "deallocation failed (error %i)", (int)result);
+            cSize = op-(BYTE*)compressedBuffer;
         }
 
         {
@@ -439,10 +436,12 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
             unsigned maxBits = FUZ_highbit(cSize);
             while (ip < iend)
             {
-                unsigned nbBitsSeg = FUZ_rand(&segRand) % maxBits;
-                size_t iSize = (FUZ_rand(&segRand) & ((1<<nbBitsSeg)-1)) + 1;
-                size_t oSize = oend-op;
+                unsigned nbBitsI = FUZ_rand(&segRand) % maxBits;
+                unsigned nbBitsO = FUZ_rand(&segRand) % maxBits;
+                size_t iSize = (FUZ_rand(&segRand) & ((1<<nbBitsI)-1)) + 1;
+                size_t oSize = (FUZ_rand(&segRand) & ((1<<nbBitsO)-1)) + 1;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
+                if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
                 op += oSize;
