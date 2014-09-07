@@ -359,14 +359,14 @@ _output_error:
 
 static const U32 srcDataLength = 4 MB;
 
-int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibility)
+int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressibility)
 {
 	unsigned testResult = 0;
 	unsigned testNb = 0;
 	void* srcBuffer;
 	void* compressedBuffer;
 	void* decodedBuffer;
-	U32 randState = seed;
+	U32 coreRand = seed;
 	LZ4F_decompressionContext_t dCtx;
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %i)  \n", seed, testNb); goto _output_error; }
@@ -377,11 +377,15 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
 	srcBuffer = malloc(srcDataLength);
 	compressedBuffer = malloc(LZ4F_compressFrameBound(srcDataLength, NULL));
 	decodedBuffer = malloc(srcDataLength);
-	FUZ_fillCompressibleNoiseBuffer(srcBuffer, srcDataLength, compressibility, &randState);
+	FUZ_fillCompressibleNoiseBuffer(srcBuffer, srcDataLength, compressibility, &coreRand);
 
-    // Select components of compression test
-    for (testNb=0; testNb < nbTests; testNb++)
+    // jump to requested testNb
+	for (testNb =0; testNb < startTest; testNb++) (void)FUZ_rand(&coreRand);   // sync randomizer
+
+    // main fuzzer loop
+    for ( ; testNb < nbTests; testNb++)
     {
+        U32 randState = coreRand ^ prime1;
         unsigned CCflag = FUZ_rand(&randState) & 1;
         unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
         LZ4F_preferences_t prefs = { { BSId, 0, CCflag, 0,0,0 }, 0,0, 0,0,0,0 };
@@ -400,7 +404,6 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
             const BYTE* const iend = ip + srcSize;
             BYTE* op = compressedBuffer;
             BYTE* const oend = op + LZ4F_compressFrameBound(srcDataLength, NULL);
-            U32 segRand = randState ^ prime2;
             unsigned maxBits = FUZ_highbit(srcSize);
             LZ4F_compressionContext_t cctx;
             result = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION, &prefs);
@@ -410,8 +413,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
             op += result;
             while (ip < iend)
             {
-                unsigned nbBitsSeg = FUZ_rand(&segRand) % maxBits;
-                size_t iSize = (FUZ_rand(&segRand) & ((1<<nbBitsSeg)-1)) + 1;
+                unsigned nbBitsSeg = FUZ_rand(&randState) % maxBits;
+                size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsSeg)-1)) + 1;
                 size_t oSize = oend-op;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 result = LZ4F_compress(cctx, op, oSize, ip, iSize, NULL);
@@ -432,14 +435,13 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
             const BYTE* const iend = ip + cSize;
             BYTE* op = decodedBuffer;
             BYTE* const oend = op + srcDataLength;
-            U32 segRand = randState ^ prime1;
             unsigned maxBits = FUZ_highbit(cSize);
             while (ip < iend)
             {
-                unsigned nbBitsI = FUZ_rand(&segRand) % maxBits;
-                unsigned nbBitsO = FUZ_rand(&segRand) % maxBits;
-                size_t iSize = (FUZ_rand(&segRand) & ((1<<nbBitsI)-1)) + 1;
-                size_t oSize = (FUZ_rand(&segRand) & ((1<<nbBitsO)-1)) + 1;
+                unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
+                unsigned nbBitsO = (FUZ_rand(&randState) % (maxBits-1)) + 1;
+                size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsI)-1)) + 1;
+                size_t oSize = (FUZ_rand(&randState) & ((1<<nbBitsO)-1)) + 1;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
@@ -451,6 +453,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, int startTest, double compressibilit
             crcDecoded = XXH64(decodedBuffer, op-(BYTE*)decodedBuffer, 1);
             CHECK(crcDecoded != crcOrig, "Decompression corruption");
         }
+
+        (void)FUZ_rand(&coreRand);   // update rand seed
     }
 
 	DISPLAYLEVEL(2, "\rAll tests completed   \n");
