@@ -124,13 +124,12 @@ typedef struct {
 /* Resource Management */
 
 #define LZ4F_VERSION 100
-LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContextPtr, int version, const LZ4F_preferences_t* preferencesPtr);
+LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContextPtr, unsigned version);
 LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_compressionContext);
 /* LZ4F_createCompressionContext() :
  * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
  * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version and an LZ4F_preferences_t structure.
  * The version provided MUST be LZ4F_VERSION. It is intended to track potential version differences between different binaries.
- * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
  * The function will provide a pointer to a fully allocated LZ4F_compressionContext_t object.
  * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
  * Object can release its memory using LZ4F_freeCompressionContext();
@@ -139,10 +138,11 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 
 /* Compression */
 
-size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize);
+size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferencesPtr);
 /* LZ4F_compressBegin() :
  * will write the frame header into dstBuffer.
- * dstBuffer must be large enough to accomodate a header (dstMaxSize). Maximum header size is 19 bytes.
+ * dstBuffer must be large enough to accommodate a header (dstMaxSize). Maximum header size is 19 bytes.
+ * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
  * The result of the function is the number of bytes written into dstBuffer for the header
  * or an error code (can be tested using LZ4F_isError())
  */
@@ -163,7 +163,7 @@ size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuff
  * Conversely, given a fixed dstMaxSize value, you can know the maximum srcSize authorized using LZ4F_getMaxSrcSize()
  * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode)
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * The result of the function is the number of bytes written into dstBuffer (it can be zero, meaning input data is just stored within compressionContext for a future block to complete)
+ * The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just stored within compressionContext
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  */
 
@@ -171,10 +171,10 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
 /* LZ4F_flush()
  * Should you need to create compressed data immediately, without waiting for a block to be filled,
  * you can call LZ4_flush(), which will immediately compress any remaining data stored within compressionContext.
+ * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  * The result of the function is the number of bytes written into dstBuffer
  * (it can be zero, this means there was no data left within compressionContext)
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
- * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  */
 
 size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr);
@@ -202,7 +202,7 @@ typedef struct {
 
 /* Resource management */
 
-LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber);
+LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr, unsigned version);
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_decompressionContext);
 /* LZ4F_createDecompressionContext() :
  * The first thing to do is to create a decompressionContext object, which will be used in all decompression operations.

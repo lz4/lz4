@@ -117,6 +117,7 @@ typedef struct {
 	unsigned version;
 	unsigned cStage;
 	size_t maxBlockSize;
+	size_t maxBufferSize;
 	XXH32_stateSpace_t xxh;
 	BYTE* tmpIn;
 	size_t tmpInSize;
@@ -254,10 +255,10 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 	if (dstMaxSize < LZ4F_compressFrameBound(srcSize, frameInfoPtr))
 		return -ERROR_dstMaxSize_tooSmall;
 
-	errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION, preferencesPtr);
+	errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
 	if (LZ4F_isError(errorCode)) return errorCode;
 
-	errorCode = LZ4F_compressBegin(cctx, dstBuffer, dstMaxSize);  /* write header */
+	errorCode = LZ4F_compressBegin(cctx, dstBuffer, dstMaxSize, preferencesPtr);  /* write header */
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;   /* header size */
 
@@ -297,30 +298,19 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
  * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
  * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version and an LZ4F_preferences_t structure.
  * The version provided MUST be LZ4F_VERSION. It is intended to track potential version differences between different binaries.
- * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
- * The function will provide a pointer to a fully allocated LZ4F_compressionContext_t object.
- * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
+ * The function will provide a pointer to an allocated LZ4F_compressionContext_t object.
+ * If the result LZ4F_errorCode_t is not OK_NoError, there was an error during context creation.
  * Object can release its memory using LZ4F_freeCompressionContext();
  */
-LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContextPtr, int version, const LZ4F_preferences_t* preferencesPtr)
+LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContextPtr, unsigned version)
 {
-	const LZ4F_preferences_t prefNull = { 0 };
 	LZ4F_cctx_internal_t* cctxPtr;
-
-	if (preferencesPtr == NULL) preferencesPtr = &prefNull;
 
 	cctxPtr = ALLOCATOR(sizeof(LZ4F_cctx_internal_t));
 	if (cctxPtr==NULL) return -ERROR_allocation_failed;
 
-	cctxPtr->prefs = *preferencesPtr;   /* equivalent to memcpy() */
 	cctxPtr->version = version;
 	cctxPtr->cStage = 0;   /* Next stage : write header */
-	if (cctxPtr->prefs.frameInfo.blockSizeID == 0) cctxPtr->prefs.frameInfo.blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
-	cctxPtr->maxBlockSize = LZ4F_getBlockSize(cctxPtr->prefs.frameInfo.blockSizeID);
-	cctxPtr->tmpIn = ALLOCATOR(cctxPtr->maxBlockSize);
-	if (cctxPtr->tmpIn == NULL) return -ERROR_allocation_failed;
-	cctxPtr->tmpInSize = 0;
-	XXH32_resetState(&(cctxPtr->xxh), 0);
 
 	*LZ4F_compressionContextPtr = (LZ4F_compressionContext_t)cctxPtr;
 
@@ -345,8 +335,9 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
  * The result of the function is the number of bytes written into dstBuffer for the header
  * or an error code (can be tested using LZ4F_isError())
  */
-size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize)
+size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferencesPtr)
 {
+    LZ4F_preferences_t prefNull = { 0 };
 	LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
 	BYTE* const dstStart = (BYTE*)dstBuffer;
 	BYTE* dstPtr = dstStart;
@@ -354,6 +345,20 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 
 	if (dstMaxSize < LZ4F_MAXHEADERFRAME_SIZE) return -ERROR_dstMaxSize_tooSmall;
 	if (cctxPtr->cStage != 0) return -ERROR_GENERIC;
+	if (preferencesPtr == NULL) preferencesPtr = &prefNull;
+
+	/* Buffer Management */
+	cctxPtr->prefs = *preferencesPtr;
+	if (cctxPtr->prefs.frameInfo.blockSizeID == 0) cctxPtr->prefs.frameInfo.blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
+	cctxPtr->maxBlockSize = LZ4F_getBlockSize(cctxPtr->prefs.frameInfo.blockSizeID);
+	if (cctxPtr->maxBufferSize < cctxPtr->maxBlockSize)
+    {
+        cctxPtr->maxBufferSize = cctxPtr->maxBlockSize;
+        cctxPtr->tmpIn = ALLOCATOR(cctxPtr->maxBlockSize);
+        if (cctxPtr->tmpIn == NULL) return -ERROR_allocation_failed;
+    }
+    cctxPtr->tmpInSize = 0;
+	XXH32_resetState(&(cctxPtr->xxh), 0);
 
 	/* Magic Number */
 	LZ4F_writeLE32(dstPtr, LZ4F_MAGICNUMBER);

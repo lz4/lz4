@@ -363,20 +363,27 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 {
 	unsigned testResult = 0;
 	unsigned testNb = 0;
-	void* srcBuffer;
-	void* compressedBuffer;
-	void* decodedBuffer;
+	void* srcBuffer = NULL;
+	void* compressedBuffer = NULL;
+	void* decodedBuffer = NULL;
 	U32 coreRand = seed;
 	LZ4F_decompressionContext_t dCtx;
+	LZ4F_compressionContext_t cCtx;
+    size_t result;
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %i)  \n", seed, testNb); goto _output_error; }
 
-	(void)startTest;
-	// Create compressible test buffer
-	LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
+	// Create buffers
+	result = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
+    CHECK(LZ4F_isError(result), "Allocation failed (error %i)", (int)result);
+	result = LZ4F_createCompressionContext(&cCtx, LZ4F_VERSION);
+    CHECK(LZ4F_isError(result), "Allocation failed (error %i)", (int)result);
 	srcBuffer = malloc(srcDataLength);
+    CHECK(srcBuffer==NULL, "srcBuffer Allocation failed");
 	compressedBuffer = malloc(LZ4F_compressFrameBound(srcDataLength, NULL));
+    CHECK(compressedBuffer==NULL, "compressedBuffer Allocation failed");
 	decodedBuffer = malloc(srcDataLength);
+    CHECK(decodedBuffer==NULL, "decodedBuffer Allocation failed");
 	FUZ_fillCompressibleNoiseBuffer(srcBuffer, srcDataLength, compressibility, &coreRand);
 
     // jump to requested testNb
@@ -394,7 +401,6 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
         size_t cSize;
         U64 crcOrig, crcDecoded;
-        size_t result;
 
         DISPLAYUPDATE(2, "\r%5i   ", testNb);
         crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
@@ -405,10 +411,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             BYTE* op = compressedBuffer;
             BYTE* const oend = op + LZ4F_compressFrameBound(srcDataLength, NULL);
             unsigned maxBits = FUZ_highbit(srcSize);
-            LZ4F_compressionContext_t cctx;
-            result = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION, &prefs);
-            CHECK(LZ4F_isError(result), "Allocation for compression failed (error %i)", (int)result);
-            result = LZ4F_compressBegin(cctx, op, oend-op);
+            result = LZ4F_compressBegin(cCtx, op, oend-op, &prefs);
             CHECK(LZ4F_isError(result), "Compression header failed (error %i)", (int)result);
             op += result;
             while (ip < iend)
@@ -417,16 +420,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsSeg)-1)) + 1;
                 size_t oSize = oend-op;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
-                result = LZ4F_compress(cctx, op, oSize, ip, iSize, NULL);
+                result = LZ4F_compress(cCtx, op, oSize, ip, iSize, NULL);
                 CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                 op += result;
                 ip += iSize;
             }
-            result = LZ4F_compressEnd(cctx, op, oend-op, NULL);
+            result = LZ4F_compressEnd(cCtx, op, oend-op, NULL);
             CHECK(LZ4F_isError(result), "Compression completion failed (error %i)", (int)result);
             op += result;
-            result = LZ4F_freeCompressionContext(cctx);
-            CHECK(LZ4F_isError(result), "deallocation failed (error %i)", (int)result);
             cSize = op-(BYTE*)compressedBuffer;
         }
 
@@ -461,6 +462,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
 _end:
     LZ4F_freeDecompressionContext(dCtx);
+    LZ4F_freeCompressionContext(cCtx);
 	free(srcBuffer);
 	free(compressedBuffer);
 	free(decodedBuffer);
