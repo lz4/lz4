@@ -352,7 +352,6 @@ _end:
 _output_error:
 	testResult = 1;
 	DISPLAY("Error detected ! \n");
-	if(!no_prompt) getchar();
 	goto _end;
 }
 
@@ -395,7 +394,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         U32 randState = coreRand ^ prime1;
         unsigned CCflag = FUZ_rand(&randState) & 1;
         unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
-        LZ4F_preferences_t prefs = { { BSId, 0, CCflag, 0,0,0 }, 0,0, 0,0,0,0 };
+        unsigned BMId   = FUZ_rand(&randState) & 1;
+        LZ4F_preferences_t prefs = { { BSId, BMId, CCflag, 0,0,0 }, 0,0, 0,0,0,0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
@@ -498,6 +498,7 @@ int main(int argc, char** argv)
     int nbTests = nbTestsDefault;
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
+    int result;
 
     // Check command line
     programName = argv[0];
@@ -584,6 +585,7 @@ int main(int argc, char** argv)
 
     if (nbTests<=0) nbTests=1;
 
-    basicTests(seed, nbTests, testNb, ((double)proba) / 100);
+    result = basicTests(seed, nbTests, testNb, ((double)proba) / 100);
+    if (result) return 1;
     return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100);
 }

@@ -185,7 +185,7 @@ typedef struct { unsigned int table[LZ4_STREAMSIZE_U32]; } LZ4_stream_t;
  * LZ4_resetStream
  * Use this function to init an allocated LZ4_stream_t structure
  */
-void LZ4_resetStream (LZ4_stream_t* LZ4_stream);
+void LZ4_resetStream (LZ4_stream_t* LZ4_streamPtr);
 
 /*
  * If you prefer dynamic allocation methods,
@@ -221,10 +221,10 @@ int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* s
 /*
  * LZ4_saveDict
  * If previously compressed data block is not guaranteed to remain available at its memory location
- * save it into a safe place (char* safeBuffer)
+ * save it into a safer place (char* safeBuffer)
  * Note : you don't need to call LZ4_loadDict() afterwards,
  *        dictionary is immediately usable, you can therefore call again LZ4_compress_continue()
- * Return : 1 if OK, 0 if error
+ * Return : dictionary size in bytes, or 0 if error
  * Note : any dictSize > 64 KB will be interpreted as 64KB.
  */
 int LZ4_saveDict (LZ4_stream_t* LZ4_stream, char* safeBuffer, int dictSize);
@@ -266,9 +266,9 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
     These decoding functions allow decompression of multiple blocks in "streaming" mode.
     Previously decoded blocks must still be available at the memory position where they were decoded.
     If it's not possible, save the relevant part of decoded data into a safe buffer,
-    and indicate where its new address using LZ4_setDictDecode()
+    and indicate where its new address using LZ4_setStreamDecode()
 */
-int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxOutputSize);
+int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
 
 
@@ -279,7 +279,7 @@ Advanced decoding functions :
     a combination of LZ4_setDictDecode() followed by LZ4_decompress_x_continue()
     They don't use nor update an LZ4_streamDecode_t structure.
 */
-int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize);
+int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxDecompressedSize, const char* dictStart, int dictSize);
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
 
 
