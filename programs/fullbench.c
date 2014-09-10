@@ -321,6 +321,11 @@ static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out
     return LZ4_compressHC_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
+static int local_LZ4F_compressFrame(const char* in, char* out, int inSize)
+{
+    return LZ4F_compressFrame(out, 2*inSize, in, inSize, NULL);
+}
+
 static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
@@ -358,7 +363,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
   char* orig_buff;
-# define NB_COMPRESSION_ALGORITHMS 13
+# define NB_COMPRESSION_ALGORITHMS 14
 # define MINCOMPRESSIONCHAR '0'
   double totalCTime[NB_COMPRESSION_ALGORITHMS+1] = {0};
   double totalCSize[NB_COMPRESSION_ALGORITHMS+1] = {0};
@@ -494,6 +499,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 11: compressionFunction = local_LZ4_compressHC_continue; initFunction = LZ4_createHC; compressorName = "LZ4_compressHC_continue"; break;
             case 12: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; compressorName = "LZ4_compressHC_limitedOutput_continue"; break;
             case 13: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
+            case 14: compressionFunction = local_LZ4F_compressFrame; compressorName = "LZ4F_compressFrame"; break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 

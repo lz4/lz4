@@ -91,7 +91,7 @@ typedef struct {
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   unsigned         compressionLevel;       /* from 0 to 16 */
-  unsigned         autoFlush;              /* 1 == automatic flush after each call to LZ4F_compress() */
+  unsigned         autoFlush;              /* 1 == always flush; reduce need for tmp buffer */
   unsigned         reserved[4];
 } LZ4F_preferences_t;
 
@@ -152,12 +152,10 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
  * or an error code (can be tested using LZ4F_isError())
  */
 
-size_t LZ4F_compressBound(size_t srcSize,    const LZ4F_frameInfo_t* frameInfoPtr);
-size_t LZ4F_getMaxSrcSize(size_t dstMaxSize, const LZ4F_frameInfo_t* frameInfoPtr);
-/* LZ4F_compressBound() : gives the size of Dst buffer given a srcSize to handle worst case situations.
- * LZ4F_getMaxSrcSize() : gives max allowed srcSize given dstMaxSize to handle worst case situations.
- *                        You can use dstMaxSize==0 to know the "natural" srcSize instead (block size).
- * The LZ4F_frameInfo_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
+size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
+/* LZ4F_compressBound() :
+ * Provides the minimum size of Dst buffer given srcSize to handle worst case situations.
+ * preferencesPtr is optional : you can provide NULL as argument, all preferences will then be set to default.
  */
 
 size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr);

@@ -454,6 +454,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
+                if (result == (size_t)-ERROR_checksum_invalid)
+                {
+                    int p=0;
+                    BYTE* b1=(BYTE*)srcBuffer+srcStart;
+                    BYTE* b2=(BYTE*)decodedBuffer;
+                    while (b1[p]==b2[p]) p++;
+                    printf("Error at pos %i : %02X != %02X \n", p, b1[p], b2[p]);
+                }
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
                 op += oSize;
                 ip += iSize;
