@@ -855,7 +855,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
     if ((U32)dictSize > 64 KB) dictSize = 64 KB;   /* useless to define a dictionary > 64 KB */
     if ((U32)dictSize > dict->dictSize) dictSize = dict->dictSize;
 
-    memcpy(safeBuffer, previousDictEnd - dictSize, dictSize);
+    memmove(safeBuffer, previousDictEnd - dictSize, dictSize);
 
     dict->dictionary = (const BYTE*)safeBuffer;
     dict->dictSize = (U32)dictSize;
@@ -870,9 +870,9 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 ****************************/
 /*
  * This generic decompression function cover all use cases.
- * It shall be instanciated several times, using different sets of directives
+ * It shall be instantiated several times, using different sets of directives
  * Note that it is essential this generic function is really inlined,
- * in order to remove useless branches during compilation optimisation.
+ * in order to remove useless branches during compilation optimization.
  */
 FORCE_INLINE int LZ4_decompress_generic(
                  const char* source,

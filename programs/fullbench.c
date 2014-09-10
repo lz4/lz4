@@ -60,10 +60,8 @@
 #endif
 
 #include "lz4.h"
-#define COMPRESSOR0 LZ4_compress
 #include "lz4hc.h"
-#define COMPRESSOR1 LZ4_compressHC
-#define DEFAULTCOMPRESSOR COMPRESSOR0
+#include "lz4frame.h"
 
 #include "xxhash.h"
 

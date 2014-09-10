@@ -61,6 +61,7 @@ typedef enum { OK_NoError = 0, ERROR_GENERIC = 1,
 	ERROR_srcSize_tooLarge, ERROR_dstMaxSize_tooSmall,
 	ERROR_allocation_failed,
     ERROR_compressionLevel_invalid,
+    ERROR_checksum_invalid,
 	ERROR_maxCode
 	} LZ4F_errorCodes;   /* error codes are negative unsigned values.
 							Compare function result to (-specificCode) */

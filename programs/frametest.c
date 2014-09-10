@@ -392,9 +392,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     for ( ; testNb < nbTests; testNb++)
     {
         U32 randState = coreRand ^ prime1;
-        unsigned CCflag = FUZ_rand(&randState) & 1;
         unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
         unsigned BMId   = FUZ_rand(&randState) & 1;
+        unsigned CCflag = FUZ_rand(&randState) & 1;
         LZ4F_preferences_t prefs = { { BSId, BMId, CCflag, 0,0,0 }, 0,0, 0,0,0,0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
@@ -445,6 +445,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t oSize = (FUZ_rand(&randState) & ((1<<nbBitsO)-1)) + 1;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
+                oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
                 op += oSize;
