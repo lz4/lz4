@@ -44,6 +44,10 @@
 extern "C" {
 #endif
 
+/****************************************
+   Note : experimental API.
+   Not yet integrated within lz4 library.
+****************************************/
 
 /**************************************
    Includes
@@ -58,9 +62,9 @@ typedef size_t LZ4F_errorCode_t;
 typedef enum { OK_FrameEnd = 1 } LZ4F_successCodes;
 typedef enum { OK_NoError = 0, ERROR_GENERIC = 1,
     ERROR_maxBlockSize_invalid, ERROR_blockMode_invalid, ERROR_contentChecksumFlag_invalid,
-	ERROR_srcSize_tooLarge, ERROR_dstMaxSize_tooSmall,
-	ERROR_allocation_failed,
     ERROR_compressionLevel_invalid,
+	ERROR_allocation_failed,
+	ERROR_srcSize_tooLarge, ERROR_dstMaxSize_tooSmall,
     ERROR_checksum_invalid,
 	ERROR_maxCode
 	} LZ4F_errorCodes;   /* error codes are negative unsigned values.
@@ -80,7 +84,7 @@ typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
 typedef struct {
   blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
   blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
-  contentChecksum_t contentChecksumFlag;   /* contentChecksumEnabled (default), noContentChecksum ; */
+  contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
   unsigned          reserved[3];
 } LZ4F_frameInfo_t;
 

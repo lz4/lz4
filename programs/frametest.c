@@ -356,7 +356,7 @@ _output_error:
 }
 
 
-static const U32 srcDataLength = 4 MB;
+static const U32 srcDataLength = 9 MB;  /* needs to be > 2x4MB to test large blocks */
 
 int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressibility)
 {
@@ -419,11 +419,18 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 unsigned nbBitsSeg = FUZ_rand(&randState) % maxBits;
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsSeg)-1)) + 1;
                 size_t oSize = oend-op;
+                unsigned forceFlush = ((FUZ_rand(&randState) & 3) == 1);
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 result = LZ4F_compress(cCtx, op, oSize, ip, iSize, NULL);
                 CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                 op += result;
                 ip += iSize;
+                if (forceFlush)
+                {
+                    result = LZ4F_flush(cCtx, op, oend-op, NULL);
+                    CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
+                    op += result;
+                }
             }
             result = LZ4F_compressEnd(cCtx, op, oend-op, NULL);
             CHECK(LZ4F_isError(result), "Compression completion failed (error %i)", (int)result);
