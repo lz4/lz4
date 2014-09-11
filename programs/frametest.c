@@ -191,7 +191,7 @@ static unsigned FUZ_highbit(U32 v32)
 }
 
 
-int basicTests(U32 seed, int nbCycles, int startCycle, double compressibility)
+int basicTests(U32 seed, double compressibility)
 {
 	int testResult = 0;
 	void* CNBuffer;
@@ -203,7 +203,6 @@ int basicTests(U32 seed, int nbCycles, int startCycle, double compressibility)
 	LZ4F_decompressionContext_t dCtx;
 	U64 crcOrig;
 
-	(void)nbCycles; (void)startCycle;
 	// Create compressible test buffer
 	CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
 	compressedBuffer = malloc(LZ4F_compressFrameBound(COMPRESSIBLE_NOISE_LENGTH, NULL));
@@ -356,6 +355,16 @@ _output_error:
 }
 
 
+static void locateBuffDiff(const void* buff1, const void* buff2)
+{
+    int p=0;
+    BYTE* b1=(BYTE*)buff1;
+    BYTE* b2=(BYTE*)buff2;
+    while (b1[p]==b2[p]) p++;
+    printf("Error at pos %i : %02X != %02X \n", p, b1[p], b2[p]);
+ }
+
+
 static const U32 srcDataLength = 9 MB;  /* needs to be > 2x4MB to test large blocks */
 
 int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressibility)
@@ -403,10 +412,10 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         U64 crcOrig, crcDecoded;
 
         DISPLAYUPDATE(2, "\r%5i   ", testNb);
-        crcOrig = XXH64(srcBuffer+srcStart, srcSize, 1);
+        crcOrig = XXH64((BYTE*)srcBuffer+srcStart, srcSize, 1);
 
         {
-            const BYTE* ip = srcBuffer + srcStart;
+            const BYTE* ip = (const BYTE*)srcBuffer + srcStart;
             const BYTE* const iend = ip + srcSize;
             BYTE* op = compressedBuffer;
             BYTE* const oend = op + LZ4F_compressFrameBound(srcDataLength, NULL);
@@ -454,14 +463,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
-                if (result == (size_t)-ERROR_checksum_invalid)
-                {
-                    int p=0;
-                    BYTE* b1=(BYTE*)srcBuffer+srcStart;
-                    BYTE* b2=(BYTE*)decodedBuffer;
-                    while (b1[p]==b2[p]) p++;
-                    printf("Error at pos %i : %02X != %02X \n", p, b1[p], b2[p]);
-                }
+                if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
                 op += oSize;
                 ip += iSize;
@@ -514,7 +516,7 @@ int main(int argc, char** argv)
     int nbTests = nbTestsDefault;
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
-    int result;
+    int result=0;
 
     // Check command line
     programName = argv[0];
@@ -601,7 +603,7 @@ int main(int argc, char** argv)
 
     if (nbTests<=0) nbTests=1;
 
-    result = basicTests(seed, nbTests, testNb, ((double)proba) / 100);
+    if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
     if (result) return 1;
     return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100);
 }

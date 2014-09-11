@@ -323,7 +323,7 @@ static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out
 
 static int local_LZ4F_compressFrame(const char* in, char* out, int inSize)
 {
-    return LZ4F_compressFrame(out, 2*inSize, in, inSize, NULL);
+    return LZ4F_compressFrame(out, 2*inSize + (4<<20), in, inSize, NULL);
 }
 
 static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
