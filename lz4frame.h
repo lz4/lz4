@@ -100,7 +100,7 @@ typedef struct {
 /***********************************
  * Simple compression function
  * *********************************/
-size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_frameInfo_t* frameInfoPtr);
+size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 /* LZ4F_compressFrame()
@@ -158,22 +158,21 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
  * preferencesPtr is optional : you can provide NULL as argument, all preferences will then be set to default.
  */
 
-size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr);
-/* LZ4F_compress()
- * You can then call LZ4F_compress() repetitively to compress as much data as necessary.
+size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr);
+/* LZ4F_compressUpdate()
+ * LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
  * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
- * You can get the minimum value of dstMaxSize by using LZ4F_compressBound()
- * Conversely, given a fixed dstMaxSize value, you can know the maximum srcSize authorized using LZ4F_getMaxSrcSize()
  * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode)
+ * You can get the minimum value of dstMaxSize by using LZ4F_compressBound()
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just stored within compressionContext
+ * The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just buffered.
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  */
 
 size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr);
 /* LZ4F_flush()
  * Should you need to create compressed data immediately, without waiting for a block to be filled,
- * you can call LZ4_flush(), which will immediately compress any remaining data stored within compressionContext.
+ * you can call LZ4_flush(), which will immediately compress any remaining data buffered within compressionContext.
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  * The result of the function is the number of bytes written into dstBuffer
  * (it can be zero, this means there was no data left within compressionContext)
@@ -217,13 +216,13 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_de
 
 /* Decompression */
 
-LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSize);
+LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSizePtr);
 /* LZ4F_getFrameInfo()
  * This function decodes frame header information, such as blockSize.
  * It is optional : you could start by calling directly LZ4F_decompress() instead.
  * The objective is to extract header information without starting decompression, typically for allocation purposes.
  * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
- * The number of bytes read from srcBuffer will be provided within *srcSize (necessarily <= original value).
+ * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * The function result is an error code which can be tested using LZ4F_isError().
  */
 
