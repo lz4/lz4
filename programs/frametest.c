@@ -355,13 +355,13 @@ _output_error:
 }
 
 
-static void locateBuffDiff(const void* buff1, const void* buff2)
+static void locateBuffDiff(const void* buff1, const void* buff2, size_t size)
 {
     int p=0;
     BYTE* b1=(BYTE*)buff1;
     BYTE* b2=(BYTE*)buff2;
     while (b1[p]==b2[p]) p++;
-    printf("Error at pos %i : %02X != %02X \n", p, b1[p], b2[p]);
+    printf("Error at pos %i/%i : %02X != %02X \n", p, (int)size, b1[p], b2[p]);
  }
 
 
@@ -473,13 +473,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
-                if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer);
+                if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
                 op += oSize;
                 ip += iSize;
             }
             CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
             crcDecoded = XXH64(decodedBuffer, op-(BYTE*)decodedBuffer, 1);
+            if (crcDecoded != crcOrig) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize);
             CHECK(crcDecoded != crcOrig, "Decompression corruption");
         }
 
@@ -613,7 +614,7 @@ int main(int argc, char** argv)
 
     if (nbTests<=0) nbTests=1;
 
-    if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
+    //if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
     if (result) return 1;
     return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100);
 }

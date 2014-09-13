@@ -354,6 +354,15 @@ static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int in
     return outSize;
 }
 
+extern int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize, const char* dict, int dictSize);
+
+static int local_LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize)
+{
+    (void)inSize;
+    LZ4_decompress_safe_forceExtDict(in, out, inSize, outSize, in - 65536, 65536);
+    return outSize;
+}
+
 static int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
 {
     return LZ4_decompress_safe_partial(in, out, inSize, outSize - 5, outSize);
@@ -380,7 +389,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 # define NB_COMPRESSION_ALGORITHMS 14
   double totalCTime[NB_COMPRESSION_ALGORITHMS+1] = {0};
   double totalCSize[NB_COMPRESSION_ALGORITHMS+1] = {0};
-# define NB_DECOMPRESSION_ALGORITHMS 8
+# define NB_DECOMPRESSION_ALGORITHMS 9
   double totalDTime[NB_DECOMPRESSION_ALGORITHMS+1] = {0};
   size_t errorCode;
 
@@ -589,7 +598,8 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 5: decompressionFunction = LZ4_decompress_safe_withPrefix64k; dName = "LZ4_decompress_safe_withPrefix64k"; break;
             case 6: decompressionFunction = local_LZ4_decompress_safe_usingDict; dName = "LZ4_decompress_safe_usingDict"; break;
             case 7: decompressionFunction = local_LZ4_decompress_safe_partial; dName = "LZ4_decompress_safe_partial"; break;
-            case 8: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
+            case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
+            case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
                     errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
                     if (LZ4F_isError(errorCode)) { DISPLAY("Preparation error compressing frame\n"); return 1; }
                     chunkP[0].origSize = benchedSize;
