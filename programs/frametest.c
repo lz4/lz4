@@ -404,7 +404,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
         unsigned BMId   = FUZ_rand(&randState) & 1;
         unsigned CCflag = FUZ_rand(&randState) & 1;
-        unsigned autoflush = (FUZ_rand(&randState) & 3) == 2;
+        unsigned autoflush = (FUZ_rand(&randState) & 7) == 2;
         LZ4F_preferences_t prefs = { 0 };
         LZ4F_compressOptions_t options = { 0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
