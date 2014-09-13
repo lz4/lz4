@@ -478,7 +478,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 op += oSize;
                 ip += iSize;
             }
-            CHECK(result != OK_FrameEnd, "Frame decompression failed (error %i)", (int)result);
+            CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
             crcDecoded = XXH64(decodedBuffer, op-(BYTE*)decodedBuffer, 1);
             CHECK(crcDecoded != crcOrig, "Decompression corruption");
         }

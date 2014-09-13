@@ -210,13 +210,13 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_de
  * The first thing to do is to create a decompressionContext object, which will be used in all decompression operations.
  * This is achieved using LZ4F_createDecompressionContext().
  * The function will provide a pointer to a fully allocated and initialized LZ4F_decompressionContext object.
- * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
+ * If the result LZ4F_errorCode_t is not OK_NoError, there was an error during context creation.
  * Object can release its memory using LZ4F_freeDecompressionContext();
  */
 
 /* Decompression */
 
-LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSizePtr);
+size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSizePtr);
 /* LZ4F_getFrameInfo()
  * This function decodes frame header information, such as blockSize.
  * It is optional : you could start by calling directly LZ4F_decompress() instead.
@@ -226,12 +226,12 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionCont
  * The function result is an error code which can be tested using LZ4F_isError().
  */
 
-LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSizePtr, const void* srcBuffer, size_t* srcSizePtr, const LZ4F_decompressOptions_t* decompressOptionsPtr);
+size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSizePtr, const void* srcBuffer, size_t* srcSizePtr, const LZ4F_decompressOptions_t* decompressOptionsPtr);
 /* LZ4F_decompress()
  * Call this function repetitively to regenerate data compressed within srcBuffer.
  * The function will attempt to decode *srcSizePtr bytes from srcBuffer, into dstBuffer of maximum size *dstSizePtr.
  *
- * The number of bytes generated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
+ * The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
  *
  * The number of bytes effectively used from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
@@ -239,10 +239,14 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
  * LZ4F_decompress() will have to be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
  * The function will check this condition, and refuse to continue if it is not respected.
  * dstBuffer is supposed to be flushed between calls to the function, since its content will be rewritten.
- * Different dst arguments can be used.
+ * Different dst arguments can be used between each calls.
  *
- * The function result is an error code which can be tested using LZ4F_isError().
- * When a frame is fully decoded, the function result will be OK_FrameEnd(=1).
+ * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
+ * Basically, it's the size of the current (or remaining) compressed block + header of next block.
+ * Respecting the hint provides some boost to performance, since it allows less buffer shuffling.
+ * Note that this is just a hint, you can always provide any srcSize you want.
+ * When a frame is fully decoded, the function result will be 0.
+ * If decompression failed, function result is an error code which can be tested using LZ4F_isError().
  */
 
 
