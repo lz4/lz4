@@ -377,7 +377,7 @@ int main(int argc, char** argv)
                 case 'c': forceStdout=1; output_filename=stdoutmark; displayLevel=1; break;
 
                     // Test
-                case 't': decode=1; output_filename=nulmark; break;
+                case 't': decode=1; LZ4IO_setOverwrite(1); output_filename=nulmark; break;
 
                     // Overwrite
                 case 'f': LZ4IO_setOverwrite(1); break;
