@@ -85,7 +85,7 @@ typedef struct {
   blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
   blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
   contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  unsigned          reserved[3];
+  unsigned          reserved[5];
 } LZ4F_frameInfo_t;
 
 typedef struct {
@@ -122,8 +122,8 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 typedef void* LZ4F_compressionContext_t;
 
 typedef struct {
-  unsigned stableSrc;          /* unused for the time being, must be 0 */
-  unsigned reserved[5];
+  unsigned stableSrc;    /* 1 == src content will remain available on future calls to LZ4F_compress(); avoid saving src content within tmp buffer as future dictionary */
+  unsigned reserved[3];
 } LZ4F_compressOptions_t;
 
 /* Resource Management */
@@ -199,7 +199,7 @@ typedef void* LZ4F_decompressionContext_t;
 
 typedef struct {
   unsigned stableDst;       /* unused for the time being, must be 0 */
-  unsigned reserved[5];
+  unsigned reserved[3];
 } LZ4F_decompressOptions_t;
 
 /* Resource management */

@@ -232,8 +232,9 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
  */
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
-	LZ4F_preferences_t prefs = { 0 };
-	LZ4F_compressionContext_t cctx = NULL;
+    LZ4F_cctx_internal_t cctxI = { 0 };   /* works because no allocation */
+    LZ4F_preferences_t prefs = { 0 };
+	LZ4F_compressOptions_t options = { 0 };
 	LZ4F_errorCode_t errorCode;
 	BYTE* const dstStart = (BYTE*) dstBuffer;
 	BYTE* dstPtr = dstStart;
@@ -241,29 +242,26 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 
 
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
+    cctxI.version = LZ4F_VERSION;
+    cctxI.maxBufferSize = 64 KB;   /* mess with real buffer size, to prevent allocation; works because autoflush==1 & stableSrc==1 */
     prefs.autoFlush = 1;
+    options.stableSrc = 1;
 
 	if (dstMaxSize < LZ4F_compressFrameBound(srcSize, &prefs))
 		return -ERROR_dstMaxSize_tooSmall;
 
-	errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
-	if (LZ4F_isError(errorCode)) return errorCode;
-
-	errorCode = LZ4F_compressBegin(cctx, dstBuffer, dstMaxSize, &prefs);  /* write header */
+	errorCode = LZ4F_compressBegin(&cctxI, dstBuffer, dstMaxSize, &prefs);  /* write header */
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;   /* header size */
 
 	dstMaxSize -= errorCode;
-    errorCode = LZ4F_compressUpdate(cctx, dstPtr, dstMaxSize, srcBuffer, srcSize, NULL);
+    errorCode = LZ4F_compressUpdate(&cctxI, dstPtr, dstMaxSize, srcBuffer, srcSize, &options);
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;
 
-	errorCode = LZ4F_compressEnd(cctx, dstPtr, dstEnd-dstPtr, NULL);   /* flush last block, and generate suffix */
+	errorCode = LZ4F_compressEnd(&cctxI, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;
-
-	errorCode = LZ4F_freeCompressionContext(cctx);
-	if (LZ4F_isError(errorCode)) return errorCode;
 
 	return (dstPtr - dstStart);
 }
@@ -496,9 +494,9 @@ size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* d
         srcPtr += iSize;
     }
 
-	if ((cctxPtr->prefs.frameInfo.blockMode == blockLinked) && (lastBlockCompressed))
+    /* save last input up to 64 KB for dictionary */
+	if ((cctxPtr->prefs.frameInfo.blockMode == blockLinked) && (lastBlockCompressed) && (!compressOptionsPtr->stableSrc))
     {
-        /* last compressed input up to 64 KB become dictionary */
         if ((lastBlockCompressed==2) ||
            ((cctxPtr->tmpBuff + cctxPtr->maxBufferSize) < (cctxPtr->tmpIn + cctxPtr->maxBlockSize)))
         {

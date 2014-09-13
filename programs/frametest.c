@@ -405,12 +405,18 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         unsigned BMId   = FUZ_rand(&randState) & 1;
         unsigned CCflag = FUZ_rand(&randState) & 1;
         unsigned autoflush = (FUZ_rand(&randState) & 3) == 2;
-        LZ4F_preferences_t prefs = { { BSId, BMId, CCflag, 0,0,0 }, 0,autoflush, 0,0,0,0 };
+        LZ4F_preferences_t prefs = { 0 };
+        LZ4F_compressOptions_t options = { 0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
         size_t cSize;
         U64 crcOrig, crcDecoded;
+
+        prefs.frameInfo.blockMode = BMId;
+        prefs.frameInfo.blockSizeID = BSId;
+        prefs.frameInfo.contentChecksumFlag = CCflag;
+        prefs.autoFlush = autoflush;
 
         DISPLAYUPDATE(2, "\r%5i   ", testNb);
         crcOrig = XXH64((BYTE*)srcBuffer+srcStart, srcSize, 1);
@@ -431,18 +437,21 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t oSize = oend-op;
                 unsigned forceFlush = ((FUZ_rand(&randState) & 3) == 1);
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
-                result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, NULL);
+                options.stableSrc = ((FUZ_rand(&randState) && 3) == 2);
+
+                result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &options);
                 CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                 op += result;
                 ip += iSize;
+
                 if (forceFlush)
                 {
-                    result = LZ4F_flush(cCtx, op, oend-op, NULL);
+                    result = LZ4F_flush(cCtx, op, oend-op, &options);
                     CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                     op += result;
                 }
             }
-            result = LZ4F_compressEnd(cCtx, op, oend-op, NULL);
+            result = LZ4F_compressEnd(cCtx, op, oend-op, &options);
             CHECK(LZ4F_isError(result), "Compression completion failed (error %i)", (int)result);
             op += result;
             cSize = op-(BYTE*)compressedBuffer;
