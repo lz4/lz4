@@ -223,7 +223,9 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_
  * The objective is to extract header information without starting decompression, typically for allocation purposes.
  * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- * The function result is an error code which can be tested using LZ4F_isError().
+ * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
+ * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
+ * or an error code which can be tested using LZ4F_isError().
  */
 
 size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSizePtr, const void* srcBuffer, size_t* srcSizePtr, const LZ4F_decompressOptions_t* decompressOptionsPtr);
