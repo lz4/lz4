@@ -734,7 +734,7 @@ typedef enum { dstage_getHeader=0, dstage_storeHeader, dstage_decodeHeader,
  * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
- * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
+ * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress,
  * or an error code which can be tested using LZ4F_isError().
  */
 LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSizePtr)
