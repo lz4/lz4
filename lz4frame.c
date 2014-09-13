@@ -775,15 +775,6 @@ static void LZ4F_saveDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* decoded, si
 
 static void LZ4F_pointDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* decoded, size_t decodedSize)
 {
-    /* large decoded block */
-    if (decodedSize >= (64 KB - 1))
-    {
-        dctxPtr->dict = (BYTE*)decoded;
-        dctxPtr->dictSize = decodedSize;
-        dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + 64 KB;
-        return;
-    }
-
     /* decoded block in the continuity of dictionary */
     if (dctxPtr->dict + dctxPtr->dictSize == decoded)
     {
@@ -797,6 +788,15 @@ static void LZ4F_pointDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* decoded, s
             }
             dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + dctxPtr->dictSize;
         }
+        return;
+    }
+
+    /* large decoded block */
+    if (decodedSize >= (64 KB - 1))
+    {
+        dctxPtr->dict = (BYTE*)decoded;
+        dctxPtr->dictSize = decodedSize;
+        dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + 64 KB;
         return;
     }
 
@@ -953,6 +953,11 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     break;
                 }
                 dctxPtr->dStage = dstage_getCBlock;
+                if (dstPtr==dstEnd)
+                {
+                    nextSrcSizeHint = nextCBlockSize + 4;
+                    doAnotherStage = 0;
+                }
                 break;
             }
 

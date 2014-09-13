@@ -466,12 +466,11 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             while (ip < iend)
             {
                 unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
-                unsigned nbBitsO = (FUZ_rand(&randState) % (maxBits-1)) + 1;
+                unsigned nbBitsO = (FUZ_rand(&randState) % (maxBits)) + 1;
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsI)-1)) + 1;
-                size_t oSize = (FUZ_rand(&randState) & ((1<<nbBitsO)-1)) + 1;
+                size_t oSize = (FUZ_rand(&randState) & ((1<<nbBitsO)-1)) + 2;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
-                oSize = oend-op;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
                 if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
