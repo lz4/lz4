@@ -187,7 +187,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
  * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark size))
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * compressionContext can then be used again, starting with LZ4F_compressBegin(). The preferences will remain the same.
+ * compressionContext can then be used again, starting with LZ4F_compressBegin().
  */
 
 

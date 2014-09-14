@@ -406,7 +406,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         unsigned CCflag = FUZ_rand(&randState) & 1;
         unsigned autoflush = (FUZ_rand(&randState) & 7) == 2;
         LZ4F_preferences_t prefs = { 0 };
-        LZ4F_compressOptions_t options = { 0 };
+        LZ4F_compressOptions_t cOptions = { 0 };
+        LZ4F_decompressOptions_t dOptions = { 0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
@@ -437,21 +438,21 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t oSize = oend-op;
                 unsigned forceFlush = ((FUZ_rand(&randState) & 3) == 1);
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
-                options.stableSrc = ((FUZ_rand(&randState) && 3) == 2);
+                cOptions.stableSrc = ((FUZ_rand(&randState) && 3) == 1);
 
-                result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &options);
+                result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &cOptions);
                 CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                 op += result;
                 ip += iSize;
 
                 if (forceFlush)
                 {
-                    result = LZ4F_flush(cCtx, op, oend-op, &options);
+                    result = LZ4F_flush(cCtx, op, oend-op, &cOptions);
                     CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                     op += result;
                 }
             }
-            result = LZ4F_compressEnd(cCtx, op, oend-op, &options);
+            result = LZ4F_compressEnd(cCtx, op, oend-op, &cOptions);
             CHECK(LZ4F_isError(result), "Compression completion failed (error %i)", (int)result);
             op += result;
             cSize = op-(BYTE*)compressedBuffer;
@@ -471,7 +472,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t oSize = (FUZ_rand(&randState) & ((1<<nbBitsO)-1)) + 2;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
-                result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
+                dOptions.stableDst = FUZ_rand(&randState) & 1;
+                result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, &dOptions);
                 if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
                 op += oSize;
