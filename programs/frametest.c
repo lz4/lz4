@@ -105,6 +105,7 @@ static U32 g_time = 0;
 static U32 no_prompt = 0;
 static char* programName;
 static U32 displayLevel = 2;
+static U32 pause = 0;
 
 
 /*********************************************************
@@ -355,13 +356,14 @@ _output_error:
 }
 
 
-static void locateBuffDiff(const void* buff1, const void* buff2, size_t size)
+static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, unsigned nonContiguous)
 {
     int p=0;
     BYTE* b1=(BYTE*)buff1;
     BYTE* b2=(BYTE*)buff2;
+    if (nonContiguous) { DISPLAY("Non-contiguous output test (%i bytes)\n", (int)size); return; }
     while (b1[p]==b2[p]) p++;
-    printf("Error at pos %i/%i : %02X != %02X \n", p, (int)size, b1[p], b2[p]);
+    DISPLAY("Error at pos %i/%i : %02X != %02X \n", p, (int)size, b1[p], b2[p]);
  }
 
 
@@ -378,6 +380,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 	LZ4F_decompressionContext_t dCtx;
 	LZ4F_compressionContext_t cCtx;
     size_t result;
+    XXH64_stateSpace_t xxh64;
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %i)  \n", seed, testNb); goto _output_error; }
 
@@ -414,6 +417,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         size_t cSize;
         U64 crcOrig, crcDecoded;
 
+        (void)FUZ_rand(&coreRand);   // update rand seed
         prefs.frameInfo.blockMode = BMId;
         prefs.frameInfo.blockSizeID = BSId;
         prefs.frameInfo.contentChecksumFlag = CCflag;
@@ -464,6 +468,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             BYTE* op = decodedBuffer;
             BYTE* const oend = op + srcDataLength;
             unsigned maxBits = FUZ_highbit(cSize);
+            unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;
+            nonContiguousDst += FUZ_rand(&randState) & nonContiguousDst;   /* 0=>0; 1=>1,2 */
+            XXH64_resetState(&xxh64, 1);
             while (ip < iend)
             {
                 unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
@@ -473,19 +480,24 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 dOptions.stableDst = FUZ_rand(&randState) & 1;
+                if (nonContiguousDst==2) dOptions.stableDst = 0;
+                //if (ip == compressedBuffer+62073)                    DISPLAY("oSize : %i : pos %i \n", (int)oSize, (int)(op-(BYTE*)decodedBuffer));
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, &dOptions);
-                if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize);
-                CHECK(LZ4F_isError(result), "Decompression failed (error %i)", (int)result);
+                //if (op+oSize >= (BYTE*)decodedBuffer+94727)                    DISPLAY("iSize : %i : pos %i \n", (int)iSize, (int)(ip-(BYTE*)compressedBuffer));
+                //if ((int)result<0)                    DISPLAY("iSize : %i : pos %i \n", (int)iSize, (int)(ip-(BYTE*)compressedBuffer));
+                if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
+                CHECK(LZ4F_isError(result), "Decompression failed (error %i:%s)", (int)result, LZ4F_getErrorName((LZ4F_errorCode_t)result));
+                XXH64_update(&xxh64, op, (U32)oSize);
                 op += oSize;
                 ip += iSize;
+                op += nonContiguousDst;
+                if (nonContiguousDst==2) op = decodedBuffer;   // overwritten destination
             }
             CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
-            crcDecoded = XXH64(decodedBuffer, op-(BYTE*)decodedBuffer, 1);
-            if (crcDecoded != crcOrig) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize);
+            crcDecoded = XXH64_intermediateDigest(&xxh64);
+            if (crcDecoded != crcOrig) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
             CHECK(crcDecoded != crcOrig, "Decompression corruption");
         }
-
-        (void)FUZ_rand(&coreRand);   // update rand seed
     }
 
 	DISPLAYLEVEL(2, "\rAll tests completed   \n");
@@ -496,6 +508,12 @@ _end:
 	free(srcBuffer);
 	free(compressedBuffer);
 	free(decodedBuffer);
+
+	if (pause)
+    {
+        DISPLAY("press enter to finish \n");
+        getchar();
+    }
 	return testResult;
 
 _output_error:
@@ -542,10 +560,10 @@ int main(int argc, char** argv)
         if (argument[0]=='-')
         {
             if (!strcmp(argument, "--no-prompt")) { no_prompt=1; seedset=1; displayLevel=1; continue; }
+            argument++;
 
-            while (argument[1]!=0)
+            while (*argument!=0)
             {
-                argument++;
                 switch(*argument)
                 {
                 case 'h':
@@ -588,7 +606,7 @@ int main(int argc, char** argv)
                         argument++;
                     }
                     break;
-                case 'p':
+                case 'p':   /* compressibility % */
                     argument++;
                     proba=0;
                     while ((*argument>='0') && (*argument<='9'))
@@ -600,7 +618,12 @@ int main(int argc, char** argv)
                     if (proba<0) proba=0;
                     if (proba>100) proba=100;
                     break;
+                case 'P': /* pause at the end */
+                    argument++;
+                    pause = 1;
+                    break;
                 default: ;
+                    return FUZ_usage();
                 }
             }
         }

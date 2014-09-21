@@ -343,14 +343,14 @@ static int local_LZ4_decompress_fast_withPrefix64k(const char* in, char* out, in
 static int local_LZ4_decompress_fast_usingDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
-    LZ4_decompress_fast_usingDict(in, out, outSize, in - 65536, 65536);
+    LZ4_decompress_fast_usingDict(in, out, outSize, out - 65536, 65536);
     return outSize;
 }
 
 static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
-    LZ4_decompress_safe_usingDict(in, out, inSize, outSize, in - 65536, 65536);
+    LZ4_decompress_safe_usingDict(in, out, inSize, outSize, out - 65536, 65536);
     return outSize;
 }
 
@@ -359,7 +359,7 @@ extern int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSiz
 static int local_LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
-    LZ4_decompress_safe_forceExtDict(in, out, inSize, outSize, in - 65536, 65536);
+    LZ4_decompress_safe_forceExtDict(in, out, inSize, outSize, out - 65536, 65536);
     return outSize;
 }
 

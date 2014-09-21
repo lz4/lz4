@@ -59,18 +59,21 @@ extern "C" {
    Error management
 **************************************/
 typedef size_t LZ4F_errorCode_t;
-typedef enum { OK_FrameEnd = 1 } LZ4F_successCodes;
-typedef enum { OK_NoError = 0, ERROR_GENERIC = 1,
-    ERROR_maxBlockSize_invalid, ERROR_blockMode_invalid, ERROR_contentChecksumFlag_invalid,
-    ERROR_compressionLevel_invalid,
-	ERROR_allocation_failed,
-	ERROR_srcSize_tooLarge, ERROR_dstMaxSize_tooSmall,
-    ERROR_checksum_invalid,
-	ERROR_maxCode
-	} LZ4F_errorCodes;   /* error codes are negative unsigned values.
-							Compare function result to (-specificCode) */
+#define LZ4F_LIST_ERRORS(ITEM) \
+        ITEM(OK_NoError) ITEM(ERROR_GENERIC) \
+        ITEM(ERROR_maxBlockSize_invalid) ITEM(ERROR_blockMode_invalid) ITEM(ERROR_contentChecksumFlag_invalid) \
+        ITEM(ERROR_compressionLevel_invalid) \
+        ITEM(ERROR_allocation_failed) \
+        ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_decompressionFailed) \
+        ITEM(ERROR_checksum_invalid) \
+        ITEM(ERROR_maxCode)
+
+#define LZ4F_GENERATE_ENUM(ENUM) ENUM,
+typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to let programmer detect & handle specific errors */
 
 int LZ4F_isError(LZ4F_errorCode_t code);   /* Basically : code > -ERROR_maxCode */
+const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return enum as string */
 
 
 /**************************************

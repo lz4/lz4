@@ -1155,7 +1155,9 @@ Advanced decoding functions :
 
 FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest, int compressedSize, int maxOutputSize, int safe, const char* dictStart, int dictSize)
 {
-    if ((dictStart+dictSize == source) && (dictSize >= (int)(64 KB - 1)))
+    if (dictSize==0)
+        return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, noDict, NULL, 64 KB);
+    if ((dictStart+dictSize == dest) && (dictSize >= (int)(64 KB - 1)))
         return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, withPrefix64k, NULL, 64 KB);
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, usingExtDict, dictStart, dictSize);
 }
