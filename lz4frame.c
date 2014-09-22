@@ -754,7 +754,7 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionCont
         if (LZ4F_isError(errorCode)) return errorCode;
         *srcSizePtr = errorCode;
         *frameInfoPtr = dctxPtr->frameInfo;
-        dctxPtr->srcExpect = (BYTE*)srcBuffer + errorCode;
+        dctxPtr->srcExpect = NULL;
         dctxPtr->dStage = dstage_getCBlockSize;
         return 4;
     }
@@ -801,11 +801,27 @@ static void LZ4F_updateDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* dstPtr, s
 
     if (withinTmp) /* copy relevant dict portion in front of tmpOut within tmpOutBuffer */
     {
+#if 0
         size_t savedDictSize = dctxPtr->tmpOut - dctxPtr->tmpOutBuffer;
         memcpy(dctxPtr->tmpOutBuffer, dctxPtr->dict + dctxPtr->dictSize - dctxPtr->tmpOutStart- savedDictSize, savedDictSize);
         dctxPtr->dict = dctxPtr->tmpOutBuffer;
         dctxPtr->dictSize = savedDictSize + dctxPtr->tmpOutStart + dstSize;
         return;
+
+#else
+
+        size_t preserveSize = dctxPtr->tmpOut - dctxPtr->tmpOutBuffer;
+        size_t copySize = 64 KB - dctxPtr->tmpOutSize;
+        BYTE* oldDictEnd = dctxPtr->dict + dctxPtr->dictSize - dctxPtr->tmpOutStart;
+        if (dctxPtr->tmpOutSize > 64 KB) copySize = 0;
+        if (copySize > preserveSize) copySize = preserveSize;
+
+        memcpy(dctxPtr->tmpOutBuffer + preserveSize - copySize, oldDictEnd - copySize, copySize);
+
+        dctxPtr->dict = dctxPtr->tmpOutBuffer;
+        dctxPtr->dictSize = preserveSize + dctxPtr->tmpOutStart + dstSize;
+        return;
+#endif
     }
 
     if (dctxPtr->dict == dctxPtr->tmpOutBuffer)     /* copy dst into tmp to complete dict */
@@ -1199,9 +1215,12 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
         if (dctxPtr->dStage == dstage_flushOut)
         {
             size_t preserveSize = dctxPtr->tmpOut - dctxPtr->tmpOutBuffer;
+            size_t copySize = 64 KB - dctxPtr->tmpOutSize;
             BYTE* oldDictEnd = dctxPtr->dict + dctxPtr->dictSize - dctxPtr->tmpOutStart;
+            if (dctxPtr->tmpOutSize > 64 KB) copySize = 0;
+            if (copySize > preserveSize) copySize = preserveSize;
 
-            memcpy(dctxPtr->tmpOutBuffer, oldDictEnd - preserveSize, preserveSize);
+            memcpy(dctxPtr->tmpOutBuffer + preserveSize - copySize, oldDictEnd - copySize, copySize);
 
             dctxPtr->dict = dctxPtr->tmpOutBuffer;
             dctxPtr->dictSize = preserveSize + dctxPtr->tmpOutStart;
