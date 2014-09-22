@@ -873,7 +873,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)decompressionContext;
-    LZ4F_decompressOptions_t optionsNull = { 0 };
+    static const LZ4F_decompressOptions_t optionsNull = { 0 };
     const BYTE* const srcStart = (const BYTE*)srcBuffer;
     const BYTE* const srcEnd = srcStart + *srcSizePtr;
     const BYTE* srcPtr = srcStart;
@@ -1210,6 +1210,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
     if ( (dctxPtr->frameInfo.blockMode==blockLinked)
        &&(dctxPtr->dict != dctxPtr->tmpOutBuffer)
        &&(!decompressOptionsPtr->stableDst)
+       &&((unsigned)(dctxPtr->dStage-1) < (unsigned)(dstage_getSuffix-1))
        )
     {
         if (dctxPtr->dStage == dstage_flushOut)
