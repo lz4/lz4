@@ -261,12 +261,29 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 	BYTE* const dstEnd = dstStart + dstMaxSize;
 
 
-    if (preferencesPtr!=NULL) prefs = *preferencesPtr;
     cctxI.version = LZ4F_VERSION;
-    cctxI.maxBufferSize = 64 KB;   /* mess with real buffer size, to prevent allocation; works because autoflush==1 & stableSrc==1 */
+    cctxI.maxBufferSize = 64 KB;   /* mess with real buffer size to prevent allocation; works because autoflush==1 & stableSrc==1 */
+
+    if (preferencesPtr!=NULL) prefs = *preferencesPtr;
+    {
+        blockSizeID_t proposedBSID = max64KB;
+        size_t maxBlockSize = 64 KB;
+        while (prefs.frameInfo.blockSizeID > proposedBSID)
+        {
+            if (srcSize <= maxBlockSize)
+            {
+                prefs.frameInfo.blockSizeID = proposedBSID;
+                break;
+            }
+            proposedBSID++;
+            maxBlockSize <<= 2;
+        }
+    }
     prefs.autoFlush = 1;
+    if (srcSize <= LZ4F_getBlockSize(prefs.frameInfo.blockSizeID))
+        prefs.frameInfo.blockMode = blockIndependent;   /* no need for linked blocks */
+
     options.stableSrc = 1;
-    if (srcSize <= 64 KB) prefs.frameInfo.blockMode = blockIndependent;   /* no need for linked blocks */
 
 	if (dstMaxSize < LZ4F_compressFrameBound(srcSize, &prefs))
 		return -ERROR_dstMaxSize_tooSmall;
