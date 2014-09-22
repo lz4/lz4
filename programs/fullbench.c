@@ -268,7 +268,7 @@ static int local_LZ4_compress_limitedOutput_withState(const char* in, char* out,
     return LZ4_compress_limitedOutput_withState(stateLZ4, in, out, inSize, LZ4_compressBound(inSize));
 }
 
-static void* ctx;
+static LZ4_stream_t* ctx;
 static int local_LZ4_compress_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_continue(ctx, in, out, inSize);
@@ -323,7 +323,7 @@ static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out
 
 static int local_LZ4F_compressFrame(const char* in, char* out, int inSize)
 {
-    return LZ4F_compressFrame(out, 2*inSize + 16, in, inSize, NULL);
+    return (int)LZ4F_compressFrame(out, 2*inSize + 16, in, inSize, NULL);
 }
 
 static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
@@ -378,7 +378,7 @@ static int local_LZ4F_decompress(const char* in, char* out, int inSize, int outS
     result = LZ4F_decompress(g_dCtx, out, &dstSize, in, &srcSize, NULL);
     if (result!=0) { DISPLAY("Error decompressing frame : unfinished frame\n"); exit(8); }
     if (srcSize != (size_t)inSize) { DISPLAY("Error decompressing frame : read size incorrect\n"); exit(9); }
-    return dstSize;
+    return (int)dstSize;
 }
 
 
@@ -526,7 +526,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 12: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = LZ4_createHC; compressorName = "LZ4_compressHC_limitedOutput_continue"; break;
             case 13: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
             case 14: compressionFunction = local_LZ4F_compressFrame; compressorName = "LZ4F_compressFrame";
-                        chunkP[0].origSize = benchedSize; nbChunks=1;
+                        chunkP[0].origSize = (int)benchedSize; nbChunks=1;
                         break;
             default : DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
@@ -602,8 +602,8 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
                     errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
                     if (LZ4F_isError(errorCode)) { DISPLAY("Preparation error compressing frame\n"); return 1; }
-                    chunkP[0].origSize = benchedSize;
-                    chunkP[0].compressedSize = errorCode;
+                    chunkP[0].origSize = (int)benchedSize;
+                    chunkP[0].compressedSize = (int)errorCode;
                     nbChunks = 1;
                     break;
             default : DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); free(chunkP); return 1;

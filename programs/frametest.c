@@ -279,7 +279,7 @@ int basicTests(U32 seed, double compressibility)
 	DISPLAYLEVEL(3, "Decompression test : \n");
 	{
         size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
-        unsigned maxBits = FUZ_highbit(decodedBufferSize);
+        unsigned maxBits = FUZ_highbit((U32)decodedBufferSize);
         BYTE* op = (BYTE*)decodedBuffer;
         BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
         BYTE* ip = (BYTE*)compressedBuffer;
@@ -377,8 +377,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 	void* compressedBuffer = NULL;
 	void* decodedBuffer = NULL;
 	U32 coreRand = seed;
-	LZ4F_decompressionContext_t dCtx;
-	LZ4F_compressionContext_t cCtx;
+	LZ4F_decompressionContext_t dCtx = NULL;
+	LZ4F_compressionContext_t cCtx = NULL;
     size_t result;
     XXH64_stateSpace_t xxh64;
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
@@ -424,13 +424,13 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         prefs.autoFlush = autoflush;
 
         DISPLAYUPDATE(2, "\r%5i   ", testNb);
-        crcOrig = XXH64((BYTE*)srcBuffer+srcStart, srcSize, 1);
+        crcOrig = XXH64((BYTE*)srcBuffer+srcStart, (U32)srcSize, 1);
 
         if ((FUZ_rand(&randState)&0xF) == 2)
         {
             LZ4F_preferences_t* framePrefs = &prefs;
             if ((FUZ_rand(&randState)&7) == 1) framePrefs = NULL;
-            cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, framePrefs), srcBuffer + srcStart, srcSize, framePrefs);
+            cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, framePrefs), (char*)srcBuffer + srcStart, srcSize, framePrefs);
             CHECK(LZ4F_isError(cSize), "LZ4F_compressFrame failed : error %i (%s)", (int)cSize, LZ4F_getErrorName(cSize));
         }
         else
@@ -439,7 +439,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             const BYTE* const iend = ip + srcSize;
             BYTE* op = compressedBuffer;
             BYTE* const oend = op + LZ4F_compressFrameBound(srcDataLength, NULL);
-            unsigned maxBits = FUZ_highbit(srcSize);
+            unsigned maxBits = FUZ_highbit((U32)srcSize);
             result = LZ4F_compressBegin(cCtx, op, oend-op, &prefs);
             CHECK(LZ4F_isError(result), "Compression header failed (error %i)", (int)result);
             op += result;
@@ -475,7 +475,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             const BYTE* const iend = ip + cSize;
             BYTE* op = decodedBuffer;
             BYTE* const oend = op + srcDataLength;
-            unsigned maxBits = FUZ_highbit(cSize);
+            unsigned maxBits = FUZ_highbit((U32)cSize);
             unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;
             nonContiguousDst += FUZ_rand(&randState) & nonContiguousDst;   /* 0=>0; 1=>1,2 */
             XXH64_resetState(&xxh64, 1);

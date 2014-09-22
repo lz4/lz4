@@ -1,5 +1,6 @@
 r123:
 Added : experimental lz4frame API, thanks to Takayuki Matsuoka and Christopher Jackson for testings
+Fix : s390x support, thanks to Nobuhiro Iwamatsu
 Fix : test mode (-t) no longer requires confirmation, thanks to Thary Nguyen
 
 r122:
