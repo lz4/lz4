@@ -262,7 +262,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 
 
     cctxI.version = LZ4F_VERSION;
-    cctxI.maxBufferSize = 64 KB;   /* mess with real buffer size to prevent allocation; works because autoflush==1 & stableSrc==1 */
+    cctxI.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent allocation; works because autoflush==1 & stableSrc==1 */
 
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
     {

@@ -426,6 +426,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         DISPLAYUPDATE(2, "\r%5i   ", testNb);
         crcOrig = XXH64((BYTE*)srcBuffer+srcStart, srcSize, 1);
 
+        if ((FUZ_rand(&randState)&0xF) == 2)
+        {
+            LZ4F_preferences_t* framePrefs = &prefs;
+            if ((FUZ_rand(&randState)&7) == 1) framePrefs = NULL;
+            cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, framePrefs), srcBuffer + srcStart, srcSize, framePrefs);
+            CHECK(LZ4F_isError(cSize), "LZ4F_compressFrame failed : error %i (%s)", (int)cSize, LZ4F_getErrorName(cSize));
+        }
+        else
         {
             const BYTE* ip = (const BYTE*)srcBuffer + srcStart;
             const BYTE* const iend = ip + srcSize;
