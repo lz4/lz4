@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r122
+RELEASE=r123
 
 DESTDIR?=
 PREFIX ?= /usr
@@ -68,28 +68,31 @@ endif
 
 default: lz4 lz4c
 
-all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 datagen
+all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest datagen
 
-lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
+lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
+lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c bench.c xxhash.c lz4io.c lz4cli.c
+lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
+fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fullbench.c
+fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c 
+fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c 
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c xxhash.c fuzzer.c
+fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
+
+frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 datagen : datagen.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
@@ -99,7 +102,8 @@ clean:
 	@rm -f core *.o \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) datagen$(EXT)
+        fuzzer$(EXT) fuzzer32$(EXT) \
+        frametest$(EXT) datagen$(EXT)
 	@echo Cleaning completed
 
 
@@ -128,7 +132,7 @@ uninstall:
 	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
 	@echo lz4 successfully uninstalled
 
-test-native: test-lz4 test-lz4c test-fullbench test-fuzzer test-mem
+test-native: test-lz4 test-lz4c test-frame test-fullbench test-fuzzer test-mem
 
 test-force32: test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
 
@@ -165,7 +169,10 @@ test-fuzzer: fuzzer
 test-fuzzer32: fuzzer32
 	./fuzzer32 --no-prompt
 
-test-mem: lz4 datagen
+test-frame: frametest
+	./frametest
+
+test-mem: lz4 datagen frametest
 	./datagen -g16KB > tmp
 	valgrind ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp
@@ -173,6 +180,7 @@ test-mem: lz4 datagen
 	./datagen -g256MB > tmp
 	valgrind ./lz4 -B4D -f tmp /dev/null
 	rm tmp
+	valgrind ./frametest -i100
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...

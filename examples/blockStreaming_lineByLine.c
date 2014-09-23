@@ -158,9 +158,9 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    sprintf(inpFilename, "%s", argv[1]);
-    sprintf(lz4Filename, "%s.lz4s", argv[1]);
-    sprintf(decFilename, "%s.lz4s.dec", argv[1]);
+    snprintf(inpFilename, 256, "%s", argv[1]);
+    snprintf(lz4Filename, 256, "%s.lz4s", argv[1]);
+    snprintf(decFilename, 256, "%s.lz4s.dec", argv[1]);
 
     printf("inp = [%s]\n", inpFilename);
     printf("lz4 = [%s]\n", lz4Filename);

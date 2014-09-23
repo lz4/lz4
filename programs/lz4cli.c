@@ -48,6 +48,10 @@
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
 #endif
 
+#ifdef __clang__
+#  pragma clang diagnostic ignored "-Wunused-const-variable"   // const variable one is really used !
+#endif
+
 #define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
 #define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
@@ -91,7 +95,7 @@
 
 #if defined(_MSC_VER)    // Visual Studio
 #  define swap32 _byteswap_ulong
-#elif GCC_VERSION >= 403
+#elif (GCC_VERSION >= 403) || defined(__clang__)
 #  define swap32 __builtin_bswap32
 #else
   static inline unsigned int swap32(unsigned int x)
@@ -377,7 +381,7 @@ int main(int argc, char** argv)
                 case 'c': forceStdout=1; output_filename=stdoutmark; displayLevel=1; break;
 
                     // Test
-                case 't': decode=1; output_filename=nulmark; break;
+                case 't': decode=1; LZ4IO_setOverwrite(1); output_filename=nulmark; break;
 
                     // Overwrite
                 case 'f': LZ4IO_setOverwrite(1); break;

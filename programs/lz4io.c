@@ -233,7 +233,7 @@ int LZ4IO_setNotificationLevel(int level)
 
 
 /* ************************************************************************ */
-/* ********************** LZ4 File / Stream compression ******************* */
+/* ********************** LZ4 File / Pipe compression ********************* */
 /* ************************************************************************ */
 
 static int          LZ4S_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
