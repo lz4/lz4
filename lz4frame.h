@@ -93,7 +93,7 @@ typedef struct {
 
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
-  unsigned         compressionLevel;       /* from 0 to 16 */
+  unsigned         compressionLevel;       /* Not yet supported : only fast compression for the time being */
   unsigned         autoFlush;              /* 1 == always flush; reduce need for tmp buffer */
   unsigned         reserved[4];
 } LZ4F_preferences_t;
