@@ -131,7 +131,6 @@ static U32 FUZ_GetMilliSpan(U32 nTimeStart)
 }
 
 
-
 #  define FUZ_rotl32(x,r) ((x << r) | (x >> (32 - r)))
 unsigned int FUZ_rand(unsigned int* src)
 {
@@ -388,7 +387,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     LZ4F_decompressionContext_t dCtx = NULL;
     LZ4F_compressionContext_t cCtx = NULL;
     size_t result;
-    XXH64_stateSpace_t xxh64;
+    XXH64_state_t xxh64;
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
 
@@ -424,21 +423,21 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
         size_t cSize;
         U64 crcOrig, crcDecoded;
+        LZ4F_preferences_t* prefsPtr = &prefs;
 
         (void)FUZ_rand(&coreRand);   // update rand seed
         prefs.frameInfo.blockMode = BMId;
         prefs.frameInfo.blockSizeID = BSId;
         prefs.frameInfo.contentChecksumFlag = CCflag;
         prefs.autoFlush = autoflush;
+        if ((FUZ_rand(&randState)&0xF) == 1) prefsPtr = NULL;
 
         DISPLAYUPDATE(2, "\r%5u   ", testNb);
         crcOrig = XXH64((BYTE*)srcBuffer+srcStart, (U32)srcSize, 1);
 
         if ((FUZ_rand(&randState)&0xF) == 2)
         {
-            LZ4F_preferences_t* framePrefs = &prefs;
-            if ((FUZ_rand(&randState)&7) == 1) framePrefs = NULL;
-            cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, framePrefs), (char*)srcBuffer + srcStart, srcSize, framePrefs);
+            cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, prefsPtr), (char*)srcBuffer + srcStart, srcSize, prefsPtr);
             CHECK(LZ4F_isError(cSize), "LZ4F_compressFrame failed : error %i (%s)", (int)cSize, LZ4F_getErrorName(cSize));
         }
         else
@@ -448,14 +447,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             BYTE* op = compressedBuffer;
             BYTE* const oend = op + LZ4F_compressFrameBound(srcDataLength, NULL);
             unsigned maxBits = FUZ_highbit((U32)srcSize);
-            result = LZ4F_compressBegin(cCtx, op, oend-op, &prefs);
+            result = LZ4F_compressBegin(cCtx, op, oend-op, prefsPtr);
             CHECK(LZ4F_isError(result), "Compression header failed (error %i)", (int)result);
             op += result;
             while (ip < iend)
             {
                 unsigned nbBitsSeg = FUZ_rand(&randState) % maxBits;
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsSeg)-1)) + 1;
-                size_t oSize = oend-op;
+                size_t oSize = LZ4F_compressBound(iSize, prefsPtr);
                 unsigned forceFlush = ((FUZ_rand(&randState) & 3) == 1);
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
                 cOptions.stableSrc = ((FUZ_rand(&randState) & 3) == 1);
@@ -486,7 +485,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             unsigned maxBits = FUZ_highbit((U32)cSize);
             unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;
             nonContiguousDst += FUZ_rand(&randState) & nonContiguousDst;   /* 0=>0; 1=>1,2 */
-            XXH64_resetState(&xxh64, 1);
+            XXH64_reset(&xxh64, 1);
             while (ip < iend)
             {
                 unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
@@ -510,7 +509,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (nonContiguousDst==2) op = decodedBuffer;   // overwritten destination
             }
             CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
-            crcDecoded = XXH64_intermediateDigest(&xxh64);
+            crcDecoded = XXH64_digest(&xxh64);
             if (crcDecoded != crcOrig) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
             CHECK(crcDecoded != crcOrig, "Decompression corruption");
         }

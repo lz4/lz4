@@ -122,7 +122,7 @@ typedef struct
     BYTE*  tmpBuff;
     BYTE*  tmpIn;
     size_t tmpInSize;
-    XXH32_stateSpace_t xxh;
+    XXH32_state_t xxh;
     LZ4_stream_t lz4ctx;
 } LZ4F_cctx_internal_t;
 
@@ -143,7 +143,7 @@ typedef struct
     BYTE*  tmpOut;
     size_t tmpOutSize;
     size_t tmpOutStart;
-    XXH32_stateSpace_t xxh;
+    XXH32_state_t xxh;
     BYTE   header[8];
 } LZ4F_dctx_internal_t;
 
@@ -383,7 +383,7 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
     }
     cctxPtr->tmpIn = cctxPtr->tmpBuff;
     cctxPtr->tmpInSize = 0;
-    XXH32_resetState(&(cctxPtr->xxh), 0);
+    XXH32_reset(&(cctxPtr->xxh), 0);
     LZ4_resetStream(&(cctxPtr->lz4ctx));
 
     /* Magic Number */
@@ -413,13 +413,14 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
  * */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
-    LZ4F_frameInfo_t* frameInfoPtr = (LZ4F_frameInfo_t*)preferencesPtr;   /* works because prefs starts with frameInfo */
-    blockSizeID_t bid = (frameInfoPtr==NULL) ? LZ4F_BLOCKSIZEID_DEFAULT : frameInfoPtr->blockSizeID;
+    const LZ4F_preferences_t prefsNull = { 0 };
+    const LZ4F_preferences_t* prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
+    blockSizeID_t bid = prefsPtr->frameInfo.blockSizeID;
     size_t blockSize = LZ4F_getBlockSize(bid);
     unsigned nbBlocks = (unsigned)(srcSize / blockSize) + 1;
-    size_t lastBlockSize = preferencesPtr->autoFlush ? srcSize % blockSize : blockSize;
+    size_t lastBlockSize = prefsPtr->autoFlush ? srcSize % blockSize : blockSize;
     size_t blockInfo = 4;   /* default, without block CRC option */
-    size_t frameEnd = 4 + (frameInfoPtr->contentChecksumFlag*4);
+    size_t frameEnd = 4 + (prefsPtr->frameInfo.contentChecksumFlag*4);
     size_t result = (blockInfo * nbBlocks) + (blockSize * (nbBlocks-1)) + lastBlockSize + frameEnd;
 
     return result;
@@ -628,7 +629,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == contentChecksumEnabled)
     {
-        U32 xxh = XXH32_intermediateDigest(&(cctxPtr->xxh));
+        U32 xxh = XXH32_digest(&(cctxPtr->xxh));
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */
     }
@@ -721,7 +722,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const BYTE* srcPt
     dctxPtr->maxBlockSize = LZ4F_getBlockSize(blockSizeID);
 
     /* init */
-    if (contentChecksumFlag) XXH32_resetState(&(dctxPtr->xxh), 0);
+    if (contentChecksumFlag) XXH32_reset(&(dctxPtr->xxh), 0);
 
     /* alloc */
     bufferNeeded = dctxPtr->maxBlockSize + ((dctxPtr->frameInfo.blockMode==blockLinked) * 128 KB);
@@ -1220,7 +1221,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
         case dstage_checkSuffix:
         {
             U32 readCRC = LZ4F_readLE32(selectedIn);
-            U32 resultCRC = XXH32_intermediateDigest(&(dctxPtr->xxh));
+            U32 resultCRC = XXH32_digest(&(dctxPtr->xxh));
             if (readCRC != resultCRC) return (size_t)-ERROR_checksum_invalid;
             nextSrcSizeHint = 0;
             dctxPtr->dStage = dstage_getHeader;
