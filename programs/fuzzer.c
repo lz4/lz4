@@ -91,6 +91,8 @@
 *****************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+static const U32 refreshRate = 250;
+static U32 g_time = 0;
 
 
 /*****************************************
@@ -104,22 +106,23 @@ static int displayLevel = 2;
 /*********************************************************
   Fuzzer functions
 *********************************************************/
-static int FUZ_GetMilliStart(void)
+static U32 FUZ_GetMilliStart(void)
 {
-   struct timeb tb;
-   int nCount;
-   ftime( &tb );
-   nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
-   return nCount;
+    struct timeb tb;
+    U32 nCount;
+    ftime( &tb );
+    nCount = (U32) (((tb.time & 0xFFFFF) * 1000) +  tb.millitm);
+    return nCount;
 }
 
 
-static int FUZ_GetMilliSpan( int nTimeStart )
+static U32 FUZ_GetMilliSpan(U32 nTimeStart)
 {
-   int nSpan = FUZ_GetMilliStart() - nTimeStart;
-   if ( nSpan < 0 )
-      nSpan += 0x100000 * 1000;
-   return nSpan;
+    U32 nCurrent = FUZ_GetMilliStart();
+    U32 nSpan = nCurrent - nTimeStart;
+    if (nTimeStart > nCurrent)
+        nSpan += 0x100000 * 1000;
+    return nSpan;
 }
 
 
@@ -263,6 +266,16 @@ _overflowError:
 }
 
 
+void FUZ_displayUpdate(int testNb)
+{
+    if ((FUZ_GetMilliSpan(g_time) > refreshRate) || (displayLevel>=3))
+    {
+        g_time = FUZ_GetMilliStart();
+        DISPLAY("\r%5u   ", testNb);
+        if (displayLevel>=3) fflush(stdout);
+    }
+}
+
 
 #define FUZ_MAX(a,b) (a>b?a:b)
 
@@ -285,7 +298,6 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
         void* LZ4continue;
         LZ4_stream_t LZ4dict;
         U32 crcOrig, crcCheck;
-        int displayRefresh;
 
 
         // init
@@ -296,15 +308,6 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
         FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
         compressedBuffer = malloc(LZ4_compressBound(FUZ_MAX_BLOCK_SIZE));
         decodedBuffer = malloc(FUZ_MAX_DICT_SIZE + FUZ_MAX_BLOCK_SIZE);
-
-        // display refresh rate
-        switch(displayLevel)
-        {
-        case 0: displayRefresh = nbCycles+1; break;
-        case 1: displayRefresh = FUZ_MAX(1, nbCycles / 100); break;
-        case 2: displayRefresh = 89; break;
-        default : displayRefresh=1;
-        }
 
         // move to startCycle
         for (cycleNb = 0; cycleNb < startCycle; cycleNb++)
@@ -337,11 +340,7 @@ int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility) {
             int dictSize, blockSize, blockStart, compressedSize, HCcompressedSize;
             int blockContinueCompressedSize;
 
-            if ((cycleNb%displayRefresh) == 0)
-            {
-                printf("\r%7i /%7i   - ", cycleNb, nbCycles);
-                fflush(stdout);
-            }
+            FUZ_displayUpdate(cycleNb);
 
             // Select block to test
             blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
@@ -641,8 +640,8 @@ int FUZ_usage(void)
 }
 
 
-int main(int argc, char** argv) {
-    U32 timestamp = FUZ_GetMilliStart();
+int main(int argc, char** argv)
+{
     U32 seed=0;
     int seedset=0;
     int argNb;
@@ -725,17 +724,7 @@ int main(int argc, char** argv) {
     // Get Seed
     printf("Starting LZ4 fuzzer (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
 
-    if (!seedset)
-    {
-        char userInput[50] = {0};
-        printf("Select an Initialisation number (default : random) : ");
-        fflush(stdout);
-        if ( no_prompt || fgets(userInput, sizeof userInput, stdin) )
-        {
-            if ( sscanf(userInput, "%u", &seed) == 1 ) {}
-            else seed = FUZ_GetMilliSpan(timestamp);
-        }
-    }
+    if (!seedset) seed = FUZ_GetMilliStart() % 10000;
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 

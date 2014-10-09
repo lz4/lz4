@@ -164,10 +164,10 @@ test-fullbench32: fullbench32
 	./fullbench32 --no-prompt $(BENCH_NB) $(TEST_FILES)
 
 test-fuzzer: fuzzer
-	./fuzzer --no-prompt
+	./fuzzer
 
 test-fuzzer32: fuzzer32
-	./fuzzer32 --no-prompt
+	./fuzzer32
 
 test-frame: frametest
 	./frametest
