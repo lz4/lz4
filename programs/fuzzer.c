@@ -90,16 +90,17 @@
    Macros
 *****************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-static const U32 refreshRate = 250;
+#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+static int g_displayLevel = 2;
+static const U32 g_refreshRate = 250;
 static U32 g_time = 0;
 
 
 /*****************************************
-  Local Parameters
+  Unit Variables
 *****************************************/
-static char* programName;
-static int displayLevel = 2;
+static char* programName = NULL;
+static int g_pause = 0;
 
 
 /*********************************************************
@@ -267,11 +268,11 @@ _overflowError:
 
 static void FUZ_displayUpdate(int testNb)
 {
-    if ((FUZ_GetMilliSpan(g_time) > refreshRate) || (displayLevel>=3))
+    if ((FUZ_GetMilliSpan(g_time) > g_refreshRate) || (g_displayLevel>=3))
     {
         g_time = FUZ_GetMilliStart();
         DISPLAY("\r%5u   ", testNb);
-        if (displayLevel>=3) fflush(stdout);
+        if (g_displayLevel>=3) fflush(stdout);
     }
 }
 
@@ -292,7 +293,7 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
     int ret, cycleNb;
 #       define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %i : ", testNb); printf(__VA_ARGS__); \
                                     printf(" (seed %u, cycle %i) \n", seed, cycleNb); goto _output_error; }
-#       define FUZ_DISPLAYTEST          { testNb++; displayLevel<3 ? 0 : printf("%2i\b\b", testNb); if (displayLevel==4) fflush(stdout); }
+#       define FUZ_DISPLAYTEST          { testNb++; g_displayLevel<3 ? 0 : printf("%2i\b\b", testNb); if (g_displayLevel==4) fflush(stdout); }
     void* stateLZ4   = malloc(LZ4_sizeofState());
     void* stateLZ4HC = malloc(LZ4_sizeofStateHC());
     void* LZ4continue;
@@ -741,7 +742,6 @@ int main(int argc, char** argv)
     int nbTests = NB_ATTEMPTS;
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
-    int pause=0;
 
     // Check command line
     programName = argv[0];
@@ -754,11 +754,11 @@ int main(int argc, char** argv)
         // Decode command (note : aggregated commands are allowed)
         if (argument[0]=='-')
         {
-            if (!strcmp(argument, "--no-prompt")) { pause=0; seedset=1; displayLevel=1; continue; }
+            if (!strcmp(argument, "--no-prompt")) { g_pause=0; seedset=1; g_displayLevel=1; continue; }
+            argument++;
 
-            while (argument[1]!=0)
+            while (*argument!=0)
             {
-                argument++;
                 switch(*argument)
                 {
                 case 'h':   /* display help */
@@ -766,12 +766,12 @@ int main(int argc, char** argv)
 
                 case 'v':   /* verbose mode */
                     argument++;
-                    displayLevel=4;
+                    g_displayLevel=4;
                     break;
 
                 case 'p':   /* pause at the end */
                     argument++;
-                    pause=1;
+                    g_pause=1;
                     break;
 
                 case 'i':
@@ -832,13 +832,13 @@ int main(int argc, char** argv)
     printf("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
-    FUZ_unitTests();
+    if (seedset==0) FUZ_unitTests();
 
     if (nbTests<=0) nbTests=1;
 
     {
         int result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100);
-        if (pause)
+        if (g_pause)
         {
             DISPLAY("press enter ... \n");
             getchar();
