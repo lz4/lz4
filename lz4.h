@@ -193,7 +193,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_streamPtr);
  * LZ4_freeStream releases its memory.
  */
 LZ4_stream_t* LZ4_createStream(void);
-int           LZ4_freeStream (LZ4_stream_t* LZ4_stream);
+int           LZ4_freeStream (LZ4_stream_t* LZ4_streamPtr);
 
 /*
  * LZ4_loadDict
@@ -202,21 +202,21 @@ int           LZ4_freeStream (LZ4_stream_t* LZ4_stream);
  * Loading a size of 0 is allowed.
  * Return : 1 if OK, 0 if error
  */
-int LZ4_loadDict (LZ4_stream_t* LZ4_stream, const char* dictionary, int dictSize);
+int LZ4_loadDict (LZ4_stream_t* LZ4_streamPtr, const char* dictionary, int dictSize);
 
 /*
  * LZ4_compress_continue
  * Compress data block 'source', using blocks compressed before as dictionary to improve compression ratio
  * Previous data blocks are assumed to still be present at their previous location.
  */
-int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
+int LZ4_compress_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
 
 /*
  * LZ4_compress_limitedOutput_continue
  * Same as before, but also specify a maximum target compressed size (maxOutputSize)
  * If objective cannot be met, compression exits, and returns a zero.
  */
-int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
  * LZ4_saveDict
@@ -227,7 +227,7 @@ int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* s
  * Return : dictionary size in bytes, or 0 if error
  * Note : any dictSize > 64 KB will be interpreted as 64KB.
  */
-int LZ4_saveDict (LZ4_stream_t* LZ4_stream, char* safeBuffer, int dictSize);
+int LZ4_saveDict (LZ4_stream_t* LZ4_streamPtr, char* safeBuffer, int dictSize);
 
 
 /************************************************

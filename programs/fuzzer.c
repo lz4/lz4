@@ -621,14 +621,102 @@ _output_error:
     }
 }
 
+static const unsigned testInputSize = 128 KB;
+static const unsigned testCompressedSize = 64 KB;
 
 static void FUZ_unitTests(void)
 {
+    const unsigned testNb = 0;
+    const unsigned seed   = 0;
+    const unsigned cycleNb= 0;
+    char testInput[testInputSize];
+    char testCompressed[testCompressedSize];
+    char testVerify[testCompressedSize];
+    U32 randState = 0;
+
+    // Init
+    FUZ_fillCompressibleNoiseBuffer(testInput, testInputSize, 0.50, &randState);
+
+    // 32-bits address space overflow test
     FUZ_AddressOverflow();
+
+    // LZ4 HC streaming tests
+    {
+        LZ4_streamHC_t* sp;
+        LZ4_streamHC_t  sHC;
+        //XXH64_state_t xxh;
+        U64 crcOrig;
+        U64 crcNew;
+        int result;
+
+        // Allocation test
+        sp = LZ4_createStreamHC();
+        FUZ_CHECKTEST(sp==NULL, "LZ4_createStreamHC() allocation failed");
+        LZ4_freeStreamHC(sp);
+
+        // simple compression test
+        crcOrig = XXH64(testInput, testCompressedSize, 0);
+        LZ4_resetStreamHC(&sHC, 0);
+        result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput, testCompressed, testCompressedSize, testCompressedSize-1);
+        FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() compression failed");
+
+        result = LZ4_decompress_safe(testCompressed, testVerify, result, testCompressedSize);
+        FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
+        crcNew = XXH64(testVerify, testCompressedSize, 0);
+        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+
+        // simple dictionary compression test
+        crcOrig = XXH64(testInput + 64 KB, testCompressedSize, 0);
+        LZ4_resetStreamHC(&sHC, 0);
+        LZ4_loadDictHC(&sHC, testInput, 64 KB);
+        result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + 64 KB, testCompressed, testCompressedSize, testCompressedSize-1);
+        FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
+
+        result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, testCompressedSize, testInput, 64 KB);
+        FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() dictionary decompression failed");
+        crcNew = XXH64(testVerify, testCompressedSize, 0);
+        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
+
+        // dictionary multi compression test
+        {
+            int result1, result2;
+            int segSize = testCompressedSize / 2;
+            crcOrig = XXH64(testInput + segSize, 64 KB, 0);
+            LZ4_resetStreamHC(&sHC, 0);
+            LZ4_loadDictHC(&sHC, testInput, segSize);
+            result1 = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + segSize, testCompressed, segSize, segSize -1);
+            FUZ_CHECKTEST(result1==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
+            result2 = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + 2*segSize, testCompressed+result1, segSize, segSize -1);
+            FUZ_CHECKTEST(result2==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
+
+            result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result1, segSize, testInput, segSize);
+            FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 1 failed");
+            result = LZ4_decompress_safe_usingDict(testCompressed+result1, testVerify+segSize, result2, segSize, testInput, 2*segSize);
+            FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 2 failed");
+            crcNew = XXH64(testVerify, testCompressedSize, 0);
+            FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
+        }
+
+        // remote dictionary compression test
+        crcOrig = XXH64(testInput + 64 KB, testCompressedSize, 0);
+        LZ4_resetStreamHC(&sHC, 0);
+        LZ4_loadDictHC(&sHC, testInput, 32 KB);
+        result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + 64 KB, testCompressed, testCompressedSize, testCompressedSize-1);
+        //FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() remote dictionary failed : result = %i", result);
+
+        result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, testCompressedSize, testInput, 32 KB);
+        //FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() dictionary decompression failed");
+        crcNew = XXH64(testVerify, testCompressedSize, 0);
+        //FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
+    }
+
+    return;
+_output_error:
+    exit(1);
 }
 
 
-int FUZ_usage(void)
+static int FUZ_usage(void)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [args]\n", programName);
