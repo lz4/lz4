@@ -95,18 +95,17 @@ int LZ4_sizeofStateHC();
 
 Note that tables must be aligned for pointer (32 or 64 bits), otherwise compression will fail (return code 0).
 
-The allocated memory can be provided to the compressions functions using 'void* state' parameter.
+The allocated memory can be provided to the compression functions using 'void* state' parameter.
 LZ4_compress_withStateHC() and LZ4_compress_limitedOutput_withStateHC() are equivalent to previously described functions.
-They just use the externally allocated memory area instead of allocating their own (on stack, or on heap).
+They just use the externally allocated memory for state instead of allocating their own (on stack, or on heap).
 */
-
 
 
 
 /**************************************
    Experimental Streaming Functions
 **************************************/
-#define LZ4_STREAMHCSIZE_U32 65546
+#define LZ4_STREAMHCSIZE_U32 65548
 #define LZ4_STREAMHCSIZE     (LZ4_STREAMHCSIZE_U32 * sizeof(unsigned int))
 typedef struct { unsigned int table[LZ4_STREAMHCSIZE_U32]; } LZ4_streamHC_t;
 
