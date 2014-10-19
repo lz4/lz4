@@ -280,8 +280,6 @@ static void FUZ_displayUpdate(int testNb)
 }
 
 
-#define FUZ_MAX(a,b) (a>b?a:b)
-
 static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibility)
 {
     unsigned long long bytes = 0;
@@ -499,10 +497,10 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
 
         // Test HC compression with just one missing byte into output buffer => must fail
         FUZ_DISPLAYTEST;
-        compressedBuffer[compressedSize-1] = 0;
+        compressedBuffer[HCcompressedSize-1] = 0;
         ret = LZ4_compressHC_limitedOutput(block, compressedBuffer, blockSize, HCcompressedSize-1);
         FUZ_CHECKTEST(ret, "LZ4_compressHC_limitedOutput should have failed (output buffer too small by 1 byte)");
-        FUZ_CHECKTEST(compressedBuffer[compressedSize-1], "LZ4_compressHC_limitedOutput overran output buffer")
+        FUZ_CHECKTEST(compressedBuffer[HCcompressedSize-1], "LZ4_compressHC_limitedOutput overran output buffer")
 
         /* Dictionary tests */
 
