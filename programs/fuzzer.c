@@ -100,7 +100,6 @@ static U32 g_time = 0;
   Unit Variables
 *****************************************/
 static char* programName = NULL;
-static int g_pause = 0;
 
 
 /*********************************************************
@@ -126,8 +125,12 @@ static U32 FUZ_GetMilliSpan(U32 nTimeStart)
 }
 
 
-#  define FUZ_rotl32(x,r) ((x << r) | (x >> (32 - r)))
-unsigned int FUZ_rand(unsigned int* src)
+static U32 FUZ_rotl32(U32 u32, U32 nbBits)
+{
+    return ((u32 << nbBits) | (u32 >> (32 - nbBits)));
+}
+
+static U32 FUZ_rand(U32* src)
 {
     U32 rand32 = *src;
     rand32 *= PRIME1;
@@ -140,7 +143,7 @@ unsigned int FUZ_rand(unsigned int* src)
 
 #define FUZ_RAND15BITS  ((FUZ_rand(seed) >> 3) & 32767)
 #define FUZ_RANDLENGTH  ( ((FUZ_rand(seed) >> 7) & 3) ? (FUZ_rand(seed) % 15) : (FUZ_rand(seed) % 510) + 15)
-void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba, U32* seed)
+static void FUZ_fillCompressibleNoiseBuffer(void* buffer, int bufferSize, double proba, U32* seed)
 {
     BYTE* BBuffer = (BYTE*)buffer;
     int pos = 0;
@@ -318,18 +321,23 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
         char* dict;
         char* block;
 
+        FUZ_displayUpdate(cycleNb);
+
         blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
         blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
         dictSize   = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
         if (dictSize > blockStart) dictSize = blockStart;
         block = ((char*)CNBuffer) + blockStart;
         dict = block - dictSize;
-        LZ4_loadDict(&LZ4dict, dict, dictSize);
-        LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
-        LZ4_loadDict(&LZ4dict, dict, dictSize);
-        LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
-        LZ4_loadDict(&LZ4dict, dict, dictSize);
-        LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
+        if (0)   // some problems related to dictionary re-use; in this case, enable this loop
+        {
+            LZ4_loadDict(&LZ4dict, dict, dictSize);
+            LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
+            LZ4_loadDict(&LZ4dict, dict, dictSize);
+            LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
+            LZ4_loadDict(&LZ4dict, dict, dictSize);
+            LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
+        }
     }
 
     // Test loop
@@ -742,6 +750,7 @@ int main(int argc, char** argv)
     int nbTests = NB_ATTEMPTS;
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
+    int pause = 0;
 
     // Check command line
     programName = argv[0];
@@ -754,7 +763,7 @@ int main(int argc, char** argv)
         // Decode command (note : aggregated commands are allowed)
         if (argument[0]=='-')
         {
-            if (!strcmp(argument, "--no-prompt")) { g_pause=0; seedset=1; g_displayLevel=1; continue; }
+            if (!strcmp(argument, "--no-prompt")) { pause=0; seedset=1; g_displayLevel=1; continue; }
             argument++;
 
             while (*argument!=0)
@@ -771,7 +780,7 @@ int main(int argc, char** argv)
 
                 case 'p':   /* pause at the end */
                     argument++;
-                    g_pause=1;
+                    pause=1;
                     break;
 
                 case 'i':
@@ -838,7 +847,7 @@ int main(int argc, char** argv)
 
     {
         int result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100);
-        if (g_pause)
+        if (pause)
         {
             DISPLAY("press enter ... \n");
             getchar();
