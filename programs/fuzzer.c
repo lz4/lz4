@@ -96,12 +96,6 @@ static const U32 g_refreshRate = 250;
 static U32 g_time = 0;
 
 
-/*****************************************
-  Unit Variables
-*****************************************/
-static char* programName = NULL;
-
-
 /*********************************************************
   Fuzzer functions
 *********************************************************/
@@ -290,7 +284,6 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
     char* compressedBuffer;
     char* decodedBuffer;
 #       define FUZ_max   LZ4_COMPRESSBOUND(LEN)
-    unsigned int randState=seed;
     int ret, cycleNb;
 #       define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %i : ", testNb); printf(__VA_ARGS__); \
                                     printf(" (seed %u, cycle %i) \n", seed, cycleNb); goto _output_error; }
@@ -300,6 +293,8 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
     void* LZ4continue;
     LZ4_stream_t LZ4dict;
     U32 crcOrig, crcCheck;
+    U32 coreRandState = seed;
+    U32 randState = coreRandState ^ PRIME3;
 
 
     // init
@@ -319,16 +314,18 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
         char* dict;
         char* block;
 
-        FUZ_displayUpdate(cycleNb);
+        (void)FUZ_rand(&coreRandState);
 
-        blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
-        blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
-        dictSize   = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
-        if (dictSize > blockStart) dictSize = blockStart;
-        block = ((char*)CNBuffer) + blockStart;
-        dict = block - dictSize;
         if (0)   // some problems related to dictionary re-use; in this case, enable this loop
         {
+            FUZ_displayUpdate(cycleNb);
+            randState = coreRandState ^ PRIME3;
+            blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
+            blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
+            dictSize   = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
+            if (dictSize > blockStart) dictSize = blockStart;
+            block = ((char*)CNBuffer) + blockStart;
+            dict = block - dictSize;
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
             LZ4_loadDict(&LZ4dict, dict, dictSize);
@@ -348,6 +345,8 @@ static int FUZ_test(U32 seed, int nbCycles, int startCycle, double compressibili
         int blockContinueCompressedSize;
 
         FUZ_displayUpdate(cycleNb);
+        (void)FUZ_rand(&coreRandState);
+        randState = coreRandState ^ PRIME3;
 
         // Select block to test
         blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
@@ -717,13 +716,14 @@ static void FUZ_unitTests(void)
         //FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
     }
 
+    printf("All unit tests completed succesfully \n");
     return;
 _output_error:
     exit(1);
 }
 
 
-static int FUZ_usage(void)
+static int FUZ_usage(char* programName)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [args]\n", programName);
@@ -749,9 +749,9 @@ int main(int argc, char** argv)
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
     int pause = 0;
+    char* programName = argv[0];
 
     // Check command line
-    programName = argv[0];
     for(argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];
@@ -769,7 +769,7 @@ int main(int argc, char** argv)
                 switch(*argument)
                 {
                 case 'h':   /* display help */
-                    return FUZ_usage();
+                    return FUZ_usage(programName);
 
                 case 'v':   /* verbose mode */
                     argument++;
