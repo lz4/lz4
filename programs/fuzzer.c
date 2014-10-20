@@ -673,7 +673,7 @@ static void FUZ_unitTests(void)
     const unsigned cycleNb= 0;
     char testInput[testInputSize];
     char testCompressed[testCompressedSize];
-    char testVerify[testCompressedSize];
+    char testVerify[testInputSize];
     U32 randState = 0;
 
     // Init
@@ -719,7 +719,7 @@ static void FUZ_unitTests(void)
         crcNew = XXH64(testVerify, testCompressedSize, 0);
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
 
-        // dictionary multi compression test
+        // multiple HC compression test with dictionary
         {
             int result1, result2;
             int segSize = testCompressedSize / 2;
@@ -727,9 +727,9 @@ static void FUZ_unitTests(void)
             LZ4_resetStreamHC(&sHC, 0);
             LZ4_loadDictHC(&sHC, testInput, segSize);
             result1 = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + segSize, testCompressed, segSize, segSize -1);
-            FUZ_CHECKTEST(result1==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
-            result2 = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + 2*segSize, testCompressed+result1, segSize, segSize -1);
-            FUZ_CHECKTEST(result2==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
+            FUZ_CHECKTEST(result1==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result1);
+            result2 = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + 2*segSize, testCompressed+result1, segSize, segSize-1);
+            FUZ_CHECKTEST(result2==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result2);
 
             result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result1, segSize, testInput, segSize);
             FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 1 failed");
@@ -750,6 +750,55 @@ static void FUZ_unitTests(void)
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe_usingDict() decompression failed following remote dictionary HC compression test");
         crcNew = XXH64(testVerify, testCompressedSize, 0);
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() decompression corruption");
+
+        // multiple HC compression with ext. dictionary
+        {
+            XXH64_state_t crcOrigState;
+            XXH64_state_t crcNewState;
+            const char* dict = testInput + 3;
+            int dictSize = (FUZ_rand(&randState) & 8191);
+            char* dst = testVerify;
+
+            size_t segStart = dictSize + 7;
+            int segSize = (FUZ_rand(&randState) & 8191);
+            int segNb = 1;
+
+            LZ4_resetStreamHC(&sHC, 0);
+            LZ4_loadDictHC(&sHC, dict, dictSize);
+
+            XXH64_reset(&crcOrigState, 0);
+            XXH64_reset(&crcNewState, 0);
+
+            while (segStart + segSize < testInputSize)
+            {
+                XXH64_update(&crcOrigState, testInput + segStart, segSize);
+                crcOrig = XXH64_digest(&crcOrigState);
+                result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + segStart, testCompressed, segSize, LZ4_compressBound(segSize));
+                FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
+
+                result = LZ4_decompress_safe_usingDict(testCompressed, dst, result, segSize, dict, dictSize);
+                FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe_usingDict() dictionary decompression part %i failed", segNb);
+                XXH64_update(&crcNewState, dst, segSize);
+                crcNew = XXH64_digest(&crcNewState);
+				if (crcOrig!=crcNew)
+				{
+					size_t c=0;
+					while (dst[c] == testInput[segStart+c]) c++;
+					DISPLAY("Bad decompression at %u / %u \n", (U32)c, (U32)segSize);
+				}
+                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() part %i corruption", segNb);
+
+                dict = dst;
+                //dict = testInput + segStart;
+                dictSize = segSize;
+
+                dst += segSize + 1;
+                segNb ++;
+
+                segStart += segSize + (FUZ_rand(&randState) & 0xF) + 1;
+                segSize = (FUZ_rand(&randState) & 8191);
+            }
+        }
     }
 
     printf("All unit tests completed succesfully \n");

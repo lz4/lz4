@@ -346,13 +346,13 @@ FORCE_INLINE void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
-    hc4->nextToUpdate = 1;
-    hc4->base = base;
+    hc4->nextToUpdate = 64 KB;
+    hc4->base = base - 64 KB;
     hc4->inputBuffer = base;
     hc4->end = base;
-    hc4->dictBase = base;
-    hc4->dictLimit = 0;
-    hc4->lowLimit = 0;
+    hc4->dictBase = base - 64 KB;
+    hc4->dictLimit = 64 KB;
+    hc4->lowLimit = 64 KB;
 }
 
 
@@ -422,17 +422,17 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   // I
     const BYTE* const base = hc4->base;
     const BYTE* const dictBase = hc4->dictBase;
     const U32 dictLimit = hc4->dictLimit;
+	const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
     U32 matchIndex;
-    const U32 idxLow = (ip-base) > 64 KB ? (U32)(ip - base) - 64 KB : 0;
     const BYTE* match;
     int nbAttempts=maxNbAttempts;
     size_t ml=0;
 
-    /* HC4 match finder */
+	/* HC4 match finder */
     LZ4HC_Insert(hc4, ip);
     matchIndex = HashTable[LZ4HC_hashPtr(ip)];
 
-    while ((matchIndex>idxLow) && (nbAttempts))
+    while ((matchIndex>=lowLimit) && (nbAttempts))
     {
         nbAttempts--;
         if (matchIndex >= dictLimit)
@@ -480,19 +480,19 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     U32* const HashTable = hc4->hashTable;
     const BYTE* const base = hc4->base;
     const U32 dictLimit = hc4->dictLimit;
-	const U32 dictLowLimit = hc4->lowLimit;
+	const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
     const BYTE* const dictBase = hc4->dictBase;
     const BYTE* match;
     U32   matchIndex;
-    const U32 idxLow = (ip-base) > 64 KB ? (U32)(ip-base) - 64 KB : 0;
     int nbAttempts = maxNbAttempts;
     int delta = (int)(ip-iLowLimit);
 
-    /* First Match */
+
+	/* First Match */
     LZ4HC_Insert(hc4, ip);
     matchIndex = HashTable[LZ4HC_hashPtr(ip)];
 
-    while ((matchIndex>idxLow) && (nbAttempts))
+    while ((matchIndex>=lowLimit) && (nbAttempts))
     {
         nbAttempts--;
         if (matchIndex >= dictLimit)
@@ -527,7 +527,7 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                 mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
                     mlt += LZ4HC_CommonLength(ip+mlt, base+dictLimit, iHighLimit);
-				while ((ip+back > iLowLimit) && (matchIndex+back > dictLowLimit) && (ip[back-1] == match[back-1])) back--;
+				while ((ip+back > iLowLimit) && (matchIndex+back > lowLimit) && (ip[back-1] == match[back-1])) back--;
 				mlt -= back;
                 if ((int)mlt > longest) { longest = (int)mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
             }

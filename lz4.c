@@ -876,8 +876,8 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
  * in order to remove useless branches during compilation optimization.
  */
 FORCE_INLINE int LZ4_decompress_generic(
-                 const char* source,
-                 char* dest,
+                 const char* const source,
+                 char* const dest,
                  int inputSize,
                  int outputSize,         /* If endOnInput==endOnInputSize, this value is the max size of Output Buffer. */
 
@@ -885,7 +885,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                  int partialDecoding,    /* full, partial */
                  int targetOutputSize,   /* only used if partialDecoding==partial */
                  int dict,               /* noDict, withPrefix64k, usingExtDict */
-                 const char* dictStart,  /* only if dict==usingExtDict */
+                 const char* const dictStart,  /* only if dict==usingExtDict */
                  int dictSize            /* note : = 0 if noDict */
                  )
 {
