@@ -268,11 +268,10 @@ typedef struct
 #define LZ4_WILDCOPY(s,d,e)    do { LZ4_COPYPACKET(s,d) } while (d<e);
 #define LZ4_BLINDCOPY(s,d,l)   { BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define HASH_VALUE(p)          HASH_FUNCTION(A32(p))
-#define HASH_POINTER(p)        (HashTable[HASH_VALUE(p)] + base)
 #define DELTANEXT(p)           chainTable[(size_t)(p) & MAXD_MASK]
 #define GETNEXT(p)             ((p) - (size_t)DELTANEXT(p))
 
+static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(A32(ptr)); }
 
 /**************************************
  Private functions
@@ -363,12 +362,12 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
     U16* chainTable = hc4->chainTable;
     U32* HashTable  = hc4->hashTable;
     const BYTE* const base = hc4->base;
-    const U32 target = ip - base;
+    const U32 target = (U32)(ip - base);
     U32 idx = hc4->nextToUpdate;
 
     while(idx < target)
     {
-        U32 h = HASH_VALUE(base+idx);
+        U32 h = LZ4HC_hashPtr(base+idx);
         size_t delta = idx - HashTable[h];
         if (delta>MAX_DISTANCE) delta = MAX_DISTANCE;
         chainTable[idx & 0xFFFF] = (U16)delta;
@@ -398,10 +397,25 @@ static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* co
 }
 
 
-FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,
-                const BYTE* ip, const BYTE* iLimit,
-                const BYTE** matchpos,
-                const int maxNbAttempts)
+static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newBlock)
+{
+	if (ctxPtr->end >= ctxPtr->base + 4)
+		LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   // finish referencing dictionary content
+    // Note : need to handle risk of index overflow
+    // Use only one memory segment for dict, so any previous External Dict is lost at this stage
+    ctxPtr->lowLimit  = ctxPtr->dictLimit;
+    ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
+    ctxPtr->dictBase  = ctxPtr->base;
+    ctxPtr->base = newBlock - ctxPtr->dictLimit;
+    ctxPtr->end  = newBlock;
+    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   // reference table must skip to from beginning of block
+}
+
+
+FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   // Index table will be updated
+                 const BYTE* ip, const BYTE* const iLimit,
+                 const BYTE** matchpos,
+                 const int maxNbAttempts)
 {
     U16* const chainTable = hc4->chainTable;
     U32* const HashTable = hc4->hashTable;
@@ -409,24 +423,41 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,
     const BYTE* const dictBase = hc4->dictBase;
     const U32 dictLimit = hc4->dictLimit;
     U32 matchIndex;
-    const U32 idxLow = (ip-base) > 64 KB ? (ip - base) - 64 KB : 0;
+    const U32 idxLow = (ip-base) > 64 KB ? (U32)(ip - base) - 64 KB : 0;
     const BYTE* match;
     int nbAttempts=maxNbAttempts;
     size_t ml=0;
 
     /* HC4 match finder */
     LZ4HC_Insert(hc4, ip);
-    matchIndex = HashTable[HASH_VALUE(ip)];
+    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
 
     while ((matchIndex>idxLow) && (nbAttempts))
     {
         nbAttempts--;
-        match = ((matchIndex<dictLimit) ? dictBase : base) + matchIndex;
-        if (*(match+ml) == *(ip+ml)
-        && (A32(match) == A32(ip)))
+        if (matchIndex >= dictLimit)
         {
-            size_t mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
-            if (mlt > ml) { ml = mlt; *matchpos = match; }
+            match = base + matchIndex;
+            if (*(match+ml) == *(ip+ml)
+            && (A32(match) == A32(ip)))
+            {
+                size_t mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
+                if (mlt > ml) { ml = mlt; *matchpos = match; }
+            }
+        }
+        else
+        {
+            match = dictBase + matchIndex;
+            if (A32(match) == A32(ip))
+            {
+                size_t mlt;
+                const BYTE* vLimit = ip + (dictLimit - matchIndex);
+                if (vLimit > iLimit) vLimit = iLimit;
+                mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
+                if ((ip+mlt == vLimit) && (vLimit < iLimit))
+                    mlt += LZ4HC_CommonLength(ip+mlt, base+dictLimit, iLimit);
+				if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   // virtual matchpos
+            }
         }
         matchIndex -= chainTable[matchIndex & 0xFFFF];
     }
@@ -438,8 +469,8 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,
 FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                     LZ4HC_Data_Structure* hc4,
                     const BYTE* ip,
-                    const BYTE* startLimit,
-                    const BYTE* matchlimit,
+                    const BYTE* iLowLimit,
+                    const BYTE* iHighLimit,
                     int longest,
                     const BYTE** matchpos,
                     const BYTE** startpos,
@@ -448,53 +479,63 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     U16* const chainTable = hc4->chainTable;
     U32* const HashTable = hc4->hashTable;
     const BYTE* const base = hc4->base;
+    const U32 dictLimit = hc4->dictLimit;
+	const U32 dictLowLimit = hc4->lowLimit;
+    const BYTE* const dictBase = hc4->dictBase;
     const BYTE* match;
-    int matchIndex;
-    const int idxLow = (ip-base) > 64 KB ? (ip-base) - 64 KB : 0;
+    U32   matchIndex;
+    const U32 idxLow = (ip-base) > 64 KB ? (U32)(ip-base) - 64 KB : 0;
     int nbAttempts = maxNbAttempts;
-    int delta = (int)(ip-startLimit);
+    int delta = (int)(ip-iLowLimit);
 
     /* First Match */
     LZ4HC_Insert(hc4, ip);
-    matchIndex = HashTable[HASH_VALUE(ip)];
+    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
 
     while ((matchIndex>idxLow) && (nbAttempts))
     {
         nbAttempts--;
-        match = base + matchIndex;
-        if (*(startLimit + longest) == *(match - delta + longest))
-        if (A32(match) == A32(ip))
+        if (matchIndex >= dictLimit)
         {
-            const BYTE* startt = ip;
-            const BYTE* tmpMatch = match;
-            const BYTE* ipt = ip + MINMATCH + LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, matchlimit);
-
-            while ((startt>startLimit) && (tmpMatch > hc4->inputBuffer) && (startt[-1] == tmpMatch[-1])) {startt--; tmpMatch--;}
-
-            if ((ipt-startt) > longest)
+            match = base + matchIndex;
+            if (*(iLowLimit + longest) == *(match - delta + longest))
+            if (A32(match) == A32(ip))
             {
-                longest = (int)(ipt-startt);
-                *matchpos = tmpMatch;
-                *startpos = startt;
+                const BYTE* startt = ip;
+                const BYTE* tmpMatch = match;
+                const BYTE* const matchEnd = ip + MINMATCH + LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, iHighLimit);
+
+                while ((startt>iLowLimit) && (tmpMatch > iLowLimit) && (startt[-1] == tmpMatch[-1])) {startt--; tmpMatch--;}
+
+                if ((matchEnd-startt) > longest)
+                {
+                    longest = (int)(matchEnd-startt);
+                    *matchpos = tmpMatch;
+                    *startpos = startt;
+                }
+            }
+        }
+        else
+        {
+            match = dictBase + matchIndex;
+            if (A32(match) == A32(ip))
+            {
+                size_t mlt;
+				int back=0;
+                const BYTE* vLimit = ip + (dictLimit - matchIndex);
+                if (vLimit > iHighLimit) vLimit = iHighLimit;
+                mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
+                if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
+                    mlt += LZ4HC_CommonLength(ip+mlt, base+dictLimit, iHighLimit);
+				while ((ip+back > iLowLimit) && (matchIndex+back > dictLowLimit) && (ip[back-1] == match[back-1])) back--;
+				mlt -= back;
+                if ((int)mlt > longest) { longest = (int)mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
             }
         }
         matchIndex -= chainTable[matchIndex & 0xFFFF];
     }
 
     return longest;
-}
-
-
-static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newBlock)
-{
-    LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   // finish referencing dictionary content
-    // Use only one memory segment for dict, so any previous External Dict is lost at this stage
-    ctxPtr->lowLimit  = ctxPtr->dictLimit;
-    ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
-    ctxPtr->dictBase  = ctxPtr->base;
-    ctxPtr->base = newBlock - ctxPtr->dictLimit;
-    ctxPtr->end  = newBlock;
-    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   // reference table must skip to from beginning of block
 }
 
 
@@ -817,7 +858,7 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
     LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) dictionary);
-    LZ4HC_Insert ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*)dictionary +(dictSize-3));
+	if (dictSize >= 4) LZ4HC_Insert ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*)dictionary +(dictSize-3));
     ((LZ4HC_Data_Structure*) LZ4_streamHCPtr)->end = (const BYTE*)dictionary + dictSize;
     return 1;
 }
@@ -845,7 +886,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     LZ4HC_Data_Structure* sp = (LZ4HC_Data_Structure*)LZ4_streamHCPtr;
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 0) dictSize = 0;
-    if (dictSize > (sp->end - sp->base)) dictSize = sp->end - sp->base;
+    if (dictSize > (sp->end - sp->base)) dictSize = (int)(sp->end - sp->base);
     memcpy(safeBuffer, sp->end - dictSize, dictSize);
     LZ4_loadDictHC(LZ4_streamHCPtr, safeBuffer, dictSize);
     return dictSize;
