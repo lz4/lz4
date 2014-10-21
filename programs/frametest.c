@@ -78,7 +78,7 @@ typedef unsigned long long  U64;
 #define MB *(1U<<20)
 #define GB *(1U<<30)
 
-static const U32 nbTestsDefault = 128 KB;
+static const U32 nbTestsDefault = 256 KB;
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)
 #define FUZ_COMPRESSIBILITY_DEFAULT 50
 static const U32 prime1 = 2654435761U;
@@ -597,7 +597,12 @@ int main(int argc, char** argv)
                     argument++;
                     displayLevel--;
                     break;
-                case 'i':
+                case 'p': /* pause at the end */
+                    argument++;
+                    pause = 1;
+                    break;
+
+				case 'i':
                     argument++;
                     nbTests=0;
                     while ((*argument>='0') && (*argument<='9'))
@@ -628,7 +633,7 @@ int main(int argc, char** argv)
                         argument++;
                     }
                     break;
-                case 'p':   /* compressibility % */
+                case 'P':   /* compressibility % */
                     argument++;
                     proba=0;
                     while ((*argument>='0') && (*argument<='9'))
@@ -639,10 +644,6 @@ int main(int argc, char** argv)
                     }
                     if (proba<0) proba=0;
                     if (proba>100) proba=100;
-                    break;
-                case 'P': /* pause at the end */
-                    argument++;
-                    pause = 1;
                     break;
                 default:
                     ;

@@ -234,6 +234,20 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
     size_t streamSize;
 
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
+    {
+        blockSizeID_t proposedBSID = max64KB;
+        size_t maxBlockSize = 64 KB;
+        while (prefs.frameInfo.blockSizeID > proposedBSID)
+        {
+            if (srcSize <= maxBlockSize)
+            {
+                prefs.frameInfo.blockSizeID = proposedBSID;
+                break;
+            }
+            proposedBSID++;
+            maxBlockSize <<= 2;
+        }
+    }
     prefs.autoFlush = 1;
 
     headerSize = 7;      /* basic header size (no option) including magic number */
