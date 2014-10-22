@@ -379,6 +379,21 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 }
 
 
+static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newBlock)
+{
+	if (ctxPtr->end >= ctxPtr->base + 4)
+		LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   // finish referencing dictionary content
+    // Note : need to handle risk of index overflow
+    // Use only one memory segment for dict, so any previous External Dict is lost at this stage
+    ctxPtr->lowLimit  = ctxPtr->dictLimit;
+    ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
+    ctxPtr->dictBase  = ctxPtr->base;
+    ctxPtr->base = newBlock - ctxPtr->dictLimit;
+    ctxPtr->end  = newBlock;
+    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   // reference table must skip to from beginning of block
+}
+
+
 static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const p1Limit)
 {
     const BYTE* const p1Start = p1;
@@ -394,21 +409,6 @@ static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* co
     if ((p1<(p1Limit-1)) && (A16(p2) == A16(p1))) { p1+=2; p2+=2; }
     if ((p1<p1Limit) && (*p2 == *p1)) p1++;
     return (p1 - p1Start);
-}
-
-
-static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newBlock)
-{
-	if (ctxPtr->end >= ctxPtr->base + 4)
-		LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   // finish referencing dictionary content
-    // Note : need to handle risk of index overflow
-    // Use only one memory segment for dict, so any previous External Dict is lost at this stage
-    ctxPtr->lowLimit  = ctxPtr->dictLimit;
-    ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
-    ctxPtr->dictBase  = ctxPtr->base;
-    ctxPtr->base = newBlock - ctxPtr->dictLimit;
-    ctxPtr->end  = newBlock;
-    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   // reference table must skip to from beginning of block
 }
 
 
@@ -618,8 +618,6 @@ static int LZ4HC_compress_generic (
     if (compressionLevel > MAX_COMPRESSION_LEVEL) compressionLevel = MAX_COMPRESSION_LEVEL;
     if (compressionLevel == 0) compressionLevel = LZ4HC_DEFAULT_COMPRESSIONLEVEL;
     maxNbAttempts = 1 << compressionLevel;
-    /* check if blocks follow each other */
-    if (ip != ctx->end) LZ4HC_setExternalDict(ctx, ip);
     ctx->end += inputSize;
 
     ip++;
@@ -866,16 +864,46 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
 
 /* compression */
 
+static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* dsPtr,
+                                            const char* source, char* dest,
+                                            int inputSize, int maxOutputSize, limitedOutput_directive limit)
+{
+    /* auto-init if forgotten */
+    if (dsPtr->base == NULL)
+        LZ4HC_init (dsPtr, (const BYTE*) source);
+
+    /* check if blocks follow each other */
+    if ((const BYTE*)source != dsPtr->end) LZ4HC_setExternalDict(dsPtr, (const BYTE*)source);
+
+	/* Check overlapping input/dictionary space */
+    {
+        const BYTE* sourceEnd = (const BYTE*) source + inputSize;
+        const BYTE* dictBegin = dsPtr->dictBase + dsPtr->lowLimit;
+        const BYTE* dictEnd   = dsPtr->dictBase + dsPtr->dictLimit;
+        if ((sourceEnd > dictBegin) && (sourceEnd < dictEnd))
+        {
+            dsPtr->lowLimit = (U32)(sourceEnd - dsPtr->dictBase);
+            if (dsPtr->dictLimit - dsPtr->lowLimit < 4) dsPtr->lowLimit = dsPtr->dictLimit;
+        }
+    }
+
+    return LZ4HC_compress_generic (dsPtr, source, dest, inputSize, maxOutputSize, dsPtr->compressionLevel, limit);
+}
+
 int LZ4_compressHC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize)
 {
-    if (((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->base == NULL) LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) source);
-    return LZ4HC_compress_generic (LZ4_streamHCPtr, source, dest, inputSize, 0, ((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->compressionLevel, noLimit);
+    //if (((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->base == NULL)
+    //    LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) source);
+    //return LZ4HC_compress_generic (LZ4_streamHCPtr, source, dest, inputSize, 0, ((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->compressionLevel, noLimit);
+    return LZ4_compressHC_continue_generic ((LZ4HC_Data_Structure*)LZ4_streamHCPtr, source, dest, inputSize, 0, noLimit);
 }
 
 int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
-    if (((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->base == NULL) LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) source);
-    return LZ4HC_compress_generic (LZ4_streamHCPtr, source, dest, inputSize, maxOutputSize, ((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->compressionLevel, limitedOutput);
+    //if (((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->base == NULL)
+    //    LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) source);
+    //return LZ4HC_compress_generic (LZ4_streamHCPtr, source, dest, inputSize, maxOutputSize, ((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->compressionLevel, limitedOutput);
+    return LZ4_compressHC_continue_generic ((LZ4HC_Data_Structure*)LZ4_streamHCPtr, source, dest, inputSize, maxOutputSize, limitedOutput);
 }
 
 

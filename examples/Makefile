@@ -58,7 +58,7 @@ endif
 
 default: all
 
-all: printVersion doubleBuffer ringBuffer lineCompress
+all: printVersion doubleBuffer ringBuffer ringBufferHC lineCompress
 
 printVersion: $(LZ4DIR)/lz4.c printVersion.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
@@ -69,6 +69,9 @@ doubleBuffer: $(LZ4DIR)/lz4.c blockStreaming_doubleBuffer.c
 ringBuffer  : $(LZ4DIR)/lz4.c blockStreaming_ringBuffer.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
+ringBufferHC: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c HCStreaming_ringBuffer.c
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
 lineCompress: $(LZ4DIR)/lz4.c blockStreaming_lineByLine.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
@@ -76,10 +79,11 @@ test : all
 	./printVersion$(EXT)
 	./doubleBuffer$(EXT) $(TESTFILE)
 	./ringBuffer$(EXT)   $(TESTFILE)
+	./ringBufferHC$(EXT) $(TESTFILE)
 	./lineCompress$(EXT) $(TESTFILE)
 
 clean:
 	@rm -f core *.o *.dec *-0 *-8192 *.lz4s \
-        printVersion$(EXT) doubleBuffer$(EXT) ringBuffer$(EXT) lineCompress$(EXT)
+        printVersion$(EXT) doubleBuffer$(EXT) ringBuffer$(EXT) ringBufferHC$(EXT) lineCompress$(EXT)
 	@echo Cleaning completed
 
