@@ -289,7 +289,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 /**************************************
    Macros
 **************************************/
-#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(!!(c)) }; }   /* use only *after* variable declarations */
+#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 #if LZ4_ARCH64 || !defined(__GNUC__)
 #  define LZ4_WILDCOPY(d,s,e)   { do { LZ4_COPY8(d,s) } while (d<e); }        /* at the end, d>=e; */
 #else
