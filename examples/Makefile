@@ -83,7 +83,7 @@ test : all
 	./lineCompress$(EXT) $(TESTFILE)
 
 clean:
-	@rm -f core *.o *.dec *-0 *-8192 *.lz4s \
+	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s \
         printVersion$(EXT) doubleBuffer$(EXT) ringBuffer$(EXT) ringBufferHC$(EXT) lineCompress$(EXT)
 	@echo Cleaning completed
 

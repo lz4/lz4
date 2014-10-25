@@ -546,14 +546,14 @@ FORCE_INLINE int LZ4HC_encodeSequence (
                        BYTE** op,
                        const BYTE** anchor,
                        int matchLength,
-                       const BYTE* match,
+                       const BYTE* const match,
                        limitedOutput_directive limitedOutputBuffer,
                        BYTE* oend)
 {
     int length;
     BYTE* token;
 
-    //printf("literal : %u  --  match : %u \n", (U32)(*ip - *anchor), (U32)matchLength);   // debug
+    //if (debug) printf("literal : %u  --  match : %u  --  offset : %u\n", (U32)(*ip - *anchor), (U32)matchLength, (U32)(*ip-match));   // debug
 
     /* Encode Literal length */
     length = (int)(*ip - *anchor);
@@ -880,8 +880,9 @@ static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* dsPtr,
         const BYTE* sourceEnd = (const BYTE*) source + inputSize;
         const BYTE* dictBegin = dsPtr->dictBase + dsPtr->lowLimit;
         const BYTE* dictEnd   = dsPtr->dictBase + dsPtr->dictLimit;
-        if ((sourceEnd > dictBegin) && (sourceEnd < dictEnd))
+        if ((sourceEnd > dictBegin) && ((BYTE*)source < dictEnd))
         {
+            if (sourceEnd > dictEnd) sourceEnd = dictEnd;
             dsPtr->lowLimit = (U32)(sourceEnd - dsPtr->dictBase);
             if (dsPtr->dictLimit - dsPtr->lowLimit < 4) dsPtr->lowLimit = dsPtr->dictLimit;
         }
@@ -892,17 +893,11 @@ static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* dsPtr,
 
 int LZ4_compressHC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize)
 {
-    //if (((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->base == NULL)
-    //    LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) source);
-    //return LZ4HC_compress_generic (LZ4_streamHCPtr, source, dest, inputSize, 0, ((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->compressionLevel, noLimit);
     return LZ4_compressHC_continue_generic ((LZ4HC_Data_Structure*)LZ4_streamHCPtr, source, dest, inputSize, 0, noLimit);
 }
 
 int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
-    //if (((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->base == NULL)
-    //    LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) source);
-    //return LZ4HC_compress_generic (LZ4_streamHCPtr, source, dest, inputSize, maxOutputSize, ((LZ4HC_Data_Structure*)LZ4_streamHCPtr)->compressionLevel, limitedOutput);
     return LZ4_compressHC_continue_generic ((LZ4HC_Data_Structure*)LZ4_streamHCPtr, source, dest, inputSize, maxOutputSize, limitedOutput);
 }
 

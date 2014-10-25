@@ -135,6 +135,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int maxDi
 
 /*
 These functions compress data in successive blocks of any size, using previous blocks as dictionary.
+One key assumption is that each previous block will remain read-accessible while compressing next block.
 
 Before starting compression, state must be properly initialized, using LZ4_resetStreamHC().
 A first "fictional block" can then be designated as initial dictionary, using LZ4_loadDictHC() (Optional).
@@ -143,8 +144,8 @@ Then, use LZ4_compressHC_continue() or LZ4_compressHC_limitedOutput_continue() t
 They work like usual LZ4_compressHC() or LZ4_compressHC_limitedOutput(), but use previous memory blocks to improve compression.
 Previous memory blocks (including initial dictionary when present) must remain accessible and unmodified during compression.
 
-If, for any reason, previous data block can't be preserved in memory for next block compression,
-you can still preserve it by moving it to a safer place,
+If, for any reason, previous data block can't be preserved in memory during next compression block,
+you can save it to a safer memory space,
 using LZ4_saveDictHC().
 */
 
