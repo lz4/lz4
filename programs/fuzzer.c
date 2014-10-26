@@ -97,7 +97,7 @@ static U32 g_time = 0;
 
 
 /*********************************************************
-Fuzzer functions
+  Fuzzer functions
 *********************************************************/
 static U32 FUZ_GetMilliStart(void)
 {
@@ -108,7 +108,6 @@ static U32 FUZ_GetMilliStart(void)
     return nCount;
 }
 
-
 static U32 FUZ_GetMilliSpan(U32 nTimeStart)
 {
     U32 nCurrent = FUZ_GetMilliStart();
@@ -117,7 +116,6 @@ static U32 FUZ_GetMilliSpan(U32 nTimeStart)
         nSpan += 0x100000 * 1000;
     return nSpan;
 }
-
 
 static U32 FUZ_rotl32(U32 u32, U32 nbBits)
 {
@@ -685,7 +683,7 @@ static void FUZ_unitTests(void)
     // 32-bits address space overflow test
     FUZ_AddressOverflow();
 
-    // LZ4 steraming tests
+    // LZ4 streaming tests
     {
         LZ4_stream_t* statePtr;
         LZ4_stream_t  streamingState;
@@ -916,9 +914,61 @@ static void FUZ_unitTests(void)
             }
         }
 
+        // long stream test ; Warning : very long test !
+        if (1)
+        {
+            XXH64_state_t crcOrigState;
+            XXH64_state_t crcNewState;
+            const U64 totalTestSize = 6ULL << 30;
+            U64 totalTestDone = 0;
+            size_t oldStart = 0;
+            size_t oldSize  = 0;
+            U32 segNb = 1;
+
+            DISPLAY("Long HC streaming test (%u MB)\n", (U32)(totalTestSize >> 20));
+            LZ4_resetStreamHC(&sHC, 0);
+
+            XXH64_reset(&crcOrigState, 0);
+            XXH64_reset(&crcNewState, 0);
+
+            while (totalTestDone < totalTestSize)
+            {
+                size_t testSize = (FUZ_rand(&randState) & 65535) + 1;
+                size_t testStart = FUZ_rand(&randState) & 65535;
+
+                FUZ_displayUpdate((U32)(totalTestDone >> 20));
+
+                XXH64_update(&crcOrigState, testInput + testStart, testSize);
+                crcOrig = XXH64_digest(&crcOrigState);
+
+                result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + testStart, testCompressed, (int)testSize, LZ4_compressBound((int)testSize));
+                FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
+
+                result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, (int)testSize, testInput + oldStart, (int)oldSize);
+                FUZ_CHECKTEST(result!=(int)testSize, "LZ4_decompress_safe_usingDict() dictionary decompression part %i failed", segNb);
+
+                XXH64_update(&crcNewState, testVerify, testSize);
+                crcNew = XXH64_digest(&crcNewState);
+                if (crcOrig!=crcNew)
+                {
+                    size_t c=0;
+                    while (testVerify[c] == testInput[testStart+c]) c++;
+                    DISPLAY("Bad decompression at %u / %u \n", (U32)c, (U32)testSize);
+                }
+                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() part %i corruption", segNb);
+
+                oldStart = testStart;
+                oldSize = testSize;
+                totalTestDone += testSize;
+
+                segNb ++;
+            }
+
+            DISPLAY("\r");
+        }
     }
 
-    printf("All unit tests completed succesfully \n");
+    printf("All unit tests completed successfully \n");
     return;
 _output_error:
     exit(1);
