@@ -174,13 +174,13 @@ test-frame: frametest
 
 test-mem: lz4 datagen frametest
 	./datagen -g16KB > tmp
-	valgrind ./lz4 -9 -BD -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp
-	valgrind ./lz4 -9 -B5D -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp /dev/null
 	./datagen -g256MB > tmp
-	valgrind ./lz4 -B4D -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -B4D -f tmp /dev/null
 	rm tmp
-	valgrind ./frametest -i100
+	valgrind --leak-check=yes ./frametest -i100
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...

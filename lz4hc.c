@@ -920,7 +920,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     LZ4HC_Data_Structure* sp = (LZ4HC_Data_Structure*)LZ4_streamHCPtr;
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 0) dictSize = 0;
-    if (dictSize > (sp->end - sp->base)) dictSize = (int)(sp->end - sp->base);
+    if (dictSize > (sp->end - (sp->base + sp->lowLimit))) dictSize = (int)(sp->end - (sp->base + sp->lowLimit));
     memcpy(safeBuffer, sp->end - dictSize, dictSize);
     LZ4_loadDictHC(LZ4_streamHCPtr, safeBuffer, dictSize);
     return dictSize;

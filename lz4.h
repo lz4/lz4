@@ -47,8 +47,8 @@ extern "C" {
    Version
 **************************************/
 #define LZ4_VERSION_MAJOR    1    /* for major interface/format changes  */
-#define LZ4_VERSION_MINOR    4    /* for minor interface/format changes  */
-#define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
+#define LZ4_VERSION_MINOR    3    /* for minor interface/format changes  */
+#define LZ4_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 int LZ4_versionNumber (void);
 

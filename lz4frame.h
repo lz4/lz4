@@ -70,7 +70,7 @@ typedef size_t LZ4F_errorCode_t;
         ITEM(ERROR_maxCode)
 
 #define LZ4F_GENERATE_ENUM(ENUM) ENUM,
-typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to let programmer detect & handle specific errors */
+typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to detect & handle specific errors; compare function result to -enum value */
 
 int LZ4F_isError(LZ4F_errorCode_t code);   /* Basically : code > -ERROR_maxCode */
 const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return enum as string */
