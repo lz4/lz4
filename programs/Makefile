@@ -153,9 +153,9 @@ uninstall:
 	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
 	@echo lz4 successfully uninstalled
 
-test: test-lz4 test-lz4c test-frame test-fullbench test-fuzzer test-mem
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
 
-test32: test-lz4c32 test-frame32 test-fullbench32 test-fuzzer32 test-mem32
+test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
 
 test-all: test test32
 
@@ -190,10 +190,10 @@ test-fuzzer: fuzzer
 test-fuzzer32: fuzzer32
 	./fuzzer32
 
-test-frame: frametest
+test-frametest: frametest
 	./frametest
 
-test-frame32: frametest32
+test-frametest32: frametest32
 	./frametest32
 
 test-mem: lz4 datagen frametest
