@@ -74,7 +74,7 @@ int LZ4_compressHC2_limitedOutput (const char* source, char* dest, int inputSize
 */
 
 /* Note :
-Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD license)
+   Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD license)
 */
 
 
@@ -95,19 +95,69 @@ int LZ4_sizeofStateHC();
 
 Note that tables must be aligned for pointer (32 or 64 bits), otherwise compression will fail (return code 0).
 
-The allocated memory can be provided to the compressions functions using 'void* state' parameter.
+The allocated memory can be provided to the compression functions using 'void* state' parameter.
 LZ4_compress_withStateHC() and LZ4_compress_limitedOutput_withStateHC() are equivalent to previously described functions.
-They just use the externally allocated memory area instead of allocating their own (on stack, or on heap).
+They just use the externally allocated memory for state instead of allocating their own (on stack, or on heap).
 */
 
 
+
 /**************************************
-   Streaming Functions
+   Experimental Streaming Functions
+**************************************/
+#define LZ4_STREAMHCSIZE_U32 65548
+#define LZ4_STREAMHCSIZE     (LZ4_STREAMHCSIZE_U32 * sizeof(unsigned int))
+typedef struct { unsigned int table[LZ4_STREAMHCSIZE_U32]; } LZ4_streamHC_t;
+
+/*
+This structure allows static allocation of LZ4 HC streaming state.
+State must then be initialized using LZ4_resetStreamHC() before first use.
+
+If you prefer dynamic allocation, please refer to functions below.
+*/
+
+LZ4_streamHC_t* LZ4_createStreamHC(void);
+int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr);
+
+/*
+These functions create and release memory for LZ4 HC streaming state.
+Newly created states are already initialized.
+Existing state space can be re-used anytime using LZ4_resetStreamHC().
+*/
+
+void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
+int  LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize);
+
+int LZ4_compressHC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize);
+int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
+
+int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int maxDictSize);
+
+/*
+These functions compress data in successive blocks of any size, using previous blocks as dictionary.
+One key assumption is that each previous block will remain read-accessible while compressing next block.
+
+Before starting compression, state must be properly initialized, using LZ4_resetStreamHC().
+A first "fictional block" can then be designated as initial dictionary, using LZ4_loadDictHC() (Optional).
+
+Then, use LZ4_compressHC_continue() or LZ4_compressHC_limitedOutput_continue() to compress each successive block.
+They work like usual LZ4_compressHC() or LZ4_compressHC_limitedOutput(), but use previous memory blocks to improve compression.
+Previous memory blocks (including initial dictionary when present) must remain accessible and unmodified during compression.
+
+If, for any reason, previous data block can't be preserved in memory during next compression block,
+you can save it to a safer memory space,
+using LZ4_saveDictHC().
+*/
+
+
+
+/**************************************
+   Deprecated Streaming Functions
 **************************************/
 /* Note : these streaming functions still follows the older model */
 void* LZ4_createHC (const char* inputBuffer);
-int   LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize);
-int   LZ4_compressHC_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize);
+//int   LZ4_compressHC_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize);
+//int   LZ4_compressHC_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize);
 char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
 int   LZ4_freeHC (void* LZ4HC_Data);
 

@@ -78,7 +78,7 @@ typedef unsigned long long  U64;
 #define MB *(1U<<20)
 #define GB *(1U<<30)
 
-static const U32 nbTestsDefault = 128 KB;
+static const U32 nbTestsDefault = 256 KB;
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)
 #define FUZ_COMPRESSIBILITY_DEFAULT 50
 static const U32 prime1 = 2654435761U;
@@ -426,10 +426,11 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         LZ4F_preferences_t* prefsPtr = &prefs;
 
         (void)FUZ_rand(&coreRand);   // update rand seed
-        prefs.frameInfo.blockMode = BMId;
-        prefs.frameInfo.blockSizeID = BSId;
-        prefs.frameInfo.contentChecksumFlag = CCflag;
+        prefs.frameInfo.blockMode = (blockMode_t)BMId;
+        prefs.frameInfo.blockSizeID = (blockSizeID_t)BSId;
+        prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)CCflag;
         prefs.autoFlush = autoflush;
+        prefs.compressionLevel = FUZ_rand(&randState) % 5;
         if ((FUZ_rand(&randState)&0xF) == 1) prefsPtr = NULL;
 
         DISPLAYUPDATE(2, "\r%5u   ", testNb);
@@ -444,7 +445,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         {
             const BYTE* ip = (const BYTE*)srcBuffer + srcStart;
             const BYTE* const iend = ip + srcSize;
-            BYTE* op = compressedBuffer;
+            BYTE* op = (BYTE*)compressedBuffer;
             BYTE* const oend = op + LZ4F_compressFrameBound(srcDataLength, NULL);
             unsigned maxBits = FUZ_highbit((U32)srcSize);
             result = LZ4F_compressBegin(cCtx, op, oend-op, prefsPtr);
@@ -478,9 +479,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         }
 
         {
-            const BYTE* ip = compressedBuffer;
+            const BYTE* ip = (const BYTE*)compressedBuffer;
             const BYTE* const iend = ip + cSize;
-            BYTE* op = decodedBuffer;
+            BYTE* op = (BYTE*)decodedBuffer;
             BYTE* const oend = op + srcDataLength;
             unsigned maxBits = FUZ_highbit((U32)cSize);
             unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;
@@ -597,6 +598,11 @@ int main(int argc, char** argv)
                     argument++;
                     displayLevel--;
                     break;
+                case 'p': /* pause at the end */
+                    argument++;
+                    pause = 1;
+                    break;
+
                 case 'i':
                     argument++;
                     nbTests=0;
@@ -628,7 +634,7 @@ int main(int argc, char** argv)
                         argument++;
                     }
                     break;
-                case 'p':   /* compressibility % */
+                case 'P':   /* compressibility % */
                     argument++;
                     proba=0;
                     while ((*argument>='0') && (*argument<='9'))
@@ -639,10 +645,6 @@ int main(int argc, char** argv)
                     }
                     if (proba<0) proba=0;
                     if (proba>100) proba=100;
-                    break;
-                case 'P': /* pause at the end */
-                    argument++;
-                    pause = 1;
                     break;
                 default:
                     ;

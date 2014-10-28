@@ -89,6 +89,16 @@ NONTEXT = images/image00.png images/image01.png images/image02.png \
 SOURCES = $(TEXT) $(NONTEXT)
 
 
+# Select test target for Travis CI's Build Matrix
+ifeq ($(LZ4_TRAVIS_CI_ENV),-dist)
+TRAVIS_TARGET=dist
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-examples)
+TRAVIS_TARGET=examples
+else
+TRAVIS_TARGET=test-prg
+endif
+
+
 default: liblz4
 	@cd $(PRGDIR); $(MAKE) -e
 
@@ -167,8 +177,14 @@ dist: clean
 	@echo Distribution $(DISTRIBNAME) built
 
 test:
-	make dist
-	@cd examples; $(MAKE) -e $@
 	@cd $(PRGDIR); $(MAKE) -e $@
+
+test-travis: $(TRAVIS_TARGET)
+
+examples:
+	cd examples; $(MAKE) -e test
+
+test-prg:
+	@cd $(PRGDIR); $(MAKE) -e test-travis
 
 endif

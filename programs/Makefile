@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r123
+RELEASE=r124
 
 DESTDIR?=
 PREFIX ?= /usr
@@ -45,15 +45,6 @@ LZ4DIR=..
 
 TEST_FILES = COPYING
 TEST_TARGETS=test-native
-BENCH_NB=-i5
-
-# Minimize test target for Travis CI's Build Matrix
-ifeq ($(LZ4_TRAVIS_CI_ENV),-m32)
-TEST_TARGETS=test-force32
-BENCH_NB=-i1
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-m64)
-BENCH_NB=-i1
-endif
 
 
 # Define *.exe as extension for Windows systems
@@ -66,9 +57,35 @@ VOID = /dev/null
 endif
 
 
+# Select test target for Travis CI's Build Matrix
+ifeq ($(LZ4_TRAVIS_CI_ENV),-lz4)
+TRAVIS_TARGET=test-lz4
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-lz4c)
+TRAVIS_TARGET=test-lz4c
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-lz4c32)
+TRAVIS_TARGET=test-lz4c32
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-fullbench)
+TRAVIS_TARGET=test-fullbench
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-fullbench32)
+TRAVIS_TARGET=test-fullbench32
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-fuzzer)
+TRAVIS_TARGET=test-fuzzer
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-fuzzer32)
+TRAVIS_TARGET=test-fuzzer32
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-frametest)
+TRAVIS_TARGET=test-frametest
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-frametest32)
+TRAVIS_TARGET=test-frametest32
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-mem)
+TRAVIS_TARGET=test-mem
+else
+TRAVIS_TARGET=test
+endif
+
+
 default: lz4 lz4c
 
-all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest datagen
+all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest frametest32 datagen
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
@@ -94,6 +111,9 @@ fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
+frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
+
 datagen : datagen.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
@@ -103,7 +123,8 @@ clean:
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
-        frametest$(EXT) datagen$(EXT)
+        frametest$(EXT) frametest32$(EXT) \
+        datagen$(EXT)
 	@echo Cleaning completed
 
 
@@ -132,13 +153,13 @@ uninstall:
 	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
 	@echo lz4 successfully uninstalled
 
-test-native: test-lz4 test-lz4c test-frame test-fullbench test-fuzzer test-mem
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
 
-test-force32: test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
+test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
 
-test-all: test-native test-force32
+test-all: test test32
 
-test: $(TEST_TARGETS)
+test-travis: $(TRAVIS_TARGET)
 
 test-lz4: lz4 datagen
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
@@ -158,10 +179,10 @@ test-lz4c32: lz4 lz4c32 lz4 datagen
 	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
 
 test-fullbench: fullbench
-	./fullbench --no-prompt $(BENCH_NB) $(TEST_FILES)
+	./fullbench --no-prompt $(TEST_FILES)
 
 test-fullbench32: fullbench32
-	./fullbench32 --no-prompt $(BENCH_NB) $(TEST_FILES)
+	./fullbench32 --no-prompt $(TEST_FILES)
 
 test-fuzzer: fuzzer
 	./fuzzer
@@ -169,18 +190,21 @@ test-fuzzer: fuzzer
 test-fuzzer32: fuzzer32
 	./fuzzer32
 
-test-frame: frametest
+test-frametest: frametest
 	./frametest
+
+test-frametest32: frametest32
+	./frametest32
 
 test-mem: lz4 datagen frametest
 	./datagen -g16KB > tmp
-	valgrind ./lz4 -9 -BD -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp
-	valgrind ./lz4 -9 -B5D -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp /dev/null
 	./datagen -g256MB > tmp
-	valgrind ./lz4 -B4D -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -B4D -f tmp /dev/null
 	rm tmp
-	valgrind ./frametest -i100
+	valgrind --leak-check=yes ./frametest -i100
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...

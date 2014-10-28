@@ -313,12 +313,12 @@ static int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inS
 
 static int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_continue(ctx, in, out, inSize);
+    return LZ4_compressHC_continue((LZ4_streamHC_t*)ctx, in, out, inSize);
 }
 
 static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_limitedOutput_continue(ctx, in, out, inSize, LZ4_compressBound(inSize));
+    return LZ4_compressHC_limitedOutput_continue((LZ4_streamHC_t*)ctx, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static int local_LZ4F_compressFrame(const char* in, char* out, int inSize)
