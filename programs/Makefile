@@ -94,6 +94,9 @@ fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
+frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
+	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
+
 datagen : datagen.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
@@ -103,7 +106,8 @@ clean:
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
-        frametest$(EXT) datagen$(EXT)
+        frametest$(EXT) frametest32$(EXT) \
+        datagen$(EXT)
 	@echo Cleaning completed
 
 
@@ -134,7 +138,7 @@ uninstall:
 
 test-native: test-lz4 test-lz4c test-frame test-fullbench test-fuzzer test-mem
 
-test-force32: test-lz4c32 test-fullbench32 test-fuzzer32 test-mem32
+test-force32: test-lz4c32 test-frame32 test-fullbench32 test-fuzzer32 test-mem32
 
 test-all: test-native test-force32
 
@@ -171,6 +175,9 @@ test-fuzzer32: fuzzer32
 
 test-frame: frametest
 	./frametest
+
+test-frame32: frametest32
+	./frametest32
 
 test-mem: lz4 datagen frametest
 	./datagen -g16KB > tmp
