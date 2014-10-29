@@ -196,7 +196,7 @@ test-frametest: frametest
 test-frametest32: frametest32
 	./frametest32
 
-test-mem: lz4 datagen frametest
+test-mem: lz4 datagen fuzzer frametest
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp
@@ -204,6 +204,7 @@ test-mem: lz4 datagen frametest
 	./datagen -g256MB > tmp
 	valgrind --leak-check=yes ./lz4 -B4D -f tmp /dev/null
 	rm tmp
+	valgrind --leak-check=yes ./fuzzer -i50 -t0
 	valgrind --leak-check=yes ./frametest -i100
 
 test-mem32: lz4c32 datagen

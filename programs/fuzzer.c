@@ -1058,7 +1058,7 @@ int main(int argc, char** argv)
 
                 case 't':   /* select starting test nb */
                     argument++;
-                    testNb=0;
+                    testNb=0; seedset=1;
                     while ((*argument>='0') && (*argument<='9'))
                     {
                         testNb *= 10;
