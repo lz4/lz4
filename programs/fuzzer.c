@@ -600,6 +600,7 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
         FUZ_DISPLAYTEST;
         dict -= (FUZ_rand(&randState) & 7);    // even bigger separation
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
+        LZ4_resetStreamHC (&LZ4dictHC, FUZ_rand(&randState) & 0x7);
         LZ4_loadDictHC(&LZ4dictHC, dict, dictSize);
         blockContinueCompressedSize = LZ4_compressHC_continue(&LZ4dictHC, block, compressedBuffer, blockSize);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compressHC_continue failed");
