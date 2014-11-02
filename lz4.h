@@ -200,7 +200,7 @@ int           LZ4_freeStream (LZ4_stream_t* LZ4_streamPtr);
  * Use this function to load a static dictionary into LZ4_stream.
  * Any previous data will be forgotten, only 'dictionary' will remain in memory.
  * Loading a size of 0 is allowed.
- * Return : 1 if OK, 0 if error
+ * Return : dictionary size, in bytes (necessarily <= 64 KB)
  */
 int LZ4_loadDict (LZ4_stream_t* LZ4_streamPtr, const char* dictionary, int dictSize);
 

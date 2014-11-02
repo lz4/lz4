@@ -250,14 +250,14 @@ typedef struct
 {
     U32   hashTable[HASHTABLESIZE];
     U16   chainTable[MAXD];
-    const BYTE* inputBuffer;
-    const BYTE* base;
-    const BYTE* end;
-    const BYTE* dictBase;
-    U32   dictLimit;
+    const BYTE* end;        /* next block here to keep current prefix as prefix */
+    const BYTE* base;       /* All index relative to this position */
+    const BYTE* dictBase;   /* alternate base for extDict */
+    U32   dictLimit;        /* below that point, need extDict */
+    U32   lowLimit;         /* below that point, no more dict */
     U32   nextToUpdate;
     U32   compressionLevel;
-    U32   lowLimit;
+    const BYTE* inputBuffer;   /* deprecated */
 } LZ4HC_Data_Structure;
 
 
@@ -342,7 +342,7 @@ FORCE_INLINE int LZ4_NbCommonBytes (register U32 val)
 #endif
 
 
-FORCE_INLINE void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* base)
+static void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
@@ -857,10 +857,16 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
-    LZ4HC_init ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*) dictionary);
-    if (dictSize >= 4) LZ4HC_Insert ((LZ4HC_Data_Structure*) LZ4_streamHCPtr, (const BYTE*)dictionary +(dictSize-3));
-    ((LZ4HC_Data_Structure*) LZ4_streamHCPtr)->end = (const BYTE*)dictionary + dictSize;
-    return 1;
+    LZ4HC_Data_Structure* streamPtr = (LZ4HC_Data_Structure*) LZ4_streamHCPtr;
+    if (dictSize > 64 KB)
+    {
+        dictionary += dictSize - 64 KB;
+        dictSize = 64 KB;
+    }
+    LZ4HC_init (streamPtr, (const BYTE*)dictionary);
+    if (dictSize >= 4) LZ4HC_Insert (streamPtr, (const BYTE*)dictionary +(dictSize-3));
+    streamPtr->end = (const BYTE*)dictionary + dictSize;
+    return dictSize;
 }
 
 
@@ -917,20 +923,27 @@ int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, cons
 
 int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictSize)
 {
-    LZ4HC_Data_Structure* sp = (LZ4HC_Data_Structure*)LZ4_streamHCPtr;
+    LZ4HC_Data_Structure* streamPtr = (LZ4HC_Data_Structure*)LZ4_streamHCPtr;
+    int prefixSize = (int)(streamPtr->end - (streamPtr->base + streamPtr->dictLimit));
     if (dictSize > 64 KB) dictSize = 64 KB;
-    if (dictSize < 0) dictSize = 0;
-    if (dictSize > (sp->end - (sp->base + sp->lowLimit))) dictSize = (int)(sp->end - (sp->base + sp->lowLimit));
-    memcpy(safeBuffer, sp->end - dictSize, dictSize);
-    LZ4_loadDictHC(LZ4_streamHCPtr, safeBuffer, dictSize);
+    if (dictSize < 4) dictSize = 0;
+    if (dictSize > prefixSize) dictSize = prefixSize;
+    memcpy(safeBuffer, streamPtr->end - dictSize, dictSize);
+    //LZ4_loadDictHC(LZ4_streamHCPtr, safeBuffer, dictSize);
+    {
+        U32 endIndex = (U32)(streamPtr->end - streamPtr->base);
+        streamPtr->end = (const BYTE*)safeBuffer + dictSize;
+        streamPtr->base = streamPtr->end - endIndex;
+        streamPtr->dictLimit = endIndex - dictSize;
+        streamPtr->lowLimit = endIndex - dictSize;
+    }
     return dictSize;
 }
 
 
-
 /***********************************
-Deprecated Streaming functions
-***********************************/
+ * Deprecated Functions
+ ***********************************/
 int LZ4_sizeofStreamStateHC(void) { return LZ4_STREAMHCSIZE; }
 
 int LZ4_resetStreamStateHC(void* state, const char* inputBuffer)

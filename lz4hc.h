@@ -145,7 +145,7 @@ They work like usual LZ4_compressHC() or LZ4_compressHC_limitedOutput(), but use
 Previous memory blocks (including initial dictionary when present) must remain accessible and unmodified during compression.
 
 If, for any reason, previous data block can't be preserved in memory during next compression block,
-you can save it to a safer memory space,
+you must save it to a safer memory space,
 using LZ4_saveDictHC().
 */
 

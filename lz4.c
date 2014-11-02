@@ -701,6 +701,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 LZ4_stream_t* LZ4_createStream(void)
 {
     LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOCATOR(4, LZ4_STREAMSIZE_U32);
+    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
     LZ4_resetStream(lz4s);
     return lz4s;
 }
@@ -719,14 +720,13 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
-    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
     if (dict->initCheck) LZ4_resetStream(LZ4_dict);                         /* Uninitialized structure detected */
 
     if (dictSize < MINMATCH)
     {
         dict->dictionary = NULL;
         dict->dictSize = 0;
-        return 1;
+        return 0;
     }
 
     if (p <= dictEnd - 64 KB) p = dictEnd - 64 KB;
@@ -741,7 +741,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
         p+=3;
     }
 
-    return 1;
+    return dict->dictSize;
 }
 
 
