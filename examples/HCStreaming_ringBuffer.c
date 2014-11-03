@@ -3,8 +3,8 @@
 
 
 /**************************************
-Compiler Options
-**************************************/
+ * Compiler Options
+ **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  define _CRT_SECURE_NO_WARNINGS // for MSVC
 #  define snprintf sprintf_s
@@ -16,10 +16,9 @@ Compiler Options
 #endif
 
 
-
 /**************************************
-Includes
-**************************************/
+ * Includes
+ **************************************/
 #include "lz4hc.h"
 #include "lz4.h"
 
@@ -98,7 +97,7 @@ void test_decompress(FILE* outFp, FILE* inpFp)
     LZ4_streamDecode_t* lz4StreamDecode = &lz4StreamDecode_body;
     unsigned done = 0;
 
-    for(;;) 
+    for(;;)
     {
         int  cmpBytes = 0;
         char cmpBuf[LZ4_COMPRESSBOUND(MESSAGE_MAX_BYTES)];
@@ -106,11 +105,11 @@ void test_decompress(FILE* outFp, FILE* inpFp)
         {
             const size_t r0 = read_int32(inpFp, &cmpBytes);
             size_t r1;
-            if(r0 != 1 || cmpBytes <= 0) 
+            if(r0 != 1 || cmpBytes <= 0)
                 break;
 
             r1 = read_bin(inpFp, cmpBuf, cmpBytes);
-            if(r1 != (size_t) cmpBytes) 
+            if(r1 != (size_t) cmpBytes)
                 break;
         }
 
@@ -118,7 +117,7 @@ void test_decompress(FILE* outFp, FILE* inpFp)
             char* const decPtr = &decBuf[decOffset];
             const int decBytes = LZ4_decompress_safe_continue(
                 lz4StreamDecode, cmpBuf, decPtr, cmpBytes, MESSAGE_MAX_BYTES);
-            if(decBytes <= 0) 
+            if(decBytes <= 0)
                 break;
 
             done += decBytes;
@@ -126,7 +125,7 @@ void test_decompress(FILE* outFp, FILE* inpFp)
             write_bin(outFp, decPtr, decBytes);
 
             // Wraparound the ringbuffer offset
-            if(decOffset >= DEC_BUFFER_BYTES - MESSAGE_MAX_BYTES) 
+            if(decOffset >= DEC_BUFFER_BYTES - MESSAGE_MAX_BYTES)
                 decOffset = 0;
         }
     }
@@ -192,9 +191,9 @@ int main(int argc, char** argv)
     snprintf(lz4Filename, 256, "%s.lz4s-%d", argv[fileID], 9);
     snprintf(decFilename, 256, "%s.lz4s-%d.dec", argv[fileID], 9);
 
-    printf("inp = [%s]\n", inpFilename);
-    printf("lz4 = [%s]\n", lz4Filename);
-    printf("dec = [%s]\n", decFilename);
+    printf("input   = [%s]\n", inpFilename);
+    printf("lz4     = [%s]\n", lz4Filename);
+    printf("decoded = [%s]\n", decFilename);
 
     // compress
     {

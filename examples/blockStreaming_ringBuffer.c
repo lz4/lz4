@@ -1,18 +1,32 @@
 // LZ4 streaming API example : ring buffer
-// Copyright : Takayuki Matsuoka
+// Based on sample code from Takayuki Matsuoka
 
 
-#define _CRT_SECURE_NO_WARNINGS // for MSVC
-#include "lz4.h"
+/**************************************
+ * Compiler Options
+ **************************************/
+#ifdef _MSC_VER    /* Visual Studio */
+#  define _CRT_SECURE_NO_WARNINGS // for MSVC
+#  define snprintf sprintf_s
+#endif
+#ifdef __GNUC__
+#  pragma GCC diagnostic ignored "-Wmissing-braces"   /* GCC bug 53119 : doesn't accept { 0 } as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
+#endif
 
+
+/**************************************
+ * Includes
+ **************************************/
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "lz4.h"
+
 
 enum {
     MESSAGE_MAX_BYTES   = 1024,
-    RING_BUFFER_BYTES   = 1024 * 256 + MESSAGE_MAX_BYTES,
+    RING_BUFFER_BYTES   = 1024 * 8 + MESSAGE_MAX_BYTES,
     DICT_BYTES          = 65536,
 };
 
