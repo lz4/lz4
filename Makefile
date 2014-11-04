@@ -90,14 +90,10 @@ SOURCES = $(TEXT) $(NONTEXT)
 
 
 # Select test target for Travis CI's Build Matrix
-ifeq ($(LZ4_TRAVIS_CI_ENV),-dist)
-TRAVIS_TARGET=dist
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-cmake)
-TRAVIS_TARGET=cmake
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-examples)
-TRAVIS_TARGET=examples
+ifneq (,$(filter test-%,$(LZ4_TRAVIS_CI_ENV)))
+TRAVIS_TARGET=prg-travis
 else
-TRAVIS_TARGET=test-prg
+TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
 endif
 
 
@@ -113,7 +109,7 @@ liblz4: lz4.c lz4hc.c
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs liblz4.a lz4.o lz4hc.o
-	@echo compiling dynamic library
+	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
@@ -186,10 +182,10 @@ test-travis: $(TRAVIS_TARGET)
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
-examples:
+streaming-examples:
 	cd examples; $(MAKE) -e test
 
-test-prg:
+prg-travis:
 	@cd $(PRGDIR); $(MAKE) -e test-travis
 
 endif

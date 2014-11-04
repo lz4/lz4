@@ -58,29 +58,7 @@ endif
 
 
 # Select test target for Travis CI's Build Matrix
-ifeq ($(LZ4_TRAVIS_CI_ENV),-lz4)
-TRAVIS_TARGET=test-lz4
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-lz4c)
-TRAVIS_TARGET=test-lz4c
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-lz4c32)
-TRAVIS_TARGET=test-lz4c32
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-fullbench)
-TRAVIS_TARGET=test-fullbench
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-fullbench32)
-TRAVIS_TARGET=test-fullbench32
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-fuzzer)
-TRAVIS_TARGET=test-fuzzer
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-fuzzer32)
-TRAVIS_TARGET=test-fuzzer32
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-frametest)
-TRAVIS_TARGET=test-frametest
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-frametest32)
-TRAVIS_TARGET=test-frametest32
-else ifeq ($(LZ4_TRAVIS_CI_ENV),-mem)
-TRAVIS_TARGET=test-mem
-else
-TRAVIS_TARGET=test
-endif
+TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
 
 
 default: lz4 lz4c
@@ -166,6 +144,7 @@ test-lz4: lz4 datagen
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
+# test frame concatenation with null-length frame
 	echo -n > empty.test
 	echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
@@ -175,6 +154,8 @@ test-lz4: lz4 datagen
 	./lz4 -d concat.lz4.test > result.test
 	sdiff orig.test result.test
 	@rm *.test
+	@echo frame concatenation test completed
+# test frame concatenation with null-length frame
 	
 
 test-lz4c: lz4c datagen
