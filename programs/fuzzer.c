@@ -663,8 +663,8 @@ _output_error:
 }
 
 
-#define testInputSize (128 KB)
-#define testCompressedSize (64 KB)
+#define testInputSize (192 KB)
+#define testCompressedSize (128 KB)
 #define ringBufferSize (8 KB)
 
 static void FUZ_unitTests(void)
@@ -786,15 +786,15 @@ static void FUZ_unitTests(void)
         FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
 
         result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, testCompressedSize, testInput, 64 KB);
-        FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() dictionary decompression failed");
+        FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() simple dictionary decompression test failed");
         crcNew = XXH64(testVerify, testCompressedSize, 0);
-        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
+        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() simple dictionary decompression test : corruption");
 
         // multiple HC compression test with dictionary
         {
             int result1, result2;
             int segSize = testCompressedSize / 2;
-            crcOrig = XXH64(testInput + segSize, 64 KB, 0);
+            crcOrig = XXH64(testInput + segSize, testCompressedSize, 0);
             LZ4_resetStreamHC(&sHC, 0);
             LZ4_loadDictHC(&sHC, testInput, segSize);
             result1 = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + segSize, testCompressed, segSize, segSize -1);
@@ -915,6 +915,48 @@ static void FUZ_unitTests(void)
             }
         }
 
+        // small decoder-side ring buffer test
+        {
+            XXH64_state_t xxhOrig;
+            XXH64_state_t xxhNew;
+            LZ4_streamDecode_t decodeState;
+            const U32 maxMessageSizeLog = 10;
+            const U32 maxMessageSizeMask = (1<<maxMessageSizeLog) - 1;
+            U32 messageSize = (FUZ_rand(&randState) & maxMessageSizeMask) + 1;
+            U32 totalMessageSize = 0;
+            U32 iNext = 0;
+            U32 dNext = 0;
+            const U32 dBufferSize = 64 KB + maxMessageSizeMask;
+
+            XXH64_reset(&xxhOrig, 0);
+            XXH64_reset(&xxhNew, 0);
+            LZ4_resetStreamHC(&sHC, 0);
+            LZ4_setStreamDecode(&decodeState, NULL, 0);
+
+            while (totalMessageSize < 9 MB)
+            {
+                XXH64_update(&xxhOrig, testInput + iNext, messageSize);
+                crcOrig = XXH64_digest(&xxhOrig);
+
+                result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + iNext, testCompressed, messageSize, testCompressedSize-ringBufferSize);
+                FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() compression failed");
+
+                result = LZ4_decompress_safe_continue(&decodeState, testCompressed, testVerify + dNext, result, messageSize);
+                FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
+
+                XXH64_update(&xxhNew, testVerify + dNext, messageSize);
+                crcNew = crcOrig = XXH64_digest(&xxhNew);
+                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+
+                // prepare next message
+                dNext += messageSize;
+                totalMessageSize += messageSize;
+                messageSize = (FUZ_rand(&randState) & maxMessageSizeMask) + 1;
+                iNext = (FUZ_rand(&randState) & 65535);
+                if (dNext + messageSize > dBufferSize) dNext = 0;
+            }
+        }
+
         // long stream test ; Warning : very long test !
         if (1)
         {
@@ -938,6 +980,9 @@ static void FUZ_unitTests(void)
                 size_t testStart = FUZ_rand(&randState) & 65535;
 
                 FUZ_displayUpdate((U32)(totalTestDone >> 20));
+
+                if (testStart == oldStart + oldSize)   // Corner case not covered by this test (LZ4_decompress_safe_usingDict() limitation)
+                    testStart++;
 
                 XXH64_update(&crcOrigState, testInput + testStart, testSize);
                 crcOrig = XXH64_digest(&crcOrigState);
