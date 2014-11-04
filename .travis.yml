@@ -8,6 +8,7 @@ before_install:
 
 env:
   - LZ4_TRAVIS_CI_ENV=-dist
+  - LZ4_TRAVIS_CI_ENV=-cmake
   - LZ4_TRAVIS_CI_ENV=-examples
   - LZ4_TRAVIS_CI_ENV=-lz4
   - LZ4_TRAVIS_CI_ENV=-lz4c

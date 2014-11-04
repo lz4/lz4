@@ -92,6 +92,8 @@ SOURCES = $(TEXT) $(NONTEXT)
 # Select test target for Travis CI's Build Matrix
 ifeq ($(LZ4_TRAVIS_CI_ENV),-dist)
 TRAVIS_TARGET=dist
+else ifeq ($(LZ4_TRAVIS_CI_ENV),-cmake)
+TRAVIS_TARGET=cmake
 else ifeq ($(LZ4_TRAVIS_CI_ENV),-examples)
 TRAVIS_TARGET=examples
 else
@@ -180,6 +182,9 @@ test:
 	@cd $(PRGDIR); $(MAKE) -e $@
 
 test-travis: $(TRAVIS_TARGET)
+
+cmake:
+	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
 examples:
 	cd examples; $(MAKE) -e test
