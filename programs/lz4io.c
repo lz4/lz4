@@ -33,16 +33,9 @@
 // Compiler Options
 //**************************************
 #ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
 #  define _CRT_SECURE_NO_WARNINGS
 #  define _CRT_SECURE_NO_DEPRECATE     // VS2005
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
-#else
-#  ifdef __GNUC__
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  else
-#    define FORCE_INLINE static inline
-#  endif
 #endif
 
 #define _LARGE_FILES           // Large file support on 32-bits AIX
@@ -91,7 +84,7 @@
 #elif GCC_VERSION >= 403
 #  define swap32 __builtin_bswap32
 #else
-  static inline unsigned int swap32(unsigned int x)
+  static unsigned int swap32(unsigned int x)
   {
     return ((x << 24) & 0xff000000 ) |
            ((x <<  8) & 0x00ff0000 ) |
@@ -289,8 +282,8 @@ static int get_fileHandle(char* input_filename, char* output_filename, FILE** pf
 }
 
 
-// LZ4IO_compressFilename_Legacy : This function is "hidden" (not published in .h)
-// Its purpose is to generate compressed streams using the old 'legacy' format
+// LZ4IO_compressFilename_Legacy : This function is intentionally "hidden" (not published in .h)
+// It generates compressed streams using the old 'legacy' format
 int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, int compressionlevel)
 {
     int (*compressionFunction)(const char*, char*, int);
@@ -549,7 +542,7 @@ static int compress_file_blockDependency(char* input_filename, char* output_file
 }
 
 
-FORCE_INLINE int LZ4_compress_limitedOutput_local(const char* src, char* dst, int size, int maxOut, int clevel)
+static int LZ4_compress_limitedOutput_local(const char* src, char* dst, int size, int maxOut, int clevel)
 { (void)clevel; return LZ4_compress_limitedOutput(src, dst, size, maxOut); }
 
 int LZ4IO_compressFilename(char* input_filename, char* output_filename, int compressionLevel)
@@ -888,6 +881,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
 }
 
 
+#define ENDOFSTREAM ((unsigned long long)-1)
 static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
 {
     unsigned int magicNumber, size;
@@ -896,7 +890,7 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
 
     // Check Archive Header
     nbReadBytes = fread(&magicNumber, 1, MAGICNUMBER_SIZE, finput);
-    if (nbReadBytes==0) return 0;                  // EOF
+    if (nbReadBytes==0) return ENDOFSTREAM;                  // EOF
     if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(41, "Unrecognized header : Magic Number unreadable");
     magicNumber = LITTLE_ENDIAN_32(magicNumber);   // Convert to Little Endian format
     if (LZ4S_isSkippableMagicNumber(magicNumber)) magicNumber = LZ4S_SKIPPABLE0;  // fold skippable magic numbers
@@ -920,7 +914,7 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     default:
         if (ftell(finput) == MAGICNUMBER_SIZE) EXM_THROW(44,"Unrecognized header : file cannot be decoded");   // Wrong magic number at the beginning of 1st stream
         DISPLAYLEVEL(2, "Stream followed by unrecognized data\n");
-        return 0;
+        return ENDOFSTREAM;
     }
 }
 
@@ -941,8 +935,9 @@ int LZ4IO_decompressFilename(char* input_filename, char* output_filename)
     do
     {
         decodedSize = selectDecoder(finput, foutput);
-        filesize += decodedSize;
-    } while (decodedSize);
+        if (decodedSize != ENDOFSTREAM)
+            filesize += decodedSize;
+    } while (decodedSize != ENDOFSTREAM);
 
     // Final Status
     end = clock();

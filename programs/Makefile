@@ -119,7 +119,7 @@ datagen : datagen.c
 
 
 clean:
-	@rm -f core *.o \
+	@rm -f core *.o *.test \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
@@ -166,6 +166,16 @@ test-lz4: lz4 datagen
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
+	echo -n > empty.test
+	echo hi > nonempty.test
+	cat nonempty.test empty.test nonempty.test > orig.test
+	@./lz4 -zq empty.test > empty.lz4.test
+	@./lz4 -zq nonempty.test > nonempty.lz4.test
+	cat nonempty.lz4.test empty.lz4.test nonempty.lz4.test > concat.lz4.test
+	./lz4 -d concat.lz4.test > result.test
+	sdiff orig.test result.test
+	@rm *.test
+	
 
 test-lz4c: lz4c datagen
 
