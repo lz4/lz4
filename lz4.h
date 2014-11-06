@@ -47,8 +47,8 @@ extern "C" {
    Version
 **************************************/
 #define LZ4_VERSION_MAJOR    1    /* for major interface/format changes  */
-#define LZ4_VERSION_MINOR    3    /* for minor interface/format changes  */
-#define LZ4_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define LZ4_VERSION_MINOR    4    /* for minor interface/format changes  */
+#define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 int LZ4_versionNumber (void);
 
@@ -193,30 +193,30 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_streamPtr);
  * LZ4_freeStream releases its memory.
  */
 LZ4_stream_t* LZ4_createStream(void);
-int           LZ4_freeStream (LZ4_stream_t* LZ4_stream);
+int           LZ4_freeStream (LZ4_stream_t* LZ4_streamPtr);
 
 /*
  * LZ4_loadDict
  * Use this function to load a static dictionary into LZ4_stream.
  * Any previous data will be forgotten, only 'dictionary' will remain in memory.
  * Loading a size of 0 is allowed.
- * Return : 1 if OK, 0 if error
+ * Return : dictionary size, in bytes (necessarily <= 64 KB)
  */
-int LZ4_loadDict (LZ4_stream_t* LZ4_stream, const char* dictionary, int dictSize);
+int LZ4_loadDict (LZ4_stream_t* LZ4_streamPtr, const char* dictionary, int dictSize);
 
 /*
  * LZ4_compress_continue
  * Compress data block 'source', using blocks compressed before as dictionary to improve compression ratio
  * Previous data blocks are assumed to still be present at their previous location.
  */
-int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
+int LZ4_compress_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
 
 /*
  * LZ4_compress_limitedOutput_continue
  * Same as before, but also specify a maximum target compressed size (maxOutputSize)
  * If objective cannot be met, compression exits, and returns a zero.
  */
-int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*
  * LZ4_saveDict
@@ -227,14 +227,14 @@ int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* s
  * Return : dictionary size in bytes, or 0 if error
  * Note : any dictSize > 64 KB will be interpreted as 64KB.
  */
-int LZ4_saveDict (LZ4_stream_t* LZ4_stream, char* safeBuffer, int dictSize);
+int LZ4_saveDict (LZ4_stream_t* LZ4_streamPtr, char* safeBuffer, int dictSize);
 
 
 /************************************************
   Experimental Streaming Decompression Functions
 ************************************************/
 
-#define LZ4_STREAMDECODESIZE_U32 4
+#define LZ4_STREAMDECODESIZE_U32  8
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U32 * sizeof(unsigned int))
 /*
  * LZ4_streamDecode_t
@@ -242,16 +242,6 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_stream, char* safeBuffer, int dictSize);
  * important : init this structure content using LZ4_setStreamDecode or memset() before first use !
  */
 typedef struct { unsigned int table[LZ4_STREAMDECODESIZE_U32]; } LZ4_streamDecode_t;
-
-/*
- * LZ4_setStreamDecode
- * Use this function to instruct where to find the dictionary.
- * This function can be used to specify a static dictionary,
- * or to instruct where to find some previously decoded data saved into a different memory space.
- * Setting a size of 0 is allowed (same effect as no dictionary).
- * Return : 1 if OK, 0 if error
- */
-int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
 
 /*
  * If you prefer dynamic allocation methods,
@@ -262,11 +252,21 @@ LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
 /*
+ * LZ4_setStreamDecode
+ * Use this function to instruct where to find the dictionary.
+ * This function can be used to specify a static dictionary,
+ * or to instruct where to find some previously decoded data saved into a different memory space.
+ * Setting a size of 0 is allowed (same effect as no dictionary, same effect as reset).
+ * Return : 1 if OK, 0 if error
+ */
+int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
+
+/*
 *_continue() :
     These decoding functions allow decompression of multiple blocks in "streaming" mode.
-    Previously decoded blocks must still be available at the memory position where they were decoded.
-    If it's not possible, save the relevant part of decoded data into a safe buffer,
-    and indicate where its new address using LZ4_setStreamDecode()
+    Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
+    If this condition is not possible, save the relevant part of decoded data into a safe buffer,
+    and indicate where is its new address using LZ4_setStreamDecode()
 */
 int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);

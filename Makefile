@@ -31,7 +31,7 @@
 # ################################################################
 
 # Version numbers
-VERSION=123
+VERSION=124
 export RELEASE=r$(VERSION)
 LIBVER_MAJOR=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER_MINOR=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
@@ -42,7 +42,7 @@ DESTDIR?=
 PREFIX ?= /usr
 CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -71,7 +71,8 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
+TEXT =  lz4.c lz4.h lz4hc.c lz4hc.h \
+	lz4frame.c lz4frame.h xxhash.c xxhash.h \
 	liblz4.pc.in Makefile \
 	lz4_format_description.txt NEWS LICENSE README.md \
 	cmake_unofficial/CMakeLists.txt \
@@ -79,11 +80,21 @@ TEXT = lz4.c lz4.h lz4hc.c lz4hc.h \
 	$(PRGDIR)/datagen.c $(PRGDIR)/fuzzer.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
-	$(PRGDIR)/xxhash.c $(PRGDIR)/xxhash.h \
 	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
-	$(PRGDIR)/Makefile $(PRGDIR)/COPYING
-NONTEXT = LZ4_Streaming_Format.odt
+	$(PRGDIR)/Makefile $(PRGDIR)/COPYING \
+	LZ4_Framing_Format.html
+NONTEXT = images/image00.png images/image01.png images/image02.png \
+	images/image03.png images/image04.png images/image05.png \
+	images/image06.png
 SOURCES = $(TEXT) $(NONTEXT)
+
+
+# Select test target for Travis CI's Build Matrix
+ifneq (,$(filter test-%,$(LZ4_TRAVIS_CI_ENV)))
+TRAVIS_TARGET=prg-travis
+else
+TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
+endif
 
 
 default: liblz4
@@ -98,7 +109,7 @@ liblz4: lz4.c lz4hc.c
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs liblz4.a lz4.o lz4hc.o
-	@echo compiling dynamic library
+	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
@@ -149,6 +160,7 @@ uninstall:
 dist: clean
 	@install -dD -m 700 lz4-$(RELEASE)/programs/
 	@install -dD -m 700 lz4-$(RELEASE)/cmake_unofficial/
+	@install -dD -m 700 lz4-$(RELEASE)/images/
 	@for f in $(TEXT); do \
 		tr -d '\r' < $$f > .tmp; \
 		install -m 600 .tmp lz4-$(RELEASE)/$$f; \
@@ -163,7 +175,17 @@ dist: clean
 	@echo Distribution $(DISTRIBNAME) built
 
 test:
-	@cd examples; $(MAKE) -e $@
 	@cd $(PRGDIR); $(MAKE) -e $@
+
+test-travis: $(TRAVIS_TARGET)
+
+cmake:
+	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
+
+streaming-examples:
+	cd examples; $(MAKE) -e test
+
+prg-travis:
+	@cd $(PRGDIR); $(MAKE) -e test-travis
 
 endif

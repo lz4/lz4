@@ -1,14 +1,26 @@
 language: c
 compiler: gcc
-script: make test
+script: make test-travis
 before_install:
-  - sudo apt-get update -qq
+  - sudo apt-get update  -qq
   - sudo apt-get install -qq gcc-multilib
   - sudo apt-get install -qq valgrind
 
 env:
-  - LZ4_TRAVIS_CI_ENV=-m32
-  - LZ4_TRAVIS_CI_ENV=-m64
+  - LZ4_TRAVIS_CI_ENV=liblz4
+  - LZ4_TRAVIS_CI_ENV=streaming-examples
+  - LZ4_TRAVIS_CI_ENV=cmake
+  - LZ4_TRAVIS_CI_ENV=dist
+  - LZ4_TRAVIS_CI_ENV=test-lz4
+  - LZ4_TRAVIS_CI_ENV=test-lz4c
+  - LZ4_TRAVIS_CI_ENV=test-lz4c32
+  - LZ4_TRAVIS_CI_ENV=test-fullbench
+  - LZ4_TRAVIS_CI_ENV=test-fullbench32
+  - LZ4_TRAVIS_CI_ENV=test-fuzzer
+  - LZ4_TRAVIS_CI_ENV=test-fuzzer32
+  - LZ4_TRAVIS_CI_ENV=test-frametest
+  - LZ4_TRAVIS_CI_ENV=test-frametest32
+  - LZ4_TRAVIS_CI_ENV=test-mem
 
 matrix:
   fast_finish: true

@@ -1,3 +1,7 @@
+r124:
+Fix : LZ4F_compressBound() using NULL preferencesPtr
+Updated : xxHash, to r37
+
 r123:
 Added : experimental lz4frame API, thanks to Takayuki Matsuoka and Christopher Jackson for testings
 Fix : s390x support, thanks to Nobuhiro Iwamatsu
