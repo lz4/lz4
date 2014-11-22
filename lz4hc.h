@@ -105,9 +105,9 @@ They just use the externally allocated memory for state instead of allocating th
 /**************************************
    Experimental Streaming Functions
 **************************************/
-#define LZ4_STREAMHCSIZE_U32 65548
-#define LZ4_STREAMHCSIZE     (LZ4_STREAMHCSIZE_U32 * sizeof(unsigned int))
-typedef struct { unsigned int table[LZ4_STREAMHCSIZE_U32]; } LZ4_streamHC_t;
+#define LZ4_STREAMHCSIZE_U64 32774
+#define LZ4_STREAMHCSIZE     (LZ4_STREAMHCSIZE_U64 * sizeof(unsigned long long))
+typedef struct { unsigned long long table[LZ4_STREAMHCSIZE_U64]; } LZ4_streamHC_t;
 
 /*
 This structure allows static allocation of LZ4 HC streaming state.

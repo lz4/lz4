@@ -84,11 +84,11 @@ You can contact the author at :
 // Modify the local functions below should you wish to use some other memory routines
 // for malloc(), free()
 #include <stdlib.h>
-FORCE_INLINE void* XXH_malloc(size_t s) { return malloc(s); }
-FORCE_INLINE void  XXH_free  (void* p)  { free(p); }
+static void* XXH_malloc(size_t s) { return malloc(s); }
+static void  XXH_free  (void* p)  { free(p); }
 // for memcpy()
 #include <string.h>
-FORCE_INLINE void* XXH_memcpy(void* dest, const void* src, size_t size)
+static void* XXH_memcpy(void* dest, const void* src, size_t size)
 {
     return memcpy(dest,src,size);
 }
@@ -221,28 +221,28 @@ static const int one = 1;
 //****************************
 typedef enum { XXH_aligned, XXH_unaligned } XXH_alignment;
 
-FORCE_INLINE U32 XXH_readLE32_align(const U32* ptr, XXH_endianess endian, XXH_alignment align)
+FORCE_INLINE U32 XXH_readLE32_align(const void* ptr, XXH_endianess endian, XXH_alignment align)
 {
     if (align==XXH_unaligned)
         return endian==XXH_littleEndian ? A32(ptr) : XXH_swap32(A32(ptr));
     else
-        return endian==XXH_littleEndian ? *ptr : XXH_swap32(*ptr);
+        return endian==XXH_littleEndian ? *(U32*)ptr : XXH_swap32(*(U32*)ptr);
 }
 
-FORCE_INLINE U32 XXH_readLE32(const U32* ptr, XXH_endianess endian)
+FORCE_INLINE U32 XXH_readLE32(const void* ptr, XXH_endianess endian)
 {
     return XXH_readLE32_align(ptr, endian, XXH_unaligned);
 }
 
-FORCE_INLINE U64 XXH_readLE64_align(const U64* ptr, XXH_endianess endian, XXH_alignment align)
+FORCE_INLINE U64 XXH_readLE64_align(const void* ptr, XXH_endianess endian, XXH_alignment align)
 {
     if (align==XXH_unaligned)
         return endian==XXH_littleEndian ? A64(ptr) : XXH_swap64(A64(ptr));
     else
-        return endian==XXH_littleEndian ? *ptr : XXH_swap64(*ptr);
+        return endian==XXH_littleEndian ? *(U64*)ptr : XXH_swap64(*(U64*)ptr);
 }
 
-FORCE_INLINE U64 XXH_readLE64(const U64* ptr, XXH_endianess endian)
+FORCE_INLINE U64 XXH_readLE64(const void* ptr, XXH_endianess endian)
 {
     return XXH_readLE64_align(ptr, endian, XXH_unaligned);
 }
@@ -256,7 +256,7 @@ FORCE_INLINE U32 XXH32_endian_align(const void* input, size_t len, U32 seed, XXH
     const BYTE* p = (const BYTE*)input;
     const BYTE* bEnd = p + len;
     U32 h32;
-#define XXH_get32bits(p) XXH_readLE32_align((const U32*)p, endian, align)
+#define XXH_get32bits(p) XXH_readLE32_align(p, endian, align)
 
 #ifdef XXH_ACCEPT_NULL_INPUT_POINTER
     if (p==NULL)
@@ -361,7 +361,7 @@ FORCE_INLINE U64 XXH64_endian_align(const void* input, size_t len, U64 seed, XXH
     const BYTE* p = (const BYTE*)input;
     const BYTE* bEnd = p + len;
     U64 h64;
-#define XXH_get64bits(p) XXH_readLE64_align((const U64*)p, endian, align)
+#define XXH_get64bits(p) XXH_readLE64_align(p, endian, align)
 
 #ifdef XXH_ACCEPT_NULL_INPUT_POINTER
     if (p==NULL)
@@ -509,8 +509,8 @@ typedef struct
     U32 v2;
     U32 v3;
     U32 v4;
+    U32 mem32[4];   /* defined as U32 for alignment */
     U32 memsize;
-    char memory[16];
 } XXH_istate32_t;
 
 typedef struct
@@ -521,8 +521,8 @@ typedef struct
     U64 v2;
     U64 v3;
     U64 v4;
+    U64 mem64[4];   /* defined as U64 for alignment */
     U32 memsize;
-    char memory[32];
 } XXH_istate64_t;
 
 
@@ -592,16 +592,16 @@ FORCE_INLINE XXH_errorcode XXH32_update_endian (XXH32_state_t* state_in, const v
 
     if (state->memsize + len < 16)   // fill in tmp buffer
     {
-        XXH_memcpy(state->memory + state->memsize, input, len);
+        XXH_memcpy((BYTE*)(state->mem32) + state->memsize, input, len);
         state->memsize += (U32)len;
         return XXH_OK;
     }
 
     if (state->memsize)   // some data left from previous update
     {
-        XXH_memcpy(state->memory + state->memsize, input, 16-state->memsize);
+        XXH_memcpy((BYTE*)(state->mem32) + state->memsize, input, 16-state->memsize);
         {
-            const U32* p32 = (const U32*)state->memory;
+            const U32* p32 = state->mem32;
             state->v1 += XXH_readLE32(p32, endian) * PRIME32_2;
             state->v1 = XXH_rotl32(state->v1, 13);
             state->v1 *= PRIME32_1;
@@ -633,19 +633,19 @@ FORCE_INLINE XXH_errorcode XXH32_update_endian (XXH32_state_t* state_in, const v
 
         do
         {
-            v1 += XXH_readLE32((const U32*)p, endian) * PRIME32_2;
+            v1 += XXH_readLE32(p, endian) * PRIME32_2;
             v1 = XXH_rotl32(v1, 13);
             v1 *= PRIME32_1;
             p+=4;
-            v2 += XXH_readLE32((const U32*)p, endian) * PRIME32_2;
+            v2 += XXH_readLE32(p, endian) * PRIME32_2;
             v2 = XXH_rotl32(v2, 13);
             v2 *= PRIME32_1;
             p+=4;
-            v3 += XXH_readLE32((const U32*)p, endian) * PRIME32_2;
+            v3 += XXH_readLE32(p, endian) * PRIME32_2;
             v3 = XXH_rotl32(v3, 13);
             v3 *= PRIME32_1;
             p+=4;
-            v4 += XXH_readLE32((const U32*)p, endian) * PRIME32_2;
+            v4 += XXH_readLE32(p, endian) * PRIME32_2;
             v4 = XXH_rotl32(v4, 13);
             v4 *= PRIME32_1;
             p+=4;
@@ -660,7 +660,7 @@ FORCE_INLINE XXH_errorcode XXH32_update_endian (XXH32_state_t* state_in, const v
 
     if (p < bEnd)
     {
-        XXH_memcpy(state->memory, p, bEnd-p);
+        XXH_memcpy(state->mem32, p, bEnd-p);
         state->memsize = (int)(bEnd-p);
     }
 
@@ -682,8 +682,8 @@ XXH_errorcode XXH32_update (XXH32_state_t* state_in, const void* input, size_t l
 FORCE_INLINE U32 XXH32_digest_endian (const XXH32_state_t* state_in, XXH_endianess endian)
 {
     XXH_istate32_t* state = (XXH_istate32_t*) state_in;
-    const BYTE * p = (const BYTE*)state->memory;
-    BYTE* bEnd = (BYTE*)state->memory + state->memsize;
+    const BYTE * p = (const BYTE*)state->mem32;
+    BYTE* bEnd = (BYTE*)(state->mem32) + state->memsize;
     U32 h32;
 
     if (state->total_len >= 16)
@@ -699,7 +699,7 @@ FORCE_INLINE U32 XXH32_digest_endian (const XXH32_state_t* state_in, XXH_endiane
 
     while (p+4<=bEnd)
     {
-        h32 += XXH_readLE32((const U32*)p, endian) * PRIME32_3;
+        h32 += XXH_readLE32(p, endian) * PRIME32_3;
         h32  = XXH_rotl32(h32, 17) * PRIME32_4;
         p+=4;
     }
@@ -746,16 +746,16 @@ FORCE_INLINE XXH_errorcode XXH64_update_endian (XXH64_state_t* state_in, const v
 
     if (state->memsize + len < 32)   // fill in tmp buffer
     {
-        XXH_memcpy(state->memory + state->memsize, input, len);
+        XXH_memcpy(((BYTE*)state->mem64) + state->memsize, input, len);
         state->memsize += (U32)len;
         return XXH_OK;
     }
 
     if (state->memsize)   // some data left from previous update
     {
-        XXH_memcpy(state->memory + state->memsize, input, 32-state->memsize);
+        XXH_memcpy(((BYTE*)state->mem64) + state->memsize, input, 32-state->memsize);
         {
-            const U64* p64 = (const U64*)state->memory;
+            const U64* p64 = state->mem64;
             state->v1 += XXH_readLE64(p64, endian) * PRIME64_2;
             state->v1 = XXH_rotl64(state->v1, 31);
             state->v1 *= PRIME64_1;
@@ -787,19 +787,19 @@ FORCE_INLINE XXH_errorcode XXH64_update_endian (XXH64_state_t* state_in, const v
 
         do
         {
-            v1 += XXH_readLE64((const U64*)p, endian) * PRIME64_2;
+            v1 += XXH_readLE64(p, endian) * PRIME64_2;
             v1 = XXH_rotl64(v1, 31);
             v1 *= PRIME64_1;
             p+=8;
-            v2 += XXH_readLE64((const U64*)p, endian) * PRIME64_2;
+            v2 += XXH_readLE64(p, endian) * PRIME64_2;
             v2 = XXH_rotl64(v2, 31);
             v2 *= PRIME64_1;
             p+=8;
-            v3 += XXH_readLE64((const U64*)p, endian) * PRIME64_2;
+            v3 += XXH_readLE64(p, endian) * PRIME64_2;
             v3 = XXH_rotl64(v3, 31);
             v3 *= PRIME64_1;
             p+=8;
-            v4 += XXH_readLE64((const U64*)p, endian) * PRIME64_2;
+            v4 += XXH_readLE64(p, endian) * PRIME64_2;
             v4 = XXH_rotl64(v4, 31);
             v4 *= PRIME64_1;
             p+=8;
@@ -814,7 +814,7 @@ FORCE_INLINE XXH_errorcode XXH64_update_endian (XXH64_state_t* state_in, const v
 
     if (p < bEnd)
     {
-        XXH_memcpy(state->memory, p, bEnd-p);
+        XXH_memcpy(state->mem64, p, bEnd-p);
         state->memsize = (int)(bEnd-p);
     }
 
@@ -836,8 +836,8 @@ XXH_errorcode XXH64_update (XXH64_state_t* state_in, const void* input, size_t l
 FORCE_INLINE U64 XXH64_digest_endian (const XXH64_state_t* state_in, XXH_endianess endian)
 {
     XXH_istate64_t * state = (XXH_istate64_t *) state_in;
-    const BYTE * p = (const BYTE*)state->memory;
-    BYTE* bEnd = (BYTE*)state->memory + state->memsize;
+    const BYTE * p = (const BYTE*)state->mem64;
+    BYTE* bEnd = (BYTE*)state->mem64 + state->memsize;
     U64 h64;
 
     if (state->total_len >= 32)
@@ -882,7 +882,7 @@ FORCE_INLINE U64 XXH64_digest_endian (const XXH64_state_t* state_in, XXH_endiane
 
     while (p+8<=bEnd)
     {
-        U64 k1 = XXH_readLE64((const U64*)p, endian);
+        U64 k1 = XXH_readLE64(p, endian);
         k1 *= PRIME64_2;
         k1 = XXH_rotl64(k1,31);
         k1 *= PRIME64_1;
@@ -893,7 +893,7 @@ FORCE_INLINE U64 XXH64_digest_endian (const XXH64_state_t* state_in, XXH_endiane
 
     if (p+4<=bEnd)
     {
-        h64 ^= (U64)(XXH_readLE32((const U32*)p, endian)) * PRIME64_1;
+        h64 ^= (U64)(XXH_readLE32(p, endian)) * PRIME64_1;
         h64 = XXH_rotl64(h64, 23) * PRIME64_2 + PRIME64_3;
         p+=4;
     }
