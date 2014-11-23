@@ -44,7 +44,10 @@
 
 /*
  * CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS :
- * You can force the code to use unaligned memory access if you know your CPU can handle it efficiently.
+ * You can force the code to use unaligned memory access, should you know your CPU can handle it efficiently.
+ * If it effectively results in better speed (up to 50% improvement can be expected)
+ * please report your configuration to upstream (https://groups.google.com/forum/#!forum/lz4c)
+ * so that an automatic detection macro can be added to mainline.
  */
 /* #define CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS 1 */
 

@@ -31,7 +31,7 @@
 # ################################################################
 
 # Version numbers
-VERSION=124
+VERSION=125
 export RELEASE=r$(VERSION)
 LIBVER_MAJOR=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER_MINOR=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
@@ -49,13 +49,6 @@ INCLUDEDIR=$(PREFIX)/include
 PRGDIR = programs
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 
-
-# Define *.exe as extension for Windows systems
-ifneq (,$(filter Windows%,$(OS)))
-EXT =.exe
-else
-EXT =
-endif
 
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html

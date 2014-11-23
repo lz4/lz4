@@ -30,7 +30,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r124
+RELEASE=r125
 
 DESTDIR?=
 PREFIX ?= /usr
@@ -113,9 +113,9 @@ ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 install: lz4 lz4c
 	@echo Installing binaries
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4   $(DESTDIR)$(BINDIR)/lz4
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
-	@install -m 755 lz4c  $(DESTDIR)$(BINDIR)/lz4c
+	@install -m 755 lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4cat
+	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	@echo Installing man pages
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@install -m 644 lz4c.1 $(DESTDIR)$(MANDIR)/lz4c.1
@@ -124,12 +124,12 @@ install: lz4 lz4c
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/lz4cat
-	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
+	[ -x $(DESTDIR)$(BINDIR)/lz4$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	[ -x $(DESTDIR)$(BINDIR)/lz4c$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
 	[ -f $(DESTDIR)$(MANDIR)/lz4c.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4c.1
 	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
-	@echo lz4 successfully uninstalled
+	@echo lz4 programs successfully uninstalled
 
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
 
