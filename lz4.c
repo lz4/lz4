@@ -44,7 +44,7 @@
 
 /*
  * CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS :
- * You can force the code to use unaligned memory access if you know your CPU can handle it.
+ * You can force the code to use unaligned memory access if you know your CPU can handle it efficiently.
  */
 /* #define CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS 1 */
 
@@ -58,7 +58,9 @@
 #if defined(CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS) \
     || defined(__ARM_FEATURE_UNALIGNED) \
     || defined(__i386__) || defined(__x86_64__) \
-    || defined(_M_IX86) || defined(_M_X64)
+    || defined(_M_IX86) || defined(_M_X64) \
+    || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__) \
+    || (defined(_M_ARM) && (_M_ARM >= 7))
 #  define LZ4_UNALIGNED_ACCESS 1
 #else
 #  define LZ4_UNALIGNED_ACCESS 0
@@ -153,6 +155,7 @@ static U16 LZ4_readLE16(const void* memPtr)
 {
     if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
         return *(U16*)memPtr;
+    else
     {
         const BYTE* p = memPtr;
         return (U16)((U16)p[0] + (p[1]<<8));
@@ -166,6 +169,7 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
         *(U16*)memPtr = value;
         return;
     }
+    else
     {
         BYTE* p = memPtr;
         p[0] = (BYTE) value;
@@ -202,6 +206,7 @@ static void LZ4_copy4(void* dstPtr, const void* srcPtr)
         *(U32*)dstPtr = *(U32*)srcPtr;
         return;
     }
+    else
     {
         BYTE* d = dstPtr;
         const BYTE* s = srcPtr;
@@ -216,6 +221,7 @@ static U64 LZ4_readLE64(const void* memPtr)
 {
     if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
         return *(U64*)memPtr;
+    else
     {
         const BYTE* p = memPtr;
         return (U64)((U64)p[0] + (p[1]<<8) + (p[2]<<16) + ((U64)p[3]<<24) +
@@ -249,6 +255,7 @@ static void LZ4_copy8(void* dstPtr, const void* srcPtr)
             ((U32*)dstPtr)[1] = ((U32*)srcPtr)[1];
         return;
     }
+    else
     {
         BYTE* d = dstPtr;
         const BYTE* s = srcPtr;
