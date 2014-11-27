@@ -56,7 +56,9 @@
    CPU Feature Detection
 **************************************/
 /*
- * Unaligned memory access detection
+ * Automated efficient unaligned memory access detection
+ * Based on known hardware architectures
+ * This list will be updated thanks to Open Source community feedbacks
  */
 #if defined(CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS) \
     || defined(__ARM_FEATURE_UNALIGNED) \
@@ -146,6 +148,8 @@
 /**************************************
    Reading and writing into memory
 **************************************/
+#define STEPSIZE sizeof(size_t)
+
 static unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
 
 static unsigned LZ4_isLittleEndian(void)
@@ -180,6 +184,36 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
     }
 }
 
+
+static U32 LZ4_read16(const void* memPtr)
+{
+    if (LZ4_UNALIGNED_ACCESS)
+    {
+        return *(U16*)memPtr;
+    }
+    else
+    {
+        U16 val16;
+        memcpy(&val16, memPtr, 2);
+        return val16;
+    }
+}
+
+static U32 LZ4_read32(const void* memPtr)
+{
+    if (LZ4_UNALIGNED_ACCESS)
+    {
+        return *(U32*)memPtr;
+    }
+    else
+    {
+        U32 val32;
+        memcpy(&val32, memPtr, 4);
+        return val32;
+    }
+}
+
+
 static U32 LZ4_readLE32(const void* memPtr)
 {
     if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
@@ -188,35 +222,6 @@ static U32 LZ4_readLE32(const void* memPtr)
         const BYTE* p = memPtr;
         U32 result = (U32)((U32)p[0] + (p[1]<<8) + (p[2]<<16) + ((U32)p[3]<<24));
         return result;
-    }
-}
-
-/*
-static void LZ4_writeLE32(void* memPtr, U32 value)
-{
-    BYTE* p = memPtr;
-    p[0] = (BYTE) value;
-    p[1] = (BYTE)(value>>8);
-    p[2] = (BYTE)(value>>16);
-    p[3] = (BYTE)(value>>24);
-}
-*/
-
-static void LZ4_copy4(void* dstPtr, const void* srcPtr)
-{
-    if (LZ4_UNALIGNED_ACCESS)
-    {
-        *(U32*)dstPtr = *(U32*)srcPtr;
-        return;
-    }
-    else
-    {
-        BYTE* d = dstPtr;
-        const BYTE* s = srcPtr;
-        d[0] = s[0];
-        d[1] = s[1];
-        d[2] = s[2];
-        d[3] = s[3];
     }
 }
 
@@ -232,20 +237,24 @@ static U64 LZ4_readLE64(const void* memPtr)
     }
 }
 
-/*
-static void LZ4_writeLE64(void* memPtr, U64 value)
+static size_t LZ4_readLE_ARCH(const void* p)
 {
-    BYTE* p = memPtr;
-    p[0] = (BYTE) value;
-    p[1] = (BYTE)(value>>8);
-    p[2] = (BYTE)(value>>16);
-    p[3] = (BYTE)(value>>24);
-    p[4] = (BYTE)(value>>32);
-    p[5] = (BYTE)(value>>40);
-    p[6] = (BYTE)(value>>48);
-    p[7] = (BYTE)(value>>56);
+    if (LZ4_64bits())
+        return (size_t)LZ4_readLE64(p);
+    else
+        return (size_t)LZ4_readLE32(p);
 }
-*/
+
+
+static void LZ4_copy4(void* dstPtr, const void* srcPtr)
+{
+    if (LZ4_UNALIGNED_ACCESS)
+    {
+        *(U32*)dstPtr = *(U32*)srcPtr;
+        return;
+    }
+    memcpy(dstPtr, srcPtr, 4);
+}
 
 static void LZ4_copy8(void* dstPtr, const void* srcPtr)
 {
@@ -258,56 +267,17 @@ static void LZ4_copy8(void* dstPtr, const void* srcPtr)
             ((U32*)dstPtr)[1] = ((U32*)srcPtr)[1];
         return;
     }
-    else
-    {
-        BYTE* d = dstPtr;
-        const BYTE* s = srcPtr;
-        d[0] = s[0];
-        d[1] = s[1];
-        d[2] = s[2];
-        d[3] = s[3];
-        d[4] = s[4];
-        d[5] = s[5];
-        d[6] = s[6];
-        d[7] = s[7];
-    }
+    memcpy(dstPtr, srcPtr, 8);
 }
 
-#define STEPSIZE sizeof(size_t)
-
-static size_t LZ4_readLE_ARCH(const void* p)
+/* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
+static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
-    if (LZ4_64bits())
-        return (size_t)LZ4_readLE64(p);
-    else
-        return (size_t)LZ4_readLE32(p);
+    BYTE* d = dstPtr;
+    const BYTE* s = srcPtr;
+    BYTE* e = dstEnd;
+    do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
 }
-
-/*
-static void LZ4_writeLE_ARCH(void* p, size_t value)
-{
-    if (LZ4_64BITS)
-        LZ4_writeLE64(p, (U64)value);
-    else
-        LZ4_writeLE32(p, (U32)value);
-}
-
-static void LZ4_copyARCH(void* dstPtr, const void* srcPtr)
-{
-    if (LZ4_64BITS)
-        LZ4_copy8(dstPtr, srcPtr);
-    else
-        LZ4_copy4(dstPtr, srcPtr);
-}
-*/
-
-#if !defined(__GNUC__)
-#  define LZ4_WILDCOPY(d,s,e)     { do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e); }        /* at the end, d>=e; */
-#else
-#  define LZ4_WILDCOPY64(d,s,e)   { do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e); }        /* at the end, d>=e; */
-#  define LZ4_WILDCOPY32(d,s,e)   { if (likely(e-d <= 8)) { LZ4_copy8(d,s); d+=8; s+=8; } else do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e); }
-#  define LZ4_WILDCOPY(d,s,e)     { if (LZ4_64bits()) LZ4_WILDCOPY64(d,s,e) else LZ4_WILDCOPY32(d,s,e); }
-#endif
 
 
 /**************************************
@@ -374,7 +344,7 @@ int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 /********************************
    Compression functions
 ********************************/
-static int LZ4_NbCommonBytes (register size_t val)
+static unsigned LZ4_NbCommonBytes (register size_t val)
 {
     if (LZ4_64bits())
     {
@@ -413,7 +383,7 @@ static U32 LZ4_hashSequence(U32 sequence, tableType_t tableType)
         return (((sequence) * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
 }
 
-static U32 LZ4_hashPosition(const BYTE* p, tableType_t tableType) { return LZ4_hashSequence(LZ4_readLE32(p), tableType); }
+static U32 LZ4_hashPosition(const BYTE* p, tableType_t tableType) { return LZ4_hashSequence(LZ4_read32(p), tableType); }
 
 static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
@@ -444,20 +414,20 @@ static const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t t
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
 }
 
-static unsigned LZ4_count(const BYTE* pIn, const BYTE* pRef, const BYTE* pInLimit)
+static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
     while (likely(pIn<pInLimit-(STEPSIZE-1)))
     {
-        size_t diff = LZ4_readLE_ARCH(pRef) ^ LZ4_readLE_ARCH(pIn);
-        if (!diff) { pIn+=STEPSIZE; pRef+=STEPSIZE; continue; }
+        size_t diff = LZ4_readLE_ARCH(pMatch) ^ LZ4_readLE_ARCH(pIn);
+        if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
         pIn += LZ4_NbCommonBytes(diff);
         return (unsigned)(pIn - pStart);
     }
-    if (LZ4_64bits()) if ((pIn<(pInLimit-3)) && (LZ4_readLE32(pRef) == LZ4_readLE32(pIn))) { pIn+=4; pRef+=4; }
-    if ((pIn<(pInLimit-1)) && (LZ4_readLE16(pRef) == LZ4_readLE16(pIn))) { pIn+=2; pRef+=2; }
-    if ((pIn<pInLimit) && (*pRef == *pIn)) pIn++;
+    if (LZ4_64bits()) if ((pIn<(pInLimit-3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn+=4; pMatch+=4; }
+    if ((pIn<(pInLimit-1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn+=2; pMatch+=2; }
+    if ((pIn<pInLimit) && (*pMatch == *pIn)) pIn++;
 
     return (unsigned)(pIn - pStart);
 }
@@ -469,7 +439,6 @@ static int LZ4_compress_generic(
                  char* dest,
                  int inputSize,
                  int maxOutputSize,
-
                  limitedOutput_directive outputLimited,
                  tableType_t tableType,
                  dict_directive dict,
@@ -559,7 +528,7 @@ static int LZ4_compress_generic(
 
             } while ( ((dictIssue==dictSmall) ? (ref < lowRefLimit) : 0)
                 || ((tableType==byU16) ? 0 : (ref + MAX_DISTANCE < ip))
-                || (LZ4_readLE32(ref+refDelta) != LZ4_readLE32(ip)) );
+                || (LZ4_read32(ref+refDelta) != LZ4_read32(ip)) );
         }
 
         /* Catch up */
@@ -581,7 +550,8 @@ static int LZ4_compress_generic(
             else *token = (BYTE)(litLength<<ML_BITS);
 
             /* Copy Literals */
-            { BYTE* end = op+litLength; LZ4_WILDCOPY(op,anchor,end); op=end; }
+            LZ4_wildCopy(op, anchor, op+litLength);
+            op+=litLength;
         }
 
 _next_match:
@@ -652,7 +622,7 @@ _next_match:
         LZ4_putPosition(ip, ctx, tableType, base);
         if ( ((dictIssue==dictSmall) ? (ref>=lowRefLimit) : 1)
             && (ref+MAX_DISTANCE>=ip)
-            && (LZ4_readLE32(ref+refDelta)==LZ4_readLE32(ip)) )
+            && (LZ4_read32(ref+refDelta)==LZ4_read32(ip)) )
         { token=op++; *token=0; goto _next_match; }
 
         /* Prepare next loop */
@@ -699,7 +669,7 @@ int LZ4_compress(const char* source, char* dest, int inputSize)
 int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
 #if (HEAPMODE)
-    void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 4);   /* Aligned on 8-bytes boundaries */
+    void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 8);   /* Aligned on 8-bytes boundaries */
 #else
     U64 ctx[LZ4_STREAMSIZE_U64] = {0};      /* Ensure data is aligned on 8-bytes boundaries */
 #endif
@@ -989,7 +959,9 @@ FORCE_INLINE int LZ4_decompress_generic(
             op += length;
             break;     /* Necessarily EOF, due to parsing restrictions */
         }
-        LZ4_WILDCOPY(op, ip, cpy); ip -= (op-cpy); op = cpy;
+        LZ4_wildCopy(op, ip, cpy);
+        ip += length; op = cpy;
+        //LZ4_WILDCOPY(op, ip, cpy); ip -= (op-cpy); op = cpy;
 
         /* get offset */
         match = cpy - LZ4_readLE16(ip); ip+=2;
@@ -1060,11 +1032,14 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         if (unlikely(cpy>oend-12))
         {
-            if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last 5 bytes must be literals */
-            if (op<oend-COPYLENGTH) LZ4_WILDCOPY(op, match, (oend-COPYLENGTH));
-            while(op<cpy) *op++=*match++;
+            if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals */
+            if (op < oend-8) LZ4_wildCopy(op, match, oend-8);
+            match += oend-8 - op;
+            op = oend-8;
+            while (op<cpy) *op++ = *match++;
         }
-        else LZ4_WILDCOPY(op, match, cpy);
+        else
+            LZ4_wildCopy(op, match, cpy);
         op=cpy;   /* correction */
     }
 

@@ -173,13 +173,13 @@ int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedS
 ***********************************************/
 
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
-#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))
+#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(long long))
 /*
  * LZ4_stream_t
  * information structure to track an LZ4 stream.
  * important : init this structure content before first use !
  */
-typedef struct { unsigned long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
+typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
 
 /*
  * LZ4_resetStream
