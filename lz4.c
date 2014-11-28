@@ -1033,9 +1033,12 @@ FORCE_INLINE int LZ4_decompress_generic(
         if (unlikely(cpy>oend-12))
         {
             if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals */
-            if (op < oend-8) LZ4_wildCopy(op, match, oend-8);
-            match += oend-8 - op;
-            op = oend-8;
+            if (op < oend-8)
+            {
+                LZ4_wildCopy(op, match, oend-8);
+                match += oend-8 - op;
+                op = oend-8;
+            }
             while (op<cpy) *op++ = *match++;
         }
         else
