@@ -50,7 +50,7 @@ Memory routines
 
 
 /**************************************
-CPU Feature Detection
+   CPU Feature Detection
 **************************************/
 /* 32 or 64 bits ? */
 #if (defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
@@ -102,7 +102,7 @@ CPU Feature Detection
 
 
 /**************************************
-Compiler Options
+   Compiler Options
 **************************************/
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
 /* "restrict" is a known keyword */
@@ -138,14 +138,14 @@ Compiler Options
 
 
 /**************************************
-Includes
+   Includes
 **************************************/
-#include "lz4hc.h"
 #include "lz4.h"
+#include "lz4hc.h"
 
 
 /**************************************
-Basic Types
+   Basic Types
 **************************************/
 #if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
 # include <stdint.h>
@@ -248,9 +248,12 @@ Architecture-specific macros
 **************************************/
 typedef struct
 {
-    U32   hashTable[HASHTABLESIZE];
+    union {
+      U64 alignedOn8Bytes;  /* force 8-bytes alignment on 32-bits systems */
+      U32 hashTable[HASHTABLESIZE];
+    };
     U16   chainTable[MAXD];
-    const BYTE* end;        /* next block here to keep current prefix as prefix */
+    const BYTE* end;        /* next block here to continue on current prefix */
     const BYTE* base;       /* All index relative to this position */
     const BYTE* dictBase;   /* alternate base for extDict */
     U32   dictLimit;        /* below that point, need extDict */
