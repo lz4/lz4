@@ -34,107 +34,9 @@ You can contact the author at :
 
 
 /**************************************
-Tuning Parameter
+   Tuning Parameter
 **************************************/
 #define LZ4HC_DEFAULT_COMPRESSIONLEVEL 8
-
-
-/**************************************
-Memory routines
-**************************************/
-#include <stdlib.h>   /* calloc, free */
-#define ALLOCATOR(s)  calloc(1,s)
-#define FREEMEM       free
-#include <string.h>   /* memset, memcpy */
-#define MEM_INIT      memset
-
-
-/**************************************
-   CPU Feature Detection
-**************************************/
-/* 32 or 64 bits ? */
-#if (defined(__x86_64__) || defined(_M_X64) || defined(_WIN64) \
-    || defined(__64BIT__)  || defined(__mips64) \
-    || defined(__powerpc64__) || defined(__powerpc64le__) \
-    || defined(__ppc64__) || defined(__ppc64le__) \
-    || defined(__PPC64__) || defined(__PPC64LE__) \
-    || defined(__ia64) || defined(__itanium__) || defined(_M_IA64) \
-    || defined(__s390x__) )   /* Detects 64 bits mode */
-#  define LZ4_ARCH64 1
-#else
-#  define LZ4_ARCH64 0
-#endif
-
-/*
-* Little Endian or Big Endian ?
-* Overwrite the #define below if you know your architecture endianess
-*/
-#include <stdlib.h>   /* Apparently required to detect endianess */
-#if defined (__GLIBC__)
-#  include <endian.h>
-#  if (__BYTE_ORDER == __BIG_ENDIAN)
-#     define LZ4_BIG_ENDIAN 1
-#  endif
-#elif (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN)) && !(defined(__LITTLE_ENDIAN__) || defined(__LITTLE_ENDIAN) || defined(_LITTLE_ENDIAN))
-#  define LZ4_BIG_ENDIAN 1
-#elif defined(__sparc) || defined(__sparc__) \
-    || defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) \
-    || defined(__hpux)  || defined(__hppa) \
-    || defined(_MIPSEB) || defined(__s390__)
-#  define LZ4_BIG_ENDIAN 1
-#else
-/* Little Endian assumed. PDP Endian and other very rare endian format are unsupported. */
-#endif
-
-/*
-* Unaligned memory access is automatically enabled for "common" CPU, such as x86.
-* For others CPU, the compiler will be more cautious, and insert extra code to ensure aligned access is respected
-* If you know your target CPU supports unaligned memory access, you want to force this option manually to improve performance
-*/
-#if defined(__ARM_FEATURE_UNALIGNED)
-#  define LZ4_FORCE_UNALIGNED_ACCESS 1
-#endif
-
-/* Define this parameter if your target system or compiler does not support hardware bit count */
-#if defined(_MSC_VER) && defined(_WIN32_WCE)            /* Visual Studio for Windows CE does not support Hardware bit count */
-#  define LZ4_FORCE_SW_BITCOUNT
-#endif
-
-
-/**************************************
-   Compiler Options
-**************************************/
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
-/* "restrict" is a known keyword */
-#else
-#  define restrict /* Disable restrict */
-#endif
-
-#ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
-#  include <intrin.h>                    /* For Visual 2005 */
-#  if LZ4_ARCH64   /* 64-bits */
-#    pragma intrinsic(_BitScanForward64) /* For Visual 2005 */
-#    pragma intrinsic(_BitScanReverse64) /* For Visual 2005 */
-#  else            /* 32-bits */
-#    pragma intrinsic(_BitScanForward)   /* For Visual 2005 */
-#    pragma intrinsic(_BitScanReverse)   /* For Visual 2005 */
-#  endif
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4701)        /* disable: C4701: potentially uninitialized local variable used */
-#else
-#  ifdef __GNUC__
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  else
-#    define FORCE_INLINE static inline
-#  endif
-#endif
-
-#ifdef _MSC_VER  /* Visual Studio */
-#  define lz4_bswap16(x) _byteswap_ushort(x)
-#else
-#  define lz4_bswap16(x)  ((unsigned short int) ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8)))
-#endif
 
 
 /**************************************
@@ -145,106 +47,40 @@ Memory routines
 
 
 /**************************************
-   Basic Types
+   Local Compiler Options
 **************************************/
-#if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
-# include <stdint.h>
-typedef uint8_t  BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
+#if defined(__GNUC__)
+#  pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
-#if defined(__GNUC__)  && !defined(LZ4_FORCE_UNALIGNED_ACCESS)
-#  define _PACKED __attribute__ ((packed))
-#else
-#  define _PACKED
+#if defined (__clang__)
+#  pragma clang diagnostic ignored "-Wunused-function"
 #endif
-
-#if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  ifdef __IBMC__
-#    pragma pack(1)
-#  else
-#    pragma pack(push, 1)
-#  endif
-#endif
-
-typedef struct _U16_S { U16 v; } _PACKED U16_S;
-typedef struct _U32_S { U32 v; } _PACKED U32_S;
-typedef struct _U64_S { U64 v; } _PACKED U64_S;
-
-#if !defined(LZ4_FORCE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  pragma pack(pop)
-#endif
-
-#define A64(x) (((U64_S *)(x))->v)
-#define A32(x) (((U32_S *)(x))->v)
-#define A16(x) (((U16_S *)(x))->v)
 
 
 /**************************************
-Constants
+   Common LZ4 definition
 **************************************/
-#define MINMATCH 4
+#define LZ4_COMMONDEFS_ONLY
+#include "lz4.c"
 
+
+/**************************************
+  Local Constants
+**************************************/
 #define DICTIONARY_LOGSIZE 16
 #define MAXD (1<<DICTIONARY_LOGSIZE)
 #define MAXD_MASK ((U32)(MAXD - 1))
-#define MAX_DISTANCE (MAXD - 1)
 
 #define HASH_LOG (DICTIONARY_LOGSIZE-1)
 #define HASHTABLESIZE (1 << HASH_LOG)
 #define HASH_MASK (HASHTABLESIZE - 1)
 
-#define ML_BITS  4
-#define ML_MASK  (size_t)((1U<<ML_BITS)-1)
-#define RUN_BITS (8-ML_BITS)
-#define RUN_MASK ((1U<<RUN_BITS)-1)
-
-#define COPYLENGTH 8
-#define LASTLITERALS 5
-#define MFLIMIT (COPYLENGTH+MINMATCH)
-#define MINLENGTH (MFLIMIT+1)
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
 
-#define KB *(1<<10)
-#define MB *(1<<20)
-#define GB *(1U<<30)
-
 
 /**************************************
-Architecture-specific macros
-**************************************/
-#if LZ4_ARCH64   /* 64-bit */
-#  define STEPSIZE 8
-#  define LZ4_COPYSTEP(s,d)     A64(d) = A64(s); d+=8; s+=8;
-#  define LZ4_COPYPACKET(s,d)   LZ4_COPYSTEP(s,d)
-#  define AARCH                 A64
-#else            /* 32-bit */
-#  define STEPSIZE 4
-#  define LZ4_COPYSTEP(s,d)     A32(d) = A32(s); d+=4; s+=4;
-#  define LZ4_COPYPACKET(s,d)   LZ4_COPYSTEP(s,d); LZ4_COPYSTEP(s,d);
-#  define AARCH                 A32
-#endif
-
-#if defined(LZ4_BIG_ENDIAN)
-#  define LZ4_READ_LITTLEENDIAN_16(d,s,p) { U16 v = A16(p); v = lz4_bswap16(v); d = (s) - v; }
-#  define LZ4_WRITE_LITTLEENDIAN_16(p,i)  { U16 v = (U16)(i); v = lz4_bswap16(v); A16(p) = v; p+=2; }
-#else      /* Little Endian */
-#  define LZ4_READ_LITTLEENDIAN_16(d,s,p) { d = (s) - A16(p); }
-#  define LZ4_WRITE_LITTLEENDIAN_16(p,v)  { A16(p) = v; p+=2; }
-#endif
-
-
-/**************************************
- Local Types
+   Local Types
 **************************************/
 typedef struct
 {
@@ -265,86 +101,19 @@ typedef struct
 
 
 /**************************************
- Macros
+   Local Macros
 **************************************/
-#define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(!!(c)) }; }   /* Visual : use only *after* variable declarations */
-#define LZ4_WILDCOPY(s,d,e)    do { LZ4_COPYPACKET(s,d) } while (d<e);
-#define LZ4_BLINDCOPY(s,d,l)   { BYTE* e=d+l; LZ4_WILDCOPY(s,d,e); d=e; }
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
 #define DELTANEXT(p)           chainTable[(size_t)(p) & MAXD_MASK]
 #define GETNEXT(p)             ((p) - (size_t)DELTANEXT(p))
 
-static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(A32(ptr)); }
+static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
+
+
 
 /**************************************
-Private functions
+   HC Compression
 **************************************/
-#if LZ4_ARCH64
-
-FORCE_INLINE int LZ4_NbCommonBytes (register U64 val)
-{
-#if defined(LZ4_BIG_ENDIAN)
-#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
-    _BitScanReverse64( &r, val );
-    return (int)(r>>3);
-#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    return (__builtin_clzll(val) >> 3);
-#  else
-    int r;
-    if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
-    if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
-    r += (!val);
-    return r;
-#  endif
-#else
-#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
-    _BitScanForward64( &r, val );
-    return (int)(r>>3);
-#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    return (__builtin_ctzll(val) >> 3);
-#  else
-    static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
-    return DeBruijnBytePos[((U64)((val & -val) * 0x0218A392CDABBD3F)) >> 58];
-#  endif
-#endif
-}
-
-#else
-
-FORCE_INLINE int LZ4_NbCommonBytes (register U32 val)
-{
-#if defined(LZ4_BIG_ENDIAN)
-#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r;
-    _BitScanReverse( &r, val );
-    return (int)(r>>3);
-#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    return (__builtin_clz(val) >> 3);
-#  else
-    int r;
-    if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
-    r += (!val);
-    return r;
-#  endif
-#else
-#  if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r;
-    _BitScanForward( &r, val );
-    return (int)(r>>3);
-#  elif defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    return (__builtin_ctz(val) >> 3);
-#  else
-    static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
-    return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
-#  endif
-#endif
-}
-
-#endif
-
-
 static void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* base)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
@@ -397,24 +166,6 @@ static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newB
 }
 
 
-static size_t LZ4HC_CommonLength (const BYTE* p1, const BYTE* p2, const BYTE* const p1Limit)
-{
-    const BYTE* const p1Start = p1;
-
-    while (p1 <= p1Limit - STEPSIZE)
-    {
-        size_t diff = AARCH(p2) ^ AARCH(p1);
-        if (!diff) { p1+=STEPSIZE; p2+=STEPSIZE; continue; }
-        p1 += LZ4_NbCommonBytes(diff);
-        return (p1 - p1Start);
-    }
-    if (LZ4_ARCH64) if ((p1<(p1Limit-3)) && (A32(p2) == A32(p1))) { p1+=4; p2+=4; }
-    if ((p1<(p1Limit-1)) && (A16(p2) == A16(p1))) { p1+=2; p2+=2; }
-    if ((p1<p1Limit) && (*p2 == *p1)) p1++;
-    return (p1 - p1Start);
-}
-
-
 FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   // Index table will be updated
                                                const BYTE* ip, const BYTE* const iLimit,
                                                const BYTE** matchpos,
@@ -442,23 +193,23 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   // I
         {
             match = base + matchIndex;
             if (*(match+ml) == *(ip+ml)
-                && (A32(match) == A32(ip)))
+                && (LZ4_read32(match) == LZ4_read32(ip)))
             {
-                size_t mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
+                size_t mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
                 if (mlt > ml) { ml = mlt; *matchpos = match; }
             }
         }
         else
         {
             match = dictBase + matchIndex;
-            if (A32(match) == A32(ip))
+            if (LZ4_read32(match) == LZ4_read32(ip))
             {
                 size_t mlt;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iLimit) vLimit = iLimit;
-                mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
+                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iLimit))
-                    mlt += LZ4HC_CommonLength(ip+mlt, base+dictLimit, iLimit);
+                    mlt += LZ4_count(ip+mlt, base+dictLimit, iLimit);
                 if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   // virtual matchpos
             }
         }
@@ -502,11 +253,11 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         {
             match = base + matchIndex;
             if (*(iLowLimit + longest) == *(match - delta + longest))
-                if (A32(match) == A32(ip))
+                if (LZ4_read32(match) == LZ4_read32(ip))
                 {
                     const BYTE* startt = ip;
                     const BYTE* tmpMatch = match;
-                    const BYTE* const matchEnd = ip + MINMATCH + LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, iHighLimit);
+                    const BYTE* const matchEnd = ip + MINMATCH + LZ4_count(ip+MINMATCH, match+MINMATCH, iHighLimit);
 
                     while ((startt>iLowLimit) && (tmpMatch > iLowLimit) && (startt[-1] == tmpMatch[-1])) {startt--; tmpMatch--;}
 
@@ -521,15 +272,15 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         else
         {
             match = dictBase + matchIndex;
-            if (A32(match) == A32(ip))
+            if (LZ4_read32(match) == LZ4_read32(ip))
             {
                 size_t mlt;
                 int back=0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
-                mlt = LZ4HC_CommonLength(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
+                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
-                    mlt += LZ4HC_CommonLength(ip+mlt, base+dictLimit, iHighLimit);
+                    mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
                 while ((ip+back > iLowLimit) && (matchIndex+back > lowLimit) && (ip[back-1] == match[back-1])) back--;
                 mlt -= back;
                 if ((int)mlt > longest) { longest = (int)mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
@@ -568,10 +319,11 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     else *token = (BYTE)(length<<ML_BITS);
 
     /* Copy Literals */
-    LZ4_BLINDCOPY(*anchor, *op, length);
+    LZ4_wildCopy(*op, *anchor, (*op) + length);
+    *op += length;
 
     /* Encode Offset */
-    LZ4_WRITE_LITTLEENDIAN_16(*op,(U16)(*ip-match));
+    LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
 
     /* Encode MatchLength */
     length = (int)(matchLength-MINMATCH);
@@ -958,7 +710,7 @@ int LZ4_resetStreamStateHC(void* state, const char* inputBuffer)
 
 void* LZ4_createHC (const char* inputBuffer)
 {
-    void* hc4 = ALLOCATOR(sizeof(LZ4HC_Data_Structure));
+    void* hc4 = ALLOCATOR(1, sizeof(LZ4HC_Data_Structure));
     LZ4HC_init ((LZ4HC_Data_Structure*)hc4, (const BYTE*)inputBuffer);
     return hc4;
 }

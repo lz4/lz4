@@ -285,12 +285,8 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 
 
 /**************************************
-   Constants
+   Common Constants
 **************************************/
-#define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
-#define HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
-#define HASH_SIZE_U32 (1 << LZ4_HASHLOG)
-
 #define MINMATCH 4
 
 #define COPYLENGTH 8
@@ -298,12 +294,9 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 #define MFLIMIT (COPYLENGTH+MINMATCH)
 static const int LZ4_minLength = (MFLIMIT+1);
 
-#define KB *(1U<<10)
-#define MB *(1U<<20)
+#define KB *(1 <<10)
+#define MB *(1 <<20)
 #define GB *(1U<<30)
-
-#define LZ4_64KLIMIT ((64 KB) + (MFLIMIT-1))
-#define SKIPSTRENGTH 6   /* Increasing this value will make the compression run slower on incompressible data */
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
@@ -315,38 +308,13 @@ static const int LZ4_minLength = (MFLIMIT+1);
 
 
 /**************************************
-   Structures and local types
-**************************************/
-typedef struct {
-    U32 hashTable[HASH_SIZE_U32];
-    U32 currentOffset;
-    U32 initCheck;
-    const BYTE* dictionary;
-    const BYTE* bufferStart;
-    U32 dictSize;
-} LZ4_stream_t_internal;
-
-typedef enum { notLimited = 0, limitedOutput = 1 } limitedOutput_directive;
-typedef enum { byPtr, byU32, byU16 } tableType_t;
-
-typedef enum { noDict = 0, withPrefix64k, usingExtDict } dict_directive;
-typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
-
-typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } endCondition_directive;
-typedef enum { full = 0, partial = 1 } earlyEnd_directive;
-
-
-/**************************************
-   Utils
+   Common Utils
 **************************************/
 #define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
-int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
-int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
-
 
 /********************************
-   Compression functions
+   Common functions
 ********************************/
 static unsigned LZ4_NbCommonBytes (register size_t val)
 {
@@ -415,6 +383,73 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
     }
 }
 
+static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
+{
+    const BYTE* const pStart = pIn;
+
+    while (likely(pIn<pInLimit-(STEPSIZE-1)))
+    {
+        size_t diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
+        if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
+        pIn += LZ4_NbCommonBytes(diff);
+        return (unsigned)(pIn - pStart);
+    }
+    if (LZ4_64bits()) if ((pIn<(pInLimit-3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn+=4; pMatch+=4; }
+    if ((pIn<(pInLimit-1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn+=2; pMatch+=2; }
+    if ((pIn<pInLimit) && (*pMatch == *pIn)) pIn++;
+
+    return (unsigned)(pIn - pStart);
+}
+
+
+#ifndef LZ4_COMMONDEFS_ONLY
+/**************************************
+   Local Common Constants
+**************************************/
+#define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
+#define HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
+#define HASH_SIZE_U32 (1 << LZ4_HASHLOG)
+
+#define LZ4_64KLIMIT ((64 KB) + (MFLIMIT-1))
+#define SKIPSTRENGTH 6   /* Increasing this value will make the compression run slower on incompressible data */
+
+#define MAXD_LOG 16
+#define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
+
+
+/**************************************
+   Local Utils
+**************************************/
+int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
+int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
+
+
+/**************************************
+   Local Structures and types
+**************************************/
+typedef struct {
+    U32 hashTable[HASH_SIZE_U32];
+    U32 currentOffset;
+    U32 initCheck;
+    const BYTE* dictionary;
+    const BYTE* bufferStart;
+    U32 dictSize;
+} LZ4_stream_t_internal;
+
+typedef enum { notLimited = 0, limitedOutput = 1 } limitedOutput_directive;
+typedef enum { byPtr, byU32, byU16 } tableType_t;
+
+typedef enum { noDict = 0, withPrefix64k, usingExtDict } dict_directive;
+typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
+
+typedef enum { endOnOutputSize = 0, endOnInputSize = 1 } endCondition_directive;
+typedef enum { full = 0, partial = 1 } earlyEnd_directive;
+
+
+
+/********************************
+   Compression functions
+********************************/
 
 static U32 LZ4_hashSequence(U32 sequence, tableType_t tableType)
 {
@@ -454,25 +489,6 @@ static const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t t
     U32 h = LZ4_hashPosition(p, tableType);
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
 }
-
-static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
-{
-    const BYTE* const pStart = pIn;
-
-    while (likely(pIn<pInLimit-(STEPSIZE-1)))
-    {
-        size_t diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
-        if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
-        pIn += LZ4_NbCommonBytes(diff);
-        return (unsigned)(pIn - pStart);
-    }
-    if (LZ4_64bits()) if ((pIn<(pInLimit-3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn+=4; pMatch+=4; }
-    if ((pIn<(pInLimit-1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn+=2; pMatch+=2; }
-    if ((pIn<pInLimit) && (*pMatch == *pIn)) pIn++;
-
-    return (unsigned)(pIn - pStart);
-}
-
 
 static int LZ4_compress_generic(
                  void* ctx,
@@ -1344,3 +1360,6 @@ int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int origin
 {
     return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, (BYTE*)dest - 64 KB, NULL, 64 KB);
 }
+
+#endif   /* LZ4_COMMONDEFS_ONLY */
+

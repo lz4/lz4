@@ -663,7 +663,7 @@ int main(int argc, char** argv)
 
     if (nbTests<=0) nbTests=1;
 
-    //if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
+    if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
     if (result) return 1;
     return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100);
 }
