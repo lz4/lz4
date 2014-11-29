@@ -169,7 +169,7 @@ int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedS
 
 
 /***********************************************
-   Experimental Streaming Compression Functions
+   Streaming Compression Functions
 ***********************************************/
 
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
@@ -231,20 +231,17 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_streamPtr, char* safeBuffer, int dictSize);
 
 
 /************************************************
-  Experimental Streaming Decompression Functions
+   Streaming Decompression Functions
 ************************************************/
 
 #define LZ4_STREAMDECODESIZE_U64  4
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
+typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_streamDecode_t;
 /*
  * LZ4_streamDecode_t
  * information structure to track an LZ4 stream.
- * important : init this structure content using LZ4_setStreamDecode or memset() before first use !
- */
-typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_streamDecode_t;
-
-/*
- * If you prefer dynamic allocation methods,
+ * init this structure content using LZ4_setStreamDecode or memset() before first use !
+ * If you prefer dynamic allocation methods :
  * LZ4_createStreamDecode will allocate and initialize an LZ4_streamDecode_t structure
  * LZ4_freeStreamDecode releases its memory.
  */
@@ -254,9 +251,7 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 /*
  * LZ4_setStreamDecode
  * Use this function to instruct where to find the dictionary.
- * This function can be used to specify a static dictionary,
- * or to instruct where to find some previously decoded data saved into a different memory space.
- * Setting a size of 0 is allowed (same effect as no dictionary, same effect as reset).
+ * Setting a size of 0 is allowed (same effect as reset).
  * Return : 1 if OK, 0 if error
  */
 int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
@@ -277,7 +272,7 @@ Advanced decoding functions :
 *_usingDict() :
     These decoding functions work the same as
     a combination of LZ4_setDictDecode() followed by LZ4_decompress_x_continue()
-    They don't use nor update an LZ4_streamDecode_t structure.
+    They are stand-alone and don't use nor update an LZ4_streamDecode_t structure.
 */
 int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxDecompressedSize, const char* dictStart, int dictSize);
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
@@ -294,18 +289,10 @@ They are only provided here for compatibility with older user programs.
 - LZ4_uncompress is the same as LZ4_decompress_fast
 - LZ4_uncompress_unknownOutputSize is the same as LZ4_decompress_safe
 These function prototypes are now disabled; uncomment them if you really need them.
-It is highly recommended to stop using these functions and migrated to newer ones */
+It is highly recommended to stop using these functions and migrate to newer ones */
 /* int LZ4_uncompress (const char* source, char* dest, int outputSize); */
 /* int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize); */
 
-/*
- * If you prefer dynamic allocation methods,
- * LZ4_createStreamDecode()
- * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
- * LZ4_free just frees it.
- */
-/* void* LZ4_createStreamDecode(void); */
-/*int   LZ4_free (void* LZ4_stream);    yes, it's the same one as for compression */
 
 /* Obsolete streaming functions; use new streaming interface whenever possible */
 void* LZ4_create (const char* inputBuffer);

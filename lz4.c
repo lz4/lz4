@@ -44,10 +44,26 @@
 
 /*
  * CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS :
- * You can force the code to use unaligned memory access, should you know your CPU can handle it efficiently.
- * If it effectively results in better speed (up to 50% improvement can be expected)
+ * By default, the source code expects the compiler to correctly optimize
+ * 4-bytes and 8-bytes read on architectures able to handle it efficiently.
+ * This is not always the case. In some circumstances (ARM notably),
+ * the compiler will issue cautious code even when target is able to correctly handle unaligned memory accesses.
+ *
+ * You can force the compiler to use unaligned memory access by uncommenting the line below.
+ * One of the below scenarios will happen :
+ * 1 - Your target CPU correctly handle unaligned access, and was not well optimized by compiler (good case).
+ *     You will witness large performance improvements (+50% and up).
+ *     Keep the line uncommented and send a word to upstream (https://groups.google.com/forum/#!forum/lz4c)
+ *     The goal is to automatically detect such situations by adding your target CPU within an exception list.
+ * 2 - Your target CPU correctly handle unaligned access, and was already correctly optimized by compiler
+ *     No change will be experienced.
+ * 3 - Your target CPU inefficiently handle unaligned access.
+ *     You will experience a performance loss. Comment back the line.
+ * 4 - Your target CPU does not handle unaligned access.
+ *     Program will crash.
+ * If it effectively results in better speed (case 1)
  * please report your configuration to upstream (https://groups.google.com/forum/#!forum/lz4c)
- * so that an automatic detection macro can be added to mainline.
+ * so that an automatic detection macro can be added for future versions of the library.
  */
 /* #define CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS 1 */
 
@@ -58,7 +74,7 @@
 /*
  * Automated efficient unaligned memory access detection
  * Based on known hardware architectures
- * This list will be updated thanks to Open Source community feedbacks
+ * This list will be updated thanks to feedbacks
  */
 #if defined(CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS) \
     || defined(__ARM_FEATURE_UNALIGNED) \
@@ -71,7 +87,10 @@
 #  define LZ4_UNALIGNED_ACCESS 0
 #endif
 
-/* Define this parameter if your target system or compiler does not support hardware bit count */
+/*
+ * LZ4_FORCE_SW_BITCOUNT
+ * Define this parameter if your target system or compiler does not support hardware bit count
+ */
 #if defined(_MSC_VER) && defined(_WIN32_WCE)   /* Visual Studio for Windows CE does not support Hardware bit count */
 #  define LZ4_FORCE_SW_BITCOUNT
 #endif
@@ -88,7 +107,7 @@
 
 #ifdef _MSC_VER    /* Visual Studio */
 #  define FORCE_INLINE static __forceinline
-#  include <intrin.h>                    /* For Visual 2005 */
+#  include <intrin.h>
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #else
 #  ifdef __GNUC__
@@ -961,7 +980,6 @@ FORCE_INLINE int LZ4_decompress_generic(
         }
         LZ4_wildCopy(op, ip, cpy);
         ip += length; op = cpy;
-        //LZ4_WILDCOPY(op, ip, cpy); ip -= (op-cpy); op = cpy;
 
         /* get offset */
         match = cpy - LZ4_readLE16(ip); ip+=2;
@@ -1018,7 +1036,7 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         /* copy repeated sequence */
         cpy = op + length;
-        if (unlikely((op-match)<(int)STEPSIZE))
+        if (unlikely((op-match)<8))
         {
             const size_t dec64 = dec64table[op-match];
             op[0] = match[0];
@@ -1036,7 +1054,7 @@ FORCE_INLINE int LZ4_decompress_generic(
             if (op < oend-8)
             {
                 LZ4_wildCopy(op, match, oend-8);
-                match += oend-8 - op;
+                match += (oend-8) - op;
                 op = oend-8;
             }
             while (op<cpy) *op++ = *match++;

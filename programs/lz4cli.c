@@ -48,10 +48,6 @@
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
 #endif
 
-#ifdef __clang__
-#  pragma clang diagnostic ignored "-Wunused-const-variable"   // const variable one is really used !
-#endif
-
 #define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
 #define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
@@ -125,15 +121,6 @@
 #define GB *(1U<<30)
 
 #define LZ4_BLOCKSIZEID_DEFAULT 7
-
-
-//**************************************
-// Architecture Macros
-//**************************************
-static const int one = 1;
-#define CPU_LITTLE_ENDIAN   (*(char*)(&one))
-#define CPU_BIG_ENDIAN      (!CPU_LITTLE_ENDIAN)
-#define LITTLE_ENDIAN_32(i) (CPU_LITTLE_ENDIAN?(i):swap32(i))
 
 
 //**************************************
@@ -462,7 +449,7 @@ int main(int argc, char** argv)
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
-    DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
+    if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
 
     // No input filename ==> use stdin
     if(!input_filename) { input_filename=stdinmark; }

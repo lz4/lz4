@@ -32,7 +32,7 @@
 
 CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wstrict-prototypes -Wno-missing-braces   # Wno-missing-braces required due to GCC <4.8.3 bug
+CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -Wno-missing-braces   # Wno-missing-braces required due to GCC <4.8.3 bug
 FLAGS   = -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 TESTFILE= Makefile
