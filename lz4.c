@@ -55,15 +55,15 @@
  *     You will witness large performance improvements (+50% and up).
  *     Keep the line uncommented and send a word to upstream (https://groups.google.com/forum/#!forum/lz4c)
  *     The goal is to automatically detect such situations by adding your target CPU within an exception list.
- * 2 - Your target CPU correctly handle unaligned access, and was already correctly optimized by compiler
+ * 2 - Your target CPU correctly handle unaligned access, and was already already optimized by compiler
  *     No change will be experienced.
  * 3 - Your target CPU inefficiently handle unaligned access.
  *     You will experience a performance loss. Comment back the line.
  * 4 - Your target CPU does not handle unaligned access.
  *     Program will crash.
- * If it effectively results in better speed (case 1)
+ * If uncommenting results in better performance (case 1)
  * please report your configuration to upstream (https://groups.google.com/forum/#!forum/lz4c)
- * so that an automatic detection macro can be added for future versions of the library.
+ * An automatic detection macro will be added to match your case within future versions of the library.
  */
 /* #define CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS 1 */
 
@@ -177,6 +177,7 @@ static unsigned LZ4_isLittleEndian(void)
     return one.c[0];
 }
 
+
 static U16 LZ4_readLE16(const void* memPtr)
 {
     if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
@@ -204,12 +205,10 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
 }
 
 
-static U32 LZ4_read16(const void* memPtr)
+static U16 LZ4_read16(const void* memPtr)
 {
     if (LZ4_UNALIGNED_ACCESS)
-    {
         return *(U16*)memPtr;
-    }
     else
     {
         U16 val16;
@@ -221,9 +220,7 @@ static U32 LZ4_read16(const void* memPtr)
 static U32 LZ4_read32(const void* memPtr)
 {
     if (LZ4_UNALIGNED_ACCESS)
-    {
         return *(U32*)memPtr;
-    }
     else
     {
         U32 val32;
@@ -232,36 +229,24 @@ static U32 LZ4_read32(const void* memPtr)
     }
 }
 
-
-static U32 LZ4_readLE32(const void* memPtr)
+static U64 LZ4_read64(const void* memPtr)
 {
-    if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
-        return *(U32*)memPtr;
-    {
-        const BYTE* p = memPtr;
-        U32 result = (U32)((U32)p[0] + (p[1]<<8) + (p[2]<<16) + ((U32)p[3]<<24));
-        return result;
-    }
-}
-
-static U64 LZ4_readLE64(const void* memPtr)
-{
-    if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
+    if (LZ4_UNALIGNED_ACCESS)
         return *(U64*)memPtr;
     else
     {
-        const BYTE* p = memPtr;
-        return (U64)((U64)p[0] + (p[1]<<8) + (p[2]<<16) + ((U64)p[3]<<24) +
-                     (((U64)p[4])<<32) + ((U64)p[5]<<40) + ((U64)p[6]<<48) + ((U64)p[7]<<56));
+        U64 val64;
+        memcpy(&val64, memPtr, 8);
+        return val64;
     }
 }
 
-static size_t LZ4_readLE_ARCH(const void* p)
+static size_t LZ4_read_ARCH(const void* p)
 {
     if (LZ4_64bits())
-        return (size_t)LZ4_readLE64(p);
+        return (size_t)LZ4_read64(p);
     else
-        return (size_t)LZ4_readLE32(p);
+        return (size_t)LZ4_read32(p);
 }
 
 
@@ -365,31 +350,68 @@ int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 ********************************/
 static unsigned LZ4_NbCommonBytes (register size_t val)
 {
-    if (LZ4_64bits())
+    if (LZ4_isLittleEndian())
     {
-#   if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r = 0;
-    _BitScanForward64( &r, (U64)val );
-    return (int)(r>>3);
-#   elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    return (__builtin_ctzll((U64)val) >> 3);
-#   else
-    static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
-    return DeBruijnBytePos[((U64)((val & -(long long)val) * 0x0218A392CDABBD3FULL)) >> 58];
-#   endif
+        if (LZ4_64bits())
+        {
+#       if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            unsigned long r = 0;
+            _BitScanForward64( &r, (U64)val );
+            return (int)(r>>3);
+#       elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            return (__builtin_ctzll((U64)val) >> 3);
+#       else
+            static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+            return DeBruijnBytePos[((U64)((val & -(long long)val) * 0x0218A392CDABBD3FULL)) >> 58];
+#       endif
+        }
+        else /* 32 bits */
+        {
+#       if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            unsigned long r;
+            _BitScanForward( &r, (U32)val );
+            return (int)(r>>3);
+#       elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            return (__builtin_ctz((U32)val) >> 3);
+#       else
+            static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+            return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
+#       endif
+        }
     }
-    /* 32 bits */
+    else   /* Big Endian CPU */
     {
-#   if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    unsigned long r;
-    _BitScanForward( &r, (U32)val );
-    return (int)(r>>3);
-#   elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
-    return (__builtin_ctz((U32)val) >> 3);
-#   else
-    static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
-    return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
-#   endif
+        if (LZ4_64bits())
+        {
+#       if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            unsigned long r = 0;
+            _BitScanReverse64( &r, val );
+            return (unsigned)(r>>3);
+#       elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            return (__builtin_clzll(val) >> 3);
+#       else
+            unsigned r;
+            if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+            if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
+            r += (!val);
+            return r;
+#       endif
+        }
+        else /* 32 bits */
+        {
+#       if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            unsigned long r = 0;
+            _BitScanReverse( &r, val );
+            return (unsigned)(r>>3);
+#       elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            return (__builtin_clz(val) >> 3);
+#       else
+            unsigned r;
+            if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
+            r += (!val);
+            return r;
+#       endif
+        }
     }
 }
 
@@ -439,7 +461,7 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLi
 
     while (likely(pIn<pInLimit-(STEPSIZE-1)))
     {
-        size_t diff = LZ4_readLE_ARCH(pMatch) ^ LZ4_readLE_ARCH(pIn);
+        size_t diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
         if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
         pIn += LZ4_NbCommonBytes(diff);
         return (unsigned)(pIn - pStart);
