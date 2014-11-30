@@ -369,7 +369,7 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
         {
 #       if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r = 0;
-            _BitScanReverse( &r, val );
+            _BitScanReverse( &r, (unsigned long)val );
             return (unsigned)(r>>3);
 #       elif defined(__GNUC__) && (GCC_VERSION >= 304) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_clz(val) >> 3);

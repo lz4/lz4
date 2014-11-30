@@ -57,6 +57,10 @@ You can contact the author at :
 #  pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
+#if defined(_MSC_VER)    /* Visual Studio */
+#  pragma warning(disable : 4201)        /* disable: C4201: unnamed struct/union*/
+#endif
+
 
 /**************************************
    Common LZ4 definition

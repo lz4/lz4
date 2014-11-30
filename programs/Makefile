@@ -193,7 +193,7 @@ test-mem: lz4 datagen fuzzer frametest
 	./datagen -g16MB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp /dev/null
 	./datagen -g256MB > tmp
-	valgrind --leak-check=yes ./lz4 -B4D -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp /dev/null
 	rm tmp
 	valgrind --leak-check=yes ./fuzzer -i50 -t0
 	valgrind --leak-check=yes ./frametest -i100
