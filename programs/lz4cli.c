@@ -48,7 +48,6 @@
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
 #endif
 
-#define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
 #define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
 
@@ -400,7 +399,7 @@ int main(int argc, char** argv)
                             argument++;
                             break;
                         }
-                        case 'D': LZ4IO_setBlockMode(chainedBlocks); argument++; break;
+                        case 'D': LZ4IO_setBlockMode(LZ4IO_blockLinked); argument++; break;
                         case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;
                         default : exitBlockProperties=1;
                         }

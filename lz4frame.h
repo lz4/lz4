@@ -201,7 +201,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 typedef void* LZ4F_decompressionContext_t;
 
 typedef struct {
-  unsigned stableDst;       /* unused for the time being, must be 0 */
+  unsigned stableDst;       /* guarantee that decompressed data will still be there on next function calls (avoid storage into tmp buffers) */
   unsigned reserved[3];
 } LZ4F_decompressOptions_t;
 

@@ -65,13 +65,13 @@ default: lz4 lz4c
 
 all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest frametest32 datagen
 
-lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
+lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) -DDISABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
+lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
+lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
 fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
@@ -80,16 +80,16 @@ fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xx
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c 
+fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
+frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c 
+frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
 datagen : datagen.c
@@ -156,9 +156,10 @@ test-lz4: lz4 datagen
 	@rm *.test
 	@echo frame concatenation test completed
 # test frame concatenation with null-length frame
-	
+
 
 test-lz4c: lz4c datagen
+	./datagen -g256MB | ./lz4c -l -v -B4D | ./lz4c -vdq > $(VOID)
 
 test-lz4c32: lz4 lz4c32 lz4 datagen
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -vdq > $(VOID)
@@ -195,8 +196,8 @@ test-mem: lz4 datagen fuzzer frametest
 	./datagen -g256MB > tmp
 	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp /dev/null
 	rm tmp
-	valgrind --leak-check=yes ./fuzzer -i50 -t0
-	valgrind --leak-check=yes ./frametest -i100
+	valgrind --leak-check=yes ./fuzzer -i64 -t0
+	valgrind --leak-check=yes ./frametest -i256
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
