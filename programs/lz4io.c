@@ -357,7 +357,7 @@ int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, i
 static void* LZ4IO_LZ4_createStream (const char* inputBuffer)
 {
     (void)inputBuffer;
-    return calloc(4, LZ4_STREAMSIZE_U32);
+    return calloc(8, LZ4_STREAMSIZE_U64);
 }
 
 static int LZ4IO_LZ4_compress_limitedOutput_continue (void* ctx, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel)

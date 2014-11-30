@@ -1,6 +1,12 @@
+r125:
+Changed : endian and alignment code
+Fixed : some alignment warnings under clang
+
 r124:
-Fix : LZ4F_compressBound() using NULL preferencesPtr
-Updated : xxHash, to r37
+New : LZ4 HC streaming mode
+Fixed : LZ4F_compressBound() using null preferencesPtr
+Updated : xxHash to r38
+Updated library number, to 1.4.0
 
 r123:
 Added : experimental lz4frame API, thanks to Takayuki Matsuoka and Christopher Jackson for testings
