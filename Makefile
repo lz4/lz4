@@ -93,8 +93,8 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
 install:
-	@cd $(LZ4DIR); $(MAKE) -e install
-	@cd $(PRGDIR); $(MAKE) -e install
+	@cd $(LZ4DIR); sudo $(MAKE) -e install
+	@cd $(PRGDIR); sudo $(MAKE) -e install
 
 uninstall:
 	@cd $(LZ4DIR); $(MAKE) uninstall
