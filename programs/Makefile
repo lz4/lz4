@@ -37,11 +37,11 @@ PREFIX ?= /usr
 CC     := $(CC)
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS   = -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man/man1
-LZ4DIR=..
+LZ4DIR=../lib
 
 TEST_FILES = COPYING
 TEST_TARGETS=test-native

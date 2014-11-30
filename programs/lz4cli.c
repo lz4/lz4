@@ -288,7 +288,7 @@ int main(int argc, char** argv)
         legacy_format=0,
         forceStdout=0,
         forceCompress=0,
-        pause=0;
+        main_pause=0;
     char* input_filename=0;
     char* output_filename=0;
     char* dynNameSpace=0;
@@ -424,7 +424,7 @@ int main(int argc, char** argv)
                     break;
 
                     // Pause at the end (hidden option)
-                case 'p': pause=1; BMK_SetPause(); break;
+                case 'p': main_pause=1; BMK_SetPause(); break;
 
                 EXTENDED_ARGUMENTS;
 
@@ -517,7 +517,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (pause) waitEnter();
+    if (main_pause) waitEnter();
     free(dynNameSpace);
     return 0;
 }
