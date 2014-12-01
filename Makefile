@@ -49,15 +49,14 @@ DISTRIBNAME=lz4-$(RELEASE).tar.gz
 TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
 	$(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4frame.h $(LZ4DIR)/xxhash.c $(LZ4DIR)/xxhash.h \
 	$(LZ4DIR)/liblz4.pc.in $(LZ4DIR)/Makefile $(LZ4DIR)/LICENSE \
-	Makefile lz4_format_description.txt NEWS README.md \
+	Makefile lz4_block_format.txt LZ4_Frame_Format.html NEWS README.md \
 	cmake_unofficial/CMakeLists.txt \
 	$(PRGDIR)/fullbench.c $(PRGDIR)/lz4cli.c \
 	$(PRGDIR)/datagen.c $(PRGDIR)/fuzzer.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
 	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
-	$(PRGDIR)/Makefile $(PRGDIR)/COPYING \
-	LZ4_Framing_Format.html
+	$(PRGDIR)/Makefile $(PRGDIR)/COPYING	
 NONTEXT = images/image00.png images/image01.png images/image02.png \
 	images/image03.png images/image04.png images/image05.png \
 	images/image06.png
