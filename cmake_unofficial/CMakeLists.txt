@@ -23,7 +23,7 @@ if(UNIX AND BUILD_LIBS)
     endif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
 endif()
 
-set(LZ4_DIR ../)
+set(LZ4_DIR ../lib/)
 set(PRG_DIR ../programs/)
 set(LZ4_SRCS_LIB ${LZ4_DIR}lz4.c ${LZ4_DIR}lz4hc.c ${LZ4_DIR}lz4.h ${LZ4_DIR}lz4hc.h)
 set(LZ4_SRCS ${LZ4_DIR}lz4frame.c ${LZ4_DIR}xxhash.c ${PRG_DIR}bench.c ${PRG_DIR}lz4cli.c ${PRG_DIR}lz4io.c)

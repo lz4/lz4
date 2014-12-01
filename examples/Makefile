@@ -33,10 +33,10 @@
 CC     := $(CC)
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -Wno-missing-braces   # Wno-missing-braces required due to GCC <4.8.3 bug
-FLAGS   = -I.. $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 TESTFILE= Makefile
-LZ4DIR=..
+LZ4DIR  = ../lib
 
 
 # Minimize test target for Travis CI's Build Matrix
