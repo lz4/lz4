@@ -32,10 +32,10 @@
 //**************************************
 // Tuning parameters
 //**************************************
-// DISABLE_LZ4C_LEGACY_OPTIONS :
+// ENABLE_LZ4C_LEGACY_OPTIONS :
 // Control the availability of -c0, -c1 and -hc legacy arguments
-// Default : Legacy options are enabled
-// #define DISABLE_LZ4C_LEGACY_OPTIONS
+// Default : Legacy options are disabled
+// #define ENABLE_LZ4C_LEGACY_OPTIONS
 
 
 //**************************************
@@ -201,14 +201,14 @@ int usage_advanced(void)
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
-#if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
+#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "Legacy arguments :\n");
     DISPLAY( " -c0    : fast compression\n");
     DISPLAY( " -c1    : high compression\n");
     DISPLAY( " -hc    : high compression\n");
     DISPLAY( " -y     : overwrite output without prompting \n");
     DISPLAY( " -s     : suppress warnings \n");
-#endif // DISABLE_LZ4C_LEGACY_OPTIONS
+#endif // ENABLE_LZ4C_LEGACY_OPTIONS
     EXTENDED_HELP;
     return 0;
 }
@@ -250,7 +250,7 @@ int usage_longhelp(void)
     DISPLAY( "%s can be used in 'pure pipe mode', for example :\n", programName);
     DISPLAY( "3 : compress data stream from 'generator', send result to 'consumer'\n");
     DISPLAY( "          generator | %s | consumer \n", programName);
-#if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
+#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "\n");
     DISPLAY( "Warning :\n");
     DISPLAY( "Legacy arguments take precedence. Therefore : \n");
@@ -259,7 +259,7 @@ int usage_longhelp(void)
     DISPLAY( "It is not equivalent to :\n");
     DISPLAY( "          %s -h -c filename\n", programName);
     DISPLAY( "which would display help text and exit\n");
-#endif // DISABLE_LZ4C_LEGACY_OPTIONS
+#endif // ENABLE_LZ4C_LEGACY_OPTIONS
     return 0;
 }
 
@@ -325,14 +325,14 @@ int main(int argc, char** argv)
             {
                 argument ++;
 
-#if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
+#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
                 // Legacy options (-c0, -c1, -hc, -y, -s)
                 if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }          // -c0 (fast compression)
                 if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }          // -c1 (high compression)
                 if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }          // -hc (high compression)
                 if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                                   // -y (answer 'yes' to overwrite permission)
                 if (*argument=='s') { displayLevel=1; continue; }                                          // -s (silent mode)
-#endif // DISABLE_LZ4C_LEGACY_OPTIONS
+#endif // ENABLE_LZ4C_LEGACY_OPTIONS
 
                 if ((*argument>='0') && (*argument<='9'))
                 {
