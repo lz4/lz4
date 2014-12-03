@@ -63,7 +63,6 @@ else
 endif
 
 default: liblz4
-	@cd $(PRGDIR); $(MAKE) -e
 
 all: liblz4
 

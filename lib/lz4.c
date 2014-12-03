@@ -394,17 +394,17 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLi
         pIn += LZ4_NbCommonBytes(diff);
         return (unsigned)(pIn - pStart);
     }
+
     if (LZ4_64bits()) if ((pIn<(pInLimit-3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn+=4; pMatch+=4; }
     if ((pIn<(pInLimit-1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn+=2; pMatch+=2; }
     if ((pIn<pInLimit) && (*pMatch == *pIn)) pIn++;
-
     return (unsigned)(pIn - pStart);
 }
 
 
 #ifndef LZ4_COMMONDEFS_ONLY
 /**************************************
-   Local Common Constants
+   Local Constants
 **************************************/
 #define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
 #define HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)

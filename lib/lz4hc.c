@@ -96,11 +96,11 @@ typedef struct
     const BYTE* end;        /* next block here to continue on current prefix */
     const BYTE* base;       /* All index relative to this position */
     const BYTE* dictBase;   /* alternate base for extDict */
+    const BYTE* inputBuffer;/* deprecated */
     U32   dictLimit;        /* below that point, need extDict */
     U32   lowLimit;         /* below that point, no more dict */
     U32   nextToUpdate;
     U32   compressionLevel;
-    const BYTE* inputBuffer;   /* deprecated */
 } LZ4HC_Data_Structure;
 
 
@@ -118,15 +118,15 @@ static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)
 /**************************************
    HC Compression
 **************************************/
-static void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* base)
+static void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* start)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
     hc4->nextToUpdate = 64 KB;
-    hc4->base = base - 64 KB;
-    hc4->inputBuffer = base;
-    hc4->end = base;
-    hc4->dictBase = base - 64 KB;
+    hc4->base = start - 64 KB;
+    hc4->inputBuffer = start;
+    hc4->end = start;
+    hc4->dictBase = start - 64 KB;
     hc4->dictLimit = 64 KB;
     hc4->lowLimit = 64 KB;
 }
@@ -152,21 +152,6 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
     }
 
     hc4->nextToUpdate = target;
-}
-
-
-static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newBlock)
-{
-    if (ctxPtr->end >= ctxPtr->base + 4)
-        LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   // finish referencing dictionary content
-    // Note : need to handle risk of index overflow
-    // Use only one memory segment for dict, so any previous External Dict is lost at this stage
-    ctxPtr->lowLimit  = ctxPtr->dictLimit;
-    ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
-    ctxPtr->dictBase  = ctxPtr->base;
-    ctxPtr->base = newBlock - ctxPtr->dictLimit;
-    ctxPtr->end  = newBlock;
-    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   // reference table must skip to from beginning of block
 }
 
 
@@ -571,7 +556,7 @@ int LZ4_compressHC_limitedOutput(const char* source, char* dest, int inputSize, 
 
 
 /*****************************
- Using external allocation
+  Using external allocation
 *****************************/
 int LZ4_sizeofStateHC(void) { return sizeof(LZ4HC_Data_Structure); }
 
@@ -598,9 +583,10 @@ int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, c
 { return LZ4_compressHC2_limitedOutput_withStateHC (state, source, dest, inputSize, maxOutputSize, 0); }
 
 
+
 /**************************************
- Experimental Streaming Functions
-**************************************/
+ * Streaming Functions
+ * ************************************/
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) { return (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t)); }
 int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) { free(LZ4_streamHCPtr); return 0; };
@@ -616,55 +602,68 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
-    LZ4HC_Data_Structure* streamPtr = (LZ4HC_Data_Structure*) LZ4_streamHCPtr;
+    LZ4HC_Data_Structure* ctxPtr = (LZ4HC_Data_Structure*) LZ4_streamHCPtr;
     if (dictSize > 64 KB)
     {
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    LZ4HC_init (streamPtr, (const BYTE*)dictionary);
-    if (dictSize >= 4) LZ4HC_Insert (streamPtr, (const BYTE*)dictionary +(dictSize-3));
-    streamPtr->end = (const BYTE*)dictionary + dictSize;
+    LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
+    if (dictSize >= 4) LZ4HC_Insert (ctxPtr, (const BYTE*)dictionary +(dictSize-3));
+    ctxPtr->end = (const BYTE*)dictionary + dictSize;
     return dictSize;
 }
 
 
 /* compression */
 
-static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* dsPtr,
+static void LZ4HC_setExternalDict(LZ4HC_Data_Structure* ctxPtr, const BYTE* newBlock)
+{
+    if (ctxPtr->end >= ctxPtr->base + 4)
+        LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
+    ctxPtr->lowLimit  = ctxPtr->dictLimit;
+    ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
+    ctxPtr->dictBase  = ctxPtr->base;
+    ctxPtr->base = newBlock - ctxPtr->dictLimit;
+    ctxPtr->end  = newBlock;
+    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   /* match referencing will resume from there */
+}
+
+static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* ctxPtr,
                                             const char* source, char* dest,
                                             int inputSize, int maxOutputSize, limitedOutput_directive limit)
 {
     /* auto-init if forgotten */
-    if (dsPtr->base == NULL)
-        LZ4HC_init (dsPtr, (const BYTE*) source);
+    if (ctxPtr->base == NULL)
+        LZ4HC_init (ctxPtr, (const BYTE*) source);
 
     /* Check overflow */
-    if ((size_t)(dsPtr->end - dsPtr->base) > 2 GB)
+    if ((size_t)(ctxPtr->end - ctxPtr->base) > 2 GB)
     {
-        size_t dictSize = (size_t)(dsPtr->end - dsPtr->base) - dsPtr->dictLimit;
+        size_t dictSize = (size_t)(ctxPtr->end - ctxPtr->base) - ctxPtr->dictLimit;
         if (dictSize > 64 KB) dictSize = 64 KB;
 
-        LZ4_loadDictHC((LZ4_streamHC_t*)dsPtr, (const char*)(dsPtr->end) - dictSize, (int)dictSize);
+        LZ4_loadDictHC((LZ4_streamHC_t*)ctxPtr, (const char*)(ctxPtr->end) - dictSize, (int)dictSize);
     }
 
     /* Check if blocks follow each other */
-    if ((const BYTE*)source != dsPtr->end) LZ4HC_setExternalDict(dsPtr, (const BYTE*)source);
+    if ((const BYTE*)source != ctxPtr->end) LZ4HC_setExternalDict(ctxPtr, (const BYTE*)source);
 
     /* Check overlapping input/dictionary space */
     {
         const BYTE* sourceEnd = (const BYTE*) source + inputSize;
-        const BYTE* dictBegin = dsPtr->dictBase + dsPtr->lowLimit;
-        const BYTE* dictEnd   = dsPtr->dictBase + dsPtr->dictLimit;
+        const BYTE* dictBegin = ctxPtr->dictBase + ctxPtr->lowLimit;
+        const BYTE* dictEnd   = ctxPtr->dictBase + ctxPtr->dictLimit;
         if ((sourceEnd > dictBegin) && ((BYTE*)source < dictEnd))
         {
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
-            dsPtr->lowLimit = (U32)(sourceEnd - dsPtr->dictBase);
-            if (dsPtr->dictLimit - dsPtr->lowLimit < 4) dsPtr->lowLimit = dsPtr->dictLimit;
+            ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictBase);
+            if (ctxPtr->dictLimit - ctxPtr->lowLimit < 4) ctxPtr->lowLimit = ctxPtr->dictLimit;
         }
     }
 
-    return LZ4HC_compress_generic (dsPtr, source, dest, inputSize, maxOutputSize, dsPtr->compressionLevel, limit);
+    return LZ4HC_compress_generic (ctxPtr, source, dest, inputSize, maxOutputSize, ctxPtr->compressionLevel, limit);
 }
 
 int LZ4_compressHC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize)
@@ -688,7 +687,6 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     if (dictSize < 4) dictSize = 0;
     if (dictSize > prefixSize) dictSize = prefixSize;
     memcpy(safeBuffer, streamPtr->end - dictSize, dictSize);
-    //LZ4_loadDictHC(LZ4_streamHCPtr, safeBuffer, dictSize);
     {
         U32 endIndex = (U32)(streamPtr->end - streamPtr->base);
         streamPtr->end = (const BYTE*)safeBuffer + dictSize;
@@ -749,20 +747,6 @@ int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source
 char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 {
     LZ4HC_Data_Structure* hc4 = (LZ4HC_Data_Structure*)LZ4HC_Data;
-    size_t distance = (hc4->end - 64 KB) - hc4->inputBuffer;
-
-    if (hc4->end <= hc4->inputBuffer + 64 KB) return (char*)(hc4->end);   /* no update : less than 64KB within buffer */
-
-    distance = (distance >> 16) << 16;   /* Must be a multiple of 64 KB */
-    LZ4HC_Insert(hc4, hc4->end - MINMATCH);
-    memcpy((void*)(hc4->end - 64 KB - distance), (const void*)(hc4->end - 64 KB), 64 KB);
-    hc4->base -= distance;
-    if ((U32)(hc4->inputBuffer - hc4->base) > 1 GB + 64 KB)   /* Avoid overflow */
-    {
-        int i;
-        hc4->base += 1 GB;
-        for (i=0; i<HASHTABLESIZE; i++) hc4->hashTable[i] -= 1 GB;
-    }
-    hc4->end -= distance;
-    return (char*)(hc4->end);
+    int dictSize = LZ4_saveDictHC((LZ4_streamHC_t*)LZ4HC_Data, (char*)(hc4->inputBuffer), 64 KB);
+    return (char*)(hc4->inputBuffer + dictSize);
 }
