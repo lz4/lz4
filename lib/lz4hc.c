@@ -556,8 +556,8 @@ int LZ4_compressHC_limitedOutput(const char* source, char* dest, int inputSize, 
 
 
 /*****************************
-  Using external allocation
-*****************************/
+ * Using external allocation
+ * ***************************/
 int LZ4_sizeofStateHC(void) { return sizeof(LZ4HC_Data_Structure); }
 
 

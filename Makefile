@@ -72,12 +72,13 @@ endif
 
 
 default: lz4programs
-	@cd $(PRGDIR); $(MAKE) -e
 
-all: lz4programs
+all: 
+	@cd $(LZ4DIR); $(MAKE) -e all
+	@cd $(PRGDIR); $(MAKE) -e all
 
 lz4programs:
-	@cd $(PRGDIR); $(MAKE) -e all
+	@cd $(PRGDIR); $(MAKE) -e
 
 clean:
 	@rm -f $(DISTRIBNAME) *.sha1

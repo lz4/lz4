@@ -3,6 +3,7 @@ Changed : endian and alignment code
 Changed : directory structure : new "lib" directory
 Updated : lz4io, now uses lz4frame
 Fixed : some alignment warnings under clang
+Fixed : deprecated function LZ4_slideInputBufferHC()
 
 r124:
 New : LZ4 HC streaming mode

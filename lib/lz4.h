@@ -178,6 +178,8 @@ int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedS
  * LZ4_stream_t
  * information structure to track an LZ4 stream.
  * important : init this structure content before first use !
+ * note : only allocated directly the structure if you are statically linking LZ4
+ *        If you are using liblz4 as a DLL, please use below construction methods instead.
  */
 typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
 
@@ -188,9 +190,10 @@ typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
 void LZ4_resetStream (LZ4_stream_t* LZ4_streamPtr);
 
 /*
- * If you prefer dynamic allocation methods,
  * LZ4_createStream will allocate and initialize an LZ4_stream_t structure
  * LZ4_freeStream releases its memory.
+ * In the context of a DLL (liblz4), please use these methods rather than the static struct.
+ * They are more future proof, in case of a change of LZ4_stream_t size.
  */
 LZ4_stream_t* LZ4_createStream(void);
 int           LZ4_freeStream (LZ4_stream_t* LZ4_streamPtr);
@@ -241,7 +244,9 @@ typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_strea
  * LZ4_streamDecode_t
  * information structure to track an LZ4 stream.
  * init this structure content using LZ4_setStreamDecode or memset() before first use !
- * If you prefer dynamic allocation methods :
+ *
+ * In the context of a DLL (liblz4) please prefer usage of construction methods below.
+ * They are more future proof, in case of a change of LZ4_streamDecode_t size in the future.
  * LZ4_createStreamDecode will allocate and initialize an LZ4_streamDecode_t structure
  * LZ4_freeStreamDecode releases its memory.
  */
