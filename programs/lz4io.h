@@ -64,8 +64,8 @@ int LZ4IO_setOverwrite(int yes);
 int LZ4IO_setBlockSizeID(int blockSizeID);
 
 /* Default setting : independent blocks */
-typedef enum { chainedBlocks, independentBlocks } blockMode_t;
-int LZ4IO_setBlockMode(blockMode_t blockMode);
+typedef enum { LZ4IO_blockLinked=0, LZ4IO_blockIndependent} LZ4IO_blockMode_t;
+int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode);
 
 /* Default setting : no checksum */
 int LZ4IO_setBlockChecksumMode(int xxhash);

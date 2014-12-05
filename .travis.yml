@@ -7,7 +7,7 @@ before_install:
   - sudo apt-get install -qq valgrind
 
 env:
-  - LZ4_TRAVIS_CI_ENV=liblz4
+  - LZ4_TRAVIS_CI_ENV=install
   - LZ4_TRAVIS_CI_ENV=streaming-examples
   - LZ4_TRAVIS_CI_ENV=cmake
   - LZ4_TRAVIS_CI_ENV=dist

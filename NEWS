@@ -1,6 +1,15 @@
+r125:
+Changed : endian and alignment code
+Changed : directory structure : new "lib" directory
+Updated : lz4io, now uses lz4frame
+Fixed : some alignment warnings under clang
+Fixed : deprecated function LZ4_slideInputBufferHC()
+
 r124:
-Fix : LZ4F_compressBound() using NULL preferencesPtr
-Updated : xxHash, to r37
+New : LZ4 HC streaming mode
+Fixed : LZ4F_compressBound() using null preferencesPtr
+Updated : xxHash to r38
+Updated library number, to 1.4.0
 
 r123:
 Added : experimental lz4frame API, thanks to Takayuki Matsuoka and Christopher Jackson for testings

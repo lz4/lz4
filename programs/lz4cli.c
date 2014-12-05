@@ -32,10 +32,10 @@
 //**************************************
 // Tuning parameters
 //**************************************
-// DISABLE_LZ4C_LEGACY_OPTIONS :
+// ENABLE_LZ4C_LEGACY_OPTIONS :
 // Control the availability of -c0, -c1 and -hc legacy arguments
-// Default : Legacy options are enabled
-// #define DISABLE_LZ4C_LEGACY_OPTIONS
+// Default : Legacy options are disabled
+// #define ENABLE_LZ4C_LEGACY_OPTIONS
 
 
 //**************************************
@@ -48,11 +48,6 @@
 #  pragma warning(disable : 4127)      // disable: C4127: conditional expression is constant
 #endif
 
-#ifdef __clang__
-#  pragma clang diagnostic ignored "-Wunused-const-variable"   // const variable one is really used !
-#endif
-
-#define _FILE_OFFSET_BITS 64   // Large file support on 32-bits unix
 #define _POSIX_SOURCE 1        // for fileno() within <stdio.h> on unix
 
 
@@ -113,7 +108,7 @@
 //****************************
 #define COMPRESSOR_NAME "LZ4 Compression CLI"
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "r122"
+#  define LZ4_VERSION "r125"
 #endif
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
@@ -125,15 +120,6 @@
 #define GB *(1U<<30)
 
 #define LZ4_BLOCKSIZEID_DEFAULT 7
-
-
-//**************************************
-// Architecture Macros
-//**************************************
-static const int one = 1;
-#define CPU_LITTLE_ENDIAN   (*(char*)(&one))
-#define CPU_BIG_ENDIAN      (!CPU_LITTLE_ENDIAN)
-#define LITTLE_ENDIAN_32(i) (CPU_LITTLE_ENDIAN?(i):swap32(i))
 
 
 //**************************************
@@ -215,14 +201,14 @@ int usage_advanced(void)
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
-#if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
+#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "Legacy arguments :\n");
     DISPLAY( " -c0    : fast compression\n");
     DISPLAY( " -c1    : high compression\n");
     DISPLAY( " -hc    : high compression\n");
     DISPLAY( " -y     : overwrite output without prompting \n");
     DISPLAY( " -s     : suppress warnings \n");
-#endif // DISABLE_LZ4C_LEGACY_OPTIONS
+#endif // ENABLE_LZ4C_LEGACY_OPTIONS
     EXTENDED_HELP;
     return 0;
 }
@@ -264,7 +250,7 @@ int usage_longhelp(void)
     DISPLAY( "%s can be used in 'pure pipe mode', for example :\n", programName);
     DISPLAY( "3 : compress data stream from 'generator', send result to 'consumer'\n");
     DISPLAY( "          generator | %s | consumer \n", programName);
-#if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
+#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "\n");
     DISPLAY( "Warning :\n");
     DISPLAY( "Legacy arguments take precedence. Therefore : \n");
@@ -273,7 +259,7 @@ int usage_longhelp(void)
     DISPLAY( "It is not equivalent to :\n");
     DISPLAY( "          %s -h -c filename\n", programName);
     DISPLAY( "which would display help text and exit\n");
-#endif // DISABLE_LZ4C_LEGACY_OPTIONS
+#endif // ENABLE_LZ4C_LEGACY_OPTIONS
     return 0;
 }
 
@@ -302,7 +288,7 @@ int main(int argc, char** argv)
         legacy_format=0,
         forceStdout=0,
         forceCompress=0,
-        pause=0;
+        main_pause=0;
     char* input_filename=0;
     char* output_filename=0;
     char* dynNameSpace=0;
@@ -339,14 +325,14 @@ int main(int argc, char** argv)
             {
                 argument ++;
 
-#if !defined(DISABLE_LZ4C_LEGACY_OPTIONS)
+#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
                 // Legacy options (-c0, -c1, -hc, -y, -s)
                 if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }          // -c0 (fast compression)
                 if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }          // -c1 (high compression)
                 if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }          // -hc (high compression)
                 if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                                   // -y (answer 'yes' to overwrite permission)
                 if (*argument=='s') { displayLevel=1; continue; }                                          // -s (silent mode)
-#endif // DISABLE_LZ4C_LEGACY_OPTIONS
+#endif // ENABLE_LZ4C_LEGACY_OPTIONS
 
                 if ((*argument>='0') && (*argument<='9'))
                 {
@@ -413,7 +399,7 @@ int main(int argc, char** argv)
                             argument++;
                             break;
                         }
-                        case 'D': LZ4IO_setBlockMode(chainedBlocks); argument++; break;
+                        case 'D': LZ4IO_setBlockMode(LZ4IO_blockLinked); argument++; break;
                         case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;
                         default : exitBlockProperties=1;
                         }
@@ -438,7 +424,7 @@ int main(int argc, char** argv)
                     break;
 
                     // Pause at the end (hidden option)
-                case 'p': pause=1; BMK_SetPause(); break;
+                case 'p': main_pause=1; BMK_SetPause(); break;
 
                 EXTENDED_ARGUMENTS;
 
@@ -462,7 +448,7 @@ int main(int argc, char** argv)
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
-    DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
+    if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
 
     // No input filename ==> use stdin
     if(!input_filename) { input_filename=stdinmark; }
@@ -531,7 +517,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (pause) waitEnter();
+    if (main_pause) waitEnter();
     free(dynNameSpace);
     return 0;
 }
