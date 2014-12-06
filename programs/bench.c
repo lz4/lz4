@@ -75,11 +75,6 @@ static int LZ4_compress_local(const char* src, char* dst, int size, int clevel) 
 #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
 
-// GCC does not support _rotl outside of Windows
-#if !defined(_WIN32)
-#  define _rotl(x,r) ((x << r) | (x >> (32 - r)))
-#endif
-
 
 //**************************************
 // Basic Types

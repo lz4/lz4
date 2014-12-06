@@ -1,6 +1,7 @@
 /*
-  LZ4cli.c - LZ4 Command Line Interface
+  LZ4cli - LZ4 Command Line Interface
   Copyright (C) Yann Collet 2011-2014
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -55,13 +56,9 @@
 // Includes
 //****************************
 #include <stdio.h>    // fprintf, fopen, fread, _fileno, stdin, stdout
-#include <stdlib.h>   // malloc
+#include <stdlib.h>   // exit, calloc, free
 #include <string.h>   // strcmp, strlen
-#include <time.h>     // clock
-#include "lz4.h"
-#include "lz4hc.h"
-#include "xxhash.h"
-#include "bench.h"
+#include "bench.h"    // BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause
 #include "lz4io.h"
 
 
@@ -83,30 +80,10 @@
 #endif
 
 
-//**************************************
-// Compiler-specific functions
-//**************************************
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
-#if defined(_MSC_VER)    // Visual Studio
-#  define swap32 _byteswap_ulong
-#elif (GCC_VERSION >= 403) || defined(__clang__)
-#  define swap32 __builtin_bswap32
-#else
-  static inline unsigned int swap32(unsigned int x)
-  {
-    return ((x << 24) & 0xff000000 ) |
-           ((x <<  8) & 0x00ff0000 ) |
-           ((x >>  8) & 0x0000ff00 ) |
-           ((x >> 24) & 0x000000ff );
-  }
-#endif
-
-
 //****************************
 // Constants
 //****************************
-#define COMPRESSOR_NAME "LZ4 Compression CLI"
+#define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION "r125"
 #endif
@@ -125,15 +102,15 @@
 //**************************************
 // Macros
 //**************************************
-#define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAY(...)           fprintf(stderr, __VA_ARGS__)
+#define DISPLAYLEVEL(l, ...)   if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+static unsigned displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 
 
 //**************************************
-// Local Parameters
+// Local Variables
 //**************************************
 static char* programName;
-static int displayLevel = 2;   // 0 : no display  // 1: errors  // 2 : + result + interaction + warnings ;  // 3 : + progression;  // 4 : + information
 
 
 //**************************************
@@ -196,7 +173,7 @@ int usage_advanced(void)
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
-    DISPLAY( " -BX    : enable block checksum (default:disabled)\n");
+    //DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   // Option currently inactive
     DISPLAY( " -Sx    : disable stream checksum (default:enabled)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
@@ -508,7 +485,7 @@ int main(int argc, char** argv)
     {
         if (legacy_format)
         {
-            DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated !) ! \n");
+            DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
             LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
         }
         else

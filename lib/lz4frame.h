@@ -207,6 +207,7 @@ typedef struct {
   unsigned reserved[3];
 } LZ4F_decompressOptions_t;
 
+
 /* Resource management */
 
 LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* ctxPtr, unsigned version);
@@ -220,6 +221,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t ctx);
  * Object can release its memory using LZ4F_freeDecompressionContext();
  */
 
+
 /* Decompression */
 
 size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t ctx,
@@ -232,7 +234,7 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t ctx,
  * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
- * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress,
+ * The function result is an hint of how many srcSize bytes LZ4F_decompress() expects for next call,
  * or an error code which can be tested using LZ4F_isError().
  */
 
@@ -246,20 +248,21 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t ctx,
  *
  * The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
  *
- * The number of bytes effectively used from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
- * This typically happens when dstBuffer is not large enough to contain all decoded data.
- * LZ4F_decompress() will have to be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
+ * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
+ * If number of bytes read is < number of bytes provided, then decompression operation is not completed.
+ * It typically happens when dstBuffer is not large enough to contain all decoded data.
+ * LZ4F_decompress() must be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
  * The function will check this condition, and refuse to continue if it is not respected.
- * dstBuffer is supposed to be flushed between calls to the function, since its content will be rewritten.
- * Different dst arguments can be used between each calls.
  *
- * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
- * Basically, it's the size of the current (or remaining) compressed block + header of next block.
- * Respecting the hint provides some boost to performance, since it does not need intermediate buffers.
+ * dstBuffer is supposed to be flushed between each call to the function, since its content will be overwritten.
+ * dst arguments can be changed at will with each consecutive call to the function.
+ *
+ * The function result is an hint of how many srcSize bytes LZ4F_decompress() expects for next call.
+ * Schematically, it's the size of the current (or remaining) compressed block + header of next block.
+ * Respecting the hint provides some boost to performance, since it does skip intermediate buffers.
  * This is just a hint, you can always provide any srcSize you want.
- * When a frame is fully decoded, the function result will be 0.
- * If decompression failed, function result is an error code which can be tested using LZ4F_isError().
+ * When a frame is fully decoded, the function result will be 0. (no more data expected)
+ * If decompression failed, function result is an error code, which can be tested using LZ4F_isError().
  */
 
 
