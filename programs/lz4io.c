@@ -134,6 +134,7 @@ static int blockIndependence = 1;
 static const int minBlockSizeID = 4;
 static const int maxBlockSizeID = 7;
 
+
 //**************************************
 // Exceptions
 //**************************************
@@ -208,9 +209,8 @@ int LZ4IO_setNotificationLevel(int level)
 
 static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
 {
-#define CLOCKS_PER_MSEC  (CLOCKS_PER_SEC/1000)
     clock_t nCurrent = clock();
-    unsigned nSpan = (unsigned)((nCurrent - nPrevious) / CLOCKS_PER_MSEC);
+    unsigned nSpan = (unsigned)(((nCurrent - nPrevious) * 1000) / CLOCKS_PER_SEC);
     return nSpan;
 }
 
@@ -481,7 +481,6 @@ static unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
     unsigned long long filesize = 0;
     char* in_buff;
     char* out_buff;
-    unsigned int blockSize;
 
     // Allocate Memory
     in_buff = (char*)malloc(LZ4_compressBound(LEGACY_BLOCKSIZE));
@@ -493,6 +492,7 @@ static unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
     {
         int decodeSize;
         size_t sizeCheck;
+        unsigned int blockSize;
 
         // Block Size
         sizeCheck = fread(in_buff, 1, 4, finput);

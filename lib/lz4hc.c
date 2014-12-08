@@ -36,13 +36,12 @@ You can contact the author at :
 /**************************************
    Tuning Parameter
 **************************************/
-#define LZ4HC_DEFAULT_COMPRESSIONLEVEL 8
+static const int LZ4HC_compressionLevel_default = 8;
 
 
 /**************************************
    Includes
 **************************************/
-#include "lz4.h"
 #include "lz4hc.h"
 
 
@@ -81,6 +80,8 @@ You can contact the author at :
 #define HASH_MASK (HASHTABLESIZE - 1)
 
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
+
+static const int g_maxCompressionLevel = 16;
 
 
 /**************************************
@@ -328,7 +329,6 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 }
 
 
-#define MAX_COMPRESSION_LEVEL 16
 static int LZ4HC_compress_generic (
     void* ctxvoid,
     const char* source,
@@ -361,9 +361,9 @@ static int LZ4HC_compress_generic (
 
 
     /* init */
-    if (compressionLevel > MAX_COMPRESSION_LEVEL) compressionLevel = MAX_COMPRESSION_LEVEL;
-    if (compressionLevel == 0) compressionLevel = LZ4HC_DEFAULT_COMPRESSIONLEVEL;
-    maxNbAttempts = 1 << compressionLevel;
+    if (compressionLevel > g_maxCompressionLevel) compressionLevel = g_maxCompressionLevel;
+    if (compressionLevel < 1) compressionLevel = LZ4HC_compressionLevel_default;
+    maxNbAttempts = 1 << (compressionLevel-1);
     ctx->end += inputSize;
 
     ip++;
