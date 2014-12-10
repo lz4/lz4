@@ -486,29 +486,28 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
         ret = LZ4_compressHC_limitedOutput_withStateHC(stateLZ4HC, block, compressedBuffer, blockSize, HCcompressedSize);
         FUZ_CHECKTEST(ret==0, "LZ4_compressHC_limitedOutput_withStateHC() failed despite sufficient space");
 
-        /* Test compression with just one missing byte into output buffer => must fail */
-        FUZ_DISPLAYTEST;
-        compressedBuffer[compressedSize-1] = 0;
-        ret = LZ4_compress_limitedOutput(block, compressedBuffer, blockSize, compressedSize-1);
-        FUZ_CHECKTEST(ret, "LZ4_compress_limitedOutput should have failed (output buffer too small by 1 byte)");
-        FUZ_CHECKTEST(compressedBuffer[compressedSize-1], "LZ4_compress_limitedOutput overran output buffer")
-
-        /* Test HC compression with just one missing byte into output buffer => must fail */
-        FUZ_DISPLAYTEST;
-        compressedBuffer[HCcompressedSize-1] = 0;
-        ret = LZ4_compressHC_limitedOutput(block, compressedBuffer, blockSize, HCcompressedSize-1);
-        FUZ_CHECKTEST(ret, "LZ4_compressHC_limitedOutput should have failed (output buffer too small by 1 byte)");
-        FUZ_CHECKTEST(compressedBuffer[HCcompressedSize-1], "LZ4_compressHC_limitedOutput overran output buffer")
-
-        /* Test compression with just multiple missing byte into output buffer => must fail */
+        /* Test compression with missing bytes into output buffer => must fail */
         FUZ_DISPLAYTEST;
         {
             int missingBytes = (FUZ_rand(&randState) % 0x3F) + 1;
             if (missingBytes >= compressedSize) missingBytes = compressedSize-1;
+            missingBytes += !missingBytes;   /* avoid special case missingBytes==0 */
             compressedBuffer[compressedSize-missingBytes] = 0;
             ret = LZ4_compress_limitedOutput(block, compressedBuffer, blockSize, compressedSize-missingBytes);
             FUZ_CHECKTEST(ret, "LZ4_compress_limitedOutput should have failed (output buffer too small by %i byte)", missingBytes);
             FUZ_CHECKTEST(compressedBuffer[compressedSize-missingBytes], "LZ4_compress_limitedOutput overran output buffer ! (%i missingBytes)", missingBytes)
+        }
+
+        /* Test HC compression with missing bytes into output buffer => must fail */
+        FUZ_DISPLAYTEST;
+        {
+            int missingBytes = (FUZ_rand(&randState) % 0x3F) + 1;
+            if (missingBytes >= HCcompressedSize) missingBytes = HCcompressedSize-1;
+            missingBytes += !missingBytes;   /* avoid special case missingBytes==0 */
+            compressedBuffer[HCcompressedSize-missingBytes] = 0;
+            ret = LZ4_compressHC_limitedOutput(block, compressedBuffer, blockSize, HCcompressedSize-missingBytes);
+            FUZ_CHECKTEST(ret, "LZ4_compressHC_limitedOutput should have failed (output buffer too small by %i byte)", missingBytes);
+            FUZ_CHECKTEST(compressedBuffer[HCcompressedSize-missingBytes], "LZ4_compressHC_limitedOutput overran output buffer ! (%i missingBytes)", missingBytes)
         }
 
 

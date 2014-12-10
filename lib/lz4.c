@@ -642,10 +642,10 @@ _next_match:
                 ip += MINMATCH + matchLength;
             }
 
+            if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > olimit)))
+                return 0;    /* Check output limit */
             if (matchLength>=ML_MASK)
             {
-                if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchLength>>8) > olimit)))
-                    return 0;    /* Check output limit */
                 *token += ML_MASK;
                 matchLength -= ML_MASK;
                 for (; matchLength >= 510 ; matchLength-=510) { *op++ = 255; *op++ = 255; }
