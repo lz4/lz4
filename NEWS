@@ -3,6 +3,7 @@ Changed : endian and alignment code
 Changed : directory structure : new "lib" directory
 Updated : lz4io, now uses lz4frame
 Improved: slightly improved decoding speed
+Fixed : LZ4_compress_limitedOutput(); Special thanks to Christopher Speller !
 Fixed : some alignment warnings under clang
 Fixed : deprecated function LZ4_slideInputBufferHC()
 
