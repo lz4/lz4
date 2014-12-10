@@ -1,6 +1,6 @@
 /*
    LZ4 - Fast LZ compression algorithm
-   Copyright (C) 2011-2014, Yann Collet.
+   Copyright (C) 2011-2015, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,8 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
-   - LZ4 source repository : http://code.google.com/p/lz4/
+   - LZ4 source repository : http://code.google.com/p/lz4
+   - LZ4 source mirror : https://github.com/Cyan4973/lz4
    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
@@ -109,6 +110,7 @@
 #  define FORCE_INLINE static __forceinline
 #  include <intrin.h>
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
+#  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #else
 #  ifdef __GNUC__
 #    define FORCE_INLINE static inline __attribute__((always_inline))
