@@ -98,6 +98,9 @@ uninstall:
 	@cd $(LZ4DIR); $(MAKE) uninstall
 	@cd $(PRGDIR); $(MAKE) uninstall
 
+travis-install:
+	sudo $(MAKE) install
+
 dist: clean
 	@install -dD -m 700 lz4-$(RELEASE)/lib/
 	@install -dD -m 700 lz4-$(RELEASE)/programs/
