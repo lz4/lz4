@@ -45,11 +45,6 @@
 extern "C" {
 #endif
 
-/****************************************
-   Note : experimental API.
-   Not yet integrated within liblz4
-****************************************/
-
 /**************************************
    Includes
 **************************************/
@@ -68,7 +63,6 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code str
 /**************************************
  * Frame compression types
  * ************************************/
-
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7 } blockSizeID_t;
 typedef enum { blockLinked=0, blockIndependent} blockMode_t;
 typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
@@ -86,7 +80,6 @@ typedef struct {
   unsigned         autoFlush;              /* 1 == always flush : reduce need for tmp buffer */
   unsigned         reserved[4];
 } LZ4F_preferences_t;
-
 
 
 /***********************************
@@ -110,7 +103,6 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 /**********************************
  * Advanced compression functions
  * ********************************/
-
 typedef void* LZ4F_compressionContext_t;
 
 typedef struct {
