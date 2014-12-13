@@ -64,7 +64,7 @@ Memory routines
 /**************************************
 Includes
 **************************************/
-#include "lz4frame.h"
+#include "lz4frame_static.h"
 #include "lz4.h"
 #include "lz4hc.h"
 #include "xxhash.h"
@@ -161,7 +161,7 @@ Error management
 static const char* LZ4F_errorStrings[] = { LZ4F_LIST_ERRORS(LZ4F_GENERATE_STRING) };
 
 
-int LZ4F_isError(LZ4F_errorCode_t code)
+U32 LZ4F_isError(LZ4F_errorCode_t code)
 {
     return (code > (LZ4F_errorCode_t)(-ERROR_maxCode));
 }

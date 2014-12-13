@@ -60,20 +60,8 @@ extern "C" {
  * Error management
  * ************************************/
 typedef size_t LZ4F_errorCode_t;
-#define LZ4F_LIST_ERRORS(ITEM) \
-        ITEM(OK_NoError) ITEM(ERROR_GENERIC) \
-        ITEM(ERROR_maxBlockSize_invalid) ITEM(ERROR_blockMode_invalid) ITEM(ERROR_contentChecksumFlag_invalid) \
-        ITEM(ERROR_compressionLevel_invalid) \
-        ITEM(ERROR_allocation_failed) \
-        ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
-        ITEM(ERROR_decompressionFailed) \
-        ITEM(ERROR_checksum_invalid) \
-        ITEM(ERROR_maxCode)
 
-#define LZ4F_GENERATE_ENUM(ENUM) ENUM,
-typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to detect & handle specific errors; compare function result to -enum value */
-
-int LZ4F_isError(LZ4F_errorCode_t code);                /* Basically : code > -ERROR_maxCode */
+unsigned    LZ4F_isError(LZ4F_errorCode_t code);
 const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code string; useful for debugging */
 
 
@@ -108,7 +96,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 /* LZ4F_compressFrame()
- * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.4.1, in a single step.
+ * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.4.1.
  * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
  * You can get the minimum value of dstMaxSize by using LZ4F_compressFrameBound()
  * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode)

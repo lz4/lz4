@@ -38,13 +38,13 @@
 
 
 /**************************************
- Includes
+  Includes
 **************************************/
-#include <stdlib.h>
+#include <stdlib.h>     // free
 #include <stdio.h>      // fgets, sscanf
 #include <sys/timeb.h>  // timeb
 #include <string.h>     // strcmp
-#include "lz4frame.h"
+#include "lz4frame_static.h"
 #include "xxhash.h"     // XXH64
 
 

@@ -55,7 +55,7 @@
 //****************************
 // Includes
 //****************************
-#include <stdio.h>    // fprintf, fopen, fread, _fileno, stdin, stdout
+#include <stdio.h>    // fprintf, getchar
 #include <stdlib.h>   // exit, calloc, free
 #include <string.h>   // strcmp, strlen
 #include "bench.h"    // BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause
@@ -85,7 +85,7 @@
 //****************************
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "r125"
+#  define LZ4_VERSION "r126"
 #endif
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
@@ -136,13 +136,13 @@ static char* programName;
 #define EXTENDED_FORMAT
 #define DEFAULT_COMPRESSOR   LZ4IO_compressFilename
 #define DEFAULT_DECOMPRESSOR LZ4IO_decompressFilename
-int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, int compressionlevel);
+int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, int compressionlevel);   // hidden function
 
 
 //****************************
 // Functions
 //****************************
-int usage(void)
+static int usage(void)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [arg] [input] [output]\n", programName);
@@ -159,7 +159,7 @@ int usage(void)
     return 0;
 }
 
-int usage_advanced(void)
+static int usage_advanced(void)
 {
     DISPLAY(WELCOME_MESSAGE);
     usage();
@@ -190,7 +190,7 @@ int usage_advanced(void)
     return 0;
 }
 
-int usage_longhelp(void)
+static int usage_longhelp(void)
 {
     DISPLAY( "\n");
     DISPLAY( "Which values can get [output] ? \n");
@@ -240,7 +240,7 @@ int usage_longhelp(void)
     return 0;
 }
 
-int badusage(void)
+static int badusage(void)
 {
     DISPLAYLEVEL(1, "Incorrect parameters\n");
     if (displayLevel >= 1) usage();
@@ -248,7 +248,7 @@ int badusage(void)
 }
 
 
-void waitEnter(void)
+static void waitEnter(void)
 {
     DISPLAY("Press enter to continue...\n");
     getchar();

@@ -1,6 +1,6 @@
 # ################################################################
-# LZ4 library - Makefile
-# Copyright (C) Yann Collet 2011-2014
+# LZ4 - Makefile
+# Copyright (C) Yann Collet 2011-2015
 # All rights reserved.
 # 
 # BSD license
@@ -30,24 +30,22 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-# Version numbers
-export VERSION=125
+# Version number
+export VERSION=126
 export RELEASE=r$(VERSION)
 
 DESTDIR?=
 PREFIX ?= /usr
-CC     := $(CC)
-CFLAGS ?= -O3
-CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 
-LIBDIR?= $(PREFIX)/lib
+LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
-PRGDIR = programs
-LZ4DIR = lib
+PRGDIR  = programs
+LZ4DIR  = lib
 DISTRIBNAME=lz4-$(RELEASE).tar.gz
 
 TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
-	$(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4frame.h $(LZ4DIR)/xxhash.c $(LZ4DIR)/xxhash.h \
+	$(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h \
+	$(LZ4DIR)/xxhash.c $(LZ4DIR)/xxhash.h \
 	$(LZ4DIR)/liblz4.pc.in $(LZ4DIR)/Makefile $(LZ4DIR)/LICENSE \
 	Makefile lz4_block_format.txt LZ4_Frame_Format.html NEWS README.md \
 	cmake_unofficial/CMakeLists.txt \
@@ -93,8 +91,8 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
 install:
-	@cd $(LZ4DIR); sudo $(MAKE) -e install
-	@cd $(PRGDIR); sudo $(MAKE) -e install
+	@cd $(LZ4DIR); $(MAKE) -e install
+	@cd $(PRGDIR); $(MAKE) -e install
 
 uninstall:
 	@cd $(LZ4DIR); $(MAKE) uninstall
@@ -119,7 +117,7 @@ dist: clean
 	@echo Distribution $(DISTRIBNAME) built
 
 test:
-	@cd $(PRGDIR); $(MAKE) -e $@
+	@cd $(PRGDIR); $(MAKE) -e test
 
 test-travis: $(TRAVIS_TARGET)
 

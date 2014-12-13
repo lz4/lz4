@@ -1,3 +1,6 @@
+r126:
+New : lz4frame API is now integrated into liblz4
+
 r125:
 Changed : endian and alignment code
 Changed : directory structure : new "lib" directory

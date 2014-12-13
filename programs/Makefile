@@ -1,6 +1,7 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2014
+# Copyright (C) Yann Collet 2011-2015
+#
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -30,11 +31,10 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r125
+RELEASE?= r126
 
 DESTDIR?=
 PREFIX ?= /usr
-CC     := $(CC)
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
