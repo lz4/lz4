@@ -58,7 +58,6 @@ void test_compress(FILE* outFp, FILE* inpFp)
 
     static char inpBuf[RING_BUFFER_BYTES];
     int inpOffset = 0;
-    unsigned done = 0;
 
     for(;;)
     {
@@ -77,7 +76,6 @@ void test_compress(FILE* outFp, FILE* inpFp)
             write_bin(outFp, cmpBuf, cmpBytes);
 
             inpOffset += inpBytes;
-            done += inpBytes;
 
             // Wraparound the ringbuffer offset
             if(inpOffset >= RING_BUFFER_BYTES - MESSAGE_MAX_BYTES)
@@ -95,7 +93,6 @@ void test_decompress(FILE* outFp, FILE* inpFp)
     int decOffset = 0;
     LZ4_streamDecode_t lz4StreamDecode_body = { 0 };
     LZ4_streamDecode_t* lz4StreamDecode = &lz4StreamDecode_body;
-    unsigned done = 0;
 
     for(;;)
     {
@@ -120,7 +117,6 @@ void test_decompress(FILE* outFp, FILE* inpFp)
             if(decBytes <= 0)
                 break;
 
-            done += decBytes;
             decOffset += decBytes;
             write_bin(outFp, decPtr, decBytes);
 
@@ -153,7 +149,7 @@ size_t compare(FILE* f0, FILE* f1)
             size_t smallest = r0;
             if (r1<r0) smallest = r1;
             result += smallest;
-            return result;
+            break;
         }
 
         if (memcmp(b0, b1, r0))
@@ -161,13 +157,13 @@ size_t compare(FILE* f0, FILE* f1)
             unsigned errorPos = 0;
             while ((errorPos < r0) && (b0[errorPos]==b1[errorPos])) errorPos++;
             result += errorPos;
-            return result;
+            break;
         }
 
         result += sizeof(b0);
     }
 
-    return 1;
+    return result;
 }
 
 
