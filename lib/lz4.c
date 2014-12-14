@@ -264,6 +264,7 @@ static void LZ4_copy4(void* dstPtr, const void* srcPtr)
 
 static void LZ4_copy8(void* dstPtr, const void* srcPtr)
 {
+#if GCC_VERSION!=409 // disabled on GCC 4.9, as it generates invalid opcode that crashes
     if (LZ4_UNALIGNED_ACCESS)
     {
         if (LZ4_64bits())
@@ -273,6 +274,7 @@ static void LZ4_copy8(void* dstPtr, const void* srcPtr)
             ((U32*)dstPtr)[1] = ((U32*)srcPtr)[1];
         return;
     }
+#endif
     memcpy(dstPtr, srcPtr, 8);
 }
 
@@ -410,13 +412,10 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLi
 **************************************/
 #define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
 #define HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
-#define HASH_SIZE_U32 (1 << LZ4_HASHLOG)
+#define HASH_SIZE_U32 (1 << LZ4_HASHLOG)       /* required as macro for static allocation */
 
-#define LZ4_64KLIMIT ((64 KB) + (MFLIMIT-1))
-#define SKIPSTRENGTH 6   /* Increasing this value will make the compression run slower on incompressible data */
-
-#define MAXD_LOG 16
-#define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
+static const int LZ4_64Klimit = ((64 KB) + (MFLIMIT-1));
+static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression run slower on incompressible data */
 
 
 /**************************************
@@ -520,7 +519,6 @@ static int LZ4_compress_generic(
     BYTE* op = (BYTE*) dest;
     BYTE* const olimit = op + maxOutputSize;
 
-    const int skipStrength = SKIPSTRENGTH;
     U32 forwardH;
     size_t refDelta=0;
 
@@ -542,7 +540,7 @@ static int LZ4_compress_generic(
         lowLimit = (const BYTE*)source;
         break;
     }
-    if ((tableType == byU16) && (inputSize>=(int)LZ4_64KLIMIT)) return 0;   /* Size too large (not within 64K limit) */
+    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
     if (inputSize<LZ4_minLength) goto _last_literals;                       /* Input too small, no compression (all literals) */
 
     /* First Byte */
@@ -557,14 +555,14 @@ static int LZ4_compress_generic(
         {
             const BYTE* forwardIp = ip;
             unsigned step=1;
-            unsigned searchMatchNb = (1U << skipStrength);
+            unsigned searchMatchNb = (1U << LZ4_skipTrigger);
 
             /* Find a match */
             do {
                 U32 h = forwardH;
                 ip = forwardIp;
                 forwardIp += step;
-                step = searchMatchNb++ >> skipStrength;
+                step = searchMatchNb++ >> LZ4_skipTrigger;
 
                 if (unlikely(forwardIp > mflimit)) goto _last_literals;
 
@@ -714,7 +712,7 @@ int LZ4_compress(const char* source, char* dest, int inputSize)
 #endif
     int result;
 
-    if (inputSize < (int)LZ4_64KLIMIT)
+    if (inputSize < LZ4_64Klimit)
         result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue);
     else
         result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue);
@@ -734,7 +732,7 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 #endif
     int result;
 
-    if (inputSize < (int)LZ4_64KLIMIT)
+    if (inputSize < LZ4_64Klimit)
         result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue);
     else
         result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue);
@@ -1332,7 +1330,7 @@ int LZ4_compress_withState (void* state, const char* source, char* dest, int inp
     if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
     MEM_INIT(state, 0, LZ4_STREAMSIZE);
 
-    if (inputSize < (int)LZ4_64KLIMIT)
+    if (inputSize < LZ4_64Klimit)
         return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue);
     else
         return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue);
@@ -1343,7 +1341,7 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
     if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
     MEM_INIT(state, 0, LZ4_STREAMSIZE);
 
-    if (inputSize < (int)LZ4_64KLIMIT)
+    if (inputSize < LZ4_64Klimit)
         return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue);
     else
         return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue);

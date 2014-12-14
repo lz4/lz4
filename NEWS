@@ -1,5 +1,6 @@
 r126:
 New : lz4frame API is now integrated into liblz4
+Fixed : GCC 4.9 bug on highest performance settings, reported by Greg Slazinski 
 
 r125:
 Changed : endian and alignment code
