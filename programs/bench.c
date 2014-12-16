@@ -22,40 +22,40 @@
     - LZ4 source repository : http://code.google.com/p/lz4/
 */
 
-//**************************************
-// Compiler Options
-//**************************************
-// Disable some Visual warning messages
+/**************************************
+*  Compiler Options
+***************************************/
+/* Disable some Visual warning messages */
 #define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     // VS2005
+#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
 
-// Unix Large Files support (>4GB)
+/* Unix Large Files support (>4GB) */
 #define _FILE_OFFSET_BITS 64
-#if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
+#if (defined(__sun__) && (!defined(__LP64__)))   /* Sun Solaris 32-bits requires specific definitions */
 #  define _LARGEFILE_SOURCE
-#elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
+#elif ! defined(__LP64__)                        /* No point defining Large file for 64 bit */
 #  define _LARGEFILE64_SOURCE
 #endif
 
-// S_ISREG & gettimeofday() are not supported by MSVC
+/* S_ISREG & gettimeofday() are not supported by MSVC */
 #if defined(_MSC_VER) || defined(_WIN32)
 #  define BMK_LEGACY_TIMER 1
 #endif
 
 
-//**************************************
-// Includes
-//**************************************
-#include <stdlib.h>      // malloc
-#include <stdio.h>       // fprintf, fopen, ftello64
-#include <sys/types.h>   // stat64
-#include <sys/stat.h>    // stat64
+/**************************************
+*  Includes
+***************************************/
+#include <stdlib.h>      /* malloc */
+#include <stdio.h>       /* fprintf, fopen, ftello64 */
+#include <sys/types.h>   /* stat64 */
+#include <sys/stat.h>    /* stat64 */
 
-// Use ftime() if gettimeofday() is not available on your target
+/* Use ftime() if gettimeofday() is not available on your target */
 #if defined(BMK_LEGACY_TIMER)
-#  include <sys/timeb.h>   // timeb, ftime
+#  include <sys/timeb.h>   /* timeb, ftime */
 #else
-#  include <sys/time.h>    // gettimeofday
+#  include <sys/time.h>    /* gettimeofday */
 #endif
 
 #include "lz4.h"
@@ -68,17 +68,17 @@ static int LZ4_compress_local(const char* src, char* dst, int size, int clevel) 
 #include "xxhash.h"
 
 
-//**************************************
-// Compiler specifics
-//**************************************
+/**************************************
+*  Compiler specifics
+***************************************/
 #if !defined(S_ISREG)
 #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
 
 
-//**************************************
-// Basic Types
-//**************************************
+/**************************************
+*  Basic Types
+***************************************/
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
   typedef uint8_t  BYTE;
@@ -95,24 +95,23 @@ static int LZ4_compress_local(const char* src, char* dst, int size, int clevel) 
 #endif
 
 
-//**************************************
-// Constants
-//**************************************
+/**************************************
+*  Constants
+***************************************/
 #define NBLOOPS    3
 #define TIMELOOP   2000
 
-#define KB *(1U<<10)
-#define MB *(1U<<20)
+#define KB *(1 <<10)
+#define MB *(1 <<20)
 #define GB *(1U<<30)
 
-#define KNUTH               2654435761U
 #define MAX_MEM             (2 GB - 64 MB)
 #define DEFAULT_CHUNKSIZE   (4 MB)
 
 
-//**************************************
-// Local structures
-//**************************************
+/**************************************
+*  Local structures
+***************************************/
 struct chunkParameters
 {
     U32   id;
@@ -129,15 +128,15 @@ struct compressionParameters
 };
 
 
-//**************************************
-// MACRO
-//**************************************
+/**************************************
+*  MACRO
+***************************************/
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
 
 
-//**************************************
-// Benchmark Parameters
-//**************************************
+/**************************************
+*  Benchmark Parameters
+***************************************/
 static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
@@ -153,17 +152,17 @@ void BMK_SetNbIterations(int nbLoops)
 void BMK_SetPause(void) { BMK_pause = 1; }
 
 
-//*********************************************************
-//  Private functions
-//*********************************************************
+/*********************************************************
+*  Private functions
+**********************************************************/
 
 #if defined(BMK_LEGACY_TIMER)
 
 static int BMK_GetMilliStart(void)
 {
-  // Based on Legacy ftime()
-  // Rolls over every ~ 12.1 days (0x100000/24/60/60)
-  // Use GetMilliSpan to correct for rollover
+  /* Based on Legacy ftime()
+     Rolls over every ~ 12.1 days (0x100000/24/60/60)
+     Use GetMilliSpan to correct for rollover */
   struct timeb tb;
   int nCount;
   ftime( &tb );
@@ -175,8 +174,8 @@ static int BMK_GetMilliStart(void)
 
 static int BMK_GetMilliStart(void)
 {
-  // Based on newer gettimeofday()
-  // Use GetMilliSpan to correct for rollover
+  /* Based on newer gettimeofday()
+     Use GetMilliSpan to correct for rollover */
   struct timeval tv;
   int nCount;
   gettimeofday(&tv, NULL);
@@ -198,7 +197,7 @@ static int BMK_GetMilliSpan( int nTimeStart )
 
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
-    size_t step = (64 MB);
+    size_t step = 64 MB;
     BYTE* testmem=NULL;
 
     requiredMem = (((requiredMem >> 26) + 1) << 26);
@@ -226,14 +225,14 @@ static U64 BMK_GetFileSize(char* infilename)
     struct stat statbuf;
     r = stat(infilename, &statbuf);
 #endif
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   // No good...
+    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
     return (U64)statbuf.st_size;
 }
 
 
-//*********************************************************
-//  Public function
-//*********************************************************
+/*********************************************************
+*  Public function
+**********************************************************/
 
 int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 {
@@ -262,7 +261,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   }
   compP.decompressionFunction = LZ4_decompress_fast;
 
-  // Loop for each file
+  /* Loop for each file */
   while (fileIdx<nbFiles)
   {
       FILE*  inFile;
@@ -276,7 +275,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
       struct chunkParameters* chunkP;
       U32 crcOrig;
 
-      // Check file existence
+      /* Check file existence */
       inFileName = fileNamesTable[fileIdx++];
       inFile = fopen( inFileName, "rb" );
       if (inFile==NULL)
@@ -285,7 +284,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
         return 11;
       }
 
-      // Memory allocation & restrictions
+      /* Memory allocation & restrictions */
       inFileSize = BMK_GetFileSize(inFileName);
       benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
@@ -294,7 +293,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
       }
 
-      // Alloc
+      /* Alloc */
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)chunkSize)+1) * sizeof(struct chunkParameters));
       orig_buff = (char*)malloc((size_t )benchedSize);
       nbChunks = (int) ((int)benchedSize / chunkSize) + 1;
@@ -313,7 +312,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
         return 12;
       }
 
-      // Init chunks data
+      /* Init chunks data */
       {
           int i;
           size_t remaining = benchedSize;
@@ -329,7 +328,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           }
       }
 
-      // Fill input buffer
+      /* Fill input buffer */
       DISPLAY("Loading %s...       \r", inFileName);
       readSize = fread(orig_buff, 1, benchedSize, inFile);
       fclose(inFile);
@@ -343,11 +342,11 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
         return 13;
       }
 
-      // Calculating input Checksum
+      /* Calculating input Checksum */
       crcOrig = XXH32(orig_buff, (unsigned int)benchedSize,0);
 
 
-      // Bench
+      /* Bench */
       {
         int loopNb, chunkNb;
         size_t cSize=0;
@@ -361,9 +360,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           int nbLoops;
           int milliTime;
 
-          // Compression
+          /* Compression */
           DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, (int)benchedSize);
-          { size_t i; for (i=0; i<benchedSize; i++) compressedBuffer[i]=(char)i; }     // warmimg up memory
+          { size_t i; for (i=0; i<benchedSize; i++) compressedBuffer[i]=(char)i; }     /* warmimg up memory */
 
           nbLoops = 0;
           milliTime = BMK_GetMilliStart();
@@ -383,8 +382,8 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
           DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000.);
 
-          // Decompression
-          { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing area, for CRC checking
+          /* Decompression */
+          { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing area, for CRC checking */
 
           nbLoops = 0;
           milliTime = BMK_GetMilliStart();
@@ -401,7 +400,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
           if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
           DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s\r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
-          // CRC Checking
+          /* CRC Checking */
           crcCheck = XXH32(orig_buff, (unsigned int)benchedSize,0);
           if (crcOrig!=crcCheck) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOrig, (unsigned)crcCheck); break; }
         }

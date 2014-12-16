@@ -146,8 +146,8 @@ test-lz4: lz4 datagen
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 # test frame concatenation with null-length frame
-	echo -n > empty.test
-	echo hi > nonempty.test
+	@echo -n > empty.test
+	@echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
 	@./lz4 -zq empty.test > empty.lz4.test
 	@./lz4 -zq nonempty.test > nonempty.lz4.test
@@ -160,7 +160,7 @@ test-lz4: lz4 datagen
 
 
 test-lz4c: lz4c datagen
-	./datagen -g256MB | ./lz4c -l -v -B4D | ./lz4c -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -vdq > $(VOID)
 
 test-lz4c32: lz4 lz4c32 lz4 datagen
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -vdq > $(VOID)

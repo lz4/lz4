@@ -112,12 +112,16 @@
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #else
-#  ifdef __GNUC__
-#    define FORCE_INLINE static inline __attribute__((always_inline))
+#  if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
+#    ifdef __GNUC__
+#      define FORCE_INLINE static inline __attribute__((always_inline))
+#    else
+#      define FORCE_INLINE static inline
+#    endif
 #  else
-#    define FORCE_INLINE static inline
-#  endif
-#endif
+#    define FORCE_INLINE static
+#  endif   /* __STDC_VERSION__ */
+#endif  /* _MSC_VER */
 
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
@@ -264,7 +268,7 @@ static void LZ4_copy4(void* dstPtr, const void* srcPtr)
 
 static void LZ4_copy8(void* dstPtr, const void* srcPtr)
 {
-#if GCC_VERSION!=409 // disabled on GCC 4.9, as it generates invalid opcode that crashes
+#if GCC_VERSION!=409  /* disabled on GCC 4.9, as it generates invalid opcode (crash) */
     if (LZ4_UNALIGNED_ACCESS)
     {
         if (LZ4_64bits())
