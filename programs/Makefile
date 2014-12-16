@@ -142,6 +142,7 @@ test-travis: $(TRAVIS_TARGET)
 test-lz4: lz4 datagen
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
+	./datagen -g6M -p100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 # test frame concatenation with null-length frame

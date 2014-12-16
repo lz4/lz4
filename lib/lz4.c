@@ -541,7 +541,7 @@ static int LZ4_compress_generic(
         break;
     }
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
-    if (inputSize<LZ4_minLength) goto _last_literals;                       /* Input too small, no compression (all literals) */
+    if (inputSize<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     /* First Byte */
     LZ4_putPosition(ip, ctx, tableType, base);

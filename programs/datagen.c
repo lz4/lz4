@@ -1,6 +1,7 @@
 /*
     datagen.c - compressible data generator test tool
-    Copyright (C) Yann Collet 2012-2014
+    Copyright (C) Yann Collet 2012-2015
+
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -18,8 +19,9 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-    - LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
-    - LZ4 source repository : http://code.google.com/p/lz4/
+   - LZ4 source repository : http://code.google.com/p/lz4
+   - LZ4 source mirror : https://github.com/Cyan4973/lz4
+   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 /**************************************
@@ -31,7 +33,6 @@
 /**************************************
  Includes
 **************************************/
-//#include <stdlib.h>
 #include <stdio.h>      // fgets, sscanf
 #include <string.h>     // strcmp
 
@@ -59,11 +60,11 @@
  Constants
 **************************************/
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "rc118"
+#  define LZ4_VERSION "r125"
 #endif
 
-#define KB *(1U<<10)
-#define MB *(1U<<20)
+#define KB *(1 <<10)
+#define MB *(1 <<20)
 #define GB *(1U<<30)
 
 #define CDG_SIZE_DEFAULT (64 KB)
@@ -83,13 +84,13 @@
 /**************************************
   Local Parameters
 **************************************/
-static int no_prompt = 0;
-static char* programName;
-static int displayLevel = 2;
+static unsigned no_prompt = 0;
+static char*    programName;
+static unsigned displayLevel = 2;
 
 
 /*********************************************************
-  Fuzzer functions
+  functions
 *********************************************************/
 
 #define CDG_rotl32(x,r) ((x << r) | (x >> (32 - r)))
@@ -113,10 +114,11 @@ static void CDG_generate(U64 size, U32* seed, double proba)
     BYTE* buff = fullbuff + 32 KB;
     U64 total=0;
     U32 P32 = (U32)(32768 * proba);
-    U32 pos=0;
+    U32 pos=1;
     U32 genBlockSize = 128 KB;
 
     // Build initial prefix
+    fullbuff[0] = CDG_RANDCHAR;
     while (pos<32 KB)
     {
         // Select : Literal (char) or Match (within 32K)
@@ -135,9 +137,7 @@ static void CDG_generate(U64 size, U32* seed, double proba)
         else
         {
             // Literal (noise)
-            U32 d;
-            int length = CDG_RANDLENGTH;
-            d = pos + length;
+            U32 d = pos + CDG_RANDLENGTH;
             while (pos < d) fullbuff[pos++] = CDG_RANDCHAR;
         }
     }
@@ -175,8 +175,10 @@ static void CDG_generate(U64 size, U32* seed, double proba)
                 while (pos < d) buff[pos++] = CDG_RANDCHAR;
             }
         }
+        // output datagen
         pos=0;
-        for (;pos+512<=genBlockSize;pos+=512) printf("%512.512s", buff+pos);
+        for (;pos+512<=genBlockSize;pos+=512)
+            printf("%512.512s", buff+pos);
         for (;pos<genBlockSize;pos++) printf("%c", buff[pos]);
         // Regenerate prefix
         memcpy(fullbuff, buff + 96 KB, 32 KB);
@@ -215,13 +217,13 @@ int main(int argc, char** argv)
         if(!argument) continue;   // Protection if argument empty
 
         // Decode command (note : aggregated commands are allowed)
-        if (argument[0]=='-')
+        if (*argument=='-')
         {
             if (!strcmp(argument, "--no-prompt")) { no_prompt=1; continue; }
 
-            while (argument[1]!=0)
+            argument++;
+            while (*argument!=0)
             {
-                argument++;
                 switch(*argument)
                 {
                 case 'h':
@@ -264,6 +266,7 @@ int main(int argc, char** argv)
                     break;
                 case 'v':
                     displayLevel = 4;
+                    argument++;
                     break;
                 default: ;
                 }
