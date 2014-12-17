@@ -4,6 +4,7 @@ Fixed : GCC 4.9 bug on highest performance settings, reported by Greg Slazinski
 Fixed : bug within LZ4 HC streaming mode, reported by James Boyle
 Fixed : older compiler don't like nameless unions, reported by Cheyi Lin
 Changed : lz4 is C90 compatible
+Changed : added -pedantic option, fixed a few mminor warnings
 
 r125:
 Changed : endian and alignment code
