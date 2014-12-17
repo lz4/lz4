@@ -49,7 +49,6 @@ You can contact the author at :
 /* XXH_ACCEPT_NULL_INPUT_POINTER :
  * If the input pointer is a null pointer, xxHash default behavior is to trigger a memory access error, since it is a bad pointer.
  * When this option is enabled, xxHash output for null input pointers will be the same as a null-length input.
- * This option has a very small performance cost (only measurable on small inputs).
  * By default, this option is disabled. To enable it, uncomment below define :
  */
 /* #define XXH_ACCEPT_NULL_INPUT_POINTER 1 */
@@ -68,19 +67,19 @@ You can contact the author at :
 /**************************************
 *  Compiler Specific Options
 ***************************************/
-/* Disable some Visual warning messages */
-#ifdef _MSC_VER
-#  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
-#endif
-
 #ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
 #  define FORCE_INLINE static __forceinline
 #else
-#  ifdef __GNUC__
-#    define FORCE_INLINE static inline __attribute__((always_inline))
+#  if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
+#    ifdef __GNUC__
+#      define FORCE_INLINE static inline __attribute__((always_inline))
+#    else
+#      define FORCE_INLINE static inline
+#    endif
 #  else
-#    define FORCE_INLINE static inline
-#  endif
+#    define FORCE_INLINE static
+#  endif /* __STDC_VERSION__ */
 #endif
 
 
@@ -171,14 +170,14 @@ typedef struct _U64_S
 #  define XXH_swap32 __builtin_bswap32
 #  define XXH_swap64 __builtin_bswap64
 #else
-static inline U32 XXH_swap32 (U32 x)
+static U32 XXH_swap32 (U32 x)
 {
     return  ((x << 24) & 0xff000000 ) |
             ((x <<  8) & 0x00ff0000 ) |
             ((x >>  8) & 0x0000ff00 ) |
             ((x >> 24) & 0x000000ff );
 }
-static inline U64 XXH_swap64 (U64 x)
+static U64 XXH_swap64 (U64 x)
 {
     return  ((x << 56) & 0xff00000000000000ULL) |
             ((x << 40) & 0x00ff000000000000ULL) |
@@ -212,7 +211,7 @@ static inline U64 XXH_swap64 (U64 x)
 *  Architecture Macros
 ****************************************/
 typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianess;
-#ifndef XXH_CPU_LITTLE_ENDIAN   // It is possible to define XXH_CPU_LITTLE_ENDIAN externally, for example using a compiler switch
+#ifndef XXH_CPU_LITTLE_ENDIAN   /* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example using a compiler switch */
 static const int one = 1;
 #   define XXH_CPU_LITTLE_ENDIAN   (*(char*)(&one))
 #endif
@@ -221,7 +220,7 @@ static const int one = 1;
 /**************************************
 *  Macros
 ***************************************/
-#define XXH_STATIC_ASSERT(c)   { enum { XXH_static_assert = 1/(!!(c)) }; }    // use only *after* variable declarations
+#define XXH_STATIC_ASSERT(c)   { enum { XXH_static_assert = 1/(!!(c)) }; }    /* use only *after* variable declarations */
 
 
 /****************************

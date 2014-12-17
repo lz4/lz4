@@ -79,7 +79,7 @@ static int LZ4_compress_local(const char* src, char* dst, int size, int clevel) 
 /**************************************
 *  Basic Types
 ***************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 # include <stdint.h>
   typedef uint8_t  BYTE;
   typedef uint16_t U16;
@@ -247,7 +247,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   double totald = 0.;
 
 
-  // Init
+  /* Init */
   if (cLevel <= 3) cfunctionId = 0; else cfunctionId = 1;
   switch (cfunctionId)
   {
