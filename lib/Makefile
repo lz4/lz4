@@ -1,6 +1,6 @@
 # ################################################################
 # LZ4 library - Makefile
-# Copyright (C) Yann Collet 2011-2014
+# Copyright (C) Yann Collet 2011-2015
 # All rights reserved.
 # 
 # BSD license
@@ -32,8 +32,7 @@
 # ################################################################
 
 # Version numbers
-VERSION=125
-RELEASE=r$(VERSION)
+VERSION ?= 126
 LIBVER_MAJOR=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER_MINOR=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
 LIBVER_PATCH=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
@@ -41,9 +40,8 @@ LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
 DESTDIR?=
 PREFIX ?= /usr
-CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -pedantic
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -67,10 +65,10 @@ default: liblz4
 
 all: liblz4
 
-liblz4: lz4.c lz4hc.c
+liblz4: lz4.c lz4hc.c lz4frame.c xxhash.c
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
-	@$(AR) rcs liblz4.a lz4.o lz4hc.o
+	@$(AR) rcs liblz4.a lz4.o lz4hc.o lz4frame.o xxhash.o
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
@@ -103,6 +101,7 @@ install: liblz4 liblz4.pc
 	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
 	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	@install -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
 	@echo lz4 static and shared library installed
 
 uninstall:

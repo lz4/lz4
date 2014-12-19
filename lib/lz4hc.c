@@ -56,10 +56,6 @@ static const int LZ4HC_compressionLevel_default = 8;
 #  pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
-#if defined(_MSC_VER)    /* Visual Studio */
-#  pragma warning(disable : 4201)        /* disable: C4201: unnamed struct/union*/
-#endif
-
 
 /**************************************
    Common LZ4 definition
@@ -89,10 +85,7 @@ static const int g_maxCompressionLevel = 16;
 **************************************/
 typedef struct
 {
-    union {
-      U64 alignedOn8Bytes;  /* force 8-bytes alignment on 32-bits systems */
-      U32 hashTable[HASHTABLESIZE];
-    };
+    U32 hashTable[HASHTABLESIZE];
     U16   chainTable[MAXD];
     const BYTE* end;        /* next block here to continue on current prefix */
     const BYTE* base;       /* All index relative to this position */
@@ -156,7 +149,7 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
 }
 
 
-FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   // Index table will be updated
+FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   /* Index table will be updated */
                                                const BYTE* ip, const BYTE* const iLimit,
                                                const BYTE** matchpos,
                                                const int maxNbAttempts)
@@ -200,7 +193,7 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   // I
                 mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iLimit))
                     mlt += LZ4_count(ip+mlt, base+dictLimit, iLimit);
-                if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   // virtual matchpos
+                if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   /* virtual matchpos */
             }
         }
         matchIndex -= chainTable[matchIndex & 0xFFFF];
@@ -285,7 +278,10 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
 
 typedef enum { noLimit = 0, limitedOutput = 1 } limitedOutput_directive;
 
-//static unsigned debug = 0;
+#define LZ4HC_DEBUG 0
+#if LZ4HC_DEBUG
+static unsigned debug = 0;
+#endif
 
 FORCE_INLINE int LZ4HC_encodeSequence (
     const BYTE** ip,
@@ -299,7 +295,9 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     int length;
     BYTE* token;
 
-    //if (debug) printf("literal : %u  --  match : %u  --  offset : %u\n", (U32)(*ip - *anchor), (U32)matchLength, (U32)(*ip-match));   // debug
+#if LZ4HC_DEBUG
+    if (debug) printf("literal : %u  --  match : %u  --  offset : %u\n", (U32)(*ip - *anchor), (U32)matchLength, (U32)(*ip-match));
+#endif
 
     /* Encode Literal length */
     length = (int)(*ip - *anchor);
@@ -589,7 +587,7 @@ int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, c
  * ************************************/
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) { return (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t)); }
-int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) { free(LZ4_streamHCPtr); return 0; };
+int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) { free(LZ4_streamHCPtr); return 0; }
 
 
 /* initialization */
@@ -693,6 +691,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
         streamPtr->base = streamPtr->end - endIndex;
         streamPtr->dictLimit = endIndex - dictSize;
         streamPtr->lowLimit = endIndex - dictSize;
+        if (streamPtr->nextToUpdate < streamPtr->dictLimit) streamPtr->nextToUpdate = streamPtr->dictLimit;
     }
     return dictSize;
 }

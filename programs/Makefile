@@ -1,6 +1,7 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2014
+# Copyright (C) Yann Collet 2011-2015
+#
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -30,13 +31,12 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE=r125
+RELEASE?= r126
 
 DESTDIR?=
 PREFIX ?= /usr
-CC     := $(CC)
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 BINDIR=$(PREFIX)/bin
@@ -142,11 +142,12 @@ test-travis: $(TRAVIS_TARGET)
 test-lz4: lz4 datagen
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
+	./datagen -g6M -p100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 # test frame concatenation with null-length frame
-	echo -n > empty.test
-	echo hi > nonempty.test
+	@echo -n > empty.test
+	@echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
 	@./lz4 -zq empty.test > empty.lz4.test
 	@./lz4 -zq nonempty.test > nonempty.lz4.test
@@ -159,7 +160,7 @@ test-lz4: lz4 datagen
 
 
 test-lz4c: lz4c datagen
-	./datagen -g256MB | ./lz4c -l -v -B4D | ./lz4c -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -vdq > $(VOID)
 
 test-lz4c32: lz4 lz4c32 lz4 datagen
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -vdq > $(VOID)
