@@ -668,7 +668,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     inBuff = (char*)malloc(inBuffSize);
 #if defined(LZ4IO_ENABLE_SPARSE_FILE)
     outBuff = (char*)malloc(outBuffSize+sizeof(U64));
-    outBuff[outBuffSize] = 1; /* sentinel */
+    *(U64*) &outBuff[outBuffSize] = (U64) -1; /* sentinel */
 #else /* LZ4IO_ENABLE_SPARSE_FILE */
     outBuff = (char*)malloc(outBuffSize);
 #endif /* LZ4IO_ENABLE_SPARSE_FILE */
