@@ -79,7 +79,9 @@
 #  if defined(LZ4IO_ENABLE_SPARSE_FILE)
 #    include <windows.h>
 #    define SET_SPARSE_FILE_MODE(file) do { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); } while(0)
-#    define fseek _fseeki64
+#    if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#      define fseek _fseeki64
+#    endif
 #  endif /* LZ4IO_ENABLE_SPARSE_FILE */
 #else
 #  include <unistd.h>  /* isatty */
@@ -197,13 +199,15 @@ int LZ4IO_setSparseFile(int yes)
 static int isSparse(const void* p, size_t size)
 {
     const char* p8 = p;
-	for(; size; --size) {
-		if(*p8 != 0) {
-			return 0;
-		}
-		++p8;
-	}
-	return 1;
+    for(; size; --size)
+    {
+        if(*p8 != 0)
+        {
+            return 0;
+        }
+        ++p8;
+    }
+    return 1;
 }
 #endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
@@ -574,7 +578,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     LZ4F_frameInfo_t frameInfo;
 #if defined(LZ4IO_ENABLE_SPARSE_FILE)
     size_t sparsePending = 0;
-#endif
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
@@ -617,29 +621,34 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
 
         /* Write Block */
 #if defined(LZ4IO_ENABLE_SPARSE_FILE)
-		if(sparseFile) {
-			if(isSparse(outBuff, decodedBytes)) {
-				sparsePending += decodedBytes;
-				continue;
-			}
-			if(sparsePending > 0) {
-				fseek(foutput, sparsePending, SEEK_CUR);
-				sparsePending = 0;
-			}
-		}
-#endif
+        if(sparseFile)
+        {
+            if(isSparse(outBuff, decodedBytes))
+            {
+                sparsePending += decodedBytes;
+                continue;
+            }
+            if(sparsePending > 0)
+            {
+                fseek(foutput, sparsePending, SEEK_CUR);
+                sparsePending = 0;
+            }
+        }
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
         sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
         if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
     }
 #if defined(LZ4IO_ENABLE_SPARSE_FILE)
-	if(sparseFile) {
-		if(sparsePending > 0) {
-			fseek(foutput, sparsePending-1, SEEK_CUR);
-			fputc(0, foutput);
-			sparsePending = 0;
-		}
-	}
-#endif
+    if(sparseFile)
+    {
+        if(sparsePending > 0)
+        {
+            fseek(foutput, sparsePending-1, SEEK_CUR);
+            fputc(0, foutput);
+            sparsePending = 0;
+        }
+    }
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
     /* Free */
     free(inBuff);
