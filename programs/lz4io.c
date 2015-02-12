@@ -76,10 +76,18 @@
 #  endif
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
+#  if defined(LZ4IO_ENABLE_SPARSE_FILE)
+#    include <windows.h>
+#    define SET_SPARSE_FILE_MODE(file) do { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); } while(0)
+#    define fseek _fseeki64
+#  endif /* LZ4IO_ENABLE_SPARSE_FILE */
 #else
 #  include <unistd.h>  /* isatty */
 #  define SET_BINARY_MODE(file)
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
+#  if defined(LZ4IO_ENABLE_SPARSE_FILE)
+#    define SET_SPARSE_FILE_MODE(file)
+#  endif /* LZ4IO_ENABLE_SPARSE_FILE */
 #endif
 
 
@@ -133,6 +141,9 @@ static int globalBlockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
 static int blockChecksum = 0;
 static int streamChecksum = 1;
 static int blockIndependence = 1;
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+static int sparseFile = 0;
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
 static const int minBlockSizeID = 4;
 static const int maxBlockSizeID = 7;
@@ -173,6 +184,28 @@ int LZ4IO_setOverwrite(int yes)
    overwrite = (yes!=0);
    return overwrite;
 }
+
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+/* Default setting : sparseFile = 0; (Disable)
+   return : sparse file mode (0:Disable / 1:Enable) */
+int LZ4IO_setSparseFile(int yes)
+{
+    sparseFile = yes;
+    return sparseFile;
+}
+
+static int isSparse(const void* p, size_t size)
+{
+    const char* p8 = p;
+	for(; size; --size) {
+		if(*p8 != 0) {
+			return 0;
+		}
+		++p8;
+	}
+	return 1;
+}
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
 /* blockSizeID : valid values : 4-5-6-7 */
 int LZ4IO_setBlockSizeID(int bsid)
@@ -539,6 +572,9 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     LZ4F_decompressionContext_t ctx;
     LZ4F_errorCode_t errorCode;
     LZ4F_frameInfo_t frameInfo;
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+    size_t sparsePending = 0;
+#endif
 
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
@@ -580,9 +616,30 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         filesize += decodedBytes;
 
         /* Write Block */
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+		if(sparseFile) {
+			if(isSparse(outBuff, decodedBytes)) {
+				sparsePending += decodedBytes;
+				continue;
+			}
+			if(sparsePending > 0) {
+				fseek(foutput, sparsePending, SEEK_CUR);
+				sparsePending = 0;
+			}
+		}
+#endif
         sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
         if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
     }
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+	if(sparseFile) {
+		if(sparsePending > 0) {
+			fseek(foutput, sparsePending-1, SEEK_CUR);
+			fputc(0, foutput);
+			sparsePending = 0;
+		}
+	}
+#endif
 
     /* Free */
     free(inBuff);
@@ -644,6 +701,14 @@ int LZ4IO_decompressFilename(char* input_filename, char* output_filename)
     /* Init */
     start = clock();
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
+
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+    if (sparseFile!=0 && foutput!=0)
+    {
+        DISPLAY("Experimental : Using sparse file\n");
+        SET_SPARSE_FILE_MODE(foutput);
+    }
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
     /* Loop over multiple streams */
     do
