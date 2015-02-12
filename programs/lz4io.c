@@ -220,6 +220,7 @@ int LZ4IO_setSparseFile(int yes)
 static int isSparse(const void* p, size_t size)
 {
 #if 0
+    /* naive */
     const char* p8 = p;
     for(; size; --size)
     {
@@ -230,7 +231,8 @@ static int isSparse(const void* p, size_t size)
         ++p8;
     }
     return 1;
-#else
+#elif 0
+    /* xz method */
     const U64* p64 = (const U64*) p;
     const char* p8 = (const char*) p;
     const size_t n = size / sizeof(*p64);
@@ -253,6 +255,10 @@ static int isSparse(const void* p, size_t size)
     }
 
     return 1;
+#else
+    /* Neil's */
+    const char* buf = (const char*) p;
+    return buf[0] == 0 && !memcmp(buf, buf + 1, size - 1);
 #endif
 }
 #endif /* LZ4IO_ENABLE_SPARSE_FILE */
