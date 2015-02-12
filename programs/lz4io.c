@@ -62,6 +62,27 @@
 #include "lz4frame.h"
 
 
+/**************************************
+   Basic Types
+**************************************/
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+#if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
+# include <stdint.h>
+  typedef  uint8_t BYTE;
+  typedef uint16_t U16;
+  typedef uint32_t U32;
+  typedef  int32_t S32;
+  typedef uint64_t U64;
+#else
+  typedef unsigned char       BYTE;
+  typedef unsigned short      U16;
+  typedef unsigned int        U32;
+  typedef   signed int        S32;
+  typedef unsigned long long  U64;
+#endif
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
+
+
 /****************************
 *  OS-specific Includes
 *****************************/
@@ -198,6 +219,7 @@ int LZ4IO_setSparseFile(int yes)
 
 static int isSparse(const void* p, size_t size)
 {
+#if 0
     const char* p8 = p;
     for(; size; --size)
     {
@@ -208,6 +230,30 @@ static int isSparse(const void* p, size_t size)
         ++p8;
     }
     return 1;
+#else
+    const U64* p64 = (const U64*) p;
+    const char* p8 = (const char*) p;
+    const size_t n = size / sizeof(*p64);
+    size_t i;
+
+    for (i = 0; i < n; ++i)
+    {
+        if (p64[i] != 0)
+        {
+            return 0;
+        }
+    }
+
+    for(i = n * sizeof(*p64); i < size; ++i)
+    {
+        if (p8[i] != 0)
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+#endif
 }
 #endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
