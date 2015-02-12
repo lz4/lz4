@@ -255,10 +255,24 @@ static int isSparse(const void* p, size_t size)
     }
 
     return 1;
-#else
+#elif 0
     /* Neil's */
     const char* buf = (const char*) p;
     return buf[0] == 0 && !memcmp(buf, buf + 1, size - 1);
+#else
+    /* GNU Core Utilities : coreutils/src/system.h / is_nul() */
+    const U64* wp = (const U64*) p;
+    const char* cbuf = (const char*) p;
+    const char* cp;
+
+    // Find first nonzero *word*, or the word with the sentinel.
+    while(*wp++ == 0) ;
+
+    // Find the first nonzero *byte*, or the sentinel.
+    cp = (const char*) (wp - 1);
+    while(*cp++ == 0) ;
+
+    return cbuf + size < cp;
 #endif
 }
 #endif /* LZ4IO_ENABLE_SPARSE_FILE */
@@ -652,7 +666,12 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     outBuffSize = LZ4IO_setBlockSizeID(frameInfo.blockSizeID);
     inBuffSize = outBuffSize + 4;
     inBuff = (char*)malloc(inBuffSize);
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+    outBuff = (char*)malloc(outBuffSize+1);
+    outBuff[outBuffSize] = 1; /* sentinel */
+#else /* LZ4IO_ENABLE_SPARSE_FILE */
     outBuff = (char*)malloc(outBuffSize);
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
     if (!inBuff || !outBuff) EXM_THROW(65, "Allocation error : not enough memory");
 
     /* Main Loop */
