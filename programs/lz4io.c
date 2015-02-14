@@ -71,6 +71,9 @@
 #  ifdef __MINGW32__
    int _fileno(FILE *stream);   /* MINGW somehow forgets to include this windows declaration into <stdio.h> */
 #  endif
+#  if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
+#    define fseek _fseeki64
+#  endif
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
