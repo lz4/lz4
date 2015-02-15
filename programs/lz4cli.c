@@ -156,6 +156,7 @@ static int usage(void)
     DISPLAY( " -z     : force compression\n");
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -h/-H  : display help/long help and exit\n");
+    DISPLAY( " -m     : allow mulitple input files (implies automatic output filenames)");
     return 0;
 }
 
@@ -265,10 +266,12 @@ int main(int argc, char** argv)
         legacy_format=0,
         forceStdout=0,
         forceCompress=0,
-        main_pause=0;
+        main_pause=0,
+        multiple_inputs=0;
     char* input_filename=0;
     char* output_filename=0;
     char* dynNameSpace=0;
+    char *input_filenames[argc];
     char nullOutput[] = NULL_OUTPUT;
     char extension[] = LZ4_EXTENSION;
     int blockSize;
@@ -284,6 +287,7 @@ int main(int argc, char** argv)
     /* command switches */
     for(i=1; i<argc; i++)
     {
+        input_filenames[i]=0;
         char* argument = argv[i];
 
         if(!argument) continue;   /* Protection if argument empty */
@@ -390,6 +394,9 @@ int main(int argc, char** argv)
                     /* Benchmark */
                 case 'b': bench=1; break;
 
+                    /* Treat non-option args as input files.  See Issue 151 in Google Code */
+                case 'm': multiple_inputs=1; break;
+
                     /* Modify Nb Iterations (benchmark only) */
                 case 'i':
                     if ((argument[1] >='1') && (argument[1] <='9'))
@@ -413,10 +420,13 @@ int main(int argc, char** argv)
             continue;
         }
 
-        /* first provided filename is input */
+        /* Input files are a wonderful thing.  Store in *input_filenames[] if -m is used. */
+        if (multiple_inputs) { input_filenames[i]=argument; continue; }
+
+        /* Store first non-option arg in input_filename to preserve original cli logic. */
         if (!input_filename) { input_filename=argument; filenamesStart=i; continue; }
 
-        /* second provided filename is output */
+        /* Second non-option arg in output_filename to preserve original cli logic. */
         if (!output_filename)
         {
             output_filename=argument;
@@ -425,74 +435,90 @@ int main(int argc, char** argv)
         }
     }
 
-    DISPLAYLEVEL(3, WELCOME_MESSAGE);
-    if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
-
-    /* No input filename ==> use stdin */
-    if(!input_filename) { input_filename=stdinmark; }
-
-    /* Check if input or output are defined as console; trigger an error in this case */
-    if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
-
-    /* Check if benchmark is selected */
-    if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, cLevel);
-
-    /* No output filename ==> try to select one automatically (when possible) */
-    while (!output_filename)
+    /* If we are not using multiple_inputs, clear *input_filesnames[] (just in case) and set element 0 to input_filename. */
+    if (!multiple_inputs)
     {
-        if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
-        if ((!decode) && !(forceCompress))   /* auto-determine compression or decompression, based on file extension */
-        {
-            size_t l = strlen(input_filename);
-            if (!strcmp(input_filename+(l-4), LZ4_EXTENSION)) decode=1;
-        }
-        if (!decode)   /* compression to file */
-        {
-            size_t l = strlen(input_filename);
-            dynNameSpace = (char*)calloc(1,l+5);
-            output_filename = dynNameSpace;
-            strcpy(output_filename, input_filename);
-            strcpy(output_filename+l, LZ4_EXTENSION);
-            DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
-            break;
-        }
-        /* decompression to file (automatic name will work only if input filename has correct format extension) */
-        {
-            size_t outl;
-            size_t inl = strlen(input_filename);
-            dynNameSpace = (char*)calloc(1,inl+1);
-            output_filename = dynNameSpace;
-            strcpy(output_filename, input_filename);
-            outl = inl;
-            if (inl>4)
-                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) output_filename[outl--]=0;
-            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(); }
-            DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
-        }
+        for (i=0; i<argc; i++) input_filenames[i]=0;
     }
+    input_filenames[0]=input_filename;
 
-    /* Check if output is defined as console; trigger an error in this case */
-    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) badusage();
-
-    /* No warning message in pure pipe mode (stdin + stdout) */
-    if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
-
-
-    /* IO Stream/File */
-    LZ4IO_setNotificationLevel(displayLevel);
-    if (decode) DEFAULT_DECOMPRESSOR(input_filename, output_filename);
-    else
+    /* Loop through all the input_filenames[], which should only be 1 if we're using the old (original, non -m) cli method.
+       This is a shamelessly-stolen loop over the original logic. */
+    for (i=0; i<argc; i++)
     {
-        /* compression is default action */
-        if (legacy_format)
+        if (!input_filenames[i]) continue;
+        input_filename=input_filenames[i];
+        DISPLAYLEVEL(3, WELCOME_MESSAGE);
+        if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
+
+        /* No input filename ==> use stdin */
+        if(!input_filename) { input_filename=stdinmark; }
+
+        /* Check if input or output are defined as console; trigger an error in this case */
+        if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
+
+        /* Check if benchmark is selected */
+        if (bench) return BMK_benchFile(argv+filenamesStart, argc-filenamesStart, cLevel);
+
+        /* No output filename ==> try to select one automatically (when possible) */
+        while (!output_filename)
         {
-            DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
-            LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
+            if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
+            if ((!decode) && !(forceCompress))   /* auto-determine compression or decompression, based on file extension */
+            {
+                size_t l = strlen(input_filename);
+                if (!strcmp(input_filename+(l-4), LZ4_EXTENSION)) decode=1;
+            }
+            if (!decode)   /* compression to file */
+            {
+                size_t l = strlen(input_filename);
+                dynNameSpace = (char*)calloc(1,l+5);
+                output_filename = dynNameSpace;
+                strcpy(output_filename, input_filename);
+                strcpy(output_filename+l, LZ4_EXTENSION);
+                DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
+                break;
+            }
+            /* decompression to file (automatic name will work only if input filename has correct format extension) */
+            {
+                size_t outl;
+                size_t inl = strlen(input_filename);
+                dynNameSpace = (char*)calloc(1,inl+1);
+                output_filename = dynNameSpace;
+                strcpy(output_filename, input_filename);
+                outl = inl;
+                if (inl>4)
+                    while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) output_filename[outl--]=0;
+                if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(); }
+                DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
+            }
         }
+
+        /* Check if output is defined as console; trigger an error in this case */
+        if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) badusage();
+
+        /* No warning message in pure pipe mode (stdin + stdout) */
+        if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
+
+
+        /* IO Stream/File */
+        LZ4IO_setNotificationLevel(displayLevel);
+        if (decode) DEFAULT_DECOMPRESSOR(input_filename, output_filename);
         else
         {
-            DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
+            /* compression is default action */
+            if (legacy_format)
+            {
+                DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
+                LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
+            }
+            else
+            {
+                DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
+            }
         }
+        /* Clear the output_filename here in case there are other files to process. */
+        output_filename=0;
     }
 
     if (main_pause) waitEnter();
