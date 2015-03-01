@@ -20,7 +20,7 @@
 #
 # You can contact the author at :
 #  - LZ4 source repository : http://code.google.com/p/lz4/
-#  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
+#  - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 # ##########################################################################
 # lz4 : Command Line Utility, supporting gzip-like arguments
 # lz4c  : CLU, supporting also legacy lz4demo arguments
@@ -143,6 +143,7 @@ test-lz4: lz4 datagen
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
 	./datagen -g6M -p100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
+	./datagen -g17M   | ./lz4 -9v    | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
 # test frame concatenation with null-length frame
