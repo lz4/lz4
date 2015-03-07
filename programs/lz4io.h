@@ -1,6 +1,6 @@
 /*
   LZ4io.h - LZ4 File/Stream Interface
-  Copyright (C) Yann Collet 2011-2014
+  Copyright (C) Yann Collet 2011-2015
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -47,8 +47,10 @@ static char nulmark[] = "/dev/null";
 /* ****************** Functions ********************* */
 /* ************************************************** */
 
-int LZ4IO_compressFilename  (char* input_filename, char* output_filename, int compressionlevel);
-int LZ4IO_decompressFilename(char* input_filename, char* output_filename);
+int LZ4IO_compressFilename  (const char* input_filename, const char* output_filename, int compressionlevel);
+int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename);
+
+int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionlevel);
 
 
 /* ************************************************** */

@@ -1,6 +1,6 @@
 /*
     bench.h - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2014
+    Copyright (C) Yann Collet 2012-2015
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ extern "C" {
 
 
 /* Main function */
-int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel);
+int BMK_benchFile(const char** fileNamesTable, int nbFiles, int cLevel);
 
 /* Set Parameters */
 void BMK_SetBlocksize(int bsize);

@@ -31,7 +31,7 @@
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
 # ##########################################################################
 
-RELEASE?= r126
+RELEASE?= r128
 
 DESTDIR?=
 PREFIX ?= /usr
@@ -158,6 +158,12 @@ test-lz4: lz4 datagen
 	@rm *.test
 	@echo frame concatenation test completed
 # test frame concatenation with null-length frame
+	@echo test multiple input files
+	@./datagen -s1 > file1
+	@./datagen -s2 > file2
+	@./datagen -s3 > file3
+	./lz4 -f -m file1 file2 file3
+	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
 
 
 test-lz4c: lz4c datagen

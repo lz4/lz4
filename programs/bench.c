@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2014
+    Copyright (C) Yann Collet 2012-2015
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -215,7 +215,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 }
 
 
-static U64 BMK_GetFileSize(char* infilename)
+static U64 BMK_GetFileSize(const char* infilename)
 {
     int r;
 #if defined(_MSC_VER)
@@ -234,7 +234,7 @@ static U64 BMK_GetFileSize(char* infilename)
 *  Public function
 **********************************************************/
 
-int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
+int BMK_benchFile(const char** fileNamesTable, int nbFiles, int cLevel)
 {
   int fileIdx=0;
   char* orig_buff;
@@ -265,7 +265,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   while (fileIdx<nbFiles)
   {
       FILE*  inFile;
-      char*  inFileName;
+      const char*  inFileName;
       U64    inFileSize;
       size_t benchedSize;
       int nbChunks;

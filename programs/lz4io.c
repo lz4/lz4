@@ -1,6 +1,6 @@
 /*
   LZ4io.c - LZ4 File/Stream Interface
-  Copyright (C) Yann Collet 2011-2014
+  Copyright (C) Yann Collet 2011-2015
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -226,7 +226,7 @@ static int          LZ4S_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (
 static int          LZ4S_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4S_SKIPPABLEMASK) == LZ4S_SKIPPABLE0; }
 
 
-static int get_fileHandle(char* input_filename, char* output_filename, FILE** pfinput, FILE** pfoutput)
+static int get_fileHandle(const char* input_filename, const char* output_filename, FILE** pfinput, FILE** pfoutput)
 {
 
     if (!strcmp (input_filename, stdinmark))
@@ -293,7 +293,7 @@ static void LZ4IO_writeLE32 (void* p, unsigned value32)
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, int compressionlevel)
+int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel)
 {
     int (*compressionFunction)(const char*, char*, int);
     unsigned long long filesize = 0;
@@ -367,7 +367,7 @@ int LZ4IO_compressFilename_Legacy(char* input_filename, char* output_filename, i
  *   Compression using Frame format
  * ********************************************/
 
-int LZ4IO_compressFilename(char* input_filename, char* output_filename, int compressionLevel)
+int LZ4IO_compressFilename(const char* input_filename, const char* output_filename, int compressionLevel)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -465,8 +465,29 @@ int LZ4IO_compressFilename(char* input_filename, char* output_filename, int comp
 }
 
 
+int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionlevel)
+{
+    int i;
+    char* outFileName = NULL;
+    size_t ofnSize = 0;
+    const size_t suffixSize = strlen(suffix);
+
+    for (i=0; i<ifntSize; i++)
+    {
+        size_t ifnSize = strlen(inFileNamesTable[i]);
+        if (ofnSize <= ifnSize+suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = malloc(ofnSize); }
+        strcpy(outFileName, inFileNamesTable[i]);
+        strcat(outFileName, suffix);
+        LZ4IO_compressFilename(inFileNamesTable[i], outFileName, compressionlevel);
+    }
+    free(outFileName);
+    return 0;
+}
+
+
+
 /* ********************************************************************* */
-/* ********************** LZ4 File / Stream decoding ******************* */
+/* ********************** LZ4 file-stream Decompression **************** */
 /* ********************************************************************* */
 
 static unsigned LZ4IO_readLE32 (const void* s)
@@ -633,7 +654,7 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
 }
 
 
-int LZ4IO_decompressFilename(char* input_filename, char* output_filename)
+int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename)
 {
     unsigned long long filesize = 0, decodedSize=0;
     FILE* finput;
