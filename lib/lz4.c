@@ -64,7 +64,7 @@
  *     Program will crash.
  * If uncommenting results in better performance (case 1)
  * please report your configuration to upstream (https://groups.google.com/forum/#!forum/lz4c)
- * An automatic detection macro will be added to match your case within future versions of the library.
+ * This way, an automatic detection macro can be added to match your case within later versions of the library.
  */
 /* #define CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS 1 */
 
@@ -98,7 +98,7 @@
 
 
 /**************************************
-   Compiler Options
+*  Compiler Options
 **************************************/
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
 /* "restrict" is a known keyword */
@@ -316,14 +316,14 @@ static const int LZ4_minLength = (MFLIMIT+1);
 
 
 /**************************************
-   Common Utils
+*  Common Utils
 **************************************/
 #define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
-/********************************
-   Common functions
-********************************/
+/**************************************
+*  Common functions
+**************************************/
 static unsigned LZ4_NbCommonBytes (register size_t val)
 {
     if (LZ4_isLittleEndian())
@@ -412,7 +412,7 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLi
 
 #ifndef LZ4_COMMONDEFS_ONLY
 /**************************************
-   Local Constants
+*  Local Constants
 **************************************/
 #define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
 #define HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
@@ -423,14 +423,14 @@ static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression ru
 
 
 /**************************************
-   Local Utils
+*  Local Utils
 **************************************/
 int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 
 
 /**************************************
-   Local Structures and types
+*  Local Structures and types
 **************************************/
 typedef struct {
     U32 hashTable[HASH_SIZE_U32];
@@ -453,7 +453,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 
 
 /********************************
-   Compression functions
+*  Compression functions
 ********************************/
 
 static U32 LZ4_hashSequence(U32 sequence, tableType_t tableType)

@@ -25,7 +25,7 @@
 */
 
 /**************************************
-* Remove Visual warning messages
+*  Compiler options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  define _CRT_SECURE_NO_WARNINGS    /* fgets */
@@ -34,21 +34,32 @@
 #  pragma warning(disable : 4310)    /* disable: C4310: constant char value > 127 */
 #endif
 
+/* S_ISREG & gettimeofday() are not supported by MSVC */
+#if defined(_MSC_VER) || defined(_WIN32)
+#  define FUZ_LEGACY_TIMER 1
+#endif
+
 
 /**************************************
-* Includes
+*  Includes
 **************************************/
 #include <stdlib.h>
 #include <stdio.h>      /* fgets, sscanf */
-#include <sys/timeb.h>  /* timeb */
 #include <string.h>     /* strcmp */
 #include "lz4.h"
 #include "lz4hc.h"
 #include "xxhash.h"
 
+/* Use ftime() if gettimeofday() is not available on your target */
+#if defined(FUZ_LEGACY_TIMER)
+#  include <sys/timeb.h>   /* timeb, ftime */
+#else
+#  include <sys/time.h>    /* gettimeofday */
+#endif
+
 
 /**************************************
-* Basic Types
+*  Basic Types
 **************************************/
 #if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
 # include <stdint.h>
@@ -67,7 +78,7 @@ typedef unsigned long long  U64;
 
 
 /**************************************
-* Constants
+*  Constants
 **************************************/
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION ""
@@ -88,7 +99,7 @@ typedef unsigned long long  U64;
 
 
 /*****************************************
-* Macros
+*  Macros
 *****************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
@@ -98,8 +109,10 @@ static U32 g_time = 0;
 
 
 /*********************************************************
-  Fuzzer functions
+*  Fuzzer functions
 *********************************************************/
+#if defined(FUZ_LEGACY_TIMER)
+
 static U32 FUZ_GetMilliStart(void)
 {
     struct timeb tb;
@@ -108,6 +121,20 @@ static U32 FUZ_GetMilliStart(void)
     nCount = (U32) (((tb.time & 0xFFFFF) * 1000) +  tb.millitm);
     return nCount;
 }
+
+#else
+
+static U32 FUZ_GetMilliStart(void)
+{
+    struct timeval tv;
+    U32 nCount;
+    gettimeofday(&tv, NULL);
+    nCount = (U32) (tv.tv_usec/1000 + (tv.tv_sec & 0xfffff) * 1000);
+    return nCount;
+}
+
+#endif
+
 
 static U32 FUZ_GetMilliSpan(U32 nTimeStart)
 {

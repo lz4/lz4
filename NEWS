@@ -1,6 +1,7 @@
 r128:
 New   : command -m, to compress multiple files in a single command
 Fixed : Restored lz4hc compression ratio (slightly lower since r124)
+Fixed : Fuzzer + frametest compatibility with NetBSD (issue #48)
 Added : Visual project directory
 
 r126:
