@@ -83,6 +83,11 @@
 /*****************************
 *  Constants
 ******************************/
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+#  undef LZ4_VERSION
+#  define LZ4_VERSION "EXPERIMENTAL_SPARSE_FILE"
+#endif
+
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION "r128"
@@ -187,6 +192,10 @@ static int usage_advanced(void)
     DISPLAY( " -y     : overwrite output without prompting \n");
     DISPLAY( " -s     : suppress warnings \n");
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+    DISPLAY( "Experimental : Sparse file\n");
+    DISPLAY( " -x     : enable sparse file\n");
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
     EXTENDED_HELP;
     return 0;
 }
@@ -279,6 +288,9 @@ int main(int argc, char** argv)
     /* Init */
     programName = argv[0];
     LZ4IO_setOverwrite(0);
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+    LZ4IO_setSparseFile(0);
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
     blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
 
     /* lz4cat predefined behavior */
@@ -414,6 +426,11 @@ int main(int argc, char** argv)
 
                     /* Pause at the end (hidden option) */
                 case 'p': main_pause=1; BMK_SetPause(); break;
+
+#if defined(LZ4IO_ENABLE_SPARSE_FILE)
+                    /* Experimental : Enable sparse file */
+                case 'x': LZ4IO_setSparseFile(1); break;
+#endif /* LZ4IO_ENABLE_SPARSE_FILE */
 
                     /* Specific commands for customized versions */
                 EXTENDED_ARGUMENTS;
