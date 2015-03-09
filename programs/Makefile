@@ -92,7 +92,7 @@ frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxha
 frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-datagen : datagen.c
+datagen : datagen.c datagencli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 
@@ -142,7 +142,7 @@ test-travis: $(TRAVIS_TARGET)
 test-lz4: lz4 datagen
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
-	./datagen -g6M -p100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
+	./datagen -g6M -P100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
 	./datagen -g17M   | ./lz4 -9v    | ./lz4 -vdq > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
@@ -197,6 +197,7 @@ test-frametest32: frametest32
 	./frametest32
 
 test-mem: lz4 datagen fuzzer frametest
+	valgrind --leak-check=yes ./datagen -g50M > /dev/null
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp

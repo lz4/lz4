@@ -50,7 +50,7 @@ TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
 	Makefile lz4_block_format.txt LZ4_Frame_Format.html NEWS README.md \
 	cmake_unofficial/CMakeLists.txt \
 	$(PRGDIR)/fullbench.c $(PRGDIR)/lz4cli.c \
-	$(PRGDIR)/datagen.c $(PRGDIR)/fuzzer.c \
+	$(PRGDIR)/datagen.c $(PRGDIR)/datagen.h $(PRGDIR)/datagencli.c $(PRGDIR)/fuzzer.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
 	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
