@@ -1,6 +1,7 @@
 /*
-    bench.c - Demo program to benchmark open-source compression algorithm
+    bench.c - Demo program to benchmark open-source compression algorithms
     Copyright (C) Yann Collet 2012-2015
+
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -141,15 +142,15 @@ static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 
-void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
+void BMK_setBlocksize(int bsize) { chunkSize = bsize; }
 
-void BMK_SetNbIterations(int nbLoops)
+void BMK_setNbIterations(int nbLoops)
 {
     nbIterations = nbLoops;
     DISPLAY("- %i iterations -\n", nbIterations);
 }
 
-void BMK_SetPause(void) { BMK_pause = 1; }
+void BMK_setPause(void) { BMK_pause = 1; }
 
 
 /*********************************************************
@@ -234,7 +235,7 @@ static U64 BMK_GetFileSize(const char* infilename)
 *  Public function
 **********************************************************/
 
-int BMK_benchFile(const char** fileNamesTable, int nbFiles, int cLevel)
+int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 {
   int fileIdx=0;
   char* orig_buff;

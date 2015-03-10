@@ -90,7 +90,7 @@ static unsigned int RDG_rand(U32* src)
 #define LTMASK (LTSIZE-1)
 static void* RDG_createLiteralDistrib(double ld)
 {
-    BYTE* lt = malloc(LTSIZE);
+    BYTE* lt = (BYTE*)malloc(LTSIZE);
     U32 i = 0;
     BYTE character = '0';
     BYTE firstChar = '(';
@@ -117,7 +117,7 @@ static void* RDG_createLiteralDistrib(double ld)
 
 static char RDG_genChar(U32* seed, const void* ltctx)
 {
-    const BYTE* lt = ltctx;
+    const BYTE* lt = (const BYTE*)ltctx;
     U32 id = RDG_rand(seed) & LTMASK;
     return lt[id];
 }

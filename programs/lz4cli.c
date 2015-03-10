@@ -83,11 +83,6 @@
 /*****************************
 *  Constants
 ******************************/
-#if defined(LZ4IO_ENABLE_SPARSE_FILE)
-#  undef LZ4_VERSION
-#  define LZ4_VERSION "EXPERIMENTAL_SPARSE_FILE"
-#endif
-
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION "r128"
@@ -192,10 +187,6 @@ static int usage_advanced(void)
     DISPLAY( " -y     : overwrite output without prompting \n");
     DISPLAY( " -s     : suppress warnings \n");
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
-#if defined(LZ4IO_ENABLE_SPARSE_FILE)
-    DISPLAY( "Experimental : Sparse file\n");
-    DISPLAY( " -x     : enable sparse file\n");
-#endif /* LZ4IO_ENABLE_SPARSE_FILE */
     EXTENDED_HELP;
     return 0;
 }
@@ -288,9 +279,6 @@ int main(int argc, char** argv)
     /* Init */
     programName = argv[0];
     LZ4IO_setOverwrite(0);
-#if defined(LZ4IO_ENABLE_SPARSE_FILE)
-    LZ4IO_setSparseFile(0);
-#endif /* LZ4IO_ENABLE_SPARSE_FILE */
     blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
 
     /* lz4cat predefined behavior */
@@ -387,7 +375,7 @@ int main(int argc, char** argv)
                         {
                             int B = argument[1] - '0';
                             blockSize = LZ4IO_setBlockSizeID(B);
-                            BMK_SetBlocksize(blockSize);
+                            BMK_setBlocksize(blockSize);
                             argument++;
                             break;
                         }
@@ -405,13 +393,13 @@ int main(int argc, char** argv)
                     /* Benchmark */
                 case 'b': bench=1; multiple_inputs=1;
                     if (inFileNames == NULL)
-                        inFileNames = malloc(argc * sizeof(char*));
+                        inFileNames = (const char**) malloc(argc * sizeof(char*));
                     break;
 
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
                     if (inFileNames == NULL)
-                        inFileNames = malloc(argc * sizeof(char*));
+                        inFileNames = (const char**) malloc(argc * sizeof(char*));
                     break;
 
                     /* Modify Nb Iterations (benchmark only) */
@@ -419,18 +407,13 @@ int main(int argc, char** argv)
                     if ((argument[1] >='1') && (argument[1] <='9'))
                     {
                         int iters = argument[1] - '0';
-                        BMK_SetNbIterations(iters);
+                        BMK_setNbIterations(iters);
                         argument++;
                     }
                     break;
 
                     /* Pause at the end (hidden option) */
-                case 'p': main_pause=1; BMK_SetPause(); break;
-
-#if defined(LZ4IO_ENABLE_SPARSE_FILE)
-                    /* Experimental : Enable sparse file */
-                case 'x': LZ4IO_setSparseFile(1); break;
-#endif /* LZ4IO_ENABLE_SPARSE_FILE */
+                case 'p': main_pause=1; BMK_setPause(); break;
 
                     /* Specific commands for customized versions */
                 EXTENDED_ARGUMENTS;
@@ -471,7 +454,7 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
     /* Check if benchmark is selected */
-    if (bench) return BMK_benchFile(inFileNames, ifnIdx, cLevel);
+    if (bench) return BMK_benchFiles(inFileNames, ifnIdx, cLevel);
 
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)

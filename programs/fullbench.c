@@ -687,7 +687,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 milliTime = BMK_GetMilliStart();
                 while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
                 {
-                    if (initFunction!=NULL) ctx = initFunction(chunkP[0].origBuffer);
+                    if (initFunction!=NULL) ctx = (LZ4_stream_t*)initFunction(chunkP[0].origBuffer);
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                     {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);

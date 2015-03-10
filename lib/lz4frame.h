@@ -215,7 +215,7 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t ctx,
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
  * The function result is an hint of how many srcSize bytes LZ4F_decompress() expects for next call,
- * or an error code which can be tested using LZ4F_isError().
+ *                        or an error code which can be tested using LZ4F_isError().
  */
 
 size_t LZ4F_decompress(LZ4F_decompressionContext_t ctx,

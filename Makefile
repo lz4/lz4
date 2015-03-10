@@ -127,6 +127,10 @@ test-travis: $(TRAVIS_TARGET)
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
+gpptest:
+	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
+
+
 streaming-examples:
 	cd examples; $(MAKE) -e test
 

@@ -29,6 +29,7 @@
   - The license of this source file is GPLv2.
 */
 
+#pragma once
 
 /* ************************************************** */
 /* Special input/output values                        */
@@ -77,8 +78,3 @@ int LZ4IO_setStreamChecksumMode(int xxhash);
 
 /* Default setting : 0 (no notification) */
 int LZ4IO_setNotificationLevel(int level);
-
-#if defined(LZ4IO_ENABLE_SPARSE_FILE)
-/* Default setting : 0 (sparseFile = 0; disable sparse file) */
-int LZ4IO_setSparseFile(int yes);
-#endif
