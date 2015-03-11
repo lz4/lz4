@@ -1151,7 +1151,7 @@ typedef struct
  */
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
-    LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(sizeof(U64), LZ4_STREAMDECODESIZE_U64);
+    LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(LZ4_STREAMDECODESIZE_U64, sizeof(U64));
     return lz4s;
 }
 

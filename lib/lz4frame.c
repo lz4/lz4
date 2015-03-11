@@ -436,16 +436,19 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 * */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
-    const LZ4F_preferences_t prefsNull = {};   /* init to zero */
-    const LZ4F_preferences_t* prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
-    blockSizeID_t bid = prefsPtr->frameInfo.blockSizeID;
-    size_t blockSize = LZ4F_getBlockSize(bid);
-    unsigned nbBlocks = (unsigned)(srcSize / blockSize) + 1;
-    size_t lastBlockSize = prefsPtr->autoFlush ? srcSize % blockSize : blockSize;
-    size_t blockInfo = 4;   /* default, without block CRC option */
-    size_t frameEnd = 4 + (prefsPtr->frameInfo.contentChecksumFlag*4);
+    LZ4F_preferences_t prefsNull;
+    memset(&prefsNull, 0, sizeof(prefsNull));
+    {
+        const LZ4F_preferences_t* prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
+        blockSizeID_t bid = prefsPtr->frameInfo.blockSizeID;
+        size_t blockSize = LZ4F_getBlockSize(bid);
+        unsigned nbBlocks = (unsigned)(srcSize / blockSize) + 1;
+        size_t lastBlockSize = prefsPtr->autoFlush ? srcSize % blockSize : blockSize;
+        size_t blockInfo = 4;   /* default, without block CRC option */
+        size_t frameEnd = 4 + (prefsPtr->frameInfo.contentChecksumFlag*4);
 
-    return (blockInfo * nbBlocks) + (blockSize * (nbBlocks-1)) + lastBlockSize + frameEnd;;
+        return (blockInfo * nbBlocks) + (blockSize * (nbBlocks-1)) + lastBlockSize + frameEnd;;
+    }
 }
 
 
