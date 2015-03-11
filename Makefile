@@ -82,7 +82,7 @@ clean:
 	@rm -f $(DISTRIBNAME) *.sha1
 	@cd $(PRGDIR); $(MAKE) clean
 	@cd $(LZ4DIR); $(MAKE) clean
-	@cd examples; $(MAKE) clean
+	@cd examples;  $(MAKE) clean
 	@echo Cleaning completed
 
 

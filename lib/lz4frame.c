@@ -46,9 +46,6 @@ Compiler Options
 #endif
 
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#ifdef __GNUC__
-#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"   /* GCC bug 53119 : doesn't accept {0} nor {} as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
-#endif
 
 
 /**************************************
@@ -520,7 +517,7 @@ typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;
 */
 size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    LZ4F_compressOptions_t cOptionsNull = { 0 };
+    LZ4F_compressOptions_t cOptionsNull;
     LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
     size_t blockSize = cctxPtr->maxBlockSize;
     const BYTE* srcPtr = (const BYTE*)srcBuffer;
@@ -533,6 +530,7 @@ size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* d
 
     if (cctxPtr->cStage != 1) return (size_t)-ERROR_GENERIC;
     if (dstMaxSize < LZ4F_compressBound(srcSize, &(cctxPtr->prefs))) return (size_t)-ERROR_dstMaxSize_tooSmall;
+    memset(&cOptionsNull, 0, sizeof(cOptionsNull));
     if (compressOptionsPtr == NULL) compressOptionsPtr = &cOptionsNull;
 
     /* select compression function */
@@ -629,7 +627,7 @@ size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* d
 */
 size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    LZ4F_compressOptions_t cOptionsNull = { 0 };
+    LZ4F_compressOptions_t cOptionsNull;
     LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
@@ -639,8 +637,8 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
     if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
     if (cctxPtr->cStage != 1) return (size_t)-ERROR_GENERIC;
     if (dstMaxSize < (cctxPtr->tmpInSize + 16)) return (size_t)-ERROR_dstMaxSize_tooSmall;
+    memset(&cOptionsNull, 0, sizeof(cOptionsNull));
     if (compressOptionsPtr == NULL) compressOptionsPtr = &cOptionsNull;
-    (void)compressOptionsPtr;   /* not yet useful */
 
     /* select compression function */
     compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel);
@@ -945,7 +943,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)decompressionContext;
-    static const LZ4F_decompressOptions_t optionsNull = { 0 };
+    LZ4F_decompressOptions_t optionsNull;
     const BYTE* const srcStart = (const BYTE*)srcBuffer;
     const BYTE* const srcEnd = srcStart + *srcSizePtr;
     const BYTE* srcPtr = srcStart;
@@ -957,6 +955,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
     size_t nextSrcSizeHint = 1;
 
 
+    memset(&optionsNull, 0, sizeof(optionsNull));
     if (decompressOptionsPtr==NULL) decompressOptionsPtr = &optionsNull;
     *srcSizePtr = 0;
     *dstSizePtr = 0;

@@ -1,4 +1,5 @@
 r128:
+New   : lz4 cli sparse file support
 New   : command -m, to compress multiple files in a single command
 Fixed : Restored lz4hc compression ratio (slightly lower since r124)
 New   : g++ compatibility test
