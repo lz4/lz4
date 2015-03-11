@@ -176,6 +176,7 @@ static int usage_advanced(void)
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
     DISPLAY( " -Sx    : disable stream checksum (default:enabled)\n");
+    DISPLAY( " -X     : enable sparse file (default:disabled)(experimental)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
@@ -389,6 +390,9 @@ int main(int argc, char** argv)
 
                     /* Modify Stream properties */
                 case 'S': if (argument[1]=='x') { LZ4IO_setStreamChecksumMode(0); argument++; break; } else { badusage(); }
+
+                    /* Enable Sparse File support (experimental) */
+                case 'X': LZ4IO_setSparseFile(1); break;
 
                     /* Benchmark */
                 case 'b': bench=1; multiple_inputs=1;
