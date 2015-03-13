@@ -1,6 +1,7 @@
 /*
   LZ4io.c - LZ4 File/Stream Interface
   Copyright (C) Yann Collet 2011-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -18,7 +19,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
-  - LZ4 source repository : http://code.google.com/p/lz4/
+  - LZ4 source repository : https://github.com/Cyan4973/lz4
   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -558,6 +559,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     LZ4F_decompressionContext_t ctx;
     LZ4F_errorCode_t errorCode;
     LZ4F_frameInfo_t frameInfo;
+    unsigned storedSkips = 0;
 
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
@@ -608,13 +610,39 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             int seekResult;
             for (checked=0; (checked < toCheckLength) && (sPtr[checked] == 0); checked++) ;
             skippedLength = checked * sizeof(size_t);
-            if (skippedLength == decodedBytes) skippedLength--;  /* ensure 1 byte at least is written */
-            seekResult = fseek(foutput, skippedLength, SEEK_CUR);
-            if (seekResult != 0) EXM_THROW(68, "Skip error (sparse file)\n");
-            decodedBytes -= skippedLength;
+            storedSkips += (unsigned)skippedLength;
+            if (storedSkips > 2 GB)
+            {
+                seekResult = fseek(foutput, 2 GB, SEEK_CUR);
+                if (seekResult != 0) EXM_THROW(68, "2 GB skip error (sparse file)\n");
+                storedSkips -= 2 GB;
+            }
+            if (skippedLength != decodedBytes)
+            {
+                seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+                if (seekResult != 0) EXM_THROW(68, "Skip error (sparse file)\n");
+                storedSkips = 0;
+                decodedBytes -= skippedLength;
+                sizeCheck = fwrite(((char*)outBuff) + skippedLength, 1, decodedBytes, foutput);
+                if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+            }
         }
-        sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
-        if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+        else
+        {
+            sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
+            if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+        }
+    }
+
+    if ((g_sparseFileSupport) && (storedSkips>0))
+    {
+        int seekResult;
+        storedSkips --;
+        seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+        if (seekResult != 0) EXM_THROW(69, "Skip error (sparse file)\n");
+        memset(outBuff, 0, 1);
+        sizeCheck = fwrite(outBuff, 1, 1, foutput);
+        if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write decoded block\n");
     }
 
     /* Free */

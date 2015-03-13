@@ -137,7 +137,7 @@ void RDG_genBlock(void* buffer, size_t buffSize, size_t prefixSize, double match
     while (matchProba >= 1.0)
     {
         size_t size0 = RDG_rand(seed) & 3;
-        size0  = 1U << (16 + size0 * 2);
+        size0  = (size_t)1 << (16 + size0 * 2);
         size0 += RDG_rand(seed) & (size0-1);   /* because size0 is power of 2*/
         if (buffSize < pos + size0)
         {
@@ -159,11 +159,11 @@ void RDG_genBlock(void* buffer, size_t buffSize, size_t prefixSize, double match
         if (RDG_RAND15BITS < matchProba32)
         {
             /* Copy (within 32K) */
-            int match;
-            U32 d;
+            size_t match;
+            size_t d;
             int length = RDG_RANDLENGTH + 4;
             U32 offset = RDG_RAND15BITS + 1;
-            if (offset > pos) offset = pos;
+            if (offset > pos) offset = (U32)pos;
             match = pos - offset;
             d = pos + length;
             if (d > buffSize) d = buffSize;

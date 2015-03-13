@@ -146,8 +146,7 @@ test-lz4: lz4 datagen
 	./datagen -g17M   | ./lz4 -9v    | ./lz4 -dq  > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
-# test frame concatenation with null-length frame
-	@echo *** test frame concatenation ***
+	@echo ---- test frame concatenation ----
 	@echo -n > empty.test
 	@echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
@@ -158,15 +157,16 @@ test-lz4: lz4 datagen
 	sdiff orig.test result.test
 	@rm *.test
 	@echo frame concatenation test completed
-# test frame concatenation with null-length frame
-	@echo *** test multiple input files ***
+	@echo ---- test multiple input files ----
 	@./datagen -s1 > file1
 	@./datagen -s2 > file2
 	@./datagen -s3 > file3
 	./lz4 -f -m file1 file2 file3
+	ls -l file*
 	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
-	@echo *** test sparse file support ***
-	./datagen -g50M -P100 | ./lz4 -B4 | ./lz4 -dvX > tmp
+	@echo ---- test sparse file support ----
+	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dvX > tmp
+	./datagen -g50M -P100 | diff -s - tmp
 	ls -ls tmp
 	@rm tmp
 
