@@ -56,22 +56,25 @@
 #include "lz4frame.h"
 
 
-/*****************************
+/******************************
 *  OS-specific Includes
-*****************************/
+******************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _fileno */
+#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
+#  include <Windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
+#  define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
 #  if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
 #    define fseek _fseeki64
 #  endif
 #else
 #  define SET_BINARY_MODE(file)
+#  define SET_SPARSE_FILE_MODE(file)
 #endif
 
 
-/****************************
+/*****************************
 *  Constants
 *****************************/
 #define KB *(1 <<10)
@@ -607,7 +610,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             static const size_t zeroBlockSize = 32 KB;
             while (oBuffPos < oBuffEnd)
             {
-                size_t* sPtr = (size_t*)oBuffPos;
+                const size_t* sPtr = (const size_t*)oBuffPos;
                 size_t seg0Size = zeroBlockSize;
                 size_t nbSizeT;
                 size_t checked;
@@ -716,6 +719,12 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     /* Init */
     start = clock();
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
+
+    /* sparse file */
+    if (g_sparseFileSupport && foutput)
+    {
+        SET_SPARSE_FILE_MODE(foutput);
+    }
 
     /* Loop over multiple streams */
     do
