@@ -88,6 +88,9 @@ static int usage(char* programName)
     DISPLAY( " -s#    : Select seed (default:%i)\n", SEED_DEFAULT);
     DISPLAY( " -P#    : Select compressibility in %% (default:%i%%)\n", COMPRESSIBILITY_DEFAULT);
     DISPLAY( " -h     : display help and exit\n");
+    DISPLAY( "Special values :\n");
+    DISPLAY( " -P0    : generate incompressible noise\n");
+    DISPLAY( " -P100  : generate sparse files\n");
     return 0;
 }
 

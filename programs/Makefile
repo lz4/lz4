@@ -165,10 +165,16 @@ test-lz4: lz4 datagen
 	ls -l file*
 	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
 	@echo ---- test sparse file support ----
-	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dvX > tmp
-	./datagen -g50M -P100 | diff -s - tmp
-	ls -ls tmp
-	@rm tmp
+	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dvX > tmpB4
+	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dvX > tmpB5
+	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dvX > tmpB6
+	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dvX > tmpB7
+	ls -ls tmp*
+	./datagen -g50M -P100 | diff -s - tmpB4
+	./datagen -g50M -P100 | diff -s - tmpB5
+	./datagen -g50M -P100 | diff -s - tmpB6
+	./datagen -g50M -P100 | diff -s - tmpB7
+	@rm tmp*
 
 
 test-lz4c: lz4c datagen

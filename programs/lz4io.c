@@ -32,20 +32,18 @@
 
 /**************************************
 *  Compiler Options
-***************************************/
+**************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  define _CRT_SECURE_NO_WARNINGS
 #  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
 #  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
 #endif
 
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
 #define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
 
 
-/****************************
+/*****************************
 *  Includes
 *****************************/
 #include <stdio.h>    /* fprintf, fopen, fread, stdin, stdout */
@@ -58,7 +56,7 @@
 #include "lz4frame.h"
 
 
-/****************************
+/*****************************
 *  OS-specific Includes
 *****************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
@@ -103,7 +101,7 @@
 
 /**************************************
 *  Macros
-***************************************/
+**************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
@@ -118,7 +116,7 @@ static clock_t g_time = 0;
 
 /**************************************
 *  Local Parameters
-***************************************/
+**************************************/
 static int g_overwrite = 1;
 static int g_blockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
 static int g_blockChecksum = 0;
@@ -216,9 +214,9 @@ static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
 }
 
 
-/* ************************************************************************ */
-/* ********************** LZ4 File / Pipe compression ********************* */
-/* ************************************************************************ */
+/* ************************************************************************ **
+** ********************** LZ4 File / Pipe compression ********************* **
+** ************************************************************************ */
 
 static int          LZ4S_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
 static int          LZ4S_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4S_SKIPPABLEMASK) == LZ4S_SKIPPABLE0; }
@@ -275,8 +273,8 @@ static int get_fileHandle(const char* input_filename, const char* output_filenam
 
 
 /***************************************
- *   Legacy Compression
- * *************************************/
+*   Legacy Compression
+***************************************/
 
 /* unoptimized version; solves endianess & alignment issues */
 static void LZ4IO_writeLE32 (void* p, unsigned value32)
@@ -361,9 +359,9 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 }
 
 
-/***********************************************
- *   Compression using Frame format
- * ********************************************/
+/*********************************************
+*  Compression using Frame format
+*********************************************/
 
 int LZ4IO_compressFilename(const char* input_filename, const char* output_filename, int compressionLevel)
 {
@@ -603,28 +601,41 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         /* Write Block */
         if (g_sparseFileSupport)
         {
-            size_t* sPtr = (size_t*)outBuff;
-            size_t toCheckLength = decodedBytes / sizeof(size_t);
-            size_t checked;
-            size_t skippedLength;
-            int seekResult;
-            for (checked=0; (checked < toCheckLength) && (sPtr[checked] == 0); checked++) ;
-            skippedLength = checked * sizeof(size_t);
-            storedSkips += (unsigned)skippedLength;
-            if (storedSkips > 2 GB)
+            char* const oBuffStart = (char*)outBuff;
+            char* oBuffPos = oBuffStart;
+            char* const oBuffEnd = oBuffStart + decodedBytes;
+            static const size_t zeroBlockSize = 32 KB;
+            while (oBuffPos < oBuffEnd)
             {
-                seekResult = fseek(foutput, 2 GB, SEEK_CUR);
-                if (seekResult != 0) EXM_THROW(68, "2 GB skip error (sparse file)\n");
-                storedSkips -= 2 GB;
-            }
-            if (skippedLength != decodedBytes)
-            {
-                seekResult = fseek(foutput, storedSkips, SEEK_CUR);
-                if (seekResult != 0) EXM_THROW(68, "Skip error (sparse file)\n");
-                storedSkips = 0;
-                decodedBytes -= skippedLength;
-                sizeCheck = fwrite(((char*)outBuff) + skippedLength, 1, decodedBytes, foutput);
-                if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+                size_t* sPtr = (size_t*)oBuffPos;
+                size_t seg0Size = zeroBlockSize;
+                size_t nbSizeT;
+                size_t checked;
+                size_t skippedLength;
+                int seekResult;
+                if (seg0Size > decodedBytes) seg0Size = decodedBytes;
+                decodedBytes -= seg0Size;
+                nbSizeT = seg0Size / sizeof(size_t);
+                for (checked=0; (checked < nbSizeT) && (sPtr[checked] == 0); checked++) ;
+                skippedLength = checked * sizeof(size_t);
+                storedSkips += (unsigned)skippedLength;
+                if (storedSkips > 1 GB)
+                {
+                    seekResult = fseek(foutput, 1 GB, SEEK_CUR);
+                    if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)\n");
+                    storedSkips -= 1 GB;
+                }
+                if (skippedLength != seg0Size)
+                {
+                    seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+                    if (seekResult != 0) EXM_THROW(68, "Skip error (sparse file)\n");
+                    storedSkips = 0;
+                    seg0Size -= skippedLength;
+                    oBuffPos += skippedLength;
+                    sizeCheck = fwrite(oBuffPos, 1, seg0Size, foutput);
+                    if (sizeCheck != seg0Size) EXM_THROW(68, "Write error : cannot write decoded block\n");
+                }
+                oBuffPos += seg0Size;
             }
         }
         else
@@ -639,10 +650,10 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         int seekResult;
         storedSkips --;
         seekResult = fseek(foutput, storedSkips, SEEK_CUR);
-        if (seekResult != 0) EXM_THROW(69, "Skip error (sparse file)\n");
+        if (seekResult != 0) EXM_THROW(69, "Final skip error (sparse file)\n");
         memset(outBuff, 0, 1);
         sizeCheck = fwrite(outBuff, 1, 1, foutput);
-        if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write decoded block\n");
+        if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write last zero\n");
     }
 
     /* Free */
