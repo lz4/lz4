@@ -91,6 +91,7 @@
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
 #define LZ4_EXTENSION ".lz4"
 #define LZ4_CAT "lz4cat"
+#define UN_LZ4 "unlz4"
 
 #define KB *(1U<<10)
 #define MB *(1U<<20)
@@ -284,6 +285,7 @@ int main(int argc, char** argv)
 
     /* lz4cat predefined behavior */
     if (!strcmp(programName, LZ4_CAT)) { decode=1; forceStdout=1; output_filename=stdoutmark; displayLevel=1; }
+    if (!strcmp(programName, UN_LZ4)) { decode=1; }
 
     /* command switches */
     for(i=1; i<argc; i++)
