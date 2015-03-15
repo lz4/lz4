@@ -127,8 +127,11 @@ test-travis: $(TRAVIS_TARGET)
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
-gpptest:
+gpptest: clean
 	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
+
+clangtest: clean
+	export CC=clang; $(MAKE) all
 
 staticAnalyze: clean
 	export CFLAGS=-g; scan-build -v $(MAKE) all

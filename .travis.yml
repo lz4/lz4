@@ -13,6 +13,7 @@ env:
   - LZ4_TRAVIS_CI_ENV=streaming-examples
   - LZ4_TRAVIS_CI_ENV=cmake
   - LZ4_TRAVIS_CI_ENV=gpptest
+  - LZ4_TRAVIS_CI_ENV=clangtest
   - LZ4_TRAVIS_CI_ENV=staticAnalyze
   - LZ4_TRAVIS_CI_ENV=dist
   - LZ4_TRAVIS_CI_ENV=test-lz4

@@ -612,7 +612,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             static const size_t zeroBlockSize = 32 KB;
             while (oBuffPos < oBuffEnd)
             {
-                const size_t* sPtr = (const size_t*)oBuffPos;
+                const size_t* sPtr = (const size_t*)(void*)oBuffPos;
                 size_t seg0Size = zeroBlockSize;
                 size_t nbSizeT;
                 size_t checked;
@@ -723,10 +723,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
     /* sparse file */
-    if (g_sparseFileSupport && foutput)
-    {
-        SET_SPARSE_FILE_MODE(foutput);
-    }
+    if (g_sparseFileSupport && foutput) { SET_SPARSE_FILE_MODE(foutput); }
 
     /* Loop over multiple streams */
     do
