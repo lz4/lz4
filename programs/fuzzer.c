@@ -204,7 +204,7 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
 #define BLOCKSIZE_I134   (32 MB)
 static int FUZ_AddressOverflow(void)
 {
-    char* buffers[MAX_NB_BUFF_I134+1] = {0};
+    char* buffers[MAX_NB_BUFF_I134+1];
     int i, nbBuff=0;
     int highAddress = 0;
 
@@ -780,7 +780,7 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = crcOrig = XXH64_digest(&xxhNew);
+                crcNew = XXH64_digest(&xxhNew);
                 FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
 
                 // prepare next message
@@ -943,7 +943,7 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = crcOrig = XXH64_digest(&xxhNew);
+                crcNew = XXH64_digest(&xxhNew);
                 FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
 
                 // prepare next message
@@ -986,7 +986,7 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = crcOrig = XXH64_digest(&xxhNew);
+                crcNew = XXH64_digest(&xxhNew);
                 FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
 
                 // prepare next message

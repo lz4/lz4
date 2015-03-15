@@ -207,12 +207,17 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 
     while (!testmem)
     {
-        requiredMem -= step;
+        if (requiredMem > step) requiredMem -= step;
+        else requiredMem >>= 1;
         testmem = (BYTE*) malloc ((size_t)requiredMem);
     }
-
     free (testmem);
-    return (size_t) (requiredMem - step);
+
+    /* keep some space available */
+    if (requiredMem > step) requiredMem -= step;
+    else requiredMem >>= 1;
+
+    return (size_t)requiredMem;
 }
 
 
@@ -287,7 +292,9 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
       /* Memory allocation & restrictions */
       inFileSize = BMK_GetFileSize(inFileName);
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
       {
@@ -296,11 +303,11 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
       /* Alloc */
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)chunkSize)+1) * sizeof(struct chunkParameters));
-      orig_buff = (char*)malloc((size_t )benchedSize);
+      orig_buff = (char*)malloc((size_t)benchedSize);
       nbChunks = (int) ((int)benchedSize / chunkSize) + 1;
       maxCompressedChunkSize = LZ4_compressBound(chunkSize);
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
-      compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
+      compressedBuffer = (char*)malloc((size_t)compressedBuffSize);
 
 
       if (!orig_buff || !compressedBuffer)

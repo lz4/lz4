@@ -45,8 +45,6 @@ Compiler Options
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #endif
 
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
 
 /**************************************
 *  Memory routines
@@ -639,6 +637,7 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
     if (dstMaxSize < (cctxPtr->tmpInSize + 16)) return (size_t)-ERROR_dstMaxSize_tooSmall;
     memset(&cOptionsNull, 0, sizeof(cOptionsNull));
     if (compressOptionsPtr == NULL) compressOptionsPtr = &cOptionsNull;
+    (void)compressOptionsPtr;   /* not yet useful */
 
     /* select compression function */
     compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel);
@@ -805,11 +804,11 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVo
 
 
 typedef enum { dstage_getHeader=0, dstage_storeHeader, dstage_decodeHeader,
-    dstage_getCBlockSize, dstage_storeCBlockSize, dstage_decodeCBlockSize,
+    dstage_getCBlockSize, dstage_storeCBlockSize,
     dstage_copyDirect,
     dstage_getCBlock, dstage_storeCBlock, dstage_decodeCBlock,
     dstage_decodeCBlock_intoDst, dstage_decodeCBlock_intoTmp, dstage_flushOut,
-    dstage_getSuffix, dstage_storeSuffix, dstage_checkSuffix
+    dstage_getSuffix, dstage_storeSuffix
 } dStage_t;
 
 
@@ -950,7 +949,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* const dstEnd = dstStart + *dstSizePtr;
     BYTE* dstPtr = dstStart;
-    const BYTE* selectedIn=NULL;
+    const BYTE* selectedIn = NULL;
     unsigned doAnotherStage = 1;
     size_t nextSrcSizeHint = 1;
 
@@ -1020,15 +1019,16 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 {
                     selectedIn = srcPtr;
                     srcPtr += 4;
-                    dctxPtr->dStage = dstage_decodeCBlockSize;
-                    break;
                 }
+                else
+                {
                 /* not enough input to read cBlockSize field */
-                dctxPtr->tmpInSize = 0;
-                dctxPtr->dStage = dstage_storeCBlockSize;
-                break;
+                    dctxPtr->tmpInSize = 0;
+                    dctxPtr->dStage = dstage_storeCBlockSize;
+                }
             }
 
+            if (dctxPtr->dStage == dstage_storeCBlockSize)
         case dstage_storeCBlockSize:
             {
                 size_t sizeToCopy = 4 - dctxPtr->tmpInSize;
@@ -1043,11 +1043,9 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     break;
                 }
                 selectedIn = dctxPtr->tmpIn;
-                dctxPtr->dStage = dstage_decodeCBlockSize;
-                break;
             }
 
-        case dstage_decodeCBlockSize:
+        /* case dstage_decodeCBlockSize: */   /* no more direct access, to prevent scan-build warning */
             {
                 size_t nextCBlockSize = LZ4F_readLE32(selectedIn) & 0x7FFFFFFFU;
                 if (nextCBlockSize==0)   /* frameEnd signal, no more CBlock */
@@ -1235,18 +1233,19 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     doAnotherStage = 0;
                     break;
                 }
-                if ((srcEnd - srcPtr) >= 4)   /* CRC present */
+                if ((srcEnd - srcPtr) < 4)   /* not enough size for entire CRC */
+                {
+                    dctxPtr->tmpInSize = 0;
+                    dctxPtr->dStage = dstage_storeSuffix;
+                }
+                else
                 {
                     selectedIn = srcPtr;
                     srcPtr += 4;
-                    dctxPtr->dStage = dstage_checkSuffix;
-                    break;
                 }
-                dctxPtr->tmpInSize = 0;
-                dctxPtr->dStage = dstage_storeSuffix;
-                break;
             }
 
+            if (dctxPtr->dStage == dstage_storeSuffix)
         case dstage_storeSuffix:
             {
                 size_t sizeToCopy = 4 - dctxPtr->tmpInSize;
@@ -1261,11 +1260,9 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     break;
                 }
                 selectedIn = dctxPtr->tmpIn;
-                dctxPtr->dStage = dstage_checkSuffix;
-                break;
             }
 
-        case dstage_checkSuffix:
+        /* case dstage_checkSuffix: */   /* no direct call, to avoid scan-build warning */
             {
                 U32 readCRC = LZ4F_readLE32(selectedIn);
                 U32 resultCRC = XXH32_digest(&(dctxPtr->xxh));

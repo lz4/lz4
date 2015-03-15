@@ -114,9 +114,13 @@
 #define NBLOOPS    6
 #define TIMELOOP   2500
 
+#define KB *(1 <<10)
+#define MB *(1 <<20)
+#define GB *(1U<<30)
+
 #define KNUTH      2654435761U
-#define MAX_MEM    (1984<<20)
-#define DEFAULT_CHUNKSIZE   (4<<20)
+#define MAX_MEM    (1984 MB)
+#define DEFAULT_CHUNKSIZE   (4 MB)
 
 #define ALL_COMPRESSORS 0
 #define ALL_DECOMPRESSORS 0
@@ -217,21 +221,26 @@ static int BMK_GetMilliSpan( int nTimeStart )
 
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
-    size_t step = (64U<<20);   // 64 MB
+    size_t step = 64 MB;
     BYTE* testmem=NULL;
 
-    requiredMem = (((requiredMem >> 25) + 1) << 26);
+    requiredMem = (((requiredMem >> 26) + 1) << 26);
+    requiredMem += 2*step;
     if (requiredMem > MAX_MEM) requiredMem = MAX_MEM;
 
-    requiredMem += 2*step;
     while (!testmem)
     {
-        requiredMem -= step;
+        if (requiredMem > step) requiredMem -= step;
+        else requiredMem >>= 1;
         testmem = (BYTE*) malloc ((size_t)requiredMem);
     }
-
     free (testmem);
-    return (size_t) (requiredMem - step);
+
+    /* keep some space available */
+    if (requiredMem > step) requiredMem -= step;
+    else requiredMem >>= 1;
+
+    return (size_t)requiredMem;
 }
 
 
@@ -566,7 +575,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
       // Memory allocation & restrictions
       inFileSize = BMK_GetFileSize(inFileName);
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize) / 2;
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
       {

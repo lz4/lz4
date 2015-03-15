@@ -130,6 +130,8 @@ cmake:
 gpptest:
 	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
 
+staticAnalyze: clean
+	export CFLAGS=-g; scan-build -v $(MAKE) all
 
 streaming-examples:
 	cd examples; $(MAKE) -e test

@@ -263,6 +263,7 @@ int basicTests(U32 seed, double compressibility)
 
         DISPLAYLEVEL(3, "Single Block : \n");
         errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &compressedBufferSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
         crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
         if (crcDest != crcOrig) goto _output_error;
         DISPLAYLEVEL(3, "Regenerated %i bytes \n", (int)decodedBufferSize);
@@ -418,7 +419,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
 
-    // Create buffers
+    /* Create buffers */
     result = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
     CHECK(LZ4F_isError(result), "Allocation failed (error %i)", (int)result);
     result = LZ4F_createCompressionContext(&cCtx, LZ4F_VERSION);
@@ -427,14 +428,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     CHECK(srcBuffer==NULL, "srcBuffer Allocation failed");
     compressedBuffer = malloc(LZ4F_compressFrameBound(srcDataLength, NULL));
     CHECK(compressedBuffer==NULL, "compressedBuffer Allocation failed");
-    decodedBuffer = malloc(srcDataLength);
+    decodedBuffer = calloc(1, srcDataLength);   /* calloc avoids decodedBuffer being considered "garbage" by scan-build */
     CHECK(decodedBuffer==NULL, "decodedBuffer Allocation failed");
     FUZ_fillCompressibleNoiseBuffer(srcBuffer, srcDataLength, compressibility, &coreRand);
 
-    // jump to requested testNb
+    /* jump to requested testNb */
     for (testNb =0; testNb < startTest; testNb++) (void)FUZ_rand(&coreRand);   // sync randomizer
 
-    // main fuzzer loop
+    /* main fuzzer test loop */
     for ( ; testNb < nbTests; testNb++)
     {
         U32 randState = coreRand ^ prime1;

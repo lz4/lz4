@@ -465,11 +465,12 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
 }
 
 
+#define FNSPACE 30
 int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionlevel)
 {
     int i;
-    char* outFileName = NULL;
-    size_t ofnSize = 0;
+    char* outFileName = (char*)malloc(FNSPACE);
+    size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
 
     for (i=0; i<ifntSize; i++)
@@ -530,15 +531,16 @@ static unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
 
         /* Read Block */
         sizeCheck = fread(in_buff, 1, blockSize, finput);
+        if (sizeCheck!=blockSize) EXM_THROW(52, "Read error : cannot access compressed block !");
 
         /* Decode Block */
         decodeSize = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
-        if (decodeSize < 0) EXM_THROW(52, "Decoding Failed ! Corrupted input detected !");
+        if (decodeSize < 0) EXM_THROW(53, "Decoding Failed ! Corrupted input detected !");
         filesize += decodeSize;
 
         /* Write Block */
         sizeCheck = fwrite(out_buff, 1, decodeSize, foutput);
-        if (sizeCheck != (size_t)decodeSize) EXM_THROW(53, "Write error : cannot write decoded block into output\n");
+        if (sizeCheck != (size_t)decodeSize) EXM_THROW(54, "Write error : cannot write decoded block into output\n");
     }
 
     /* Free */
