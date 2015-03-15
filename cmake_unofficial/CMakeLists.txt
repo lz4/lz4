@@ -18,9 +18,7 @@ option(BUILD_TOOLS "Build the command line tools" ON)
 option(BUILD_LIBS  "Build the libraries in addition to the tools" OFF)
 
 if(UNIX AND BUILD_LIBS)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
-        add_definitions(-fPIC)
-    endif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+    add_definitions(-fPIC)
 endif()
 
 set(LZ4_DIR ../lib/)
