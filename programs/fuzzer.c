@@ -323,6 +323,7 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
     U32 crcOrig, crcCheck;
     U32 coreRandState = seed;
     U32 randState = coreRandState ^ PRIME3;
+    int result = 0;
 
 
     // init
@@ -688,7 +689,6 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
 
     // unalloc
     {
-        int result = 0;
 _exit:
         free(CNBuffer);
         free(compressedBuffer);

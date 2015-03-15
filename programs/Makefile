@@ -92,7 +92,7 @@ frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxha
 frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-datagen : datagen.c
+datagen : datagen.c datagencli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 
@@ -142,11 +142,11 @@ test-travis: $(TRAVIS_TARGET)
 test-lz4: lz4 datagen
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
 	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
-	./datagen -g6M -p100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
-	./datagen -g17M   | ./lz4 -9v    | ./lz4 -vdq > $(VOID)
+	./datagen -g6M -P100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
+	./datagen -g17M   | ./lz4 -9v    | ./lz4 -dq  > $(VOID)
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
-# test frame concatenation with null-length frame
+	@echo ---- test frame concatenation ----
 	@echo -n > empty.test
 	@echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
@@ -157,13 +157,24 @@ test-lz4: lz4 datagen
 	sdiff orig.test result.test
 	@rm *.test
 	@echo frame concatenation test completed
-# test frame concatenation with null-length frame
-	@echo test multiple input files
+	@echo ---- test multiple input files ----
 	@./datagen -s1 > file1
 	@./datagen -s2 > file2
 	@./datagen -s3 > file3
 	./lz4 -f -m file1 file2 file3
+	ls -l file*
 	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
+	@echo ---- test sparse file support ----
+	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dvX > tmpB4
+	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dvX > tmpB5
+	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dvX > tmpB6
+	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dvX > tmpB7
+	ls -ls tmp*
+	./datagen -g50M -P100 | diff -s - tmpB4
+	./datagen -g50M -P100 | diff -s - tmpB5
+	./datagen -g50M -P100 | diff -s - tmpB6
+	./datagen -g50M -P100 | diff -s - tmpB7
+	@rm tmp*
 
 
 test-lz4c: lz4c datagen
@@ -197,6 +208,7 @@ test-frametest32: frametest32
 	./frametest32
 
 test-mem: lz4 datagen fuzzer frametest
+	valgrind --leak-check=yes ./datagen -g50M > /dev/null
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp /dev/null
 	./datagen -g16MB > tmp

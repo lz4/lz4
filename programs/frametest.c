@@ -229,11 +229,12 @@ int basicTests(U32 seed, double compressibility)
     void* decodedBuffer;
     U32 randState = seed;
     size_t cSize, testSize;
-    LZ4F_preferences_t prefs = { 0 };
+    LZ4F_preferences_t prefs;
     LZ4F_decompressionContext_t dCtx;
     U64 crcOrig;
 
     // Create compressible test buffer
+    memset(&prefs, 0, sizeof(prefs));
     CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
     compressedBuffer = malloc(LZ4F_compressFrameBound(COMPRESSIBLE_NOISE_LENGTH, NULL));
     decodedBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
@@ -441,7 +442,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         unsigned BMId   = FUZ_rand(&randState) & 1;
         unsigned CCflag = FUZ_rand(&randState) & 1;
         unsigned autoflush = (FUZ_rand(&randState) & 7) == 2;
-        LZ4F_preferences_t prefs = { 0 };
+        LZ4F_preferences_t prefs;
         LZ4F_compressOptions_t cOptions = { 0 };
         LZ4F_decompressOptions_t dOptions = { 0 };
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
@@ -452,6 +453,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         LZ4F_preferences_t* prefsPtr = &prefs;
 
         (void)FUZ_rand(&coreRand);   // update rand seed
+        memset(&prefs, 0, sizeof(prefs));
         prefs.frameInfo.blockMode = (blockMode_t)BMId;
         prefs.frameInfo.blockSizeID = (blockSizeID_t)BSId;
         prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)CCflag;
@@ -523,17 +525,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 dOptions.stableDst = FUZ_rand(&randState) & 1;
                 if (nonContiguousDst==2) dOptions.stableDst = 0;
-                //if (ip == compressedBuffer+62073)                    DISPLAY("oSize : %i : pos %i \n", (int)oSize, (int)(op-(BYTE*)decodedBuffer));
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, &dOptions);
-                //if (op+oSize >= (BYTE*)decodedBuffer+94727)                    DISPLAY("iSize : %i : pos %i \n", (int)iSize, (int)(ip-(BYTE*)compressedBuffer));
-                //if ((int)result<0)                    DISPLAY("iSize : %i : pos %i \n", (int)iSize, (int)(ip-(BYTE*)compressedBuffer));
                 if (result == (size_t)-ERROR_checksum_invalid) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i:%s)", (int)result, LZ4F_getErrorName((LZ4F_errorCode_t)result));
                 XXH64_update(&xxh64, op, (U32)oSize);
                 op += oSize;
                 ip += iSize;
                 op += nonContiguousDst;
-                if (nonContiguousDst==2) op = decodedBuffer;   // overwritten destination
+                if (nonContiguousDst==2) op = (BYTE*)decodedBuffer;   /* overwritten destination */
             }
             CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
             crcDecoded = XXH64_digest(&xxh64);

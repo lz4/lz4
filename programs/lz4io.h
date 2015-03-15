@@ -18,7 +18,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
-  - LZ4 source repository : http://code.google.com/p/lz4/
+  - LZ4 source repository : https://github.com/Cyan4973/lz4
   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -29,6 +29,7 @@
   - The license of this source file is GPLv2.
 */
 
+#pragma once
 
 /* ************************************************** */
 /* Special input/output values                        */
@@ -69,11 +70,15 @@ int LZ4IO_setBlockSizeID(int blockSizeID);
 typedef enum { LZ4IO_blockLinked=0, LZ4IO_blockIndependent} LZ4IO_blockMode_t;
 int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode);
 
-/* Default setting : no checksum */
+/* Default setting : no block checksum */
 int LZ4IO_setBlockChecksumMode(int xxhash);
 
-/* Default setting : checksum enabled */
+/* Default setting : stream checksum enabled */
 int LZ4IO_setStreamChecksumMode(int xxhash);
 
 /* Default setting : 0 (no notification) */
 int LZ4IO_setNotificationLevel(int level);
+
+/* Default setting : 0 (disabled) */
+int LZ4IO_setSparseFile(int enable);
+

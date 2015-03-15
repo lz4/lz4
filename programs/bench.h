@@ -17,26 +17,17 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-    - LZ4 source repository : http://code.google.com/p/lz4/
-    - LZ4 public forum : https://group.google.com/forum/#!forum/lz4c
+    - LZ4 source repository : https://github.com/Cyan4973/lz4
+    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 #pragma once
 
-#if defined (__cplusplus)
-extern "C" {
-#endif
-
 
 /* Main function */
-int BMK_benchFile(const char** fileNamesTable, int nbFiles, int cLevel);
+int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel);
 
 /* Set Parameters */
-void BMK_SetBlocksize(int bsize);
-void BMK_SetNbIterations(int nbLoops);
-void BMK_SetPause(void);
+void BMK_setBlocksize(int bsize);
+void BMK_setNbIterations(int nbLoops);
+void BMK_setPause(void);
 
-
-
-#if defined (__cplusplus)
-}
-#endif

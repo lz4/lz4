@@ -19,7 +19,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
-  - LZ4 source repository : http://code.google.com/p/lz4/
+  - LZ4 source repository : https://github.com/Cyan4973/lz4
   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -176,6 +176,7 @@ static int usage_advanced(void)
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
     DISPLAY( " -Sx    : disable stream checksum (default:enabled)\n");
+    DISPLAY( " -X     : enable sparse file (default:disabled)(experimental)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
@@ -375,7 +376,7 @@ int main(int argc, char** argv)
                         {
                             int B = argument[1] - '0';
                             blockSize = LZ4IO_setBlockSizeID(B);
-                            BMK_SetBlocksize(blockSize);
+                            BMK_setBlocksize(blockSize);
                             argument++;
                             break;
                         }
@@ -390,16 +391,19 @@ int main(int argc, char** argv)
                     /* Modify Stream properties */
                 case 'S': if (argument[1]=='x') { LZ4IO_setStreamChecksumMode(0); argument++; break; } else { badusage(); }
 
+                    /* Enable Sparse File support (experimental) */
+                case 'X': LZ4IO_setSparseFile(1); break;
+
                     /* Benchmark */
                 case 'b': bench=1; multiple_inputs=1;
                     if (inFileNames == NULL)
-                        inFileNames = malloc(argc * sizeof(char*));
+                        inFileNames = (const char**) malloc(argc * sizeof(char*));
                     break;
 
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
                     if (inFileNames == NULL)
-                        inFileNames = malloc(argc * sizeof(char*));
+                        inFileNames = (const char**) malloc(argc * sizeof(char*));
                     break;
 
                     /* Modify Nb Iterations (benchmark only) */
@@ -407,13 +411,13 @@ int main(int argc, char** argv)
                     if ((argument[1] >='1') && (argument[1] <='9'))
                     {
                         int iters = argument[1] - '0';
-                        BMK_SetNbIterations(iters);
+                        BMK_setNbIterations(iters);
                         argument++;
                     }
                     break;
 
                     /* Pause at the end (hidden option) */
-                case 'p': main_pause=1; BMK_SetPause(); break;
+                case 'p': main_pause=1; BMK_setPause(); break;
 
                     /* Specific commands for customized versions */
                 EXTENDED_ARGUMENTS;
@@ -454,7 +458,7 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
     /* Check if benchmark is selected */
-    if (bench) return BMK_benchFile(inFileNames, ifnIdx, cLevel);
+    if (bench) return BMK_benchFiles(inFileNames, ifnIdx, cLevel);
 
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)

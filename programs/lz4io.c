@@ -1,6 +1,7 @@
 /*
   LZ4io.c - LZ4 File/Stream Interface
   Copyright (C) Yann Collet 2011-2015
+
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -18,7 +19,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
-  - LZ4 source repository : http://code.google.com/p/lz4/
+  - LZ4 source repository : https://github.com/Cyan4973/lz4
   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -31,28 +32,21 @@
 
 /**************************************
 *  Compiler Options
-***************************************/
+**************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  define _CRT_SECURE_NO_WARNINGS
 #  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
 #  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
 #endif
 
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#ifdef __GNUC__
-#  pragma GCC diagnostic ignored "-Wmissing-braces"   /* GCC bug 53119 : doesn't accept { 0 } as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
-#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"   /* GCC bug 53119 : doesn't accept { 0 } as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
-#endif
-
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
 #define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
-#define _POSIX_SOURCE 1        /* for fileno() within <stdio.h> on unix */
 
 
-/****************************
+/*****************************
 *  Includes
 *****************************/
-#include <stdio.h>    /* fprintf, fopen, fread, _fileno, stdin, stdout */
+#include <stdio.h>    /* fprintf, fopen, fread, stdin, stdout */
 #include <stdlib.h>   /* malloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include <time.h>     /* clock */
@@ -62,28 +56,25 @@
 #include "lz4frame.h"
 
 
-/****************************
+/******************************
 *  OS-specific Includes
-*****************************/
+******************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _isatty */
-#  ifdef __MINGW32__
-   int _fileno(FILE *stream);   /* MINGW somehow forgets to include this windows declaration into <stdio.h> */
-#  endif
+#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
+#  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
+#  include <Windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
+#  define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
 #  if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
 #    define fseek _fseeki64
 #  endif
-#  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
-#  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
-#  include <unistd.h>  /* isatty */
 #  define SET_BINARY_MODE(file)
-#  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
+#  define SET_SPARSE_FILE_MODE(file)
 #endif
 
 
-/****************************
+/*****************************
 *  Constants
 *****************************/
 #define KB *(1 <<10)
@@ -113,26 +104,28 @@
 
 /**************************************
 *  Macros
-***************************************/
+**************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-#define DISPLAYUPDATE(l, ...) if (displayLevel>=l) { \
-            if ((LZ4IO_GetMilliSpan(g_time) > refreshRate) || (displayLevel>=4)) \
+#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
+
+#define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
+            if ((LZ4IO_GetMilliSpan(g_time) > refreshRate) || (g_displayLevel>=4)) \
             { g_time = clock(); DISPLAY(__VA_ARGS__); \
-            if (displayLevel>=4) fflush(stdout); } }
+            if (g_displayLevel>=4) fflush(stdout); } }
 static const unsigned refreshRate = 150;
 static clock_t g_time = 0;
 
 
 /**************************************
 *  Local Parameters
-***************************************/
-static int displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
-static int overwrite = 1;
-static int globalBlockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
-static int blockChecksum = 0;
-static int streamChecksum = 1;
-static int blockIndependence = 1;
+**************************************/
+static int g_overwrite = 1;
+static int g_blockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
+static int g_blockChecksum = 0;
+static int g_streamChecksum = 1;
+static int g_blockIndependence = 1;
+static int g_sparseFileSupport = 0;
 
 static const int minBlockSizeID = 4;
 static const int maxBlockSizeID = 7;
@@ -159,7 +152,6 @@ static const int maxBlockSizeID = 7;
 #define EXTENDED_ARGUMENTS
 #define EXTENDED_HELP
 #define EXTENDED_FORMAT
-#define DEFAULT_COMPRESSOR   compress_file
 #define DEFAULT_DECOMPRESSOR decodeLZ4S
 
 
@@ -170,8 +162,8 @@ static const int maxBlockSizeID = 7;
 /* Default setting : overwrite = 1; return : overwrite mode (0/1) */
 int LZ4IO_setOverwrite(int yes)
 {
-   overwrite = (yes!=0);
-   return overwrite;
+   g_overwrite = (yes!=0);
+   return g_overwrite;
 }
 
 /* blockSizeID : valid values : 4-5-6-7 */
@@ -179,35 +171,42 @@ int LZ4IO_setBlockSizeID(int bsid)
 {
     static const int blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
     if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return -1;
-    globalBlockSizeId = bsid;
-    return blockSizeTable[globalBlockSizeId-minBlockSizeID];
+    g_blockSizeId = bsid;
+    return blockSizeTable[g_blockSizeId-minBlockSizeID];
 }
 
 int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode)
 {
-    blockIndependence = (blockMode == LZ4IO_blockIndependent);
-    return blockIndependence;
+    g_blockIndependence = (blockMode == LZ4IO_blockIndependent);
+    return g_blockIndependence;
 }
 
 /* Default setting : no checksum */
 int LZ4IO_setBlockChecksumMode(int xxhash)
 {
-    blockChecksum = (xxhash != 0);
-    return blockChecksum;
+    g_blockChecksum = (xxhash != 0);
+    return g_blockChecksum;
 }
 
 /* Default setting : checksum enabled */
 int LZ4IO_setStreamChecksumMode(int xxhash)
 {
-    streamChecksum = (xxhash != 0);
-    return streamChecksum;
+    g_streamChecksum = (xxhash != 0);
+    return g_streamChecksum;
 }
 
 /* Default setting : 0 (no notification) */
 int LZ4IO_setNotificationLevel(int level)
 {
-    displayLevel = level;
-    return displayLevel;
+    g_displayLevel = level;
+    return g_displayLevel;
+}
+
+/* Default setting : 0 (disabled) */
+int LZ4IO_setSparseFile(int enable)
+{
+    g_sparseFileSupport = enable;
+    return g_sparseFileSupport;
 }
 
 static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
@@ -218,9 +217,9 @@ static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
 }
 
 
-/* ************************************************************************ */
-/* ********************** LZ4 File / Pipe compression ********************* */
-/* ************************************************************************ */
+/* ************************************************************************ **
+** ********************** LZ4 File / Pipe compression ********************* **
+** ************************************************************************ */
 
 static int          LZ4S_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
 static int          LZ4S_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4S_SKIPPABLEMASK) == LZ4S_SKIPPABLE0; }
@@ -254,12 +253,12 @@ static int get_fileHandle(const char* input_filename, const char* output_filenam
         if (*pfoutput!=0)
         {
             fclose(*pfoutput);
-            if (!overwrite)
+            if (!g_overwrite)
             {
                 char ch;
                 DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
                 DISPLAYLEVEL(2, "Overwrite ? (Y/N) : ");
-                if (displayLevel <= 1) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   /* No interaction possible */
+                if (g_displayLevel <= 1) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   /* No interaction possible */
                 ch = (char)getchar();
                 if ((ch!='Y') && (ch!='y')) EXM_THROW(11, "Operation aborted : %s already exists", output_filename);
             }
@@ -277,13 +276,13 @@ static int get_fileHandle(const char* input_filename, const char* output_filenam
 
 
 /***************************************
- *   Legacy Compression
- * *************************************/
+*   Legacy Compression
+***************************************/
 
 /* unoptimized version; solves endianess & alignment issues */
 static void LZ4IO_writeLE32 (void* p, unsigned value32)
 {
-    unsigned char* dstPtr = p;
+    unsigned char* dstPtr = (unsigned char*)p;
     dstPtr[0] = (unsigned char)value32;
     dstPtr[1] = (unsigned char)(value32 >> 8);
     dstPtr[2] = (unsigned char)(value32 >> 16);
@@ -311,7 +310,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     if (compressionlevel < 3) compressionFunction = LZ4_compress; else compressionFunction = LZ4_compressHC;
 
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
-    if ((displayLevel==2) && (compressionlevel==1)) displayLevel=3;
+    if ((g_displayLevel==2) && (compressionlevel==1)) g_displayLevel=3;
 
     /* Allocate Memory */
     in_buff = (char*)malloc(LEGACY_BLOCKSIZE);
@@ -363,9 +362,9 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 }
 
 
-/***********************************************
- *   Compression using Frame format
- * ********************************************/
+/*********************************************
+*  Compression using Frame format
+*********************************************/
 
 int LZ4IO_compressFilename(const char* input_filename, const char* output_filename, int compressionLevel)
 {
@@ -380,23 +379,24 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     size_t sizeCheck, headerSize, readSize, outBuffSize;
     LZ4F_compressionContext_t ctx;
     LZ4F_errorCode_t errorCode;
-    LZ4F_preferences_t prefs = {0};
+    LZ4F_preferences_t prefs;
 
 
     /* Init */
     start = clock();
-    if ((displayLevel==2) && (compressionLevel>=3)) displayLevel=3;
+    memset(&prefs, 0, sizeof(prefs));
+    if ((g_displayLevel==2) && (compressionLevel>=3)) g_displayLevel=3;
     errorCode = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
-    blockSize = LZ4S_GetBlockSize_FromBlockId (globalBlockSizeId);
+    blockSize = LZ4S_GetBlockSize_FromBlockId (g_blockSizeId);
 
     /* Set compression parameters */
     prefs.autoFlush = 1;
     prefs.compressionLevel = compressionLevel;
-    prefs.frameInfo.blockMode = blockIndependence;
-    prefs.frameInfo.blockSizeID = globalBlockSizeId;
-    prefs.frameInfo.contentChecksumFlag = streamChecksum;
+    prefs.frameInfo.blockMode = (blockMode_t)g_blockIndependence;
+    prefs.frameInfo.blockSizeID = (blockSizeID_t)g_blockSizeId;
+    prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)g_streamChecksum;
 
     /* Allocate Memory */
     in_buff  = (char*)malloc(blockSize);
@@ -475,7 +475,7 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
     for (i=0; i<ifntSize; i++)
     {
         size_t ifnSize = strlen(inFileNamesTable[i]);
-        if (ofnSize <= ifnSize+suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = malloc(ofnSize); }
+        if (ofnSize <= ifnSize+suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
         strcpy(outFileName, inFileNamesTable[i]);
         strcat(outFileName, suffix);
         LZ4IO_compressFilename(inFileNamesTable[i], outFileName, compressionlevel);
@@ -492,7 +492,7 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
 
 static unsigned LZ4IO_readLE32 (const void* s)
 {
-    const unsigned char* srcPtr = s;
+    const unsigned char* srcPtr = (const unsigned char*)s;
     unsigned value32 = srcPtr[0];
     value32 += (srcPtr[1]<<8);
     value32 += (srcPtr[2]<<16);
@@ -552,14 +552,15 @@ static unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
 static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
 {
     unsigned long long filesize = 0;
-    char* inBuff;
-    char* outBuff;
+    void* inBuff;
+    void* outBuff;
 #   define HEADERMAX 20
     char  headerBuff[HEADERMAX];
     size_t sizeCheck, nextToRead, outBuffSize, inBuffSize;
     LZ4F_decompressionContext_t ctx;
     LZ4F_errorCode_t errorCode;
     LZ4F_frameInfo_t frameInfo;
+    unsigned storedSkips = 0;
 
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
@@ -580,8 +581,8 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     /* Allocate Memory */
     outBuffSize = LZ4IO_setBlockSizeID(frameInfo.blockSizeID);
     inBuffSize = outBuffSize + 4;
-    inBuff = (char*)malloc(inBuffSize);
-    outBuff = (char*)malloc(outBuffSize);
+    inBuff = malloc(inBuffSize);
+    outBuff = malloc(outBuffSize);
     if (!inBuff || !outBuff) EXM_THROW(65, "Allocation error : not enough memory");
 
     /* Main Loop */
@@ -601,8 +602,61 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         filesize += decodedBytes;
 
         /* Write Block */
-        sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
-        if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+        if (g_sparseFileSupport)
+        {
+            char* const oBuffStart = (char*)outBuff;
+            char* oBuffPos = oBuffStart;
+            char* const oBuffEnd = oBuffStart + decodedBytes;
+            static const size_t zeroBlockSize = 32 KB;
+            while (oBuffPos < oBuffEnd)
+            {
+                const size_t* sPtr = (const size_t*)oBuffPos;
+                size_t seg0Size = zeroBlockSize;
+                size_t nbSizeT;
+                size_t checked;
+                size_t skippedLength;
+                int seekResult;
+                if (seg0Size > decodedBytes) seg0Size = decodedBytes;
+                decodedBytes -= seg0Size;
+                nbSizeT = seg0Size / sizeof(size_t);
+                for (checked=0; (checked < nbSizeT) && (sPtr[checked] == 0); checked++) ;
+                skippedLength = checked * sizeof(size_t);
+                storedSkips += (unsigned)skippedLength;
+                if (storedSkips > 1 GB)
+                {
+                    seekResult = fseek(foutput, 1 GB, SEEK_CUR);
+                    if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)\n");
+                    storedSkips -= 1 GB;
+                }
+                if (skippedLength != seg0Size)
+                {
+                    seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+                    if (seekResult != 0) EXM_THROW(68, "Skip error (sparse file)\n");
+                    storedSkips = 0;
+                    seg0Size -= skippedLength;
+                    oBuffPos += skippedLength;
+                    sizeCheck = fwrite(oBuffPos, 1, seg0Size, foutput);
+                    if (sizeCheck != seg0Size) EXM_THROW(68, "Write error : cannot write decoded block\n");
+                }
+                oBuffPos += seg0Size;
+            }
+        }
+        else
+        {
+            sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
+            if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+        }
+    }
+
+    if ((g_sparseFileSupport) && (storedSkips>0))
+    {
+        int seekResult;
+        storedSkips --;
+        seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+        if (seekResult != 0) EXM_THROW(69, "Final skip error (sparse file)\n");
+        memset(outBuff, 0, 1);
+        sizeCheck = fwrite(outBuff, 1, 1, foutput);
+        if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write last zero\n");
     }
 
     /* Free */
@@ -665,6 +719,12 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     /* Init */
     start = clock();
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
+
+    /* sparse file */
+    if (g_sparseFileSupport && foutput)
+    {
+        SET_SPARSE_FILE_MODE(foutput);
+    }
 
     /* Loop over multiple streams */
     do
