@@ -187,7 +187,6 @@ static int usage_advanced(void)
     DISPLAY( " -c1    : high compression\n");
     DISPLAY( " -hc    : high compression\n");
     DISPLAY( " -y     : overwrite output without prompting \n");
-    DISPLAY( " -s     : suppress warnings \n");
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
     EXTENDED_HELP;
     return 0;
@@ -314,7 +313,6 @@ int main(int argc, char** argv)
                 if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }  /* -c1 (high compression) */
                 if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }  /* -hc (high compression) */
                 if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                           /* -y (answer 'yes' to overwrite permission) */
-                if (*argument=='s') { displayLevel=1; continue; }                                  /* -s (silent mode) */
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
 
                 if ((*argument>='0') && (*argument<='9'))
