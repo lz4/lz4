@@ -26,7 +26,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 # You can contact the author at :
-#  - LZ4 source repository : http://code.google.com/p/lz4/
+#  - LZ4 source repository : https://github.com/Cyan4973/lz4
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
@@ -35,7 +35,7 @@ export VERSION=128
 export RELEASE=r$(VERSION)
 
 DESTDIR?=
-PREFIX ?= /usr
+PREFIX ?= /usr/local
 
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include

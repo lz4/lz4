@@ -19,7 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # You can contact the author at :
-#  - LZ4 source repository : http://code.google.com/p/lz4/
+#  - LZ4 source repository : https://github.com/Cyan4973/lz4
 #  - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 # ##########################################################################
 # lz4 : Command Line Utility, supporting gzip-like arguments
@@ -34,7 +34,7 @@
 RELEASE?= r128
 
 DESTDIR?=
-PREFIX ?= /usr
+PREFIX ?= /usr/local
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
@@ -115,6 +115,7 @@ install: lz4 lz4c
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
 	@install -m 755 lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4$(EXT)
 	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4cat
+	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/unlz4
 	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	@echo Installing man pages
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
@@ -124,6 +125,7 @@ install: lz4 lz4c
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/lz4cat
+	rm -f $(DESTDIR)$(BINDIR)/unlz4
 	[ -x $(DESTDIR)$(BINDIR)/lz4$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4$(EXT)
 	[ -x $(DESTDIR)$(BINDIR)/lz4c$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
