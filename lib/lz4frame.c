@@ -707,7 +707,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
 * Object can release its memory using LZ4F_freeDecompressionContext();
 */
-LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber)
+LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber)
 {
     LZ4F_dctx_internal_t* dctxPtr;
 
@@ -719,7 +719,7 @@ LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_compressionContext_t* LZ4F
     return OK_NoError;
 }
 
-LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_compressionContext_t LZ4F_decompressionContext)
+LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t LZ4F_decompressionContext)
 {
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)LZ4F_decompressionContext;
     FREEMEM(dctxPtr->tmpIn);
@@ -766,8 +766,18 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVo
     {
         memset(&(dctxPtr->frameInfo), 0, sizeof(dctxPtr->frameInfo));
         dctxPtr->frameInfo.frameType = skippableFrame;
-        dctxPtr->dStage = dstage_getSBlockSize;
-        return 4;
+        if (srcVoidPtr == (void*)(dctxPtr->header))
+        {
+            memcpy(dctxPtr->header,  dctxPtr->header + 4, srcSize-4);
+            dctxPtr->tmpInSize = srcSize-4;
+            dctxPtr->dStage = dstage_storeSBlockSize;
+            return srcSize;
+        }
+        else
+        {
+            dctxPtr->dStage = dstage_getSBlockSize;
+            return 4;
+        }
     }
 
     /* control magic number */
@@ -1023,12 +1033,6 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 }
                 LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, dctxPtr->header, 7);
                 if (LZ4F_isError(errorCode)) return errorCode;
-                if (errorCode==4)
-                {
-                    memcpy(dctxPtr->header,  dctxPtr->header + 4, 3);
-                    dctxPtr->tmpInSize = 3;
-                    dctxPtr->dStage = dstage_storeSBlockSize;
-                }
                 break;
             }
 

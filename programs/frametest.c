@@ -388,7 +388,7 @@ int basicTests(U32 seed, double compressibility)
         BYTE* op = (BYTE*)decodedBuffer;
         BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
         BYTE* ip = (BYTE*)compressedBuffer;
-        BYTE* const iend = (BYTE*)compressedBuffer + cSize + 8;
+        BYTE* iend = (BYTE*)compressedBuffer + cSize + 8;
 
         LZ4F_errorCode_t errorCode = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
         if (LZ4F_isError(errorCode)) goto _output_error;
@@ -396,6 +396,25 @@ int basicTests(U32 seed, double compressibility)
         /* generate skippable frame */
         FUZ_writeLE32(ip, LZ4F_MAGIC_SKIPPABLE_START);
         FUZ_writeLE32(ip+4, (U32)cSize);
+
+        DISPLAYLEVEL(3, "random segment sizes : \n");
+        while (ip < iend)
+        {
+            unsigned nbBits = FUZ_rand(&randState) % maxBits;
+            size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
+            size_t oSize = oend-op;
+            if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
+            errorCode = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
+            if (LZ4F_isError(errorCode)) goto _output_error;
+            op += oSize;
+            ip += iSize;
+        }
+        DISPLAYLEVEL(3, "Skipped %i bytes \n", (int)decodedBufferSize);
+
+        /* generate zero-size skippable frame */
+        FUZ_writeLE32(ip, LZ4F_MAGIC_SKIPPABLE_START+1);
+        FUZ_writeLE32(ip+4, 0);
+        iend = ip+8;
 
         DISPLAYLEVEL(3, "random segment sizes : \n");
         while (ip < iend)
@@ -509,7 +528,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         DISPLAYUPDATE(2, "\r%5u   ", testNb);
         crcOrig = XXH64((BYTE*)srcBuffer+srcStart, srcSize, 1);
 
-        if ((FUZ_rand(&randState) & 0xFFF) == 3)
+        if ((FUZ_rand(&randState) & 0xFFF) == 0)
         {
             /* create a skippable frame (rare case) */
             BYTE* op = (BYTE*)compressedBuffer;
