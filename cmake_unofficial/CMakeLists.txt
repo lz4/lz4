@@ -2,7 +2,7 @@ PROJECT(LZ4 C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "LZ4 compression library")
 set(CPACK_PACKAGE_VERSION_MAJOR 1)
 set(CPACK_PACKAGE_VERSION_MINOR 5)
-set(CPACK_PACKAGE_VERSION_PATCH r126)
+set(CPACK_PACKAGE_VERSION_PATCH r128)
 set(VERSION_STRING	" \"${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}\" ")
 include(CPack)
 
@@ -15,7 +15,7 @@ IF( ${SIZEOF_VOID_P} STREQUAL  "8" )
 ENDIF()
 
 option(BUILD_TOOLS "Build the command line tools" ON)
-option(BUILD_LIBS  "Build the libraries in addition to the tools" OFF)
+option(BUILD_LIBS  "Build the libraries in addition to the tools" ON)
 
 if(UNIX AND BUILD_LIBS)
     add_definitions(-fPIC)
@@ -23,7 +23,7 @@ endif()
 
 set(LZ4_DIR ../lib/)
 set(PRG_DIR ../programs/)
-set(LZ4_SRCS_LIB ${LZ4_DIR}lz4.c ${LZ4_DIR}lz4hc.c ${LZ4_DIR}lz4.h ${LZ4_DIR}lz4hc.h)
+set(LZ4_SRCS_LIB ${LZ4_DIR}lz4.c ${LZ4_DIR}lz4hc.c ${LZ4_DIR}lz4.h ${LZ4_DIR}lz4hc.h ${LZ4_DIR}lz4frame.c ${LZ4_DIR}xxhash.c)
 set(LZ4_SRCS ${LZ4_DIR}lz4frame.c ${LZ4_DIR}xxhash.c ${PRG_DIR}bench.c ${PRG_DIR}lz4cli.c ${PRG_DIR}lz4io.c)
 
 if(BUILD_TOOLS AND NOT BUILD_LIBS)
@@ -32,10 +32,7 @@ endif()
 
 if(BUILD_TOOLS)
     add_executable(lz4 ${LZ4_SRCS})
-    set_target_properties(lz4 PROPERTIES COMPILE_DEFINITIONS DISABLE_LZ4C_LEGACY_OPTIONS)
     install(TARGETS lz4 RUNTIME DESTINATION "bin/")
-    add_executable(lz4c ${LZ4_SRCS})
-    install(TARGETS lz4c RUNTIME DESTINATION "bin/")
 endif()
 
 if(BUILD_LIBS)    
@@ -59,7 +56,6 @@ if(BUILD_LIBS)
     
     if(BUILD_TOOLS)
         target_link_libraries(lz4 liblz4)
-        target_link_libraries(lz4c liblz4)
     endif()
 endif()
 
