@@ -10,6 +10,7 @@ New   : datagen can generate sparse files
 New   : scan-build tests
 Fixed : Fuzzer + frametest compatibility with NetBSD (issue #48)
 Added : Visual project directory
+Updated:Doc
 
 r127:
 N/A   : added a file on SVN
