@@ -65,12 +65,14 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code str
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7 } blockSizeID_t;
 typedef enum { blockLinked=0, blockIndependent} blockMode_t;
 typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
+typedef enum { LZ4F_frame=0, skippableFrame } frameType_t;
 
 typedef struct {
   blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
   blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
   contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  unsigned          reserved[5];
+  frameType_t       frameType;             /* LZ4F_frame, skippableFrame : 0 == default */
+  unsigned          reserved[4];
 } LZ4F_frameInfo_t;
 
 typedef struct {

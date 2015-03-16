@@ -52,6 +52,7 @@ extern "C" {
         ITEM(ERROR_compressionLevel_invalid) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_wrongSrcPtr) \
         ITEM(ERROR_decompressionFailed) \
         ITEM(ERROR_checksum_invalid) \
         ITEM(ERROR_maxCode)
