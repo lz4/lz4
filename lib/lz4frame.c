@@ -208,6 +208,21 @@ static BYTE LZ4F_headerChecksum (const BYTE* header, size_t length)
 /**************************************
 *  Simple compression functions
 **************************************/
+static blockSizeID_t LZ4F_optimalBSID(const blockSizeID_t requestedBSID, const size_t srcSize)
+{
+    blockSizeID_t proposedBSID = max64KB;
+    size_t maxBlockSize = 64 KB;
+    while (requestedBSID > proposedBSID)
+    {
+        if (srcSize <= maxBlockSize)
+            return proposedBSID;
+        proposedBSID = (blockSizeID_t)((int)proposedBSID + 1);
+        maxBlockSize <<= 2;
+    }
+    return requestedBSID;
+}
+
+
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_preferences_t prefs;
@@ -217,20 +232,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
     else memset(&prefs, 0, sizeof(prefs));
 
-    {
-        blockSizeID_t proposedBSID = max64KB;
-        size_t maxBlockSize = 64 KB;
-        while (prefs.frameInfo.blockSizeID > proposedBSID)
-        {
-            if (srcSize <= maxBlockSize)
-            {
-                prefs.frameInfo.blockSizeID = proposedBSID;
-                break;
-            }
-            proposedBSID = (blockSizeID_t)( ((int)proposedBSID) + 1);
-            maxBlockSize <<= 2;
-        }
-    }
+    prefs.frameInfo.blockSizeID = LZ4F_optimalBSID(prefs.frameInfo.blockSizeID, srcSize);
     prefs.autoFlush = 1;
 
     headerSize = 7;      /* basic header size (no option) including magic number */
@@ -241,11 +243,11 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 
 
 /* LZ4F_compressFrame()
-* Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.4.1, in a single step.
+* Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.5.0, in a single step.
 * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
 * You can get the minimum value of dstMaxSize by using LZ4F_compressFrameBound()
 * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode)
-* The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+* The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will then be set to default.
 * The result of the function is the number of bytes written into dstBuffer.
 * The function outputs an error code if it fails (can be tested using LZ4F_isError())
 */
@@ -268,20 +270,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
     else memset(&prefs, 0, sizeof(prefs));
 
-    {
-        blockSizeID_t proposedBSID = max64KB;
-        size_t maxBlockSize = 64 KB;
-        while (prefs.frameInfo.blockSizeID > proposedBSID)
-        {
-            if (srcSize <= maxBlockSize)
-            {
-                prefs.frameInfo.blockSizeID = proposedBSID;
-                break;
-            }
-            proposedBSID = (blockSizeID_t)((int)proposedBSID + 1);
-            maxBlockSize <<= 2;
-        }
-    }
+    prefs.frameInfo.blockSizeID = LZ4F_optimalBSID(prefs.frameInfo.blockSizeID, srcSize);
     prefs.autoFlush = 1;
     if (srcSize <= LZ4F_getBlockSize(prefs.frameInfo.blockSizeID))
         prefs.frameInfo.blockMode = blockIndependent;   /* no need for linked blocks */

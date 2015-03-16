@@ -45,7 +45,7 @@ extern "C" {
 */
 
 /**************************************
-   Version
+*  Version
 **************************************/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    5    /* for new (non-breaking) interface capabilities */
@@ -54,7 +54,7 @@ extern "C" {
 int LZ4_versionNumber (void);
 
 /**************************************
-   Tuning parameter
+*  Tuning parameter
 **************************************/
 /*
  * LZ4_MEMORY_USAGE :
@@ -67,7 +67,7 @@ int LZ4_versionNumber (void);
 
 
 /**************************************
-   Simple Functions
+*  Simple Functions
 **************************************/
 
 int LZ4_compress        (const char* source, char* dest, int sourceSize);
@@ -96,7 +96,7 @@ LZ4_decompress_safe() :
 
 
 /**************************************
-   Advanced Functions
+*  Advanced Functions
 **************************************/
 #define LZ4_MAX_INPUT_SIZE        0x7E000000   /* 2 113 929 216 bytes */
 #define LZ4_COMPRESSBOUND(isize)  ((unsigned int)(isize) > (unsigned int)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
@@ -170,7 +170,7 @@ int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedS
 
 
 /***********************************************
-   Streaming Compression Functions
+*  Streaming Compression Functions
 ***********************************************/
 
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
@@ -235,7 +235,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_streamPtr, char* safeBuffer, int dictSize);
 
 
 /************************************************
-   Streaming Decompression Functions
+*  Streaming Decompression Functions
 ************************************************/
 
 #define LZ4_STREAMDECODESIZE_U64  4
@@ -286,7 +286,7 @@ int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalS
 
 
 /**************************************
-   Obsolete Functions
+*  Obsolete Functions
 **************************************/
 /*
 Obsolete decompression functions

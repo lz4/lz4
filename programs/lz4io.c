@@ -627,18 +627,18 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
                 if (storedSkips > 1 GB)
                 {
                     seekResult = fseek(foutput, 1 GB, SEEK_CUR);
-                    if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)\n");
+                    if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)");
                     storedSkips -= 1 GB;
                 }
                 if (skippedLength != seg0Size)
                 {
                     seekResult = fseek(foutput, storedSkips, SEEK_CUR);
-                    if (seekResult != 0) EXM_THROW(68, "Skip error (sparse file)\n");
+                    if (seekResult) EXM_THROW(68, "Skip error (sparse file)");
                     storedSkips = 0;
                     seg0Size -= skippedLength;
                     oBuffPos += skippedLength;
                     sizeCheck = fwrite(oBuffPos, 1, seg0Size, foutput);
-                    if (sizeCheck != seg0Size) EXM_THROW(68, "Write error : cannot write decoded block\n");
+                    if (sizeCheck != seg0Size) EXM_THROW(68, "Write error : cannot write decoded block");
                 }
                 oBuffPos += seg0Size;
             }
@@ -646,7 +646,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         else
         {
             sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
-            if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block\n");
+            if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block");
         }
     }
 
