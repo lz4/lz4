@@ -177,6 +177,8 @@ test-lz4: lz4 datagen
 	./datagen -g50M -P100 | diff -s - tmpB6
 	./datagen -g50M -P100 | diff -s - tmpB7
 	@rm tmp*
+	@echo ---- test pass-through ----
+	./datagen | ./lz4 -dfvq > /dev/null
 
 
 test-lz4c: lz4c datagen

@@ -205,7 +205,7 @@ int LZ4IO_setNotificationLevel(int level)
 /* Default setting : 0 (disabled) */
 int LZ4IO_setSparseFile(int enable)
 {
-    g_sparseFileSupport = enable;
+    g_sparseFileSupport = (enable!=0);
     return g_sparseFileSupport;
 }
 
@@ -671,6 +671,28 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
 }
 
 
+static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigned char U32store[MAGICNUMBER_SIZE])
+{
+    void* buffer = malloc(64 KB);
+    size_t read = 1, sizeCheck;
+    unsigned long long total = MAGICNUMBER_SIZE;
+
+    sizeCheck = fwrite(U32store, 1, MAGICNUMBER_SIZE, foutput);
+    if (sizeCheck != MAGICNUMBER_SIZE) EXM_THROW(50, "Pass-through error at start");
+
+    while (read)
+    {
+        read = fread(buffer, 1, 64 KB, finput);
+        total += read;
+        sizeCheck = fwrite(buffer, 1, read, foutput);
+        if (sizeCheck != read) EXM_THROW(50, "Pass-through error");
+    }
+
+    free(buffer);
+    return total;
+}
+
+
 #define ENDOFSTREAM ((unsigned long long)-1)
 static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
 {
@@ -678,6 +700,10 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     unsigned magicNumber, size;
     int errorNb;
     size_t nbReadBytes;
+    static unsigned nbCalls = 0;
+
+    /* init */
+    nbCalls++;
 
     /* Check Archive Header */
     nbReadBytes = fread(U32store, 1, MAGICNUMBER_SIZE, finput);
@@ -703,7 +729,12 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
         return selectDecoder(finput, foutput);
     EXTENDED_FORMAT;
     default:
-        if (ftell(finput) == MAGICNUMBER_SIZE) EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
+        if (nbCalls == 1)   /* just started */
+        {
+            if (g_overwrite)
+                return LZ4IO_passThrough(finput, foutput, U32store);
+            EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
+        }
         DISPLAYLEVEL(2, "Stream followed by unrecognized data\n");
         return ENDOFSTREAM;
     }
