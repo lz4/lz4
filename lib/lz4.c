@@ -749,7 +749,7 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 
 
 /*****************************************
-   Experimental : Streaming functions
+*  Experimental : Streaming functions
 *****************************************/
 
 /*
@@ -930,9 +930,9 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 
 
 
-/****************************
-   Decompression functions
-****************************/
+/*******************************
+*  Decompression functions
+*******************************/
 /*
  * This generic decompression function cover all use cases.
  * It shall be instantiated several times, using different sets of directives
@@ -1282,7 +1282,7 @@ int LZ4_decompress_safe_forceExtDict(const char* source, char* dest, int compres
 
 
 /***************************************************
-    Obsolete Functions
+*  Obsolete Functions
 ***************************************************/
 /*
 These function names are deprecated and should no longer be used.

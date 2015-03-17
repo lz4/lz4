@@ -176,6 +176,9 @@ test-lz4: lz4 datagen
 	./datagen -g50M -P100 | diff -s - tmpB5
 	./datagen -g50M -P100 | diff -s - tmpB6
 	./datagen -g50M -P100 | diff -s - tmpB7
+	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dvX > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
+	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
+	ls -ls tmpOdd
 	@rm tmp*
 	@echo ---- test pass-through ----
 	./datagen | ./lz4 -dfvq > /dev/null

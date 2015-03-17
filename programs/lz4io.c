@@ -87,19 +87,19 @@
 #define _4BITS 0x0F
 #define _8BITS 0xFF
 
-#define MAGICNUMBER_SIZE   4
-#define LZ4S_MAGICNUMBER   0x184D2204
-#define LZ4S_SKIPPABLE0    0x184D2A50
-#define LZ4S_SKIPPABLEMASK 0xFFFFFFF0
-#define LEGACY_MAGICNUMBER 0x184C2102
+#define MAGICNUMBER_SIZE    4
+#define LZ4IO_MAGICNUMBER   0x184D2204
+#define LZ4IO_SKIPPABLE0    0x184D2A50
+#define LZ4IO_SKIPPABLEMASK 0xFFFFFFF0
+#define LEGACY_MAGICNUMBER  0x184C2102
 
 #define CACHELINE 64
 #define LEGACY_BLOCKSIZE   (8 MB)
 #define MIN_STREAM_BUFSIZE (192 KB)
-#define LZ4S_BLOCKSIZEID_DEFAULT 7
-#define LZ4S_CHECKSUM_SEED 0
-#define LZ4S_EOS 0
-#define LZ4S_MAXHEADERSIZE (MAGICNUMBER_SIZE+2+8+4+1)
+#define LZ4IO_BLOCKSIZEID_DEFAULT 7
+
+#define sizeT sizeof(size_t)
+#define maskT (sizeT - 1)
 
 
 /**************************************
@@ -121,7 +121,7 @@ static clock_t g_time = 0;
 *  Local Parameters
 **************************************/
 static int g_overwrite = 1;
-static int g_blockSizeId = LZ4S_BLOCKSIZEID_DEFAULT;
+static int g_blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
 static int g_blockChecksum = 0;
 static int g_streamChecksum = 1;
 static int g_blockIndependence = 1;
@@ -148,7 +148,7 @@ static const int maxBlockSizeID = 7;
 
 /**************************************
 *  Version modifiers
-***************************************/
+**************************************/
 #define EXTENDED_ARGUMENTS
 #define EXTENDED_HELP
 #define EXTENDED_FORMAT
@@ -221,8 +221,8 @@ static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
 ** ********************** LZ4 File / Pipe compression ********************* **
 ** ************************************************************************ */
 
-static int          LZ4S_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
-static int          LZ4S_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4S_SKIPPABLEMASK) == LZ4S_SKIPPABLE0; }
+static int LZ4IO_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
+static int LZ4IO_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4IO_SKIPPABLEMASK) == LZ4IO_SKIPPABLE0; }
 
 
 static int get_fileHandle(const char* input_filename, const char* output_filename, FILE** pfinput, FILE** pfoutput)
@@ -271,7 +271,6 @@ static int get_fileHandle(const char* input_filename, const char* output_filenam
 
     return 0;
 }
-
 
 
 
@@ -389,7 +388,7 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     errorCode = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
-    blockSize = LZ4S_GetBlockSize_FromBlockId (g_blockSizeId);
+    blockSize = LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
 
     /* Set compression parameters */
     prefs.autoFlush = 1;
@@ -567,7 +566,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(60, "Allocation error : can't create context : %s", LZ4F_getErrorName(errorCode));
-    LZ4IO_writeLE32(headerBuff, LZ4S_MAGICNUMBER);   /* regenerated here, as it was already read from finput */
+    LZ4IO_writeLE32(headerBuff, LZ4IO_MAGICNUMBER);   /* regenerated here, as it was already read from finput */
 
     /* Decode stream descriptor */
     outBuffSize = 0; inBuffSize = 0; sizeCheck = MAGICNUMBER_SIZE;
@@ -606,41 +605,54 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         /* Write Block */
         if (g_sparseFileSupport)
         {
-            char* const oBuffStart = (char*)outBuff;
-            char* oBuffPos = oBuffStart;
-            char* const oBuffEnd = oBuffStart + decodedBytes;
-            static const size_t zeroBlockSize = 32 KB;
-            while (oBuffPos < oBuffEnd)
+            size_t* const oBuffStartT = (size_t*)outBuff;   /* since outBuff is malloc'ed, it's aligned on size_t */
+            size_t* oBuffPosT = oBuffStartT;
+            size_t  oBuffSizeT = decodedBytes / sizeT;
+            size_t* const oBuffEndT = oBuffStartT + oBuffSizeT;
+            static const size_t bs0T = (32 KB) / sizeT;
+            while (oBuffPosT < oBuffEndT)
             {
-                const size_t* sPtr = (const size_t*)(void*)oBuffPos;
-                size_t seg0Size = zeroBlockSize;
-                size_t nbSizeT;
-                size_t checked;
-                size_t skippedLength;
+                size_t seg0SizeT = bs0T;
+                size_t nb0T;
                 int seekResult;
-                if (seg0Size > decodedBytes) seg0Size = decodedBytes;
-                decodedBytes -= seg0Size;
-                nbSizeT = seg0Size / sizeof(size_t);
-                for (checked=0; (checked < nbSizeT) && (sPtr[checked] == 0); checked++) ;
-                skippedLength = checked * sizeof(size_t);
-                storedSkips += (unsigned)skippedLength;
-                if (storedSkips > 1 GB)
+                if (seg0SizeT > oBuffSizeT) seg0SizeT = oBuffSizeT;
+                oBuffSizeT -= seg0SizeT;
+                for (nb0T=0; (nb0T < seg0SizeT) && (oBuffPosT[nb0T] == 0); nb0T++) ;
+                storedSkips += (unsigned)(nb0T * sizeT);
+                if (storedSkips > 1 GB)   /* avoid int overflow */
                 {
                     seekResult = fseek(foutput, 1 GB, SEEK_CUR);
                     if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)");
                     storedSkips -= 1 GB;
                 }
-                if (skippedLength != seg0Size)
+                if (nb0T != seg0SizeT)
                 {
                     seekResult = fseek(foutput, storedSkips, SEEK_CUR);
                     if (seekResult) EXM_THROW(68, "Skip error (sparse file)");
                     storedSkips = 0;
-                    seg0Size -= skippedLength;
-                    oBuffPos += skippedLength;
-                    sizeCheck = fwrite(oBuffPos, 1, seg0Size, foutput);
-                    if (sizeCheck != seg0Size) EXM_THROW(68, "Write error : cannot write decoded block");
+                    seg0SizeT -= nb0T;
+                    oBuffPosT += nb0T;
+                    sizeCheck = fwrite(oBuffPosT, sizeT, seg0SizeT, foutput);
+                    if (sizeCheck != seg0SizeT) EXM_THROW(68, "Write error : cannot write decoded block");
                 }
-                oBuffPos += seg0Size;
+                oBuffPosT += seg0SizeT;
+            }
+            if (decodedBytes & maskT)   /* size not multiple of sizeT (necessarily end of block) */
+            {
+                const char* const restStart = (char*)oBuffEndT;
+                const char* restPtr = restStart;
+                size_t  restSize =  decodedBytes & maskT;
+                const char* const restEnd = restStart + restSize;
+                for (; (restPtr < restEnd) && (*restPtr == 0); restPtr++) ;
+                storedSkips += (unsigned) (restPtr - restStart);
+                if (restPtr != restEnd)
+                {
+                    int seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+                    if (seekResult) EXM_THROW(68, "Skip error (end of block)");
+                    storedSkips = 0;
+                    sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, foutput);
+                    if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(68, "Write error : cannot write decoded end of block");
+                }
             }
         }
         else
@@ -710,16 +722,16 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     if (nbReadBytes==0) return ENDOFSTREAM;                  /* EOF */
     if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
     magicNumber = LZ4IO_readLE32(U32store);   /* Little Endian format */
-    if (LZ4S_isSkippableMagicNumber(magicNumber)) magicNumber = LZ4S_SKIPPABLE0;  /* fold skippable magic numbers */
+    if (LZ4IO_isSkippableMagicNumber(magicNumber)) magicNumber = LZ4IO_SKIPPABLE0;  /* fold skippable magic numbers */
 
     switch(magicNumber)
     {
-    case LZ4S_MAGICNUMBER:
+    case LZ4IO_MAGICNUMBER:
         return DEFAULT_DECOMPRESSOR(finput, foutput);
     case LEGACY_MAGICNUMBER:
         DISPLAYLEVEL(4, "Detected : Legacy format \n");
         return decodeLegacyStream(finput, foutput);
-    case LZ4S_SKIPPABLE0:
+    case LZ4IO_SKIPPABLE0:
         DISPLAYLEVEL(4, "Skipping detected skippable area \n");
         nbReadBytes = fread(U32store, 1, 4, finput);
         if (nbReadBytes != 4) EXM_THROW(42, "Stream error : skippable size unreadable");
