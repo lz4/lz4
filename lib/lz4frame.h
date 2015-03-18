@@ -68,18 +68,19 @@ typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
 typedef enum { LZ4F_frame=0, skippableFrame } frameType_t;
 
 typedef struct {
-  blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
-  blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
-  contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  frameType_t       frameType;             /* LZ4F_frame, skippableFrame : 0 == default */
-  unsigned          reserved[4];
+  blockSizeID_t      blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
+  blockMode_t        blockMode;             /* blockLinked, blockIndependent ; 0 == default */
+  contentChecksum_t  contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
+  frameType_t        frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
+  unsigned long long frameOSize;            /* Size of uncompressed (original) content ; 0 == unknown */
+  unsigned           reserved[2];           /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   unsigned         compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16 */
-  unsigned         autoFlush;              /* 1 == always flush : reduce need for tmp buffer */
-  unsigned         reserved[4];
+  unsigned         autoFlush;              /* 1 == always flush (reduce need for tmp buffer) */
+  unsigned         reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
 
@@ -131,7 +132,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferencesPtr);
 /* LZ4F_compressBegin() :
  * will write the frame header into dstBuffer.
- * dstBuffer must be large enough to accommodate a header (dstMaxSize). Maximum header size is 19 bytes.
+ * dstBuffer must be large enough to accommodate a header (dstMaxSize). Maximum header size is 15 bytes.
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
  * The result of the function is the number of bytes written into dstBuffer for the header
  * or an error code (can be tested using LZ4F_isError())

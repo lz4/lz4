@@ -381,6 +381,57 @@ int basicTests(U32 seed, double compressibility)
     if (LZ4F_isError(cSize)) goto _output_error;
     DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
 
+    {
+        size_t errorCode;
+        BYTE* const ostart = (BYTE*)compressedBuffer;
+        BYTE* op = ostart;
+        LZ4F_compressionContext_t cctx;
+        errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+
+        DISPLAYLEVEL(3, "compress without frameSize : \n");
+        memset(&(prefs.frameInfo), 0, sizeof(prefs.frameInfo));
+        errorCode = LZ4F_compressBegin(cctx, compressedBuffer, testSize, &prefs);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        op += errorCode;
+        errorCode = LZ4F_compressUpdate(cctx, op, LZ4F_compressBound(testSize, &prefs), CNBuffer, testSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        op += errorCode;
+        errorCode = LZ4F_compressEnd(cctx, compressedBuffer, testSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)(op-ostart));
+
+        DISPLAYLEVEL(3, "compress with frameSize : \n");
+        prefs.frameInfo.frameOSize = testSize;
+        op = ostart;
+        errorCode = LZ4F_compressBegin(cctx, compressedBuffer, testSize, &prefs);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        op += errorCode;
+        errorCode = LZ4F_compressUpdate(cctx, op, LZ4F_compressBound(testSize, &prefs), CNBuffer, testSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        op += errorCode;
+        errorCode = LZ4F_compressEnd(cctx, compressedBuffer, testSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)(op-ostart));
+
+        DISPLAYLEVEL(3, "compress with wrong frameSize : \n");
+        prefs.frameInfo.frameOSize = testSize+1;
+        op = ostart;
+        errorCode = LZ4F_compressBegin(cctx, compressedBuffer, testSize, &prefs);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        op += errorCode;
+        errorCode = LZ4F_compressUpdate(cctx, op, LZ4F_compressBound(testSize, &prefs), CNBuffer, testSize, NULL);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+        op += errorCode;
+        errorCode = LZ4F_compressEnd(cctx, op, testSize, NULL);
+        if (LZ4F_isError(errorCode)) { DISPLAYLEVEL(3, "Error correctly detected : %s \n", LZ4F_getErrorName(errorCode)); }
+        else
+            goto _output_error;
+
+        errorCode = LZ4F_freeCompressionContext(cctx);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+    }
+
     DISPLAYLEVEL(3, "Skippable frame test : \n");
     {
         size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
@@ -412,11 +463,13 @@ int basicTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "Skipped %i bytes \n", (int)decodedBufferSize);
 
         /* generate zero-size skippable frame */
+        DISPLAYLEVEL(3, "zero-size skippable frame\n");
+        ip = (BYTE*)compressedBuffer;
+        op = (BYTE*)decodedBuffer;
         FUZ_writeLE32(ip, LZ4F_MAGIC_SKIPPABLE_START+1);
         FUZ_writeLE32(ip+4, 0);
         iend = ip+8;
 
-        DISPLAYLEVEL(3, "random segment sizes : \n");
         while (ip < iend)
         {
             unsigned nbBits = FUZ_rand(&randState) % maxBits;
@@ -428,8 +481,27 @@ int basicTests(U32 seed, double compressibility)
             op += oSize;
             ip += iSize;
         }
-        DISPLAYLEVEL(3, "Skipped %i bytes \n", (int)decodedBufferSize);
+        DISPLAYLEVEL(3, "Skipped %i bytes \n", (int)(ip - (BYTE*)compressedBuffer - 8));
 
+        DISPLAYLEVEL(3, "Skippable frame header complete in first call \n");
+        ip = (BYTE*)compressedBuffer;
+        op = (BYTE*)decodedBuffer;
+        FUZ_writeLE32(ip, LZ4F_MAGIC_SKIPPABLE_START+2);
+        FUZ_writeLE32(ip+4, 10);
+        iend = ip+18;
+        while (ip < iend)
+        {
+            size_t iSize = 10;
+            size_t oSize = 10;
+            if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
+            errorCode = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
+            if (LZ4F_isError(errorCode)) goto _output_error;
+            op += oSize;
+            ip += iSize;
+        }
+        DISPLAYLEVEL(3, "Skipped %i bytes \n", (int)(ip - (BYTE*)compressedBuffer - 8));
+
+        /* release memory */
         errorCode = LZ4F_freeDecompressionContext(dCtx);
         if (LZ4F_isError(errorCode)) goto _output_error;
     }

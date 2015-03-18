@@ -625,7 +625,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
                     if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)");
                     storedSkips -= 1 GB;
                 }
-                if (nb0T != seg0SizeT)
+                if (nb0T != seg0SizeT)   /* not all 0s */
                 {
                     seekResult = fseek(foutput, storedSkips, SEEK_CUR);
                     if (seekResult) EXM_THROW(68, "Skip error (sparse file)");
