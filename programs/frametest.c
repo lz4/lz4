@@ -582,6 +582,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         unsigned nbBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
         size_t srcSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
+        U64 frameContentSize = ((FUZ_rand(&randState) & 0xF) == 1) ? srcSize : 0;
         size_t cSize;
         U64 crcOrig, crcDecoded;
         LZ4F_preferences_t* prefsPtr = &prefs;
@@ -593,6 +594,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         prefs.frameInfo.blockMode = (blockMode_t)BMId;
         prefs.frameInfo.blockSizeID = (blockSizeID_t)BSId;
         prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)CCflag;
+        prefs.frameInfo.frameOSize = frameContentSize;
         prefs.autoFlush = autoflush;
         prefs.compressionLevel = FUZ_rand(&randState) % 5;
         if ((FUZ_rand(&randState) & 0xF) == 1) prefsPtr = NULL;
