@@ -35,12 +35,12 @@
 /* Special input/output values                        */
 /* ************************************************** */
 #define NULL_OUTPUT "null"
-static char stdinmark[] = "stdin";
-static char stdoutmark[] = "stdout";
+static char const stdinmark[] = "stdin";
+static char const stdoutmark[] = "stdout";
 #ifdef _WIN32
-static char nulmark[] = "nul";
+static char const nulmark[] = "nul";
 #else
-static char nulmark[] = "/dev/null";
+static char const nulmark[] = "/dev/null";
 #endif
 
 

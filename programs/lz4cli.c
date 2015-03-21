@@ -59,23 +59,20 @@
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
-#include "lz4io.h"
+#include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 
 
 /****************************
 *  OS-specific Includes
 *****************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#  include <fcntl.h>    /* _O_BINARY */
-#  include <io.h>       /* _setmode, _isatty */
+#  include <io.h>       /* _isatty */
 #  ifdef __MINGW32__
    int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
 #  endif
-#  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
 #  include <unistd.h>   /* isatty */
-#  define SET_BINARY_MODE(file)
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
 #endif
 
@@ -90,8 +87,8 @@
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
 #define LZ4_EXTENSION ".lz4"
-#define LZ4_CAT "lz4cat"
-#define UN_LZ4 "unlz4"
+#define LZ4CAT "lz4cat"
+#define UNLZ4 "unlz4"
 
 #define KB *(1U<<10)
 #define MB *(1U<<20)
@@ -140,7 +137,7 @@ static char* programName;
 int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel);   /* hidden function */
 
 
-/****************************
+/*****************************
 *  Functions
 *****************************/
 static int usage(void)
@@ -176,8 +173,9 @@ static int usage_advanced(void)
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
-    DISPLAY( " -Sx    : disable stream checksum (default:enabled)\n");
-    DISPLAY( " -X     : enable sparse file (default:disabled)(experimental)\n");
+    DISPLAY( "--no-frame-crc       : disable stream checksum (default:enabled)\n");
+    DISPLAY( "--frame-content-size : compressed frame includes original size (default:not present)\n");
+    DISPLAY( "--sparse-support     : enable sparse file (default:disabled)(experimental)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
@@ -269,7 +267,7 @@ int main(int argc, char** argv)
         main_pause=0,
         multiple_inputs=0;
     const char* input_filename=0;
-    char* output_filename=0;
+    const char* output_filename=0;
     char* dynNameSpace=0;
     const char** inFileNames = NULL;
     unsigned ifnIdx=0;
@@ -283,8 +281,8 @@ int main(int argc, char** argv)
     blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
 
     /* lz4cat predefined behavior */
-    if (!strcmp(programName, LZ4_CAT)) { decode=1; forceStdout=1; output_filename=stdoutmark; displayLevel=1; }
-    if (!strcmp(programName, UN_LZ4)) { decode=1; }
+    if (!strcmp(programName, LZ4CAT)) { decode=1; forceStdout=1; output_filename=stdoutmark; displayLevel=1; }
+    if (!strcmp(programName, UNLZ4)) { decode=1; }
 
     /* command switches */
     for(i=1; i<argc; i++)
@@ -292,6 +290,11 @@ int main(int argc, char** argv)
         char* argument = argv[i];
 
         if(!argument) continue;   /* Protection if argument empty */
+
+        /* long options (--****) */
+        if (!strcmp(argument, "--sparse-support")) { LZ4IO_setSparseFile(1); continue; }
+        if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
+        if (!strcmp(argument, "--frame-content-size")) { continue; }
 
         /* Decode command (note : aggregated commands are allowed) */
         if (argument[0]=='-')
@@ -388,12 +391,6 @@ int main(int argc, char** argv)
                     }
                     break;
 
-                    /* Modify Stream properties */
-                case 'S': if (argument[1]=='x') { LZ4IO_setStreamChecksumMode(0); argument++; break; } else { badusage(); }
-
-                    /* Enable Sparse File support (experimental) */
-                case 'X': LZ4IO_setSparseFile(1); break;
-
                     /* Benchmark */
                 case 'b': bench=1; multiple_inputs=1;
                     if (inFileNames == NULL)
@@ -473,9 +470,9 @@ int main(int argc, char** argv)
         {
             size_t l = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,l+5);
+            strcpy(dynNameSpace, input_filename);
+            strcat(dynNameSpace, LZ4_EXTENSION);
             output_filename = dynNameSpace;
-            strcpy(output_filename, input_filename);
-            strcat(output_filename, LZ4_EXTENSION);
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
             break;
         }
@@ -484,12 +481,12 @@ int main(int argc, char** argv)
             size_t outl;
             size_t inl = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,inl+1);
-            output_filename = dynNameSpace;
-            strcpy(output_filename, input_filename);
+            strcpy(dynNameSpace, input_filename);
             outl = inl;
             if (inl>4)
-                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) output_filename[outl--]=0;
+                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) dynNameSpace[outl--]=0;
             if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(); }
+            output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
         }
     }
