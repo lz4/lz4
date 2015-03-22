@@ -212,6 +212,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_streamPtr, const char* dictionary, int dictS
  * LZ4_compress_continue
  * Compress data block 'source', using blocks compressed before as dictionary to improve compression ratio
  * Previous data blocks are assumed to still be present at their previous location.
+ * dest buffer must be already allocated, and sized to at least LZ4_compressBound(inputSize)
  */
 int LZ4_compress_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
 
@@ -228,8 +229,7 @@ int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_streamPtr, const char
  * save it into a safer place (char* safeBuffer)
  * Note : you don't need to call LZ4_loadDict() afterwards,
  *        dictionary is immediately usable, you can therefore call again LZ4_compress_continue()
- * Return : dictionary size in bytes, or 0 if error
- * Note : any dictSize > 64 KB will be interpreted as 64KB.
+ * Return : saved dictionary size in bytes (necessarily <= dictSize), or 0 if error
  */
 int LZ4_saveDict (LZ4_stream_t* LZ4_streamPtr, char* safeBuffer, int dictSize);
 

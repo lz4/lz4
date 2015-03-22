@@ -3,15 +3,17 @@ New   : lz4 cli sparse file support
 New   : command -m, to compress multiple files in a single command
 New   : lz4frame supports frame content size
 Fixed : Restored lz4hc compression ratio (was slightly lower since r124)
+New   : lz4 cli supports long commands
 New   : lz4frame supports skippable frames
 Changed:Default "make install" directory is /usr/local
 New   : lz4 cli supports "pass-through" mode
+New   : long commands
 New   : g++ compatibility tests
 New   : datagen can generate sparse files
 New   : scan-build tests
 Fixed : Fuzzer + frametest compatibility with NetBSD (issue #48)
 Added : Visual project directory
-Updated:Doc
+Updated:Man page & Specification
 
 r127:
 N/A   : added a file on SVN

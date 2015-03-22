@@ -154,7 +154,6 @@ static int usage(void)
     DISPLAY( " -z     : force compression\n");
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -h/-H  : display help/long help and exit\n");
-    DISPLAY( " -m     : multiple input files (implies automatic output filenames)\n");
     return 0;
 }
 
@@ -169,6 +168,7 @@ static int usage_advanced(void)
     DISPLAY( " -q     : suppress warnings; specify twice to suppress errors too\n");
     DISPLAY( " -c     : force write to standard output, even if it is the console\n");
     DISPLAY( " -t     : test compressed file integrity\n");
+    DISPLAY( " -m     : multiple input files (implies automatic output filenames)\n");
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
@@ -291,12 +291,23 @@ int main(int argc, char** argv)
 
         if(!argument) continue;   /* Protection if argument empty */
 
-        /* long options (--****) */
-        if (!strcmp(argument, "--sparse-support")) { LZ4IO_setSparseFile(1); continue; }
+        /* long commands (--long-word) */
+        if (!strcmp(argument, "--compress")) { forceCompress = 1; continue; }
+        if (!strcmp(argument, "--decompress")) { decode = 1; continue; }
+        if (!strcmp(argument, "--uncompress")) { decode = 1; continue; }
+        if (!strcmp(argument, "--test")) { decode = 1; LZ4IO_setOverwrite(1); output_filename=nulmark; continue; }
+        if (!strcmp(argument, "--force")) { LZ4IO_setOverwrite(1); continue; }
+        if (!strcmp(argument, "--stdout")) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
+        if (!strcmp(argument, "--to-stdout")) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
         if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
         if (!strcmp(argument, "--frame-content-size")) { continue; }
+        if (!strcmp(argument, "--sparse-support")) { LZ4IO_setSparseFile(1); continue; }
+        if (!strcmp(argument, "--verbose")) { displayLevel=4; continue; }
+        if (!strcmp(argument, "--quiet")) { if (displayLevel) displayLevel--; continue; }
+        if (!strcmp(argument, "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
+        if (!strcmp(argument, "--keep")) { continue; } /* keep source file (default anyway, so useless) (for xz/lzma compatibility) */
 
-        /* Decode command (note : aggregated commands are allowed) */
+        /* Short commands (note : aggregated short commands are allowed) */
         if (argument[0]=='-')
         {
             /* '-' means stdin/stdout */
@@ -360,7 +371,7 @@ int main(int argc, char** argv)
                 case 'v': displayLevel=4; break;
 
                     /* Quiet mode */
-                case 'q': displayLevel--; break;
+                case 'q': if (displayLevel) displayLevel--; break;
 
                     /* keep source file (default anyway, so useless) (for xz/lzma compatibility) */
                 case 'k': break;

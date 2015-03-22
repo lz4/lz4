@@ -95,7 +95,6 @@ frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xx
 datagen : datagen.c datagencli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
-
 clean:
 	@rm -f core *.o *.test \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
@@ -113,24 +112,26 @@ ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 install: lz4 lz4c
 	@echo Installing binaries
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4$(EXT)
-	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4cat
-	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/unlz4
-	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
+	@install -m 755 lz4 $(DESTDIR)$(BINDIR)/lz4
+	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
+	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
+	@install -m 755 lz4c $(DESTDIR)$(BINDIR)/lz4c
 	@echo Installing man pages
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
-	@install -m 644 lz4c.1 $(DESTDIR)$(MANDIR)/lz4c.1
-	@install -m 644 lz4cat.1 $(DESTDIR)$(MANDIR)/lz4cat.1
+	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
+	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
+	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1
 	@echo lz4 installation completed
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/lz4cat
 	rm -f $(DESTDIR)$(BINDIR)/unlz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4$(EXT)
-	[ -x $(DESTDIR)$(BINDIR)/lz4c$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4c$(EXT)
+	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
+	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
-	[ -f $(DESTDIR)$(MANDIR)/lz4c.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4c.1
-	[ -f $(DESTDIR)$(MANDIR)/lz4cat.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
+	rm -f $(DESTDIR)$(MANDIR)/lz4c.1
+	rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
+	rm -f $(DESTDIR)$(MANDIR)/unlz4.1
 	@echo lz4 programs successfully uninstalled
 
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
@@ -141,13 +142,37 @@ test-all: test test32
 
 test-travis: $(TRAVIS_TARGET)
 
-test-lz4: lz4 datagen
-	./datagen -g16KB  | ./lz4 -9     | ./lz4 -vdq > $(VOID)
-	./datagen         | ./lz4        | ./lz4 -vdq > $(VOID)
-	./datagen -g6M -P100 | ./lz4 -9BD | ./lz4 -vdq > $(VOID)
-	./datagen -g17M   | ./lz4 -9v    | ./lz4 -dq  > $(VOID)
-	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -vdq > $(VOID)
-	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -vdq > $(VOID)
+test-lz4-sparse: lz4 datagen
+	@echo ---- test sparse file support ----
+	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dv --sparse-support > tmpB4
+	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dv --sparse-support > tmpB5
+	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dv --sparse-support > tmpB6
+	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dv --sparse-support > tmpB7
+	ls -ls tmp*
+	./datagen -g50M -P100 | diff -s - tmpB4
+	./datagen -g50M -P100 | diff -s - tmpB5
+	./datagen -g50M -P100 | diff -s - tmpB6
+	./datagen -g50M -P100 | diff -s - tmpB7
+	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse-support > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
+	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
+	ls -ls tmpOdd
+	@rm tmp*
+
+test-lz4-contentSize: lz4 datagen
+	@echo ---- test original size support ----
+	./datagen -g15M | ./lz4 -v | ./lz4 -t
+	./datagen -g15M | ./lz4 -v --frame-content-size | ./lz4 -t
+
+test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize
+	@echo ---- test lz4 basic compression/decompression ----
+	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
+	./datagen         | ./lz4        | ./lz4 -t
+	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
+	./datagen -g17M   | ./lz4 -9v    | ./lz4 -tq
+	./datagen -g33M   | ./lz4 --no-frame-crc | ./lz4 -t
+	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
+	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -t
+	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -t
 	@echo ---- test frame concatenation ----
 	@echo -n > empty.test
 	@echo hi > nonempty.test
@@ -166,35 +191,21 @@ test-lz4: lz4 datagen
 	./lz4 -f -m file1 file2 file3
 	ls -l file*
 	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
-	@echo ---- test sparse file support ----
-	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dvX > tmpB4
-	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dvX > tmpB5
-	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dvX > tmpB6
-	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dvX > tmpB7
-	ls -ls tmp*
-	./datagen -g50M -P100 | diff -s - tmpB4
-	./datagen -g50M -P100 | diff -s - tmpB5
-	./datagen -g50M -P100 | diff -s - tmpB6
-	./datagen -g50M -P100 | diff -s - tmpB7
-	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dvX > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
-	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
-	ls -ls tmpOdd
-	@rm tmp*
 	@echo ---- test pass-through ----
-	./datagen | ./lz4 -dfvq > /dev/null
-
+	./datagen | ./lz4 -tf
 
 test-lz4c: lz4c datagen
-	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -vdq > $(VOID)
+	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -t
 
-test-lz4c32: lz4 lz4c32 lz4 datagen
-	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -vdq > $(VOID)
-	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -vdq > $(VOID)
-	./datagen         | ./lz4c32        | ./lz4c32 -vdq > $(VOID)
-	./datagen         | ./lz4c32        | ./lz4    -vdq > $(VOID)
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -vdq > $(VOID)
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -vdq > $(VOID)
-	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -vdq > $(VOID)
+test-lz4c32: lz4 lz4c32 datagen
+	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
+	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
+	./datagen         | ./lz4c32        | ./lz4c32 -t
+	./datagen         | ./lz4c32        | ./lz4    -t
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -t
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -t
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -t
+	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -t
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(TEST_FILES)
@@ -215,14 +226,15 @@ test-frametest32: frametest32
 	./frametest32
 
 test-mem: lz4 datagen fuzzer frametest
-	valgrind --leak-check=yes ./datagen -g50M > /dev/null
+	valgrind --leak-check=yes ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
-	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
 	./datagen -g16MB > tmp
-	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp /dev/null
+	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
 	./datagen -g256MB > tmp
-	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp /dev/null
-	rm tmp
+	valgrind --leak-check=yes ./lz4 -t tmp2
+	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp $(VOID)
+	rm tmp*
 	valgrind --leak-check=yes ./fuzzer -i64 -t1
 	valgrind --leak-check=yes ./frametest -i256
 

@@ -456,7 +456,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 *  Compression functions
 ********************************/
 
-static U32 LZ4_hashSequence(U32 sequence, tableType_t tableType)
+static U32 LZ4_hashSequence(U32 sequence, tableType_t const tableType)
 {
     if (tableType == byU16)
         return (((sequence) * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
@@ -466,7 +466,7 @@ static U32 LZ4_hashSequence(U32 sequence, tableType_t tableType)
 
 static U32 LZ4_hashPosition(const BYTE* p, tableType_t tableType) { return LZ4_hashSequence(LZ4_read32(p), tableType); }
 
-static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t const tableType, const BYTE* srcBase)
 {
     switch (tableType)
     {
@@ -502,7 +502,7 @@ static int LZ4_compress_generic(
                  int inputSize,
                  int maxOutputSize,
                  limitedOutput_directive outputLimited,
-                 tableType_t tableType,
+                 tableType_t const tableType,
                  dict_directive dict,
                  dictIssue_directive dictIssue)
 {
