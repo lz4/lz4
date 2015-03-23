@@ -87,8 +87,6 @@ When multiple contradictory commands are issued on a same command line,
 only the latest one will be applied.
 .
 .SS "Operation mode"
-If multiple operation mode options are given,
-the last one takes effect.
 .TP
 .BR \-z ", " \-\-compress
 Compress.
@@ -122,7 +120,7 @@ Test the integrity of compressed
 .B .lz4
 files.
 The decompressed data is discarded.
-No files are created or removed.
+No files are created nor removed.
 .
 .SS "Operation modifiers"
 .TP
@@ -133,7 +131,7 @@ No files are created or removed.
  high compression
 
 .TP
-.BR \-f ", " --force
+.BR \-f ", " --[no-]force
  This option has several effects:
 .RS
 .IP \(bu 3
@@ -178,13 +176,15 @@ with the resulting compressed file named
 .B \-BD
  block dependency (improve compression ratio)
 .TP
-.B \--no-frame-crc
+.B \--[no-]frame-crc
  disable stream checksum (default:enabled)
 .TP
-.B \--content-size
- compressed frame includes original size (default:not present)
+.B \--[no-]content-size
+ compressed file includes original size (default:not present)
+ Note : this option can only be activated when the original size can be determined,
+hence for a file. It won't work with unknown source size, such as stdin pipe.
 .TP
-.B \--sparse 
+.B \--[no-]sparse 
  enable sparse file (default:disabled)(experimental)
 .TP
 .B \-l
