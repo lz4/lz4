@@ -26,9 +26,11 @@
 /**************************************
 *  Compiler Options
 ***************************************/
-/* Disable some Visual warning messages */
-#define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
+#if defined(_MSC_VER) || defined(_WIN32)
+#  define _CRT_SECURE_NO_WARNINGS
+#  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
+#  define BMK_LEGACY_TIMER 1           /* S_ISREG & gettimeofday() are not supported by MSVC */
+#endif
 
 /* Unix Large Files support (>4GB) */
 #define _FILE_OFFSET_BITS 64
@@ -36,11 +38,6 @@
 #  define _LARGEFILE_SOURCE
 #elif ! defined(__LP64__)                        /* No point defining Large file for 64 bit */
 #  define _LARGEFILE64_SOURCE
-#endif
-
-/* S_ISREG & gettimeofday() are not supported by MSVC */
-#if defined(_MSC_VER) || defined(_WIN32)
-#  define BMK_LEGACY_TIMER 1
 #endif
 
 

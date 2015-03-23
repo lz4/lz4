@@ -82,3 +82,5 @@ int LZ4IO_setNotificationLevel(int level);
 /* Default setting : 0 (disabled) */
 int LZ4IO_setSparseFile(int enable);
 
+/* Default setting : 0 (disabled) */
+int LZ4IO_setContentSize(int enable);

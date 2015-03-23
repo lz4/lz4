@@ -300,7 +300,7 @@ int main(int argc, char** argv)
         if (!strcmp(argument, "--stdout")) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
         if (!strcmp(argument, "--to-stdout")) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
         if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
-        if (!strcmp(argument, "--frame-content-size")) { continue; }
+        if (!strcmp(argument, "--frame-content-size")) { LZ4IO_setContentSize(1); continue; }
         if (!strcmp(argument, "--sparse-support")) { LZ4IO_setSparseFile(1); continue; }
         if (!strcmp(argument, "--verbose")) { displayLevel=4; continue; }
         if (!strcmp(argument, "--quiet")) { if (displayLevel) displayLevel--; continue; }

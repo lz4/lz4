@@ -46,10 +46,12 @@
 /*****************************
 *  Includes
 *****************************/
-#include <stdio.h>    /* fprintf, fopen, fread, stdin, stdout */
-#include <stdlib.h>   /* malloc, free */
-#include <string.h>   /* strcmp, strlen */
-#include <time.h>     /* clock */
+#include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout */
+#include <stdlib.h>    /* malloc, free */
+#include <string.h>    /* strcmp, strlen */
+#include <time.h>      /* clock */
+#include <sys/types.h> /* stat64 */
+#include <sys/stat.h>  /* stat64 */
 #include "lz4io.h"
 #include "lz4.h"      /* still required for legacy format */
 #include "lz4hc.h"    /* still required for legacy format */
@@ -126,6 +128,7 @@ static int g_blockChecksum = 0;
 static int g_streamChecksum = 1;
 static int g_blockIndependence = 1;
 static int g_sparseFileSupport = 0;
+static int g_contentSizeFlag = 0;
 
 static const int minBlockSizeID = 4;
 static const int maxBlockSizeID = 7;
@@ -209,11 +212,32 @@ int LZ4IO_setSparseFile(int enable)
     return g_sparseFileSupport;
 }
 
+/* Default setting : 0 (disabled) */
+int LZ4IO_setContentSize(int enable)
+{
+    g_contentSizeFlag = (enable!=0);
+    return g_contentSizeFlag;
+}
+
 static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
 {
     clock_t nCurrent = clock();
     unsigned nSpan = (unsigned)(((nCurrent - nPrevious) * 1000) / CLOCKS_PER_SEC);
     return nSpan;
+}
+
+static unsigned long long LZ4IO_GetFileSize(const char* infilename)
+{
+    int r;
+#if defined(_MSC_VER)
+    struct _stat64 statbuf;
+    r = _stat64(infilename, &statbuf);
+#else
+    struct stat statbuf;
+    r = stat(infilename, &statbuf);
+#endif
+    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
+    return (unsigned long long)statbuf.st_size;
 }
 
 
@@ -396,6 +420,11 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     prefs.frameInfo.blockMode = (blockMode_t)g_blockIndependence;
     prefs.frameInfo.blockSizeID = (blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)g_streamChecksum;
+    if (g_contentSizeFlag)
+    {
+      unsigned long long fileSize = LZ4IO_GetFileSize(input_filename);
+      prefs.frameInfo.frameOSize = fileSize;   /* == 0 if input == stdin */
+    }
 
     /* Allocate Memory */
     in_buff  = (char*)malloc(blockSize);
@@ -485,7 +514,6 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
 }
 
 
-
 /* ********************************************************************* */
 /* ********************** LZ4 file-stream Decompression **************** */
 /* ********************************************************************* */
@@ -557,109 +585,116 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     void* outBuff;
 #   define HEADERMAX 20
     char  headerBuff[HEADERMAX];
-    size_t sizeCheck, nextToRead, outBuffSize, inBuffSize;
+    size_t sizeCheck;
+    const size_t inBuffSize = 256 KB;
+    const size_t outBuffSize = 256 KB;
     LZ4F_decompressionContext_t ctx;
     LZ4F_errorCode_t errorCode;
-    LZ4F_frameInfo_t frameInfo;
     unsigned storedSkips = 0;
 
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
-    if (LZ4F_isError(errorCode)) EXM_THROW(60, "Allocation error : can't create context : %s", LZ4F_getErrorName(errorCode));
+    if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create context : %s", LZ4F_getErrorName(errorCode));
     LZ4IO_writeLE32(headerBuff, LZ4IO_MAGICNUMBER);   /* regenerated here, as it was already read from finput */
 
-    /* Decode stream descriptor */
-    outBuffSize = 0; inBuffSize = 0; sizeCheck = MAGICNUMBER_SIZE;
-    nextToRead = LZ4F_decompress(ctx, NULL, &outBuffSize, headerBuff, &sizeCheck, NULL);
-    if (LZ4F_isError(nextToRead)) EXM_THROW(61, "Decompression error : %s", LZ4F_getErrorName(nextToRead));
-    if (nextToRead > HEADERMAX) EXM_THROW(62, "Header too large (%i>%i)", (int)nextToRead, HEADERMAX);
-    sizeCheck = fread(headerBuff, 1, nextToRead, finput);
-    if (sizeCheck!=nextToRead) EXM_THROW(63, "Read error ");
-    nextToRead = LZ4F_decompress(ctx, NULL, &outBuffSize, headerBuff, &sizeCheck, NULL);
-    errorCode = LZ4F_getFrameInfo(ctx, &frameInfo, NULL, &inBuffSize);
-    if (LZ4F_isError(errorCode)) EXM_THROW(64, "can't decode frame header : %s", LZ4F_getErrorName(errorCode));
-
     /* Allocate Memory */
-    outBuffSize = LZ4IO_setBlockSizeID(frameInfo.blockSizeID);
-    inBuffSize = outBuffSize + 4;
-    inBuff = malloc(inBuffSize);
-    outBuff = malloc(outBuffSize);
-    if (!inBuff || !outBuff) EXM_THROW(65, "Allocation error : not enough memory");
+    inBuff = malloc(256 KB);
+    outBuff = malloc(256 KB);
+    if (!inBuff || !outBuff) EXM_THROW(61, "Allocation error : not enough memory");
+
+    /* Init feed with magic number (already consumed from FILE) */
+    {
+        size_t inSize = 4;
+        size_t outSize=0;
+        LZ4IO_writeLE32(inBuff, LZ4IO_MAGICNUMBER);
+        errorCode = LZ4F_decompress(ctx, outBuff, &outSize, inBuff, &inSize, NULL);
+        if (LZ4F_isError(errorCode)) EXM_THROW(62, "Header error : %s", LZ4F_getErrorName(errorCode));
+    }
+
 
     /* Main Loop */
-    while (nextToRead != 0)
+    for (;;)
     {
-        size_t decodedBytes = outBuffSize;
+        size_t readSize;
+        size_t pos = 0;
 
-        /* Read Block */
-        sizeCheck = fread(inBuff, 1, nextToRead, finput);
-        if (sizeCheck!=nextToRead) EXM_THROW(66, "Read error ");
+        /* Read input */
+        readSize = fread(inBuff, 1, inBuffSize, finput);
+        if (!readSize) break;   /* empty file or stream */
 
-        /* Decode Block */
-        errorCode = LZ4F_decompress(ctx, outBuff, &decodedBytes, inBuff, &sizeCheck, NULL);
-        if (LZ4F_isError(errorCode)) EXM_THROW(67, "Decompression error : %s", LZ4F_getErrorName(errorCode));
-        if (sizeCheck!=nextToRead) EXM_THROW(67, "Synchronization error");
-        nextToRead = errorCode;
-        filesize += decodedBytes;
-
-        /* Write Block */
-        if (g_sparseFileSupport)
+        while (pos < readSize)
         {
-            size_t* const oBuffStartT = (size_t*)outBuff;   /* since outBuff is malloc'ed, it's aligned on size_t */
-            size_t* oBuffPosT = oBuffStartT;
-            size_t  oBuffSizeT = decodedBytes / sizeT;
-            size_t* const oBuffEndT = oBuffStartT + oBuffSizeT;
-            static const size_t bs0T = (32 KB) / sizeT;
-            while (oBuffPosT < oBuffEndT)
+            /* Decode Input (at least partially) */
+            size_t remaining = readSize - pos;
+            size_t decodedBytes = outBuffSize;
+            errorCode = LZ4F_decompress(ctx, outBuff, &decodedBytes, (char*)inBuff+pos, &remaining, NULL);
+            if (LZ4F_isError(errorCode)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(errorCode));
+            pos += remaining;
+
+            if (decodedBytes)
             {
-                size_t seg0SizeT = bs0T;
-                size_t nb0T;
-                int seekResult;
-                if (seg0SizeT > oBuffSizeT) seg0SizeT = oBuffSizeT;
-                oBuffSizeT -= seg0SizeT;
-                for (nb0T=0; (nb0T < seg0SizeT) && (oBuffPosT[nb0T] == 0); nb0T++) ;
-                storedSkips += (unsigned)(nb0T * sizeT);
-                if (storedSkips > 1 GB)   /* avoid int overflow */
+                /* Write Block */
+                filesize += decodedBytes;
+                if (g_sparseFileSupport)
                 {
-                    seekResult = fseek(foutput, 1 GB, SEEK_CUR);
-                    if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)");
-                    storedSkips -= 1 GB;
+                    size_t* const oBuffStartT = (size_t*)outBuff;   /* since outBuff is malloc'ed, it's aligned on size_t */
+                    size_t* oBuffPosT = oBuffStartT;
+                    size_t  oBuffSizeT = decodedBytes / sizeT;
+                    size_t* const oBuffEndT = oBuffStartT + oBuffSizeT;
+                    static const size_t bs0T = (32 KB) / sizeT;
+                    while (oBuffPosT < oBuffEndT)
+                    {
+                        size_t seg0SizeT = bs0T;
+                        size_t nb0T;
+                        int seekResult;
+                        if (seg0SizeT > oBuffSizeT) seg0SizeT = oBuffSizeT;
+                        oBuffSizeT -= seg0SizeT;
+                        for (nb0T=0; (nb0T < seg0SizeT) && (oBuffPosT[nb0T] == 0); nb0T++) ;
+                        storedSkips += (unsigned)(nb0T * sizeT);
+                        if (storedSkips > 1 GB)   /* avoid int overflow */
+                        {
+                            seekResult = fseek(foutput, 1 GB, SEEK_CUR);
+                            if (seekResult != 0) EXM_THROW(68, "1 GB skip error (sparse file)");
+                            storedSkips -= 1 GB;
+                        }
+                        if (nb0T != seg0SizeT)   /* not all 0s */
+                        {
+                            seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+                            if (seekResult) EXM_THROW(68, "Skip error (sparse file)");
+                            storedSkips = 0;
+                            seg0SizeT -= nb0T;
+                            oBuffPosT += nb0T;
+                            sizeCheck = fwrite(oBuffPosT, sizeT, seg0SizeT, foutput);
+                            if (sizeCheck != seg0SizeT) EXM_THROW(68, "Write error : cannot write decoded block");
+                        }
+                        oBuffPosT += seg0SizeT;
+                    }
+                    if (decodedBytes & maskT)   /* size not multiple of sizeT (necessarily end of block) */
+                    {
+                        const char* const restStart = (char*)oBuffEndT;
+                        const char* restPtr = restStart;
+                        size_t  restSize =  decodedBytes & maskT;
+                        const char* const restEnd = restStart + restSize;
+                        for (; (restPtr < restEnd) && (*restPtr == 0); restPtr++) ;
+                        storedSkips += (unsigned) (restPtr - restStart);
+                        if (restPtr != restEnd)
+                        {
+                            int seekResult = fseek(foutput, storedSkips, SEEK_CUR);
+                            if (seekResult) EXM_THROW(68, "Skip error (end of block)");
+                            storedSkips = 0;
+                            sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, foutput);
+                            if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(68, "Write error : cannot write decoded end of block");
+                        }
+                    }
                 }
-                if (nb0T != seg0SizeT)   /* not all 0s */
+                else
                 {
-                    seekResult = fseek(foutput, storedSkips, SEEK_CUR);
-                    if (seekResult) EXM_THROW(68, "Skip error (sparse file)");
-                    storedSkips = 0;
-                    seg0SizeT -= nb0T;
-                    oBuffPosT += nb0T;
-                    sizeCheck = fwrite(oBuffPosT, sizeT, seg0SizeT, foutput);
-                    if (sizeCheck != seg0SizeT) EXM_THROW(68, "Write error : cannot write decoded block");
-                }
-                oBuffPosT += seg0SizeT;
-            }
-            if (decodedBytes & maskT)   /* size not multiple of sizeT (necessarily end of block) */
-            {
-                const char* const restStart = (char*)oBuffEndT;
-                const char* restPtr = restStart;
-                size_t  restSize =  decodedBytes & maskT;
-                const char* const restEnd = restStart + restSize;
-                for (; (restPtr < restEnd) && (*restPtr == 0); restPtr++) ;
-                storedSkips += (unsigned) (restPtr - restStart);
-                if (restPtr != restEnd)
-                {
-                    int seekResult = fseek(foutput, storedSkips, SEEK_CUR);
-                    if (seekResult) EXM_THROW(68, "Skip error (end of block)");
-                    storedSkips = 0;
-                    sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, foutput);
-                    if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(68, "Write error : cannot write decoded end of block");
+                    sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
+                    if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block");
                 }
             }
         }
-        else
-        {
-            sizeCheck = fwrite(outBuff, 1, decodedBytes, foutput);
-            if (sizeCheck != decodedBytes) EXM_THROW(68, "Write error : cannot write decoded block");
-        }
+
     }
 
     if ((g_sparseFileSupport) && (storedSkips>0))

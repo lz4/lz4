@@ -160,19 +160,13 @@ test-lz4-sparse: lz4 datagen
 
 test-lz4-contentSize: lz4 datagen
 	@echo ---- test original size support ----
-	./datagen -g15M | ./lz4 -v | ./lz4 -t
-	./datagen -g15M | ./lz4 -v --frame-content-size | ./lz4 -t
+	./datagen -g15M > tmp
+	./lz4 -v tmp | ./lz4 -t
+	./lz4 -v --frame-content-size tmp | ./lz4 -d > tmp2
+	diff -s tmp tmp2
+	@rm tmp*
 
-test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize
-	@echo ---- test lz4 basic compression/decompression ----
-	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
-	./datagen         | ./lz4        | ./lz4 -t
-	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
-	./datagen -g17M   | ./lz4 -9v    | ./lz4 -tq
-	./datagen -g33M   | ./lz4 --no-frame-crc | ./lz4 -t
-	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -t
+test-lz4-frame-concatenation: lz4 datagen
 	@echo ---- test frame concatenation ----
 	@echo -n > empty.test
 	@echo hi > nonempty.test
@@ -184,6 +178,18 @@ test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize
 	sdiff orig.test result.test
 	@rm *.test
 	@echo frame concatenation test completed
+
+test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
+	@echo ---- test lz4 basic compression/decompression ----
+	./datagen -g0     | ./lz4 -v     | ./lz4 -t
+	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
+	./datagen         | ./lz4        | ./lz4 -t
+	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
+	./datagen -g17M   | ./lz4 -9v    | ./lz4 -tq
+	./datagen -g33M   | ./lz4 --no-frame-crc | ./lz4 -t
+	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
+	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -t
+	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -t
 	@echo ---- test multiple input files ----
 	@./datagen -s1 > file1
 	@./datagen -s2 > file2
