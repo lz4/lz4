@@ -26,16 +26,16 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 # You can contact the author at :
-#  - LZ4 source repository : http://code.google.com/p/lz4/
+#  - LZ4 source repository : https://github.com/Cyan4973/lz4
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
 # Version number
-export VERSION=126
+export VERSION=128
 export RELEASE=r$(VERSION)
 
 DESTDIR?=
-PREFIX ?= /usr
+PREFIX ?= /usr/local
 
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -50,7 +50,7 @@ TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
 	Makefile lz4_block_format.txt LZ4_Frame_Format.html NEWS README.md \
 	cmake_unofficial/CMakeLists.txt \
 	$(PRGDIR)/fullbench.c $(PRGDIR)/lz4cli.c \
-	$(PRGDIR)/datagen.c $(PRGDIR)/fuzzer.c \
+	$(PRGDIR)/datagen.c $(PRGDIR)/datagen.h $(PRGDIR)/datagencli.c $(PRGDIR)/fuzzer.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
 	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
@@ -82,7 +82,7 @@ clean:
 	@rm -f $(DISTRIBNAME) *.sha1
 	@cd $(PRGDIR); $(MAKE) clean
 	@cd $(LZ4DIR); $(MAKE) clean
-	@cd examples; $(MAKE) clean
+	@cd examples;  $(MAKE) clean
 	@echo Cleaning completed
 
 
@@ -126,6 +126,15 @@ test-travis: $(TRAVIS_TARGET)
 
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
+
+gpptest: clean
+	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
+
+clangtest: clean
+	export CC=clang; $(MAKE) all
+
+staticAnalyze: clean
+	export CFLAGS=-g; scan-build -v $(MAKE) all
 
 streaming-examples:
 	cd examples; $(MAKE) -e test

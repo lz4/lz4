@@ -1,6 +1,6 @@
 /*
   LZ4io.h - LZ4 File/Stream Interface
-  Copyright (C) Yann Collet 2011-2014
+  Copyright (C) Yann Collet 2011-2015
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -18,7 +18,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
   You can contact the author at :
-  - LZ4 source repository : http://code.google.com/p/lz4/
+  - LZ4 source repository : https://github.com/Cyan4973/lz4
   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 /*
@@ -29,17 +29,18 @@
   - The license of this source file is GPLv2.
 */
 
+#pragma once
 
 /* ************************************************** */
 /* Special input/output values                        */
 /* ************************************************** */
 #define NULL_OUTPUT "null"
-static char stdinmark[] = "stdin";
-static char stdoutmark[] = "stdout";
+static char const stdinmark[] = "stdin";
+static char const stdoutmark[] = "stdout";
 #ifdef _WIN32
-static char nulmark[] = "nul";
+static char const nulmark[] = "nul";
 #else
-static char nulmark[] = "/dev/null";
+static char const nulmark[] = "/dev/null";
 #endif
 
 
@@ -47,8 +48,10 @@ static char nulmark[] = "/dev/null";
 /* ****************** Functions ********************* */
 /* ************************************************** */
 
-int LZ4IO_compressFilename  (char* input_filename, char* output_filename, int compressionlevel);
-int LZ4IO_decompressFilename(char* input_filename, char* output_filename);
+int LZ4IO_compressFilename  (const char* input_filename, const char* output_filename, int compressionlevel);
+int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename);
+
+int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionlevel);
 
 
 /* ************************************************** */
@@ -67,11 +70,17 @@ int LZ4IO_setBlockSizeID(int blockSizeID);
 typedef enum { LZ4IO_blockLinked=0, LZ4IO_blockIndependent} LZ4IO_blockMode_t;
 int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode);
 
-/* Default setting : no checksum */
+/* Default setting : no block checksum */
 int LZ4IO_setBlockChecksumMode(int xxhash);
 
-/* Default setting : checksum enabled */
+/* Default setting : stream checksum enabled */
 int LZ4IO_setStreamChecksumMode(int xxhash);
 
 /* Default setting : 0 (no notification) */
 int LZ4IO_setNotificationLevel(int level);
+
+/* Default setting : 0 (disabled) */
+int LZ4IO_setSparseFile(int enable);
+
+/* Default setting : 0 (disabled) */
+int LZ4IO_setContentSize(int enable);

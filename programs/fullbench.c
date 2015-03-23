@@ -19,17 +19,16 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-    - LZ4 source repository : http://code.google.com/p/lz4
-    - LZ4 source mirror : https://github.com/Cyan4973/lz4
+    - LZ4 source repository : https://github.com/Cyan4973/lz4
     - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-//**************************************
-// Compiler Options
-//**************************************
-// Disable some Visual warning messages
+/**************************************
+*  Compiler Options
+**************************************/
+/* Disable some Visual warning messages */
 #define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     // VS2005
+#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
 
 // Unix Large Files support (>4GB)
 #if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
@@ -45,9 +44,9 @@
 #endif
 
 
-//**************************************
-// Includes
-//**************************************
+/**************************************
+*  Includes
+**************************************/
 #include <stdlib.h>      // malloc
 #include <stdio.h>       // fprintf, fopen, ftello64
 #include <sys/types.h>   // stat64
@@ -68,10 +67,10 @@
 #include "xxhash.h"
 
 
-//**************************************
-// Compiler Options
-//**************************************
-// S_ISREG & gettimeofday() are not supported by MSVC
+/**************************************
+*  Compiler Options
+**************************************/
+/* S_ISREG & gettimeofday() are not supported by MSVC */
 #if !defined(S_ISREG)
 #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
@@ -82,9 +81,9 @@
 #endif
 
 
-//**************************************
-// Basic Types
-//**************************************
+/**************************************
+*  Basic Types
+**************************************/
 #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   // C99
 # include <stdint.h>
   typedef uint8_t  BYTE;
@@ -101,9 +100,9 @@
 #endif
 
 
-//****************************
-// Constants
-//****************************
+/**************************************
+*  Constants
+**************************************/
 #define PROGRAM_DESCRIPTION "LZ4 speed analyzer"
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION ""
@@ -114,17 +113,21 @@
 #define NBLOOPS    6
 #define TIMELOOP   2500
 
+#define KB *(1 <<10)
+#define MB *(1 <<20)
+#define GB *(1U<<30)
+
 #define KNUTH      2654435761U
-#define MAX_MEM    (1984<<20)
-#define DEFAULT_CHUNKSIZE   (4<<20)
+#define MAX_MEM    (1984 MB)
+#define DEFAULT_CHUNKSIZE   (4 MB)
 
 #define ALL_COMPRESSORS 0
 #define ALL_DECOMPRESSORS 0
 
 
-//**************************************
-// Local structures
-//**************************************
+/**************************************
+*  Local structures
+**************************************/
 struct chunkParameters
 {
     U32   id;
@@ -135,9 +138,9 @@ struct chunkParameters
 };
 
 
-//**************************************
-// MACRO
-//**************************************
+/**************************************
+*  MACRO
+**************************************/
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
 #define PROGRESS(...) no_prompt ? 0 : DISPLAY(__VA_ARGS__)
 
@@ -217,21 +220,26 @@ static int BMK_GetMilliSpan( int nTimeStart )
 
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
-    size_t step = (64U<<20);   // 64 MB
+    size_t step = 64 MB;
     BYTE* testmem=NULL;
 
-    requiredMem = (((requiredMem >> 25) + 1) << 26);
+    requiredMem = (((requiredMem >> 26) + 1) << 26);
+    requiredMem += 2*step;
     if (requiredMem > MAX_MEM) requiredMem = MAX_MEM;
 
-    requiredMem += 2*step;
     while (!testmem)
     {
-        requiredMem -= step;
+        if (requiredMem > step) requiredMem -= step;
+        else requiredMem >>= 1;
         testmem = (BYTE*) malloc ((size_t)requiredMem);
     }
-
     free (testmem);
-    return (size_t) (requiredMem - step);
+
+    /* keep some space available */
+    if (requiredMem > step) requiredMem -= step;
+    else requiredMem >>= 1;
+
+    return (size_t)requiredMem;
 }
 
 
@@ -251,8 +259,127 @@ static U64 BMK_GetFileSize(char* infilename)
 
 
 /*********************************************************
-  Benchmark function
+*  Benchmark function
 *********************************************************/
+#ifdef __SSSE3__
+
+#include <tmmintrin.h>
+
+/* Idea proposed by Terje Mathisen */
+static BYTE stepSize16[17] = {16,16,16,15,16,15,12,14,16,9,10,11,12,13,14,15,16};
+static __m128i replicateTable[17] = {
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1},
+    {0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,0},
+    {0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3},
+    {0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0},
+    {0,1,2,3,4,5,0,1,2,3,4,5,0,1,2,3},
+    {0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1},
+    {0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7},
+    {0,1,2,3,4,5,6,7,8,0,1,2,3,4,5,6},
+    {0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5},
+    {0,1,2,3,4,5,6,7,8,9,10,0,1,2,3,4},
+    {0,1,2,3,4,5,6,7,8,9,10,11,0,1,2,3},
+    {0,1,2,3,4,5,6,7,8,9,10,11,12,0,1,2},
+    {0,1,2,3,4,5,6,7,8,9,10,11,12,13,0,1},
+    {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,0},
+    {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}};
+static BYTE stepSize32[17] = {32,32,32,30,32,30,30,28,32,27,30,22,24,26,28,30,16};
+static __m128i replicateTable2[17] = {
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1},
+    {1,2,0,1,2,0,1,2,0,1,2,0,1,2,0,1},
+    {0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3},
+    {1,2,3,4,0,1,2,3,4,0,1,2,3,4,0,1},
+    {4,5,0,1,2,3,4,5,0,1,2,3,4,5,0,1},
+    {2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3},
+    {0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7},
+    {7,8,0,1,2,3,4,5,6,7,8,0,1,2,3,4},
+    {6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1},
+    {5,6,7,8,9,10,0,1,2,3,4,5,6,7,8,9},
+    {4,5,6,7,8,9,10,11,0,1,2,3,4,5,6,7},
+    {3,4,5,6,7,8,9,10,11,12,0,1,2,3,4,5},
+    {2,3,4,5,6,7,8,9,10,11,12,13,0,1,2,3},
+    {1,2,3,4,5,6,7,8,9,10,11,12,13,14,0,1},
+    {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}};
+
+U32 lz4_decode_sse(BYTE* dest, BYTE* src, U32 srcLength)
+{
+    BYTE* d = dest, *e = src+srcLength;
+    unsigned token, lit_len, mat_len;
+    __m128i a;
+    BYTE* dstore, *msrc;
+
+    if (!srcLength) return 0;
+    goto start;
+
+    do {
+        U32 step;
+        unsigned mat_offset = src[0] + (src[1] << 8);
+        src += 2;
+        msrc = d - mat_offset;
+        if (mat_len == 15) {
+            do {
+                token = *src++;
+                mat_len += token;
+            } while (token == 255);
+        }
+        mat_len += 4;
+
+        dstore = d;
+        d += mat_len;
+
+        if (mat_offset <= 16)
+        { // Bulk store only!
+            __m128i a2;
+            a = _mm_loadu_si128((const __m128i *)msrc);
+            a2 = _mm_shuffle_epi8(a, replicateTable2[mat_offset]);
+            a = _mm_shuffle_epi8(a, replicateTable[mat_offset]);
+            step = stepSize32[mat_offset];
+            do {
+                _mm_storeu_si128((__m128i *)dstore, a);
+                _mm_storeu_si128((__m128i *)(dstore+16), a2);
+                dstore += step;
+            } while (dstore < d);
+        }
+        else
+        {
+            do
+            {
+                a = _mm_loadu_si128((const __m128i *)msrc);
+                _mm_storeu_si128((__m128i *)dstore, a);
+                msrc += sizeof(a);
+                dstore += sizeof(a);
+            } while (dstore < d);
+        }
+start:
+        token = *src++;
+        lit_len = token >> 4;
+        mat_len = token & 15;
+        if (token >= 0xf0) { // lit_len == 15
+            do {
+                token = *src++;
+                lit_len += token;
+            } while (token == 255);
+        }
+        dstore = d;
+        msrc = src;
+        d += lit_len;
+        src += lit_len;
+        do {
+            a = _mm_loadu_si128((const __m128i *)msrc);
+            _mm_storeu_si128((__m128i *)dstore, a);
+            msrc += sizeof(a);
+            dstore += sizeof(a);
+        } while (dstore < d);
+    } while (src < e);
+
+    return (U32)(d-dest);
+}
+#endif // __SSSE3__
+
 
 static int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
 {
@@ -345,6 +472,7 @@ static int local_LZ4_saveDictHC(const char* in, char* out, int inSize)
 static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
+    //lz4_decode_sse((BYTE*)out, (BYTE*)in, inSize);
     LZ4_decompress_fast(in, out, outSize);
     return outSize;
 }
@@ -446,7 +574,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
       // Memory allocation & restrictions
       inFileSize = BMK_GetFileSize(inFileName);
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize) / 2;
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
       {
@@ -567,7 +697,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 milliTime = BMK_GetMilliStart();
                 while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
                 {
-                    if (initFunction!=NULL) ctx = initFunction(chunkP[0].origBuffer);
+                    if (initFunction!=NULL) ctx = (LZ4_stream_t*)initFunction(chunkP[0].origBuffer);
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
                     {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
@@ -677,7 +807,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
                 PROGRESS("%1i- %-29.29s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
 
-                // CRC Checking
+                /* CRC Checking */
                 crcDecoded = XXH32(orig_buff, (int)benchedSize, 0);
                 if (crcOriginal!=crcDecoded) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOriginal, (unsigned)crcDecoded); exit(1); }
             }

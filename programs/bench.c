@@ -1,6 +1,7 @@
 /*
-    bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2014
+    bench.c - Demo program to benchmark open-source compression algorithms
+    Copyright (C) Yann Collet 2012-2015
+
     GPL v2 License
 
     This program is free software; you can redistribute it and/or modify
@@ -18,16 +19,18 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-    - LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
-    - LZ4 source repository : http://code.google.com/p/lz4/
+    - LZ4 source repository : https://github.com/Cyan4973/lz4
+    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 /**************************************
 *  Compiler Options
 ***************************************/
-/* Disable some Visual warning messages */
-#define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
+#if defined(_MSC_VER) || defined(_WIN32)
+#  define _CRT_SECURE_NO_WARNINGS
+#  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
+#  define BMK_LEGACY_TIMER 1           /* S_ISREG & gettimeofday() are not supported by MSVC */
+#endif
 
 /* Unix Large Files support (>4GB) */
 #define _FILE_OFFSET_BITS 64
@@ -35,11 +38,6 @@
 #  define _LARGEFILE_SOURCE
 #elif ! defined(__LP64__)                        /* No point defining Large file for 64 bit */
 #  define _LARGEFILE64_SOURCE
-#endif
-
-/* S_ISREG & gettimeofday() are not supported by MSVC */
-#if defined(_MSC_VER) || defined(_WIN32)
-#  define BMK_LEGACY_TIMER 1
 #endif
 
 
@@ -141,15 +139,15 @@ static int chunkSize = DEFAULT_CHUNKSIZE;
 static int nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 
-void BMK_SetBlocksize(int bsize) { chunkSize = bsize; }
+void BMK_setBlocksize(int bsize) { chunkSize = bsize; }
 
-void BMK_SetNbIterations(int nbLoops)
+void BMK_setNbIterations(int nbLoops)
 {
     nbIterations = nbLoops;
     DISPLAY("- %i iterations -\n", nbIterations);
 }
 
-void BMK_SetPause(void) { BMK_pause = 1; }
+void BMK_setPause(void) { BMK_pause = 1; }
 
 
 /*********************************************************
@@ -206,16 +204,21 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 
     while (!testmem)
     {
-        requiredMem -= step;
+        if (requiredMem > step) requiredMem -= step;
+        else requiredMem >>= 1;
         testmem = (BYTE*) malloc ((size_t)requiredMem);
     }
-
     free (testmem);
-    return (size_t) (requiredMem - step);
+
+    /* keep some space available */
+    if (requiredMem > step) requiredMem -= step;
+    else requiredMem >>= 1;
+
+    return (size_t)requiredMem;
 }
 
 
-static U64 BMK_GetFileSize(char* infilename)
+static U64 BMK_GetFileSize(const char* infilename)
 {
     int r;
 #if defined(_MSC_VER)
@@ -234,7 +237,7 @@ static U64 BMK_GetFileSize(char* infilename)
 *  Public function
 **********************************************************/
 
-int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
+int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 {
   int fileIdx=0;
   char* orig_buff;
@@ -265,7 +268,7 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
   while (fileIdx<nbFiles)
   {
       FILE*  inFile;
-      char*  inFileName;
+      const char*  inFileName;
       U64    inFileSize;
       size_t benchedSize;
       int nbChunks;
@@ -286,7 +289,9 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
       /* Memory allocation & restrictions */
       inFileSize = BMK_GetFileSize(inFileName);
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
       {
@@ -295,11 +300,11 @@ int BMK_benchFile(char** fileNamesTable, int nbFiles, int cLevel)
 
       /* Alloc */
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)chunkSize)+1) * sizeof(struct chunkParameters));
-      orig_buff = (char*)malloc((size_t )benchedSize);
+      orig_buff = (char*)malloc((size_t)benchedSize);
       nbChunks = (int) ((int)benchedSize / chunkSize) + 1;
       maxCompressedChunkSize = LZ4_compressBound(chunkSize);
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
-      compressedBuffer = (char*)malloc((size_t )compressedBuffSize);
+      compressedBuffer = (char*)malloc((size_t)compressedBuffSize);
 
 
       if (!orig_buff || !compressedBuffer)

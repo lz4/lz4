@@ -9,13 +9,13 @@ A high compression derivative, called LZ4_HC, is also provided. It trades CPU ti
 |master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) |
 |dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) |
 
-This is an official mirror of LZ4 project, [hosted on Google Code](http://code.google.com/p/lz4/).
-The intention is to offer github's capabilities to lz4 users, such as cloning, branch, pull requests or source download.
 
-The "master" branch will reflect, the status of lz4 at its official homepage.
-The "dev" branch is the one where all contributions will be merged. If you plan to propose a patch, please commit into the "dev" branch. Direct commit to "master" are not permitted.
-Feature branches will also exist, typically to introduce new requirements, and be temporarily available for testing before merge into "dev" branch.
+> **Branch Policy:**
 
+> - The "master" branch is considered stable, at all times.
+> - The "dev" branch is the one where all contributions must be merged before being promoted to master.
+>  - If you plan to propose a patch, please commit into the "dev" branch. Direct commit to "master" are not permitted.
+> - Feature branches can also exist, for dedicated testing of larger modifications before merge into "dev" branch.
 
 Benchmarks
 -------------------------

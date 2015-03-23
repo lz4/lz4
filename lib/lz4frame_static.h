@@ -29,8 +29,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
-   - LZ4 source repository : http://code.google.com/p/lz4/
-   - LZ4 source mirror : https://github.com/Cyan4973/lz4
+   - LZ4 source repository : https://github.com/Cyan4973/lz4
    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
@@ -53,6 +52,9 @@ extern "C" {
         ITEM(ERROR_compressionLevel_invalid) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_frameSize_wrong) \
+        ITEM(ERROR_frameType_unknown) \
+        ITEM(ERROR_wrongSrcPtr) \
         ITEM(ERROR_decompressionFailed) \
         ITEM(ERROR_checksum_invalid) \
         ITEM(ERROR_maxCode)

@@ -28,8 +28,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
-   - LZ4 source repository : http://code.google.com/p/lz4/
-   - LZ4 source mirror : https://github.com/Cyan4973/lz4
+   - LZ4 source repository : https://github.com/Cyan4973/lz4
    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
@@ -66,19 +65,22 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code str
 typedef enum { LZ4F_default=0, max64KB=4, max256KB=5, max1MB=6, max4MB=7 } blockSizeID_t;
 typedef enum { blockLinked=0, blockIndependent} blockMode_t;
 typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
+typedef enum { LZ4F_frame=0, skippableFrame } frameType_t;
 
 typedef struct {
-  blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
-  blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
-  contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  unsigned          reserved[5];
+  blockSizeID_t      blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
+  blockMode_t        blockMode;             /* blockLinked, blockIndependent ; 0 == default */
+  contentChecksum_t  contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
+  frameType_t        frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
+  unsigned long long frameOSize;            /* Size of uncompressed (original) content ; 0 == unknown */
+  unsigned           reserved[2];           /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   unsigned         compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16 */
-  unsigned         autoFlush;              /* 1 == always flush : reduce need for tmp buffer */
-  unsigned         reserved[4];
+  unsigned         autoFlush;              /* 1 == always flush (reduce need for tmp buffer) */
+  unsigned         reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
 
@@ -130,7 +132,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferencesPtr);
 /* LZ4F_compressBegin() :
  * will write the frame header into dstBuffer.
- * dstBuffer must be large enough to accommodate a header (dstMaxSize). Maximum header size is 19 bytes.
+ * dstBuffer must be large enough to accommodate a header (dstMaxSize). Maximum header size is 15 bytes.
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
  * The result of the function is the number of bytes written into dstBuffer for the header
  * or an error code (can be tested using LZ4F_isError())
@@ -215,7 +217,7 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t ctx,
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
  * The function result is an hint of how many srcSize bytes LZ4F_decompress() expects for next call,
- * or an error code which can be tested using LZ4F_isError().
+ *                        or an error code which can be tested using LZ4F_isError().
  */
 
 size_t LZ4F_decompress(LZ4F_decompressionContext_t ctx,
