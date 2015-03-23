@@ -59,12 +59,19 @@ files as is.
 .B lz4
 will decompress such files as if they were a single
 .B .lz4
-file.
+file. For example:
+  lz4 file1  > foo.lz4
+  lz4 file2 >> foo.lz4
+ then
+  lz4cat foo.lz4
+ is equivalent to :
+  cat file1 file2
+
 .PP
 
 .SH OPTIONS
 .
-.SS "Short command concatenation"
+.SS "Short commands concatenation"
 In some cases, some options can be expressed using short command
 .B "-x"
 or long command
@@ -75,6 +82,9 @@ is equivalent to
 .B "-dc" .
 Long commands cannot be concatenated.
 They must be clearly separated by a space.
+.SS "Multiple commands"
+When multiple contradictory commands are issued on a same command line,
+only the latest one will be applied.
 .
 .SS "Operation mode"
 If multiple operation mode options are given,
@@ -171,10 +181,10 @@ with the resulting compressed file named
 .B \--no-frame-crc
  disable stream checksum (default:enabled)
 .TP
-.B \--frame-content-size
+.B \--content-size
  compressed frame includes original size (default:not present)
 .TP
-.B \--sparse-support 
+.B \--sparse 
  enable sparse file (default:disabled)(experimental)
 .TP
 .B \-l
