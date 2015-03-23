@@ -53,7 +53,7 @@ TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
 	$(PRGDIR)/datagen.c $(PRGDIR)/datagen.h $(PRGDIR)/datagencli.c $(PRGDIR)/fuzzer.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
-	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
+	$(PRGDIR)/lz4.1 \
 	$(PRGDIR)/Makefile $(PRGDIR)/COPYING	
 NONTEXT = images/image00.png images/image01.png images/image02.png \
 	images/image03.png images/image04.png images/image05.png \
