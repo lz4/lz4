@@ -79,10 +79,10 @@ lz4programs:
 	@cd $(PRGDIR); $(MAKE) -e
 
 clean:
-	@rm -f $(DISTRIBNAME) *.sha1
-	@cd $(PRGDIR); $(MAKE) clean
-	@cd $(LZ4DIR); $(MAKE) clean
-	@cd examples;  $(MAKE) clean
+	@rm -f $(DISTRIBNAME) *.sha1 > /dev/null
+	@cd $(PRGDIR); $(MAKE) clean > /dev/null
+	@cd $(LZ4DIR); $(MAKE) clean > /dev/null
+	@cd examples;  $(MAKE) clean > /dev/null
 	@echo Cleaning completed
 
 
