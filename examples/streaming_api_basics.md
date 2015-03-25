@@ -1,5 +1,5 @@
 # LZ4 Streaming API Basics
-
+by *Takayuki Matsuoka*
 ## LZ4 API sets
 
 LZ4 has the following API sets :
