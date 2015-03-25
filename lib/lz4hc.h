@@ -79,7 +79,7 @@ int LZ4_compressHC2_limitedOutput (const char* source, char* dest, int inputSize
 
 
 /**************************************
-   Using an external allocation
+*  Using an external allocation
 **************************************/
 int LZ4_sizeofStateHC(void);
 int LZ4_compressHC_withStateHC               (void* state, const char* source, char* dest, int inputSize);
@@ -102,12 +102,18 @@ They just use the externally allocated memory for state instead of allocating th
 
 
 
+/*****************************
+*  Includes
+*****************************/
+#include <stddef.h>   /* size_t */
+
+
 /**************************************
-   Experimental Streaming Functions
+*  Experimental Streaming Functions
 **************************************/
-#define LZ4_STREAMHCSIZE_U64 32774
-#define LZ4_STREAMHCSIZE     (LZ4_STREAMHCSIZE_U64 * sizeof(unsigned long long))
-typedef struct { unsigned long long table[LZ4_STREAMHCSIZE_U64]; } LZ4_streamHC_t;
+#define LZ4_STREAMHCSIZE        262192
+#define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
+typedef struct { size_t table[LZ4_STREAMHCSIZE_SIZET]; } LZ4_streamHC_t;
 /*
 LZ4_streamHC_t
 This structure allows static allocation of LZ4 HC streaming state.
