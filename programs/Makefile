@@ -61,9 +61,13 @@ endif
 TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
 
 
-default: lz4 lz4c
+default: lz4
 
-all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest frametest32 datagen
+m32: lz4c32 fullbench32 fuzzer32 frametest32
+
+bins: lz4 lz4c fullbench fuzzer frametest datagen
+
+all: bins m32
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)

@@ -127,14 +127,18 @@ test-travis: $(TRAVIS_TARGET)
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
-gpptest: clean
-	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
-
 clangtest: clean
 	export CC=clang; $(MAKE) all
 
 staticAnalyze: clean
 	export CFLAGS=-g; scan-build -v $(MAKE) all
+
+gpptest: clean
+	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
+
+armtest: clean
+	export CC=arm-linux-gnueabi-gcc; cd lib; $(MAKE) -e all
+	export CC=arm-linux-gnueabi-gcc; cd programs; $(MAKE) -e bins
 
 streaming-examples:
 	cd examples; $(MAKE) -e test
