@@ -1,111 +1,95 @@
-# ##########################################################################
-# LZ4 programs - Makefile
+# ################################################################
+# LZ4 - Makefile
 # Copyright (C) Yann Collet 2011-2015
-#
-# GPL v2 License
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
+# All rights reserved.
+# 
+# BSD license
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+# 
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+# 
+# * Redistributions in binary form must reproduce the above copyright notice, this
+#   list of conditions and the following disclaimer in the documentation and/or
+#   other materials provided with the distribution.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
 # You can contact the author at :
 #  - LZ4 source repository : https://github.com/Cyan4973/lz4
-#  - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
-# ##########################################################################
-# lz4 : Command Line Utility, supporting gzip-like arguments
-# lz4c  : CLU, supporting also legacy lz4demo arguments
-# lz4c32: Same as lz4c, but forced to compile in 32-bits mode
-# fuzzer  : Test tool, to check lz4 integrity on target platform
-# fuzzer32: Same as fuzzer, but forced to compile in 32-bits mode
-# fullbench  : Precisely measure speed for each LZ4 function variant
-# fullbench32: Same as fullbench, but forced to compile in 32-bits mode
-# ##########################################################################
+#  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
+# ################################################################
 
-RELEASE?= r128
+# Version number
+export VERSION=128
+export RELEASE=r$(VERSION)
 
 DESTDIR?=
 PREFIX ?= /usr/local
-CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
-BINDIR=$(PREFIX)/bin
-MANDIR=$(PREFIX)/share/man/man1
-LZ4DIR=../lib
+LIBDIR ?= $(PREFIX)/lib
+INCLUDEDIR=$(PREFIX)/include
+PRGDIR  = programs
+LZ4DIR  = lib
+DISTRIBNAME=lz4-$(RELEASE).tar.gz
 
-TEST_FILES = COPYING
-TEST_TARGETS=test-native
+TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
+	$(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h \
+	$(LZ4DIR)/xxhash.c $(LZ4DIR)/xxhash.h \
+	$(LZ4DIR)/liblz4.pc.in $(LZ4DIR)/Makefile $(LZ4DIR)/LICENSE \
+	Makefile lz4_block_format.txt LZ4_Frame_Format.html NEWS README.md \
+	cmake_unofficial/CMakeLists.txt \
+	$(PRGDIR)/fullbench.c $(PRGDIR)/lz4cli.c \
+	$(PRGDIR)/datagen.c $(PRGDIR)/datagen.h $(PRGDIR)/datagencli.c $(PRGDIR)/fuzzer.c \
+	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
+	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
+	$(PRGDIR)/lz4.1 \
+	$(PRGDIR)/Makefile $(PRGDIR)/COPYING	
+NONTEXT = images/image00.png images/image01.png images/image02.png \
+	images/image03.png images/image04.png images/image05.png \
+	images/image06.png
+SOURCES = $(TEXT) $(NONTEXT)
 
 
-# Define *.exe as extension for Windows systems
+# Select test target for Travis CI's Build Matrix
+ifneq (,$(filter test-%,$(LZ4_TRAVIS_CI_ENV)))
+TRAVIS_TARGET=prg-travis
+else
+TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
+endif
+
+# Define nul output
 ifneq (,$(filter Windows%,$(OS)))
-EXT =.exe
 VOID = nul
 else
-EXT =
 VOID = /dev/null
 endif
 
 
-# Select test target for Travis CI's Build Matrix
-TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
+default: lz4programs
 
+all: 
+	@cd $(LZ4DIR); $(MAKE) -e all
+	@cd $(PRGDIR); $(MAKE) -e all
 
-default: lz4
-
-m32: lz4c32 fullbench32 fuzzer32 frametest32
-
-bins: lz4 lz4c fullbench fuzzer frametest datagen
-
-all: bins m32
-
-lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
-
-lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC)      $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
-
-lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC) -m32 $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
-
-fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
-
-fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
-	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
-
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
-
-fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
-	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
-
-frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
-
-frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
-	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
-
-datagen : datagen.c datagencli.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+lz4programs:
+	@cd $(PRGDIR); $(MAKE) -e
 
 clean:
-	@rm -f core *.o *.test \
-        lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
-        fullbench$(EXT) fullbench32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) \
-        frametest$(EXT) frametest32$(EXT) \
-        datagen$(EXT)
+	@rm -f $(DISTRIBNAME) *.sha1 > $(VOID)
+	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
+	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
+	@cd examples;  $(MAKE) clean > $(VOID)
 	@echo Cleaning completed
 
 
@@ -113,142 +97,60 @@ clean:
 #make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
-install: lz4 lz4c
-	@echo Installing binaries
-	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4 $(DESTDIR)$(BINDIR)/lz4
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
-	@install -m 755 lz4c $(DESTDIR)$(BINDIR)/lz4c
-	@echo Installing man pages
-	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1
-	@echo lz4 installation completed
+install:
+	@cd $(LZ4DIR); $(MAKE) -e install
+	@cd $(PRGDIR); $(MAKE) -e install
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/lz4cat
-	rm -f $(DESTDIR)$(BINDIR)/unlz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
-	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
-	rm -f $(DESTDIR)$(MANDIR)/lz4c.1
-	rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
-	rm -f $(DESTDIR)$(MANDIR)/unlz4.1
-	@echo lz4 programs successfully uninstalled
+	@cd $(LZ4DIR); $(MAKE) uninstall
+	@cd $(PRGDIR); $(MAKE) uninstall
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
+travis-install:
+	sudo $(MAKE) install
 
-test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
+dist: clean
+	@install -dD -m 700 lz4-$(RELEASE)/lib/
+	@install -dD -m 700 lz4-$(RELEASE)/programs/
+	@install -dD -m 700 lz4-$(RELEASE)/cmake_unofficial/
+	@install -dD -m 700 lz4-$(RELEASE)/images/
+	@for f in $(TEXT); do \
+		tr -d '\r' < $$f > .tmp; \
+		install -m 600 .tmp lz4-$(RELEASE)/$$f; \
+	done
+	@rm .tmp
+	@for f in $(NONTEXT); do \
+		install -m 600 $$f lz4-$(RELEASE)/$$f; \
+	done
+	@tar -czf $(DISTRIBNAME) lz4-$(RELEASE)/
+	@rm -rf lz4-$(RELEASE)
+	@sha1sum $(DISTRIBNAME) > $(DISTRIBNAME).sha1
+	@echo Distribution $(DISTRIBNAME) built
 
-test-all: test test32
+test:
+	@cd $(PRGDIR); $(MAKE) -e test
 
 test-travis: $(TRAVIS_TARGET)
 
-test-lz4-sparse: lz4 datagen
-	@echo ---- test sparse file support ----
-	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dv --sparse > tmpB4
-	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dv --sparse > tmpB5
-	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dv --sparse > tmpB6
-	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dv --sparse > tmpB7
-	ls -ls tmp*
-	./datagen -g50M -P100 | diff -s - tmpB4
-	./datagen -g50M -P100 | diff -s - tmpB5
-	./datagen -g50M -P100 | diff -s - tmpB6
-	./datagen -g50M -P100 | diff -s - tmpB7
-	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
-	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
-	ls -ls tmpOdd
-	@rm tmp*
+cmake:
+	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
-test-lz4-contentSize: lz4 datagen
-	@echo ---- test original size support ----
-	./datagen -g15M > tmp
-	./lz4 -v tmp | ./lz4 -t
-	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
-	diff -s tmp tmp2
-	@rm tmp*
+clangtest: clean
+	export CC=clang; $(MAKE) all
 
-test-lz4-frame-concatenation: lz4 datagen
-	@echo ---- test frame concatenation ----
-	@echo -n > empty.test
-	@echo hi > nonempty.test
-	cat nonempty.test empty.test nonempty.test > orig.test
-	@./lz4 -zq empty.test > empty.lz4.test
-	@./lz4 -zq nonempty.test > nonempty.lz4.test
-	cat nonempty.lz4.test empty.lz4.test nonempty.lz4.test > concat.lz4.test
-	./lz4 -d concat.lz4.test > result.test
-	sdiff orig.test result.test
-	@rm *.test
-	@echo frame concatenation test completed
+staticAnalyze: clean
+	export CFLAGS=-g; scan-build -v $(MAKE) all
 
-test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
-	@echo ---- test lz4 basic compression/decompression ----
-	./datagen -g0     | ./lz4 -v     | ./lz4 -t
-	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
-	./datagen         | ./lz4        | ./lz4 -t
-	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
-	./datagen -g17M   | ./lz4 -9v    | ./lz4 -tq
-	./datagen -g33M   | ./lz4 --no-frame-crc | ./lz4 -t
-	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -t
-	@echo ---- test multiple input files ----
-	@./datagen -s1 > file1
-	@./datagen -s2 > file2
-	@./datagen -s3 > file3
-	./lz4 -f -m file1 file2 file3
-	ls -l file*
-	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
-	@echo ---- test pass-through ----
-	./datagen | ./lz4 -tf
+gpptest: clean
+	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
 
-test-lz4c: lz4c datagen
-	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -t
+armtest: clean
+	export CC=arm-linux-gnueabi-gcc; cd lib; $(MAKE) -e all
+	export CC=arm-linux-gnueabi-gcc; cd programs; $(MAKE) -e bins
 
-test-lz4c32: lz4 lz4c32 datagen
-	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
-	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
-	./datagen         | ./lz4c32        | ./lz4c32 -t
-	./datagen         | ./lz4c32        | ./lz4    -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -t
-	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -t
-	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -t
+streaming-examples:
+	cd examples; $(MAKE) -e test
 
-test-fullbench: fullbench
-	./fullbench --no-prompt $(TEST_FILES)
-
-test-fullbench32: fullbench32
-	./fullbench32 --no-prompt $(TEST_FILES)
-
-test-fuzzer: fuzzer
-	./fuzzer
-
-test-fuzzer32: fuzzer32
-	./fuzzer32
-
-test-frametest: frametest
-	./frametest
-
-test-frametest32: frametest32
-	./frametest32
-
-test-mem: lz4 datagen fuzzer frametest
-	valgrind --leak-check=yes ./datagen -g50M > $(VOID)
-	./datagen -g16KB > tmp
-	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
-	./datagen -g16MB > tmp
-	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
-	valgrind --leak-check=yes ./lz4 -t tmp2
-	./datagen -g256MB > tmp
-	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp $(VOID)
-	rm tmp*
-	valgrind --leak-check=yes ./fuzzer -i64 -t1
-	valgrind --leak-check=yes ./frametest -i256
-
-test-mem32: lz4c32 datagen
-# unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
+prg-travis:
+	@cd $(PRGDIR); $(MAKE) -e test-travis
 
 endif
