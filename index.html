@@ -60,6 +60,56 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
   </tr>
 </table>
 
+The LZ4 block compression format is detailed within [lz4_block_format.txt](lz4_block_format.txt).
+
+For streaming unknown amount of data, and compress files of any size, a frame format has been published, and can be consulted within the file [LZ4_Frame_Format.html](LZ4_Frame_Format.html).
+
+## Interoperable LZ4 versions :
+The following versions are provided for languages beyond the C reference version. They are in conformance with the LZ4 frame specification and are therefore interoperable.
+
+* __Javascript__ : by Pierre Curto, at https://github.com/pierrec/node-lz4
+* __C++11__ multi-threads : by Takayuki Matsuoka, at https://github.com/t-mat/lz4mt
+* __Python__ : by Christopher Jackson, at https://github.com/darkdragn/lz4tools
+* __Delphi__ : by Hanno Hugenberg, at https://github.com/Hugie/lz4-delphi
+* __Go__ : by Pierre Curto, at https://github.com/pierrec/lz4
+* __Rust__ : by Artem Navrotskiy, at https://github.com/bozaro/lz4-rs
+
+## Other Source versions :
+The following versions compress data blocks using LZ4 compression algorithm in multiple languages. Each version encapsulates the compressed result into its own header/frame format convention.
+
+* __Java__ : by Adrien Grand, at https://github.com/jpountz/lz4-java
+* __Python__ : by Steeve Morin, at http://pypi.python.org/pypi/lz4
+* __Perl__ : by Gray, at http://search.cpan.org/dist/Compress-LZ4/
+* __C#__ : by Milosz Krajewski, at http://lz4net.codeplex.com
+* __C#__ streaming : by Phill Djonov, at https://github.com/pdjonov/Lz4Stream
+* __Go__ : by Branimir Karadzic, at https://github.com/bkaradzic/go-lz4
+* __Ruby__ : by Komiya Atsushi, at http://rubygems.org/gems/lz4-ruby
+* __PHP__ : by Kamijo, at https://github.com/kjdev/php-ext-lz4
+* __Lua__ : by Christophe Delord, at http://cdsoft.fr/bl/bonaluna.html
+* __Haskell__ : by Mark Wotton, at http://hackage.haskell.org/package/lz4
+* __Erlang__ : by Tetsuya Suzuki, at https://github.com/szktty/erlang-lz4
+* __Smalltalk__ (Pharo) : by Mariano Martinez Peck, at http://smalltalkhub.com/#!/~marianopeck/LZ4/
+* __OCaml__ : by Peter Zotov, at https://github.com/whitequark/ocaml-lz4
+* __Rust__ : by Alex Crichton, at http://alexcrichton.com/rust-compress/compress/lz4/index.html
+* __8088 assembly__ decoder, by Jim Leonard, at http://www.oldskool.org/pc/lz4_8088
+* __6502 & 65C02 assembly__ decoder, by Peter Ferrie, at http://pferrie.host22.com/misc/appleii.htm
+* __Atari XL/XE assembly__ decoder, by xxl, at http://xxl.atari.pl/?p=1524
+* __65c816 assembly__ decoder, by Olivier Zardini, at http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
+
+## LZ4 is used by
+
+* __Operating Systems__ : <img src="http://static.commentcamarche.net/www.commentcamarche.net/faq/images/7283-linux-online-inc-s-.png" height=50 alt="Linux"/> [Linux](https://github.com/torvalds/linux), <img src="http://blog.xen.org/wp-content/uploads/2014/01/Freebsd-logo.png" height=50 alt="FreeBSD"/> [FreeBSD](http://www.freebsd.org/), <img src="http://cloud.ohloh.net/attachments/38708/64x64-RGB_med.png" height=50 alt="Illumos"/> [Illumos](http://wiki.illumos.org/display/illumos/illumos+Home), <img src="http://everycity.co.uk/wp-content/uploads/logos/supported/platforms/smartos_200_200.png" height=50 alt="SmartOS"/> [SmartOS](http://smartos.org/)
+* __File Systems__ : OpenZFS, Hammer2, SquashFS, LessFS, LeoFS, Grub
+* __Big Data__ : Hadoop, Cassandra, Hbase, Rarelogic, SparkSpark, Hustle
+* __Search Engine__ : Lucene, Solr, Scalyr, kafka
+* __Database__ : MySQL, Tokudb, Delphix, infiniSQL, RocksDB, OlegDB
+* __Games__ : Battlefield 4, Guild Wars 2, Sine Mora, 1000 Tiny Claws
+* __Graphics__ : nVidia, Enlightenment, Xpra, OpenVDB, Scaplib, kanzi
+* __Network__ : freeNAS, openVPN, Netty, dovecot, virtualHere
+* __Storage__ : Datastax, Nimble Storage, Nexenta, K2 Spear, Syneto OS
+* __Caching__ : Zram, HHVM, PHP Zend Optimizer
+* __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
+
 </xmp>
 
 <script src="strapdown/v/0.2/strapdown.js"></script>
