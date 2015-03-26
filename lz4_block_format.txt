@@ -1,6 +1,7 @@
-LZ4 Format Description
-Last revised: 2012-02-27
-Author : Y. Collet
+LZ4 Block Format Description
+============================
+Last revised: 2015-03-26;
+Author : Yann Collet
 
 
 
@@ -11,19 +12,19 @@ using any programming language.
 LZ4 is an LZ77-type compressor with a fixed, byte-oriented encoding.
 The most important design principle behind LZ4 is simplicity.
 It helps to create an easy to read and maintain source code.
-It also helps later on for optimisations, compactness, and speed.
-There is no entropy encoder backend nor framing layer.
+It also helps later on for optimizations, compactness, and speed.
+There is no entropy encoder back-end nor framing layer.
 The latter is assumed to be handled by other parts of the system.
 
-This document only describes the format,
+This document only describes the block format,
 not how the LZ4 compressor nor decompressor actually work.
 The correctness of the decompressor should not depend
 on implementation details of the compressor, and vice versa.
 
 
 
--- Compressed block format --
-
+Compressed block format
+-----------------------
 An LZ4 compressed block is composed of sequences.
 Schematically, a sequence is a suite of literals, followed by a match copy.
 
@@ -90,8 +91,8 @@ On decoding the matchlength, we reach the end of the compressed sequence,
 and therefore start another one.
 
 
--- Parsing restrictions --
-
+Parsing restrictions
+-----------------------
 There are specific parsing rules to respect in order to remain compatible
 with assumptions made by the decoder :
 1) The last 5 bytes are always literals
@@ -104,8 +105,8 @@ Note that the last sequence is also incomplete,
 and stops right after literals.
 
 
--- Additional notes --
-
+Additional notes
+-----------------------
 There is no assumption nor limits to the way the compressor
 searches and selects matches within the source data block.
 It could be a fast scan, a multi-probe, a full search using BST,
