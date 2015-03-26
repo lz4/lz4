@@ -54,3 +54,7 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
   </tr>
 </table>
 
+The LZ4 block compression format is detailed within [lz4_block_format.txt](lz4_block_format.txt).
+
+For streaming unknown amount of data and compress files of any size, a frame format has been published, and can be consulted within the file LZ4_Frame_Format.html .
+
