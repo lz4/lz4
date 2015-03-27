@@ -3,19 +3,21 @@ compiler: gcc
 script: make test-travis
 before_install:
   - sudo apt-get update  -qq
+  - sudo apt-get install -qq gcc-arm-linux-gnueabi
   - sudo apt-get install -qq clang
   - sudo apt-get install -qq g++-multilib
   - sudo apt-get install -qq gcc-multilib
   - sudo apt-get install -qq valgrind
 
 env:
+  - LZ4_TRAVIS_CI_ENV=dist
   - LZ4_TRAVIS_CI_ENV=travis-install
   - LZ4_TRAVIS_CI_ENV=streaming-examples
   - LZ4_TRAVIS_CI_ENV=cmake
-  - LZ4_TRAVIS_CI_ENV=gpptest
   - LZ4_TRAVIS_CI_ENV=clangtest
   - LZ4_TRAVIS_CI_ENV=staticAnalyze
-  - LZ4_TRAVIS_CI_ENV=dist
+  - LZ4_TRAVIS_CI_ENV=gpptest
+  - LZ4_TRAVIS_CI_ENV=armtest
   - LZ4_TRAVIS_CI_ENV=test-lz4
   - LZ4_TRAVIS_CI_ENV=test-lz4c
   - LZ4_TRAVIS_CI_ENV=test-lz4c32

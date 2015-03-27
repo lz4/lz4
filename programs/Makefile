@@ -61,9 +61,13 @@ endif
 TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
 
 
-default: lz4 lz4c
+default: lz4
 
-all: lz4 lz4c lz4c32 fullbench fullbench32 fuzzer fuzzer32 frametest frametest32 datagen
+m32: lz4c32 fullbench32 fuzzer32 frametest32
+
+bins: lz4 lz4c fullbench fuzzer frametest datagen
+
+all: bins m32
 
 lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
@@ -144,16 +148,16 @@ test-travis: $(TRAVIS_TARGET)
 
 test-lz4-sparse: lz4 datagen
 	@echo ---- test sparse file support ----
-	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dv --sparse-support > tmpB4
-	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dv --sparse-support > tmpB5
-	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dv --sparse-support > tmpB6
-	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dv --sparse-support > tmpB7
+	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dv --sparse > tmpB4
+	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dv --sparse > tmpB5
+	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dv --sparse > tmpB6
+	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dv --sparse > tmpB7
 	ls -ls tmp*
 	./datagen -g50M -P100 | diff -s - tmpB4
 	./datagen -g50M -P100 | diff -s - tmpB5
 	./datagen -g50M -P100 | diff -s - tmpB6
 	./datagen -g50M -P100 | diff -s - tmpB7
-	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse-support > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
+	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
 	@rm tmp*
@@ -162,7 +166,7 @@ test-lz4-contentSize: lz4 datagen
 	@echo ---- test original size support ----
 	./datagen -g15M > tmp
 	./lz4 -v tmp | ./lz4 -t
-	./lz4 -v --frame-content-size tmp | ./lz4 -d > tmp2
+	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
 	diff -s tmp tmp2
 	@rm tmp*
 
@@ -237,8 +241,8 @@ test-mem: lz4 datagen fuzzer frametest
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
 	./datagen -g16MB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
-	./datagen -g256MB > tmp
 	valgrind --leak-check=yes ./lz4 -t tmp2
+	./datagen -g256MB > tmp
 	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp $(VOID)
 	rm tmp*
 	valgrind --leak-check=yes ./fuzzer -i64 -t1

@@ -7,9 +7,10 @@ New   : lz4frame & lz4cli frame content size support
 New   : lz4frame supports skippable frames
 Changed:Default "make install" directory is /usr/local
 New   : lz4 cli supports "pass-through" mode
-New   : g++ compatibility tests
 New   : datagen can generate sparse files
 New   : scan-build tests
+New   : g++ compatibility tests
+New   : arm cross-compilation test
 Fixed : Fuzzer + frametest compatibility with NetBSD (issue #48)
 Added : Visual project directory
 Updated:Man page & Specification

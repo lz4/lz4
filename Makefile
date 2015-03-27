@@ -53,7 +53,7 @@ TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
 	$(PRGDIR)/datagen.c $(PRGDIR)/datagen.h $(PRGDIR)/datagencli.c $(PRGDIR)/fuzzer.c \
 	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
 	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
-	$(PRGDIR)/lz4.1 $(PRGDIR)/lz4c.1 $(PRGDIR)/lz4cat.1 \
+	$(PRGDIR)/lz4.1 \
 	$(PRGDIR)/Makefile $(PRGDIR)/COPYING	
 NONTEXT = images/image00.png images/image01.png images/image02.png \
 	images/image03.png images/image04.png images/image05.png \
@@ -68,6 +68,13 @@ else
 TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
 endif
 
+# Define nul output
+ifneq (,$(filter Windows%,$(OS)))
+VOID = nul
+else
+VOID = /dev/null
+endif
+
 
 default: lz4programs
 
@@ -79,10 +86,10 @@ lz4programs:
 	@cd $(PRGDIR); $(MAKE) -e
 
 clean:
-	@rm -f $(DISTRIBNAME) *.sha1
-	@cd $(PRGDIR); $(MAKE) clean
-	@cd $(LZ4DIR); $(MAKE) clean
-	@cd examples;  $(MAKE) clean
+	@rm -f $(DISTRIBNAME) *.sha1 > $(VOID)
+	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
+	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
+	@cd examples;  $(MAKE) clean > $(VOID)
 	@echo Cleaning completed
 
 
@@ -127,14 +134,18 @@ test-travis: $(TRAVIS_TARGET)
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
-gpptest: clean
-	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
-
 clangtest: clean
 	export CC=clang; $(MAKE) all
 
 staticAnalyze: clean
 	export CFLAGS=-g; scan-build -v $(MAKE) all
+
+gpptest: clean
+	export CC=g++; export CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align"; $(MAKE) -e all
+
+armtest: clean
+	export CC=arm-linux-gnueabi-gcc; cd lib; $(MAKE) -e all
+	export CC=arm-linux-gnueabi-gcc; cd programs; $(MAKE) -e bins
 
 streaming-examples:
 	cd examples; $(MAKE) -e test

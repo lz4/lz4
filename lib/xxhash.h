@@ -56,6 +56,12 @@ SHA1-32         0.28 GB/s    10
 Q.Score is a measure of quality of the hash function.
 It depends on successfully passing SMHasher test set.
 10 is a perfect score.
+
+A new 64-bits version, named XXH64, is available since r35.
+It offers better speed for 64-bits applications.
+Name     Speed on 64 bits    Speed on 32 bits
+XXH64       13.8 GB/s            1.9 GB/s
+XXH32        6.8 GB/s            6.0 GB/s
 */
 
 #pragma once
@@ -66,20 +72,15 @@ extern "C" {
 
 
 /*****************************
-   Includes
+*  Definitions
 *****************************/
 #include <stddef.h>   /* size_t */
-
-
-/*****************************
-   Type
-*****************************/
 typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
 
 
 
 /*****************************
-   Simple Hash Functions
+*  Simple Hash Functions
 *****************************/
 
 unsigned int       XXH32 (const void* input, size_t length, unsigned seed);
@@ -94,12 +95,13 @@ XXH32() :
     Speed on Core 2 Duo @ 3 GHz (single thread, SMHasher benchmark) : 5.4 GB/s
 XXH64() :
     Calculate the 64-bits hash of sequence of length "len" stored at memory address "input".
+    Faster on 64-bits systems. Slower on 32-bits systems.
 */
 
 
 
 /*****************************
-   Advanced Hash Functions
+*  Advanced Hash Functions
 *****************************/
 typedef struct { long long ll[ 6]; } XXH32_state_t;
 typedef struct { long long ll[11]; } XXH64_state_t;

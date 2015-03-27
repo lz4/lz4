@@ -173,9 +173,9 @@ static int usage_advanced(void)
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
-    DISPLAY( "--no-frame-crc       : disable stream checksum (default:enabled)\n");
-    DISPLAY( "--frame-content-size : compressed frame includes original size (default:not present)\n");
-    DISPLAY( "--sparse-support     : enable sparse file (default:disabled)(experimental)\n");
+    DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled)\n");
+    DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
+    DISPLAY( "--sparse       : enable sparse file (default:disabled)(experimental)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
@@ -293,19 +293,23 @@ int main(int argc, char** argv)
 
         /* long commands (--long-word) */
         if (!strcmp(argument, "--compress")) { forceCompress = 1; continue; }
-        if (!strcmp(argument, "--decompress")) { decode = 1; continue; }
-        if (!strcmp(argument, "--uncompress")) { decode = 1; continue; }
+        if ((!strcmp(argument, "--decompress"))
+           || (!strcmp(argument, "--uncompress"))) { decode = 1; continue; }
         if (!strcmp(argument, "--test")) { decode = 1; LZ4IO_setOverwrite(1); output_filename=nulmark; continue; }
         if (!strcmp(argument, "--force")) { LZ4IO_setOverwrite(1); continue; }
-        if (!strcmp(argument, "--stdout")) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
-        if (!strcmp(argument, "--to-stdout")) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
+        if (!strcmp(argument, "--no-force")) { LZ4IO_setOverwrite(0); continue; }
+        if ((!strcmp(argument, "--stdout"))
+           || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
+        if (!strcmp(argument, "--frame-crc")) { LZ4IO_setStreamChecksumMode(1); continue; }
         if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
-        if (!strcmp(argument, "--frame-content-size")) { LZ4IO_setContentSize(1); continue; }
-        if (!strcmp(argument, "--sparse-support")) { LZ4IO_setSparseFile(1); continue; }
+        if (!strcmp(argument, "--content-size")) { LZ4IO_setContentSize(1); continue; }
+        if (!strcmp(argument, "--no-content-size")) { LZ4IO_setContentSize(0); continue; }
+        if (!strcmp(argument, "--sparse")) { LZ4IO_setSparseFile(1); continue; }
+        if (!strcmp(argument, "--no-sparse")) { LZ4IO_setSparseFile(0); continue; }
         if (!strcmp(argument, "--verbose")) { displayLevel=4; continue; }
         if (!strcmp(argument, "--quiet")) { if (displayLevel) displayLevel--; continue; }
         if (!strcmp(argument, "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
-        if (!strcmp(argument, "--keep")) { continue; } /* keep source file (default anyway, so useless) (for xz/lzma compatibility) */
+        if (!strcmp(argument, "--keep")) { continue; }   /* keep source file (default anyway; just for xz/lzma compatibility) */
 
         /* Short commands (note : aggregated short commands are allowed) */
         if (argument[0]=='-')

@@ -39,8 +39,8 @@ extern "C" {
 #endif
 
 /*
- * lz4.h provides raw compression format functions, for optimal performance and integration into programs.
- * If you need to generate data using an inter-operable format (respecting the framing specification),
+ * lz4.h provides block compression functions, for optimal performance.
+ * If you need to generate inter-operable compressed data (respecting LZ4 frame specification),
  * please use lz4frame.h instead.
 */
 

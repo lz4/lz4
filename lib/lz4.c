@@ -1321,7 +1321,7 @@ void* LZ4_create (const char* inputBuffer)
 char* LZ4_slideInputBuffer (void* LZ4_Data)
 {
     LZ4_stream_t_internal* ctx = (LZ4_stream_t_internal*)LZ4_Data;
-    int dictSize = LZ4_saveDict((LZ4_stream_t*)ctx, (char*)ctx->bufferStart, 64 KB);
+    int dictSize = LZ4_saveDict((LZ4_stream_t*)LZ4_Data, (char*)ctx->bufferStart, 64 KB);
     return (char*)(ctx->bufferStart + dictSize);
 }
 
