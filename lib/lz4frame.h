@@ -72,7 +72,7 @@ typedef struct {
   blockMode_t        blockMode;             /* blockLinked, blockIndependent ; 0 == default */
   contentChecksum_t  contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
   frameType_t        frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
-  unsigned long long frameOSize;            /* Size of uncompressed (original) content ; 0 == unknown */
+  unsigned long long contentSize;           /* Size of uncompressed (original) content ; 0 == unknown */
   unsigned           reserved[2];           /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 

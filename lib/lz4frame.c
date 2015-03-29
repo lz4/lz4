@@ -299,10 +299,10 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     else
     {
         memset(&prefs, 0, sizeof(prefs));
-        prefs.frameInfo.frameOSize = (U64)srcSize;
+        prefs.frameInfo.contentSize = (U64)srcSize;
     }
-    if (prefs.frameInfo.frameOSize != 0)
-        prefs.frameInfo.frameOSize = (U64)srcSize;   /* correct frame size if selected (!=0) */
+    if (prefs.frameInfo.contentSize != 0)
+        prefs.frameInfo.contentSize = (U64)srcSize;   /* correct content size if selected (!=0) */
 
     if (prefs.compressionLevel < minHClevel)
     {
@@ -446,13 +446,13 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
     *dstPtr++ = ((1 & _2BITS) << 6)    /* Version('01') */
         + ((cctxPtr->prefs.frameInfo.blockMode & _1BIT ) << 5)    /* Block mode */
         + (BYTE)((cctxPtr->prefs.frameInfo.contentChecksumFlag & _1BIT ) << 2)   /* Frame checksum */
-        + (BYTE)((cctxPtr->prefs.frameInfo.frameOSize > 0) << 3);   /* Frame content size */
+        + (BYTE)((cctxPtr->prefs.frameInfo.contentSize > 0) << 3);   /* Frame content size */
     /* BD Byte */
     *dstPtr++ = (BYTE)((cctxPtr->prefs.frameInfo.blockSizeID & _3BITS) << 4);
     /* Optional Frame content size field */
-    if (cctxPtr->prefs.frameInfo.frameOSize)
+    if (cctxPtr->prefs.frameInfo.contentSize)
     {
-        LZ4F_writeLE64(dstPtr, cctxPtr->prefs.frameInfo.frameOSize);
+        LZ4F_writeLE64(dstPtr, cctxPtr->prefs.frameInfo.contentSize);
         dstPtr += 8;
         cctxPtr->totalInSize = 0;
     }
@@ -729,9 +729,9 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 
     cctxPtr->cStage = 0;   /* state is now re-usable (with identical preferences) */
 
-    if (cctxPtr->prefs.frameInfo.frameOSize)
+    if (cctxPtr->prefs.frameInfo.contentSize)
     {
-        if (cctxPtr->prefs.frameInfo.frameOSize != cctxPtr->totalInSize)
+        if (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)
             return (size_t)-ERROR_frameSize_wrong;
     }
 
@@ -871,7 +871,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVo
     dctxPtr->frameInfo.blockSizeID = (blockSizeID_t)blockSizeID;
     dctxPtr->maxBlockSize = LZ4F_getBlockSize(blockSizeID);
     if (contentSizeFlag)
-        dctxPtr->frameInfo.frameOSize = LZ4F_readLE64(srcPtr+6);
+        dctxPtr->frameInfo.contentSize = LZ4F_readLE64(srcPtr+6);
 
     /* init */
     if (contentChecksumFlag) XXH32_reset(&(dctxPtr->xxh), 0);
@@ -1389,7 +1389,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
         /* case dstage_decodeSBlockSize: */   /* no direct access */
             {
                 size_t SFrameSize = LZ4F_readLE32(selectedIn);
-                dctxPtr->frameInfo.frameOSize = SFrameSize;
+                dctxPtr->frameInfo.contentSize = SFrameSize;
                 dctxPtr->tmpInTarget = SFrameSize;
                 dctxPtr->dStage = dstage_skipSkippable;
                 break;

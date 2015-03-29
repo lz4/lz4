@@ -402,7 +402,7 @@ int basicTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)(op-ostart));
 
         DISPLAYLEVEL(3, "compress with frameSize : \n");
-        prefs.frameInfo.frameOSize = testSize;
+        prefs.frameInfo.contentSize = testSize;
         op = ostart;
         errorCode = LZ4F_compressBegin(cctx, compressedBuffer, testSize, &prefs);
         if (LZ4F_isError(errorCode)) goto _output_error;
@@ -415,7 +415,7 @@ int basicTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)(op-ostart));
 
         DISPLAYLEVEL(3, "compress with wrong frameSize : \n");
-        prefs.frameInfo.frameOSize = testSize+1;
+        prefs.frameInfo.contentSize = testSize+1;
         op = ostart;
         errorCode = LZ4F_compressBegin(cctx, compressedBuffer, testSize, &prefs);
         if (LZ4F_isError(errorCode)) goto _output_error;
@@ -594,7 +594,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         prefs.frameInfo.blockMode = (blockMode_t)BMId;
         prefs.frameInfo.blockSizeID = (blockSizeID_t)BSId;
         prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)CCflag;
-        prefs.frameInfo.frameOSize = frameContentSize;
+        prefs.frameInfo.contentSize = frameContentSize;
         prefs.autoFlush = autoflush;
         prefs.compressionLevel = FUZ_rand(&randState) % 5;
         if ((FUZ_rand(&randState) & 0xF) == 1) prefsPtr = NULL;
