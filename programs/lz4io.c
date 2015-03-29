@@ -423,7 +423,7 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     if (g_contentSizeFlag)
     {
       unsigned long long fileSize = LZ4IO_GetFileSize(input_filename);
-      prefs.frameInfo.frameOSize = fileSize;   /* == 0 if input == stdin */
+      prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
     }
 
     /* Allocate Memory */
