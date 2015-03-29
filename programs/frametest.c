@@ -740,7 +740,7 @@ int main(int argc, char** argv)
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
     int result=0;
 
-    // Check command line
+    /* Check command line */
     programName = argv[0];
     for(argNb=1; argNb<argc; argNb++)
     {
@@ -830,7 +830,7 @@ int main(int argc, char** argv)
         }
     }
 
-    // Get Seed
+    /* Get Seed */
     printf("Starting lz4frame tester (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
 
     if (!seedset) seed = FUZ_GetMilliStart() % 10000;

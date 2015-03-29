@@ -636,8 +636,8 @@ size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* d
     if ((cctxPtr->tmpIn + blockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize)   /* necessarily blockLinked && lastBlockCompressed==fromTmpBuffer */
         && !(cctxPtr->prefs.autoFlush))
     {
-        LZ4F_localSaveDict(cctxPtr);
-        cctxPtr->tmpIn = cctxPtr->tmpBuff + 64 KB;
+        int realDictSize = LZ4F_localSaveDict(cctxPtr);
+        cctxPtr->tmpIn = cctxPtr->tmpBuff + realDictSize;
     }
 
     /* some input data left, necessarily < blockSize */
@@ -675,7 +675,7 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
 
     if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
     if (cctxPtr->cStage != 1) return (size_t)-ERROR_GENERIC;
-    if (dstMaxSize < (cctxPtr->tmpInSize + 16)) return (size_t)-ERROR_dstMaxSize_tooSmall;
+    if (dstMaxSize < (cctxPtr->tmpInSize + 8)) return (size_t)-ERROR_dstMaxSize_tooSmall;   /* +8 : block header(4) + block checksum(4) */
     (void)compressOptionsPtr;   /* not yet useful */
 
     /* select compression function */
@@ -689,8 +689,8 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
     /* keep tmpIn within limits */
     if ((cctxPtr->tmpIn + cctxPtr->maxBlockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize))   /* necessarily blockLinked */
     {
-        LZ4F_localSaveDict(cctxPtr);
-        cctxPtr->tmpIn = cctxPtr->tmpBuff + 64 KB;
+        int realDictSize = LZ4F_localSaveDict(cctxPtr);
+        cctxPtr->tmpIn = cctxPtr->tmpBuff + realDictSize;
     }
 
     return dstPtr - dstStart;
@@ -1155,7 +1155,8 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 if ((size_t)(srcEnd-srcPtr) < sizeToCopy) sizeToCopy = srcEnd - srcPtr;  /* not enough input to read full block */
                 if ((size_t)(dstEnd-dstPtr) < sizeToCopy) sizeToCopy = dstEnd - dstPtr;
                 memcpy(dstPtr, srcPtr, sizeToCopy);
-                if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), srcPtr, (U32)sizeToCopy);
+                if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), srcPtr, sizeToCopy);
+                if (dctxPtr->frameInfo.contentSize) dctxPtr->frameInfo.contentSize -= sizeToCopy;
 
                 /* dictionary management */
                 if (dctxPtr->frameInfo.blockMode==blockLinked)
@@ -1228,6 +1229,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 decodedSize = decoder((const char*)selectedIn, (char*)dstPtr, (int)dctxPtr->tmpInTarget, (int)dctxPtr->maxBlockSize, (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
                 if (decodedSize < 0) return (size_t)-ERROR_GENERIC;   /* decompression failed */
                 if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), dstPtr, decodedSize);
+                if (dctxPtr->frameInfo.contentSize) dctxPtr->frameInfo.contentSize -= decodedSize;
 
                 /* dictionary management */
                 if (dctxPtr->frameInfo.blockMode==blockLinked)
@@ -1273,6 +1275,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 decodedSize = decoder((const char*)selectedIn, (char*)dctxPtr->tmpOut, (int)dctxPtr->tmpInTarget, (int)dctxPtr->maxBlockSize, (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
                 if (decodedSize < 0) return (size_t)-ERROR_decompressionFailed;   /* decompression failed */
                 if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), dctxPtr->tmpOut, decodedSize);
+                if (dctxPtr->frameInfo.contentSize) dctxPtr->frameInfo.contentSize -= decodedSize;
                 dctxPtr->tmpOutSize = decodedSize;
                 dctxPtr->tmpOutStart = 0;
                 dctxPtr->dStage = dstage_flushOut;
@@ -1306,6 +1309,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
         case dstage_getSuffix:
             {
                 size_t suffixSize = dctxPtr->frameInfo.contentChecksumFlag * 4;
+                if (dctxPtr->frameInfo.contentSize) return (size_t)-ERROR_frameSize_wrong;   /* incorrect frame size decoded */
                 if (suffixSize == 0)   /* frame completed */
                 {
                     nextSrcSizeHint = 0;
