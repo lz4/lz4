@@ -583,7 +583,7 @@ static int LZ4_compress_generic(
         {
             const BYTE* forwardIp = ip;
             unsigned step=1;
-            unsigned searchMatchNb = ((1+acceleration) << LZ4_skipTrigger);
+            unsigned searchMatchNb = ((acceleration) << LZ4_skipTrigger);
 
             /* Find a match */
             do {
@@ -741,9 +741,9 @@ int LZ4_compress(const char* source, char* dest, const int inputSize)
     int result;
 
     if (inputSize < LZ4_64Klimit)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 0);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 0);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
@@ -761,9 +761,9 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
     int result;
 
     if (inputSize < LZ4_64Klimit)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 0);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 0);
+        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
@@ -913,9 +913,9 @@ FORCE_INLINE int LZ4_compress_continue_generic (void* LZ4_stream, const char* so
     {
         int result;
         if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset))
-            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, withPrefix64k, dictSmall, 0);
+            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, withPrefix64k, dictSmall, 1);
         else
-            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, withPrefix64k, noDictIssue, 0);
+            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, withPrefix64k, noDictIssue, 1);
         streamPtr->dictSize += (U32)inputSize;
         streamPtr->currentOffset += (U32)inputSize;
         return result;
@@ -925,9 +925,9 @@ FORCE_INLINE int LZ4_compress_continue_generic (void* LZ4_stream, const char* so
     {
         int result;
         if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset))
-            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, usingExtDict, dictSmall, 0);
+            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, usingExtDict, dictSmall, 1);
         else
-            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, usingExtDict, noDictIssue, 0);
+            result = LZ4_compress_generic(LZ4_stream, source, dest, inputSize, maxOutputSize, limit, byU32, usingExtDict, noDictIssue, 1);
         streamPtr->dictionary = (const BYTE*)source;
         streamPtr->dictSize = (U32)inputSize;
         streamPtr->currentOffset += (U32)inputSize;
@@ -957,7 +957,7 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
     if (smallest > (const BYTE*) source) smallest = (const BYTE*) source;
     LZ4_renormDictT((LZ4_stream_t_internal*)LZ4_dict, smallest);
 
-    result = LZ4_compress_generic(LZ4_dict, source, dest, inputSize, 0, notLimited, byU32, usingExtDict, noDictIssue, 0);
+    result = LZ4_compress_generic(LZ4_dict, source, dest, inputSize, 0, notLimited, byU32, usingExtDict, noDictIssue, 1);
 
     streamPtr->dictionary = (const BYTE*)source;
     streamPtr->dictSize = (U32)inputSize;
@@ -1390,9 +1390,9 @@ int LZ4_compress_withState (void* state, const char* source, char* dest, int inp
     MEM_INIT(state, 0, LZ4_STREAMSIZE);
 
     if (inputSize < LZ4_64Klimit)
-        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 0);
+        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
     else
-        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 0);
+        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
 }
 
 int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize)
@@ -1401,9 +1401,9 @@ int LZ4_compress_limitedOutput_withState (void* state, const char* source, char*
     MEM_INIT(state, 0, LZ4_STREAMSIZE);
 
     if (inputSize < LZ4_64Klimit)
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 0);
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
     else
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 0);
+        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
 }
 
 /* Obsolete streaming decompression functions */

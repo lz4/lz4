@@ -29,7 +29,7 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
 |  memcpy           |  1.000  | 4200 MB/s   |   4200 MB/s   |
 |  RLE64 v3.0       |  1.029  | 2800 MB/s   |   2800 MB/s   |
 |  density -c1      |  1.592  |  700 MB/s   |    920 MB/s   |
-|**LZ4 fast (r129)**|  1.595  |**680 MB/s** | **2220 MB/s** |
+|**LZ4 fast (r129)**|  1.607  |**680 MB/s** | **2220 MB/s** |
 |**LZ4 (r129)**     |**2.101**|**385 MB/s** | **1850 MB/s** |
 |  density -c2      |  2.083  |  370 MB/s   |    505 MB/s   |
 |  LZO 2.06         |  2.108  |  350 MB/s   |    510 MB/s   |
