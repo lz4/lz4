@@ -918,10 +918,10 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionCont
 
     if (dctxPtr->dStage == dstage_getHeader)
     {
-        LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, srcBuffer, *srcSizePtr);
-        if (LZ4F_isError(errorCode)) return errorCode;
-        *srcSizePtr = errorCode;   /* nb Bytes consumed */
-        *frameInfoPtr = dctxPtr->frameInfo;
+        size_t frameHeaderSize = LZ4F_decodeHeader(dctxPtr, srcBuffer, *srcSizePtr);
+        if (LZ4F_isError(frameHeaderSize)) return frameHeaderSize;
+        *srcSizePtr = frameHeaderSize;   /* nb Bytes consumed */
+        *frameInfoPtr = dctxPtr->frameInfo;   /* copy into */
         dctxPtr->srcExpect = NULL;
         return 4;   /* nextSrcSizeHint : 4 == block header size */
     }
