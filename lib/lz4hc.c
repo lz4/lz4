@@ -37,7 +37,7 @@ You can contact the author at :
 /**************************************
    Tuning Parameter
 **************************************/
-static const int LZ4HC_compressionLevel_default = 8;
+static const int LZ4HC_compressionLevel_default = 9;
 
 
 /**************************************
@@ -206,9 +206,9 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   /* I
 
 FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     LZ4HC_Data_Structure* hc4,
-    const BYTE* ip,
-    const BYTE* iLowLimit,
-    const BYTE* iHighLimit,
+    const BYTE* const ip,
+    const BYTE* const iLowLimit,
+    const BYTE* const iHighLimit,
     int longest,
     const BYTE** matchpos,
     const BYTE** startpos,
@@ -218,9 +218,9 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     U32* const HashTable = hc4->hashTable;
     const BYTE* const base = hc4->base;
     const U32 dictLimit = hc4->dictLimit;
+    const BYTE* const lowPrefixPtr = base + dictLimit;
     const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
     const BYTE* const dictBase = hc4->dictBase;
-    const BYTE* match;
     U32   matchIndex;
     int nbAttempts = maxNbAttempts;
     int delta = (int)(ip-iLowLimit);
@@ -235,37 +235,41 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         nbAttempts--;
         if (matchIndex >= dictLimit)
         {
-            match = base + matchIndex;
-            if (*(iLowLimit + longest) == *(match - delta + longest))
-                if (LZ4_read32(match) == LZ4_read32(ip))
+            const BYTE* matchPtr = base + matchIndex;
+            if (*(iLowLimit + longest) == *(matchPtr - delta + longest))
+                if (LZ4_read32(matchPtr) == LZ4_read32(ip))
                 {
-                    const BYTE* startt = ip;
-                    const BYTE* tmpMatch = match;
-                    const BYTE* const matchEnd = ip + MINMATCH + LZ4_count(ip+MINMATCH, match+MINMATCH, iHighLimit);
+                    int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
+                    int back = 0;
 
-                    while ((startt>iLowLimit) && (tmpMatch > iLowLimit) && (startt[-1] == tmpMatch[-1])) {startt--; tmpMatch--;}
+                    while ((ip+back>iLowLimit)
+                           && (matchPtr+back > lowPrefixPtr)
+                           && (ip[back-1] == matchPtr[back-1]))
+                            back--;
 
-                    if ((matchEnd-startt) > longest)
+                    mlt -= back;
+
+                    if (mlt > longest)
                     {
-                        longest = (int)(matchEnd-startt);
-                        *matchpos = tmpMatch;
-                        *startpos = startt;
+                        longest = (int)mlt;
+                        *matchpos = matchPtr+back;
+                        *startpos = ip+back;
                     }
                 }
         }
         else
         {
-            match = dictBase + matchIndex;
-            if (LZ4_read32(match) == LZ4_read32(ip))
+            const BYTE* matchPtr = dictBase + matchIndex;
+            if (LZ4_read32(matchPtr) == LZ4_read32(ip))
             {
                 size_t mlt;
                 int back=0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
-                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
+                mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
                     mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
-                while ((ip+back > iLowLimit) && (matchIndex+back > lowLimit) && (ip[back-1] == match[back-1])) back--;
+                while ((ip+back > iLowLimit) && (matchIndex+back > lowLimit) && (ip[back-1] == matchPtr[back-1])) back--;
                 mlt -= back;
                 if ((int)mlt > longest) { longest = (int)mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
             }
