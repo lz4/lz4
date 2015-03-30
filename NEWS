@@ -1,3 +1,6 @@
+r129:
+Added : LZ4_compress_fast()
+
 r128:
 New   : lz4cli sparse file support
 New   : command -m, to compress multiple files in a single command
