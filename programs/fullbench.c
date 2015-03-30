@@ -544,7 +544,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
      return 10;
   }
 
-  // Loop for each file
+  /* Loop for each fileName */
   while (fileIdx<nbFiles)
   {
       FILE* inFile;
@@ -559,11 +559,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       U32 crcOriginal;
 
 
-      // Init
-      stateLZ4   = LZ4_createStream();
-      stateLZ4HC = LZ4_createStreamHC();
-
-      // Check file existence
+      /* Check file existence */
       inFileName = fileNamesTable[fileIdx++];
       inFile = fopen( inFileName, "rb" );
       if (inFile==NULL)
@@ -572,10 +568,14 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         return 11;
       }
 
-      // Memory allocation & restrictions
+      /* Init */
+      stateLZ4   = LZ4_createStream();
+      stateLZ4HC = LZ4_createStreamHC();
+
+      /* Memory allocation & restrictions */
       inFileSize = BMK_GetFileSize(inFileName);
       if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
-      benchedSize = (size_t) BMK_findMaxMem(inFileSize) / 2;
+      benchedSize = (size_t) BMK_findMaxMem(inFileSize);
       if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
@@ -940,7 +940,7 @@ _exit_blockProperties:
 
                     // Modify Nb Iterations
                 case 'i':
-                    if ((argument[1] >='1') && (argument[1] <='9'))
+                    if ((argument[1] >='0') && (argument[1] <='9'))
                     {
                         int iters = argument[1] - '0';
                         BMK_SetNbIterations(iters);
