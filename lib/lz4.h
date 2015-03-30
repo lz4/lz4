@@ -130,6 +130,16 @@ int LZ4_compress_limitedOutput (const char* source, char* dest, int sourceSize, 
 
 
 /*
+LZ4_compress_fast() :
+    Same as LZ4_compress_limitedOutput, but allows to select an "acceleration" factor.
+    The larger the value, the faster the algorithm, but also the lesser the compression.
+    So it's a trade-off, which can be fine tuned, selecting whichever value you want.
+    An acceleration value of "0" means "use Default value", which is typically about 15 (see lz4.c source code).
+*/
+int LZ4_compress_fast (const char* source, char* dest, int sourceSize, int maxOutputSize, unsigned acceleration);
+
+
+/*
 LZ4_compress_withState() :
     Same compression functions, but using an externally allocated memory space to store compression state.
     Use LZ4_sizeofState() to know how much memory must be allocated,
