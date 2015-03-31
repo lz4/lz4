@@ -75,6 +75,10 @@
 #  define SET_SPARSE_FILE_MODE(file)
 #endif
 
+#if !defined(S_ISREG)
+#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+#endif
+
 
 /*****************************
 *  Constants
