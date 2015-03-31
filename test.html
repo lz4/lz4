@@ -175,6 +175,8 @@ The following versions compress data blocks using LZ4 compression algorithm in m
 * __Caching__ : Zram, HHVM, PHP Zend Optimizer
 * __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
 
+---
+
 ## Chart 1
 
 <div
@@ -200,16 +202,14 @@ The following versions compress data blocks using LZ4 compression algorithm in m
 "data-csv-props" attribute is custom properties for js/rendercharts.js.
 Properties which has "csv" prefix are basic settings for js/rendercharts.js.
 
-    "csvSrc"      : Source CSV URL
-    "csvGvType"   : Google Charts class name
-    "csvGvPackage": Google Charts package name. See 
+    "csvSrc"      : Source CSV URL.
+    "csvGvType"   : Google Charts class name.
+    "csvGvPackage": Google Charts package name.
 
-Each Google Charts class document has "Loading" section
+To find "class name" and "package name", see "Loading" section in Google Charts class document :
 
   - https://google-developers.appspot.com/chart/interactive/docs/gallery/table#Loading
   - https://google-developers.appspot.com/chart/interactive/docs/gallery/combochart#Loading
-
-In this section, you can find "class name" and "package name".
 
 Other properties in "data-csv-props" are "Configuration Options" for specific Google Charts class.
 Each class document has "Configuration Options" section
@@ -221,7 +221,7 @@ Each class document has "Configuration Options" section
 
 ## Chart 2
 
-You can also specify standard HTML "style" attributes.
+You can also specify standard HTML "style" attributes such as `style="height:40em"`.
 
 <div
   style="height:40em"
