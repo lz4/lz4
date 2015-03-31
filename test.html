@@ -17,81 +17,6 @@
       <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
       <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
-
-    <!-- Chart example -->
-    <script type="text/javascript" src="js/csvToArray.v2.1.js"></script>
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <script type="text/javascript">
-      // http://stackoverflow.com/a/3000784/2132223
-      function trim1 (str) {
-          return str.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
-      }
-
-      // http://stackoverflow.com/a/1414175/2132223
-      function stringToBoolean(str) {
-        switch(str.toLowerCase()) {
-          case "true": case "yes": case "1": return true;
-          case "false": case "no": case "0": case null: return false;
-          default: return Boolean(str);
-        }
-      }
-
-
-      function drawTable(gvCtor, gvOptions, csvUrl, tableId) {
-        var r = new XMLHttpRequest();
-        r.open("GET", csvUrl, true);
-        r.onreadystatechange = function() {
-          if (this.readyState === 4 && this.status == 200) {
-            var csvAsArray = this.responseText.csvToArray();
-
-            var gvdt = new google.visualization.DataTable()
-            var csvHeaderLine = csvAsArray.shift();
-            for(var i = 0; i < csvHeaderLine.length; i++) {
-              var csvHeaderElement = csvHeaderLine[i].split(":");
-              var csvHeaderName = "?";
-              var csvHeaderType = "string";
-              if(csvHeaderElement.length > 0) {
-                csvHeaderName = csvHeaderElement[0];
-                if(csvHeaderElement.length > 1) {
-                  csvHeaderType = trim1(csvHeaderElement[1]);
-                }
-              }
-              gvdt.addColumn(csvHeaderType, csvHeaderName);
-              for(var j = 0; j < csvAsArray.length; j++) {
-                switch(csvHeaderType) {
-                  default:
-                  case "string":  csvAsArray[j][i] = String(csvAsArray[j][i]); break;
-                  case "number":  csvAsArray[j][i] = Number(csvAsArray[j][i]); break;
-                  case "boolean": csvAsArray[j][i] = stringToBoolean(csvAsArray[j][i]); break;
-                }
-              }
-            }
-            gvdt.addRows(csvAsArray);
-
-            var table = new gvCtor (document.getElementById(tableId));
-            table.draw(gvdt, gvOptions);
-          }
-        }
-        r.send();
-      }
-
-      google.load("visualization", "1", {packages:["table", "corechart"]});
-      google.setOnLoadCallback(function() {
-        options = {
-          showRowNumber: true
-        };
-        drawTable(google.visualization.Table, options, "csv/sample1.csv", "table_div");
-
-        options = {
-          title : 'Monthly Coffee Production by Country',
-          vAxis: {title: "Cups"},
-          hAxis: {title: "Month"},
-          seriesType: "bars",
-          series: {5: {type: "line"}}
-        };
-        drawTable(google.visualization.ComboChart, options, "csv/sample2.csv", "table_2");
-      });
-    </script>
   </head>
   <body style="padding-top:0; padding-bottom:0; ">
     <nav class="navbar navbar-default">
@@ -251,10 +176,53 @@ The following versions compress data blocks using LZ4 compression algorithm in m
 * __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
 
 ## Chart 1
-<div id="table_div"></div>
+<!--
+"data-csv-props" attribute is custom properties for js/rendercharts.js.
+Properties which has "csv" prefix are basic settings for js/rendercharts.js.
+
+    "csvSrc" : Source CSV URL
+    "csvGvType": Google Charts class name
+    "csvGvPackage": Google Charts package name. See 
+
+Each Google Charts class document has "Loading" section
+
+  - https://google-developers.appspot.com/chart/interactive/docs/gallery/table#Loading
+  - https://google-developers.appspot.com/chart/interactive/docs/gallery/combochart#Loading
+
+In this section, you can find "class name" and "package name".
+
+Other properties are "Configuration Options" for specific Google Charts class.
+Each class document has "Configuration Options" section
+
+  - https://google-developers.appspot.com/chart/interactive/docs/gallery/table#Configuration_Options
+  - https://google-developers.appspot.com/chart/interactive/docs/gallery/combochart#Configuration_Options
+-->
+<div
+  data-csv-props='{
+    "csvSrc": "csv/sample1.csv",
+    "csvGvType": "google.visualization.Table",
+    "csvGvPackage": "table",
+    "showRowNumber": true
+  }'
+></div>
 
 ## Chart 2
-<div id="table_2" style="height:40em"></div>
+<!--
+You can also specify standard HTML "style" attributes.
+-->
+<div
+  style="height:40em"
+  data-csv-props='{
+    "csvSrc": "csv/sample2.csv",
+    "csvGvType": "google.visualization.ComboChart",
+    "csvGvPackage": "corechart",
+    "title" : "Monthly Coffee Production by Country",
+    "vAxis": {"title": "Cups"},
+    "hAxis": {"title": "Month"},
+    "seriesType": "bars",
+    "series": {"5": {"type": "line"}}
+  }'
+></div>
 
 </xmp>
 
@@ -263,5 +231,9 @@ The following versions compress data blocks using LZ4 compression algorithm in m
     <!-- Include all compiled plugins (below), or include individual files as needed -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
     <script src="strapdown/v/0.2/strapdown.js"></script>
+
+    <!-- Chart -->
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="js/rendercharts.js"></script>
   </body>
 </html>
