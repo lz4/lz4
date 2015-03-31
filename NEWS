@@ -1,5 +1,6 @@
 r129:
-Added : LZ4_compress_fast()
+Added  : LZ4_compress_fast()
+Updated: Documentation converted to MarkDown
 
 r128:
 New   : lz4cli sparse file support
