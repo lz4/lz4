@@ -731,7 +731,7 @@ _last_literals:
 }
 
 
-int LZ4_compress(const char* source, char* dest, const int inputSize)
+int LZ4_compress(const char* source, char* dest, int inputSize)
 {
 #if (HEAPMODE)
     void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 8);   /* Aligned on 8-bytes boundaries */
