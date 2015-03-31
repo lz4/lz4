@@ -1088,8 +1088,10 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     doAnotherStage = 0;   /* not enough src data, ask for some more */
                     break;
                 }
-                LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, dctxPtr->header, dctxPtr->tmpInTarget);
-                if (LZ4F_isError(errorCode)) return errorCode;
+                {
+                    LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, dctxPtr->header, dctxPtr->tmpInTarget);
+                    if (LZ4F_isError(errorCode)) return errorCode;
+                }
                 break;
             }
 

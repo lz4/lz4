@@ -607,7 +607,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             /* create a skippable frame (rare case) */
             BYTE* op = (BYTE*)compressedBuffer;
             FUZ_writeLE32(op, LZ4F_MAGIC_SKIPPABLE_START + (FUZ_rand(&randState) & 15));
-            FUZ_writeLE32(op+4, srcSize);
+            FUZ_writeLE32(op+4, (U32)srcSize);
             cSize = srcSize+8;
         }
         else if ((FUZ_rand(&randState) & 0xF) == 2)
