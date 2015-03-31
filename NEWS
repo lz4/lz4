@@ -1,5 +1,6 @@
 r129:
 Added  : LZ4_compress_fast()
+Added  : AppVeyor CI environment, for Visual tests - Suggested by Takayuki Matsuoka
 Updated: Documentation converted to MarkDown
 
 r128:
