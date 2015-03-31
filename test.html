@@ -56,33 +56,116 @@
     </nav>
 
 <xmp theme="sandstone" style="display:none;">
+<a name="summary"></a>
 LZ4 - Extremely fast compression
 ================================
-<p style="margin-bottom:256px;">-- TEXT HERE --</p>
+
+LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core, scalable with multi-cores CPU. It also features an extremely fast decoder, with speed in multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
+A high compression derivative, called LZ4_HC, is also provided. It trades CPU time for compression ratio.
+
+|Branch      |Status   |
+|------------|---------|
+|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) |
+|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) |
 
 
-<a name="heading-1"></a>
-Heading 1
-=========
-<p style="margin-bottom:256px;">-- TEXT HERE --</p>
+> **Branch Policy:**
 
+> - The "master" branch is considered stable, at all times.
+> - The "dev" branch is the one where all contributions must be merged before being promoted to master.
+>  - If you plan to propose a patch, please commit into the "dev" branch. Direct commit to "master" are not permitted.
+> - Feature branches can also exist, for dedicated testing of larger modifications before merge into "dev" branch.
 
-<a name="heading-2"></a>
-Heading 2
-=========
-<p style="margin-bottom:256px;">-- TEXT HERE --</p>
+<a name="benchmarks"></a>
+Benchmarks
+-------------------------
 
+The benchmark uses the [Open-Source Benchmark program by m^2 (v0.14.2)](http://encode.ru/threads/1371-Filesystem-benchmark?p=33548&viewfull=1#post33548) compiled with GCC v4.6.1 on Linux Ubuntu 64-bits v11.10,
+The reference system uses a Core i5-3340M @2.7GHz.
+Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia) in single-thread mode.
 
-<a name="heading-3"></a>
-Heading 3
-=========
-<p style="margin-bottom:256px;">-- TEXT HERE --</p>
+<table>
+  <tr>
+    <th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
+  </tr>
+  <tr>
+    <th>LZ4 (r101)</th><th>2.084</th><th>422 MB/s</th><th>1820 MB/s</th>
+  </tr>
+  <tr>
+    <th>LZO 2.06</th><th>2.106</th><th>414 MB/s</th><th>600 MB/s</th>
+  </tr>
+  <tr>
+    <th>QuickLZ 1.5.1b6</th><th>2.237</th><th>373 MB/s</th><th>420 MB/s</th>
+  </tr>
+  <tr>
+    <th>Snappy 1.1.0</th><th>2.091</th><th>323 MB/s</th><th>1070 MB/s</th>
+  </tr>
+  <tr>
+    <th>LZF</th><th>2.077</th><th>270 MB/s</th><th>570 MB/s</th>
+  </tr>
+  <tr>
+    <th>zlib 1.2.8 -1</th><th>2.730</th><th>65 MB/s</th><th>280 MB/s</th>
+  </tr>
+  <tr>
+    <th>LZ4 HC (r101)</th><th>2.720</th><th>25 MB/s</th><th>2080 MB/s</th>
+  </tr>
+  <tr>
+    <th>zlib 1.2.8 -6</th><th>3.099</th><th>21 MB/s</th><th>300 MB/s</th>
+  </tr>
+</table>
 
+The LZ4 block compression format is detailed within [lz4_block_format.txt](lz4_block_format.txt).
 
-<a name="heading-4"></a>
-Heading 4
-=========
-<p style="margin-bottom:256px;">-- TEXT HERE --</p>
+For streaming unknown amount of data, and compress files of any size, a frame format has been published, and can be consulted within the file [LZ4_Frame_Format.html](LZ4_Frame_Format.html).
+
+<a name="interoperable-lz4"></a>
+## Interoperable LZ4 versions :
+The following versions are provided for languages beyond the C reference version. They are in conformance with the LZ4 frame specification and are therefore interoperable.
+
+* __Javascript__ : by Pierre Curto, at https://github.com/pierrec/node-lz4
+* __C++11__ multi-threads : by Takayuki Matsuoka, at https://github.com/t-mat/lz4mt
+* __Python__ : by Christopher Jackson, at https://github.com/darkdragn/lz4tools
+* __Delphi__ : by Hanno Hugenberg, at https://github.com/Hugie/lz4-delphi
+* __Go__ : by Pierre Curto, at https://github.com/pierrec/lz4
+* __Rust__ : by Artem Navrotskiy, at https://github.com/bozaro/lz4-rs
+
+<a name="other-source"></a>
+## Other Source versions :
+The following versions compress data blocks using LZ4 compression algorithm in multiple languages. Each version encapsulates the compressed result into its own header/frame format convention.
+
+* __Java__ : by Adrien Grand, at https://github.com/jpountz/lz4-java
+* __Python__ : by Steeve Morin, at http://pypi.python.org/pypi/lz4
+* __Perl__ : by Gray, at http://search.cpan.org/dist/Compress-LZ4/
+* __C#__ : by Milosz Krajewski, at http://lz4net.codeplex.com
+* __C#__ streaming : by Phill Djonov, at https://github.com/pdjonov/Lz4Stream
+* __Go__ : by Branimir Karadzic, at https://github.com/bkaradzic/go-lz4
+* __Ruby__ : by Komiya Atsushi, at http://rubygems.org/gems/lz4-ruby
+* __PHP__ : by Kamijo, at https://github.com/kjdev/php-ext-lz4
+* __Lua__ : by Christophe Delord, at http://cdsoft.fr/bl/bonaluna.html
+* __Haskell__ : by Mark Wotton, at http://hackage.haskell.org/package/lz4
+* __Erlang__ : by Tetsuya Suzuki, at https://github.com/szktty/erlang-lz4
+* __Smalltalk__ (Pharo) : by Mariano Martinez Peck, at http://smalltalkhub.com/#!/~marianopeck/LZ4/
+* __OCaml__ : by Peter Zotov, at https://github.com/whitequark/ocaml-lz4
+* __Rust__ : by Alex Crichton, at http://alexcrichton.com/rust-compress/compress/lz4/index.html
+* __8088 assembly__ decoder, by Jim Leonard, at http://www.oldskool.org/pc/lz4_8088
+* __6502 & 65C02 assembly__ decoder, by Peter Ferrie, at http://pferrie.host22.com/misc/appleii.htm
+* __Atari XL/XE assembly__ decoder, by xxl, at http://xxl.atari.pl/?p=1524
+* __65c816 assembly__ decoder, by Olivier Zardini, at http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
+
+<a name="lz4-is-used-by"></a>
+## LZ4 is used by
+
+* __Operating Systems__ : ![](images/linux50.png) [Linux](https://github.com/torvalds/linux), ![](images/FreeBSD50.png) [FreeBSD](http://www.freebsd.org/), ![](images/Illumos50.png) [Illumos](http://wiki.illumos.org/display/illumos/illumos+Home), ![](images/smartos50.png) [SmartOS](http://smartos.org/)
+* __File Systems__ : OpenZFS, Hammer2, SquashFS, LessFS, LeoFS, Grub
+* __Big Data__ : Hadoop, Cassandra, Hbase, Rarelogic, SparkSpark, Hustle
+* __Search Engine__ : Lucene, Solr, Scalyr, kafka
+* __Database__ : MySQL, Tokudb, Delphix, infiniSQL, RocksDB, OlegDB
+* __Games__ : Battlefield 4, Guild Wars 2, Sine Mora, 1000 Tiny Claws
+* __Graphics__ : nVidia, Enlightenment, Xpra, OpenVDB, Scaplib, kanzi
+* __Network__ : freeNAS, openVPN, Netty, dovecot, virtualHere
+* __Storage__ : Datastax, Nimble Storage, Nexenta, K2 Spear, Syneto OS
+* __Caching__ : Zram, HHVM, PHP Zend Optimizer
+* __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
 </xmp>
 
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
