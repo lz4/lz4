@@ -41,22 +41,6 @@ LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
 PRGDIR  = programs
 LZ4DIR  = lib
-DISTRIBNAME=lz4-$(RELEASE).tar.gz
-
-TEXT =  $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4hc.h \
-	$(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h \
-	$(LZ4DIR)/xxhash.c $(LZ4DIR)/xxhash.h \
-	$(LZ4DIR)/liblz4.pc.in $(LZ4DIR)/Makefile $(LZ4DIR)/LICENSE \
-	Makefile lz4_Block_format.md lz4_Frame_format.md NEWS README.md \
-	cmake_unofficial/CMakeLists.txt \
-	$(PRGDIR)/fullbench.c $(PRGDIR)/lz4cli.c \
-	$(PRGDIR)/datagen.c $(PRGDIR)/datagen.h $(PRGDIR)/datagencli.c $(PRGDIR)/fuzzer.c \
-	$(PRGDIR)/lz4io.c $(PRGDIR)/lz4io.h \
-	$(PRGDIR)/bench.c $(PRGDIR)/bench.h \
-	$(PRGDIR)/lz4.1 \
-	$(PRGDIR)/Makefile $(PRGDIR)/COPYING	
-NONTEXT =
-SOURCES = $(TEXT) $(NONTEXT)
 
 
 # Select test target for Travis CI's Build Matrix
@@ -84,7 +68,6 @@ lz4programs:
 	@cd $(PRGDIR); $(MAKE) -e
 
 clean:
-	@rm -f $(DISTRIBNAME) *.sha1 > $(VOID)
 	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
 	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
 	@cd examples;  $(MAKE) clean > $(VOID)
@@ -105,23 +88,6 @@ uninstall:
 
 travis-install:
 	sudo $(MAKE) install
-
-dist: clean
-	@install -dD -m 700 lz4-$(RELEASE)/lib/
-	@install -dD -m 700 lz4-$(RELEASE)/programs/
-	@install -dD -m 700 lz4-$(RELEASE)/cmake_unofficial/
-	@for f in $(TEXT); do \
-		tr -d '\r' < $$f > .tmp; \
-		install -m 600 .tmp lz4-$(RELEASE)/$$f; \
-	done
-	@rm .tmp
-	@for f in $(NONTEXT); do \
-		install -m 600 $$f lz4-$(RELEASE)/$$f; \
-	done
-	@tar -czf $(DISTRIBNAME) lz4-$(RELEASE)/
-	@rm -rf lz4-$(RELEASE)
-	@sha1sum $(DISTRIBNAME) > $(DISTRIBNAME).sha1
-	@echo Distribution $(DISTRIBNAME) built
 
 test:
 	@cd $(PRGDIR); $(MAKE) -e test
