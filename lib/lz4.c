@@ -771,26 +771,13 @@ int LZ4_compress_withState (void* state, const char* source, char* dest, int inp
 int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
 #if (HEAPMODE)
-    void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 8);   /* Aligned on 8-bytes boundaries */
+    void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 8);   /* malloc-calloc aligned on 8-bytes boundaries */
 #else
     U64 ctx[LZ4_STREAMSIZE_U64] = {0};      /* Ensure data is aligned on 8-bytes boundaries */
 #endif
-    int result;
 
-    if (maxOutputSize >= LZ4_compressBound(inputSize))
-    {
-        if (inputSize < LZ4_64Klimit)
-            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
-        else
-            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
-    }
-    else
-    {
-        if (inputSize < LZ4_64Klimit)
-            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
-        else
-            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
-    }
+    int result = LZ4_compress_limitedOutput_withState(ctx, source, dest, inputSize, maxOutputSize);
+
 #if (HEAPMODE)
     FREEMEM(ctx);
 #endif
