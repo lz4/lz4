@@ -740,6 +740,34 @@ _last_literals:
 }
 
 
+int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
+
+int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
+    MEM_INIT(state, 0, LZ4_STREAMSIZE);
+
+    if (maxOutputSize >= LZ4_compressBound(inputSize))
+    {
+        if (inputSize < LZ4_64Klimit)
+            return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
+        else
+            return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
+    }
+    else
+    {
+        if (inputSize < LZ4_64Klimit)
+            return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
+        else
+            return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
+    }
+}
+
+int LZ4_compress_withState (void* state, const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_limitedOutput_withState(state, source, dest, inputSize, LZ4_compressBound(inputSize));
+}
+
 int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
 #if (HEAPMODE)
@@ -1382,32 +1410,6 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
     LZ4_stream_t_internal* ctx = (LZ4_stream_t_internal*)LZ4_Data;
     int dictSize = LZ4_saveDict((LZ4_stream_t*)LZ4_Data, (char*)ctx->bufferStart, 64 KB);
     return (char*)(ctx->bufferStart + dictSize);
-}
-
-/*  Obsolete compresson functions using User-allocated state */
-
-int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
-
-int LZ4_compress_withState (void* state, const char* source, char* dest, int inputSize)
-{
-    if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
-    MEM_INIT(state, 0, LZ4_STREAMSIZE);
-
-    if (inputSize < LZ4_64Klimit)
-        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
-    else
-        return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
-}
-
-int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize)
-{
-    if (((size_t)(state)&3) != 0) return 0;   /* Error : state is not aligned on 4-bytes boundary */
-    MEM_INIT(state, 0, LZ4_STREAMSIZE);
-
-    if (inputSize < LZ4_64Klimit)
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
-    else
-        return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
 }
 
 /* Obsolete streaming decompression functions */
