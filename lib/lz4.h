@@ -99,7 +99,7 @@ LZ4_decompress_safe() :
 *  Advanced Functions
 **************************************/
 #define LZ4_MAX_INPUT_SIZE        0x7E000000   /* 2 113 929 216 bytes */
-#define LZ4_COMPRESSBOUND(isize)  ((unsigned int)(isize) > (unsigned int)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
+#define LZ4_COMPRESSBOUND(isize)  ((unsigned)(isize) > (unsigned)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
 
 /*
 LZ4_compressBound() :
@@ -107,11 +107,11 @@ LZ4_compressBound() :
     This function is primarily useful for memory allocation purposes (output buffer size).
     Macro LZ4_COMPRESSBOUND() is also provided for compilation-time evaluation (stack memory allocation for example).
 
-    isize  : is the input size. Max supported value is LZ4_MAX_INPUT_SIZE
+    inputSize  : max supported value is LZ4_MAX_INPUT_SIZE
     return : maximum output size in a "worst case" scenario
              or 0, if input size is too large ( > LZ4_MAX_INPUT_SIZE)
 */
-int LZ4_compressBound(int isize);
+int LZ4_compressBound(int inputSize);
 
 
 /*

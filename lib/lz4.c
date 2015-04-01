@@ -582,8 +582,8 @@ static int LZ4_compress_generic(
         BYTE* token;
         {
             const BYTE* forwardIp = ip;
-            unsigned step=1;
-            unsigned searchMatchNb = ((acceleration) << LZ4_skipTrigger);
+            unsigned step = 1;
+            unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
 
             /* Find a match */
             do {
@@ -717,39 +717,28 @@ _next_match:
 _last_literals:
     /* Encode Last Literals */
     {
-        int lastRun = (int)(iend - anchor);
-        if ((outputLimited) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize))
+        const size_t lastRun = (size_t)(iend - anchor);
+        if ((outputLimited) && ((op - (BYTE*)dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize))
             return 0;   /* Check output limit */
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun >= 255 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
-        else *op++ = (BYTE)(lastRun<<ML_BITS);
-        memcpy(op, anchor, iend - anchor);
-        op += iend-anchor;
+        if (lastRun >= RUN_MASK)
+        {
+            size_t accumulator = lastRun - RUN_MASK;
+            *op++ = RUN_MASK << ML_BITS;
+            for(; accumulator >= 255 ; accumulator-=255) *op++ = 255;
+            *op++ = (BYTE) accumulator;
+        }
+        else
+        {
+            *op++ = (BYTE)(lastRun<<ML_BITS);
+        }
+        memcpy(op, anchor, lastRun);
+        op += lastRun;
     }
 
     /* End */
     return (int) (((char*)op)-dest);
 }
 
-
-int LZ4_compress(const char* source, char* dest, int inputSize)
-{
-#if (HEAPMODE)
-    void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 8);   /* Aligned on 8-bytes boundaries */
-#else
-    U64 ctx[LZ4_STREAMSIZE_U64] = {0};      /* Ensure data is aligned on 8-bytes boundaries */
-#endif
-    int result;
-
-    if (inputSize < LZ4_64Klimit)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
-    else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
-
-#if (HEAPMODE)
-    FREEMEM(ctx);
-#endif
-    return result;
-}
 
 int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
@@ -760,15 +749,30 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 #endif
     int result;
 
-    if (inputSize < LZ4_64Klimit)
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
+    if (maxOutputSize >= LZ4_compressBound(inputSize))
+    {
+        if (inputSize < LZ4_64Klimit)
+            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, 1);
+        else
+            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
+    }
     else
-        result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
-
+    {
+        if (inputSize < LZ4_64Klimit)
+            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, 1);
+        else
+            result = LZ4_compress_generic((void*)ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, 1);
+    }
 #if (HEAPMODE)
     FREEMEM(ctx);
 #endif
     return result;
+}
+
+
+int LZ4_compress(const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_limitedOutput(source, dest, inputSize, LZ4_compressBound(inputSize));
 }
 
 
@@ -807,6 +811,14 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 *  Experimental : Streaming functions
 *****************************************/
 
+LZ4_stream_t* LZ4_createStream(void)
+{
+    LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOCATOR(8, LZ4_STREAMSIZE_U64);
+    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
+    LZ4_resetStream(lz4s);
+    return lz4s;
+}
+
 /*
  * LZ4_initStream
  * Use this function once, to init a newly allocated LZ4_stream_t structure
@@ -815,14 +827,6 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
-}
-
-LZ4_stream_t* LZ4_createStream(void)
-{
-    LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOCATOR(8, LZ4_STREAMSIZE_U64);
-    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
-    LZ4_resetStream(lz4s);
-    return lz4s;
 }
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
