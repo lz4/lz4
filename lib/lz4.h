@@ -144,6 +144,7 @@ LZ4_compress_withState() :
     Same compression functions, but using an externally allocated memory space to store compression state.
     Use LZ4_sizeofState() to know how much memory must be allocated,
     and then, provide it as 'void* state' to compression functions.
+    Note that 'state' must be aligned on 4-bytes boundaries.
 */
 int LZ4_sizeofState(void);
 int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);

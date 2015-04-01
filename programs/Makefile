@@ -27,11 +27,14 @@
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # fuzzer  : Test tool, to check lz4 integrity on target platform
 # fuzzer32: Same as fuzzer, but forced to compile in 32-bits mode
+# frametest  : Test tool, to check lz4frame integrity on target platform
+# frametest32: Same as frametest, but forced to compile in 32-bits mode
 # fullbench  : Precisely measure speed for each LZ4 function variant
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
+# datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r128
+RELEASE?= r129
 
 DESTDIR?=
 PREFIX ?= /usr/local
