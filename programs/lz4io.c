@@ -61,7 +61,7 @@
 /******************************
 *  OS-specific Includes
 ******************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <fcntl.h>   /* _O_BINARY */
 #  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
