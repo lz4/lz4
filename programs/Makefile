@@ -171,6 +171,11 @@ test-lz4-contentSize: lz4 datagen
 	./lz4 -v tmp | ./lz4 -t
 	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
 	diff -s tmp tmp2
+	# test large size [2-4] GB
+	@./datagen -g3G -P100 | ./lz4 | ./lz4 --decompress --force --sparse - tmp
+	@ls -ls tmp
+	./lz4 --quiet --content-size tmp | ./lz4 --verbose --decompress --force --sparse - tmp2
+	@ls -ls tmp2
 	@rm tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
