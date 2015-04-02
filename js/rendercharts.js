@@ -109,7 +109,7 @@
   };
   // end of http://code.google.com/p/csv-to-array/
 
-  var drawTable = function (gvCtor, gvOptions, csvUrl, tableEl) {
+  var drawTable = function (gvCtor, gvOptions, csvUrl, csvEl) {
     var r = new XMLHttpRequest();
     r.open("GET", csvUrl, true);
     r.onreadystatechange = function() {
@@ -140,7 +140,7 @@
         }
         gvdt.addRows(csvAsArray);
         var ctor = getNestedObjectByName(gvCtor);
-        var table = new ctor (tableEl);
+        var table = new ctor (csvEl);
         table.draw(gvdt, gvOptions);
       }
     }

@@ -1,4 +1,4 @@
-"Compressor:string"	,"Compression:number"	,"Decompression:number"	,"Transfer:number"
+﻿"Compressor:string"	,"Compression:number"	,"Decompression:number"	,"Transfer:number"
 LZ4 (r101) -1		, 0.0000		, 0.1165		, 1.0170
 LZO-2.06		, 0.0000		, 0.3532		, 1.0064
 QuickLZ 1.5.1b6		, 0.0000		, 0.5046		, 0.94743

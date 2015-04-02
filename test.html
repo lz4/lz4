@@ -17,6 +17,8 @@
       <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
       <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
+
+    <link rel="stylesheet" href="js/bootstrap-patch.css">
   </head>
   <body style="padding-top:0; padding-bottom:0; ">
     <nav class="navbar navbar-default">
@@ -58,15 +60,15 @@
     <a name="summary"></a>
     <div class="container">
       <div class="page-header jumbotron" style="padding-top:1em;padding-bottom:2em;">
-        <h1>LZ4 - Extremely fast compression</h1>
-        <b>LZ4</b> is lossless compression algorithm, providing compression speed
-        at 400 MB/s per core (0.16 Byte/cycle), scalable with multi-cores CPU.
-        It also features an extremely fast decoder, with speed in multiple
-        GB/s per core (0.71 Byte/cycle), typically reaching RAM speed limits on multi-core systems.
-        A high compression derivative, called <b>LZ4_HC</b>, is also provided.
+        <h1>LZ4</h1>
+        LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core (0.16 Bytes/cycle).
+        It also features an extremely fast decoder, with speed in multiple GB/s per core (0.71 Bytes/cycle).
+        A high compression derivative, called LZ4_HC, is also provided.
         It trades CPU time for compression ratio.
       </div>
     </div>
+
+
 
 <xmp theme="sandstone" style="display:none;">
 <a name="benchmarks"></a>
@@ -79,34 +81,37 @@ The benchmark uses the
 The reference system uses a Core i5-3340M @2.7GHz.
 Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia) in single-thread mode.
 
-<div class="btn-group" role="group">
-  <button data-chartselector-chart-id="my-chart-1" type="button" class="btn btn-primary">Offline Compression@1000Mbps</button>
-  <button data-chartselector-chart-id="my-chart-2" type="button" class="btn btn-primary">Online Compression@1000Mbps</button>
+<div>
+  <ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
+    <li class="active"><a href="#tab-1" data-toggle="tab">Transfer + Decompression Time<br/>@1000Mbps</a></li>
+    <li               ><a href="#tab-2" data-toggle="tab">Compression + Transfer + Decompression Time<br/>@1000Mbps</a></li>
+  </ul>
+  <div id="my-tab-content" class="tab-content">
+    <div id="tab-1" class="tab-pane active">
+      <div style="height:30em;"
+           data-csv-props='{
+             "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
+             "csvGvType": "google.visualization.ColumnChart",
+             "csvGvPackage": "corechart",
+             "isStacked": "true",
+             "title": "Transfer + Decompression Time | [SMALLER IS BETTER]"
+           }'
+      ></div>
+    </div>
+    <div id="tab-2" class="tab-pane">
+      <div style="height:30em;"
+           data-csv-props='{
+             "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
+             "csvGvType": "google.visualization.ColumnChart",
+             "csvGvPackage": "corechart",
+             "isStacked": "true",
+             "title": "Compression + Transfer + Decompression Time | [SMALLER IS BETTER]"
+           }'
+      ></div>
+    </div>
+  </div>
 </div>
 
-<div class="chartselector-group" style="height:30em;">
-  <div id="my-chart-1"
-       class="chartselector-chart"
-       data-csv-props='{
-         "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
-         "csvGvType": "google.visualization.ColumnChart",
-         "csvGvPackage": "corechart",
-         "isStacked": "true",
-         "title": "Round Trip Time - offline compression - Silesia Corpus(212MB)@1000Mbit/s | [SMALLER IS BETTER]"
-       }'
-  ></div>
-
-  <div id="my-chart-2"
-       class="chartselector-chart"
-       data-csv-props='{
-         "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
-         "csvGvType": "google.visualization.ColumnChart",
-         "csvGvPackage": "corechart",
-         "isStacked": "true",
-         "title": "Round Trip Time - Silesia Corpus(212MB)@1000Mbit/s | [SMALLER IS BETTER]"
-       }'
-  ></div>
-</div>
 
 <br/>
 <a name="interoperable-lz4"></a>
@@ -178,8 +183,7 @@ The following versions compress data blocks using LZ4 compression algorithm in m
     <script src="strapdown/v/0.2/strapdown.js"></script>
 
     <!-- Chart -->
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <script type="text/javascript" src="js/rendercharts.js"></script>
-    <script src="js/chartselector.js"></script>
+    <script src="https://www.google.com/jsapi"></script>
+    <script src="js/rendercharts.js"></script>
   </body>
 </html>
