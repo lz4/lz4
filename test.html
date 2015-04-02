@@ -35,7 +35,7 @@
         <!-- Collect the nav links, forms, and other content for toggling -->
         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
           <ul class="nav navbar-nav navbar-nav">
-            <li><a href="https://github.com/Cyan4973/lz4/archive/r127.tar.gz">Download</a></li>
+            <li><a href="https://github.com/Cyan4973/lz4/releases/latest">Latest Release</a></li>
             <li><a href="#interoperable-lz4">Languages</a></li>
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Index<span class="caret"></span></a>
@@ -48,86 +48,77 @@
           </ul>
           <ul class="nav navbar-nav navbar-right">
             <li><a href="https://groups.google.com/forum/#!forum/lz4c">Public discussion forum</a></li>
-            <li><a href="https://groups.google.com/forum/#!forum/lz4c">Issue Tracker</a></li>
+            <li><a href="https://github.com/Cyan4973/lz4/issues">Issue Tracker</a></li>
             <li><a href="https://github.com/Cyan4973/lz4"><i class="fa fa-lg fa-github"></i> GitHub</a></li>
           </ul>
         </div><!-- /.navbar-collapse -->
       </div><!-- /.container-fluid -->
     </nav>
 
+    <a name="summary"></a>
     <div class="container">
-      <div class="page-header jumbotron">
-      <h1>LZ4</h1>
-      LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core, scalable with multi-cores CPU. It also features an extremely fast decoder, with speed in multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
-      A high compression derivative, called LZ4_HC, is also provided. It trades CPU time for compression ratio.
+      <div class="page-header jumbotron" style="padding-top:1em;padding-bottom:2em;">
+        <h1>LZ4 - Extremely fast compression</h1>
+        <b>LZ4</b> is lossless compression algorithm, providing compression speed
+        at 400 MB/s per core (0.16 Byte/cycle), scalable with multi-cores CPU.
+        It also features an extremely fast decoder, with speed in multiple
+        GB/s per core (0.71 Byte/cycle), typically reaching RAM speed limits on multi-core systems.
+        A high compression derivative, called <b>LZ4_HC</b>, is also provided.
+        It trades CPU time for compression ratio.
       </div>
     </div>
 
 <xmp theme="sandstone" style="display:none;">
-<a name="summary"></a>
-LZ4 - Extremely fast compression
-================================
-
-LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core, scalable with multi-cores CPU. It also features an extremely fast decoder, with speed in multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
-A high compression derivative, called LZ4_HC, is also provided. It trades CPU time for compression ratio.
-
-|Branch      |Status   |
-|------------|---------|
-|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) |
-|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) |
-
-
-> **Branch Policy:**
-
-> - The "master" branch is considered stable, at all times.
-> - The "dev" branch is the one where all contributions must be merged before being promoted to master.
->  - If you plan to propose a patch, please commit into the "dev" branch. Direct commit to "master" are not permitted.
-> - Feature branches can also exist, for dedicated testing of larger modifications before merge into "dev" branch.
-
 <a name="benchmarks"></a>
 Benchmarks
--------------------------
+----------
 
-The benchmark uses the [Open-Source Benchmark program by m^2 (v0.14.2)](http://encode.ru/threads/1371-Filesystem-benchmark?p=33548&viewfull=1#post33548) compiled with GCC v4.6.1 on Linux Ubuntu 64-bits v11.10,
+The benchmark uses the
+ [Open-Source Benchmark program by m^2 (v0.14.2)](http://encode.ru/threads/1371-Filesystem-benchmark?p=33548&viewfull=1#post33548)
+ compiled with GCC v4.6.1 on Linux Ubuntu 64-bits v11.10,
 The reference system uses a Core i5-3340M @2.7GHz.
 Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia) in single-thread mode.
 
-<table>
-  <tr>
-    <th>Compressor</th><th>Ratio</th><th>Compression</th><th>Decompression</th>
-  </tr>
-  <tr>
-    <th>LZ4 (r101)</th><th>2.084</th><th>422 MB/s</th><th>1820 MB/s</th>
-  </tr>
-  <tr>
-    <th>LZO 2.06</th><th>2.106</th><th>414 MB/s</th><th>600 MB/s</th>
-  </tr>
-  <tr>
-    <th>QuickLZ 1.5.1b6</th><th>2.237</th><th>373 MB/s</th><th>420 MB/s</th>
-  </tr>
-  <tr>
-    <th>Snappy 1.1.0</th><th>2.091</th><th>323 MB/s</th><th>1070 MB/s</th>
-  </tr>
-  <tr>
-    <th>LZF</th><th>2.077</th><th>270 MB/s</th><th>570 MB/s</th>
-  </tr>
-  <tr>
-    <th>zlib 1.2.8 -1</th><th>2.730</th><th>65 MB/s</th><th>280 MB/s</th>
-  </tr>
-  <tr>
-    <th>LZ4 HC (r101)</th><th>2.720</th><th>25 MB/s</th><th>2080 MB/s</th>
-  </tr>
-  <tr>
-    <th>zlib 1.2.8 -6</th><th>3.099</th><th>21 MB/s</th><th>300 MB/s</th>
-  </tr>
-</table>
+<div class="btn-group" role="group">
+  <button data-chartselector-chart-id="my-chart-1" type="button" class="btn btn-primary">Offline Compression@1000Mbps</button>
+  <button data-chartselector-chart-id="my-chart-2" type="button" class="btn btn-primary">Online Compression@1000Mbps</button>
+</div>
+
+<div class="chartselector-group" style="height:30em;">
+  <div id="my-chart-1"
+       class="chartselector-chart"
+       data-csv-props='{
+         "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
+         "csvGvType": "google.visualization.ColumnChart",
+         "csvGvPackage": "corechart",
+         "isStacked": "true",
+         "title": "Round Trip Time - offline compression - Silesia Corpus(212MB)@1000Mbit/s | [SMALLER IS BETTER]"
+       }'
+  ></div>
+
+  <div id="my-chart-2"
+       class="chartselector-chart"
+       data-csv-props='{
+         "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
+         "csvGvType": "google.visualization.ColumnChart",
+         "csvGvPackage": "corechart",
+         "isStacked": "true",
+         "title": "Round Trip Time - Silesia Corpus(212MB)@1000Mbit/s | [SMALLER IS BETTER]"
+       }'
+  ></div>
+</div>
+
+<br/>
+<a name="interoperable-lz4"></a>
+## Specifications
 
 The LZ4 block compression format is detailed within [lz4_block_format.txt](lz4_block_format.txt).
 
 For streaming unknown amount of data, and compress files of any size, a frame format has been published, and can be consulted within the file [LZ4_Frame_Format.html](LZ4_Frame_Format.html).
 
+<br/>
 <a name="interoperable-lz4"></a>
-## Interoperable LZ4 versions :
+## Interoperable LZ4 versions
 The following versions are provided for languages beyond the C reference version. They are in conformance with the LZ4 frame specification and are therefore interoperable.
 
 * __Javascript__ : by Pierre Curto, at https://github.com/pierrec/node-lz4
@@ -137,6 +128,7 @@ The following versions are provided for languages beyond the C reference version
 * __Go__ : by Pierre Curto, at https://github.com/pierrec/lz4
 * __Rust__ : by Artem Navrotskiy, at https://github.com/bozaro/lz4-rs
 
+<br/>
 <a name="other-source"></a>
 ## Other Source versions :
 The following versions compress data blocks using LZ4 compression algorithm in multiple languages. Each version encapsulates the compressed result into its own header/frame format convention.
@@ -160,6 +152,7 @@ The following versions compress data blocks using LZ4 compression algorithm in m
 * __Atari XL/XE assembly__ decoder, by xxl, at http://xxl.atari.pl/?p=1524
 * __65c816 assembly__ decoder, by Olivier Zardini, at http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
 
+<br/>
 <a name="lz4-is-used-by"></a>
 ## LZ4 is used by
 
@@ -176,41 +169,6 @@ The following versions compress data blocks using LZ4 compression algorithm in m
 * __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
 
 ---
-## Charts
-
-<div class="btn-group" role="group">
-  <button data-chartselector-chart-id="my-chart-1" type="button" class="btn btn-primary">Test Chart #1</button>
-  <button data-chartselector-chart-id="my-chart-2" type="button" class="btn btn-primary">Test Chart #2</button>
-</div>
-
-<div class="chartselector-group" style="height:30em;">
-  <div id="my-chart-1"
-       class="chartselector-chart"
-       data-csv-props='{
-         "csvSrc": "csv/sample1.csv",
-         "csvGvType": "google.visualization.Table",
-         "csvGvPackage": "table",
-         "showRowNumber": true
-       }'
-  ></div>
-
-  <div id="my-chart-2"
-       class="chartselector-chart"
-       data-csv-props='{
-         "csvSrc": "csv/sample2.csv",
-         "csvGvType": "google.visualization.ComboChart",
-         "csvGvPackage": "corechart",
-         "title" : "Monthly Coffee Production by Country",
-         "vAxis": {"title": "Cups"},
-         "hAxis": {"title": "Month"},
-         "seriesType": "bars",
-         "series": {"5": {"type": "line"}}
-       }'
-  ></div>
-</div>
-
----
-## Footer
 </xmp>
 
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
