@@ -412,7 +412,6 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     /* Init */
     start = clock();
     memset(&prefs, 0, sizeof(prefs));
-    if ((g_displayLevel==2) && (compressionLevel>=3)) g_displayLevel=3;
     errorCode = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
@@ -428,6 +427,8 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     {
       unsigned long long fileSize = LZ4IO_GetFileSize(input_filename);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
+      if (fileSize==0)
+          DISPLAYLEVEL(3, "Warning : cannot determine uncompressed frame content size \n");
     }
 
     /* Allocate Memory */
@@ -456,7 +457,7 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
         outSize = LZ4F_compressUpdate(ctx, out_buff, outBuffSize, in_buff, readSize, NULL);
         if (LZ4F_isError(outSize)) EXM_THROW(34, "Compression failed : %s", LZ4F_getErrorName(outSize));
         compressedfilesize += outSize;
-        DISPLAYUPDATE(3, "\rRead : %i MB   ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %i MB   ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
         sizeCheck = fwrite(out_buff, 1, outSize, foutput);
@@ -639,6 +640,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             {
                 /* Write Block */
                 filesize += decodedBytes;
+                DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
                 if (g_sparseFileSupport)
                 {
                     size_t* const oBuffStartT = (size_t*)outBuff;   /* since outBuff is malloc'ed, it's aligned on size_t */
