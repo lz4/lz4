@@ -176,67 +176,41 @@ The following versions compress data blocks using LZ4 compression algorithm in m
 * __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
 
 ---
+## Charts
 
-## Chart 1
+<div class="btn-group" role="group">
+  <button data-chartselector-chart-id="my-chart-1" type="button" class="btn btn-primary">Test Chart #1</button>
+  <button data-chartselector-chart-id="my-chart-2" type="button" class="btn btn-primary">Test Chart #2</button>
+</div>
 
-<div
-  data-csv-props='{
-    "csvSrc": "csv/sample1.csv",
-    "csvGvType": "google.visualization.Table",
-    "csvGvPackage": "table",
-    "showRowNumber": true
-  }'
-></div>
+<div class="chartselector-group" style="height:30em;">
+  <div id="my-chart-1"
+       class="chartselector-chart"
+       data-csv-props='{
+         "csvSrc": "csv/sample1.csv",
+         "csvGvType": "google.visualization.Table",
+         "csvGvPackage": "table",
+         "showRowNumber": true
+       }'
+  ></div>
 
-```
-<div
-  data-csv-props='{
-    "csvSrc": "csv/sample1.csv",
-    "csvGvType": "google.visualization.Table",
-    "csvGvPackage": "table",
-    "showRowNumber": true
-  }'
-></div>
-```
-
-"data-csv-props" attribute is custom properties for js/rendercharts.js.
-Properties which has "csv" prefix are basic settings for js/rendercharts.js.
-
-    "csvSrc"      : Source CSV URL.
-    "csvGvType"   : Google Charts class name.
-    "csvGvPackage": Google Charts package name.
-
-To find "class name" and "package name", see "Loading" section in Google Charts class document :
-
-  - https://google-developers.appspot.com/chart/interactive/docs/gallery/table#Loading
-  - https://google-developers.appspot.com/chart/interactive/docs/gallery/combochart#Loading
-
-Other properties in "data-csv-props" are "Configuration Options" for specific Google Charts class.
-Each class document has "Configuration Options" section
-
-  - https://google-developers.appspot.com/chart/interactive/docs/gallery/table#Configuration_Options
-  - https://google-developers.appspot.com/chart/interactive/docs/gallery/combochart#Configuration_Options
+  <div id="my-chart-2"
+       class="chartselector-chart"
+       data-csv-props='{
+         "csvSrc": "csv/sample2.csv",
+         "csvGvType": "google.visualization.ComboChart",
+         "csvGvPackage": "corechart",
+         "title" : "Monthly Coffee Production by Country",
+         "vAxis": {"title": "Cups"},
+         "hAxis": {"title": "Month"},
+         "seriesType": "bars",
+         "series": {"5": {"type": "line"}}
+       }'
+  ></div>
+</div>
 
 ---
-
-## Chart 2
-
-You can also specify standard HTML "style" attributes such as `style="height:40em"`.
-
-<div
-  style="height:40em"
-  data-csv-props='{
-    "csvSrc": "csv/sample2.csv",
-    "csvGvType": "google.visualization.ComboChart",
-    "csvGvPackage": "corechart",
-    "title" : "Monthly Coffee Production by Country",
-    "vAxis": {"title": "Cups"},
-    "hAxis": {"title": "Month"},
-    "seriesType": "bars",
-    "series": {"5": {"type": "line"}}
-  }'
-></div>
-
+## Footer
 </xmp>
 
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
@@ -248,5 +222,6 @@ You can also specify standard HTML "style" attributes such as `style="height:40e
     <!-- Chart -->
     <script type="text/javascript" src="https://www.google.com/jsapi"></script>
     <script type="text/javascript" src="js/rendercharts.js"></script>
+    <script src="js/chartselector.js"></script>
   </body>
 </html>
