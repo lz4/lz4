@@ -59,7 +59,7 @@
 
     <a name="summary"></a>
     <div class="container">
-      <div class="page-header jumbotron" style="padding-top:1em;padding-bottom:2em;">
+      <div class="page-header jumbotron text-justify" style="padding-top:1em;padding-bottom:2em;">
         <h1>LZ4</h1>
         LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core (0.16 Bytes/cycle).
         It also features an extremely fast decoder, with speed in multiple GB/s per core (0.71 Bytes/cycle).
@@ -83,31 +83,63 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
 
 <div>
   <ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
-    <li class="active"><a href="#tab-1" data-toggle="tab">Transfer + Decompression Time<br/>@1000Mbps</a></li>
-    <li               ><a href="#tab-2" data-toggle="tab">Compression + Transfer + Decompression Time<br/>@1000Mbps</a></li>
+    <li class="active"><a href="#tab-1" data-toggle="tab">Transfer + Decompression Time<br/>@1000Mbit/s</a></li>
+    <li               ><a href="#tab-2" data-toggle="tab">Compression + Transfer + Decompression Time<br/>@1000Mbit/s</a></li>
   </ul>
   <div id="my-tab-content" class="tab-content">
-    <div id="tab-1" class="tab-pane active">
-      <div style="height:30em;"
-           data-csv-props='{
-             "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
-             "csvGvType": "google.visualization.ColumnChart",
-             "csvGvPackage": "corechart",
-             "isStacked": "true",
-             "title": "Transfer + Decompression Time | [SMALLER IS BETTER]"
-           }'
-      ></div>
+    <div id="tab-1" class="tab-pane container-fluid active">
+      <div class="row">
+        <div class="col-md-4 text-justify">
+          <h2>Transfer + Decompression Time @1000Mbit/s <small>(without I/O overwrapping, multithreading)</small></h2>
+          <p>
+          This benchmark simulates simple "static content transfer" scenario such as Kernel compression
+          or video game's static assets (text/images/tables/scripts/etc) which loading from Flash Memory / HDD / SSD.
+          </p>
+          <p>
+          In this case, compression time is completely ignored.
+          Because only content developers compress the data at once and usually they don't care about its computational cost.
+          But they always care enduser's experience a.k.a. "loading time" and bandwidth.
+          </p>
+        </div>
+        <div class="col-md-8"
+             style="height:34em;"
+             data-csv-props='{
+               "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
+               "csvGvType": "google.visualization.ColumnChart",
+               "csvGvPackage": "corechart",
+               "chartArea": {"width": "90%", "height": "30em"},
+               "legend": {"position": "top"},
+               "isStacked": "true",
+               "title": "Transfer + Decompression Time\nSMALLER IS BETTER"
+             }'
+        ></div>
+      </div>
     </div>
-    <div id="tab-2" class="tab-pane">
-      <div style="height:30em;"
-           data-csv-props='{
-             "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
-             "csvGvType": "google.visualization.ColumnChart",
-             "csvGvPackage": "corechart",
-             "isStacked": "true",
-             "title": "Compression + Transfer + Decompression Time | [SMALLER IS BETTER]"
-           }'
-      ></div>
+    <div id="tab-2" class="tab-pane container-fluid">
+      <div class="row">
+        <div class="col-md-4 text-justify">
+          <h2>Compression + Transfer + Decompression Time @1000Mbit/s <small>(without I/O overwrapping, multithreading)</small></h2>
+          <p>
+          This benchmark simulates "dynamic content transfer" scenario such as filesystems, caches, network packets, RPCs, databases, and usual files.
+          </p>
+          <p>
+          In this case, both compression and decompression times are important.
+          Also robust compression time for incompressible (eg. encrypted) data is required.
+          </p>
+        </div>
+        <div class="col-md-8"
+             style="height:34em;"
+             data-csv-props='{
+               "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
+               "csvGvType": "google.visualization.ColumnChart",
+               "csvGvPackage": "corechart",
+               "chartArea": {"width": "90%", "height": "30em"},
+               "legend": {"position": "top"},
+               "isStacked": "true",
+               "title": "Compression + Transfer + Decompression Time\nSMALLER IS BETTER"
+             }'
+        ></div>
+      </div>
     </div>
   </div>
 </div>
