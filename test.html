@@ -76,8 +76,8 @@ Benchmarks
 ----------
 
 The benchmark uses the
- [Open-Source Benchmark program by m^2 (v0.14.2)](http://encode.ru/threads/1371-Filesystem-benchmark?p=33548&viewfull=1#post33548)
- compiled with GCC v4.6.1 on Linux Ubuntu 64-bits v11.10,
+[Open-Source Benchmark program by m^2 (v0.14.2)](http://encode.ru/threads/1371-Filesystem-benchmark?p=33548&viewfull=1#post33548)
+compiled with GCC v4.6.1 on Linux Ubuntu 64-bits v11.10,
 The reference system uses a Core i5-3340M @2.7GHz.
 Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia) in single-thread mode.
 
@@ -92,13 +92,16 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
         <div class="col-md-4 text-justify">
           <h2>Transfer + Decompression Time @1000Mbit/s <small>(without I/O overwrapping, multithreading)</small></h2>
           <p>
-          This benchmark simulates simple "static content transfer" scenario such as Kernel compression
+          This benchmark simulates simple "static content transfer" scenario such as OS Kernel compression
           or video game's static assets (text/images/tables/scripts/etc) which loading from Flash Memory / HDD / SSD.
           </p>
           <p>
           In this case, compression time is completely ignored.
           Because only content developers compress the data at once and usually they don't care about its computational cost.
           But they always care enduser's experience a.k.a. "loading time" and bandwidth.
+          </p>
+          <p>
+          Please pay attention to "LZ4HC -9" which is quite faster than other methods.
           </p>
         </div>
         <div class="col-md-8"
@@ -107,9 +110,10 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
                "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
                "csvGvType": "google.visualization.ColumnChart",
                "csvGvPackage": "corechart",
-               "chartArea": {"width": "90%", "height": "30em"},
+               "chartArea": {"width": "80%", "height": "30em"},
                "legend": {"position": "top"},
                "isStacked": "true",
+               "vAxis": {"title": "Seconds" },
                "title": "Transfer + Decompression Time\nSMALLER IS BETTER"
              }'
         ></div>
@@ -120,11 +124,11 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
         <div class="col-md-4 text-justify">
           <h2>Compression + Transfer + Decompression Time @1000Mbit/s <small>(without I/O overwrapping, multithreading)</small></h2>
           <p>
-          This benchmark simulates "dynamic content transfer" scenario such as filesystems, caches, network packets, RPCs, databases, and usual files.
+          This benchmark simulates "dynamic content transfer" scenario such as filesystems, caches, network packets, IPC/RPCs, and databases.
           </p>
           <p>
           In this case, both compression and decompression times are important.
-          Also robust compression time for incompressible (eg. encrypted) data is required.
+          You can observe "Fast compression algorithms" are better than traditional algorithms such as DEFLATE (zlib).
           </p>
         </div>
         <div class="col-md-8"
@@ -133,9 +137,10 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
                "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
                "csvGvType": "google.visualization.ColumnChart",
                "csvGvPackage": "corechart",
-               "chartArea": {"width": "90%", "height": "30em"},
+               "chartArea": {"width": "80%", "height": "30em"},
                "legend": {"position": "top"},
                "isStacked": "true",
+               "vAxis": {"title": "Seconds" },
                "title": "Compression + Transfer + Decompression Time\nSMALLER IS BETTER"
              }'
         ></div>
@@ -145,77 +150,200 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
 </div>
 
 
-<br/>
 <a name="interoperable-lz4"></a>
-## Specifications
+## Documentation
 
 The LZ4 block compression format is detailed within [lz4_block_format.txt](lz4_block_format.txt).
 
-For streaming unknown amount of data, and compress files of any size, a frame format has been published, and can be consulted within the file [LZ4_Frame_Format.html](LZ4_Frame_Format.html).
+For streaming unknown amount of data, and compress files of any size,
+a frame format has been published, and can be consulted within the file [LZ4_Frame_Format.html](LZ4_Frame_Format.html).
+
+
 
 <br/>
 <a name="interoperable-lz4"></a>
 ## Interoperable LZ4 versions
-The following versions are provided for languages beyond the C reference version. They are in conformance with the LZ4 frame specification and are therefore interoperable.
+The following versions are provided for languages beyond the C reference version.
+They are in conformance with the LZ4 frame specification and are therefore interoperable.
 
-* __Javascript__ : by Pierre Curto, at https://github.com/pierrec/node-lz4
-* __C++11__ multi-threads : by Takayuki Matsuoka, at https://github.com/t-mat/lz4mt
-* __Python__ : by Christopher Jackson, at https://github.com/darkdragn/lz4tools
-* __Delphi__ : by Hanno Hugenberg, at https://github.com/Hugie/lz4-delphi
-* __Go__ : by Pierre Curto, at https://github.com/pierrec/lz4
-* __Rust__ : by Artem Navrotskiy, at https://github.com/bozaro/lz4-rs
+|Language				|Author			|URL					|
+|--					|--			|--					|
+|__Javascript__				|Pierre Curto		|https://github.com/pierrec/node-lz4	|
+|__C++11 multi-threads__		|Takayuki Matsuoka	|https://github.com/t-mat/lz4mt		|
+|__Python__				|Christopher Jackson	|https://github.com/darkdragn/lz4tools	|
+|__Delphi__				|Hanno Hugenberg	|https://github.com/Hugie/lz4-delphi	|
+|__Go__					|Pierre Curto		|https://github.com/pierrec/lz4		|
+|__Rust__				|Artem Navrotskiy	|https://github.com/bozaro/lz4-rs	|
+
+
 
 <br/>
 <a name="other-source"></a>
-## Other Source versions :
-The following versions compress data blocks using LZ4 compression algorithm in multiple languages. Each version encapsulates the compressed result into its own header/frame format convention.
+## Other Source versions
+The following versions compress data blocks using LZ4 compression algorithm in multiple languages.
+Each version encapsulates the compressed result into its own header/frame format convention.
 
-* __Java__ : by Adrien Grand, at https://github.com/jpountz/lz4-java
-* __Python__ : by Steeve Morin, at http://pypi.python.org/pypi/lz4
-* __Perl__ : by Gray, at http://search.cpan.org/dist/Compress-LZ4/
-* __C#__ : by Milosz Krajewski, at http://lz4net.codeplex.com
-* __C#__ streaming : by Phill Djonov, at https://github.com/pdjonov/Lz4Stream
-* __Go__ : by Branimir Karadzic, at https://github.com/bkaradzic/go-lz4
-* __Ruby__ : by Komiya Atsushi, at http://rubygems.org/gems/lz4-ruby
-* __PHP__ : by Kamijo, at https://github.com/kjdev/php-ext-lz4
-* __Lua__ : by Christophe Delord, at http://cdsoft.fr/bl/bonaluna.html
-* __Haskell__ : by Mark Wotton, at http://hackage.haskell.org/package/lz4
-* __Erlang__ : by Tetsuya Suzuki, at https://github.com/szktty/erlang-lz4
-* __Smalltalk__ (Pharo) : by Mariano Martinez Peck, at http://smalltalkhub.com/#!/~marianopeck/LZ4/
-* __OCaml__ : by Peter Zotov, at https://github.com/whitequark/ocaml-lz4
-* __Rust__ : by Alex Crichton, at http://alexcrichton.com/rust-compress/compress/lz4/index.html
-* __8088 assembly__ decoder, by Jim Leonard, at http://www.oldskool.org/pc/lz4_8088
-* __6502 & 65C02 assembly__ decoder, by Peter Ferrie, at http://pferrie.host22.com/misc/appleii.htm
-* __Atari XL/XE assembly__ decoder, by xxl, at http://xxl.atari.pl/?p=1524
-* __65c816 assembly__ decoder, by Olivier Zardini, at http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
+|Language				|Author			|URL									|
+|--					|--			|--									|
+|__Java__				|Adrien Grand		|https://github.com/jpountz/lz4-java					|
+|__Python__				|Steeve Morin		|http://pypi.python.org/pypi/lz4					|
+|__Perl__				|Gray			|http://search.cpan.org/dist/Compress-LZ4/				|
+|__C#__					|Milosz Krajewski	|http://lz4net.codeplex.com						|
+|__C#__ streaming			|Phill Djonov		|https://github.com/pdjonov/Lz4Stream					|
+|__Go__					|Branimir Karadzic	|https://github.com/bkaradzic/go-lz4					|
+|__Ruby__				|Komiya Atsushi		|http://rubygems.org/gems/lz4-ruby					|
+|__PHP__				|Kamijo			|https://github.com/kjdev/php-ext-lz4					|
+|__Lua__				|Christophe Delord	|http://cdsoft.fr/bl/bonaluna.html					|
+|__Haskell__				|Mark Wotton		|http://hackage.haskell.org/package/lz4					|
+|__Erlang__				|Tetsuya Suzuki		|https://github.com/szktty/erlang-lz4					|
+|__Smalltalk__ (Pharo)			|Mariano Martinez Peck	|http://smalltalkhub.com/#!/~marianopeck/LZ4/				|
+|__OCaml__				|Peter Zotov		|https://github.com/whitequark/ocaml-lz4				|
+|__Rust__				|Alex Crichton		|http://alexcrichton.com/rust-compress/compress/lz4/index.html		|
+|__8088 assembly__ decoder		|Jim Leonard		|http://www.oldskool.org/pc/lz4_8088					|
+|__6502 & 65C02 assembly__ decoder	|Peter Ferrie		|http://pferrie.host22.com/misc/appleii.htm				|
+|__Atari XL/XE assembly__ decoder	|xxl			|http://xxl.atari.pl/?p=1524						|
+|__65c816 assembly__ decoder		|Olivier Zardini	|http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html	|
+
+
 
 <br/>
 <a name="lz4-is-used-by"></a>
 ## LZ4 is used by
 
-* __Operating Systems__ : ![](images/linux50.png) [Linux](https://github.com/torvalds/linux), ![](images/FreeBSD50.png) [FreeBSD](http://www.freebsd.org/), ![](images/Illumos50.png) [Illumos](http://wiki.illumos.org/display/illumos/illumos+Home), ![](images/smartos50.png) [SmartOS](http://smartos.org/)
-* __File Systems__ : OpenZFS, Hammer2, SquashFS, LessFS, LeoFS, Grub
-* __Big Data__ : Hadoop, Cassandra, Hbase, Rarelogic, SparkSpark, Hustle
-* __Search Engine__ : Lucene, Solr, Scalyr, kafka
-* __Database__ : MySQL, Tokudb, Delphix, infiniSQL, RocksDB, OlegDB
-* __Games__ : Battlefield 4, Guild Wars 2, Sine Mora, 1000 Tiny Claws
-* __Graphics__ : nVidia, Enlightenment, Xpra, OpenVDB, Scaplib, kanzi
-* __Network__ : freeNAS, openVPN, Netty, dovecot, virtualHere
-* __Storage__ : Datastax, Nimble Storage, Nexenta, K2 Spear, Syneto OS
-* __Caching__ : Zram, HHVM, PHP Zend Optimizer
-* __Other__ : Mozilla Firefox, Bareos, GTKWave, Blosc, Facebook's Mercurial, Nippy, systemd
+
+#### Operating Systems
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+    <li><a href="//www.linux.org"   ><img src="images/linux50.png"  /><span>Linux</span></a></li>
+    <li><a href="//www.freebsd.org/"><img src="images/FreeBSD50.png"/><span>FreeBSD</span></a></li>
+    <li><a href="//www.illumos.org/"><img src="images/Illumos50.png"/><span>Illumos</span></a></li>
+    <li><a href="//smartos.org/"    ><img src="images/smartos50.png"/><span>SmartOS</span></a></li>
+  </ul>
+</div>
+
+#### File Systems
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+    <li><a href="//www.open-zfs.org/wiki/Main_Page"><img src="images/OpenZFS50.png" /><span>OpenZFS</span></a></li>
+    <li><a href="//www.dragonflybsd.org/hammer/"   ><img src="images/hammer50.png"  /><span>HAMMER2</span></a></li>
+    <li><a href="//squashfs.sourceforge.net/"      ><img src="images/squashfs50.png"/><span>SquashFS</span></a></li>
+    <li><a href="//www.lessfs.com/wordpress/"      ><img src="images/lessfs50.png"  /><span>LessFS</span></a></li>
+    <li><a href="//leo-project.net/leofs/"         ><img src="images/leofs50.png"   /><span>LeoFS</span></a></li>
+    <li><a href="//www.gnu.org/software/grub/"     ><img src="images/grub50.png"    /><span>GNU GRUB</span></a></li>
+  </ul>
+</div>
+
+#### Big Data
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//hadoop.apache.org/"					><img height="50" src="images/hadoop50.png"										/><span>Hadoop</span></a></li>
+<li><a href="//cassandra.apache.org/"					><img height="50" src="images/cassandra50.png"										/><span>Cassandra</span></a></li>
+<li><a href="//hbase.apache.org/"					><img height="50" src="images/hbase50.png"										/><span>Hbase</span></a></li>
+<li><a href="//www.rarelogic.com/"					><img height="50" src="images/rarelogic50.png"										/><span>Rarelogic</span></a></li>
+<li><a href="//spark.apache.org/"					><img height="50" src="images/spark50.png"										/><span>Spark</span></a></li>
+<li><a href="//github.com/chango/hustle"				><img height="50" src="images/hustle50.png"										/><span>Hustle</span></a></li>
+  </ul>
+</div>
+
+#### Search Engine
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//lucene.apache.org/"					><img height="50" src="images/lucene50.png"										/><span>Lucene</span></a></li>
+<li><a href="//lucene.apache.org/solr/"					><img height="50" src="images/solr50.png"										/><span>solr</span></a></li>
+<li><a href="//www.scalyr.com/"						><img height="50" src="images/scalyr50.png"										/><span>Scalyr</span></a></li>
+<li><a href="//kafka.apache.org/"					><img height="50" src="images/kafka50.png"										/><span>Kafka</span></a></li>
+  </ul>
+</div>
+
+#### Database
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//dev.mysql.com/"						><img height="50" src="//dev.mysql.com/common/logos/logo-mysql-110x57.png"						/><span>MySQL</span></a></li>
+<li><a href="//www.tokutek.com/products/tokudb-for-mysql/"		><img height="50" src="//www.tokutek.com/wp-content/uploads/2014/09/icon-tokudb.png"					/><span>Tokudb</span></a></li>
+<li><a href="//www.delphix.com/products/overview/"			><img height="50" src="//www.delphix.com/wp-content/themes/delphix6.0/images/logo.gif"					/><span>Delphix</span></a></li>
+<li><a href="//www.infinisql.org/"					><img height="50" src="images/infinisql50.png"										/><span>infiniSQL</span></a></li>
+<li><a href="//rocksdb.org/"						><img height="50" src="//cognitiones.kantel-chaos-team.de/webworking/db/images/rocksdb-logo.png"			/><span>RocksDB</span></a></li>
+<li><a href="//olegdb.org/"						><img height="50" src="//ih1.redbubble.net/image.22493834.2423/fc,220x200,white.u1.jpg"					/><span>OlegDB</span></a></li>
+  </ul>
+</div>
+
+#### Games
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//www.battlefield.com/battlefield-4"			><img height="50" src="//lh4.googleusercontent.com/-QxT7qF3nu0g/AAAAAAAAAAI/AAAAAAAAAAA/g5dy7Cpe1yI/s48-c-k/photo.jpg"	/><span>Battlefield 4</span></a></li>
+<li><a href="//www.guildwars2.com/fr/"					><img height="50" src="//gaygamer.net/images/GW2_Primary_Textured_FC.png"						/><span>Guild Wars 2</span></a></li>
+<li><a href="//www.sinemoragame.com/"					><img height="50" src="//img.uptodown.net/icons/256/sine-mora.png"							/><span>Sine Mora</span></a></li>
+<li><a href="//www.mediatonic.co.uk/blog/1000-tiny-claws-out-today"	><img height="50" src="//uk.playstation.com/media/ArozIyTc/163/282291.jpg"						/><span>1000 Tiny Claws</span></a></li>
+  </ul>
+</div>
+
+#### Graphics
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//www.nvidia.com/"						><img height="50" src="//upload.wikimedia.org/wikipedia/fr/thumb/2/21/Nvidia_logo.svg/220px-Nvidia_logo.svg.png"	/><span>nVidia</span></a></li>
+<li><a href="//www.enlightenment.org/"					><img height="50" src="//www.enlightenment.org/p/index/d/logo.png"							/><span>Enlightenment</span></a></li>
+<li><a href="//www.xpra.org/"						><img height="50" src="//xpra.org/icons/xpra-logo.png"									/><span>Xpra</span></a></li>
+<li><a href="//www.openvdb.org/"					><img height="50" src="//www.cartoonbrew.com/wp-content/uploads/open_vdb_logo_web-e1344041308558.png"			/><span>OpenVDB</span></a></li>
+<li><a href="//scap.codeplex.com/"					><img height="50" src="images/placeholder50.png"									/><span>Scaplib</span></a></li>
+<li><a href="//github.com/flanglet/kanzi"				><img height="50" src="images/placeholder50.png"									/><span>kanzi</span></a></li>
+  </ul>
+</div>
+
+#### Network
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//www.freenas.org/"					><img height="50" src="//hardwaredenlk.files.wordpress.com/2013/04/freenas_logo_twitter.jpg"				/><span>freeNAS</span></a></li>
+<li><a href="//openvpn.net/"						><img height="50" src="//www.tharunpkarun.com/data/uploads/2012/05/openvpn1.png"					/><span>openVPN</span></a></li>
+<li><a href="//netty.io/"						><img height="50" src="//dl.dropboxusercontent.com/u/59565338/Images/Netty.png"						/><span>Netty</span></a></li>
+<li><a href="//dovecot.org/"						><img height="50" src="//dovecot.org/dovecot.gif"									/><span>dovecot</span></a></li>
+<li><a href="//www.virtualhere.com/"					><img height="50" src="//www.virtualhere.com/sites/default/files/img2_0.png"						/><span>virtualHere</span></a></li>
+  </ul>
+</div>
+
+#### Storage
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//www.datastax.com/"					><img height="50" src="//openvirtualizationalliance.org/images/uploads/member_orgs/datastax_logo_x.png"			/><span>DataStax</span></a></li>
+<li><a href="//www.hybrid-san.co.uk/"					><img height="50" src="//www.silicon.fr/wp-content/uploads/2012/12/Nimble-Storage.jpeg"					/><span>Nimble Storage</span></a></li>
+<li><a href="//www.nexenta.com/"					><img height="50" src="//www.silicon.fr/wp-content/uploads/2013/02/Nexenta-logo.png"					/><span>Nexenta</span></a></li>
+<li><a href="//kaminario.com/flash-array/"				><img height="50" src="//pbs.twimg.com/profile_images/3673684968/74a1b1a493e85f01f60f9fe6ddb246b1_400x400.png"		/><span>K2 Spear</span></a></li>
+<li><a href="//syneto.net/"						><img height="50" src="//syneto.eu/wp-content/themes/flat/img/syneto.svg"						/><span>Syneto OS</span></a></li>
+  </ul>
+</div>
+
+#### Caching
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//en.wikipedia.org/wiki/ZRam"				><img height="50" src="//code.google.com/p/compcache/logo?cct=1280815816"						/><span>Zram</span></a></li>
+<li><a href="//hhvm.com/"						><img height="50" src="//docs.hhvm.com/images/og.png"									/><span>HHVM</span></a></li>
+<li><a href="//www.zend.com/"						><img height="50" src="//static.zend.com/cmsdata/static-assets/img/zend-logo-big.gif"					/><span>PHP Zend Optimizer</span></a></li>
+  </ul>
+</div>
+
+#### Other
+<div id="lz4usedby" class="container">
+  <ul id="icons" class="list-inline">
+<li><a href="//www.mozilla.org/"					><img height="50" src="//mozorg.cdn.mozilla.net/media/img/styleguide/identity/firefox/guidelines-logo.png?2013-06"	/><span>Mozilla Firefox</span></a></li>
+<li><a href="//www.bareos.org/en/"					><img height="50" src="//www.bareos.org/assets/images/9/Logo_signet_64x64-4e199499.png"					/><span>Bareos</span></a></li>
+<li><a href="//gtkwave.sourceforge.net/"				><img height="50" src="//upload.wikimedia.org/wikipedia/commons/6/68/Gtkwave_256x256x32.png"				/><span>GTKWave</span></a></li>
+<li><a href="//www.blosc.org/"						><img height="50" src="images/placeholder50.png"									/><span>Blosc</span></a></li>
+<li><a href="//bitbucket.org/facebook/lz4revlog"			><img height="50" src="//www.facebook.com/images/fb_icon_325x325.png"							/><span>Facebook&#x27;s Mercurial</span></a></li>
+<li><a href="//github.com/ptaoussanis/nippy"				><img height="50" src="images/placeholder50.png"									/><span>Nippy</span></a></li>
+<li><a href="//www.freedesktop.org/wiki/Software/systemd"		><img height="50" src="images/freedesktop50.png"									/><span>systemd</span></a></li>
+  </ul>
+</div>
 
 ---
 </xmp>
 
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
     <!-- Include all compiled plugins (below), or include individual files as needed -->
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
     <script src="strapdown/v/0.2/strapdown.js"></script>
 
     <!-- Chart -->
-    <script src="https://www.google.com/jsapi"></script>
+    <script src="//www.google.com/jsapi"></script>
     <script src="js/rendercharts.js"></script>
   </body>
 </html>
