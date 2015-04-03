@@ -41,15 +41,11 @@ in single-thread mode.
 |  Compressor       | Ratio   | Compression | Decompression |
 |  ----------       | -----   | ----------- | ------------- |
 |  memcpy           |  1.000  | 4200 MB/s   |   4200 MB/s   |
-|  RLE64 v3.0       |  1.029  | 2800 MB/s   |   2800 MB/s   |
-|  density -c1      |  1.592  |  700 MB/s   |    920 MB/s   |
 |**LZ4 fast (r129)**|  1.607  |**680 MB/s** | **2220 MB/s** |
 |**LZ4 (r129)**     |**2.101**|**385 MB/s** | **1850 MB/s** |
-|  density -c2      |  2.083  |  370 MB/s   |    505 MB/s   |
 |  LZO 2.06         |  2.108  |  350 MB/s   |    510 MB/s   |
 |  QuickLZ 1.5.1.b6 |  2.238  |  320 MB/s   |    380 MB/s   |
 |  Snappy 1.1.0     |  2.091  |  250 MB/s   |    960 MB/s   |
-|  density -c3      |  2.370  |  190 MB/s   |    185 MB/s   |
 |  zlib 1.2.8 -1    |  2.730  |   59 MB/s   |    250 MB/s   |
 |**LZ4 HC (r129)**  |**2.720**|   22 MB/s   | **1830 MB/s** |
 |  zlib 1.2.8 -6    |  3.099  |   18 MB/s   |    270 MB/s   |
