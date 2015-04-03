@@ -27,11 +27,14 @@
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # fuzzer  : Test tool, to check lz4 integrity on target platform
 # fuzzer32: Same as fuzzer, but forced to compile in 32-bits mode
+# frametest  : Test tool, to check lz4frame integrity on target platform
+# frametest32: Same as frametest, but forced to compile in 32-bits mode
 # fullbench  : Precisely measure speed for each LZ4 function variant
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
+# datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r128
+RELEASE?= r129
 
 DESTDIR?=
 PREFIX ?= /usr/local
@@ -168,6 +171,11 @@ test-lz4-contentSize: lz4 datagen
 	./lz4 -v tmp | ./lz4 -t
 	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
 	diff -s tmp tmp2
+	# test large size [2-4] GB
+	@./datagen -g3G -P100 | ./lz4 | ./lz4 --decompress --force --sparse - tmp
+	@ls -ls tmp
+	./lz4 --quiet --content-size tmp | ./lz4 --verbose --decompress --force --sparse - tmp2
+	@ls -ls tmp2
 	@rm tmp*
 
 test-lz4-frame-concatenation: lz4 datagen

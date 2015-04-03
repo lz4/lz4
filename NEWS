@@ -1,19 +1,24 @@
+r129:
+Added  : LZ4_compress_fast()
+Added  : AppVeyor CI environment, for Visual tests - Suggested by Takayuki Matsuoka
+Updated: Documentation converted to MarkDown
+
 r128:
-New   : lz4cli sparse file support
-New   : command -m, to compress multiple files in a single command
-Fixed : Restored lz4hc compression ratio (was slightly lower since r124)
-New   : lz4 cli supports long commands
-New   : lz4frame & lz4cli frame content size support
-New   : lz4frame supports skippable frames
-Changed:Default "make install" directory is /usr/local
-New   : lz4 cli supports "pass-through" mode
-New   : datagen can generate sparse files
-New   : scan-build tests
-New   : g++ compatibility tests
-New   : arm cross-compilation test
-Fixed : Fuzzer + frametest compatibility with NetBSD (issue #48)
-Added : Visual project directory
-Updated:Man page & Specification
+New    : lz4cli sparse file support (Requested by Neil Wilson, and contributed by Takayuki Matsuoka)
+New    : command -m, to compress multiple files in a single command (suggested by Kyle J. Harper)
+Fixed  : Restored lz4hc compression ratio (slightly lower since r124)
+New    : lz4 cli supports long commands (suggested by Takayuki Matsuoka)
+New    : lz4frame & lz4cli frame content size support
+New    : lz4frame supports skippable frames, as requested by Sergey Cherepanov
+Changed: Default "make install" directory is /usr/local, as notified by Ron Johnson
+New    : lz4 cli supports "pass-through" mode, requested by Neil Wilson
+New    : datagen can generate sparse files
+New    : scan-build tests, thanks to kind help by Takayuki Matsuoka
+New    : g++ compatibility tests
+New    : arm cross-compilation test, thanks to kind help by Takayuki Matsuoka
+Fixed  : Fuzzer + frametest compatibility with NetBSD (issue #48, reported by Thomas Klausner)
+Added  : Visual project directory
+Updated: Man page & Specification
 
 r127:
 N/A   : added a file on SVN

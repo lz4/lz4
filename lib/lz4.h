@@ -48,7 +48,7 @@ extern "C" {
 *  Version
 **************************************/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
-#define LZ4_VERSION_MINOR    6    /* for new (non-breaking) interface capabilities */
+#define LZ4_VERSION_MINOR    7    /* for new (non-breaking) interface capabilities */
 #define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 int LZ4_versionNumber (void);
@@ -99,7 +99,7 @@ LZ4_decompress_safe() :
 *  Advanced Functions
 **************************************/
 #define LZ4_MAX_INPUT_SIZE        0x7E000000   /* 2 113 929 216 bytes */
-#define LZ4_COMPRESSBOUND(isize)  ((unsigned int)(isize) > (unsigned int)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
+#define LZ4_COMPRESSBOUND(isize)  ((unsigned)(isize) > (unsigned)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
 
 /*
 LZ4_compressBound() :
@@ -107,11 +107,11 @@ LZ4_compressBound() :
     This function is primarily useful for memory allocation purposes (output buffer size).
     Macro LZ4_COMPRESSBOUND() is also provided for compilation-time evaluation (stack memory allocation for example).
 
-    isize  : is the input size. Max supported value is LZ4_MAX_INPUT_SIZE
+    inputSize  : max supported value is LZ4_MAX_INPUT_SIZE
     return : maximum output size in a "worst case" scenario
              or 0, if input size is too large ( > LZ4_MAX_INPUT_SIZE)
 */
-int LZ4_compressBound(int isize);
+int LZ4_compressBound(int inputSize);
 
 
 /*
@@ -130,10 +130,21 @@ int LZ4_compress_limitedOutput (const char* source, char* dest, int sourceSize, 
 
 
 /*
+LZ4_compress_fast() :
+    Same as LZ4_compress_limitedOutput, but allows to select an "acceleration" factor.
+    The larger the value, the faster the algorithm, but also the lesser the compression.
+    So it's a trade-off, which can be fine tuned, selecting whichever value you want.
+    An acceleration value of "0" means "use Default value", which is typically about 15 (see lz4.c source code).
+*/
+int LZ4_compress_fast (const char* source, char* dest, int sourceSize, int maxOutputSize, unsigned acceleration);
+
+
+/*
 LZ4_compress_withState() :
     Same compression functions, but using an externally allocated memory space to store compression state.
     Use LZ4_sizeofState() to know how much memory must be allocated,
     and then, provide it as 'void* state' to compression functions.
+    Note that 'state' must be aligned on 4-bytes boundaries.
 */
 int LZ4_sizeofState(void);
 int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
