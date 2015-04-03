@@ -587,8 +587,6 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     unsigned long long filesize = 0;
     void* inBuff;
     void* outBuff;
-#   define HEADERMAX 20
-    char  headerBuff[HEADERMAX];
     size_t sizeCheck;
     const size_t inBuffSize = 256 KB;
     const size_t outBuffSize = 256 KB;
@@ -599,7 +597,6 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create context : %s", LZ4F_getErrorName(errorCode));
-    LZ4IO_writeLE32(headerBuff, LZ4IO_MAGICNUMBER);   /* regenerated here, as it was already read from finput */
 
     /* Allocate Memory */
     inBuff = malloc(256 KB);
