@@ -1,11 +1,19 @@
 (function(window, document) {
   // http://stackoverflow.com/a/1414175/2132223
-  var stringToBoolean = function (str) {
+  var stringToBoolean1 = function (str) {
     switch(str.toLowerCase()) {
       case "true": case "yes": case "1": return true;
       case "false": case "no": case "0": case null: return false;
-      default: return Boolean(str);
+      default: return null;
     }
+  };
+
+  var stringToBoolean = function (str) {
+    var b = stringToBoolean1(str);
+    if(b === null) {
+      b = Boolean(str);
+    }
+    return b;
   };
 
   // http://stackoverflow.com/a/4981700/2132223
@@ -109,6 +117,40 @@
   };
   // end of http://code.google.com/p/csv-to-array/
 
+  var estimateColumnType = function (csvAsArray, columnIndex) {
+    var isColumnBoolean = function (csvAsArray, columnIndex) {
+      for(var row = 0, nRow = csvAsArray.length; row < nRow; ++row) {
+        if(stringToBoolean1(csvAsArray[row][columnIndex]) === null) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    var isColumnNumber = function (csvAsArray, columnIndex) {
+      // http://stackoverflow.com/a/1830844/2132223
+      var isNumber = function(n) {
+        return !isNaN(parseFloat(n)) && isFinite(n);
+      }
+      for(var row = 0, nRow = csvAsArray.length; row < nRow; ++row) {
+        if(! isNumber(csvAsArray[row][columnIndex])) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if(isColumnBoolean(csvAsArray, columnIndex)) {
+      return "boolean";
+    }
+
+    if(isColumnNumber(csvAsArray, columnIndex)) {
+      return "number";
+    }
+
+    return "string";
+  };
+
   var drawTable = function (gvCtor, gvOptions, csvUrl, csvEl) {
     var r = new XMLHttpRequest();
     r.open("GET", csvUrl, true);
@@ -119,6 +161,7 @@
         var gvdt = new google.visualization.DataTable()
         var csvHeaderLine = csvAsArray.shift();
         for(var i = 0; i < csvHeaderLine.length; i++) {
+/*
           var csvHeaderElement = csvHeaderLine[i].split(":");
           var csvHeaderName = "?";
           var csvHeaderType = "string";
@@ -137,7 +180,19 @@
               case "boolean": csvAsArray[j][i] = stringToBoolean(csvAsArray[j][i]); break;
             }
           }
-        }
+*/
+			var csvHeaderType = estimateColumnType(csvAsArray, i);
+//			alert("column" + i + " = " + csvHeaderType);
+          gvdt.addColumn(csvHeaderType, csvHeaderLine[i]);
+          for(var j = 0; j < csvAsArray.length; j++) {
+            switch(csvHeaderType) {
+              default:
+              case "string":  csvAsArray[j][i] = String(csvAsArray[j][i]); break;
+              case "number":  csvAsArray[j][i] = Number(csvAsArray[j][i]); break;
+              case "boolean": csvAsArray[j][i] = stringToBoolean(csvAsArray[j][i]); break;
+            }
+          }
+		}
         gvdt.addRows(csvAsArray);
         var ctor = getNestedObjectByName(gvCtor);
         var table = new ctor (csvEl);
