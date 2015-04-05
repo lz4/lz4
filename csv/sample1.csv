@@ -1,0 +1,5 @@
+"Name:string","Salary:number","Full Time Employee:boolean"
+Mike,10000,true
+Jim,8000,false
+Alice,12500,true
+Bob,7000,true
