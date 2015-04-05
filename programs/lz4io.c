@@ -624,13 +624,14 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
         readSize = fread(inBuff, 1, inBuffSize, finput);
         if (!readSize) break;   /* empty file or stream */
 
-        while (pos < readSize)
+        while (1)
         {
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
             size_t decodedBytes = outBuffSize;
             errorCode = LZ4F_decompress(ctx, outBuff, &decodedBytes, (char*)inBuff+pos, &remaining, NULL);
             if (LZ4F_isError(errorCode)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(errorCode));
+            if (decodedBytes == 0 && remaining == 0) break;
             pos += remaining;
 
             if (decodedBytes)
