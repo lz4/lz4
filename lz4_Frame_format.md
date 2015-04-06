@@ -341,8 +341,8 @@ Data is always compressed, even when compression is detrimental.
 
 __EndMark__
 
-End of compressed stream is implicit.
-It needs to be followed by a standard EOF (End Of File) signal,
+End of legacy frame is implicit only.
+It must be followed by a standard EOF (End Of File) signal,
 wether it is a file or a stream.
 
 Alternatively, if the frame is followed by a valid Frame Magic Number,

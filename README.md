@@ -50,13 +50,12 @@ in single-thread mode.
 |**LZ4 HC (r129)**  |**2.720**|   22 MB/s   | **1830 MB/s** |
 |  zlib 1.2.8 -6    |  3.099  |   18 MB/s   |    270 MB/s   |
 
-The LZ4 block compression format is detailed within [lz4_Block_format].
+The raw LZ4 block compression format is detailed within [lz4_Block_format].
 
-Block format doesn't deal with header information, 
-nor how to handle arbitrarily long files or data streams.
-This is the purpose of the Frame format.
-Interoperable versions of LZ4 should use the same frame format, 
-defined into [lz4_Frame_format].
+Compressing an arbitrarily long file or data stream requires multiple blocks.
+Organizing these blocks and providing a common header format to handle their content
+is the purpose of the Frame format, defined into [lz4_Frame_format].
+Interoperable versions of LZ4 must respect this frame format too.
 
 [Open-Source Benchmark program by m^2 (v0.14.3)]: http://encode.ru/threads/1371-Filesystem-benchmark?p=34029&viewfull=1#post34029
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
