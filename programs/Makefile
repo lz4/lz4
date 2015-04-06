@@ -243,13 +243,14 @@ test-frametest: frametest
 test-frametest32: frametest32
 	./frametest32
 
-test-mem: lz4 datagen fuzzer frametest
+test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
 	./datagen -g16MB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
 	valgrind --leak-check=yes ./lz4 -t tmp2
+	valgrind --leak-check=yes ./fullbench -i1 tmp
 	./datagen -g256MB > tmp
 	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp $(VOID)
 	rm tmp*

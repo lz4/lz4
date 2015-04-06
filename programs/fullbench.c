@@ -541,12 +541,6 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
   double totalDTime[NB_DECOMPRESSION_ALGORITHMS+1] = {0};
   size_t errorCode;
 
-  errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
-  if (LZ4F_isError(errorCode))
-  {
-     DISPLAY("dctx allocation issue \n");
-     return 10;
-  }
 
   /* Loop for each fileName */
   while (fileIdx<nbFiles)
@@ -584,6 +578,12 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       /* Allocation */
       stateLZ4   = LZ4_createStream();
       stateLZ4HC = LZ4_createStreamHC();
+      errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
+      if (LZ4F_isError(errorCode))
+      {
+         DISPLAY("dctx allocation issue \n");
+         return 10;
+      }
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)chunkSize)+1) * sizeof(struct chunkParameters));
       orig_buff = (char*) malloc((size_t)benchedSize);
       nbChunks = (int) (((int)benchedSize + (chunkSize-1))/ chunkSize);
@@ -629,7 +629,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         DISPLAY("\r%79s\r", "");
         DISPLAY(" %s : \n", inFileName);
 
-        // Compression Algorithms
+        /* Bench Compression Algorithms */
         for (cAlgNb=1; (cAlgNb <= NB_COMPRESSION_ALGORITHMS) && (compressionTest); cAlgNb++)
         {
             const char* compressorName;
@@ -751,7 +751,6 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         /* Decompression Algorithms */
         for (dAlgNb=1; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && (decompressionTest); dAlgNb++)
         {
-            //const char* dName = decompressionNames[dAlgNb];
             const char* dName;
             int (*decompressionFunction)(const char*, char*, int, int);
             double bestTime = 100000000.;
@@ -778,7 +777,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             default : DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); free(chunkP); return 1;
             }
 
-            { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     // zeroing source area, for CRC checking
+            { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
 
             for (loopNb = 1; loopNb <= nbIterations; loopNb++)
             {
@@ -823,6 +822,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       free(orig_buff);
       free(compressed_buff);
       free(chunkP);
+      LZ4_freeStream(stateLZ4);
+      LZ4_freeStreamHC(stateLZ4HC);
+      LZ4F_freeDecompressionContext(g_dCtx);
   }
 
   if (BMK_pause) { printf("press enter...\n"); getchar(); }
