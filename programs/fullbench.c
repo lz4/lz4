@@ -391,7 +391,7 @@ static int local_LZ4_compress_fast(const char* in, char* out, int inSize)
     return LZ4_compress_fast(in, out, inSize, LZ4_compressBound(inSize), 0);
 }
 
-static void* stateLZ4;
+static LZ4_stream_t* stateLZ4;
 static int local_LZ4_compress_withState(const char* in, char* out, int inSize)
 {
     return LZ4_compress_withState(stateLZ4, in, out, inSize);
@@ -429,7 +429,7 @@ static int local_LZ4_compress_forceDict(const char* in, char* out, int inSize)
 }
 
 
-static void* stateLZ4HC;
+static LZ4_streamHC_t* stateLZ4HC;
 static int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
 {
     return LZ4_compressHC_withStateHC(stateLZ4HC, in, out, inSize);
