@@ -473,7 +473,7 @@ int main(int argc, char** argv)
     if (bench)
     {
         int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel);
-        free(inFileNames);
+        free((void*)inFileNames);
         return bmkResult;
     }
 
