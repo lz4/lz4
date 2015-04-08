@@ -470,7 +470,12 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
     /* Check if benchmark is selected */
-    if (bench) return BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+    if (bench)
+    {
+        int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+        free(inFileNames);
+        return bmkResult;
+    }
 
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)
