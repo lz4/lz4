@@ -34,7 +34,7 @@
 
 
 /**************************************
-   Tuning parameters
+*  Tuning parameters
 **************************************/
 /*
  * HEAPMODE :
@@ -49,51 +49,10 @@
  */
 #define ACCELERATION_DEFAULT 17
 
-/*
- * CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS :
- * By default, the source code expects the compiler to correctly optimize
- * 4-bytes and 8-bytes read on architectures able to handle it efficiently.
- * This is not always the case. In some circumstances (ARM notably),
- * the compiler will issue cautious code even when target is able to correctly handle unaligned memory accesses.
- *
- * You can force the compiler to use unaligned memory access by uncommenting the line below.
- * One of the below scenarios will happen :
- * 1 - Your target CPU correctly handle unaligned access, and was not well optimized by compiler (good case).
- *     You will witness large performance improvements (+50% and up).
- *     Keep the line uncommented and send a word to upstream (https://groups.google.com/forum/#!forum/lz4c)
- *     The goal is to automatically detect such situations by adding your target CPU within an exception list.
- * 2 - Your target CPU correctly handle unaligned access, and was already already optimized by compiler
- *     No change will be experienced.
- * 3 - Your target CPU inefficiently handle unaligned access.
- *     You will experience a performance loss. Comment back the line.
- * 4 - Your target CPU does not handle unaligned access.
- *     Program will crash.
- * If uncommenting results in better performance (case 1)
- * please report your configuration to upstream (https://groups.google.com/forum/#!forum/lz4c)
- * This way, an automatic detection macro can be added to match your case within later versions of the library.
- */
-/* #define CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS 1 */
-
 
 /**************************************
-   CPU Feature Detection
+*  CPU Feature Detection
 **************************************/
-/*
- * Automated efficient unaligned memory access detection
- * Based on known hardware architectures
- * This list will be updated thanks to feedbacks
- */
-#if defined(CPU_HAS_EFFICIENT_UNALIGNED_MEMORY_ACCESS) \
-    || defined(__ARM_FEATURE_UNALIGNED) \
-    || defined(__i386__) || defined(__x86_64__) \
-    || defined(_M_IX86) || defined(_M_X64) \
-    || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__) \
-    || (defined(_M_ARM) && (_M_ARM >= 7))
-#  define LZ4_UNALIGNED_ACCESS 1
-#else
-#  define LZ4_UNALIGNED_ACCESS 0
-#endif
-
 /*
  * LZ4_FORCE_SW_BITCOUNT
  * Define this parameter if your target system or compiler does not support hardware bit count
@@ -142,7 +101,7 @@
 
 
 /**************************************
-   Memory routines
+*  Memory routines
 **************************************/
 #include <stdlib.h>   /* malloc, calloc, free */
 #define ALLOCATOR(n,s) calloc(n,s)
@@ -152,13 +111,13 @@
 
 
 /**************************************
-   Includes
+*  Includes
 **************************************/
 #include "lz4.h"
 
 
 /**************************************
-   Basic Types
+*  Basic Types
 **************************************/
 #if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
 # include <stdint.h>
@@ -177,7 +136,7 @@
 
 
 /**************************************
-   Reading and writing into memory
+*  Reading and writing into memory
 **************************************/
 #define STEPSIZE sizeof(size_t)
 
@@ -190,10 +149,19 @@ static unsigned LZ4_isLittleEndian(void)
 }
 
 
+static U16 LZ4_read16(const void* memPtr)
+{
+    U16 val16;
+    memcpy(&val16, memPtr, 2);
+    return val16;
+}
+
 static U16 LZ4_readLE16(const void* memPtr)
 {
-    if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
-        return *(U16*)memPtr;
+    if (LZ4_isLittleEndian())
+    {
+        return LZ4_read16(memPtr);
+    }
     else
     {
         const BYTE* p = (const BYTE*)memPtr;
@@ -203,10 +171,9 @@ static U16 LZ4_readLE16(const void* memPtr)
 
 static void LZ4_writeLE16(void* memPtr, U16 value)
 {
-    if ((LZ4_UNALIGNED_ACCESS) && (LZ4_isLittleEndian()))
+    if (LZ4_isLittleEndian())
     {
-        *(U16*)memPtr = value;
-        return;
+        memcpy(memPtr, &value, 2);
     }
     else
     {
@@ -216,41 +183,18 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
     }
 }
 
-
-static U16 LZ4_read16(const void* memPtr)
-{
-    if (LZ4_UNALIGNED_ACCESS)
-        return *(U16*)memPtr;
-    else
-    {
-        U16 val16;
-        memcpy(&val16, memPtr, 2);
-        return val16;
-    }
-}
-
 static U32 LZ4_read32(const void* memPtr)
 {
-    if (LZ4_UNALIGNED_ACCESS)
-        return *(U32*)memPtr;
-    else
-    {
-        U32 val32;
-        memcpy(&val32, memPtr, 4);
-        return val32;
-    }
+    U32 val32;
+    memcpy(&val32, memPtr, 4);
+    return val32;
 }
 
 static U64 LZ4_read64(const void* memPtr)
 {
-    if (LZ4_UNALIGNED_ACCESS)
-        return *(U64*)memPtr;
-    else
-    {
-        U64 val64;
-        memcpy(&val64, memPtr, 8);
-        return val64;
-    }
+    U64 val64;
+    memcpy(&val64, memPtr, 8);
+    return val64;
 }
 
 static size_t LZ4_read_ARCH(const void* p)
@@ -262,31 +206,9 @@ static size_t LZ4_read_ARCH(const void* p)
 }
 
 
-static void LZ4_copy4(void* dstPtr, const void* srcPtr)
-{
-    if (LZ4_UNALIGNED_ACCESS)
-    {
-        *(U32*)dstPtr = *(U32*)srcPtr;
-        return;
-    }
-    memcpy(dstPtr, srcPtr, 4);
-}
+static void LZ4_copy4(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 4); }
 
-static void LZ4_copy8(void* dstPtr, const void* srcPtr)
-{
-#if GCC_VERSION!=409  /* disabled on GCC 4.9, as it generates invalid opcode (crash) */
-    if (LZ4_UNALIGNED_ACCESS)
-    {
-        if (LZ4_64bits())
-            *(U64*)dstPtr = *(U64*)srcPtr;
-        else
-            ((U32*)dstPtr)[0] = ((U32*)srcPtr)[0],
-            ((U32*)dstPtr)[1] = ((U32*)srcPtr)[1];
-        return;
-    }
-#endif
-    memcpy(dstPtr, srcPtr, 8);
-}
+static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
 
 /* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
 static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
