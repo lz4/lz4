@@ -40,14 +40,11 @@ DESTDIR?=
 PREFIX ?= /usr/local
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
-BINDIR=$(PREFIX)/bin
-MANDIR=$(PREFIX)/share/man/man1
-LZ4DIR=../lib
-
-TEST_FILES = COPYING
-TEST_TARGETS=test-native
+BINDIR := $(PREFIX)/bin
+MANDIR := $(PREFIX)/share/man/man1
+LZ4DIR := ../lib
 
 
 # Define *.exe as extension for Windows systems
@@ -61,7 +58,10 @@ endif
 
 
 # Select test target for Travis CI's Build Matrix
-TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
+TRAVIS_TARGET:= $(LZ4_TRAVIS_CI_ENV)
+TEST_FILES   := COPYING
+TEST_TARGETS := test-native
+FUZZER_TIME  ?= -T20mn
 
 
 default: lz4
@@ -220,10 +220,10 @@ test-lz4c32: lz4 lz4c32 datagen
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
 	./datagen         | ./lz4c32        | ./lz4c32 -t
 	./datagen         | ./lz4c32        | ./lz4    -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -t
-	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -t
-	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -t
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -qt
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
+	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -qt
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(TEST_FILES)
@@ -232,16 +232,16 @@ test-fullbench32: fullbench32
 	./fullbench32 --no-prompt $(TEST_FILES)
 
 test-fuzzer: fuzzer
-	./fuzzer
+	./fuzzer $(FUZZER_TIME)
 
 test-fuzzer32: fuzzer32
-	./fuzzer32
+	./fuzzer32 $(FUZZER_TIME)
 
 test-frametest: frametest
-	./frametest
+	./frametest $(FUZZER_TIME)
 
 test-frametest32: frametest32
-	./frametest32
+	./frametest32 $(FUZZER_TIME)
 
 test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes ./datagen -g50M > $(VOID)

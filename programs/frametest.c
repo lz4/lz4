@@ -537,7 +537,7 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, un
 
 static const U32 srcDataLength = 9 MB;  /* needs to be > 2x4MB to test large blocks */
 
-int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressibility)
+int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressibility, U32 duration)
 {
     unsigned testResult = 0;
     unsigned testNb = 0;
@@ -548,9 +548,14 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     LZ4F_decompressionContext_t dCtx = NULL;
     LZ4F_compressionContext_t cCtx = NULL;
     size_t result;
+    const U32 startTime = FUZ_GetMilliStart();
     XXH64_state_t xxh64;
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
+
+
+    /* Init */
+    duration *= 1000;
 
     /* Create buffers */
     result = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
@@ -566,10 +571,10 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     FUZ_fillCompressibleNoiseBuffer(srcBuffer, srcDataLength, compressibility, &coreRand);
 
     /* jump to requested testNb */
-    for (testNb =0; testNb < startTest; testNb++) (void)FUZ_rand(&coreRand);   // sync randomizer
+    for (testNb =0; (testNb < startTest); testNb++) (void)FUZ_rand(&coreRand);   // sync randomizer
 
     /* main fuzzer test loop */
-    for ( ; testNb < nbTests; testNb++)
+    for ( ; (testNb < nbTests) || (duration > FUZ_GetMilliSpan(startTime)) ; testNb++)
     {
         U32 randState = coreRand ^ prime1;
         unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
@@ -721,6 +726,7 @@ int FUZ_usage(void)
     DISPLAY( "\n");
     DISPLAY( "Arguments :\n");
     DISPLAY( " -i#    : Nb of tests (default:%u) \n", nbTestsDefault);
+    DISPLAY( " -T#    : Duration of tests (default: use Nb of tests) \n");
     DISPLAY( " -s#    : Select seed (default:prompt user)\n");
     DISPLAY( " -t#    : Select starting test number (default:0)\n");
     DISPLAY( " -p#    : Select compressibility in %% (default:%i%%)\n", FUZ_COMPRESSIBILITY_DEFAULT);
@@ -739,6 +745,7 @@ int main(int argc, char** argv)
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
     int result=0;
+    U32 duration=0;
 
     /* Check command line */
     programName = argv[0];
@@ -746,9 +753,9 @@ int main(int argc, char** argv)
     {
         char* argument = argv[argNb];
 
-        if(!argument) continue;   // Protection if argument empty
+        if(!argument) continue;   /* Protection if argument empty */
 
-        // Decode command (note : aggregated commands are allowed)
+        /* Decode command (note : aggregated commands are allowed) */
         if (argument[0]=='-')
         {
             if (!strcmp(argument, "--no-prompt"))
@@ -781,7 +788,7 @@ int main(int argc, char** argv)
 
                 case 'i':
                     argument++;
-                    nbTests=0;
+                    nbTests=0; duration=0;
                     while ((*argument>='0') && (*argument<='9'))
                     {
                         nbTests *= 10;
@@ -789,6 +796,35 @@ int main(int argc, char** argv)
                         argument++;
                     }
                     break;
+
+                case 'T':
+                    argument++;
+                    nbTests = 0; duration = 0;
+
+                    for (;;)
+                    {
+                        if (argument[0]=='m')
+                        {
+                            duration *= 60;
+                            argument++;
+                            continue;
+                        }
+                        if (argument[0]=='n')
+                        {
+                            argument++;
+                            continue;
+                        }
+                        if ((*argument>='0') && (*argument<='9'))
+                        {
+                            duration *= 10;
+                            duration += *argument - '0';
+                            argument++;
+                            continue;
+                        }
+                        break;
+                    }
+                    break;
+
                 case 's':
                     argument++;
                     seed=0;
@@ -841,5 +877,5 @@ int main(int argc, char** argv)
 
     if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
     if (result) return 1;
-    return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100);
+    return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100, duration);
 }
