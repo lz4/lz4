@@ -493,11 +493,9 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     }
     else
     {
+        double seconds = (double)(end - start)/CLOCKS_PER_SEC;
         DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
-    }
-    {
-        double seconds = (double)(end - start)/CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
     }
 
@@ -825,6 +823,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     end = clock();
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
+    if (filesize > 0)
     {
         double seconds = (double)(end - start)/CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);

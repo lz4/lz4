@@ -197,11 +197,11 @@ test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize test-lz4-frame-concat
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
 	./datagen         | ./lz4        | ./lz4 -t
 	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
-	./datagen -g17M   | ./lz4 -9v    | ./lz4 -tq
+	./datagen -g17M   | ./lz4 -9v    | ./lz4 -qt
 	./datagen -g33M   | ./lz4 --no-frame-crc | ./lz4 -t
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -t
+	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
+	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
 	@echo ---- test multiple input files ----
 	@./datagen -s1 > file1
 	@./datagen -s2 > file2
