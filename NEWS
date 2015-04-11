@@ -1,6 +1,8 @@
 r129:
 Added  : LZ4_compress_fast()
+Changed: New compression functions LZ4_compress_safe() - Suggested by Evan Nemerson & Takayuki Matsuoka
 Added  : AppVeyor CI environment, for Visual tests - Suggested by Takayuki Matsuoka
+Fixed  : GCC 4.9+ optimization bug - Reported by Markus Trippelsdorf, Evan Nemerson and Greg Slazinski
 Updated: Documentation converted to MarkDown
 
 r128:
