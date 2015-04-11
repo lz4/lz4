@@ -137,8 +137,29 @@ using LZ4_saveDictHC().
 /**************************************
  * Deprecated Functions
  * ************************************/
+/* Deprecate Warnings */
+/* Should these warnings messages be a problem,
+   it is generally possible to disable them,
+   with -Wno-deprecated-declarations for gcc
+   or _CRT_SECURE_NO_WARNINGS in Visual for example.
+   You can also define _DEPRECATE_WARNING_DEFBLOCK. */
+#ifndef _DEPRECATE_WARNING_DEFBLOCK
+#  define _DEPRECATE_WARNING_DEFBLOCK
+#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+#  if (GCC_VERSION >= 405) || defined(__clang__)
+#    define DEPRECATED(message) __attribute__((deprecated(message)))
+#  elif (GCC_VERSION >= 301)
+#    define DEPRECATED(message) __attribute__((deprecated))
+#  elif defined(_MSC_VER)
+#    define DEPRECATED(message) __declspec(deprecated(message))
+#  else
+#    pragma message("WARNING: You need to implement DEPRECATED for this compiler")
+#    define DEPRECATED
+#  endif
+#endif // _DEPRECATE_WARNING_DEFBLOCK
 
 /* compression functions */
+/* these functions are planned to trigger warning messages by r131 approximately */
 int LZ4_compressHC                (const char* source, char* dest, int inputSize);
 int LZ4_compressHC_limitedOutput  (const char* source, char* dest, int inputSize, int maxOutputSize);
 int LZ4_compressHC2               (const char* source, char* dest, int inputSize, int compressionLevel);
@@ -151,13 +172,13 @@ int LZ4_compressHC_continue               (LZ4_streamHC_t* LZ4_streamHCPtr, cons
 int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /* Streaming functions following the older model; should no longer be used */
-void* LZ4_createHC (const char* inputBuffer);
-char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
-int   LZ4_freeHC (void* LZ4HC_Data);
-int   LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
-int   LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
-int   LZ4_sizeofStreamStateHC(void);
-int   LZ4_resetStreamStateHC(void* state, const char* inputBuffer);
+DEPRECATED("use LZ4_createStreamHC() instead") void* LZ4_createHC (const char* inputBuffer);
+DEPRECATED("use LZ4_saveDictHC() instead")     char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
+DEPRECATED("use LZ4_freeStreamHC() instead")   int   LZ4_freeHC (void* LZ4HC_Data);
+DEPRECATED("use LZ4_compressHC_safe_continue() instead") int   LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
+DEPRECATED("use LZ4_compressHC_safe_continue() instead") int   LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+DEPRECATED("use LZ4_createStreamHC() instead") int   LZ4_sizeofStreamStateHC(void);
+DEPRECATED("use LZ4_resetStreamHC() instead")  int   LZ4_resetStreamStateHC(void* state, const char* inputBuffer);
 
 
 #if defined (__cplusplus)

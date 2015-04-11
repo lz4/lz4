@@ -280,9 +280,14 @@ int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalS
 /**************************************
 *  Obsolete Functions
 **************************************/
-/* Warning statements */
-#ifndef _WARNING_STATEMENT_BLOCK
-#  define _WARNING_STATEMENT_BLOCK
+/* Deprecate Warnings */
+/* Should these warnings messages be a problem,
+   it is generally possible to disable them,
+   with -Wno-deprecated-declarations for gcc
+   or _CRT_SECURE_NO_WARNINGS in Visual for example.
+   You can also define _DEPRECATE_WARNING_DEFBLOCK. */
+#ifndef _DEPRECATE_WARNING_DEFBLOCK
+#  define _DEPRECATE_WARNING_DEFBLOCK
 #  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #  if (GCC_VERSION >= 405) || defined(__clang__)
 #    define DEPRECATED(message) __attribute__((deprecated(message)))
@@ -294,7 +299,7 @@ int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalS
 #    pragma message("WARNING: You need to implement DEPRECATED for this compiler")
 #    define DEPRECATED
 #  endif
-#endif // _WARNING_STATEMENT_BLOCK
+#endif // _DEPRECATE_WARNING_DEFBLOCK
 
 /* Obsolete compression functions */
 /* These functions are planned to generate warnings by r131 approximately */
