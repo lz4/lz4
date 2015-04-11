@@ -316,7 +316,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 #   define FUZ_DISPLAYTEST          { testNb++; g_displayLevel<3 ? 0 : printf("%2u\b\b", testNb); if (g_displayLevel==4) fflush(stdout); }
     void* stateLZ4   = malloc(LZ4_sizeofState());
     void* stateLZ4HC = malloc(LZ4_sizeofStateHC());
-    void* LZ4continue;
     LZ4_stream_t LZ4dict;
     LZ4_streamHC_t LZ4dictHC;
     U32 crcOrig, crcCheck;
@@ -546,16 +545,18 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Compress using dictionary */
         FUZ_DISPLAYTEST;
-        LZ4continue = LZ4_create (dict);
-        LZ4_compress_continue ((LZ4_stream_t*)LZ4continue, dict, compressedBuffer, dictSize);   // Just to fill hash tables
-        blockContinueCompressedSize = LZ4_compress_continue ((LZ4_stream_t*)LZ4continue, block, compressedBuffer, blockSize);
-        FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
-        free (LZ4continue);
+        {
+            LZ4_stream_t LZ4_stream;
+            LZ4_resetStream(&LZ4_stream);
+            LZ4_compress_continue (&LZ4_stream, dict, compressedBuffer, dictSize);   /* Just to fill hash tables */
+            blockContinueCompressedSize = LZ4_compress_continue (&LZ4_stream, block, compressedBuffer, blockSize);
+            FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
+        }
 
         /* Decompress with dictionary as prefix */
         FUZ_DISPLAYTEST;
         memcpy(decodedBuffer, dict, dictSize);
-        ret = LZ4_decompress_fast_withPrefix64k(compressedBuffer, decodedBuffer+dictSize, blockSize);
+        ret = LZ4_decompress_fast_usingDict(compressedBuffer, decodedBuffer+dictSize, blockSize, decodedBuffer, dictSize);
         FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_decompress_fast_withPrefix64k did not read all compressed block input");
         crcCheck = XXH32(decodedBuffer+dictSize, blockSize, 0);
         if (crcCheck!=crcOrig)
@@ -568,7 +569,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast_withPrefix64k corrupted decoded data (dict %i)", dictSize);
 
         FUZ_DISPLAYTEST;
-        ret = LZ4_decompress_safe_withPrefix64k(compressedBuffer, decodedBuffer+dictSize, blockContinueCompressedSize, blockSize);
+        ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer+dictSize, blockContinueCompressedSize, blockSize, decodedBuffer, dictSize);
         FUZ_CHECKTEST(ret!=blockSize, "LZ4_decompress_safe_withPrefix64k did not regenerate original data");
         crcCheck = XXH32(decodedBuffer+dictSize, blockSize, 0);
         FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe_withPrefix64k corrupted decoded data");
