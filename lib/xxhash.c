@@ -117,35 +117,20 @@ typedef   signed int       S32;
 typedef unsigned long long U64;
 #endif
 
-#if defined(__GNUC__)  && !defined(XXH_USE_UNALIGNED_ACCESS)
-#  define _PACKED __attribute__ ((packed))
-#else
-#  define _PACKED
-#endif
-
-#if !defined(XXH_USE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  ifdef __IBMC__
-#    pragma pack(1)
-#  else
-#    pragma pack(push, 1)
-#  endif
-#endif
-
-typedef struct _U32_S
+static U32 XXH_read32(const void* memPtr)
 {
-    U32 v;
-} _PACKED U32_S;
-typedef struct _U64_S
+    U32 val32;
+    memcpy(&val32, memPtr, 4);
+    return val32;
+}
+
+static U64 XXH_read64(const void* memPtr)
 {
-    U64 v;
-} _PACKED U64_S;
+    U64 val64;
+    memcpy(&val64, memPtr, 8);
+    return val64;
+}
 
-#if !defined(XXH_USE_UNALIGNED_ACCESS) && !defined(__GNUC__)
-#  pragma pack(pop)
-#endif
-
-#define A32(x) (((U32_S *)(x))->v)
-#define A64(x) (((U64_S *)(x))->v)
 
 
 /*****************************************
@@ -230,7 +215,7 @@ typedef enum { XXH_aligned, XXH_unaligned } XXH_alignment;
 FORCE_INLINE U32 XXH_readLE32_align(const void* ptr, XXH_endianess endian, XXH_alignment align)
 {
     if (align==XXH_unaligned)
-        return endian==XXH_littleEndian ? A32(ptr) : XXH_swap32(A32(ptr));
+        return endian==XXH_littleEndian ? XXH_read32(ptr) : XXH_swap32(XXH_read32(ptr));
     else
         return endian==XXH_littleEndian ? *(U32*)ptr : XXH_swap32(*(U32*)ptr);
 }
@@ -243,7 +228,7 @@ FORCE_INLINE U32 XXH_readLE32(const void* ptr, XXH_endianess endian)
 FORCE_INLINE U64 XXH_readLE64_align(const void* ptr, XXH_endianess endian, XXH_alignment align)
 {
     if (align==XXH_unaligned)
-        return endian==XXH_littleEndian ? A64(ptr) : XXH_swap64(A64(ptr));
+        return endian==XXH_littleEndian ? XXH_read64(ptr) : XXH_swap64(XXH_read64(ptr));
     else
         return endian==XXH_littleEndian ? *(U64*)ptr : XXH_swap64(*(U64*)ptr);
 }

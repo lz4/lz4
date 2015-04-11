@@ -65,7 +65,7 @@
 /****************************
 *  OS-specific Includes
 *****************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <io.h>       /* _isatty */
 #  ifdef __MINGW32__
    int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
@@ -420,11 +420,15 @@ int main(int argc, char** argv)
 
                     /* Modify Nb Iterations (benchmark only) */
                 case 'i':
-                    if ((argument[1] >='1') && (argument[1] <='9'))
                     {
-                        int iters = argument[1] - '0';
+                        unsigned iters = 0;
+                        while ((argument[1] >='0') && (argument[1] <='9'))
+                        {
+                            iters *= 10;
+                            iters += argument[1] - '0';
+                            argument++;
+                        }
                         BMK_setNbIterations(iters);
-                        argument++;
                     }
                     break;
 
@@ -470,7 +474,12 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
     /* Check if benchmark is selected */
-    if (bench) return BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+    if (bench)
+    {
+        int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+        free((void*)inFileNames);
+        return bmkResult;
+    }
 
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)

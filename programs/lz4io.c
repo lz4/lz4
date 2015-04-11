@@ -53,15 +53,15 @@
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
 #include "lz4io.h"
-#include "lz4.h"      /* still required for legacy format */
-#include "lz4hc.h"    /* still required for legacy format */
+#include "lz4.h"       /* still required for legacy format */
+#include "lz4hc.h"     /* still required for legacy format */
 #include "lz4frame.h"
 
 
 /******************************
 *  OS-specific Includes
 ******************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <fcntl.h>   /* _O_BINARY */
 #  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
@@ -412,7 +412,6 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     /* Init */
     start = clock();
     memset(&prefs, 0, sizeof(prefs));
-    if ((g_displayLevel==2) && (compressionLevel>=3)) g_displayLevel=3;
     errorCode = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
@@ -428,6 +427,8 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     {
       unsigned long long fileSize = LZ4IO_GetFileSize(input_filename);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
+      if (fileSize==0)
+          DISPLAYLEVEL(3, "Warning : cannot determine uncompressed frame content size \n");
     }
 
     /* Allocate Memory */
@@ -456,7 +457,7 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
         outSize = LZ4F_compressUpdate(ctx, out_buff, outBuffSize, in_buff, readSize, NULL);
         if (LZ4F_isError(outSize)) EXM_THROW(34, "Compression failed : %s", LZ4F_getErrorName(outSize));
         compressedfilesize += outSize;
-        DISPLAYUPDATE(3, "\rRead : %i MB   ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %i MB   ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
         sizeCheck = fwrite(out_buff, 1, outSize, foutput);
@@ -486,10 +487,15 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
     /* Final Status */
     end = clock();
     DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-        (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
+    if (filesize == 0)
+    {
+        DISPLAYLEVEL(2, "Null size input; converted into %u lz4 stream\n", (unsigned)compressedfilesize);
+    }
+    else
     {
         double seconds = (double)(end - start)/CLOCKS_PER_SEC;
+        DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
+        (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
         DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
     }
 
@@ -587,8 +593,6 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     unsigned long long filesize = 0;
     void* inBuff;
     void* outBuff;
-#   define HEADERMAX 20
-    char  headerBuff[HEADERMAX];
     size_t sizeCheck;
     const size_t inBuffSize = 256 KB;
     const size_t outBuffSize = 256 KB;
@@ -599,7 +603,6 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
     /* init */
     errorCode = LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create context : %s", LZ4F_getErrorName(errorCode));
-    LZ4IO_writeLE32(headerBuff, LZ4IO_MAGICNUMBER);   /* regenerated here, as it was already read from finput */
 
     /* Allocate Memory */
     inBuff = malloc(256 KB);
@@ -639,6 +642,7 @@ static unsigned long long decodeLZ4S(FILE* finput, FILE* foutput)
             {
                 /* Write Block */
                 filesize += decodedBytes;
+                DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
                 if (g_sparseFileSupport)
                 {
                     size_t* const oBuffStartT = (size_t*)outBuff;   /* since outBuff is malloc'ed, it's aligned on size_t */
@@ -819,6 +823,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     end = clock();
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
+    if (end==start) end=start+1;
     {
         double seconds = (double)(end - start)/CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);

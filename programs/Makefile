@@ -27,24 +27,24 @@
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # fuzzer  : Test tool, to check lz4 integrity on target platform
 # fuzzer32: Same as fuzzer, but forced to compile in 32-bits mode
+# frametest  : Test tool, to check lz4frame integrity on target platform
+# frametest32: Same as frametest, but forced to compile in 32-bits mode
 # fullbench  : Precisely measure speed for each LZ4 function variant
 # fullbench32: Same as fullbench, but forced to compile in 32-bits mode
+# datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r128
+RELEASE?= r129
 
 DESTDIR?=
 PREFIX ?= /usr/local
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS   = -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
-BINDIR=$(PREFIX)/bin
-MANDIR=$(PREFIX)/share/man/man1
-LZ4DIR=../lib
-
-TEST_FILES = COPYING
-TEST_TARGETS=test-native
+BINDIR := $(PREFIX)/bin
+MANDIR := $(PREFIX)/share/man/man1
+LZ4DIR := ../lib
 
 
 # Define *.exe as extension for Windows systems
@@ -58,7 +58,9 @@ endif
 
 
 # Select test target for Travis CI's Build Matrix
-TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
+TRAVIS_TARGET:= $(LZ4_TRAVIS_CI_ENV)
+TEST_FILES   := COPYING
+TEST_TARGETS := test-native
 
 
 default: lz4
@@ -100,7 +102,7 @@ datagen : datagen.c datagencli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o *.test \
+	@rm -f core *.o *.test tmp* \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
@@ -168,6 +170,11 @@ test-lz4-contentSize: lz4 datagen
 	./lz4 -v tmp | ./lz4 -t
 	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
 	diff -s tmp tmp2
+	# test large size [2-4] GB
+	@./datagen -g3G -P100 | ./lz4 | ./lz4 --decompress --force --sparse - tmp
+	@ls -ls tmp
+	./lz4 --quiet --content-size tmp | ./lz4 --verbose --decompress --force --sparse - tmp2
+	@ls -ls tmp2
 	@rm tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
@@ -189,11 +196,11 @@ test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize test-lz4-frame-concat
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
 	./datagen         | ./lz4        | ./lz4 -t
 	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
-	./datagen -g17M   | ./lz4 -9v    | ./lz4 -tq
+	./datagen -g17M   | ./lz4 -9v    | ./lz4 -qt
 	./datagen -g33M   | ./lz4 --no-frame-crc | ./lz4 -t
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -t
-	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -t
+	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
+	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
 	@echo ---- test multiple input files ----
 	@./datagen -s1 > file1
 	@./datagen -s2 > file2
@@ -212,10 +219,10 @@ test-lz4c32: lz4 lz4c32 datagen
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
 	./datagen         | ./lz4c32        | ./lz4c32 -t
 	./datagen         | ./lz4c32        | ./lz4    -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -t
-	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -t
-	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -t
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -qt
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
+	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -qt
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(TEST_FILES)
@@ -224,24 +231,26 @@ test-fullbench32: fullbench32
 	./fullbench32 --no-prompt $(TEST_FILES)
 
 test-fuzzer: fuzzer
-	./fuzzer
+	./fuzzer $(FUZZER_TIME)
 
 test-fuzzer32: fuzzer32
-	./fuzzer32
+	./fuzzer32 $(FUZZER_TIME)
 
 test-frametest: frametest
-	./frametest
+	./frametest $(FUZZER_TIME)
 
 test-frametest32: frametest32
-	./frametest32
+	./frametest32 $(FUZZER_TIME)
 
-test-mem: lz4 datagen fuzzer frametest
+test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
 	./datagen -g16MB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
 	valgrind --leak-check=yes ./lz4 -t tmp2
+	valgrind --leak-check=yes ./lz4 -bi1 tmp
+	valgrind --leak-check=yes ./fullbench -i1 tmp
 	./datagen -g256MB > tmp
 	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp $(VOID)
 	rm tmp*

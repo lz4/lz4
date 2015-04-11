@@ -19,7 +19,6 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-    - LZ4 source repository : http://code.google.com/p/lz4
     - LZ4 source mirror : https://github.com/Cyan4973/lz4
     - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
@@ -210,7 +209,7 @@ static int FUZ_AddressOverflow(void)
 
     printf("Overflow tests : ");
 
-    // Only possible in 32-bits
+    /* Only possible in 32-bits */
     if (sizeof(void*)==8)
     {
         printf("64 bits mode : no overflow \n");
@@ -300,7 +299,7 @@ static void FUZ_displayUpdate(unsigned testNb)
 }
 
 
-static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const double compressibility)
+static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double compressibility, U32 duration)
 {
     unsigned long long bytes = 0;
     unsigned long long cbytes = 0;
@@ -313,7 +312,7 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
     int ret;
     unsigned cycleNb;
 #   define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %u : ", testNb); printf(__VA_ARGS__); \
-    printf(" (seed %u, cycle %u) \n", seed, cycleNb); goto _output_error; }
+                                                printf(" (seed %u, cycle %u) \n", seed, cycleNb); goto _output_error; }
 #   define FUZ_DISPLAYTEST          { testNb++; g_displayLevel<3 ? 0 : printf("%2u\b\b", testNb); if (g_displayLevel==4) fflush(stdout); }
     void* stateLZ4   = malloc(LZ4_sizeofState());
     void* stateLZ4HC = malloc(LZ4_sizeofStateHC());
@@ -324,23 +323,25 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
     U32 coreRandState = seed;
     U32 randState = coreRandState ^ PRIME3;
     int result = 0;
+    const U32 startTime = FUZ_GetMilliStart();
 
 
-    // init
+    /* init */
     memset(&LZ4dict, 0, sizeof(LZ4dict));
+    duration *= 1000;
 
-    // Create compressible test buffer
+    /* Create compressible test buffer */
     CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
     FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
     compressedBuffer = (char*)malloc(LZ4_compressBound(FUZ_MAX_BLOCK_SIZE));
     decodedBuffer = (char*)malloc(FUZ_MAX_DICT_SIZE + FUZ_MAX_BLOCK_SIZE);
 
-    // move to startCycle
+    /* move to startCycle */
     for (cycleNb = 0; cycleNb < startCycle; cycleNb++)
     {
         (void)FUZ_rand(&coreRandState);
 
-        if (0)   // some problems related to dictionary re-use; in this case, enable this loop
+        if (0)   /* some problems are related to dictionary re-use; in this case, enable this loop */
         {
             int dictSize, blockSize, blockStart;
             char* dict;
@@ -362,8 +363,8 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
         }
     }
 
-    // Test loop
-    for (cycleNb = startCycle; cycleNb < nbCycles; cycleNb++)
+    /* Main test loop */
+    for (cycleNb = startCycle; (cycleNb < nbCycles) || (FUZ_GetMilliSpan(startTime) < duration) ; cycleNb++)
     {
         U32 testNb = 0;
         char* dict;
@@ -375,7 +376,7 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
         (void)FUZ_rand(&coreRandState);
         randState = coreRandState ^ PRIME3;
 
-        // Select block to test
+        /* Select block to test */
         blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
         blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
         dictSize   = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
@@ -385,7 +386,7 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
 
         /* Compression tests */
 
-        // Test compression HC
+        /* Test compression HC */
         FUZ_DISPLAYTEST;
         ret = LZ4_compressHC(block, compressedBuffer, blockSize);
         FUZ_CHECKTEST(ret==0, "LZ4_compressHC() failed");
@@ -673,21 +674,22 @@ static int FUZ_test(U32 seed, const U32 nbCycles, const U32 startCycle, const do
         FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe_usingDict corrupted decoded data");
 
 
-        // ***** End of tests *** //
-        // Fill stats
+        /* ***** End of tests *** */
+        /* Fill stats */
         bytes += blockSize;
         cbytes += compressedSize;
         hcbytes += HCcompressedSize;
         ccbytes += blockContinueCompressedSize;
     }
 
+    if (nbCycles<=1) nbCycles = cycleNb;
     printf("\r%7u /%7u   - ", cycleNb, nbCycles);
     printf("all tests completed successfully \n");
     printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
     printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
     printf("ratio with dict: %0.3f%%\n", (double)ccbytes/bytes*100);
 
-    // unalloc
+    /* release memory */
     {
 _exit:
         free(CNBuffer);
@@ -831,7 +833,7 @@ static void FUZ_unitTests(void)
         crcNew = XXH64(testVerify, testCompressedSize, 0);
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() simple dictionary decompression test : corruption");
 
-        // multiple HC compression test with dictionary
+        /* multiple HC compression test with dictionary */
         {
             int result1, result2;
             int segSize = testCompressedSize / 2;
@@ -863,7 +865,7 @@ static void FUZ_unitTests(void)
         crcNew = XXH64(testVerify, testCompressedSize, 0);
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() decompression corruption");
 
-        // multiple HC compression with ext. dictionary
+        /* multiple HC compression with ext. dictionary */
         {
             XXH64_state_t crcOrigState;
             XXH64_state_t crcNewState;
@@ -912,7 +914,7 @@ static void FUZ_unitTests(void)
             }
         }
 
-        // ring buffer test
+        /* ring buffer test */
         {
             XXH64_state_t xxhOrig;
             XXH64_state_t xxhNew;
@@ -956,7 +958,7 @@ static void FUZ_unitTests(void)
             }
         }
 
-        // small decoder-side ring buffer test
+        /* small decoder-side ring buffer test */
         {
             XXH64_state_t xxhOrig;
             XXH64_state_t xxhNew;
@@ -1013,6 +1015,7 @@ static int FUZ_usage(char* programName)
     DISPLAY( "\n");
     DISPLAY( "Arguments :\n");
     DISPLAY( " -i#    : Nb of tests (default:%i) \n", NB_ATTEMPTS);
+    DISPLAY( " -T#    : Duration of tests (default: use Nb of tests) \n");
     DISPLAY( " -s#    : Select seed (default:prompt user)\n");
     DISPLAY( " -t#    : Select starting test number (default:0)\n");
     DISPLAY( " -P#    : Select compressibility in %% (default:%i%%)\n", FUZ_COMPRESSIBILITY_DEFAULT);
@@ -1033,8 +1036,9 @@ int main(int argc, char** argv)
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
     int pause = 0;
     char* programName = argv[0];
+    U32 duration = 0;
 
-    // Check command line
+    /* Check command line */
     for(argNb=1; argNb<argc; argNb++)
     {
         char* argument = argv[argNb];
@@ -1066,12 +1070,40 @@ int main(int argc, char** argv)
 
                 case 'i':
                     argument++;
-                    nbTests=0;
+                    nbTests = 0; duration = 0;
                     while ((*argument>='0') && (*argument<='9'))
                     {
                         nbTests *= 10;
                         nbTests += *argument - '0';
                         argument++;
+                    }
+                    break;
+
+                case 'T':
+                    argument++;
+                    nbTests = 0; duration = 0;
+
+                    for (;;)
+                    {
+                        if (argument[0]=='m')
+                        {
+                            duration *= 60;
+                            argument++;
+                            continue;
+                        }
+                        if (argument[0]=='n')
+                        {
+                            argument++;
+                            continue;
+                        }
+                        if ((*argument>='0') && (*argument<='9'))
+                        {
+                            duration *= 10;
+                            duration += *argument - '0';
+                            argument++;
+                            continue;
+                        }
+                        break;
                     }
                     break;
 
@@ -1115,7 +1147,6 @@ int main(int argc, char** argv)
         }
     }
 
-    // Get Seed
     printf("Starting LZ4 fuzzer (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
 
     if (!seedset) seed = FUZ_GetMilliStart() % 10000;
@@ -1127,7 +1158,7 @@ int main(int argc, char** argv)
     if (nbTests<=0) nbTests=1;
 
     {
-        int result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100);
+        int result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
         if (pause)
         {
             DISPLAY("press enter ... \n");
