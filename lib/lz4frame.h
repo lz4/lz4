@@ -45,7 +45,7 @@ extern "C" {
 #endif
 
 /**************************************
-   Includes
+*  Includes
 **************************************/
 #include <stddef.h>   /* size_t */
 
@@ -142,15 +142,17 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* prefsPtr);
 /* LZ4F_compressBound() :
  * Provides the minimum size of Dst buffer given srcSize to handle worst case situations.
  * prefsPtr is optional : you can provide NULL as argument, all preferences will then be set to default.
- * Note that different preferences will produce in different results.
+ * Note that different preferences will produce different results.
+ * This function doesn't include frame termination cost (4 bytes, or 8 is frame checksum is enabled)
  */
 
 size_t LZ4F_compressUpdate(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* cOptPtr);
 /* LZ4F_compressUpdate()
  * LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
  * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
- * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode)
- * You can get the minimum value of dstMaxSize by using LZ4F_compressBound()
+ * You can get the minimum value of dstMaxSize by using LZ4F_compressBound().
+ * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode).
+ * LZ4F_compressUpdate() doesn't guarantee error recovery, so you have to reset compression context when an error occurs.
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
  * The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just buffered.
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
@@ -172,10 +174,10 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t 
  * When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
  * It will flush whatever data remained within compressionContext (like LZ4_flush())
  * but also properly finalize the frame, with an endMark and a checksum.
- * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark size))
+ * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * A successful call to LZ4F_compressEnd() makes cctx available again for future compression work.
+ * A successful call to LZ4F_compressEnd() makes cctx available again for future compression task.
  */
 
 
