@@ -53,8 +53,8 @@
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
 #include "lz4io.h"
-#include "lz4.h"      /* still required for legacy format */
-#include "lz4hc.h"    /* still required for legacy format */
+#include "lz4.h"       /* still required for legacy format */
+#include "lz4hc.h"     /* still required for legacy format */
 #include "lz4frame.h"
 
 
@@ -823,7 +823,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     end = clock();
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
-    if (filesize > 0)
+    if (end==start) end=start+1;
     {
         double seconds = (double)(end - start)/CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);

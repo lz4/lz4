@@ -61,7 +61,6 @@ endif
 TRAVIS_TARGET:= $(LZ4_TRAVIS_CI_ENV)
 TEST_FILES   := COPYING
 TEST_TARGETS := test-native
-FUZZER_TIME  ?= -T20mn
 
 
 default: lz4
@@ -103,7 +102,7 @@ datagen : datagen.c datagencli.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 clean:
-	@rm -f core *.o *.test \
+	@rm -f core *.o *.test tmp* \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
