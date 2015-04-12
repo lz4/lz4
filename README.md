@@ -13,9 +13,9 @@ It trades CPU time for compression ratio.
 
 |Branch      |Status   |
 |------------|---------|
-|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) |
-|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) |
-|visual      | [![Build status](https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq?svg=true)](https://ci.appveyor.com/project/YannCollet/lz4) |
+|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) [![Build status](https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/master?svg=true)](https://ci.appveyor.com/project/YannCollet/lz4) |
+|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) [![Build status](https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/dev?svg=true)](https://ci.appveyor.com/project/YannCollet/lz4) |
+
 
 
 
