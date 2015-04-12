@@ -238,10 +238,11 @@ int basicTests(U32 seed, double compressibility)
     U32 randState = seed;
     size_t cSize, testSize;
     LZ4F_preferences_t prefs;
-    LZ4F_decompressionContext_t dCtx;
+    LZ4F_decompressionContext_t dCtx = NULL;
+    LZ4F_compressionContext_t cctx = NULL;
     U64 crcOrig;
 
-    // Create compressible test buffer
+    /* Create compressible test buffer */
     memset(&prefs, 0, sizeof(prefs));
     CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
     compressedBuffer = malloc(LZ4F_compressFrameBound(COMPRESSIBLE_NOISE_LENGTH, NULL));
@@ -249,7 +250,7 @@ int basicTests(U32 seed, double compressibility)
     FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
     crcOrig = XXH64(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
 
-    // Trivial tests : one-step frame
+    /* Trivial tests : one-step frame */
     testSize = COMPRESSIBLE_NOISE_LENGTH;
     DISPLAYLEVEL(3, "Using NULL preferences : \n");
     cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
@@ -385,7 +386,6 @@ int basicTests(U32 seed, double compressibility)
         size_t errorCode;
         BYTE* const ostart = (BYTE*)compressedBuffer;
         BYTE* op = ostart;
-        LZ4F_compressionContext_t cctx;
         errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
         if (LZ4F_isError(errorCode)) goto _output_error;
 
@@ -430,6 +430,7 @@ int basicTests(U32 seed, double compressibility)
 
         errorCode = LZ4F_freeCompressionContext(cctx);
         if (LZ4F_isError(errorCode)) goto _output_error;
+        cctx = NULL;
     }
 
     DISPLAYLEVEL(3, "Skippable frame test : \n");
@@ -500,10 +501,6 @@ int basicTests(U32 seed, double compressibility)
             ip += iSize;
         }
         DISPLAYLEVEL(3, "Skipped %i bytes \n", (int)(ip - (BYTE*)compressedBuffer - 8));
-
-        /* release memory */
-        errorCode = LZ4F_freeDecompressionContext(dCtx);
-        if (LZ4F_isError(errorCode)) goto _output_error;
     }
 
     DISPLAY("Basic tests completed \n");
@@ -511,6 +508,8 @@ _end:
     free(CNBuffer);
     free(compressedBuffer);
     free(decodedBuffer);
+    LZ4F_freeDecompressionContext(dCtx); dCtx = NULL;
+    LZ4F_freeCompressionContext(cctx); cctx = NULL;
     return testResult;
 
 _output_error:
@@ -667,6 +666,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;
             nonContiguousDst += FUZ_rand(&randState) & nonContiguousDst;   /* 0=>0; 1=>1,2 */
             XXH64_reset(&xxh64, 1);
+            if (maxBits < 3) maxBits = 3;
             while (ip < iend)
             {
                 unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
@@ -709,7 +709,7 @@ _end:
     if (pause)
     {
         DISPLAY("press enter to finish \n");
-        getchar();
+        (void)getchar();
     }
     return testResult;
 

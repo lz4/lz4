@@ -574,9 +574,9 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         crcCheck = XXH32(decodedBuffer+dictSize, blockSize, 0);
         FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe_withPrefix64k corrupted decoded data");
 
-        // Compress using External dictionary
+        /* Compress using External dictionary */
         FUZ_DISPLAYTEST;
-        dict -= (FUZ_rand(&randState) & 0xF) + 1;   // Separation, so it is an ExtDict
+        dict -= (FUZ_rand(&randState) & 0xF) + 1;   /* Separation, so it is an ExtDict */
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_loadDict(&LZ4dict, dict, dictSize);
         blockContinueCompressedSize = LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
@@ -683,7 +683,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         ccbytes += blockContinueCompressedSize;
     }
 
-    if (nbCycles<=1) nbCycles = cycleNb;
+    if (nbCycles<=1) nbCycles = cycleNb;   /* end by time */
+    bytes += !bytes;   /* avoid division by 0 */
     printf("\r%7u /%7u   - ", cycleNb, nbCycles);
     printf("all tests completed successfully \n");
     printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
@@ -1163,7 +1164,7 @@ int main(int argc, char** argv)
         if (pause)
         {
             DISPLAY("press enter ... \n");
-            getchar();
+            (void)getchar();
         }
         return result;
     }

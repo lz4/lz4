@@ -281,15 +281,11 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
       /* Check file existence */
       inFileName = fileNamesTable[fileIdx++];
       inFile = fopen( inFileName, "rb" );
-      if (inFile==NULL)
-      {
-        DISPLAY( "Pb opening %s\n", inFileName);
-        return 11;
-      }
+      if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
       /* Memory allocation & restrictions */
       inFileSize = BMK_GetFileSize(inFileName);
-      if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
       if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
@@ -305,7 +301,6 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
       maxCompressedChunkSize = LZ4_compressBound(chunkSize);
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
       compressedBuffer = (char*)malloc((size_t)compressedBuffSize);
-
 
       if (!orig_buff || !compressedBuffer)
       {
@@ -402,6 +397,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           }
           milliTime = BMK_GetMilliSpan(milliTime);
 
+          nbLoops += !nbLoops;   /* avoid division by zero */
           if ((double)milliTime < fastestD*nbLoops) fastestD = (double)milliTime/nbLoops;
           DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s \r", loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / fastestC / 1000., (double)benchedSize / fastestD / 1000.);
 
@@ -431,7 +427,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
   if (nbFiles > 1)
         DISPLAY("%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL", (long long unsigned int)totals, (long long unsigned int)totalz, (double)totalz/(double)totals*100., (double)totals/totalc/1000., (double)totals/totald/1000.);
 
-  if (BMK_pause) { DISPLAY("\npress enter...\n"); getchar(); }
+  if (BMK_pause) { DISPLAY("\npress enter...\n"); (void)getchar(); }
 
   return 0;
 }

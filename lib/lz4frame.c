@@ -372,9 +372,12 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 {
     LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)LZ4F_compressionContext;
 
-    FREEMEM(cctxPtr->lz4CtxPtr);
-    FREEMEM(cctxPtr->tmpBuff);
-    FREEMEM(LZ4F_compressionContext);
+    if (cctxPtr != NULL)   /* null pointers can be safely provided to this function, like free() */
+    {
+       FREEMEM(cctxPtr->lz4CtxPtr);
+       FREEMEM(cctxPtr->tmpBuff);
+       FREEMEM(LZ4F_compressionContext);
+    }
 
     return OK_NoError;
 }
@@ -768,9 +771,12 @@ LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* LZ
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t LZ4F_decompressionContext)
 {
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)LZ4F_decompressionContext;
-    FREEMEM(dctxPtr->tmpIn);
-    FREEMEM(dctxPtr->tmpOutBuffer);
-    FREEMEM(dctxPtr);
+    if (dctxPtr != NULL)   /* can accept NULL input, like free() */
+    {
+      FREEMEM(dctxPtr->tmpIn);
+      FREEMEM(dctxPtr->tmpOutBuffer);
+      FREEMEM(dctxPtr);
+    }
     return OK_NoError;
 }
 

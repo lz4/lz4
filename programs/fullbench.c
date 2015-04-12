@@ -533,14 +533,15 @@ static int local_LZ4F_decompress(const char* in, char* out, int inSize, int outS
 }
 
 
+#define NB_COMPRESSION_ALGORITHMS 100
+#define NB_DECOMPRESSION_ALGORITHMS 100
+#define CLEANEXIT(c) { benchStatus = c; goto _clean_up; }
 int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
   char* orig_buff;
-# define NB_COMPRESSION_ALGORITHMS 100
-# define NB_DECOMPRESSION_ALGORITHMS 100
   size_t errorCode;
-
+  int benchStatus = 0;
 
   /* Loop for each fileName */
   while (fileIdx<nbFiles)
@@ -580,6 +581,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       if (LZ4F_isError(errorCode))
       {
          DISPLAY("dctx allocation issue \n");
+         fclose(inFile);
          return 10;
       }
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)chunkSize)+1) * sizeof(struct chunkParameters));
@@ -765,14 +767,14 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
             case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
                     errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
-                    if (LZ4F_isError(errorCode)) { DISPLAY("Preparation error compressing frame\n"); return 1; }
+                    if (LZ4F_isError(errorCode)) { DISPLAY("Preparation error compressing frame\n"); CLEANEXIT(1); }
                     chunkP[0].origSize = (int)benchedSize;
                     chunkP[0].compressedSize = (int)errorCode;
                     nbChunks = 1;
                     break;
             default :
                 continue;   /* skip if unknown ID */
-                DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); free(chunkP); return 1;
+                DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); CLEANEXIT(1);
             }
 
             { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
@@ -800,6 +802,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 }
                 milliTime = BMK_GetMilliSpan(milliTime);
 
+                nb_loops += !nb_loops;   /* Avoid division by zero */
                 averageTime = (double)milliTime / nb_loops;
                 if (averageTime < bestTime) bestTime = averageTime;
 
@@ -815,15 +818,16 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
       }
 
+_clean_up:
       free(orig_buff);
       free(compressed_buff);
       free(chunkP);
       LZ4F_freeDecompressionContext(g_dCtx);
   }
 
-  if (BMK_pause) { printf("press enter...\n"); getchar(); }
+  if (BMK_pause) { printf("press enter...\n"); (void)getchar(); }
 
-  return 0;
+  return benchStatus;
 }
 
 
