@@ -265,7 +265,8 @@ int main(int argc, char** argv)
         forceStdout=0,
         forceCompress=0,
         main_pause=0,
-        multiple_inputs=0;
+        multiple_inputs=0,
+        multiple_rv=0;
     const char* input_filename=0;
     const char* output_filename=0;
     char* dynNameSpace=0;
@@ -518,7 +519,7 @@ int main(int argc, char** argv)
     if (decode)
     {
       if (multiple_inputs)
-        LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
+        multiple_rv = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
       else
         DEFAULT_DECOMPRESSOR(input_filename, output_filename);
     }
@@ -533,7 +534,7 @@ int main(int argc, char** argv)
       else
       {
         if (multiple_inputs)
-          LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
+          multiple_rv = LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
         else
           DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
       }
@@ -542,5 +543,6 @@ int main(int argc, char** argv)
     if (main_pause) waitEnter();
     free(dynNameSpace);
     free((void*)inFileNames);
+    if (multiple_rv != 0) return multiple_rv;
     return 0;
 }
