@@ -63,6 +63,12 @@
 
 
 /**************************************
+*  Includes
+**************************************/
+#include "lz4.h"
+
+
+/**************************************
 *  Compiler Options
 **************************************/
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
@@ -88,8 +94,6 @@
 #  endif   /* __STDC_VERSION__ */
 #endif  /* _MSC_VER */
 
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
 #if (GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
 #else
@@ -108,12 +112,6 @@
 #define FREEMEM        free
 #include <string.h>   /* memset, memcpy */
 #define MEM_INIT       memset
-
-
-/**************************************
-*  Includes
-**************************************/
-#include "lz4.h"
 
 
 /**************************************

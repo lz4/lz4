@@ -372,6 +372,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     /* Status */
     end = clock();
     DISPLAYLEVEL(2, "\r%79s\r", "");
+    filesize += !filesize;   /* avoid divide by zero */
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
     {
@@ -538,6 +539,7 @@ static unsigned LZ4IO_readLE32 (const void* s)
     return value32;
 }
 
+static unsigned g_magicRead = 0;
 static unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
 {
     unsigned long long filesize = 0;
@@ -562,7 +564,7 @@ static unsigned long long decodeLegacyStream(FILE* finput, FILE* foutput)
         blockSize = LZ4IO_readLE32(in_buff);       /* Convert to Little Endian */
         if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE))
         {   /* Cannot read next block : maybe new stream ? */
-            fseek(finput, -4, SEEK_CUR);
+            g_magicRead = blockSize;
             break;
         }
 
@@ -761,10 +763,18 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     nbCalls++;
 
     /* Check Archive Header */
-    nbReadBytes = fread(U32store, 1, MAGICNUMBER_SIZE, finput);
-    if (nbReadBytes==0) return ENDOFSTREAM;                  /* EOF */
-    if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
-    magicNumber = LZ4IO_readLE32(U32store);   /* Little Endian format */
+    if (g_magicRead)
+    {
+      magicNumber = g_magicRead;
+      g_magicRead = 0;
+    }
+    else
+    {
+      nbReadBytes = fread(U32store, 1, MAGICNUMBER_SIZE, finput);
+      if (nbReadBytes==0) return ENDOFSTREAM;                  /* EOF */
+      if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
+      magicNumber = LZ4IO_readLE32(U32store);   /* Little Endian format */
+    }
     if (LZ4IO_isSkippableMagicNumber(magicNumber)) magicNumber = LZ4IO_SKIPPABLE0;  /* fold skippable magic numbers */
 
     switch(magicNumber)
@@ -809,7 +819,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     get_fileHandle(input_filename, output_filename, &finput, &foutput);
 
     /* sparse file */
-    if (g_sparseFileSupport && foutput) { SET_SPARSE_FILE_MODE(foutput); }
+    if (g_sparseFileSupport) { SET_SPARSE_FILE_MODE(foutput); }
 
     /* Loop over multiple streams */
     do

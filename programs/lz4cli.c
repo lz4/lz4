@@ -251,7 +251,7 @@ static int badusage(void)
 static void waitEnter(void)
 {
     DISPLAY("Press enter to continue...\n");
-    getchar();
+    (void)getchar();
 }
 
 
