@@ -693,6 +693,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 }
                 milliTime = BMK_GetMilliSpan(milliTime);
 
+                nb_loops += !nb_loops;   /* avoid division by zero */
                 averageTime = (double)milliTime / nb_loops;
                 if (averageTime < bestTime) bestTime = averageTime;
                 cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;

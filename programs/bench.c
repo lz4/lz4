@@ -287,7 +287,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
       inFileSize = BMK_GetFileSize(inFileName);
       if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize * 2) / 2;
-      if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); fclose(inFile); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
       {
@@ -376,6 +376,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           }
           milliTime = BMK_GetMilliSpan(milliTime);
 
+          nbLoops += !nbLoops;   /* avoid division by zero */
           if ((double)milliTime < fastestC*nbLoops) fastestC = (double)milliTime/nbLoops;
           cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
           ratio = (double)cSize/(double)benchedSize*100.;
