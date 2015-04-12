@@ -515,22 +515,28 @@ int main(int argc, char** argv)
 
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
-    if (decode) DEFAULT_DECOMPRESSOR(input_filename, output_filename);
+    if (decode)
+    {
+      if (multiple_inputs)
+        LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
+      else
+        DEFAULT_DECOMPRESSOR(input_filename, output_filename);
+    }
     else
     {
-        /* compression is default action */
-        if (legacy_format)
-        {
-            DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
-            LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
-        }
+      /* compression is default action */
+      if (legacy_format)
+      {
+        DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
+        LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
+      }
+      else
+      {
+        if (multiple_inputs)
+          LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
         else
-        {
-            if (multiple_inputs)
-                LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
-            else
-                DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
-        }
+          DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
+      }
     }
 
     if (main_pause) waitEnter();
