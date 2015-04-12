@@ -539,9 +539,15 @@ static int local_LZ4F_decompress(const char* in, char* out, int inSize, int outS
 int fullSpeedBench(char** fileNamesTable, int nbFiles)
 {
   int fileIdx=0;
-  char* orig_buff;
+  char* orig_buff = NULL;
+  struct chunkParameters* chunkP = NULL;
+  char* compressed_buff=NULL;
   size_t errorCode;
   int benchStatus = 0;
+
+  /* Init */
+  errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
+  if (LZ4F_isError(errorCode)) { DISPLAY("dctx allocation issue \n"); CLEANEXIT(10); }
 
   /* Loop for each fileName */
   while (fileIdx<nbFiles)
@@ -552,55 +558,32 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       size_t benchedSize;
       int nbChunks;
       int maxCompressedChunkSize;
-      struct chunkParameters* chunkP;
       size_t readSize;
-      char* compressed_buff; int compressedBuffSize;
+      int compressedBuffSize;
       U32 crcOriginal;
-
 
       /* Check file existence */
       inFileName = fileNamesTable[fileIdx++];
       inFile = fopen( inFileName, "rb" );
-      if (inFile==NULL)
-      {
-        DISPLAY( "Pb opening %s\n", inFileName);
-        return 11;
-      }
+      if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); CLEANEXIT(11); }
 
       /* Memory size adjustments */
       inFileSize = BMK_GetFileSize(inFileName);
-      if (inFileSize==0) { DISPLAY( "file is empty\n"); return 11; }
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); CLEANEXIT(11); }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
-      if (benchedSize==0) { DISPLAY( "not enough memory\n"); return 11; }
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); CLEANEXIT(11); }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
           DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
 
       /* Allocation */
-      errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
-      if (LZ4F_isError(errorCode))
-      {
-         DISPLAY("dctx allocation issue \n");
-         fclose(inFile);
-         return 10;
-      }
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)chunkSize)+1) * sizeof(struct chunkParameters));
       orig_buff = (char*) malloc((size_t)benchedSize);
       nbChunks = (int) (((int)benchedSize + (chunkSize-1))/ chunkSize);
       maxCompressedChunkSize = LZ4_compressBound(chunkSize);
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
       compressed_buff = (char*)malloc((size_t)compressedBuffSize);
-
-
-      if(!orig_buff || !compressed_buff)
-      {
-        DISPLAY("\nError: not enough memory!\n");
-        free(orig_buff);
-        free(compressed_buff);
-        free(chunkP);
-        fclose(inFile);
-        return 12;
-      }
+      if(!orig_buff || !compressed_buff) { DISPLAY("\nError: not enough memory!\n"); fclose(inFile); CLEANEXIT(12); }
 
       /* Fill in src buffer */
       DISPLAY("Loading %s...       \r", inFileName);
@@ -813,15 +796,14 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
             DISPLAY("%2i-%-29.29s :%10i -> %7.1f MB/s\n", dAlgNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
         }
-
       }
+  }
 
 _clean_up:
-      free(orig_buff);
-      free(compressed_buff);
-      free(chunkP);
-      LZ4F_freeDecompressionContext(g_dCtx);
-  }
+  free(orig_buff);
+  free(compressed_buff);
+  free(chunkP);
+  LZ4F_freeDecompressionContext(g_dCtx);
 
   if (BMK_pause) { printf("press enter...\n"); (void)getchar(); }
 

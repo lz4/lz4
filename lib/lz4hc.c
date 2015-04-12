@@ -656,7 +656,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 4) dictSize = 0;
     if (dictSize > prefixSize) dictSize = prefixSize;
-    memcpy(safeBuffer, streamPtr->end - dictSize, dictSize);
+    memmove(safeBuffer, streamPtr->end - dictSize, dictSize);
     {
         U32 endIndex = (U32)(streamPtr->end - streamPtr->base);
         streamPtr->end = (const BYTE*)safeBuffer + dictSize;
