@@ -447,10 +447,10 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
     headerStart = dstPtr;
 
     /* FLG Byte */
-    *dstPtr++ = ((1 & _2BITS) << 6)    /* Version('01') */
+    *dstPtr++ = (BYTE)(((1 & _2BITS) << 6)    /* Version('01') */
         + ((cctxPtr->prefs.frameInfo.blockMode & _1BIT ) << 5)    /* Block mode */
-        + (BYTE)((cctxPtr->prefs.frameInfo.contentChecksumFlag & _1BIT ) << 2)   /* Frame checksum */
-        + (BYTE)((cctxPtr->prefs.frameInfo.contentSize > 0) << 3);   /* Frame content size */
+        + ((cctxPtr->prefs.frameInfo.contentChecksumFlag & _1BIT ) << 2)   /* Frame checksum */
+        + ((cctxPtr->prefs.frameInfo.contentSize > 0) << 3));   /* Frame content size */
     /* BD Byte */
     *dstPtr++ = (BYTE)((cctxPtr->prefs.frameInfo.blockSizeID & _3BITS) << 4);
     /* Optional Frame content size field */

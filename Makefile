@@ -101,10 +101,10 @@ gpptest: clean
 	$(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 clangtest: clean
-	$(MAKE) all CC=clang CFLAGS="-O3 -Werror"
+	$(MAKE) all CC=clang CPPFLAGS="-Werror -Wconversion -Wno-sign-conversion"
 
 sanitize: clean
-	$(MAKE) test CC=clang CFLAGS="-O3 -g -fsanitize=undefined" FUZZER_TIME="-T5mn"
+	$(MAKE) test CC=clang CPPFLAGS="-g -fsanitize=undefined" FUZZER_TIME="-T5mn"
 
 staticAnalyze: clean
 	scan-build -v $(MAKE) all CFLAGS=-g
