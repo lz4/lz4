@@ -684,7 +684,6 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                         break;
             default :
                 continue;   /* unknown ID : just skip */
-                DISPLAY("ERROR ! Bad algorithm Id !! \n"); free(chunkP); return 1;
             }
 
             for (loopNb = 1; loopNb <= nbIterations; loopNb++)
@@ -774,7 +773,6 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                     break;
             default :
                 continue;   /* skip if unknown ID */
-                DISPLAY("ERROR ! Bad decompression algorithm Id !! \n"); CLEANEXIT(1);
             }
 
             { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
