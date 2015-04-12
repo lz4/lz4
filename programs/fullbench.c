@@ -569,9 +569,9 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
       /* Memory size adjustments */
       inFileSize = BMK_GetFileSize(inFileName);
-      if (inFileSize==0) { DISPLAY( "file is empty\n"); CLEANEXIT(11); }
+      if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); CLEANEXIT(11); }
       benchedSize = (size_t) BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
-      if (benchedSize==0) { DISPLAY( "not enough memory\n"); CLEANEXIT(11); }
+      if (benchedSize==0) { DISPLAY( "not enough memory\n"); fclose(inFile); CLEANEXIT(11); }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
           DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
