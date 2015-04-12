@@ -285,21 +285,21 @@ int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalS
    it is generally possible to disable them,
    with -Wno-deprecated-declarations for gcc
    or _CRT_SECURE_NO_WARNINGS in Visual for example.
-   You can also define _DEPRECATE_WARNING_DEFBLOCK. */
-#ifndef _DEPRECATE_WARNING_DEFBLOCK
-#  define _DEPRECATE_WARNING_DEFBLOCK
+   You can also define LZ4_DEPRECATE_WARNING_DEFBLOCK. */
+#ifndef LZ4_DEPRECATE_WARNING_DEFBLOCK
+#  define LZ4_DEPRECATE_WARNING_DEFBLOCK
 #  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #  if (GCC_VERSION >= 405) || defined(__clang__)
-#    define DEPRECATED(message) __attribute__((deprecated(message)))
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
 #  elif (GCC_VERSION >= 301)
-#    define DEPRECATED(message) __attribute__((deprecated))
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
-#    define DEPRECATED(message) __declspec(deprecated(message))
+#    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
 #  else
-#    pragma message("WARNING: You need to implement DEPRECATED for this compiler")
-#    define DEPRECATED
+#    pragma message("WARNING: You need to implement LZ4_DEPRECATED for this compiler")
+#    define LZ4_DEPRECATED
 #  endif
-#endif // _DEPRECATE_WARNING_DEFBLOCK
+#endif // LZ4_DEPRECATE_WARNING_DEFBLOCK
 
 /* Obsolete compression functions */
 /* These functions are planned to generate warnings by r131 approximately */
@@ -321,14 +321,14 @@ int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const cha
 /* int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize); */
 
 /* Obsolete streaming functions; use new streaming interface whenever possible */
-DEPRECATED("use LZ4_createStream() instead") void* LZ4_create (const char* inputBuffer);
-DEPRECATED("use LZ4_createStream() instead") int   LZ4_sizeofStreamState(void);
-DEPRECATED("use LZ4_resetStream() instead")  int   LZ4_resetStreamState(void* state, const char* inputBuffer);
-DEPRECATED("use LZ4_saveDict() instead")     char* LZ4_slideInputBuffer (void* state);
+LZ4_DEPRECATED("use LZ4_createStream() instead") void* LZ4_create (const char* inputBuffer);
+LZ4_DEPRECATED("use LZ4_createStream() instead") int   LZ4_sizeofStreamState(void);
+LZ4_DEPRECATED("use LZ4_resetStream() instead")  int   LZ4_resetStreamState(void* state, const char* inputBuffer);
+LZ4_DEPRECATED("use LZ4_saveDict() instead")     char* LZ4_slideInputBuffer (void* state);
 
 /* Obsolete streaming decoding functions */
-DEPRECATED("use LZ4_decompress_safe_usingDict() instead") int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int compressedSize, int maxOutputSize);
-DEPRECATED("use LZ4_decompress_fast_usingDict() instead") int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int originalSize);
+LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") int LZ4_decompress_safe_withPrefix64k (const char* source, char* dest, int compressedSize, int maxOutputSize);
+LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") int LZ4_decompress_fast_withPrefix64k (const char* source, char* dest, int originalSize);
 
 
 #if defined (__cplusplus)
