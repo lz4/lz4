@@ -61,6 +61,7 @@ endif
 TRAVIS_TARGET:= $(LZ4_TRAVIS_CI_ENV)
 TEST_FILES   := COPYING
 TEST_TARGETS := test-native
+FUZZER_TIME  := -T9mn
 
 
 default: lz4

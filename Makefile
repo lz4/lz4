@@ -104,7 +104,7 @@ clangtest: clean
 	$(MAKE) all CC=clang CPPFLAGS="-Werror -Wconversion -Wno-sign-conversion"
 
 sanitize: clean
-	$(MAKE) test CC=clang CPPFLAGS="-g -fsanitize=undefined" FUZZER_TIME="-T5mn"
+	$(MAKE) test CC=clang CPPFLAGS="-g -fsanitize=undefined" FUZZER_TIME="-T1mn"
 
 staticAnalyze: clean
 	scan-build -v $(MAKE) all CFLAGS=-g

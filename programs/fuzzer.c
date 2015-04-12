@@ -1017,7 +1017,7 @@ static int FUZ_usage(char* programName)
     DISPLAY( "\n");
     DISPLAY( "Arguments :\n");
     DISPLAY( " -i#    : Nb of tests (default:%i) \n", NB_ATTEMPTS);
-    DISPLAY( " -T#    : Duration of tests (default: use Nb of tests) \n");
+    DISPLAY( " -T#    : Duration of tests, in seconds (default: use Nb of tests) \n");
     DISPLAY( " -s#    : Select seed (default:prompt user)\n");
     DISPLAY( " -t#    : Select starting test number (default:0)\n");
     DISPLAY( " -P#    : Select compressibility in %% (default:%i%%)\n", FUZ_COMPRESSIBILITY_DEFAULT);
@@ -1084,26 +1084,23 @@ int main(int argc, char** argv)
                 case 'T':
                     argument++;
                     nbTests = 0; duration = 0;
-
                     for (;;)
                     {
-                        if (argument[0]=='m')
+                        switch(*argument)
                         {
-                            duration *= 60;
-                            argument++;
-                            continue;
-                        }
-                        if (argument[0]=='n')
-                        {
-                            argument++;
-                            continue;
-                        }
-                        if ((*argument>='0') && (*argument<='9'))
-                        {
-                            duration *= 10;
-                            duration += *argument - '0';
-                            argument++;
-                            continue;
+                            case 'm': duration *= 60; argument++; continue;
+                            case 's':
+                            case 'n': argument++; continue;
+                            case '0':
+                            case '1':
+                            case '2':
+                            case '3':
+                            case '4':
+                            case '5':
+                            case '6':
+                            case '7':
+                            case '8':
+                            case '9': duration *= 10; duration += *argument++ - '0'; continue;
                         }
                         break;
                     }
