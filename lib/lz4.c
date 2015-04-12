@@ -766,7 +766,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 
     if (dict->initCheck) LZ4_resetStream(LZ4_dict);                         /* Uninitialized structure detected */
 
-    if (dictSize < HASH_UNIT)
+    if (dictSize < (int)HASH_UNIT)
     {
         dict->dictionary = NULL;
         dict->dictSize = 0;
