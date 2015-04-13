@@ -2,7 +2,10 @@
 // Copyright : Takayuki Matsuoka
 
 
-#define _CRT_SECURE_NO_WARNINGS // for MSVC
+#ifdef _MSC_VER    /* Visual Studio */
+#  define _CRT_SECURE_NO_WARNINGS
+#  define snprintf sprintf_s
+#endif
 #include "lz4.h"
 
 #include <stdio.h>
@@ -38,7 +41,8 @@ static void test_compress(
     size_t ringBufferBytes)
 {
     LZ4_stream_t* const lz4Stream = LZ4_createStream();
-    char* const cmpBuf = malloc(LZ4_COMPRESSBOUND(messageMaxBytes));
+    const size_t cmpBufBytes = LZ4_COMPRESSBOUND(messageMaxBytes);
+    char* const cmpBuf = malloc(cmpBufBytes);
     char* const inpBuf = malloc(ringBufferBytes);
     int inpOffset = 0;
 
@@ -60,8 +64,8 @@ static void test_compress(
 #endif
 
         {
-            const int cmpBytes = LZ4_compress_continue(
-                lz4Stream, inpPtr, cmpBuf, inpBytes);
+            const int cmpBytes = LZ4_compress_safe_continue(
+                lz4Stream, inpPtr, cmpBuf, inpBytes, cmpBufBytes);
             if (cmpBytes <= 0) break;
             write_uint16(outFp, (uint16_t) cmpBytes);
             write_bin(outFp, cmpBuf, cmpBytes);
