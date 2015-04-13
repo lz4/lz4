@@ -2,7 +2,10 @@
 // Copyright : Takayuki Matsuoka
 
 
-#define _CRT_SECURE_NO_WARNINGS // for MSVC
+#ifdef _MSC_VER    /* Visual Studio */
+#  define _CRT_SECURE_NO_WARNINGS
+#  define snprintf sprintf_s
+#endif
 #include "lz4.h"
 
 #include <stdio.h>
