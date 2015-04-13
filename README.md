@@ -22,12 +22,11 @@ It trades CPU time for compression ratio.
 > **Branch Policy:**
 
 > - The "master" branch is considered stable, at all times.
-> - The "dev" branch is the one where all contributions must be merged 
+> - The "dev" branch is the one where all contributions must be merged
     before being promoted to master.
->   + If you plan to propose a patch, please commit into the "dev" branch. 
+>   + If you plan to propose a patch, please commit into the "dev" branch,
+      or its own feature branch.
       Direct commit to "master" are not permitted.
-> - Feature branches can also exist,
-    for dedicated tests of larger modifications before merge into "dev" branch.
 
 Benchmarks
 -------------------------

@@ -158,13 +158,13 @@ for files that have not been compressed with
  force write to standard output, even if it is the console
 
 .TP
-.BR \-m
+.BR \-m ", " \--multiple
  Multiple file names.
  By default, the second filename is used as the output filename for the compressed file.
  With
 .B -m
-, you can specify any number of input filenames, each of them will be compressed
-with the resulting compressed file named
+, you can specify any number of input filenames. Each of them will be compressed
+independently, and the resulting name of the compressed file will be
 .B filename.lz4
 .
 

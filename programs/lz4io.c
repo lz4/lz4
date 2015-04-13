@@ -509,21 +509,21 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
 {
     int i;
     int missing_files = 0;
-    FILE *ifp;
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
 
     for (i=0; i<ifntSize; i++)
     {
-        ifp = fopen(inFileNamesTable[i], "r");
+        size_t ifnSize;
+        FILE* ifp = fopen(inFileNamesTable[i], "r");
         if (ifp == NULL) {
             DISPLAYLEVEL(2, "Unable to access file for processing: %s\n", inFileNamesTable[i]);
             missing_files++;
             continue;
         }
         fclose(ifp);
-        size_t ifnSize = strlen(inFileNamesTable[i]);
+        ifnSize = strlen(inFileNamesTable[i]);
         if (ofnSize <= ifnSize+suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
         strcpy(outFileName, inFileNamesTable[i]);
         strcat(outFileName, suffix);
@@ -539,25 +539,27 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
     int i;
     int skipped_files = 0;
     int missing_files = 0;
-    FILE *ifp;
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
-    size_t suffixSize = strlen(suffix);
+    const size_t suffixSize = strlen(suffix);
     char* ifnSuffix = (char*)malloc(suffixSize + 1);
 
     for (i=0; i<ifntSize; i++)
     {
-        ifp = fopen(inFileNamesTable[i], "r");
-        if (ifp == NULL) {
+        size_t ifnSize;
+        FILE* ifp = fopen(inFileNamesTable[i], "r");
+        if (ifp == NULL)
+        {
             DISPLAYLEVEL(2, "Unable to access file for processing: %s\n", inFileNamesTable[i]);
             missing_files++;
             continue;
         }
         fclose(ifp);
-        size_t ifnSize = strlen(inFileNamesTable[i]);
+        ifnSize = strlen(inFileNamesTable[i]);
         strcpy(ifnSuffix, inFileNamesTable[i] + ifnSize - suffixSize);
         if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
-        if (ifnSize <= suffixSize  ||  strcmp(ifnSuffix, suffix) != 0) {
+        if (ifnSize <= suffixSize  ||  strcmp(ifnSuffix, suffix) != 0)
+        {
             DISPLAYLEVEL(2, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skipped_files++;
             continue;
@@ -567,6 +569,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
         LZ4IO_decompressFilename(inFileNamesTable[i], outFileName);
     }
     free(outFileName);
+    free(ifnSuffix);
     if (skipped_files > 0) return 1;
     if (missing_files > 0) return 1;
     return 0;

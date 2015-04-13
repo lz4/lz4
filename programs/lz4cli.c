@@ -266,7 +266,7 @@ int main(int argc, char** argv)
         forceCompress=0,
         main_pause=0,
         multiple_inputs=0,
-        multiple_rv=0;
+        operationResult=0;
     const char* input_filename=0;
     const char* output_filename=0;
     char* dynNameSpace=0;
@@ -295,12 +295,13 @@ int main(int argc, char** argv)
         /* long commands (--long-word) */
         if (!strcmp(argument, "--compress")) { forceCompress = 1; continue; }
         if ((!strcmp(argument, "--decompress"))
-           || (!strcmp(argument, "--uncompress"))) { decode = 1; continue; }
+         || (!strcmp(argument, "--uncompress"))) { decode = 1; continue; }
+        if (!strcmp(argument, "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
         if (!strcmp(argument, "--test")) { decode = 1; LZ4IO_setOverwrite(1); output_filename=nulmark; continue; }
         if (!strcmp(argument, "--force")) { LZ4IO_setOverwrite(1); continue; }
         if (!strcmp(argument, "--no-force")) { LZ4IO_setOverwrite(0); continue; }
         if ((!strcmp(argument, "--stdout"))
-           || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
+         || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
         if (!strcmp(argument, "--frame-crc")) { LZ4IO_setStreamChecksumMode(1); continue; }
         if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
         if (!strcmp(argument, "--content-size")) { LZ4IO_setContentSize(1); continue; }
@@ -311,6 +312,7 @@ int main(int argc, char** argv)
         if (!strcmp(argument, "--quiet")) { if (displayLevel) displayLevel--; continue; }
         if (!strcmp(argument, "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
         if (!strcmp(argument, "--keep")) { continue; }   /* keep source file (default anyway; just for xz/lzma compatibility) */
+
 
         /* Short commands (note : aggregated short commands are allowed) */
         if (argument[0]=='-')
@@ -528,7 +530,7 @@ int main(int argc, char** argv)
     if (decode)
     {
       if (multiple_inputs)
-        multiple_rv = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
+        operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
       else
         DEFAULT_DECOMPRESSOR(input_filename, output_filename);
     }
@@ -543,7 +545,7 @@ int main(int argc, char** argv)
       else
       {
         if (multiple_inputs)
-          multiple_rv = LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
+          operationResult = LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
         else
           DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
       }
@@ -552,6 +554,6 @@ int main(int argc, char** argv)
     if (main_pause) waitEnter();
     free(dynNameSpace);
     free((void*)inFileNames);
-    if (multiple_rv != 0) return multiple_rv;
+    if (operationResult != 0) return operationResult;
     return 0;
 }
