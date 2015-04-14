@@ -94,8 +94,8 @@
 #  endif   /* __STDC_VERSION__ */
 #endif  /* _MSC_VER */
 
-/* GCC_VERSION is defined into lz4.h */
-#if (GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
+/* LZ4_GCC_VERSION is defined into lz4.h */
+#if (LZ4_GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
 #else
 #  define expect(expr,value)    (expr)
@@ -261,7 +261,7 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
             unsigned long r = 0;
             _BitScanForward64( &r, (U64)val );
             return (int)(r>>3);
-#       elif (defined(__clang__) || (GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       elif (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_ctzll((U64)val) >> 3);
 #       else
             static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
@@ -274,7 +274,7 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
             unsigned long r;
             _BitScanForward( &r, (U32)val );
             return (int)(r>>3);
-#       elif (defined(__clang__) || (GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       elif (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_ctz((U32)val) >> 3);
 #       else
             static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
@@ -290,7 +290,7 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
             unsigned long r = 0;
             _BitScanReverse64( &r, val );
             return (unsigned)(r>>3);
-#       elif (defined(__clang__) || (GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       elif (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_clzll((U64)val) >> 3);
 #       else
             unsigned r;
@@ -306,7 +306,7 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
             unsigned long r = 0;
             _BitScanReverse( &r, (unsigned long)val );
             return (unsigned)(r>>3);
-#       elif (defined(__clang__) || (GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       elif (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_clz((U32)val) >> 3);
 #       else
             unsigned r;
