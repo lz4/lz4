@@ -57,6 +57,11 @@ extern "C" {
         ITEM(ERROR_wrongSrcPtr) \
         ITEM(ERROR_decompressionFailed) \
         ITEM(ERROR_checksum_invalid) \
+        ITEM(ERROR_version_wrong) \
+        ITEM(ERROR_unsupported_checksum) \
+        ITEM(ERROR_reserved_flag_set) \
+        ITEM(ERROR_unsupported_block_size) \
+        ITEM(ERROR_header_checksum_invalid) \
         ITEM(ERROR_maxCode)
 
 #define LZ4F_GENERATE_ENUM(ENUM) ENUM,
