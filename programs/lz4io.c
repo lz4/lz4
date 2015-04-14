@@ -402,25 +402,48 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 *********************************************/
 
 typedef struct {
-    const char* srcFileName;
-    FILE* sFile;
-    const char* dstFileName;
-    FILE* dFile;
-    void* srcBuffer;
+    void*  srcBuffer;
     size_t srcBufferSize;
-    void* dstBuffer;
+    void*  dstBuffer;
     size_t dstBufferSize;
     LZ4F_compressionContext_t ctx;
-    unsigned compressionLevel;
-} compressionJob_t;
+} cRess_t;
+
+static cRess_t LZ4IO_createCResources(void)
+{
+    const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
+    cRess_t ress;
+    LZ4F_errorCode_t errorCode;
+
+    errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
+    if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+
+    /* Allocate Memory */
+    ress.srcBuffer = malloc(blockSize);
+    ress.srcBufferSize = blockSize;
+    ress.dstBufferSize = LZ4F_compressBound(blockSize, NULL);   /* risk : real prefs may cost more */
+    ress.dstBuffer = malloc(ress.dstBufferSize);
+    if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(31, "Allocation error : not enough memory");
+
+    return ress;
+}
+
+static void LZ4IO_freeCResources(cRess_t ress)
+{
+    LZ4F_errorCode_t errorCode;
+    free(ress.srcBuffer);
+    free(ress.dstBuffer);
+    errorCode = LZ4F_freeCompressionContext(ress.ctx);
+    if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
+}
 
 
-static int LZ4IO_compressJob(compressionJob_t ress)
+static int LZ4IO_compressJob(cRess_t ress, const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
-    FILE* finput = ress.sFile;
-    FILE* foutput = ress.dFile;
+    FILE* srcFile;
+    FILE* dstFile;
     void* const srcBuffer = ress.srcBuffer;
     void* const dstBuffer = ress.dstBuffer;
     const size_t dstBufferSize = ress.dstBufferSize;
@@ -433,15 +456,21 @@ static int LZ4IO_compressJob(compressionJob_t ress)
     /* Init */
     memset(&prefs, 0, sizeof(prefs));
 
+    /* File check */
+    {
+        int srcFileAbsent = LZ4IO_getFiles(srcFileName, dstFileName, &srcFile, &dstFile);
+        if (srcFileAbsent) return srcFileAbsent;
+    }
+
     /* Set compression parameters */
     prefs.autoFlush = 1;
-    prefs.compressionLevel = ress.compressionLevel;
+    prefs.compressionLevel = compressionLevel;
     prefs.frameInfo.blockMode = (blockMode_t)g_blockIndependence;
     prefs.frameInfo.blockSizeID = (blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)g_streamChecksum;
     if (g_contentSizeFlag)
     {
-      unsigned long long fileSize = LZ4IO_GetFileSize(ress.srcFileName);
+      unsigned long long fileSize = LZ4IO_GetFileSize(srcFileName);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine uncompressed frame content size \n");
@@ -450,12 +479,12 @@ static int LZ4IO_compressJob(compressionJob_t ress)
     /* Write Archive Header */
     headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
     if (LZ4F_isError(headerSize)) EXM_THROW(32, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
-    sizeCheck = fwrite(dstBuffer, 1, headerSize, foutput);
+    sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
     if (sizeCheck!=headerSize) EXM_THROW(33, "Write error : cannot write header");
     compressedfilesize += headerSize;
 
     /* read first block */
-    readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, finput);
+    readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
     filesize += readSize;
 
     /* Main Loop */
@@ -470,11 +499,11 @@ static int LZ4IO_compressJob(compressionJob_t ress)
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ", (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
-        sizeCheck = fwrite(dstBuffer, 1, outSize, foutput);
+        sizeCheck = fwrite(dstBuffer, 1, outSize, dstFile);
         if (sizeCheck!=outSize) EXM_THROW(35, "Write error : cannot write compressed block");
 
         /* Read next block */
-        readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, finput);
+        readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
         filesize += readSize;
     }
 
@@ -482,9 +511,13 @@ static int LZ4IO_compressJob(compressionJob_t ress)
     headerSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
     if (LZ4F_isError(headerSize)) EXM_THROW(36, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
 
-    sizeCheck = fwrite(dstBuffer, 1, headerSize, foutput);
+    sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
     if (sizeCheck!=headerSize) EXM_THROW(37, "Write error : cannot write end of stream");
     compressedfilesize += headerSize;
+
+    /* Release files */
+    fclose (srcFile);
+    fclose (dstFile);
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
@@ -502,40 +535,21 @@ static int LZ4IO_compressJob(compressionJob_t ress)
 }
 
 
-int LZ4IO_compressFilename(const char* input_filename, const char* output_filename, int compressionLevel)
+int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
     clock_t start, end;
-    const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
-    compressionJob_t ress;
-    LZ4F_errorCode_t errorCode;
-
+    cRess_t ress;
+    int issueWithSrcFile = 0;
 
     /* Init */
     start = clock();
-    errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
-    if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
-    if (LZ4IO_getFiles(input_filename, output_filename, &(ress.sFile), &(ress.dFile)))
-        EXM_THROW(31, "File error");
-    ress.compressionLevel =  (unsigned)compressionLevel;
+    ress = LZ4IO_createCResources();
 
-    /* Allocate Memory */
-    ress.srcFileName = input_filename;
-    ress.srcBuffer = malloc(blockSize);
-    ress.srcBufferSize = blockSize;
-    ress.dstBufferSize = LZ4F_compressBound(blockSize, NULL);   /* risk : real prefs may cost more */
-    ress.dstBuffer = malloc(ress.dstBufferSize);
-    if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(31, "Allocation error : not enough memory");
+    /* Compress File */
+    issueWithSrcFile += LZ4IO_compressJob(ress, srcFileName, dstFileName, compressionLevel);
 
-    /* Compress */
-    LZ4IO_compressJob(ress);
-
-    /* Close & Free */
-    free(ress.srcBuffer);
-    free(ress.dstBuffer);
-    fclose(ress.sFile);
-    fclose(ress.dFile);
-    errorCode = LZ4F_freeCompressionContext(ress.ctx);
-    if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
+    /* Free resources */
+    LZ4IO_freeCResources(ress);
 
     /* Final Status */
     end = clock();
@@ -544,7 +558,7 @@ int LZ4IO_compressFilename(const char* input_filename, const char* output_filena
         DISPLAYLEVEL(4, "Completed in %.2f sec \n", seconds);
     }
 
-    return 0;
+    return issueWithSrcFile;
 }
 
 
@@ -556,54 +570,27 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
-    const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
-    compressionJob_t ress;
-    LZ4F_errorCode_t errorCode;
+    cRess_t ress;
 
     /* init */
-    errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
-    if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
-    ress.compressionLevel =  (unsigned)compressionLevel;
-
-    /* Allocate Memory */
-    ress.srcBuffer = malloc(blockSize);
-    ress.srcBufferSize = blockSize;
-    ress.dstBufferSize = LZ4F_compressBound(blockSize, NULL);   /* risk : real prefs may cost more */
-    ress.dstBuffer = malloc(ress.dstBufferSize);
-    if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(31, "Allocation error : not enough memory");
+    ress = LZ4IO_createCResources();
 
     /* loop on each file */
     for (i=0; i<ifntSize; i++)
     {
-        size_t ifnSize;
-        int issueWithSrcFile;
-        ifnSize = strlen(inFileNamesTable[i]);
+        size_t ifnSize = strlen(inFileNamesTable[i]);
         if (ofnSize <= ifnSize+suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
         strcpy(outFileName, inFileNamesTable[i]);
         strcat(outFileName, suffix);
 
-        ress.srcFileName = inFileNamesTable[i];
-        ress.dstFileName = outFileName;
-        issueWithSrcFile = LZ4IO_getFiles(inFileNamesTable[i], outFileName, &(ress.sFile), &(ress.dFile));
-        missing_files += issueWithSrcFile;
-
-        if (!issueWithSrcFile)
-        {
-            LZ4IO_compressJob(ress);
-            fclose(ress.sFile);
-            fclose(ress.dFile);
-        }
+        missing_files += LZ4IO_compressJob(ress, inFileNamesTable[i], outFileName, compressionLevel);
     }
 
     /* Close & Free */
-    free(ress.srcBuffer);
-    free(ress.dstBuffer);
-    errorCode = LZ4F_freeCompressionContext(ress.ctx);
-    if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
+    LZ4IO_freeCResources(ress);
     free(outFileName);
 
-    if (missing_files > 0) return 1;
-    return 0;
+    return missing_files;
 }
 
 
