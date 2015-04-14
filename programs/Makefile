@@ -247,6 +247,9 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
+	./datagen -g16KB -s2 > tmp2
+	./datagen -g16KB -s3 > tmp3
+	valgrind --leak-check=yes ./lz4 --force --multiple tmp tmp2 tmp3
 	./datagen -g16MB > tmp
 	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
 	valgrind --leak-check=yes ./lz4 -t tmp2
