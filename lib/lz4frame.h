@@ -68,10 +68,19 @@ typedef enum { LZ4F_noContentChecksum=0, LZ4F_contentChecksumEnabled } LZ4F_cont
 typedef enum { LZ4F_frame=0, LZ4F_skippableFrame } LZ4F_frameType_t;
 
 #ifndef LZ4F_DISABLE_OLD_ENUMS
-typedef enum { /*LZ4F_default=0,*/ max64KB=4, max256KB=5, max1MB=6, max4MB=7 } blockSizeID_t;
-typedef enum { blockLinked=0, blockIndependent} blockMode_t;
-typedef enum { noContentChecksum=0, contentChecksumEnabled } contentChecksum_t;
-typedef enum { /*LZ4F_frame=0,*/ skippableFrame } frameType_t;
+#  define max64KB                LZ4F_max64KB
+#  define max256KB               LZ4F_max256KB
+#  define max1MB                 LZ4F_max1MB
+#  define max4MB                 LZ4F_max4MB
+#  define blockSizeID_t          LZ4F_blockSizeID_t
+#  define blockLinked            LZ4F_blockLinked
+#  define blockIndependent       LZ4F_blockIndependent
+#  define blockMode_t            LZ4F_blockMode_t
+#  define noContentChecksum      LZ4F_noContentChecksum
+#  define contentChecksumEnabled LZ4F_contentChecksumEnabled
+#  define contentChecksum_t      LZ4F_contentChecksum_t
+#  define skippableFrame         LZ4F_skippableFrame
+#  define frameType_t            LZ4F_frameType_t
 #endif
 
 typedef struct {
