@@ -145,10 +145,10 @@ using LZ4_saveDictHC().
    You can also define LZ4_DEPRECATE_WARNING_DEFBLOCK. */
 #ifndef LZ4_DEPRECATE_WARNING_DEFBLOCK
 #  define LZ4_DEPRECATE_WARNING_DEFBLOCK
-#  define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#  if (GCC_VERSION >= 405) || defined(__clang__)
+#  define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+#  if (LZ4_GCC_VERSION >= 405) || defined(__clang__)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif (GCC_VERSION >= 301)
+#  elif (LZ4_GCC_VERSION >= 301)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
