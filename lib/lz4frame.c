@@ -862,16 +862,16 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVo
     blockSizeID = (BD>>4) & _3BITS;
 
     /* validate */
-    if (version != 1) return (size_t)-ERROR_GENERIC;           /* Version Number, only supported value */
-    if (blockChecksumFlag != 0) return (size_t)-ERROR_GENERIC; /* Only supported value for the time being */
-    if (((FLG>>0)&_2BITS) != 0) return (size_t)-ERROR_GENERIC; /* Reserved bits */
-    if (((BD>>7)&_1BIT) != 0) return (size_t)-ERROR_GENERIC;   /* Reserved bit */
-    if (blockSizeID < 4) return (size_t)-ERROR_GENERIC;        /* 4-7 only supported values for the time being */
-    if (((BD>>0)&_4BITS) != 0) return (size_t)-ERROR_GENERIC;  /* Reserved bits */
+    if (version != 1) return (size_t)-ERROR_version_wrong;           /* Version Number, only supported value */
+    if (blockChecksumFlag != 0) return (size_t)-ERROR_unsupported_checksum; /* Only supported value for the time being */
+    if (((FLG>>0)&_2BITS) != 0) return (size_t)-ERROR_reserved_flag_set; /* Reserved bits */
+    if (((BD>>7)&_1BIT) != 0) return (size_t)-ERROR_reserved_flag_set;   /* Reserved bit */
+    if (blockSizeID < 4) return (size_t)-ERROR_unsupported_block_size;        /* 4-7 only supported values for the time being */
+    if (((BD>>0)&_4BITS) != 0) return (size_t)-ERROR_reserved_flag_set;  /* Reserved bits */
 
     /* check */
     HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
-    if (HC != srcPtr[frameHeaderSize-1]) return (size_t)-ERROR_GENERIC;   /* Bad header checksum error */
+    if (HC != srcPtr[frameHeaderSize-1]) return (size_t)-ERROR_header_checksum_invalid;   /* Bad header checksum error */
 
     /* save */
     dctxPtr->frameInfo.blockMode = (blockMode_t)blockMode;
