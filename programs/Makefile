@@ -244,22 +244,22 @@ test-frametest32: frametest32
 	./frametest32 $(FUZZER_TIME)
 
 test-mem: lz4 datagen fuzzer frametest fullbench
-	valgrind --leak-check=yes ./datagen -g50M > $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
-	valgrind --leak-check=yes ./lz4 -9 -BD -f tmp $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -9 -BD -f tmp $(VOID)
 	./datagen -g16KB -s2 > tmp2
 	./datagen -g16KB -s3 > tmp3
-	valgrind --leak-check=yes ./lz4 --force --multiple tmp tmp2 tmp3
+	valgrind --leak-check=yes --error-exitcode=1 ./lz4 --force --multiple tmp tmp2 tmp3
 	./datagen -g16MB > tmp
-	valgrind --leak-check=yes ./lz4 -9 -B5D -f tmp tmp2
-	valgrind --leak-check=yes ./lz4 -t tmp2
-	valgrind --leak-check=yes ./lz4 -bi1 tmp
-	valgrind --leak-check=yes ./fullbench -i1 tmp tmp2
+	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -9 -B5D -f tmp tmp2
+	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -t tmp2
+	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -bi1 tmp
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 tmp tmp2
 	./datagen -g256MB > tmp
-	valgrind --leak-check=yes ./lz4 -B4D -f -vq tmp $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -B4D -f -vq tmp $(VOID)
 	rm tmp*
-	valgrind --leak-check=yes ./fuzzer -i64 -t1
-	valgrind --leak-check=yes ./frametest -i256
+	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
+	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
