@@ -141,9 +141,9 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t cctx, void* dstBuffer, size_
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* prefsPtr);
 /* LZ4F_compressBound() :
  * Provides the minimum size of Dst buffer given srcSize to handle worst case situations.
- * prefsPtr is optional : you can provide NULL as argument, all preferences will then be set to default.
- * Note that different preferences will produce different results.
- * This function doesn't include frame termination cost (4 bytes, or 8 is frame checksum is enabled)
+ * Different preferences can produce different results.
+ * prefsPtr is optional : you can provide NULL as argument, all preferences will then be set to cover worst case.
+ * This function includes frame termination cost (4 bytes, or 8 is frame checksum is enabled)
  */
 
 size_t LZ4F_compressUpdate(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* cOptPtr);

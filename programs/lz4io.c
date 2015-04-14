@@ -421,7 +421,7 @@ static cRess_t LZ4IO_createCResources(void)
     /* Allocate Memory */
     ress.srcBuffer = malloc(blockSize);
     ress.srcBufferSize = blockSize;
-    ress.dstBufferSize = LZ4F_compressBound(blockSize, NULL);   /* risk : real prefs may cost more */
+    ress.dstBufferSize = LZ4F_compressBound(blockSize, NULL);   /* cover worst case */
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(31, "Allocation error : not enough memory");
 

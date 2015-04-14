@@ -472,12 +472,13 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 
 /* LZ4F_compressBound() : gives the size of Dst buffer given a srcSize to handle worst case situations.
 *                        The LZ4F_frameInfo_t structure is optional :
-*                        you can provide NULL as argument, all preferences will then be set to default.
+*                        you can provide NULL as argument, preferences will then be set to cover worst case situations.
 * */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_preferences_t prefsNull;
     memset(&prefsNull, 0, sizeof(prefsNull));
+    prefsNull.frameInfo.contentChecksumFlag = contentChecksumEnabled;   /* worst case */
     {
         const LZ4F_preferences_t* prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
         blockSizeID_t bid = prefsPtr->frameInfo.blockSizeID;
