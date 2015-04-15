@@ -226,10 +226,10 @@ test-lz4c32: lz4 lz4c32 datagen
 	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -qt
 
 test-fullbench: fullbench
-	./fullbench --no-prompt $(TEST_FILES)
+	./fullbench --no-prompt $(NB_LOOPS) $(TEST_FILES)
 
 test-fullbench32: fullbench32
-	./fullbench32 --no-prompt $(TEST_FILES)
+	./fullbench32 --no-prompt $(NB_LOOPS) $(TEST_FILES)
 
 test-fuzzer: fuzzer
 	./fuzzer $(FUZZER_TIME)

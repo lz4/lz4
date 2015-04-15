@@ -50,20 +50,16 @@ extern "C" {
         ITEM(OK_NoError) ITEM(ERROR_GENERIC) \
         ITEM(ERROR_maxBlockSize_invalid) ITEM(ERROR_blockMode_invalid) ITEM(ERROR_contentChecksumFlag_invalid) \
         ITEM(ERROR_compressionLevel_invalid) \
+        ITEM(ERROR_headerVersion_wrong) ITEM(ERROR_blockChecksum_unsupported) ITEM(ERROR_reservedFlag_set) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
-        ITEM(ERROR_frameSize_wrong) \
-        ITEM(ERROR_frameType_unknown) \
-        ITEM(ERROR_wrongSrcPtr) \
+        ITEM(ERROR_frameType_unknown) ITEM(ERROR_frameSize_wrong) \
+        ITEM(ERROR_srcPtr_wrong) \
         ITEM(ERROR_decompressionFailed) \
-        ITEM(ERROR_checksum_invalid) \
-        ITEM(ERROR_version_wrong) \
-        ITEM(ERROR_unsupported_checksum) \
-        ITEM(ERROR_reserved_flag_set) \
-        ITEM(ERROR_unsupported_block_size) \
-        ITEM(ERROR_header_checksum_invalid) \
+        ITEM(ERROR_headerChecksum_invalid) ITEM(ERROR_contentChecksum_invalid) \
         ITEM(ERROR_maxCode)
 
+//#define LZ4F_DISABLE_OLD_ENUMS
 #ifndef LZ4F_DISABLE_OLD_ENUMS
 #define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM, ENUM = LZ4F_##ENUM,
 #else

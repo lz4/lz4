@@ -177,12 +177,12 @@ independently, and the resulting name of the compressed file will be
  block dependency (improve compression ratio)
 .TP
 .B \--[no-]frame-crc
- disable stream checksum (default:enabled)
+ select frame checksum (default:enabled)
 .TP
 .B \--[no-]content-size
- compressed file includes original size (default:not present)
+ header includes original size (default:not present)
  Note : this option can only be activated when the original size can be determined,
-hence for a file. It won't work with unknown source size, such as stdin pipe.
+hence for a file. It won't work with unknown source size, such as stdin or pipe.
 .TP
 .B \--[no-]sparse 
  enable sparse file (default:disabled)(experimental)

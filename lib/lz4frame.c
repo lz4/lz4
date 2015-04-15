@@ -478,7 +478,7 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
 {
     LZ4F_preferences_t prefsNull;
     memset(&prefsNull, 0, sizeof(prefsNull));
-    prefsNull.frameInfo.contentChecksumFlag = contentChecksumEnabled;   /* worst case */
+    prefsNull.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;   /* worst case */
     {
         const LZ4F_preferences_t* prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
         LZ4F_blockSizeID_t bid = prefsPtr->frameInfo.blockSizeID;
@@ -862,16 +862,16 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVo
     blockSizeID = (BD>>4) & _3BITS;
 
     /* validate */
-    if (version != 1) return (size_t)-ERROR_version_wrong;           /* Version Number, only supported value */
-    if (blockChecksumFlag != 0) return (size_t)-ERROR_unsupported_checksum; /* Only supported value for the time being */
-    if (((FLG>>0)&_2BITS) != 0) return (size_t)-ERROR_reserved_flag_set; /* Reserved bits */
-    if (((BD>>7)&_1BIT) != 0) return (size_t)-ERROR_reserved_flag_set;   /* Reserved bit */
-    if (blockSizeID < 4) return (size_t)-ERROR_unsupported_block_size;        /* 4-7 only supported values for the time being */
-    if (((BD>>0)&_4BITS) != 0) return (size_t)-ERROR_reserved_flag_set;  /* Reserved bits */
+    if (version != 1) return (size_t)-LZ4F_ERROR_headerVersion_wrong;        /* Version Number, only supported value */
+    if (blockChecksumFlag != 0) return (size_t)-LZ4F_ERROR_blockChecksum_unsupported; /* Not supported for the time being */
+    if (((FLG>>0)&_2BITS) != 0) return (size_t)-LZ4F_ERROR_reservedFlag_set; /* Reserved bits */
+    if (((BD>>7)&_1BIT) != 0) return (size_t)-LZ4F_ERROR_reservedFlag_set;   /* Reserved bit */
+    if (blockSizeID < 4) return (size_t)-LZ4F_ERROR_maxBlockSize_invalid;    /* 4-7 only supported values for the time being */
+    if (((BD>>0)&_4BITS) != 0) return (size_t)-LZ4F_ERROR_reservedFlag_set;  /* Reserved bits */
 
     /* check */
     HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
-    if (HC != srcPtr[frameHeaderSize-1]) return (size_t)-ERROR_header_checksum_invalid;   /* Bad header checksum error */
+    if (HC != srcPtr[frameHeaderSize-1]) return (size_t)-LZ4F_ERROR_headerChecksum_invalid;   /* Bad header checksum error */
 
     /* save */
     dctxPtr->frameInfo.blockMode = (LZ4F_blockMode_t)blockMode;
@@ -1058,7 +1058,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
     /* expect to continue decoding src buffer where it left previously */
     if (dctxPtr->srcExpect != NULL)
     {
-        if (srcStart != dctxPtr->srcExpect) return (size_t)-LZ4F_ERROR_wrongSrcPtr;
+        if (srcStart != dctxPtr->srcExpect) return (size_t)-LZ4F_ERROR_srcPtr_wrong;
     }
 
     /* programmed as a state machine */
@@ -1360,7 +1360,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
             {
                 U32 readCRC = LZ4F_readLE32(selectedIn);
                 U32 resultCRC = XXH32_digest(&(dctxPtr->xxh));
-                if (readCRC != resultCRC) return (size_t)-LZ4F_ERROR_checksum_invalid;
+                if (readCRC != resultCRC) return (size_t)-LZ4F_ERROR_contentChecksum_invalid;
                 nextSrcSizeHint = 0;
                 dctxPtr->dStage = dstage_getHeader;
                 doAnotherStage = 0;
