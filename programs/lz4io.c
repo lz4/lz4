@@ -465,9 +465,9 @@ static int LZ4IO_compressJob(cRess_t ress, const char* srcFileName, const char* 
     /* Set compression parameters */
     prefs.autoFlush = 1;
     prefs.compressionLevel = compressionLevel;
-    prefs.frameInfo.blockMode = (blockMode_t)g_blockIndependence;
-    prefs.frameInfo.blockSizeID = (blockSizeID_t)g_blockSizeId;
-    prefs.frameInfo.contentChecksumFlag = (contentChecksum_t)g_streamChecksum;
+    prefs.frameInfo.blockMode = (LZ4F_blockMode_t)g_blockIndependence;
+    prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
+    prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
     if (g_contentSizeFlag)
     {
       unsigned long long fileSize = LZ4IO_GetFileSize(srcFileName);

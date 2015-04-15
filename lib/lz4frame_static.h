@@ -64,7 +64,11 @@ extern "C" {
         ITEM(ERROR_header_checksum_invalid) \
         ITEM(ERROR_maxCode)
 
-#define LZ4F_GENERATE_ENUM(ENUM) ENUM,
+#ifndef LZ4F_DISABLE_OLD_ENUMS
+#define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM, ENUM = LZ4F_##ENUM,
+#else
+#define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
+#endif
 typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to handle specific errors; compare function result to -enum value */
 
 
