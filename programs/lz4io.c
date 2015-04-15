@@ -159,7 +159,7 @@ static const int maxBlockSizeID = 7;
 #define EXTENDED_ARGUMENTS
 #define EXTENDED_HELP
 #define EXTENDED_FORMAT
-#define DEFAULT_DECOMPRESSOR LZ4IO_decompressFile
+#define DEFAULT_DECOMPRESSOR LZ4IO_decompressLZ4F
 
 
 /* ************************************************** */
@@ -751,16 +751,44 @@ static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput)
 
 
 typedef struct {
-    FILE*  sFile;
-    FILE*  dFile;
     void*  srcBuffer;
     size_t srcBufferSize;
     void*  dstBuffer;
     size_t dstBufferSize;
     LZ4F_decompressionContext_t dCtx;
-} decompressionJob_t;
+} dRess_t;
 
-static unsigned long long LZ4IO_decompressJob(decompressionJob_t ress)
+static const size_t LZ4IO_dBufferSize = 64 KB;
+
+static dRess_t LZ4IO_createDResources(void)
+{
+    dRess_t ress;
+    LZ4F_errorCode_t errorCode;
+
+    /* init */
+    errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
+    if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+
+    /* Allocate Memory */
+    ress.srcBufferSize = LZ4IO_dBufferSize;
+    ress.srcBuffer = malloc(ress.srcBufferSize);
+    ress.dstBufferSize = LZ4IO_dBufferSize;
+    ress.dstBuffer = malloc(ress.dstBufferSize);
+    if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(61, "Allocation error : not enough memory");
+
+    return ress;
+}
+
+static void LZ4IO_freeDResources(dRess_t ress)
+{
+    LZ4F_errorCode_t errorCode = LZ4F_freeDecompressionContext(ress.dCtx);
+    if (LZ4F_isError(errorCode)) EXM_THROW(69, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
+    free(ress.srcBuffer);
+    free(ress.dstBuffer);
+}
+
+
+static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE* dstFile)
 {
     unsigned long long filesize = 0;
     LZ4F_errorCode_t errorCode;
@@ -782,7 +810,7 @@ static unsigned long long LZ4IO_decompressJob(decompressionJob_t ress)
         size_t pos = 0;
 
         /* Read input */
-        readSize = fread(ress.srcBuffer, 1, ress.srcBufferSize, ress.sFile);
+        readSize = fread(ress.srcBuffer, 1, ress.srcBufferSize, srcFile);
         if (!readSize) break;   /* empty file or stream */
 
         while (pos < readSize)
@@ -799,69 +827,26 @@ static unsigned long long LZ4IO_decompressJob(decompressionJob_t ress)
                 /* Write Block */
                 filesize += decodedBytes;
                 DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
-                storedSkips = LZ4IO_fwriteSparse(ress.dFile, ress.dstBuffer, decodedBytes, storedSkips);
+                storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, storedSkips);
             }
         }
     }
 
-    LZ4IO_fwriteSparseEnd(ress.dFile, storedSkips);
+    LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
     return filesize;
 }
 
 
-static const size_t LZ4IO_dBufferSize = 64 KB;
-
-static unsigned long long LZ4IO_decompressFile(FILE* finput, FILE* foutput)
-{
-    unsigned long long filesize = 0;
-    void* inBuff;
-    void* outBuff;
-    const size_t inBuffSize = LZ4IO_dBufferSize;
-    const size_t outBuffSize = LZ4IO_dBufferSize;
-    LZ4F_decompressionContext_t dCtx;
-    LZ4F_errorCode_t errorCode;
-    decompressionJob_t ress;
-
-    /* init */
-    errorCode = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
-    if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create context : %s", LZ4F_getErrorName(errorCode));
-
-    /* Allocate Memory */
-    inBuff = malloc(inBuffSize);
-    outBuff = malloc(outBuffSize);
-    if (!inBuff || !outBuff) EXM_THROW(61, "Allocation error : not enough memory");
-
-    /* Decompression Job */
-    ress.dCtx = dCtx;
-    ress.dFile = foutput;
-    ress.dstBuffer = outBuff;
-    ress.dstBufferSize = outBuffSize;
-    ress.sFile = finput;
-    ress.srcBuffer = inBuff;
-    ress.srcBufferSize = inBuffSize;
-
-    filesize = LZ4IO_decompressJob(ress);
-
-    /* Free */
-    free(inBuff);
-    free(outBuff);
-    errorCode = LZ4F_freeDecompressionContext(dCtx);
-    if (LZ4F_isError(errorCode)) EXM_THROW(69, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
-
-    return filesize;
-}
-
-
-static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigned char U32store[MAGICNUMBER_SIZE])
+static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigned char MNstore[MAGICNUMBER_SIZE])
 {
     void* buffer = malloc(64 KB);
     size_t read = 1, sizeCheck;
     unsigned long long total = MAGICNUMBER_SIZE;
     unsigned storedSkips = 0;
 
-    sizeCheck = fwrite(U32store, 1, MAGICNUMBER_SIZE, foutput);
-    if (sizeCheck != MAGICNUMBER_SIZE) EXM_THROW(50, "Pass-through error at start");
+    sizeCheck = fwrite(MNstore, 1, MAGICNUMBER_SIZE, foutput);
+    if (sizeCheck != MAGICNUMBER_SIZE) EXM_THROW(50, "Pass-through write error");
 
     while (read)
     {
@@ -877,9 +862,9 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
 
 
 #define ENDOFSTREAM ((unsigned long long)-1)
-static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
+static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutput)
 {
-    unsigned char U32store[MAGICNUMBER_SIZE];
+    unsigned char MNstore[MAGICNUMBER_SIZE];
     unsigned magicNumber, size;
     int errorNb;
     size_t nbReadBytes;
@@ -896,34 +881,34 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
     }
     else
     {
-      nbReadBytes = fread(U32store, 1, MAGICNUMBER_SIZE, finput);
+      nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
       if (nbReadBytes==0) return ENDOFSTREAM;                  /* EOF */
       if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
-      magicNumber = LZ4IO_readLE32(U32store);   /* Little Endian format */
+      magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
     }
     if (LZ4IO_isSkippableMagicNumber(magicNumber)) magicNumber = LZ4IO_SKIPPABLE0;  /* fold skippable magic numbers */
 
     switch(magicNumber)
     {
     case LZ4IO_MAGICNUMBER:
-        return DEFAULT_DECOMPRESSOR(finput, foutput);
+        return LZ4IO_decompressLZ4F(ress, finput, foutput);
     case LEGACY_MAGICNUMBER:
         DISPLAYLEVEL(4, "Detected : Legacy format \n");
         return LZ4IO_decodeLegacyStream(finput, foutput);
     case LZ4IO_SKIPPABLE0:
         DISPLAYLEVEL(4, "Skipping detected skippable area \n");
-        nbReadBytes = fread(U32store, 1, 4, finput);
+        nbReadBytes = fread(MNstore, 1, 4, finput);
         if (nbReadBytes != 4) EXM_THROW(42, "Stream error : skippable size unreadable");
-        size = LZ4IO_readLE32(U32store);     /* Little Endian format */
+        size = LZ4IO_readLE32(MNstore);     /* Little Endian format */
         errorNb = fseek(finput, size, SEEK_CUR);
         if (errorNb != 0) EXM_THROW(43, "Stream error : cannot skip skippable area");
-        return selectDecoder(finput, foutput);
+        return selectDecoder(ress, finput, foutput);
     EXTENDED_FORMAT;
     default:
         if (nbCalls == 1)   /* just started */
         {
             if (g_overwrite)
-                return LZ4IO_passThrough(finput, foutput, U32store);
+                return LZ4IO_passThrough(finput, foutput, MNstore);
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
         }
         DISPLAYLEVEL(2, "Stream followed by unrecognized data\n");
@@ -932,18 +917,16 @@ static unsigned long long selectDecoder( FILE* finput,  FILE* foutput)
 }
 
 
-int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename)
+static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename, const char* output_filename)
 {
     unsigned long long filesize = 0, decodedSize=0;
     FILE* finput;
     FILE* foutput;
-    clock_t start, end;
 
 
     /* Init */
-    start = clock();
     if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
-        EXM_THROW(50, "File error");
+        return 1;
 
     /* sparse file */
     if (g_sparseFileSupport) { SET_SPARSE_FILE_MODE(foutput); }
@@ -951,67 +934,77 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     /* Loop over multiple streams */
     do
     {
-        decodedSize = selectDecoder(finput, foutput);
+        decodedSize = selectDecoder(ress, finput, foutput);
         if (decodedSize != ENDOFSTREAM)
             filesize += decodedSize;
     } while (decodedSize != ENDOFSTREAM);
 
     /* Final Status */
-    end = clock();
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
-    if (end==start) end=start+1;
-    {
-        double seconds = (double)(end - start)/CLOCKS_PER_SEC;
-        DISPLAYLEVEL(4, "Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
-    }
 
     /* Close */
     fclose(finput);
     fclose(foutput);
 
-    /*  Error status = OK */
     return 0;
+}
+
+
+int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename)
+{
+    dRess_t ress;
+    clock_t start, end;
+    int missingFiles = 0;
+
+    start = clock();
+
+    ress = LZ4IO_createDResources();
+    missingFiles += LZ4IO_decompressFile_extRess(ress, input_filename, output_filename);
+    LZ4IO_freeDResources(ress);
+
+    end = clock();
+    if (end==start) end=start+1;
+    {
+        double seconds = (double)(end - start)/CLOCKS_PER_SEC;
+        DISPLAYLEVEL(4, "Done in %.2f sec  \n", seconds);
+    }
+
+    return missingFiles;
 }
 
 
 int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix)
 {
     int i;
-    int skipped_files = 0;
-    int missing_files = 0;
+    int skippedFiles = 0;
+    int missingFiles = 0;
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
     char* ifnSuffix = (char*)malloc(suffixSize + 1);
+    dRess_t ress;
+
+    ress = LZ4IO_createDResources();
 
     for (i=0; i<ifntSize; i++)
     {
-        size_t ifnSize;
-        FILE* ifp = fopen(inFileNamesTable[i], "r");
-        if (ifp == NULL)
-        {
-            DISPLAYLEVEL(2, "Unable to access file for processing: %s\n", inFileNamesTable[i]);
-            missing_files++;
-            continue;
-        }
-        fclose(ifp);
-        ifnSize = strlen(inFileNamesTable[i]);
+        size_t ifnSize = strlen(inFileNamesTable[i]);
         strcpy(ifnSuffix, inFileNamesTable[i] + ifnSize - suffixSize);
         if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
         if (ifnSize <= suffixSize  ||  strcmp(ifnSuffix, suffix) != 0)
         {
             DISPLAYLEVEL(2, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
-            skipped_files++;
+            skippedFiles++;
             continue;
         }
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
-        LZ4IO_decompressFilename(inFileNamesTable[i], outFileName);
+
+        missingFiles += LZ4IO_decompressFile_extRess(ress, inFileNamesTable[i], outFileName);
     }
+
+    LZ4IO_freeDResources(ress);
     free(outFileName);
-    free(ifnSuffix);
-    if (skipped_files > 0) return 1;
-    if (missing_files > 0) return 1;
-    return 0;
+    return missingFiles + skippedFiles;
 }

@@ -191,7 +191,19 @@ test-lz4-frame-concatenation: lz4 datagen
 	@rm *.test
 	@echo frame concatenation test completed
 
-test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
+test-lz4-multiple: lz4 datagen
+	@echo ---- test multiple files ----
+	@./datagen -s1        > tmp1
+	@./datagen -s2 -g100K > tmp2
+	@./datagen -s3 -g1M   > tmp3
+	./lz4 -f -m tmp*
+	ls -ls tmp*
+	rm tmp1 tmp2 tmp3
+	./lz4 -df -m *.lz4
+	ls -ls tmp*
+	@rm tmp*
+
+test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
 	@echo ---- test lz4 basic compression/decompression ----
 	./datagen -g0     | ./lz4 -v     | ./lz4 -t
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
@@ -202,13 +214,6 @@ test-lz4: lz4 datagen test-lz4-sparse test-lz4-contentSize test-lz4-frame-concat
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
 	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
-	@echo ---- test multiple input files ----
-	@./datagen -s1 > file1
-	@./datagen -s2 > file2
-	@./datagen -s3 > file3
-	./lz4 -f -m file1 file2 file3
-	ls -l file*
-	@rm file1 file2 file3 file1.lz4 file2.lz4 file3.lz4
 	@echo ---- test pass-through ----
 	./datagen | ./lz4 -tf
 
