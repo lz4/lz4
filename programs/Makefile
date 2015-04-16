@@ -193,9 +193,9 @@ test-lz4-frame-concatenation: lz4 datagen
 
 test-lz4-multiple: lz4 datagen
 	@echo ---- test multiple files ----
-	@./datagen -s1        > tmp1
-	@./datagen -s2 -g100K > tmp2
-	@./datagen -s3 -g1M   > tmp3
+	@./datagen -s1        > tmp1 2> $(VOID)
+	@./datagen -s2 -g100K > tmp2 2> $(VOID)
+	@./datagen -s3 -g1M   > tmp3 2> $(VOID)
 	./lz4 -f -m tmp*
 	ls -ls tmp*
 	rm tmp1 tmp2 tmp3
