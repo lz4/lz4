@@ -289,12 +289,12 @@ static int LZ4IO_getFiles(const char* input_filename, const char* output_filenam
             fclose(*pfoutput);
             if (!g_overwrite)
             {
-                char ch = 'Y';
+                int ch = 'Y';
                 DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
                 if ((g_displayLevel <= 1) || (*pfinput == stdin))
                     EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   /* No interaction possible */
                 DISPLAYLEVEL(2, "Overwrite ? (Y/n) : ");
-                while((ch = (char)getchar()) != '\n' && ch != EOF)   /* flush integrated */
+                while((ch = getchar()) != '\n' && ch != EOF)   /* flush integrated */
                 if ((ch!='Y') && (ch!='y')) EXM_THROW(12, "No. Operation aborted : %s already exists", output_filename);
             }
         }

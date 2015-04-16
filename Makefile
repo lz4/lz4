@@ -110,8 +110,8 @@ staticAnalyze: clean
 	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g
 
 armtest: clean
-	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror"
-	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror"
+	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
+	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 
 streaming-examples:
 	cd examples; $(MAKE) -e test
