@@ -1021,5 +1021,6 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 
     LZ4IO_freeDResources(ress);
     free(outFileName);
+    free(ifnSuffix);
     return missingFiles + skippedFiles;
 }
