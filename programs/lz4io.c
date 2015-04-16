@@ -487,7 +487,8 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
         size_t cSize = LZ4F_compressFrame(dstBuffer, dstBufferSize, srcBuffer, readSize, &prefs);
         if (LZ4F_isError(cSize)) EXM_THROW(34, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize += cSize;
-        DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ", (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
+                      (unsigned)(filesize>>20), (double)compressedfilesize/(filesize+!filesize)*100);   /* avoid division by zero */
 
         /* Write Block */
         sizeCheck = fwrite(dstBuffer, 1, cSize, dstFile);
