@@ -49,6 +49,14 @@ extern "C" {
 **************************************/
 #include <stddef.h>   /* size_t */
 
+#ifndef LZ4F_OBSOLETE_ENUM
+#  ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
+#    define LZ4F_OBSOLETE_ENUM(x) ,x
+#  else
+#    define LZ4F_OBSOLETE_ENUM(x)
+#  endif
+#endif
+
 
 /**************************************
  * Error management
@@ -62,25 +70,43 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code str
 /**************************************
  * Frame compression types
  * ************************************/
-typedef enum { LZ4F_default=0, LZ4F_max64KB=4, LZ4F_max256KB=5, LZ4F_max1MB=6, LZ4F_max4MB=7 } LZ4F_blockSizeID_t;
-typedef enum { LZ4F_blockLinked=0, LZ4F_blockIndependent} LZ4F_blockMode_t;
-typedef enum { LZ4F_noContentChecksum=0, LZ4F_contentChecksumEnabled } LZ4F_contentChecksum_t;
-typedef enum { LZ4F_frame=0, LZ4F_skippableFrame } LZ4F_frameType_t;
+typedef enum {
+    LZ4F_default=0,
+    LZ4F_max64KB=4,
+    LZ4F_max256KB=5,
+    LZ4F_max1MB=6,
+    LZ4F_max4MB=7
+    LZ4F_OBSOLETE_ENUM(max64KB = LZ4F_max64KB)
+    LZ4F_OBSOLETE_ENUM(max256KB = LZ4F_max256KB)
+    LZ4F_OBSOLETE_ENUM(max1MB = LZ4F_max1MB)
+    LZ4F_OBSOLETE_ENUM(max4MB = LZ4F_max4MB)
+} LZ4F_blockSizeID_t;
 
-#ifndef LZ4F_DISABLE_OLD_ENUMS
-#  define max64KB                LZ4F_max64KB
-#  define max256KB               LZ4F_max256KB
-#  define max1MB                 LZ4F_max1MB
-#  define max4MB                 LZ4F_max4MB
-#  define blockSizeID_t          LZ4F_blockSizeID_t
-#  define blockLinked            LZ4F_blockLinked
-#  define blockIndependent       LZ4F_blockIndependent
-#  define blockMode_t            LZ4F_blockMode_t
-#  define noContentChecksum      LZ4F_noContentChecksum
-#  define contentChecksumEnabled LZ4F_contentChecksumEnabled
-#  define contentChecksum_t      LZ4F_contentChecksum_t
-#  define skippableFrame         LZ4F_skippableFrame
-#  define frameType_t            LZ4F_frameType_t
+typedef enum {
+    LZ4F_blockLinked=0,
+    LZ4F_blockIndependent
+    LZ4F_OBSOLETE_ENUM(blockLinked = LZ4F_blockLinked)
+    LZ4F_OBSOLETE_ENUM(blockIndependent = LZ4F_blockIndependent)
+} LZ4F_blockMode_t;
+
+typedef enum {
+    LZ4F_noContentChecksum=0,
+    LZ4F_contentChecksumEnabled
+    LZ4F_OBSOLETE_ENUM(noContentChecksum = LZ4F_noContentChecksum)
+    LZ4F_OBSOLETE_ENUM(contentChecksumEnabled = LZ4F_contentChecksumEnabled)
+} LZ4F_contentChecksum_t;
+
+typedef enum {
+    LZ4F_frame=0,
+    LZ4F_skippableFrame
+    LZ4F_OBSOLETE_ENUM(skippableFrame = LZ4F_skippableFrame)
+} LZ4F_frameType_t;
+
+#ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
+typedef LZ4F_blockSizeID_t blockSizeID_t;
+typedef LZ4F_blockMode_t blockMode_t;
+typedef LZ4F_frameType_t frameType_t;
+typedef LZ4F_contentChecksum_t contentChecksum_t;
 #endif
 
 typedef struct {
