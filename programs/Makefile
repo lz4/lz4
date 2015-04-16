@@ -201,6 +201,7 @@ test-lz4-multiple: lz4 datagen
 	rm tmp1 tmp2 tmp3
 	./lz4 -df -m *.lz4
 	ls -ls tmp*
+	./lz4 -f -m tmp1 notHere tmp2; echo $$?
 	@rm tmp*
 
 test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
