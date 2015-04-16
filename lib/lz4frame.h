@@ -49,14 +49,6 @@ extern "C" {
 **************************************/
 #include <stddef.h>   /* size_t */
 
-#ifndef LZ4F_OBSOLETE_ENUM
-#  ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
-#    define LZ4F_OBSOLETE_ENUM(x) ,x
-#  else
-#    define LZ4F_OBSOLETE_ENUM(x)
-#  endif
-#endif
-
 
 /**************************************
  * Error management
@@ -70,6 +62,13 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code str
 /**************************************
  * Frame compression types
  * ************************************/
+//#define LZ4F_DISABLE_OBSOLETE_ENUMS
+#ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
+#  define LZ4F_OBSOLETE_ENUM(x) ,x
+#else
+#  define LZ4F_OBSOLETE_ENUM(x)
+#endif
+
 typedef enum {
     LZ4F_default=0,
     LZ4F_max64KB=4,
@@ -110,12 +109,12 @@ typedef LZ4F_contentChecksum_t contentChecksum_t;
 #endif
 
 typedef struct {
-  LZ4F_blockSizeID_t      blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
-  LZ4F_blockMode_t        blockMode;             /* blockLinked, blockIndependent ; 0 == default */
-  LZ4F_contentChecksum_t  contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  LZ4F_frameType_t        frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
-  unsigned long long contentSize;           /* Size of uncompressed (original) content ; 0 == unknown */
-  unsigned           reserved[2];           /* must be zero for forward compatibility */
+  LZ4F_blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
+  LZ4F_blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
+  LZ4F_contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
+  LZ4F_frameType_t       frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
+  unsigned long long     contentSize;           /* Size of uncompressed (original) content ; 0 == unknown */
+  unsigned               reserved[2];           /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
 typedef struct {
@@ -185,7 +184,7 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* prefsPtr);
  * Provides the minimum size of Dst buffer given srcSize to handle worst case situations.
  * Different preferences can produce different results.
  * prefsPtr is optional : you can provide NULL as argument, all preferences will then be set to cover worst case.
- * This function includes frame termination cost (4 bytes, or 8 is frame checksum is enabled)
+ * This function includes frame termination cost (4 bytes, or 8 if frame checksum is enabled)
  */
 
 size_t LZ4F_compressUpdate(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* cOptPtr);
@@ -219,7 +218,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t 
  * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * A successful call to LZ4F_compressEnd() makes cctx available again for future compression task.
+ * A successful call to LZ4F_compressEnd() makes cctx available again for next compression task.
  */
 
 
