@@ -269,7 +269,7 @@ static int LZ4IO_getFiles(const char* input_filename, const char* output_filenam
 
     if ( *pfinput==0 )
     {
-        DISPLAYLEVEL(2, "Unable to access file for processing: %s\n", input_filename);
+        DISPLAYLEVEL(1, "Unable to access file for processing: %s\n", input_filename);
         return 1;
     }
 
@@ -1010,7 +1010,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
         if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
         if (ifnSize <= suffixSize  ||  strcmp(ifnSuffix, suffix) != 0)
         {
-            DISPLAYLEVEL(2, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
+            DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
             continue;
         }
