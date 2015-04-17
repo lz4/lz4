@@ -131,7 +131,7 @@ static int g_blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
 static int g_blockChecksum = 0;
 static int g_streamChecksum = 1;
 static int g_blockIndependence = 1;
-static int g_sparseFileSupport = 0;
+static int g_sparseFileSupport = 1;
 static int g_contentSizeFlag = 0;
 
 static const int minBlockSizeID = 4;
