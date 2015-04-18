@@ -151,15 +151,18 @@ test-travis: $(TRAVIS_TARGET)
 
 test-lz4-sparse: lz4 datagen
 	@echo ---- test sparse file support ----
-	./datagen -g50M -P100 | ./lz4 -B4D | ./lz4 -dv --sparse > tmpB4
-	./datagen -g50M -P100 | ./lz4 -B5D | ./lz4 -dv --sparse > tmpB5
-	./datagen -g50M -P100 | ./lz4 -B6D | ./lz4 -dv --sparse > tmpB6
-	./datagen -g50M -P100 | ./lz4 -B7D | ./lz4 -dv --sparse > tmpB7
+	./datagen -g5M  -P100 > tmpSrc
+	./lz4 -B4D tmpSrc | ./lz4 -dv --sparse > tmpB4
+	diff -s tmpSrc tmpB4
+	./lz4 -B5D tmpSrc | ./lz4 -dv --sparse > tmpB5
+	diff -s tmpSrc tmpB5
+	./lz4 -B6D tmpSrc | ./lz4 -dv --sparse > tmpB6
+	diff -s tmpSrc tmpB6
+	./lz4 -B7D tmpSrc | ./lz4 -dv --sparse > tmpB7
+	diff -s tmpSrc tmpB7
+	./lz4 tmpSrc | ./lz4 -dv --no-sparse > tmpNoSparse
+	diff -s tmpSrc tmpNoSparse
 	ls -ls tmp*
-	./datagen -g50M -P100 | diff -s - tmpB4
-	./datagen -g50M -P100 | diff -s - tmpB5
-	./datagen -g50M -P100 | diff -s - tmpB6
-	./datagen -g50M -P100 | diff -s - tmpB7
 	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
