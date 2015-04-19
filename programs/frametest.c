@@ -277,6 +277,37 @@ int basicTests(U32 seed, double compressibility)
         if (crcDest != crcOrig) goto _output_error;
         DISPLAYLEVEL(3, "Regenerated %i bytes \n", (int)decodedBufferSize);
 
+        DISPLAYLEVEL(4, "Reusing decompression context \n");
+        {
+            size_t oSize = 0;
+            size_t iSize = 0;
+            LZ4F_frameInfo_t fi;
+
+            DISPLAYLEVEL(3, "Start by feeding 0 bytes, to get next input size : ");
+            errorCode = LZ4F_decompress(dCtx, NULL, &oSize, ip, &iSize, NULL);
+            if (LZ4F_isError(errorCode)) goto _output_error;
+            DISPLAYLEVEL(3, " %u  \n", (unsigned)errorCode);
+
+            DISPLAYLEVEL(3, "get FrameInfo on null input : ");
+            errorCode = LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize);
+            if (errorCode != (size_t)-LZ4F_ERROR_frameHeader_incomplete) goto _output_error;
+            DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(errorCode));
+
+            DISPLAYLEVEL(3, "get FrameInfo on not enough input : ");
+            iSize = 6;
+            errorCode = LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize);
+            if (errorCode != (size_t)-LZ4F_ERROR_frameHeader_incomplete) goto _output_error;
+            DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(errorCode));
+            ip += iSize;
+
+            DISPLAYLEVEL(3, "get FrameInfo on enough input : ");
+            iSize = 15 - iSize;
+            errorCode = LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize);
+            if (LZ4F_isError(errorCode)) goto _output_error;
+            DISPLAYLEVEL(3, " correctly decoded \n");
+            ip += iSize;
+        }
+
         DISPLAYLEVEL(3, "Byte after byte : \n");
         while (ip < iend)
         {

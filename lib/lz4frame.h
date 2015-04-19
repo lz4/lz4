@@ -33,7 +33,7 @@
 */
 
 /* LZ4F is a stand-alone API to create LZ4-compressed frames
- * fully conformant to specification v1.4.1.
+ * fully conformant to specification v1.5.1.
  * All related operations, including memory management, are handled by the library.
  * You don't need lz4.h when using lz4frame.h.
  * */
@@ -254,18 +254,16 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dctx,
                          LZ4F_frameInfo_t* frameInfoPtr,
                          const void* srcBuffer, size_t* srcSizePtr);
 /* LZ4F_getFrameInfo()
- * This function decodes frame header information, such as blockSize.
- * It is optional : you could start by calling directly LZ4F_decompress() instead.
- * The objective is to extract header information without starting decompression, typically for allocation purposes.
- * The function will work only if srcBuffer points at the beginning of the frame,
- * and *srcSizePtr is large enough to decode the whole header (typically, between 7 & 15 bytes).
- * The result is copied into an LZ4F_frameInfo_t structure, which is pointed by frameInfoPtr, and must be already allocated.
- * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
+ * This function decodes frame header information (such as max blockSize, frame checksum, etc.).
+ * Its usage is optional : you can start by calling directly LZ4F_decompress() instead.
+ * The objective is to extract frame header information, typically for allocation purposes.
+ * LZ4F_getFrameInfo() can also be used anytime *after* starting decompression, on any valid LZ4F_decompressionContext_t.
+ * The result is *copied* into an existing LZ4F_frameInfo_t structure which must be already allocated.
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- * It is basically the frame header size.
- * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
  * The function result is an hint of how many srcSize bytes LZ4F_decompress() expects for next call,
- *                        or an error code which can be tested using LZ4F_isError().
+ *                        or an error code which can be tested using LZ4F_isError()
+ *                        (typically, when there is not enough src bytes to fully decode the frame header)
+ * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
  */
 
 size_t LZ4F_decompress(LZ4F_decompressionContext_t dctx,
