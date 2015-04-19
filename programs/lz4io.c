@@ -829,13 +829,14 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
         readSize = fread(ress.srcBuffer, 1, ress.srcBufferSize, srcFile);
         if (!readSize) break;   /* empty file or stream */
 
-        while (pos < readSize)
+        while (1)
         {
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
             size_t decodedBytes = ress.dstBufferSize;
             errorCode = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
             if (LZ4F_isError(errorCode)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(errorCode));
+            if (decodedBytes == 0 && remaining == 0) break;
             pos += remaining;
 
             if (decodedBytes)
