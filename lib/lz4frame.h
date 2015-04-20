@@ -245,6 +245,8 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t dctx)
  * The function will provide a pointer to a fully allocated and initialized LZ4F_decompressionContext_t object.
  * The result is an errorCode, which can be tested using LZ4F_isError().
  * dctx memory can be released using LZ4F_freeDecompressionContext();
+ * The result of LZ4F_freeDecompressionContext() is indicative of the current state of decompressionContext when being released.
+ * That is, it should be == 0 if decompression has been completed fully and correctly.
  */
 
 

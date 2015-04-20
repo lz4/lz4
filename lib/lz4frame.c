@@ -772,14 +772,16 @@ LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* LZ
 
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t LZ4F_decompressionContext)
 {
+    LZ4F_errorCode_t result = LZ4F_OK_NoError;
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)LZ4F_decompressionContext;
     if (dctxPtr != NULL)   /* can accept NULL input, like free() */
     {
+      result = (LZ4F_errorCode_t)dctxPtr->dStage;
       FREEMEM(dctxPtr->tmpIn);
       FREEMEM(dctxPtr->tmpOutBuffer);
       FREEMEM(dctxPtr);
     }
-    return LZ4F_OK_NoError;
+    return result;
 }
 
 
