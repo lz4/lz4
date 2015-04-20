@@ -207,13 +207,7 @@ test-lz4-multiple: lz4 datagen
 	./lz4 -f -m tmp1 notHere tmp2; echo $$?
 	@rm tmp*
 
-# test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
-test-lz4: lz4 datagen 
-	@echo ---- test erroneous data ----
-	./datagen -s1     | ./lz4 -vf - tmp
-	tmpSize= $(stat -c%s "tmp")
-	echo "Size of tmp = $tmpSize bytes."
-	rm tmp*
+test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
 	@echo ---- test lz4 basic compression/decompression ----
 	./datagen -g0     | ./lz4 -v     | ./lz4 -t
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
