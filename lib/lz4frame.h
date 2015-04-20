@@ -119,9 +119,9 @@ typedef struct {
 
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
-  unsigned         compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16 */
-  unsigned         autoFlush;              /* 1 == always flush (reduce need for tmp buffer) */
-  unsigned         reserved[4];            /* must be zero for forward compatibility */
+  int      compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16; values below 0 count as 0 */
+  unsigned autoFlush;              /* 1 == always flush (reduce need for tmp buffer) */
+  unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
 

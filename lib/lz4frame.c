@@ -105,7 +105,7 @@ typedef unsigned long long  U64;
 static const size_t minFHSize = 7;
 static const size_t maxFHSize = 15;
 static const size_t BHSize = 4;
-static const U32 minHClevel = 3;
+static const int    minHClevel = 3;
 
 /**************************************
 *  Structures and local types
@@ -306,7 +306,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     if (prefs.frameInfo.contentSize != 0)
         prefs.frameInfo.contentSize = (U64)srcSize;   /* auto-correct content size if selected (!=0) */
 
-    if (prefs.compressionLevel < minHClevel)
+    if (prefs.compressionLevel < (int)minHClevel)
     {
         cctxI.lz4CtxPtr = &lz4ctx;
         cctxI.lz4CtxLevel = 1;
@@ -334,7 +334,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;
 
-    if (prefs.compressionLevel >= minHClevel)   /* no allocation necessary with lz4 fast */
+    if (prefs.compressionLevel >= (int)minHClevel)   /* no allocation necessary with lz4 fast */
         FREEMEM(cctxI.lz4CtxPtr);
 
     return (dstPtr - dstStart);
@@ -407,11 +407,11 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 
     /* ctx Management */
     {
-        U32 tableID = cctxPtr->prefs.compressionLevel<minHClevel ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
+        U32 tableID = (cctxPtr->prefs.compressionLevel < minHClevel) ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
         if (cctxPtr->lz4CtxLevel < tableID)
         {
             FREEMEM(cctxPtr->lz4CtxPtr);
-            if (cctxPtr->prefs.compressionLevel<minHClevel)
+            if (cctxPtr->prefs.compressionLevel < minHClevel)
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStream();
             else
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStreamHC();
@@ -531,7 +531,7 @@ static int LZ4F_localLZ4_compressHC_limitedOutput_continue(void* ctx, const char
     return LZ4_compressHC_limitedOutput_continue((LZ4_streamHC_t*)ctx, src, dst, srcSize, dstSize);
 }
 
-static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, U32 level)
+static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int level)
 {
     if (level < minHClevel)
     {
