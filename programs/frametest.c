@@ -280,13 +280,15 @@ int basicTests(U32 seed, double compressibility)
         DISPLAYLEVEL(4, "Reusing decompression context \n");
         {
             size_t iSize = compressedBufferSize - 4;
+            const BYTE* cBuff = (const BYTE*) compressedBuffer;
             DISPLAYLEVEL(3, "Missing last 4 bytes : ");
-            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &iSize, NULL);
+            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, cBuff, &iSize, NULL);
             if (LZ4F_isError(errorCode)) goto _output_error;
             if (!errorCode) goto _output_error;
             DISPLAYLEVEL(3, "indeed, request %u bytes \n", (unsigned)errorCode);
+            cBuff += iSize;
             iSize = errorCode;
-            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &iSize, NULL);
+            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, cBuff, &iSize, NULL);
             if (errorCode != 0) goto _output_error;
             crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
             if (crcDest != crcOrig) goto _output_error;
@@ -327,7 +329,6 @@ int basicTests(U32 seed, double compressibility)
         {
             size_t oSize = oend-op;
             size_t iSize = 1;
-            //DISPLAY("%7i \n", (int)(ip-(BYTE*)compressedBuffer));
             errorCode = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
             if (LZ4F_isError(errorCode)) goto _output_error;
             op += oSize;
@@ -335,7 +336,7 @@ int basicTests(U32 seed, double compressibility)
         }
         crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
         if (crcDest != crcOrig) goto _output_error;
-        DISPLAYLEVEL(3, "Regenerated %i bytes \n", (int)decodedBufferSize);
+        DISPLAYLEVEL(3, "Regenerated %u/%u bytes \n", (unsigned)(op-(BYTE*)decodedBuffer), COMPRESSIBLE_NOISE_LENGTH);
 
         errorCode = LZ4F_freeDecompressionContext(dCtx);
         if (LZ4F_isError(errorCode)) goto _output_error;
