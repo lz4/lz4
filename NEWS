@@ -1,9 +1,13 @@
 r129:
+New    : LZ4 CLI improved performance when compressing/decompressing multiple files (#86, kind contribution from Kyle J. Harper & Takayuki Matsuoka)
 Added  : LZ4_compress_fast()
-Changed: New compression functions LZ4_compress_safe() - Suggested by Evan Nemerson & Takayuki Matsuoka
+Changed: Sparse file support enabled by default
+Changed: New function names LZ4_compress_safe() - Suggested by Evan Nemerson & Takayuki Matsuoka
+Fixed  : GCC 4.9+ optimization bug - Reported by Markus Trippelsdorf, Greg Slazinski & Evan Nemerson
+Changed: Enums converted to LZ4F_ namespace convention - by Takayuki Matsuoka
 Added  : AppVeyor CI environment, for Visual tests - Suggested by Takayuki Matsuoka
-Fixed  : GCC 4.9+ optimization bug - Reported by Markus Trippelsdorf, Greg Slazinski, Evan Nemerson & Takayuki Matsuoka
 Modified:Obsolete functions generate warnings - Suggested by Evan Nemerson & Takayuki Matsuoka
+Fixed  : Bug #75 (unfinished stream), reported by Yongwoon Cho
 Updated: Documentation converted to MarkDown
 
 r128:

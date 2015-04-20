@@ -279,6 +279,20 @@ int basicTests(U32 seed, double compressibility)
 
         DISPLAYLEVEL(4, "Reusing decompression context \n");
         {
+            size_t iSize = compressedBufferSize - 4;
+            DISPLAYLEVEL(3, "Missing last 4 bytes : ");
+            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &iSize, NULL);
+            if (LZ4F_isError(errorCode)) goto _output_error;
+            if (!errorCode) goto _output_error;
+            DISPLAYLEVEL(3, "indeed, request %u bytes \n", (unsigned)errorCode);
+            iSize = errorCode;
+            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, compressedBuffer, &iSize, NULL);
+            if (errorCode != 0) goto _output_error;
+            crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
+            if (crcDest != crcOrig) goto _output_error;
+        }
+
+        {
             size_t oSize = 0;
             size_t iSize = 0;
             LZ4F_frameInfo_t fi;

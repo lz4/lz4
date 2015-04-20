@@ -807,7 +807,7 @@ static void LZ4IO_freeDResources(dRess_t ress)
 static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE* dstFile)
 {
     unsigned long long filesize = 0;
-    LZ4F_errorCode_t errorCode;
+    LZ4F_errorCode_t nextToLoad;
     unsigned storedSkips = 0;
 
     /* Init feed with magic number (already consumed from FILE*  sFile) */
@@ -815,8 +815,8 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
         size_t inSize = MAGICNUMBER_SIZE;
         size_t outSize= 0;
         LZ4IO_writeLE32(ress.srcBuffer, LZ4IO_MAGICNUMBER);
-        errorCode = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &outSize, ress.srcBuffer, &inSize, NULL);
-        if (LZ4F_isError(errorCode)) EXM_THROW(62, "Header error : %s", LZ4F_getErrorName(errorCode));
+        nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &outSize, ress.srcBuffer, &inSize, NULL);
+        if (LZ4F_isError(nextToLoad)) EXM_THROW(62, "Header error : %s", LZ4F_getErrorName(nextToLoad));
     }
 
     /* Main Loop */
@@ -824,18 +824,20 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     {
         size_t readSize;
         size_t pos = 0;
+        size_t decodedBytes = ress.dstBufferSize;
 
         /* Read input */
         readSize = fread(ress.srcBuffer, 1, ress.srcBufferSize, srcFile);
-        if (!readSize) break;   /* empty file or stream */
+        if (!readSize)
+            break;   /* empty file or stream */
 
-        while (pos < readSize)
+        while (nextToLoad && ((pos < readSize) || (decodedBytes == ress.dstBufferSize)))   /* still to read, or still to flush */
         {
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
-            size_t decodedBytes = ress.dstBufferSize;
-            errorCode = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
-            if (LZ4F_isError(errorCode)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(errorCode));
+            decodedBytes = ress.dstBufferSize;
+            nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
+            if (LZ4F_isError(nextToLoad)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             pos += remaining;
 
             if (decodedBytes)
@@ -849,6 +851,9 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     }
 
     LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
+
+    if (nextToLoad!=0)
+        EXM_THROW(67, "Unfinished stream");
 
     return filesize;
 }
