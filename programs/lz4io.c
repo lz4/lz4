@@ -820,18 +820,19 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     }
 
     /* Main Loop */
-    for (;;)
+    for (;nextToLoad;)
     {
         size_t readSize;
         size_t pos = 0;
         size_t decodedBytes = ress.dstBufferSize;
 
         /* Read input */
-        readSize = fread(ress.srcBuffer, 1, ress.srcBufferSize, srcFile);
+        if (nextToLoad > ress.srcBufferSize) nextToLoad = ress.srcBufferSize;
+        readSize = fread(ress.srcBuffer, 1, nextToLoad, srcFile);
         if (!readSize)
             break;   /* empty file or stream */
 
-        while (nextToLoad && ((pos < readSize) || (decodedBytes == ress.dstBufferSize)))   /* still to read, or still to flush */
+        while ((pos < readSize) || (decodedBytes == ress.dstBufferSize))   /* still to read, or still to flush */
         {
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
@@ -839,6 +840,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
             nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
             if (LZ4F_isError(nextToLoad)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             pos += remaining;
+            if (!nextToLoad) break;
 
             if (decodedBytes)
             {
