@@ -685,7 +685,7 @@ int LZ4_compress_safe(const char* source, char* dest, int inputSize, int maxOutp
 #if (HEAPMODE)
     void* ctx = ALLOCATOR(LZ4_STREAMSIZE_U64, 8);   /* malloc-calloc aligned on 8-bytes boundaries */
 #else
-    U64 ctx[LZ4_STREAMSIZE_U64] = {0};      /* Ensure data is aligned on 8-bytes boundaries */
+    U64 ctx[LZ4_STREAMSIZE_U64];      /* Ensure data is aligned on 8-bytes boundaries */
 #endif
 
     int result = LZ4_compress_safe_extState(ctx, source, dest, inputSize, maxOutputSize);

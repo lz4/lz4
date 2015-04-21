@@ -327,11 +327,12 @@ static void LZ4IO_writeLE32 (void* p, unsigned value32)
  * It generates compressed streams using the old 'legacy' format */
 int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel)
 {
-    int (*compressionFunction)(const char*, char*, int);
+    int (*compressionFunction)(const char* src, char* dst, int srcSize, int dstSize);
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = MAGICNUMBER_SIZE;
     char* in_buff;
     char* out_buff;
+    const int outBuffSize = LZ4_compressBound(LEGACY_BLOCKSIZE);
     FILE* finput;
     FILE* foutput;
     clock_t start, end;
@@ -340,15 +341,14 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 
     /* Init */
     start = clock();
-    if (compressionlevel < 3) compressionFunction = LZ4_compress; else compressionFunction = LZ4_compressHC;
+    if (compressionlevel < 3) compressionFunction = LZ4_compress_safe; else compressionFunction = LZ4_compressHC_limitedOutput;
 
     if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
         EXM_THROW(20, "File error");
-    if ((g_displayLevel==2) && (compressionlevel==1)) g_displayLevel=3;
 
     /* Allocate Memory */
     in_buff = (char*)malloc(LEGACY_BLOCKSIZE);
-    out_buff = (char*)malloc(LZ4_compressBound(LEGACY_BLOCKSIZE));
+    out_buff = (char*)malloc(outBuffSize);
     if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");
 
     /* Write Archive Header */
@@ -366,9 +366,9 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         filesize += inSize;
 
         /* Compress Block */
-        outSize = compressionFunction(in_buff, out_buff+4, inSize);
+        outSize = compressionFunction(in_buff, out_buff+4, inSize, outBuffSize);
         compressedfilesize += outSize+4;
-        DISPLAYUPDATE(3, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
         LZ4IO_writeLE32(out_buff, outSize);

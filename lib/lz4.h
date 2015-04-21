@@ -302,7 +302,7 @@ int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalS
 #endif // LZ4_DEPRECATE_WARNING_DEFBLOCK
 
 /* Obsolete compression functions */
-/* These functions are planned to generate warnings by r131 approximately */
+/* These functions are planned to start generate warnings by r131 approximately */
 int LZ4_compress               (const char* source, char* dest, int sourceSize);
 int LZ4_compress_limitedOutput (const char* source, char* dest, int sourceSize, int maxOutputSize);
 int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
