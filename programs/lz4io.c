@@ -322,12 +322,18 @@ static void LZ4IO_writeLE32 (void* p, unsigned value32)
     dstPtr[3] = (unsigned char)(value32 >> 24);
 }
 
+static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSize, int cLevel)
+{
+    (void)cLevel;
+    return LZ4_compress_safe(src, dst, srcSize, dstSize);
+}
+
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
 int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel)
 {
-    int (*compressionFunction)(const char* src, char* dst, int srcSize, int dstSize);
+    int (*compressionFunction)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = MAGICNUMBER_SIZE;
     char* in_buff;
@@ -341,7 +347,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 
     /* Init */
     start = clock();
-    if (compressionlevel < 3) compressionFunction = LZ4_compress_safe; else compressionFunction = LZ4_compressHC_limitedOutput;
+    if (compressionlevel < 3) compressionFunction = LZ4IO_LZ4_compress; else compressionFunction = LZ4_compressHC_safe;
 
     if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
         EXM_THROW(20, "File error");
@@ -366,7 +372,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         filesize += inSize;
 
         /* Compress Block */
-        outSize = compressionFunction(in_buff, out_buff+4, inSize, outBuffSize);
+        outSize = compressionFunction(in_buff, out_buff+4, inSize, outBuffSize, compressionlevel);
         compressedfilesize += outSize+4;
         DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 

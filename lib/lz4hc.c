@@ -673,7 +673,8 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
  * Deprecated Functions
  ***********************************/
 /* Deprecated compression functions */
-int LZ4_compressHC(const char* source, char* dest, int inputSize) { return LZ4_compressHC2(source, dest, inputSize, 0); }
+/* These functions are planned to start generate warnings by r131 approximately */
+int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compressHC_safe (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
 int LZ4_compressHC_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compressHC_safe(src, dst, srcSize, maxDstSize, 0); }
 int LZ4_compressHC2(const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compressHC_safe (src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
 int LZ4_compressHC2_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize, int cLevel) { return LZ4_compressHC_safe(src, dst, srcSize, maxDstSize, cLevel); }
