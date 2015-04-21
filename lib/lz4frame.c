@@ -301,7 +301,6 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     else
     {
         memset(&prefs, 0, sizeof(prefs));
-        prefs.frameInfo.contentSize = (U64)srcSize;
     }
     if (prefs.frameInfo.contentSize != 0)
         prefs.frameInfo.contentSize = (U64)srcSize;   /* auto-correct content size if selected (!=0) */
