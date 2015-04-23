@@ -119,16 +119,6 @@ LZ4_compressBound() :
 int LZ4_compressBound(int inputSize);
 
 /*
-LZ4_compress_fast() :
-    Same as LZ4_compress_limitedOutput, but allows to select an "acceleration" factor.
-    The larger the value, the faster the algorithm, but also the lesser the compression.
-    So it's a trade-off, which can be fine tuned, selecting whichever value you want.
-    An acceleration value of "0" means "use Default value", which is typically about 15 (see lz4.c source code).
-    Note : this function is "safe", even if its name does not say it. It's just faster and compress less.
-*/
-int LZ4_compress_fast (const char* source, char* dest, int sourceSize, int maxOutputSize, unsigned acceleration);
-
-/*
 LZ4_compress_safe_extState() :
     Same compression function, just using an externally allocated memory space to store compression state.
     Use LZ4_sizeofState() to know how much memory must be allocated,
@@ -137,6 +127,18 @@ LZ4_compress_safe_extState() :
 */
 int LZ4_sizeofState(void);
 int LZ4_compress_safe_extState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+
+/*
+LZ4_compress_fast() :
+    Same as LZ4_compress_safe(), but allows to select an "acceleration" factor.
+    The larger the acceleration value, the faster the algorithm, but also the lesser the compression.
+    It's a trade-off, which can be fine tuned, selecting whichever value you want.
+    An acceleration value of "0" means "use Default value", which is typically 17 (see lz4.c source code).
+    An acceleration value of "1" is the same as regular LZ4_compress_safe()
+    Note : this function is "safe", even if its name does not explicitly contain the word. It's just faster and compress less.
+*/
+int LZ4_compress_fast (const char* source, char* dest, int sourceSize, int maxOutputSize, unsigned acceleration);
+int LZ4_compress_fast_extState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize, unsigned acceleration);
 
 
 /*
