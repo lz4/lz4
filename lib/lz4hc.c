@@ -620,7 +620,8 @@ static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* ctxPtr,
     }
 
     /* Check if blocks follow each other */
-    if ((const BYTE*)source != ctxPtr->end) LZ4HC_setExternalDict(ctxPtr, (const BYTE*)source);
+    if ((const BYTE*)source != ctxPtr->end)
+        LZ4HC_setExternalDict(ctxPtr, (const BYTE*)source);
 
     /* Check overlapping input/dictionary space */
     {

@@ -74,15 +74,14 @@ int LZ4_compress_safe   (const char* source, char* dest, int sourceSize, int max
 int LZ4_decompress_safe (const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 
 /*
-LZ4_compress_limitedOutput() :
+LZ4_compress_safe() :
     Compresses 'sourceSize' bytes from buffer 'source'
-    into already allocated 'dest' of size 'maxOutputSize'.
-    Compression runs faster when 'maxOutputSize' >= LZ4_compressBound(sourceSize).
-    That's because in such case, it is guaranteed to compress within 'dest' budget, even in worst case scenario.
-    Compressing into a more limited space budget requires additional checks.
-    If the function cannot compress 'source' into a limited 'dest' budget,
-    compression stops *immediately*, and result of the function is zero.
-    It greatly accelerates behavior on non-compressible input, but as a consequence, 'dest' content is not valid either.
+    into already allocated 'dest' buffer of size 'maxDestSize'.
+    Compression is guaranteed to succeed if 'maxDestSize' >= LZ4_compressBound(sourceSize).
+    It also runs faster, so it's a recommended setting.
+    If the function cannot compress 'source' into a more limited 'dest' budget,
+    compression stops *immediately*, and the function result is zero.
+    As a consequence, 'dest' content is not valid.
     This function never writes outside 'dest' buffer, nor read outside 'source' buffer.
         sourceSize  : Max supported value is LZ4_MAX_INPUT_VALUE
         maxDestSize : full or partial size of buffer 'dest' (which must be already allocated)
@@ -132,13 +131,13 @@ int LZ4_compress_safe_extState (void* state, const char* source, char* dest, int
 LZ4_compress_fast() :
     Same as LZ4_compress_safe(), but allows to select an "acceleration" factor.
     The larger the acceleration value, the faster the algorithm, but also the lesser the compression.
-    It's a trade-off, which can be fine tuned, selecting whichever value you want.
+    It's a trade-off. It can be fine tuned, with each successive value providing an additional +2/3% to speed.
     An acceleration value of "0" means "use Default value", which is typically 17 (see lz4.c source code).
     An acceleration value of "1" is the same as regular LZ4_compress_safe()
     Note : this function is "safe", even if its name does not explicitly contain the word. It's just faster and compress less.
 */
-int LZ4_compress_fast (const char* source, char* dest, int sourceSize, int maxOutputSize, unsigned acceleration);
-int LZ4_compress_fast_extState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize, unsigned acceleration);
+int LZ4_compress_fast (const char* source, char* dest, int sourceSize, int maxDestSize, unsigned acceleration);
+int LZ4_compress_fast_extState (void* state, const char* source, char* dest, int inputSize, int maxDestSize, unsigned acceleration);
 
 
 /*
@@ -260,8 +259,18 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
 *_continue() :
     These decoding functions allow decompression of multiple blocks in "streaming" mode.
     Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
-    If this condition is not possible, save the relevant part of decoded data into a safe buffer,
-    and indicate where is its new address using LZ4_setStreamDecode()
+    In the case of a ring buffers, decoding buffer must be either :
+    - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
+      In which case, the decoding & encoding ring buffer can have any size, including very small ones ( < 64 KB).
+    - Larger than encoding buffer, by a minimum of maxBlockSize more bytes.
+      maxBlockSize is implementation dependent. It's the maximum size you intend to compress into a single block.
+      In which case, encoding and decoding buffers do not need to be synchronized,
+      and encoding ring buffer can have any size, including small ones ( < 64 KB).
+    - _At least_ 64 KB + 8 bytes + maxBlockSize.
+      In which case, encoding and decoding buffers do not need to be synchronized,
+      and encoding ring buffer can have any size, including larger than decoding buffer.
+    Whenever these conditions are not possible, save the last 64KB of decoded data into a safe buffer,
+    and indicate where it is saved using LZ4_setStreamDecode()
 */
 int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
@@ -271,8 +280,8 @@ int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
 Advanced decoding functions :
 *_usingDict() :
     These decoding functions work the same as
-    a combination of LZ4_setDictDecode() followed by LZ4_decompress_x_continue()
-    They are stand-alone and don't use nor update an LZ4_streamDecode_t structure.
+    a combination of LZ4_setStreamDecode() followed by LZ4_decompress_x_continue()
+    They are stand-alone. They don't need nor update an LZ4_streamDecode_t structure.
 */
 int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxDecompressedSize, const char* dictStart, int dictSize);
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);

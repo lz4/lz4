@@ -443,7 +443,11 @@ static void LZ4IO_freeCResources(cRess_t ress)
     if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
 }
 
-
+/*
+ * LZ4IO_compressFilename_extRess()
+ * result : 0 : compression completed correctly
+ *          1 : missing or pb opening srcFileName
+ */
 static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
     unsigned long long filesize = 0;
@@ -463,10 +467,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     memset(&prefs, 0, sizeof(prefs));
 
     /* File check */
-    {
-        int srcFileAbsent = LZ4IO_getFiles(srcFileName, dstFileName, &srcFile, &dstFile);
-        if (srcFileAbsent) return srcFileAbsent;
-    }
+    if (LZ4IO_getFiles(srcFileName, dstFileName, &srcFile, &dstFile)) return 1;
 
     /* Set compression parameters */
     prefs.autoFlush = 1;
@@ -547,11 +548,8 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
-    {
-        DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-        (unsigned long long) filesize, (unsigned long long) compressedfilesize,
-                     (double)compressedfilesize/(filesize + !filesize)*100);   /* avoid division by zero */
-    }
+    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
+        filesize, compressedfilesize, (double)compressedfilesize/(filesize + !filesize)*100);   /* avoid division by zero */
 
     return 0;
 }
@@ -588,8 +586,8 @@ int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int
 int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionLevel)
 {
     int i;
-    int missing_files = 0;
-    char* outFileName = (char*)malloc(FNSPACE);
+    int missed_files = 0;
+    char* dstFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
     cRess_t ress;
@@ -601,18 +599,18 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
     for (i=0; i<ifntSize; i++)
     {
         size_t ifnSize = strlen(inFileNamesTable[i]);
-        if (ofnSize <= ifnSize+suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); }
-        strcpy(outFileName, inFileNamesTable[i]);
-        strcat(outFileName, suffix);
+        if (ofnSize <= ifnSize+suffixSize+1) { free(dstFileName); ofnSize = ifnSize + 20; dstFileName = (char*)malloc(ofnSize); }
+        strcpy(dstFileName, inFileNamesTable[i]);
+        strcat(dstFileName, suffix);
 
-        missing_files += LZ4IO_compressFilename_extRess(ress, inFileNamesTable[i], outFileName, compressionLevel);
+        missed_files += LZ4IO_compressFilename_extRess(ress, inFileNamesTable[i], dstFileName, compressionLevel);
     }
 
     /* Close & Free */
     LZ4IO_freeCResources(ress);
-    free(outFileName);
+    free(dstFileName);
 
-    return missing_files;
+    return missed_files;
 }
 
 

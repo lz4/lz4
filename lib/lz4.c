@@ -1023,8 +1023,7 @@ FORCE_INLINE int LZ4_decompress_generic(
             {
                 /* match can be copied as a single segment from external dictionary */
                 match = dictEnd - (lowPrefix-match);
-                memcpy(op, match, length);
-                op += length;
+                memmove(op, match, length); op += length;
             }
             else
             {
