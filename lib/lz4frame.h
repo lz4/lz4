@@ -132,7 +132,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 /* LZ4F_compressFrame()
- * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.5
+ * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.5.1
  * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
  * You can get the minimum value of dstMaxSize by using LZ4F_compressFrameBound()
  * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode)
@@ -146,7 +146,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 /**********************************
  * Advanced compression functions
  * ********************************/
-typedef size_t* LZ4F_compressionContext_t;
+typedef long long* LZ4F_compressionContext_t;   /* must be aligned on 8-bytes */
 
 typedef struct {
   unsigned stableSrc;    /* 1 == src content will remain available on future calls to LZ4F_compress(); avoid saving src content within tmp buffer as future dictionary */
@@ -226,7 +226,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t 
  * Decompression functions
  * *********************************/
 
-typedef size_t* LZ4F_decompressionContext_t;
+typedef long long* LZ4F_decompressionContext_t;   /* must be aligned on 8-bytes */
 
 typedef struct {
   unsigned stableDst;       /* guarantee that decompressed data will still be there on next function calls (avoid storage into tmp buffers) */
