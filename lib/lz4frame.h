@@ -146,7 +146,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 /**********************************
  * Advanced compression functions
  * ********************************/
-typedef void* LZ4F_compressionContext_t;
+typedef size_t* LZ4F_compressionContext_t;
 
 typedef struct {
   unsigned stableSrc;    /* 1 == src content will remain available on future calls to LZ4F_compress(); avoid saving src content within tmp buffer as future dictionary */
@@ -226,7 +226,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t 
  * Decompression functions
  * *********************************/
 
-typedef void* LZ4F_decompressionContext_t;
+typedef size_t* LZ4F_decompressionContext_t;
 
 typedef struct {
   unsigned stableDst;       /* guarantee that decompressed data will still be there on next function calls (avoid storage into tmp buffers) */

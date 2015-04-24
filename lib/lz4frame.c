@@ -283,6 +283,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_cctx_internal_t cctxI;
+    LZ4F_compressionContext_t cctx = (LZ4F_compressionContext_t)(&cctxI);
     LZ4_stream_t lz4ctx;
     LZ4F_preferences_t prefs;
     LZ4F_compressOptions_t options;
@@ -321,15 +322,15 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     if (dstMaxSize < LZ4F_compressFrameBound(srcSize, &prefs))
         return (size_t)-LZ4F_ERROR_dstMaxSize_tooSmall;
 
-    errorCode = LZ4F_compressBegin(&cctxI, dstBuffer, dstMaxSize, &prefs);  /* write header */
+    errorCode = LZ4F_compressBegin(cctx, dstBuffer, dstMaxSize, &prefs);  /* write header */
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;   /* header size */
 
-    errorCode = LZ4F_compressUpdate(&cctxI, dstPtr, dstEnd-dstPtr, srcBuffer, srcSize, &options);
+    errorCode = LZ4F_compressUpdate(cctx, dstPtr, dstEnd-dstPtr, srcBuffer, srcSize, &options);
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;
 
-    errorCode = LZ4F_compressEnd(&cctxI, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
+    errorCode = LZ4F_compressEnd(cctx, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;
 
