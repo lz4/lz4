@@ -968,7 +968,7 @@ static void FUZ_unitTests(void)
             LZ4_streamDecode_t decodeState;
             const U32 maxMessageSizeLog = 12;
             const U32 maxMessageSizeMask = (1<<maxMessageSizeLog) - 1;
-            U32 messageSize = (FUZ_rand(&randState) & maxMessageSizeMask) + 1;
+            U32 messageSize;
             U32 totalMessageSize = 0;
             U32 iNext = 0;
             U32 dNext = 0;
