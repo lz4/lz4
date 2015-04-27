@@ -39,7 +39,7 @@ You can contact the author at :
 
 
 /**************************************
-Compiler Options
+*  Compiler Options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
@@ -107,10 +107,11 @@ static const size_t maxFHSize = 15;
 static const size_t BHSize = 4;
 static const int    minHClevel = 3;
 
+
 /**************************************
 *  Structures and local types
 **************************************/
-typedef struct
+typedef struct LZ4F_cctx_s
 {
     LZ4F_preferences_t prefs;
     U32    version;
@@ -124,9 +125,9 @@ typedef struct
     XXH32_state_t xxh;
     void*  lz4CtxPtr;
     U32    lz4CtxLevel;     /* 0: unallocated;  1: LZ4_stream_t;  3: LZ4_streamHC_t */
-} LZ4F_cctx_internal_t;
+} LZ4F_cctx_t;
 
-typedef struct
+typedef struct LZ4F_dctx_s
 {
     LZ4F_frameInfo_t frameInfo;
     U32    version;
@@ -146,7 +147,7 @@ typedef struct
     size_t tmpOutStart;
     XXH32_state_t xxh;
     BYTE   header[16];
-} LZ4F_dctx_internal_t;
+} LZ4F_dctx_t;
 
 
 /**************************************
@@ -282,8 +283,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 */
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
-    LZ4F_cctx_internal_t cctxI;
-    LZ4F_compressionContext_t cctx = (LZ4F_compressionContext_t)(&cctxI);
+    LZ4F_cctx_t cctxI;
     LZ4_stream_t lz4ctx;
     LZ4F_preferences_t prefs;
     LZ4F_compressOptions_t options;
@@ -298,11 +298,10 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     cctxI.version = LZ4F_VERSION;
     cctxI.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent allocation; works because autoflush==1 & stableSrc==1 */
 
-    if (preferencesPtr!=NULL) prefs = *preferencesPtr;
+    if (preferencesPtr!=NULL)
+        prefs = *preferencesPtr;
     else
-    {
         memset(&prefs, 0, sizeof(prefs));
-    }
     if (prefs.frameInfo.contentSize != 0)
         prefs.frameInfo.contentSize = (U64)srcSize;   /* auto-correct content size if selected (!=0) */
 
@@ -322,15 +321,15 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
     if (dstMaxSize < LZ4F_compressFrameBound(srcSize, &prefs))
         return (size_t)-LZ4F_ERROR_dstMaxSize_tooSmall;
 
-    errorCode = LZ4F_compressBegin(cctx, dstBuffer, dstMaxSize, &prefs);  /* write header */
+    errorCode = LZ4F_compressBegin(&cctxI, dstBuffer, dstMaxSize, &prefs);  /* write header */
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;   /* header size */
 
-    errorCode = LZ4F_compressUpdate(cctx, dstPtr, dstEnd-dstPtr, srcBuffer, srcSize, &options);
+    errorCode = LZ4F_compressUpdate(&cctxI, dstPtr, dstEnd-dstPtr, srcBuffer, srcSize, &options);
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;
 
-    errorCode = LZ4F_compressEnd(cctx, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
+    errorCode = LZ4F_compressEnd(&cctxI, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
     if (LZ4F_isError(errorCode)) return errorCode;
     dstPtr += errorCode;
 
@@ -342,8 +341,8 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 
 
 /***********************************
-* Advanced compression functions
-* *********************************/
+*  Advanced compression functions
+***********************************/
 
 /* LZ4F_createCompressionContext() :
 * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
@@ -355,9 +354,9 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 */
 LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContextPtr, unsigned version)
 {
-    LZ4F_cctx_internal_t* cctxPtr;
+    LZ4F_cctx_t* cctxPtr;
 
-    cctxPtr = (LZ4F_cctx_internal_t*)ALLOCATOR(sizeof(LZ4F_cctx_internal_t));
+    cctxPtr = (LZ4F_cctx_t*)ALLOCATOR(sizeof(LZ4F_cctx_t));
     if (cctxPtr==NULL) return (LZ4F_errorCode_t)(-LZ4F_ERROR_allocation_failed);
 
     cctxPtr->version = version;
@@ -371,7 +370,7 @@ LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_c
 
 LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_compressionContext)
 {
-    LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)LZ4F_compressionContext;
+    LZ4F_cctx_t* cctxPtr = (LZ4F_cctx_t*)LZ4F_compressionContext;
 
     if (cctxPtr != NULL)   /* null pointers can be safely provided to this function, like free() */
     {
@@ -393,7 +392,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_preferences_t prefNull;
-    LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
+    LZ4F_cctx_t* cctxPtr = (LZ4F_cctx_t*)compressionContext;
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
     BYTE* headerStart;
@@ -542,7 +541,7 @@ static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int lev
     return LZ4F_localLZ4_compressHC_limitedOutput_continue;
 }
 
-static int LZ4F_localSaveDict(LZ4F_cctx_internal_t* cctxPtr)
+static int LZ4F_localSaveDict(LZ4F_cctx_t* cctxPtr)
 {
     if (cctxPtr->prefs.compressionLevel < minHClevel)
         return LZ4_saveDict ((LZ4_stream_t*)(cctxPtr->lz4CtxPtr), (char*)(cctxPtr->tmpBuff), 64 KB);
@@ -563,7 +562,7 @@ typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;
 size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
     LZ4F_compressOptions_t cOptionsNull;
-    LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
+    LZ4F_cctx_t* cctxPtr = (LZ4F_cctx_t*)compressionContext;
     size_t blockSize = cctxPtr->maxBlockSize;
     const BYTE* srcPtr = (const BYTE*)srcBuffer;
     const BYTE* const srcEnd = srcPtr + srcSize;
@@ -673,7 +672,7 @@ size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* d
 */
 size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
+    LZ4F_cctx_t* cctxPtr = (LZ4F_cctx_t*)compressionContext;
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
     compressFunc_t compress;
@@ -714,7 +713,7 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
 */
 size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
+    LZ4F_cctx_t* cctxPtr = (LZ4F_cctx_t*)compressionContext;
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
     size_t errorCode;
@@ -760,20 +759,20 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 */
 LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber)
 {
-    LZ4F_dctx_internal_t* dctxPtr;
+    LZ4F_dctx_t* dctxPtr;
 
-    dctxPtr = (LZ4F_dctx_internal_t*)ALLOCATOR(sizeof(LZ4F_dctx_internal_t));
+    dctxPtr = (LZ4F_dctx_t*)ALLOCATOR(sizeof(LZ4F_dctx_t));
     if (dctxPtr==NULL) return (LZ4F_errorCode_t)-LZ4F_ERROR_GENERIC;
 
     dctxPtr->version = versionNumber;
-    *LZ4F_decompressionContextPtr = (LZ4F_compressionContext_t)dctxPtr;
+    *LZ4F_decompressionContextPtr = (LZ4F_decompressionContext_t)dctxPtr;
     return LZ4F_OK_NoError;
 }
 
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t LZ4F_decompressionContext)
 {
     LZ4F_errorCode_t result = LZ4F_OK_NoError;
-    LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)LZ4F_decompressionContext;
+    LZ4F_dctx_t* dctxPtr = (LZ4F_dctx_t*)LZ4F_decompressionContext;
     if (dctxPtr != NULL)   /* can accept NULL input, like free() */
     {
       result = (LZ4F_errorCode_t)dctxPtr->dStage;
@@ -808,7 +807,7 @@ typedef enum { dstage_getHeader=0, dstage_storeHeader,
             dctxPtr->frameInfo and dctxPtr->dStage.
    input  : srcVoidPtr points at the **beginning of the frame**
 */
-static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVoidPtr, size_t srcSize)
+static size_t LZ4F_decodeHeader(LZ4F_dctx_t* dctxPtr, const void* srcVoidPtr, size_t srcSize)
 {
     BYTE FLG, BD, HC;
     unsigned version, blockMode, blockChecksumFlag, contentSizeFlag, contentChecksumFlag, blockSizeID;
@@ -929,7 +928,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const void* srcVo
 LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dCtx, LZ4F_frameInfo_t* frameInfoPtr,
                                    const void* srcBuffer, size_t* srcSizePtr)
 {
-    LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)dCtx;
+    LZ4F_dctx_t* dctxPtr = (LZ4F_dctx_t*)dCtx;
 
     if (dctxPtr->dStage > dstage_storeHeader)   /* note : requires dstage_* header related to be at beginning of enum */
     {
@@ -959,7 +958,7 @@ static int LZ4F_decompress_safe (const char* source, char* dest, int compressedS
 }
 
 
-static void LZ4F_updateDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* dstPtr, size_t dstSize, const BYTE* dstPtr0, unsigned withinTmp)
+static void LZ4F_updateDict(LZ4F_dctx_t* dctxPtr, const BYTE* dstPtr, size_t dstSize, const BYTE* dstPtr0, unsigned withinTmp)
 {
     if (dctxPtr->dictSize==0)
         dctxPtr->dict = (BYTE*)dstPtr;   /* priority to dictionary continuity */
@@ -1047,7 +1046,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                        const void* srcBuffer, size_t* srcSizePtr,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
-    LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)decompressionContext;
+    LZ4F_dctx_t* dctxPtr = (LZ4F_dctx_t*)decompressionContext;
     LZ4F_decompressOptions_t optionsNull;
     const BYTE* const srcStart = (const BYTE*)srcBuffer;
     const BYTE* const srcEnd = srcStart + *srcSizePtr;
