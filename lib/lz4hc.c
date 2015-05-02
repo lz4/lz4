@@ -1,53 +1,53 @@
 /*
-LZ4 HC - High Compression Mode of LZ4
-Copyright (C) 2011-2015, Yann Collet.
+    LZ4 HC - High Compression Mode of LZ4
+    Copyright (C) 2011-2015, Yann Collet.
 
-BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
 
-* Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-* Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
+    * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+    copyright notice, this list of conditions and the following disclaimer
+    in the documentation and/or other materials provided with the
+    distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-You can contact the author at :
-   - LZ4 source repository : https://github.com/Cyan4973/lz4
-   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
+    You can contact the author at :
+       - LZ4 source repository : https://github.com/Cyan4973/lz4
+       - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 
 
 /**************************************
-   Tuning Parameter
+*  Tuning Parameter
 **************************************/
 static const int LZ4HC_compressionLevel_default = 9;
 
 
 /**************************************
-   Includes
+*  Includes
 **************************************/
 #include "lz4hc.h"
 
 
 /**************************************
-   Local Compiler Options
+*  Local Compiler Options
 **************************************/
 #if defined(__GNUC__)
 #  pragma GCC diagnostic ignored "-Wunused-function"
@@ -59,18 +59,18 @@ static const int LZ4HC_compressionLevel_default = 9;
 
 
 /**************************************
-   Common LZ4 definition
+*  Common LZ4 definition
 **************************************/
 #define LZ4_COMMONDEFS_ONLY
 #include "lz4.c"
 
 
 /**************************************
-  Local Constants
+*  Local Constants
 **************************************/
 #define DICTIONARY_LOGSIZE 16
 #define MAXD (1<<DICTIONARY_LOGSIZE)
-#define MAXD_MASK ((U32)(MAXD - 1))
+#define MAXD_MASK (MAXD - 1)
 
 #define HASH_LOG (DICTIONARY_LOGSIZE-1)
 #define HASHTABLESIZE (1 << HASH_LOG)
@@ -82,11 +82,11 @@ static const int g_maxCompressionLevel = 16;
 
 
 /**************************************
-   Local Types
+*  Local Types
 **************************************/
 typedef struct
 {
-    U32 hashTable[HASHTABLESIZE];
+    U32   hashTable[HASHTABLESIZE];
     U16   chainTable[MAXD];
     const BYTE* end;        /* next block here to continue on current prefix */
     const BYTE* base;       /* All index relative to this position */
@@ -94,24 +94,24 @@ typedef struct
     const BYTE* inputBuffer;/* deprecated */
     U32   dictLimit;        /* below that point, need extDict */
     U32   lowLimit;         /* below that point, no more dict */
-    U32   nextToUpdate;
+    U32   nextToUpdate;     /* index from which to continue dictionary update */
     U32   compressionLevel;
 } LZ4HC_Data_Structure;
 
 
 /**************************************
-   Local Macros
+*  Local Macros
 **************************************/
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-#define DELTANEXT(p)           chainTable[(size_t)(p) & MAXD_MASK]
-#define GETNEXT(p)             ((p) - (size_t)DELTANEXT(p))
+//#define DELTANEXTU16(p)        chainTable[(p) & MAXD_MASK]   /* flexible, MAXD dependent */
+#define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
 
 
 /**************************************
-   HC Compression
+*  HC Compression
 **************************************/
 static void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* start)
 {
@@ -141,7 +141,7 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
         U32 h = LZ4HC_hashPtr(base+idx);
         size_t delta = idx - HashTable[h];
         if (delta>MAX_DISTANCE) delta = MAX_DISTANCE;
-        chainTable[idx & 0xFFFF] = (U16)delta;
+        DELTANEXTU16(idx) = (U16)delta;
         HashTable[h] = idx;
         idx++;
     }
@@ -197,7 +197,7 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   /* I
                 if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   /* virtual matchpos */
             }
         }
-        matchIndex -= chainTable[matchIndex & 0xFFFF];
+        matchIndex -= DELTANEXTU16(matchIndex);
     }
 
     return (int)ml;
@@ -274,7 +274,7 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                 if ((int)mlt > longest) { longest = (int)mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
             }
         }
-        matchIndex -= chainTable[matchIndex & 0xFFFF];
+        matchIndex -= DELTANEXTU16(matchIndex);
     }
 
     return longest;
@@ -557,8 +557,8 @@ int LZ4_compressHC_safe(const char* source, char* dest, int inputSize, int maxOu
 
 
 /**************************************
- * Streaming Functions
- * ************************************/
+*  Streaming Functions
+**************************************/
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) { return (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t)); }
 int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) { free(LZ4_streamHCPtr); return 0; }
@@ -671,8 +671,8 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
 
 
 /***********************************
- * Deprecated Functions
- ***********************************/
+*  Deprecated Functions
+***********************************/
 /* Deprecated compression functions */
 /* These functions are planned to start generate warnings by r131 approximately */
 int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compressHC_safe (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
