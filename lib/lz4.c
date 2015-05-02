@@ -767,7 +767,8 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
-    if (dict->initCheck) LZ4_resetStream(LZ4_dict);                         /* Uninitialized structure detected */
+    if (dict->initCheck)   /* Uninitialized structure detected */
+        LZ4_resetStream(LZ4_dict);
 
     if (dictSize < (int)HASH_UNIT)
     {
@@ -776,7 +777,8 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
         return 0;
     }
 
-    if (p <= dictEnd - 64 KB) p = dictEnd - 64 KB;
+    if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
+    dict->currentOffset += 64 KB;
     base = p - dict->currentOffset;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
@@ -784,7 +786,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 
     while (p <= dictEnd-HASH_UNIT)
     {
-        LZ4_putPosition(p, dict, byU32, base);
+        LZ4_putPosition(p, dict->hashTable, byU32, base);
         p+=3;
     }
 
@@ -1260,7 +1262,7 @@ int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, in
 int LZ4_compress(const char* source, char* dest, int inputSize) { return LZ4_compress_safe(source, dest, inputSize, LZ4_compressBound(inputSize)); }
 int LZ4_compress_limitedOutput_withState (void* state, const char* src, char* dst, int srcSize, int dstSize) { return LZ4_compress_safe_extState(state, src, dst, srcSize, dstSize); }
 int LZ4_compress_withState (void* state, const char* src, char* dst, int srcSize) { return LZ4_compress_safe_extState(state, src, dst, srcSize, LZ4_compressBound(srcSize)); }
-int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize) { return LZ4_compress_safe_continue(LZ4_stream, source, dest, inputSize, maxOutputSize); }
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_safe_continue(LZ4_stream, src, dst, srcSize, maxDstSize); }
 int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize) { return LZ4_compress_safe_continue(LZ4_stream, source, dest, inputSize, LZ4_compressBound(inputSize)); }
 
 /*
