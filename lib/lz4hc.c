@@ -538,20 +538,20 @@ _Search3:
 
 int LZ4_sizeofStateHC(void) { return sizeof(LZ4HC_Data_Structure); }
 
-int LZ4_compressHC_safe_extStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel)
+int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
     if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
-    LZ4HC_init ((LZ4HC_Data_Structure*)state, (const BYTE*)source);
-    if (maxOutputSize < LZ4_compressBound(inputSize))
-        return LZ4HC_compress_generic (state, source, dest, inputSize, maxOutputSize, compressionLevel, limitedOutput);
+    LZ4HC_init ((LZ4HC_Data_Structure*)state, (const BYTE*)src);
+    if (maxDstSize < LZ4_compressBound(srcSize))
+        return LZ4HC_compress_generic (state, src, dst, srcSize, maxDstSize, compressionLevel, limitedOutput);
     else
-        return LZ4HC_compress_generic (state, source, dest, inputSize, maxOutputSize, compressionLevel, noLimit);
+        return LZ4HC_compress_generic (state, src, dst, srcSize, maxDstSize, compressionLevel, noLimit);
 }
 
-int LZ4_compressHC_safe(const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel)
+int LZ4_compress_HC(const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
     LZ4HC_Data_Structure state;
-    return LZ4_compressHC_safe_extStateHC(&state, source, dest, inputSize, maxOutputSize, compressionLevel);
+    return LZ4_compress_HC_extStateHC(&state, src, dst, srcSize, maxDstSize, compressionLevel);
 }
 
 
@@ -639,7 +639,7 @@ static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* ctxPtr,
     return LZ4HC_compress_generic (ctxPtr, source, dest, inputSize, maxOutputSize, ctxPtr->compressionLevel, limit);
 }
 
-int LZ4_compressHC_safe_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize)
+int LZ4_compress_HC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     if (maxOutputSize < LZ4_compressBound(inputSize))
         return LZ4_compressHC_continue_generic ((LZ4HC_Data_Structure*)LZ4_streamHCPtr, source, dest, inputSize, maxOutputSize, limitedOutput);
@@ -675,19 +675,20 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
 ***********************************/
 /* Deprecated compression functions */
 /* These functions are planned to start generate warnings by r131 approximately */
-int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compressHC_safe (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
-int LZ4_compressHC_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compressHC_safe(src, dst, srcSize, maxDstSize, 0); }
-int LZ4_compressHC2(const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compressHC_safe (src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
-int LZ4_compressHC2_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize, int cLevel) { return LZ4_compressHC_safe(src, dst, srcSize, maxDstSize, cLevel); }
-int LZ4_compressHC_withStateHC (void* state, const char* src, char* dst, int srcSize) { return LZ4_compressHC_safe_extStateHC (state, src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
-int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compressHC_safe_extStateHC (state, src, dst, srcSize, maxDstSize, 0); }
-int LZ4_compressHC2_withStateHC (void* state, const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compressHC_safe_extStateHC(state, src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
-int LZ4_compressHC2_limitedOutput_withStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize, int cLevel) { return LZ4_compressHC_safe_extStateHC(state, src, dst, srcSize, maxDstSize, cLevel); }
-int LZ4_compressHC_continue (LZ4_streamHC_t* ctx, const char* src, char* dst, int srcSize) { return LZ4_compressHC_safe_continue (ctx, src, dst, srcSize, LZ4_compressBound(srcSize)); }
-int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* ctx, const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compressHC_safe_continue (ctx, src, dst, srcSize, maxDstSize); }
+int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
+int LZ4_compressHC_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_HC(src, dst, srcSize, maxDstSize, 0); }
+int LZ4_compressHC2(const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
+int LZ4_compressHC2_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize, int cLevel) { return LZ4_compress_HC(src, dst, srcSize, maxDstSize, cLevel); }
+int LZ4_compressHC_withStateHC (void* state, const char* src, char* dst, int srcSize) { return LZ4_compress_HC_extStateHC (state, src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
+int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_HC_extStateHC (state, src, dst, srcSize, maxDstSize, 0); }
+int LZ4_compressHC2_withStateHC (void* state, const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compress_HC_extStateHC(state, src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
+int LZ4_compressHC2_limitedOutput_withStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize, int cLevel) { return LZ4_compress_HC_extStateHC(state, src, dst, srcSize, maxDstSize, cLevel); }
+int LZ4_compressHC_continue (LZ4_streamHC_t* ctx, const char* src, char* dst, int srcSize) { return LZ4_compress_HC_continue (ctx, src, dst, srcSize, LZ4_compressBound(srcSize)); }
+int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* ctx, const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_HC_continue (ctx, src, dst, srcSize, maxDstSize); }
 
 
 /* Deprecated streaming functions */
+/* These functions currently generate deprecation warnings */
 int LZ4_sizeofStreamStateHC(void) { return LZ4_STREAMHCSIZE; }
 
 int LZ4_resetStreamStateHC(void* state, const char* inputBuffer)

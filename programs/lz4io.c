@@ -347,7 +347,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 
     /* Init */
     start = clock();
-    if (compressionlevel < 3) compressionFunction = LZ4IO_LZ4_compress; else compressionFunction = LZ4_compressHC_safe;
+    if (compressionlevel < 3) compressionFunction = LZ4IO_LZ4_compress; else compressionFunction = LZ4_compress_HC;
 
     if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
         EXM_THROW(20, "File error");

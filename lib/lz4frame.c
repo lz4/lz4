@@ -527,7 +527,7 @@ static int LZ4F_localLZ4_compress_limitedOutput_continue(void* ctx, const char* 
 static int LZ4F_localLZ4_compressHC_limitedOutput_continue(void* ctx, const char* src, char* dst, int srcSize, int dstSize, int level)
 {
     (void) level;
-    return LZ4_compressHC_safe_continue((LZ4_streamHC_t*)ctx, src, dst, srcSize, dstSize);
+    return LZ4_compress_HC_continue((LZ4_streamHC_t*)ctx, src, dst, srcSize, dstSize);
 }
 
 static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int level)
@@ -537,7 +537,7 @@ static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int lev
         if (blockMode == LZ4F_blockIndependent) return LZ4F_localLZ4_compress_limitedOutput_withState;
         return LZ4F_localLZ4_compress_limitedOutput_continue;
     }
-    if (blockMode == LZ4F_blockIndependent) return LZ4_compressHC_safe_extStateHC;
+    if (blockMode == LZ4F_blockIndependent) return LZ4_compress_HC_extStateHC;
     return LZ4F_localLZ4_compressHC_limitedOutput_continue;
 }
 
