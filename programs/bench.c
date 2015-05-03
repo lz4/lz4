@@ -58,7 +58,7 @@
 
 #include "lz4.h"
 #define COMPRESSOR0 LZ4_compress_local
-static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSize, int clevel) { (void)clevel; return LZ4_compress_safe(src, dst, srcSize, dstSize); }
+static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSize, int clevel) { (void)clevel; return LZ4_compress_default(src, dst, srcSize, dstSize); }
 #include "lz4hc.h"
 #define COMPRESSOR1 LZ4_compressHC_safe
 #define DEFAULTCOMPRESSOR COMPRESSOR0

@@ -515,13 +515,13 @@ static size_t LZ4F_compressBlock(void* dst, const void* src, size_t srcSize, com
 static int LZ4F_localLZ4_compress_limitedOutput_withState(void* ctx, const char* src, char* dst, int srcSize, int dstSize, int level)
 {
     (void) level;
-    return LZ4_compress_safe_extState(ctx, src, dst, srcSize, dstSize);
+    return LZ4_compress_limitedOutput_withState(ctx, src, dst, srcSize, dstSize);
 }
 
 static int LZ4F_localLZ4_compress_limitedOutput_continue(void* ctx, const char* src, char* dst, int srcSize, int dstSize, int level)
 {
     (void) level;
-    return LZ4_compress_safe_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstSize);
+    return LZ4_compress_limitedOutput_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstSize);
 }
 
 static int LZ4F_localLZ4_compressHC_limitedOutput_continue(void* ctx, const char* src, char* dst, int srcSize, int dstSize, int level)

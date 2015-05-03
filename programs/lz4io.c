@@ -325,7 +325,7 @@ static void LZ4IO_writeLE32 (void* p, unsigned value32)
 static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSize, int cLevel)
 {
     (void)cLevel;
-    return LZ4_compress_safe(src, dst, srcSize, dstSize);
+    return LZ4_compress_fast(src, dst, srcSize, dstSize, 1);
 }
 
 /* LZ4IO_compressFilename_Legacy :
