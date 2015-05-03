@@ -64,8 +64,8 @@ static void test_compress(
 #endif
 
         {
-            const int cmpBytes = LZ4_compress_safe_continue(
-                lz4Stream, inpPtr, cmpBuf, inpBytes, cmpBufBytes);
+            const int cmpBytes = LZ4_compress_fast_continue(
+                lz4Stream, inpPtr, cmpBuf, inpBytes, cmpBufBytes, 1);
             if (cmpBytes <= 0) break;
             write_uint16(outFp, (uint16_t) cmpBytes);
             write_bin(outFp, cmpBuf, cmpBytes);
