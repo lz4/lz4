@@ -654,7 +654,7 @@ _last_literals:
 }
 
 
-int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, volatile int acceleration)
+int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
     LZ4_resetStream((LZ4_stream_t*)state);
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
