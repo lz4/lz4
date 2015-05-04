@@ -49,7 +49,7 @@
               <ul class="dropdown-menu" role="menu">
                 <li><a href="#benchmarks">Benchmarks</a></li>
                 <li><a href="#interoperable-lz4">Interoperable LZ4 versions</a></li>
-                <li><a href="#other-source">Other Source versions</a></li>
+                <li><a href="#other-languages">Other Source versions</a></li>
               </ul>
             </li>
           </ul>
@@ -161,8 +161,8 @@ Benchmark evaluates the compression of reference [Silesia Corpus](http://sun.aei
 
 The LZ4 block compression format is detailed within [lz4_Block_format](lz4_Block_format.md).
 
-For streaming unknown amount of data, and compress files of any size,
-a frame format has been published, and can be consulted within the file [lz4_Frame_format](lz4_Frame_format.md).
+For streaming arbitrarily large amount of data, or compress files of any size,
+a frame format has been established, detailed within the file [lz4_Frame_format](lz4_Frame_format.md).
 
 
 
@@ -170,7 +170,7 @@ a frame format has been published, and can be consulted within the file [lz4_Fra
 <a name="interoperable-lz4"></a>
 ## Interoperable LZ4 versions
 The following versions are provided for languages beyond the C reference version.
-They are in conformance with the LZ4 frame specification and are therefore interoperable.
+They are in conformance with the LZ4 [block] and [frame] specifications, and are therefore interoperable.
 
 |Language				|Author			|URL					|
 |--					|--			|--					|
@@ -181,12 +181,14 @@ They are in conformance with the LZ4 frame specification and are therefore inter
 |__Go__					|Pierre Curto		|https://github.com/pierrec/lz4		|
 |__Rust__				|Artem Navrotskiy	|https://github.com/bozaro/lz4-rs	|
 
+[block]:lz4_Block_format.md
+[frame]:lz4_Frame_format.md
 
 
 <br/>
-<a name="other-source"></a>
-## Other Source versions
-The following versions compress data blocks using LZ4 compression algorithm in multiple languages.
+<a name="other-languages"></a>
+## Multiple languages
+The following versions compress data blocks with LZ4 compression algorithm using various programming languages.
 Each version encapsulates the compressed result into its own header/frame format convention.
 
 |Language				|Author			|URL									|
