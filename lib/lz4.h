@@ -89,10 +89,10 @@ LZ4_compress_default() :
               or 0 if compression fails
 
 LZ4_decompress_safe() :
-    compressedSize : is obviously the source size
-    maxDecompressedSize : is the size of the destination buffer, which must be already allocated.
-    return : the number of bytes decompressed into the destination buffer (necessarily <= maxDecompressedSize)
-             If the destination buffer is not large enough, decoding will stop and output an error code (<0).
+    compressedSize : is the precise full size of the compressed block.
+    maxDecompressedSize : is the size of destination buffer, which must be already allocated.
+    return : the number of bytes decompressed into destination buffer (necessarily <= maxDecompressedSize)
+             If destination buffer is not large enough, decoding will stop and output an error code (<0).
              If the source stream is detected malformed, the function will stop decoding and return a negative result.
              This function is protected against buffer overflow exploits, including malicious data packets.
              It never writes outside output buffer, nor reads outside input buffer.
