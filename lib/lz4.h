@@ -140,6 +140,21 @@ int LZ4_compress_fast_extState (void* state, const char* source, char* dest, int
 
 
 /*
+LZ4_compress_destSize() :
+    Reverse the logic, by compressing as much data as possible from 'source' buffer
+    into already allocated buffer 'dest' of size 'targetDestSize'.
+    This function either compresses the entire 'source' content into 'dest' if it's large enough,
+    or fill 'dest' buffer completely with as much data as possible from 'source'.
+    Original idea by WiredTiger team.
+        *sourceSizePtr : will be modified to indicate how many bytes where read from 'source' to fill 'dest'.
+                         New value is necessarily <= old value.
+        return : Nb bytes written into 'dest' (necessarily <= targetDestSize)
+              or 0 if compression fails
+*/
+int LZ4_compress_destSize (const char* source, char* dest, int* sourceSizePtr, int targetDestSize);
+
+
+/*
 LZ4_decompress_fast() :
     originalSize : is the original and therefore uncompressed size
     return : the number of bytes read from the source buffer (in other words, the compressed size)

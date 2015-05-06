@@ -396,6 +396,41 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Compression tests */
 
+        /* Test compression destSize */
+        FUZ_DISPLAYTEST;
+        {
+            int srcSize = blockSize;
+            int targetSize = srcSize * ((FUZ_rand(&randState) & 127)+1) >> 7;
+            char endCheck = FUZ_rand(&randState) & 255;
+            compressedBuffer[targetSize] = endCheck;
+            ret = LZ4_compress_destSize(block, compressedBuffer, &srcSize, targetSize);
+            FUZ_CHECKTEST(ret > targetSize, "LZ4_compress_destSize() result larger than dst buffer !");
+            FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compress_destSize() overwrite dst buffer !");
+            FUZ_CHECKTEST(srcSize > blockSize, "LZ4_compress_destSize() fed more than src buffer !");
+            DISPLAY("destSize : %7i/%7i; content%7i/%7i ", ret, targetSize, srcSize, blockSize);
+            if (targetSize>0)
+            {
+                FUZ_CHECKTEST((ret==0), "LZ4_compress_destSize() compression failed");
+                /* check correctness */
+                FUZ_DISPLAYTEST;
+
+                crcOrig = XXH32(block, srcSize, 0);
+                compressedSize = ret;
+                endCheck = FUZ_rand(&randState) & 255;
+                decodedBuffer[srcSize] = endCheck;
+                ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, srcSize);
+                FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe() failed on data compressed by LZ4_compress_destSize");
+                FUZ_CHECKTEST(ret!=srcSize, "LZ4_decompress_safe() failed : did not fully decompressed data");
+                FUZ_CHECKTEST(decodedBuffer[srcSize] != endCheck, "LZ4_decompress_safe() overwrite dst buffer !");
+                crcCheck = XXH32(decodedBuffer, srcSize, 0);
+                FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe() corrupted decoded data");
+
+                DISPLAY(" OK \n");
+            }
+            else
+                DISPLAY(" \n");
+        }
+
         /* Test compression HC */
         FUZ_DISPLAYTEST;
         ret = LZ4_compressHC(block, compressedBuffer, blockSize);

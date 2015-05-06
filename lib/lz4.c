@@ -679,7 +679,7 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
 #if (HEAPMODE)
-    void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t_internal));   /* malloc-calloc always properly aligned */
+    void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctx;
     void* ctxPtr = &ctx;
@@ -715,9 +715,222 @@ int LZ4_compress_fast_force(const char* source, char* dest, int inputSize, int m
 }
 
 
-/*****************************************
-*  Experimental : Streaming functions
-*****************************************/
+/********************************
+*  destSize variant
+********************************/
+
+static int LZ4_compress_destSize_generic(
+                       void* const ctx,
+                 const char* const src,
+                       char* const dst,
+                       int*  const srcSizePtr,
+                 const int targetDstSize,
+                 const tableType_t tableType)
+{
+    const BYTE* ip = (const BYTE*) src;
+    const BYTE* base = (const BYTE*) src;
+    const BYTE* lowLimit = (const BYTE*) src;
+    const BYTE* anchor = ip;
+    const BYTE* const iend = ip + *srcSizePtr;
+    const BYTE* const mflimit = iend - MFLIMIT;
+    const BYTE* const matchlimit = iend - LASTLITERALS;
+
+    BYTE* op = (BYTE*) dst;
+    BYTE* const oend = op + targetDstSize;
+    BYTE* const oMaxLit = op + targetDstSize - 2 /* offset */ - 8 /* because 8+MINMATCH==MFLIMIT */ - 1 /* token */;
+    BYTE* const oMaxMatch = op + targetDstSize - (LASTLITERALS + 1 /* token */);
+    BYTE* const oMaxSeq = oMaxLit - 1 /* token */;
+
+    U32 forwardH;
+
+
+    /* Init conditions */
+    if (targetDstSize < 1) return 0;                                     /* Impossible to store anything */
+    if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;            /* Unsupported input size, too large (or negative) */
+    if ((tableType == byU16) && (*srcSizePtr>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
+    if (*srcSizePtr<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
+
+    /* First Byte */
+    *srcSizePtr = 0;
+    LZ4_putPosition(ip, ctx, tableType, base);
+    ip++; forwardH = LZ4_hashPosition(ip, tableType);
+
+    /* Main Loop */
+    for ( ; ; )
+    {
+        const BYTE* match;
+        BYTE* token;
+        {
+            const BYTE* forwardIp = ip;
+            unsigned step = 1;
+            unsigned searchMatchNb = 1 << LZ4_skipTrigger;
+
+            /* Find a match */
+            do {
+                U32 h = forwardH;
+                ip = forwardIp;
+                forwardIp += step;
+                step = (searchMatchNb++ >> LZ4_skipTrigger);
+
+                if (unlikely(forwardIp > mflimit))
+                    goto _last_literals;
+
+                match = LZ4_getPositionOnHash(h, ctx, tableType, base);
+                forwardH = LZ4_hashPosition(forwardIp, tableType);
+                LZ4_putPositionOnHash(ip, h, ctx, tableType, base);
+
+            } while ( ((tableType==byU16) ? 0 : (match + MAX_DISTANCE < ip))
+                || (LZ4_read32(match) != LZ4_read32(ip)) );
+        }
+
+        /* Catch up */
+        while ((ip>anchor) && (match > lowLimit) && (unlikely(ip[-1]==match[-1]))) { ip--; match--; }
+
+        {
+            /* Encode Literal length */
+            unsigned litLength = (unsigned)(ip - anchor);
+            token = op++;
+            if (op + ((litLength+240)/255) + litLength > oMaxLit)
+            {
+                /* Not enough space for a last match */
+                op--;
+                goto _last_literals;
+            }
+            if (litLength>=RUN_MASK)
+            {
+                unsigned len = litLength - RUN_MASK;
+                *token=(RUN_MASK<<ML_BITS);
+                for(; len >= 255 ; len-=255) *op++ = 255;
+                *op++ = (BYTE)len;
+            }
+            else *token = (BYTE)(litLength<<ML_BITS);
+
+            /* Copy Literals */
+            LZ4_wildCopy(op, anchor, op+litLength);
+            op += litLength;
+        }
+
+_next_match:
+        /* Encode Offset */
+        LZ4_writeLE16(op, (U16)(ip-match)); op+=2;
+
+        /* Encode MatchLength */
+        {
+            size_t matchLength;
+
+            matchLength = LZ4_count(ip+MINMATCH, match+MINMATCH, matchlimit);
+
+            if (op + ((matchLength+240)/255) > oMaxMatch)
+            {
+                /* Match description too long : reduce it */
+                matchLength = (15-1) + (oMaxMatch-op) * 255;
+            }
+            //printf("offset %5i, matchLength%5i \n", (int)(ip-match), matchLength + MINMATCH);
+            ip += MINMATCH + matchLength;
+
+            if (matchLength>=ML_MASK)
+            {
+                *token += ML_MASK;
+                matchLength -= ML_MASK;
+                while (matchLength >= 255) { matchLength-=255; *op++ = 255; }
+                *op++ = (BYTE)matchLength;
+            }
+            else *token += (BYTE)(matchLength);
+        }
+
+        anchor = ip;
+
+        /* Test end of block */
+        if (ip > mflimit) break;
+        if (op > oMaxSeq) break;
+
+        /* Fill table */
+        LZ4_putPosition(ip-2, ctx, tableType, base);
+
+        /* Test next position */
+        match = LZ4_getPosition(ip, ctx, tableType, base);
+        LZ4_putPosition(ip, ctx, tableType, base);
+        if ( (match+MAX_DISTANCE>=ip)
+            && (LZ4_read32(match)==LZ4_read32(ip)) )
+        { token=op++; *token=0; goto _next_match; }
+
+        /* Prepare next loop */
+        forwardH = LZ4_hashPosition(++ip, tableType);
+    }
+
+_last_literals:
+    /* Encode Last Literals */
+    {
+        size_t lastRunSize = (size_t)(iend - anchor);
+        if (op + 1 /* token */ + ((lastRunSize+240)/255) /* litLength */ + lastRunSize /* literals */ > oend)
+        {
+            /* adapt lastRunSize to fill 'dst' */
+            lastRunSize  = (oend-op) - 1;
+            lastRunSize -= (lastRunSize+240)/255;
+        }
+        ip = anchor + lastRunSize;
+
+        if (lastRunSize >= RUN_MASK)
+        {
+            size_t accumulator = lastRunSize - RUN_MASK;
+            *op++ = RUN_MASK << ML_BITS;
+            for(; accumulator >= 255 ; accumulator-=255) *op++ = 255;
+            *op++ = (BYTE) accumulator;
+        }
+        else
+        {
+            *op++ = (BYTE)(lastRunSize<<ML_BITS);
+        }
+        memcpy(op, anchor, lastRunSize);
+        op += lastRunSize;
+    }
+
+    /* End */
+    *srcSizePtr = (int) (((const char*)ip)-src);
+    return (int) (((char*)op)-dst);
+}
+
+
+static int LZ4_compress_destSize_extState (void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize)
+{
+    LZ4_resetStream((LZ4_stream_t*)state);
+
+    if (targetDstSize >= LZ4_compressBound(*srcSizePtr))   /* compression success is guaranteed */
+    {
+        return LZ4_compress_fast_extState(state, src, dst, *srcSizePtr, targetDstSize, 1);
+    }
+    else
+    {
+        if (*srcSizePtr < LZ4_64Klimit)
+            return LZ4_compress_destSize_generic(state, src, dst, srcSizePtr, targetDstSize, byU16);
+        else
+            return LZ4_compress_destSize_generic(state, src, dst, srcSizePtr, targetDstSize, LZ4_64bits() ? byU32 : byPtr);
+    }
+}
+
+
+int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targetDstSize)
+{
+#if (HEAPMODE)
+    void* ctx = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
+#else
+    LZ4_stream_t ctxBody;
+    void* ctx = &ctxBody;
+#endif
+
+    int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
+
+#if (HEAPMODE)
+    FREEMEM(ctx);
+#endif
+    return result;
+}
+
+
+
+/********************************
+*  Streaming functions
+********************************/
 
 LZ4_stream_t* LZ4_createStream(void)
 {
