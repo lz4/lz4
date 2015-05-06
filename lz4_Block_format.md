@@ -45,17 +45,20 @@ There can be any number of bytes following the token. There is no "size limit".
 (Side note : this is why a not-compressible input block is expanded by 0.4%).
 
 Example 1 : A length of 48 will be represented as :
-- 15 : value for the 4-bits High field
-- 33 : (=48-15) remaining length to reach 48
+
+  - 15 : value for the 4-bits High field
+  - 33 : (=48-15) remaining length to reach 48
 
 Example 2 : A length of 280 will be represented as :
-- 15  : value for the 4-bits High field
-- 255 : following byte is maxed, since 280-15 >= 255
-- 10  : (=280 - 15 - 255) ) remaining length to reach 280
+
+  - 15  : value for the 4-bits High field
+  - 255 : following byte is maxed, since 280-15 >= 255
+  - 10  : (=280 - 15 - 255) ) remaining length to reach 280
 
 Example 3 : A length of 15 will be represented as :
-- 15 : value for the 4-bits High field
-- 0  : (=15-15) yes, the zero must be output
+
+  - 15 : value for the 4-bits High field
+  - 0  : (=15-15) yes, the zero must be output
 
 Following the token and optional length bytes, are the literals themselves.
 They are exactly as numerous as previously decoded (length of literals).
@@ -84,7 +87,7 @@ we output additional bytes, one at a time, with values ranging from 0 to 255.
 They are added to total to provide the final match length.
 A 255 value means there is another byte to read and add.
 There is no limit to the number of optional bytes that can be output this way.
-(This points towards a maximum achievable compression ratio of ~250).
+(This points towards a maximum achievable compression ratio of about 250).
 
 With the offset and the matchlength,
 the decoder can now proceed to copy the data from the already decoded buffer.
@@ -98,8 +101,7 @@ There are specific parsing rules to respect in order to remain compatible
 with assumptions made by the decoder :
 
 1. The last 5 bytes are always literals
-2. The last match must start at least 12 bytes before end of block.
-   
+2. The last match must start at least 12 bytes before end of block.   
    Consequently, a block with less than 13 bytes cannot be compressed.
 
 These rules are in place to ensure that the decoder
