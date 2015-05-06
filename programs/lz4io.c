@@ -630,10 +630,10 @@ static unsigned LZ4IO_readLE32 (const void* s)
 
 static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t bufferSize, unsigned storedSkips)
 {
-    size_t* const bufferT = (size_t*)buffer;   /* Buffer is supposed malloc'ed, hence aligned on size_t */
-    size_t* ptrT = bufferT;
+    const size_t* const bufferT = (const size_t*)buffer;   /* Buffer is supposed malloc'ed, hence aligned on size_t */
+    const size_t* ptrT = bufferT;
     size_t  bufferSizeT = bufferSize / sizeT;
-    size_t* const bufferTEnd = bufferT + bufferSizeT;
+    const size_t* const bufferTEnd = bufferT + bufferSizeT;
     static const size_t segmentSizeT = (32 KB) / sizeT;
 
     if (!g_sparseFileSupport)   /* normal write */
@@ -679,7 +679,7 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
 
     if (bufferSize & maskT)   /* size not multiple of sizeT : implies end of block */
     {
-        const char* const restStart = (char*)bufferTEnd;
+        const char* const restStart = (const char*)bufferTEnd;
         const char* restPtr = restStart;
         size_t  restSize =  bufferSize & maskT;
         const char* const restEnd = restStart + restSize;

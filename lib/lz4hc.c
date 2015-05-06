@@ -91,7 +91,7 @@ typedef struct
     const BYTE* end;        /* next block here to continue on current prefix */
     const BYTE* base;       /* All index relative to this position */
     const BYTE* dictBase;   /* alternate base for extDict */
-    const BYTE* inputBuffer;/* deprecated */
+    BYTE* inputBuffer;      /* deprecated */
     U32   dictLimit;        /* below that point, need extDict */
     U32   lowLimit;         /* below that point, no more dict */
     U32   nextToUpdate;     /* index from which to continue dictionary update */
@@ -119,7 +119,6 @@ static void LZ4HC_init (LZ4HC_Data_Structure* hc4, const BYTE* start)
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
     hc4->nextToUpdate = 64 KB;
     hc4->base = start - 64 KB;
-    hc4->inputBuffer = start;
     hc4->end = start;
     hc4->dictBase = start - 64 KB;
     hc4->dictLimit = 64 KB;
@@ -628,7 +627,7 @@ static int LZ4_compressHC_continue_generic (LZ4HC_Data_Structure* ctxPtr,
         const BYTE* sourceEnd = (const BYTE*) source + inputSize;
         const BYTE* dictBegin = ctxPtr->dictBase + ctxPtr->lowLimit;
         const BYTE* dictEnd   = ctxPtr->dictBase + ctxPtr->dictLimit;
-        if ((sourceEnd > dictBegin) && ((BYTE*)source < dictEnd))
+        if ((sourceEnd > dictBegin) && ((const BYTE*)source < dictEnd))
         {
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
             ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictBase);
@@ -691,17 +690,19 @@ int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* ctx, const char* src,
 /* These functions currently generate deprecation warnings */
 int LZ4_sizeofStreamStateHC(void) { return LZ4_STREAMHCSIZE; }
 
-int LZ4_resetStreamStateHC(void* state, const char* inputBuffer)
+int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
 {
     if ((((size_t)state) & (sizeof(void*)-1)) != 0) return 1;   /* Error : pointer is not aligned for pointer (32 or 64 bits) */
     LZ4HC_init((LZ4HC_Data_Structure*)state, (const BYTE*)inputBuffer);
+    ((LZ4HC_Data_Structure*)state)->inputBuffer = (BYTE*)inputBuffer;
     return 0;
 }
 
-void* LZ4_createHC (const char* inputBuffer)
+void* LZ4_createHC (char* inputBuffer)
 {
     void* hc4 = ALLOCATOR(1, sizeof(LZ4HC_Data_Structure));
     LZ4HC_init ((LZ4HC_Data_Structure*)hc4, (const BYTE*)inputBuffer);
+    ((LZ4HC_Data_Structure*)hc4)->inputBuffer = (BYTE*)inputBuffer;
     return hc4;
 }
 

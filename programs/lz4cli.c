@@ -470,7 +470,7 @@ int main(int argc, char** argv)
     if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
 
     /* No input filename ==> use stdin */
-    if (multiple_inputs) input_filename = inFileNames[0], output_filename = (char*)(inFileNames[0]);
+    if (multiple_inputs) input_filename = inFileNames[0], output_filename = (const char*)(inFileNames[0]);
     if(!input_filename) { input_filename=stdinmark; }
 
     /* Check if input or output are defined as console; trigger an error in this case */

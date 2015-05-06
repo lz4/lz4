@@ -568,8 +568,8 @@ _output_error:
 static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, unsigned nonContiguous)
 {
     int p=0;
-    BYTE* b1=(BYTE*)buff1;
-    BYTE* b2=(BYTE*)buff2;
+    const BYTE* b1=(const BYTE*)buff1;
+    const BYTE* b2=(const BYTE*)buff2;
     if (nonContiguous)
     {
         DISPLAY("Non-contiguous output test (%i bytes)\n", (int)size);

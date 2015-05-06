@@ -351,7 +351,7 @@ typedef struct {
     U32 currentOffset;
     U32 initCheck;
     const BYTE* dictionary;
-    const BYTE* bufferStart;
+    BYTE* bufferStart;   /* obsolete, used for slideInputBuffer */
     U32 dictSize;
 } LZ4_stream_t_internal;
 
@@ -1064,11 +1064,11 @@ FORCE_INLINE int LZ4_decompress_generic(
     if (endOnInput)
        return (int) (((char*)op)-dest);     /* Nb of output bytes decoded */
     else
-       return (int) (((char*)ip)-source);   /* Nb of input bytes read */
+       return (int) (((const char*)ip)-source);   /* Nb of input bytes read */
 
     /* Overflow error detected */
 _output_error:
-    return (int) (-(((char*)ip)-source))-1;
+    return (int) (-(((const char*)ip)-source))-1;
 }
 
 
@@ -1092,9 +1092,9 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 
 typedef struct
 {
-    BYTE* externalDict;
+    const BYTE* externalDict;
     size_t extDictSize;
-    BYTE* prefixEnd;
+    const BYTE* prefixEnd;
     size_t prefixSize;
 } LZ4_streamDecode_t_internal;
 
@@ -1126,7 +1126,7 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
 {
     LZ4_streamDecode_t_internal* lz4sd = (LZ4_streamDecode_t_internal*) LZ4_streamDecode;
     lz4sd->prefixSize = (size_t) dictSize;
-    lz4sd->prefixEnd = (BYTE*) dictionary + dictSize;
+    lz4sd->prefixEnd = (const BYTE*) dictionary + dictSize;
     lz4sd->externalDict = NULL;
     lz4sd->extDictSize  = 0;
     return 1;
@@ -1215,7 +1215,7 @@ FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest
             return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, withPrefix64k, (BYTE*)dest-64 KB, NULL, 0);
         return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, noDict, (BYTE*)dest-dictSize, NULL, 0);
     }
-    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, usingExtDict, (BYTE*)dest, (BYTE*)dictStart, dictSize);
+    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, usingExtDict, (BYTE*)dest, (const BYTE*)dictStart, dictSize);
 }
 
 int LZ4_decompress_safe_usingDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
@@ -1231,7 +1231,7 @@ int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSi
 /* debug function */
 int LZ4_decompress_safe_forceExtDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
 {
-    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, usingExtDict, (BYTE*)dest, (BYTE*)dictStart, dictSize);
+    return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, usingExtDict, (BYTE*)dest, (const BYTE*)dictStart, dictSize);
 }
 
 
@@ -1260,23 +1260,23 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
 
-static void LZ4_init(LZ4_stream_t_internal* lz4ds, const BYTE* base)
+static void LZ4_init(LZ4_stream_t_internal* lz4ds, BYTE* base)
 {
     MEM_INIT(lz4ds, 0, LZ4_STREAMSIZE);
     lz4ds->bufferStart = base;
 }
 
-int LZ4_resetStreamState(void* state, const char* inputBuffer)
+int LZ4_resetStreamState(void* state, char* inputBuffer)
 {
     if ((((size_t)state) & 3) != 0) return 1;   /* Error : pointer is not aligned on 4-bytes boundary */
-    LZ4_init((LZ4_stream_t_internal*)state, (const BYTE*)inputBuffer);
+    LZ4_init((LZ4_stream_t_internal*)state, (BYTE*)inputBuffer);
     return 0;
 }
 
-void* LZ4_create (const char* inputBuffer)
+void* LZ4_create (char* inputBuffer)
 {
     void* lz4ds = ALLOCATOR(8, LZ4_STREAMSIZE_U64);
-    LZ4_init ((LZ4_stream_t_internal*)lz4ds, (const BYTE*)inputBuffer);
+    LZ4_init ((LZ4_stream_t_internal*)lz4ds, (BYTE*)inputBuffer);
     return lz4ds;
 }
 

@@ -331,9 +331,9 @@ int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const cha
 /* int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize); */
 
 /* Obsolete streaming functions; use new streaming interface whenever possible */
-LZ4_DEPRECATED("use LZ4_createStream() instead") void* LZ4_create (const char* inputBuffer);
+LZ4_DEPRECATED("use LZ4_createStream() instead") void* LZ4_create (char* inputBuffer);
 LZ4_DEPRECATED("use LZ4_createStream() instead") int   LZ4_sizeofStreamState(void);
-LZ4_DEPRECATED("use LZ4_resetStream() instead")  int   LZ4_resetStreamState(void* state, const char* inputBuffer);
+LZ4_DEPRECATED("use LZ4_resetStream() instead")  int   LZ4_resetStreamState(void* state, char* inputBuffer);
 LZ4_DEPRECATED("use LZ4_saveDict() instead")     char* LZ4_slideInputBuffer (void* state);
 
 /* Obsolete streaming decoding functions */

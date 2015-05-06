@@ -29,7 +29,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
-   - xxHash source repository : http://code.google.com/p/xxhash/
+   - xxHash source repository : https://github.com/Cyan4973/xxHash
 */
 
 /* Notice extracted from xxHash homepage :
@@ -57,8 +57,8 @@ Q.Score is a measure of quality of the hash function.
 It depends on successfully passing SMHasher test set.
 10 is a perfect score.
 
-A new 64-bits version, named XXH64, is available since r35.
-It offers better speed for 64-bits applications.
+A 64-bits version, named XXH64, is available since r35.
+It offers much better speed, but for 64-bits applications only.
 Name     Speed on 64 bits    Speed on 32 bits
 XXH64       13.8 GB/s            1.9 GB/s
 XXH32        6.8 GB/s            6.0 GB/s
