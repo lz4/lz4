@@ -211,7 +211,7 @@ It can be safely skipped by a conformant decoder.
 __Header Checksum__
 
 One-byte checksum of combined descriptor fields, including optional ones.
-The value is the second byte of xxh32() : ` (xxh32()>>8) & 0xFF } `
+The value is the second byte of xxh32() : ` (xxh32()>>8) & 0xFF `
 using zero as a seed,
 and the full Frame Descriptor as an input
 (including optional fields when they are present).
