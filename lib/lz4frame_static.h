@@ -40,7 +40,15 @@ extern "C" {
 #endif
 
 /* lz4frame_static.h should be used solely in the context of static linking.
+ * It contains definitions which may still change overtime.
+ * Never use it in the context of DLL linking.
  * */
+
+
+/**************************************
+*  Includes
+**************************************/
+#include "lz4frame.h"
 
 
 /**************************************
@@ -50,23 +58,22 @@ extern "C" {
         ITEM(OK_NoError) ITEM(ERROR_GENERIC) \
         ITEM(ERROR_maxBlockSize_invalid) ITEM(ERROR_blockMode_invalid) ITEM(ERROR_contentChecksumFlag_invalid) \
         ITEM(ERROR_compressionLevel_invalid) \
+        ITEM(ERROR_headerVersion_wrong) ITEM(ERROR_blockChecksum_unsupported) ITEM(ERROR_reservedFlag_set) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
-        ITEM(ERROR_frameSize_wrong) \
-        ITEM(ERROR_frameType_unknown) \
-        ITEM(ERROR_wrongSrcPtr) \
+        ITEM(ERROR_frameHeader_incomplete) ITEM(ERROR_frameType_unknown) ITEM(ERROR_frameSize_wrong) \
+        ITEM(ERROR_srcPtr_wrong) \
         ITEM(ERROR_decompressionFailed) \
-        ITEM(ERROR_checksum_invalid) \
+        ITEM(ERROR_headerChecksum_invalid) ITEM(ERROR_contentChecksum_invalid) \
         ITEM(ERROR_maxCode)
 
-#define LZ4F_GENERATE_ENUM(ENUM) ENUM,
+//#define LZ4F_DISABLE_OLD_ENUMS
+#ifndef LZ4F_DISABLE_OLD_ENUMS
+#define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM, ENUM = LZ4F_##ENUM,
+#else
+#define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
+#endif
 typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to handle specific errors; compare function result to -enum value */
-
-
-/**************************************
-   Includes
-**************************************/
-#include "lz4frame.h"
 
 
 #if defined (__cplusplus)

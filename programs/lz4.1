@@ -158,13 +158,13 @@ for files that have not been compressed with
  force write to standard output, even if it is the console
 
 .TP
-.BR \-m
+.BR \-m ", " \--multiple
  Multiple file names.
  By default, the second filename is used as the output filename for the compressed file.
  With
 .B -m
-, you can specify any number of input filenames, each of them will be compressed
-with the resulting compressed file named
+, you can specify any number of input filenames. Each of them will be compressed
+independently, and the resulting name of the compressed file will be
 .B filename.lz4
 .
 
@@ -177,15 +177,15 @@ with the resulting compressed file named
  block dependency (improve compression ratio)
 .TP
 .B \--[no-]frame-crc
- disable stream checksum (default:enabled)
+ select frame checksum (default:enabled)
 .TP
 .B \--[no-]content-size
- compressed file includes original size (default:not present)
+ header includes original size (default:not present)
  Note : this option can only be activated when the original size can be determined,
-hence for a file. It won't work with unknown source size, such as stdin pipe.
+hence for a file. It won't work with unknown source size, such as stdin or pipe.
 .TP
 .B \--[no-]sparse 
- enable sparse file (default:disabled)(experimental)
+ sparse file support (default:enabled)
 .TP
 .B \-l
  use Legacy format (useful for Linux Kernel compression)

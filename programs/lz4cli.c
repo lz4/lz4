@@ -65,7 +65,7 @@
 /****************************
 *  OS-specific Includes
 *****************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <io.h>       /* _isatty */
 #  ifdef __MINGW32__
    int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
@@ -102,7 +102,7 @@
 ***************************************/
 #define DISPLAY(...)           fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...)   if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
+static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : downgradable normal ; 3 : non-downgradable normal; 4 : + information */
 
 
 /**************************************
@@ -175,7 +175,7 @@ static int usage_advanced(void)
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled)\n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
-    DISPLAY( "--sparse       : enable sparse file (default:disabled)(experimental)\n");
+    DISPLAY( "--[no-]sparse  : sparse file support (default:enabled)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
@@ -251,7 +251,7 @@ static int badusage(void)
 static void waitEnter(void)
 {
     DISPLAY("Press enter to continue...\n");
-    getchar();
+    (void)getchar();
 }
 
 
@@ -265,7 +265,8 @@ int main(int argc, char** argv)
         forceStdout=0,
         forceCompress=0,
         main_pause=0,
-        multiple_inputs=0;
+        multiple_inputs=0,
+        operationResult=0;
     const char* input_filename=0;
     const char* output_filename=0;
     char* dynNameSpace=0;
@@ -294,12 +295,13 @@ int main(int argc, char** argv)
         /* long commands (--long-word) */
         if (!strcmp(argument, "--compress")) { forceCompress = 1; continue; }
         if ((!strcmp(argument, "--decompress"))
-           || (!strcmp(argument, "--uncompress"))) { decode = 1; continue; }
+         || (!strcmp(argument, "--uncompress"))) { decode = 1; continue; }
+        if (!strcmp(argument, "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
         if (!strcmp(argument, "--test")) { decode = 1; LZ4IO_setOverwrite(1); output_filename=nulmark; continue; }
         if (!strcmp(argument, "--force")) { LZ4IO_setOverwrite(1); continue; }
         if (!strcmp(argument, "--no-force")) { LZ4IO_setOverwrite(0); continue; }
         if ((!strcmp(argument, "--stdout"))
-           || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
+         || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
         if (!strcmp(argument, "--frame-crc")) { LZ4IO_setStreamChecksumMode(1); continue; }
         if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
         if (!strcmp(argument, "--content-size")) { LZ4IO_setContentSize(1); continue; }
@@ -310,6 +312,7 @@ int main(int argc, char** argv)
         if (!strcmp(argument, "--quiet")) { if (displayLevel) displayLevel--; continue; }
         if (!strcmp(argument, "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
         if (!strcmp(argument, "--keep")) { continue; }   /* keep source file (default anyway; just for xz/lzma compatibility) */
+
 
         /* Short commands (note : aggregated short commands are allowed) */
         if (argument[0]=='-')
@@ -420,11 +423,15 @@ int main(int argc, char** argv)
 
                     /* Modify Nb Iterations (benchmark only) */
                 case 'i':
-                    if ((argument[1] >='1') && (argument[1] <='9'))
                     {
-                        int iters = argument[1] - '0';
+                        unsigned iters = 0;
+                        while ((argument[1] >='0') && (argument[1] <='9'))
+                        {
+                            iters *= 10;
+                            iters += argument[1] - '0';
+                            argument++;
+                        }
                         BMK_setNbIterations(iters);
-                        argument++;
                     }
                     break;
 
@@ -463,14 +470,19 @@ int main(int argc, char** argv)
     if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
 
     /* No input filename ==> use stdin */
-    if (multiple_inputs) input_filename = inFileNames[0], output_filename = (char*)(inFileNames[0]);
+    if (multiple_inputs) input_filename = inFileNames[0], output_filename = (const char*)(inFileNames[0]);
     if(!input_filename) { input_filename=stdinmark; }
 
     /* Check if input or output are defined as console; trigger an error in this case */
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
     /* Check if benchmark is selected */
-    if (bench) return BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+    if (bench)
+    {
+        int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+        free((void*)inFileNames);
+        return bmkResult;
+    }
 
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)
@@ -509,32 +521,40 @@ int main(int argc, char** argv)
     /* Check if output is defined as console; trigger an error in this case */
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) badusage();
 
-    /* No warning message in pure pipe mode (stdin + stdout) */
+    /* Downgrade notification level in pure pipe mode (stdin + stdout) and multiple file mode */
     if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
+    if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
 
 
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
-    if (decode) DEFAULT_DECOMPRESSOR(input_filename, output_filename);
+    if (decode)
+    {
+      if (multiple_inputs)
+        operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
+      else
+        DEFAULT_DECOMPRESSOR(input_filename, output_filename);
+    }
     else
     {
-        /* compression is default action */
-        if (legacy_format)
-        {
-            DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
-            LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
-        }
+      /* compression is default action */
+      if (legacy_format)
+      {
+        DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
+        LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
+      }
+      else
+      {
+        if (multiple_inputs)
+          operationResult = LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
         else
-        {
-            if (multiple_inputs)
-                LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
-            else
-                DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
-        }
+          DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
+      }
     }
 
     if (main_pause) waitEnter();
     free(dynNameSpace);
     free((void*)inFileNames);
+    if (operationResult != 0) return operationResult;
     return 0;
 }

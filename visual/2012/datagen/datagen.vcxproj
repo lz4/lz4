@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{18B9F1A7-9C66-4352-898B-30804DADE0FD}</ProjectGuid>
+    <ProjectGuid>{D745AE2F-596A-403A-9B91-81A8C6779243}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>fuzzer</RootNamespace>
+    <RootNamespace>datagen</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -147,15 +147,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\lz4.c" />
-    <ClCompile Include="..\..\..\lib\lz4hc.c" />
-    <ClCompile Include="..\..\..\lib\xxhash.c" />
-    <ClCompile Include="..\..\..\programs\fuzzer.c" />
+    <ClCompile Include="..\..\..\programs\datagen.c" />
+    <ClCompile Include="..\..\..\programs\datagencli.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\lib\lz4.h" />
-    <ClInclude Include="..\..\..\lib\lz4hc.h" />
-    <ClInclude Include="..\..\..\lib\xxhash.h" />
+    <ClInclude Include="..\..\..\programs\datagen.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
