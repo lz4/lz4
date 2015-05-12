@@ -205,8 +205,8 @@ This is the original (uncompressed) size.
 This information is optional, and only present if the associated flag is set.
 Content size is provided using unsigned 8 Bytes, for a maximum of 16 HexaBytes.
 Format is Little endian.
-This value is informational.
-It can be safely skipped by a conformant decoder.
+This value is informational, typically for display or memory allocation.
+It can be skipped by a decoder, or used to validate content correctness.
 
 __Header Checksum__
 
