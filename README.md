@@ -77,4 +77,4 @@ A list of these sources is maintained on the [LZ4 Homepage].
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 [lz4_Block_format]: lz4_Block_format.md
 [lz4_Frame_format]: lz4_Frame_format.md
-[LZ4 Homepage]: http://www.lz4.info
+[LZ4 Homepage]: http://www.lz4.org

@@ -224,15 +224,21 @@ test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize tes
 test-lz4c: lz4c datagen
 	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -t
 
-test-lz4c32: lz4 lz4c32 datagen
-	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
+test-interop-32-64: lz4 lz4c32 datagen
+	@echo ---- test interoperability 32-bits -vs- 64 bits ----
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
-	./datagen         | ./lz4c32        | ./lz4c32 -t
+	./datagen -P10    | ./lz4    -9B4   | ./lz4c32 -t
 	./datagen         | ./lz4c32        | ./lz4    -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
+	./datagen -g1M    | ./lz4    -3B5   | ./lz4c32 -t
 	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -qt
-	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
+	./datagen -g1G -P90 | ./lz4         | ./lz4c32 -t
 	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -qt
+
+test-lz4c32: lz4c32 datagen test-interop-32-64
+	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
+	./datagen         | ./lz4c32        | ./lz4c32 -t
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(NB_LOOPS) $(TEST_FILES)
