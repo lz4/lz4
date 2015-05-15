@@ -45,7 +45,7 @@
 
 /*
  * ACCELERATION_DEFAULT :
- * Select the value of "acceleration" for LZ4_compress_fast() when parameter == 0
+ * Select "acceleration" for LZ4_compress_fast() when parameter value <= 0
  */
 #define ACCELERATION_DEFAULT 1
 
