@@ -6,6 +6,7 @@ import filecmp
 import os
 import shutil
 import sys
+import hashlib
 
 repo_url = 'https://github.com/Cyan4973/lz4.git'
 tmp_dir_name = 'test/lz4test'
@@ -36,6 +37,11 @@ def get_git_tags():
     stdout, stderr = git(['tag', '-l', 'r[0-9][0-9][0-9]'])
     tags = stdout.decode('utf-8').split()
     return tags
+
+# http://stackoverflow.com/a/19711609/2132223
+def sha1_of_file(filepath):
+    with open(filepath, 'rb') as f:
+        return hashlib.sha1(f.read()).hexdigest()
 
 if __name__ == '__main__':
     error_code = 0
@@ -102,6 +108,7 @@ if __name__ == '__main__':
                 continue
             if filecmp.cmp(lz4, lz4t):
                 os.remove(lz4t)
+                print('{} == {}'.format(lz4, lz4t))
 
     print('Enumerate only different compressed files')
     lz4s = sorted(glob.glob('*.lz4'))
@@ -127,6 +134,10 @@ if __name__ == '__main__':
             error_code = 1
         else:
             os.remove(dec)
+
+    lz4s = sorted(glob.glob('*.lz4'))
+    for lz4 in lz4s:
+        print('{}   {}'.format(sha1_of_file(lz4), lz4))
 
     if error_code != 0:
         print('ERROR')
