@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 tests - Makefile
-# Copyright (C) Yann Collet 2011-2015
+# Copyright (C) Takayuki Matsuoka - Yann Collet 2011-2015
 #
 # GPL v2 License
 #
@@ -22,7 +22,7 @@
 #  - LZ4 source repository : https://github.com/Cyan4973/lz4
 #  - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 # ##########################################################################
-# versionstest : Compatibility test between all LZ4 versions
+# versionstest : Compatibility test between LZ4 versions stored on Github (r116+)
 # ##########################################################################
 
 PYTHON?= python3
