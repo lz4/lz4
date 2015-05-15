@@ -98,6 +98,8 @@ if __name__ == '__main__':
         print(lz4 + ' : ' + repr(os.path.getsize(lz4)))
 
     # Remove duplicated .lz4 files
+    print('')
+    print('Duplicated files')
     lz4s = sorted(glob.glob('*.lz4'))
     for i, lz4 in enumerate(lz4s):
         if not os.path.isfile(lz4):
@@ -133,8 +135,11 @@ if __name__ == '__main__':
             print('ERR : ' + dec)
             error_code = 1
         else:
+            print('OK  : ' + dec)
             os.remove(dec)
 
+    print('')
+    print('Unique .lz4 files')
     lz4s = sorted(glob.glob('*.lz4'))
     for lz4 in lz4s:
         print('{}   {}'.format(sha1_of_file(lz4), lz4))
