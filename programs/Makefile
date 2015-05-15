@@ -34,7 +34,7 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r129
+RELEASE?= r130
 
 DESTDIR?=
 PREFIX ?= /usr/local
