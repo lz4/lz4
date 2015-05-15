@@ -8,6 +8,7 @@ before_install:
   - sudo apt-get install -qq g++-multilib
   - sudo apt-get install -qq gcc-multilib
   - sudo apt-get install -qq valgrind
+  - sudo apt-get install -qq python3
 
 env:
   - LZ4_TRAVIS_CI_ENV=travis-install
@@ -18,6 +19,7 @@ env:
   - LZ4_TRAVIS_CI_ENV=staticAnalyze
   - LZ4_TRAVIS_CI_ENV=gpptest
   - LZ4_TRAVIS_CI_ENV=armtest
+  - LZ4_TRAVIS_CI_ENV=versionstest
   - LZ4_TRAVIS_CI_ENV=test-lz4
   - LZ4_TRAVIS_CI_ENV=test-lz4c
   - LZ4_TRAVIS_CI_ENV=test-lz4c32
