@@ -68,16 +68,17 @@ if __name__ == '__main__':
         os.chdir(base_dir)
         dst_lz4c   = '{}/lz4c.{}'  .format(tmp_dir, tag) # /path/to/lz4/test/lz4test/lz4c.<TAG>
         dst_lz4c32 = '{}/lz4c32.{}'.format(tmp_dir, tag) # /path/to/lz4/test/lz4test/lz4c32.<TAG>
-        if not os.path.isfile(dst_lz4c) or not os.path.isfile(dst_lz4c32):
+        if not os.path.isfile(dst_lz4c) or not os.path.isfile(dst_lz4c32) or tag == head:
             if tag != head:
                 r_dir = '{}/{}'.format(tmp_dir, tag)  # /path/to/lz4/test/lz4test/<TAG>
                 os.makedirs(r_dir, exist_ok=True)
                 os.chdir(clone_dir)
                 git(['--work-tree=' + r_dir, 'checkout', tag, '--', '.'], False)
                 os.chdir(r_dir + '/programs')  # /path/to/lz4/lz4test/<TAG>/programs
+                make(['clean', 'lz4c', 'lz4c32'], False)
             else:
                 os.chdir(programs_dir)
-            make(['clean', 'lz4c', 'lz4c32'], False)
+                make(['lz4c', 'lz4c32'], False)
             shutil.copy2('lz4c',   dst_lz4c)
             shutil.copy2('lz4c32', dst_lz4c32)
 
@@ -120,6 +121,8 @@ if __name__ == '__main__':
     # Decompress remained .lz4 files by all released lz4c and lz4c32
     print('Decompression tests and verifications')
     lz4s = sorted(glob.glob('*.lz4'))
+    for dec in glob.glob("*.dec"):
+        os.remove(dec)
     for lz4 in lz4s:
         print(lz4, end=" ")
         for tag in tags:
