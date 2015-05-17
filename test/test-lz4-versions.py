@@ -112,12 +112,12 @@ if __name__ == '__main__':
     print('Decompression tests and verifications')
     lz4s = sorted(glob.glob('*.lz4'))
     for lz4 in lz4s:
-        print(lz4, end=" ", flush=True)
+        print(lz4, end=" ")
         for tag in tags:
-            print(tag, end=" ", flush=True)
+            print(tag, end=" ")
             proc(['./lz4c.'   + tag, '-df', lz4, lz4 + '_d64_' + tag + '.dec'])
             proc(['./lz4c32.' + tag, '-df', lz4, lz4 + '_d32_' + tag + '.dec'])
-        print(' OK')
+        print(' OK')   # well, here, decompression has worked; but file is not yet verified
 
     # Compare all '.dec' files with test_dat
     decs = glob.glob('*.dec')
