@@ -41,6 +41,7 @@
 
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
 #define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
+#define _POSIX_SOURCE 1        /* for fileno() within <stdio.h> on unix */
 
 
 /*****************************
@@ -63,14 +64,20 @@
 ******************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
+#  include <io.h>      /* _setmode, _fileno, _get_osfhandle, _isatty */
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
 #  include <Windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
 #  define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
 #  if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
 #    define fseek _fseeki64
 #  endif
+#  ifdef __MINGW32__
+   int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
+#  endif
+#  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
+#  include <unistd.h>   /* isatty */
+#  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
 #  define SET_BINARY_MODE(file)
 #  define SET_SPARSE_FILE_MODE(file)
 #endif
@@ -636,7 +643,7 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     static const size_t segmentSizeT = (32 KB) / sizeT;
 
-    if (!g_sparseFileSupport)   /* normal write */
+    if (!g_sparseFileSupport || IS_CONSOLE(file))   /* normal write */
     {
         size_t sizeCheck = fwrite(buffer, 1, bufferSize, file);
         if (sizeCheck != bufferSize) EXM_THROW(68, "Write error : cannot write decoded block");
