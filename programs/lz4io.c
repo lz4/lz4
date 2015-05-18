@@ -301,12 +301,13 @@ static int LZ4IO_getFiles(const char* input_filename, const char* output_filenam
         *pfoutput = fopen( output_filename, "wb" );
     }
 
-    if ( *pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
+    if (*pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
 
     if (g_sparseFileSupport)
     {
         long int ftr = ftell(*pfoutput);
-        if (ftr==-1) g_sparseFileSupport = 0;
+        /* DISPLAY("%s->%s ==> %i \n", input_filename, output_filename, (int)ftr); */
+        if (ftr!=0) g_sparseFileSupport = 0;
     }
 
     return 0;

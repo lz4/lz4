@@ -172,7 +172,7 @@ test-lz4-sparse: lz4 datagen
 	./lz4 COPYING | ./lz4 -d | cat
 
 test-lz4-contentSize: lz4 datagen
-	@echo ---- test original size support ----
+	@echo "\n ---- test original size support ----"
 	./datagen -g15M > tmp
 	./lz4 -v tmp | ./lz4 -t
 	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
@@ -185,7 +185,7 @@ test-lz4-contentSize: lz4 datagen
 	@rm tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
-	@echo ---- test frame concatenation ----
+	@echo "\n ---- test frame concatenation ----"
 	@echo -n > empty.test
 	@echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
@@ -198,7 +198,7 @@ test-lz4-frame-concatenation: lz4 datagen
 	@echo frame concatenation test completed
 
 test-lz4-multiple: lz4 datagen
-	@echo ---- test multiple files ----
+	@echo "\n ---- test multiple files ----"
 	@./datagen -s1        > tmp1 2> $(VOID)
 	@./datagen -s2 -g100K > tmp2 2> $(VOID)
 	@./datagen -s3 -g1M   > tmp3 2> $(VOID)
@@ -210,8 +210,8 @@ test-lz4-multiple: lz4 datagen
 	./lz4 -f -m tmp1 notHere tmp2; echo $$?
 	@rm tmp*
 
-test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
-	@echo ---- test lz4 basic compression/decompression ----
+test-lz4-basic: lz4 datagen
+	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0     | ./lz4 -v     | ./lz4 -t
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
 	./datagen         | ./lz4        | ./lz4 -t
@@ -221,7 +221,9 @@ test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize tes
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
 	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
-	@echo ---- test pass-through ----
+
+test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
+	@echo "\n ---- test pass-through ----"
 	./datagen | ./lz4 -tf
 
 test-lz4c: lz4c datagen
