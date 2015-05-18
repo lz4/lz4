@@ -150,7 +150,7 @@ test-all: test test32
 test-travis: $(TRAVIS_TARGET)
 
 test-lz4-sparse: lz4 datagen
-	@echo ---- test sparse file support ----
+	@echo "\n ---- test sparse file support ----"
 	./datagen -g5M  -P100 > tmpSrc
 	./lz4 -B4D tmpSrc | ./lz4 -dv --sparse > tmpB4
 	diff -s tmpSrc tmpB4
@@ -167,6 +167,9 @@ test-lz4-sparse: lz4 datagen
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
 	@rm tmp*
+	@echo "\n Compatibility with Console :"
+	./lz4 COPYING | ./lz4 -d -c
+	./lz4 COPYING | ./lz4 -d | cat
 
 test-lz4-contentSize: lz4 datagen
 	@echo ---- test original size support ----
