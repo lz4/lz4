@@ -227,10 +227,11 @@ test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-
 	./datagen | ./lz4 -tf
 
 test-lz4c: lz4c datagen
+	@echo "\n ---- test lz4c version ----"
 	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -t
 
 test-interop-32-64: lz4 lz4c32 datagen
-	@echo ---- test interoperability 32-bits -vs- 64 bits ----
+	@echo "\n ---- test interoperability 32-bits -vs- 64 bits ----"
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
 	./datagen -P10    | ./lz4    -9B4   | ./lz4c32 -t
 	./datagen         | ./lz4c32        | ./lz4    -t
@@ -239,11 +240,14 @@ test-interop-32-64: lz4 lz4c32 datagen
 	./datagen -g1G -P90 | ./lz4         | ./lz4c32 -t
 	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -qt
 
-test-lz4c32: lz4c32 datagen test-interop-32-64
+test-lz4c32-basic: lz4c32 datagen
+	@echo "\n ---- test lz4c32 32-bits version ----"
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
 	./datagen         | ./lz4c32        | ./lz4c32 -t
 	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
 	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
+
+test-lz4c32: test-lz4c32-basic test-interop-32-64
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(NB_LOOPS) $(TEST_FILES)
@@ -264,6 +268,7 @@ test-frametest32: frametest32
 	./frametest32 $(FUZZER_TIME)
 
 test-mem: lz4 datagen fuzzer frametest fullbench
+	@echo "\n ---- valgrind tests : memory analyzer ----"
 	valgrind --leak-check=yes --error-exitcode=1 ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -9 -BD -f tmp $(VOID)
