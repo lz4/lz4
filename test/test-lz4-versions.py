@@ -116,7 +116,7 @@ if __name__ == '__main__':
     print('Enumerate only different compressed files')
     lz4s = sorted(glob.glob('*.lz4'))
     for lz4 in lz4s:
-        print(lz4 + ' : ' + repr(os.path.getsize(lz4)))
+        print(lz4 + ' : ' + repr(os.path.getsize(lz4)) + ', ' + sha1_of_file(lz4))
 
     # Decompress remained .lz4 files by all released lz4c and lz4c32
     print('Decompression tests and verifications')
@@ -140,12 +140,6 @@ if __name__ == '__main__':
         else:
             print('OK  : ' + dec)
             os.remove(dec)
-
-    print('')
-    print('Unique .lz4 files')
-    lz4s = sorted(glob.glob('*.lz4'))
-    for lz4 in lz4s:
-        print('{}   {}'.format(sha1_of_file(lz4), lz4))
 
     if error_code != 0:
         print('ERROR')
