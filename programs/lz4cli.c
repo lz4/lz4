@@ -263,6 +263,7 @@ int main(int argc, char** argv)
         bench=0,
         legacy_format=0,
         forceStdout=0,
+        forceFileOut=0,
         forceCompress=0,
         main_pause=0,
         multiple_inputs=0,
@@ -302,6 +303,7 @@ int main(int argc, char** argv)
         if (!strcmp(argument, "--no-force")) { LZ4IO_setOverwrite(0); continue; }
         if ((!strcmp(argument, "--stdout"))
          || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
+        if (!strcmp(argument, "--no-stdout")) { forceStdout=0; displayLevel=1; forceFileOut=1; continue; }
         if (!strcmp(argument, "--frame-crc")) { LZ4IO_setStreamChecksumMode(1); continue; }
         if (!strcmp(argument, "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
         if (!strcmp(argument, "--content-size")) { LZ4IO_setContentSize(1); continue; }
@@ -476,6 +478,9 @@ int main(int argc, char** argv)
     /* Check if input or output are defined as console; trigger an error in this case */
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
 
+    /* stdout and file-out option cannot be co-existed. */
+    if (forceStdout && forceFileOut) badusage();
+
     /* Check if benchmark is selected */
     if (bench)
     {
@@ -487,7 +492,7 @@ int main(int argc, char** argv)
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename)
     {
-        if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
+        if (!IS_CONSOLE(stdout) && !forceFileOut) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
         if ((!decode) && !(forceCompress))   /* auto-determine compression or decompression, based on file extension */
         {
             size_t l = strlen(input_filename);
