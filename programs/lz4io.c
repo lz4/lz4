@@ -851,7 +851,6 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
             nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
             if (LZ4F_isError(nextToLoad)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             pos += remaining;
-            if (!nextToLoad) break;
 
             if (decodedBytes)
             {
@@ -860,6 +859,8 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
                 DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
                 storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, storedSkips);
             }
+
+            if (!nextToLoad) break;
         }
     }
 

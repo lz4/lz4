@@ -168,8 +168,9 @@ test-lz4-sparse: lz4 datagen
 	ls -ls tmpOdd
 	@rm tmp*
 	@echo "\n Compatibility with Console :"
-	./lz4 COPYING | ./lz4 -d -c
-	./lz4 COPYING | ./lz4 -d | cat
+	echo "Hello World 1 !" | ./lz4 | ./lz4 -d -c
+	echo "Hello World 2 !" | ./lz4 | ./lz4 -d | cat
+	echo "Hello World 3 !" | ./lz4 --no-frame-crc | ./lz4 -d -c
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
@@ -214,6 +215,11 @@ test-lz4-basic: lz4 datagen
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0     | ./lz4 -v     | ./lz4 -t
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
+	./datagen -g20KB > tmpSrc
+	./lz4 < tmpSrc | ./lz4 -d > tmpRes
+	diff -q tmpSrc tmpRes
+	./lz4 --no-frame-crc < tmpSrc | ./lz4 -d > tmpRes
+	diff -q tmpSrc tmpRes
 	./datagen         | ./lz4        | ./lz4 -t
 	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
 	./datagen -g17M   | ./lz4 -9v    | ./lz4 -qt
@@ -221,6 +227,7 @@ test-lz4-basic: lz4 datagen
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
 	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
+	@rm tmp*
 
 test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
 	@echo "\n ---- test pass-through ----"
