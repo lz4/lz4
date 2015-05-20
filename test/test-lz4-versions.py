@@ -6,6 +6,7 @@ import filecmp
 import os
 import shutil
 import sys
+import hashlib
 
 repo_url = 'https://github.com/Cyan4973/lz4.git'
 tmp_dir_name = 'test/lz4test'
@@ -37,6 +38,11 @@ def get_git_tags():
     tags = stdout.decode('utf-8').split()
     return tags
 
+# http://stackoverflow.com/a/19711609/2132223
+def sha1_of_file(filepath):
+    with open(filepath, 'rb') as f:
+        return hashlib.sha1(f.read()).hexdigest()
+
 if __name__ == '__main__':
     error_code = 0
     base_dir = os.getcwd() + '/..'           # /path/to/lz4
@@ -62,16 +68,17 @@ if __name__ == '__main__':
         os.chdir(base_dir)
         dst_lz4c   = '{}/lz4c.{}'  .format(tmp_dir, tag) # /path/to/lz4/test/lz4test/lz4c.<TAG>
         dst_lz4c32 = '{}/lz4c32.{}'.format(tmp_dir, tag) # /path/to/lz4/test/lz4test/lz4c32.<TAG>
-        if not os.path.isfile(dst_lz4c) or not os.path.isfile(dst_lz4c32):
+        if not os.path.isfile(dst_lz4c) or not os.path.isfile(dst_lz4c32) or tag == head:
             if tag != head:
                 r_dir = '{}/{}'.format(tmp_dir, tag)  # /path/to/lz4/test/lz4test/<TAG>
                 os.makedirs(r_dir, exist_ok=True)
                 os.chdir(clone_dir)
                 git(['--work-tree=' + r_dir, 'checkout', tag, '--', '.'], False)
                 os.chdir(r_dir + '/programs')  # /path/to/lz4/lz4test/<TAG>/programs
+                make(['clean', 'lz4c', 'lz4c32'], False)
             else:
                 os.chdir(programs_dir)
-            make(['clean', 'lz4c', 'lz4c32'], False)
+                make(['lz4c', 'lz4c32'], False)
             shutil.copy2('lz4c',   dst_lz4c)
             shutil.copy2('lz4c32', dst_lz4c32)
 
@@ -92,6 +99,8 @@ if __name__ == '__main__':
         print(lz4 + ' : ' + repr(os.path.getsize(lz4)))
 
     # Remove duplicated .lz4 files
+    print('')
+    print('Duplicated files')
     lz4s = sorted(glob.glob('*.lz4'))
     for i, lz4 in enumerate(lz4s):
         if not os.path.isfile(lz4):
@@ -102,15 +111,18 @@ if __name__ == '__main__':
                 continue
             if filecmp.cmp(lz4, lz4t):
                 os.remove(lz4t)
+                print('{} == {}'.format(lz4, lz4t))
 
     print('Enumerate only different compressed files')
     lz4s = sorted(glob.glob('*.lz4'))
     for lz4 in lz4s:
-        print(lz4 + ' : ' + repr(os.path.getsize(lz4)))
+        print(lz4 + ' : ' + repr(os.path.getsize(lz4)) + ', ' + sha1_of_file(lz4))
 
     # Decompress remained .lz4 files by all released lz4c and lz4c32
     print('Decompression tests and verifications')
     lz4s = sorted(glob.glob('*.lz4'))
+    for dec in glob.glob("*.dec"):
+        os.remove(dec)
     for lz4 in lz4s:
         print(lz4, end=" ")
         for tag in tags:
@@ -126,6 +138,7 @@ if __name__ == '__main__':
             print('ERR : ' + dec)
             error_code = 1
         else:
+            print('OK  : ' + dec)
             os.remove(dec)
 
     if error_code != 0:
