@@ -115,7 +115,7 @@ armtest: clean
 	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 
 versionstest: clean
-	@cd test; $(MAKE) -e versionstest
+	@cd test; $(MAKE)
 
 streaming-examples:
 	cd examples; $(MAKE) -e test

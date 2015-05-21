@@ -1,6 +1,7 @@
 r130:
 Fixed  : incompatibility sparse mode vs console, reported by Yongwoon Cho (#105)
 Fixed  : LZ4IO exits too early when frame crc not present, reported by Yongwoon Cho (#106)
+Performance fix : big compression speed boost for clang (+30%)
 
 r129:
 Added  : LZ4_compress_fast(), LZ4_compress_fast_continue()

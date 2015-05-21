@@ -432,7 +432,7 @@ static const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t t
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
 }
 
-static int LZ4_compress_generic(
+FORCE_INLINE int LZ4_compress_generic(
                  void* const ctx,
                  const char* const source,
                  char* const dest,
