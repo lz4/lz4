@@ -118,6 +118,7 @@ versionstest: clean
 	@cd test; $(MAKE)
 
 streaming-examples:
+	cd lib; $(MAKE) -e
 	cd examples; $(MAKE) -e test
 
 prg-travis:
