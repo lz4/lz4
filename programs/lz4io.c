@@ -278,6 +278,11 @@ static int LZ4IO_getFiles(const char* input_filename, const char* output_filenam
         DISPLAYLEVEL(4,"Using stdout for output\n");
         *pfoutput = stdout;
         SET_BINARY_MODE(stdout);
+        if (g_sparseFileSupport==1)
+        {
+            g_sparseFileSupport = 0;
+            DISPLAYLEVEL(4, "Sparse File Support is automatically disabled on stdout ; try --sparse \n");
+        }
     }
     else
     {
@@ -302,13 +307,6 @@ static int LZ4IO_getFiles(const char* input_filename, const char* output_filenam
     }
 
     if (*pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
-
-    if (g_sparseFileSupport)
-    {
-        long int ftr = ftell(*pfoutput);
-        /* DISPLAY("%s->%s ==> %i \n", input_filename, output_filename, (int)ftr); */
-        if (ftr!=0) g_sparseFileSupport = 0;
-    }
 
     return 0;
 }
@@ -674,7 +672,7 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
         {
             size_t sizeCheck;
             seekResult = fseek(file, storedSkips, SEEK_CUR);
-            if (seekResult) EXM_THROW(72, "Skip error (sparse file)");
+            if (seekResult) EXM_THROW(72, "Sparse skip error ; try --no-sparse");
             storedSkips = 0;
             seg0SizeT -= nb0T;
             ptrT += nb0T;
@@ -696,7 +694,7 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
         {
             size_t sizeCheck;
             int seekResult = fseek(file, storedSkips, SEEK_CUR);
-            if (seekResult) EXM_THROW(74, "Skip error (end of block)");
+            if (seekResult) EXM_THROW(74, "Sparse skip error ; try --no-sparse");
             storedSkips = 0;
             sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, file);
             if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(75, "Write error : cannot write decoded end of block");

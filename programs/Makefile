@@ -171,6 +171,18 @@ test-lz4-sparse: lz4 datagen
 	echo "Hello World 1 !" | ./lz4 | ./lz4 -d -c
 	echo "Hello World 2 !" | ./lz4 | ./lz4 -d | cat
 	echo "Hello World 3 !" | ./lz4 --no-frame-crc | ./lz4 -d -c
+	@echo "\n Compatibility with Append :"
+	./datagen -P100 -g1M > tmp1M
+	cat tmp1M > tmp2M
+	cat tmp1M >> tmp2M
+	./lz4 -B5 -v tmp1M tmpC
+	./lz4 -d -v tmpC tmpR
+	./lz4 -d -v tmpC >> tmpR
+	ls -ls tmp*
+	diff tmp2M tmpR
+	@rm tmp*
+
+
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
