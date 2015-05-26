@@ -67,6 +67,11 @@
 *****************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <io.h>       /* _isatty */
+#  if defined(__DJGPP__)
+#    include <unistd.h>
+#    define _isatty isatty
+#    define _fileno fileno
+#  endif
 #  ifdef __MINGW32__
    int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
 #  endif
