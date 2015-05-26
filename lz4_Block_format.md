@@ -1,24 +1,25 @@
 LZ4 Block Format Description
 ============================
-Last revised: 2015-03-26.
+Last revised: 2015-05-07.
 Author : Yann Collet
 
 
-This small specification intents to provide enough information
-to anyone willing to produce LZ4-compatible compressed data blocks
+This specification is intended for developers
+willing to produce LZ4-compatible compressed data blocks
 using any programming language.
 
 LZ4 is an LZ77-type compressor with a fixed, byte-oriented encoding.
-The most important design principle behind LZ4 is simplicity.
-It helps to create an easy to read and maintain source code.
-It also helps later on for optimizations, compactness, and speed.
 There is no entropy encoder back-end nor framing layer.
-The latter is assumed to be handled by other parts of the system.
+The latter is assumed to be handled by other parts of the system (see [LZ4 Frame format]).
+This design is assumed to favor simplicity and speed.
+It helps later on for optimizations, compactness, and features.
 
-This document only describes the block format,
-not how the LZ4 compressor nor decompressor actually work.
+This document describes only the block format,
+not how the compressor nor decompressor actually work.
 The correctness of the decompressor should not depend
 on implementation details of the compressor, and vice versa.
+
+[LZ4 Frame format]: LZ4_Frame_format.md
 
 
 

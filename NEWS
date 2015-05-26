@@ -1,5 +1,13 @@
+r130:
+Fixed  : incompatibility sparse mode vs console, reported by Yongwoon Cho (#105)
+Fixed  : LZ4IO exits too early when frame crc not present, reported by Yongwoon Cho (#106)
+Fixed  : incompatibility sparse mode vs append mode, reported by Takayuki Matsuoka (#110)
+Performance fix : big compression speed boost for clang (+30%)
+New    : cross-version test, by Takayuki Matsuoka
+
 r129:
-Added  : LZ4_compress_fast()
+Added  : LZ4_compress_fast(), LZ4_compress_fast_continue()
+Added  : LZ4_compress_destSize()
 Changed: New lz4 and lz4hc compression API. Previous function prototypes still supported.
 Changed: Sparse file support enabled by default
 New    : LZ4 CLI improved performance compressing/decompressing multiple files (#86, kind contribution from Kyle J. Harper & Takayuki Matsuoka)

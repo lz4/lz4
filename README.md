@@ -49,6 +49,7 @@ in single-thread mode.
 |  LZO 2.06            |  2.108  |  350 MB/s   |    510 MB/s   |
 |  QuickLZ 1.5.1.b6    |  2.238  |  320 MB/s   |    380 MB/s   |
 |  Snappy 1.1.0        |  2.091  |  250 MB/s   |    960 MB/s   |
+|  LZF v3.6            |  2.073  |  175 MB/s   |    500 MB/s   |
 |  zlib 1.2.8 -1       |  2.730  |   59 MB/s   |    250 MB/s   |
 |**LZ4 HC (r129)**     |**2.720**|   22 MB/s   | **1830 MB/s** |
 |  zlib 1.2.8 -6       |  3.099  |   18 MB/s   |    270 MB/s   |
@@ -77,4 +78,4 @@ A list of these sources is maintained on the [LZ4 Homepage].
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 [lz4_Block_format]: lz4_Block_format.md
 [lz4_Frame_format]: lz4_Frame_format.md
-[LZ4 Homepage]: http://www.lz4.info
+[LZ4 Homepage]: http://www.lz4.org

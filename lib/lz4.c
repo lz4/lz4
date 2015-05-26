@@ -45,7 +45,7 @@
 
 /*
  * ACCELERATION_DEFAULT :
- * Select the value of "acceleration" for LZ4_compress_fast() when parameter == 0
+ * Select "acceleration" for LZ4_compress_fast() when parameter value <= 0
  */
 #define ACCELERATION_DEFAULT 1
 
@@ -432,7 +432,7 @@ static const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t t
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
 }
 
-static int LZ4_compress_generic(
+FORCE_INLINE int LZ4_compress_generic(
                  void* const ctx,
                  const char* const source,
                  char* const dest,

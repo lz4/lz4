@@ -31,7 +31,7 @@
 # ################################################################
 
 # Version number
-export VERSION=129
+export VERSION=130
 export RELEASE=r$(VERSION)
 
 DESTDIR?=
@@ -71,6 +71,7 @@ clean:
 	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
 	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
 	@cd examples;  $(MAKE) clean > $(VOID)
+	@cd test;      $(MAKE) clean > $(VOID)
 	@echo Cleaning completed
 
 
@@ -112,6 +113,9 @@ staticAnalyze: clean
 armtest: clean
 	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
+
+versionstest: clean
+	@cd test; $(MAKE)
 
 streaming-examples:
 	cd examples; $(MAKE) -e test

@@ -34,7 +34,7 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r129
+RELEASE?= r130
 
 DESTDIR?=
 PREFIX ?= /usr/local
@@ -150,7 +150,7 @@ test-all: test test32
 test-travis: $(TRAVIS_TARGET)
 
 test-lz4-sparse: lz4 datagen
-	@echo ---- test sparse file support ----
+	@echo "\n ---- test sparse file support ----"
 	./datagen -g5M  -P100 > tmpSrc
 	./lz4 -B4D tmpSrc | ./lz4 -dv --sparse > tmpB4
 	diff -s tmpSrc tmpB4
@@ -167,9 +167,25 @@ test-lz4-sparse: lz4 datagen
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
 	@rm tmp*
+	@echo "\n Compatibility with Console :"
+	echo "Hello World 1 !" | ./lz4 | ./lz4 -d -c
+	echo "Hello World 2 !" | ./lz4 | ./lz4 -d | cat
+	echo "Hello World 3 !" | ./lz4 --no-frame-crc | ./lz4 -d -c
+	@echo "\n Compatibility with Append :"
+	./datagen -P100 -g1M > tmp1M
+	cat tmp1M > tmp2M
+	cat tmp1M >> tmp2M
+	./lz4 -B5 -v tmp1M tmpC
+	./lz4 -d -v tmpC tmpR
+	./lz4 -d -v tmpC >> tmpR
+	ls -ls tmp*
+	diff tmp2M tmpR
+	@rm tmp*
+
+
 
 test-lz4-contentSize: lz4 datagen
-	@echo ---- test original size support ----
+	@echo "\n ---- test original size support ----"
 	./datagen -g15M > tmp
 	./lz4 -v tmp | ./lz4 -t
 	./lz4 -v --content-size tmp | ./lz4 -d > tmp2
@@ -182,7 +198,7 @@ test-lz4-contentSize: lz4 datagen
 	@rm tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
-	@echo ---- test frame concatenation ----
+	@echo "\n ---- test frame concatenation ----"
 	@echo -n > empty.test
 	@echo hi > nonempty.test
 	cat nonempty.test empty.test nonempty.test > orig.test
@@ -195,7 +211,7 @@ test-lz4-frame-concatenation: lz4 datagen
 	@echo frame concatenation test completed
 
 test-lz4-multiple: lz4 datagen
-	@echo ---- test multiple files ----
+	@echo "\n ---- test multiple files ----"
 	@./datagen -s1        > tmp1 2> $(VOID)
 	@./datagen -s2 -g100K > tmp2 2> $(VOID)
 	@./datagen -s3 -g1M   > tmp3 2> $(VOID)
@@ -207,10 +223,15 @@ test-lz4-multiple: lz4 datagen
 	./lz4 -f -m tmp1 notHere tmp2; echo $$?
 	@rm tmp*
 
-test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
-	@echo ---- test lz4 basic compression/decompression ----
+test-lz4-basic: lz4 datagen
+	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0     | ./lz4 -v     | ./lz4 -t
 	./datagen -g16KB  | ./lz4 -9     | ./lz4 -t
+	./datagen -g20KB > tmpSrc
+	./lz4 < tmpSrc | ./lz4 -d > tmpRes
+	diff -q tmpSrc tmpRes
+	./lz4 --no-frame-crc < tmpSrc | ./lz4 -d > tmpRes
+	diff -q tmpSrc tmpRes
 	./datagen         | ./lz4        | ./lz4 -t
 	./datagen -g6M -P99 | ./lz4 -9BD | ./lz4 -t
 	./datagen -g17M   | ./lz4 -9v    | ./lz4 -qt
@@ -218,21 +239,34 @@ test-lz4: lz4 datagen test-lz4-multiple test-lz4-sparse test-lz4-contentSize tes
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
 	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
-	@echo ---- test pass-through ----
+	@rm tmp*
+
+test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
+	@echo "\n ---- test pass-through ----"
 	./datagen | ./lz4 -tf
 
 test-lz4c: lz4c datagen
+	@echo "\n ---- test lz4c version ----"
 	./datagen -g256MB | ./lz4c -l -v    | ./lz4c   -t
 
-test-lz4c32: lz4 lz4c32 datagen
-	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
+test-interop-32-64: lz4 lz4c32 datagen
+	@echo "\n ---- test interoperability 32-bits -vs- 64 bits ----"
 	./datagen -g16KB  | ./lz4c32 -9     | ./lz4    -t
-	./datagen         | ./lz4c32        | ./lz4c32 -t
+	./datagen -P10    | ./lz4    -9B4   | ./lz4c32 -t
 	./datagen         | ./lz4c32        | ./lz4    -t
-	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
+	./datagen -g1M    | ./lz4    -3B5   | ./lz4c32 -t
 	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4    -qt
-	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
+	./datagen -g1G -P90 | ./lz4         | ./lz4c32 -t
 	./datagen -g6GB   | ./lz4c32 -vq9BD | ./lz4    -qt
+
+test-lz4c32-basic: lz4c32 datagen
+	@echo "\n ---- test lz4c32 32-bits version ----"
+	./datagen -g16KB  | ./lz4c32 -9     | ./lz4c32 -t
+	./datagen         | ./lz4c32        | ./lz4c32 -t
+	./datagen -g256MB | ./lz4c32 -vqB4D | ./lz4c32 -qt
+	./datagen -g6GB   | ./lz4c32 -vqB5D | ./lz4c32 -qt
+
+test-lz4c32: test-lz4c32-basic test-interop-32-64
 
 test-fullbench: fullbench
 	./fullbench --no-prompt $(NB_LOOPS) $(TEST_FILES)
@@ -253,6 +287,7 @@ test-frametest32: frametest32
 	./frametest32 $(FUZZER_TIME)
 
 test-mem: lz4 datagen fuzzer frametest fullbench
+	@echo "\n ---- valgrind tests : memory analyzer ----"
 	valgrind --leak-check=yes --error-exitcode=1 ./datagen -g50M > $(VOID)
 	./datagen -g16KB > tmp
 	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -9 -BD -f tmp $(VOID)
