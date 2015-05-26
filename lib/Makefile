@@ -40,7 +40,7 @@ LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 DESTDIR?=
 PREFIX ?= /usr/local
 CFLAGS ?= -O3
-CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
+CFLAGS += -I. -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -60,14 +60,20 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
+.PHONY: default all liblz4 liblz4 liblz4-static liblz4 clean install uninstall
+
 default: liblz4
 
 all: liblz4
 
-liblz4: lz4.c lz4hc.c lz4frame.c xxhash.c
+liblz4: liblz4-static liblz4-dynamic
+
+liblz4-static: lz4.c lz4hc.c lz4frame.c xxhash.c
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $^
 	@$(AR) rcs liblz4.a lz4.o lz4hc.o lz4frame.o xxhash.o
+
+liblz4-dynamic: lz4.c lz4hc.c lz4frame.c xxhash.c
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links

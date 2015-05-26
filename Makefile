@@ -60,9 +60,13 @@ endif
 
 default: lz4programs
 
-all: 
+all: lz4lib lz4programs
+
+lz4lib:
 	@cd $(LZ4DIR); $(MAKE) -e all
-	@cd $(PRGDIR); $(MAKE) -e all
+
+lz4lib-djgpp:
+	@cd $(LZ4DIR); $(MAKE) -e liblz4-static
 
 lz4programs:
 	@cd $(PRGDIR); $(MAKE) -e
