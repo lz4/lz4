@@ -60,25 +60,25 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-.PHONY: default all liblz4 liblz4 liblz4-static liblz4 clean install uninstall
+.PHONY: default all liblz4 liblz4-static clean install uninstall
 
 default: liblz4
 
 all: liblz4
 
-liblz4: liblz4-static liblz4-dynamic
-
-liblz4-static: lz4.c lz4hc.c lz4frame.c xxhash.c
-	@echo compiling static library
-	@$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $^
-	@$(AR) rcs liblz4.a lz4.o lz4hc.o lz4frame.o xxhash.o
-
-liblz4-dynamic: lz4.c lz4hc.c lz4frame.c xxhash.c
+liblz4: liblz4.a lz4.c lz4hc.c lz4frame.c xxhash.c
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
+
+liblz4.a: lz4.c lz4hc.c lz4frame.c xxhash.c
+	@echo compiling static library
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $^
+	@$(AR) rcs liblz4.a lz4.o lz4hc.o lz4frame.o xxhash.o
+
+liblz4-static: liblz4.a
 
 clean:
 	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc
