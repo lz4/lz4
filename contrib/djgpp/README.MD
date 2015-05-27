@@ -14,7 +14,7 @@ Try:
 * `make -f contrib/djgpp/Makefile`
 * `make -f contrib/djgpp/Makefile liblz4.a`
 * `make -f contrib/djgpp/Makefile lz4.exe`
-* `make -f contrib/djgpp/Makefile DESTDIR=/home/user/dos install`, however it doesn\'t make much sense on a \*nix.
+* `make -f contrib/djgpp/Makefile DESTDIR=/home/user/dos install`, however it doesn't make much sense on a \*nix.
 * You can also do `make -f contrib/djgpp/Makefile uninstall`
 
 [0]: https://github.com/andrewwutw/build-djgpp
