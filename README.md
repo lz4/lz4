@@ -76,8 +76,9 @@ Other source versions
 -------------------------
 
 Beyond the C reference source, 
-many contributors have created versions of lz4 in multiple languages.
-A list of these sources is maintained on the [LZ4 Homepage].
+many contributors have created versions of lz4 in multiple languages
+(Java, C#, Python, Perl, Ruby, etc.).
+A list of known source ports is maintained on the [LZ4 Homepage].
 
 
 [Open-Source Benchmark program by m^2 (v0.14.3)]: http://encode.ru/threads/1371-Filesystem-benchmark?p=34029&viewfull=1#post34029
