@@ -119,6 +119,7 @@ versionstest: clean
 
 streaming-examples:
 	cd lib; $(MAKE) -e
+	cd programs; $(MAKE) -e lz4
 	cd examples; $(MAKE) -e test
 
 prg-travis:

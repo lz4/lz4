@@ -33,6 +33,7 @@ FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 TESTFILE= Makefile
 LZ4DIR := ../lib
+LZ4 = ../programs/lz4
 
 
 # Define *.exe as extension for Windows systems
@@ -74,6 +75,7 @@ test : all
 	./ringBufferHC$(EXT) $(TESTFILE)
 	./lineCompress$(EXT) $(TESTFILE)
 	LD_LIBRARY_PATH=$(LZ4DIR) ./frameCompress$(EXT) $(TESTFILE)
+	$(LZ4) -vt $(TESTFILE).lz4
 
 clean:
 	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s \
