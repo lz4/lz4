@@ -112,7 +112,7 @@ sanitize: clean
 	$(MAKE) test CC=clang CPPFLAGS="-g -fsanitize=undefined" FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
 staticAnalyze: clean
-	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g
+	CPPFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
 armtest: clean
 	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"

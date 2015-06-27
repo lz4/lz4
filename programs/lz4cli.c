@@ -197,6 +197,7 @@ static int usage_advanced(void)
 
 static int usage_longhelp(void)
 {
+    usage_advanced();
     DISPLAY( "\n");
     DISPLAY( "Which values can get [output] ? \n");
     DISPLAY( "[output] : a filename\n");
@@ -357,9 +358,9 @@ int main(int argc, char** argv)
                 switch(argument[0])
                 {
                     /* Display help */
-                case 'V': DISPLAY(WELCOME_MESSAGE); return 0;   /* Version */
-                case 'h': usage_advanced(); return 0;
-                case 'H': usage_advanced(); usage_longhelp(); return 0;
+                case 'V': DISPLAY(WELCOME_MESSAGE); goto _cleanup;   /* Version */
+                case 'h': usage_advanced(); goto _cleanup;
+                case 'H': usage_longhelp(); goto _cleanup;
 
                     /* Compression (default) */
                 case 'z': forceCompress = 1; break;
@@ -557,9 +558,9 @@ int main(int argc, char** argv)
       }
     }
 
+_cleanup:
     if (main_pause) waitEnter();
     free(dynNameSpace);
     free((void*)inFileNames);
-    if (operationResult != 0) return operationResult;
-    return 0;
+    return operationResult;
 }
