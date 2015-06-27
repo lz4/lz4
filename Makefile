@@ -58,11 +58,15 @@ VOID = /dev/null
 endif
 
 
+.PHONY: default all lib lz4programs clean
+
 default: lz4programs
 
-all: 
-	@cd $(LZ4DIR); $(MAKE) -e all
+all: lib
 	@cd $(PRGDIR); $(MAKE) -e all
+
+lib:
+	@cd $(LZ4DIR); $(MAKE) -e all
 
 lz4programs:
 	@cd $(PRGDIR); $(MAKE) -e
