@@ -58,7 +58,7 @@ VOID = /dev/null
 endif
 
 
-.PHONY: default all lib lz4programs clean
+.PHONY: default all lib lz4programs clean test
 
 default: lz4programs
 
