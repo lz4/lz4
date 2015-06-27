@@ -407,7 +407,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_CHECKTEST(ret > targetSize, "LZ4_compress_destSize() result larger than dst buffer !");
             FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compress_destSize() overwrite dst buffer !");
             FUZ_CHECKTEST(srcSize > blockSize, "LZ4_compress_destSize() fed more than src buffer !");
-            DISPLAY("destSize : %7i/%7i; content%7i/%7i ", ret, targetSize, srcSize, blockSize);
+            DISPLAYLEVEL(5, "destSize : %7i/%7i; content%7i/%7i ", ret, targetSize, srcSize, blockSize);
             if (targetSize>0)
             {
                 FUZ_CHECKTEST((ret==0), "LZ4_compress_destSize() compression failed");
@@ -425,10 +425,10 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 crcCheck = XXH32(decodedBuffer, srcSize, 0);
                 FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe() corrupted decoded data");
 
-                DISPLAY(" OK \n");
+                DISPLAYLEVEL(5, " OK \n");
             }
             else
-                DISPLAY(" \n");
+                DISPLAYLEVEL(5, " \n");
         }
 
         /* Test compression HC */
