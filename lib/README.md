@@ -1,13 +1,14 @@
 LZ4 - Library Files
 ================================
 
-This directory contains many files, but you don't necessarily need them all.
+The __lib__ directory contains several files, but you don't necessarily need them all.
 
-To integrate LZ4 compression/decompression into your program, you basically just need to include "**lz4.c**" and "**lz4.h**".
+To integrate fast LZ4 compression/decompression into your program, you basically just need "**lz4.c**" and "**lz4.h**".
 
-For more compression at the cost of compression speed (while preserving decompression speed), use **lz4hc**. Compile "**lz4hc.c**" and include "**lz4hc.h**". Note that lz4hc needs lz4 to compile properly.
+For more compression at the cost of compression speed (while preserving decompression speed), use **lz4hc** on top of regular lz4. `lz4hc` only provides compression functions. It also needs `lz4` to compile properly.
 
-Next level, if you want to produce files or data streams compatible with lz4 utility, use and include "**lz4frame.c**" and **lz4frame.h**". This library encapsulate lz4-compressed blocks into the [official interoperable frame format]. In order to work properly, lz4frame needs lz4 and lz4hc, and also "**xxhash.c**" and "**xxhash.h**", which provide error detection algorithm.
+If you want to produce files or data streams compatible with `lz4` command line utility, use **lz4frame**. This library encapsulates lz4-compressed blocks into the [official interoperable frame format]. In order to work properly, lz4frame needs lz4 and lz4hc, and also **xxhash**, which provides error detection algorithm.
+(_Advanced stuff_ : It's possible to hide xxhash symbols into a local namespace. This is what `liblz4` does, to avoid symbol duplication in case a user program would link to several libraries containing xxhash symbols.)
 
 A more complex "lz4frame_static.h" is also provided, although its usage is not recommended. It contains definitions which are not guaranteed to remain stable within future versions. Use for static linking ***only***.
 
