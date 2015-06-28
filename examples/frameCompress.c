@@ -1,3 +1,6 @@
+// LZ4frame API example : compress a file
+// Based on sample code from Zbigniew Jędrzejewski-Szmek
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,10 +13,10 @@
 #define LZ4_FOOTER_SIZE 4
 
 static const LZ4F_preferences_t lz4_preferences = {
-	{ 5, 0, 0, 0, 0, { 0, 0 } },
-	0,
-	0,
-	{ 0, 0, 0, 0 },
+	{ LZ4F_max256KB, LZ4F_blockLinked, LZ4F_noContentChecksum, LZ4F_frame, 0, { 0, 0 } },
+	0,   /* compression level */
+	0,   /* autoflush */
+	{ 0, 0, 0, 0 },  /* reserved, must be set to 0 */
 };
 
 static int compress_file(FILE *in, FILE *out, size_t *size_in, size_t *size_out) {
@@ -154,6 +157,7 @@ static int compress(const char *input, const char *output) {
 	free(tmp);
 	return r;
 }
+
 
 int main(int argc, char **argv) {
 	if (argc < 2 || argc > 3) {

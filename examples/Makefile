@@ -78,7 +78,7 @@ test : all
 	$(LZ4) -vt $(TESTFILE).lz4
 
 clean:
-	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s \
+	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s *.lz4 \
 	 printVersion$(EXT) doubleBuffer$(EXT) ringBuffer$(EXT) ringBufferHC$(EXT) \
 	 lineCompress$(EXT) frameCompress$(EXT)
 	@echo Cleaning completed

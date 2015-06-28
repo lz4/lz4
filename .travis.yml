@@ -12,7 +12,7 @@ before_install:
 
 env:
   - LZ4_TRAVIS_CI_ENV=travis-install
-  - LZ4_TRAVIS_CI_ENV=streaming-examples
+  - LZ4_TRAVIS_CI_ENV=examples
   - LZ4_TRAVIS_CI_ENV=cmake
   - LZ4_TRAVIS_CI_ENV=clangtest
   - LZ4_TRAVIS_CI_ENV=sanitize

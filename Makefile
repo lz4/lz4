@@ -121,7 +121,7 @@ armtest: clean
 versionstest: clean
 	@cd test; $(MAKE)
 
-streaming-examples:
+examples:
 	cd lib; $(MAKE) -e
 	cd programs; $(MAKE) -e lz4
 	cd examples; $(MAKE) -e test
