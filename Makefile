@@ -58,7 +58,7 @@ VOID = /dev/null
 endif
 
 
-.PHONY: default all lib lz4programs clean test
+.PHONY: default all lib lz4programs clean test versionsTest
 
 default: lz4programs
 
@@ -75,7 +75,7 @@ clean:
 	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
 	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
 	@cd examples;  $(MAKE) clean > $(VOID)
-	@cd test;      $(MAKE) clean > $(VOID)
+	@cd versionsTest; $(MAKE) clean > $(VOID)
 	@echo Cleaning completed
 
 
@@ -118,8 +118,8 @@ armtest: clean
 	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 
-versionstest: clean
-	@cd test; $(MAKE)
+versionsTest: clean
+	@cd versionsTest; $(MAKE)
 
 examples:
 	cd lib; $(MAKE) -e

@@ -19,7 +19,7 @@ env:
   - LZ4_TRAVIS_CI_ENV=staticAnalyze
   - LZ4_TRAVIS_CI_ENV=gpptest
   - LZ4_TRAVIS_CI_ENV=armtest
-  - LZ4_TRAVIS_CI_ENV=versionstest
+  - LZ4_TRAVIS_CI_ENV=versionsTest
   - LZ4_TRAVIS_CI_ENV=test-lz4
   - LZ4_TRAVIS_CI_ENV=test-lz4c
   - LZ4_TRAVIS_CI_ENV=test-lz4c32

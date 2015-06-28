@@ -30,9 +30,9 @@ TESTDIR := lz4test
 
 default: all
 
-all: versionstest
+all: versionsTest
 
-versionstest:
+versionsTest:
 	$(PYTHON) test-lz4-versions.py
 
 clean:
