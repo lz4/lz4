@@ -40,7 +40,7 @@ LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 DESTDIR?=
 PREFIX ?= /usr/local
 CFLAGS ?= -O3
-CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
+CFLAGS += -I. -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic -DXXH_NAMESPACE=LZ4_
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -66,7 +66,7 @@ all: liblz4
 
 liblz4: lz4.c lz4hc.c lz4frame.c xxhash.c
 	@echo compiling static library
-	@$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $^
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs liblz4.a lz4.o lz4hc.o lz4frame.o xxhash.o
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)

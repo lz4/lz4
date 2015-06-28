@@ -1,3 +1,8 @@
+r131
+New    : Dos/DJGPP target, thanks to Louis Santillan (#114)
+Added  : Example using lz4frame library, by Zbigniew Jędrzejewski-Szmek (#118)
+Changed: xxhash symbols are modified (namespace emulation) within liblz4
+
 r130:
 Fixed  : incompatibility sparse mode vs console, reported by Yongwoon Cho (#105)
 Fixed  : LZ4IO exits too early when frame crc not present, reported by Yongwoon Cho (#106)

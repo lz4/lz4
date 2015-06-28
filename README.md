@@ -17,11 +17,17 @@ All versions feature the same excellent decompression speed.
 
 |Branch      |Status   |
 |------------|---------|
-|master      | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=master)](https://travis-ci.org/Cyan4973/lz4) [![Build status](https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/master?svg=true)](https://ci.appveyor.com/project/YannCollet/lz4) |
-|dev         | [![Build Status](https://travis-ci.org/Cyan4973/lz4.svg?branch=dev)](https://travis-ci.org/Cyan4973/lz4) [![Build status](https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/dev?svg=true)](https://ci.appveyor.com/project/YannCollet/lz4) |
+|master      | [![Build Status][travisMasterBadge]][travisLink] [![Build status][AppveyorMasterBadge]][AppveyorLink] [![coverity][coverBadge]][coverlink] |
+|dev         | [![Build Status][travisDevBadge]][travisLink]    [![Build status][AppveyorDevBadge]][AppveyorLink]                                         |
 
-
-
+[travisMasterBadge]: https://travis-ci.org/Cyan4973/lz4.svg?branch=master "Continuous Integration test suite"
+[travisDevBadge]: https://travis-ci.org/Cyan4973/lz4.svg?branch=dev "Continuous Integration test suite"
+[travisLink]: https://ci.appveyor.com/project/YannCollet/lz4
+[AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/master?svg=true "Visual test suite"
+[AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/dev?svg=true "Visual test suite"
+[AppveyorLink]: https://ci.appveyor.com/project/YannCollet/lz4
+[coverBadge]: https://scan.coverity.com/projects/4735/badge.svg "Static code analysis of Master branch"
+[coverlink]: https://scan.coverity.com/projects/4735
 
 > **Branch Policy:**
 
@@ -70,8 +76,9 @@ Other source versions
 -------------------------
 
 Beyond the C reference source, 
-many contributors have created versions of lz4 in multiple languages.
-A list of these sources is maintained on the [LZ4 Homepage].
+many contributors have created versions of lz4 in multiple languages
+(Java, C#, Python, Perl, Ruby, etc.).
+A list of known source ports is maintained on the [LZ4 Homepage].
 
 
 [Open-Source Benchmark program by m^2 (v0.14.3)]: http://encode.ru/threads/1371-Filesystem-benchmark?p=34029&viewfull=1#post34029

@@ -58,11 +58,15 @@ VOID = /dev/null
 endif
 
 
+.PHONY: default all lib lz4programs clean test versionsTest
+
 default: lz4programs
 
-all: 
-	@cd $(LZ4DIR); $(MAKE) -e all
+all: lib
 	@cd $(PRGDIR); $(MAKE) -e all
+
+lib:
+	@cd $(LZ4DIR); $(MAKE) -e all
 
 lz4programs:
 	@cd $(PRGDIR); $(MAKE) -e
@@ -71,7 +75,7 @@ clean:
 	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
 	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
 	@cd examples;  $(MAKE) clean > $(VOID)
-	@cd test;      $(MAKE) clean > $(VOID)
+	@cd versionsTest; $(MAKE) clean > $(VOID)
 	@echo Cleaning completed
 
 
@@ -108,16 +112,18 @@ sanitize: clean
 	$(MAKE) test CC=clang CPPFLAGS="-g -fsanitize=undefined" FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
 staticAnalyze: clean
-	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g
+	CPPFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
 armtest: clean
 	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
 
-versionstest: clean
-	@cd test; $(MAKE)
+versionsTest: clean
+	@cd versionsTest; $(MAKE)
 
-streaming-examples:
+examples:
+	cd lib; $(MAKE) -e
+	cd programs; $(MAKE) -e lz4
 	cd examples; $(MAKE) -e test
 
 prg-travis:

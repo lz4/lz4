@@ -67,6 +67,11 @@
 *****************************/
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <io.h>       /* _isatty */
+#  if defined(__DJGPP__)
+#    include <unistd.h>
+#    define _isatty isatty
+#    define _fileno fileno
+#  endif
 #  ifdef __MINGW32__
    int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
 #  endif
@@ -175,7 +180,7 @@ static int usage_advanced(void)
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled)\n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
-    DISPLAY( "--[no-]sparse  : sparse file support (default:enabled)\n");
+    DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b     : benchmark file(s)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
@@ -192,6 +197,7 @@ static int usage_advanced(void)
 
 static int usage_longhelp(void)
 {
+    usage_advanced();
     DISPLAY( "\n");
     DISPLAY( "Which values can get [output] ? \n");
     DISPLAY( "[output] : a filename\n");
@@ -352,9 +358,9 @@ int main(int argc, char** argv)
                 switch(argument[0])
                 {
                     /* Display help */
-                case 'V': DISPLAY(WELCOME_MESSAGE); return 0;   /* Version */
-                case 'h': usage_advanced(); return 0;
-                case 'H': usage_advanced(); usage_longhelp(); return 0;
+                case 'V': DISPLAY(WELCOME_MESSAGE); goto _cleanup;   /* Version */
+                case 'h': usage_advanced(); goto _cleanup;
+                case 'H': usage_longhelp(); goto _cleanup;
 
                     /* Compression (default) */
                 case 'z': forceCompress = 1; break;
@@ -552,9 +558,9 @@ int main(int argc, char** argv)
       }
     }
 
+_cleanup:
     if (main_pause) waitEnter();
     free(dynNameSpace);
     free((void*)inFileNames);
-    if (operationResult != 0) return operationResult;
-    return 0;
+    return operationResult;
 }
