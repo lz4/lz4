@@ -67,7 +67,6 @@
 **************************************/
 #include "lz4.h"
 
-
 /**************************************
 *  Compiler Options
 **************************************/
@@ -119,12 +118,14 @@
   typedef uint32_t U32;
   typedef  int32_t S32;
   typedef uint64_t U64;
+  typedef  int64_t S64;
 #else
   typedef unsigned char       BYTE;
   typedef unsigned short      U16;
   typedef unsigned int        U32;
   typedef   signed int        S32;
   typedef unsigned long long  U64;
+  typedef   signed long long  S64;
 #endif
 
 
@@ -199,8 +200,6 @@ static size_t LZ4_read_ARCH(const void* p)
 }
 
 
-static void LZ4_copy4(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 4); }
-
 static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
 
 /* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
@@ -211,6 +210,117 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* e = (BYTE*)dstEnd;
     do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
 }
+
+FORCE_INLINE void MT_wildCopyMisalignedLE(void* destStart, const void* srcStart, void* destEnd)
+{
+    S64 bytesToAlignDest = -((S64)destStart) & 7;
+    U64 srcStartAddr = (U64)srcStart;
+    if (bytesToAlignDest != 0)
+    {
+        U64 destStartAddr = (U64)destStart;
+        U64 mask = ~0UL >> (8 * bytesToAlignDest);
+        U64* destStartAligned = (U64*) (destStartAddr & ~7);
+        U64 srcVal = *(U64*) (srcStartAddr - (destStartAddr & 7)) & ~mask;
+        U64 destVal = *destStartAligned & mask;
+        *destStartAligned = srcVal | destVal;
+        destStart = (void*) (destStartAligned + 1);
+        srcStart = (const BYTE*)srcStart + bytesToAlignDest;
+        srcStartAddr = (U64)srcStart;
+    }
+    U64 alignRightShiftBytes = srcStartAddr & 7;
+    U64 alignLeftShiftBytes = (8 - alignRightShiftBytes) & 7;
+    U64 alignRightShift = 8 * alignRightShiftBytes;
+    U64 alignLeftShift = 8 * alignLeftShiftBytes;
+    const U64* alignedReadOff = (const U64*) (srcStartAddr & ~7);
+    U64 val1 = *alignedReadOff >> alignRightShift;
+    for (U64* writeOff = (U64*)destStart; writeOff < (U64*)destEnd; writeOff++)
+    {
+        alignedReadOff++;
+        U64 val2 = *alignedReadOff;
+        *writeOff = val1 | val2 << alignLeftShift;
+        val1 = val2 >> alignRightShift;
+    }
+}
+
+FORCE_INLINE void MT_wildCopyNarrowLE(void* destStart, const void* srcStart, void* destEnd)
+{
+    U64 distance = (BYTE*)destStart - (BYTE*)srcStart;
+    U64 val = *((const U64*)srcStart);
+    U64 shiftDistance = 8 * distance;
+    U64 maskedVal = val & ~(~0UL << shiftDistance);
+    if (distance > 3)
+    {
+        val <<= shiftDistance;
+        val |= maskedVal;
+    } else
+    {
+        switch (distance)
+        {
+            case 3:
+                val = maskedVal;
+                maskedVal <<= shiftDistance;
+                val |= maskedVal;
+                maskedVal <<= shiftDistance;
+                val |= maskedVal;
+                break;
+            case 2:
+                val = maskedVal | maskedVal << shiftDistance;
+                val |= val << 2 * shiftDistance;
+                break;
+            case 1:
+                val = maskedVal | maskedVal << shiftDistance;
+                val |= val << 2 * shiftDistance;
+                val |= val << 4 * shiftDistance;
+        }
+    }
+    U64 slipDistance, wrapDistance;
+    switch (distance) {
+        case 4:
+        case 2:
+        case 1:
+            for (U64* off = (U64*)destStart; off < (U64*)destEnd; off++)
+            {
+                *off = val;
+            }
+            break;
+        default:
+            // slipDistance = 8 * (8 % distance), but avoid the mod operation:
+            slipDistance = distance == 3? 8 * (8 % 3) : 64 - shiftDistance;
+            wrapDistance = 64 - slipDistance;
+            for (U64* off = (U64*)destStart; off < (U64*)destEnd; off++)
+            {
+                *off = val;
+                val >>= slipDistance;
+                val |= val << wrapDistance;
+            }
+    }
+}
+
+static void MT_wildCopy(void* destStart, const void* srcStart, void* destEnd)
+{
+    U64 distance = (BYTE*)destStart - (BYTE*)srcStart;
+    if (distance > 32)
+    {
+        LZ4_wildCopy(destStart, srcStart, destEnd);
+    } else if (unlikely(distance == 8))
+    {
+        U64 val = *((U64*)srcStart);
+        for (U64* off = destStart; off < (U64*)destEnd; off++)
+        {
+            *off = val;
+        }
+    } else if (((U64)srcStart & 7) == ((U64)destStart & 7))
+    {
+        LZ4_wildCopy(destStart, srcStart, destEnd);
+    } else if (distance > 8)
+    {
+        MT_wildCopyMisalignedLE(destStart, srcStart, destEnd);
+    } else
+    {
+        MT_wildCopyNarrowLE(destStart, srcStart, destEnd);
+    }
+}
+
 
 
 /**************************************
@@ -1133,8 +1243,6 @@ FORCE_INLINE int LZ4_decompress_generic(
     const BYTE* const lowLimit = lowPrefix - dictSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const size_t dec32table[] = {4, 1, 2, 1, 4, 4, 4, 4};
-    const size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
@@ -1245,31 +1353,19 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         /* copy repeated sequence */
         cpy = op + length;
-        if (unlikely((op-match)<8))
-        {
-            const size_t dec64 = dec64table[op-match];
-            op[0] = match[0];
-            op[1] = match[1];
-            op[2] = match[2];
-            op[3] = match[3];
-            match += dec32table[op-match];
-            LZ4_copy4(op+4, match);
-            op += 8; match -= dec64;
-        } else { LZ4_copy8(op, match); op+=8; match+=8; }
-
         if (unlikely(cpy>oend-12))
         {
             if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals */
             if (op < oend-8)
             {
-                LZ4_wildCopy(op, match, oend-8);
+                MT_wildCopy(op, match, oend-8);
                 match += (oend-8) - op;
                 op = oend-8;
             }
             while (op<cpy) *op++ = *match++;
         }
         else
-            LZ4_wildCopy(op, match, cpy);
+            MT_wildCopy(op, match, cpy);
         op=cpy;   /* correction */
     }
 
