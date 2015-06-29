@@ -205,8 +205,8 @@ static void LZ4F_writeLE32 (BYTE* dstPtr, U32 value32)
 static U64 LZ4F_readLE64 (const BYTE* srcPtr)
 {
     U64 value64 = srcPtr[0];
-    value64 += (srcPtr[1]<<8);
-    value64 += (srcPtr[2]<<16);
+    value64 += ((U64)srcPtr[1]<<8);
+    value64 += ((U64)srcPtr[2]<<16);
     value64 += ((U64)srcPtr[3]<<24);
     value64 += ((U64)srcPtr[4]<<32);
     value64 += ((U64)srcPtr[5]<<40);
