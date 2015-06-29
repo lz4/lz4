@@ -203,7 +203,7 @@ static size_t LZ4_read_ARCH(const void* p)
 static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
 
 /* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
-static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
+FORCE_INLINE void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
@@ -211,7 +211,7 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
 }
 
-FORCE_INLINE void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
+static void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
     ADDR bytesToAlignDest = -((ADDR)destStart) & 7;
     ADDR srcStartAddr = (ADDR)srcStart;
@@ -221,12 +221,12 @@ FORCE_INLINE void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart,
         ADDR destStartAddr = (ADDR)destStart;
         ADDR mask = ~0UL >> (8 * bytesToAlignDest);
         destStartAligned = (U64*) (destStartAddr & ~7);
-        U64 srcVal = *(U64*) (srcStartAddr - (destStartAddr & 7)) & ~mask;
+        U64 srcVal = *(U64*) ((srcStartAddr - (destStartAddr & 7)) & ~mask);
         U64 destVal = *destStartAligned & mask;
         *destStartAligned = srcVal | destVal;
         destStartAligned++;
         srcStart = (const BYTE*)srcStart + bytesToAlignDest;
-        srcStartAddr = (U64)srcStart;
+        srcStartAddr = (ADDR)srcStart;
     } else {
         destStartAligned = (U64*) ((ADDR)destStart & ~7);
     }
@@ -245,7 +245,7 @@ FORCE_INLINE void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart,
     }
 }
 
-FORCE_INLINE void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
+static void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
     ADDR distance = destStart - srcStart;
     U64 val = LZ4_read64(srcStart);
@@ -299,7 +299,7 @@ FORCE_INLINE void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYT
     }
 }
 
-static void MT_wildCopy(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
+FORCE_INLINE void MT_wildCopy(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
     ADDR distance = destStart - srcStart;
     ADDR length = destEnd - destStart;
