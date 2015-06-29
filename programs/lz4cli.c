@@ -503,6 +503,7 @@ int main(int argc, char** argv)
         {
             size_t l = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,l+5);
+			if (dynNameSpace==NULL) exit(1);
             strcpy(dynNameSpace, input_filename);
             strcat(dynNameSpace, LZ4_EXTENSION);
             output_filename = dynNameSpace;
