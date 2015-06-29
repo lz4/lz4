@@ -876,9 +876,11 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
 }
 
 
+#define PTSIZE  (64 KB)
+#define PTSIZET (PTSIZE / sizeof(size_t))
 static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigned char MNstore[MAGICNUMBER_SIZE])
 {
-    void* buffer = malloc(64 KB);
+	size_t buffer[PTSIZET];
     size_t read = 1, sizeCheck;
     unsigned long long total = MAGICNUMBER_SIZE;
     unsigned storedSkips = 0;
@@ -888,13 +890,12 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
 
     while (read)
     {
-        read = fread(buffer, 1, 64 KB, finput);
+        read = fread(buffer, 1, PTSIZE, finput);
         total += read;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, read, storedSkips);
     }
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
-    free(buffer);
     return total;
 }
 
