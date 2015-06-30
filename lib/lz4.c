@@ -221,7 +221,7 @@ static void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE*
         ADDR destStartAddr = (ADDR)destStart;
         ADDR mask = ~0UL >> (8 * bytesToAlignDest);
         destStartAligned = (U64*) (destStartAddr & ~7);
-        U64 srcVal = *(U64*) ((srcStartAddr - (destStartAddr & 7)) & ~mask);
+        U64 srcVal = *(U64*) (srcStartAddr - (destStartAddr & 7)) & ~mask;
         U64 destVal = *destStartAligned & mask;
         *destStartAligned = srcVal | destVal;
         destStartAligned++;
