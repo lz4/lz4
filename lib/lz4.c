@@ -214,21 +214,23 @@ FORCE_INLINE void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 static void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
     ADDR bytesToAlignDest = -((ADDR)destStart) & 7;
-    ADDR srcStartAddr = (ADDR)srcStart;
+    ADDR srcStartAddr;
     U64* destStartAligned;
     if (bytesToAlignDest != 0)
     {
         ADDR destStartAddr = (ADDR)destStart;
         ADDR mask = ~0UL >> (8 * bytesToAlignDest);
         destStartAligned = (U64*) (destStartAddr & ~7);
-        U64 srcVal = LZ4_read64((BYTE*) (srcStartAddr - (destStartAddr & 7))) & ~mask;
+        U64 srcVal = LZ4_read64(srcStart);
+        srcVal <<= 8 * (destStartAddr & 7);
+        srcVal &= ~mask;
         U64 destVal = *destStartAligned & mask;
         *destStartAligned = srcVal | destVal;
         destStartAligned++;
-        srcStart = (const BYTE*)srcStart + bytesToAlignDest;
-        srcStartAddr = (ADDR)srcStart;
+        srcStartAddr = (ADDR) (srcStart + bytesToAlignDest);
     } else {
         destStartAligned = (U64*) ((ADDR)destStart & ~7);
+        srcStartAddr = (ADDR)srcStart;
     }
     ADDR alignRightShiftBytes = srcStartAddr & 7;
     ADDR alignLeftShiftBytes = (8 - alignRightShiftBytes) & 7;
@@ -285,6 +287,10 @@ static void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYTE* con
             {
                 LZ4_copy8(off, &val);
             }
+//            for (U64* off = (U64*)destStart; off < (U64*)destEnd; off++)
+//            {
+//                *off = val;
+//            }
             break;
         default:
             // slipDistance = 8 * (8 % distance), but avoid the mod operation:
@@ -296,6 +302,12 @@ static void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYTE* con
                 val >>= slipDistance;
                 val |= val << wrapDistance;
             }
+//            for (U64* off = (U64*)destStart; off < (U64*)destEnd; off++)
+//            {
+//                *off = val;
+//                val >>= slipDistance;
+//                val |= val << wrapDistance;
+//            }
     }
 }
 
