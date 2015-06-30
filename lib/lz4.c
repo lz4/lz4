@@ -221,7 +221,7 @@ static void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE*
         ADDR destStartAddr = (ADDR)destStart;
         ADDR mask = ~0UL >> (8 * bytesToAlignDest);
         destStartAligned = (U64*) (destStartAddr & ~7);
-        U64 srcVal = *(U64*) ((srcStartAddr - (destStartAddr & 7)) & ~mask);
+        U64 srcVal = LZ4_read64((BYTE*) (srcStartAddr - (destStartAddr & 7))) & ~mask;
         U64 destVal = *destStartAligned & mask;
         *destStartAligned = srcVal | destVal;
         destStartAligned++;
@@ -302,21 +302,17 @@ static void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYTE* con
 FORCE_INLINE void MT_wildCopy(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
     ADDR distance = destStart - srcStart;
+    ADDR misalignment = distance & 7UL;
     ADDR length = destEnd - destStart;
-    if (distance > 32 || (distance > 8 && (length < 32 || ((destStart - srcStart) & 7) == 0)))
+    if (distance > 32 || misalignment == 0 || (distance > 8 && length < 32))
     {
         LZ4_wildCopy(destStart, srcStart, destEnd);
-    } else if (unlikely(distance == 8))
-    {
-        U64 val = LZ4_read64(srcStart);
-        for (BYTE* off = destStart; off < destEnd; off += 8)
-        {
-            LZ4_copy8(off, &val);
-        }
-    } else if (distance > 8)
+    }
+    else if (distance > 8)
     {
         MT_wildCopyMisalignedLE(destStart, srcStart, destEnd);
-    } else
+    }
+    else
     {
         MT_wildCopyNarrowLE(destStart, srcStart, destEnd);
     }
