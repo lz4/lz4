@@ -133,23 +133,23 @@
 **************************************/
 #define STEPSIZE sizeof(size_t)
 
-static unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
+FORCE_INLINE unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
 
-static unsigned LZ4_isLittleEndian(void)
+FORCE_INLINE unsigned LZ4_isLittleEndian(void)
 {
     const union { U32 i; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental  */
     return one.c[0];
 }
 
 
-static U16 LZ4_read16(const void* memPtr)
+FORCE_INLINE U16 LZ4_read16(const void* memPtr)
 {
     U16 val16;
     memcpy(&val16, memPtr, 2);
     return val16;
 }
 
-static U16 LZ4_readLE16(const void* memPtr)
+FORCE_INLINE U16 LZ4_readLE16(const void* memPtr)
 {
     if (LZ4_isLittleEndian())
     {
@@ -162,7 +162,7 @@ static U16 LZ4_readLE16(const void* memPtr)
     }
 }
 
-static void LZ4_writeLE16(void* memPtr, U16 value)
+FORCE_INLINE void LZ4_writeLE16(void* memPtr, U16 value)
 {
     if (LZ4_isLittleEndian())
     {
@@ -176,21 +176,21 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
     }
 }
 
-static U32 LZ4_read32(const void* memPtr)
+FORCE_INLINE U32 LZ4_read32(const void* memPtr)
 {
     U32 val32;
     memcpy(&val32, memPtr, 4);
     return val32;
 }
 
-static U64 LZ4_read64(const void* memPtr)
+FORCE_INLINE U64 LZ4_read64(const void* memPtr)
 {
     U64 val64;
     memcpy(&val64, memPtr, 8);
     return val64;
 }
 
-static size_t LZ4_read_ARCH(const void* p)
+FORCE_INLINE size_t LZ4_read_ARCH(const void* p)
 {
     if (LZ4_64bits())
         return (size_t)LZ4_read64(p);
@@ -199,9 +199,9 @@ static size_t LZ4_read_ARCH(const void* p)
 }
 
 
-static void LZ4_copy4(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 4); }
+FORCE_INLINE void LZ4_copy4(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 4); }
 
-static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
+FORCE_INLINE void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
 
 /* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
 static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
