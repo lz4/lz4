@@ -66,6 +66,7 @@
 *  Includes
 **************************************/
 #include "lz4.h"
+#include <limits.h>
 
 /**************************************
 *  Compiler Options
@@ -213,30 +214,31 @@ FORCE_INLINE void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 
 static void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
-    ADDR bytesToAlignDest = -((ADDR)destStart) & 7;
+    int alignMask = CHAR_BIT - 1;
+    ADDR bytesToAlignDest = -((ADDR)destStart) & alignMask;
     ADDR srcStartAddr;
     U64* destStartAligned;
     if (bytesToAlignDest != 0)
     {
         ADDR destStartAddr = (ADDR)destStart;
-        ADDR mask = ~0UL >> (8 * bytesToAlignDest);
-        destStartAligned = (U64*) (destStartAddr & ~7);
+        ADDR mask = ~0UL >> (CHAR_BIT * bytesToAlignDest);
+        destStartAligned = (U64*) (destStartAddr & ~alignMask);
         U64 srcVal = LZ4_read64(srcStart);
-        srcVal <<= 8 * (destStartAddr & 7);
+        srcVal <<= CHAR_BIT * (destStartAddr & alignMask);
         srcVal &= ~mask;
         U64 destVal = *destStartAligned & mask;
         *destStartAligned = srcVal | destVal;
         destStartAligned++;
         srcStartAddr = (ADDR) (srcStart + bytesToAlignDest);
     } else {
-        destStartAligned = (U64*) ((ADDR)destStart & ~7);
+        destStartAligned = (U64*) ((ADDR)destStart & ~alignMask);
         srcStartAddr = (ADDR)srcStart;
     }
-    ADDR alignRightShiftBytes = srcStartAddr & 7;
-    ADDR alignLeftShiftBytes = (8 - alignRightShiftBytes) & 7;
-    ADDR alignRightShift = 8 * alignRightShiftBytes;
-    ADDR alignLeftShift = 8 * alignLeftShiftBytes;
-    const U64* alignedReadOff = (const U64*) (srcStartAddr & ~7);
+    ADDR alignRightShiftBytes = srcStartAddr & alignMask;
+    ADDR alignLeftShiftBytes = (CHAR_BIT - alignRightShiftBytes) & alignMask;
+    ADDR alignRightShift = CHAR_BIT * alignRightShiftBytes;
+    ADDR alignLeftShift = CHAR_BIT * alignLeftShiftBytes;
+    const U64* alignedReadOff = (const U64*) (srcStartAddr & ~alignMask);
     U64 val1 = *alignedReadOff >> alignRightShift;
     for (U64* writeOff = destStartAligned; (ADDR)writeOff < (ADDR)destEnd; writeOff++)
     {
@@ -249,65 +251,64 @@ static void MT_wildCopyMisalignedLE(BYTE* destStart, const BYTE* srcStart, BYTE*
 
 static void MT_wildCopyNarrowLE(BYTE* destStart, const BYTE* srcStart, BYTE* const destEnd)
 {
+    int alignMask = CHAR_BIT - 1;
     ADDR distance = destStart - srcStart;
     U64 val = LZ4_read64(srcStart);
-    ADDR shiftDistance = 8 * distance;
+    ADDR shiftDistance = CHAR_BIT * distance;
     ADDR maskedVal = val & ~(~0UL << shiftDistance);
     if (distance > 3)
     {
         val <<= shiftDistance;
         val |= maskedVal;
-    } else
-    {
-        switch (distance)
-        {
-            case 3:
-                val = maskedVal;
-                maskedVal <<= shiftDistance;
-                val |= maskedVal;
-                maskedVal <<= shiftDistance;
-                val |= maskedVal;
-                break;
-            case 2:
-                val = maskedVal | maskedVal << shiftDistance;
-                val |= val << 2 * shiftDistance;
-                break;
-            case 1:
-                val = maskedVal | maskedVal << shiftDistance;
-                val |= val << 2 * shiftDistance;
-                val |= val << 4 * shiftDistance;
-        }
     }
-    U64 slipDistance, wrapDistance;
+    else switch (distance)
+    {
+        case 3:
+            val = maskedVal;
+            maskedVal <<= shiftDistance;
+            val |= maskedVal;
+            maskedVal <<= shiftDistance;
+            val |= maskedVal;
+            break;
+        case 2:
+            val = maskedVal | maskedVal << shiftDistance;
+            val |= val << 2 * shiftDistance;
+            break;
+        case 1:
+            val = maskedVal | maskedVal << shiftDistance;
+            val |= val << 2 * shiftDistance;
+            val |= val << 4 * shiftDistance;
+    }
+    int slipDistance = CHAR_BIT * (sizeof(val) % distance);
+    int wrapDistance = CHAR_BIT * sizeof(val) - slipDistance;
+    ADDR bytesToAlignDest = -((ADDR)destStart) & alignMask;
+    U64* destStartAligned;
+    if (bytesToAlignDest != 0)
+    {
+        LZ4_copy8(destStart, &val);
+        U64 val2 = val >> slipDistance;
+        val2 |= val2 << wrapDistance;
+        int bitsToAlignDest = (int) (CHAR_BIT * bytesToAlignDest);
+        val = val >> bitsToAlignDest | val2 << (CHAR_BIT * sizeof(val) - bitsToAlignDest);
+        destStartAligned = (U64*) (((ADDR)destStart + bytesToAlignDest) & ~alignMask);
+    }
+    else { destStartAligned = (U64*) ((ADDR)destStart & ~alignMask); }
     switch (distance) {
         case 4:
         case 2:
         case 1:
-            for (BYTE* off = destStart; off < destEnd; off += 8)
+            for (U64* off = destStartAligned; (BYTE*)off < destEnd; off++)
             {
-                LZ4_copy8(off, &val);
+                *off = val;
             }
-//            for (U64* off = (U64*)destStart; off < (U64*)destEnd; off++)
-//            {
-//                *off = val;
-//            }
             break;
         default:
-            // slipDistance = 8 * (8 % distance), but avoid the mod operation:
-            slipDistance = distance == 3? 8 * (8 % 3) : 64 - shiftDistance;
-            wrapDistance = 64 - slipDistance;
-            for (BYTE* off = destStart; off < destEnd; off += 8)
+            for (U64* off = destStartAligned; (BYTE*)off < destEnd; off++)
             {
-                LZ4_copy8(off, &val);
+                *off = val;
                 val >>= slipDistance;
                 val |= val << wrapDistance;
             }
-//            for (U64* off = (U64*)destStart; off < (U64*)destEnd; off++)
-//            {
-//                *off = val;
-//                val >>= slipDistance;
-//                val |= val << wrapDistance;
-//            }
     }
 }
 
@@ -325,9 +326,9 @@ FORCE_INLINE void MT_wildCopy(BYTE* destStart, const BYTE* srcStart, BYTE* const
         MT_wildCopyMisalignedLE(destStart, srcStart, destEnd);
     }
     else
-    {
-        MT_wildCopyNarrowLE(destStart, srcStart, destEnd);
-    }
+     {
+         MT_wildCopyNarrowLE(destStart, srcStart, destEnd);
+     }
 }
 
 
