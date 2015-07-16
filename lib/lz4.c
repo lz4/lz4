@@ -199,15 +199,13 @@ static size_t LZ4_read_ARCH(const void* p)
 }
 
 
-static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
-
-/* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
+/* customized variant of memcpy, which can overwrite up to 7 bytes beyond dstEnd */
 static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
-    BYTE* e = (BYTE*)dstEnd;
-    do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
+    BYTE* const e = (BYTE*)dstEnd;
+    do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
     //do { memcpy(d,s,16); d+=16; s+=16; } while (d<e);
 }
 
@@ -217,9 +215,9 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 **************************************/
 #define MINMATCH 4
 
-#define COPYLENGTH 8
+#define WILDCOPYLENGTH 8
 #define LASTLITERALS 5
-#define MFLIMIT (COPYLENGTH+MINMATCH)
+#define MFLIMIT (WILDCOPYLENGTH+MINMATCH)
 static const int LZ4_minLength = (MFLIMIT+1);
 
 #define KB *(1 <<10)
@@ -824,7 +822,6 @@ _next_match:
                 /* Match description too long : reduce it */
                 matchLength = (15-1) + (oMaxMatch-op) * 255;
             }
-            //printf("offset %5i, matchLength%5i \n", (int)(ip-match), matchLength + MINMATCH);
             ip += MINMATCH + matchLength;
 
             if (matchLength>=ML_MASK)
@@ -1151,6 +1148,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         unsigned token;
         size_t length;
         const BYTE* match;
+        size_t offset;
 
         /* get literal length */
         token = *ip++;
@@ -1170,7 +1168,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         /* copy literals */
         cpy = op+length;
         if (((endOnInput) && ((cpy>(partialDecoding?oexit:oend-MFLIMIT)) || (ip+length>iend-(2+1+LASTLITERALS))) )
-            || ((!endOnInput) && (cpy>oend-COPYLENGTH)))
+            || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)))
         {
             if (partialDecoding)
             {
@@ -1191,7 +1189,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         ip += length; op = cpy;
 
         /* get offset */
-        const size_t offset = LZ4_readLE16(ip); ip+=2;
+        offset = LZ4_readLE16(ip); ip+=2;
         match = op - offset;
         if ((checkOffset) && (unlikely(match < lowLimit))) goto _output_error;   /* Error : offset outside buffers */
 
@@ -1255,17 +1253,18 @@ FORCE_INLINE int LZ4_decompress_generic(
             match += dec32table[offset];
             memcpy(op+4, match, 4);
             match -= dec64;
-        } else { LZ4_copy8(op, match); match+=8; }
+        } else { memcpy(op, match, 8); match+=8; }
         op += 8;
 
         if (unlikely(cpy>oend-12))
         {
-            if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals */
-            if (op < oend-8)
+            BYTE* const oCopyLimit = oend-(WILDCOPYLENGTH-1);
+            if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals (uncompressed) */
+            if (op < oCopyLimit)
             {
-                LZ4_wildCopy(op, match, oend-8);
-                match += (oend-8) - op;
-                op = oend-8;
+                LZ4_wildCopy(op, match, oCopyLimit);
+                match += oCopyLimit - op;
+                op = oCopyLimit;
             }
             while (op<cpy) *op++ = *match++;
         }
