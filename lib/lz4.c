@@ -199,8 +199,6 @@ static size_t LZ4_read_ARCH(const void* p)
 }
 
 
-static void LZ4_copy4(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 4); }
-
 static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
 
 /* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
@@ -210,6 +208,7 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* e = (BYTE*)dstEnd;
     do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
+    //do { memcpy(d,s,16); d+=16; s+=16; } while (d<e);
 }
 
 
@@ -1163,7 +1162,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                 s = *ip++;
                 length += s;
             }
-            while (likely((endOnInput)?ip<iend-RUN_MASK:1) && (s==255));
+            while ( likely(endOnInput ? ip<iend-RUN_MASK : 1) && (s==255) );
             if ((safeDecode) && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* overflow detection */
             if ((safeDecode) && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* overflow detection */
         }
@@ -1192,8 +1191,9 @@ FORCE_INLINE int LZ4_decompress_generic(
         ip += length; op = cpy;
 
         /* get offset */
-        match = cpy - LZ4_readLE16(ip); ip+=2;
-        if ((checkOffset) && (unlikely(match < lowLimit))) goto _output_error;   /* Error : offset outside destination buffer */
+        const size_t offset = LZ4_readLE16(ip); ip+=2;
+        match = op - offset;
+        if ((checkOffset) && (unlikely(match < lowLimit))) goto _output_error;   /* Error : offset outside buffers */
 
         /* get matchlength */
         length = token & ML_MASK;
@@ -1223,12 +1223,12 @@ FORCE_INLINE int LZ4_decompress_generic(
             }
             else
             {
-                /* match encompass external dictionary and current segment */
+                /* match encompass external dictionary and current block */
                 size_t copySize = (size_t)(lowPrefix-match);
                 memcpy(op, dictEnd - copySize, copySize);
                 op += copySize;
                 copySize = length - copySize;
-                if (copySize > (size_t)(op-lowPrefix))   /* overlap within current segment */
+                if (copySize > (size_t)(op-lowPrefix))   /* overlap copy */
                 {
                     BYTE* const endOfMatch = op + copySize;
                     const BYTE* copyFrom = lowPrefix;
@@ -1243,17 +1243,17 @@ FORCE_INLINE int LZ4_decompress_generic(
             continue;
         }
 
-        /* copy repeated sequence */
+        /* copy match within block */
         cpy = op + length;
-        if (unlikely((op-match)<8))
+        if (unlikely(offset<8))
         {
-            const size_t dec64 = dec64table[op-match];
+            const size_t dec64 = dec64table[offset];
             op[0] = match[0];
             op[1] = match[1];
             op[2] = match[2];
             op[3] = match[3];
-            match += dec32table[op-match];
-            LZ4_copy4(op+4, match);
+            match += dec32table[offset];
+            memcpy(op+4, match, 4);
             op += 8; match -= dec64;
         } else { LZ4_copy8(op, match); op+=8; match+=8; }
 
