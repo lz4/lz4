@@ -183,19 +183,11 @@ static U32 LZ4_read32(const void* memPtr)
     return val32;
 }
 
-static U64 LZ4_read64(const void* memPtr)
+static size_t LZ4_read_ARCH(const void* memPtr)
 {
-    U64 val64;
-    memcpy(&val64, memPtr, 8);
-    return val64;
-}
-
-static size_t LZ4_read_ARCH(const void* p)
-{
-    if (LZ4_64bits())
-        return (size_t)LZ4_read64(p);
-    else
-        return (size_t)LZ4_read32(p);
+    size_t val;
+    memcpy(&val, memPtr, sizeof(val));
+    return val;
 }
 
 
