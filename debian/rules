@@ -1,26 +1,8 @@
 #!/usr/bin/make -f
 
-%:
-	dh $@ --buildsystem=cmake
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/cmake.mk
 
-override_dh_auto_configure:
-	DESTDIR="$(CURDIR)/debian/lz4" dh_auto_configure \
-		--buildsystem=cmake -- \
-		-DCMAKE_INSTALL_PREFIX="/usr" \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		../cmake_unofficial
 
-override_dh_auto_install:
-	dh_auto_install \
-		--destdir="$(CURDIR)/debian/lz4"
-		--buildsystem=cmake
-
-override_dh_clean:
-	dh_clean
-
-override_dh_makeshlibs:
-	dh_makeshlibs -V "lz4 (>= $(shell dpkg-parsechangelog | sed -n -r -e 's/^Version: ([^.]+\.[^.]+).*/\1/p'))"
-
-override_dh_strip:
-	#dh_strip --dbg-package=lz4-dbg
+DEB_CMAKE_EXTRA_FLAGS := -DCMAKE_BUILD_TYPE=RelWithDebInfo ../cmake_unofficial
 

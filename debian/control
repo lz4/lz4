@@ -4,7 +4,8 @@ Priority: optional
 Maintainer: Evgeniy Polyakov <zbr@ioremap.net>
 Build-Depends:
  cmake (>= 2.6),
- debhelper (>= 7.0.50~)
+ debhelper (>= 7.0.50~),
+ cdbs
 Standards-Version: 3.8.0
 Homepage: https://code.google.com/p/lz4/
 Vcs-Git: git://github.com/Cyan4973/lz4.git
