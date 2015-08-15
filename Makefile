@@ -58,18 +58,18 @@ VOID = /dev/null
 endif
 
 
-.PHONY: default all lib lz4programs clean test versionsTest
+.PHONY: default all lib lz4programs clean test versionsTest examples
 
 default: lz4programs
 
 all: lib
-	@cd $(PRGDIR); $(MAKE) -e all
+	@cd $(PRGDIR); $(MAKE) all
 
 lib:
-	@cd $(LZ4DIR); $(MAKE) -e all
+	@cd $(LZ4DIR); $(MAKE) all
 
 lz4programs:
-	@cd $(PRGDIR); $(MAKE) -e
+	@cd $(PRGDIR); $(MAKE)
 
 clean:
 	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
@@ -84,8 +84,8 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
 install:
-	@cd $(LZ4DIR); $(MAKE) -e install
-	@cd $(PRGDIR); $(MAKE) -e install
+	@cd $(LZ4DIR); $(MAKE) install
+	@cd $(PRGDIR); $(MAKE) install
 
 uninstall:
 	@cd $(LZ4DIR); $(MAKE) uninstall
@@ -95,7 +95,7 @@ travis-install:
 	sudo $(MAKE) install
 
 test:
-	@cd $(PRGDIR); $(MAKE) -e test
+	@cd $(PRGDIR); $(MAKE) test
 
 test-travis: $(TRAVIS_TARGET)
 
@@ -103,30 +103,30 @@ cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
 gpptest: clean
-	$(MAKE) all CC=g++ CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 clangtest: clean
-	$(MAKE) all CC=clang CPPFLAGS="-Werror -Wconversion -Wno-sign-conversion"
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) all CC=clang
 
 sanitize: clean
-	$(MAKE) test CC=clang CPPFLAGS="-g -fsanitize=undefined" FUZZER_TIME="-T1mn" NB_LOOPS=-i1
+	CFLAGS="-g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
 staticAnalyze: clean
-	CPPFLAGS=-g scan-build --status-bugs -v $(MAKE) all
+	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
 armtest: clean
-	cd lib; $(MAKE) -e all CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
-	cd programs; $(MAKE) -e bins CC=arm-linux-gnueabi-gcc CPPFLAGS="-Werror"
+	cd lib; CFLAGS="-O3 -Werror" $(MAKE) all CC=arm-linux-gnueabi-gcc
+	cd programs; CFLAGS="-O3 -Werror" $(MAKE) bins CC=arm-linux-gnueabi-gcc
 
 versionsTest: clean
 	@cd versionsTest; $(MAKE)
 
 examples:
-	cd lib; $(MAKE) -e
-	cd programs; $(MAKE) -e lz4
-	cd examples; $(MAKE) -e test
+	cd lib; $(MAKE)
+	cd programs; $(MAKE) lz4
+	cd examples; $(MAKE) test
 
 prg-travis:
-	@cd $(PRGDIR); $(MAKE) -e test-travis
+	@cd $(PRGDIR); $(MAKE) test-travis
 
 endif

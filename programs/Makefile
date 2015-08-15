@@ -34,17 +34,18 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r132
+RELEASE ?= r132
 
-DESTDIR?=
-PREFIX ?= /usr/local
-CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+DESTDIR ?=
+PREFIX  ?= /usr/local
+CFLAGS  ?= -O3 # can select your own settings, for example : CFLAGS="-O2 -g" make
+CFLAGS  += -I../lib -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
+CPPFLAGS:= -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
+FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
-BINDIR := $(PREFIX)/bin
-MANDIR := $(PREFIX)/share/man/man1
-LZ4DIR := ../lib
+BINDIR  := $(PREFIX)/bin
+MANDIR  := $(PREFIX)/share/man/man1
+LZ4DIR  := ../lib
 
 
 # Define *.exe as extension for Windows systems
@@ -72,35 +73,35 @@ bins: lz4 lz4c fullbench fuzzer frametest datagen
 
 all: bins m32
 
-lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+lz4: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC)      $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
+lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o
+	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o frametest.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-datagen : datagen.c datagencli.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+datagen : datagen.o datagencli.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
 	@rm -f core *.o *.test tmp* \

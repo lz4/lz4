@@ -31,19 +31,18 @@
 # ################################################################
 
 # Version numbers
-VERSION ?= 132
-LIBVER_MAJOR=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
-LIBVER_MINOR=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
-LIBVER_PATCH=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
-LIBVER=$(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
+VERSION?= 132
+LIBVER_MAJOR:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
+LIBVER_MINOR:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
+LIBVER_PATCH:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
+LIBVER := $(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
 DESTDIR?=
 PREFIX ?= /usr/local
 CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
 CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
-LDFLAGS = -I.
-FLAGS   = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 LIBDIR?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -67,10 +66,9 @@ default: liblz4
 
 all: liblz4
 
-liblz4: lz4.c lz4hc.c lz4frame.c xxhash.c
+liblz4: lz4.c lz4hc.c lz4frame.c xxhash.c   # need to compile once with -fPIC, and once without -fPIC
 	@echo compiling static library
-	@$(CC) $(FLAGS) -c $^
-	@$(AR) rcs liblz4.a lz4.o lz4hc.o lz4frame.o xxhash.o
+	@$(AR) rcs $@.a $^
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links

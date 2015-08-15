@@ -1,5 +1,6 @@
 r132
-Improved: Small decompression speed boost (+5%)
+Improved: Small decompression speed boost (+4%)
+Makefile: Generate intermediate object files (*.o) for faster compilation on low power systems
 
 r131
 New    : Dos/DJGPP target, thanks to Louis Santillan (#114)
