@@ -1,0 +1,8 @@
+liblz4 (0.131) unstable; urgency=low
+
+  * New    : Dos/DJGPP target, thanks to Louis Santillan (#114)
+  * Added  : Example using lz4frame library, by Zbigniew Jędrzejewski-Szmek (#118)
+  * Changed: xxhash symbols are modified (namespace emulation) within liblz4
+
+ -- Yann Collet <Cyan4973@github.com>  Sun, 28 Jun 2015 01:00:00 +0000
+
