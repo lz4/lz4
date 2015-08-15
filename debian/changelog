@@ -1,4 +1,4 @@
-lz4 (0.131) unstable; urgency=low
+liblz4 (0.131) unstable; urgency=low
 
   * New    : Dos/DJGPP target, thanks to Louis Santillan (#114)
   * Added  : Example using lz4frame library, by Zbigniew Jędrzejewski-Szmek (#118)
