@@ -35,13 +35,15 @@ You can contact the author at :
 /**************************************
 *  Tuning parameters
 **************************************/
-/* Unaligned memory access is automatically enabled for "common" CPU, such as x86.
- * For others CPU, the compiler will be more cautious, and insert extra code to ensure aligned access is respected.
- * If you know your target CPU supports unaligned memory access, you want to force this option manually to improve performance.
- * You can also enable this parameter if you know your input data will always be aligned (boundaries of 4, for U32).
+/* XXH_FORCE_DIRECT_UNALIGNED_MEMORY_ACCESS
+ * Unaligned memory access is automatically enabled for "common" CPU, such as x86/x64.
+ * For others CPU, the compiler will be more cautious, and insert extra code to ensure proper working with unaligned memory accesses.
+ * If you know your target CPU efficiently supports unaligned memory accesses, you can force this option manually.
+ * If your CPU efficiently supports unaligned memory accesses and the compiler did not automatically detected it, you will witness large performance improvement.
+ * You can also enable this switch from compilation command line / Makefile.
  */
-#if defined(__ARM_FEATURE_UNALIGNED) || defined(__i386) || defined(_M_IX86) || defined(__x86_64__) || defined(_M_X64)
-#  define XXH_USE_UNALIGNED_ACCESS 1
+#if !defined(XXH_FORCE_DIRECT_MEMORY_ACCESS) && ( defined(__ARM_FEATURE_UNALIGNED) )
+#  define XXH_FORCE_DIRECT_MEMORY_ACCESS 1
 #endif
 
 /* XXH_ACCEPT_NULL_INPUT_POINTER :
@@ -60,6 +62,15 @@ You can contact the author at :
  * This option has no impact on Little_Endian CPU.
  */
 #define XXH_FORCE_NATIVE_FORMAT 0
+
+/* XXH_USELESS_ALIGN_BRANCH :
+ * This is a minor performance trick, only useful with lots of very small keys.
+ * It means : don't make a test between aligned/unaligned, because performance will be the same.
+ * It avoids one initial branch per hash.
+ */
+#if defined(__i386) || defined(_M_IX86) || defined(__x86_64__) || defined(_M_X64) || defined(XXH_FORCE_DIRECT_MEMORY_ACCESS)
+#  define XXH_USELESS_ALIGN_BRANCH 1
+#endif
 
 
 /**************************************
@@ -113,20 +124,29 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcp
   typedef unsigned long long U64;
 #endif
 
+
+#if defined(XXH_FORCE_DIRECT_MEMORY_ACCESS)
+
+static U32 XXH_read32(const void* memPtr) { return *(const U32*) memPtr; }
+static U64 XXH_read64(const void* memPtr) { return *(const U64*) memPtr; }
+
+#else
+
 static U32 XXH_read32(const void* memPtr)
 {
-    U32 val32;
-    memcpy(&val32, memPtr, 4);
-    return val32;
+    U32 val;
+    memcpy(&val, memPtr, sizeof(val));
+    return val;
 }
 
 static U64 XXH_read64(const void* memPtr)
 {
-    U64 val64;
-    memcpy(&val64, memPtr, 8);
-    return val64;
+    U64 val;
+    memcpy(&val, memPtr, sizeof(val));
+    return val;
 }
 
+#endif // defined
 
 
 /******************************************
@@ -175,8 +195,10 @@ static U64 XXH_swap64 (U64 x)
 *  Architecture Macros
 ***************************************/
 typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianess;
-#ifndef XXH_CPU_LITTLE_ENDIAN   /* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example using a compiler switch */
-static const int one = 1;
+
+/* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example one the compiler command line */
+#ifndef XXH_CPU_LITTLE_ENDIAN
+    static const int one = 1;
 #   define XXH_CPU_LITTLE_ENDIAN   (*(const char*)(&one))
 #endif
 
@@ -315,7 +337,7 @@ FORCE_INLINE U32 XXH32_endian_align(const void* input, size_t len, U32 seed, XXH
 }
 
 
-unsigned XXH32 (const void* input, size_t len, unsigned seed)
+unsigned int XXH32 (const void* input, size_t len, unsigned int seed)
 {
 #if 0
     /* Simple version, good for code maintenance, but unfortunately slow for small inputs */
@@ -326,7 +348,7 @@ unsigned XXH32 (const void* input, size_t len, unsigned seed)
 #else
     XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
 
-#  if !defined(XXH_USE_UNALIGNED_ACCESS)
+#  if !defined(XXH_USELESS_ALIGN_BRANCH)
     if ((((size_t)input) & 3) == 0)   /* Input is 4-bytes aligned, leverage the speed benefit */
     {
         if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
@@ -466,7 +488,7 @@ unsigned long long XXH64 (const void* input, size_t len, unsigned long long seed
 #else
     XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
 
-#  if !defined(XXH_USE_UNALIGNED_ACCESS)
+#  if !defined(XXH_USELESS_ALIGN_BRANCH)
     if ((((size_t)input) & 7)==0)   /* Input is aligned, let's leverage the speed advantage */
     {
         if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
@@ -538,7 +560,7 @@ XXH_errorcode XXH64_freeState(XXH64_state_t* statePtr)
 
 /*** Hash feed ***/
 
-XXH_errorcode XXH32_reset(XXH32_state_t* state_in, U32 seed)
+XXH_errorcode XXH32_reset(XXH32_state_t* state_in, unsigned int seed)
 {
     XXH_istate32_t* state = (XXH_istate32_t*) state_in;
     state->seed = seed;
@@ -708,7 +730,7 @@ FORCE_INLINE U32 XXH32_digest_endian (const XXH32_state_t* state_in, XXH_endiane
 }
 
 
-U32 XXH32_digest (const XXH32_state_t* state_in)
+unsigned int XXH32_digest (const XXH32_state_t* state_in)
 {
     XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
 
