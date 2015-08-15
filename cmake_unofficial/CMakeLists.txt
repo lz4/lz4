@@ -43,7 +43,7 @@ if(BUILD_TOOLS)
 endif()
 
 if(BUILD_LIBS)    
-    add_library(liblz4 ${LZ4_SRCS_LIB})
+    add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
     
     set_target_properties(liblz4 PROPERTIES
     OUTPUT_NAME lz4
