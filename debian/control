@@ -1,4 +1,4 @@
-Source: lz4
+Source: liblz4
 Section: devel
 Priority: optional
 Maintainer: Evgeniy Polyakov <zbr@ioremap.net>
@@ -11,7 +11,13 @@ Homepage: https://code.google.com/p/lz4/
 Vcs-Git: git://github.com/Cyan4973/lz4.git
 Vcs-Browser: https://github.com/Cyan4973/lz4
 
-Package: lz4
+Package: liblz4
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Extremely Fast Compression algorithm http://www.lz4.org
+
+Package: liblz4-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Extremely Fast Compression algorithm http://www.lz4.org
+ Development files.
