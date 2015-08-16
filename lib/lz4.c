@@ -158,27 +158,28 @@ static U16 LZ4_read16(const void* memPtr) { return *(const U16*) memPtr; }
 static U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
 static size_t LZ4_read_ARCH(const void* memPtr) { return *(const size_t*) memPtr; }
 
+static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
+
 #else
 
 static U16 LZ4_read16(const void* memPtr)
 {
-    U16 val16;
-    memcpy(&val16, memPtr, 2);
-    return val16;
+    U16 val; memcpy(&val, memPtr, sizeof(val)); return val;
 }
 
 static U32 LZ4_read32(const void* memPtr)
 {
-    U32 val32;
-    memcpy(&val32, memPtr, 4);
-    return val32;
+    U32 val; memcpy(&val, memPtr, sizeof(val)); return val;
 }
 
 static size_t LZ4_read_ARCH(const void* memPtr)
 {
-    size_t val;
-    memcpy(&val, memPtr, sizeof(val));
-    return val;
+    size_t val; memcpy(&val, memPtr, sizeof(val)); return val;
+}
+
+static void LZ4_write16(void* memPtr, U16 value)
+{
+    memcpy(memPtr, &value, sizeof(value));
 }
 
 #endif // LZ4_FORCE_DIRECT_MEMORY_ACCESS
@@ -201,7 +202,7 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
 {
     if (LZ4_isLittleEndian())
     {
-        memcpy(memPtr, &value, 2);
+        LZ4_write16(memPtr, value);
     }
     else
     {
@@ -218,7 +219,6 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
     do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
-    //do { memcpy(d,s,16); d+=16; s+=16; } while (d<e);
 }
 
 
