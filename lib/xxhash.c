@@ -35,7 +35,7 @@ You can contact the author at :
 /**************************************
 *  Tuning parameters
 **************************************/
-/* XXH_FORCE_DIRECT_UNALIGNED_MEMORY_ACCESS
+/* XXH_FORCE_DIRECT_MEMORY_ACCESS
  * Unaligned memory access is automatically enabled for "common" CPU, such as x86/x64.
  * For others CPU, the compiler will be more cautious, and insert extra code to ensure proper working with unaligned memory accesses.
  * If you know your target CPU efficiently supports unaligned memory accesses, you can force this option manually.

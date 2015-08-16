@@ -53,6 +53,17 @@
 /**************************************
 *  CPU Feature Detection
 **************************************/
+/* LZ4_FORCE_DIRECT_MEMORY_ACCESS
+ * Unaligned memory access is automatically enabled for "common" CPU, such as x86/x64.
+ * For others CPU, the compiler will be more cautious, and insert extra code to ensure proper working with unaligned memory accesses.
+ * If you know your target CPU efficiently supports unaligned memory accesses, you can force this option manually.
+ * If your CPU efficiently supports unaligned memory accesses and the compiler did not automatically detected it, you will witness large performance improvement.
+ * You can also enable this switch from compilation command line / Makefile.
+ */
+#if !defined(LZ4_FORCE_DIRECT_MEMORY_ACCESS) && ( defined(__ARM_FEATURE_UNALIGNED) )
+#  define LZ4_FORCE_DIRECT_MEMORY_ACCESS 1
+#endif
+
 /*
  * LZ4_FORCE_SW_BITCOUNT
  * Define this parameter if your target system or compiler does not support hardware bit count
@@ -141,6 +152,13 @@ static unsigned LZ4_isLittleEndian(void)
     return one.c[0];
 }
 
+#if defined(LZ4_FORCE_DIRECT_MEMORY_ACCESS)
+
+static U16 LZ4_read16(const void* memPtr) { return *(const U16*) memPtr; }
+static U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
+static size_t LZ4_read_ARCH(const void* memPtr) { return *(const size_t*) memPtr; }
+
+#else
 
 static U16 LZ4_read16(const void* memPtr)
 {
@@ -148,6 +166,23 @@ static U16 LZ4_read16(const void* memPtr)
     memcpy(&val16, memPtr, 2);
     return val16;
 }
+
+static U32 LZ4_read32(const void* memPtr)
+{
+    U32 val32;
+    memcpy(&val32, memPtr, 4);
+    return val32;
+}
+
+static size_t LZ4_read_ARCH(const void* memPtr)
+{
+    size_t val;
+    memcpy(&val, memPtr, sizeof(val));
+    return val;
+}
+
+#endif // LZ4_FORCE_DIRECT_MEMORY_ACCESS
+
 
 static U16 LZ4_readLE16(const void* memPtr)
 {
@@ -175,21 +210,6 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
         p[1] = (BYTE)(value>>8);
     }
 }
-
-static U32 LZ4_read32(const void* memPtr)
-{
-    U32 val32;
-    memcpy(&val32, memPtr, 4);
-    return val32;
-}
-
-static size_t LZ4_read_ARCH(const void* memPtr)
-{
-    size_t val;
-    memcpy(&val, memPtr, sizeof(val));
-    return val;
-}
-
 
 /* customized variant of memcpy, which can overwrite up to 7 bytes beyond dstEnd */
 static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
