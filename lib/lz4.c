@@ -53,15 +53,26 @@
 /**************************************
 *  CPU Feature Detection
 **************************************/
-/* LZ4_FORCE_DIRECT_MEMORY_ACCESS
- * Unaligned memory access is automatically enabled for "common" CPU, such as x86/x64.
- * For others CPU, the compiler will be more cautious, and insert extra code to ensure proper working with unaligned memory accesses.
- * If you know your target CPU efficiently supports unaligned memory accesses, you can force this option manually.
- * If your CPU efficiently supports unaligned memory accesses and the compiler did not automatically detected it, you will witness large performance improvement.
- * You can also enable this switch from compilation command line / Makefile.
+/* LZ4_FORCE_MEMORY_ACCESS
+ * By default, access to unaligned memory is controlled by `memcpy()`, which is safe and portable.
+ * Unfortunately, on some target/compiler combinations, the generated assembly is sub-optimal.
+ * The below switch allow to select different access method for improved performance.
+ * Method 0 (default) : use `memcpy()`. Safe and portable.
+ * Method 1 : `__packed` statement. It depends on compiler extension (ie, not portable).
+ *            This method is safe if your compiler supports it, and *generally* as fast or faster than `memcpy`.
+ * Method 2 : direct access. This method is portable but violate C standard.
+ *            It can generate buggy code on targets which generate assembly depending on alignment.
+ *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
+ * See http://fastcompression.blogspot.fr/2015/08/accessing-unaligned-memory.html for details.
+ * Prefer these methods in priority order (0 > 1 > 2)
  */
-#if !defined(LZ4_FORCE_DIRECT_MEMORY_ACCESS) && ( defined(__ARM_FEATURE_UNALIGNED) )
-#  define LZ4_FORCE_DIRECT_MEMORY_ACCESS 1
+#ifndef LZ4_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
+#  if defined(__GNUC__) && ( defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || defined(__ARM_ARCH_6T2__) )
+#    define LZ4_FORCE_MEMORY_ACCESS 2
+#  elif defined(__INTEL_COMPILER) || \
+  (defined(__GNUC__) && ( defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7S__) ))
+#    define LZ4_FORCE_MEMORY_ACCESS 1
+#  endif
 #endif
 
 /*
@@ -148,17 +159,30 @@ static unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
 
 static unsigned LZ4_isLittleEndian(void)
 {
-    const union { U32 i; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental  */
+    const union { U32 i; BYTE c[4]; } one = { 1 };   // don't use static : performance detrimental
     return one.c[0];
 }
 
-#if defined(LZ4_FORCE_DIRECT_MEMORY_ACCESS)
+
+#if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
 
 static U16 LZ4_read16(const void* memPtr) { return *(const U16*) memPtr; }
 static U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
 static size_t LZ4_read_ARCH(const void* memPtr) { return *(const size_t*) memPtr; }
 
 static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
+
+#elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
+
+/* __pack instructions are safer, but compiler specific, hence potentially problematic for some compilers */
+/* currently only defined for gcc and icc */
+typedef union { U16 u16; U32 u32; size_t uArch; } __attribute__((packed)) unalign;
+
+static U16 LZ4_read16(const void* ptr) { return ((const unalign*)ptr)->u16; }
+static U32 LZ4_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
+static size_t LZ4_read_ARCH(const void* ptr) { return ((const unalign*)ptr)->uArch; }
+
+static void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
 
 #else
 
@@ -212,13 +236,18 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
     }
 }
 
+static void LZ4_copy8(void* dst, const void* src)
+{
+	memcpy(dst,src,8);
+}
+
 /* customized variant of memcpy, which can overwrite up to 7 bytes beyond dstEnd */
 static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
-    do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
+    do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
 }
 
 
@@ -1265,7 +1294,7 @@ FORCE_INLINE int LZ4_decompress_generic(
             match += dec32table[offset];
             memcpy(op+4, match, 4);
             match -= dec64;
-        } else { memcpy(op, match, 8); match+=8; }
+        } else { LZ4_copy8(op, match); match+=8; }
         op += 8;
 
         if (unlikely(cpy>oend-12))
