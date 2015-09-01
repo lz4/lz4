@@ -206,7 +206,7 @@ static void LZ4_write16(void* memPtr, U16 value)
     memcpy(memPtr, &value, sizeof(value));
 }
 
-#endif // LZ4_FORCE_DIRECT_MEMORY_ACCESS
+#endif // LZ4_FORCE_MEMORY_ACCESS
 
 
 static U16 LZ4_readLE16(const void* memPtr)
@@ -247,6 +247,13 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
+
+#if 1
+    const size_t l2 = 8 - (((size_t)d) & (sizeof(void*)-1));
+    LZ4_copy8(d,s); if (d>e-9) return;
+    d+=l2; s+=l2;
+#endif // join to align
+
     do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
 }
 

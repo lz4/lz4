@@ -33,8 +33,8 @@
 */
 
 /* LZ4F is a stand-alone API to create LZ4-compressed frames
- * fully conformant to specification v1.5.1.
- * All related operations, including memory management, are handled by the library.
+ * conformant with specification v1.5.1.
+ * All related operations, including memory management, are handled internally by the library.
  * You don't need lz4.h when using lz4frame.h.
  * */
 
@@ -51,8 +51,8 @@ extern "C" {
 
 
 /**************************************
- * Error management
- * ************************************/
+*  Error management
+**************************************/
 typedef size_t LZ4F_errorCode_t;
 
 unsigned    LZ4F_isError(LZ4F_errorCode_t code);
@@ -60,8 +60,8 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code str
 
 
 /**************************************
- * Frame compression types
- * ************************************/
+*  Frame compression types
+**************************************/
 //#define LZ4F_DISABLE_OBSOLETE_ENUMS
 #ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
 #  define LZ4F_OBSOLETE_ENUM(x) ,x
@@ -126,8 +126,8 @@ typedef struct {
 
 
 /***********************************
- * Simple compression function
- * *********************************/
+*  Simple compression function
+***********************************/
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
@@ -257,15 +257,15 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dctx,
                          const void* srcBuffer, size_t* srcSizePtr);
 /* LZ4F_getFrameInfo()
  * This function decodes frame header information (such as max blockSize, frame checksum, etc.).
- * Its usage is optional : you can start by calling directly LZ4F_decompress() instead.
- * The objective is to extract frame header information, typically for allocation purposes.
- * LZ4F_getFrameInfo() can also be used anytime *after* starting decompression, on any valid LZ4F_decompressionContext_t.
- * The result is *copied* into an existing LZ4F_frameInfo_t structure which must be already allocated.
- * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- * The function result is an hint of how many srcSize bytes LZ4F_decompress() expects for next call,
+ * Its usage is optional. The objective is to extract frame header information, typically for allocation purposes.
+ * A header size is variable and can be from 7 to 15 bytes. It's also possible to input more bytes than that. 
+ * The number of bytes read from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
+ * (note that LZ4F_getFrameInfo() can also be used anytime *after* starting decompression, in this case 0 input byte is enough)
+ * Frame header info is *copied into* an already allocated LZ4F_frameInfo_t structure.
+ * The function result is an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
  *                        or an error code which can be tested using LZ4F_isError()
  *                        (typically, when there is not enough src bytes to fully decode the frame header)
- * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
+ * Decompression is expected to resume from where it stopped (srcBuffer + *srcSizePtr)
  */
 
 size_t LZ4F_decompress(LZ4F_decompressionContext_t dctx,

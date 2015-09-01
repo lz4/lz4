@@ -38,7 +38,7 @@ RELEASE ?= r132
 
 DESTDIR ?=
 PREFIX  ?= /usr/local
-CFLAGS  ?= -O3 # can select your own settings, for example : CFLAGS="-O2 -g" make
+CFLAGS  ?= -O3   # can select customized flags instead, for example : CFLAGS="-O2 -g" make
 CFLAGS  += -I../lib -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
 CPPFLAGS:= -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
@@ -59,9 +59,7 @@ endif
 
 
 # Select test target for Travis CI's Build Matrix
-TRAVIS_TARGET:= $(LZ4_TRAVIS_CI_ENV)
 TEST_FILES   := COPYING
-TEST_TARGETS := test-native
 FUZZER_TIME  := -T9mn
 
 
@@ -148,8 +146,6 @@ test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
 
 test-all: test test32
 
-test-travis: $(TRAVIS_TARGET)
-
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
 	./datagen -g5M  -P100 > tmpSrc
@@ -164,7 +160,7 @@ test-lz4-sparse: lz4 datagen
 	./lz4 tmpSrc | ./lz4 -dv --no-sparse > tmpNoSparse
 	diff -s tmpSrc tmpNoSparse
 	ls -ls tmp*
-	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
+	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to generate non-full last block)
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
 	@rm tmp*
@@ -181,8 +177,6 @@ test-lz4-sparse: lz4 datagen
 	ls -ls tmp*
 	diff tmp2M tmpR
 	@rm tmp*
-
-
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
@@ -306,6 +300,6 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
 
 test-mem32: lz4c32 datagen
-# unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
+# unfortunately, valgrind doesn't seem to work with non-native binary...
 
 endif

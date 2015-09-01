@@ -1,7 +1,9 @@
 r132
 Improved: Small decompression speed boost (+4%)
-Improved: Performance on ARMv6
-Makefile: Generate intermediate object files (*.o) for faster compilation on low power systems
+Improved: Performance on ARMv6 and ARMv7
+Added : Debianization, by Evgeniy Polyakov
+Makefile: Safely protects lz4 version when selecting custom CFLAGS
+Makefile: Generates intermediate object files (*.o) for faster compilation on low power systems
 
 r131
 New    : Dos/DJGPP target, thanks to Louis Santillan (#114)

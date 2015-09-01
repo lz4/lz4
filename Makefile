@@ -43,13 +43,6 @@ PRGDIR  = programs
 LZ4DIR  = lib
 
 
-# Select test target for Travis CI's Build Matrix
-ifneq (,$(filter test-%,$(LZ4_TRAVIS_CI_ENV)))
-TRAVIS_TARGET=prg-travis
-else
-TRAVIS_TARGET=$(LZ4_TRAVIS_CI_ENV)
-endif
-
 # Define nul output
 ifneq (,$(filter Windows%,$(OS)))
 VOID = nul
@@ -62,20 +55,19 @@ endif
 
 default: lz4programs
 
-all: lib
-	@cd $(PRGDIR); $(MAKE) all
+all: lib lz4programs
 
 lib:
-	@cd $(LZ4DIR); $(MAKE) all
+	@$(MAKE) -C $(LZ4DIR) all
 
 lz4programs:
-	@cd $(PRGDIR); $(MAKE)
+	@$(MAKE) -C $(PRGDIR)
 
 clean:
-	@cd $(PRGDIR); $(MAKE) clean > $(VOID)
-	@cd $(LZ4DIR); $(MAKE) clean > $(VOID)
-	@cd examples;  $(MAKE) clean > $(VOID)
-	@cd versionsTest; $(MAKE) clean > $(VOID)
+	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	@$(MAKE) -C examples $@ > $(VOID)
+	@$(MAKE) -C versionsTest $@ > $(VOID)
 	@echo Cleaning completed
 
 
@@ -84,20 +76,18 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
 install:
-	@cd $(LZ4DIR); $(MAKE) install
-	@cd $(PRGDIR); $(MAKE) install
+	@$(MAKE) -C $(LZ4DIR) $@
+	@$(MAKE) -C $(PRGDIR) $@
 
 uninstall:
-	@cd $(LZ4DIR); $(MAKE) uninstall
-	@cd $(PRGDIR); $(MAKE) uninstall
+	@$(MAKE) -C $(LZ4DIR) $@
+	@$(MAKE) -C $(PRGDIR) $@
 
 travis-install:
 	sudo $(MAKE) install
 
 test:
-	@cd $(PRGDIR); $(MAKE) test
-
-test-travis: $(TRAVIS_TARGET)
+	$(MAKE) -C $(PRGDIR) test
 
 cmake:
 	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
@@ -115,18 +105,15 @@ staticAnalyze: clean
 	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
 armtest: clean
-	cd lib; CFLAGS="-O3 -Werror" $(MAKE) all CC=arm-linux-gnueabi-gcc
-	cd programs; CFLAGS="-O3 -Werror" $(MAKE) bins CC=arm-linux-gnueabi-gcc
+	CFLAGS="-O3 -Werror" $(MAKE) -C $(LZ4DIR) all CC=arm-linux-gnueabi-gcc
+	CFLAGS="-O3 -Werror" $(MAKE) -C $(PRGDIR) bins CC=arm-linux-gnueabi-gcc
 
 versionsTest: clean
-	@cd versionsTest; $(MAKE)
+	$(MAKE) -C versionsTest
 
 examples:
-	cd lib; $(MAKE)
-	cd programs; $(MAKE) lz4
-	cd examples; $(MAKE) test
-
-prg-travis:
-	@cd $(PRGDIR); $(MAKE) test-travis
+	$(MAKE) -C $(LZ4DIR)
+	$(MAKE) -C $(PRGDIR) lz4
+	$(MAKE) -C examples test
 
 endif
