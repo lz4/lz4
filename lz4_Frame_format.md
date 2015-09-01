@@ -63,7 +63,7 @@ General Structure of LZ4 Frame format
 
 | MagicNb | F. Descriptor | Block | (...) | EndMark | C. Checksum |
 |:-------:|:-------------:| ----- | ----- | ------- | ----------- |
-| 4 bytes |  3-11 bytes   |       |       | 4 bytes |   4 bytes   | 
+| 4 bytes |  3-11 bytes   |       |       | 4 bytes | 0-4 bytes   | 
 
 __Magic Number__
 
