@@ -542,7 +542,7 @@ int main(int argc, char** argv)
     /* Check if output is defined as console; trigger an error in this case */
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout)
     {
-        DISPLAYLEVEL(1, "refusing to output to console\n");
+        DISPLAYLEVEL(1, "refusing to write to console without -c\n");
         exit(1);
     }
 
