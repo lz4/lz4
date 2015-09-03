@@ -490,7 +490,11 @@ int main(int argc, char** argv)
     if(!input_filename) { input_filename=stdinmark; }
 
     /* Check if input is defined as console; trigger an error in this case */
-    if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) badusage();
+    if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) )
+    {
+        DISPLAYLEVEL(1, "refusing to read from a console\n");
+        exit(1);
+    }
 
     /* Check if benchmark is selected */
     if (bench)
@@ -536,7 +540,11 @@ int main(int argc, char** argv)
     }
 
     /* Check if output is defined as console; trigger an error in this case */
-    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) badusage();
+    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout)
+    {
+        DISPLAYLEVEL(1, "refusing to write to console without -c\n");
+        exit(1);
+    }
 
     /* Downgrade notification level in pure pipe mode (stdin + stdout) and multiple file mode */
     if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
