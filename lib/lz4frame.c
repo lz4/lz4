@@ -1080,7 +1080,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
 
         case dstage_getHeader:
             {
-                if ((size_t)(srcEnd-srcPtr) >= maxFHSize)   /* enough to decode - shortcut */
+                if ((size_t)(srcEnd-srcPtr) >= minFHSize)   /* enough to decode - shortcut */
                 {
                     LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, srcPtr, srcEnd-srcPtr);
                     if (LZ4F_isError(errorCode)) return errorCode;
