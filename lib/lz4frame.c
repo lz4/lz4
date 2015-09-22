@@ -130,6 +130,7 @@ typedef struct LZ4F_cctx_s
 typedef struct LZ4F_dctx_s
 {
     LZ4F_frameInfo_t frameInfo;
+    U32    frameInfoValid;
     U32    version;
     U32    dStage;
     U64    frameRemainingSize;
@@ -910,6 +911,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_t* dctxPtr, const void* srcVoidPtr, si
     dctxPtr->tmpOutSize = 0;
 
     dctxPtr->dStage = dstage_getCBlockSize;
+    dctxPtr->frameInfoValid = 1;
 
     return frameHeaderSize;
 }
@@ -942,7 +944,7 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dCtx, LZ4F_frameI
     {
         size_t o=0;
         size_t nextSrcSize = LZ4F_decompress(dCtx, NULL, &o, srcBuffer, srcSizePtr, NULL);
-        if (dctxPtr->dStage <= dstage_storeHeader)   /* note : requires dstage_* header related to be at beginning of enum */
+        if (dctxPtr->dStage <= dstage_storeHeader && !dctxPtr->frameInfoValid)   /* note : requires dstage_* header related to be at beginning of enum */
             return (size_t)-LZ4F_ERROR_frameHeader_incomplete;
         *frameInfoPtr = dctxPtr->frameInfo;
         return nextSrcSize;
@@ -1087,6 +1089,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     srcPtr += errorCode;
                     break;
                 }
+                dctxPtr->frameInfoValid = 0;
                 dctxPtr->tmpInSize = 0;
                 dctxPtr->tmpInTarget = minFHSize;   /* minimum to attempt decode */
                 dctxPtr->dStage = dstage_storeHeader;
