@@ -19,7 +19,7 @@ not how the compressor nor decompressor actually work.
 The correctness of the decompressor should not depend
 on implementation details of the compressor, and vice versa.
 
-[LZ4 Frame format]: LZ4_Frame_format.md
+[LZ4 Frame format]: lz4_Frame_format.md
 
 
 
