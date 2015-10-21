@@ -238,7 +238,7 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
 
 static void LZ4_copy8(void* dst, const void* src)
 {
-	memcpy(dst,src,8);
+    memcpy(dst,src,8);
 }
 
 /* customized variant of memcpy, which can overwrite up to 7 bytes beyond dstEnd */
@@ -248,11 +248,11 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
-#if 1
+#if 0
     const size_t l2 = 8 - (((size_t)d) & (sizeof(void*)-1));
     LZ4_copy8(d,s); if (d>e-9) return;
     d+=l2; s+=l2;
-#endif // join to align
+#endif /* join to align */
 
     do { LZ4_copy8(d,s); d+=8; s+=8; } while (d<e);
 }

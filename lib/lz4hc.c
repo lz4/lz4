@@ -34,21 +34,29 @@
 
 
 
-/**************************************
+/* *************************************
 *  Tuning Parameter
-**************************************/
+***************************************/
 static const int LZ4HC_compressionLevel_default = 9;
 
+/*!
+ * HEAPMODE :
+ * Select how default compression function will allocate workplace memory,
+ * in stack (0:fastest), or in heap (1:requires malloc()).
+ * Since workplace is rather large, heap mode is recommended.
+ */
+#define LZ4HC_HEAPMODE 0
 
-/**************************************
+
+/* *************************************
 *  Includes
-**************************************/
+***************************************/
 #include "lz4hc.h"
 
 
-/**************************************
+/* *************************************
 *  Local Compiler Options
-**************************************/
+***************************************/
 #if defined(__GNUC__)
 #  pragma GCC diagnostic ignored "-Wunused-function"
 #endif
@@ -58,16 +66,16 @@ static const int LZ4HC_compressionLevel_default = 9;
 #endif
 
 
-/**************************************
+/* *************************************
 *  Common LZ4 definition
-**************************************/
+***************************************/
 #define LZ4_COMMONDEFS_ONLY
 #include "lz4.c"
 
 
-/**************************************
+/* *************************************
 *  Local Constants
-**************************************/
+***************************************/
 #define DICTIONARY_LOGSIZE 16
 #define MAXD (1<<DICTIONARY_LOGSIZE)
 #define MAXD_MASK (MAXD - 1)
@@ -549,8 +557,17 @@ int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int src
 
 int LZ4_compress_HC(const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
+#if LZ4HC_HEAPMODE==1
+    LZ4HC_Data_Structure* statePtr = malloc(sizeof(LZ4HC_Data_Structure));
+#else
     LZ4HC_Data_Structure state;
-    return LZ4_compress_HC_extStateHC(&state, src, dst, srcSize, maxDstSize, compressionLevel);
+    LZ4HC_Data_Structure* const statePtr = &state;
+#endif
+    int cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, maxDstSize, compressionLevel);
+#if LZ4HC_HEAPMODE==1
+    free(statePtr);
+#endif
+    return cSize;
 }
 
 
