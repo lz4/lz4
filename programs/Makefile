@@ -36,16 +36,16 @@
 
 RELEASE ?= r132
 
-DESTDIR ?=
-PREFIX  ?= /usr/local
-CFLAGS  ?= -O3   # can select customized flags instead, for example : CFLAGS="-O2 -g" make
-CFLAGS  += -I../lib -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
-CPPFLAGS:= -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
-
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
+
+DESTDIR ?=
+PREFIX  ?= /usr/local
+CFLAGS  ?= -O3   # can select customized optimized flags such as for example : CFLAGS="-O2 -g" make
+CFLAGS  += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
+CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
+FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
 # Define *.exe as extension for Windows systems
@@ -58,7 +58,7 @@ VOID = /dev/null
 endif
 
 
-# Select test target for Travis CI's Build Matrix
+# Default test parameters
 TEST_FILES   := COPYING
 FUZZER_TIME  := -T9mn
 
@@ -102,6 +102,7 @@ datagen : datagen.o datagencli.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@rm -f core *.o *.test tmp* \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
