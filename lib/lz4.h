@@ -300,6 +300,10 @@ int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compresse
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
 
 
+/*
+ * Testing so we don't have to hack prototypes or the static inline nature of LZ4_compress_generic().
+ */
+int LZ4_compress_generic_wrapper(void* state, const char* source, char* dest, int inputSize, int acceleration);
 
 /**************************************
 *  Obsolete Functions
