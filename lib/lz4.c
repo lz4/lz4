@@ -1097,6 +1097,11 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 }
 
 
+int LZ4_compress_generic_wrapper(void* state, const char* source, char* dest, const int inputSize, const int max_dst_size,
+                                 const int limited_output, const int table_type, const int dictionary,
+                                 const int dictionary_issue, const int acceleration) {
+  return LZ4_compress_generic(state, source, dest, inputSize, max_dst_size, limited_output, table_type, dictionary, dictionary_issue, acceleration);
+}
 
 /*******************************
 *  Decompression functions
@@ -1498,13 +1503,6 @@ char* LZ4_slideInputBuffer (void* LZ4_Data)
     LZ4_stream_t_internal* ctx = (LZ4_stream_t_internal*)LZ4_Data;
     int dictSize = LZ4_saveDict((LZ4_stream_t*)LZ4_Data, (char*)ctx->bufferStart, 64 KB);
     return (char*)(ctx->bufferStart + dictSize);
-}
-
-/*
- * Testing so we don't have to hack prototypes or the static inline nature of LZ4_compress_generic().
- */
-int LZ4_compress_generic_wrapper(void* state, const char* source, char* dest, int inputSize, int acceleration) {
-  return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, acceleration);
 }
 
 /* Obsolete streaming decompression functions */

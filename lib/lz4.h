@@ -180,6 +180,13 @@ LZ4_decompress_safe_partial() :
 */
 int LZ4_decompress_safe_partial (const char* source, char* dest, int compressedSize, int targetOutputSize, int maxDecompressedSize);
 
+/*
+ * LZ4_compress_generic_wrapper
+ * The LZ4_compress_generic function is inline and isn't easily exposed.  Writing this for the time being.
+ */
+int LZ4_compress_generic_wrapper(void* state, const char* source, char* dest, const int inputSize, const int max_dst_size,
+                                 const int limited_output, const int table_type, const int dictionary,
+                                 const int dictionary_issue, const int acceleration);
 
 /***********************************************
 *  Streaming Compression Functions
@@ -300,10 +307,6 @@ int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compresse
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
 
 
-/*
- * Testing so we don't have to hack prototypes or the static inline nature of LZ4_compress_generic().
- */
-int LZ4_compress_generic_wrapper(void* state, const char* source, char* dest, int inputSize, int acceleration);
 
 /**************************************
 *  Obsolete Functions

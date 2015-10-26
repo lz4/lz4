@@ -68,8 +68,11 @@ lineCompress: $(LZ4DIR)/lz4.c blockStreaming_lineByLine.c
 frameCompress: frameCompress.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT) -L$(LZ4DIR) -llz4
 
-argPerformanceTesting: $(LZ4DIR)/lz4.c argPerformanceTesting.c
+compressFunctions: $(LZ4DIR)/lz4.c compress_functions.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT) -lrt
+
+basics: $(LZ4DIR)/lz4.c basics.c
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 test : all
 	./printVersion$(EXT)
