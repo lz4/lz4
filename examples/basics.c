@@ -27,6 +27,13 @@ void run_screaming(const char *message, const int code) {
  * main
  */
 int main(void) {
+  /* Introduction */
+  // Below we will have a Compression and Decompression section to demonstrate.  There are a few important notes before we start:
+  //   1) The return codes of LZ4_ functions are important.  Read lz4.h if you're unsure what a given code means.
+  //   2) LZ4 uses char* pointers in all LZ4_ functions.  This is baked into the API and probably not going to change.  If your
+  //      program uses pointers that are unsigned char*, void*, or otherwise different you may need to do some casting or set the
+  //      right -W compiler flags to ignore those warnings (e.g.: -Wno-pointer-sign).
+
   /* Compression */
   // We'll store some text into a variable pointed to by *src to be compressed later.
   const char *src = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
