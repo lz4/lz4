@@ -3,8 +3,8 @@
  * Copyright  : Kyle Harper
  * License    : Follows same licensing as the lz4.c/lz4.h program at any given time.  Currently, BSD 2.
  * Description: Example program to demonstrate the basic usage of the compress/decompress functions within lz4.c/lz4.h.
- *              The functions you'll likely want are LZ4_compress_default and LZ4_compress_fast.  Both of these are documented in
- *              the lz4.h header file; I guess reading them.
+ *              The functions you'll likely want are LZ4_compress_default and LZ4_decompress_fast.  Both of these are documented in
+ *              the lz4.h header file; I recommend reading them.
  */
 
 /* Includes, for Power! */
@@ -32,7 +32,7 @@ int main(void) {
   const char *src = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
   // The compression function needs to know how many bytes of data we're sending.  The string above has 57 characters == 57 bytes.
   const int src_size = 57;
-  // LZ4 provides a function that will tell you the maximum size of compressed output based on input data via LZ4_compressBound.
+  // LZ4 provides a function that will tell you the maximum size of compressed output based on input data via LZ4_compressBound().
   const int max_dst_size = LZ4_compressBound(src_size);
   // We will use that size for our destination boundary when allocating space.
   char *compressed_data = malloc(max_dst_size);
@@ -54,7 +54,7 @@ int main(void) {
   const int compressed_data_size = return_value;
   compressed_data = (char *)realloc(compressed_data, compressed_data_size);
   if (compressed_data == NULL)
-    run_screaming("Failed to re-alloc memeory for compressed_data.  Sad :(", 1);
+    run_screaming("Failed to re-alloc memory for compressed_data.  Sad :(", 1);
 
   /* Decompression */
   // Now that we've successfully compressed the information from *src to *compressed_data, let's do the opposite!  We'll create a

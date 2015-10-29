@@ -1097,11 +1097,6 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 }
 
 
-int LZ4_compress_generic_wrapper(void* state, const char* source, char* dest, const int inputSize, const int max_dst_size,
-                                 const int limited_output, const int table_type, const int dictionary,
-                                 const int dictionary_issue, const int acceleration) {
-  return LZ4_compress_generic(state, source, dest, inputSize, max_dst_size, limited_output, table_type, dictionary, dictionary_issue, acceleration);
-}
 
 /*******************************
 *  Decompression functions

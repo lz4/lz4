@@ -5,6 +5,7 @@
  * Description: A program to demonstrate the various compression functions involved in when using LZ4_compress_default().  The idea
  *              is to show how each step in the call stack can be used directly, if desired.  There is also some benchmarking for
  *              each function to demonstrate the (probably lack of) performance difference when jumping the stack.
+ *              (If you're new to lz4, please read basics.c to understand the fundamentals)
  *
  *              The call stack (before theoretical compiler optimizations) for LZ4_compress_default is as follows:
  *                LZ4_compress_default
@@ -25,11 +26,11 @@
  *              LZ4_compress_generic()
  *                As the name suggests, this is the generic function that ultimately does most of the heavy lifting.  Calling this
  *                directly can help avoid some test cases and branching which might be useful in some implementation-specific
- *                situations.
- *
+ *                situations, but you really need to know what you're doing AND what you're asking lz4 to do!  You also need a
+ *                wrapper function because this function isn't exposed with lz4.h.
  */
 
-/* Since lz4 compiles with c99 and not gnu/std99 we need to enable posix linking for time.h structs and functions. */
+/* Since lz4 compiles with c99 and not gnu/std99 we need to enable POSIX linking for time.h structs and functions. */
 #if __STDC_VERSION__ >= 199901L
 #define _XOPEN_SOURCE 600
 #else
@@ -39,28 +40,23 @@
 
 /* Includes, for Power! */
 #include "lz4.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>   /* for atoi() */
+#include <stdio.h>    /* for printf() */
+#include <stdlib.h>   /* for exit() */
+#include <string.h>   /* for atoi() memcmp() */
 #include <stdint.h>   /* for uint_types */
 #include <inttypes.h> /* for PRIu64 */
 #include <time.h>     /* for clock_gettime() */
+#include <locale.h>   /* for setlocale() */
 
 /* We need to know what one billion is for clock timing. */
 #define BILLION 1000000000L
 
-/* Create a crude set of test IDs so we can switch on them later  (Can't switch() on a char[] or char*. */
+/* Create a crude set of test IDs so we can switch on them later  (Can't switch() on a char[] or char*). */
 #define ID__LZ4_COMPRESS_DEFAULT        1
 #define ID__LZ4_COMPRESS_FAST           2
 #define ID__LZ4_COMPRESS_FAST_EXTSTATE  3
 #define ID__LZ4_COMPRESS_GENERIC        4
 #define ID__LZ4_DECOMPRESS_FAST         5
-
-/* Copy these to be syntactically accurate to lz4.c */
-typedef enum { notLimited = 0, limitedOutput = 1 } limitedOutput_directive;
-typedef enum { byPtr, byU32, byU16 } tableType_t;
-typedef enum { noDict = 0, withPrefix64k, usingExtDict } dict_directive;
-typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
 
 
 
@@ -96,9 +92,8 @@ uint64_t bench(const char *known_good_dst, const int function_id, const int iter
   const int acceleration = 1;
   LZ4_stream_t state;
 
-  // Select the right function to perform the benchmark on.  For simplicity, start the timer here.  We perform 5000 initial loops
-  // to warm the cache and ensure that dst remains matching to known_good_dst between successive calls.
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  // Select the right function to perform the benchmark on.  We perform 5000 initial loops to warm the cache and ensure that dst
+  // remains matching to known_good_dst between successive calls.
   switch(function_id) {
     case ID__LZ4_COMPRESS_DEFAULT:
       printf("Starting benchmark for function: LZ4_compress_default()\n");
@@ -108,6 +103,7 @@ uint64_t bench(const char *known_good_dst, const int function_id, const int iter
         run_screaming("Couldn't run LZ4_compress_default()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
+      clock_gettime(CLOCK_MONOTONIC, &start);
       for (int i=1; i<=iterations; i++)
         LZ4_compress_default(src, dst, src_size, max_dst_size);
       break;
@@ -120,6 +116,7 @@ uint64_t bench(const char *known_good_dst, const int function_id, const int iter
         run_screaming("Couldn't run LZ4_compress_fast()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
+      clock_gettime(CLOCK_MONOTONIC, &start);
       for (int i=1; i<=iterations; i++)
         LZ4_compress_fast(src, dst, src_size, max_dst_size, acceleration);
       break;
@@ -132,26 +129,30 @@ uint64_t bench(const char *known_good_dst, const int function_id, const int iter
         run_screaming("Couldn't run LZ4_compress_fast_extState()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
+      clock_gettime(CLOCK_MONOTONIC, &start);
       for (int i=1; i<=iterations; i++)
         LZ4_compress_fast_extState(&state, src, dst, src_size, max_dst_size, acceleration);
       break;
 
-    case ID__LZ4_COMPRESS_GENERIC:
-      printf("Starting benchmark for function: LZ4_compress_generic()\n");
-      LZ4_resetStream((LZ4_stream_t*)&state);
-      for(int junk=0; junk<warm_up; junk++) {
-        LZ4_resetStream((LZ4_stream_t*)&state);
-        rv = LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, notLimited, byU16, noDict, noDictIssue, 1);
-      }
-      if (rv < 1)
-        run_screaming("Couldn't run LZ4_compress_generic()... error code received is in exit code.", rv);
-      if (memcmp(known_good_dst, dst, max_dst_size) != 0)
-        run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
-      for (int i=1; i<=iterations; i++) {
-        LZ4_resetStream((LZ4_stream_t*)&state);
-        LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, notLimited, byU16, noDict, noDictIssue, 1);
-      }
-      break;
+//    Disabled until LZ4_compress_generic() is exposed in the header.
+//    case ID__LZ4_COMPRESS_GENERIC:
+//      printf("Starting benchmark for function: LZ4_compress_generic()\n");
+//      LZ4_resetStream((LZ4_stream_t*)&state);
+//      for(int junk=0; junk<warm_up; junk++) {
+//        LZ4_resetStream((LZ4_stream_t*)&state);
+//        //rv = LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, notLimited, byU16, noDict, noDictIssue, acceleration);
+//        LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, acceleration);
+//      }
+//      if (rv < 1)
+//        run_screaming("Couldn't run LZ4_compress_generic()... error code received is in exit code.", rv);
+//      if (memcmp(known_good_dst, dst, max_dst_size) != 0)
+//        run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
+//      for (int i=1; i<=iterations; i++) {
+//        LZ4_resetStream((LZ4_stream_t*)&state);
+//        //LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, notLimited, byU16, noDict, noDictIssue, acceleration);
+//        LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, acceleration);
+//      }
+//      break;
 
     case ID__LZ4_DECOMPRESS_FAST:
       printf("Starting benchmark for function: LZ4_decompress_fast()\n");
@@ -161,6 +162,7 @@ uint64_t bench(const char *known_good_dst, const int function_id, const int iter
         run_screaming("Couldn't run LZ4_compress_generic()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, src_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
+      clock_gettime(CLOCK_MONOTONIC, &start);
       for (int i=1; i<=iterations; i++)
         LZ4_decompress_fast(src, dst, src_size);
       break;
@@ -241,19 +243,29 @@ int main(int argc, char **argv) {
   /* LZ4_compress_generic */
   // When you can exactly control the inputs and options of your LZ4 needs, you can use LZ4_compress_generic and fixed (const)
   // values for the enum types such as dictionary and limitations.  Any other direct-use is probably a bad idea.
-  memset(dst, 0, max_dst_size);
-  // LZ4_stream_t state:  is already declared above.  We can reuse it BUT we have to reset the stream ourselves between each call.
-  LZ4_resetStream((LZ4_stream_t *)&state);
-  // Since src size is small we know the following enums will be used:  notLimited (0), byU16 (2), noDict (0), noDictIssue (0).
-  // They are hard-coded into the LZ4_compress_generic_wrapper() function that THIS program provides.
-  bytes_returned = LZ4_compress_generic_wrapper(&state, src, dst, src_size, max_dst_size, notLimited, byU16, noDict, noDictIssue, 1);
-  if (bytes_returned < 1)
-    run_screaming("Failed to compress src using LZ4_compress_generic.  echo $? for return code.", bytes_returned);
-  if (memcmp(dst, known_good_dst, bytes_returned) != 0)
-    run_screaming("According to memcmp(), the value we got in dst from LZ4_compress_generic doesn't match the known-good value.  This is bad.", 1);
+  //
+  // That said, the LZ4_compress_generic() function is 'static inline' and does not have a prototype in lz4.h to expose a symbol
+  // for it.  In other words: we can't access it directly.  I don't want to submit a PR that modifies lz4.c/h.  Yann and others can
+  // do that if they feel it's worth expanding this example.
+  //
+  // I will, however, leave a skeleton of what would be required to use it directly:
+  /*
+    memset(dst, 0, max_dst_size);
+    // LZ4_stream_t state:  is already declared above.  We can reuse it BUT we have to reset the stream ourselves between each call.
+    LZ4_resetStream((LZ4_stream_t *)&state);
+    // Since src size is small we know the following enums will be used:  notLimited (0), byU16 (2), noDict (0), noDictIssue (0).
+    bytes_returned = LZ4_compress_generic(&state, src, dst, src_size, max_dst_size, notLimited, byU16, noDict, noDictIssue, 1);
+    if (bytes_returned < 1)
+      run_screaming("Failed to compress src using LZ4_compress_generic.  echo $? for return code.", bytes_returned);
+    if (memcmp(dst, known_good_dst, bytes_returned) != 0)
+      run_screaming("According to memcmp(), the value we got in dst from LZ4_compress_generic doesn't match the known-good value.  This is bad.", 1);
+  */
 
 
-  /* Now we'll run a few benchmarks with each function to demonstrate differences in speed based on the function used. */
+  /* Benchmarking */
+  /* Now we'll run a few rudimentary benchmarks with each function to demonstrate differences in speed based on the function used.
+   * Remember, we cannot call LZ4_compress_generic() directly (yet) so it's disabled.
+   */
   // Suite A - Normal Compressibility
   char *dst_d = calloc(1, src_size);
   memset(dst, 0, max_dst_size);
@@ -261,7 +273,7 @@ int main(int argc, char **argv) {
   uint64_t time_taken__default       = bench(known_good_dst, ID__LZ4_COMPRESS_DEFAULT,       iterations, src,            dst,   src_size, max_dst_size);
   uint64_t time_taken__fast          = bench(known_good_dst, ID__LZ4_COMPRESS_FAST,          iterations, src,            dst,   src_size, max_dst_size);
   uint64_t time_taken__fast_extstate = bench(known_good_dst, ID__LZ4_COMPRESS_FAST_EXTSTATE, iterations, src,            dst,   src_size, max_dst_size);
-  uint64_t time_taken__generic       = bench(known_good_dst, ID__LZ4_COMPRESS_GENERIC,       iterations, src,            dst,   src_size, max_dst_size);
+  //uint64_t time_taken__generic       = bench(known_good_dst, ID__LZ4_COMPRESS_GENERIC,       iterations, src,            dst,   src_size, max_dst_size);
   uint64_t time_taken__decomp        = bench(src,            ID__LZ4_DECOMPRESS_FAST,        iterations, known_good_dst, dst_d, src_size, max_dst_size);
   // Suite B - Highly Compressible
   memset(dst, 0, max_dst_size);
@@ -269,13 +281,14 @@ int main(int argc, char **argv) {
   uint64_t time_taken_hc__default       = bench(known_good_hc_dst, ID__LZ4_COMPRESS_DEFAULT,       iterations, hc_src,            dst,   src_size, max_dst_size);
   uint64_t time_taken_hc__fast          = bench(known_good_hc_dst, ID__LZ4_COMPRESS_FAST,          iterations, hc_src,            dst,   src_size, max_dst_size);
   uint64_t time_taken_hc__fast_extstate = bench(known_good_hc_dst, ID__LZ4_COMPRESS_FAST_EXTSTATE, iterations, hc_src,            dst,   src_size, max_dst_size);
-  uint64_t time_taken_hc__generic       = bench(known_good_hc_dst, ID__LZ4_COMPRESS_GENERIC,       iterations, hc_src,            dst,   src_size, max_dst_size);
+  //uint64_t time_taken_hc__generic       = bench(known_good_hc_dst, ID__LZ4_COMPRESS_GENERIC,       iterations, hc_src,            dst,   src_size, max_dst_size);
   uint64_t time_taken_hc__decomp        = bench(hc_src,            ID__LZ4_DECOMPRESS_FAST,        iterations, known_good_hc_dst, dst_d, src_size, max_dst_size);
 
   // Report and leave.
-  const char *format        = "|%-16s|%-32s|%16.9f|%16d|%16d|%13.2f%%|\n";
-  const char *header_format = "|%-16s|%-32s|%16s|%16s|%16s|%14s|\n";
-  const char *separator     = "+----------------+--------------------------------+----------------+----------------+----------------+--------------+\n";
+  setlocale(LC_ALL, "");
+  const char *format        = "|%-14s|%-30s|%'14.9f|%'16d|%'14d|%'13.2f%%|\n";
+  const char *header_format = "|%-14s|%-30s|%14s|%16s|%14s|%14s|\n";
+  const char *separator     = "+--------------+------------------------------+--------------+----------------+--------------+--------------+\n";
   printf("\n");
   printf("%s", separator);
   printf(header_format, "Source", "Function Benchmarked", "Total Seconds", "Iterations/sec", "ns/Iteration", "% of default");
@@ -283,13 +296,13 @@ int main(int argc, char **argv) {
   printf(format, "Normal Text", "LZ4_compress_default()",       (double)time_taken__default       / BILLION, (int)(iterations / ((double)time_taken__default       /BILLION)), time_taken__default       / iterations, (double)time_taken__default       * 100 / time_taken__default);
   printf(format, "Normal Text", "LZ4_compress_fast()",          (double)time_taken__fast          / BILLION, (int)(iterations / ((double)time_taken__fast          /BILLION)), time_taken__fast          / iterations, (double)time_taken__fast          * 100 / time_taken__default);
   printf(format, "Normal Text", "LZ4_compress_fast_extState()", (double)time_taken__fast_extstate / BILLION, (int)(iterations / ((double)time_taken__fast_extstate /BILLION)), time_taken__fast_extstate / iterations, (double)time_taken__fast_extstate * 100 / time_taken__default);
-  printf(format, "Normal Text", "LZ4_compress_generic()",       (double)time_taken__generic       / BILLION, (int)(iterations / ((double)time_taken__generic       /BILLION)), time_taken__generic       / iterations, (double)time_taken__generic       * 100 / time_taken__default);
+  //printf(format, "Normal Text", "LZ4_compress_generic()",       (double)time_taken__generic       / BILLION, (int)(iterations / ((double)time_taken__generic       /BILLION)), time_taken__generic       / iterations, (double)time_taken__generic       * 100 / time_taken__default);
   printf(format, "Normal Text", "LZ4_decompress_fast()",        (double)time_taken__decomp        / BILLION, (int)(iterations / ((double)time_taken__decomp        /BILLION)), time_taken__decomp        / iterations, (double)time_taken__decomp        * 100 / time_taken__default);
   printf(header_format, "", "", "", "", "", "");
   printf(format, "Compressible", "LZ4_compress_default()",       (double)time_taken_hc__default       / BILLION, (int)(iterations / ((double)time_taken_hc__default       /BILLION)), time_taken_hc__default       / iterations, (double)time_taken_hc__default       * 100 / time_taken_hc__default);
   printf(format, "Compressible", "LZ4_compress_fast()",          (double)time_taken_hc__fast          / BILLION, (int)(iterations / ((double)time_taken_hc__fast          /BILLION)), time_taken_hc__fast          / iterations, (double)time_taken_hc__fast          * 100 / time_taken_hc__default);
   printf(format, "Compressible", "LZ4_compress_fast_extState()", (double)time_taken_hc__fast_extstate / BILLION, (int)(iterations / ((double)time_taken_hc__fast_extstate /BILLION)), time_taken_hc__fast_extstate / iterations, (double)time_taken_hc__fast_extstate * 100 / time_taken_hc__default);
-  printf(format, "Compressible", "LZ4_compress_generic()",       (double)time_taken_hc__generic       / BILLION, (int)(iterations / ((double)time_taken_hc__generic       /BILLION)), time_taken_hc__generic       / iterations, (double)time_taken_hc__generic       * 100 / time_taken_hc__default);
+  //printf(format, "Compressible", "LZ4_compress_generic()",       (double)time_taken_hc__generic       / BILLION, (int)(iterations / ((double)time_taken_hc__generic       /BILLION)), time_taken_hc__generic       / iterations, (double)time_taken_hc__generic       * 100 / time_taken_hc__default);
   printf(format, "Compressible", "LZ4_decompress_fast()",        (double)time_taken_hc__decomp        / BILLION, (int)(iterations / ((double)time_taken_hc__decomp        /BILLION)), time_taken_hc__decomp        / iterations, (double)time_taken_hc__decomp        * 100 / time_taken_hc__default);
   printf("%s", separator);
   printf("\n");
