@@ -68,6 +68,12 @@ lineCompress: $(LZ4DIR)/lz4.c blockStreaming_lineByLine.c
 frameCompress: frameCompress.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT) -L$(LZ4DIR) -llz4
 
+compressFunctions: $(LZ4DIR)/lz4.c compress_functions.c
+	$(CC)      $(FLAGS) $^ -o $@$(EXT) -lrt
+
+simpleBuffer: $(LZ4DIR)/lz4.c simple_buffer.c
+	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+
 test : all
 	./printVersion$(EXT)
 	./doubleBuffer$(EXT) $(TESTFILE)
@@ -80,6 +86,6 @@ test : all
 clean:
 	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s *.lz4 \
 	 printVersion$(EXT) doubleBuffer$(EXT) ringBuffer$(EXT) ringBufferHC$(EXT) \
-	 lineCompress$(EXT) frameCompress$(EXT)
+	 lineCompress$(EXT) frameCompress$(EXT) compressFunctions$(EXT) simpleBuffer$(EXT)
 	@echo Cleaning completed
 
