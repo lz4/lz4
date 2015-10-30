@@ -1,9 +1,9 @@
 /*
- * basics.c
+ * simple_buffer.c
  * Copyright  : Kyle Harper
  * License    : Follows same licensing as the lz4.c/lz4.h program at any given time.  Currently, BSD 2.
  * Description: Example program to demonstrate the basic usage of the compress/decompress functions within lz4.c/lz4.h.
- *              The functions you'll likely want are LZ4_compress_default and LZ4_decompress_fast.  Both of these are documented in
+ *              The functions you'll likely want are LZ4_compress_default and LZ4_decompress_safe.  Both of these are documented in
  *              the lz4.h header file; I recommend reading them.
  */
 
@@ -37,10 +37,10 @@ int main(void) {
   /* Compression */
   // We'll store some text into a variable pointed to by *src to be compressed later.
   const char *src = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
-  // The compression function needs to know how many bytes of data we're sending.  The string above has 57 characters == 57 bytes.
-  const int src_size = 57;
+  // The compression function needs to know how many bytes of exist.  Since we're using a string, we can use strlen() + 1 (for \0).
+  const size_t src_size = strlen(src) + 1;
   // LZ4 provides a function that will tell you the maximum size of compressed output based on input data via LZ4_compressBound().
-  const int max_dst_size = LZ4_compressBound(src_size);
+  const size_t max_dst_size = LZ4_compressBound(src_size);
   // We will use that size for our destination boundary when allocating space.
   char *compressed_data = malloc(max_dst_size);
   if (compressed_data == NULL)
@@ -58,7 +58,7 @@ int main(void) {
     printf("We successfully compressed some data!\n");
   // Not only does a positive return_value mean success, the value returned == the number of bytes required.  You can use this to
   // realloc() *compress_data to free up memory, if desired.  We'll do so just to demonstrate the concept.
-  const int compressed_data_size = return_value;
+  const size_t compressed_data_size = return_value;
   compressed_data = (char *)realloc(compressed_data, compressed_data_size);
   if (compressed_data == NULL)
     run_screaming("Failed to re-alloc memory for compressed_data.  Sad :(", 1);
@@ -69,9 +69,9 @@ int main(void) {
   char *new_src = malloc(src_size);
   if (new_src == NULL)
     run_screaming("Failed to allocate memory for *new_src.", 1);
-  // The LZ4_decompress_fast function needs to know where the compressed data is, where the new_src memory location is, and how
-  // large the new_src (uncompressed) output will be.  Again, save the return_value.
-  return_value = LZ4_decompress_fast(compressed_data, new_src, src_size);
+  // The LZ4_decompress_safe function needs to know where the compressed data is, how many bytes long it is, where the new_src
+  // memory location is, and how large the new_src (uncompressed) output will be.  Again, save the return_value.
+  return_value = LZ4_decompress_safe(compressed_data, new_src, compressed_data_size, src_size);
   if (return_value < 0)
     run_screaming("A negative result from LZ4_decompress_fast indicates a failure trying to decompress the data.  See exit code (echo $?) for value returned.", return_value);
   if (return_value == 0)

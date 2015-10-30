@@ -71,7 +71,7 @@ frameCompress: frameCompress.c
 compressFunctions: $(LZ4DIR)/lz4.c compress_functions.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT) -lrt
 
-basics: $(LZ4DIR)/lz4.c basics.c
+simpleBuffer: $(LZ4DIR)/lz4.c simple_buffer.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 test : all
@@ -86,6 +86,6 @@ test : all
 clean:
 	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s *.lz4 \
 	 printVersion$(EXT) doubleBuffer$(EXT) ringBuffer$(EXT) ringBufferHC$(EXT) \
-	 lineCompress$(EXT) frameCompress$(EXT) argPerformanceTesting$(EXT)
+	 lineCompress$(EXT) frameCompress$(EXT) compressFunctions$(EXT) simpleBuffer$(EXT)
 	@echo Cleaning completed
 
