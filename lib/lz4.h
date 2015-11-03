@@ -137,7 +137,7 @@ LZ4_compress_fast_extState() :
 */
 int LZ4_sizeofState(void);
 int LZ4_compress_fast_extState (void* state, const char* source, char* dest, int inputSize, int maxDestSize, int acceleration);
-
+int LZ4_compress_fast_destSize_extState (void* state, const char* source, char* dest, int* srcSizePtr, int maxDestSize, int acceleration);
 
 /*
 LZ4_compress_destSize() :
@@ -228,6 +228,7 @@ int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, int dictSize)
  * If not, and if compressed data cannot fit into 'dst' buffer size, compression stops, and function returns a zero.
  */
 int LZ4_compress_fast_continue (LZ4_stream_t* streamPtr, const char* src, char* dst, int srcSize, int maxDstSize, int acceleration);
+int LZ4_compress_fast_destSize_continue (LZ4_stream_t* streamPtr, const char* src, char* dst, int* srcSizePtr, int maxDstSize, int acceleration);
 
 /*
  * LZ4_saveDict
