@@ -44,6 +44,8 @@ endif()
 
 if(BUILD_LIBS)    
     add_library(liblz4 ${LZ4_SRCS_LIB})
+    add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
+    SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
     
     set_target_properties(liblz4 PROPERTIES
     OUTPUT_NAME lz4
