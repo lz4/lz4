@@ -43,14 +43,26 @@ if(BUILD_TOOLS)
 endif()
 
 if(BUILD_LIBS)    
-    add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
-    
+	   
+	
+	SET(LIBS_TARGETS "")
+	IF(NOT WIN32)
+	add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
+    add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
+    SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
+	SET(LIBS_TARGETS liblz4 liblz4_static)
+	ELSE(NOT WIN32)
+	add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
+	SET(LIBS_TARGETS liblz4)
+    ENDIF(NOT WIN32)
+	
     set_target_properties(liblz4 PROPERTIES
     OUTPUT_NAME lz4
     SOVERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}"
     )
         
-    install(TARGETS liblz4
+    install(TARGETS ${LIBS_TARGETS}
+	RUNTIME DESTINATION lib #on Windows: cmake considers dlls as runtime component
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     )
