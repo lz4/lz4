@@ -45,12 +45,20 @@ based on \fBbyte-aligned LZ77\fR family of compression scheme.
 \fBlz4\fR offers compression speeds of 400 MB/s per core, linearly scalable with multi-core CPUs. 
 It features an extremely fast decoder, with speed in multiple GB/s per core,
 typically reaching RAM speed limit on multi-core systems. 
-.B lz4
-supports a command line syntax similar to
-.BR gzip (1).
 The native file format is the
 .B .lz4
 format.
+
+.B lz4 
+supports a command line syntax similar but not identical to 
+.BR gzip (1). 
+Differences are : 
+\fBlz4\fR preserve original files ;
+\fBlz4 file1 file2\fR means : compress file1 \fIinto\fR file2 ;
+\fBlz4 file\fR shows real-time statistics during compression .
+
+Default behaviors can be modified by opt-in commands, described below.
+\fBlz4 --quiet --multiple\fR more closely mimics \fBgzip\fR behavior.
 
 .SS "Concatenation of .lz4 files"
 It is possible to concatenate
@@ -160,11 +168,11 @@ for files that have not been compressed with
 .TP
 .BR \-m ", " \--multiple
  Multiple file names.
- By default, the second filename is used as the output filename for the compressed file.
+ By default, the second filename is used as the destination filename for the compressed file.
  With
 .B -m
 , you can specify any number of input filenames. Each of them will be compressed
-independently, and the resulting name of the compressed file will be
+independently, and the resulting name of each compressed file will be
 .B filename.lz4
 .
 
@@ -174,7 +182,7 @@ independently, and the resulting name of the compressed file will be
  B4= 64KB ; B5= 256KB ; B6= 1MB ; B7= 4MB
 .TP
 .B \-BD
- block dependency (improve compression ratio)
+ block dependency (improves compression ratio on small blocks)
 .TP
 .B \--[no-]frame-crc
  select frame checksum (default:enabled)
@@ -196,7 +204,7 @@ hence for a file. It won't work with unknown source size, such as stdin or pipe.
  verbose mode
 .TP
 .BR \-q ", " --quiet
- suppress warnings; specify twice to suppress errors too
+ suppress warnings and real-time statistics; specify twice to suppress errors too
 .TP
 .B \-h/\-H
  display help/long help and exit
