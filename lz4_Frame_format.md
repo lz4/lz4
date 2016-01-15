@@ -26,7 +26,7 @@ The purpose of this document is to define a lossless compressed data format,
 that is independent of CPU type, operating system, 
 file system and character set, suitable for 
 File compression, Pipe and streaming compression 
-using the [LZ4 algorithm](http://www.lz4.info).
+using the [LZ4 algorithm](http://www.lz4.org).
 
 The data can be produced or consumed, 
 even for an arbitrarily long sequentially presented input data stream,
