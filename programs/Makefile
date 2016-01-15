@@ -116,13 +116,13 @@ clean:
 #make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
 
-install: lz4 lz4c
+install: lz4$(EXT) lz4c$(EXT)
 	@echo Installing binaries
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4 $(DESTDIR)$(BINDIR)/lz4
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
-	@install -m 755 lz4c $(DESTDIR)$(BINDIR)/lz4c
+	@install -m 755 lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/unlz4$(EXT)
+	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	@echo Installing man pages
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
@@ -131,10 +131,10 @@ install: lz4 lz4c
 	@echo lz4 installation completed
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/lz4cat
-	rm -f $(DESTDIR)$(BINDIR)/unlz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
+	rm -f $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
+	rm -f $(DESTDIR)$(BINDIR)/unlz4$(EXT)
+	[ -x $(DESTDIR)$(BINDIR)/lz4$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	[ -x $(DESTDIR)$(BINDIR)/lz4c$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
 	rm -f $(DESTDIR)$(MANDIR)/lz4c.1
 	rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
