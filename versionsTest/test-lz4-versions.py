@@ -21,7 +21,7 @@ def proc(cmd_args, pipe=True, dummy=False):
         return
     if pipe:
         subproc = subprocess.Popen(cmd_args,
-                                   stdout=subprocess.PIPE, 
+                                   stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
     else:
         subproc = subprocess.Popen(cmd_args)

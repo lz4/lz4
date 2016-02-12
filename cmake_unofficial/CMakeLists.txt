@@ -42,9 +42,9 @@ if(BUILD_TOOLS)
     install(TARGETS lz4 RUNTIME DESTINATION "bin/")
 endif()
 
-if(BUILD_LIBS)    
-	   
-	
+if(BUILD_LIBS)
+
+
 	SET(LIBS_TARGETS "")
 	IF(NOT WIN32)
 	add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
@@ -55,12 +55,12 @@ if(BUILD_LIBS)
 	add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
 	SET(LIBS_TARGETS liblz4)
     ENDIF(NOT WIN32)
-	
+
     set_target_properties(liblz4 PROPERTIES
     OUTPUT_NAME lz4
     SOVERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}"
     )
-        
+
     install(TARGETS ${LIBS_TARGETS}
 	RUNTIME DESTINATION lib #on Windows: cmake considers dlls as runtime component
     LIBRARY DESTINATION lib
@@ -73,7 +73,7 @@ if(BUILD_LIBS)
     ${LZ4_DIR}/lz4frame.h
     DESTINATION include
     )
-    
+
     if(BUILD_TOOLS)
         target_link_libraries(lz4 liblz4)
     endif()

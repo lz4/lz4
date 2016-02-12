@@ -5,12 +5,12 @@ LZ4 Frame Format Description
 
 Copyright (c) 2013-2015 Yann Collet
 
-Permission is granted to copy and distribute this document 
-for any  purpose and without charge, 
-including translations into other  languages 
-and incorporation into compilations, 
-provided that the copyright notice and this notice are preserved, 
-and that any substantive changes or deletions from the original 
+Permission is granted to copy and distribute this document
+for any  purpose and without charge,
+including translations into other  languages
+and incorporation into compilations,
+provided that the copyright notice and this notice are preserved,
+and that any substantive changes or deletions from the original
 are clearly marked.
 Distribution of this document is unlimited.
 
@@ -22,13 +22,13 @@ Distribution of this document is unlimited.
 Introduction
 ------------
 
-The purpose of this document is to define a lossless compressed data format, 
-that is independent of CPU type, operating system, 
-file system and character set, suitable for 
-File compression, Pipe and streaming compression 
+The purpose of this document is to define a lossless compressed data format,
+that is independent of CPU type, operating system,
+file system and character set, suitable for
+File compression, Pipe and streaming compression
 using the [LZ4 algorithm](http://www.lz4.org).
 
-The data can be produced or consumed, 
+The data can be produced or consumed,
 even for an arbitrarily long sequentially presented input data stream,
 using only an a priori bounded amount of intermediate storage,
 and hence can be used in data communications.
@@ -36,7 +36,7 @@ The format uses the LZ4 compression method,
 and optional [xxHash-32 checksum method](https://github.com/Cyan4973/xxHash),
 for detection of data corruption.
 
-The data format defined by this specification 
+The data format defined by this specification
 does not attempt to allow random access to compressed data.
 
 This specification is intended for use by implementers of software
@@ -63,7 +63,7 @@ General Structure of LZ4 Frame format
 
 | MagicNb | F. Descriptor | Block | (...) | EndMark | C. Checksum |
 |:-------:|:-------------:| ----- | ----- | ------- | ----------- |
-| 4 bytes |  3-11 bytes   |       |       | 4 bytes | 0-4 bytes   | 
+| 4 bytes |  3-11 bytes   |       |       | 4 bytes | 0-4 bytes   |
 
 __Magic Number__
 
@@ -88,11 +88,11 @@ The size is expressed as a 32-bits value.
 __Content Checksum__
 
 Content Checksum verify that the full content has been decoded correctly.
-The content checksum is the result 
+The content checksum is the result
 of [xxh32() hash function](https://github.com/Cyan4973/xxHash)
 digesting the original (decoded) data as input, and a seed of zero.
 Content checksum is only present when its associated flag
-is set in the frame descriptor. 
+is set in the frame descriptor.
 Content Checksum validates the result,
 that all blocks were fully transmitted in the correct order and without error,
 and also that the encoding/decoding process itself generated no distortion.
@@ -108,19 +108,19 @@ In such case, each frame has its own set of descriptor flags.
 Each frame is considered independent.
 The only relation between frames is their sequential order.
 
-The ability to decode multiple concatenated frames 
+The ability to decode multiple concatenated frames
 within a single stream or file
-is left outside of this specification. 
+is left outside of this specification.
 As an example, the reference lz4 command line utility behavior is
 to decode all concatenated frames in their sequential order.
 
- 
+
 Frame Descriptor
 ----------------
 
 | FLG     | BD      | (Content Size) | HC      |
 | ------- | ------- |:--------------:| ------- |
-| 1 byte  | 1 byte  |  0 - 8 bytes   | 1 byte  | 
+| 1 byte  | 1 byte  |  0 - 8 bytes   | 1 byte  |
 
 The descriptor uses a minimum of 3 bytes,
 and up to 11 bytes depending on optional parameters.
@@ -148,7 +148,7 @@ Other version numbers will use different flag layouts.
 
 __Block Independence flag__
 
-If this flag is set to “1”, blocks are independent. 
+If this flag is set to “1”, blocks are independent.
 If this flag is set to “0”, each block depends on previous ones
 (up to LZ4 window size, which is 64 KB).
 In such case, it’s necessary to decode all blocks in sequence.
@@ -160,13 +160,13 @@ __Block checksum flag__
 
 If this flag is set, each data block will be followed by a 4-bytes checksum,
 calculated by using the xxHash-32 algorithm on the raw (compressed) data block.
-The intention is to detect data corruption (storage or transmission errors) 
+The intention is to detect data corruption (storage or transmission errors)
 immediately, before decoding.
 Block checksum usage is optional.
 
 __Content Size flag__
 
-If this flag is set, the uncompressed size of data included within the frame 
+If this flag is set, the uncompressed size of data included within the frame
 will be present as an 8 bytes unsigned little endian value, after the flags.
 Content Size usage is optional.
 
@@ -182,9 +182,9 @@ This information is intended to help the decoder allocate memory.
 Size here refers to the original (uncompressed) data size.
 Block Maximum Size is one value among the following table :
 
-|  0  |  1  |  2  |  3  |   4   |   5    |  6   |  7   | 
-| --- | --- | --- | --- | ----- | ------ | ---- | ---- | 
-| N/A | N/A | N/A | N/A | 64 KB | 256 KB | 1 MB | 4 MB | 
+|  0  |  1  |  2  |  3  |   4   |   5    |  6   |  7   |
+| --- | --- | --- | --- | ----- | ------ | ---- | ---- |
+| N/A | N/A | N/A | N/A | 64 KB | 256 KB | 1 MB | 4 MB |
 
 The decoder may refuse to allocate block sizes above a (system-specific) size.
 Unused values may be used in a future revision of the spec.
@@ -224,7 +224,7 @@ Data Blocks
 
 | Block Size |  data  | (Block Checksum) |
 |:----------:| ------ |:----------------:|
-|  4 bytes   |        |   0 - 4 bytes    | 
+|  4 bytes   |        |   0 - 4 bytes    |
 
 
 __Block Size__
@@ -239,7 +239,7 @@ All other bits give the size, in bytes, of the following data block
 (the size does not include the block checksum if present).
 
 Block Size shall never be larger than Block Maximum Size.
-Such a thing could happen for incompressible source data. 
+Such a thing could happen for incompressible source data.
 In such case, such a data block shall be passed in uncompressed format.
 
 __Data__
@@ -247,7 +247,7 @@ __Data__
 Where the actual data to decode stands.
 It might be compressed or not, depending on previous field indications.
 Uncompressed size of Data can be any size, up to “block maximum size”.
-Note that data block is not necessarily full : 
+Note that data block is not necessarily full :
 an arbitrary “flush” may happen anytime. Any block can be “partially filled”.
 
 __Block checksum__
@@ -256,7 +256,7 @@ Only present if the associated flag is set.
 This is a 4-bytes checksum value, in little endian format,
 calculated by using the xxHash-32 algorithm on the raw (undecoded) data block,
 and a seed of zero.
-The intention is to detect data corruption (storage or transmission errors) 
+The intention is to detect data corruption (storage or transmission errors)
 before decoding.
 
 Block checksum is cumulative with Content checksum.
@@ -267,12 +267,12 @@ Skippable Frames
 
 | Magic Number | Frame Size | User Data |
 |:------------:|:----------:| --------- |
-|   4 bytes    |  4 bytes   |           | 
+|   4 bytes    |  4 bytes   |           |
 
 Skippable frames allow the integration of user-defined data
 into a flow of concatenated frames.
 Its design is pretty straightforward,
-with the sole objective to allow the decoder to quickly skip 
+with the sole objective to allow the decoder to quickly skip
 over user-defined data and continue decoding.
 
 For the purpose of facilitating identification,
@@ -283,14 +283,14 @@ it’s recommended to start with a zero-byte LZ4 frame
 followed by a skippable frame.
 This will make it easier for file type identifiers.
 
- 
+
 __Magic Number__
 
 4 Bytes, Little endian format.
 Value : 0x184D2A5X, which means any value from 0x184D2A50 to 0x184D2A5F.
 All 16 values are valid to identify a skippable frame.
 
-__Frame Size__ 
+__Frame Size__
 
 This is the size, in bytes, of the following User Data
 (without including the magic number nor the size field itself).
@@ -313,7 +313,7 @@ Main characteristics of the legacy format :
 - Fixed block size : 8 MB.
 - All blocks must be completely filled, except the last one.
 - All blocks are always compressed, even when compression is detrimental.
-- The last block is detected either because 
+- The last block is detected either because
   it is followed by the “EOF” (End of File) mark,
   or because it is followed by a known Frame Magic Number.
 - No checksum
