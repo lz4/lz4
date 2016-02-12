@@ -1182,6 +1182,7 @@ FORCE_INLINE int LZ4_decompress_generic(
 
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
+    const int inPlaceDecode = ((ip >= op) && (ip < oend));
 
 
     /* Special cases */
@@ -1197,6 +1198,8 @@ FORCE_INLINE int LZ4_decompress_generic(
         size_t length;
         const BYTE* match;
         size_t offset;
+
+        if (unlikely((inPlaceDecode) && (op + WILDCOPYLENGTH > ip))) goto _output_error;   /* output stream ran over input stream */
 
         /* get literal length */
         token = *ip++;
@@ -1228,7 +1231,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                 if ((!endOnInput) && (cpy != oend)) goto _output_error;       /* Error : block decoding must stop exactly there */
                 if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) goto _output_error;   /* Error : input must be consumed */
             }
-            memcpy(op, ip, length);
+            memmove(op, ip, length);
             ip += length;
             op += length;
             break;     /* Necessarily EOF, due to parsing restrictions */
