@@ -43,7 +43,7 @@ void test_compress(FILE* outFp, FILE* inpFp)
 
     char inpBuf[2][BLOCK_BYTES];
     int  inpBufIndex = 0;
-    
+
     LZ4_resetStream(lz4Stream);
 
     for(;;) {
