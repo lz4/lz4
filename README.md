@@ -57,10 +57,14 @@ in single-thread mode.
 |  LZO 2.06            |  2.108  |  350 MB/s   |    510 MB/s   |
 |  QuickLZ 1.5.1.b6    |  2.238  |  320 MB/s   |    380 MB/s   |
 |  Snappy 1.1.0        |  2.091  |  250 MB/s   |    960 MB/s   |
+|  [Zstandard] 0.5.1   |  2.876  |  240 MB/s   |    620 MB/s   |
 |  LZF v3.6            |  2.073  |  175 MB/s   |    500 MB/s   |
-|  zlib 1.2.8 -1       |  2.730  |   59 MB/s   |    250 MB/s   |
+|  [zlib] 1.2.8 -1     |  2.730  |   59 MB/s   |    250 MB/s   |
 |**LZ4 HC (r129)**     |**2.720**|   22 MB/s   | **1830 MB/s** |
-|  zlib 1.2.8 -6       |  3.099  |   18 MB/s   |    270 MB/s   |
+|  [zlib] 1.2.8 -6     |  3.099  |   18 MB/s   |    270 MB/s   |
+
+[zlib]: http://www.zlib.net/
+[Zstandard]: http://www.zstd.net/
 
 
 Documentation
