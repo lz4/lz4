@@ -258,7 +258,7 @@ size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dctx,
 /* LZ4F_getFrameInfo()
  * This function decodes frame header information (such as max blockSize, frame checksum, etc.).
  * Its usage is optional. The objective is to extract frame header information, typically for allocation purposes.
- * A header size is variable and can be from 7 to 15 bytes. It's also possible to input more bytes than that. 
+ * A header size is variable and can be from 7 to 15 bytes. It's also possible to input more bytes than that.
  * The number of bytes read from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
  * (note that LZ4F_getFrameInfo() can also be used anytime *after* starting decompression, in this case 0 input byte is enough)
  * Frame header info is *copied into* an already allocated LZ4F_frameInfo_t structure.

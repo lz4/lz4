@@ -75,15 +75,15 @@ This is a 2 bytes value, in little endian format
 The offset represents the position of the match to be copied from.
 1 means "current position - 1 byte".
 The maximum offset value is 65535, 65536 cannot be coded.
-Note that 0 is an invalid value, not used. 
+Note that 0 is an invalid value, not used.
 
 Then we need to extract the match length.
 For this, we use the second token field, the low 4-bits.
 Value, obviously, ranges from 0 to 15.
 However here, 0 means that the copy operation will be minimal.
-The minimum length of a match, called minmatch, is 4. 
+The minimum length of a match, called minmatch, is 4.
 As a consequence, a 0 value means 4 bytes, and a value of 15 means 19+ bytes.
-Similar to literal length, on reaching the highest possible value (15), 
+Similar to literal length, on reaching the highest possible value (15),
 we output additional bytes, one at a time, with values ranging from 0 to 255.
 They are added to total to provide the final match length.
 A 255 value means there is another byte to read and add.
@@ -102,7 +102,7 @@ There are specific parsing rules to respect in order to remain compatible
 with assumptions made by the decoder :
 
 1. The last 5 bytes are always literals
-2. The last match must start at least 12 bytes before end of block.   
+2. The last match must start at least 12 bytes before end of block.
    Consequently, a block with less than 13 bytes cannot be compressed.
 
 These rules are in place to ensure that the decoder

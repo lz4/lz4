@@ -1,11 +1,11 @@
 LZ4 - Extremely fast compression
 ================================
 
-LZ4 is lossless compression algorithm, 
-providing compression speed at 400 MB/s per core, 
-scalable with multi-cores CPU. 
-It features an extremely fast decoder, 
-with speed in multiple GB/s per core, 
+LZ4 is lossless compression algorithm,
+providing compression speed at 400 MB/s per core,
+scalable with multi-cores CPU.
+It features an extremely fast decoder,
+with speed in multiple GB/s per core,
 typically reaching RAM speed limits on multi-core systems.
 
 Speed can be tuned dynamically, selecting an "acceleration" factor
@@ -81,7 +81,7 @@ Interoperable versions of LZ4 must respect this frame format.
 Other source versions
 -------------------------
 
-Beyond the C reference source, 
+Beyond the C reference source,
 many contributors have created versions of lz4 in multiple languages
 (Java, C#, Python, Perl, Ruby, etc.).
 A list of known source ports is maintained on the [LZ4 Homepage].
