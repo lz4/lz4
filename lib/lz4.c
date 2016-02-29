@@ -988,8 +988,17 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 
 int LZ4_stream_preserve(LZ4_stream_t* stream_, struct preserved_hash_table_entry_t** buf_out)
 {
+  /*
+   * Work out how many locations in the stream's hash table are filled in, and
+   * record which ones they are. This allows us to copy only those locations to
+   * a new stream, which is much faster than entirely re-initializing the
+   * stream (e.g. with lz4_loadDict) or just memcpying all the data (a lot of
+   * which is zeroes).
+   */
   LZ4_stream_t_internal* stream = (LZ4_stream_t_internal*)stream_;
 
+  /* How many positions in the hash table are populated? This affects how much
+   * space we need to malloc to record it. */
   int num_locs_needed = 0;
   for (int i = 0; i < HASH_SIZE_U32; i++)
   {
@@ -999,12 +1008,16 @@ int LZ4_stream_preserve(LZ4_stream_t* stream_, struct preserved_hash_table_entry
     }
   }
 
-  // Add an extra location - this holds the sentinel value to indicate we're at the end of the array
+  /* Add an extra location - this holds the sentinel value to indicate we're at
+   * the end of the array */
   num_locs_needed += 1;
 
   int nbytes = sizeof(struct preserved_hash_table_entry_t) * num_locs_needed;
   struct preserved_hash_table_entry_t* buf = malloc(nbytes);
   *buf_out = buf;
+
+  /* Look through the hash table, and for each entry that has a value, record
+   * which position in the hash table it was at and what the value was. */
   int buf_pos = 0;
   for (int i = 0; i < HASH_SIZE_U32; i++)
   {
@@ -1016,7 +1029,7 @@ int LZ4_stream_preserve(LZ4_stream_t* stream_, struct preserved_hash_table_entry
     }
   }
 
-  // Set a sentinel -1 value at the end of the array
+  /* Set a sentinel -1 value at the end of the array */
   buf[buf_pos].location = -1;
   buf[buf_pos].value = -1;
   return buf_pos;
@@ -1026,11 +1039,16 @@ void LZ4_stream_restore_preserved(LZ4_stream_t* stream_, LZ4_stream_t* orig_, st
 {
   LZ4_stream_t_internal* orig = (LZ4_stream_t_internal*)orig_;
   LZ4_stream_t_internal* stream = (LZ4_stream_t_internal*)stream_;
+
+  /* Copy over the simple int values (these don't need special handling for efficiency, unlike the hash table.). */
   stream->currentOffset = orig->currentOffset;
   stream->dictionary = orig->dictionary;
   stream->bufferStart = orig->bufferStart;
   stream->dictSize = orig->dictSize;
 
+  /* Look through the list of location-value pairs produced by
+   * LZ4_stream_preserve, and initialise this hash table based on those. Stop
+   * when we hit the sentinel location -1. */
   for (int i = 0; i < HASH_SIZE_U32; i++)
   {
     if (buf[i].location != -1)
