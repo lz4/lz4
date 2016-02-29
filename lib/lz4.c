@@ -986,6 +986,63 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     return dict->dictSize;
 }
 
+int LZ4_stream_preserve(LZ4_stream_t* stream_, struct preserved_hash_table_entry_t** buf_out)
+{
+  LZ4_stream_t_internal* stream = (LZ4_stream_t_internal*)stream_;
+
+  int num_locs_needed = 0;
+  for (int i = 0; i < HASH_SIZE_U32; i++)
+  {
+    if (stream->hashTable[i] != 0)
+    {
+      num_locs_needed++;
+    }
+  }
+
+  // Add an extra location - this holds the sentinel value to indicate we're at the end of the array
+  num_locs_needed += 1;
+
+  int nbytes = sizeof(struct preserved_hash_table_entry_t) * num_locs_needed;
+  struct preserved_hash_table_entry_t* buf = malloc(nbytes);
+  *buf_out = buf;
+  int buf_pos = 0;
+  for (int i = 0; i < HASH_SIZE_U32; i++)
+  {
+    if (stream->hashTable[i] != 0)
+    {
+      buf[buf_pos].location = i;
+      buf[buf_pos].value = stream->hashTable[i];
+      buf_pos++;
+    }
+  }
+
+  // Set a sentinel -1 value at the end of the array
+  buf[buf_pos].location = -1;
+  buf[buf_pos].value = -1;
+  return buf_pos;
+}
+
+void LZ4_stream_restore_preserved(LZ4_stream_t* stream_, LZ4_stream_t* orig_, struct preserved_hash_table_entry_t* buf)
+{
+  LZ4_stream_t_internal* orig = (LZ4_stream_t_internal*)orig_;
+  LZ4_stream_t_internal* stream = (LZ4_stream_t_internal*)stream_;
+  stream->currentOffset = orig->currentOffset;
+  stream->dictionary = orig->dictionary;
+  stream->bufferStart = orig->bufferStart;
+  stream->dictSize = orig->dictSize;
+
+  for (int i = 0; i < HASH_SIZE_U32; i++)
+  {
+    if (buf[i].location != -1)
+    {
+      stream->hashTable[buf[i].location] = buf[i].value;
+    }
+    else
+    {
+      break;
+    }
+  }
+}
 
 static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, const BYTE* src)
 {
