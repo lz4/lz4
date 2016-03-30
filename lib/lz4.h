@@ -50,8 +50,15 @@ extern "C" {
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    7    /* for new (non-breaking) interface capabilities */
 #define LZ4_VERSION_RELEASE  2    /* for tweaks, bug-fixes, or development */
+
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 int LZ4_versionNumber (void);
+
+#define LZ4_STR(str) #str
+#define LZ4_XSTR(str) LZ4_STR(str)
+#define LZ4_VERSION_STRING LZ4_XSTR(LZ4_VERSION_MAJOR) "." \
+	LZ4_XSTR(LZ4_VERSION_MINOR) "." LZ4_XSTR(LZ4_VERSION_RELEASE)
+const char* LZ4_versionString (void);
 
 /**************************************
 *  Tuning parameter

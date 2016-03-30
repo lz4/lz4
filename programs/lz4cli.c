@@ -59,6 +59,7 @@
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
+#include "lz4.h"      /* LZ4_versionString */
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 
 
@@ -85,12 +86,14 @@
 /*****************************
 *  Constants
 ******************************/
-#define COMPRESSOR_NAME "LZ4 command line interface"
+#define COMPRESSOR_NAME "LZ4 CLI"
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION "r128"
 #endif
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
+#define WELCOME_MESSAGE "*** %s %i-bits %s (lib %s), by %s ***\n", \
+	COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, \
+	LZ4_versionString(), AUTHOR
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"
