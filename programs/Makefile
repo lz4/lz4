@@ -39,9 +39,15 @@ RELEASE?= r131
 DESTDIR?=
 PREFIX ?= /usr/local
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+CFLAGS += -std=c99 -Wall   -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
 
+
+ifeq ($(shell uname --hardware-platform), i386)
+           CFLAGS += -march=prescott
+   endif
+
+
+FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 BINDIR := $(PREFIX)/bin
 MANDIR := $(PREFIX)/share/man/man1
 LZ4DIR := ../lib

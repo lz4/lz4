@@ -384,7 +384,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         /* Compress Block */
         outSize = compressionFunction(in_buff, out_buff+4, inSize, outBuffSize, compressionlevel);
         compressedfilesize += outSize+4;
-        DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/((filesize<<6)+26);
 
         /* Write Block */
         LZ4IO_writeLE32(out_buff, outSize);
@@ -523,6 +523,8 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
         if (sizeCheck!=headerSize) EXM_THROW(33, "Write error : cannot write header");
         compressedfilesize += headerSize;
 
+	size_t changeBlock=blockSize;
+	int i=1;
         /* Main Loop */
         while (readSize>0)
         {
@@ -539,8 +541,11 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
             if (sizeCheck!=outSize) EXM_THROW(35, "Write error : cannot write compressed block");
 
             /* Read next block */
-            readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
+            readSize  = fread(srcBuffer, (size_t)1, (size_t)changeBlock, srcFile);
             filesize += readSize;
+
+	    i+=10;
+	    changeBlock=(size_t)LZ4IO_GetBlockSize_FromBlockId (readSize+i);
         }
 
         /* End of Stream mark */
