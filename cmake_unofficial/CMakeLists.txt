@@ -74,6 +74,15 @@ if(BUILD_LIBS)
     DESTINATION include
     )
 
+    set(PREFIX ${CMAKE_INSTALL_PREFIX})
+    set(LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
+    set(INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+    string(SUBSTRING ${CPACK_PACKAGE_VERSION_PATCH} 1 -1 VERSION)
+    configure_file(${LZ4_DIR}/liblz4.pc.in liblz4.pc @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/pkgconfig"
+    )
+
     if(BUILD_TOOLS)
         target_link_libraries(lz4 liblz4)
     endif()
