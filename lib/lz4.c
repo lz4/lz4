@@ -730,12 +730,13 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     LZ4_stream_t ctx;
     void* ctxPtr = &ctx;
 #endif
+    int result;
 
 #if (HEAPMODE)
     if (!ctxPtr) { return 0; }
 #endif
 
-    int result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
+    result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
 #if (HEAPMODE)
     FREEMEM(ctxPtr);
@@ -966,12 +967,13 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
     LZ4_stream_t ctxBody;
     void* ctx = &ctxBody;
 #endif
+    int result;
 
 #if (HEAPMODE)
     if (!ctx) { return 0; }
 #endif
 
-    int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
+    result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
