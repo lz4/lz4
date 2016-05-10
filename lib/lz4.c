@@ -730,8 +730,13 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     LZ4_stream_t ctx;
     void* ctxPtr = &ctx;
 #endif
+    int result;
 
-    int result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
+#if (HEAPMODE)
+    if (!ctxPtr) { return 0; }
+#endif
+
+    result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
 #if (HEAPMODE)
     FREEMEM(ctxPtr);
@@ -962,8 +967,13 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
     LZ4_stream_t ctxBody;
     void* ctx = &ctxBody;
 #endif
+    int result;
 
-    int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
+#if (HEAPMODE)
+    if (!ctx) { return 0; }
+#endif
+
+    result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
 
 #if (HEAPMODE)
     FREEMEM(ctx);
@@ -980,6 +990,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 LZ4_stream_t* LZ4_createStream(void)
 {
     LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOCATOR(8, LZ4_STREAMSIZE_U64);
+    if (!lz4s) { return NULL; }
     LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
     LZ4_resetStream(lz4s);
     return lz4s;
@@ -1541,6 +1552,7 @@ int LZ4_resetStreamState(void* state, char* inputBuffer)
 void* LZ4_create (char* inputBuffer)
 {
     void* lz4ds = ALLOCATOR(8, LZ4_STREAMSIZE_U64);
+    if (!lz4ds) { return NULL; }
     LZ4_init ((LZ4_stream_t_internal*)lz4ds, (BYTE*)inputBuffer);
     return lz4ds;
 }
