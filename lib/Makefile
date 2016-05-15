@@ -81,7 +81,7 @@ clean:
 
 #------------------------------------------------------------------------
 #make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD FreeBSD GNU))
 
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
