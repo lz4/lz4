@@ -114,7 +114,7 @@ clean:
 
 #------------------------------------------------------------------------
 #make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD FreeBSD GNU))
 
 install: lz4 lz4c
 	@echo Installing binaries
