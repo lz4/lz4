@@ -1,13 +1,13 @@
-\"
-\" lz4.1: This is a manual page for 'lz4' program. This file is part of the
-\" lz4 <https://code.google.com/p/lz4/> project.
-\" Author: Yann Collet
-\"
-
-\" No hyphenation
+\."
+\." lz4.1: This is a manual page for 'lz4' program. This file is part of the
+\." lz4 <http://www.lz4.org/> project.
+\." Author: Yann Collet
+\."
+.
+\." No hyphenation
 .hy 0
 .nr HY 0
-
+.
 .TH lz4 "1" "2015-03-21" "lz4" "User Commands"
 .SH NAME
 \fBlz4, unlz4, lz4cat\fR \- Compress or decompress .lz4 files
@@ -18,11 +18,11 @@
 .PP
 .B unlz4
 is equivalent to
-.BR "lz4 \-d" 
+.BR "lz4 \-d"
 .br
 .B lz4cat
 is equivalent to
-.BR "lz4 \-dc" 
+.BR "lz4 \-dc"
 .br
 .PP
 When writing scripts that need to decompress files,
@@ -42,15 +42,23 @@ and
 .PP
 \fBlz4\fR is an extremely fast lossless compression algorithm,
 based on \fBbyte-aligned LZ77\fR family of compression scheme.
-\fBlz4\fR offers compression speeds of 400 MB/s per core, linearly scalable with multi-core CPUs. 
+\fBlz4\fR offers compression speeds of 400 MB/s per core, linearly scalable with multi-core CPUs.
 It features an extremely fast decoder, with speed in multiple GB/s per core,
-typically reaching RAM speed limit on multi-core systems. 
-.B lz4
-supports a command line syntax similar to
-.BR gzip (1).
+typically reaching RAM speed limit on multi-core systems.
 The native file format is the
 .B .lz4
 format.
+
+.B lz4
+supports a command line syntax similar but not identical to
+.BR gzip (1).
+Differences are :
+\fBlz4\fR preserve original files ;
+\fBlz4 file1 file2\fR means : compress file1 \fIinto\fR file2 ;
+\fBlz4 file\fR shows real-time statistics during compression .
+
+Default behaviors can be modified by opt-in commands, described below.
+\fBlz4 --quiet --multiple\fR more closely mimics \fBgzip\fR behavior.
 
 .SS "Concatenation of .lz4 files"
 It is possible to concatenate
@@ -90,9 +98,9 @@ only the latest one will be applied.
 .TP
 .BR \-z ", " \-\-compress
 Compress.
-This is the default operation mode 
+This is the default operation mode
 when no operation mode option is specified ,
-no other operation mode is implied from the command name 
+no other operation mode is implied from the command name
 (for example,
 .B unlz4
 implies
@@ -160,11 +168,11 @@ for files that have not been compressed with
 .TP
 .BR \-m ", " \--multiple
  Multiple file names.
- By default, the second filename is used as the output filename for the compressed file.
+ By default, the second filename is used as the destination filename for the compressed file.
  With
 .B -m
 , you can specify any number of input filenames. Each of them will be compressed
-independently, and the resulting name of the compressed file will be
+independently, and the resulting name of each compressed file will be
 .B filename.lz4
 .
 
@@ -174,7 +182,7 @@ independently, and the resulting name of the compressed file will be
  B4= 64KB ; B5= 256KB ; B6= 1MB ; B7= 4MB
 .TP
 .B \-BD
- block dependency (improve compression ratio)
+ block dependency (improves compression ratio on small blocks)
 .TP
 .B \--[no-]frame-crc
  select frame checksum (default:enabled)
@@ -184,7 +192,7 @@ independently, and the resulting name of the compressed file will be
  Note : this option can only be activated when the original size can be determined,
 hence for a file. It won't work with unknown source size, such as stdin or pipe.
 .TP
-.B \--[no-]sparse 
+.B \--[no-]sparse
  sparse mode support (default:enabled on file, disabled on stdout)
 .TP
 .B \-l
@@ -196,7 +204,7 @@ hence for a file. It won't work with unknown source size, such as stdin or pipe.
  verbose mode
 .TP
 .BR \-q ", " --quiet
- suppress warnings; specify twice to suppress errors too
+ suppress warnings and real-time statistics; specify twice to suppress errors too
 .TP
 .B \-h/\-H
  display help/long help and exit
@@ -215,7 +223,7 @@ This is default behavior anyway, so this option is just for compatibility with g
  iteration loops [1-9](default : 3), benchmark mode only
 
 .SH BUGS
-Report bugs at: https://github.com/Cyan4973/lz4
+Report bugs at: https://github.com/Cyan4973/lz4/issues
 
 .SH AUTHOR
 Yann Collet
