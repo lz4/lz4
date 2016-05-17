@@ -1,15 +1,15 @@
 PROJECT(LZ4 C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "LZ4 compression library")
 set(CPACK_PACKAGE_VERSION_MAJOR 1)
-set(CPACK_PACKAGE_VERSION_MINOR 5)
-set(CPACK_PACKAGE_VERSION_PATCH r128)
+set(CPACK_PACKAGE_VERSION_MINOR 7)
+set(CPACK_PACKAGE_VERSION_PATCH r132)
 set(VERSION_STRING	" \"${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}\" ")
 include(CPack)
 
 cmake_minimum_required (VERSION 2.6)
 INCLUDE (CheckTypeSize)
 check_type_size("void *" SIZEOF_VOID_P)
-IF( ${SIZEOF_VOID_P} STREQUAL  "8" )
+IF( "${SIZEOF_VOID_P}" STREQUAL  "8" )
     set (CMAKE_SYSTEM_PROCESSOR "64bit")
     MESSAGE( STATUS "64 bit architecture detected size of void * is " ${SIZEOF_VOID_P})
 ENDIF()
@@ -42,15 +42,27 @@ if(BUILD_TOOLS)
     install(TARGETS lz4 RUNTIME DESTINATION "bin/")
 endif()
 
-if(BUILD_LIBS)    
-    add_library(liblz4 ${LZ4_SRCS_LIB})
-    
+if(BUILD_LIBS)
+
+
+	SET(LIBS_TARGETS "")
+	IF(NOT WIN32)
+	add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
+    add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
+    SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
+	SET(LIBS_TARGETS liblz4 liblz4_static)
+	ELSE(NOT WIN32)
+	add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
+	SET(LIBS_TARGETS liblz4)
+    ENDIF(NOT WIN32)
+
     set_target_properties(liblz4 PROPERTIES
     OUTPUT_NAME lz4
     SOVERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}"
     )
-        
-    install(TARGETS liblz4
+
+    install(TARGETS ${LIBS_TARGETS}
+	RUNTIME DESTINATION lib #on Windows: cmake considers dlls as runtime component
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     )
@@ -61,7 +73,16 @@ if(BUILD_LIBS)
     ${LZ4_DIR}/lz4frame.h
     DESTINATION include
     )
-    
+
+    set(PREFIX ${CMAKE_INSTALL_PREFIX})
+    set(LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
+    set(INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+    string(SUBSTRING ${CPACK_PACKAGE_VERSION_PATCH} 1 -1 VERSION)
+    configure_file(${LZ4_DIR}/liblz4.pc.in liblz4.pc @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/pkgconfig"
+    )
+
     if(BUILD_TOOLS)
         target_link_libraries(lz4 liblz4)
     endif()

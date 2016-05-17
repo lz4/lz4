@@ -1,18 +1,20 @@
 LZ4 - Extremely fast compression
 ================================
 
-LZ4 is lossless compression algorithm, 
-providing compression speed at 400 MB/s per core, 
-scalable with multi-cores CPU. 
-It also features an extremely fast decoder, 
-with speed in multiple GB/s per core, 
+LZ4 is lossless compression algorithm,
+providing compression speed at 400 MB/s per core,
+scalable with multi-cores CPU.
+It features an extremely fast decoder,
+with speed in multiple GB/s per core,
 typically reaching RAM speed limits on multi-core systems.
 
 Speed can be tuned dynamically, selecting an "acceleration" factor
 which trades compression ratio for more speed up.
 On the other end, a high compression derivative, LZ4_HC, is also provided,
 trading CPU time for improved compression ratio.
-All versions feature the same excellent decompression speed.
+All versions feature the same decompression speed.
+
+LZ4 library is provided as open-source software using BSD license.s
 
 
 |Branch      |Status   |
@@ -22,7 +24,7 @@ All versions feature the same excellent decompression speed.
 
 [travisMasterBadge]: https://travis-ci.org/Cyan4973/lz4.svg?branch=master "Continuous Integration test suite"
 [travisDevBadge]: https://travis-ci.org/Cyan4973/lz4.svg?branch=dev "Continuous Integration test suite"
-[travisLink]: https://ci.appveyor.com/project/YannCollet/lz4
+[travisLink]: https://travis-ci.org/Cyan4973/lz4
 [AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/master?svg=true "Visual test suite"
 [AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/dev?svg=true "Visual test suite"
 [AppveyorLink]: https://ci.appveyor.com/project/YannCollet/lz4
@@ -55,10 +57,14 @@ in single-thread mode.
 |  LZO 2.06            |  2.108  |  350 MB/s   |    510 MB/s   |
 |  QuickLZ 1.5.1.b6    |  2.238  |  320 MB/s   |    380 MB/s   |
 |  Snappy 1.1.0        |  2.091  |  250 MB/s   |    960 MB/s   |
+|  [Zstandard] 0.5.1   |  2.876  |  240 MB/s   |    620 MB/s   |
 |  LZF v3.6            |  2.073  |  175 MB/s   |    500 MB/s   |
-|  zlib 1.2.8 -1       |  2.730  |   59 MB/s   |    250 MB/s   |
+|  [zlib] 1.2.8 -1     |  2.730  |   59 MB/s   |    250 MB/s   |
 |**LZ4 HC (r129)**     |**2.720**|   22 MB/s   | **1830 MB/s** |
-|  zlib 1.2.8 -6       |  3.099  |   18 MB/s   |    270 MB/s   |
+|  [zlib] 1.2.8 -6     |  3.099  |   18 MB/s   |    270 MB/s   |
+
+[zlib]: http://www.zlib.net/
+[Zstandard]: http://www.zstd.net/
 
 
 Documentation
@@ -75,7 +81,7 @@ Interoperable versions of LZ4 must respect this frame format.
 Other source versions
 -------------------------
 
-Beyond the C reference source, 
+Beyond the C reference source,
 many contributors have created versions of lz4 in multiple languages
 (Java, C#, Python, Perl, Ruby, etc.).
 A list of known source ports is maintained on the [LZ4 Homepage].

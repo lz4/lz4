@@ -34,17 +34,18 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE?= r131
+RELEASE ?= r132
 
-DESTDIR?=
-PREFIX ?= /usr/local
-CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
-FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+BINDIR  := $(PREFIX)/bin
+MANDIR  := $(PREFIX)/share/man/man1
+LZ4DIR  := ../lib
 
-BINDIR := $(PREFIX)/bin
-MANDIR := $(PREFIX)/share/man/man1
-LZ4DIR := ../lib
+DESTDIR ?=
+PREFIX  ?= /usr/local
+CFLAGS  ?= -O3   # can select customized optimized flags such as for example : CFLAGS="-O2 -g" make
+CFLAGS  += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
+CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
+FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
 # Define *.exe as extension for Windows systems
@@ -57,10 +58,8 @@ VOID = /dev/null
 endif
 
 
-# Select test target for Travis CI's Build Matrix
-TRAVIS_TARGET:= $(LZ4_TRAVIS_CI_ENV)
+# Default test parameters
 TEST_FILES   := COPYING
-TEST_TARGETS := test-native
 FUZZER_TIME  := -T9mn
 
 
@@ -72,37 +71,38 @@ bins: lz4 lz4c fullbench fuzzer frametest datagen
 
 all: bins m32
 
-lz4: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+lz4: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lz4c  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
-	$(CC)      $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
+lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o
+	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
 lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c
 	$(CC) -m32 $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-fullbench  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-fuzzer  : $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fuzzer32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c fuzzer.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o frametest.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
-datagen : datagen.c datagencli.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+datagen : datagen.o datagencli.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@rm -f core *.o *.test tmp* \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
@@ -116,13 +116,13 @@ clean:
 #make install is validated only for Linux, OSX, kFreeBSD and Hurd targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD FreeBSD GNU))
 
-install: lz4 lz4c
+install: lz4$(EXT) lz4c$(EXT)
 	@echo Installing binaries
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4 $(DESTDIR)$(BINDIR)/lz4
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
-	@install -m 755 lz4c $(DESTDIR)$(BINDIR)/lz4c
+	@install -m 755 lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/unlz4$(EXT)
+	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	@echo Installing man pages
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
@@ -131,10 +131,10 @@ install: lz4 lz4c
 	@echo lz4 installation completed
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/lz4cat
-	rm -f $(DESTDIR)$(BINDIR)/unlz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4 ] && rm -f $(DESTDIR)$(BINDIR)/lz4
-	[ -x $(DESTDIR)$(BINDIR)/lz4c ] && rm -f $(DESTDIR)$(BINDIR)/lz4c
+	rm -f $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
+	rm -f $(DESTDIR)$(BINDIR)/unlz4$(EXT)
+	[ -x $(DESTDIR)$(BINDIR)/lz4$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	[ -x $(DESTDIR)$(BINDIR)/lz4c$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4c$(EXT)
 	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
 	rm -f $(DESTDIR)$(MANDIR)/lz4c.1
 	rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
@@ -146,8 +146,6 @@ test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
 test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
 
 test-all: test test32
-
-test-travis: $(TRAVIS_TARGET)
 
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
@@ -163,7 +161,7 @@ test-lz4-sparse: lz4 datagen
 	./lz4 tmpSrc | ./lz4 -dv --no-sparse > tmpNoSparse
 	diff -s tmpSrc tmpNoSparse
 	ls -ls tmp*
-	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to not finish on an exact nb of blocks)
+	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to generate non-full last block)
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
 	@rm tmp*
@@ -180,8 +178,6 @@ test-lz4-sparse: lz4 datagen
 	ls -ls tmp*
 	diff tmp2M tmpR
 	@rm tmp*
-
-
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
@@ -305,6 +301,6 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
 
 test-mem32: lz4c32 datagen
-# unfortunately, valgrind doesn't seem to work with non-native binary. If someone knows how to do a valgrind-test on a 32-bits exe with a 64-bits system...
+# unfortunately, valgrind doesn't seem to work with non-native binary...
 
 endif

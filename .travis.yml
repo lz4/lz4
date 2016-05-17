@@ -1,6 +1,6 @@
 language: c
 compiler: gcc
-script: make test-travis
+script: make $LZ4_TRAVIS_CI_ENV
 before_install:
   - sudo apt-get update  -qq
   - sudo apt-get install -qq gcc-arm-linux-gnueabi
@@ -20,16 +20,16 @@ env:
   - LZ4_TRAVIS_CI_ENV=gpptest
   - LZ4_TRAVIS_CI_ENV=armtest
   - LZ4_TRAVIS_CI_ENV=versionsTest
-  - LZ4_TRAVIS_CI_ENV=test-lz4
-  - LZ4_TRAVIS_CI_ENV=test-lz4c
-  - LZ4_TRAVIS_CI_ENV=test-lz4c32
-  - LZ4_TRAVIS_CI_ENV=test-fullbench
-  - LZ4_TRAVIS_CI_ENV=test-fullbench32
-  - LZ4_TRAVIS_CI_ENV=test-fuzzer
-  - LZ4_TRAVIS_CI_ENV=test-fuzzer32
-  - LZ4_TRAVIS_CI_ENV=test-frametest
-  - LZ4_TRAVIS_CI_ENV=test-frametest32
-  - LZ4_TRAVIS_CI_ENV=test-mem
+  - LZ4_TRAVIS_CI_ENV="-C programs test-lz4"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-lz4c"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-lz4c32"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-fullbench"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-fullbench32"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-fuzzer"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-fuzzer32"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-frametest"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-frametest32"
+  - LZ4_TRAVIS_CI_ENV="-C programs test-mem"
 
 matrix:
   fast_finish: true
