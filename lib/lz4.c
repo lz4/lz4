@@ -145,7 +145,13 @@ static unsigned LZ4_isLittleEndian(void)
 static U16 LZ4_read16(const void* memPtr)
 {
     U16 val16;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_suppress 551
+#endif
     memcpy(&val16, memPtr, 2);
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif
     return val16;
 }
 
@@ -179,14 +185,26 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
 static U32 LZ4_read32(const void* memPtr)
 {
     U32 val32;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_suppress 551
+#endif
     memcpy(&val32, memPtr, 4);
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif
     return val32;
 }
 
 static U64 LZ4_read64(const void* memPtr)
 {
     U64 val64;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_suppress 551
+#endif
     memcpy(&val64, memPtr, 8);
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif
     return val64;
 }
 
@@ -288,7 +306,20 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
             return (__builtin_clzll((U64)val) >> 3);
 #       else
             unsigned r;
+            //Disable warning "shift count is too large"
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_remark 64
+#endif
+#ifdef __IAR_SYSTEMS_ICC__
+#pragma diag_remark=Pe063
+#endif
             if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+#ifdef __IAR_SYSTEMS_ICC__
+#pragma diag_default=Pe063
+#endif
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 64
+#endif
             if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
             r += (!val);
             return r;
@@ -370,7 +401,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 **************************************/
 int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
-int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
+int LZ4_sizeofState(void) { return LZ4_STREAMSIZE; }
 
 
 
@@ -681,8 +712,14 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 #if (HEAPMODE)
     void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_suppress 551
+#endif
     LZ4_stream_t ctx;
     void* ctxPtr = &ctx;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif
 #endif
 
     int result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
@@ -702,17 +739,29 @@ int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxO
 
 /* hidden debug function */
 /* strangely enough, gcc generates faster code when this function is uncommented, even if unused */
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 int LZ4_compress_fast_force(const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
     LZ4_stream_t ctx;
 
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_suppress 551
+#endif
     LZ4_resetStream(&ctx);
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif
 
     if (inputSize < LZ4_64Klimit)
         return LZ4_compress_generic(&ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16,                        noDict, noDictIssue, acceleration);
     else
         return LZ4_compress_generic(&ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, acceleration);
 }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 
 /********************************
@@ -915,7 +964,13 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
     void* ctx = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctxBody;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_suppress 551
+#endif
     void* ctx = &ctxBody;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif
 #endif
 
     int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
@@ -945,12 +1000,13 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
 
+#if (HEAPMODE)
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     FREEMEM(LZ4_stream);
     return (0);
 }
-
+#endif
 
 #define HASH_UNIT sizeof(size_t)
 int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
@@ -1060,6 +1116,9 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
 
 /* Hidden debug function, to force external dictionary mode */
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int inputSize)
 {
     LZ4_stream_t_internal* streamPtr = (LZ4_stream_t_internal*)LZ4_dict;
@@ -1078,6 +1137,9 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
 
     return result;
 }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 
 int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
@@ -1442,10 +1504,16 @@ int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSi
 }
 
 /* debug function */
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 int LZ4_decompress_safe_forceExtDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, usingExtDict, (BYTE*)dest, (const BYTE*)dictStart, dictSize);
 }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 
 /***************************************************
@@ -1465,13 +1533,19 @@ They are only provided here for compatibility with older user programs.
 - LZ4_uncompress is totally equivalent to LZ4_decompress_fast
 - LZ4_uncompress_unknownOutputSize is totally equivalent to LZ4_decompress_safe
 */
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4_decompress_fast(source, dest, outputSize); }
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 
 /* Obsolete Streaming functions */
 
-int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
+int LZ4_sizeofStreamState(void) { return LZ4_STREAMSIZE; }
 
 static void LZ4_init(LZ4_stream_t_internal* lz4ds, BYTE* base)
 {
