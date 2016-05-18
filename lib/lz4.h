@@ -319,6 +319,10 @@ int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalS
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
+#  elif defined(__TI_COMPILER_VERSION__)
+#    define LZ4_DEPRECATED(message)  __attribute__((deprecated))
+#  elif defined(__IAR_SYSTEMS_ICC__)
+#    define LZ4_DEPRECATED(message)
 #  else
 #    pragma message("WARNING: You need to implement LZ4_DEPRECATED for this compiler")
 #    define LZ4_DEPRECATED(message)
