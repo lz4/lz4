@@ -43,6 +43,7 @@
  */
 #define HEAPMODE 0
 
+
 /*
  * ACCELERATION_DEFAULT :
  * Select "acceleration" for LZ4_compress_fast() when parameter value <= 0
@@ -124,9 +125,11 @@
 /**************************************
 *  Memory routines
 **************************************/
+#if (HEAPMODE)
 #include <stdlib.h>   /* malloc, calloc, free */
 #define ALLOCATOR(n,s) calloc(n,s)
 #define FREEMEM        free
+#endif /* HEAPMODE */
 #include <string.h>   /* memset, memcpy */
 #define MEM_INIT       memset
 
@@ -188,17 +191,38 @@ static void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = val
 
 static U16 LZ4_read16(const void* memPtr)
 {
+#ifdef __TI_COMPILER_VERSION__
+    /* Suppess warning: #551-D variable "ctx" is used before its value is set*/
+#pragma diag_suppress 551
+#endif  /* __TI_COMPILER_VERSION__ */
     U16 val; memcpy(&val, memPtr, sizeof(val)); return val;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif /* __TI_COMPILER_VERSION__ */
 }
 
 static U32 LZ4_read32(const void* memPtr)
 {
+#ifdef __TI_COMPILER_VERSION__
+    /* Suppess warning: #551-D variable "ctx" is used before its value is set*/
+#pragma diag_suppress 551
+#endif  /* __TI_COMPILER_VERSION__ */
     U32 val; memcpy(&val, memPtr, sizeof(val)); return val;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif /* __TI_COMPILER_VERSION__ */
 }
 
 static size_t LZ4_read_ARCH(const void* memPtr)
 {
-    size_t val; memcpy(&val, memPtr, sizeof(val)); return val;
+#ifdef __TI_COMPILER_VERSION__
+    /* Suppess warning: #551-D variable "ctx" is used before its value is set*/
+#pragma diag_suppress 551
+#endif  /* __TI_COMPILER_VERSION__ */
+size_t val; memcpy(&val, memPtr, sizeof(val)); return val;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif /* __TI_COMPILER_VERSION__ */
 }
 
 static void LZ4_write16(void* memPtr, U16 value)
@@ -333,7 +357,20 @@ static unsigned LZ4_NbCommonBytes (register size_t val)
             return (__builtin_clzll((U64)val) >> 3);
 #       else
             unsigned r;
+/* Disable warning "shift count is too large" */
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_remark 64
+#endif
+#ifdef __IAR_SYSTEMS_ICC__
+#pragma diag_remark=Pe063
+#endif
             if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+#ifdef __IAR_SYSTEMS_ICC__
+#pragma diag_default=Pe063
+#endif
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 64
+#endif
             if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
             r += (!val);
             return r;
@@ -416,7 +453,7 @@ typedef enum { full = 0, partial = 1 } earlyEnd_directive;
 int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 const char* LZ4_versionString (void) { return LZ4_VERSION_STRING; }
 int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
-int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
+int LZ4_sizeofState(void) { return LZ4_STREAMSIZE; }
 
 
 
@@ -726,15 +763,19 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 {
 #if (HEAPMODE)
     void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
+    if (!ctxPtr) { return 0; }
 #else
     LZ4_stream_t ctx;
+#ifdef __TI_COMPILER_VERSION__
+    /* Suppess warning: #551-D variable "ctx" is used before its value is set*/
+#pragma diag_suppress 551
+#endif  /* __TI_COMPILER_VERSION__ */
     void* ctxPtr = &ctx;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif /* __TI_COMPILER_VERSION__ */
 #endif
     int result;
-
-#if (HEAPMODE)
-    if (!ctxPtr) { return 0; }
-#endif
 
     result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
@@ -744,27 +785,36 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     return result;
 }
 
-
 int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize)
 {
     return LZ4_compress_fast(source, dest, inputSize, maxOutputSize, 1);
 }
 
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 /* hidden debug function */
 /* strangely enough, gcc generates faster code when this function is uncommented, even if unused */
 int LZ4_compress_fast_force(const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
     LZ4_stream_t ctx;
-
+#ifdef __TI_COMPILER_VERSION__
+    /* Suppess warning: #551-D variable "ctx" is used before its value is set*/
+#pragma diag_suppress 551
+#endif  /* __TI_COMPILER_VERSION__ */
     LZ4_resetStream(&ctx);
-
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif /* __TI_COMPILER_VERSION__ */
     if (inputSize < LZ4_64Klimit)
         return LZ4_compress_generic(&ctx, source, dest, inputSize, maxOutputSize, limitedOutput, byU16,                        noDict, noDictIssue, acceleration);
     else
         return LZ4_compress_generic(&ctx, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, acceleration);
 }
-
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 /********************************
 *  destSize variant
@@ -963,16 +1013,19 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 {
 #if (HEAPMODE)
     void* ctx = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
+    if (!ctx) { return 0; }
 #else
     LZ4_stream_t ctxBody;
+#ifdef __TI_COMPILER_VERSION__
+    /* Suppess warning: #551-D variable "ctx" is used before its value is set*/
+#pragma diag_suppress 551
+#endif  /* __TI_COMPILER_VERSION__ */
     void* ctx = &ctxBody;
+#ifdef __TI_COMPILER_VERSION__
+#pragma diag_default 551
+#endif /* __TI_COMPILER_VERSION__ */
 #endif
     int result;
-
-#if (HEAPMODE)
-    if (!ctx) { return 0; }
-#endif
-
     result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
 
 #if (HEAPMODE)
@@ -987,6 +1040,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 *  Streaming functions
 ********************************/
 
+#if (HEAPMODE)
 LZ4_stream_t* LZ4_createStream(void)
 {
     LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOCATOR(8, LZ4_STREAMSIZE_U64);
@@ -995,17 +1049,20 @@ LZ4_stream_t* LZ4_createStream(void)
     LZ4_resetStream(lz4s);
     return lz4s;
 }
+#endif /* HEAPMODE */
 
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
 
+#if (HEAPMODE)
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     FREEMEM(LZ4_stream);
     return (0);
 }
+#endif /* HEAPMODE */
 
 
 #define HASH_UNIT sizeof(size_t)
@@ -1115,6 +1172,9 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 }
 
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 /* Hidden debug function, to force external dictionary mode */
 int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int inputSize)
 {
@@ -1134,7 +1194,9 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
 
     return result;
 }
-
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 {
@@ -1363,7 +1425,6 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
     return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, (BYTE*)(dest - 64 KB), NULL, 64 KB);
 }
 
-
 /* streaming decompression functions */
 
 typedef struct
@@ -1379,6 +1440,7 @@ typedef struct
  * LZ4_createStreamDecode()
  * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
  */
+#if (HEAPMODE)
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(1, sizeof(LZ4_streamDecode_t));
@@ -1390,6 +1452,7 @@ int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
     FREEMEM(LZ4_stream);
     return 0;
 }
+#endif /* HEAPMODE */
 
 /*
  * LZ4_setStreamDecode
@@ -1504,12 +1567,17 @@ int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSi
     return LZ4_decompress_usingDict_generic(source, dest, 0, originalSize, 0, dictStart, dictSize);
 }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 /* debug function */
 int LZ4_decompress_safe_forceExtDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, usingExtDict, (BYTE*)dest, (const BYTE*)dictStart, dictSize);
 }
-
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 /***************************************************
 *  Obsolete Functions
@@ -1522,6 +1590,9 @@ int LZ4_compress_withState (void* state, const char* src, char* dst, int srcSize
 int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_fast_continue(LZ4_stream, src, dst, srcSize, maxDstSize, 1); }
 int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize) { return LZ4_compress_fast_continue(LZ4_stream, source, dest, inputSize, LZ4_compressBound(inputSize), 1); }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 /*
 These function names are deprecated and should no longer be used.
 They are only provided here for compatibility with older user programs.
@@ -1534,7 +1605,10 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 /* Obsolete Streaming functions */
 
-int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
+int LZ4_sizeofStreamState(void) { return LZ4_STREAMSIZE; }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 static void LZ4_init(LZ4_stream_t_internal* lz4ds, BYTE* base)
 {
@@ -1549,6 +1623,7 @@ int LZ4_resetStreamState(void* state, char* inputBuffer)
     return 0;
 }
 
+#if (HEAPMODE)
 void* LZ4_create (char* inputBuffer)
 {
     void* lz4ds = ALLOCATOR(8, LZ4_STREAMSIZE_U64);
@@ -1556,6 +1631,7 @@ void* LZ4_create (char* inputBuffer)
     LZ4_init ((LZ4_stream_t_internal*)lz4ds, (BYTE*)inputBuffer);
     return lz4ds;
 }
+#endif /* HEAPMODE */
 
 char* LZ4_slideInputBuffer (void* LZ4_Data)
 {
