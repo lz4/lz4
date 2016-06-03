@@ -297,6 +297,10 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t dctx,
  * After a frame is fully decoded, dctx can be used again to decompress another frame.
  */
 
+void LZ4F_disableChecksum(LZ4F_decompressionContext_t decompressionContext);
+/* LZ4F_disableChecksum()
+* Call this function to allow you to read compressed blocks out of order.
+*/
 
 #if defined (__cplusplus)
 }
