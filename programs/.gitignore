@@ -1,4 +1,9 @@
 # local binary (Makefile)
 lz4
 lz4c32
+datagen
+fuzzer
 *.exe
+
+# tests files
+tmp*

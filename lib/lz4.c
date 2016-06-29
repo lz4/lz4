@@ -1150,8 +1150,7 @@ FORCE_INLINE int LZ4_decompress_generic(
     if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
-
-    /* Main Loop */
+    /* Main Loop : decode sequences */
     while (1) {
         unsigned token;
         size_t length;
@@ -1214,21 +1213,21 @@ FORCE_INLINE int LZ4_decompress_generic(
 
             if (length <= (size_t)(lowPrefix-match)) {
                 /* match can be copied as a single segment from external dictionary */
-                match = dictEnd - (lowPrefix-match);
-                memmove(op, match, length); op += length;
+                memmove(op, dictEnd - (lowPrefix-match), length);
+                op += length;
             } else {
                 /* match encompass external dictionary and current block */
-                size_t copySize = (size_t)(lowPrefix-match);
+                size_t const copySize = (size_t)(lowPrefix-match);
+                size_t const restSize = length - copySize;
                 memcpy(op, dictEnd - copySize, copySize);
                 op += copySize;
-                copySize = length - copySize;
-                if (copySize > (size_t)(op-lowPrefix)) {  /* overlap copy */
-                    BYTE* const endOfMatch = op + copySize;
+                if (restSize > (size_t)(op-lowPrefix)) {  /* overlap copy */
+                    BYTE* const endOfMatch = op + restSize;
                     const BYTE* copyFrom = lowPrefix;
                     while (op < endOfMatch) *op++ = *copyFrom++;
                 } else {
-                    memcpy(op, lowPrefix, copySize);
-                    op += copySize;
+                    memcpy(op, lowPrefix, restSize);
+                    op += restSize;
                 }
             }
             continue;
