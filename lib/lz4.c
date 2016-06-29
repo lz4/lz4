@@ -605,9 +605,10 @@ _next_match:
             if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
                 matchCode -= ML_MASK;
-                for (; matchCode >= 510 ; matchCode-=510) { *op++ = 255; *op++ = 255; }
-                if (matchCode >= 255) { matchCode-=255; *op++ = 255; }
-                *op++ = (BYTE)matchCode;
+                *(U32*)op = 0xFFFFFFFF;
+                while (matchCode >= 4*255) op+=4, *(U32*)op=0xFFFFFFFF, matchCode -= 4*255;
+                op += matchCode / 255;
+                *op++ = (BYTE)(matchCode % 255);
             } else
                 *token += (BYTE)(matchCode);
         }
