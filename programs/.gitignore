@@ -1,2 +1,4 @@
-/lz4
-/*.exe
+# local binary (Makefile)
+lz4
+lz4c32
+*.exe

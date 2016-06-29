@@ -59,7 +59,6 @@
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
-#include "lz4.h"      /* LZ4_versionString */
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 
 
@@ -86,14 +85,12 @@
 /*****************************
 *  Constants
 ******************************/
-#define COMPRESSOR_NAME "LZ4 CLI"
+#define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
 #  define LZ4_VERSION "r128"
 #endif
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %i-bits %s (lib %s), by %s ***\n", \
-	COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, \
-	LZ4_versionString(), AUTHOR
+#define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"
@@ -105,7 +102,7 @@
 #define LZ4_BLOCKSIZEID_DEFAULT 7
 
 
-/**************************************
+/*-************************************
 *  Macros
 ***************************************/
 #define DISPLAY(...)           fprintf(stderr, __VA_ARGS__)
@@ -113,13 +110,13 @@
 static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : downgradable normal ; 3 : non-downgradable normal; 4 : + information */
 
 
-/**************************************
+/*-************************************
 *  Local Variables
 ***************************************/
-static char* programName;
+static const char* programName;
 
 
-/**************************************
+/*-************************************
 *  Exceptions
 ***************************************/
 #define DEBUG 0
@@ -134,7 +131,7 @@ static char* programName;
 }
 
 
-/**************************************
+/*-************************************
 *  Version modifiers
 ***************************************/
 #define EXTENDED_ARGUMENTS
@@ -145,7 +142,7 @@ static char* programName;
 int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel);   /* hidden function */
 
 
-/*****************************
+/*-***************************
 *  Functions
 *****************************/
 static int usage(void)
@@ -274,7 +271,7 @@ static void waitEnter(void)
 }
 
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
     int i,
         cLevel=0,
@@ -305,9 +302,8 @@ int main(int argc, char** argv)
     if (!strcmp(programName, UNLZ4)) { decode=1; }
 
     /* command switches */
-    for(i=1; i<argc; i++)
-    {
-        char* argument = argv[i];
+    for(i=1; i<argc; i++) {
+        const char* argument = argv[i];
 
         if(!argument) continue;   /* Protection if argument empty */
 
@@ -334,17 +330,14 @@ int main(int argc, char** argv)
 
 
         /* Short commands (note : aggregated short commands are allowed) */
-        if (argument[0]=='-')
-        {
+        if (argument[0]=='-') {
             /* '-' means stdin/stdout */
-            if (argument[1]==0)
-            {
+            if (argument[1]==0) {
                 if (!input_filename) input_filename=stdinmark;
                 else output_filename=stdoutmark;
             }
 
-            while (argument[1]!=0)
-            {
+            while (argument[1]!=0) {
                 argument ++;
 
 #if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
@@ -355,11 +348,9 @@ int main(int argc, char** argv)
                 if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                           /* -y (answer 'yes' to overwrite permission) */
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
 
-                if ((*argument>='0') && (*argument<='9'))
-                {
+                if ((*argument>='0') && (*argument<='9')) {
                     cLevel = 0;
-                    while ((*argument >= '0') && (*argument <= '9'))
-                    {
+                    while ((*argument >= '0') && (*argument <= '9')) {
                         cLevel *= 10;
                         cLevel += *argument - '0';
                         argument++;
@@ -413,13 +404,12 @@ int main(int argc, char** argv)
                         case '5':
                         case '6':
                         case '7':
-                        {
-                            int B = argument[1] - '0';
-                            blockSize = LZ4IO_setBlockSizeID(B);
-                            BMK_setBlocksize(blockSize);
-                            argument++;
-                            break;
-                        }
+                            {   int B = argument[1] - '0';
+                                blockSize = LZ4IO_setBlockSizeID(B);
+                                BMK_setBlocksize(blockSize);
+                                argument++;
+                                break;
+                            }
                         case 'D': LZ4IO_setBlockMode(LZ4IO_blockLinked); argument++; break;
                         case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;   /* currently disabled */
                         default : exitBlockProperties=1;
@@ -442,8 +432,7 @@ int main(int argc, char** argv)
 
                     /* Modify Nb Iterations (benchmark only) */
                 case 'i':
-                    {
-                        unsigned iters = 0;
+                    {   unsigned iters = 0;
                         while ((argument[1] >='0') && (argument[1] <='9'))
                         {
                             iters *= 10;
@@ -513,12 +502,12 @@ int main(int argc, char** argv)
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
         if ((!decode) && !(forceCompress))   /* auto-determine compression or decompression, based on file extension */
         {
-            size_t l = strlen(input_filename);
+            size_t const l = strlen(input_filename);
             if (!strcmp(input_filename+(l-4), LZ4_EXTENSION)) decode=1;
         }
         if (!decode)   /* compression to file */
         {
-            size_t l = strlen(input_filename);
+            size_t const l = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,l+5);
 			if (dynNameSpace==NULL) exit(1);
             strcpy(dynNameSpace, input_filename);
@@ -543,8 +532,7 @@ int main(int argc, char** argv)
     }
 
     /* Check if output is defined as console; trigger an error in this case */
-    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout)
-    {
+    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) {
         DISPLAYLEVEL(1, "refusing to write to console without -c\n");
         exit(1);
     }
@@ -553,26 +541,19 @@ int main(int argc, char** argv)
     if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
     if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
 
-
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
-    if (decode)
-    {
+    if (decode) {
       if (multiple_inputs)
         operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
       else
         DEFAULT_DECOMPRESSOR(input_filename, output_filename);
-    }
-    else
-    {
+    } else {
       /* compression is default action */
-      if (legacy_format)
-      {
+      if (legacy_format) {
         DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
         LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
-      }
-      else
-      {
+      } else {
         if (multiple_inputs)
           operationResult = LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
         else
