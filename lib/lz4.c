@@ -933,7 +933,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 
 
 
-/********************************
+/*-******************************
 *  Streaming functions
 ********************************/
 
@@ -1103,14 +1103,14 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 
 
 
-/*******************************
+/*-*****************************
 *  Decompression functions
 *******************************/
-/*
- * This generic decompression function cover all use cases.
- * It shall be instantiated several times, using different sets of directives
- * Note that it is essential this generic function is really inlined,
- * in order to remove useless branches during compilation optimization.
+/*! LZ4_decompress_generic() :
+ *  This generic decompression function cover all use cases.
+ *  It shall be instantiated several times, using different sets of directives
+ *  Note that it is important this generic function is really inlined,
+ *  in order to remove useless branches during compilation optimization.
  */
 FORCE_INLINE int LZ4_decompress_generic(
                  const char* const source,
@@ -1152,8 +1152,7 @@ FORCE_INLINE int LZ4_decompress_generic(
 
 
     /* Main Loop */
-    while (1)
-    {
+    while (1) {
         unsigned token;
         size_t length;
         const BYTE* match;
@@ -1161,15 +1160,12 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         /* get literal length */
         token = *ip++;
-        if ((length=(token>>ML_BITS)) == RUN_MASK)
-        {
+        if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
-            do
-            {
+            do {
                 s = *ip++;
                 length += s;
-            }
-            while ( likely(endOnInput ? ip<iend-RUN_MASK : 1) && (s==255) );
+            } while ( likely(endOnInput ? ip<iend-RUN_MASK : 1) && (s==255) );
             if ((safeDecode) && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* overflow detection */
             if ((safeDecode) && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* overflow detection */
         }
@@ -1179,13 +1175,10 @@ FORCE_INLINE int LZ4_decompress_generic(
         if (((endOnInput) && ((cpy>(partialDecoding?oexit:oend-MFLIMIT)) || (ip+length>iend-(2+1+LASTLITERALS))) )
             || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)))
         {
-            if (partialDecoding)
-            {
+            if (partialDecoding) {
                 if (cpy > oend) goto _output_error;                           /* Error : write attempt beyond end of output buffer */
                 if ((endOnInput) && (ip+length > iend)) goto _output_error;   /* Error : read attempt beyond end of input buffer */
-            }
-            else
-            {
+            } else {
                 if ((!endOnInput) && (cpy != oend)) goto _output_error;       /* Error : block decoding must stop exactly there */
                 if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) goto _output_error;   /* Error : input must be consumed */
             }
@@ -1204,11 +1197,9 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         /* get matchlength */
         length = token & ML_MASK;
-        if (length == ML_MASK)
-        {
+        if (length == ML_MASK) {
             unsigned s;
-            do
-            {
+            do {
                 if ((endOnInput) && (ip > iend-LASTLITERALS)) goto _output_error;
                 s = *ip++;
                 length += s;
@@ -1218,31 +1209,24 @@ FORCE_INLINE int LZ4_decompress_generic(
         length += MINMATCH;
 
         /* check external dictionary */
-        if ((dict==usingExtDict) && (match < lowPrefix))
-        {
+        if ((dict==usingExtDict) && (match < lowPrefix)) {
             if (unlikely(op+length > oend-LASTLITERALS)) goto _output_error;   /* doesn't respect parsing restriction */
 
-            if (length <= (size_t)(lowPrefix-match))
-            {
+            if (length <= (size_t)(lowPrefix-match)) {
                 /* match can be copied as a single segment from external dictionary */
                 match = dictEnd - (lowPrefix-match);
                 memmove(op, match, length); op += length;
-            }
-            else
-            {
+            } else {
                 /* match encompass external dictionary and current block */
                 size_t copySize = (size_t)(lowPrefix-match);
                 memcpy(op, dictEnd - copySize, copySize);
                 op += copySize;
                 copySize = length - copySize;
-                if (copySize > (size_t)(op-lowPrefix))   /* overlap copy */
-                {
+                if (copySize > (size_t)(op-lowPrefix)) {  /* overlap copy */
                     BYTE* const endOfMatch = op + copySize;
                     const BYTE* copyFrom = lowPrefix;
                     while (op < endOfMatch) *op++ = *copyFrom++;
-                }
-                else
-                {
+                } else {
                     memcpy(op, lowPrefix, copySize);
                     op += copySize;
                 }
@@ -1252,8 +1236,7 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         /* copy match within block */
         cpy = op + length;
-        if (unlikely(offset<8))
-        {
+        if (unlikely(offset<8)) {
             const int dec64 = dec64table[offset];
             op[0] = match[0];
             op[1] = match[1];
@@ -1265,12 +1248,10 @@ FORCE_INLINE int LZ4_decompress_generic(
         } else { LZ4_copy8(op, match); match+=8; }
         op += 8;
 
-        if (unlikely(cpy>oend-12))
-        {
+        if (unlikely(cpy>oend-12)) {
             BYTE* const oCopyLimit = oend-(WILDCOPYLENGTH-1);
             if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals (uncompressed) */
-            if (op < oCopyLimit)
-            {
+            if (op < oCopyLimit) {
                 LZ4_wildCopy(op, match, oCopyLimit);
                 match += oCopyLimit - op;
                 op = oCopyLimit;
@@ -1310,10 +1291,9 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 }
 
 
-/* streaming decompression functions */
+/*===== streaming decompression functions =====*/
 
-typedef struct
-{
+typedef struct {
     const BYTE* externalDict;
     size_t extDictSize;
     const BYTE* prefixEnd;

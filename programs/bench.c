@@ -29,7 +29,6 @@
 #if defined(_MSC_VER) || defined(_WIN32)
 #  define _CRT_SECURE_NO_WARNINGS
 #  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
-#  define BMK_LEGACY_TIMER 1           /* S_ISREG & gettimeofday() are not supported by MSVC */
 #endif
 
 /* Unix Large Files support (>4GB) */
@@ -131,15 +130,15 @@ struct compressionParameters
 *  Benchmark Parameters
 ***************************************/
 static int g_chunkSize = DEFAULT_CHUNKSIZE;
-static int nbIterations = NBLOOPS;
+static int g_nbIterations = NBLOOPS;
 static int BMK_pause = 0;
 
 void BMK_setBlocksize(int bsize) { g_chunkSize = bsize; }
 
 void BMK_setNbIterations(int nbLoops)
 {
-    nbIterations = nbLoops;
-    DISPLAY("- %i iterations -\n", nbIterations);
+    g_nbIterations = nbLoops;
+    DISPLAY("- %i iterations -\n", g_nbIterations);
 }
 
 void BMK_setPause(void) { BMK_pause = 1; }
@@ -156,11 +155,10 @@ static clock_t BMK_getClockSpan (clock_t clockStart)
     return clock() - clockStart;
 }
 
-
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
-    size_t step = 64 MB;
-    BYTE* testmem=NULL;
+    size_t const step = 64 MB;
+    void* testmem = NULL;
 
     requiredMem = (((requiredMem >> 26) + 1) << 26);
     requiredMem += 2*step;
@@ -169,7 +167,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     while (!testmem) {
         if (requiredMem > step) requiredMem -= step;
         else requiredMem >>= 1;
-        testmem = (BYTE*) malloc ((size_t)requiredMem);
+        testmem = malloc ((size_t)requiredMem);
     }
     free (testmem);
 
@@ -179,7 +177,6 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 
     return (size_t)requiredMem;
 }
-
 
 static U64 BMK_GetFileSize(const char* infilename)
 {
@@ -211,7 +208,6 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
   U64 totalz = 0;
   double totalc = 0.;
   double totald = 0.;
-
 
   /* Init */
   if (cLevel <= 2) cfunctionId = 0; else cfunctionId = 1;
@@ -249,7 +245,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           DISPLAY("Not enough memory for '%s' full size; testing %u MB only...\n", inFileName, (unsigned)(benchedSize>>20));
       }
 
-      /* Alloc */
+      /* Allocation */
       nbChunks = (unsigned)(benchedSize / g_chunkSize) + 1;
       chunkP = (struct chunkParameters*) malloc(nbChunks * sizeof(struct chunkParameters));
       orig_buff = (char*)malloc(benchedSize);
@@ -303,8 +299,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
         U32 crcCheck = 0;
 
         DISPLAY("\r%79s\r", "");
-        for (loopNb = 1; loopNb <= nbIterations; loopNb++) {
-          int nbLoops;
+        for (loopNb = 1; loopNb <= g_nbIterations; loopNb++) {
+          int nbLoops = 0;
           clock_t clockStart, clockEnd;
           unsigned chunkNb;
 
@@ -312,7 +308,6 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, (int)benchedSize);
           { size_t i; for (i=0; i<benchedSize; i++) compressedBuffer[i]=(char)i; }     /* warmimg up memory */
 
-          nbLoops = 0;
           clockStart = clock();
           while (clock() == clockStart);
           clockStart = clock();
@@ -357,7 +352,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
         }
 
         if (crcOrig==crcCheck) {
-            if (ratio<100.)
+            if (ratio < 100.)
                 DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s \n",
                         inFileName, (int)benchedSize, (int)cSize, ratio,
                         (double)benchedSize / (fastestC / CLOCKS_PER_SEC) / 1000000, (double)benchedSize / (fastestD / CLOCKS_PER_SEC) / 1000000 );
