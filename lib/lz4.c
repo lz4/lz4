@@ -1146,7 +1146,7 @@ FORCE_INLINE int LZ4_decompress_generic(
 
 
     /* Special cases */
-    if ((partialDecoding) && (oexit> oend-MFLIMIT)) oexit = oend-MFLIMIT;                         /* targetOutputSize too high => decode everything */
+    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
     if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
@@ -1165,7 +1165,7 @@ FORCE_INLINE int LZ4_decompress_generic(
             do {
                 s = *ip++;
                 length += s;
-            } while ( likely(endOnInput ? ip<iend-RUN_MASK : 1) && (s==255) );
+            } while ( likely(endOnInput ? ip<iend-RUN_MASK : 1) & (s==255) );
             if ((safeDecode) && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* overflow detection */
             if ((safeDecode) && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* overflow detection */
         }
