@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2015
+# Copyright (C) Yann Collet 2011-2016
 #
 # GPL v2 License
 #
@@ -19,8 +19,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # You can contact the author at :
+#  - LZ4 homepage : http://www.lz4.org
 #  - LZ4 source repository : https://github.com/Cyan4973/lz4
-#  - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 # ##########################################################################
 # lz4 : Command Line Utility, supporting gzip-like arguments
 # lz4c  : CLU, supporting also legacy lz4demo arguments
@@ -42,8 +42,8 @@ LZ4DIR  := ../lib
 
 DESTDIR ?=
 PREFIX  ?= /usr/local
-CFLAGS  ?= -O3   # can select customized optimized flags such as for example : CFLAGS="-O2 -g" make
-CFLAGS  += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic
+CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
+CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes # -Wstrict-aliasing=1
 CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 

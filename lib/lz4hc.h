@@ -100,15 +100,15 @@ typedef struct { size_t table[LZ4_STREAMHCSIZE_SIZET]; } LZ4_streamHC_t;
 */
 
 
-LZ4_streamHC_t* LZ4_createStreamHC(void);
-int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
-/*
+/*! LZ4_createStreamHC() and LZ4_freeStreamHC() :
   These functions create and release memory for LZ4 HC streaming state.
   Newly created states are already initialized.
   Existing state space can be re-used anytime using LZ4_resetStreamHC().
   If you use LZ4 as a DLL, use these functions instead of static structure allocation,
   to avoid size mismatch between different versions.
 */
+LZ4_streamHC_t* LZ4_createStreamHC(void);
+int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
 
 void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
 int  LZ4_loadDictHC (LZ4_streamHC_t* streamHCPtr, const char* dictionary, int dictSize);
@@ -120,7 +120,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, int maxDictSi
 /*
   These functions compress data in successive blocks of any size, using previous blocks as dictionary.
   One key assumption is that previous blocks (up to 64 KB) remain read-accessible while compressing next blocks.
-  There is an exception for ring buffers, which can be smaller 64 KB.
+  There is an exception for ring buffers, which can be smaller than 64 KB.
   Such case is automatically detected and correctly handled by LZ4_compress_HC_continue().
 
   Before starting compression, state must be properly initialized, using LZ4_resetStreamHC().
