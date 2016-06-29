@@ -495,7 +495,7 @@ FORCE_INLINE int LZ4_compress_generic(
     size_t refDelta=0;
 
     /* Init conditions */
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported input size, too large (or negative) */
+    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
     switch(dict)
     {
     case noDict:
@@ -559,11 +559,12 @@ FORCE_INLINE int LZ4_compress_generic(
         /* Encode Literals */
         {   unsigned const litLength = (unsigned)(ip - anchor);
             token = op++;
-            if ((outputLimited) && (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
-                return 0;   /* Check output limit */
-            if (litLength>=RUN_MASK) {
+            if ((outputLimited) &&  /* Check output buffer overflow */
+                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
+                return 0;
+            if (litLength >= RUN_MASK) {
                 int len = (int)litLength-RUN_MASK;
-                *token=(RUN_MASK<<ML_BITS);
+                *token = (RUN_MASK<<ML_BITS);
                 for(; len >= 255 ; len-=255) *op++ = 255;
                 *op++ = (BYTE)len;
             }
@@ -598,9 +599,10 @@ _next_match:
                 ip += MINMATCH + matchCode;
             }
 
-            if ((outputLimited) && (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)))
-                return 0;    /* Check output limit */
-            if (matchCode>=ML_MASK) {
+            if ( outputLimited &&    /* Check output buffer overflow */
+                (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) )
+                return 0;
+            if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
                 matchCode -= ML_MASK;
                 for (; matchCode >= 510 ; matchCode-=510) { *op++ = 255; *op++ = 255; }
