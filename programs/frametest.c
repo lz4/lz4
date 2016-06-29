@@ -1,6 +1,6 @@
 /*
     frameTest - test tool for lz4frame
-    Copyright (C) Yann Collet 2014-2015
+    Copyright (C) Yann Collet 2014-2016
 
     GPL v2 License
 
@@ -19,11 +19,11 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
+    - LZ4 homepage : http://www.lz4.org
     - LZ4 source repository : https://github.com/Cyan4973/lz4
-    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-/**************************************
+/*-************************************
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -37,13 +37,14 @@
 #endif
 
 
-/**************************************
+/*-************************************
 *  Includes
 **************************************/
 #include <stdlib.h>     /* malloc, free */
 #include <stdio.h>      /* fprintf */
 #include <string.h>     /* strcmp */
 #include "lz4frame_static.h"
+#define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
 
 /* Use ftime() if gettimeofday() is not available on your target */

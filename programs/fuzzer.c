@@ -1,6 +1,6 @@
 /*
     fuzzer.c - Fuzzer test tool for LZ4
-    Copyright (C) Yann Collet 2012-2015
+    Copyright (C) Yann Collet 2012-2016
 
     GPL v2 License
 
@@ -19,11 +19,11 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-    - LZ4 source mirror : https://github.com/Cyan4973/lz4
-    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
+    - LZ4 homepage : http://www.lz4.org
+    - LZ4 source repo : https://github.com/Cyan4973/lz4
 */
 
-/**************************************
+/*-************************************
 *  Compiler options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -39,7 +39,7 @@
 #endif
 
 
-/**************************************
+/*-************************************
 *  Includes
 **************************************/
 #include <stdlib.h>
@@ -47,6 +47,7 @@
 #include <string.h>     /* strcmp */
 #include "lz4.h"
 #include "lz4hc.h"
+#define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
 
 /* Use ftime() if gettimeofday() is not available on your target */
