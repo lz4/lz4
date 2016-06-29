@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithms
-    Copyright (C) Yann Collet 2012-2015
+    Copyright (C) Yann Collet 2012-2016
 
     GPL v2 License
 
@@ -19,8 +19,8 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
+    - LZ4 homepage : http://www.lz4.org
     - LZ4 source repository : https://github.com/Cyan4973/lz4
-    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 /*-************************************
@@ -221,7 +221,6 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 #endif
   default : compP.compressionFunction = DEFAULTCOMPRESSOR;
   }
-  compP.decompressionFunction = LZ4_decompress_fast;
 
   /* Loop for each file */
   while (fileIdx<nbFiles) {
@@ -335,7 +334,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           clockStart = clock();
           while (BMK_getClockSpan(clockStart) < TIMELOOP_CLOCK) {
              for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                chunkP[chunkNb].compressedSize = LZ4_decompress_fast(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
+                //chunkP[chunkNb].compressedSize = LZ4_decompress_fast(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].origSize);
+                LZ4_decompress_safe(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkP[chunkNb].origSize);
              nbLoops++;
           }
           clockEnd = BMK_getClockSpan(clockStart);

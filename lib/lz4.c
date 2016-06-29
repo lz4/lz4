@@ -1,6 +1,6 @@
 /*
    LZ4 - Fast LZ compression algorithm
-   Copyright (C) 2011-2015, Yann Collet.
+   Copyright (C) 2011-2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -28,8 +28,8 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    You can contact the author at :
-   - LZ4 source repository : https://github.com/Cyan4973/lz4
-   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
+    - LZ4 homepage : http://www.lz4.org
+    - LZ4 source repository : https://github.com/Cyan4973/lz4
 */
 
 
@@ -1153,8 +1153,8 @@ FORCE_INLINE int LZ4_decompress_generic(
 
         /* copy literals */
         cpy = op+length;
-        if (((endOnInput) && ((cpy>(partialDecoding?oexit:oend-MFLIMIT)) || (ip+length>iend-(2+1+LASTLITERALS))) )
-            || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)))
+        if ( ((endOnInput) && ((cpy>(partialDecoding?oexit:oend-MFLIMIT)) || (ip+length>iend-(2+1+LASTLITERALS))) )
+            || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)) )
         {
             if (partialDecoding) {
                 if (cpy > oend) goto _output_error;                           /* Error : write attempt beyond end of output buffer */
@@ -1210,8 +1210,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                 } else {
                     memcpy(op, lowPrefix, restSize);
                     op += restSize;
-                }
-            }
+            }   }
             continue;
         }
 
