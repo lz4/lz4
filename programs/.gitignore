@@ -1,7 +1,10 @@
 # local binary (Makefile)
 lz4
+lz4c
 lz4c32
 datagen
+frametest
+fullbench
 fuzzer
 *.exe
 

@@ -171,6 +171,7 @@ static U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
 static size_t LZ4_read_ARCH(const void* memPtr) { return *(const size_t*) memPtr; }
 
 static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
+static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
 
 #elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
 
@@ -183,6 +184,7 @@ static U32 LZ4_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
 static size_t LZ4_read_ARCH(const void* ptr) { return ((const unalign*)ptr)->uArch; }
 
 static void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
+static void LZ4_write32(void* memPtr, U32 value) { ((unalign*)memPtr)->u32 = value; }
 
 #else
 
@@ -202,6 +204,11 @@ static size_t LZ4_read_ARCH(const void* memPtr)
 }
 
 static void LZ4_write16(void* memPtr, U16 value)
+{
+    memcpy(memPtr, &value, sizeof(value));
+}
+
+static void LZ4_write32(void* memPtr, U32 value)
 {
     memcpy(memPtr, &value, sizeof(value));
 }
@@ -605,8 +612,8 @@ _next_match:
             if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
                 matchCode -= ML_MASK;
-                *(U32*)op = 0xFFFFFFFF;
-                while (matchCode >= 4*255) op+=4, *(U32*)op=0xFFFFFFFF, matchCode -= 4*255;
+                LZ4_write32(op, 0xFFFFFFFF);
+                while (matchCode >= 4*255) op+=4, LZ4_write32(op, 0xFFFFFFFF), matchCode -= 4*255;
                 op += matchCode / 255;
                 *op++ = (BYTE)(matchCode % 255);
             } else
@@ -1199,8 +1206,8 @@ FORCE_INLINE int LZ4_decompress_generic(
         if (length == ML_MASK) {
             unsigned s;
             do {
-                if ((endOnInput) && (ip > iend-LASTLITERALS)) goto _output_error;
                 s = *ip++;
+                if ((endOnInput) && (ip > iend-LASTLITERALS)) goto _output_error;
                 length += s;
             } while (s==255);
             if ((safeDecode) && unlikely((size_t)(op+length)<(size_t)op)) goto _output_error;   /* overflow detection */
