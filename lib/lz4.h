@@ -32,7 +32,8 @@
     - LZ4 homepage : http://www.lz4.org
     - LZ4 source repository : https://github.com/Cyan4973/lz4
 */
-#pragma once
+#ifndef LZ4_H_2983827168210
+#define LZ4_H_2983827168210
 
 #if defined (__cplusplus)
 extern "C" {
@@ -360,3 +361,5 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") int LZ4_decompress
 #if defined (__cplusplus)
 }
 #endif
+
+#endif /* LZ4_H_2983827168210 */
