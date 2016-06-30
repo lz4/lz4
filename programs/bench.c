@@ -381,6 +381,3 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
   return 0;
 }
-
-
-

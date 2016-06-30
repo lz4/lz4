@@ -55,7 +55,7 @@
 #endif
 
 
-/**************************************
+/*-************************************
 *  Basic Types
 **************************************/
 #if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
@@ -85,7 +85,7 @@ static void FUZ_writeLE32 (void* dstVoidPtr, U32 value32)
 }
 
 
-/**************************************
+/*-************************************
 *  Constants
 **************************************/
 #ifndef LZ4_VERSION
@@ -106,7 +106,7 @@ static const U32 prime2 = 2246822519U;
 
 
 
-/**************************************
+/*-************************************
 *  Macros
 **************************************/
 #define DISPLAY(...)          fprintf(stderr, __VA_ARGS__)
@@ -119,7 +119,7 @@ static const U32 refreshRate = 150;
 static U32 g_time = 0;
 
 
-/*****************************************
+/*-***************************************
 *  Local Parameters
 *****************************************/
 static U32 no_prompt = 0;
@@ -128,7 +128,7 @@ static U32 displayLevel = 2;
 static U32 pause = 0;
 
 
-/*********************************************************
+/*-*******************************************************
 *  Fuzzer functions
 *********************************************************/
 #if defined(FUZ_LEGACY_TIMER)
@@ -189,11 +189,9 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, unsigned bufferSize, d
     /* First Byte */
     BBuffer[pos++] = (BYTE)(FUZ_rand(seed));
 
-    while (pos < bufferSize)
-    {
+    while (pos < bufferSize) {
         /* Select : Literal (noise) or copy (within 64K) */
-        if (FUZ_RAND15BITS < P32)
-        {
+        if (FUZ_RAND15BITS < P32) {
             /* Copy (within 64K) */
             unsigned match, end;
             unsigned length = FUZ_RANDLENGTH + 4;
@@ -203,9 +201,7 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, unsigned bufferSize, d
             match = pos - offset;
             end = pos + length;
             while (pos < end) BBuffer[pos++] = BBuffer[match++];
-        }
-        else
-        {
+        } else {
             /* Literal (noise) */
             unsigned end;
             unsigned length = FUZ_RANDLENGTH;
@@ -221,8 +217,7 @@ static unsigned FUZ_highbit(U32 v32)
 {
     unsigned nbBits = 0;
     if (v32==0) return 0;
-    while (v32)
-    {
+    while (v32) {
         v32 >>= 1;
         nbBits ++;
     }
@@ -295,8 +290,7 @@ int basicTests(U32 seed, double compressibility)
             if (crcDest != crcOrig) goto _output_error;
         }
 
-        {
-            size_t oSize = 0;
+        {   size_t oSize = 0;
             size_t iSize = 0;
             LZ4F_frameInfo_t fi;
 
@@ -326,8 +320,7 @@ int basicTests(U32 seed, double compressibility)
         }
 
         DISPLAYLEVEL(3, "Byte after byte : \n");
-        while (ip < iend)
-        {
+        while (ip < iend) {
             size_t oSize = oend-op;
             size_t iSize = 1;
             errorCode = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL);
@@ -377,8 +370,7 @@ int basicTests(U32 seed, double compressibility)
         if (LZ4F_isError(errorCode)) goto _output_error;
 
         DISPLAYLEVEL(3, "random segment sizes : \n");
-        while (ip < iend)
-        {
+        while (ip < iend) {
             unsigned nbBits = FUZ_rand(&randState) % maxBits;
             size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
             size_t oSize = oend-op;
@@ -497,8 +489,7 @@ int basicTests(U32 seed, double compressibility)
         FUZ_writeLE32(ip+4, (U32)cSize);
 
         DISPLAYLEVEL(3, "random segment sizes : \n");
-        while (ip < iend)
-        {
+        while (ip < iend) {
             unsigned nbBits = FUZ_rand(&randState) % maxBits;
             size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
             size_t oSize = oend-op;
@@ -518,8 +509,7 @@ int basicTests(U32 seed, double compressibility)
         FUZ_writeLE32(ip+4, 0);
         iend = ip+8;
 
-        while (ip < iend)
-        {
+        while (ip < iend) {
             unsigned nbBits = FUZ_rand(&randState) % maxBits;
             size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
             size_t oSize = oend-op;
@@ -537,8 +527,7 @@ int basicTests(U32 seed, double compressibility)
         FUZ_writeLE32(ip, LZ4F_MAGIC_SKIPPABLE_START+2);
         FUZ_writeLE32(ip+4, 10);
         iend = ip+18;
-        while (ip < iend)
-        {
+        while (ip < iend) {
             size_t iSize = 10;
             size_t oSize = 10;
             if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
@@ -571,8 +560,7 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, un
     int p=0;
     const BYTE* b1=(const BYTE*)buff1;
     const BYTE* b2=(const BYTE*)buff2;
-    if (nonContiguous)
-    {
+    if (nonContiguous) {
         DISPLAY("Non-contiguous output test (%i bytes)\n", (int)size);
         return;
     }
@@ -599,7 +587,6 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 #   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
                             DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
 
-
     /* Init */
     duration *= 1000;
 
@@ -620,8 +607,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     for (testNb =0; (testNb < startTest); testNb++) (void)FUZ_rand(&coreRand);   // sync randomizer
 
     /* main fuzzer test loop */
-    for ( ; (testNb < nbTests) || (duration > FUZ_GetMilliSpan(startTime)) ; testNb++)
-    {
+    for ( ; (testNb < nbTests) || (duration > FUZ_GetMilliSpan(startTime)) ; testNb++) {
         U32 randState = coreRand ^ prime1;
         unsigned BSId   = 4 + (FUZ_rand(&randState) & 3);
         unsigned BMId   = FUZ_rand(&randState) & 1;
@@ -653,21 +639,16 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         DISPLAYUPDATE(2, "\r%5u   ", testNb);
         crcOrig = XXH64((BYTE*)srcBuffer+srcStart, srcSize, 1);
 
-        if ((FUZ_rand(&randState) & 0xFFF) == 0)
-        {
+        if ((FUZ_rand(&randState) & 0xFFF) == 0) {
             /* create a skippable frame (rare case) */
             BYTE* op = (BYTE*)compressedBuffer;
             FUZ_writeLE32(op, LZ4F_MAGIC_SKIPPABLE_START + (FUZ_rand(&randState) & 15));
             FUZ_writeLE32(op+4, (U32)srcSize);
             cSize = srcSize+8;
-        }
-        else if ((FUZ_rand(&randState) & 0xF) == 2)
-        {
+        } else if ((FUZ_rand(&randState) & 0xF) == 2) {
             cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(srcSize, prefsPtr), (char*)srcBuffer + srcStart, srcSize, prefsPtr);
             CHECK(LZ4F_isError(cSize), "LZ4F_compressFrame failed : error %i (%s)", (int)cSize, LZ4F_getErrorName(cSize));
-        }
-        else
-        {
+        } else {
             const BYTE* ip = (const BYTE*)srcBuffer + srcStart;
             const BYTE* const iend = ip + srcSize;
             BYTE* op = (BYTE*)compressedBuffer;
@@ -676,8 +657,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             result = LZ4F_compressBegin(cCtx, op, oend-op, prefsPtr);
             CHECK(LZ4F_isError(result), "Compression header failed (error %i)", (int)result);
             op += result;
-            while (ip < iend)
-            {
+            while (ip < iend) {
                 unsigned nbBitsSeg = FUZ_rand(&randState) % maxBits;
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsSeg)-1)) + 1;
                 size_t oSize = LZ4F_compressBound(iSize, prefsPtr);
@@ -690,8 +670,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 op += result;
                 ip += iSize;
 
-                if (forceFlush)
-                {
+                if (forceFlush) {
                     result = LZ4F_flush(cCtx, op, oend-op, &cOptions);
                     CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
                     op += result;
@@ -714,8 +693,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             nonContiguousDst += FUZ_rand(&randState) & nonContiguousDst;   /* 0=>0; 1=>1,2 */
             XXH64_reset(&xxh64, 1);
             if (maxBits < 3) maxBits = 3;
-            while (ip < iend)
-            {
+            while (ip < iend) {
                 unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
                 unsigned nbBitsO = (FUZ_rand(&randState) % (maxBits)) + 1;
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsI)-1)) + 1;
@@ -736,8 +714,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (nonContiguousDst==2) op = (BYTE*)decodedBuffer;   /* overwritten destination */
             }
             CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
-            if (totalOut)   /* otherwise, it's a skippable frame */
-            {
+            if (totalOut) {  /* otherwise, it's a skippable frame */
                 crcDecoded = XXH64_digest(&xxh64);
                 if (crcDecoded != crcOrig) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
                 CHECK(crcDecoded != crcOrig, "Decompression corruption");
@@ -754,8 +731,7 @@ _end:
     free(compressedBuffer);
     free(decodedBuffer);
 
-    if (pause)
-    {
+    if (pause) {
         DISPLAY("press enter to finish \n");
         (void)getchar();
     }
@@ -797,17 +773,14 @@ int main(int argc, char** argv)
 
     /* Check command line */
     programName = argv[0];
-    for(argNb=1; argNb<argc; argNb++)
-    {
+    for(argNb=1; argNb<argc; argNb++) {
         char* argument = argv[argNb];
 
         if(!argument) continue;   /* Protection if argument empty */
 
         /* Decode command (note : aggregated commands are allowed) */
-        if (argument[0]=='-')
-        {
-            if (!strcmp(argument, "--no-prompt"))
-            {
+        if (argument[0]=='-') {
+            if (!strcmp(argument, "--no-prompt")) {
                 no_prompt=1;
                 seedset=1;
                 displayLevel=1;
@@ -815,8 +788,7 @@ int main(int argc, char** argv)
             }
             argument++;
 
-            while (*argument!=0)
-            {
+            while (*argument!=0) {
                 switch(*argument)
                 {
                 case 'h':
@@ -837,8 +809,7 @@ int main(int argc, char** argv)
                 case 'i':
                     argument++;
                     nbTests=0; duration=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         nbTests *= 10;
                         nbTests += *argument - '0';
                         argument++;
@@ -848,8 +819,7 @@ int main(int argc, char** argv)
                 case 'T':
                     argument++;
                     nbTests = 0; duration = 0;
-                    for (;;)
-                    {
+                    for (;;) {
                         switch(*argument)
                         {
                             case 'm': duration *= 60; argument++; continue;
@@ -874,8 +844,7 @@ int main(int argc, char** argv)
                     argument++;
                     seed=0;
                     seedset=1;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         seed *= 10;
                         seed += *argument - '0';
                         argument++;
@@ -884,8 +853,7 @@ int main(int argc, char** argv)
                 case 't':
                     argument++;
                     testNb=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         testNb *= 10;
                         testNb += *argument - '0';
                         argument++;
@@ -894,8 +862,7 @@ int main(int argc, char** argv)
                 case 'P':   /* compressibility % */
                     argument++;
                     proba=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         proba *= 10;
                         proba += *argument - '0';
                         argument++;
