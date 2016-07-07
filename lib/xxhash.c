@@ -46,7 +46,7 @@
  * Method 2 : direct access. This method doesn't depend on compiler but violate C standard.
  *            It can generate buggy code on targets which do not support unaligned memory accesses.
  *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
- * See http://stackoverflow.com/a/32095106/646947 for details.
+ * See https://stackoverflow.com/a/32095106/646947 for details.
  * Prefer these methods in priority order (0 > 1 > 2)
  */
 #ifndef XXH_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
@@ -167,7 +167,7 @@ static U64 XXH_read64(const void* ptr) { return ((const unalign*)ptr)->u64; }
 #else
 
 /* portable and safe solution. Generally efficient.
- * see : http://stackoverflow.com/a/32095106/646947
+ * see : https://stackoverflow.com/a/32095106/646947
  */
 
 static U32 XXH_read32(const void* memPtr)
