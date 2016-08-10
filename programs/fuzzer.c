@@ -58,7 +58,7 @@
 #endif
 
 
-/**************************************
+/*-************************************
 *  Basic Types
 **************************************/
 #if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
@@ -77,7 +77,7 @@ typedef unsigned long long  U64;
 #endif
 
 
-/**************************************
+/*-************************************
 *  Constants
 **************************************/
 #ifndef LZ4_VERSION
@@ -98,7 +98,7 @@ typedef unsigned long long  U64;
 #define GB *(1U<<30)
 
 
-/*****************************************
+/*-***************************************
 *  Macros
 *****************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
@@ -108,7 +108,7 @@ static const U32 g_refreshRate = 250;
 static U32 g_time = 0;
 
 
-/*********************************************************
+/*-*******************************************************
 *  Fuzzer functions
 *********************************************************/
 #if defined(FUZ_LEGACY_TIMER)
@@ -388,7 +388,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         randState = coreRandState ^ PRIME3;
 
         /* Select block to test */
-        blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
+        blockSize  = (FUZ_rand(&randState) % (FUZ_MAX_BLOCK_SIZE-1)) + 1;
         blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
         dictSize   = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
         if (dictSize > blockStart) dictSize = blockStart;
