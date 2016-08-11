@@ -69,20 +69,64 @@ You can contact the author at :
 /*-************************************
 *  Basic Types
 **************************************/
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
+#if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
 # include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
+  typedef  uint8_t BYTE;
+  typedef uint16_t U16;
+  typedef uint32_t U32;
+  typedef  int32_t S32;
+  typedef uint64_t U64;
 #else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
+  typedef unsigned char       BYTE;
+  typedef unsigned short      U16;
+  typedef unsigned int        U32;
+  typedef   signed int        S32;
+  typedef unsigned long long  U64;
 #endif
+
+/* unoptimized version; solves endianess & alignment issues */
+static U32 LZ4F_readLE32 (const void* src)
+{
+    const BYTE* const srcPtr = (const BYTE*)src;
+    U32 value32 = srcPtr[0];
+    value32 += (srcPtr[1]<<8);
+    value32 += (srcPtr[2]<<16);
+    value32 += ((U32)srcPtr[3])<<24;
+    return value32;
+}
+
+static void LZ4F_writeLE32 (BYTE* dstPtr, U32 value32)
+{
+    dstPtr[0] = (BYTE)value32;
+    dstPtr[1] = (BYTE)(value32 >> 8);
+    dstPtr[2] = (BYTE)(value32 >> 16);
+    dstPtr[3] = (BYTE)(value32 >> 24);
+}
+
+static U64 LZ4F_readLE64 (const BYTE* srcPtr)
+{
+    U64 value64 = srcPtr[0];
+    value64 += ((U64)srcPtr[1]<<8);
+    value64 += ((U64)srcPtr[2]<<16);
+    value64 += ((U64)srcPtr[3]<<24);
+    value64 += ((U64)srcPtr[4]<<32);
+    value64 += ((U64)srcPtr[5]<<40);
+    value64 += ((U64)srcPtr[6]<<48);
+    value64 += ((U64)srcPtr[7]<<56);
+    return value64;
+}
+
+static void LZ4F_writeLE64 (BYTE* dstPtr, U64 value64)
+{
+    dstPtr[0] = (BYTE)value64;
+    dstPtr[1] = (BYTE)(value64 >> 8);
+    dstPtr[2] = (BYTE)(value64 >> 16);
+    dstPtr[3] = (BYTE)(value64 >> 24);
+    dstPtr[4] = (BYTE)(value64 >> 32);
+    dstPtr[5] = (BYTE)(value64 >> 40);
+    dstPtr[6] = (BYTE)(value64 >> 48);
+    dstPtr[7] = (BYTE)(value64 >> 56);
+}
 
 
 /*-************************************
@@ -182,50 +226,6 @@ static size_t LZ4F_getBlockSize(unsigned blockSizeID)
     blockSizeID -= 4;
     if (blockSizeID > 3) return (size_t)-LZ4F_ERROR_maxBlockSize_invalid;
     return blockSizes[blockSizeID];
-}
-
-
-/* unoptimized version; solves endianess & alignment issues */
-static U32 LZ4F_readLE32 (const BYTE* srcPtr)
-{
-    U32 value32 = srcPtr[0];
-    value32 += (srcPtr[1]<<8);
-    value32 += (srcPtr[2]<<16);
-    value32 += ((U32)srcPtr[3])<<24;
-    return value32;
-}
-
-static void LZ4F_writeLE32 (BYTE* dstPtr, U32 value32)
-{
-    dstPtr[0] = (BYTE)value32;
-    dstPtr[1] = (BYTE)(value32 >> 8);
-    dstPtr[2] = (BYTE)(value32 >> 16);
-    dstPtr[3] = (BYTE)(value32 >> 24);
-}
-
-static U64 LZ4F_readLE64 (const BYTE* srcPtr)
-{
-    U64 value64 = srcPtr[0];
-    value64 += ((U64)srcPtr[1]<<8);
-    value64 += ((U64)srcPtr[2]<<16);
-    value64 += ((U64)srcPtr[3]<<24);
-    value64 += ((U64)srcPtr[4]<<32);
-    value64 += ((U64)srcPtr[5]<<40);
-    value64 += ((U64)srcPtr[6]<<48);
-    value64 += ((U64)srcPtr[7]<<56);
-    return value64;
-}
-
-static void LZ4F_writeLE64 (BYTE* dstPtr, U64 value64)
-{
-    dstPtr[0] = (BYTE)value64;
-    dstPtr[1] = (BYTE)(value64 >> 8);
-    dstPtr[2] = (BYTE)(value64 >> 16);
-    dstPtr[3] = (BYTE)(value64 >> 24);
-    dstPtr[4] = (BYTE)(value64 >> 32);
-    dstPtr[5] = (BYTE)(value64 >> 40);
-    dstPtr[6] = (BYTE)(value64 >> 48);
-    dstPtr[7] = (BYTE)(value64 >> 56);
 }
 
 
@@ -722,24 +722,21 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
 }
 
 
-/*-*******************************
-*  Decompression functions
-**********************************/
+/*-***************************************************
+*   Frame Decompression
+*****************************************************/
 
 /* Resource management */
 
-/* LZ4F_createDecompressionContext() :
-* The first thing to do is to create a decompressionContext object, which will be used in all decompression operations.
-* This is achieved using LZ4F_createDecompressionContext().
-* The function will provide a pointer to a fully allocated and initialized LZ4F_decompressionContext object.
-* If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
-* Object can release its memory using LZ4F_freeDecompressionContext();
+/*! LZ4F_createDecompressionContext() :
+*   Create a decompressionContext object, which will track all decompression operations.
+*   Provides a pointer to a fully allocated and initialized LZ4F_decompressionContext object.
+*   Object can later be released using LZ4F_freeDecompressionContext().
+*   @return : if != 0, there was an error during context creation.
 */
 LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* LZ4F_decompressionContextPtr, unsigned versionNumber)
 {
-    LZ4F_dctx_t* dctxPtr;
-
-    dctxPtr = (LZ4F_dctx_t*)ALLOCATOR(sizeof(LZ4F_dctx_t));
+    LZ4F_dctx_t* const dctxPtr = (LZ4F_dctx_t*)ALLOCATOR(sizeof(LZ4F_dctx_t));
     if (dctxPtr==NULL) return (LZ4F_errorCode_t)-LZ4F_ERROR_GENERIC;
 
     dctxPtr->version = versionNumber;
@@ -750,7 +747,7 @@ LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* LZ
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t LZ4F_decompressionContext)
 {
     LZ4F_errorCode_t result = LZ4F_OK_NoError;
-    LZ4F_dctx_t* dctxPtr = (LZ4F_dctx_t*)LZ4F_decompressionContext;
+    LZ4F_dctx_t* const dctxPtr = (LZ4F_dctx_t*)LZ4F_decompressionContext;
     if (dctxPtr != NULL) {   /* can accept NULL input, like free() */
       result = (LZ4F_errorCode_t)dctxPtr->dStage;
       FREEMEM(dctxPtr->tmpIn);
@@ -777,12 +774,36 @@ typedef enum { dstage_getHeader=0, dstage_storeHeader,
 } dStage_t;
 
 
+/*! LZ4F_headerSize() :
+*   @return : size of frame header
+*             or an error code, which can be tested using LZ4F_isError()
+*/
+static size_t LZ4F_headerSize(const void* src, size_t srcSize)
+{
+    /* minimal srcSize to determine header size */
+    if (srcSize < 5) return (size_t)-LZ4F_ERROR_frameHeader_incomplete;
+
+    /* special case : skippable frames */
+    if ((LZ4F_readLE32(src) & 0xFFFFFFF0U) == LZ4F_MAGIC_SKIPPABLE_START) return 8;
+
+    /* control magic number */
+    if (LZ4F_readLE32(src) != LZ4F_MAGICNUMBER) return (size_t)-LZ4F_ERROR_frameType_unknown;
+
+    /* Frame Header Size */
+    {   BYTE const FLG = ((const BYTE*)src)[4];
+        U32 const contentSizeFlag = (FLG>>3) & _1BIT;
+        return contentSizeFlag ? maxFHSize : minFHSize;
+    }
+}
+
+
 /*! LZ4F_decodeHeader() :
-   return : nb Bytes read from srcVoidPtr (necessarily <= srcSize)
-            or an error code (testable with LZ4F_isError())
-   output : set internal values of dctx, such as
-            dctxPtr->frameInfo and dctxPtr->dStage.
-   input  : srcVoidPtr points at the **beginning of the frame**
+   input   : `srcVoidPtr` points at the **beginning of the frame**
+   output  : set internal values of dctx, such as
+             dctxPtr->frameInfo and dctxPtr->dStage.
+             Also allocates internal buffers.
+   @return : nb Bytes read from srcVoidPtr (necessarily <= srcSize)
+             or an error code (testable with LZ4F_isError())
 */
 static size_t LZ4F_decodeHeader(LZ4F_dctx_t* dctxPtr, const void* srcVoidPtr, size_t srcSize)
 {
@@ -887,14 +908,14 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_t* dctxPtr, const void* srcVoidPtr, si
 
 
 /*! LZ4F_getFrameInfo() :
-* This function decodes frame header information, such as blockSize.
-* It is optional : you could start by calling directly LZ4F_decompress() instead.
-* The objective is to extract header information without starting decompression, typically for allocation purposes.
-* LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
-* The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
-* You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
-* The function result is an hint of the better srcSize to use for next call to LZ4F_decompress,
-* or an error code which can be tested using LZ4F_isError().
+*   Decodes frame header information, such as blockSize.
+*   It is optional : you could start by calling directly LZ4F_decompress() instead.
+*   The objective is to extract header information without starting decompression, typically for allocation purposes.
+*   LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
+*   The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
+*   You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
+*   @return : hint of the better `srcSize` to use for next call to LZ4F_decompress,
+*             or an error code which can be tested using LZ4F_isError().
 */
 LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dCtx, LZ4F_frameInfo_t* frameInfoPtr,
                                    const void* srcBuffer, size_t* srcSizePtr)
@@ -902,16 +923,20 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dCtx, LZ4F_frameI
     LZ4F_dctx_t* dctxPtr = (LZ4F_dctx_t*)dCtx;
 
     if (dctxPtr->dStage > dstage_storeHeader) {  /* note : requires dstage_* header related to be at beginning of enum */
-        size_t o=0, i=0;
         /* frameInfo already decoded */
+        size_t o=0, i=0;
         *srcSizePtr = 0;
         *frameInfoPtr = dctxPtr->frameInfo;
-        return LZ4F_decompress(dCtx, NULL, &o, NULL, &i, NULL);
+        return LZ4F_decompress(dCtx, NULL, &o, NULL, &i, NULL);  /* returns : recommended nb of bytes for LZ4F_decompress() */
     } else {
-        size_t o=0;
-        size_t nextSrcSize = LZ4F_decompress(dCtx, NULL, &o, srcBuffer, srcSizePtr, NULL);
-        if (dctxPtr->dStage <= dstage_storeHeader)   /* note : requires dstage_* header related to be at beginning of enum */
-            return (size_t)-LZ4F_ERROR_frameHeader_incomplete;
+        size_t nextSrcSize, o=0;
+        size_t const hSize = LZ4F_headerSize(srcBuffer, *srcSizePtr);
+        if (LZ4F_isError(hSize)) { *srcSizePtr=0; return hSize; }
+        if (*srcSizePtr < hSize) { *srcSizePtr=0; return (size_t)-LZ4F_ERROR_frameHeader_incomplete; }
+
+        *srcSizePtr = hSize;
+        nextSrcSize = LZ4F_decompress(dCtx, NULL, &o, srcBuffer, srcSizePtr, NULL);
+        if (dctxPtr->dStage <= dstage_storeHeader) return (size_t)-LZ4F_ERROR_frameHeader_incomplete; /* should not happen, already checked */
         *frameInfoPtr = dctxPtr->frameInfo;
         return nextSrcSize;
     }
@@ -1038,16 +1063,16 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
         {
 
         case dstage_getHeader:
-            {   if ((size_t)(srcEnd-srcPtr) >= maxFHSize) {  /* enough to decode - shortcut */
-                    LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, srcPtr, srcEnd-srcPtr);
-                    if (LZ4F_isError(errorCode)) return errorCode;
-                    srcPtr += errorCode;
-                    break;
-                }
-                dctxPtr->tmpInSize = 0;
-                dctxPtr->tmpInTarget = minFHSize;   /* minimum to attempt decode */
-                dctxPtr->dStage = dstage_storeHeader;
+            if ((size_t)(srcEnd-srcPtr) >= maxFHSize) {  /* enough to decode - shortcut */
+                LZ4F_errorCode_t const hSize = LZ4F_decodeHeader(dctxPtr, srcPtr, srcEnd-srcPtr);
+                if (LZ4F_isError(hSize)) return hSize;
+                srcPtr += hSize;
+                break;
             }
+            dctxPtr->tmpInSize = 0;
+            dctxPtr->tmpInTarget = minFHSize;   /* minimum to attempt decode */
+            dctxPtr->dStage = dstage_storeHeader;
+            /* pass-through */
 
         case dstage_storeHeader:
             {   size_t sizeToCopy = dctxPtr->tmpInTarget - dctxPtr->tmpInSize;
@@ -1060,8 +1085,8 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                     doAnotherStage = 0;   /* not enough src data, ask for some more */
                     break;
                 }
-                {   LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, dctxPtr->header, dctxPtr->tmpInTarget);
-                    if (LZ4F_isError(errorCode)) return errorCode;
+                {   LZ4F_errorCode_t const hSize = LZ4F_decodeHeader(dctxPtr, dctxPtr->header, dctxPtr->tmpInTarget);
+                    if (LZ4F_isError(hSize)) return hSize;
                 }
                 break;
             }
@@ -1076,7 +1101,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 dctxPtr->dStage = dstage_storeCBlockSize;
             }
 
-            if (dctxPtr->dStage == dstage_storeCBlockSize)
+            if (dctxPtr->dStage == dstage_storeCBlockSize)   /* can be skipped */
         case dstage_storeCBlockSize:
             {
                 size_t sizeToCopy = BHSize - dctxPtr->tmpInSize;
@@ -1084,7 +1109,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 memcpy(dctxPtr->tmpIn + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dctxPtr->tmpInSize += sizeToCopy;
-                if (dctxPtr->tmpInSize < BHSize) { /* not enough input to get full cBlockSize; wait for more */
+                if (dctxPtr->tmpInSize < BHSize) {   /* not enough input to get full cBlockSize; wait for more */
                     nextSrcSizeHint = BHSize - dctxPtr->tmpInSize;
                     doAnotherStage  = 0;
                     break;
@@ -1093,7 +1118,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
             }
 
         /* case dstage_decodeCBlockSize: */   /* no more direct access, to prevent scan-build warning */
-            {   size_t nextCBlockSize = LZ4F_readLE32(selectedIn) & 0x7FFFFFFFU;
+            {   size_t const nextCBlockSize = LZ4F_readLE32(selectedIn) & 0x7FFFFFFFU;
                 if (nextCBlockSize==0) {  /* frameEnd signal, no more CBlock */
                     dctxPtr->dStage = dstage_getSuffix;
                     break;
@@ -1137,8 +1162,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
             }
 
         case dstage_getCBlock:   /* entry from dstage_decodeCBlockSize */
-            if ((size_t)(srcEnd-srcPtr) < dctxPtr->tmpInTarget)
-            {
+            if ((size_t)(srcEnd-srcPtr) < dctxPtr->tmpInTarget) {
                 dctxPtr->tmpInSize = 0;
                 dctxPtr->dStage = dstage_storeCBlock;
                 break;
@@ -1253,7 +1277,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
             }
 
         case dstage_getSuffix:
-            {   size_t suffixSize = dctxPtr->frameInfo.contentChecksumFlag * 4;
+            {   size_t const suffixSize = dctxPtr->frameInfo.contentChecksumFlag * 4;
                 if (dctxPtr->frameRemainingSize) return (size_t)-LZ4F_ERROR_frameSize_wrong;   /* incorrect frame size decoded */
                 if (suffixSize == 0) {  /* frame completed */
                     nextSrcSizeHint = 0;
@@ -1270,7 +1294,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 }
             }
 
-            if (dctxPtr->dStage == dstage_storeSuffix)
+            if (dctxPtr->dStage == dstage_storeSuffix)   /* can be skipped */
         case dstage_storeSuffix:
             {
                 size_t sizeToCopy = 4 - dctxPtr->tmpInSize;

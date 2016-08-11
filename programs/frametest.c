@@ -217,10 +217,7 @@ static unsigned FUZ_highbit(U32 v32)
 {
     unsigned nbBits = 0;
     if (v32==0) return 0;
-    while (v32) {
-        v32 >>= 1;
-        nbBits ++;
-    }
+    while (v32) v32 >>= 1, nbBits ++;
     return nbBits;
 }
 
@@ -246,16 +243,37 @@ int basicTests(U32 seed, double compressibility)
     FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
     crcOrig = XXH64(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
 
+    /* Special case : null-content frame */
+    testSize = 0;
+    DISPLAYLEVEL(3, "LZ4F_compressFrame, compress null content : \n");
+    cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
+    if (LZ4F_isError(cSize)) goto _output_error;
+    DISPLAYLEVEL(3, "Compressed null content into a %i bytes frame \n", (int)cSize);
+
+    DISPLAYLEVEL(3, "LZ4F_createDecompressionContext \n");
+    { LZ4F_errorCode_t const errorCode = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
+      if (LZ4F_isError(errorCode)) goto _output_error; }
+
+    DISPLAYLEVEL(3, "LZ4F_getFrameInfo on null-content frame (#157) \n");
+    {   size_t avail_in = cSize;
+        LZ4F_frameInfo_t frame_info;
+        LZ4F_errorCode_t const errorCode = LZ4F_getFrameInfo(dCtx, &frame_info, compressedBuffer, &avail_in);
+        if (LZ4F_isError(errorCode)) goto _output_error;
+    }
+
+    DISPLAYLEVEL(3, "LZ4F_freeDecompressionContext \n");
+    { LZ4F_errorCode_t const errorCode = LZ4F_freeDecompressionContext(dCtx);
+      if (LZ4F_isError(errorCode)) goto _output_error; }
+
     /* Trivial tests : one-step frame */
     testSize = COMPRESSIBLE_NOISE_LENGTH;
-    DISPLAYLEVEL(3, "Using NULL preferences : \n");
+    DISPLAYLEVEL(3, "LZ4F_compressFrame, using default preferences : \n");
     cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
     if (LZ4F_isError(cSize)) goto _output_error;
     DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
 
     DISPLAYLEVEL(3, "Decompression test : \n");
-    {
-        size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
+    {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
         size_t compressedBufferSize = cSize;
         BYTE* op = (BYTE*)decodedBuffer;
         BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
@@ -273,19 +291,19 @@ int basicTests(U32 seed, double compressibility)
         if (crcDest != crcOrig) goto _output_error;
         DISPLAYLEVEL(3, "Regenerated %i bytes \n", (int)decodedBufferSize);
 
-        DISPLAYLEVEL(4, "Reusing decompression context \n");
-        {
-            size_t iSize = compressedBufferSize - 4;
+        DISPLAYLEVEL(3, "Reusing decompression context \n");
+        {   size_t iSize = compressedBufferSize - 4;
             const BYTE* cBuff = (const BYTE*) compressedBuffer;
+            size_t decResult;
             DISPLAYLEVEL(3, "Missing last 4 bytes : ");
-            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, cBuff, &iSize, NULL);
-            if (LZ4F_isError(errorCode)) goto _output_error;
-            if (!errorCode) goto _output_error;
-            DISPLAYLEVEL(3, "indeed, request %u bytes \n", (unsigned)errorCode);
+            decResult = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, cBuff, &iSize, NULL);
+            if (LZ4F_isError(decResult)) goto _output_error;
+            if (!decResult) goto _output_error;   /* not finished */
+            DISPLAYLEVEL(3, "indeed, request %u bytes \n", (unsigned)decResult);
             cBuff += iSize;
-            iSize = errorCode;
-            errorCode = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, cBuff, &iSize, NULL);
-            if (errorCode != 0) goto _output_error;
+            iSize = decResult;
+            decResult = LZ4F_decompress(dCtx, decodedBuffer, &decodedBufferSize, cBuff, &iSize, NULL);
+            if (decResult != 0) goto _output_error;   /* should finish now */
             crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
             if (crcDest != crcOrig) goto _output_error;
         }
@@ -357,8 +375,7 @@ int basicTests(U32 seed, double compressibility)
     DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
 
     DISPLAYLEVEL(3, "Decompression test : \n");
-    {
-        size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
+    {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
         unsigned maxBits = FUZ_highbit((U32)decodedBufferSize);
         BYTE* op = (BYTE*)decodedBuffer;
         BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
@@ -421,8 +438,7 @@ int basicTests(U32 seed, double compressibility)
     if (LZ4F_isError(cSize)) goto _output_error;
     DISPLAYLEVEL(3, "Compressed %i bytes into a %i bytes frame \n", (int)testSize, (int)cSize);
 
-    {
-        size_t errorCode;
+    {   size_t errorCode;
         BYTE* const ostart = (BYTE*)compressedBuffer;
         BYTE* op = ostart;
         errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
@@ -473,8 +489,7 @@ int basicTests(U32 seed, double compressibility)
     }
 
     DISPLAYLEVEL(3, "Skippable frame test : \n");
-    {
-        size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
+    {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
         unsigned maxBits = FUZ_highbit((U32)decodedBufferSize);
         BYTE* op = (BYTE*)decodedBuffer;
         BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
@@ -682,8 +697,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             cSize = op-(BYTE*)compressedBuffer;
         }
 
-        {
-            const BYTE* ip = (const BYTE*)compressedBuffer;
+        {   const BYTE* ip = (const BYTE*)compressedBuffer;
             const BYTE* const iend = ip + cSize;
             BYTE* op = (BYTE*)decodedBuffer;
             BYTE* const oend = op + srcDataLength;

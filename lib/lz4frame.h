@@ -44,13 +44,13 @@
 extern "C" {
 #endif
 
-/**************************************
+/*-************************************
 *  Includes
 **************************************/
 #include <stddef.h>   /* size_t */
 
 
-/**************************************
+/*-************************************
 *  Error management
 **************************************/
 typedef size_t LZ4F_errorCode_t;
@@ -59,7 +59,7 @@ unsigned    LZ4F_isError(LZ4F_errorCode_t code);
 const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return error code string; useful for debugging */
 
 
-/**************************************
+/*-************************************
 *  Frame compression types
 **************************************/
 //#define LZ4F_DISABLE_OBSOLETE_ENUMS
@@ -125,7 +125,7 @@ typedef struct {
 } LZ4F_preferences_t;
 
 
-/***********************************
+/*-*********************************
 *  Simple compression function
 ***********************************/
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
@@ -143,7 +143,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuf
 
 
 
-/**********************************
+/*-********************************
 *  Advanced compression functions
 **********************************/
 typedef struct LZ4F_cctx_s* LZ4F_compressionContext_t;   /* must be aligned on 8-bytes */
