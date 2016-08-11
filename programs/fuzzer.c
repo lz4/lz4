@@ -203,6 +203,10 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
 
 #define MAX_NB_BUFF_I134 150
 #define BLOCKSIZE_I134   (32 MB)
+/*! FUZ_AddressOverflow() :
+*   Aggressively pushes memory allocation limits,
+*   and generates patterns which create address space overflow.
+*   only possible in 32-bits mode */
 static int FUZ_AddressOverflow(void)
 {
     char* buffers[MAX_NB_BUFF_I134+1];
@@ -221,54 +225,49 @@ static int FUZ_AddressOverflow(void)
 
     buffers[0] = (char*)malloc(BLOCKSIZE_I134);
     buffers[1] = (char*)malloc(BLOCKSIZE_I134);
-    if ((!buffers[0]) || (!buffers[1]))
-    {
+    if ((!buffers[0]) || (!buffers[1])) {
         DISPLAY("not enough memory for tests \n");
         return 0;
     }
 
-    for (nbBuff=2; nbBuff < MAX_NB_BUFF_I134; nbBuff++)
-    {
+    for (nbBuff=2; nbBuff < MAX_NB_BUFF_I134; nbBuff++) {
         DISPLAY("%3i \b\b\b\b", nbBuff);
         buffers[nbBuff] = (char*)malloc(BLOCKSIZE_I134);
         if (buffers[nbBuff]==NULL) goto _endOfTests;
-        //DISPLAY("%08X ", (U32)(size_t)(buffers[nbBuff])); fflush(stdout);
 
-        if (((size_t)buffers[nbBuff] > (size_t)0x80000000) && (!highAddress))
-        {
+        if (((size_t)buffers[nbBuff] > (size_t)0x80000000) && (!highAddress)) {
             DISPLAY("high address detected : ");
             fflush(stdout);
             highAddress=1;
         }
 
-        {
-            size_t sizeToGenerateOverflow = (size_t)(- ((size_t)buffers[nbBuff-1]) + 512);
-            int nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
-            char* input = buffers[nbBuff-1];
+        {   size_t const sizeToGenerateOverflow = (size_t)(- ((size_t)buffers[nbBuff-1]) + 512);
+            int const nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
+            char* const input = buffers[nbBuff-1];
             char* output = buffers[nbBuff];
             int r;
-            input[0] = (char)0xF0;   // Literal length overflow
+            input[0] = (char)0xF0;   /* Literal length overflow */
             input[1] = (char)0xFF;
             input[2] = (char)0xFF;
             input[3] = (char)0xFF;
             for(i = 4; i <= nbOf255+4; i++) input[i] = (char)0xff;
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
             if (r>0) goto _overflowError;
-            input[0] = (char)0x1F;   // Match length overflow
+            input[0] = (char)0x1F;   /* Match length overflow */
             input[1] = (char)0x01;
             input[2] = (char)0x01;
             input[3] = (char)0x00;
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
             if (r>0) goto _overflowError;
 
-            output = buffers[nbBuff-2];   // Reverse in/out pointer order
-            input[0] = (char)0xF0;   // Literal length overflow
+            output = buffers[nbBuff-2];   /* Reverse in/out pointer order */
+            input[0] = (char)0xF0;   /* Literal length overflow */
             input[1] = (char)0xFF;
             input[2] = (char)0xFF;
             input[3] = (char)0xFF;
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
             if (r>0) goto _overflowError;
-            input[0] = (char)0x1F;   // Match length overflow
+            input[0] = (char)0x1F;   /* Match length overflow */
             input[1] = (char)0x01;
             input[2] = (char)0x01;
             input[3] = (char)0x00;
@@ -292,8 +291,7 @@ _overflowError:
 
 static void FUZ_displayUpdate(unsigned testNb)
 {
-    if ((FUZ_GetMilliSpan(g_time) > g_refreshRate) || (g_displayLevel>=3))
-    {
+    if ((FUZ_GetMilliSpan(g_time) > g_refreshRate) | (g_displayLevel>=3)) {
         g_time = FUZ_GetMilliStart();
         DISPLAY("\r%5u   ", testNb);
         if (g_displayLevel>=3) fflush(stdout);
@@ -301,10 +299,16 @@ static void FUZ_displayUpdate(unsigned testNb)
 }
 
 
+/*! FUZ_findDiff() :
+*   find the first different byte between buff1 and buff2.
+*   presumes buff1 != buff2.
+*   presumes a difference exists before end of either buffer.
+*   Typically invoked after a checksum mismatch.
+*/
 static void FUZ_findDiff(const void* buff1, const void* buff2)
 {
-    const BYTE* b1 = (const BYTE*)buff1;
-    const BYTE* b2 = (const BYTE*)buff2;
+    const BYTE* const b1 = (const BYTE*)buff1;
+    const BYTE* const b2 = (const BYTE*)buff2;
     size_t i=0;
     while (b1[i]==b2[i]) i++;
     DISPLAY("Wrong Byte at position %u\n", (unsigned)i);
@@ -348,12 +352,10 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     decodedBuffer = (char*)malloc(FUZ_MAX_DICT_SIZE + FUZ_MAX_BLOCK_SIZE);
 
     /* move to startCycle */
-    for (cycleNb = 0; cycleNb < startCycle; cycleNb++)
-    {
+    for (cycleNb = 0; cycleNb < startCycle; cycleNb++) {
         (void)FUZ_rand(&coreRandState);
 
-        if (0)   /* some problems are related to dictionary re-use; in this case, enable this loop */
-        {
+        if (0) {   /* some problems can be related to dictionary re-use; in this case, enable this loop */
             int dictSize, blockSize, blockStart;
             char* dict;
             char* block;
@@ -371,12 +373,10 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             LZ4_compress_continue(&LZ4dict, block, compressedBuffer, blockSize);
-        }
-    }
+    }   }
 
     /* Main test loop */
-    for (cycleNb = startCycle; (cycleNb < nbCycles) || (FUZ_GetMilliSpan(startTime) < duration) ; cycleNb++)
-    {
+    for (cycleNb = startCycle; (cycleNb < nbCycles) || (FUZ_GetMilliSpan(startTime) < duration) ; cycleNb++) {
         U32 testNb = 0;
         char* dict;
         char* block;
@@ -399,8 +399,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test compression destSize */
         FUZ_DISPLAYTEST;
-        {
-            int srcSize = blockSize;
+        {   int srcSize = blockSize;
             int targetSize = srcSize * ((FUZ_rand(&randState) & 127)+1) >> 7;
             char endCheck = FUZ_rand(&randState) & 255;
             compressedBuffer[targetSize] = endCheck;
@@ -409,8 +408,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compress_destSize() overwrite dst buffer !");
             FUZ_CHECKTEST(srcSize > blockSize, "LZ4_compress_destSize() fed more than src buffer !");
             DISPLAYLEVEL(5, "destSize : %7i/%7i; content%7i/%7i ", ret, targetSize, srcSize, blockSize);
-            if (targetSize>0)
-            {
+            if (targetSize>0) {
                 FUZ_CHECKTEST((ret==0), "LZ4_compress_destSize() compression failed");
                 /* check correctness */
                 FUZ_DISPLAYTEST;
@@ -563,8 +561,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test compression with missing bytes into output buffer => must fail */
         FUZ_DISPLAYTEST;
-        {
-            int missingBytes = (FUZ_rand(&randState) % 0x3F) + 1;
+        {   int missingBytes = (FUZ_rand(&randState) % 0x3F) + 1;
             if (missingBytes >= compressedSize) missingBytes = compressedSize-1;
             missingBytes += !missingBytes;   /* avoid special case missingBytes==0 */
             compressedBuffer[compressedSize-missingBytes] = 0;
@@ -575,8 +572,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test HC compression with missing bytes into output buffer => must fail */
         FUZ_DISPLAYTEST;
-        {
-            int missingBytes = (FUZ_rand(&randState) % 0x3F) + 1;
+        {   int missingBytes = (FUZ_rand(&randState) % 0x3F) + 1;
             if (missingBytes >= HCcompressedSize) missingBytes = HCcompressedSize-1;
             missingBytes += !missingBytes;   /* avoid special case missingBytes==0 */
             compressedBuffer[HCcompressedSize-missingBytes] = 0;
@@ -586,14 +582,13 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         }
 
 
-        /********************/
+        /*-******************/
         /* Dictionary tests */
-        /********************/
+        /*-******************/
 
         /* Compress using dictionary */
         FUZ_DISPLAYTEST;
-        {
-            LZ4_stream_t LZ4_stream;
+        {   LZ4_stream_t LZ4_stream;
             LZ4_resetStream(&LZ4_stream);
             LZ4_compress_continue (&LZ4_stream, dict, compressedBuffer, dictSize);   /* Just to fill hash tables */
             blockContinueCompressedSize = LZ4_compress_continue (&LZ4_stream, block, compressedBuffer, blockSize);
@@ -606,8 +601,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         ret = LZ4_decompress_fast_usingDict(compressedBuffer, decodedBuffer+dictSize, blockSize, decodedBuffer, dictSize);
         FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_decompress_fast_withPrefix64k did not read all compressed block input");
         crcCheck = XXH32(decodedBuffer+dictSize, blockSize, 0);
-        if (crcCheck!=crcOrig)
-        {
+        if (crcCheck!=crcOrig) {
             int i=0;
             while (block[i]==decodedBuffer[i]) i++;
             printf("Wrong Byte at position %i/%i\n", i, blockSize);
@@ -672,16 +666,13 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_safe_usingDict overrun specified output buffer size");
 
         FUZ_DISPLAYTEST;
-        {
-            U32 missingBytes = (FUZ_rand(&randState) & 0xF) + 2;
-            if ((U32)blockSize > missingBytes)
-            {
+        {   U32 const missingBytes = (FUZ_rand(&randState) & 0xF) + 2;
+            if ((U32)blockSize > missingBytes) {
                 decodedBuffer[blockSize-missingBytes] = 0;
                 ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize-missingBytes, dict, dictSize);
                 FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : output buffer too small (-%u byte)", missingBytes);
                 FUZ_CHECKTEST(decodedBuffer[blockSize-missingBytes], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-%u byte) (blockSize=%i)", missingBytes, blockSize);
-            }
-        }
+        }   }
 
         /* Compress HC using External dictionary */
         FUZ_DISPLAYTEST;
@@ -768,8 +759,7 @@ static void FUZ_unitTests(void)
     FUZ_AddressOverflow();
 
     /* LZ4 streaming tests */
-    {
-        LZ4_stream_t* statePtr;
+    {   LZ4_stream_t* statePtr;
         LZ4_stream_t  streamingState;
         U64 crcOrig;
         U64 crcNew;
@@ -792,8 +782,7 @@ static void FUZ_unitTests(void)
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
 
         /* ring buffer test */
-        {
-            XXH64_state_t xxhOrig;
+        {   XXH64_state_t xxhOrig;
             XXH64_state_t xxhNew;
             LZ4_streamDecode_t decodeState;
             const U32 maxMessageSizeLog = 10;
@@ -809,8 +798,7 @@ static void FUZ_unitTests(void)
             LZ4_resetStream(&streamingState);
             LZ4_setStreamDecode(&decodeState, NULL, 0);
 
-            while (iNext + messageSize < testCompressedSize)
-            {
+            while (iNext + messageSize < testCompressedSize) {
                 XXH64_update(&xxhOrig, testInput + iNext, messageSize);
                 crcOrig = XXH64_digest(&xxhOrig);
 
@@ -837,8 +825,7 @@ static void FUZ_unitTests(void)
     }
 
     /* LZ4 HC streaming tests */
-    {
-        LZ4_streamHC_t* sp;
+    {   LZ4_streamHC_t* sp;
         LZ4_streamHC_t  sHC;
         U64 crcOrig;
         U64 crcNew;
@@ -873,8 +860,7 @@ static void FUZ_unitTests(void)
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() simple dictionary decompression test : corruption");
 
         /* multiple HC compression test with dictionary */
-        {
-            int result1, result2;
+        {   int result1, result2;
             int segSize = testCompressedSize / 2;
             crcOrig = XXH64(testInput + segSize, testCompressedSize, 0);
             LZ4_resetStreamHC(&sHC, 0);
@@ -905,8 +891,7 @@ static void FUZ_unitTests(void)
         FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() decompression corruption");
 
         /* multiple HC compression with ext. dictionary */
-        {
-            XXH64_state_t crcOrigState;
+        {   XXH64_state_t crcOrigState;
             XXH64_state_t crcNewState;
             const char* dict = testInput + 3;
             int dictSize = (FUZ_rand(&randState) & 8191);
@@ -922,8 +907,7 @@ static void FUZ_unitTests(void)
             XXH64_reset(&crcOrigState, 0);
             XXH64_reset(&crcNewState, 0);
 
-            while (segStart + segSize < testInputSize)
-            {
+            while (segStart + segSize < testInputSize) {
                 XXH64_update(&crcOrigState, testInput + segStart, segSize);
                 crcOrig = XXH64_digest(&crcOrigState);
                 result = LZ4_compressHC_limitedOutput_continue(&sHC, testInput + segStart, testCompressed, segSize, LZ4_compressBound(segSize));
@@ -933,8 +917,7 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe_usingDict() dictionary decompression part %i failed", segNb);
                 XXH64_update(&crcNewState, dst, segSize);
                 crcNew = XXH64_digest(&crcNewState);
-                if (crcOrig!=crcNew)
-                {
+                if (crcOrig!=crcNew) {
                     size_t c=0;
                     while (dst[c] == testInput[segStart+c]) c++;
                     DISPLAY("Bad decompression at %u / %u \n", (U32)c, (U32)segSize);
@@ -954,8 +937,7 @@ static void FUZ_unitTests(void)
         }
 
         /* ring buffer test */
-        {
-            XXH64_state_t xxhOrig;
+        {   XXH64_state_t xxhOrig;
             XXH64_state_t xxhNew;
             LZ4_streamDecode_t decodeState;
             const U32 maxMessageSizeLog = 10;
@@ -971,8 +953,7 @@ static void FUZ_unitTests(void)
             LZ4_resetStreamHC(&sHC, 0);
             LZ4_setStreamDecode(&decodeState, NULL, 0);
 
-            while (iNext + messageSize < testCompressedSize)
-            {
+            while (iNext + messageSize < testCompressedSize) {
                 XXH64_update(&xxhOrig, testInput + iNext, messageSize);
                 crcOrig = XXH64_digest(&xxhOrig);
 
@@ -987,7 +968,7 @@ static void FUZ_unitTests(void)
                 crcNew = XXH64_digest(&xxhNew);
                 FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
 
-                // prepare next message
+                /* prepare next message */
                 iNext += messageSize;
                 rNext += messageSize;
                 dNext += messageSize;
@@ -998,8 +979,7 @@ static void FUZ_unitTests(void)
         }
 
         /* small decoder-side ring buffer test */
-        {
-            XXH64_state_t xxhOrig;
+        {   XXH64_state_t xxhOrig;
             XXH64_state_t xxhNew;
             LZ4_streamDecode_t decodeState;
             const U32 maxMessageSizeLog = 12;
@@ -1042,8 +1022,7 @@ static void FUZ_unitTests(void)
                 memcpy(testInput + iNext, testInput + 8, messageSize);
                 if (dNext > dBufferSize) dNext = 0;
 
-            while (totalMessageSize < 9 MB)
-            {
+            while (totalMessageSize < 9 MB) {
                 XXH64_update(&xxhOrig, testInput + iNext, messageSize);
                 crcOrig = XXH64_digest(&xxhOrig);
 
@@ -1107,20 +1086,17 @@ int main(int argc, char** argv)
     U32 duration = 0;
 
     /* Check command line */
-    for(argNb=1; argNb<argc; argNb++)
-    {
+    for(argNb=1; argNb<argc; argNb++) {
         char* argument = argv[argNb];
 
         if(!argument) continue;   // Protection if argument empty
 
         // Decode command (note : aggregated commands are allowed)
-        if (argument[0]=='-')
-        {
+        if (argument[0]=='-') {
             if (!strcmp(argument, "--no-prompt")) { pause=0; seedset=1; g_displayLevel=1; continue; }
             argument++;
 
-            while (*argument!=0)
-            {
+            while (*argument!=0) {
                 switch(*argument)
                 {
                 case 'h':   /* display help */
@@ -1139,8 +1115,7 @@ int main(int argc, char** argv)
                 case 'i':
                     argument++;
                     nbTests = 0; duration = 0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         nbTests *= 10;
                         nbTests += *argument - '0';
                         argument++;
@@ -1150,8 +1125,7 @@ int main(int argc, char** argv)
                 case 'T':
                     argument++;
                     nbTests = 0; duration = 0;
-                    for (;;)
-                    {
+                    for (;;) {
                         switch(*argument)
                         {
                             case 'm': duration *= 60; argument++; continue;
@@ -1175,8 +1149,7 @@ int main(int argc, char** argv)
                 case 's':
                     argument++;
                     seed=0; seedset=1;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         seed *= 10;
                         seed += *argument - '0';
                         argument++;
@@ -1186,8 +1159,7 @@ int main(int argc, char** argv)
                 case 't':   /* select starting test nb */
                     argument++;
                     testNb=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         testNb *= 10;
                         testNb += *argument - '0';
                         argument++;
@@ -1197,8 +1169,7 @@ int main(int argc, char** argv)
                 case 'P':  /* change probability */
                     argument++;
                     proba=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
+                    while ((*argument>='0') && (*argument<='9')) {
                         proba *= 10;
                         proba += *argument - '0';
                         argument++;
@@ -1222,10 +1193,8 @@ int main(int argc, char** argv)
 
     if (nbTests<=0) nbTests=1;
 
-    {
-        int result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
-        if (pause)
-        {
+    {   int const result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
+        if (pause) {
             DISPLAY("press enter ... \n");
             (void)getchar();
         }
