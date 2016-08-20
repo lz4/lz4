@@ -51,18 +51,18 @@ VOID = /dev/null
 endif
 
 
-.PHONY: default all lib lz4programs clean test versionsTest examples
+.PHONY: default all lib lz4 clean test versionsTest examples
 
-default: lz4programs
+default: lz4
 
-all: lib lz4programs
+all: lib lz4
 
 lib:
 	@$(MAKE) -C $(LZ4DIR) all
 
-lz4programs:
+lz4:
 	@$(MAKE) -C $(PRGDIR)
-	cp $(PRGDIR)/lz4 .
+	@cp $(PRGDIR)/lz4 .
 
 clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
