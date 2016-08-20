@@ -41,8 +41,11 @@ extern "C" {
 
 /*
  * lz4.h provides block compression functions. It gives full buffer control to user.
- * For inter-operable compressed data, respecting LZ4 frame specification,
- * and can let the library handle its own memory, use lz4frame.h instead.
+ * Block compression functions are not-enough to send information,
+ * since it's still necessary to provide metadata (such as compressed size),
+ * and each application can do it in whichever way it wants.
+ * For interoperability, there is LZ4 frame specification (lz4_Frame_format.md).
+ * A library is provided to take care of it, see lz4frame.h.
 */
 
 /*-************************************
@@ -60,6 +63,7 @@ int LZ4_versionNumber (void);
 #define LZ4_VERSION_STRING LZ4_XSTR(LZ4_VERSION_MAJOR) "." \
 	LZ4_XSTR(LZ4_VERSION_MINOR) "." LZ4_XSTR(LZ4_VERSION_RELEASE)
 const char* LZ4_versionString (void);
+
 
 /*-************************************
 *  Tuning parameter
@@ -208,7 +212,7 @@ typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
  */
 void LZ4_resetStream (LZ4_stream_t* streamPtr);
 
-/*! LZ4_createStream() will allocate and initialize an `LZ4_stream_t` structure
+/*! LZ4_createStream() will allocate and initialize an `LZ4_stream_t` structure.
  *  LZ4_freeStream() releases its memory.
  *  In the context of a DLL (liblz4), please use these methods rather than the static struct.
  *  They are more future proof, in case of a change of `LZ4_stream_t` size.
@@ -234,11 +238,11 @@ int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, int dictSize)
 int LZ4_compress_fast_continue (LZ4_stream_t* streamPtr, const char* src, char* dst, int srcSize, int maxDstSize, int acceleration);
 
 /*! LZ4_saveDict() :
- *  If previously compressed data block is not guaranteed to remain available at its memory location
- *  save it into a safer place (char* safeBuffer)
+ *  If previously compressed data block is not guaranteed to remain available at its memory location,
+ *  save it into a safer place (char* safeBuffer).
  *  Note : you don't need to call LZ4_loadDict() afterwards,
- *         dictionary is immediately usable, you can therefore call LZ4_compress_fast_continue()
- *  Return : saved dictionary size in bytes (necessarily <= dictSize), or 0 if error
+ *         dictionary is immediately usable, you can therefore call LZ4_compress_fast_continue().
+ *  Return : saved dictionary size in bytes (necessarily <= dictSize), or 0 if error.
  */
 int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dictSize);
 
@@ -263,11 +267,10 @@ typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_strea
 LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
-/*
- * LZ4_setStreamDecode
- * Use this function to instruct where to find the dictionary.
- * Setting a size of 0 is allowed (same effect as reset).
- * Return : 1 if OK, 0 if error
+/*! LZ4_setStreamDecode() :
+ *  Use this function to instruct where to find the dictionary.
+ *  Setting a size of 0 is allowed (same effect as reset).
+ *  @return : 1 if OK, 0 if error
  */
 int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
 
@@ -303,7 +306,7 @@ int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compresse
 int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
 
 
-/**************************************
+/*=************************************
 *  Obsolete Functions
 **************************************/
 /* Deprecate Warnings */
