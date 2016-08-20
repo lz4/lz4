@@ -1238,8 +1238,11 @@ FORCE_INLINE int LZ4_decompress_generic(
             }
             while (op<cpy) *op++ = *match++;
         }
-        else
-            LZ4_wildCopy(op, match, cpy);
+        else {
+            LZ4_copy8(op, match);
+            if (length>16)
+                LZ4_wildCopy(op+8, match+8, cpy);
+        }
         op=cpy;   /* correction */
     }
 
