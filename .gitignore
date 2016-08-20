@@ -16,6 +16,7 @@
 *.exe
 *.out
 *.app
+lz4
 
 # Visual solution files
 *.suo

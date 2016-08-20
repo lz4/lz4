@@ -62,12 +62,14 @@ lib:
 
 lz4programs:
 	@$(MAKE) -C $(PRGDIR)
+	cp $(PRGDIR)/lz4 .
 
 clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
 	@$(MAKE) -C versionsTest $@ > $(VOID)
+	@$(RM) lz4
 	@echo Cleaning completed
 
 
