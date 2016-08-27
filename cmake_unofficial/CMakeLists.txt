@@ -22,11 +22,6 @@ IF("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR
   SET(GNU_COMPATIBLE_COMPILER 1)
 ENDIF()
 
-if(GNU_COMPATIBLE_COMPILER)
-if(UNIX AND BUILD_LIBS)
-    add_definitions(-fPIC)
-endif()
-endif()
 
 set(LZ4_DIR ../lib/)
 set(PRG_DIR ../programs/)
@@ -45,15 +40,15 @@ endif()
 if(BUILD_LIBS)
 
 
-	SET(LIBS_TARGETS "")
-	IF(NOT WIN32)
-	add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
-    add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
-    SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
-	SET(LIBS_TARGETS liblz4 liblz4_static)
-	ELSE(NOT WIN32)
-	add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
-	SET(LIBS_TARGETS liblz4)
+    SET(LIBS_TARGETS "")
+    IF(NOT WIN32)
+        add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
+        add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
+        SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
+        SET(LIBS_TARGETS liblz4 liblz4_static)
+    ELSE(NOT WIN32)
+        add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
+        SET(LIBS_TARGETS liblz4)
     ENDIF(NOT WIN32)
 
     set_target_properties(liblz4 PROPERTIES
