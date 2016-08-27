@@ -49,7 +49,8 @@
 #  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
 #endif
 
-#define _POSIX_SOURCE 1        /* for fileno() within <stdio.h> on unix */
+/* cf. http://man7.org/linux/man-pages/man7/feature_test_macros.7.html */
+#define _XOPEN_VERSION 600 /* POSIX.2001, for fileno() within <stdio.h> on unix */
 
 
 /****************************
