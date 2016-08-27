@@ -92,21 +92,23 @@ endif()
 #warnings
 
 if(MSVC)
-ADD_DEFINITIONS("-W4")
+    ADD_DEFINITIONS("-W4")
 endif()
 if(GNU_COMPATIBLE_COMPILER)
-ADD_DEFINITIONS("-Wall")
+    ADD_DEFINITIONS("-Wall")
 endif()
 if(CMAKE_COMPILER_IS_GNUCXX)
-ADD_DEFINITIONS("-Wextra")
-ADD_DEFINITIONS("-Wundef")
-ADD_DEFINITIONS("-Wshadow")
-ADD_DEFINITIONS("-Wcast-align")
-ADD_DEFINITIONS("-Wstrict-prototypes")
+    ADD_DEFINITIONS("-Wextra")
+    ADD_DEFINITIONS("-Wundef")
+    ADD_DEFINITIONS("-Wshadow")
+    ADD_DEFINITIONS("-Wcast-align")
+    ADD_DEFINITIONS("-Wstrict-prototypes")
 endif(CMAKE_COMPILER_IS_GNUCXX)
-if(GNU_COMPATIBLE_COMPILER AND
-   (NOT CMAKE_SYSTEM_NAME MATCHES "SunOS"))
-ADD_DEFINITIONS("-std=c99")
+if(GNU_COMPATIBLE_COMPILER)
+    # we need gnu99 instead of c99 on Linux and Solaris
+    # to get C99 and POSIX definitions
+    # an alternative with cmake >= 3.1/3.2 is the C_STANDARD property
+    ADD_DEFINITIONS("-std=gnu99")
 endif()
 ADD_DEFINITIONS("-DLZ4_VERSION=\"${CPACK_PACKAGE_VERSION_PATCH}\"")
 INCLUDE_DIRECTORIES (${LZ4_DIR})
