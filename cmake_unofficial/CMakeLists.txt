@@ -16,6 +16,7 @@ ENDIF()
 
 option(BUILD_TOOLS "Build the command line tools" ON)
 option(BUILD_LIBS  "Build the libraries in addition to the tools" ON)
+option(LINK_TOOLS_WITH_LIB "Link the command line tools with the (shared) library" OFF)
 
 IF("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR
    "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
@@ -28,7 +29,7 @@ set(PRG_DIR ../programs/)
 set(LZ4_SRCS_LIB ${LZ4_DIR}lz4.c ${LZ4_DIR}lz4hc.c ${LZ4_DIR}lz4.h ${LZ4_DIR}lz4hc.h ${LZ4_DIR}lz4frame.c ${LZ4_DIR}lz4frame.h ${LZ4_DIR}xxhash.c)
 set(LZ4_SRCS ${LZ4_DIR}lz4frame.c ${LZ4_DIR}xxhash.c ${PRG_DIR}bench.c ${PRG_DIR}lz4cli.c ${PRG_DIR}lz4io.c)
 
-if(BUILD_TOOLS AND NOT BUILD_LIBS)
+if(BUILD_TOOLS AND NOT (LINK_TOOLS_WITH_LIB AND BUILD_LIBS))
     set(LZ4_SRCS ${LZ4_SRCS} ${LZ4_SRCS_LIB})
 endif()
 
@@ -41,15 +42,15 @@ if(BUILD_LIBS)
 
 
     SET(LIBS_TARGETS "")
-    IF(NOT WIN32)
+    IF(WIN32)
+        add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
+        SET(LIBS_TARGETS liblz4)
+    ELSE(WIN32)
         add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
         add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
         SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
         SET(LIBS_TARGETS liblz4 liblz4_static)
-    ELSE(NOT WIN32)
-        add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
-        SET(LIBS_TARGETS liblz4)
-    ENDIF(NOT WIN32)
+    ENDIF(WIN32)
 
     set_target_properties(liblz4 PROPERTIES
     OUTPUT_NAME lz4
@@ -78,7 +79,7 @@ if(BUILD_LIBS)
     DESTINATION "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/pkgconfig"
     )
 
-    if(BUILD_TOOLS)
+  if(BUILD_TOOLS AND LINK_TOOLS_WITH_LIB)
         target_link_libraries(lz4 liblz4)
     endif()
 endif()
