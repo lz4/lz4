@@ -9,7 +9,7 @@ include(CPack)
 cmake_minimum_required (VERSION 2.6)
 INCLUDE (CheckTypeSize)
 check_type_size("void *" SIZEOF_VOID_P)
-IF( "${SIZEOF_VOID_P}" STREQUAL  "8" )
+IF(SIZEOF_VOID_P STREQUAL  "8")
     set (CMAKE_SYSTEM_PROCESSOR "64bit")
     MESSAGE( STATUS "64 bit architecture detected size of void * is " ${SIZEOF_VOID_P})
 ENDIF()
@@ -18,8 +18,8 @@ option(BUILD_TOOLS "Build the command line tools" ON)
 option(BUILD_LIBS  "Build the libraries in addition to the tools" ON)
 option(LINK_TOOLS_WITH_LIB "Link the command line tools with the (shared) library" OFF)
 
-IF("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR
-   "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+IF(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR
+   CMAKE_C_COMPILER_ID STREQUAL "Clang")
   SET(GNU_COMPATIBLE_COMPILER 1)
 ENDIF()
 
