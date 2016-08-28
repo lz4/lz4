@@ -41,7 +41,7 @@ DESTDIR?=
 PREFIX ?= /usr/local
 CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
+CFLAGS += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 LIBDIR?= $(PREFIX)/lib

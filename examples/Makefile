@@ -28,7 +28,7 @@
 # ##########################################################################
 
 CFLAGS ?= -O3
-CFLAGS += -std=c99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
+CFLAGS += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
 FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 TESTFILE= Makefile
