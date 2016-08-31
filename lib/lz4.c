@@ -825,7 +825,7 @@ _next_match:
                 /* Match description too long : reduce it */
                 matchLength = (15-1) + (oMaxMatch-op) * 255;
             }
-            //printf("offset %5i, matchLength%5i \n", (int)(ip-match), matchLength + MINMATCH);
+            /*printf("offset %5i, matchLength%5i \n", (int)(ip-match), matchLength + MINMATCH);*/
             ip += MINMATCH + matchLength;
 
             if (matchLength>=ML_MASK)
