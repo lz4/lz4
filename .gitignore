@@ -21,3 +21,6 @@ lz4
 # Visual solution files
 *.suo
 *.user
+
+# Directories
+_codelite/

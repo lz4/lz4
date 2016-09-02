@@ -88,7 +88,7 @@
 ******************************/
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "r128"
+#  define LZ4_VERSION "r132"
 #endif
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__

@@ -42,6 +42,9 @@
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
 #define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
 
+#if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
+#  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
+#endif
 
 /*****************************
 *  Includes
