@@ -73,9 +73,6 @@
 #    define _isatty isatty
 #    define _fileno fileno
 #  endif
-#  ifdef __MINGW32__
-   int _fileno(FILE *stream);   /* MINGW somehow forgets to include this prototype into <stdio.h> */
-#  endif
 #  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
 #  include <unistd.h>   /* isatty */
