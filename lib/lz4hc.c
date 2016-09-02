@@ -37,7 +37,6 @@
 /* *************************************
 *  Tuning Parameter
 ***************************************/
-static const int LZ4HC_compressionLevel_default = 9;
 
 /*!
  * HEAPMODE :
@@ -85,8 +84,6 @@ static const int LZ4HC_compressionLevel_default = 9;
 #define HASH_MASK (HASHTABLESIZE - 1)
 
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
-
-static const int g_maxCompressionLevel = 16;
 
 
 /**************************************
@@ -371,8 +368,8 @@ static int LZ4HC_compress_generic (
 
 
     /* init */
-    if (compressionLevel > g_maxCompressionLevel) compressionLevel = g_maxCompressionLevel;
-    if (compressionLevel < 1) compressionLevel = LZ4HC_compressionLevel_default;
+    if (compressionLevel > LZ4HC_MAX_CLEVEL) compressionLevel = LZ4HC_MAX_CLEVEL;
+    if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
     maxNbAttempts = 1 << (compressionLevel-1);
     ctx->end += inputSize;
 

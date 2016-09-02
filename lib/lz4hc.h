@@ -45,6 +45,10 @@ extern "C" {
 #include <stddef.h>   /* size_t */
 
 
+#define LZ4HC_MIN_CLEVEL        3
+#define LZ4HC_DEFAULT_CLEVEL    9
+#define LZ4HC_MAX_CLEVEL        16
+
 /*-************************************
 *  Block Compression
 **************************************/
@@ -54,9 +58,9 @@ LZ4_compress_HC() :
     Compression success is guaranteed if `dst` buffer is sized to handle worst circumstances (data not compressible)
     Worst size evaluation is provided by function LZ4_compressBound() (see "lz4.h")
       `srcSize`  : Max supported value is LZ4_MAX_INPUT_SIZE (see "lz4.h")
-      `compressionLevel` : Recommended values are between 4 and 9, although any value between 0 and 16 will work.
+      `compressionLevel` : Recommended values are between 4 and 9, although any value between 0 and LZ4HC_MAX_CLEVEL will work.
                            0 means "use default value" (see lz4hc.c).
-                           Values >16 behave the same as 16.
+                           Values >LZ4HC_MAX_CLEVEL behave the same as 16.
       @return : the number of bytes written into buffer 'dst'
              or 0 if compression fails.
 */
