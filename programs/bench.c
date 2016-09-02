@@ -52,6 +52,8 @@
 #include <sys/types.h>  /* stat64 */
 #include <sys/stat.h>   /* stat64 */
 #include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
+#include <string.h>     /* strlen */
+
 
 #include "lz4.h"
 #define COMPRESSOR0 LZ4_compress_local
