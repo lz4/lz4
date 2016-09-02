@@ -39,6 +39,10 @@
 #  define _LARGEFILE64_SOURCE
 #endif
 
+#if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
+#  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
+#endif
+
 
 /*-************************************
 *  Includes
@@ -48,6 +52,8 @@
 #include <sys/types.h>  /* stat64 */
 #include <sys/stat.h>   /* stat64 */
 #include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
+#include <string.h>     /* strlen */
+
 
 #include "lz4.h"
 #define COMPRESSOR0 LZ4_compress_local
@@ -197,7 +203,7 @@ static U64 BMK_GetFileSize(const char* infilename)
 *  Public function
 **********************************************************/
 
-int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
+int BMK_benchLevel(const char** fileNamesTable, int nbFiles, int cLevel)
 {
   int fileIdx=0;
   char* orig_buff;
@@ -210,7 +216,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
   double totald = 0.;
 
   /* Init */
-  if (cLevel <= 2) cfunctionId = 0; else cfunctionId = 1;
+  if (cLevel < LZ4HC_MIN_CLEVEL) cfunctionId = 0; else cfunctionId = 1;
   switch (cfunctionId)
   {
 #ifdef COMPRESSOR0
@@ -224,7 +230,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
   /* Loop for each file */
   while (fileIdx<nbFiles) {
-      const char* const inFileName = fileNamesTable[fileIdx++];
+      const char* inFileName = fileNamesTable[fileIdx++];
       FILE* const inFile = fopen( inFileName, "rb" );
       U64 const inFileSize = BMK_GetFileSize(inFileName);
       size_t benchedSize = BMK_findMaxMem(inFileSize * 2) / 2;
@@ -276,6 +282,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
       /* Fill input buffer */
       DISPLAY("Loading %s...       \r", inFileName);
+      if (strlen(inFileName)>16) inFileName += strlen(inFileName)-16;   /* can only display 16 characters */ 
       readSize = fread(orig_buff, 1, benchedSize, inFile);
       fclose(inFile);
 
@@ -304,7 +311,7 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           unsigned chunkNb;
 
           /* Compression */
-          DISPLAY("%1i-%-14.14s : %9i ->\r", loopNb, inFileName, (int)benchedSize);
+          DISPLAY("%2i#%1i-%-14.14s : %9i ->\r", cLevel, loopNb, inFileName, (int)benchedSize);
           { size_t i; for (i=0; i<benchedSize; i++) compressedBuffer[i]=(char)i; }     /* warmimg up memory */
 
           clockStart = clock();
@@ -322,8 +329,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
           cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
           ratio = (double)cSize/(double)benchedSize*100.;
 
-          DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r",
-                  loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / (fastestC / CLOCKS_PER_SEC) / 1000000);
+          DISPLAY("%2i#%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s\r",
+                  cLevel, loopNb, inFileName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / (fastestC / CLOCKS_PER_SEC) / 1000000);
 
           /* Decompression */
           { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing area, for CRC checking */
@@ -342,8 +349,8 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
           nbLoops += !nbLoops;   /* avoid division by zero */
           if ((double)clockEnd < fastestD*nbLoops) fastestD = (double)clockEnd/nbLoops;
-          DISPLAY("%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s \r",
-                  loopNb, inFileName, (int)benchedSize, (int)cSize, ratio,
+          DISPLAY("%2i#%1i-%-14.14s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s \r",
+                  cLevel, loopNb, inFileName, (int)benchedSize, (int)cSize, ratio,
                   (double)benchedSize / (fastestC / CLOCKS_PER_SEC) / 1000000, (double)benchedSize / (fastestD / CLOCKS_PER_SEC) / 1000000 );
 
           /* CRC Checking */
@@ -353,12 +360,12 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
 
         if (crcOrig==crcCheck) {
             if (ratio < 100.)
-                DISPLAY("%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s \n",
-                        inFileName, (int)benchedSize, (int)cSize, ratio,
+                DISPLAY("%2i#%-16.16s : %9i -> %9i (%5.2f%%),%7.1f MB/s ,%7.1f MB/s \n",
+                        cLevel, inFileName, (int)benchedSize, (int)cSize, ratio,
                         (double)benchedSize / (fastestC / CLOCKS_PER_SEC) / 1000000, (double)benchedSize / (fastestD / CLOCKS_PER_SEC) / 1000000 );
             else
-                DISPLAY("%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s  \n",
-                        inFileName, (int)benchedSize, (int)cSize, ratio,
+                DISPLAY("%2i#%-16.16s : %9i -> %9i (%5.1f%%),%7.1f MB/s ,%7.1f MB/s  \n",
+                        cLevel, inFileName, (int)benchedSize, (int)cSize, ratio,
                         (double)benchedSize / (fastestC / CLOCKS_PER_SEC) / 1000000, (double)benchedSize / (fastestD / CLOCKS_PER_SEC) / 1000000 );
         }
         totals += benchedSize;
@@ -373,11 +380,29 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel)
   }
 
   if (nbFiles > 1)
-        DISPLAY("%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", "  TOTAL",
+        DISPLAY("%2i#%-16.16s :%10llu ->%10llu (%5.2f%%), %6.1f MB/s , %6.1f MB/s\n", cLevel, "  TOTAL",
                 (long long unsigned)totals, (long long unsigned int)totalz, (double)totalz/(double)totals*100.,
                 (double)totals/(totalc/CLOCKS_PER_SEC)/1000000, (double)totals/(totald/CLOCKS_PER_SEC)/1000000);
 
   if (BMK_pause) { DISPLAY("\npress enter...\n"); (void)getchar(); }
 
   return 0;
+}
+
+
+int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel, int cLevelLast)
+{
+    int i, res = 0;
+
+    if (cLevel > LZ4HC_MAX_CLEVEL) cLevel = LZ4HC_MAX_CLEVEL;
+    if (cLevelLast > LZ4HC_MAX_CLEVEL) cLevelLast = LZ4HC_MAX_CLEVEL;
+    if (cLevelLast < cLevel) cLevelLast = cLevel;
+
+    DISPLAY("Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
+    for (i=cLevel; i<=cLevelLast; i++) {
+        res = BMK_benchLevel(fileNamesTable, nbFiles, i);
+        if (res != 0) break;
+    }
+    
+    return res;
 }

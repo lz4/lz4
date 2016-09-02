@@ -61,7 +61,7 @@
 #include <string.h>   /* strcmp, strlen */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
-
+#include "lz4hc.h"    /* LZ4HC_DEFAULT_CLEVEL */
 
 /****************************
 *  OS-specific Includes
@@ -88,7 +88,7 @@
 ******************************/
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #ifndef LZ4_VERSION
-#  define LZ4_VERSION "r128"
+#  define LZ4_VERSION "r132"
 #endif
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s %i-bits %s, by %s (%s) ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION, AUTHOR, __DATE__
@@ -183,7 +183,9 @@ static int usage_advanced(void)
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "Benchmark arguments :\n");
-    DISPLAY( " -b     : benchmark file(s)\n");
+    DISPLAY( "Benchmark arguments :\n");
+    DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
+    DISPLAY( " -e#    : test all compression levels from -bX to # (default: 1)\n");
     DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
 #if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "Legacy arguments :\n");
@@ -219,7 +221,7 @@ static int usage_longhelp(void)
     DISPLAY( "Compression levels : \n");
     DISPLAY( "---------------------\n");
     DISPLAY( "-0 ... -2  => Fast compression, all identicals\n");
-    DISPLAY( "-3 ... -16 => High compression; higher number == more compression but slower\n");
+    DISPLAY( "-3 ... -%d => High compression; higher number == more compression but slower\n", LZ4HC_MAX_CLEVEL);
     DISPLAY( "\n");
     DISPLAY( "stdin, stdout and the console : \n");
     DISPLAY( "--------------------------------\n");
@@ -272,10 +274,24 @@ static void waitEnter(void)
 }
 
 
+/*! readU32FromChar() :
+    @return : unsigned integer value reach from input in `char` format
+    Will also modify `*stringPtr`, advancing it to position where it stopped reading.
+    Note : this function can overflow if result > MAX_UINT */
+static unsigned readU32FromChar(const char** stringPtr)
+{
+    unsigned result = 0;
+    while ((**stringPtr >='0') && (**stringPtr <='9'))
+        result *= 10, result += **stringPtr - '0', (*stringPtr)++ ;
+    return result;
+}
+
+
 int main(int argc, const char** argv)
 {
     int i,
-        cLevel=0,
+        cLevel=1,
+        cLevelLast=1,
         decode=0,
         bench=0,
         legacy_format=0,
@@ -350,15 +366,11 @@ int main(int argc, const char** argv)
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
 
                 if ((*argument>='0') && (*argument<='9')) {
-                    cLevel = 0;
-                    while ((*argument >= '0') && (*argument <= '9')) {
-                        cLevel *= 10;
-                        cLevel += *argument - '0';
-                        argument++;
-                    }
+                    cLevel = readU32FromChar(&argument);
                     argument--;
                     continue;
                 }
+
 
                 switch(argument[0])
                 {
@@ -366,6 +378,12 @@ int main(int argc, const char** argv)
                 case 'V': DISPLAY(WELCOME_MESSAGE); goto _cleanup;   /* Version */
                 case 'h': usage_advanced(); goto _cleanup;
                 case 'H': usage_longhelp(); goto _cleanup;
+
+                case 'e':
+                    argument++;
+                    cLevelLast = readU32FromChar(&argument);
+                    argument--;
+                    break;
 
                     /* Compression (default) */
                 case 'z': forceCompress = 1; break;
@@ -492,7 +510,7 @@ int main(int argc, const char** argv)
     /* Check if benchmark is selected */
     if (bench)
     {
-        int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel);
+        int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel, cLevelLast);
         free((void*)inFileNames);
         return bmkResult;
     }
