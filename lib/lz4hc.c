@@ -111,7 +111,7 @@ typedef struct
 //#define DELTANEXTU16(p)        chainTable[(p) & MAXD_MASK]   /* flexible, MAXD dependent */
 #define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
 
-static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
+static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(MEM_read32(ptr)); }
 
 
 
@@ -178,14 +178,14 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   /* I
         if (matchIndex >= dictLimit) {
             match = base + matchIndex;
             if (*(match+ml) == *(ip+ml)
-                && (LZ4_read32(match) == LZ4_read32(ip)))
+                && (MEM_read32(match) == MEM_read32(ip)))
             {
                 size_t const mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
                 if (mlt > ml) { ml = mlt; *matchpos = match; }
             }
         } else {
             match = dictBase + matchIndex;
-            if (LZ4_read32(match) == LZ4_read32(ip)) {
+            if (MEM_read32(match) == MEM_read32(ip)) {
                 size_t mlt;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iLimit) vLimit = iLimit;
@@ -232,8 +232,14 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             const BYTE* matchPtr = base + matchIndex;
+<<<<<<< HEAD
+            if (*(iLowLimit + longest) == *(matchPtr - delta + longest))
+                if (MEM_read32(matchPtr) == MEM_read32(ip))
+                {
+=======
             if (*(iLowLimit + longest) == *(matchPtr - delta + longest)) {
                 if (LZ4_read32(matchPtr) == LZ4_read32(ip)) {
+>>>>>>> refs/remotes/origin/dev
                     int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
                     int back = 0;
 
@@ -253,7 +259,12 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
             }
         } else {
             const BYTE* matchPtr = dictBase + matchIndex;
+<<<<<<< HEAD
+            if (MEM_read32(matchPtr) == MEM_read32(ip))
+            {
+=======
             if (LZ4_read32(matchPtr) == LZ4_read32(ip)) {
+>>>>>>> refs/remotes/origin/dev
                 size_t mlt;
                 int back=0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
@@ -308,7 +319,7 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     *op += length;
 
     /* Encode Offset */
-    LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
+    MEM_writeLE16(*op, (U16)(*ip-match)); *op += 2;
 
     /* Encode MatchLength */
     length = (int)(matchLength-MINMATCH);
