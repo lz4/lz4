@@ -31,17 +31,21 @@
 # ################################################################
 
 # Version numbers
-VERSION?= 132
-LIBVER_MAJOR:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
-LIBVER_MINOR:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
-LIBVER_PATCH:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < lz4.h`
-LIBVER := $(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
+LIBVER_MAJOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < ./lz4.h`
+LIBVER_MINOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < ./lz4.h`
+LIBVER_PATCH_SCRIPT:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < ./lz4.h`
+LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCRIPT)
+LIBVER_MAJOR := $(shell echo $(LIBVER_MAJOR_SCRIPT))
+LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
+LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
+LIBVER := $(shell echo $(LIBVER_SCRIPT))
+
 
 DESTDIR?=
 PREFIX ?= /usr/local
 CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
-CFLAGS += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -pedantic
+CFLAGS += -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 LIBDIR?= $(PREFIX)/lib
@@ -66,9 +70,10 @@ default: liblz4
 
 all: liblz4
 
-liblz4: lz4.c lz4hc.c lz4frame.c xxhash.c   # need to compile once with -fPIC, and once without -fPIC
+liblz4: *.c
 	@echo compiling static library
-	@$(AR) rcs $@.a $^
+	@$(CC) $(FLAGS) -c $^
+	@$(AR) rcs $@.a *.o
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
@@ -90,7 +95,7 @@ liblz4.pc: liblz4.pc.in Makefile
 	@sed -e 's|@PREFIX@|$(PREFIX)|' \
             -e 's|@LIBDIR@|$(LIBDIR)|' \
             -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
-            -e 's|@VERSION@|$(VERSION)|' \
+            -e 's|@VERSION@|$(LIBVER)|' \
              $< >$@
 
 install: liblz4 liblz4.pc
