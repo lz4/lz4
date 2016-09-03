@@ -313,8 +313,15 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     /* Encode MatchLength */
     length = (int)(matchLength-MINMATCH);
     if ((limitedOutputBuffer) && (*op + (length>>8) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
-    if (length>=(int)ML_MASK) { *token+=ML_MASK; length-=ML_MASK; for(; length > 509 ; length-=510) { *(*op)++ = 255; *(*op)++ = 255; } if (length > 254) { length-=255; *(*op)++ = 255; } *(*op)++ = (BYTE)length; }
-    else *token += (BYTE)(length);
+    if (length>=(int)ML_MASK) {
+        *token += ML_MASK;
+        length -= ML_MASK;
+        for(; length > 509 ; length-=510) { *(*op)++ = 255; *(*op)++ = 255; }
+        if (length > 254) { length-=255; *(*op)++ = 255; }
+        *(*op)++ = (BYTE)length;
+    } else {
+        *token += (BYTE)(length);
+    }
 
     /* Prepare next loop */
     *ip += matchLength;
