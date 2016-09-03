@@ -18,9 +18,8 @@
 *.app
 lz4
 
-# Visual solution files
+# IDE / editors files
 *.suo
 *.user
-
-# Directories
+.clang_complete
 _codelite/

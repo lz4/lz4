@@ -30,10 +30,6 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-# Version number
-export VERSION=132
-export RELEASE=r$(VERSION)
-
 DESTDIR?=
 PREFIX ?= /usr/local
 
