@@ -34,18 +34,16 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-RELEASE ?= r132
-
+DESTDIR ?=
+PREFIX  ?= /usr/local
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 
-DESTDIR ?=
-PREFIX  ?= /usr/local
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ -DLZ4_VERSION=\"$(RELEASE)\"
+CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 

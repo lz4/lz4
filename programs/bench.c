@@ -282,7 +282,7 @@ int BMK_benchLevel(const char** fileNamesTable, int nbFiles, int cLevel)
 
       /* Fill input buffer */
       DISPLAY("Loading %s...       \r", inFileName);
-      if (strlen(inFileName)>16) inFileName += strlen(inFileName)-16;   /* can only display 16 characters */ 
+      if (strlen(inFileName)>16) inFileName += strlen(inFileName)-16;   /* can only display 16 characters */
       readSize = fread(orig_buff, 1, benchedSize, inFile);
       fclose(inFile);
 
@@ -398,11 +398,11 @@ int BMK_benchFiles(const char** fileNamesTable, int nbFiles, int cLevel, int cLe
     if (cLevelLast > LZ4HC_MAX_CLEVEL) cLevelLast = LZ4HC_MAX_CLEVEL;
     if (cLevelLast < cLevel) cLevelLast = cLevel;
 
-    DISPLAY("Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
+    if (cLevelLast > cLevel) DISPLAY("Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
     for (i=cLevel; i<=cLevelLast; i++) {
         res = BMK_benchLevel(fileNamesTable, nbFiles, i);
         if (res != 0) break;
     }
-    
+
     return res;
 }

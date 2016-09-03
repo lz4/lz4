@@ -7,7 +7,7 @@ libdir=@LIBDIR@
 includedir=@INCLUDEDIR@
 
 Name: lz4
-Description: fast lossless compression algorithm library
+Description: extremely fast lossless compression algorithm library
 URL: http://www.lz4.org/
 Version: @VERSION@
 Libs: -L@LIBDIR@ -llz4
