@@ -45,17 +45,11 @@
 #include <stdlib.h>
 #include <stdio.h>      /* fgets, sscanf */
 #include <string.h>     /* strcmp */
-#include "lz4.h"
+#include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
+#include "lz4.h"        /* LZ4_VERSION_STRING */
 #include "lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
-
-/* Use ftime() if gettimeofday() is not available on your target */
-#if defined(FUZ_LEGACY_TIMER)
-#  include <sys/timeb.h>   /* timeb, ftime */
-#else
-#  include <sys/time.h>    /* gettimeofday */
-#endif
 
 
 /*-************************************
@@ -80,10 +74,6 @@ typedef unsigned long long  U64;
 /*-************************************
 *  Constants
 **************************************/
-#ifndef LZ4_VERSION
-#  define LZ4_VERSION ""
-#endif
-
 #define NB_ATTEMPTS (1<<16)
 #define COMPRESSIBLE_NOISE_LENGTH (1 << 21)
 #define FUZ_MAX_BLOCK_SIZE (1 << 17)
@@ -104,45 +94,16 @@ typedef unsigned long long  U64;
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 static int g_displayLevel = 2;
-static const U32 g_refreshRate = 250;
-static U32 g_time = 0;
+static const clock_t g_refreshRate = CLOCKS_PER_SEC * 25 / 100;
+static clock_t g_time = 0;
 
 
 /*-*******************************************************
 *  Fuzzer functions
 *********************************************************/
-#if defined(FUZ_LEGACY_TIMER)
-
-static U32 FUZ_GetMilliStart(void)
+static clock_t FUZ_GetClockSpan(clock_t clockStart)
 {
-    struct timeb tb;
-    U32 nCount;
-    ftime( &tb );
-    nCount = (U32) (((tb.time & 0xFFFFF) * 1000) +  tb.millitm);
-    return nCount;
-}
-
-#else
-
-static U32 FUZ_GetMilliStart(void)
-{
-    struct timeval tv;
-    U32 nCount;
-    gettimeofday(&tv, NULL);
-    nCount = (U32) (tv.tv_usec/1000 + (tv.tv_sec & 0xfffff) * 1000);
-    return nCount;
-}
-
-#endif
-
-
-static U32 FUZ_GetMilliSpan(U32 nTimeStart)
-{
-    U32 nCurrent = FUZ_GetMilliStart();
-    U32 nSpan = nCurrent - nTimeStart;
-    if (nTimeStart > nCurrent)
-        nSpan += 0x100000 * 1000;
-    return nSpan;
+    return clock() - clockStart;   /* works even if overflow; max span ~ 30mn */
 }
 
 static U32 FUZ_rotl32(U32 u32, U32 nbBits)
@@ -291,8 +252,8 @@ _overflowError:
 
 static void FUZ_displayUpdate(unsigned testNb)
 {
-    if ((FUZ_GetMilliSpan(g_time) > g_refreshRate) | (g_displayLevel>=3)) {
-        g_time = FUZ_GetMilliStart();
+    if ((FUZ_GetClockSpan(g_time) > g_refreshRate) | (g_displayLevel>=3)) {
+        g_time = clock();
         DISPLAY("\r%5u   ", testNb);
         if (g_displayLevel>=3) fflush(stdout);
     }
@@ -315,7 +276,7 @@ static void FUZ_findDiff(const void* buff1, const void* buff2)
 }
 
 
-static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double compressibility, U32 duration)
+static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double compressibility, U32 duration_s)
 {
     unsigned long long bytes = 0;
     unsigned long long cbytes = 0;
@@ -338,12 +299,12 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     U32 coreRandState = seed;
     U32 randState = coreRandState ^ PRIME3;
     int result = 0;
-    const U32 startTime = FUZ_GetMilliStart();
+    clock_t const clockStart = clock();
+    clock_t const clockDuration = (clock_t)duration_s * CLOCKS_PER_SEC;
 
 
     /* init */
     memset(&LZ4dict, 0, sizeof(LZ4dict));
-    duration *= 1000;
 
     /* Create compressible test buffer */
     CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
@@ -376,7 +337,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     }   }
 
     /* Main test loop */
-    for (cycleNb = startCycle; (cycleNb < nbCycles) || (FUZ_GetMilliSpan(startTime) < duration) ; cycleNb++) {
+    for (cycleNb = startCycle; (cycleNb < nbCycles) || (FUZ_GetClockSpan(clockStart) < clockDuration) ; cycleNb++) {
         U32 testNb = 0;
         char* dict;
         char* block;
@@ -1183,10 +1144,15 @@ int main(int argc, char** argv)
         }
     }
 
-    printf("Starting LZ4 fuzzer (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION);
+    printf("Starting LZ4 fuzzer (%i-bits, v%s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION_STRING);
 
-    if (!seedset) seed = FUZ_GetMilliStart() % 10000;
+    if (!seedset) {
+        time_t const t = time(NULL);
+        U32 const h = XXH32(&t, sizeof(t), 1);
+        seed = h % 10000;
+    }
     printf("Seed = %u\n", seed);
+
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
     if ((seedset==0) && (testNb==0)) FUZ_unitTests();
