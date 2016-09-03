@@ -52,13 +52,7 @@
 #include <sys/types.h>   /* stat64 */
 #include <sys/stat.h>    /* stat64 */
 #include <string.h>      /* strcmp */
-
-/* Use ftime() if gettimeofday() is not available on your target */
-#if defined(BMK_LEGACY_TIMER)
-#  include <sys/timeb.h>   /* timeb, ftime */
-#else
-#  include <sys/time.h>    /* gettimeofday */
-#endif
+#include <time.h>        /* clock_t, clock(), CLOCKS_PER_SEC */
 
 #include "lz4.h"
 #include "lz4hc.h"
@@ -99,14 +93,11 @@
 *  Constants
 **************************************/
 #define PROGRAM_DESCRIPTION "LZ4 speed analyzer"
-#ifndef LZ4_VERSION
-#  define LZ4_VERSION ""
-#endif
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %s %i-bits, by %s (%s) ***\n", PROGRAM_DESCRIPTION, LZ4_VERSION, (int)(sizeof(void*)*8), AUTHOR, __DATE__
+#define WELCOME_MESSAGE "*** %s v%s %i-bits, by %s ***\n", PROGRAM_DESCRIPTION, LZ4_VERSION_STRING, (int)(sizeof(void*)*8), AUTHOR
 
 #define NBLOOPS    6
-#define TIMELOOP   2500
+#define TIMELOOP   (CLOCKS_PER_SEC * 25 / 10)
 
 #define KB *(1 <<10)
 #define MB *(1 <<20)
@@ -173,43 +164,9 @@ static void BMK_setPause(void)
 /*********************************************************
 *  Private functions
 *********************************************************/
-
-#if defined(BMK_LEGACY_TIMER)
-
-static int BMK_GetMilliStart(void)
+static clock_t BMK_GetClockSpan( clock_t clockStart )
 {
-  /* Based on Legacy ftime()
-   * Rolls over every ~ 12.1 days (0x100000/24/60/60)
-   * Use GetMilliSpan to correct for rollover */
-  struct timeb tb;
-  int nCount;
-  ftime( &tb );
-  nCount = (int) (tb.millitm + (tb.time & 0xfffff) * 1000);
-  return nCount;
-}
-
-#else
-
-static int BMK_GetMilliStart(void)
-{
-  /* Based on newer gettimeofday()
-   * Use GetMilliSpan to correct for rollover */
-  struct timeval tv;
-  int nCount;
-  gettimeofday(&tv, NULL);
-  nCount = (int) (tv.tv_usec/1000 + (tv.tv_sec & 0xfffff) * 1000);
-  return nCount;
-}
-
-#endif
-
-
-static int BMK_GetMilliSpan( int nTimeStart )
-{
-  int nSpan = BMK_GetMilliStart() - nTimeStart;
-  if ( nSpan < 0 )
-    nSpan += 0x100000 * 1000;
-  return nSpan;
+    return clock() - clockStart;   /* works even if overflow; max span ~30 mn */
 }
 
 
@@ -222,8 +179,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     requiredMem += 2*step;
     if (requiredMem > MAX_MEM) requiredMem = MAX_MEM;
 
-    while (!testmem)
-    {
+    while (!testmem) {
         if (requiredMem > step) requiredMem -= step;
         else requiredMem >>= 1;
         testmem = (BYTE*) malloc ((size_t)requiredMem);
@@ -238,7 +194,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 }
 
 
-static U64 BMK_GetFileSize(char* infilename)
+static U64 BMK_GetFileSize(const char* infilename)
 {
     int r;
 #if defined(_MSC_VER)
@@ -445,23 +401,21 @@ static int local_LZ4F_decompress(const char* in, char* out, int inSize, int outS
 
 #define NB_COMPRESSION_ALGORITHMS 100
 #define NB_DECOMPRESSION_ALGORITHMS 100
-int fullSpeedBench(char** fileNamesTable, int nbFiles)
+int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 {
-  int fileIdx=0;
-  size_t errorCode;
+    int fileIdx=0;
 
-  /* Init */
-  errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
-  if (LZ4F_isError(errorCode)) { DISPLAY("dctx allocation issue \n"); return 10; }
+    /* Init */
+    { size_t const errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
+      if (LZ4F_isError(errorCode)) { DISPLAY("dctx allocation issue \n"); return 10; } }
 
-  /* Loop for each fileName */
-  while (fileIdx<nbFiles)
-  {
-      FILE* inFile;
+    /* Loop for each fileName */
+    while (fileIdx<nbFiles) {
       char* orig_buff = NULL;
       struct chunkParameters* chunkP = NULL;
       char* compressed_buff=NULL;
-      char* inFileName;
+      const char* const inFileName = fileNamesTable[fileIdx++];
+      FILE* const inFile = fopen( inFileName, "rb" );
       U64   inFileSize;
       size_t benchedSize;
       int nbChunks;
@@ -469,16 +423,15 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       size_t readSize;
       int compressedBuffSize;
       U32 crcOriginal;
+      size_t errorCode;
 
       /* Check file existence */
-      inFileName = fileNamesTable[fileIdx++];
-      inFile = fopen( inFileName, "rb" );
       if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
       /* Memory size adjustments */
       inFileSize = BMK_GetFileSize(inFileName);
       if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
-      benchedSize = (size_t) BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
+      benchedSize = BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
       if (benchedSize==0) { DISPLAY( "not enough memory\n"); fclose(inFile); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
       if (benchedSize < inFileSize)
@@ -491,8 +444,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       maxCompressedChunkSize = LZ4_compressBound(g_chunkSize);
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
       compressed_buff = (char*)malloc((size_t)compressedBuffSize);
-      if(!chunkP || !orig_buff || !compressed_buff)
-      {
+      if(!chunkP || !orig_buff || !compressed_buff) {
           DISPLAY("\nError: not enough memory!\n");
           fclose(inFile);
           free(orig_buff);
@@ -506,8 +458,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
       readSize = fread(orig_buff, 1, benchedSize, inFile);
       fclose(inFile);
 
-      if(readSize != benchedSize)
-      {
+      if (readSize != benchedSize) {
         DISPLAY("\nError: problem reading file '%s' !!    \n", inFileName);
         free(orig_buff);
         free(compressed_buff);
@@ -520,8 +471,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
 
       /* Bench */
-      {
-        int loopNb, nb_loops, chunkNb, cAlgNb, dAlgNb;
+      { int loopNb, nb_loops, chunkNb, cAlgNb, dAlgNb;
         size_t cSize=0;
         double ratio=0.;
 
@@ -529,8 +479,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
         DISPLAY(" %s : \n", inFileName);
 
         /* Bench Compression Algorithms */
-        for (cAlgNb=0; (cAlgNb <= NB_COMPRESSION_ALGORITHMS) && (g_compressionTest); cAlgNb++)
-        {
+        for (cAlgNb=0; (cAlgNb <= NB_COMPRESSION_ALGORITHMS) && (g_compressionTest); cAlgNb++) {
             const char* compressorName;
             int (*compressionFunction)(const char*, char*, int);
             void (*initFunction)(void) = NULL;
@@ -540,20 +489,18 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             if ((g_compressionAlgo != ALL_COMPRESSORS) && (g_compressionAlgo != cAlgNb)) continue;
 
             /* Init data chunks */
-            {
-              int i;
-              size_t remaining = benchedSize;
-              char* in = orig_buff;
-              char* out = compressed_buff;
+            {   int i;
+                size_t remaining = benchedSize;
+                char* in = orig_buff;
+                char* out = compressed_buff;
                 nbChunks = (int) (((int)benchedSize + (g_chunkSize-1))/ g_chunkSize);
-              for (i=0; i<nbChunks; i++)
-              {
-                  chunkP[i].id = i;
-                  chunkP[i].origBuffer = in; in += g_chunkSize;
-                  if ((int)remaining > g_chunkSize) { chunkP[i].origSize = g_chunkSize; remaining -= g_chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
-                  chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
-                  chunkP[i].compressedSize = 0;
-              }
+                for (i=0; i<nbChunks; i++) {
+                    chunkP[i].id = i;
+                    chunkP[i].origBuffer = in; in += g_chunkSize;
+                    if ((int)remaining > g_chunkSize) { chunkP[i].origSize = g_chunkSize; remaining -= g_chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
+                    chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
+                    chunkP[i].compressedSize = 0;
+                }
             }
 
             switch(cAlgNb)
@@ -595,55 +542,50 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
                 continue;   /* unknown ID : just skip */
             }
 
-            for (loopNb = 1; loopNb <= g_nbIterations; loopNb++)
-            {
+            for (loopNb = 1; loopNb <= g_nbIterations; loopNb++) {
                 double averageTime;
-                int milliTime;
+                clock_t clockTime;
 
                 PROGRESS("%1i- %-28.28s :%9i ->\r", loopNb, compressorName, (int)benchedSize);
                 { size_t i; for (i=0; i<benchedSize; i++) compressed_buff[i]=(char)i; }     /* warming up memory */
 
                 nb_loops = 0;
-                milliTime = BMK_GetMilliStart();
-                while(BMK_GetMilliStart() == milliTime);
-                milliTime = BMK_GetMilliStart();
-                while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-                {
+                clockTime = clock();
+                while(clock() == clockTime);
+                clockTime = clock();
+                while(BMK_GetClockSpan(clockTime) < TIMELOOP) {
                     if (initFunction!=NULL) initFunction();
-                    for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                    {
+                    for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
                         if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", compressorName), exit(1);
                     }
                     nb_loops++;
                 }
-                milliTime = BMK_GetMilliSpan(milliTime);
+                clockTime = BMK_GetClockSpan(clockTime);
 
                 nb_loops += !nb_loops;   /* avoid division by zero */
-                averageTime = (double)milliTime / nb_loops;
+                averageTime = ((double)clockTime) / nb_loops / CLOCKS_PER_SEC;
                 if (averageTime < bestTime) bestTime = averageTime;
                 cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
                 ratio = (double)cSize/(double)benchedSize*100.;
-                PROGRESS("%1i- %-28.28s :%9i ->%9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i- %-28.28s :%9i ->%9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
             }
 
             if (ratio<100.)
-                DISPLAY("%2i-%-28.28s :%9i ->%9i (%5.2f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%2i-%-28.28s :%9i ->%9i (%5.2f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
             else
-                DISPLAY("%2i-%-28.28s :%9i ->%9i (%5.1f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000.);
+                DISPLAY("%2i-%-28.28s :%9i ->%9i (%5.1f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 100000);
         }
 
         /* Prepare layout for decompression */
         /* Init data chunks */
-        {
-          int i;
+        { int i;
           size_t remaining = benchedSize;
           char* in = orig_buff;
           char* out = compressed_buff;
 
           nbChunks = (int) (((int)benchedSize + (g_chunkSize-1))/ g_chunkSize);
-          for (i=0; i<nbChunks; i++)
-          {
+          for (i=0; i<nbChunks; i++) {
               chunkP[i].id = i;
               chunkP[i].origBuffer = in; in += g_chunkSize;
               if ((int)remaining > g_chunkSize) { chunkP[i].origSize = g_chunkSize; remaining -= g_chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
@@ -651,15 +593,13 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
               chunkP[i].compressedSize = 0;
           }
         }
-        for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-        {
+        for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
             chunkP[chunkNb].compressedSize = LZ4_compress(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
             if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress"), exit(1);
         }
 
         /* Decompression Algorithms */
-        for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && (g_decompressionTest); dAlgNb++)
-        {
+        for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && (g_decompressionTest); dAlgNb++) {
             const char* dName;
             int (*decompressionFunction)(const char*, char*, int, int);
             double bestTime = 100000000.;
@@ -677,8 +617,7 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
             case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
             case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
                     errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
-                    if (LZ4F_isError(errorCode))
-                    {
+                    if (LZ4F_isError(errorCode)) {
                         DISPLAY("Error while preparing compressed frame\n");
                         free(orig_buff);
                         free(compressed_buff);
@@ -695,56 +634,53 @@ int fullSpeedBench(char** fileNamesTable, int nbFiles)
 
             { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
 
-            for (loopNb = 1; loopNb <= g_nbIterations; loopNb++)
-            {
+            for (loopNb = 1; loopNb <= g_nbIterations; loopNb++) {
                 double averageTime;
-                int milliTime;
+                clock_t clockTime;
                 U32 crcDecoded;
 
                 PROGRESS("%1i- %-29.29s :%10i ->\r", loopNb, dName, (int)benchedSize);
 
                 nb_loops = 0;
-                milliTime = BMK_GetMilliStart();
-                while(BMK_GetMilliStart() == milliTime);
-                milliTime = BMK_GetMilliStart();
-                while(BMK_GetMilliSpan(milliTime) < TIMELOOP)
-                {
-                    for (chunkNb=0; chunkNb<nbChunks; chunkNb++)
-                    {
+                clockTime = clock();
+                while(clock() == clockTime);
+                clockTime = clock();
+                while(BMK_GetClockSpan(clockTime) < TIMELOOP) {
+                    for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                         int decodedSize = decompressionFunction(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedSize, chunkP[chunkNb].origSize);
                         if (chunkP[chunkNb].origSize != decodedSize) DISPLAY("ERROR ! %s() == %i != %i !! \n", dName, decodedSize, chunkP[chunkNb].origSize), exit(1);
                     }
                     nb_loops++;
                 }
-                milliTime = BMK_GetMilliSpan(milliTime);
+                clockTime = BMK_GetClockSpan(clockTime);
 
                 nb_loops += !nb_loops;   /* Avoid division by zero */
-                averageTime = (double)milliTime / nb_loops;
+                averageTime = (double)clockTime / nb_loops / CLOCKS_PER_SEC;
                 if (averageTime < bestTime) bestTime = averageTime;
 
-                PROGRESS("%1i- %-29.29s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+                PROGRESS("%1i- %-29.29s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000000);
 
                 /* CRC Checking */
                 crcDecoded = XXH32(orig_buff, (int)benchedSize, 0);
                 if (crcOriginal!=crcDecoded) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOriginal, (unsigned)crcDecoded); exit(1); }
             }
 
-            DISPLAY("%2i-%-29.29s :%10i -> %7.1f MB/s\n", dAlgNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000.);
+            DISPLAY("%2i-%-29.29s :%10i -> %7.1f MB/s\n", dAlgNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000000);
         }
       }
       free(orig_buff);
       free(compressed_buff);
       free(chunkP);
-  }
+    }
 
-  LZ4F_freeDecompressionContext(g_dCtx);
-  if (g_pause) { printf("press enter...\n"); (void)getchar(); }
+    LZ4F_freeDecompressionContext(g_dCtx);
+    if (g_pause) { printf("press enter...\n"); (void)getchar(); }
 
-  return 0;
+    return 0;
 }
 
 
-static int usage(char* exename)
+static int usage(const char* exename)
 {
     DISPLAY( "Usage :\n");
     DISPLAY( "      %s [arg] file1 file2 ... fileX\n", exename);
@@ -765,41 +701,37 @@ static int usage_advanced(void)
     return 0;
 }
 
-static int badusage(char* exename)
+static int badusage(const char* exename)
 {
     DISPLAY("Wrong parameters\n");
     usage(exename);
     return 0;
 }
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
     int i,
         filenamesStart=2;
-    char* exename=argv[0];
-    char* input_filename=0;
+    const char* exename = argv[0];
+    const char* input_filename=0;
 
     // Welcome message
     DISPLAY(WELCOME_MESSAGE);
 
     if (argc<2) { badusage(exename); return 1; }
 
-    for(i=1; i<argc; i++)
-    {
-        char* argument = argv[i];
+    for(i=1; i<argc; i++) {
+        const char* argument = argv[i];
 
         if(!argument) continue;   // Protection if argument empty
-        if (!strcmp(argument, "--no-prompt"))
-        {
+        if (!strcmp(argument, "--no-prompt")) {
             g_noPrompt = 1;
             continue;
         }
 
         // Decode command (note : aggregated commands are allowed)
-        if (argument[0]=='-')
-        {
-            while (argument[1]!=0)
-            {
+        if (argument[0]=='-') {
+            while (argument[1]!=0) {
                 argument ++;
 
                 switch(argument[0])
@@ -807,8 +739,7 @@ int main(int argc, char** argv)
                     // Select compression algorithm only
                 case 'c':
                     g_decompressionTest = 0;
-                    while ((argument[1]>= '0') && (argument[1]<= '9'))
-                    {
+                    while ((argument[1]>= '0') && (argument[1]<= '9')) {
                         g_compressionAlgo *= 10;
                         g_compressionAlgo += argument[1] - '0';
                         argument++;
@@ -818,8 +749,7 @@ int main(int argc, char** argv)
                     // Select decompression algorithm only
                 case 'd':
                     g_compressionTest = 0;
-                    while ((argument[1]>= '0') && (argument[1]<= '9'))
-                    {
+                    while ((argument[1]>= '0') && (argument[1]<= '9')) {
                         g_decompressionAlgo *= 10;
                         g_decompressionAlgo += argument[1] - '0';
                         argument++;
@@ -839,8 +769,7 @@ int main(int argc, char** argv)
                     case '5':
                     case '6':
                     case '7':
-                    {
-                        int B = argument[1] - '0';
+                    {   int B = argument[1] - '0';
                         int S = 1 << (8 + 2*B);
                         BMK_setBlocksize(S);
                         argument++;
@@ -854,8 +783,7 @@ _exit_blockProperties:
 
                     // Modify Nb Iterations
                 case 'i':
-                    if ((argument[1] >='0') && (argument[1] <='9'))
-                    {
+                    if ((argument[1] >='0') && (argument[1] <='9')) {
                         int iters = argument[1] - '0';
                         BMK_setNbIterations(iters);
                         argument++;
