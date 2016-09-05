@@ -23,9 +23,6 @@ matrix:
       env: Ubu="12.04cont" PARAMS=gpptest COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS=versionsTest COMPILER=cc
-    - os: linux
-      sudo: false
       env: Ubu="12.04cont" PARAMS='-C programs test-lz4' COMPILER=cc
     - os: linux
       sudo: false
@@ -43,21 +40,22 @@ matrix:
       sudo: false
       env: Ubu="12.04cont" PARAMS='-C programs test-frametest' COMPILER=cc
     # 14.04 LTS Server Edition 64 bit
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS=sanitize COMPILER=clang
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - valgrind
-      env: Ubu="14.04" PARAMS=sanitize COMPILER=clang
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS=staticAnalyze COMPILER=clang
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - clang
-      env: Ubu="14.04" PARAMS=staticAnalyze COMPILER=clang
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS=armtest COMPILER=arm-linux-gnueabi-gcc
+      dist: trusty
       sudo: required
       addons:
         apt:
@@ -65,19 +63,26 @@ matrix:
             - gcc-arm-linux-gnueabi
             - libc6-dev-armel-cross
             - linux-libc-dev-armel-cross
-      env: Ubu="14.04" PARAMS=armtest COMPILER=arm-linux-gnueabi-gcc
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS=versionsTest COMPILER=cc
+      dist: trusty
       sudo: required
-      env: Ubu="14.04" PARAMS='-C programs test-lz4' COMPILER=cc
-    - dist: trusty
+      addons:
+        apt:
+          packages:
+            - python3
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4' COMPILER=cc
+      dist: trusty
+      sudo: required
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4c32' COMPILER=cc
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-      env: Ubu="14.04" PARAMS='-C programs test-lz4c32' COMPILER=cc
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=gcc-5' COMPILER=gcc-5
+      dist: trusty
       sudo: required
       addons:
         apt:
@@ -85,8 +90,8 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - gcc-5
-      env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=gcc-5' COMPILER=gcc-5
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4c32 CC=gcc-5' COMPILER=gcc-5
+      dist: trusty
       sudo: required
       addons:
         apt:
@@ -95,8 +100,8 @@ matrix:
           packages:
             - gcc-5
             - gcc-5-multilib
-      env: Ubu="14.04" PARAMS='-C programs test-lz4c32 CC=gcc-5' COMPILER=gcc-5
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=gcc-6' COMPILER=gcc-6
+      dist: trusty
       sudo: required
       addons:
         apt:
@@ -104,8 +109,8 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - gcc-6
-      env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=gcc-6' COMPILER=gcc-6
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=clang-3.8' COMPILER=clang-3.8
+      dist: trusty
       sudo: required
       addons:
         apt:
@@ -114,38 +119,37 @@ matrix:
             - llvm-toolchain-precise-3.8
           packages:
             - clang-3.8
-      env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=clang-3.8' COMPILER=clang-3.8
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-fullbench32' COMPILER=cc
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-      env: Ubu="14.04" PARAMS='-C programs test-fullbench32' COMPILER=cc
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-fuzzer32' COMPILER=cc
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-      env: Ubu="14.04" PARAMS='-C programs test-fuzzer32' COMPILER=cc
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-frametest32' COMPILER=cc
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-      env: Ubu="14.04" PARAMS='-C programs test-frametest32' COMPILER=cc
-    - dist: trusty
+    - env: Ubu="14.04" PARAMS='-C programs test-mem' COMPILER=cc
+      dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - valgrind
-      env: Ubu="14.04" PARAMS='-C programs test-mem' COMPILER=cc
 
 script:
   - echo PARAMS=$PARAMS
