@@ -1,35 +1,159 @@
 language: c
-compiler: gcc
-script: make $LZ4_TRAVIS_CI_ENV
-before_install:
-  - sudo apt-get update  -qq
-  - sudo apt-get install -qq gcc-arm-linux-gnueabi
-  - sudo apt-get install -qq clang
-  - sudo apt-get install -qq g++-multilib
-  - sudo apt-get install -qq gcc-multilib
-  - sudo apt-get install -qq valgrind
-  - sudo apt-get install -qq python3
-
-env:
-  - LZ4_TRAVIS_CI_ENV=travis-install
-  - LZ4_TRAVIS_CI_ENV=examples
-  - LZ4_TRAVIS_CI_ENV=cmake
-  - LZ4_TRAVIS_CI_ENV=clangtest
-  - LZ4_TRAVIS_CI_ENV=sanitize
-  - LZ4_TRAVIS_CI_ENV=staticAnalyze
-  - LZ4_TRAVIS_CI_ENV=gpptest
-  - LZ4_TRAVIS_CI_ENV=armtest
-  - LZ4_TRAVIS_CI_ENV=versionsTest
-  - LZ4_TRAVIS_CI_ENV="-C programs test-lz4"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-lz4c"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-lz4c32"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-fullbench"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-fullbench32"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-fuzzer"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-fuzzer32"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-frametest"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-frametest32"
-  - LZ4_TRAVIS_CI_ENV="-C programs test-mem"
-
 matrix:
   fast_finish: true
+  include:
+    # OS X Mavericks
+    - os: osx
+      env: Ubu="OS X Mavericks" PARAMS='-C programs test-lz4 CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"' COMPILER=clang
+    # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS="install PREFIX=~/install_test_dir" COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS="examples" COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS="cmake" COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS=clangtest COMPILER=clang
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS=gpptest COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS='-C programs test-lz4' COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS='-C programs test-lz4 MOREFLAGS="-std=c99"' COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS='-C programs test-lz4c' COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS='-C programs test-fullbench' COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS='-C programs test-fuzzer' COMPILER=cc
+    - os: linux
+      sudo: false
+      env: Ubu="12.04cont" PARAMS='-C programs test-frametest' COMPILER=cc
+    # 14.04 LTS Server Edition 64 bit
+    - env: Ubu="14.04" PARAMS=sanitize COMPILER=clang
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - valgrind
+    - env: Ubu="14.04" PARAMS=staticAnalyze COMPILER=clang
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - clang
+    - env: Ubu="14.04" PARAMS=armtest COMPILER=arm-linux-gnueabi-gcc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - gcc-arm-linux-gnueabi
+            - libc6-dev-armel-cross
+            - linux-libc-dev-armel-cross
+    - env: Ubu="14.04" PARAMS=versionsTest COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - python3
+            - libc6-dev-i386
+            - gcc-multilib
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4' COMPILER=cc
+      dist: trusty
+      sudo: required
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4c32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=gcc-5' COMPILER=gcc-5
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - gcc-5
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4c32 CC=gcc-5' COMPILER=gcc-5
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - gcc-5
+            - gcc-5-multilib
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=gcc-6' COMPILER=gcc-6
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - gcc-6
+    - env: Ubu="14.04" PARAMS='-C programs test-lz4 CC=clang-3.8' COMPILER=clang-3.8
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-precise-3.8
+          packages:
+            - clang-3.8
+    - env: Ubu="14.04" PARAMS='-C programs test-fullbench32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+    - env: Ubu="14.04" PARAMS='-C programs test-fuzzer32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+    - env: Ubu="14.04" PARAMS='-C programs test-frametest32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+    - env: Ubu="14.04" PARAMS='-C programs test-mem' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - valgrind
+
+script:
+  - echo PARAMS=$PARAMS
+  - $COMPILER -v
+  - sh -c "make $PARAMS"

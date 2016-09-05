@@ -19,7 +19,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-   - ZSTD source repository : https://github.com/Cyan4973/zstd
+   - LZ4 source repository : https://github.com/Cyan4973/lz4
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
