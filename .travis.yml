@@ -70,6 +70,8 @@ matrix:
         apt:
           packages:
             - python3
+            - libc6-dev-i386
+            - gcc-multilib
     - env: Ubu="14.04" PARAMS='-C programs test-lz4' COMPILER=cc
       dist: trusty
       sudo: required
