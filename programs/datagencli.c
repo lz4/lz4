@@ -20,7 +20,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     You can contact the author at :
-   - ZSTD source repository : https://github.com/Cyan4973/zstd
+   - LZ4 source repository : https://github.com/Cyan4973/lz4
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
@@ -53,8 +53,8 @@
 /**************************************
 *  Constants
 **************************************/
-#ifndef ZSTD_VERSION
-#  define ZSTD_VERSION "r1"
+#ifndef LZ4_VERSION
+#  define LZ4_VERSION "r1"
 #endif
 
 #define KB *(1 <<10)
@@ -182,7 +182,7 @@ int main(int argc, char** argv)
         }
     }
 
-    DISPLAYLEVEL(4, "Data Generator %s \n", ZSTD_VERSION);
+    DISPLAYLEVEL(4, "Data Generator %s \n", LZ4_VERSION);
     DISPLAYLEVEL(3, "Seed = %u \n", seed);
     if (proba!=COMPRESSIBILITY_DEFAULT) DISPLAYLEVEL(3, "Compressibility : %i%%\n", (U32)(proba*100));
 
