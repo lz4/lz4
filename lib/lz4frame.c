@@ -711,6 +711,7 @@ size_t LZ4F_compressEnd(LZ4F_compressionContext_t compressionContext, void* dstB
     }
 
     cctxPtr->cStage = 0;   /* state is now re-usable (with identical preferences) */
+    cctxPtr->maxBufferSize = 0;  /* reuse HC context */
 
     if (cctxPtr->prefs.frameInfo.contentSize) {
         if (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)
