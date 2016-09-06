@@ -23,3 +23,5 @@ lz4
 *.user
 .clang_complete
 _codelite/
+_codelite_lz4/
+*.zip
