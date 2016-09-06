@@ -1184,7 +1184,7 @@ size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
                 }
                 selectedIn = dctxPtr->tmpIn;
                 dctxPtr->dStage = dstage_decodeCBlock;
-                break;
+                /* pass-through */
             }
 
         case dstage_decodeCBlock:

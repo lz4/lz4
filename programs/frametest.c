@@ -654,7 +654,6 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
         {   const BYTE* ip = (const BYTE*)compressedBuffer;
             const BYTE* const iend = ip + cSize;
-            DISPLAY("cSize : %u  ; srcSize : %u \n", (U32)cSize, (U32)srcDataLength);
             BYTE* op = (BYTE*)decodedBuffer;
             BYTE* const oend = op + srcDataLength;
             size_t totalOut = 0;
@@ -672,11 +671,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 if (oSize > (size_t)(oend-op)) oSize = oend-op;
                 dOptions.stableDst = FUZ_rand(&randState) & 1;
                 if (nonContiguousDst==2) dOptions.stableDst = 0;
-                DISPLAY("in : %u / %u  ; out : %u / %u \n", (U32)iSize, (U32)(iend-ip), (U32)oSize, (U32)(oend-op));
-                if (iSize == 107662)
-                    iSize += !iSize;
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, &dOptions);
-                DISPLAY("consumed : %u  ; generated : %u  ; hint : %u \n", (U32)iSize, (U32)oSize, (U32)result);
                 if (result == (size_t)-LZ4F_ERROR_contentChecksum_invalid)
                     locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i:%s)", (int)result, LZ4F_getErrorName((LZ4F_errorCode_t)result));
