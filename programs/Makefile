@@ -102,7 +102,7 @@ datagen : datagen.o datagencli.c
 
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
-	@rm -f core *.o *.test tmp* \
+	@$(RM) core *.o *.test tmp* \
         lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
@@ -131,14 +131,14 @@ install: lz4$(EXT) lz4c$(EXT)
 	@echo lz4 installation completed
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
-	rm -f $(DESTDIR)$(BINDIR)/unlz4$(EXT)
-	[ -x $(DESTDIR)$(BINDIR)/lz4$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4$(EXT)
-	[ -x $(DESTDIR)$(BINDIR)/lz4c$(EXT) ] && rm -f $(DESTDIR)$(BINDIR)/lz4c$(EXT)
-	[ -f $(DESTDIR)$(MANDIR)/lz4.1 ] && rm -f $(DESTDIR)$(MANDIR)/lz4.1
-	rm -f $(DESTDIR)$(MANDIR)/lz4c.1
-	rm -f $(DESTDIR)$(MANDIR)/lz4cat.1
-	rm -f $(DESTDIR)$(MANDIR)/unlz4.1
+	@$(RM) $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
+	@$(RM) $(DESTDIR)$(BINDIR)/unlz4$(EXT)
+	@$(RM) $(DESTDIR)$(BINDIR)/lz4$(EXT)
+	@$(RM) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
+	@$(RM) $(DESTDIR)$(MANDIR)/lz4.1
+	@$(RM) $(DESTDIR)$(MANDIR)/lz4c.1
+	@$(RM) $(DESTDIR)$(MANDIR)/lz4cat.1
+	@$(RM) $(DESTDIR)$(MANDIR)/unlz4.1
 	@echo lz4 programs successfully uninstalled
 
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
@@ -164,7 +164,7 @@ test-lz4-sparse: lz4 datagen
 	./datagen -s1 -g1200007 -P100 | ./lz4 | ./lz4 -dv --sparse > tmpOdd   # Odd size file (to generate non-full last block)
 	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
 	ls -ls tmpOdd
-	@rm tmp*
+	@$(RM) tmp*
 	@echo "\n Compatibility with Console :"
 	echo "Hello World 1 !" | ./lz4 | ./lz4 -d -c
 	echo "Hello World 2 !" | ./lz4 | ./lz4 -d | cat
@@ -177,7 +177,7 @@ test-lz4-sparse: lz4 datagen
 	./lz4 -d -v tmpC >> tmpR
 	ls -ls tmp*
 	diff tmp2M tmpR
-	@rm tmp*
+	@$(RM) tmp*
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
@@ -190,7 +190,7 @@ test-lz4-contentSize: lz4 datagen
 	@ls -ls tmp
 	./lz4 --quiet --content-size tmp | ./lz4 --verbose --decompress --force --sparse - tmp2
 	@ls -ls tmp2
-	@rm tmp*
+	@$(RM) tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
 	@echo "\n ---- test frame concatenation ----"
@@ -202,7 +202,7 @@ test-lz4-frame-concatenation: lz4 datagen
 	cat nonempty.lz4.test empty.lz4.test nonempty.lz4.test > concat.lz4.test
 	./lz4 -d concat.lz4.test > result.test
 	sdiff orig.test result.test
-	@rm *.test
+	@$(RM) *.test
 	@echo frame concatenation test completed
 
 test-lz4-multiple: lz4 datagen
@@ -212,11 +212,11 @@ test-lz4-multiple: lz4 datagen
 	@./datagen -s3 -g1M   > tmp3 2> $(VOID)
 	./lz4 -f -m tmp*
 	ls -ls tmp*
-	rm tmp1 tmp2 tmp3
+	@$(RM) tmp1 tmp2 tmp3
 	./lz4 -df -m *.lz4
 	ls -ls tmp*
 	./lz4 -f -m tmp1 notHere tmp2; echo $$?
-	@rm tmp*
+	@$(RM) tmp*
 
 test-lz4-basic: lz4 datagen
 	@echo "\n ---- test lz4 basic compression/decompression ----"
@@ -234,7 +234,7 @@ test-lz4-basic: lz4 datagen
 	./datagen -g256MB | ./lz4 -vqB4D | ./lz4 -t
 	./datagen -g6GB   | ./lz4 -vqB5D | ./lz4 -qt
 	./datagen -g6GB   | ./lz4 -vq9BD | ./lz4 -qt
-	@rm tmp*
+	@$(RM) tmp*
 
 test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
 	@echo "\n ---- test pass-through ----"
@@ -296,7 +296,7 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 tmp tmp2
 	./datagen -g256MB > tmp
 	valgrind --leak-check=yes --error-exitcode=1 ./lz4 -B4D -f -vq tmp $(VOID)
-	rm tmp*
+	$(RM) tmp*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
 
