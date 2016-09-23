@@ -41,8 +41,10 @@ LZ4DIR  = lib
 
 # Define nul output
 ifneq (,$(filter Windows%,$(OS)))
+EXT = .exe
 VOID = nul
 else
+EXT =
 VOID = /dev/null
 endif
 
@@ -58,14 +60,14 @@ lib:
 
 lz4:
 	@$(MAKE) -C $(PRGDIR)
-	@cp $(PRGDIR)/lz4 .
+	@cp $(PRGDIR)/lz4$(EXT) .
 
 clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
 	@$(MAKE) -C versionsTest $@ > $(VOID)
-	@$(RM) lz4
+	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
 
