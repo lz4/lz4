@@ -40,6 +40,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER := $(shell echo $(LIBVER_SCRIPT))
 
+BUILD_STATIC:= yes
 
 DESTDIR?=
 PREFIX ?= /usr/local
@@ -71,9 +72,11 @@ default: liblz4
 all: liblz4
 
 liblz4: *.c
+ifeq ($(BUILD_STATIC),yes)
 	@echo compiling static library
 	@$(CC) $(FLAGS) -c $^
 	@$(AR) rcs $@.a *.o
+endif
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
@@ -104,7 +107,9 @@ install: liblz4 liblz4.pc
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	@install -m 644 liblz4.pc $(DESTDIR)$(LIBDIR)/pkgconfig/
+ifeq ($(BUILD_STATIC),yes)
 	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+endif
 	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@install -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
