@@ -1,9 +1,10 @@
-r132
+v1.7.2
+Changed : moved to versioning; package, cli and library have same version number
 Improved: Small decompression speed boost (+4%)
 Improved: Performance on ARMv6 and ARMv7
 Added : Debianization, by Evgeniy Polyakov
-Makefile: Safely protects lz4 version when selecting custom CFLAGS
-Makefile: Generates intermediate object files (*.o) for faster compilation on low power systems
+Makefile: Generates object files (*.o) for faster (re)compilation on low power systems
+Fix : cli : crash on some invalid inputs
 
 r131
 New    : Dos/DJGPP target, thanks to Louis Santillan (#114)

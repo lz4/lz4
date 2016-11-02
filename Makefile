@@ -91,7 +91,7 @@ test:
 	$(MAKE) -C $(PRGDIR) test
 
 cmake:
-	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
+	@cd contrib/cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
 gpptest: clean
 	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"

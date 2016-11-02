@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: liblz4
 Upstream-Contact: Yann Collet <Cyan4973@github.com>
-Source: https://github.com/Cyan4973/lz4
+Source: https://github.com/lz4/lz4
 
 Files: *
 Copyright: (C) 2011+ Yann Collet

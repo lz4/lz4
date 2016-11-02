@@ -697,12 +697,12 @@ static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput)
     /* Main Loop */
     while (1) {
         int decodeSize;
-        size_t sizeCheck;
         unsigned int blockSize;
 
         /* Block Size */
-        sizeCheck = fread(in_buff, 1, 4, finput);
-        if (sizeCheck==0) break;                   /* Nothing to read : file read is completed */
+        { size_t const sizeCheck = fread(in_buff, 1, 4, finput);
+          if (sizeCheck == 0) break;                   /* Nothing to read : file read is completed */
+          if (sizeCheck != 4) EXM_THROW(52, "Read error : cannot access block size "); }
         blockSize = LZ4IO_readLE32(in_buff);       /* Convert to Little Endian */
         if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
             /* Cannot read next block : maybe new stream ? */
@@ -711,8 +711,8 @@ static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput)
         }
 
         /* Read Block */
-        sizeCheck = fread(in_buff, 1, blockSize, finput);
-        if (sizeCheck!=blockSize) EXM_THROW(52, "Read error : cannot access compressed block !");
+        { size_t const sizeCheck = fread(in_buff, 1, blockSize, finput);
+          if (sizeCheck!=blockSize) EXM_THROW(52, "Read error : cannot access compressed block !"); }
 
         /* Decode Block */
         decodeSize = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);

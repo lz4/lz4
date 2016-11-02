@@ -1,0 +1,7 @@
+# cmake artefact
+
+CMakeCache.txt
+CMakeFiles
+*.cmake
+Makefile
+liblz4.pc
