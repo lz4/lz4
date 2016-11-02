@@ -125,10 +125,10 @@
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
-            if (((g_time - clock()) > refreshRate) || (g_displayLevel>=4)) \
+            if (((clock_t)(g_time - clock()) > refreshRate) || (g_displayLevel>=4)) \
             { g_time = clock(); DISPLAY(__VA_ARGS__); \
             if (g_displayLevel>=4) fflush(stderr); } }
-static const unsigned refreshRate = CLOCKS_PER_SEC / 6;
+static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_time = 0;
 
 
