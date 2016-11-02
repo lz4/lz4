@@ -1,5 +1,7 @@
 # LZ4 examples
 
+All examples are GPL-v2 licensed.
+
 ## Documents
 
  - [Streaming API Basics](streaming_api_basics.md)
