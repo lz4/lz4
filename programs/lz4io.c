@@ -159,7 +159,7 @@ static const int maxBlockSizeID = 7;
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
     DISPLAYLEVEL(1, "Error %i : ", error);                                \
     DISPLAYLEVEL(1, __VA_ARGS__);                                         \
-    DISPLAYLEVEL(1, "\n");                                                \
+    DISPLAYLEVEL(1, " \n");                                               \
     exit(error);                                                          \
 }
 
@@ -362,8 +362,9 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     while (1) {
         unsigned int outSize;
         /* Read Block */
-        int const inSize = (int) fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
-        if (inSize <= 0) break;
+        size_t const inSize = (int) fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
+        if (inSize == 0) break;
+        if (inSize > LEGACY_BLOCKSIZE) EXM_THROW(23, "Read error : wrong fread() size report ");   /* should be impossible */
         filesize += inSize;
 
         /* Compress Block */
@@ -374,8 +375,9 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         /* Write Block */
         LZ4IO_writeLE32(out_buff, outSize);
         {   size_t const sizeCheck = fwrite(out_buff, 1, outSize+4, foutput);
-            if (sizeCheck!=(size_t)(outSize+4)) EXM_THROW(23, "Write error : cannot write compressed block");
+            if (sizeCheck!=(size_t)(outSize+4)) EXM_THROW(24, "Write error : cannot write compressed block");
     }   }
+    if (ferror(finput)) EXM_THROW(25, "Error while reading %s ", input_filename);
 
     /* Status */
     end = clock();
@@ -451,7 +453,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     void* const dstBuffer = ress.dstBuffer;
     const size_t dstBufferSize = ress.dstBufferSize;
     const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
-    size_t headerSize, readSize;
+    size_t readSize;
     LZ4F_compressionContext_t ctx = ress.ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
 
@@ -498,7 +500,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* multiple-blocks file */
     {
         /* Write Archive Header */
-        headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
+        size_t headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
         if (LZ4F_isError(headerSize)) EXM_THROW(32, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
         { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
           if (sizeCheck!=headerSize) EXM_THROW(33, "Write error : cannot write header"); }
@@ -522,13 +524,14 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
             readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
             filesize += readSize;
         }
+        if (ferror(srcFile)) EXM_THROW(36, "Error reading %s ", srcFileName);
 
         /* End of Stream mark */
         headerSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
-        if (LZ4F_isError(headerSize)) EXM_THROW(36, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
+        if (LZ4F_isError(headerSize)) EXM_THROW(37, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
 
         { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-          if (sizeCheck!=headerSize) EXM_THROW(37, "Write error : cannot write end of stream"); }
+          if (sizeCheck!=headerSize) EXM_THROW(38, "Write error : cannot write end of stream"); }
         compressedfilesize += headerSize;
     }
 
@@ -722,6 +725,7 @@ static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput)
         /* Write Block */
         storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, decodeSize, storedSkips);
     }
+    if (ferror(finput)) EXM_THROW(54, "Read error : ferror");
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
 
@@ -813,9 +817,11 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
             if (!nextToLoad) break;
         }
     }
+    /* can be out because readSize == 0, which could be an fread() error */
+    if (ferror(srcFile)) EXM_THROW(67, "Read error");
 
     LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
-    if (nextToLoad!=0) EXM_THROW(67, "Unfinished stream");
+    if (nextToLoad!=0) EXM_THROW(68, "Unfinished stream");
 
     return filesize;
 }
@@ -838,6 +844,7 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
         total += read;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, read, storedSkips);
     }
+    if (ferror(finput)) EXM_THROW(51, "Read Error")
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
     return total;
