@@ -50,10 +50,6 @@ VOID = /dev/null
 endif
 
 
-# Default test parameters
-TEST_FILES   := COPYING
-FUZZER_TIME  := -T9mn
-
 
 default: lz4
 
