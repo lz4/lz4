@@ -29,6 +29,7 @@
 **************************************/
 #include <stdio.h>     /* fprintf, stderr */
 #include "datagen.h"   /* RDG_generate */
+#include "lz4.h"       /* LZ4_VERSION_STRING */
 
 
 /**************************************
@@ -53,10 +54,6 @@
 /**************************************
 *  Constants
 **************************************/
-#ifndef LZ4_VERSION
-#  define LZ4_VERSION "r1"
-#endif
-
 #define KB *(1 <<10)
 #define MB *(1 <<20)
 #define GB *(1U<<30)
@@ -182,7 +179,7 @@ int main(int argc, char** argv)
         }
     }
 
-    DISPLAYLEVEL(4, "Data Generator %s \n", LZ4_VERSION);
+    DISPLAYLEVEL(4, "Data Generator %s \n", LZ4_VERSION_STRING);
     DISPLAYLEVEL(3, "Seed = %u \n", seed);
     if (proba!=COMPRESSIBILITY_DEFAULT) DISPLAYLEVEL(3, "Compressibility : %i%%\n", (U32)(proba*100));
 

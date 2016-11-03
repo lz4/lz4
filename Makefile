@@ -41,8 +41,10 @@ LZ4DIR  = lib
 
 # Define nul output
 ifneq (,$(filter Windows%,$(OS)))
+EXT = .exe
 VOID = nul
 else
+EXT =
 VOID = /dev/null
 endif
 
@@ -58,14 +60,14 @@ lib:
 
 lz4:
 	@$(MAKE) -C $(PRGDIR)
-	@cp $(PRGDIR)/lz4 .
+	@cp $(PRGDIR)/lz4$(EXT) .
 
 clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
 	@$(MAKE) -C versionsTest $@ > $(VOID)
-	@$(RM) lz4
+	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
 
@@ -89,7 +91,7 @@ test:
 	$(MAKE) -C $(PRGDIR) test
 
 cmake:
-	@cd cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
+	@cd contrib/cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
 
 gpptest: clean
 	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"

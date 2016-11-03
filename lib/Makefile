@@ -40,10 +40,11 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER := $(shell echo $(LIBVER_SCRIPT))
 
+BUILD_STATIC:= yes
 
 DESTDIR?=
 PREFIX ?= /usr/local
-CPPFLAGS= -DXXH_NAMESPACE=LZ4_
+CPPFLAGS= -DXXH_NAMESPACE=LZ4_ -DLZ4_DLL_EXPORT=1
 CFLAGS ?= -O3
 CFLAGS += -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
@@ -71,9 +72,11 @@ default: liblz4
 all: liblz4
 
 liblz4: *.c
+ifeq ($(BUILD_STATIC),yes)
 	@echo compiling static library
 	@$(CC) $(FLAGS) -c $^
 	@$(AR) rcs $@.a *.o
+endif
 	@echo compiling dynamic library $(LIBVER)
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
@@ -81,7 +84,7 @@ liblz4: *.c
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
 
 clean:
-	@rm -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc
+	@$(RM) -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc
 	@echo Cleaning library completed
 
 
@@ -104,21 +107,23 @@ install: liblz4 liblz4.pc
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	@install -m 644 liblz4.pc $(DESTDIR)$(LIBDIR)/pkgconfig/
+ifeq ($(BUILD_STATIC),yes)
 	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+endif
 	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@install -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
 	@echo lz4 static and shared libraries installed
 
 uninstall:
-	@rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
-	@rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	@rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
-	@[ -x $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER) ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
-	@[ -f $(DESTDIR)$(LIBDIR)/liblz4.a ] && rm -f $(DESTDIR)$(LIBDIR)/liblz4.a
-	@[ -f $(DESTDIR)$(INCLUDEDIR)/lz4.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@[ -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	@[ -f $(DESTDIR)$(INCLUDEDIR)/lz4frame.h ] && rm -f $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
+	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
+	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
+	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
+	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.a
+	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
 	@echo lz4 libraries successfully uninstalled
 
 endif

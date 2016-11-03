@@ -14,7 +14,7 @@ On the other end, a high compression derivative, LZ4_HC, is also provided,
 trading CPU time for improved compression ratio.
 All versions feature the same decompression speed.
 
-LZ4 library is provided as open-source software using BSD license.s
+LZ4 library is provided as open-source software using BSD 2-Clause license.
 
 
 |Branch      |Status   |

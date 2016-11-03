@@ -70,7 +70,7 @@
 #  if !defined(__DJGPP__)
 #    define SET_BINARY_MODE(file) { int unused=_setmode(_fileno(file), _O_BINARY); (void)unused; }
 #    include <windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
-#    include <WinIoCtl.h> /* FSCTL_SET_SPARSE */
+#    include <winioctl.h> /* FSCTL_SET_SPARSE */
 #    define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
 #    if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
 #      define fseek _fseeki64
@@ -125,10 +125,10 @@
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
-            if ((LZ4IO_GetMilliSpan(g_time) > refreshRate) || (g_displayLevel>=4)) \
+            if (((clock_t)(g_time - clock()) > refreshRate) || (g_displayLevel>=4)) \
             { g_time = clock(); DISPLAY(__VA_ARGS__); \
-            if (g_displayLevel>=4) fflush(stdout); } }
-static const unsigned refreshRate = 150;
+            if (g_displayLevel>=4) fflush(stderr); } }
+static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_time = 0;
 
 
@@ -150,7 +150,9 @@ static const int maxBlockSizeID = 7;
 /**************************************
 *  Exceptions
 ***************************************/
-#define DEBUG 0
+#ifndef DEBUG
+#  define DEBUG 0
+#endif
 #define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
 #define EXM_THROW(error, ...)                                             \
 {                                                                         \
@@ -232,13 +234,6 @@ int LZ4IO_setContentSize(int enable)
     return g_contentSizeFlag;
 }
 
-static unsigned LZ4IO_GetMilliSpan(clock_t nPrevious)
-{
-    clock_t nCurrent = clock();
-    unsigned nSpan = (unsigned)(((nCurrent - nPrevious) * 1000) / CLOCKS_PER_SEC);
-    return nSpan;
-}
-
 static unsigned long long LZ4IO_GetFileSize(const char* infilename)
 {
     int r;
@@ -264,45 +259,34 @@ static int LZ4IO_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ
 
 static int LZ4IO_getFiles(const char* input_filename, const char* output_filename, FILE** pfinput, FILE** pfoutput)
 {
-
-    if (!strcmp (input_filename, stdinmark))
-    {
-        DISPLAYLEVEL(4,"Using stdin for input\n");
+    if (!strcmp (input_filename, stdinmark)) {
+        DISPLAYLEVEL(4,"Using stdin for input \n");
         *pfinput = stdin;
         SET_BINARY_MODE(stdin);
-    }
-    else
-    {
+    } else {
         *pfinput = fopen(input_filename, "rb");
     }
 
-    if ( *pfinput==0 )
-    {
-        DISPLAYLEVEL(1, "Unable to access file for processing: %s\n", input_filename);
+    if ( *pfinput==0 ) {
+        DISPLAYLEVEL(1, "Unable to access file for processing: %s \n", input_filename);
         return 1;
     }
 
-    if (!strcmp (output_filename, stdoutmark))
-    {
-        DISPLAYLEVEL(4,"Using stdout for output\n");
+    if (!strcmp (output_filename, stdoutmark)) {
+        DISPLAYLEVEL(4,"Using stdout for output \n");
         *pfoutput = stdout;
         SET_BINARY_MODE(stdout);
-        if (g_sparseFileSupport==1)
-        {
+        if (g_sparseFileSupport==1) {
             g_sparseFileSupport = 0;
             DISPLAYLEVEL(4, "Sparse File Support is automatically disabled on stdout ; try --sparse \n");
         }
-    }
-    else
-    {
+    } else {
         /* Check if destination file already exists */
         *pfoutput=0;
         if (output_filename != nulmark) *pfoutput = fopen( output_filename, "rb" );
-        if (*pfoutput!=0)
-        {
+        if (*pfoutput!=0) {
             fclose(*pfoutput);
-            if (!g_overwrite)
-            {
+            if (!g_overwrite) {
                 int ch = 'Y';
                 DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
                 if ((g_displayLevel <= 1) || (*pfinput == stdin))
@@ -355,12 +339,10 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     const int outBuffSize = LZ4_compressBound(LEGACY_BLOCKSIZE);
     FILE* finput;
     FILE* foutput;
-    clock_t start, end;
-    size_t sizeCheck;
-
+    clock_t end;
 
     /* Init */
-    start = clock();
+    clock_t const start = clock();
     if (compressionlevel < 3) compressionFunction = LZ4IO_LZ4_compress; else compressionFunction = LZ4_compress_HC;
 
     if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
@@ -373,16 +355,15 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 
     /* Write Archive Header */
     LZ4IO_writeLE32(out_buff, LEGACY_MAGICNUMBER);
-    sizeCheck = fwrite(out_buff, 1, MAGICNUMBER_SIZE, foutput);
-    if (sizeCheck!=MAGICNUMBER_SIZE) EXM_THROW(22, "Write error : cannot write header");
+    { size_t const sizeCheck = fwrite(out_buff, 1, MAGICNUMBER_SIZE, foutput);
+      if (sizeCheck!=MAGICNUMBER_SIZE) EXM_THROW(22, "Write error : cannot write header"); }
 
     /* Main Loop */
-    while (1)
-    {
+    while (1) {
         unsigned int outSize;
         /* Read Block */
-        int inSize = (int) fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
-        if( inSize<=0 ) break;
+        int const inSize = (int) fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
+        if (inSize <= 0) break;
         filesize += inSize;
 
         /* Compress Block */
@@ -392,18 +373,18 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 
         /* Write Block */
         LZ4IO_writeLE32(out_buff, outSize);
-        sizeCheck = fwrite(out_buff, 1, outSize+4, foutput);
-        if (sizeCheck!=(size_t)(outSize+4)) EXM_THROW(23, "Write error : cannot write compressed block");
-    }
+        {   size_t const sizeCheck = fwrite(out_buff, 1, outSize+4, foutput);
+            if (sizeCheck!=(size_t)(outSize+4)) EXM_THROW(23, "Write error : cannot write compressed block");
+    }   }
 
     /* Status */
     end = clock();
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    filesize += !filesize;   /* avoid divide by zero */
+    if (end==start) end+=1;  /* avoid division by zero (speed) */
+    filesize += !filesize;   /* avoid division by zero (ratio) */
+    DISPLAYLEVEL(2, "\r%79s\r", "");   /* blank line */
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-        (unsigned long long) filesize, (unsigned long long) compressedfilesize, (double)compressedfilesize/filesize*100);
-    {
-        double seconds = (double)(end - start)/CLOCKS_PER_SEC;
+        filesize, compressedfilesize, (double)compressedfilesize / filesize * 100);
+    {   double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
         DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
     }
 
@@ -433,9 +414,8 @@ static cRess_t LZ4IO_createCResources(void)
 {
     const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
     cRess_t ress;
-    LZ4F_errorCode_t errorCode;
 
-    errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
+    LZ4F_errorCode_t const errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
 
     /* Allocate Memory */
@@ -450,11 +430,10 @@ static cRess_t LZ4IO_createCResources(void)
 
 static void LZ4IO_freeCResources(cRess_t ress)
 {
-    LZ4F_errorCode_t errorCode;
     free(ress.srcBuffer);
     free(ress.dstBuffer);
-    errorCode = LZ4F_freeCompressionContext(ress.ctx);
-    if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
+    { LZ4F_errorCode_t const errorCode = LZ4F_freeCompressionContext(ress.ctx);
+      if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode)); }
 }
 
 /*
@@ -472,7 +451,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     void* const dstBuffer = ress.dstBuffer;
     const size_t dstBufferSize = ress.dstBufferSize;
     const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
-    size_t sizeCheck, headerSize, readSize;
+    size_t headerSize, readSize;
     LZ4F_compressionContext_t ctx = ress.ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
 
@@ -489,12 +468,11 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     prefs.frameInfo.blockMode = (LZ4F_blockMode_t)g_blockIndependence;
     prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
-    if (g_contentSizeFlag)
-    {
-      unsigned long long fileSize = LZ4IO_GetFileSize(srcFileName);
+    if (g_contentSizeFlag) {
+      unsigned long long const fileSize = LZ4IO_GetFileSize(srcFileName);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
       if (fileSize==0)
-          DISPLAYLEVEL(3, "Warning : cannot determine uncompressed frame content size \n");
+          DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
     }
 
     /* read first block */
@@ -502,19 +480,18 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     filesize += readSize;
 
     /* single-block file */
-    if (readSize < blockSize)
-    {
+    if (readSize < blockSize) {
         /* Compress in single pass */
-        size_t cSize = LZ4F_compressFrame(dstBuffer, dstBufferSize, srcBuffer, readSize, &prefs);
+        size_t const cSize = LZ4F_compressFrame(dstBuffer, dstBufferSize, srcBuffer, readSize, &prefs);
         if (LZ4F_isError(cSize)) EXM_THROW(34, "Compression failed : %s", LZ4F_getErrorName(cSize));
-        compressedfilesize += cSize;
+        compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(filesize+!filesize)*100);   /* avoid division by zero */
 
         /* Write Block */
-        sizeCheck = fwrite(dstBuffer, 1, cSize, dstFile);
-        if (sizeCheck!=cSize) EXM_THROW(35, "Write error : cannot write compressed block");
-    }
+        {   size_t const sizeCheck = fwrite(dstBuffer, 1, cSize, dstFile);
+            if (sizeCheck!=cSize) EXM_THROW(35, "Write error : cannot write compressed block");
+    }   }
 
     else
 
@@ -523,13 +500,12 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
         /* Write Archive Header */
         headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
         if (LZ4F_isError(headerSize)) EXM_THROW(32, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
-        sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-        if (sizeCheck!=headerSize) EXM_THROW(33, "Write error : cannot write header");
+        { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
+          if (sizeCheck!=headerSize) EXM_THROW(33, "Write error : cannot write header"); }
         compressedfilesize += headerSize;
 
         /* Main Loop */
-        while (readSize>0)
-        {
+        while (readSize>0) {
             size_t outSize;
 
             /* Compress Block */
@@ -539,8 +515,8 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
             DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ", (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
 
             /* Write Block */
-            sizeCheck = fwrite(dstBuffer, 1, outSize, dstFile);
-            if (sizeCheck!=outSize) EXM_THROW(35, "Write error : cannot write compressed block");
+            { size_t const sizeCheck = fwrite(dstBuffer, 1, outSize, dstFile);
+              if (sizeCheck!=outSize) EXM_THROW(35, "Write error : cannot write compressed block"); }
 
             /* Read next block */
             readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
@@ -551,8 +527,8 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
         headerSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
         if (LZ4F_isError(headerSize)) EXM_THROW(36, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
 
-        sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-        if (sizeCheck!=headerSize) EXM_THROW(37, "Write error : cannot write end of stream");
+        { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
+          if (sizeCheck!=headerSize) EXM_THROW(37, "Write error : cannot write end of stream"); }
         compressedfilesize += headerSize;
     }
 
@@ -571,24 +547,17 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
-    clock_t start, end;
-    cRess_t ress;
-    int issueWithSrcFile = 0;
+    clock_t const start = clock();
+    cRess_t const ress = LZ4IO_createCResources();
 
-    /* Init */
-    start = clock();
-    ress = LZ4IO_createCResources();
-
-    /* Compress File */
-    issueWithSrcFile += LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel);
+    int const issueWithSrcFile = LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel);
 
     /* Free resources */
     LZ4IO_freeCResources(ress);
 
     /* Final Status */
-    end = clock();
-    {
-        double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+    {   clock_t const end = clock();
+        double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Completed in %.2f sec \n", seconds);
     }
 
@@ -604,15 +573,11 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
     char* dstFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
-    cRess_t ress;
-
-    /* init */
-    ress = LZ4IO_createCResources();
+    cRess_t const ress = LZ4IO_createCResources();
 
     /* loop on each file */
-    for (i=0; i<ifntSize; i++)
-    {
-        size_t ifnSize = strlen(inFileNamesTable[i]);
+    for (i=0; i<ifntSize; i++) {
+        size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (ofnSize <= ifnSize+suffixSize+1) { free(dstFileName); ofnSize = ifnSize + 20; dstFileName = (char*)malloc(ofnSize); }
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
@@ -634,7 +599,7 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
 
 static unsigned LZ4IO_readLE32 (const void* s)
 {
-    const unsigned char* srcPtr = (const unsigned char*)s;
+    const unsigned char* const srcPtr = (const unsigned char*)s;
     unsigned value32 = srcPtr[0];
     value32 += (srcPtr[1]<<8);
     value32 += (srcPtr[2]<<16);
@@ -650,26 +615,22 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     static const size_t segmentSizeT = (32 KB) / sizeT;
 
-    if (!g_sparseFileSupport)   /* normal write */
-    {
-        size_t sizeCheck = fwrite(buffer, 1, bufferSize, file);
+    if (!g_sparseFileSupport) {  /* normal write */
+        size_t const sizeCheck = fwrite(buffer, 1, bufferSize, file);
         if (sizeCheck != bufferSize) EXM_THROW(70, "Write error : cannot write decoded block");
         return 0;
     }
 
     /* avoid int overflow */
-    if (storedSkips > 1 GB)
-    {
-        int seekResult = fseek(file, 1 GB, SEEK_CUR);
+    if (storedSkips > 1 GB) {
+        int const seekResult = fseek(file, 1 GB, SEEK_CUR);
         if (seekResult != 0) EXM_THROW(71, "1 GB skip error (sparse file support)");
         storedSkips -= 1 GB;
     }
 
-    while (ptrT < bufferTEnd)
-    {
+    while (ptrT < bufferTEnd) {
         size_t seg0SizeT = segmentSizeT;
         size_t nb0T;
-        int seekResult;
 
         /* count leading zeros */
         if (seg0SizeT > bufferSizeT) seg0SizeT = bufferSizeT;
@@ -677,37 +638,32 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
         for (nb0T=0; (nb0T < seg0SizeT) && (ptrT[nb0T] == 0); nb0T++) ;
         storedSkips += (unsigned)(nb0T * sizeT);
 
-        if (nb0T != seg0SizeT)   /* not all 0s */
-        {
-            size_t sizeCheck;
-            seekResult = fseek(file, storedSkips, SEEK_CUR);
+        if (nb0T != seg0SizeT) {   /* not all 0s */
+            int const seekResult = fseek(file, storedSkips, SEEK_CUR);
             if (seekResult) EXM_THROW(72, "Sparse skip error ; try --no-sparse");
             storedSkips = 0;
             seg0SizeT -= nb0T;
             ptrT += nb0T;
-            sizeCheck = fwrite(ptrT, sizeT, seg0SizeT, file);
-            if (sizeCheck != seg0SizeT) EXM_THROW(73, "Write error : cannot write decoded block");
-        }
+            {   size_t const sizeCheck = fwrite(ptrT, sizeT, seg0SizeT, file);
+                if (sizeCheck != seg0SizeT) EXM_THROW(73, "Write error : cannot write decoded block");
+        }   }
         ptrT += seg0SizeT;
     }
 
-    if (bufferSize & maskT)   /* size not multiple of sizeT : implies end of block */
-    {
+    if (bufferSize & maskT) {  /* size not multiple of sizeT : implies end of block */
         const char* const restStart = (const char*)bufferTEnd;
         const char* restPtr = restStart;
-        size_t  restSize =  bufferSize & maskT;
+        size_t const restSize =  bufferSize & maskT;
         const char* const restEnd = restStart + restSize;
         for (; (restPtr < restEnd) && (*restPtr == 0); restPtr++) ;
         storedSkips += (unsigned) (restPtr - restStart);
-        if (restPtr != restEnd)
-        {
-            size_t sizeCheck;
-            int seekResult = fseek(file, storedSkips, SEEK_CUR);
+        if (restPtr != restEnd) {
+            int const seekResult = fseek(file, storedSkips, SEEK_CUR);
             if (seekResult) EXM_THROW(74, "Sparse skip error ; try --no-sparse");
             storedSkips = 0;
-            sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, file);
-            if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(75, "Write error : cannot write decoded end of block");
-        }
+            {   size_t const sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, file);
+                if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(75, "Write error : cannot write decoded end of block");
+        }   }
     }
 
     return storedSkips;
@@ -715,18 +671,13 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
 
 static void LZ4IO_fwriteSparseEnd(FILE* file, unsigned storedSkips)
 {
-    char lastZeroByte[1] = { 0 };
-
-    if (storedSkips>0)   /* implies g_sparseFileSupport */
-    {
-        int seekResult;
-        size_t sizeCheck;
-        storedSkips --;
-        seekResult = fseek(file, storedSkips, SEEK_CUR);
+    if (storedSkips>0) {   /* implies g_sparseFileSupport */
+        int const seekResult = fseek(file, storedSkips-1, SEEK_CUR);
         if (seekResult != 0) EXM_THROW(69, "Final skip error (sparse file)\n");
-        sizeCheck = fwrite(lastZeroByte, 1, 1, file);
-        if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write last zero\n");
-    }
+        {   const char lastZeroByte[1] = { 0 };
+            size_t const sizeCheck = fwrite(lastZeroByte, 1, 1, file);
+            if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write last zero\n");
+    }   }
 }
 
 
@@ -744,25 +695,24 @@ static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput)
     if (!in_buff || !out_buff) EXM_THROW(51, "Allocation error : not enough memory");
 
     /* Main Loop */
-    while (1)
-    {
+    while (1) {
         int decodeSize;
-        size_t sizeCheck;
         unsigned int blockSize;
 
         /* Block Size */
-        sizeCheck = fread(in_buff, 1, 4, finput);
-        if (sizeCheck==0) break;                   /* Nothing to read : file read is completed */
+        { size_t const sizeCheck = fread(in_buff, 1, 4, finput);
+          if (sizeCheck == 0) break;                   /* Nothing to read : file read is completed */
+          if (sizeCheck != 4) EXM_THROW(52, "Read error : cannot access block size "); }
         blockSize = LZ4IO_readLE32(in_buff);       /* Convert to Little Endian */
-        if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE))
-        {   /* Cannot read next block : maybe new stream ? */
+        if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
+            /* Cannot read next block : maybe new stream ? */
             g_magicRead = blockSize;
             break;
         }
 
         /* Read Block */
-        sizeCheck = fread(in_buff, 1, blockSize, finput);
-        if (sizeCheck!=blockSize) EXM_THROW(52, "Read error : cannot access compressed block !");
+        { size_t const sizeCheck = fread(in_buff, 1, blockSize, finput);
+          if (sizeCheck!=blockSize) EXM_THROW(52, "Read error : cannot access compressed block !"); }
 
         /* Decode Block */
         decodeSize = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
@@ -793,14 +743,12 @@ typedef struct {
 } dRess_t;
 
 static const size_t LZ4IO_dBufferSize = 64 KB;
-
 static dRess_t LZ4IO_createDResources(void)
 {
     dRess_t ress;
-    LZ4F_errorCode_t errorCode;
 
     /* init */
-    errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
+    LZ4F_errorCode_t const errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
 
     /* Allocate Memory */
@@ -828,9 +776,8 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     LZ4F_errorCode_t nextToLoad;
     unsigned storedSkips = 0;
 
-    /* Init feed with magic number (already consumed from FILE*  sFile) */
-    {
-        size_t inSize = MAGICNUMBER_SIZE;
+    /* Init feed with magic number (already consumed from FILE* sFile) */
+    {   size_t inSize = MAGICNUMBER_SIZE;
         size_t outSize= 0;
         LZ4IO_writeLE32(ress.srcBuffer, LZ4IO_MAGICNUMBER);
         nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &outSize, ress.srcBuffer, &inSize, NULL);
@@ -838,8 +785,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     }
 
     /* Main Loop */
-    for (;nextToLoad;)
-    {
+    for (;nextToLoad;) {
         size_t readSize;
         size_t pos = 0;
         size_t decodedBytes = ress.dstBufferSize;
@@ -847,11 +793,9 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
         /* Read input */
         if (nextToLoad > ress.srcBufferSize) nextToLoad = ress.srcBufferSize;
         readSize = fread(ress.srcBuffer, 1, nextToLoad, srcFile);
-        if (!readSize)
-            break;   /* empty file or stream */
+        if (!readSize) break;   /* reached end of file or stream */
 
-        while ((pos < readSize) || (decodedBytes == ress.dstBufferSize))   /* still to read, or still to flush */
-        {
+        while ((pos < readSize) || (decodedBytes == ress.dstBufferSize)) {  /* still to read, or still to flush */
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
             decodedBytes = ress.dstBufferSize;
@@ -859,12 +803,11 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
             if (LZ4F_isError(nextToLoad)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             pos += remaining;
 
-            if (decodedBytes)
-            {
-                /* Write Block */
+            /* Write Block */
+            if (decodedBytes) {
+                storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, storedSkips);
                 filesize += decodedBytes;
                 DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
-                storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, storedSkips);
             }
 
             if (!nextToLoad) break;
@@ -872,9 +815,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     }
 
     LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
-
-    if (nextToLoad!=0)
-        EXM_THROW(67, "Unfinished stream");
+    if (nextToLoad!=0) EXM_THROW(67, "Unfinished stream");
 
     return filesize;
 }
@@ -885,15 +826,14 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
 static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigned char MNstore[MAGICNUMBER_SIZE])
 {
 	size_t buffer[PTSIZET];
-    size_t read = 1, sizeCheck;
+    size_t read = 1;
     unsigned long long total = MAGICNUMBER_SIZE;
     unsigned storedSkips = 0;
 
-    sizeCheck = fwrite(MNstore, 1, MAGICNUMBER_SIZE, foutput);
+    size_t const sizeCheck = fwrite(MNstore, 1, MAGICNUMBER_SIZE, foutput);
     if (sizeCheck != MAGICNUMBER_SIZE) EXM_THROW(50, "Pass-through write error");
 
-    while (read)
-    {
+    while (read) {
         read = fread(buffer, 1, PTSIZE, finput);
         total += read;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, read, storedSkips);
@@ -904,27 +844,39 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
 }
 
 
+/** Safely handle cases when (unsigned)offset > LONG_MAX */
+static int fseek_u32(FILE *fp, unsigned offset, int where)
+{
+    const unsigned stepMax = 1U << 30;
+    int errorNb = 0;
+
+    if (where != SEEK_CUR) return -1;  /* Only allows SEEK_CUR */
+    while (offset > 0) {
+        unsigned s = offset;
+        if (s > stepMax) s = stepMax;
+        errorNb = fseek(fp, (long) s, SEEK_CUR);
+        if (errorNb != 0) break;
+        offset -= s;
+    }
+    return errorNb;
+}
+
 #define ENDOFSTREAM ((unsigned long long)-1)
 static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutput)
 {
     unsigned char MNstore[MAGICNUMBER_SIZE];
-    unsigned magicNumber, size;
-    int errorNb;
-    size_t nbReadBytes;
+    unsigned magicNumber;
     static unsigned nbCalls = 0;
 
     /* init */
     nbCalls++;
 
     /* Check Archive Header */
-    if (g_magicRead)
-    {
+    if (g_magicRead) {  /* magic number already read from finput (see legacy frame)*/
       magicNumber = g_magicRead;
       g_magicRead = 0;
-    }
-    else
-    {
-      nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
+    } else {
+      size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
       if (nbReadBytes==0) return ENDOFSTREAM;                  /* EOF */
       if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
       magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
@@ -940,21 +892,20 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
         return LZ4IO_decodeLegacyStream(finput, foutput);
     case LZ4IO_SKIPPABLE0:
         DISPLAYLEVEL(4, "Skipping detected skippable area \n");
-        nbReadBytes = fread(MNstore, 1, 4, finput);
-        if (nbReadBytes != 4) EXM_THROW(42, "Stream error : skippable size unreadable");
-        size = LZ4IO_readLE32(MNstore);     /* Little Endian format */
-        errorNb = fseek(finput, size, SEEK_CUR);
-        if (errorNb != 0) EXM_THROW(43, "Stream error : cannot skip skippable area");
-        return selectDecoder(ress, finput, foutput);
-    EXTENDED_FORMAT;
+        { size_t const nbReadBytes = fread(MNstore, 1, 4, finput);
+          if (nbReadBytes != 4) EXM_THROW(42, "Stream error : skippable size unreadable"); }
+        { unsigned const size = LZ4IO_readLE32(MNstore);     /* Little Endian format */
+          int const errorNb = fseek_u32(finput, size, SEEK_CUR);
+          if (errorNb != 0) EXM_THROW(43, "Stream error : cannot skip skippable area"); }
+        return 0;
+    EXTENDED_FORMAT;  /* macro extension for custom formats */
     default:
-        if (nbCalls == 1)   /* just started */
-        {
+        if (nbCalls == 1) {  /* just started */
             if (g_overwrite)
                 return LZ4IO_passThrough(finput, foutput, MNstore);
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
         }
-        DISPLAYLEVEL(2, "Stream followed by unrecognized data\n");
+        DISPLAYLEVEL(2, "Stream followed by undecodable data\n");
         return ENDOFSTREAM;
     }
 }
@@ -966,7 +917,6 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
     FILE* finput;
     FILE* foutput;
 
-
     /* Init */
     if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
         return 1;
@@ -975,8 +925,7 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
     if (g_sparseFileSupport) { SET_SPARSE_FILE_MODE(foutput); }
 
     /* Loop over multiple streams */
-    do
-    {
+    do {
         decodedSize = selectDecoder(ress, finput, foutput);
         if (decodedSize != ENDOFSTREAM)
             filesize += decodedSize;
@@ -996,23 +945,17 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
 
 int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename)
 {
-    dRess_t ress;
-    clock_t start, end;
-    int missingFiles = 0;
+    dRess_t const ress = LZ4IO_createDResources();
+    clock_t const start = clock();
 
-    start = clock();
+    int const missingFiles = LZ4IO_decompressFile_extRess(ress, input_filename, output_filename);
 
-    ress = LZ4IO_createDResources();
-    missingFiles += LZ4IO_decompressFile_extRess(ress, input_filename, output_filename);
-    LZ4IO_freeDResources(ress);
-
-    end = clock();
-    if (end==start) end=start+1;
-    {
-        double seconds = (double)(end - start)/CLOCKS_PER_SEC;
+    {   clock_t const end = clock();
+        double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
         DISPLAYLEVEL(4, "Done in %.2f sec  \n", seconds);
     }
 
+    LZ4IO_freeDResources(ress);
     return missingFiles;
 }
 
@@ -1025,20 +968,16 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
     int missingFiles = 0;
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
-    const size_t suffixSize = strlen(suffix);
-    const char* suffixPtr;
-    dRess_t ress;
+    size_t const suffixSize = strlen(suffix);
+    dRess_t const ress = LZ4IO_createDResources();
 
-	if (outFileName==NULL) exit(1);   /* not enough memory */
-    ress = LZ4IO_createDResources();
+    if (outFileName==NULL) exit(1);   /* not enough memory */
 
-    for (i=0; i<ifntSize; i++)
-    {
-        size_t ifnSize = strlen(inFileNamesTable[i]);
-        suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
+    for (i=0; i<ifntSize; i++) {
+        size_t const ifnSize = strlen(inFileNamesTable[i]);
+        const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
         if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); if (outFileName==NULL) exit(1); }
-        if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0)
-        {
+        if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
             continue;

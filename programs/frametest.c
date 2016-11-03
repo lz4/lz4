@@ -591,7 +591,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         size_t srcStart = FUZ_rand(&randState) % (srcDataLength - srcSize);
         U64 frameContentSize = ((FUZ_rand(&randState) & 0xF) == 1) ? srcSize : 0;
         size_t cSize;
-        U64 crcOrig, crcDecoded;
+        U64 crcOrig;
         LZ4F_preferences_t* prefsPtr = &prefs;
 
         (void)FUZ_rand(&coreRand);   /* update seed */
@@ -658,13 +658,13 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             BYTE* const oend = op + srcDataLength;
             size_t totalOut = 0;
             unsigned maxBits = FUZ_highbit((U32)cSize);
-            unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;
+            unsigned nonContiguousDst = (FUZ_rand(&randState) & 3) == 1;   /* 0 : contiguous; 1 : non-contiguous; 2 : dst overwritten */
             nonContiguousDst += FUZ_rand(&randState) & nonContiguousDst;   /* 0=>0; 1=>1,2 */
             XXH64_reset(&xxh64, 1);
             if (maxBits < 3) maxBits = 3;
             while (ip < iend) {
-                unsigned nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
-                unsigned nbBitsO = (FUZ_rand(&randState) % (maxBits)) + 1;
+                unsigned const nbBitsI = (FUZ_rand(&randState) % (maxBits-1)) + 1;
+                unsigned const nbBitsO = (FUZ_rand(&randState) % (maxBits)) + 1;
                 size_t iSize = (FUZ_rand(&randState) & ((1<<nbBitsI)-1)) + 1;
                 size_t oSize = (FUZ_rand(&randState) & ((1<<nbBitsO)-1)) + 2;
                 if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
@@ -684,7 +684,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             }
             CHECK(result != 0, "Frame decompression failed (error %i)", (int)result);
             if (totalOut) {  /* otherwise, it's a skippable frame */
-                crcDecoded = XXH64_digest(&xxh64);
+                U64 const crcDecoded = XXH64_digest(&xxh64);
                 if (crcDecoded != crcOrig) locateBuffDiff((BYTE*)srcBuffer+srcStart, decodedBuffer, srcSize, nonContiguousDst);
                 CHECK(crcDecoded != crcOrig, "Decompression corruption");
             }

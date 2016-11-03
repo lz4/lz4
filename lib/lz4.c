@@ -1103,7 +1103,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                  int partialDecoding,    /* full, partial */
                  int targetOutputSize,   /* only used if partialDecoding==partial */
                  int dict,               /* noDict, withPrefix64k, usingExtDict */
-                 const BYTE* const lowPrefix,  /* == dest if dict == noDict */
+                 const BYTE* const lowPrefix,  /* == dest when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
                  const size_t dictSize         /* note : = 0 if noDict */
                  )
@@ -1385,8 +1385,7 @@ FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest
 {
     if (dictSize==0)
         return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, noDict, (BYTE*)dest, NULL, 0);
-    if (dictStart+dictSize == dest)
-    {
+    if (dictStart+dictSize == dest) {
         if (dictSize >= (int)(64 KB - 1))
             return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, withPrefix64k, (BYTE*)dest-64 KB, NULL, 0);
         return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, noDict, (BYTE*)dest-dictSize, NULL, 0);

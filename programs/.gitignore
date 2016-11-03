@@ -13,3 +13,6 @@ fuzzer32
 
 # tests files
 tmp*
+
+# artefacts
+*.dSYM

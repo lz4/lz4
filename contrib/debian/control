@@ -7,9 +7,9 @@ Build-Depends:
  debhelper (>= 7.0.50~),
  cdbs
 Standards-Version: 3.8.0
-Homepage: https://code.google.com/p/lz4/
-Vcs-Git: git://github.com/Cyan4973/lz4.git
-Vcs-Browser: https://github.com/Cyan4973/lz4
+Homepage: http://www.lz4.org/
+Vcs-Git: git://github.com/lz4/lz4.git
+Vcs-Browser: https://github.com/lz4/lz4
 
 Package: liblz4
 Architecture: any
