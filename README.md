@@ -22,9 +22,9 @@ LZ4 library is provided as open-source software using BSD 2-Clause license.
 |master      | [![Build Status][travisMasterBadge]][travisLink] [![Build status][AppveyorMasterBadge]][AppveyorLink] [![coverity][coverBadge]][coverlink] |
 |dev         | [![Build Status][travisDevBadge]][travisLink]    [![Build status][AppveyorDevBadge]][AppveyorLink]                                         |
 
-[travisMasterBadge]: https://travis-ci.org/Cyan4973/lz4.svg?branch=master "Continuous Integration test suite"
-[travisDevBadge]: https://travis-ci.org/Cyan4973/lz4.svg?branch=dev "Continuous Integration test suite"
-[travisLink]: https://travis-ci.org/Cyan4973/lz4
+[travisMasterBadge]: https://travis-ci.org/lz4/lz4.svg?branch=master "Continuous Integration test suite"
+[travisDevBadge]: https://travis-ci.org/lz4/lz4.svg?branch=dev "Continuous Integration test suite"
+[travisLink]: https://travis-ci.org/lz4/lz4
 [AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/master?svg=true "Visual test suite"
 [AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/v6kxv9si529477cq/branch/dev?svg=true "Visual test suite"
 [AppveyorLink]: https://ci.appveyor.com/project/YannCollet/lz4
