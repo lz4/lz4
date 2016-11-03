@@ -393,7 +393,7 @@ int main(int argc, const char** argv)
                 case 'c': forceStdout=1; output_filename=stdoutmark; displayLevel=1; break;
 
                     /* Test integrity */
-                case 't': decode=1; LZ4IO_setOverwrite(1); output_filename=nulmark; break;
+                case 't': decode=1; LZ4IO_setPassThrough(0); output_filename=nulmark; break;
 
                     /* Overwrite */
                 case 'f': LZ4IO_setOverwrite(1); break;

@@ -136,6 +136,7 @@ static clock_t g_time = 0;
 *  Local Parameters
 **************************************/
 static int g_overwrite = 1;
+static int g_passThrough = 1;
 static int g_blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
 static int g_blockChecksum = 0;
 static int g_streamChecksum = 1;
@@ -182,6 +183,13 @@ int LZ4IO_setOverwrite(int yes)
 {
    g_overwrite = (yes!=0);
    return g_overwrite;
+}
+
+/* Default setting : passThrough = 1; return : passThrough mode (0/1) */
+int LZ4IO_setPassThrough(int yes)
+{
+   g_passThrough = (yes!=0);
+   return g_passThrough;
 }
 
 /* blockSizeID : valid values : 4-5-6-7 */
@@ -283,7 +291,7 @@ static int LZ4IO_getFiles(const char* input_filename, const char* output_filenam
     } else {
         /* Check if destination file already exists */
         *pfoutput=0;
-        if (output_filename != nulmark) *pfoutput = fopen( output_filename, "rb" );
+        if (strcmp(output_filename, nulmark)) *pfoutput = fopen( output_filename, "rb" );
         if (*pfoutput!=0) {
             fclose(*pfoutput);
             if (!g_overwrite) {
@@ -908,7 +916,7 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
     EXTENDED_FORMAT;  /* macro extension for custom formats */
     default:
         if (nbCalls == 1) {  /* just started */
-            if (g_overwrite)
+            if (g_passThrough && g_overwrite)
                 return LZ4IO_passThrough(finput, foutput, MNstore);
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
         }
