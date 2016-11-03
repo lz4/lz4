@@ -153,7 +153,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\programs\datagen.c" />
-    <ClCompile Include="..\..\..\programs\datagencli.c" />
+    <ClCompile Include="..\..\..\tests\datagencli.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\programs\datagen.h" />
