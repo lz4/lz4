@@ -37,6 +37,7 @@ LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
 PRGDIR  = programs
 LZ4DIR  = lib
+TESTDIR = tests
 
 
 # Define nul output
@@ -64,9 +65,9 @@ lz4:
 
 clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
+	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
-	@$(MAKE) -C versionsTest $@ > $(VOID)
 	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
@@ -88,7 +89,7 @@ travis-install:
 	sudo $(MAKE) install
 
 test:
-	$(MAKE) -C $(PRGDIR) test
+	$(MAKE) -C $(TESTDIR) test
 
 cmake:
 	@cd contrib/cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
@@ -108,9 +109,10 @@ staticAnalyze: clean
 armtest: clean
 	CFLAGS="-O3 -Werror" $(MAKE) -C $(LZ4DIR) all CC=arm-linux-gnueabi-gcc
 	CFLAGS="-O3 -Werror" $(MAKE) -C $(PRGDIR) bins CC=arm-linux-gnueabi-gcc
+	CFLAGS="-O3 -Werror" $(MAKE) -C $(TESTDIR) bins CC=arm-linux-gnueabi-gcc
 
 versionsTest: clean
-	$(MAKE) -C versionsTest
+	$(MAKE) -C $(TESTDIR) $@
 
 examples:
 	$(MAKE) -C $(LZ4DIR)

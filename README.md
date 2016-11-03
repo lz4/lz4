@@ -89,6 +89,6 @@ A list of known source ports is maintained on the [LZ4 Homepage].
 
 [Open-Source Benchmark program by m^2 (v0.14.3)]: http://encode.ru/threads/1371-Filesystem-benchmark?p=34029&viewfull=1#post34029
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
-[lz4_Block_format]: lz4_Block_format.md
-[lz4_Frame_format]: lz4_Frame_format.md
+[lz4_Block_format]: doc/lz4_Block_format.md
+[lz4_Frame_format]: doc/lz4_Frame_format.md
 [LZ4 Homepage]: http://www.lz4.org

@@ -30,7 +30,7 @@
 
    You can contact the author at :
     - LZ4 homepage : http://www.lz4.org
-    - LZ4 source repository : https://github.com/Cyan4973/lz4
+    - LZ4 source repository : https://github.com/lz4/lz4
 */
 #ifndef LZ4_H_2983827168210
 #define LZ4_H_2983827168210
@@ -44,7 +44,7 @@ extern "C" {
  * Block compression functions are not-enough to send information,
  * since it's still necessary to provide metadata (such as compressed size),
  * and each application can do it in whichever way it wants.
- * For interoperability, there is LZ4 frame specification (lz4_Frame_format.md).
+ * For interoperability, there is LZ4 frame specification (doc/lz4_Frame_format.md).
  * A library is provided to take care of it, see lz4frame.h.
 */
 

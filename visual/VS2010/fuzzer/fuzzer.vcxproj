@@ -155,7 +155,7 @@
     <ClCompile Include="..\..\..\lib\lz4.c" />
     <ClCompile Include="..\..\..\lib\lz4hc.c" />
     <ClCompile Include="..\..\..\lib\xxhash.c" />
-    <ClCompile Include="..\..\..\programs\fuzzer.c" />
+    <ClCompile Include="..\..\..\tests\fuzzer.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\lz4.h" />
