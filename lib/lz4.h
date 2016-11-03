@@ -44,7 +44,7 @@ extern "C" {
  * Block compression functions are not-enough to send information,
  * since it's still necessary to provide metadata (such as compressed size),
  * and each application can do it in whichever way it wants.
- * For interoperability, there is LZ4 frame specification (lz4_Frame_format.md).
+ * For interoperability, there is LZ4 frame specification (doc/lz4_Frame_format.md).
  * A library is provided to take care of it, see lz4frame.h.
 */
 

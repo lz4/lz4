@@ -37,4 +37,4 @@ Other files present in the directory are not source code. There are :
  - liblz4.pc.in : for pkg-config (make install)
  - README.md : this file
 
-[official interoperable frame format]: ../lz4_Frame_format.md
+[official interoperable frame format]: ../doc/lz4_Frame_format.md
