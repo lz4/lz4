@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Test LZ4 interoperability between versions"""
+
+#
+# Copyright (C) 2011-present, Takayuki Matsuoka
+# All rights reserved.
+# GPL v2 License
+#
 
 import glob
 import subprocess
@@ -8,8 +15,8 @@ import shutil
 import sys
 import hashlib
 
-repo_url = 'https://github.com/Cyan4973/lz4.git'
-tmp_dir_name = 'versionsTest/lz4test'
+repo_url = 'https://github.com/lz4/lz4.git'
+tmp_dir_name = 'tests/versionsTest'
 make_cmd = 'make'
 git_cmd = 'git'
 test_dat_src = 'README.md'
@@ -46,8 +53,8 @@ def sha1_of_file(filepath):
 if __name__ == '__main__':
     error_code = 0
     base_dir = os.getcwd() + '/..'           # /path/to/lz4
-    tmp_dir = base_dir + '/' + tmp_dir_name  # /path/to/lz4/versionsTest/lz4test
-    clone_dir = tmp_dir + '/' + 'lz4'        # /path/to/lz4/versionsTest/lz4test/lz4
+    tmp_dir = base_dir + '/' + tmp_dir_name  # /path/to/lz4/tests/versionsTest
+    clone_dir = tmp_dir + '/' + 'lz4'        # /path/to/lz4/tests/versionsTest/lz4
     programs_dir = base_dir + '/programs'    # /path/to/lz4/programs
     os.makedirs(tmp_dir, exist_ok=True)
 

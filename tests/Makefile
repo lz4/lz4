@@ -1,4 +1,3 @@
-
 # ##########################################################################
 # LZ4 programs - Makefile
 # Copyright (C) Yann Collet 2011-2016
@@ -38,6 +37,8 @@ BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 PRGDIR  := ../programs
+TESTDIR := lz4test
+PYTHON?= python3
 
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes
@@ -107,7 +108,11 @@ clean:
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
         datagen$(EXT)
+	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
+
+versionsTest:
+	$(PYTHON) test-lz4-versions.py
 
 
 #------------------------------------------------------------------------
