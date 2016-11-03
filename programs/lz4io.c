@@ -368,7 +368,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         filesize += inSize;
 
         /* Compress Block */
-        outSize = compressionFunction(in_buff, out_buff+4, inSize, outBuffSize, compressionlevel);
+        outSize = compressionFunction(in_buff, out_buff+4, (int)inSize, outBuffSize, compressionlevel);
         compressedfilesize += outSize+4;
         DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
