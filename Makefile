@@ -68,7 +68,6 @@ clean:
 	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
-	@$(MAKE) -C versionsTest $@ > $(VOID)
 	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
@@ -113,7 +112,7 @@ armtest: clean
 	CFLAGS="-O3 -Werror" $(MAKE) -C $(TESTDIR) bins CC=arm-linux-gnueabi-gcc
 
 versionsTest: clean
-	$(MAKE) -C versionsTest
+	$(MAKE) -C $(TESTDIR) $@
 
 examples:
 	$(MAKE) -C $(LZ4DIR)

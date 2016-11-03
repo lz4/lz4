@@ -37,7 +37,7 @@ BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 PRGDIR  := ../programs
-TESTDIR := lz4test
+TESTDIR := versionsTest
 PYTHON?= python3
 
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
