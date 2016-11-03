@@ -29,7 +29,7 @@
 
    You can contact the author at :
     - LZ4 homepage : http://www.lz4.org
-    - LZ4 source repository : https://github.com/Cyan4973/lz4
+    - LZ4 source repository : https://github.com/lz4/lz4
 */
 
 

@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 You can contact the author at :
 - LZ4 homepage : http://www.lz4.org
-- LZ4 source repository : https://github.com/Cyan4973/lz4
+- LZ4 source repository : https://github.com/lz4/lz4
 */
 
 /* LZ4F is a stand-alone API to create LZ4-compressed Frames
