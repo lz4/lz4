@@ -30,8 +30,9 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-DESTDIR?=
-PREFIX ?= /usr/local
+DESTDIR ?=
+PREFIX  ?= /usr/local
+VOID    := /dev/null
 
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
@@ -43,10 +44,8 @@ TESTDIR = tests
 # Define nul output
 ifneq (,$(filter Windows%,$(OS)))
 EXT = .exe
-VOID = nul
 else
 EXT =
-VOID = /dev/null
 endif
 
 

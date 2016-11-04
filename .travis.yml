@@ -100,6 +100,8 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
+            - libc6-dev-i386
+            - gcc-multilib
             - gcc-5
             - gcc-5-multilib
     - env: Ubu="14.04" PARAMS='-C tests test-lz4 CC=gcc-6' COMPILER=gcc-6
