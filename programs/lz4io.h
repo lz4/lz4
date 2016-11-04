@@ -63,6 +63,10 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
    return : overwrite mode (0/1) */
 int LZ4IO_setOverwrite(int yes);
 
+/* Default setting : testMode = 0;
+   return : testMode (0/1) */
+int LZ4IO_setTestMode(int yes);
+
 /* blockSizeID : valid values : 4-5-6-7
    return : -1 if error, blockSize if OK */
 int LZ4IO_setBlockSizeID(int blockSizeID);
