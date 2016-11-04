@@ -42,13 +42,6 @@
 /**************************************
 *  Compiler Options
 ***************************************/
-/* Disable some Visual warning messages */
-#ifdef _MSC_VER
-#  define _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
-#  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
-#endif
-
 /* cf. http://man7.org/linux/man-pages/man7/feature_test_macros.7.html */
 #define _XOPEN_VERSION 600 /* POSIX.2001, for fileno() within <stdio.h> on unix */
 
@@ -56,6 +49,7 @@
 /****************************
 *  Includes
 *****************************/
+#include "util.h"     /* Compiler options, UTIL_HAS_CREATEFILELIST */
 #include <stdio.h>    /* fprintf, getchar */
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
@@ -171,6 +165,9 @@ static int usage_advanced(void)
     DISPLAY( " -c     : force write to standard output, even if it is the console\n");
     DISPLAY( " -t     : test compressed file integrity\n");
     DISPLAY( " -m     : multiple input files (implies automatic output filenames)\n");
+#ifdef UTIL_HAS_CREATEFILELIST
+    DISPLAY( " -r     : operate recursively on directories (sets also -m)\n");
+#endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
@@ -304,6 +301,11 @@ int main(int argc, const char** argv)
     char nullOutput[] = NULL_OUTPUT;
     char extension[] = LZ4_EXTENSION;
     int  blockSize;
+#ifdef UTIL_HAS_CREATEFILELIST
+    const char** extendedFileList = NULL;
+    char* fileNamesBuf = NULL;
+    unsigned fileNamesNb, recursive=0;
+#endif
 
     /* Init */
     programName = argv[0];
@@ -437,6 +439,10 @@ int main(int argc, const char** argv)
                         inFileNames = (const char**) malloc(argc * sizeof(char*));
                     break;
 
+#ifdef UTIL_HAS_CREATEFILELIST
+                        /* recursive */
+                case 'r': recursive=1;  /* without break */
+#endif
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
                     if (inFileNames == NULL)
@@ -487,7 +493,22 @@ int main(int argc, const char** argv)
     if (!decode) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
 
     /* No input filename ==> use stdin */
-    if (multiple_inputs) input_filename = inFileNames[0], output_filename = (const char*)(inFileNames[0]);
+    if (multiple_inputs) {
+        input_filename = inFileNames[0];
+        output_filename = (const char*)(inFileNames[0]);
+#ifdef UTIL_HAS_CREATEFILELIST
+        if (recursive) {  /* at this stage, filenameTable is a list of paths, which can contain both files and directories */
+            extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
+            if (extendedFileList) {
+                unsigned u;
+                for (u=0; u<fileNamesNb; u++) DISPLAYLEVEL(4, "%u %s\n", u, extendedFileList[u]);
+                free((void*)inFileNames);
+                inFileNames = extendedFileList;
+                ifnIdx = fileNamesNb;
+            }
+        }
+#endif
+    }
     if(!input_filename) { input_filename=stdinmark; }
 
     /* Check if input is defined as console; trigger an error in this case */
@@ -498,9 +519,8 @@ int main(int argc, const char** argv)
 
     /* Check if benchmark is selected */
     if (bench) {
-        int bmkResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel, cLevelLast);
-        free((void*)inFileNames);
-        return bmkResult;
+        operationResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel, cLevelLast);
+        goto _cleanup;
     }
 
     /* No output filename ==> try to select one automatically (when possible) */
@@ -566,7 +586,12 @@ int main(int argc, const char** argv)
 
 _cleanup:
     if (main_pause) waitEnter();
-    free(dynNameSpace);
-    free((void*)inFileNames);
+    if (dynNameSpace) free(dynNameSpace);
+#ifdef UTIL_HAS_CREATEFILELIST
+    if (extendedFileList)
+        UTIL_freeFileList(extendedFileList, fileNamesBuf);
+    else
+#endif
+        free((void*)inFileNames);
     return operationResult;
 }
