@@ -177,7 +177,7 @@ typedef struct {
 /* Resource Management */
 
 #define LZ4F_VERSION 100
-LZ4FLIB_API unsigned LZ4F_getVersion();
+LZ4FLIB_API unsigned LZ4F_getVersion(void);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 /* LZ4F_createCompressionContext() :
@@ -246,8 +246,8 @@ LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx, void* dstBuffer, size_t dst
 /*-*********************************
 *  Decompression functions
 ***********************************/
-
-typedef struct LZ4F_dctx_s* LZ4F_decompressionContext_t;   /* must be aligned on 8-bytes */
+typedef struct LZ4F_dctx_s LZ4F_dctx;   /* incomplete type */
+typedef LZ4F_dctx* LZ4F_decompressionContext_t;   /* compatibility with previous API versions */
 
 typedef struct {
   unsigned stableDst;       /* guarantee that decompressed data will still be there on next function calls (avoid storage into tmp buffers) */
@@ -266,8 +266,8 @@ typedef struct {
  * The result of LZ4F_freeDecompressionContext() is indicative of the current state of decompressionContext when being released.
  * That is, it should be == 0 if decompression has been completed fully and correctly.
  */
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_decompressionContext_t* dctxPtr, unsigned version);
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionContext_t dctx);
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 
 
 /*======   Decompression   ======*/
@@ -275,29 +275,29 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_decompressionCon
 /*!LZ4F_getFrameInfo() :
  * This function decodes frame header information (such as max blockSize, frame checksum, etc.).
  * Its usage is optional. The objective is to extract frame header information, typically for allocation purposes.
- * A header size is variable and can be from 7 to 15 bytes. It's also possible to input more bytes than that.
+ * A header size is variable and can length from 7 to 15 bytes. It's possible to provide more input bytes than that.
  * The number of bytes read from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
- * (note that LZ4F_getFrameInfo() can also be used anytime *after* starting decompression, in this case 0 input byte is enough)
+ * (note that LZ4F_getFrameInfo() can also be used anytime *after* decompression is started, in which case 0 input byte is enough)
  * Frame header info is *copied into* an already allocated LZ4F_frameInfo_t structure.
- * The function result is an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
- *                        or an error code which can be tested using LZ4F_isError()
- *                        (typically, when there is not enough src bytes to fully decode the frame header)
+ * @return : an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
+ *           or an error code which can be tested using LZ4F_isError()
+ *           (typically, when there is not enough src bytes to fully decode the frame header)
  * Decompression is expected to resume from where it stopped (srcBuffer + *srcSizePtr)
  */
-LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dctx,
+LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
                                      LZ4F_frameInfo_t* frameInfoPtr,
                                      const void* srcBuffer, size_t* srcSizePtr);
 
 /*!LZ4F_decompress() :
- * Call this function repetitively to regenerate data compressed within srcBuffer.
- * The function will attempt to decode *srcSizePtr bytes from srcBuffer, into dstBuffer of maximum size *dstSizePtr.
+ * Call this function repetitively to regenerate data compressed within `srcBuffer`.
+ * The function will attempt to decode up to *srcSizePtr bytes from srcBuffer, into dstBuffer of capacity *dstSizePtr.
  *
  * The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
  *
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- * If number of bytes read is < number of bytes provided, then decompression operation is not completed.
+ * Number of bytes read can be < number of bytes provided, meaning there is some more data to decode.
  * It typically happens when dstBuffer is not large enough to contain all decoded data.
- * LZ4F_decompress() must be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
+ * In which case, LZ4F_decompress() must be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
  * The function will check this condition, and refuse to continue if it is not respected.
  *
  * `dstBuffer` is expected to be flushed between each call to the function, its content will be overwritten.
@@ -312,7 +312,7 @@ LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t dctx,
  *
  * After a frame is fully decoded, dctx can be used again to decompress another frame.
  */
-LZ4FLIB_API size_t LZ4F_decompress(LZ4F_decompressionContext_t dctx,
+LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    void* dstBuffer, size_t* dstSizePtr,
                                    const void* srcBuffer, size_t* srcSizePtr,
                                    const LZ4F_decompressOptions_t* dOptPtr);

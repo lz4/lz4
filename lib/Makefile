@@ -46,9 +46,9 @@ DESTDIR?=
 PREFIX ?= /usr/local
 CPPFLAGS= -DXXH_NAMESPACE=LZ4_ -DLZ4_DLL_EXPORT=1
 CFLAGS ?= -O3
-CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow -Wstrict-aliasing=1 \
+CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
-          -Wpointer-arith
+          -Wpointer-arith   # -Wstrict-aliasing=1
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 LIBDIR?= $(PREFIX)/lib
