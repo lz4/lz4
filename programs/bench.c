@@ -59,6 +59,7 @@ static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSi
 #define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
 #define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
 #define COOLPERIOD_SEC        10
+#define DECOMP_MULT           2 /* test decompression DECOMP_MULT times longer than compression */
 
 #define KB *(1 <<10)
 #define MB *(1 <<20)
@@ -291,11 +292,11 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         blockTable[blockNb].resSize = regenSize;
                     }
                     nbLoops++;
-                } while (UTIL_clockSpanMicro(clockStart, ticksPerSecond) < clockLoop);
+                } while (UTIL_clockSpanMicro(clockStart, ticksPerSecond) < DECOMP_MULT*clockLoop);
                 {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart, ticksPerSecond);
                     if (clockSpan < fastestD*nbLoops) fastestD = clockSpan / nbLoops;
                     totalDTime += clockSpan;
-                    dCompleted = totalDTime>maxTime;
+                    dCompleted = totalDTime>(DECOMP_MULT*maxTime);
             }   }
 
             markNb = (markNb+1) % NB_MARKS;

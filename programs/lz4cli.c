@@ -176,10 +176,9 @@ static int usage_advanced(void)
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "Benchmark arguments :\n");
-    DISPLAY( "Benchmark arguments :\n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
-    DISPLAY( " -e#    : test all compression levels from -bX to # (default: 1)\n");
-    DISPLAY( " -i#    : iteration loops [1-9](default : 3), benchmark mode only\n");
+    DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
+    DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s)\n");
 #if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "Legacy arguments :\n");
     DISPLAY( " -c0    : fast compression\n");
@@ -421,7 +420,7 @@ int main(int argc, const char** argv)
                         case '7':
                             {   int B = argument[1] - '0';
                                 blockSize = LZ4IO_setBlockSizeID(B);
-                                BMK_setBlocksize(blockSize);
+                                BMK_SetBlockSize(blockSize);
                                 argument++;
                                 break;
                             }
@@ -449,18 +448,18 @@ int main(int argc, const char** argv)
                         inFileNames = (const char**) malloc(argc * sizeof(char*));
                     break;
 
-                    /* Modify Nb Iterations (benchmark only) */
+                    /* Modify Nb Seconds (benchmark only) */
                 case 'i':
                     {   unsigned iters;
                         argument++;
                         iters = readU32FromChar(&argument);
                         argument--;
-                        BMK_setNbIterations(iters);
+                        BMK_SetNbSeconds(iters);
                     }
                     break;
 
                     /* Pause at the end (hidden option) */
-                case 'p': main_pause=1; BMK_setPause(); break;
+                case 'p': main_pause=1; break;
 
                     /* Specific commands for customized versions */
                 EXTENDED_ARGUMENTS;
