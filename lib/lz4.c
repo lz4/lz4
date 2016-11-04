@@ -415,27 +415,28 @@ int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
 static U32 LZ4_hashSequence(U32 sequence, tableType_t const tableType)
 {
     if (tableType == byU16)
-        return (((sequence) * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
+        return ((sequence * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
     else
-        return (((sequence) * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
+        return ((sequence * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
 }
 
 static const U64 prime5bytes = 889523592379ULL;
-static U32 LZ4_hashSequence64(size_t sequence, tableType_t const tableType)
+static U32 LZ4_hashSequence64(U64 sequence, tableType_t const tableType)
 {
     const U32 hashLog = (tableType == byU16) ? LZ4_HASHLOG+1 : LZ4_HASHLOG;
-    const U32 hashMask = (1<<hashLog) - 1;
-    return ((sequence * prime5bytes) >> (40 - hashLog)) & hashMask;
+    return ((sequence << 24) * prime5bytes) >> (64 - hashLog);
 }
 
 static U32 LZ4_hashSequenceT(size_t sequence, tableType_t const tableType)
 {
-    if (LZ4_64bits())
-        return LZ4_hashSequence64(sequence, tableType);
+    if (LZ4_64bits()) return LZ4_hashSequence64(sequence, tableType);
     return LZ4_hashSequence((U32)sequence, tableType);
 }
 
-static U32 LZ4_hashPosition(const void* p, tableType_t tableType) { return LZ4_hashSequenceT(LZ4_read_ARCH(p), tableType); }
+static U32 LZ4_hashPosition(const void* p, tableType_t tableType)
+{
+    return LZ4_hashSequenceT(LZ4_read_ARCH(p), tableType);
+}
 
 static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t const tableType, const BYTE* srcBase)
 {
