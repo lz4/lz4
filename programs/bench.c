@@ -353,21 +353,27 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
-    size_t const step = 64 MB;
-    BYTE* testmem = NULL;
+    size_t step = 64 MB;
+    BYTE* testmem=NULL;
 
     requiredMem = (((requiredMem >> 26) + 1) << 26);
-    requiredMem += step;
+    requiredMem += 2*step;
     if (requiredMem > maxMemory) requiredMem = maxMemory;
 
-    do {
-        testmem = (BYTE*)malloc((size_t)requiredMem);
-        requiredMem -= step;
-    } while (!testmem);
+    while (!testmem) {
+        if (requiredMem > step) requiredMem -= step;
+        else requiredMem >>= 1;
+        testmem = (BYTE*) malloc ((size_t)requiredMem);
+    }
+    free (testmem);
 
-    free(testmem);
-    return (size_t)(requiredMem);
+    /* keep some space available */
+    if (requiredMem > step) requiredMem -= step;
+    else requiredMem >>= 1;
+
+    return (size_t)requiredMem;
 }
+
 
 static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
                             const char* displayName, int cLevel, int cLevelLast,
