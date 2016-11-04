@@ -59,6 +59,8 @@ extern "C" {
 ******************************************/
 #include <stdlib.h>     /* features.h with _POSIX_C_SOURCE, malloc */
 #include <stdio.h>      /* fprintf */
+#include <string.h>     /* strerr, strlen, memcpy */
+#include <stddef.h>     /* ptrdiff_t */
 #include <sys/types.h>  /* stat, utime */
 #include <sys/stat.h>   /* stat */
 #if defined(_MSC_VER)
