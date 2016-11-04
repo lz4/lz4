@@ -221,6 +221,11 @@ test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-
 	./datagen | $(PRGDIR)/lz4 -tf            && false || true
 	./datagen | $(PRGDIR)/lz4 -d  > $(VOID)  && false || true
 	./datagen | $(PRGDIR)/lz4 -df > $(VOID)
+	@echo "\n ---- test cli ----"
+	$(PRGDIR)/lz4     file-does-not-exist    && false || true
+	$(PRGDIR)/lz4 -f  file-does-not-exist    && false || true
+	$(PRGDIR)/lz4 -fm file1-dne file2-dne    && false || true
+	$(PRGDIR)/lz4 -fm file1-dne file2-dne    && false || true
 
 test-lz4c: lz4c datagen
 	@echo "\n ---- test lz4c version ----"

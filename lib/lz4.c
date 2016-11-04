@@ -426,9 +426,9 @@ static U32 LZ4_hashSequence64(U64 sequence, tableType_t const tableType)
     static const U64 prime8bytes = 11400714785074694791ULL;
     const U32 hashLog = (tableType == byU16) ? LZ4_HASHLOG+1 : LZ4_HASHLOG;
     if (LZ4_isLittleEndian())
-        return ((sequence << 24) * prime5bytes) >> (64 - hashLog);
+        return (U32)(((sequence << 24) * prime5bytes) >> (64 - hashLog));
     else
-        return ((sequence >> 24) * prime8bytes) >> (64 - hashLog);
+        return (U32)(((sequence >> 24) * prime8bytes) >> (64 - hashLog));
 }
 
 static U32 LZ4_hashSequenceT(size_t sequence, tableType_t const tableType)
