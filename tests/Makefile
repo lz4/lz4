@@ -217,7 +217,10 @@ test-lz4-basic: lz4 datagen
 
 test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-contentSize test-lz4-frame-concatenation
 	@echo "\n ---- test pass-through ----"
-	./datagen | $(PRGDIR)/lz4 -tf
+	./datagen | $(PRGDIR)/lz4 -t             && false || true
+	./datagen | $(PRGDIR)/lz4 -tf            && false || true
+	./datagen | $(PRGDIR)/lz4 -d  > $(VOID)  && false || true
+	./datagen | $(PRGDIR)/lz4 -df > $(VOID)
 
 test-lz4c: lz4c datagen
 	@echo "\n ---- test lz4c version ----"

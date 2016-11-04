@@ -108,7 +108,7 @@ typedef struct
 *  Local Macros
 **************************************/
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-HASH_LOG))
-//#define DELTANEXTU16(p)        chainTable[(p) & MAXD_MASK]   /* flexible, MAXD dependent */
+/* #define DELTANEXTU16(p)        chainTable[(p) & MAXD_MASK] */   /* flexible, MAXD dependent */
 #define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
@@ -252,7 +252,7 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                 }
             }
         } else {
-            const BYTE* matchPtr = dictBase + matchIndex;
+            const BYTE* const matchPtr = dictBase + matchIndex;
             if (LZ4_read32(matchPtr) == LZ4_read32(ip)) {
                 size_t mlt;
                 int back=0;
