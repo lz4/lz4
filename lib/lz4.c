@@ -85,9 +85,10 @@
 
 
 /*-************************************
-*  Includes
+*  Dependency
 **************************************/
 #include "lz4.h"
+/* see also "memory routines" below */
 
 
 /*-************************************
@@ -99,15 +100,13 @@
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #else
-#  if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
-#    if defined(__GNUC__) || defined(__clang__)
-#      define FORCE_INLINE static inline __attribute__((always_inline))
-#    else
-#      define FORCE_INLINE static inline
-#    endif
+#  if defined(__GNUC__) || defined(__clang__)
+#    define FORCE_INLINE static inline __attribute__((always_inline))
+#  elif defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#    define FORCE_INLINE static inline
 #  else
 #    define FORCE_INLINE static
-#  endif   /* __STDC_VERSION__ */
+#  endif
 #endif  /* _MSC_VER */
 
 /* LZ4_GCC_VERSION is defined into lz4.h */
@@ -134,7 +133,7 @@
 /*-************************************
 *  Basic Types
 **************************************/
-#if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
+#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
   typedef  uint8_t BYTE;
   typedef uint16_t U16;
@@ -165,6 +164,7 @@ static unsigned LZ4_isLittleEndian(void)
 
 
 #if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
+/* lie to the compiler about data alignment; use with caution */
 
 static U16 LZ4_read16(const void* memPtr) { return *(const U16*) memPtr; }
 static U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
@@ -186,7 +186,7 @@ static size_t LZ4_read_ARCH(const void* ptr) { return ((const unalign*)ptr)->uAr
 static void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
 static void LZ4_write32(void* memPtr, U32 value) { ((unalign*)memPtr)->u32 = value; }
 
-#else
+#else  /* safe and portable access through memcpy() */
 
 static U16 LZ4_read16(const void* memPtr)
 {
@@ -242,7 +242,7 @@ static void LZ4_copy8(void* dst, const void* src)
     memcpy(dst,src,8);
 }
 
-/* customized variant of memcpy, which can overwrite up to 7 bytes beyond dstEnd */
+/* customized variant of memcpy, which can overwrite up to 8 bytes beyond dstEnd */
 static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
@@ -354,7 +354,7 @@ static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLi
     const BYTE* const pStart = pIn;
 
     while (likely(pIn<pInLimit-(STEPSIZE-1))) {
-        size_t diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
+        size_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
         if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
         pIn += LZ4_NbCommonBytes(diff);
         return (unsigned)(pIn - pStart);
@@ -1475,4 +1475,3 @@ int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int origin
 }
 
 #endif   /* LZ4_COMMONDEFS_ONLY */
-

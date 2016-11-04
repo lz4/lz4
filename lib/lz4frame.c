@@ -213,6 +213,8 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code)
     return codeError;
 }
 
+unsigned LZ4F_getVersion() { return LZ4F_VERSION; }
+
 
 /*-************************************
 *  Private functions

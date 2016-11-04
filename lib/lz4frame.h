@@ -34,18 +34,19 @@
 
 /* LZ4F is a stand-alone API to create LZ4-compressed frames
  * conformant with specification v1.5.1.
- * All related operations, including memory management, are handled internally by the library.
- * You don't need lz4.h when using lz4frame.h.
+ * It also offers streaming capabilities.
+ * lz4.h is not required when using lz4frame.h.
  * */
 
-#pragma once
+#ifndef LZ4F_H_09782039843
+#define LZ4F_H_09782039843
 
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
 /*-************************************
-*  Includes
+*  Dependency
 **************************************/
 #include <stddef.h>   /* size_t */
 
@@ -78,7 +79,7 @@ LZ4FLIB_API const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return er
 /*-************************************
 *  Frame compression types
 **************************************/
-//#define LZ4F_DISABLE_OBSOLETE_ENUMS
+/* #define LZ4F_DISABLE_OBSOLETE_ENUMS */  /* uncomment to disable obsolete enums */
 #ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
 #  define LZ4F_OBSOLETE_ENUM(x) ,x
 #else
@@ -136,7 +137,7 @@ typedef struct {
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16; values below 0 count as 0 */
-  unsigned autoFlush;              /* 1 == always flush (reduce need for tmp buffer) */
+  unsigned autoFlush;              /* 1 == always flush (reduce usage of tmp buffer) */
   unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
@@ -144,55 +145,60 @@ typedef struct {
 /*-*********************************
 *  Simple compression function
 ***********************************/
+/*!LZ4F_compressFrameBound() :
+ * Returns the maximum possible size of a frame given srcSize content and preferences.
+ */
 LZ4FLIB_API size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
 /*!LZ4F_compressFrame() :
  * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.5.1
- * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
- * You can get the minimum value of dstMaxSize by using LZ4F_compressFrameBound()
- * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode)
+ * An important rule is that dstBuffer MUST be large enough (dstCapacity) to store the result in worst case situation.
+ * This value is supplied by LZ4F_compressFrameBound().
+ * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode).
  * The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
- * The result of the function is the number of bytes written into dstBuffer.
- * The function outputs an error code if it fails (can be tested using LZ4F_isError())
+ * @return : number of bytes written into dstBuffer.
+ *           or an error code if it fails (can be tested using LZ4F_isError())
  */
-LZ4FLIB_API size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
+LZ4FLIB_API size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
 
 
 /*-***********************************
 *  Advanced compression functions
 *************************************/
-typedef struct LZ4F_cctx_s* LZ4F_compressionContext_t;   /* must be aligned on 8-bytes */
+typedef struct LZ4F_cctx_s LZ4F_cctx;   /* incomplete type */
+typedef LZ4F_cctx* LZ4F_compressionContext_t;   /* for compatibility with previous API version */
 
 typedef struct {
-  unsigned stableSrc;    /* 1 == src content will remain available on future calls to LZ4F_compress(); avoid saving src content within tmp buffer as future dictionary */
+  unsigned stableSrc;    /* 1 == src content remain present on future calls to LZ4F_compress(); avoid saving src content within tmp buffer as future dictionary */
   unsigned reserved[3];
 } LZ4F_compressOptions_t;
 
 /* Resource Management */
 
 #define LZ4F_VERSION 100
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* cctxPtr, unsigned version);
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t cctx);
+LZ4FLIB_API unsigned LZ4F_getVersion();
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 /* LZ4F_createCompressionContext() :
  * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
  * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version and an LZ4F_preferences_t structure.
- * The version provided MUST be LZ4F_VERSION. It is intended to track potential version differences between different binaries.
- * The function will provide a pointer to a fully allocated LZ4F_compressionContext_t object.
- * If the result LZ4F_errorCode_t is not zero, there was an error during context creation.
+ * The version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
+ * The function will provide a pointer to a fully allocated LZ4F_cctx object.
+ * If @return != zero, there was an error during context creation.
  * Object can release its memory using LZ4F_freeCompressionContext();
  */
 
 
 /* Compression */
 
-LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const LZ4F_preferences_t* prefsPtr);
+LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_preferences_t* prefsPtr);
 /* LZ4F_compressBegin() :
  * will write the frame header into dstBuffer.
- * dstBuffer must be large enough to accommodate a header (dstMaxSize). Maximum header size is 15 bytes.
- * The LZ4F_preferences_t structure is optional : you can provide NULL as argument, all preferences will then be set to default.
- * The result of the function is the number of bytes written into dstBuffer for the header
- * or an error code (can be tested using LZ4F_isError())
+ * dstBuffer must be large enough to accommodate a header. Maximum header size is 15 bytes.
+ * `prefsPtr` is optional : you can provide NULL as argument, all preferences will then be set to default.
+ * @return : number of bytes written into dstBuffer for the header
+ *           or an error code (which can be tested using LZ4F_isError())
  */
 
 LZ4FLIB_API size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* prefsPtr);
@@ -203,38 +209,37 @@ LZ4FLIB_API size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* 
  * This function includes frame termination cost (4 bytes, or 8 if frame checksum is enabled)
  */
 
-LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* cOptPtr);
-/* LZ4F_compressUpdate()
+LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* cOptPtr);
+/* LZ4F_compressUpdate() :
  * LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
- * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
- * You can get the minimum value of dstMaxSize by using LZ4F_compressBound().
+ * An important rule is that dstBuffer MUST be large enough (dstCapacity) to ensure compression completion even in worst case.
+ * This value is provided by using LZ4F_compressBound().
  * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode).
- * LZ4F_compressUpdate() doesn't guarantee error recovery, so you have to reset compression context when an error occurs.
- * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just buffered.
- * The function outputs an error code if it fails (can be tested using LZ4F_isError())
+ * LZ4F_compressUpdate() doesn't guarantee error recovery. When an error occurs, compression context must be freed or resized.
+ * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
+ * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
+ *           or an error code if it fails (which can be tested using LZ4F_isError())
  */
 
-LZ4FLIB_API size_t LZ4F_flush(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* cOptPtr);
-/* LZ4F_flush()
- * Should you need to generate compressed data immediately, without waiting for the current block to be filled,
- * you can call LZ4_flush(), which will immediately compress any remaining data buffered within cctx.
- * Note that dstMaxSize must be large enough to ensure the operation will be successful.
- * LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * The result of the function is the number of bytes written into dstBuffer
- * (it can be zero, this means there was no data left within cctx)
- * The function outputs an error code if it fails (can be tested using LZ4F_isError())
+LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_compressOptions_t* cOptPtr);
+/* LZ4F_flush() :
+ * When data must be generated and sent immediately, without waiting for a block to be completely filled,
+ * it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.
+ * `dstCapacity` must be large enough to ensure the operation will be successful.
+ * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
+ * @return : number of bytes written into dstBuffer (it can be zero, which means there was no data stored within cctx)
+ *           or an error code if it fails (which can be tested using LZ4F_isError())
  */
 
-LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_compressionContext_t cctx, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* cOptPtr);
-/* LZ4F_compressEnd()
- * When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
- * It will flush whatever data remained within compressionContext (like LZ4_flush())
- * but also properly finalize the frame, with an endMark and a checksum.
- * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
- * The function outputs an error code if it fails (can be tested using LZ4F_isError())
- * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * A successful call to LZ4F_compressEnd() makes cctx available again for next compression task.
+LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* cOptPtr);
+/* LZ4F_compressEnd() :
+ * To properly finish the compressed frame, invoke LZ4F_compressEnd().
+ * It will flush whatever data remained within `cctx` (like LZ4_flush())
+ * and properly finalize the frame, with an endMark and a checksum.
+ * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
+ * @return : number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
+ *           or an error code if it fails (which can be tested using LZ4F_isError())
+ * A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
  */
 
 
@@ -317,3 +322,5 @@ LZ4FLIB_API size_t LZ4F_decompress(LZ4F_decompressionContext_t dctx,
 #if defined (__cplusplus)
 }
 #endif
+
+#endif  /* LZ4F_H_09782039843 */
