@@ -29,6 +29,7 @@
 
 DESTDIR ?=
 PREFIX  ?= /usr/local
+VOID    := /dev/null
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
@@ -43,10 +44,8 @@ FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
 EXT =.exe
-VOID = nul
 else
 EXT =
-VOID = /dev/null
 endif
 
 
