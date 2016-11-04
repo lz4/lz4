@@ -276,13 +276,13 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
  * This function decodes frame header information (such as max blockSize, frame checksum, etc.).
  * Its usage is optional. The objective is to extract frame header information, typically for allocation purposes.
  * A header size is variable and can length from 7 to 15 bytes. It's possible to provide more input bytes than that.
- * The number of bytes read from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
- * (note that LZ4F_getFrameInfo() can also be used anytime *after* decompression is started, in which case 0 input byte is enough)
+ * The number of bytes consumed from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
+ * Decompression must resume from this point (srcBuffer + *srcSizePtr).
+ * Note that LZ4F_getFrameInfo() can also be used anytime *after* decompression is started, in which case 0 input byte can be enough.
  * Frame header info is *copied into* an already allocated LZ4F_frameInfo_t structure.
  * @return : an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
  *           or an error code which can be tested using LZ4F_isError()
  *           (typically, when there is not enough src bytes to fully decode the frame header)
- * Decompression is expected to resume from where it stopped (srcBuffer + *srcSizePtr)
  */
 LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
                                      LZ4F_frameInfo_t* frameInfoPtr,
@@ -297,18 +297,17 @@ LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * Number of bytes read can be < number of bytes provided, meaning there is some more data to decode.
  * It typically happens when dstBuffer is not large enough to contain all decoded data.
- * In which case, LZ4F_decompress() must be called again, starting from where it stopped (srcBuffer + *srcSizePtr)
- * The function will check this condition, and refuse to continue if it is not respected.
+ * Remaining data will have to be presented again in a subsequent invocation.
  *
- * `dstBuffer` is expected to be flushed between each call to the function, its content will be overwritten.
- * `dst` arguments can be changed at will at each consecutive call to the function.
+ * `dstBuffer` content is expected to be flushed between each invocation, as its content will be overwritten.
+ * `dstBuffer` can be changed at will between each consecutive function invocation.
  *
- * The function result is an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
+ * @return is an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
  * Schematically, it's the size of the current (or remaining) compressed block + header of next block.
  * Respecting the hint provides some boost to performance, since it does skip intermediate buffers.
  * This is just a hint though, it's always possible to provide any srcSize.
- * When a frame is fully decoded, the function result will be 0 (no more data expected).
- * If decompression failed, function result is an error code, which can be tested using LZ4F_isError().
+ * When a frame is fully decoded, @return will be 0 (no more data expected).
+ * If decompression failed, @return is an error code, which can be tested using LZ4F_isError().
  *
  * After a frame is fully decoded, dctx can be used again to decompress another frame.
  */
