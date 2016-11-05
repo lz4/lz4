@@ -1366,7 +1366,7 @@ int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
         lz4sd->prefixEnd  += originalSize;
     } else {
         lz4sd->extDictSize = lz4sd->prefixSize;
-        lz4sd->externalDict = (BYTE*)dest - lz4sd->extDictSize;
+        lz4sd->externalDict = lz4sd->prefixEnd - lz4sd->extDictSize;
         result = LZ4_decompress_generic(source, dest, 0, originalSize,
                                         endOnOutputSize, full, 0,
                                         usingExtDict, (BYTE*)dest, lz4sd->externalDict, lz4sd->extDictSize);
