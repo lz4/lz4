@@ -2,20 +2,20 @@ Command Line Interface for LZ4 library
 ============================================
 
 Command Line Interface (CLI) can be created using the `make` command without any additional parameters.
-There are however other Makefile targets that create different variations of CLI:
-- `lz4` : default CLI supporting gzip-like arguments
-- `lz4c` : Same as `lz4` with additional support for decompression of legacy lz4 versions
+There are also multiple targets that create different variations of CLI:
+- `lz4` : default CLI, with a command line syntax close to gzip
+- `lz4c` : Same as `lz4` with additional support legacy lz4 commands (incompatible with gzip)
 - `lz4c32` : Same as `lz4c`, but forced to compile in 32-bits mode
 
 
 #### Aggregation of parameters
-CLI supports aggregation of parameters i.e. `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`. 
+CLI supports aggregation of parameters i.e. `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`.
 
 
 
 #### Benchmark in Command Line Interface
 CLI includes in-memory compression benchmark module for lz4.
-The benchmark is conducted using a given filename. 
+The benchmark is conducted using a given filename.
 The file is read into memory.
 It makes benchmark more precise as it eliminates I/O overhead.
 
@@ -26,7 +26,7 @@ The `-i` parameter selects a number of iterations used for each of tested levels
 
 
 #### Usage of Command Line Interface
-The full list of options can be obtained with `-h` or `-H` parameter:
+The full list of commands can be obtained with `-h` or `-H` parameter:
 ```
 Usage :
       lz4 [arg] [input] [output]

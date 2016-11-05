@@ -50,12 +50,16 @@ The native file format is the
 format.
 
 .B lz4
-supports a command line syntax similar but not identical to
+supports a command line syntax similar \fIbut not identical\fR to
 .BR gzip (1).
 Differences are :
-\fBlz4\fR preserve original files ;
-\fBlz4 file1 file2\fR means : compress file1 \fIinto\fR file2 ;
-\fBlz4 file\fR shows real-time statistics during compression .
+ \fBlz4\fR preserves original files
+ \fBlz4\fR compresses a single file by default (use \fB-m\fR for multiple files)
+ \fBlz4 file1 file2\fR means : compress file1 \fIinto\fR file2
+ When no destination name is provided, compressed file name receives a \fB.lz4\fR suffix
+ When no destination name is provided, if \fBstdout\fR is \fInot\fR the console, it becomes the output (like a silent \fB-c\fR)
+      Therefore \fBlz4 file > /dev/null\fR will not create \fBfile.lz4\fR
+ \fBlz4 file\fR shows real-time statistics during compression (use \fB-q\fR to silent them)
 
 Default behaviors can be modified by opt-in commands, described below.
 \fBlz4 --quiet --multiple\fR more closely mimics \fBgzip\fR behavior.
@@ -129,6 +133,11 @@ Test the integrity of compressed
 files.
 The decompressed data is discarded.
 No files are created nor removed.
+
+.TP
+.BR \-b#
+Benchmark mode, using # compression level.
+
 .
 .SS "Operation modifiers"
 .TP
@@ -215,12 +224,22 @@ hence for a file. It won't work with unknown source size, such as stdin or pipe.
 .BR \-k ", " \--keep
  Don't delete source file.
 This is default behavior anyway, so this option is just for compatibility with gzip/xz.
+
+.
+.SS "Benchmark mode"
 .TP
-.B \-b
- benchmark file(s)
+.B \-b#
+ benchmark file(s), using # compression level
+.TP
+.B \-e#
+ benchmark multiple compression levels, from b# to e# (included)
 .TP
 .B \-i#
- iteration loops [1-9](default : 3), benchmark mode only
+ minimum evaluation in seconds [1-9] (default : 3)
+.TP
+.B \-r
+ operate recursively on directories
+
 
 .SH BUGS
 Report bugs at: https://github.com/Cyan4973/lz4/issues
