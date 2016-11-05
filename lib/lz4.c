@@ -701,7 +701,7 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctx;
-    void* ctxPtr = &ctx;
+    void* const ctxPtr = &ctx;
 #endif
 
     int result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);

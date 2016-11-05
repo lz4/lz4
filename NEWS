@@ -5,6 +5,7 @@ Improved: Small compression speed improvement on 64-bits systems
 Improved: Performance on ARMv6 and ARMv7
 Added : Debianization, by Evgeniy Polyakov
 Makefile: Generates object files (*.o) for faster (re)compilation on low power systems
+New : recursive mode in benchmark, by Przemyslaw Skibinski
 Fix : cli : crash on some invalid inputs
 Fix : cli : -t correctly validates lz4-compressed files, by Nick Terrell
 Fix : better ratio on 64-bits big-endian targets
