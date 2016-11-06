@@ -569,7 +569,7 @@ int main(int argc, const char** argv)
         if (multiple_inputs)
             operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
         else
-            DEFAULT_DECOMPRESSOR(input_filename, output_filename);
+            operationResult = DEFAULT_DECOMPRESSOR(input_filename, output_filename);
     } else {
         /* compression is default action */
         if (legacy_format) {
@@ -579,7 +579,7 @@ int main(int argc, const char** argv)
             if (multiple_inputs)
                 operationResult = LZ4IO_compressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
             else
-                DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
+                operationResult = DEFAULT_COMPRESSOR(input_filename, output_filename, cLevel);
         }
     }
 

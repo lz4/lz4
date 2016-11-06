@@ -64,7 +64,7 @@ extern "C" {
         ITEM(ERROR_headerChecksum_invalid) ITEM(ERROR_contentChecksum_invalid) \
         ITEM(ERROR_maxCode)
 
-//#define LZ4F_DISABLE_OLD_ENUMS   /* uncomment to disable deprecated enums */
+#define LZ4F_DISABLE_OLD_ENUMS   /* comment to enable deprecated enums */
 #ifndef LZ4F_DISABLE_OLD_ENUMS
 #  define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM, ENUM = LZ4F_##ENUM,
 #else

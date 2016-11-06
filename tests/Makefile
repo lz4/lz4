@@ -97,6 +97,9 @@ frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxha
 frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
+fasttest: $(LZ4DIR)/lz4.o fasttest.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
@@ -119,7 +122,7 @@ versionsTest:
 #FreeBSD targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
+test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer test-mem
 
 test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
 
@@ -220,6 +223,11 @@ test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse test-lz4-
 	./datagen | $(PRGDIR)/lz4 -tf            && false || true
 	./datagen | $(PRGDIR)/lz4 -d  > $(VOID)  && false || true
 	./datagen | $(PRGDIR)/lz4 -df > $(VOID)
+	@echo "\n ---- test cli ----"
+	$(PRGDIR)/lz4     file-does-not-exist    && false || true
+	$(PRGDIR)/lz4 -f  file-does-not-exist    && false || true
+	$(PRGDIR)/lz4 -fm file1-dne file2-dne    && false || true
+	$(PRGDIR)/lz4 -fm file1-dne file2-dne    && false || true
 
 test-lz4c: lz4c datagen
 	@echo "\n ---- test lz4c version ----"
@@ -261,6 +269,9 @@ test-frametest: frametest
 
 test-frametest32: frametest32
 	./frametest32 $(FUZZER_TIME)
+
+test-fasttest: fasttest
+	./fasttest
 
 test-mem: lz4 datagen fuzzer frametest fullbench
 	@echo "\n ---- valgrind tests : memory analyzer ----"

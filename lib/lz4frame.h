@@ -45,13 +45,11 @@
 extern "C" {
 #endif
 
-/*-************************************
-*  Dependency
-**************************************/
+/* ---   Dependency   --- */
 #include <stddef.h>   /* size_t */
 
 /*-***************************************************************
-*  Export parameters
+*  Compiler specifics
 *****************************************************************/
 /*!
 *  LZ4_DLL_EXPORT :
@@ -67,6 +65,15 @@ extern "C" {
 #  define LZ4FLIB_API
 #endif
 
+#if defined(_MSC_VER)
+#  define LZ4F_DEPRECATE(x) __declspec(deprecated) x
+#elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 6))
+#  define LZ4F_DEPRECATE(x) x __attribute__((deprecated))
+#else
+#  define LZ4F_DEPRECATE(x) x   /* no deprecation warning for this compiler */
+#endif
+
+
 /*-************************************
 *  Error management
 **************************************/
@@ -81,7 +88,7 @@ LZ4FLIB_API const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /* return er
 **************************************/
 /* #define LZ4F_DISABLE_OBSOLETE_ENUMS */  /* uncomment to disable obsolete enums */
 #ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
-#  define LZ4F_OBSOLETE_ENUM(x) ,x
+#  define LZ4F_OBSOLETE_ENUM(x) , LZ4F_DEPRECATE(x) = LZ4F_##x
 #else
 #  define LZ4F_OBSOLETE_ENUM(x)
 #endif
@@ -92,30 +99,30 @@ typedef enum {
     LZ4F_max256KB=5,
     LZ4F_max1MB=6,
     LZ4F_max4MB=7
-    LZ4F_OBSOLETE_ENUM(max64KB = LZ4F_max64KB)
-    LZ4F_OBSOLETE_ENUM(max256KB = LZ4F_max256KB)
-    LZ4F_OBSOLETE_ENUM(max1MB = LZ4F_max1MB)
-    LZ4F_OBSOLETE_ENUM(max4MB = LZ4F_max4MB)
+    LZ4F_OBSOLETE_ENUM(max64KB)
+    LZ4F_OBSOLETE_ENUM(max256KB)
+    LZ4F_OBSOLETE_ENUM(max1MB)
+    LZ4F_OBSOLETE_ENUM(max4MB)
 } LZ4F_blockSizeID_t;
 
 typedef enum {
     LZ4F_blockLinked=0,
     LZ4F_blockIndependent
-    LZ4F_OBSOLETE_ENUM(blockLinked = LZ4F_blockLinked)
-    LZ4F_OBSOLETE_ENUM(blockIndependent = LZ4F_blockIndependent)
+    LZ4F_OBSOLETE_ENUM(blockLinked)
+    LZ4F_OBSOLETE_ENUM(blockIndependent)
 } LZ4F_blockMode_t;
 
 typedef enum {
     LZ4F_noContentChecksum=0,
     LZ4F_contentChecksumEnabled
-    LZ4F_OBSOLETE_ENUM(noContentChecksum = LZ4F_noContentChecksum)
-    LZ4F_OBSOLETE_ENUM(contentChecksumEnabled = LZ4F_contentChecksumEnabled)
+    LZ4F_OBSOLETE_ENUM(noContentChecksum)
+    LZ4F_OBSOLETE_ENUM(contentChecksumEnabled)
 } LZ4F_contentChecksum_t;
 
 typedef enum {
     LZ4F_frame=0,
     LZ4F_skippableFrame
-    LZ4F_OBSOLETE_ENUM(skippableFrame = LZ4F_skippableFrame)
+    LZ4F_OBSOLETE_ENUM(skippableFrame)
 } LZ4F_frameType_t;
 
 #ifndef LZ4F_DISABLE_OBSOLETE_ENUMS

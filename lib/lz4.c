@@ -415,27 +415,32 @@ int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
 static U32 LZ4_hashSequence(U32 sequence, tableType_t const tableType)
 {
     if (tableType == byU16)
-        return (((sequence) * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
+        return ((sequence * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
     else
-        return (((sequence) * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
+        return ((sequence * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
 }
 
-static const U64 prime5bytes = 889523592379ULL;
-static U32 LZ4_hashSequence64(size_t sequence, tableType_t const tableType)
+static U32 LZ4_hashSequence64(U64 sequence, tableType_t const tableType)
 {
+    static const U64 prime5bytes = 889523592379ULL;
+    static const U64 prime8bytes = 11400714785074694791ULL;
     const U32 hashLog = (tableType == byU16) ? LZ4_HASHLOG+1 : LZ4_HASHLOG;
-    const U32 hashMask = (1<<hashLog) - 1;
-    return ((sequence * prime5bytes) >> (40 - hashLog)) & hashMask;
+    if (LZ4_isLittleEndian())
+        return (U32)(((sequence << 24) * prime5bytes) >> (64 - hashLog));
+    else
+        return (U32)(((sequence >> 24) * prime8bytes) >> (64 - hashLog));
 }
 
 static U32 LZ4_hashSequenceT(size_t sequence, tableType_t const tableType)
 {
-    if (LZ4_64bits())
-        return LZ4_hashSequence64(sequence, tableType);
+    if (LZ4_64bits()) return LZ4_hashSequence64(sequence, tableType);
     return LZ4_hashSequence((U32)sequence, tableType);
 }
 
-static U32 LZ4_hashPosition(const void* p, tableType_t tableType) { return LZ4_hashSequenceT(LZ4_read_ARCH(p), tableType); }
+static U32 LZ4_hashPosition(const void* p, tableType_t tableType)
+{
+    return LZ4_hashSequenceT(LZ4_read_ARCH(p), tableType);
+}
 
 static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t const tableType, const BYTE* srcBase)
 {
@@ -1361,7 +1366,7 @@ int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
         lz4sd->prefixEnd  += originalSize;
     } else {
         lz4sd->extDictSize = lz4sd->prefixSize;
-        lz4sd->externalDict = (BYTE*)dest - lz4sd->extDictSize;
+        lz4sd->externalDict = lz4sd->prefixEnd - lz4sd->extDictSize;
         result = LZ4_decompress_generic(source, dest, 0, originalSize,
                                         endOnOutputSize, full, 0,
                                         usingExtDict, (BYTE*)dest, lz4sd->externalDict, lz4sd->extDictSize);
