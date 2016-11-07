@@ -326,7 +326,7 @@ int main(int argc, const char** argv)
         if ((!strcmp(argument, "--decompress"))
          || (!strcmp(argument, "--uncompress"))) { decode = 1; continue; }
         if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
-        if (!strcmp(argument,  "--test")) { decode = 1; LZ4IO_setOverwrite(1); output_filename=nulmark; continue; }
+        if (!strcmp(argument,  "--test")) { decode = 1; LZ4IO_setTestMode(1); output_filename=nulmark; continue; }
         if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(1); continue; }
         if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(0); continue; }
         if ((!strcmp(argument, "--stdout"))
