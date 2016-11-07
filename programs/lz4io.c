@@ -466,20 +466,21 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
     /* read first block */
     readSize  = fread(srcBuffer, (size_t)1, blockSize, srcFile);
+    if (ferror(srcFile)) EXM_THROW(30, "Error reading %s ", srcFileName);
     filesize += readSize;
 
     /* single-block file */
     if (readSize < blockSize) {
         /* Compress in single pass */
         size_t const cSize = LZ4F_compressFrame(dstBuffer, dstBufferSize, srcBuffer, readSize, &prefs);
-        if (LZ4F_isError(cSize)) EXM_THROW(34, "Compression failed : %s", LZ4F_getErrorName(cSize));
+        if (LZ4F_isError(cSize)) EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(filesize+!filesize)*100);   /* avoid division by zero */
 
         /* Write Block */
         {   size_t const sizeCheck = fwrite(dstBuffer, 1, cSize, dstFile);
-            if (sizeCheck!=cSize) EXM_THROW(35, "Write error : cannot write compressed block");
+            if (sizeCheck!=cSize) EXM_THROW(32, "Write error : cannot write compressed block");
     }   }
 
     else
@@ -488,9 +489,9 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     {
         /* Write Archive Header */
         size_t headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
-        if (LZ4F_isError(headerSize)) EXM_THROW(32, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
+        if (LZ4F_isError(headerSize)) EXM_THROW(33, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
         { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-          if (sizeCheck!=headerSize) EXM_THROW(33, "Write error : cannot write header"); }
+          if (sizeCheck!=headerSize) EXM_THROW(34, "Write error : cannot write header"); }
         compressedfilesize += headerSize;
 
         /* Main Loop */
@@ -499,26 +500,26 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
             /* Compress Block */
             outSize = LZ4F_compressUpdate(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, NULL);
-            if (LZ4F_isError(outSize)) EXM_THROW(34, "Compression failed : %s", LZ4F_getErrorName(outSize));
+            if (LZ4F_isError(outSize)) EXM_THROW(35, "Compression failed : %s", LZ4F_getErrorName(outSize));
             compressedfilesize += outSize;
             DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ", (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
 
             /* Write Block */
             { size_t const sizeCheck = fwrite(dstBuffer, 1, outSize, dstFile);
-              if (sizeCheck!=outSize) EXM_THROW(35, "Write error : cannot write compressed block"); }
+              if (sizeCheck!=outSize) EXM_THROW(36, "Write error : cannot write compressed block"); }
 
             /* Read next block */
             readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
             filesize += readSize;
         }
-        if (ferror(srcFile)) EXM_THROW(36, "Error reading %s ", srcFileName);
+        if (ferror(srcFile)) EXM_THROW(37, "Error reading %s ", srcFileName);
 
         /* End of Stream mark */
         headerSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
-        if (LZ4F_isError(headerSize)) EXM_THROW(37, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
+        if (LZ4F_isError(headerSize)) EXM_THROW(38, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
 
         { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-          if (sizeCheck!=headerSize) EXM_THROW(38, "Write error : cannot write end of stream"); }
+          if (sizeCheck!=headerSize) EXM_THROW(39, "Write error : cannot write end of stream"); }
         compressedfilesize += headerSize;
     }
 
@@ -532,7 +533,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
             UTIL_setFileStat(dstFileName, &statbuf);
     }
 
-    if (g_removeSrcFile) { if (remove(srcFileName)) EXM_THROW(39, "Remove error : %s: %s", srcFileName, strerror(errno)); } /* remove source file : --rm */
+    if (g_removeSrcFile) { if (remove(srcFileName)) EXM_THROW(40, "Remove error : %s: %s", srcFileName, strerror(errno)); } /* remove source file : --rm */
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
