@@ -33,14 +33,7 @@
 /**************************************
 *  Compiler Options
 **************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
-#  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
-#endif
-
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
-#define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
 
 #if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
@@ -49,6 +42,7 @@
 /*****************************
 *  Includes
 *****************************/
+#include "util.h"      /* Compiler options, UTIL_getFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strcmp, strlen */
@@ -464,12 +458,14 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress.ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
-
+    stat_t statbuf;
+    int stat_result = 0;
 
     /* Init */
     memset(&prefs, 0, sizeof(prefs));
 
     /* File check */
+    if (strcmp (srcFileName, stdinmark) && UTIL_getFileStat(srcFileName, &statbuf)) stat_result = 1;
     if (LZ4IO_getFiles(srcFileName, dstFileName, &srcFile, &dstFile)) return 1;
 
     /* Set compression parameters */
@@ -546,6 +542,9 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* Release files */
     fclose (srcFile);
     fclose (dstFile);
+
+    /* Copy owner, file permissions and modification time */
+    if (strcmp (dstFileName, stdoutmark) && stat_result) UTIL_setFileStat(dstFileName, &statbuf);
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
