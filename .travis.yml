@@ -12,7 +12,7 @@ matrix:
       env: Ubu=12.04cont Cmd="make gpptest && make clean && make examples && make clean && make cmake && make clean && make travis-install" COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make test && make clean' COMPILER=cc
+      env: Ubu=12.04cont Cmd='make test' COMPILER=cc
     - os: linux
       sudo: false
       env: Ubu=12.04cont Cmd='make clangtest' COMPILER=clang
@@ -51,7 +51,7 @@ matrix:
             - python3
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu=14.04 Cmd='make -C tests test-lz4 test-lz4c32 CC=gcc-5' COMPILER=gcc-5
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4 test-lz4c32 CC=gcc-5 MOREFLAGS="-Werror"' COMPILER=gcc-5
       dist: trusty
       sudo: required
       addons:
@@ -63,7 +63,7 @@ matrix:
             - gcc-multilib
             - gcc-5
             - gcc-5-multilib
-    - env: Ubu=14.04 Cmd='make c_standards && make -C tests test-lz4 CC=gcc-6' COMPILER=gcc-6
+    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 && make -C tests test-lz4 CC=gcc-6 MOREFLAGS="-Werror"' COMPILER=gcc-6
       dist: trusty
       sudo: required
       addons:
