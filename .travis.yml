@@ -4,57 +4,57 @@ matrix:
   include:
     # OS X Mavericks
     - os: osx
-      env: Ubu="OS X Mavericks" PARAMS='-C tests test-lz4 CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"' COMPILER=clang
+      env: Ubu="OS X Mavericks" CMD='-C tests test-lz4 CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"' COMPILER=clang
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS="install PREFIX=~/install_test_dir" COMPILER=cc
+      env: Ubu="12.04cont" CMD="make install PREFIX=~/install_test_dir" COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS="examples" COMPILER=cc
+      env: Ubu="12.04cont" CMD="make examples" COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS="cmake" COMPILER=cc
+      env: Ubu="12.04cont" CMD="make cmake" COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS=clangtest COMPILER=clang
+      env: Ubu="12.04cont" CMD='make clangtest' COMPILER=clang
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS=gpptest COMPILER=cc
+      env: Ubu="12.04cont" CMD='make gpptest' COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS='-C tests test-lz4' COMPILER=cc
+      env: Ubu="12.04cont" CMD='make -C tests test-lz4' COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS='-C tests test-lz4 MOREFLAGS="-std=c99"' COMPILER=cc
+      env: Ubu="12.04cont" CMD='make -C tests test-lz4 MOREFLAGS="-std=c99"' COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS='-C tests test-lz4c' COMPILER=cc
+      env: Ubu="12.04cont" CMD='make -C tests test-lz4c' COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS='-C tests test-fullbench' COMPILER=cc
+      env: Ubu="12.04cont" CMD='make -C tests test-fullbench' COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS='-C tests test-fuzzer' COMPILER=cc
+      env: Ubu="12.04cont" CMD='make -C tests test-fuzzer' COMPILER=cc
     - os: linux
       sudo: false
-      env: Ubu="12.04cont" PARAMS='-C tests test-frametest' COMPILER=cc
+      env: Ubu="12.04cont" CMD='make -C tests test-frametest' COMPILER=cc
     # 14.04 LTS Server Edition 64 bit
-    - env: Ubu="14.04" PARAMS=sanitize COMPILER=clang
+    - env: Ubu="14.04" CMD='make sanitize' COMPILER=clang
       dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - valgrind
-    - env: Ubu="14.04" PARAMS=staticAnalyze COMPILER=clang
+    - env: Ubu="14.04" CMD='make staticAnalyze' COMPILER=clang
       dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - clang
-    - env: Ubu="14.04" PARAMS=armtest COMPILER=arm-linux-gnueabi-gcc
+    - env: Ubu="14.04" CMD='make armtest' COMPILER=arm-linux-gnueabi-gcc
       dist: trusty
       sudo: required
       addons:
@@ -63,7 +63,7 @@ matrix:
             - gcc-arm-linux-gnueabi
             - libc6-dev-armel-cross
             - linux-libc-dev-armel-cross
-    - env: Ubu="14.04" PARAMS=versionsTest COMPILER=cc
+    - env: Ubu="14.04" CMD='make versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -72,10 +72,10 @@ matrix:
             - python3
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu="14.04" PARAMS='-C tests test-lz4' COMPILER=cc
+    - env: Ubu="14.04" CMD='make -C tests test-lz4' COMPILER=cc
       dist: trusty
       sudo: required
-    - env: Ubu="14.04" PARAMS='-C tests test-lz4c32' COMPILER=cc
+    - env: Ubu="14.04" CMD='make -C tests test-lz4c32' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -83,7 +83,7 @@ matrix:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu="14.04" PARAMS='-C tests test-lz4 CC=gcc-5' COMPILER=gcc-5
+    - env: Ubu="14.04" CMD='make -C tests test-lz4 CC=gcc-5' COMPILER=gcc-5
       dist: trusty
       sudo: required
       addons:
@@ -92,7 +92,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - gcc-5
-    - env: Ubu="14.04" PARAMS='-C tests test-lz4c32 CC=gcc-5' COMPILER=gcc-5
+    - env: Ubu="14.04" CMD='make -C tests test-lz4c32 CC=gcc-5' COMPILER=gcc-5
       dist: trusty
       sudo: required
       addons:
@@ -104,7 +104,7 @@ matrix:
             - gcc-multilib
             - gcc-5
             - gcc-5-multilib
-    - env: Ubu="14.04" PARAMS='-C tests test-lz4 CC=gcc-6' COMPILER=gcc-6
+    - env: Ubu="14.04" CMD='make -C tests test-lz4 CC=gcc-6' COMPILER=gcc-6
       dist: trusty
       sudo: required
       addons:
@@ -113,7 +113,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - gcc-6
-    - env: Ubu="14.04" PARAMS='-C tests test-lz4 CC=clang-3.8' COMPILER=clang-3.8
+    - env: Ubu="14.04" CMD='make -C tests test-lz4 CC=clang-3.8' COMPILER=clang-3.8
       dist: trusty
       sudo: required
       addons:
@@ -123,7 +123,7 @@ matrix:
             - llvm-toolchain-precise-3.8
           packages:
             - clang-3.8
-    - env: Ubu="14.04" PARAMS='-C tests test-fullbench32' COMPILER=cc
+    - env: Ubu="14.04" CMD='make -C tests test-fullbench32' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -131,7 +131,7 @@ matrix:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu="14.04" PARAMS='-C tests test-fuzzer32' COMPILER=cc
+    - env: Ubu="14.04" CMD='make -C tests test-fuzzer32' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -139,7 +139,7 @@ matrix:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu="14.04" PARAMS='-C tests test-frametest32' COMPILER=cc
+    - env: Ubu="14.04" CMD='make -C tests test-frametest32' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -147,7 +147,7 @@ matrix:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu="14.04" PARAMS='-C tests test-mem' COMPILER=cc
+    - env: Ubu="14.04" CMD='make -C tests test-mem' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -156,6 +156,6 @@ matrix:
             - valgrind
 
 script:
-  - echo PARAMS=$PARAMS
+  - echo CMD=$CMD
   - $COMPILER -v
-  - sh -c "make $PARAMS"
+  - sh -c "$CMD"
