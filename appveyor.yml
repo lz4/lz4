@@ -14,13 +14,10 @@ environment:
     CONFIGURATION: "Release"
     PLATFORM: "Win32"
   - COMPILER: "gcc"
-    MAKE_PARAMS: "make -C programs lz4 && make -C tests fullbench"
     PLATFORM: "mingw64"
   - COMPILER: "gcc"
-    MAKE_PARAMS: "make -C programs lz4 && make -C tests fullbench"
     PLATFORM: "mingw32"
   - COMPILER: "gcc"
-    MAKE_PARAMS: 'make -C programs lz4 CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" && make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"'
     PLATFORM: "clang"
 
 install:
@@ -48,9 +45,13 @@ build_script:
       echo ----- &&
       make -v &&
       echo ----- &&
-      ECHO -%MAKE_PARAMS%- &&
-      %MAKE_PARAMS%
-    ) ELSE (
+      if not [%PLATFORM%]==[clang] (
+        make -C programs lz4 && make -C tests fullbench"
+      ) ELSE (
+        sh -c CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" make -C programs lz4 && make -C tests fullbench 
+      )
+    )
+  - if [%COMPILER%]==[visual] (
       ECHO *** &&
       ECHO *** Building Visual Studio 2010 %PLATFORM%\%CONFIGURATION% &&
       ECHO *** &&
