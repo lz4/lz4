@@ -97,6 +97,9 @@ frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxha
 frametest32: $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/xxhash.c frametest.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
+fasttest: $(LZ4DIR)/lz4.o fasttest.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
@@ -119,9 +122,9 @@ versionsTest:
 #FreeBSD targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-mem
+test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer
 
-test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
+test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32
 
 test-all: test test32
 
@@ -266,6 +269,9 @@ test-frametest: frametest
 
 test-frametest32: frametest32
 	./frametest32 $(FUZZER_TIME)
+
+test-fasttest: fasttest
+	./fasttest
 
 test-mem: lz4 datagen fuzzer frametest fullbench
 	@echo "\n ---- valgrind tests : memory analyzer ----"

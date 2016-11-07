@@ -33,14 +33,7 @@
 /**************************************
 *  Compiler Options
 **************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
-#  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
-#endif
-
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
-#define _FILE_OFFSET_BITS 64   /* Large file support on 32-bits unix */
 
 #if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
@@ -49,6 +42,7 @@
 /*****************************
 *  Includes
 *****************************/
+#include "util.h"      /* Compiler options, UTIL_getFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strcmp, strlen */
@@ -82,10 +76,6 @@
 #else
 #  define SET_BINARY_MODE(file)
 #  define SET_SPARSE_FILE_MODE(file)
-#endif
-
-#if !defined(S_ISREG)
-#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
 #endif
 
 
@@ -242,19 +232,9 @@ int LZ4IO_setContentSize(int enable)
     return g_contentSizeFlag;
 }
 
-static unsigned long long LZ4IO_GetFileSize(const char* infilename)
-{
-    int r;
-#if defined(_MSC_VER)
-    struct _stat64 statbuf;
-    r = _stat64(infilename, &statbuf);
-#else
-    struct stat statbuf;
-    r = stat(infilename, &statbuf);
-#endif
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* failure, or is not a regular file */
-    return (unsigned long long)statbuf.st_size;
-}
+static U32 g_removeSrcFile = 0;
+void LZ4IO_setRemoveSrcFile(unsigned flag) { g_removeSrcFile = (flag>0); }
+
 
 
 /* ************************************************************************ **
@@ -465,7 +445,6 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     LZ4F_compressionContext_t ctx = ress.ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
 
-
     /* Init */
     memset(&prefs, 0, sizeof(prefs));
 
@@ -479,7 +458,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
     if (g_contentSizeFlag) {
-      unsigned long long const fileSize = LZ4IO_GetFileSize(srcFileName);
+      U64 const fileSize = UTIL_getFileSize(srcFileName);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
@@ -546,6 +525,14 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* Release files */
     fclose (srcFile);
     fclose (dstFile);
+
+    /* Copy owner, file permissions and modification time */
+    {   stat_t statbuf;
+        if (strcmp (srcFileName, stdinmark) && strcmp (dstFileName, stdoutmark) && UTIL_getFileStat(srcFileName, &statbuf))
+            UTIL_setFileStat(dstFileName, &statbuf);
+    }
+
+    if (g_removeSrcFile) { if (remove(srcFileName)) EXM_THROW(39, "Remove error : %s: %s", srcFileName, strerror(errno)); } /* remove source file : --rm */
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
@@ -946,13 +933,21 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
             filesize += decodedSize;
     } while (decodedSize != ENDOFSTREAM);
 
-    /* Final Status */
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
-
     /* Close */
     fclose(finput);
     fclose(foutput);
+
+    /* Copy owner, file permissions and modification time */
+    {   stat_t statbuf;
+        if (strcmp (input_filename, stdinmark) && strcmp (output_filename, stdoutmark) && UTIL_getFileStat(input_filename, &statbuf))
+            UTIL_setFileStat(output_filename, &statbuf);
+    }
+
+    if (g_removeSrcFile) { if (remove(input_filename)) EXM_THROW(45, "Remove error : %s: %s", input_filename, strerror(errno)); } /* remove source file : --rm */
+
+    /* Final Status */
+    DISPLAYLEVEL(2, "\r%79s\r", "");
+    DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
 
     return 0;
 }
