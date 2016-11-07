@@ -85,7 +85,7 @@ uninstall:
 	@$(MAKE) -C $(PRGDIR) $@
 
 travis-install:
-	sudo $(MAKE) install
+	$(MAKE) install PREFIX=~/install_test_dir
 
 test:
 	$(MAKE) -C $(TESTDIR) test
@@ -96,19 +96,29 @@ cmake:
 gpptest: clean
 	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
+c_standards: clean
+	$(MAKE) all CFLAGS="-std=gnu90" 
+	$(MAKE) clean
+	$(MAKE) all CFLAGS="-std=c99" 
+	$(MAKE) clean
+	$(MAKE) all CFLAGS="-std=gnu99" 
+	$(MAKE) clean
+	$(MAKE) all CFLAGS="-std=c11" 
+	$(MAKE) clean
+
 clangtest: clean
-	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) all CC=clang
+	$(MAKE) all CC=clang CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" 
 
 sanitize: clean
-	CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
+	$(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1 CFLAGS="-O3 -g -fsanitize=undefined" 
 
 staticAnalyze: clean
-	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
+	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g 
 
 armtest: clean
-	CFLAGS="-O3 -Werror" $(MAKE) -C $(LZ4DIR) all CC=arm-linux-gnueabi-gcc
-	CFLAGS="-O3 -Werror" $(MAKE) -C $(PRGDIR) bins CC=arm-linux-gnueabi-gcc
-	CFLAGS="-O3 -Werror" $(MAKE) -C $(TESTDIR) bins CC=arm-linux-gnueabi-gcc
+	$(MAKE) -C $(LZ4DIR) all CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
+	$(MAKE) -C $(PRGDIR) bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
+	$(MAKE) -C $(TESTDIR) bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
 
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@
