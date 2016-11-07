@@ -52,6 +52,7 @@ build_script:
         make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
       )
     )
+  - if [%COMPILER%]==[gcc] (COPY tests\fullbench.exe programs\)
   - if [%COMPILER%]==[visual] (
       ECHO *** &&
       ECHO *** Building Visual Studio 2010 %PLATFORM%\%CONFIGURATION% &&
@@ -84,6 +85,5 @@ test_script:
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
       echo lz4 tested && 
-      CD ..\tests &&
       fullbench.exe -i1 fullbench.exe
     )
