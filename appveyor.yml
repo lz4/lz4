@@ -46,7 +46,7 @@ build_script:
       make -v &&
       echo ----- &&
       if not [%PLATFORM%]==[clang] (
-        make -C programs lz4 && make -C tests fullbench"
+        make -C programs lz4 && make -C tests fullbench
       ) ELSE (
         sh -c CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" make -C programs lz4 && make -C tests fullbench 
       )
