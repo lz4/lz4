@@ -66,7 +66,7 @@ extern "C" {
 #endif
 
 #if defined(_MSC_VER)
-#  define LZ4F_DEPRECATE(x) __declspec(deprecated) x
+#  define LZ4F_DEPRECATE(x) x   /* __declspec(deprecated) x - only works with C++ */
 #elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 6))
 #  define LZ4F_DEPRECATE(x) x __attribute__((deprecated))
 #else
@@ -274,7 +274,7 @@ typedef struct {
  * That is, it should be == 0 if decompression has been completed fully and correctly.
  */
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* const dctx);
 
 
 /*======   Decompression   ======*/
