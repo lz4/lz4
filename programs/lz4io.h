@@ -89,3 +89,5 @@ int LZ4IO_setSparseFile(int enable);
 
 /* Default setting : 0 (disabled) */
 int LZ4IO_setContentSize(int enable);
+
+void LZ4IO_setRemoveSrcFile(unsigned flag);

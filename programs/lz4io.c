@@ -78,10 +78,6 @@
 #  define SET_SPARSE_FILE_MODE(file)
 #endif
 
-#if !defined(S_ISREG)
-#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
-#endif
-
 
 /*****************************
 *  Constants
@@ -236,19 +232,9 @@ int LZ4IO_setContentSize(int enable)
     return g_contentSizeFlag;
 }
 
-static unsigned long long LZ4IO_GetFileSize(const char* infilename)
-{
-    int r;
-#if defined(_MSC_VER)
-    struct _stat64 statbuf;
-    r = _stat64(infilename, &statbuf);
-#else
-    struct stat statbuf;
-    r = stat(infilename, &statbuf);
-#endif
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* failure, or is not a regular file */
-    return (unsigned long long)statbuf.st_size;
-}
+static U32 g_removeSrcFile = 0;
+void LZ4IO_setRemoveSrcFile(unsigned flag) { g_removeSrcFile = (flag>0); }
+
 
 
 /* ************************************************************************ **
@@ -458,14 +444,11 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress.ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
-    stat_t statbuf;
-    int stat_result = 0;
 
     /* Init */
     memset(&prefs, 0, sizeof(prefs));
 
     /* File check */
-    if (strcmp (srcFileName, stdinmark) && UTIL_getFileStat(srcFileName, &statbuf)) stat_result = 1;
     if (LZ4IO_getFiles(srcFileName, dstFileName, &srcFile, &dstFile)) return 1;
 
     /* Set compression parameters */
@@ -475,7 +458,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
     if (g_contentSizeFlag) {
-      unsigned long long const fileSize = LZ4IO_GetFileSize(srcFileName);
+      U64 const fileSize = UTIL_getFileSize(srcFileName);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
@@ -544,7 +527,12 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     fclose (dstFile);
 
     /* Copy owner, file permissions and modification time */
-    if (strcmp (dstFileName, stdoutmark) && stat_result) UTIL_setFileStat(dstFileName, &statbuf);
+    {   stat_t statbuf;
+        if (strcmp (srcFileName, stdinmark) && strcmp (dstFileName, stdoutmark) && UTIL_getFileStat(srcFileName, &statbuf))
+            UTIL_setFileStat(dstFileName, &statbuf);
+    }
+
+    if (g_removeSrcFile) { if (remove(srcFileName)) EXM_THROW(39, "Remove error : %s: %s", srcFileName, strerror(errno)); } /* remove source file : --rm */
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
@@ -945,13 +933,21 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
             filesize += decodedSize;
     } while (decodedSize != ENDOFSTREAM);
 
-    /* Final Status */
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
-
     /* Close */
     fclose(finput);
     fclose(foutput);
+
+    /* Copy owner, file permissions and modification time */
+    {   stat_t statbuf;
+        if (strcmp (input_filename, stdinmark) && strcmp (output_filename, stdoutmark) && UTIL_getFileStat(input_filename, &statbuf))
+            UTIL_setFileStat(output_filename, &statbuf);
+    }
+
+    if (g_removeSrcFile) { if (remove(input_filename)) EXM_THROW(45, "Remove error : %s: %s", input_filename, strerror(errno)); } /* remove source file : --rm */
+
+    /* Final Status */
+    DISPLAYLEVEL(2, "\r%79s\r", "");
+    DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
 
     return 0;
 }

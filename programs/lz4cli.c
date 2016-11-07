@@ -149,6 +149,7 @@ static int usage(void)
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -z     : force compression\n");
     DISPLAY( " -f     : overwrite output without prompting \n");
+    DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");
     DISPLAY( " -h/-H  : display help/long help and exit\n");
     return 0;
 }
@@ -340,7 +341,8 @@ int main(int argc, const char** argv)
         if (!strcmp(argument,  "--verbose")) { displayLevel=4; continue; }
         if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
         if (!strcmp(argument,  "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
-        if (!strcmp(argument,  "--keep")) { continue; }   /* keep source file (default anyway; just for xz/lzma compatibility) */
+        if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(0); continue; }   /* keep source file (default anyway; just for xz/lzma compatibility) */
+        if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(1); continue; }
 
         /* Short commands (note : aggregated short commands are allowed) */
         if (argument[0]=='-') {
@@ -406,7 +408,7 @@ int main(int argc, const char** argv)
                 case 'q': if (displayLevel) displayLevel--; break;
 
                     /* keep source file (default anyway, so useless) (for xz/lzma compatibility) */
-                case 'k': break;
+                case 'k': LZ4IO_setRemoveSrcFile(0); break;
 
                     /* Modify Block Properties */
                 case 'B':
