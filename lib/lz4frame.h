@@ -66,7 +66,7 @@ extern "C" {
 #endif
 
 #if defined(_MSC_VER)
-#  define LZ4F_DEPRECATE(x) __declspec(deprecated) x
+#  define LZ4F_DEPRECATE(x) x   /* __declspec(deprecated) x - only works with C++ */
 #elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 6))
 #  define LZ4F_DEPRECATE(x) x __attribute__((deprecated))
 #else
