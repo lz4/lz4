@@ -48,7 +48,8 @@ build_script:
       if not [%PLATFORM%]==[clang] (
         make -C programs lz4 && make -C tests fullbench
       ) ELSE (
-        sh -c CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" make -C programs lz4 && make -C tests fullbench 
+        make -C programs lz4 CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+        make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
       )
     )
   - if [%COMPILER%]==[visual] (
@@ -83,5 +84,6 @@ test_script:
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
       echo lz4 tested && 
+      CD ..\tests &&
       fullbench.exe -i1 fullbench.exe
     )
