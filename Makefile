@@ -116,6 +116,8 @@ staticAnalyze: clean
 	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
 platformTest: clean
+	@echo "\n ---- test lz4 with $(CC) compiler ----"
+	@$(CC) -v
 	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
 	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) bins
 	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) bins
