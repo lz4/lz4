@@ -419,6 +419,7 @@ int main(int argc, const char** argv)
                         case '7':
                             {   int B = argument[1] - '0';
                                 blockSize = LZ4IO_setBlockSizeID(B);
+                                BMK_setNotificationLevel(displayLevel);
                                 BMK_SetBlockSize(blockSize);
                                 argument++;
                                 break;
@@ -453,6 +454,7 @@ int main(int argc, const char** argv)
                         argument++;
                         iters = readU32FromChar(&argument);
                         argument--;
+                        BMK_setNotificationLevel(displayLevel);
                         BMK_SetNbSeconds(iters);
                     }
                     break;
@@ -517,6 +519,7 @@ int main(int argc, const char** argv)
 
     /* Check if benchmark is selected */
     if (bench) {
+        BMK_setNotificationLevel(displayLevel);
         operationResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel, cLevelLast);
         goto _cleanup;
     }
