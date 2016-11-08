@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Express 2012 for Windows Desktop
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lz4", "lz4\lz4.vcxproj", "{E30329AC-0057-4FE0-8FDA-7F650D398C4C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lz4-dll", "lz4-dll\lz4-dll.vcxproj", "{9800039D-4AAA-43A4-BB78-FEF6F4836927}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "liblz4", "liblz4\liblz4.vcxproj", "{9092C5CC-3E71-41B3-BF68-4A7BDD8A5476}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fuzzer", "fuzzer\fuzzer.vcxproj", "{18B9F1A7-9C66-4352-898B-30804DADE0FD}"
@@ -29,6 +31,14 @@ Global
 		{E30329AC-0057-4FE0-8FDA-7F650D398C4C}.Release|Win32.Build.0 = Release|Win32
 		{E30329AC-0057-4FE0-8FDA-7F650D398C4C}.Release|x64.ActiveCfg = Release|x64
 		{E30329AC-0057-4FE0-8FDA-7F650D398C4C}.Release|x64.Build.0 = Release|x64
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Debug|Win32.Build.0 = Debug|Win32
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Debug|x64.ActiveCfg = Debug|x64
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Debug|x64.Build.0 = Debug|x64
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Release|Win32.ActiveCfg = Release|Win32
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Release|Win32.Build.0 = Release|Win32
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Release|x64.ActiveCfg = Release|x64
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927}.Release|x64.Build.0 = Release|x64
 		{9092C5CC-3E71-41B3-BF68-4A7BDD8A5476}.Debug|Win32.ActiveCfg = Debug|Win32
 		{9092C5CC-3E71-41B3-BF68-4A7BDD8A5476}.Debug|Win32.Build.0 = Debug|Win32
 		{9092C5CC-3E71-41B3-BF68-4A7BDD8A5476}.Debug|x64.ActiveCfg = Debug|x64

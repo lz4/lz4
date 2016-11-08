@@ -9,39 +9,18 @@ matrix:
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd="make gpptest && make clean && make examples && make clean && make cmake && make clean && make travis-install" COMPILER=cc
+      env: Ubu=12.04cont Cmd='make test' COMPILER=cc
+      
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make test' COMPILER=cc
+      env: Ubu=12.04cont Cmd="make gpptest && make clean && make examples && make clean && make cmake && make clean && make travis-install" COMPILER=cc
+      
     - os: linux
       sudo: false
       env: Ubu=12.04cont Cmd='make clangtest' COMPILER=clang
     
+    
     # 14.04 LTS Server Edition 64 bit
-    - env: Ubu=14.04 Cmd='make staticAnalyze sanitize' COMPILER=clang
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - valgrind
-            - clang
-    - env: Ubu=14.04 Cmd='make armtest' COMPILER=arm-linux-gnueabi-gcc
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - gcc-arm-linux-gnueabi
-            - libc6-dev-armel-cross
-            - linux-libc-dev-armel-cross
-    - env: Ubu=14.04 Cmd='make c_standards && make -C tests test-lz4 test-mem' COMPILER=cc
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - valgrind
     - env: Ubu=14.04 Cmd='make -C tests test32 versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
@@ -51,7 +30,48 @@ matrix:
             - python3
             - libc6-dev-i386
             - gcc-multilib
-    - env: Ubu=14.04 Cmd='make -C tests test-lz4 test-lz4c32 CC=gcc-5 MOREFLAGS="-Werror"' COMPILER=gcc-5
+    
+    - env: Ubu=14.04 Cmd='make staticAnalyze sanitize' COMPILER=clang
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - valgrind
+            - clang
+    
+    - env: Ubu=14.04 Cmd='make platformTest CC=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static && make platformTest CC=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static' COMPILER=arm-linux-gnueabi-gcc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - qemu-system-arm
+            - qemu-user-static
+            - gcc-arm-linux-gnueabi
+            - libc6-dev-armel-cross 
+            - gcc-aarch64-linux-gnu
+            - libc6-dev-arm64-cross
+    
+    - env: Ubu=14.04 Cmd='make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc-static && make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static MOREFLAGS=-m64' COMPILER=powerpc-linux-gnu-gcc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - qemu-system-ppc
+            - qemu-user-static
+            - gcc-powerpc-linux-gnu
+    
+    - env: Ubu=14.04 Cmd='make c_standards && make -C tests test-lz4 test-mem' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - valgrind
+    
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4 test-lz4c32 CC=gcc-5 MOREFLAGS=-Werror' COMPILER=gcc-5
       dist: trusty
       sudo: required
       addons:
@@ -63,7 +83,8 @@ matrix:
             - gcc-multilib
             - gcc-5
             - gcc-5-multilib
-    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 && make -C tests test-lz4 CC=gcc-6 MOREFLAGS="-Werror"' COMPILER=gcc-6
+    
+    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 && make -C tests test-lz4 CC=gcc-6 MOREFLAGS=-Werror' COMPILER=gcc-6
       dist: trusty
       sudo: required
       addons:
@@ -72,6 +93,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - gcc-6
+    
     - env: Ubu=14.04 Cmd='make -C tests test-lz4 CC=clang-3.8' COMPILER=clang-3.8
       dist: trusty
       sudo: required

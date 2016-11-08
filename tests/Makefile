@@ -250,6 +250,15 @@ test-lz4c32-basic: lz4c32 datagen
 	./datagen -g256MB | $(PRGDIR)/lz4c32 -vqB4D | $(PRGDIR)/lz4c32 -qt
 	./datagen -g6GB   | $(PRGDIR)/lz4c32 -vqB5D | $(PRGDIR)/lz4c32 -qt
 
+test-platform:
+	@echo "\n ---- test lz4 $(QEMU_SYS) platform ----"
+	$(QEMU_SYS) ./datagen -g16KB  | $(QEMU_SYS) $(PRGDIR)/lz4 -9     | $(QEMU_SYS) $(PRGDIR)/lz4 -t
+	$(QEMU_SYS) ./datagen         | $(QEMU_SYS) $(PRGDIR)/lz4        | $(QEMU_SYS) $(PRGDIR)/lz4 -t
+	$(QEMU_SYS) ./datagen -g256MB | $(QEMU_SYS) $(PRGDIR)/lz4 -vqB4D | $(QEMU_SYS) $(PRGDIR)/lz4 -qt
+ifneq ($(QEMU_SYS),qemu-arm-static)
+	$(QEMU_SYS) ./datagen -g3GB   | $(QEMU_SYS) $(PRGDIR)/lz4 -vqB5D | $(QEMU_SYS) $(PRGDIR)/lz4 -qt
+endif
+
 test-lz4c32: test-lz4c32-basic test-interop-32-64
 
 test-fullbench: fullbench

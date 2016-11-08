@@ -97,28 +97,31 @@ gpptest: clean
 	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
-	$(MAKE) all CFLAGS="-std=gnu90" 
+	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror" 
 	$(MAKE) clean
-	$(MAKE) all CFLAGS="-std=c99" 
+	$(MAKE) all MOREFLAGS="-std=c99 -Werror" 
 	$(MAKE) clean
-	$(MAKE) all CFLAGS="-std=gnu99" 
+	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror" 
 	$(MAKE) clean
-	$(MAKE) all CFLAGS="-std=c11" 
+	$(MAKE) all MOREFLAGS="-std=c11 -Werror" 
 	$(MAKE) clean
 
 clangtest: clean
-	$(MAKE) all CC=clang CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" 
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) all CC=clang
 
 sanitize: clean
-	$(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1 CFLAGS="-O3 -g -fsanitize=undefined" 
+	CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
 staticAnalyze: clean
-	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g 
+	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
-armtest: clean
-	$(MAKE) -C $(LZ4DIR) all CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
-	$(MAKE) -C $(PRGDIR) bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
-	$(MAKE) -C $(TESTDIR) bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
+platformTest: clean
+	@echo "\n ---- test lz4 with $(CC) compiler ----"
+	@$(CC) -v
+	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) bins
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) bins
+	$(MAKE) -C $(TESTDIR) test-platform
 
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@

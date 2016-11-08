@@ -195,7 +195,7 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code)
     return codeError;
 }
 
-static LZ4F_errorCode_t err0r(LZ4F_errorCodes code) { return (LZ4F_errorCode_t)-(LZ4F_errorCode_t)code; }
+static LZ4F_errorCode_t err0r(LZ4F_errorCodes code) { return (LZ4F_errorCode_t)-(ptrdiff_t)code; }
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 

@@ -49,6 +49,7 @@ CFLAGS ?= -O3
 CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
           -Wpointer-arith   # -Wstrict-aliasing=1
+CFLAGS  += $(MOREFLAGS)
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 LIBDIR?= $(PREFIX)/lib
