@@ -36,7 +36,8 @@ matrix:
             - qemu-system-arm
             - qemu-user-static
             - gcc-arm-linux-gnueabi
-            - libc6-dev-i386
+            - libc6-dev-armel-cross
+            - linux-libc-dev-armel-cross
     
     - env: Ubu=14.04 Cmd='make platformTest CC=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static' COMPILER=aarch64-linux-gnu-gcc
       dist: trusty
@@ -47,6 +48,7 @@ matrix:
             - qemu-system-arm
             - qemu-user-static
             - gcc-aarch64-linux-gnu
+            - libc6-dev-arm64-cross
     
     - env: Ubu=14.04 Cmd='make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc-static && make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static MOREFLAGS=-m64' COMPILER=powerpc-linux-gnu-gcc
       dist: trusty
