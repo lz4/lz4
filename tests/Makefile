@@ -122,9 +122,9 @@ versionsTest:
 #FreeBSD targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
 
-test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer test-mem
+test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer
 
-test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32 test-mem32
+test32: test-lz4c32 test-frametest32 test-fullbench32 test-fuzzer32
 
 test-all: test test32
 

@@ -332,11 +332,11 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 
 
 static int LZ4HC_compress_generic (
-    void* ctxvoid,
-    const char* source,
-    char* dest,
-    int inputSize,
-    int maxOutputSize,
+    void* const ctxvoid,
+    const char* const source,
+    char* const dest,
+    int const inputSize,
+    int const maxOutputSize,
     int compressionLevel,
     limitedOutput_directive limit
     )
@@ -381,7 +381,7 @@ static int LZ4HC_compress_generic (
 
 _Search2:
         if (ip+ml < mflimit)
-            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 1, matchlimit, ml, &ref2, &start2, maxNbAttempts);
+            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2, maxNbAttempts);
         else ml2 = ml;
 
         if (ml2 == ml) { /* No better match */

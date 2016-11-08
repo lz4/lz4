@@ -412,7 +412,7 @@ int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
 /*-******************************
 *  Compression functions
 ********************************/
-static U32 LZ4_hashSequence(U32 sequence, tableType_t const tableType)
+static U32 LZ4_hash4(U32 sequence, tableType_t const tableType)
 {
     if (tableType == byU16)
         return ((sequence * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
@@ -420,7 +420,7 @@ static U32 LZ4_hashSequence(U32 sequence, tableType_t const tableType)
         return ((sequence * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
 }
 
-static U32 LZ4_hashSequence64(U64 sequence, tableType_t const tableType)
+static U32 LZ4_hash5(U64 sequence, tableType_t const tableType)
 {
     static const U64 prime5bytes = 889523592379ULL;
     static const U64 prime8bytes = 11400714785074694791ULL;
@@ -431,15 +431,10 @@ static U32 LZ4_hashSequence64(U64 sequence, tableType_t const tableType)
         return (U32)(((sequence >> 24) * prime8bytes) >> (64 - hashLog));
 }
 
-static U32 LZ4_hashSequenceT(size_t sequence, tableType_t const tableType)
+FORCE_INLINE U32 LZ4_hashPosition(const void* p, tableType_t const tableType)
 {
-    if (LZ4_64bits()) return LZ4_hashSequence64(sequence, tableType);
-    return LZ4_hashSequence((U32)sequence, tableType);
-}
-
-static U32 LZ4_hashPosition(const void* p, tableType_t tableType)
-{
-    return LZ4_hashSequenceT(LZ4_read_ARCH(p), tableType);
+    if ((LZ4_64bits()) && (tableType == byU32)) return LZ4_hash5(LZ4_read_ARCH(p), tableType);
+    return LZ4_hash4(LZ4_read32(p), tableType);
 }
 
 static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableType_t const tableType, const BYTE* srcBase)
@@ -452,7 +447,7 @@ static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableTy
     }
 }
 
-static void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     LZ4_putPositionOnHash(p, h, tableBase, tableType, srcBase);
@@ -465,7 +460,7 @@ static const BYTE* LZ4_getPositionOnHash(U32 h, void* tableBase, tableType_t tab
     { const U16* const hashTable = (U16*) tableBase; return hashTable[h] + srcBase; }   /* default, to ensure a return */
 }
 
-static const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
@@ -655,7 +650,7 @@ _next_match:
 
 _last_literals:
     /* Encode Last Literals */
-    {   const size_t lastRun = (size_t)(iend - anchor);
+    {   size_t const lastRun = (size_t)(iend - anchor);
         if ( (outputLimited) &&  /* Check output buffer overflow */
             ((op - (BYTE*)dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) )
             return 0;
@@ -683,12 +678,12 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 
     if (maxOutputSize >= LZ4_compressBound(inputSize)) {
         if (inputSize < LZ4_64Klimit)
-            return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, byU16,                        noDict, noDictIssue, acceleration);
+            return LZ4_compress_generic(state, source, dest, inputSize,             0,    notLimited,                        byU16, noDict, noDictIssue, acceleration);
         else
-            return LZ4_compress_generic(state, source, dest, inputSize, 0, notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, acceleration);
+            return LZ4_compress_generic(state, source, dest, inputSize,             0,    notLimited, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, acceleration);
     } else {
         if (inputSize < LZ4_64Klimit)
-            return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, byU16,                        noDict, noDictIssue, acceleration);
+            return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput,                        byU16, noDict, noDictIssue, acceleration);
         else
             return LZ4_compress_generic(state, source, dest, inputSize, maxOutputSize, limitedOutput, LZ4_64bits() ? byU32 : byPtr, noDict, noDictIssue, acceleration);
     }
@@ -701,10 +696,10 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctx;
-    void* ctxPtr = &ctx;
+    void* const ctxPtr = &ctx;
 #endif
 
-    int result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
+    int const result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
 #if (HEAPMODE)
     FREEMEM(ctxPtr);
