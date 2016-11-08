@@ -1,10 +1,13 @@
 *Copy
+*.db
+.vs/
 
 # Visual C++
 build/
 VS2005/
 VS2008/
-VS2010/
+VS2010/bin/
+VS2010/obj/
 VS2012/
 VS2013/
 VS2015/
