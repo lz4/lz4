@@ -322,6 +322,8 @@ if __name__ == '__main__':
             if first_time:
                 first_time = False
             else:
+                if verbose:
+                    log("sleep for %s seconds" % args.sleepTime)
                 time.sleep(args.sleepTime)
             loadavg = os.getloadavg()[0]
             if (loadavg <= args.maxLoadAvg):
@@ -338,8 +340,6 @@ if __name__ == '__main__':
                         test_commit(branch, commit, last_commit, args, testFilePaths, have_mutt, have_mail)
             else:
                 log("WARNING: main loadavg=%.2f is higher than %s" % (loadavg, args.maxLoadAvg))
-            if verbose:
-                log("sleep for %s seconds" % args.sleepTime)
         except Exception as e:
             stack = traceback.format_exc()
             email_topic = '[%s:%s] ERROR in %s:%s' % (email_header, pid, branch, commit)
