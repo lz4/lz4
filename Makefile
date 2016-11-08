@@ -107,18 +107,18 @@ c_standards: clean
 	$(MAKE) clean
 
 clangtest: clean
-	$(MAKE) all CC=clang CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" 
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) all CC=clang
 
 sanitize: clean
-	$(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1 CFLAGS="-O3 -g -fsanitize=undefined" 
+	CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
 staticAnalyze: clean
-	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g 
+	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
 platformTest: clean
-	$(MAKE) -C $(LZ4DIR)  all  MOREFLAGS="-Werror" 
-	$(MAKE) -C $(PRGDIR)  bins MOREFLAGS="-Werror -static"
-	$(MAKE) -C $(TESTDIR) bins MOREFLAGS="-Werror -static"
+	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) bins
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) bins
 	$(MAKE) -C $(TESTDIR) test-platform
 
 versionsTest: clean
