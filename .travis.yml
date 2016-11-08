@@ -27,7 +27,7 @@ matrix:
             - valgrind
             - clang
     
-    - env: Ubu=14.04 Cmd='make platformTest CC=arm-linux-gnueabi-gcc' COMPILER=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static
+    - env: Ubu=14.04 Cmd='make platformTest CC=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static' COMPILER=arm-linux-gnueabi-gcc
       dist: trusty
       sudo: required
       addons:
@@ -39,7 +39,7 @@ matrix:
             - libc6-dev-armel-cross
             - linux-libc-dev-armel-cross
     
-    - env: Ubu=14.04 Cmd='make platformTest CC=aarch64-linux-gnu-gcc' COMPILER=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static
+    - env: Ubu=14.04 Cmd='make platformTest CC=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static' COMPILER=aarch64-linux-gnu-gcc
       dist: trusty
       sudo: required
       addons:
@@ -49,7 +49,7 @@ matrix:
             - qemu-user-static
             - gcc-aarch64-linux-gnu
     
-    - env: Ubu=14.04 Cmd='make platformTest CC=powerpc-linux-gnu-gcc' COMPILER=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static
+    - env: Ubu=14.04 Cmd='make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc-static' COMPILER=powerpc-linux-gnu-gcc
       dist: trusty
       sudo: required
       addons:
@@ -87,7 +87,7 @@ matrix:
             - gcc-multilib
             - gcc-5
             - gcc-5-multilib
-    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 MOREFLAGS="-Werror" && make -C tests test-lz4 CC=gcc-6 MOREFLAGS="-Werror"' COMPILER=gcc-6
+    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 && make -C tests test-lz4 CC=gcc-6 MOREFLAGS="-Werror"' COMPILER=gcc-6
       dist: trusty
       sudo: required
       addons:

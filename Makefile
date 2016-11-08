@@ -97,13 +97,13 @@ gpptest: clean
 	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
-	$(MAKE) all CFLAGS="-std=gnu90" 
+	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror" 
 	$(MAKE) clean
-	$(MAKE) all CFLAGS="-std=c99" 
+	$(MAKE) all MOREFLAGS="-std=c99 -Werror" 
 	$(MAKE) clean
-	$(MAKE) all CFLAGS="-std=gnu99" 
+	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror" 
 	$(MAKE) clean
-	$(MAKE) all CFLAGS="-std=c11" 
+	$(MAKE) all MOREFLAGS="-std=c11 -Werror" 
 	$(MAKE) clean
 
 clangtest: clean
@@ -116,9 +116,10 @@ staticAnalyze: clean
 	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g 
 
 platformTest: clean
-	$(MAKE) -C $(LZ4DIR) all CFLAGS="-Werror -static -O3 -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith"
-	$(MAKE) -C $(PRGDIR) bins CFLAGS="-Werror -static -O3 -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith" 
-	$(MAKE) -C $(TESTDIR) bins CFLAGS="-Werror -static -O3 -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith"
+	$(MAKE) -C $(LZ4DIR)  all  MOREFLAGS="-Werror" 
+	$(MAKE) -C $(PRGDIR)  bins MOREFLAGS="-Werror -static"
+	$(MAKE) -C $(TESTDIR) bins MOREFLAGS="-Werror -static"
+	$(MAKE) -C $(TESTDIR) test-platform
 
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@

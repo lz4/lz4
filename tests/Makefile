@@ -43,9 +43,8 @@ PYTHON?= python3
 
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes
-CFLAGS  += $(MOREFLAGS)
 CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ -DLZ4_DLL_EXPORT=1
-FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(MOREFLAGS)
 
 
 # Define *.exe as extension for Windows systems
@@ -249,6 +248,13 @@ test-lz4c32-basic: lz4c32 datagen
 	./datagen         | $(PRGDIR)/lz4c32        | $(PRGDIR)/lz4c32 -t
 	./datagen -g256MB | $(PRGDIR)/lz4c32 -vqB4D | $(PRGDIR)/lz4c32 -qt
 	./datagen -g6GB   | $(PRGDIR)/lz4c32 -vqB5D | $(PRGDIR)/lz4c32 -qt
+
+test-platform:
+	@echo "\n ---- test lz4 $(QEMU_SYS) platform ----"
+	$(QEMU_SYS) ./datagen -g16KB  | $(QEMU_SYS) $(PRGDIR)/lz4 -9     | $(QEMU_SYS) $(PRGDIR)/lz4 -t
+	$(QEMU_SYS) ./datagen         | $(QEMU_SYS) $(PRGDIR)/lz4        | $(QEMU_SYS) $(PRGDIR)/lz4 -t
+	$(QEMU_SYS) ./datagen -g256MB | $(QEMU_SYS) $(PRGDIR)/lz4 -vqB4D | $(QEMU_SYS) $(PRGDIR)/lz4 -qt
+	$(QEMU_SYS) ./datagen -g6GB   | $(QEMU_SYS) $(PRGDIR)/lz4 -vqB5D | $(QEMU_SYS) $(PRGDIR)/lz4 -qt
 
 test-lz4c32: test-lz4c32-basic test-interop-32-64
 
