@@ -27,7 +27,7 @@ matrix:
             - valgrind
             - clang
     
-    - env: Ubu=14.04 Cmd='make armtest' COMPILER=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static
+    - env: Ubu=14.04 Cmd='make platformTest CC=arm-linux-gnueabi-gcc' COMPILER=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static
       dist: trusty
       sudo: required
       addons:
@@ -36,8 +36,10 @@ matrix:
             - qemu-system-arm
             - qemu-user-static
             - gcc-arm-linux-gnueabi
+            - libc6-dev-armel-cross
+            - linux-libc-dev-armel-cross
     
-    - env: Ubu=14.04 Cmd='make armtest' COMPILER=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static
+    - env: Ubu=14.04 Cmd='make platformTest CC=aarch64-linux-gnu-gcc' COMPILER=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static
       dist: trusty
       sudo: required
       addons:
@@ -47,7 +49,7 @@ matrix:
             - qemu-user-static
             - gcc-aarch64-linux-gnu
     
-    - env: Ubu=14.04 Cmd='make armtest' COMPILER=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static
+    - env: Ubu=14.04 Cmd='make platformTest CC=powerpc-linux-gnu-gcc' COMPILER=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static
       dist: trusty
       sudo: required
       addons:

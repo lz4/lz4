@@ -115,10 +115,10 @@ sanitize: clean
 staticAnalyze: clean
 	scan-build --status-bugs -v $(MAKE) all CFLAGS=-g 
 
-armtest: clean
-	$(MAKE) -C $(LZ4DIR) all CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
-	$(MAKE) -C $(PRGDIR) bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
-	$(MAKE) -C $(TESTDIR) bins CC=arm-linux-gnueabi-gcc CFLAGS="-O3 -Werror" 
+platformTest: clean
+	$(MAKE) -C $(LZ4DIR) all CFLAGS="-Werror -static -O3 -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith"
+	$(MAKE) -C $(PRGDIR) bins CFLAGS="-Werror -static -O3 -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith" 
+	$(MAKE) -C $(TESTDIR) bins CFLAGS="-Werror -static -O3 -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith"
 
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@
