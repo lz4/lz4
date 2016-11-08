@@ -2,6 +2,7 @@ v1.7.2
 Changed : moved to versioning; package, cli and library have same version number
 Improved: Small decompression speed boost
 Improved: Small compression speed improvement on 64-bits systems
+Improved: Small compression ratio and speed improvement on small files
 Improved: Significant speed boost on ARMv6 and ARMv7
 New : cli : --rm command
 New : cli : file attributes are preserved, by Przemyslaw Skibinki
