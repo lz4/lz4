@@ -294,6 +294,7 @@ static int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, 
     return LZ4_compress_limitedOutput_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1);
 }
 
+#ifndef LZ4_DLL_IMPORT
 /* declare hidden function */
 int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
 
@@ -301,6 +302,7 @@ static int local_LZ4_compress_forceDict(const char* in, char* out, int inSize)
 {
     return LZ4_compress_forceExtDict(&LZ4_stream, in, out, inSize);
 }
+#endif
 
 
 /* HC compression functions */
@@ -364,6 +366,7 @@ static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int in
     return outSize;
 }
 
+#ifndef LZ4_DLL_IMPORT
 extern int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize, const char* dict, int dictSize);
 
 static int local_LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize)
@@ -372,6 +375,7 @@ static int local_LZ4_decompress_safe_forceExtDict(const char* in, char* out, int
     LZ4_decompress_safe_forceExtDict(in, out, inSize, outSize, out - 65536, 65536);
     return outSize;
 }
+#endif
 
 static int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
 {
@@ -521,8 +525,10 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 13: compressionFunction = local_LZ4_compressHC_limitedOutput_withStateHC; compressorName = "LZ4_compressHC_limitedOutput_withStateHC"; break;
             case 14: compressionFunction = local_LZ4_compressHC_continue; initFunction = local_LZ4_resetStreamHC; compressorName = "LZ4_compressHC_continue"; break;
             case 15: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = local_LZ4_resetStreamHC; compressorName = "LZ4_compressHC_limitedOutput_continue"; break;
-            case 20: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
-            case 30: compressionFunction = local_LZ4F_compressFrame; compressorName = "LZ4F_compressFrame";
+#ifndef LZ4_DLL_IMPORT
+			case 20: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
+#endif
+			case 30: compressionFunction = local_LZ4F_compressFrame; compressorName = "LZ4F_compressFrame";
                         chunkP[0].origSize = (int)benchedSize; nbChunks=1;
                         break;
             case 40: compressionFunction = local_LZ4_saveDict; compressorName = "LZ4_saveDict";
@@ -614,8 +620,10 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 4: decompressionFunction = LZ4_decompress_safe; dName = "LZ4_decompress_safe"; break;
             case 6: decompressionFunction = local_LZ4_decompress_safe_usingDict; dName = "LZ4_decompress_safe_usingDict"; break;
             case 7: decompressionFunction = local_LZ4_decompress_safe_partial; dName = "LZ4_decompress_safe_partial"; break;
-            case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
-            case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
+#ifndef LZ4_DLL_IMPORT
+			case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
+#endif
+			case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
                     errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
                     if (LZ4F_isError(errorCode)) {
                         DISPLAY("Error while preparing compressed frame\n");

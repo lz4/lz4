@@ -20,8 +20,6 @@
 lz4
 
 # IDE / editors files
-*.suo
-*.user
 .clang_complete
 _codelite/
 _codelite_lz4/

@@ -44,7 +44,7 @@ BUILD_STATIC:= yes
 
 DESTDIR?=
 PREFIX ?= /usr/local
-CPPFLAGS= -DXXH_NAMESPACE=LZ4_ -DLZ4_DLL_EXPORT=1
+CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
 CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
@@ -70,21 +70,30 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-default: liblz4
+default: lib
 
-all: liblz4
+all: lib
 
-liblz4: *.c
+lib: liblz4.a liblz4
+
+liblz4.a: *.c
 ifeq ($(BUILD_STATIC),yes)
 	@echo compiling static library
 	@$(CC) $(FLAGS) -c $^
-	@$(AR) rcs $@.a *.o
+	@$(AR) rcs $@ *.o
 endif
+
+liblz4: *.c
 	@echo compiling dynamic library $(LIBVER)
+ifneq (,$(filter Windows%,$(OS))) 
+	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@.dll
+	dlltool -D liblz4.dll -d liblz4.def -l liblz4.dll.a
+else
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
+endif
 
 clean:
 	@$(RM) -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc
@@ -104,7 +113,7 @@ liblz4.pc: liblz4.pc.in Makefile
             -e 's|@VERSION@|$(LIBVER)|' \
              $< >$@
 
-install: liblz4 liblz4.pc
+install: lib liblz4.pc
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/ $(DESTDIR)$(INCLUDEDIR)/
 	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)

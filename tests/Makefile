@@ -44,7 +44,7 @@ PYTHON?= python3
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ -DLZ4_DLL_EXPORT=1
+CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -84,6 +84,14 @@ fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xx
 
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
+
+fullbench-lib: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.a
+
+fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/liblz4.dll.a
 
 fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)

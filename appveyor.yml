@@ -70,7 +70,7 @@ build_script:
       ECHO *** Building Visual Studio 2015 %PLATFORM%\%CONFIGURATION% &&
       ECHO *** &&
       msbuild "visual\VS2010\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v140 /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
-      COPY visual\VS2010\bin\%PLATFORM%\%CONFIGURATION%\*.exe programs\
+      COPY visual\VS2010\bin\%PLATFORM%_%CONFIGURATION%\*.exe programs\
     )
 
 test_script:
@@ -84,6 +84,6 @@ test_script:
       lz4 -i1b5 lz4.exe &&
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
-      echo lz4 tested && 
+      echo ------- lz4 tested ------- && 
       fullbench.exe -i1 fullbench.exe
     )
