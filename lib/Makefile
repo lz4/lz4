@@ -84,7 +84,8 @@ endif
 liblz4: *.c
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS))) 
-	@$(CC) $(FLAGS) -shared $^ -o $@.dll -Wl,--out-implib,liblz4.dll.a
+	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@.dll
+	dlltool -D liblz4.dll -d liblz4.def -l liblz4.dll.a
 else
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links

@@ -91,7 +91,7 @@ fullbench-lib: fullbench.c $(LZ4DIR)/xxhash.c
 
 fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
 	$(MAKE) -C $(LZ4DIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.dll.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/liblz4.dll.a
 
 fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)

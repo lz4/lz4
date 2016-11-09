@@ -201,7 +201,11 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code)
     return codeError;
 }
 
-static LZ4F_errorCode_t err0r(LZ4F_errorCodes code) { return (LZ4F_errorCode_t)-(ptrdiff_t)code; }
+static LZ4F_errorCode_t err0r(LZ4F_errorCodes code)
+{
+    LZ4_STATIC_ASSERT(sizeof(ptrdiff_t) >= sizeof(size_t));    /* A compilation error here means sizeof(ptrdiff_t) is not large enough */
+    return (LZ4F_errorCode_t)-(ptrdiff_t)code; 
+}
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
@@ -384,7 +388,6 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstMaxSize
     BYTE* headerStart;
     size_t requiredBuffSize;
 
-    LZ4_STATIC_ASSERT(sizeof(ptrdiff_t) >= sizeof(size_t));    /* A compilation error here means sizeof(ptrdiff_t) is not large enough */
     if (dstMaxSize < maxFHSize) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     if (cctxPtr->cStage != 0) return err0r(LZ4F_ERROR_GENERIC);
     memset(&prefNull, 0, sizeof(prefNull));
