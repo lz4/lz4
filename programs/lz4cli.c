@@ -279,7 +279,6 @@ int main(int argc, const char** argv)
         cLevelLast=1,
         legacy_format=0,
         forceStdout=0,
-        forceCompress=0,
         main_pause=0,
         multiple_inputs=0,
         operationResult=0;
@@ -313,7 +312,7 @@ int main(int argc, const char** argv)
         if(!argument) continue;   /* Protection if argument empty */
 
         /* long commands (--long-word) */
-        if (!strcmp(argument,  "--compress")) { forceCompress = 1; continue; }
+        if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
         if ((!strcmp(argument, "--decompress"))
          || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }
         if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
