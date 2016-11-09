@@ -67,6 +67,12 @@ You can contact the author at :
 
 
 /*-************************************
+*  Common Utils
+**************************************/
+#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+
+
+/*-************************************
 *  Basic Types
 **************************************/
 #if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
@@ -378,6 +384,7 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstMaxSize
     BYTE* headerStart;
     size_t requiredBuffSize;
 
+    LZ4_STATIC_ASSERT(sizeof(ptrdiff_t) >= sizeof(size_t));    /* A compilation error here means sizeof(ptrdiff_t) is not large enough */
     if (dstMaxSize < maxFHSize) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     if (cctxPtr->cStage != 0) return err0r(LZ4F_ERROR_GENERIC);
     memset(&prefNull, 0, sizeof(prefNull));
