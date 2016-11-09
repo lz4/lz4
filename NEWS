@@ -8,13 +8,13 @@ Fix : better ratio on 64-bits big-endian targets
 Improved cmake build script, by Evan Nemerson
 New liblz4-dll project, by Przemyslaw Skibinki
 Makefile: Generates object files (*.o) for faster (re)compilation on low power systems
-Added : Debianization, by Evgeniy Polyakov
 cli : new : --rm command
 cli : new : file attributes are preserved, by Przemyslaw Skibinki
 cli : fix : crash on some invalid inputs
 cli : fix : -t correctly validates lz4-compressed files, by Nick Terrell
 cli : fix : detects and reports fread() errors, thanks to Hiroshi Fujishima report #243
 cli : bench : new : -r recursive mode
+Added : Debianization, by Evgeniy Polyakov
 
 r131
 New    : Dos/DJGPP target, thanks to Louis Santillan (#114)
