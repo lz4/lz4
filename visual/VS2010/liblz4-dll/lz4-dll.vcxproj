@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9800039D-4AAA-43A4-BB78-FEF6F4836927}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>lz4-dll</RootNamespace>
+    <RootNamespace>liblz4-dll</RootNamespace>
     <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\obj\$(RootNamespace)_$(Platform)_$(Configuration)\</IntDir>
   </PropertyGroup>
