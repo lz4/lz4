@@ -70,21 +70,27 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-default: liblz4
+default: all
 
-all: liblz4
+all: liblz4.a liblz4
 
-liblz4: *.c
+liblz4.a: *.c
 ifeq ($(BUILD_STATIC),yes)
 	@echo compiling static library
 	@$(CC) $(FLAGS) -c $^
-	@$(AR) rcs $@.a *.o
+	@$(AR) rcs $@ *.o
 endif
+
+liblz4: *.c
 	@echo compiling dynamic library $(LIBVER)
+ifneq (,$(filter Windows%,$(OS))) 
+	@$(CC) $(FLAGS) -shared $^ -o $@.dll -Wl,--out-implib,liblz4.dll.a
+else
 	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
 	@echo creating versioned links
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
 	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
+endif
 
 clean:
 	@$(RM) -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc

@@ -85,6 +85,14 @@ fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xx
 fullbench32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c fullbench.c
 	$(CC) -m32 $(FLAGS) $^ -o $@$(EXT)
 
+fullbench-lib: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.a
+
+fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4
+	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.dll.a
+
 fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
