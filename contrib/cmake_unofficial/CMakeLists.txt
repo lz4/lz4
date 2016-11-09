@@ -1,110 +1,157 @@
-PROJECT(LZ4 C)
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "LZ4 compression library")
-set(CPACK_PACKAGE_VERSION_MAJOR 1)
-set(CPACK_PACKAGE_VERSION_MINOR 7)
-set(CPACK_PACKAGE_VERSION_PATCH 2)
-set(VERSION_STRING	" \"${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}\" ")
-include(CPack)
+set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
-cmake_minimum_required (VERSION 2.6)
-INCLUDE (CheckTypeSize)
-check_type_size("void *" SIZEOF_VOID_P)
-IF(SIZEOF_VOID_P STREQUAL  "8")
-    set (CMAKE_SYSTEM_PROCESSOR "64bit")
-    MESSAGE( STATUS "64 bit architecture detected size of void * is " ${SIZEOF_VOID_P})
-ENDIF()
+# Parse version information
+file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MAJOR REGEX "^#define LZ4_VERSION_MAJOR +([0-9]+) +.*$")
+string(REGEX REPLACE "^#define LZ4_VERSION_MAJOR +([0-9]+) +.*$" "\\1" LZ4_VERSION_MAJOR "${LZ4_VERSION_MAJOR}")
+file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MINOR REGEX "^#define LZ4_VERSION_MINOR +([0-9]+) +.*$")
+string(REGEX REPLACE "^#define LZ4_VERSION_MINOR +([0-9]+) +.*$" "\\1" LZ4_VERSION_MINOR "${LZ4_VERSION_MINOR}")
+file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_RELEASE REGEX "^#define LZ4_VERSION_RELEASE +([0-9]+) +.*$")
+string(REGEX REPLACE "^#define LZ4_VERSION_RELEASE +([0-9]+) +.*$" "\\1" LZ4_VERSION_RELEASE "${LZ4_VERSION_RELEASE}")
+set(LZ4_VERSION_STRING "${LZ4_VERSION_MAJOR}.${LZ4_VERSION_MINOR}.${LZ4_VERSION_RELEASE}")
+mark_as_advanced(LZ4_VERSION_STRING LZ4_VERSION_MAJOR LZ4_VERSION_MINOR LZ4_VERSION_RELEASE)
 
-option(BUILD_TOOLS "Build the command line tools" ON)
-option(BUILD_LIBS  "Build the libraries in addition to the tools" ON)
-option(LINK_TOOLS_WITH_LIB "Link the command line tools with the (shared) library" OFF)
-
-IF(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR
-   CMAKE_C_COMPILER_ID STREQUAL "Clang")
-  SET(GNU_COMPATIBLE_COMPILER 1)
-ENDIF()
-
-
-set(LZ4_DIR ../../lib/)
-set(PRG_DIR ../../programs/)
-set(LZ4_SRCS_LIB ${LZ4_DIR}lz4.c ${LZ4_DIR}lz4hc.c ${LZ4_DIR}lz4.h ${LZ4_DIR}lz4hc.h ${LZ4_DIR}lz4frame.c ${LZ4_DIR}lz4frame.h ${LZ4_DIR}xxhash.c)
-set(LZ4_SRCS ${LZ4_DIR}lz4frame.c ${LZ4_DIR}xxhash.c ${PRG_DIR}bench.c ${PRG_DIR}lz4cli.c ${PRG_DIR}lz4io.c ${PRG_DIR}datagen.c)
-
-if(BUILD_TOOLS AND NOT (LINK_TOOLS_WITH_LIB AND BUILD_LIBS))
-    set(LZ4_SRCS ${LZ4_SRCS} ${LZ4_SRCS_LIB})
+if("${CMAKE_VERSION}" VERSION_LESS "3.0")
+  project(LZ4 C)
+else()
+  cmake_policy (SET CMP0048 NEW)
+  project(LZ4
+    VERSION ${LZ4_VERSION_STRING}
+    LANGUAGES C)
 endif()
 
-if(BUILD_TOOLS)
-    add_executable(lz4 ${LZ4_SRCS})
-    install(TARGETS lz4 RUNTIME DESTINATION "bin/")
+cmake_minimum_required (VERSION 2.8.6)
+
+# If LZ4 is being bundled in another project, we don't want to
+# install anything.  However, we want to let people override this, so
+# we'll use the LZ4_BUNDLED_MODE variable to let them do that; just
+# set it to OFF in your project before you add_subdirectory(lz4/contrib/cmake_unofficial).
+get_directory_property(LZ4_PARENT_DIRECTORY PARENT_DIRECTORY)
+if("${LZ4_BUNDLED_MODE}" STREQUAL "")
+  # Bundled mode hasn't been set one way or the other, set the default
+  # depending on whether or not we are the top-level project.
+  if("${LZ4_PARENT_DIRECTORY}" STREQUAL "")
+    set(LZ4_BUNDLED_MODE OFF)
+  else()
+    set(LZ4_BUNDLED_MODE ON)
+  endif()
+endif()
+mark_as_advanced(LZ4_BUNDLED_MODE)
+
+# CPack
+if(NOT LZ4_BUNDLED_MODE AND NOT CPack_CMake_INCLUDED)
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "LZ4 compression library")
+  set(CPACK_PACKAGE_DESCRIPTION_FILE "${LZ4_TOP_SOURCE_DIR}/README.md")
+  set(CPACK_RESOURCE_FILE_LICENSE "${LZ4_TOP_SOURCE_DIR}/LICENSE")
+  set(CPACK_PACKAGE_VERSION_MAJOR ${LZ4_VERSION_MAJOR})
+  set(CPACK_PACKAGE_VERSION_MINOR ${LZ4_VERSION_MINOR})
+  set(CPACK_PACKAGE_VERSION_PATCH ${LZ4_VERSION_RELEASE})
+  include(CPack)
+endif(NOT LZ4_BUNDLED_MODE AND NOT CPack_CMake_INCLUDED)
+
+# Allow people to choose whether to build shared or static libraries
+# via the BUILD_SHARED_LIBS option unless we are in bundled mode, in
+# which case we always use static libraries.
+include(CMakeDependentOption)
+CMAKE_DEPENDENT_OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON "NOT LZ4_BUNDLED_MODE" OFF)
+
+set(LZ4_LIB_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/lib")
+set(LZ4_PROG_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/programs")
+
+include_directories("${LZ4_LIB_SOURCE_DIR}")
+
+# CLI sources
+set(LZ4_SOURCES
+  "${LZ4_LIB_SOURCE_DIR}/lz4.c"
+  "${LZ4_LIB_SOURCE_DIR}/lz4hc.c"
+  "${LZ4_LIB_SOURCE_DIR}/lz4.h"
+  "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
+  "${LZ4_LIB_SOURCE_DIR}/lz4frame.c"
+  "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
+  "${LZ4_LIB_SOURCE_DIR}/xxhash.c")
+set(LZ4_CLI_SOURCES
+  "${LZ4_PROG_SOURCE_DIR}/bench.c"
+  "${LZ4_PROG_SOURCE_DIR}/lz4cli.c"
+  "${LZ4_PROG_SOURCE_DIR}/lz4io.c"
+  "${LZ4_PROG_SOURCE_DIR}/datagen.c")
+
+# liblz4
+add_library(lz4 ${LZ4_SOURCES})
+set_target_properties(lz4 PROPERTIES
+  SOVERSION "${LZ4_VERSION_STRING}"
+  VERSION "${LZ4_VERSION_STRING}"
+  POSITION_INDEPENDENT_CODE TRUE)
+
+# lz4
+add_executable(lz4cli ${LZ4_CLI_SOURCES})
+set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
+target_link_libraries(lz4cli lz4)
+
+# lz4c
+add_executable(lz4c ${LZ4_CLI_SOURCES})
+set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
+target_link_libraries(lz4c lz4)
+
+# Extra warning flags
+include (CheckCCompilerFlag)
+foreach (flag
+    # GCC-style
+    -Wall
+    -Wextra
+    -Wundef
+    -Wcast-qual
+    -Wcast-align
+    -Wshadow
+    -Wswitch-enum
+    -Wdeclaration-after-statement
+    -Wstrict-prototypes
+    -Wpointer-arith
+
+    # MSVC-style
+    /W4)
+  # Because https://gcc.gnu.org/wiki/FAQ#wnowarning
+  string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
+  string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_${flag_to_test}")
+
+  check_c_compiler_flag("${ADD_COMPILER_FLAGS_PREPEND} ${flag_to_test}" ${test_name})
+
+  if(${test_name})
+    set(CMAKE_C_FLAGS "${flag} ${CMAKE_C_FLAGS}")
+  endif()
+
+  unset(test_name)
+  unset(flag_to_test)
+endforeach (flag)
+
+if(NOT LZ4_BUNDLED_MODE)
+  include(GNUInstallDirs)
+
+  install(TARGETS lz4cli lz4c
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  install(TARGETS lz4
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+  install(FILES
+    "${LZ4_LIB_SOURCE_DIR}/lz4.h"
+    "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
+    "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+endif(NOT LZ4_BUNDLED_MODE)
+
+# pkg-config
+set(PREFIX "${CMAKE_INSTALL_PREFIX}")
+
+if("${CMAKE_INSTALL_FULL_LIBDIR}" STREQUAL "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+  set(LIBDIR "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+else()
+  set(LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}")
 endif()
 
-if(BUILD_LIBS)
-
-
-    SET(LIBS_TARGETS "")
-    IF(WIN32)
-        add_library(liblz4 STATIC ${LZ4_SRCS_LIB})
-        SET(LIBS_TARGETS liblz4)
-    ELSE(WIN32)
-        add_library(liblz4 SHARED ${LZ4_SRCS_LIB})
-        add_library(liblz4_static STATIC ${LZ4_SRCS_LIB})
-        SET_TARGET_PROPERTIES(liblz4_static PROPERTIES OUTPUT_NAME lz4)
-        SET(LIBS_TARGETS liblz4 liblz4_static)
-    ENDIF(WIN32)
-
-    set_target_properties(liblz4 PROPERTIES
-    OUTPUT_NAME lz4
-    SOVERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}"
-    )
-
-    install(TARGETS ${LIBS_TARGETS}
-	RUNTIME DESTINATION lib #on Windows: cmake considers dlls as runtime component
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    )
-
-    install(FILES
-    ${LZ4_DIR}/lz4.h
-    ${LZ4_DIR}/lz4hc.h
-    ${LZ4_DIR}/lz4frame.h
-    DESTINATION include
-    )
-
-    set(PREFIX ${CMAKE_INSTALL_PREFIX})
-    set(LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
-    set(INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
-    string(SUBSTRING ${CPACK_PACKAGE_VERSION_PATCH} 1 -1 VERSION)
-    configure_file(${LZ4_DIR}/liblz4.pc.in liblz4.pc @ONLY)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc
-    DESTINATION "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/pkgconfig"
-    )
-
-  if(BUILD_TOOLS AND LINK_TOOLS_WITH_LIB)
-        target_link_libraries(lz4 liblz4)
-    endif()
+if("${CMAKE_INSTALL_FULL_INCLUDEDIR}" STREQUAL "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
+  set(INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+else()
+  set(INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 endif()
 
-
-#warnings
-
-if(MSVC)
-    ADD_DEFINITIONS("-W4")
-endif()
-if(GNU_COMPATIBLE_COMPILER)
-    ADD_DEFINITIONS("-Wall")
-endif()
-if(CMAKE_COMPILER_IS_GNUCXX)
-    ADD_DEFINITIONS("-Wextra")
-    ADD_DEFINITIONS("-Wundef")
-    ADD_DEFINITIONS("-Wshadow")
-    ADD_DEFINITIONS("-Wcast-align")
-    ADD_DEFINITIONS("-Wstrict-prototypes")
-endif(CMAKE_COMPILER_IS_GNUCXX)
-if(GNU_COMPATIBLE_COMPILER)
-    # we need gnu99 instead of c99 on Linux and Solaris
-    # to get C99 and POSIX definitions
-    # an alternative with cmake >= 3.1/3.2 is the C_STANDARD property
-    ADD_DEFINITIONS("-std=gnu99")
-endif()
-ADD_DEFINITIONS("-DLZ4_VERSION=\"${CPACK_PACKAGE_VERSION_PATCH}\"")
-INCLUDE_DIRECTORIES (${LZ4_DIR})
+configure_file(${LZ4_LIB_SOURCE_DIR}/liblz4.pc.in liblz4.pc @ONLY)
