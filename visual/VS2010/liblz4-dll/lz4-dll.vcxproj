@@ -165,6 +165,9 @@
     <ClCompile Include="..\..\..\lib\lz4hc.c" />
     <ClCompile Include="..\..\..\lib\xxhash.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="lz4-dll.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
