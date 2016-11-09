@@ -176,6 +176,9 @@
     <ClCompile Include="..\..\..\programs\lz4cli.c" />
     <ClCompile Include="..\..\..\programs\lz4io.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="lz4.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
