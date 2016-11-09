@@ -109,7 +109,7 @@ clean:
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
-        datagen$(EXT)
+        fasttest$(EXT) datagen$(EXT)
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
 
