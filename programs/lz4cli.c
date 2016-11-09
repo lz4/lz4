@@ -284,9 +284,9 @@ int main(int argc, const char** argv)
         multiple_inputs=0,
         operationResult=0;
     operationMode_e mode = om_auto;
-    const char* input_filename=0;
-    const char* output_filename=0;
-    char* dynNameSpace=0;
+    const char* input_filename = NULL;
+    const char* output_filename= NULL;
+    char* dynNameSpace = NULL;
     const char** inFileNames = NULL;
     unsigned ifnIdx=0;
     const char nullOutput[] = NULL_OUTPUT;
@@ -428,7 +428,7 @@ int main(int argc, const char** argv)
                     /* Benchmark */
                 case 'b': mode = om_bench; multiple_inputs=1;
                     if (inFileNames == NULL)
-                        inFileNames = (const char**) malloc(argc * sizeof(char*));
+                        inFileNames = (const char**) calloc(argc,  sizeof(char*));
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
@@ -438,7 +438,7 @@ int main(int argc, const char** argv)
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
                     if (inFileNames == NULL)
-                        inFileNames = (const char**) malloc(argc * sizeof(char*));
+                        inFileNames = (const char**) calloc(argc, sizeof(char*));
                     break;
 
                     /* Modify Nb Seconds (benchmark only) */
@@ -502,13 +502,6 @@ int main(int argc, const char** argv)
         }
 #endif
     }
-    if(!input_filename) { input_filename=stdinmark; }
-
-    /* Check if input is defined as console; trigger an error in this case */
-    if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) {
-        DISPLAYLEVEL(1, "refusing to read from a console\n");
-        exit(1);
-    }
 
     /* benchmark and test modes */
     if (mode == om_bench) {
@@ -524,6 +517,14 @@ int main(int argc, const char** argv)
     }
 
     /* compress or decompress */
+    if (!input_filename) { input_filename=stdinmark; }
+    /* Check if input is defined as console; trigger an error in this case */
+    if (!strcmp(input_filename, stdinmark)
+       && IS_CONSOLE(stdin) ) {
+        DISPLAYLEVEL(1, "refusing to read from a console\n");
+        exit(1);
+    }
+
     /* No output filename ==> try to select one automatically (when possible) */
     while (!output_filename) {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */

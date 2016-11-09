@@ -43,7 +43,7 @@ static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSi
 #include "lz4hc.h"
 #define COMPRESSOR1 LZ4_compress_HC
 #define DEFAULTCOMPRESSOR COMPRESSOR0
-#define LZ4_isError(errcode) (errcode==0) 
+#define LZ4_isError(errcode) (errcode==0)
 
 
 /* *************************************
@@ -129,8 +129,7 @@ void BMK_SetBlockSize(size_t blockSize)
 /* ********************************************************
 *  Bench functions
 **********************************************************/
-typedef struct
-{
+typedef struct {
     const char* srcPtr;
     size_t srcSize;
     char*  cPtr;

@@ -805,7 +805,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
 
             /* Write Block */
             if (decodedBytes) {
-                storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, storedSkips);
+                if (!g_testMode) storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, storedSkips);
                 filesize += decodedBytes;
                 DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
             }
@@ -816,7 +816,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     /* can be out because readSize == 0, which could be an fread() error */
     if (ferror(srcFile)) EXM_THROW(67, "Read error");
 
-    LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
+    if (!g_testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
     if (nextToLoad!=0) EXM_THROW(68, "Unfinished stream");
 
     return filesize;

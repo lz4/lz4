@@ -230,9 +230,12 @@ test-lz4-hugefile: lz4 datagen
 	@$(RM) tmp*
 
 test-lz4-testmode: lz4 datagen
-	@echo "\n ---- test and pass-through ----"
+	@echo "\n ---- bench mode ----"
+	$(PRGDIR)/lz4 -bi1
+	@echo "\n ---- test mode ----"
 	./datagen | $(PRGDIR)/lz4 -t             && false || true
 	./datagen | $(PRGDIR)/lz4 -tf            && false || true
+	@echo "\n ---- pass-through mode ----"
 	./datagen | $(PRGDIR)/lz4 -d  > $(VOID)  && false || true
 	./datagen | $(PRGDIR)/lz4 -df > $(VOID)
 	@echo "Hello World !" > tmp1
