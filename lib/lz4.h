@@ -55,11 +55,14 @@ extern "C" {
 *  LZ4_DLL_EXPORT :
 *  Enable exporting of functions when building a Windows DLL
 */
-#if defined(_WIN32) && defined(LZ4_DLL_EXPORT) && (LZ4_DLL_EXPORT==1)
+#if defined(LZ4_DLL_EXPORT) && (LZ4_DLL_EXPORT==1)
 #  define LZ4LIB_API __declspec(dllexport)
+#elif defined(LZ4_DLL_IMPORT) && (LZ4_DLL_IMPORT==1)
+#  define LZ4LIB_API __declspec(dllimport)
 #else
 #  define LZ4LIB_API
 #endif
+
 
 /*-************************************
 *  Version

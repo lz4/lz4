@@ -44,7 +44,7 @@ BUILD_STATIC:= yes
 
 DESTDIR?=
 PREFIX ?= /usr/local
-CPPFLAGS= -DXXH_NAMESPACE=LZ4_ -DLZ4_DLL_EXPORT=1
+CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
 CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
