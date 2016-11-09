@@ -15,6 +15,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "datagen", "datagen\datagen.vcxproj", "{D745AE2F-596A-403A-9B91-81A8C6779243}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fullbench-dll", "fullbench-dll\fullbench-dll.vcxproj", "{13992FD2-077E-4954-B065-A428198201A9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9800039D-4AAA-43A4-BB78-FEF6F4836927} = {9800039D-4AAA-43A4-BB78-FEF6F4836927}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
