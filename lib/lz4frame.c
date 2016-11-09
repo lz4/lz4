@@ -67,6 +67,12 @@ You can contact the author at :
 
 
 /*-************************************
+*  Common Utils
+**************************************/
+#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+
+
+/*-************************************
 *  Basic Types
 **************************************/
 #if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
@@ -195,7 +201,11 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code)
     return codeError;
 }
 
-static LZ4F_errorCode_t err0r(LZ4F_errorCodes code) { return (LZ4F_errorCode_t)-(ptrdiff_t)code; }
+static LZ4F_errorCode_t err0r(LZ4F_errorCodes code)
+{
+    LZ4_STATIC_ASSERT(sizeof(ptrdiff_t) >= sizeof(size_t));    /* A compilation error here means sizeof(ptrdiff_t) is not large enough */
+    return (LZ4F_errorCode_t)-(ptrdiff_t)code; 
+}
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 

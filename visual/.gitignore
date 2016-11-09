@@ -1,16 +1,10 @@
+# Visual C++
+.vs/
 *Copy
 *.db
-.vs/
+*.opensdf
+*.sdf
+*.suo
+*.user
 
-# Visual C++
-build/
-VS2005/
-VS2008/
 VS2010/bin/
-VS2010/obj/
-VS2012/
-VS2013/
-VS2015/
-
-# CMake
-cmake/
