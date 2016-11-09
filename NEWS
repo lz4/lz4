@@ -4,15 +4,17 @@ Improved: Small decompression speed boost
 Improved: Small compression speed improvement on 64-bits systems
 Improved: Small compression ratio and speed improvement on small files
 Improved: Significant speed boost on ARMv6 and ARMv7
-New : cli : --rm command
-New : cli : file attributes are preserved, by Przemyslaw Skibinki
-Added : Debianization, by Evgeniy Polyakov
-Makefile: Generates object files (*.o) for faster (re)compilation on low power systems
-New : recursive mode in benchmark
-Fix : cli : crash on some invalid inputs
-Fix : cli : -t correctly validates lz4-compressed files, by Nick Terrell
 Fix : better ratio on 64-bits big-endian targets
-Fix : cli : detects and reports fread() errors, thanks to Hiroshi Fujishima report #243
+Improved cmake build script, by Evan Nemerson
+New liblz4-dll project, by Przemyslaw Skibinki
+Makefile: Generates object files (*.o) for faster (re)compilation on low power systems
+Added : Debianization, by Evgeniy Polyakov
+cli : new : --rm command
+cli : new : file attributes are preserved, by Przemyslaw Skibinki
+cli : fix : crash on some invalid inputs
+cli : fix : -t correctly validates lz4-compressed files, by Nick Terrell
+cli : fix : detects and reports fread() errors, thanks to Hiroshi Fujishima report #243
+cli : bench : new : -r recursive mode
 
 r131
 New    : Dos/DJGPP target, thanks to Louis Santillan (#114)
