@@ -70,9 +70,11 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-default: all
+default: lib
 
-all: liblz4.a liblz4
+all: lib
+
+lib: liblz4.a liblz4
 
 liblz4.a: *.c
 ifeq ($(BUILD_STATIC),yes)
@@ -111,7 +113,7 @@ liblz4.pc: liblz4.pc.in Makefile
             -e 's|@VERSION@|$(LIBVER)|' \
              $< >$@
 
-install: liblz4 liblz4.pc
+install: lib liblz4.pc
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/ $(DESTDIR)$(INCLUDEDIR)/
 	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
