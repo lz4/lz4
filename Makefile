@@ -75,6 +75,7 @@ clean:
 #make install is validated only for Linux, OSX, kFreeBSD, Hurd and
 #FreeBSD targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+HOST_OS = POSIX
 
 install:
 	@$(MAKE) -C $(LZ4DIR) $@
@@ -90,23 +91,8 @@ travis-install:
 test:
 	$(MAKE) -C $(TESTDIR) test
 
-cmake:
-	@cd contrib/cmake_unofficial; cmake CMakeLists.txt; $(MAKE)
-
-gpptest: clean
-	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-
-c_standards: clean
-	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror" 
-	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=c99 -Werror" 
-	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror" 
-	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=c11 -Werror" 
-	$(MAKE) clean
-
 clangtest: clean
+	clang -v
 	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) all CC=clang
 
 sanitize: clean
@@ -130,5 +116,35 @@ examples:
 	$(MAKE) -C $(LZ4DIR)
 	$(MAKE) -C $(PRGDIR) lz4
 	$(MAKE) -C examples test
+
+endif
+
+
+ifneq (,$(filter MSYS%,$(shell uname)))
+HOST_OS = MSYS
+CMAKE_PARAMS = -G"MSYS Makefiles"
+endif
+
+
+#------------------------------------------------------------------------
+#make tests validated only for MSYS, Linux, OSX, kFreeBSD and Hurd targets
+#------------------------------------------------------------------------
+ifneq (,$(filter $(HOST_OS),MSYS POSIX))
+
+cmake:
+	@cd contrib/cmake_unofficial; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
+
+gpptest: clean
+	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+
+c_standards: clean
+	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror" 
+	$(MAKE) clean
+	$(MAKE) all MOREFLAGS="-std=c99 -Werror" 
+	$(MAKE) clean
+	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror" 
+	$(MAKE) clean
+	$(MAKE) all MOREFLAGS="-std=c11 -Werror" 
+	$(MAKE) clean
 
 endif

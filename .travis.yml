@@ -9,19 +9,19 @@ matrix:
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make test' COMPILER=cc
+      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fasttest test-fullbench' COMPILER=cc
+    
+    - os: linux
+      sudo: false
+      env: Ubu=12.04cont Cmd='make -C tests test-frametest test-fuzzer' COMPILER=cc
       
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd="make gpptest && make clean && make examples && make clean && make cmake && make clean && make travis-install" COMPILER=cc
-      
-    - os: linux
-      sudo: false
-      env: Ubu=12.04cont Cmd='make clangtest' COMPILER=clang
+      env: Ubu=12.04cont Cmd="make gpptest && make clean && make examples && make clean && make cmake && make clean && make travis-install && make clean && make clangtest" COMPILER=cc
     
     
     # 14.04 LTS Server Edition 64 bit
-    - env: Ubu=14.04 Cmd='make -C tests test32 versionsTest' COMPILER=cc
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
@@ -31,13 +31,29 @@ matrix:
             - libc6-dev-i386
             - gcc-multilib
     
-    - env: Ubu=14.04 Cmd='make staticAnalyze sanitize' COMPILER=clang
+    - env: Ubu=14.04 Cmd='make -C tests test-frametest32 test-fuzzer32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+    
+    - env: Ubu=14.04 Cmd='make sanitize' COMPILER=clang
       dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - valgrind
+    
+    - env: Ubu=14.04 Cmd='make staticAnalyze' COMPILER=clang
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
             - clang
     
     - env: Ubu=14.04 Cmd='make platformTest CC=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static && make platformTest CC=aarch64-linux-gnu-gcc QEMU_SYS=qemu-aarch64-static' COMPILER=arm-linux-gnueabi-gcc
