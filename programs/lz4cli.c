@@ -302,7 +302,16 @@ int main(int argc, const char** argv)
     LZ4IO_setOverwrite(0);
 
     /* lz4cat predefined behavior */
-    if (!strcmp(exeName, LZ4CAT)) { mode = om_decompress; LZ4IO_setOverwrite(1); forceStdout=1; output_filename=stdoutmark; displayLevel=1; }
+    if (!strcmp(exeName, LZ4CAT)) {
+        mode = om_decompress;
+        LZ4IO_setOverwrite(1);
+        forceStdout=1;
+        output_filename=stdoutmark;
+        displayLevel=1;
+        multiple_inputs=1;
+        inFileNames = (const char**) calloc(argc, sizeof(char*));
+        if (inFileNames==NULL) { perror(exeName); exit(1); }
+    }
     if (!strcmp(exeName, UNLZ4)) { mode = om_decompress; }
 
     /* command switches */
@@ -429,8 +438,10 @@ int main(int argc, const char** argv)
 
                     /* Benchmark */
                 case 'b': mode = om_bench; multiple_inputs=1;
-                    if (inFileNames == NULL)
+                    if (inFileNames == NULL) {
                         inFileNames = (const char**) calloc(argc,  sizeof(char*));
+                        if (inFileNames==NULL) { perror(exeName); exit(1); }
+                    }
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
@@ -439,8 +450,10 @@ int main(int argc, const char** argv)
 #endif
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
-                    if (inFileNames == NULL)
-                        inFileNames = (const char**) calloc(argc, sizeof(char*));
+                    if (inFileNames == NULL) {
+                        inFileNames = (const char**) calloc(argc,  sizeof(char*));
+                        if (inFileNames==NULL) { perror(exeName); exit(1); }
+                    }
                     break;
 
                     /* Modify Nb Seconds (benchmark only) */
@@ -490,7 +503,6 @@ int main(int argc, const char** argv)
     /* No input filename ==> use stdin */
     if (multiple_inputs) {
         input_filename = inFileNames[0];
-        //output_filename = (const char*)(inFileNames[0]);
 #ifdef UTIL_HAS_CREATEFILELIST
         if (recursive) {  /* at this stage, filenameTable is a list of paths, which can contain both files and directories */
             extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
@@ -514,12 +526,12 @@ int main(int argc, const char** argv)
 
     if (mode == om_test) {
         LZ4IO_setTestMode(1);
-        output_filename=nulmark;
+        output_filename = nulmark;
         mode = om_decompress;   /* defer to decompress */
     }
 
     /* compress or decompress */
-    if (!input_filename) { input_filename=stdinmark; }
+    if (!input_filename) input_filename = stdinmark;
     /* Check if input is defined as console; trigger an error in this case */
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) {
         DISPLAYLEVEL(1, "refusing to read from a console\n");

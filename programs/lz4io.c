@@ -1007,6 +1007,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
     if (outFileName==NULL) exit(1);   /* not enough memory */
     ress.dstFile = stdout;
     SET_BINARY_MODE(stdout);
+    if (g_sparseFileSupport==1) g_sparseFileSupport = 0;
 
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
