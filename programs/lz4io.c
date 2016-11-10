@@ -247,18 +247,22 @@ static int LZ4IO_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ
 
 static int LZ4IO_getFiles(const char* input_filename, const char* output_filename, FILE** pfinput, FILE** pfoutput)
 {
-    if (!strcmp (input_filename, stdinmark)) {
-        DISPLAYLEVEL(4,"Using stdin for input \n");
-        *pfinput = stdin;
-        SET_BINARY_MODE(stdin);
-    } else {
-        *pfinput = fopen(input_filename, "rb");
+    if (pfinput!=NULL) {   /* no need to open finput */
+        if (!strcmp (input_filename, stdinmark)) {
+            DISPLAYLEVEL(4,"Using stdin for input \n");
+            *pfinput = stdin;
+            SET_BINARY_MODE(stdin);
+        } else {
+            *pfinput = fopen(input_filename, "rb");
+        }
+
+        if ( *pfinput==0 ) {
+            DISPLAYLEVEL(1, "Unable to access file for processing: %s \n", input_filename);
+            return 1;
+        }
     }
 
-    if ( *pfinput==0 ) {
-        DISPLAYLEVEL(1, "Unable to access file for processing: %s \n", input_filename);
-        return 1;
-    }
+    if (pfoutput==NULL) return 0;   /* no need to open foutput */
 
     if (!strcmp (output_filename, stdoutmark)) {
         DISPLAYLEVEL(4,"Using stdout for output \n");
@@ -739,6 +743,7 @@ typedef struct {
     size_t srcBufferSize;
     void*  dstBuffer;
     size_t dstBufferSize;
+    FILE*  dstFile;
     LZ4F_decompressionContext_t dCtx;
 } dRess_t;
 
@@ -880,7 +885,7 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
       g_magicRead = 0;
     } else {
       size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
-      if (nbReadBytes==0) return ENDOFSTREAM;                  /* EOF */
+      if (nbReadBytes==0) { nbCalls = 0; return ENDOFSTREAM; }   /* EOF */
       if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
       magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
     }
@@ -904,8 +909,10 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
     EXTENDED_FORMAT;  /* macro extension for custom formats */
     default:
         if (nbCalls == 1) {  /* just started */
-            if (!g_testMode && g_overwrite)
+            if (!g_testMode && g_overwrite) {
+                nbCalls = 0;
                 return LZ4IO_passThrough(finput, foutput, MNstore);
+            }
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
         }
         DISPLAYLEVEL(2, "Stream followed by undecodable data\n");
@@ -914,18 +921,15 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
 }
 
 
-static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename, const char* output_filename)
+static int LZ4IO_decompressSrcFile(dRess_t ress, const char* input_filename, const char* output_filename)
 {
+    FILE* const foutput = ress.dstFile;
     unsigned long long filesize = 0, decodedSize=0;
     FILE* finput;
-    FILE* foutput;
 
     /* Init */
-    if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
+    if (LZ4IO_getFiles(input_filename, output_filename, &finput, NULL))
         return 1;
-
-    /* sparse file */
-    if (g_sparseFileSupport) { SET_SPARSE_FILE_MODE(foutput); }
 
     /* Loop over multiple streams */
     do {
@@ -936,6 +940,31 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
 
     /* Close */
     fclose(finput);
+
+    if (g_removeSrcFile) { if (remove(input_filename)) EXM_THROW(45, "Remove error : %s: %s", input_filename, strerror(errno)); }  /* remove source file : --rm */
+
+    /* Final Status */
+    DISPLAYLEVEL(2, "\r%79s\r", "");
+    DISPLAYLEVEL(2, "%-20.20s : decoded %llu bytes \n", input_filename, filesize);
+
+    return 0;
+}
+
+
+static int LZ4IO_decompressDstFile(dRess_t ress, const char* input_filename, const char* output_filename)
+{
+    FILE* foutput;
+
+    /* Init */
+    if (LZ4IO_getFiles(input_filename, output_filename, NULL, &foutput))
+        return 1;
+
+    /* sparse file */
+    if (g_sparseFileSupport) { SET_SPARSE_FILE_MODE(foutput); }
+
+    ress.dstFile = foutput;
+    LZ4IO_decompressSrcFile(ress, input_filename, output_filename);
+
     fclose(foutput);
 
     /* Copy owner, file permissions and modification time */
@@ -943,12 +972,6 @@ static int LZ4IO_decompressFile_extRess(dRess_t ress, const char* input_filename
         if (strcmp (input_filename, stdinmark) && strcmp (output_filename, stdoutmark) && UTIL_getFileStat(input_filename, &statbuf))
             UTIL_setFileStat(output_filename, &statbuf);
     }
-
-    if (g_removeSrcFile) { if (remove(input_filename)) EXM_THROW(45, "Remove error : %s: %s", input_filename, strerror(errno)); } /* remove source file : --rm */
-
-    /* Final Status */
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Successfully decoded %llu bytes \n", filesize);
 
     return 0;
 }
@@ -959,7 +982,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     dRess_t const ress = LZ4IO_createDResources();
     clock_t const start = clock();
 
-    int const missingFiles = LZ4IO_decompressFile_extRess(ress, input_filename, output_filename);
+    int const missingFiles = LZ4IO_decompressDstFile(ress, input_filename, output_filename);
 
     {   clock_t const end = clock();
         double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
@@ -971,7 +994,6 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
 }
 
 
-#define MAXSUFFIXSIZE 8
 int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix)
 {
     int i;
@@ -980,13 +1002,19 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     size_t const suffixSize = strlen(suffix);
-    dRess_t const ress = LZ4IO_createDResources();
+    dRess_t ress = LZ4IO_createDResources();
 
     if (outFileName==NULL) exit(1);   /* not enough memory */
+    ress.dstFile = stdout;
+    SET_BINARY_MODE(stdout);
 
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
+        if (!strcmp(suffix, stdoutmark)) {
+            missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], stdoutmark);
+            continue;
+        }
         if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); if (outFileName==NULL) exit(1); }
         if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
@@ -995,8 +1023,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
         }
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
-
-        missingFiles += LZ4IO_decompressFile_extRess(ress, inFileNamesTable[i], outFileName);
+        missingFiles += LZ4IO_decompressDstFile(ress, inFileNamesTable[i], outFileName);
     }
 
     LZ4IO_freeDResources(ress);

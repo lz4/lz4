@@ -225,8 +225,8 @@ test-lz4-basic: lz4 datagen
 
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
-	./datagen -g6GB   | $(PRGDIR)/lz4 -vqB5D | $(PRGDIR)/lz4 -qt
-	./datagen -g6GB   | $(PRGDIR)/lz4 -vq5BD | $(PRGDIR)/lz4 -qt
+	./datagen -g6GB   | $(PRGDIR)/lz4 -vB5D  | $(PRGDIR)/lz4 -qt
+	./datagen -g6GB   | $(PRGDIR)/lz4 -v5BD  | $(PRGDIR)/lz4 -qt
 	@$(RM) tmp*
 
 test-lz4-testmode: lz4 datagen
@@ -240,8 +240,8 @@ test-lz4-testmode: lz4 datagen
 	./datagen | $(PRGDIR)/lz4 -df > $(VOID)
 	@echo "Hello World !" > tmp1
 	$(PRGDIR)/lz4 -dcf tmp1
-#	@echo "from underground..." > tmp2
-#	$(PRGDIR)/lz4 -dcfm tmp1 tmp2
+	@echo "from underground..." > tmp2
+	$(PRGDIR)/lz4 -dcfm tmp1 tmp2
 	@echo "\n ---- test cli ----"
 	$(PRGDIR)/lz4     file-does-not-exist    && false || true
 	$(PRGDIR)/lz4 -f  file-does-not-exist    && false || true

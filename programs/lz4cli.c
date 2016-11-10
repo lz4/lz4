@@ -311,34 +311,37 @@ int main(int argc, const char** argv)
 
         if(!argument) continue;   /* Protection if argument empty */
 
-        /* long commands (--long-word) */
-        if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
-        if ((!strcmp(argument, "--decompress"))
-         || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }
-        if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
-        if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
-        if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(1); continue; }
-        if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(0); continue; }
-        if ((!strcmp(argument, "--stdout"))
-         || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; displayLevel=1; continue; }
-        if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(1); continue; }
-        if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
-        if (!strcmp(argument,  "--content-size")) { LZ4IO_setContentSize(1); continue; }
-        if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(0); continue; }
-        if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(2); continue; }
-        if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(0); continue; }
-        if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
-        if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
-        if (!strcmp(argument,  "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
-        if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(0); continue; }   /* keep source file (default anyway; just for xz/lzma compatibility) */
-        if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(1); continue; }
-
         /* Short commands (note : aggregated short commands are allowed) */
         if (argument[0]=='-') {
             /* '-' means stdin/stdout */
             if (argument[1]==0) {
                 if (!input_filename) input_filename=stdinmark;
                 else output_filename=stdoutmark;
+                continue;
+            }
+
+            /* long commands (--long-word) */
+            if (argument[1]=='-') {
+                if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
+                if ((!strcmp(argument, "--decompress"))
+                    || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }
+                if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
+                if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
+                if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(1); continue; }
+                if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(0); continue; }
+                if ((!strcmp(argument, "--stdout"))
+                    || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; continue; }
+                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(1); continue; }
+                if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(0); continue; }
+                if (!strcmp(argument,  "--content-size")) { LZ4IO_setContentSize(1); continue; }
+                if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(0); continue; }
+                if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(2); continue; }
+                if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(0); continue; }
+                if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
+                if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
+                if (!strcmp(argument,  "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
+                if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(0); continue; }   /* keep source file (default) */
+                if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(1); continue; }
             }
 
             while (argument[1]!=0) {
@@ -382,7 +385,7 @@ int main(int argc, const char** argv)
                 case 'd': mode = om_decompress; break;
 
                     /* Force stdout, even if stdout==console */
-                case 'c': forceStdout=1; output_filename=stdoutmark; displayLevel=1; break;
+                case 'c': forceStdout=1; output_filename=stdoutmark; break;
 
                     /* Test integrity */
                 case 't': mode = om_test; break;
@@ -409,7 +412,7 @@ int main(int argc, const char** argv)
                         case '5':
                         case '6':
                         case '7':
-                            {   int B = argument[1] - '0';
+                            {   int const B = argument[1] - '0';
                                 blockSize = LZ4IO_setBlockSizeID(B);
                                 BMK_setNotificationLevel(displayLevel);
                                 BMK_SetBlockSize(blockSize);
@@ -417,7 +420,7 @@ int main(int argc, const char** argv)
                                 break;
                             }
                         case 'D': LZ4IO_setBlockMode(LZ4IO_blockLinked); argument++; break;
-                        case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;   /* currently disabled */
+                        case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;   /* disabled by default */
                         default : exitBlockProperties=1;
                         }
                         if (exitBlockProperties) break;
@@ -487,7 +490,7 @@ int main(int argc, const char** argv)
     /* No input filename ==> use stdin */
     if (multiple_inputs) {
         input_filename = inFileNames[0];
-        output_filename = (const char*)(inFileNames[0]);
+        //output_filename = (const char*)(inFileNames[0]);
 #ifdef UTIL_HAS_CREATEFILELIST
         if (recursive) {  /* at this stage, filenameTable is a list of paths, which can contain both files and directories */
             extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
@@ -518,8 +521,7 @@ int main(int argc, const char** argv)
     /* compress or decompress */
     if (!input_filename) { input_filename=stdinmark; }
     /* Check if input is defined as console; trigger an error in this case */
-    if (!strcmp(input_filename, stdinmark)
-       && IS_CONSOLE(stdin) ) {
+    if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) {
         DISPLAYLEVEL(1, "refusing to read from a console\n");
         exit(1);
     }
@@ -565,15 +567,15 @@ int main(int argc, const char** argv)
         exit(1);
     }
 
-    /* Downgrade notification level in pure pipe mode (stdin + stdout) and multiple file mode */
-    if (!strcmp(input_filename, stdinmark) && !strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
+    /* Downgrade notification level in stdout and multiple file mode */
+    if (!strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
     if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
 
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
     if (mode == om_decompress) {
         if (multiple_inputs)
-            operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, LZ4_EXTENSION);
+            operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION);
         else
             operationResult = DEFAULT_DECOMPRESSOR(input_filename, output_filename);
     } else {   /* compression is default action */
