@@ -39,7 +39,7 @@ MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 PRGDIR  := ../programs
 TESTDIR := versionsTest
-PYTHON?= python3
+PYTHON  ?= python3
 
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes
@@ -59,6 +59,7 @@ endif
 # Default test parameters
 TEST_FILES   := COPYING
 FUZZER_TIME  := -T3mn
+NB_LOOPS     ?= -i1
 
 
 default: bins
