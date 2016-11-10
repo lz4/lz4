@@ -122,7 +122,6 @@ void BMK_SetNbSeconds(unsigned nbSeconds)
 void BMK_SetBlockSize(size_t blockSize)
 {
     g_blockSize = blockSize;
-    DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
 }
 
 
@@ -493,6 +492,11 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast)
 {
     double const compressibility = (double)g_compressibilityDefault / 100;
+
+    if (cLevel > LZ4HC_MAX_CLEVEL) cLevel = LZ4HC_MAX_CLEVEL;
+    if (cLevelLast > LZ4HC_MAX_CLEVEL) cLevelLast = LZ4HC_MAX_CLEVEL;
+    if (cLevelLast < cLevel) cLevelLast = cLevel;
+    if (cLevelLast > cLevel) DISPLAYLEVEL(2, "Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
 
     if (nbFiles == 0)
         BMK_syntheticTest(cLevel, cLevelLast, compressibility);

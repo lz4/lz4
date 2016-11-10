@@ -161,7 +161,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -r     : operate recursively on directories (sets also -m)\n");
 #endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
-    DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
+    DISPLAY( " -B#    : Block size [4-7] (default : 7)\n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled)\n");
@@ -171,6 +171,8 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
     DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s)\n");
+    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+]\n");
+    DISPLAY( "                      or predefined block size [4-7] (default: 7)\n");
 #if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
     DISPLAY( "Legacy arguments :\n");
     DISPLAY( " -c0    : fast compression\n");
@@ -417,20 +419,33 @@ int main(int argc, const char** argv)
                         int exitBlockProperties=0;
                         switch(argument[1])
                         {
-                        case '4':
-                        case '5':
-                        case '6':
-                        case '7':
-                            {   int const B = argument[1] - '0';
-                                blockSize = LZ4IO_setBlockSizeID(B);
-                                BMK_setNotificationLevel(displayLevel);
-                                BMK_SetBlockSize(blockSize);
-                                argument++;
-                                break;
-                            }
                         case 'D': LZ4IO_setBlockMode(LZ4IO_blockLinked); argument++; break;
                         case 'X': LZ4IO_setBlockChecksumMode(1); argument ++; break;   /* disabled by default */
-                        default : exitBlockProperties=1;
+                        default :
+                            if (argument[1] < '0' || argument[1] > '9') {
+                                exitBlockProperties=1;
+                                break;
+                            } else {
+                                unsigned B;
+                                argument++;
+                                B = readU32FromChar(&argument);
+                                argument--;
+                                if (B < 4) badusage(exeName);
+                                if (B <= 7) {
+                                    blockSize = LZ4IO_setBlockSizeID(B);
+                                    BMK_SetBlockSize(blockSize);
+                                    DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
+                                } else {
+                                    if (B < 32) badusage(exeName);
+                                    BMK_SetBlockSize(B);
+                                    if (B >= 1024) {
+                                        DISPLAYLEVEL(2, "bench: using blocks of size %u KB \n", (U32)(B>>10));
+                                    } else {
+                                        DISPLAYLEVEL(2, "bench: using blocks of size %u bytes \n", (U32)(B));
+                                    }
+                                }
+                                break;
+                            }
                         }
                         if (exitBlockProperties) break;
                     }
