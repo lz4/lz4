@@ -107,6 +107,7 @@ c_standards: clean
 	$(MAKE) clean
 
 clangtest: clean
+	clang -v
 	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) all CC=clang
 
 sanitize: clean
