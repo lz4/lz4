@@ -39,19 +39,31 @@
 extern "C" {
 #endif
 
-/*
- * lz4.h provides block compression functions. It gives full buffer control to user.
- * Block compression functions are not-enough to send information,
- * since it's still necessary to provide metadata (such as compressed size),
- * and each application can do it in whichever way it wants.
- * For interoperability, there is LZ4 frame specification (doc/lz4_Frame_format.md).
- * A library is provided to take care of it, see lz4frame.h.
+/**
+  Introduction
+
+  LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core,
+  scalable with multi-cores CPU. It features an extremely fast decoder, with speed in
+  multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
+
+  The LZ4 compression library provides in-memory compression and decompression functions.
+  Compression can be done in:
+    - a single step (described as Simple Functions)
+    - a single step, reusing a context (described in Advanced Functions)
+    - unbounded multiple steps (described as Streaming compression)
+
+  lz4.h provides block compression functions. It gives full buffer control to user.
+  Block compression functions are not-enough to send information,
+  since it's still necessary to provide metadata (such as compressed size),
+  and each application can do it in whichever way it wants.
+  For interoperability, there is LZ4 frame specification (doc/lz4_Frame_format.md).
+  A library is provided to take care of it, see lz4frame.h.
 */
 
-/*-***************************************************************
+/*^***************************************************************
 *  Export parameters
 *****************************************************************/
-/*!
+/*
 *  LZ4_DLL_EXPORT :
 *  Enable exporting of functions when building a Windows DLL
 */
@@ -64,27 +76,26 @@ extern "C" {
 #endif
 
 
-/*-************************************
-*  Version
-**************************************/
+/*========== Version =========== */
+LZ4LIB_API int LZ4_versionNumber (void);
+LZ4LIB_API const char* LZ4_versionString (void);
+
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    7    /* for new (non-breaking) interface capabilities */
 #define LZ4_VERSION_RELEASE  2    /* for tweaks, bug-fixes, or development */
 
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
-LZ4LIB_API int LZ4_versionNumber (void);
 
 #define LZ4_LIB_VERSION LZ4_VERSION_MAJOR.LZ4_VERSION_MINOR.LZ4_VERSION_RELEASE
 #define LZ4_QUOTE(str) #str
 #define LZ4_EXPAND_AND_QUOTE(str) LZ4_QUOTE(str)
 #define LZ4_VERSION_STRING LZ4_EXPAND_AND_QUOTE(LZ4_LIB_VERSION)
-LZ4LIB_API const char* LZ4_versionString (void);
 
 
 /*-************************************
 *  Tuning parameter
 **************************************/
-/*
+/*!
  * LZ4_MEMORY_USAGE :
  * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
  * Increasing memory usage improves compression ratio
@@ -97,12 +108,7 @@ LZ4LIB_API const char* LZ4_versionString (void);
 /*-************************************
 *  Simple Functions
 **************************************/
-
-LZ4LIB_API int LZ4_compress_default(const char* source, char* dest, int sourceSize, int maxDestSize);
-LZ4LIB_API int LZ4_decompress_safe (const char* source, char* dest, int compressedSize, int maxDecompressedSize);
-
-/*
-LZ4_compress_default() :
+/*! LZ4_compress_default() :
     Compresses 'sourceSize' bytes from buffer 'source'
     into already allocated 'dest' buffer of size 'maxDestSize'.
     Compression is guaranteed to succeed if 'maxDestSize' >= LZ4_compressBound(sourceSize).
@@ -114,9 +120,10 @@ LZ4_compress_default() :
         sourceSize  : Max supported value is LZ4_MAX_INPUT_VALUE
         maxDestSize : full or partial size of buffer 'dest' (which must be already allocated)
         return : the number of bytes written into buffer 'dest' (necessarily <= maxOutputSize)
-              or 0 if compression fails
+              or 0 if compression fails */
+LZ4LIB_API int LZ4_compress_default(const char* source, char* dest, int sourceSize, int maxDestSize);
 
-LZ4_decompress_safe() :
+/*! LZ4_decompress_safe() :
     compressedSize : is the precise full size of the compressed block.
     maxDecompressedSize : is the size of destination buffer, which must be already allocated.
     return : the number of bytes decompressed into destination buffer (necessarily <= maxDecompressedSize)
@@ -125,6 +132,7 @@ LZ4_decompress_safe() :
              This function is protected against buffer overflow exploits, including malicious data packets.
              It never writes outside output buffer, nor reads outside input buffer.
 */
+LZ4LIB_API int LZ4_decompress_safe (const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 
 
 /*-************************************
@@ -214,7 +222,7 @@ LZ4LIB_API int LZ4_decompress_safe_partial (const char* source, char* dest, int 
 ***********************************************/
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
 #define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(long long))
-/*
+/*!
  * LZ4_stream_t :
  * information structure to track an LZ4 stream.
  * important : init this structure content before first use !
@@ -228,7 +236,8 @@ typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
  */
 LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
 
-/*! LZ4_createStream() will allocate and initialize an `LZ4_stream_t` structure.
+/*! LZ4_createStream() and LZ4_freeStream() :
+ *  LZ4_createStream() will allocate and initialize an `LZ4_stream_t` structure.
  *  LZ4_freeStream() releases its memory.
  *  In the context of a DLL (liblz4), please use these methods rather than the static struct.
  *  They are more future proof, in case of a change of `LZ4_stream_t` size.
@@ -270,7 +279,7 @@ LZ4LIB_API int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dict
 #define LZ4_STREAMDECODESIZE_U64  4
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
 typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_streamDecode_t;
-/*
+/*!
  * LZ4_streamDecode_t
  * information structure to track an LZ4 stream.
  * init this structure content using LZ4_setStreamDecode or memset() before first use !
@@ -290,7 +299,7 @@ LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_str
  */
 LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
 
-/*
+/*!
 *_continue() :
     These decoding functions allow decompression of multiple blocks in "streaming" mode.
     Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
@@ -311,9 +320,9 @@ LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecod
 LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
 
 
-/*
-Advanced decoding functions :
+/*!
 *_usingDict() :
+Advanced decoding functions :
     These decoding functions work the same as
     a combination of LZ4_setStreamDecode() followed by LZ4_decompress_x_continue()
     They are stand-alone. They don't need nor update an LZ4_streamDecode_t structure.
