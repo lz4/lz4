@@ -9,11 +9,11 @@ matrix:
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-frametest test-fuzzer' COMPILER=cc
+      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fasttest test-fullbench' COMPILER=cc
     
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make -C tests test-lz4c test-fasttest test-fullbench' COMPILER=cc
+      env: Ubu=12.04cont Cmd='make -C tests test-frametest test-fuzzer' COMPILER=cc
       
     - os: linux
       sudo: false
@@ -21,22 +21,22 @@ matrix:
     
     
     # 14.04 LTS Server Edition 64 bit
-    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-frametest32 test-fuzzer32' COMPILER=cc
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - libc6-dev-i386
-            - gcc-multilib
-    
-    - env: Ubu=14.04 Cmd='make -C tests test-fullbench32 versionsTest' COMPILER=cc
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - python3
+            - libc6-dev-i386
+            - gcc-multilib
+    
+    - env: Ubu=14.04 Cmd='make -C tests test-frametest32 test-fuzzer32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
             - libc6-dev-i386
             - gcc-multilib
     

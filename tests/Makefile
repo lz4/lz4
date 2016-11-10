@@ -115,6 +115,7 @@ datagen : $(PRGDIR)/datagen.c datagencli.c
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
+        fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
