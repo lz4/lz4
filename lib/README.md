@@ -19,7 +19,7 @@ The variant still depends on regular `lz4` source files.
 In particular, the decompression is still provided by `lz4.c`.
 
 
-#### Compatibiliy issues
+#### Compatibility issues
 
 In order to produce files or streams compatible with `lz4` command line utility,
 it's necessary to encode lz4-compressed blocks using the [official interoperable frame format].
@@ -36,6 +36,18 @@ in case a user program would link to several libraries containing xxhash symbols
 A more complex `lz4frame_static.h` is also provided.
 It contains definitions which are not guaranteed to remain stable within future versions.
 It must be used with static linking ***only***.
+
+
+#### Using MinGW+MSYS to create DLL
+
+DLL can be created using MinGW+MSYS with the "make liblz4" command.
+This command creates "liblz4.dll" and the import library "liblz4.dll.a".
+To compile a project the import library has to be added to linking options.
+It means that if a project that uses LZ4 consists of a single test-dll.c 
+file it should be compiled with "liblz4.dll.a". For example:
+```
+    gcc $CFLAGS test-dll.c -o test-dll liblz4.dll.a
+```
 
 
 #### Miscellaneous 
