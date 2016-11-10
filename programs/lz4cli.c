@@ -498,9 +498,8 @@ int main(int argc, const char** argv)
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
-    if (mode == om_compress) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
+    if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
 
-    /* No input filename ==> use stdin */
     if (multiple_inputs) {
         input_filename = inFileNames[0];
 #ifdef UTIL_HAS_CREATEFILELIST
@@ -542,9 +541,10 @@ int main(int argc, const char** argv)
     while (!output_filename) {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
-            size_t const inSize = strlen(input_filename);
+            size_t const inSize  = strlen(input_filename);
             size_t const extSize = strlen(LZ4_EXTENSION);
-            if (!strcmp(input_filename+(inSize-extSize), LZ4_EXTENSION)) mode = om_decompress;
+            size_t const extStart= (inSize > extSize) ? inSize-extSize : 0;
+            if (!strcmp(input_filename+extStart, LZ4_EXTENSION)) mode = om_decompress;
             else mode = om_compress;
         }
         if (mode == om_compress) {   /* compression to file */

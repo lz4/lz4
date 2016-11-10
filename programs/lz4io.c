@@ -245,55 +245,65 @@ static int LZ4IO_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))
 static int LZ4IO_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4IO_SKIPPABLEMASK) == LZ4IO_SKIPPABLE0; }
 
 
-static int LZ4IO_getFiles(const char* input_filename, const char* output_filename, FILE** pfinput, FILE** pfoutput)
+/** LZ4IO_openSrcFile() :
+ * condition : `dstFileName` must be non-NULL.
+ * @result : FILE* to `dstFileName`, or NULL if it fails */
+static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 {
-    if (pfinput!=NULL) {   /* no need to open finput */
-        if (!strcmp (input_filename, stdinmark)) {
-            DISPLAYLEVEL(4,"Using stdin for input \n");
-            *pfinput = stdin;
-            SET_BINARY_MODE(stdin);
-        } else {
-            *pfinput = fopen(input_filename, "rb");
-        }
+    FILE* f;
 
-        if ( *pfinput==0 ) {
-            DISPLAYLEVEL(1, "Unable to access file for processing: %s \n", input_filename);
-            return 1;
-        }
+    if (!strcmp (srcFileName, stdinmark)) {
+        DISPLAYLEVEL(4,"Using stdin for input\n");
+        f = stdin;
+        SET_BINARY_MODE(stdin);
+    } else {
+        f = fopen(srcFileName, "rb");
+        if ( f==NULL ) DISPLAYLEVEL(1, "zstd: %s: %s \n", srcFileName, strerror(errno));
     }
 
-    if (pfoutput==NULL) return 0;   /* no need to open foutput */
+    return f;
+}
 
-    if (!strcmp (output_filename, stdoutmark)) {
-        DISPLAYLEVEL(4,"Using stdout for output \n");
-        *pfoutput = stdout;
+/** FIO_openDstFile() :
+ * condition : `dstFileName` must be non-NULL.
+ * @result : FILE* to `dstFileName`, or NULL if it fails */
+static FILE* LZ4IO_openDstFile(const char* dstFileName)
+{
+    FILE* f;
+
+    if (!strcmp (dstFileName, stdoutmark)) {
+        DISPLAYLEVEL(4,"Using stdout for output\n");
+        f = stdout;
         SET_BINARY_MODE(stdout);
         if (g_sparseFileSupport==1) {
             g_sparseFileSupport = 0;
             DISPLAYLEVEL(4, "Sparse File Support is automatically disabled on stdout ; try --sparse \n");
         }
     } else {
-        /* Check if destination file already exists */
-        *pfoutput=0;
-        if (strcmp(output_filename, nulmark)) *pfoutput = fopen( output_filename, "rb" );
-        if (*pfoutput!=0) {
-            fclose(*pfoutput);
-            if (!g_overwrite) {
-                int ch = 'Y';
-                DISPLAYLEVEL(2, "Warning : %s already exists\n", output_filename);
-                if ((g_displayLevel <= 1) || (*pfinput == stdin))
-                    EXM_THROW(11, "Operation aborted : %s already exists", output_filename);   /* No interaction possible */
-                DISPLAYLEVEL(2, "Overwrite ? (Y/n) : ");
-                while((ch = getchar()) != '\n' && ch != EOF)   /* flush integrated */
-                if ((ch!='Y') && (ch!='y')) EXM_THROW(12, "No. Operation aborted : %s already exists", output_filename);
-            }
-        }
-        *pfoutput = fopen( output_filename, "wb" );
+        if (!g_overwrite && strcmp (dstFileName, nulmark)) {  /* Check if destination file already exists */
+            f = fopen( dstFileName, "rb" );
+            if (f != NULL) {  /* dest exists, prompt for overwrite authorization */
+                fclose(f);
+                if (g_displayLevel <= 1) {  /* No interaction possible */
+                    DISPLAY("zstd: %s already exists; not overwritten  \n", dstFileName);
+                    return NULL;
+                }
+                DISPLAY("zstd: %s already exists; do you wish to overwrite (y/N) ? ", dstFileName);
+                {   int ch = getchar();
+                    if ((ch!='Y') && (ch!='y')) {
+                        DISPLAY("    not overwritten  \n");
+                        return NULL;
+                    }
+                    while ((ch!=EOF) && (ch!='\n')) ch = getchar();  /* flush rest of input line */
+        }   }   }
+        f = fopen( dstFileName, "wb" );
+        if (f==NULL) DISPLAYLEVEL(1, "zstd: %s: %s\n", dstFileName, strerror(errno));
     }
 
-    if (*pfoutput==0) EXM_THROW(13, "Pb opening %s", output_filename);
+    /* sparse file */
+    if (f && g_sparseFileSupport) SET_SPARSE_FILE_MODE(foutput);
 
-    return 0;
+    return f;
 }
 
 
@@ -337,8 +347,10 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     clock_t const start = clock();
     if (compressionlevel < 3) compressionFunction = LZ4IO_LZ4_compress; else compressionFunction = LZ4_compress_HC;
 
-    if (LZ4IO_getFiles(input_filename, output_filename, &finput, &foutput))
-        EXM_THROW(20, "File error");
+    finput = LZ4IO_openSrcFile(input_filename);
+    if (finput == NULL) EXM_THROW(20, "%s : open file error ", input_filename);
+    foutput = LZ4IO_openDstFile(output_filename);
+    if (foutput == NULL) { fclose(finput); EXM_THROW(20, "%s : open file error ", input_filename); }
 
     /* Allocate Memory */
     in_buff = (char*)malloc(LEGACY_BLOCKSIZE);
@@ -450,10 +462,12 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     LZ4F_preferences_t prefs;
 
     /* Init */
+    srcFile = LZ4IO_openSrcFile(srcFileName);
+    if (srcFile == NULL) return 1;
+    dstFile = LZ4IO_openDstFile(dstFileName);
+    if (dstFile == NULL) { fclose(srcFile); return 1; }
     memset(&prefs, 0, sizeof(prefs));
 
-    /* File check */
-    if (LZ4IO_getFiles(srcFileName, dstFileName, &srcFile, &dstFile)) return 1;
 
     /* Set compression parameters */
     prefs.autoFlush = 1;
@@ -674,7 +688,7 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
 
 static void LZ4IO_fwriteSparseEnd(FILE* file, unsigned storedSkips)
 {
-    if (storedSkips>0) {   /* implies g_sparseFileSupport */
+    if (storedSkips>0) {   /* implies g_sparseFileSupport>0 */
         int const seekResult = fseek(file, storedSkips-1, SEEK_CUR);
         if (seekResult != 0) EXM_THROW(69, "Final skip error (sparse file)\n");
         {   const char lastZeroByte[1] = { 0 };
@@ -928,8 +942,8 @@ static int LZ4IO_decompressSrcFile(dRess_t ress, const char* input_filename, con
     FILE* finput;
 
     /* Init */
-    if (LZ4IO_getFiles(input_filename, output_filename, &finput, NULL))
-        return 1;
+    finput = LZ4IO_openSrcFile(input_filename);
+    if (finput==NULL) return 1;
 
     /* Loop over multiple streams */
     do {
@@ -946,6 +960,7 @@ static int LZ4IO_decompressSrcFile(dRess_t ress, const char* input_filename, con
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "%-20.20s : decoded %llu bytes \n", input_filename, filesize);
+    (void)output_filename;
 
     return 0;
 }
@@ -956,11 +971,8 @@ static int LZ4IO_decompressDstFile(dRess_t ress, const char* input_filename, con
     FILE* foutput;
 
     /* Init */
-    if (LZ4IO_getFiles(input_filename, output_filename, NULL, &foutput))
-        return 1;
-
-    /* sparse file */
-    if (g_sparseFileSupport) { SET_SPARSE_FILE_MODE(foutput); }
+    foutput = LZ4IO_openDstFile(output_filename);
+    if (foutput==NULL) return 1;   /* failure */
 
     ress.dstFile = foutput;
     LZ4IO_decompressSrcFile(ress, input_filename, output_filename);
@@ -1005,9 +1017,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
     dRess_t ress = LZ4IO_createDResources();
 
     if (outFileName==NULL) exit(1);   /* not enough memory */
-    ress.dstFile = stdout;
-    SET_BINARY_MODE(stdout);
-    if (g_sparseFileSupport==1) g_sparseFileSupport = 0;
+    ress.dstFile = LZ4IO_openDstFile(stdoutmark);
 
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
