@@ -29,7 +29,8 @@
   - The license of this source file is GPLv2.
 */
 
-#pragma once
+#ifndef LZ4IO_H_237902873
+#define LZ4IO_H_237902873
 
 /* ************************************************** */
 /* Special input/output values                        */
@@ -51,9 +52,9 @@ static char const nulmark[] = "/dev/null";
 int LZ4IO_compressFilename  (const char* input_filename, const char* output_filename, int compressionlevel);
 int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename);
 
-
 int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionlevel);
 int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSize, const char* suffix);
+
 
 /* ************************************************** */
 /* ****************** Parameters ******************** */
@@ -91,3 +92,6 @@ int LZ4IO_setSparseFile(int enable);
 int LZ4IO_setContentSize(int enable);
 
 void LZ4IO_setRemoveSrcFile(unsigned flag);
+
+
+#endif  /* LZ4IO_H_237902873 */

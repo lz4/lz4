@@ -43,7 +43,7 @@ static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSi
 #include "lz4hc.h"
 #define COMPRESSOR1 LZ4_compress_HC
 #define DEFAULTCOMPRESSOR COMPRESSOR0
-#define LZ4_isError(errcode) (errcode==0) 
+#define LZ4_isError(errcode) (errcode==0)
 
 
 /* *************************************
@@ -129,8 +129,7 @@ void BMK_SetBlockSize(size_t blockSize)
 /* ********************************************************
 *  Bench functions
 **********************************************************/
-typedef struct
-{
+typedef struct {
     const char* srcPtr;
     size_t srcSize;
     char*  cPtr;
@@ -449,7 +448,7 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     if ((U64)benchedSize > totalSizeToLoad) benchedSize = (size_t)totalSizeToLoad;
     if (benchedSize < totalSizeToLoad)
         DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
-    srcBuffer = malloc(benchedSize);
+    srcBuffer = malloc(benchedSize + !benchedSize);   /* avoid alloc of zero */
     if (!srcBuffer) EXM_THROW(12, "not enough memory");
 
     /* Load input buffer */

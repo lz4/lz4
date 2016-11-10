@@ -24,3 +24,6 @@ lz4
 _codelite/
 _codelite_lz4/
 *.zip
+
+# Mac
+.DS_Store

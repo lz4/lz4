@@ -7,3 +7,7 @@ fullbench
 fullbench32
 fuzzer
 fuzzer32
+fasttest
+
+# test artefacts
+tmp*
