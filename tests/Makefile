@@ -58,7 +58,7 @@ endif
 
 # Default test parameters
 TEST_FILES   := COPYING
-FUZZER_TIME  := -T9mn
+FUZZER_TIME  := -T3mn
 
 
 default: bins
