@@ -427,7 +427,7 @@ UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_
 UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_t* pos, char** bufEnd)
 {
     (void)bufStart; (void)bufEnd; (void)pos;
-    fprintf(stderr, "Directory %s ignored (zstd compiled without _WIN32 or _POSIX_C_SOURCE)\n", dirName);
+    fprintf(stderr, "Directory %s ignored (lz4 compiled without _WIN32 or _POSIX_C_SOURCE)\n", dirName);
     return 0;
 }
 
