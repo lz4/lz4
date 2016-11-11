@@ -204,7 +204,7 @@ const char* LZ4F_getErrorName(LZ4F_errorCode_t code)
 LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult)
 {
     if (!LZ4F_isError(functionResult)) return LZ4F_OK_NoError;
-    return (LZ4F_errorCode_t)(-functionResult);
+    return (LZ4F_errorCodes)(-(ptrdiff_t)functionResult);
 }
 
 static LZ4F_errorCode_t err0r(LZ4F_errorCodes code)
@@ -499,7 +499,7 @@ static size_t LZ4F_compressBlock(void* dst, const void* src, size_t srcSize, com
     LZ4F_writeLE32(cSizePtr, cSize);
     if (cSize == 0) {  /* compression failed */
         cSize = (U32)srcSize;
-        LZ4F_writeLE32(cSizePtr, srcSize | LZ4F_BLOCKUNCOMPRESSED_FLAG);
+        LZ4F_writeLE32(cSizePtr, cSize | LZ4F_BLOCKUNCOMPRESSED_FLAG);
         memcpy(cSizePtr+4, src, srcSize);
     }
     return cSize + 4;
