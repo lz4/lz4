@@ -40,13 +40,13 @@ It must be used with static linking ***only***.
 
 #### Using MinGW+MSYS to create DLL
 
-DLL can be created using MinGW+MSYS with the "make liblz4" command.
-This command creates "liblz4.dll" and the import library "liblz4.dll.a".
+DLL can be created using MinGW+MSYS with the `make liblz4` command.
+This command creates `liblz4.dll` and the import library `liblz4.dll.a`.
 To compile a project the import library has to be added to linking options.
-It means that if a project that uses LZ4 consists of a single test-dll.c 
+It means that if a project that uses LZ4 consists of a single `test-dll.c`
 file it should be compiled with "liblz4.dll.a". For example:
 ```
-    gcc $CFLAGS test-dll.c -o test-dll liblz4.dll.a
+    gcc $(CFLAGS) test-dll.c -o test-dll liblz4.dll.a
 ```
 
 
