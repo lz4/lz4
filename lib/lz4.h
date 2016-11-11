@@ -39,6 +39,12 @@
 extern "C" {
 #endif
 
+/*^***************************
+*  Includes
+*****************************/
+#include <stddef.h>   /* size_t */
+
+
 /**
   Introduction
 
@@ -104,6 +110,56 @@ LZ4LIB_API const char* LZ4_versionString (void);
  */
 #define LZ4_MEMORY_USAGE 14
 
+
+/*-************************************
+ *  Private definitions
+ **************************************
+ * Do not use these definitions.
+ * They are exposed to allow static allocation of `LZ4_stream_t` and `LZ4_streamDecode_t`.
+ * If you use these definitions in your code, it will break when you upgrade LZ4 to a new version.
+**************************************/
+#define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
+#define LZ4_HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
+#define LZ4_HASH_SIZE_U32 (1 << LZ4_HASHLOG)       /* required as macro for static allocation */
+
+#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#include <stdint.h>
+
+typedef struct {
+    uint32_t hashTable[LZ4_HASH_SIZE_U32];
+    uint32_t currentOffset;
+    uint32_t initCheck;
+    const uint8_t* dictionary;
+    uint8_t* bufferStart;   /* obsolete, used for slideInputBuffer */
+    uint32_t dictSize;
+} LZ4_stream_t_internal;
+
+typedef struct {
+    const uint8_t* externalDict;
+    size_t extDictSize;
+    const uint8_t* prefixEnd;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+
+#else
+
+typedef struct {
+    unsigned int hashTable[LZ4_HASH_SIZE_U32];
+    unsigned int currentOffset;
+    unsigned int initCheck;
+    const unsigned char* dictionary;
+    unsigned char* bufferStart;   /* obsolete, used for slideInputBuffer */
+    unsigned int dictSize;
+} LZ4_stream_t_internal;
+
+typedef struct {
+    const unsigned char* externalDict;
+    size_t extDictSize;
+    const unsigned char* prefixEnd;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+
+#endif
 
 /*-************************************
 *  Simple Functions
@@ -229,7 +285,12 @@ LZ4LIB_API int LZ4_decompress_safe_partial (const char* source, char* dest, int 
  * note : only allocated directly the structure if you are statically linking LZ4
  *        If you are using liblz4 as a DLL, please use below construction methods instead.
  */
-typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
+typedef struct {
+  union {
+    long long table[LZ4_STREAMSIZE_U64];
+    LZ4_stream_t_internal internal_donotuse;
+  };
+} LZ4_stream_t;
 
 /*! LZ4_resetStream() :
  *  Use this function to init an allocated `LZ4_stream_t` structure
@@ -278,7 +339,12 @@ LZ4LIB_API int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dict
 
 #define LZ4_STREAMDECODESIZE_U64  4
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
-typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_streamDecode_t;
+typedef struct {
+  union {
+    unsigned long long table[LZ4_STREAMDECODESIZE_U64];
+    LZ4_streamDecode_t_internal internal_donotuse;
+  };
+} LZ4_streamDecode_t;
 /*!
  * LZ4_streamDecode_t
  * information structure to track an LZ4 stream.
