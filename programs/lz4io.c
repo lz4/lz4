@@ -258,7 +258,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
         SET_BINARY_MODE(stdin);
     } else {
         f = fopen(srcFileName, "rb");
-        if ( f==NULL ) DISPLAYLEVEL(1, "zstd: %s: %s \n", srcFileName, strerror(errno));
+        if ( f==NULL ) DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(errno));
     }
 
     return f;
@@ -285,10 +285,10 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName)
             if (f != NULL) {  /* dest exists, prompt for overwrite authorization */
                 fclose(f);
                 if (g_displayLevel <= 1) {  /* No interaction possible */
-                    DISPLAY("zstd: %s already exists; not overwritten  \n", dstFileName);
+                    DISPLAY("%s already exists; not overwritten  \n", dstFileName);
                     return NULL;
                 }
-                DISPLAY("zstd: %s already exists; do you wish to overwrite (y/N) ? ", dstFileName);
+                DISPLAY("%s already exists; do you wish to overwrite (y/N) ? ", dstFileName);
                 {   int ch = getchar();
                     if ((ch!='Y') && (ch!='y')) {
                         DISPLAY("    not overwritten  \n");
@@ -297,7 +297,7 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName)
                     while ((ch!=EOF) && (ch!='\n')) ch = getchar();  /* flush rest of input line */
         }   }   }
         f = fopen( dstFileName, "wb" );
-        if (f==NULL) DISPLAYLEVEL(1, "zstd: %s: %s\n", dstFileName, strerror(errno));
+        if (f==NULL) DISPLAYLEVEL(1, "%s: %s\n", dstFileName, strerror(errno));
     }
 
     /* sparse file */

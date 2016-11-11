@@ -10,7 +10,7 @@ The minimum required is **`lz4.c`** and **`lz4.h`**,
 which will provide the fast compression and decompression algorithm.
 
 
-#### The High Compression variant od LZ4
+#### The High Compression variant of LZ4
 
 For more compression at the cost of compression speed,
 the High Compression variant **lz4hc** is available.
