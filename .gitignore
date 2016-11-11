@@ -27,3 +27,4 @@ _codelite_lz4/
 
 # Mac
 .DS_Store
+*.dSYM

@@ -16,7 +16,7 @@ cli : fix : detects and reports fread() errors, thanks to Hiroshi Fujishima repo
 cli : bench : new : -r recursive mode
 lz4cat : can cat multiple files in a single command line (#184)
 Added : doc/lz4_manual.html, by Przemyslaw Skibinski
-Added : dictionary compression example, by Nick Terrell
+Added : dictionary compression and frame decompression examples, by Nick Terrell
 Added : Debianization, by Evgeniy Polyakov
 
 r131

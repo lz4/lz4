@@ -151,7 +151,8 @@ typedef struct {
 *  Simple compression function
 ***********************************/
 /*!LZ4F_compressFrameBound() :
- * Returns the maximum possible size of a frame given srcSize content and preferences.
+ * Returns the maximum possible size of a frame compressed with LZ4F_compressFrame() given srcSize content and preferences.
+ * Note : this result is only usable with LZ4F_compressFrame(), not with multi-segments compression.
  */
 LZ4FLIB_API size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
@@ -175,7 +176,7 @@ typedef struct LZ4F_cctx_s LZ4F_cctx;   /* incomplete type */
 typedef LZ4F_cctx* LZ4F_compressionContext_t;   /* for compatibility with previous API version */
 
 typedef struct {
-  unsigned stableSrc;    /* 1 == src content remain present on future calls to LZ4F_compress(); avoid saving src content within tmp buffer as future dictionary */
+  unsigned stableSrc;    /* 1 == src content will remain present on future calls to LZ4F_compress(); skip copying src content within tmp buffer */
   unsigned reserved[3];
 } LZ4F_compressOptions_t;
 
