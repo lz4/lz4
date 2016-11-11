@@ -1066,10 +1066,17 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
 }
 
 
+/*! LZ4_saveDict() :
+ *  If previously compressed data block is not guaranteed to remain available at its memory location,
+ *  save it into a safer place (char* safeBuffer).
+ *  Note : you don't need to call LZ4_loadDict() afterwards,
+ *         dictionary is immediately usable, you can therefore call LZ4_compress_fast_continue().
+ *  Return : saved dictionary size in bytes (necessarily <= dictSize), or 0 if error.
+ */
 int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 {
-    LZ4_stream_t_internal* dict = (LZ4_stream_t_internal*) LZ4_dict;
-    const BYTE* previousDictEnd = dict->dictionary + dict->dictSize;
+    LZ4_stream_t_internal* const dict = (LZ4_stream_t_internal*) LZ4_dict;
+    const BYTE* const previousDictEnd = dict->dictionary + dict->dictSize;
 
     if ((U32)dictSize > 64 KB) dictSize = 64 KB;   /* useless to define a dictionary > 64 KB */
     if ((U32)dictSize > dict->dictSize) dictSize = dict->dictSize;

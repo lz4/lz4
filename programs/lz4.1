@@ -141,11 +141,13 @@ Benchmark mode, using # compression level.
 .
 .SS "Operation modifiers"
 .TP
-.B \-1
- fast compression (default)
-.TP
-.B \-9
- high compression
+.B \-#
+ compression level, with # being any value from 1 to 16.
+ Higher values trade compression speed for compression ratio.
+ Values above 16 are considered the same as 16.
+ Recommended values are 1 for fast compression (default), and 9 for high compression.
+ Speed/compression trade-off will vary depending on data to compress.
+ Decompression speed remains fast at all settings.
 
 .TP
 .BR \-f ", " --[no-]force
@@ -180,7 +182,7 @@ for files that have not been compressed with
  By default, the second filename is used as the destination filename for the compressed file.
  With
 .B -m
-, you can specify any number of input filenames. Each of them will be compressed
+, it is possible to specify any number of input filenames. Each of them will be compressed
 independently, and the resulting name of each compressed file will be
 .B filename.lz4
 .

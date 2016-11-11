@@ -386,7 +386,7 @@ static int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSi
 /* frame functions */
 static int local_LZ4F_compressFrame(const char* in, char* out, int inSize)
 {
-    return (int)LZ4F_compressFrame(out, 2*inSize + 16, in, inSize, NULL);
+    return (int)LZ4F_compressFrame(out, LZ4F_compressFrameBound(inSize, NULL), in, inSize, NULL);
 }
 
 static LZ4F_decompressionContext_t g_dCtx;
@@ -532,9 +532,11 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                         chunkP[0].origSize = (int)benchedSize; nbChunks=1;
                         break;
             case 40: compressionFunction = local_LZ4_saveDict; compressorName = "LZ4_saveDict";
+                        if (chunkP[0].origSize < 8) { DISPLAY(" cannot bench %s with less then 8 bytes \n", compressorName); continue; }
                         LZ4_loadDict(&LZ4_stream, chunkP[0].origBuffer, chunkP[0].origSize);
                         break;
             case 41: compressionFunction = local_LZ4_saveDictHC; compressorName = "LZ4_saveDictHC";
+                        if (chunkP[0].origSize < 8) { DISPLAY(" cannot bench %s with less then 8 bytes \n", compressorName); continue; }
                         LZ4_loadDictHC(&LZ4_streamHC, chunkP[0].origBuffer, chunkP[0].origSize);
                         break;
             case 60: DISPLAY("Obsolete compression functions : \n"); continue;

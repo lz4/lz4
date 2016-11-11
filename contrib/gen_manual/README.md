@@ -1,5 +1,5 @@
-gen_manual - a program for automatic generation of zstd manual 
-============================================================
+gen_manual - a program for automatic generation of manual from source code
+==========================================================================
 
 #### Introduction
 
@@ -24,8 +24,8 @@ The program requires 3 parameters:
 gen_manual [lz4_version] [input_file] [output_html]
 ```
 
-To compile program and generate lz4 manual we have used: 
+To compile program and generate lz4 manual we have used:
 ```
 make
-./gen_manual.exe 1.7.3 ../../lib/lz4.h zstd_manual.html
+./gen_manual.exe 1.7.3 ../../lib/lz4.h lz4_manual.html
 ```
