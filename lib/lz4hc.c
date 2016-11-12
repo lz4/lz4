@@ -31,7 +31,7 @@
        - LZ4 source repository : https://github.com/lz4/lz4
        - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
-
+/* note : lz4hc is not an independent module, it requires lz4.h/lz4.c for proper compilation */
 
 
 /* *************************************
@@ -44,11 +44,13 @@
  * in stack (0:fastest), or in heap (1:requires malloc()).
  * Since workplace is rather large, heap mode is recommended.
  */
-#define LZ4HC_HEAPMODE 0
+#ifndef LZ4HC_HEAPMODE
+#  define LZ4HC_HEAPMODE 1
+#endif
 
 
 /* *************************************
-*  Includes
+*  Dependency
 ***************************************/
 #include "lz4hc.h"
 
@@ -139,7 +141,6 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* In
     const U32 dictLimit = hc4->dictLimit;
     const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
     U32 matchIndex;
-    const BYTE* match;
     int nbAttempts=maxNbAttempts;
     size_t ml=0;
 
@@ -150,7 +151,7 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* In
     while ((matchIndex>=lowLimit) && (nbAttempts)) {
         nbAttempts--;
         if (matchIndex >= dictLimit) {
-            match = base + matchIndex;
+            const BYTE* const match = base + matchIndex;
             if (*(match+ml) == *(ip+ml)
                 && (LZ4_read32(match) == LZ4_read32(ip)))
             {
@@ -158,7 +159,7 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* In
                 if (mlt > ml) { ml = mlt; *matchpos = match; }
             }
         } else {
-            match = dictBase + matchIndex;
+            const BYTE* const match = dictBase + matchIndex;
             if (LZ4_read32(match) == LZ4_read32(ip)) {
                 size_t mlt;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
@@ -489,7 +490,7 @@ _Search3:
 }
 
 
-int LZ4_sizeofStateHC(void) { return sizeof(LZ4HC_CCtx_internal); }
+int LZ4_sizeofStateHC(void) { return sizeof(LZ4_streamHC_t); }
 
 int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
@@ -504,14 +505,14 @@ int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int src
 
 int LZ4_compress_HC(const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
-#if LZ4HC_HEAPMODE==1
-    LZ4_streamHC_t* statePtr = malloc(sizeof(LZ4_streamHC_t));
+#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
+    LZ4_streamHC_t* const statePtr = malloc(sizeof(LZ4_streamHC_t));
 #else
     LZ4_streamHC_t state;
     LZ4_streamHC_t* const statePtr = &state;
 #endif
-    int cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, maxDstSize, compressionLevel);
-#if LZ4HC_HEAPMODE==1
+    int const cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, maxDstSize, compressionLevel);
+#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     free(statePtr);
 #endif
     return cSize;
@@ -628,8 +629,8 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
 /***********************************
 *  Deprecated Functions
 ***********************************/
+/* These functions currently generate deprecation warnings */
 /* Deprecated compression functions */
-/* These functions are planned to start generate warnings by r131 approximately */
 int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
 int LZ4_compressHC_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_HC(src, dst, srcSize, maxDstSize, 0); }
 int LZ4_compressHC2(const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
@@ -643,7 +644,6 @@ int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* ctx, const char* src,
 
 
 /* Deprecated streaming functions */
-/* These functions currently generate deprecation warnings */
 int LZ4_sizeofStreamStateHC(void) { return LZ4_STREAMHCSIZE; }
 
 int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
@@ -664,11 +664,7 @@ void* LZ4_createHC (char* inputBuffer)
     return hc4;
 }
 
-int LZ4_freeHC (void* LZ4HC_Data)
-{
-    FREEMEM(LZ4HC_Data);
-    return (0);
-}
+int LZ4_freeHC (void* LZ4HC_Data) { FREEMEM(LZ4HC_Data); return 0; }
 
 int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel)
 {
@@ -682,7 +678,7 @@ int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source
 
 char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 {
-    LZ4HC_CCtx_internal* hc4 = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
-    int dictSize = LZ4_saveDictHC((LZ4_streamHC_t*)LZ4HC_Data, (char*)(hc4->inputBuffer), 64 KB);
+    LZ4HC_CCtx_internal* const hc4 = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
+    int const dictSize = LZ4_saveDictHC((LZ4_streamHC_t*)LZ4HC_Data, (char*)(hc4->inputBuffer), 64 KB);
     return (char*)(hc4->inputBuffer + dictSize);
 }
