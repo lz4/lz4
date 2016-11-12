@@ -400,7 +400,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test compression using external state */
         FUZ_DISPLAYTEST;
-        ret = LZ4_compress_HC_extStateHC(stateLZ4, block, compressedBuffer, blockSize, compressedBufferSize, 9);
+        ret = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, compressedBufferSize, 9);
         FUZ_CHECKTEST(ret==0, "LZ4_compress_withState() failed");
 
         /* Test compression */
