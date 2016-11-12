@@ -74,12 +74,22 @@ set(LZ4_CLI_SOURCES
   "${LZ4_PROG_SOURCE_DIR}/lz4io.c"
   "${LZ4_PROG_SOURCE_DIR}/datagen.c")
 
+# Whether to use position independent code for the static library.  If
+# we're building a shared library this is ignored and PIC is always
+# used.
+option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static library (if applicable)" ON)
+if(LZ4_POSITION_INDEPENDENT_LIB OR BUILD_SHARED_LIBS)
+  set(LZ4_POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set(LZ4_POSITION_INDEPENDENT_CODE FALSE)
+endif()
+
 # liblz4
 add_library(lz4 ${LZ4_SOURCES})
 set_target_properties(lz4 PROPERTIES
   SOVERSION "${LZ4_VERSION_STRING}"
   VERSION "${LZ4_VERSION_STRING}"
-  POSITION_INDEPENDENT_CODE TRUE)
+  POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_CODE})
 
 # lz4
 add_executable(lz4cli ${LZ4_CLI_SOURCES})
