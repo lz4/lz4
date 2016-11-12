@@ -39,9 +39,7 @@
 extern "C" {
 #endif
 
-/*^***************************
-*  Includes
-*****************************/
+/* --- Dependency --- */
 #include <stddef.h>   /* size_t */
 
 
@@ -59,10 +57,12 @@ extern "C" {
     - unbounded multiple steps (described as Streaming compression)
 
   lz4.h provides block compression functions. It gives full buffer control to user.
-  Block compression functions are not-enough to send information,
-  since it's still necessary to provide metadata (such as compressed size),
-  and each application can do it in whichever way it wants.
-  For interoperability, there is LZ4 frame specification (doc/lz4_Frame_format.md).
+  Decompressing an lz4-compressed block also requires metadata (such as compressed size).
+  Each application is free to encode such metadata in whichever way it wants.
+
+  An additional format, called LZ4 frame specification (doc/lz4_Frame_format.md),
+  take care of encoding standard metadata alongside LZ4-compressed blocks.
+  If your application requires interoperability, it's recommended to use it.
   A library is provided to take care of it, see lz4frame.h.
 */
 
@@ -83,9 +83,6 @@ extern "C" {
 
 
 /*========== Version =========== */
-LZ4LIB_API int LZ4_versionNumber (void);
-LZ4LIB_API const char* LZ4_versionString (void);
-
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    7    /* for new (non-breaking) interface capabilities */
 #define LZ4_VERSION_RELEASE  2    /* for tweaks, bug-fixes, or development */
@@ -96,6 +93,9 @@ LZ4LIB_API const char* LZ4_versionString (void);
 #define LZ4_QUOTE(str) #str
 #define LZ4_EXPAND_AND_QUOTE(str) LZ4_QUOTE(str)
 #define LZ4_VERSION_STRING LZ4_EXPAND_AND_QUOTE(LZ4_LIB_VERSION)
+
+LZ4LIB_API int LZ4_versionNumber (void);
+LZ4LIB_API const char* LZ4_versionString (void);
 
 
 /*-************************************
@@ -346,7 +346,7 @@ typedef struct {
   };
 } LZ4_streamDecode_t;
 /*!
- * LZ4_streamDecode_t
+ * LZ4_streamDecode_t :
  * information structure to track an LZ4 stream.
  * init this structure content using LZ4_setStreamDecode or memset() before first use !
  *
@@ -400,12 +400,12 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* source, char* dest, in
 /*=************************************
 *  Obsolete Functions
 **************************************/
-/* Deprecate Warnings */
-/* Should these warnings messages be a problem,
+/* Deprecation warnings */
+/* Should these warnings be a problem,
    it is generally possible to disable them,
-   with -Wno-deprecated-declarations for gcc
-   or _CRT_SECURE_NO_WARNINGS in Visual for example.
-   Otherwise, you can also define LZ4_DISABLE_DEPRECATE_WARNINGS */
+   typically with -Wno-deprecated-declarations for gcc
+   or _CRT_SECURE_NO_WARNINGS in Visual.
+   Otherwise, it's also possible to define LZ4_DISABLE_DEPRECATE_WARNINGS */
 #define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DEPRECATED()   /* disable deprecation warnings */
