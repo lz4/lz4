@@ -217,9 +217,9 @@ struct LZ4_streamHC_s {
 #ifdef LZ4HC_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DEPRECATED(message)  /* disable deprecation warnings */
 #else
-#  if (defined(__GNU_C__) && (__GNU_C__ >= 4)) || defined(__clang__)
+#  if (defined(__GNUC__) && (__GNUC__ >= 4)) || defined(__clang__)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif (defined(__GNU_C__) && (__GNU_C__ >= 3))
+#  elif (defined(__GNUC__) && (__GNUC__ >= 3))
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
