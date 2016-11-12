@@ -66,7 +66,7 @@ default: bins
 
 m32: fullbench32 fuzzer32 frametest32
 
-bins: fullbench fuzzer frametest datagen
+bins: fullbench fuzzer frametest datagen fasttest
 
 all: bins m32
 

@@ -41,7 +41,9 @@
  * Select how default compression functions will allocate memory for their hash table,
  * in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
  */
-#define HEAPMODE 0
+#ifndef HEAPMODE
+#  define HEAPMODE 0
+#endif
 
 /*
  * ACCELERATION_DEFAULT :
@@ -109,8 +111,7 @@
 #  endif
 #endif  /* _MSC_VER */
 
-/* LZ4_GCC_VERSION is defined into lz4.h */
-#if (LZ4_GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
+#if (defined(__GNU_C__) && (__GNU_C__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
 #else
 #  define expect(expr,value)    (expr)

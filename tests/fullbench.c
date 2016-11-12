@@ -229,9 +229,14 @@ static int local_LZ4_saveDict(const char* in, char* out, int inSize)
     return LZ4_saveDict(&LZ4_stream, out, inSize);
 }
 
+static int local_LZ4_compress_default(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_default(in, out, inSize, LZ4_compressBound(inSize));
+}
+
 static int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_limitedOutput(in, out, inSize, LZ4_compressBound(inSize)-1);
+    return LZ4_compress_default(in, out, inSize, LZ4_compressBound(inSize)-1);
 }
 
 static int local_LZ4_compress_default_large(const char* in, char* out, int inSize)
@@ -276,22 +281,22 @@ static int local_LZ4_compress_fast_continue0(const char* in, char* out, int inSi
 
 static int local_LZ4_compress_withState(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_withState(&LZ4_stream, in, out, inSize);
+    return LZ4_compress_fast_extState(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize), 1);
 }
 
 static int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_limitedOutput_withState(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1);
+    return LZ4_compress_fast_extState(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1, 1);
 }
 
 static int local_LZ4_compress_continue(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_continue(&LZ4_stream, in, out, inSize);
+    return LZ4_compress_fast_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize), 1);
 }
 
 static int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
 {
-    return LZ4_compress_limitedOutput_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1);
+    return LZ4_compress_fast_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1, 1);
 }
 
 #ifndef LZ4_DLL_IMPORT
@@ -318,29 +323,34 @@ static int local_LZ4_saveDictHC(const char* in, char* out, int inSize)
     return LZ4_saveDictHC(&LZ4_streamHC, out, inSize);
 }
 
+static int local_LZ4_compress_HC(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_HC(in, out, inSize, LZ4_compressBound(inSize), 9);
+}
+
 static int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_withStateHC(&LZ4_streamHC, in, out, inSize);
+    return LZ4_compress_HC_extStateHC(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize), 9);
 }
 
 static int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_limitedOutput_withStateHC(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize)-1);
+    return LZ4_compress_HC_extStateHC(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize)-1, 9);
 }
 
 static int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_limitedOutput(in, out, inSize, LZ4_compressBound(inSize)-1);
+    return LZ4_compress_HC(in, out, inSize, LZ4_compressBound(inSize)-1, 9);
 }
 
 static int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_continue(&LZ4_streamHC, in, out, inSize);
+    return LZ4_compress_HC_continue(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize));
 }
 
 static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
 {
-    return LZ4_compressHC_limitedOutput_continue(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize)-1);
+    return LZ4_compress_HC_continue(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize)-1);
 }
 
 
@@ -519,7 +529,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 7 : compressionFunction = local_LZ4_compress_fast_extState0; compressorName = "LZ4_compress_fast_extState(0)"; break;
             case 8 : compressionFunction = local_LZ4_compress_fast_continue0; initFunction = local_LZ4_createStream; compressorName = "LZ4_compress_fast_continue(0)"; break;
 
-            case 10: compressionFunction = LZ4_compressHC; compressorName = "LZ4_compressHC"; break;
+            case 10: compressionFunction = local_LZ4_compress_HC; compressorName = "LZ4_compress_HC"; break;
             case 11: compressionFunction = local_LZ4_compressHC_limitedOutput; compressorName = "LZ4_compressHC_limitedOutput"; break;
             case 12 : compressionFunction = local_LZ4_compressHC_withStateHC; compressorName = "LZ4_compressHC_withStateHC"; break;
             case 13: compressionFunction = local_LZ4_compressHC_limitedOutput_withStateHC; compressorName = "LZ4_compressHC_limitedOutput_withStateHC"; break;
@@ -540,7 +550,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                         LZ4_loadDictHC(&LZ4_streamHC, chunkP[0].origBuffer, chunkP[0].origSize);
                         break;
             case 60: DISPLAY("Obsolete compression functions : \n"); continue;
-            case 61: compressionFunction = LZ4_compress; compressorName = "LZ4_compress"; break;
+            case 61: compressionFunction = local_LZ4_compress_default; compressorName = "LZ4_compress_default"; break;
             case 62: compressionFunction = local_LZ4_compress_limitedOutput; compressorName = "LZ4_compress_limitedOutput"; break;
             case 63: compressionFunction = local_LZ4_compress_withState; compressorName = "LZ4_compress_withState"; break;
             case 64: compressionFunction = local_LZ4_compress_limitedOutput_withState; compressorName = "LZ4_compress_limitedOutput_withState"; break;
@@ -602,7 +612,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
           }
         }
         for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
-            chunkP[chunkNb].compressedSize = LZ4_compress(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
+            chunkP[chunkNb].compressedSize = LZ4_compress_default(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize, maxCompressedChunkSize);
             if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress"), exit(1);
         }
 
