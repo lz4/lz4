@@ -64,6 +64,59 @@ extern "C" {
 #define LZ4HC_DEFAULT_CLEVEL    9
 #define LZ4HC_MAX_CLEVEL        16
 
+
+/*-************************************
+ *  Private definitions
+ **************************************
+ * Do not use these definitions.
+ * They are exposed to allow static allocation of `LZ4_streamHC_t`.
+ * If you use these definitions in your code, it will break when you upgrade LZ4 to a new version.
+**************************************/
+#define LZ4HC_DICTIONARY_LOGSIZE 16
+#define LZ4HC_MAXD (1<<LZ4HC_DICTIONARY_LOGSIZE)
+#define LZ4HC_MAXD_MASK (LZ4HC_MAXD - 1)
+
+#define LZ4HC_HASH_LOG (LZ4HC_DICTIONARY_LOGSIZE-1)
+#define LZ4HC_HASHTABLESIZE (1 << LZ4HC_HASH_LOG)
+#define LZ4HC_HASH_MASK (LZ4HC_HASHTABLESIZE - 1)
+
+
+#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#include <stdint.h>
+
+typedef struct
+{
+    uint32_t   hashTable[LZ4HC_HASHTABLESIZE];
+    uint16_t   chainTable[LZ4HC_MAXD];
+    const uint8_t* end;        /* next block here to continue on current prefix */
+    const uint8_t* base;       /* All index relative to this position */
+    const uint8_t* dictBase;   /* alternate base for extDict */
+    uint8_t* inputBuffer;      /* deprecated */
+    uint32_t   dictLimit;        /* below that point, need extDict */
+    uint32_t   lowLimit;         /* below that point, no more dict */
+    uint32_t   nextToUpdate;     /* index from which to continue dictionary update */
+    uint32_t   compressionLevel;
+} LZ4HC_Data_Structure;
+
+#else
+
+typedef struct
+{
+    unsigned int   hashTable[LZ4HC_HASHTABLESIZE];
+    unsigned short   chainTable[LZ4HC_MAXD];
+    const unsigned char* end;        /* next block here to continue on current prefix */
+    const unsigned char* base;       /* All index relative to this position */
+    const unsigned char* dictBase;   /* alternate base for extDict */
+    unsigned char* inputBuffer;      /* deprecated */
+    unsigned int   dictLimit;        /* below that point, need extDict */
+    unsigned int   lowLimit;         /* below that point, no more dict */
+    unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
+    unsigned int   compressionLevel;
+} LZ4HC_Data_Structure;
+
+#endif
+
+
 /*-************************************
 *  Block Compression
 **************************************/
@@ -108,7 +161,12 @@ LZ4HCLIB_API int LZ4_sizeofStateHC(void);
 **************************************/
 #define LZ4_STREAMHCSIZE        262192
 #define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
-typedef struct { size_t table[LZ4_STREAMHCSIZE_SIZET]; } LZ4_streamHC_t;
+typedef struct {
+  union {
+    size_t table[LZ4_STREAMHCSIZE_SIZET];
+    LZ4HC_Data_Structure internal_donotuse;
+  };
+} LZ4_streamHC_t;
 /*
   LZ4_streamHC_t
   This structure allows static allocation of LZ4 HC streaming state.
