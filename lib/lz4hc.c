@@ -506,7 +506,7 @@ int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int src
 int LZ4_compress_HC(const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    LZ4_streamHC_t* const statePtr = malloc(sizeof(LZ4_streamHC_t));
+    LZ4_streamHC_t* const statePtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
 #else
     LZ4_streamHC_t state;
     LZ4_streamHC_t* const statePtr = &state;
