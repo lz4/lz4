@@ -300,24 +300,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     }
 
     /* move to startCycle */
-    for (cycleNb = 0; cycleNb < startCycle; cycleNb++) {
-        U32 randState = FUZ_rand(&coreRandState) ^ PRIME3;
-
-        if (0) {   /* some problems can be related to dictionary re-use; in this case, enable this loop */
-            int const blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
-            int const blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
-            int const dictSizeRand = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
-            int const dictSize = MIN(dictSizeRand, blockStart);
-            char* const block = ((char*)CNBuffer) + blockStart;
-            const char* const dict = block - dictSize;
-            FUZ_displayUpdate(cycleNb);
-            LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
-            LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
-            LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
-    }   }
+    for (cycleNb = 0; cycleNb < startCycle; cycleNb++)
+        (void) FUZ_rand(&coreRandState);   /* sync coreRandState */
 
     /* Main test loop */
     for (cycleNb = startCycle;
