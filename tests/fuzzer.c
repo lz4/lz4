@@ -193,13 +193,13 @@ static int FUZ_AddressOverflow(void)
         buffers[nbBuff] = (char*)malloc(BLOCKSIZE_I134);
         if (buffers[nbBuff]==NULL) goto _endOfTests;
 
-        if (((size_t)buffers[nbBuff] > (size_t)0x80000000) && (!highAddress)) {
+        if (((uintptr_t)buffers[nbBuff] > (uintptr_t)0x80000000) && (!highAddress)) {
             DISPLAY("high address detected : ");
             fflush(stdout);
             highAddress=1;
         }
 
-        {   size_t const sizeToGenerateOverflow = (size_t)(- ((size_t)buffers[nbBuff-1]) + 512);
+        {   size_t const sizeToGenerateOverflow = (size_t)(- ((uintptr_t)buffers[nbBuff-1]) + 512);
             int const nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
             char* const input = buffers[nbBuff-1];
             char* output = buffers[nbBuff];
@@ -701,7 +701,6 @@ static void FUZ_unitTests(void)
     {   LZ4_stream_t* statePtr;
         LZ4_stream_t  streamingState;
         U64 crcOrig;
-        U64 crcNew;
         int result;
 
         /* Allocation test */
@@ -717,8 +716,8 @@ static void FUZ_unitTests(void)
 
         result = LZ4_decompress_safe(testCompressed, testVerify, result, testCompressedSize);
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
-        crcNew = XXH64(testVerify, testCompressedSize, 0);
-        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+        { U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+          FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption"); }
 
         /* ring buffer test */
         {   XXH64_state_t xxhOrig;
@@ -749,8 +748,8 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = XXH64_digest(&xxhNew);
-                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+                { U64 const crcNew = XXH64_digest(&xxhNew);
+                  FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption"); }
 
                 /* prepare next message */
                 iNext += messageSize;
@@ -767,7 +766,6 @@ static void FUZ_unitTests(void)
     {   LZ4_streamHC_t* sp;
         LZ4_streamHC_t  sHC;
         U64 crcOrig;
-        U64 crcNew;
         int result;
 
         /* Allocation test */
@@ -783,8 +781,8 @@ static void FUZ_unitTests(void)
 
         result = LZ4_decompress_safe(testCompressed, testVerify, result, testCompressedSize);
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
-        crcNew = XXH64(testVerify, testCompressedSize, 0);
-        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+        { U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+          FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption"); }
 
         /* simple dictionary HC compression test */
         crcOrig = XXH64(testInput + 64 KB, testCompressedSize, 0);
@@ -795,8 +793,8 @@ static void FUZ_unitTests(void)
 
         result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, testCompressedSize, testInput, 64 KB);
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() simple dictionary decompression test failed");
-        crcNew = XXH64(testVerify, testCompressedSize, 0);
-        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() simple dictionary decompression test : corruption");
+        { U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+          FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() simple dictionary decompression test : corruption"); }
 
         /* multiple HC compression test with dictionary */
         {   int result1, result2;
@@ -813,8 +811,8 @@ static void FUZ_unitTests(void)
             FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 1 failed");
             result = LZ4_decompress_safe_usingDict(testCompressed+result1, testVerify+segSize, result2, segSize, testInput, 2*segSize);
             FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 2 failed");
-            crcNew = XXH64(testVerify, testCompressedSize, 0);
-            FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
+            { U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+              FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption"); }
         }
 
         /* remote dictionary HC compression test */
@@ -826,8 +824,8 @@ static void FUZ_unitTests(void)
 
         result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, testCompressedSize, testInput, 32 KB);
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe_usingDict() decompression failed following remote dictionary HC compression test");
-        crcNew = XXH64(testVerify, testCompressedSize, 0);
-        FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() decompression corruption");
+        { U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+          FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() decompression corruption"); }
 
         /* multiple HC compression with ext. dictionary */
         {   XXH64_state_t crcOrigState;
@@ -855,13 +853,10 @@ static void FUZ_unitTests(void)
                 result = LZ4_decompress_safe_usingDict(testCompressed, dst, result, segSize, dict, dictSize);
                 FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe_usingDict() dictionary decompression part %i failed", segNb);
                 XXH64_update(&crcNewState, dst, segSize);
-                crcNew = XXH64_digest(&crcNewState);
-                if (crcOrig!=crcNew) {
-                    size_t c=0;
-                    while (dst[c] == testInput[segStart+c]) c++;
-                    DISPLAY("Bad decompression at %u / %u \n", (U32)c, (U32)segSize);
+                {   U64 const crcNew = XXH64_digest(&crcNewState);
+                    if (crcOrig != crcNew) FUZ_findDiff(dst, testInput+segStart);
+                    FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() part %i corruption", segNb);
                 }
-                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() part %i corruption", segNb);
 
                 dict = dst;
                 //dict = testInput + segStart;
@@ -904,8 +899,8 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = XXH64_digest(&xxhNew);
-                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+                { U64 const crcNew = XXH64_digest(&xxhNew);
+                  FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption"); }
 
                 /* prepare next message */
                 iNext += messageSize;
@@ -950,8 +945,8 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "64K D.ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = XXH64_digest(&xxhNew);
-                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+                { U64 const crcNew = XXH64_digest(&xxhNew);
+                  FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption"); }
 
                 /* prepare next message */
                 dNext += messageSize;
@@ -972,11 +967,10 @@ static void FUZ_unitTests(void)
                 FUZ_CHECKTEST(result!=(int)messageSize, "64K D.ringBuffer : LZ4_decompress_safe() test failed");
 
                 XXH64_update(&xxhNew, testVerify + dNext, messageSize);
-                crcNew = XXH64_digest(&xxhNew);
-                if (crcOrig != crcNew)
-                    FUZ_findDiff(testInput + iNext, testVerify + dNext);
-                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption during small decoder-side ring buffer test");
-
+                {   U64 const crcNew = XXH64_digest(&xxhNew);
+                    if (crcOrig != crcNew) FUZ_findDiff(testInput + iNext, testVerify + dNext);
+                    FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption during small decoder-side ring buffer test");
+                }
                 /* prepare next message */
                 dNext += messageSize;
                 totalMessageSize += messageSize;
