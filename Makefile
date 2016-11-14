@@ -135,16 +135,16 @@ cmake:
 	@cd contrib/cmake_unofficial; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
 
 gpptest: clean
-	$(MAKE) all CC=g++ CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) all CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
-	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror" 
+	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror"
 	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=c99 -Werror" 
+	$(MAKE) all MOREFLAGS="-std=c99 -Werror"
 	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror" 
+	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror"
 	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=c11 -Werror" 
+	$(MAKE) all MOREFLAGS="-std=c11 -Werror"
 	$(MAKE) clean
 
 endif

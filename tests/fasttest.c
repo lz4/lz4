@@ -36,8 +36,8 @@ int test_compress(const char *input, int inSize, char *output, int outSize)
         if (inSize > 1024) return -2;
         if (outSize - (outOffset + 8) < LZ4_compressBound(length)) return -3;
         {
-            const int outBytes = LZ4_compress_continue(
-                lz4Stream, input + inOffset, output + outOffset + 8, length);
+            const int outBytes = LZ4_compress_fast_continue(
+                lz4Stream, input + inOffset, output + outOffset + 8, length, outSize-outOffset, 1);
             if(outBytes <= 0) return -4;
             memcpy(output + outOffset, &length, 4); /* input length */
             memcpy(output + outOffset + 4, &outBytes, 4); /* output length */

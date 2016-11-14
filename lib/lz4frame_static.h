@@ -72,6 +72,8 @@ extern "C" {
 #endif
 typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to handle specific errors; compare function result to -enum value */
 
+LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
+
 
 #if defined (__cplusplus)
 }

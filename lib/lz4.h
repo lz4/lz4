@@ -39,6 +39,10 @@
 extern "C" {
 #endif
 
+/* --- Dependency --- */
+#include <stddef.h>   /* size_t */
+
+
 /**
   Introduction
 
@@ -53,10 +57,12 @@ extern "C" {
     - unbounded multiple steps (described as Streaming compression)
 
   lz4.h provides block compression functions. It gives full buffer control to user.
-  Block compression functions are not-enough to send information,
-  since it's still necessary to provide metadata (such as compressed size),
-  and each application can do it in whichever way it wants.
-  For interoperability, there is LZ4 frame specification (doc/lz4_Frame_format.md).
+  Decompressing an lz4-compressed block also requires metadata (such as compressed size).
+  Each application is free to encode such metadata in whichever way it wants.
+
+  An additional format, called LZ4 frame specification (doc/lz4_Frame_format.md),
+  take care of encoding standard metadata alongside LZ4-compressed blocks.
+  If your application requires interoperability, it's recommended to use it.
   A library is provided to take care of it, see lz4frame.h.
 */
 
@@ -77,9 +83,6 @@ extern "C" {
 
 
 /*========== Version =========== */
-LZ4LIB_API int LZ4_versionNumber (void);
-LZ4LIB_API const char* LZ4_versionString (void);
-
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    7    /* for new (non-breaking) interface capabilities */
 #define LZ4_VERSION_RELEASE  2    /* for tweaks, bug-fixes, or development */
@@ -90,6 +93,9 @@ LZ4LIB_API const char* LZ4_versionString (void);
 #define LZ4_QUOTE(str) #str
 #define LZ4_EXPAND_AND_QUOTE(str) LZ4_QUOTE(str)
 #define LZ4_VERSION_STRING LZ4_EXPAND_AND_QUOTE(LZ4_LIB_VERSION)
+
+LZ4LIB_API int LZ4_versionNumber (void);
+LZ4LIB_API const char* LZ4_versionString (void);
 
 
 /*-************************************
@@ -220,30 +226,20 @@ LZ4LIB_API int LZ4_decompress_safe_partial (const char* source, char* dest, int 
 /*-*********************************************
 *  Streaming Compression Functions
 ***********************************************/
-#define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
-#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(long long))
-/*!
- * LZ4_stream_t :
- * information structure to track an LZ4 stream.
- * important : init this structure content before first use !
- * note : only allocated directly the structure if you are statically linking LZ4
- *        If you are using liblz4 as a DLL, please use below construction methods instead.
- */
-typedef struct { long long table[LZ4_STREAMSIZE_U64]; } LZ4_stream_t;
-
-/*! LZ4_resetStream() :
- *  Use this function to init an allocated `LZ4_stream_t` structure
- */
-LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
+typedef struct LZ4_stream_s LZ4_stream_t;   /* incomplete type (defined later) */
 
 /*! LZ4_createStream() and LZ4_freeStream() :
  *  LZ4_createStream() will allocate and initialize an `LZ4_stream_t` structure.
  *  LZ4_freeStream() releases its memory.
- *  In the context of a DLL (liblz4), please use these methods rather than the static struct.
- *  They are more future proof, in case of a change of `LZ4_stream_t` size.
  */
 LZ4LIB_API LZ4_stream_t* LZ4_createStream(void);
 LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
+
+/*! LZ4_resetStream() :
+ *  An LZ4_stream_t structure can be allocated once and re-used multiple times.
+ *  Use this function to init an allocated `LZ4_stream_t` structure and start a new compression.
+ */
+LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
 
 /*! LZ4_loadDict() :
  *  Use this function to load a static dictionary into LZ4_stream.
@@ -274,21 +270,11 @@ LZ4LIB_API int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dict
 
 /*-**********************************************
 *  Streaming Decompression Functions
+*  Bufferless synchronous API
 ************************************************/
+typedef struct LZ4_streamDecode_s LZ4_streamDecode_t;   /* incomplete type (defined later) */
 
-#define LZ4_STREAMDECODESIZE_U64  4
-#define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
-typedef struct { unsigned long long table[LZ4_STREAMDECODESIZE_U64]; } LZ4_streamDecode_t;
-/*!
- * LZ4_streamDecode_t
- * information structure to track an LZ4 stream.
- * init this structure content using LZ4_setStreamDecode or memset() before first use !
- *
- * In the context of a DLL (liblz4) please prefer usage of construction methods below.
- * They are more future proof, in case of a change of LZ4_streamDecode_t size in the future.
- * LZ4_createStreamDecode will allocate and initialize an LZ4_streamDecode_t structure
- * LZ4_freeStreamDecode releases its memory.
- */
+/* creation / destruction of streaming decompression tracking structure */
 LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
@@ -300,7 +286,7 @@ LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_str
 LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
 
 /*!
-*_continue() :
+LZ4_decompress_*_continue() :
     These decoding functions allow decompression of multiple blocks in "streaming" mode.
     Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
     In the case of a ring buffers, decoding buffer must be either :
@@ -320,50 +306,135 @@ LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecod
 LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
 
 
-/*!
-*_usingDict() :
-Advanced decoding functions :
-    These decoding functions work the same as
-    a combination of LZ4_setStreamDecode() followed by LZ4_decompress_x_continue()
-    They are stand-alone. They don't need nor update an LZ4_streamDecode_t structure.
-*/
+/*! LZ4_decompress_*_usingDict() :
+ *  These decoding functions work the same as
+ *  a combination of LZ4_setStreamDecode() followed by LZ4_decompress_*_continue()
+ *  They are stand-alone, and don't need an LZ4_streamDecode_t structure.
+ */
 LZ4LIB_API int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxDecompressedSize, const char* dictStart, int dictSize);
 LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* source, char* dest, int originalSize, const char* dictStart, int dictSize);
+
+
+/*^**********************************************
+ * !!!!!!   STATIC LINKING ONLY   !!!!!!
+ ***********************************************/
+/*-************************************
+ *  Private definitions
+ **************************************
+ * Do not use these definitions.
+ * They are exposed to allow static allocation of `LZ4_stream_t` and `LZ4_streamDecode_t`.
+ * Using these definitions will expose code to API and/or ABI break in future versions of the library.
+ **************************************/
+#define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
+#define LZ4_HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
+#define LZ4_HASH_SIZE_U32 (1 << LZ4_HASHLOG)       /* required as macro for static allocation */
+
+#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#include <stdint.h>
+
+typedef struct {
+    uint32_t hashTable[LZ4_HASH_SIZE_U32];
+    uint32_t currentOffset;
+    uint32_t initCheck;
+    const uint8_t* dictionary;
+    uint8_t* bufferStart;   /* obsolete, used for slideInputBuffer */
+    uint32_t dictSize;
+} LZ4_stream_t_internal;
+
+typedef struct {
+    const uint8_t* externalDict;
+    size_t extDictSize;
+    const uint8_t* prefixEnd;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+
+#else
+
+typedef struct {
+    unsigned int hashTable[LZ4_HASH_SIZE_U32];
+    unsigned int currentOffset;
+    unsigned int initCheck;
+    const unsigned char* dictionary;
+    unsigned char* bufferStart;   /* obsolete, used for slideInputBuffer */
+    unsigned int dictSize;
+} LZ4_stream_t_internal;
+
+typedef struct {
+    const unsigned char* externalDict;
+    size_t extDictSize;
+    const unsigned char* prefixEnd;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+
+#endif
+
+/*!
+ * LZ4_stream_t :
+ * information structure to track an LZ4 stream.
+ * init this structure before first use.
+ * note : only use in association with static linking !
+ *        this definition is not API/ABI safe,
+ *        and may change in a future version !
+ */
+#define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
+#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))
+struct LZ4_stream_s {
+  union {
+    unsigned long long table[LZ4_STREAMSIZE_U64];
+    LZ4_stream_t_internal internal_donotuse;
+  };
+} ;  /* previously typedef'd to LZ4_stream_t */
+
+
+/*!
+ * LZ4_streamDecode_t :
+ * information structure to track an LZ4 stream during decompression.
+ * init this structure  using LZ4_setStreamDecode (or memset()) before first use
+ * note : only use in association with static linking !
+ *        this definition is not API/ABI safe,
+ *        and may change in a future version !
+ */
+#define LZ4_STREAMDECODESIZE_U64  4
+#define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
+struct LZ4_streamDecode_s {
+  union {
+    unsigned long long table[LZ4_STREAMDECODESIZE_U64];
+    LZ4_streamDecode_t_internal internal_donotuse;
+  };
+} ;   /* previously typedef'd to LZ4_streamDecode_t */
 
 
 /*=************************************
 *  Obsolete Functions
 **************************************/
-/* Deprecate Warnings */
-/* Should these warnings messages be a problem,
+/* Deprecation warnings */
+/* Should these warnings be a problem,
    it is generally possible to disable them,
-   with -Wno-deprecated-declarations for gcc
-   or _CRT_SECURE_NO_WARNINGS in Visual for example.
-   Otherwise, you can also define LZ4_DISABLE_DEPRECATE_WARNINGS */
-#define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
+   typically with -Wno-deprecated-declarations for gcc
+   or _CRT_SECURE_NO_WARNINGS in Visual.
+   Otherwise, it's also possible to define LZ4_DISABLE_DEPRECATE_WARNINGS */
 #ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
-#  define LZ4_DEPRECATED()   /* disable deprecation warnings */
+#  define LZ4_DEPRECATED(message)   /* disable deprecation warnings */
 #else
-#  if (LZ4_GCC_VERSION >= 405) || defined(__clang__)
+#  if (defined(__GNUC__) && (__GNUC__ >= 4)) || defined(__clang__)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif (LZ4_GCC_VERSION >= 301)
+#  elif defined(__GNUC__) && (__GNUC__ >= 3)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
 #  else
-#    pragma message("WARNING: You need to implement LZ4_DEPRECATED for this compiler")
+#    warning "WARNING: You need to implement LZ4_DEPRECATED for this compiler"
 #    define LZ4_DEPRECATED(message)
 #  endif
 #endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */
 
 /* Obsolete compression functions */
-/* These functions will generate warnings in a future release */
-LZ4LIB_API int LZ4_compress               (const char* source, char* dest, int sourceSize);
-LZ4LIB_API int LZ4_compress_limitedOutput (const char* source, char* dest, int sourceSize, int maxOutputSize);
-LZ4LIB_API int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
-LZ4LIB_API int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
-LZ4LIB_API int LZ4_compress_continue                (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
-LZ4LIB_API int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4_DEPRECATED("use LZ4_compress_default() instead") int LZ4_compress               (const char* source, char* dest, int sourceSize);
+LZ4_DEPRECATED("use LZ4_compress_default() instead") int LZ4_compress_limitedOutput (const char* source, char* dest, int sourceSize, int maxOutputSize);
+LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead") int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
+LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead") int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") int LZ4_compress_continue                (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
+LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /* Obsolete decompression functions */
 /* These function names are completely deprecated and must no longer be used.

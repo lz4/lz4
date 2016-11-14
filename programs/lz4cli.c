@@ -351,6 +351,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
                 if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
                 if (!strcmp(argument,  "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
+                if (!strcmp(argument,  "--help")) { usage_advanced(exeName); goto _cleanup; }
                 if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(0); continue; }   /* keep source file (default) */
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(1); continue; }
             }
