@@ -1168,6 +1168,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         offset = LZ4_readLE16(ip); ip+=2;
         match = op - offset;
         if ((checkOffset) && (unlikely(match < lowLimit))) goto _output_error;   /* Error : offset outside buffers */
+        LZ4_write32(op, offset);   /* costs ~1%; silence an msan warning when offset==0 */
 
         /* get matchlength */
         length = token & ML_MASK;
