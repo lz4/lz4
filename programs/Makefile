@@ -34,8 +34,10 @@ BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 
-CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
-CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wpointer-arith
+CFLAGS  ?= -O3   # allows custom optimization flags. For example : CFLAGS="-O2 -g" make
+CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
+		   -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
 CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
@@ -54,9 +56,9 @@ default: lz4
 
 m32: lz4c32
 
-bins: lz4 lz4c
+native: lz4 lz4c
 
-all: bins m32
+all: native m32
 
 lz4: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
 	$(CC) $(FLAGS) $^ -o $@$(EXT)

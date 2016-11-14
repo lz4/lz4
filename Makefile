@@ -91,12 +91,17 @@ travis-install:
 test:
 	$(MAKE) -C $(TESTDIR) test
 
-clangtest: CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion"
 clangtest: clean
 	clang -v
 	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all CC=clang
 	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  all CC=clang
 	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) all CC=clang
+
+clangtest-native: clean
+	clang -v
+	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all    CC=clang
+	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  native CC=clang
+	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) native CC=clang
 
 sanitize: clean
 	CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
@@ -108,8 +113,8 @@ platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
 	@$(CC) -v
 	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) bins
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) bins
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) native
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) native
 	$(MAKE) -C $(TESTDIR) test-platform
 
 versionsTest: clean
@@ -138,7 +143,16 @@ cmake:
 	@cd contrib/cmake_unofficial; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
 
 gpptest: clean
-	CC=g++ $(MAKE) all CFLAGS="-O3 -I../lib -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	g++ -v
+	CC=g++ $(MAKE) -C $(LZ4DIR)  all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(PRGDIR)  all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(TESTDIR) all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+
+gpptest-native: clean
+	g++ -v
+	CC=g++ $(MAKE) -C $(LZ4DIR)  all    CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(PRGDIR)  native CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
 	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror"

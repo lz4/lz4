@@ -42,7 +42,8 @@ TESTDIR := versionsTest
 PYTHON  ?= python3
 
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
-CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes
+CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum \
+           -Wdeclaration-after-statement -Wstrict-prototypes
 CFLAGS  += $(MOREFLAGS)
 CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
@@ -62,13 +63,13 @@ FUZZER_TIME  := -T3mn
 NB_LOOPS     ?= -i1
 
 
-default: bins
+default: native
 
 m32: fullbench32 fuzzer32 frametest32
 
-bins: fullbench fuzzer frametest datagen fasttest
+native: fullbench fuzzer frametest datagen fasttest
 
-all: bins m32
+all: native m32
 
 
 lz4:

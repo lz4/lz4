@@ -48,7 +48,7 @@ CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
 CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
-          -Wpointer-arith   # -Wstrict-aliasing=1
+          -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
@@ -85,7 +85,7 @@ endif
 
 liblz4: *.c
 	@echo compiling dynamic library $(LIBVER)
-ifneq (,$(filter Windows%,$(OS))) 
+ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@.dll
 	dlltool -D liblz4.dll -d liblz4.def -l liblz4.dll.a
 else
