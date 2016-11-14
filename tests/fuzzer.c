@@ -49,7 +49,7 @@
 /*-************************************
 *  Basic Types
 **************************************/
-#if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
+#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
 typedef  uint8_t BYTE;
 typedef uint16_t U16;
@@ -62,6 +62,7 @@ typedef unsigned short      U16;
 typedef unsigned int        U32;
 typedef   signed int        S32;
 typedef unsigned long long  U64;
+typedef size_t uintptr_t;   /* true on most systems, except OpenVMS-64 (which doesn't need address overflow test) */
 #endif
 
 
