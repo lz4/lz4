@@ -1,3 +1,15 @@
+# CMake support for LZ4
+#
+# To the extent possible under law, the author(s) have dedicated all
+# copyright and related and neighboring rights to this software to
+# the public domain worldwide. This software is distributed without
+# any warranty.
+#
+# For details, see <http://creativecommons.org/publicdomain/zero/1.0/>.
+#
+# LZ4's CMake support is maintained by Evan Nemerson; when filing
+# bugs please mention @nemequ to make sure I see it.
+
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 # Parse version information
@@ -74,12 +86,22 @@ set(LZ4_CLI_SOURCES
   "${LZ4_PROG_SOURCE_DIR}/lz4io.c"
   "${LZ4_PROG_SOURCE_DIR}/datagen.c")
 
+# Whether to use position independent code for the static library.  If
+# we're building a shared library this is ignored and PIC is always
+# used.
+option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static library (if applicable)" ON)
+if(LZ4_POSITION_INDEPENDENT_LIB OR BUILD_SHARED_LIBS)
+  set(LZ4_POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set(LZ4_POSITION_INDEPENDENT_CODE FALSE)
+endif()
+
 # liblz4
 add_library(lz4 ${LZ4_SOURCES})
 set_target_properties(lz4 PROPERTIES
   SOVERSION "${LZ4_VERSION_STRING}"
   VERSION "${LZ4_VERSION_STRING}"
-  POSITION_INDEPENDENT_CODE TRUE)
+  POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_CODE})
 
 # lz4
 add_executable(lz4cli ${LZ4_CLI_SOURCES})
