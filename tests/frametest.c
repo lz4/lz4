@@ -139,10 +139,10 @@ unsigned int FUZ_rand(unsigned int* src)
 
 #define FUZ_RAND15BITS  (FUZ_rand(seed) & 0x7FFF)
 #define FUZ_RANDLENGTH  ( (FUZ_rand(seed) & 3) ? (FUZ_rand(seed) % 15) : (FUZ_rand(seed) % 510) + 15)
-static void FUZ_fillCompressibleNoiseBuffer(void* buffer, unsigned bufferSize, double proba, U32* seed)
+static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, double proba, U32* seed)
 {
     BYTE* BBuffer = (BYTE*)buffer;
-    unsigned pos = 0;
+    size_t pos = 0;
     U32 P32 = (U32)(32768 * proba);
 
     /* First Byte */
@@ -152,20 +152,18 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, unsigned bufferSize, d
         /* Select : Literal (noise) or copy (within 64K) */
         if (FUZ_RAND15BITS < P32) {
             /* Copy (within 64K) */
-            unsigned match, end;
-            unsigned length = FUZ_RANDLENGTH + 4;
-            unsigned offset = FUZ_RAND15BITS + 1;
-            if (offset > pos) offset = pos;
-            if (pos + length > bufferSize) length = bufferSize - pos;
-            match = pos - offset;
-            end = pos + length;
+            size_t const lengthRand = FUZ_RANDLENGTH + 4;
+            size_t const length = MIN(lengthRand, bufferSize - pos);
+            size_t const end = pos + length;
+            size_t const offsetRand = FUZ_RAND15BITS + 1;
+            size_t const offset = MIN(offsetRand, pos);
+            size_t match = pos - offset;
             while (pos < end) BBuffer[pos++] = BBuffer[match++];
         } else {
             /* Literal (noise) */
-            unsigned end;
-            unsigned length = FUZ_RANDLENGTH;
-            if (pos + length > bufferSize) length = bufferSize - pos;
-            end = pos + length;
+            size_t const lengthRand = FUZ_RANDLENGTH + 4;
+            size_t const length = MIN(lengthRand, bufferSize - pos);
+            size_t const end = pos + length;
             while (pos < end) BBuffer[pos++] = (BYTE)(FUZ_rand(seed) >> 5);
         }
     }
@@ -606,7 +604,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     /* main fuzzer test loop */
     for ( ; (testNb < nbTests) || (clockDuration > FUZ_GetClockSpan(startClock)) ; testNb++) {
         U32 randState = coreRand ^ prime1;
-        unsigned const srcBits = (FUZ_rand(&randState) % (FUZ_highbit(srcDataLength-1) - 1)) + 1;
+        unsigned const srcBits = (FUZ_rand(&randState) % (FUZ_highbit((U32)(srcDataLength-1)) - 1)) + 1;
         size_t const srcSize = (FUZ_rand(&randState) & ((1<<srcBits)-1)) + 1;
         size_t const srcStartId = FUZ_rand(&randState) % (srcDataLength - srcSize);
         const BYTE* const srcStart = (const BYTE*)srcBuffer + srcStartId;

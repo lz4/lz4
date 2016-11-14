@@ -1,7 +1,7 @@
 /*
-   LZ4 - Fast LZ compression algorithm
-   Header File
-   Copyright (C) 2011-2016, Yann Collet.
+ *  LZ4 - Fast LZ compression algorithm
+ *  Header File
+ *  Copyright (C) 2011-2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -423,7 +423,7 @@ struct LZ4_streamDecode_s {
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
 #  else
-#    warning "WARNING: You need to implement LZ4_DEPRECATED for this compiler"
+#    pragma message("WARNING: You need to implement LZ4_DEPRECATED for this compiler")
 #    define LZ4_DEPRECATED(message)
 #  endif
 #endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */
