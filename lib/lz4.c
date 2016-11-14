@@ -159,7 +159,7 @@ static unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
 
 static unsigned LZ4_isLittleEndian(void)
 {
-    const union { U32 i; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
+    const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
     return one.c[0];
 }
 
@@ -1113,7 +1113,7 @@ FORCE_INLINE int LZ4_decompress_generic(
     const BYTE* const lowLimit = lowPrefix - dictSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const unsigned dec32table[] = {4, 1, 2, 1, 4, 4, 4, 4};
+    const unsigned dec32table[] = {0, 1, 2, 1, 4, 4, 4, 4};
     const int dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
