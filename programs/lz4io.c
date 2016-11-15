@@ -134,9 +134,6 @@ static int g_blockIndependence = 1;
 static int g_sparseFileSupport = 1;
 static int g_contentSizeFlag = 0;
 
-static const int minBlockSizeID = 4;
-static const int maxBlockSizeID = 7;
-
 
 /**************************************
 *  Exceptions
@@ -186,6 +183,8 @@ int LZ4IO_setTestMode(int yes)
 size_t LZ4IO_setBlockSizeID(unsigned bsid)
 {
     static const size_t blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
+    static const unsigned minBlockSizeID = 4;
+    static const unsigned maxBlockSizeID = 7;
     if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return 0;
     g_blockSizeId = bsid;
     return blockSizeTable[g_blockSizeId-minBlockSizeID];
