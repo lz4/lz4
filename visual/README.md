@@ -31,14 +31,23 @@ following projects:
 - `frametest` : Test tool that checks lz4frame integrity on target platform
 - `fullbench`  : Precisely measure speed for each lz4 inner functions
 - `fuzzer` : Test tool, to check lz4 integrity on target platform 
-- `liblz4` : A static LZ4 library compiled to `liblz4_x86.lib` or `liblz4_x64.lib`
-- `liblz4-dll` : A dynamic LZ4 library (DLL) compiled to `lz4_x86.dll` or `lz4_x64.dll` with the import library `lz4_x86.lib` or `lz4_x64.lib`
+- `liblz4` : A static LZ4 library compiled to `liblz4_static.lib`
+- `liblz4-dll` : A dynamic LZ4 library (DLL) compiled to `liblz4.dll` with the import library `liblz4.lib`
 - `fullbench-dll` : The fullbench program compiled with the import library; the executable requires LZ4 DLL
 
 
 #### Using LZ4 DLL with Microsoft Visual C++ project
 
-1. Copy `lz4.h` into a directory found in the INCLUDE path list.
-2. Copy the import library `lz4_x86.lib` or `lz4_x64.lib` into a directory found in the LIB path list.
-3. Add `lz4_x86.lib` or `lz4_x64.lib` to your project.
-4. Compile the project. The compiled executable requires `lz4_x86.dll` or `lz4_x64.dll`.
+The header files `lib\lz4.h`, `lib\lz4hc.h`, `lib\lz4frame.h` and the import library
+`visual\VS2010\bin\$(Platform)_$(Configuration)\liblz4.lib` are required to compile a
+project using Visual C++.
+
+1. The path to header files should be added to `Additional Include Directories` that can
+   be found in project properties `C/C++` then `General`.
+2. The import library has to be added to `Additional Dependencies` that can
+   be found in project properties `Linker` then `Input`.
+   If one will provide only the name `liblz4.lib` without a full path to the library
+   the directory has to be added to `Linker\General\Additional Library Directories`.
+
+The compiled executable will require LZ4 DLL which is available at
+`visual\VS2010\bin\$(Platform)_$(Configuration)\liblz4.dll`.
