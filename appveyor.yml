@@ -54,7 +54,7 @@ build_script:
         make -C lib lib CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
       )
     )
-  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
+  - if [%COMPILER%]==[gcc] if not [%PLATFORM%]==[clang] (
       MKDIR bin\dll bin\static bin\fullbench bin\include &&
       COPY tests\fullbench.c bin\fullbench\ &&
       COPY lib\xxhash.c bin\fullbench\ &&
@@ -66,13 +66,17 @@ build_script:
       COPY lib\dll\fullbench-dll\Makefile bin\ &&
       COPY lib\dll\fullbench-dll\fullbench-dll.* bin\fullbench\ &&
       COPY lib\dll\README.md bin\ &&
-      COPY lib\liblz4.a bin\static\liblz4_static.lib &&
-      7z.exe a bin\liblz4-dll_x64.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
-      appveyor PushArtifact bin\liblz4-dll_x64.zip &&
+      COPY lib\liblz4.a bin\static\liblz4_static.lib
+    )
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
+      7z.exe a bin\liblz4_x64.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      appveyor PushArtifact bin\liblz4_x64.zip &&
       COPY programs\lz4.exe bin\lz4.exe &&
       appveyor PushArtifact bin\lz4.exe
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
+      7z.exe a bin\liblz4_x86.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      appveyor PushArtifact bin\liblz4_x86.zip &&
       COPY programs\lz4.exe bin\lz4_32.exe &&
       appveyor PushArtifact bin\lz4_32.exe
     )
@@ -101,7 +105,7 @@ test_script:
   - ECHO *** &&
       ECHO Testing %COMPILER% %PLATFORM% %CONFIGURATION% &&
       ECHO ***
-  - if [%COMPILER%]==[unknown] (
+  - if not [%COMPILER%]==[unknown] (
       CD programs &&
       lz4 -h &&
       lz4 -i1b lz4.exe && 
@@ -115,7 +119,7 @@ test_script:
 artifacts:
   - path: bin\lz4.exe
   - path: bin\lz4_32.exe
-  - path: bin\liblz4-dll_x64.zip
+  - path: bin\liblz4_x64.zip
 
 deploy:
 - provider: GitHub
@@ -127,6 +131,7 @@ deploy:
     COMPILER: gcc
     PLATFORM: "mingw64"
     appveyor_repo_tag: true
+
 - provider: GitHub
   auth_token:
     secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
@@ -136,12 +141,23 @@ deploy:
     COMPILER: gcc
     PLATFORM: "mingw32"
     appveyor_repo_tag: true
+
 - provider: GitHub
   auth_token:
     secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
-  artifact: bin\liblz4-dll_x64.zip
+  artifact: bin\liblz4_x64.zip
   force_update: true
   on:
     COMPILER: gcc
     PLATFORM: "mingw64"
+    appveyor_repo_tag: true
+
+- provider: GitHub
+  auth_token:
+    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+  artifact: bin\liblz4_x86.zip
+  force_update: true
+  on:
+    COMPILER: gcc
+    PLATFORM: "mingw32"
     appveyor_repo_tag: true

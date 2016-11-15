@@ -1,7 +1,7 @@
 The static and dynamic LZ4 libraries
 ====================================
 
-#### The package content
+#### The package contents
 
 - `dll\liblz4.dll` : The DLL of LZ4 library
 - `dll\liblz4.lib` : The import library of LZ4 library
