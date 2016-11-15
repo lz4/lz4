@@ -1,0 +1,25 @@
+language: c
+compiler: gcc
+script: make all
+before_install:
+  - sudo apt-get update  -qq
+  - sudo apt-get install -qq gcc-multilib
+
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "dTX2Mzka5xLZa0Dy46j+adFGV2e9IXyZtU2+HXlO3a/i1PA3Y4Kt6NSFgCfB3i7jdy+arxyqPOXVH72sHsHiaiMNYFL2d3mQ6XYjOQ4KIE/WW/hZijHtrV9OYJZoJZTuOSRTv+dMuypWJ9XXVxTy4xnUIGQxLa/Fw0LNtjTIt2w="
+
+addons:
+  coverity_scan:
+    project:
+      name: "Cyan4973/lz4"
+      description: "Build submitted via Travis CI"
+    notification_email: yann.collet.73@gmail.com
+    build_command_prepend: "make clean"
+    build_command:   "make all"
+    branch_pattern: coverity_scan
+
+matrix:
+  fast_finish: true
