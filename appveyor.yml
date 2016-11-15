@@ -34,9 +34,9 @@ install:
     )
 
 build_script:
-  - if [%PLATFORM%]==[mingw32] SET PATH=%PATH_MINGW32%;%PATH_ORIGINAL% 
-  - if [%PLATFORM%]==[mingw64] SET PATH=%PATH_MINGW64%;%PATH_ORIGINAL% 
-  - if [%PLATFORM%]==[clang] SET PATH=%PATH_MINGW64%;%PATH_ORIGINAL% 
+  - if [%PLATFORM%]==[mingw32] SET PATH=%PATH_MINGW32%;%PATH_ORIGINAL%
+  - if [%PLATFORM%]==[mingw64] SET PATH=%PATH_MINGW64%;%PATH_ORIGINAL%
+  - if [%PLATFORM%]==[clang] SET PATH=%PATH_MINGW64%;%PATH_ORIGINAL%
   - ECHO *** &&
       ECHO Building %COMPILER% %PLATFORM% %CONFIGURATION% &&
       ECHO ***
@@ -108,11 +108,11 @@ test_script:
   - if not [%COMPILER%]==[unknown] (
       CD programs &&
       lz4 -h &&
-      lz4 -i1b lz4.exe && 
+      lz4 -i1b lz4.exe &&
       lz4 -i1b5 lz4.exe &&
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
-      echo ------- lz4 tested ------- && 
+      echo ------- lz4 tested ------- &&
       fullbench.exe -i1 fullbench.exe
     )
 
@@ -125,7 +125,7 @@ artifacts:
 deploy:
 - provider: GitHub
   auth_token:
-    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
   artifact: bin\lz4.exe
   force_update: true
   on:
@@ -135,7 +135,7 @@ deploy:
 
 - provider: GitHub
   auth_token:
-    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
   artifact: bin\lz4_32.exe
   force_update: true
   on:
@@ -145,7 +145,7 @@ deploy:
 
 - provider: GitHub
   auth_token:
-    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
   artifact: bin\liblz4_x64.zip
   force_update: true
   on:
@@ -155,7 +155,7 @@ deploy:
 
 - provider: GitHub
   auth_token:
-    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
   artifact: bin\liblz4_x86.zip
   force_update: true
   on:
