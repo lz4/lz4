@@ -22,7 +22,7 @@ environment:
 
 install:
   - ECHO Installing %COMPILER% %PLATFORM% %CONFIGURATION%
-  - MKDIR bin bin\x86 bin\x64
+  - MKDIR bin
   - if [%COMPILER%]==[gcc] SET PATH_ORIGINAL=%PATH%
   - if [%COMPILER%]==[gcc] (
       SET "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin" &&
@@ -55,8 +55,19 @@ build_script:
       )
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
-      COPY lib\liblz4.* bin\x64\ &&
-      7z a bin\liblz4-dll_x64.zip bin\x64\* && 
+      MKDIR bin\dll bin\static bin\fullbench bin\include &&
+      COPY tests\fullbench.c bin\fullbench\ &&
+      COPY lib\xxhash.c bin\fullbench\ &&
+      COPY lib\xxhash.h bin\fullbench\ &&
+      COPY lib\lz4.h bin\include\ &&
+      COPY lib\lz4hc.h bin\include\ &&
+      COPY lib\lz4frame.h bin\include\ &&
+      COPY lib\dll\liblz4.* bin\dll\ &&
+      COPY lib\dll\fullbench-dll\Makefile bin\ &&
+      COPY lib\dll\fullbench-dll\fullbench-dll.* bin\fullbench\ &&
+      COPY lib\dll\README.md bin\ &&
+      COPY lib\liblz4.a bin\static\liblz4_static.lib &&
+      7z.exe a bin\liblz4-dll_x64.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
       appveyor PushArtifact bin\liblz4-dll_x64.zip &&
       COPY programs\lz4.exe bin\lz4.exe &&
       appveyor PushArtifact bin\lz4.exe
