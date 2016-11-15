@@ -83,7 +83,7 @@ LZ4LIB_API int LZ4_sizeofStateHC(void);
  *  Streaming Compression
  *  Bufferless synchronous API
  **************************************/
- typedef struct LZ4_streamHC_s LZ4_streamHC_t;   /* incomplete type (defined later) */
+ typedef union LZ4_streamHC_u LZ4_streamHC_t;   /* incomplete type (defined later) */
 
 /*! LZ4_createStreamHC() and LZ4_freeStreamHC() :
  * These functions create and release memory for LZ4 HC streaming state.
@@ -176,11 +176,9 @@ typedef struct
 
 #define LZ4_STREAMHCSIZE        262192
 #define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
-struct LZ4_streamHC_s {
-  union {
+union LZ4_streamHC_u {
     size_t table[LZ4_STREAMHCSIZE_SIZET];
     LZ4HC_CCtx_internal internal_donotuse;
-  };
 };   /* previously typedef'd to LZ4_streamHC_t */
 /*
   LZ4_streamHC_t :

@@ -300,24 +300,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     }
 
     /* move to startCycle */
-    for (cycleNb = 0; cycleNb < startCycle; cycleNb++) {
-        U32 randState = FUZ_rand(&coreRandState) ^ PRIME3;
-
-        if (0) {   /* some problems can be related to dictionary re-use; in this case, enable this loop */
-            int const blockSize  = FUZ_rand(&randState) % FUZ_MAX_BLOCK_SIZE;
-            int const blockStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - blockSize);
-            int const dictSizeRand = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
-            int const dictSize = MIN(dictSizeRand, blockStart);
-            char* const block = ((char*)CNBuffer) + blockStart;
-            const char* const dict = block - dictSize;
-            FUZ_displayUpdate(cycleNb);
-            LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
-            LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
-            LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
-    }   }
+    for (cycleNb = 0; cycleNb < startCycle; cycleNb++)
+        (void) FUZ_rand(&coreRandState);   /* sync coreRandState */
 
     /* Main test loop */
     for (cycleNb = startCycle;
@@ -375,23 +359,23 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test compression HC */
         FUZ_DISPLAYTEST;
-        ret = LZ4_compress_HC(block, compressedBuffer, blockSize, compressedBufferSize, 9);
+        ret = LZ4_compress_HC(block, compressedBuffer, blockSize, (int)compressedBufferSize, 9);
         FUZ_CHECKTEST(ret==0, "LZ4_compressHC() failed");
         HCcompressedSize = ret;
 
         /* Test compression HC using external state */
         FUZ_DISPLAYTEST;
-        ret = LZ4_compress_HC_extStateHC(stateLZ4HC, block, compressedBuffer, blockSize, compressedBufferSize, 9);
+        ret = LZ4_compress_HC_extStateHC(stateLZ4HC, block, compressedBuffer, blockSize, (int)compressedBufferSize, 9);
         FUZ_CHECKTEST(ret==0, "LZ4_compressHC_withStateHC() failed");
 
         /* Test compression using external state */
         FUZ_DISPLAYTEST;
-        ret = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, compressedBufferSize, 9);
+        ret = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, (int)compressedBufferSize, 9);
         FUZ_CHECKTEST(ret==0, "LZ4_compress_withState() failed");
 
         /* Test compression */
         FUZ_DISPLAYTEST;
-        ret = LZ4_compress_default(block, compressedBuffer, blockSize, compressedBufferSize);
+        ret = LZ4_compress_default(block, compressedBuffer, blockSize, (int)compressedBufferSize);
         FUZ_CHECKTEST(ret==0, "LZ4_compress() failed");
         compressedSize = ret;
 
@@ -531,8 +515,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST;
         {   LZ4_stream_t LZ4_stream;
             LZ4_resetStream(&LZ4_stream);
-            LZ4_compress_fast_continue (&LZ4_stream, dict, compressedBuffer, dictSize, compressedBufferSize, 1);   /* Just to fill hash tables */
-            blockContinueCompressedSize = LZ4_compress_fast_continue (&LZ4_stream, block, compressedBuffer, blockSize, compressedBufferSize, 1);
+            LZ4_compress_fast_continue (&LZ4_stream, dict, compressedBuffer, dictSize, (int)compressedBufferSize, 1);   /* Just to fill hash tables */
+            blockContinueCompressedSize = LZ4_compress_fast_continue (&LZ4_stream, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
         }
 
@@ -561,7 +545,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         dict -= (FUZ_rand(&randState) & 0xF) + 1;   /* Separation, so it is an ExtDict */
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_loadDict(&LZ4dict, dict, dictSize);
-        blockContinueCompressedSize = LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, compressedBufferSize, 1);
+        blockContinueCompressedSize = LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_continue failed");
 
         FUZ_DISPLAYTEST;
@@ -620,7 +604,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_resetStreamHC (&LZ4dictHC, FUZ_rand(&randState) & 0x7);
         LZ4_loadDictHC(&LZ4dictHC, dict, dictSize);
-        blockContinueCompressedSize = LZ4_compress_HC_continue(&LZ4dictHC, block, compressedBuffer, blockSize, compressedBufferSize);
+        blockContinueCompressedSize = LZ4_compress_HC_continue(&LZ4dictHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compressHC_continue failed");
 
         FUZ_DISPLAYTEST;

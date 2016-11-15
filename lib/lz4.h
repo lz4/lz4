@@ -1,7 +1,7 @@
 /*
-   LZ4 - Fast LZ compression algorithm
-   Header File
-   Copyright (C) 2011-2016, Yann Collet.
+ *  LZ4 - Fast LZ compression algorithm
+ *  Header File
+ *  Copyright (C) 2011-2016, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -226,7 +226,7 @@ LZ4LIB_API int LZ4_decompress_safe_partial (const char* source, char* dest, int 
 /*-*********************************************
 *  Streaming Compression Functions
 ***********************************************/
-typedef struct LZ4_stream_s LZ4_stream_t;   /* incomplete type (defined later) */
+typedef union LZ4_stream_u LZ4_stream_t;   /* incomplete type (defined later) */
 
 /*! LZ4_createStream() and LZ4_freeStream() :
  *  LZ4_createStream() will allocate and initialize an `LZ4_stream_t` structure.
@@ -272,7 +272,7 @@ LZ4LIB_API int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dict
 *  Streaming Decompression Functions
 *  Bufferless synchronous API
 ************************************************/
-typedef struct LZ4_streamDecode_s LZ4_streamDecode_t;   /* incomplete type (defined later) */
+typedef union LZ4_streamDecode_u LZ4_streamDecode_t;   /* incomplete type (defined later) */
 
 /* creation / destruction of streaming decompression tracking structure */
 LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
@@ -378,11 +378,9 @@ typedef struct {
  */
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
 #define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))
-struct LZ4_stream_s {
-  union {
+union LZ4_stream_u {
     unsigned long long table[LZ4_STREAMSIZE_U64];
     LZ4_stream_t_internal internal_donotuse;
-  };
 } ;  /* previously typedef'd to LZ4_stream_t */
 
 
@@ -396,11 +394,9 @@ struct LZ4_stream_s {
  */
 #define LZ4_STREAMDECODESIZE_U64  4
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
-struct LZ4_streamDecode_s {
-  union {
+union LZ4_streamDecode_u {
     unsigned long long table[LZ4_STREAMDECODESIZE_U64];
     LZ4_streamDecode_t_internal internal_donotuse;
-  };
 } ;   /* previously typedef'd to LZ4_streamDecode_t */
 
 
@@ -423,7 +419,7 @@ struct LZ4_streamDecode_s {
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
 #  else
-#    warning "WARNING: You need to implement LZ4_DEPRECATED for this compiler"
+#    pragma message("WARNING: You need to implement LZ4_DEPRECATED for this compiler")
 #    define LZ4_DEPRECATED(message)
 #  endif
 #endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */

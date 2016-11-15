@@ -159,7 +159,7 @@ static unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
 
 static unsigned LZ4_isLittleEndian(void)
 {
-    const union { U32 i; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
+    const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
     return one.c[0];
 }
 
@@ -1113,7 +1113,7 @@ FORCE_INLINE int LZ4_decompress_generic(
     const BYTE* const lowLimit = lowPrefix - dictSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const unsigned dec32table[] = {4, 1, 2, 1, 4, 4, 4, 4};
+    const unsigned dec32table[] = {0, 1, 2, 1, 4, 4, 4, 4};
     const int dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
@@ -1127,13 +1127,12 @@ FORCE_INLINE int LZ4_decompress_generic(
 
     /* Main Loop : decode sequences */
     while (1) {
-        unsigned token;
         size_t length;
         const BYTE* match;
         size_t offset;
 
         /* get literal length */
-        token = *ip++;
+        unsigned const token = *ip++;
         if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
             do {
@@ -1168,6 +1167,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         offset = LZ4_readLE16(ip); ip+=2;
         match = op - offset;
         if ((checkOffset) && (unlikely(match < lowLimit))) goto _output_error;   /* Error : offset outside buffers */
+        LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */
 
         /* get matchlength */
         length = token & ML_MASK;
