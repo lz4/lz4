@@ -120,6 +120,7 @@ artifacts:
   - path: bin\lz4.exe
   - path: bin\lz4_32.exe
   - path: bin\liblz4_x64.zip
+  - path: bin\liblz4_x86.zip
 
 deploy:
 - provider: GitHub
