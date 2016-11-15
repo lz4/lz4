@@ -288,7 +288,7 @@ int main(int argc, const char** argv)
     const char* input_filename = NULL;
     const char* output_filename= NULL;
     char* dynNameSpace = NULL;
-    const char** inFileNames = (const char**) calloc(argc, sizeof(char*));;
+    const char** inFileNames = (const char**) calloc(argc, sizeof(char*));
     unsigned ifnIdx=0;
     const char nullOutput[] = NULL_OUTPUT;
     const char extension[] = LZ4_EXTENSION;
