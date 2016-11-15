@@ -23,6 +23,7 @@ lz4
 .clang_complete
 _codelite/
 _codelite_lz4/
+bin/
 *.zip
 
 # Mac
