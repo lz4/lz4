@@ -207,7 +207,8 @@ hence for a file. It won't work with unknown source size, such as stdin or pipe.
  sparse mode support (default:enabled on file, disabled on stdout)
 .TP
 .B \-l
- use Legacy format (useful for Linux Kernel compression)
+ use Legacy format (typically used for Linux Kernel compression)
+ note : \fB-l\fR is not compatible with \fB-m\fR (\fB--multiple\fR)
 .
 .SS "Other options"
 .TP
