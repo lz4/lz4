@@ -22,6 +22,7 @@ environment:
 
 install:
   - ECHO Installing %COMPILER% %PLATFORM% %CONFIGURATION%
+  - MKDIR bin
   - if [%COMPILER%]==[gcc] SET PATH_ORIGINAL=%PATH%
   - if [%COMPILER%]==[gcc] (
       SET "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin" &&
@@ -46,11 +47,38 @@ build_script:
       make -v &&
       echo ----- &&
       if not [%PLATFORM%]==[clang] (
-        make -C programs lz4 && make -C tests fullbench
+        make -C programs lz4 && make -C tests fullbench && make -C lib lib
       ) ELSE (
         make -C programs lz4 CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
-        make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
+        make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+        make -C lib lib CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
       )
+    )
+  - if [%COMPILER%]==[gcc] if not [%PLATFORM%]==[clang] (
+      MKDIR bin\dll bin\static bin\fullbench bin\include &&
+      COPY tests\fullbench.c bin\fullbench\ &&
+      COPY lib\xxhash.c bin\fullbench\ &&
+      COPY lib\xxhash.h bin\fullbench\ &&
+      COPY lib\lz4.h bin\include\ &&
+      COPY lib\lz4hc.h bin\include\ &&
+      COPY lib\lz4frame.h bin\include\ &&
+      COPY lib\dll\liblz4.* bin\dll\ &&
+      COPY lib\dll\fullbench-dll\Makefile bin\ &&
+      COPY lib\dll\fullbench-dll\fullbench-dll.* bin\fullbench\ &&
+      COPY lib\dll\README.md bin\ &&
+      COPY lib\liblz4.a bin\static\liblz4_static.lib
+    )
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
+      7z.exe a bin\liblz4_x64.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      appveyor PushArtifact bin\liblz4_x64.zip &&
+      COPY programs\lz4.exe bin\lz4.exe &&
+      appveyor PushArtifact bin\lz4.exe
+    )
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
+      7z.exe a bin\liblz4_x86.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      appveyor PushArtifact bin\liblz4_x86.zip &&
+      COPY programs\lz4.exe bin\lz4_32.exe &&
+      appveyor PushArtifact bin\lz4_32.exe
     )
   - if [%COMPILER%]==[gcc] (COPY tests\fullbench.exe programs\)
   - if [%COMPILER%]==[visual] (
@@ -87,3 +115,50 @@ test_script:
       echo ------- lz4 tested ------- && 
       fullbench.exe -i1 fullbench.exe
     )
+
+artifacts:
+  - path: bin\lz4.exe
+  - path: bin\lz4_32.exe
+  - path: bin\liblz4_x64.zip
+  - path: bin\liblz4_x86.zip
+
+deploy:
+- provider: GitHub
+  auth_token:
+    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+  artifact: bin\lz4.exe
+  force_update: true
+  on:
+    COMPILER: gcc
+    PLATFORM: "mingw64"
+    appveyor_repo_tag: true
+
+- provider: GitHub
+  auth_token:
+    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+  artifact: bin\lz4_32.exe
+  force_update: true
+  on:
+    COMPILER: gcc
+    PLATFORM: "mingw32"
+    appveyor_repo_tag: true
+
+- provider: GitHub
+  auth_token:
+    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+  artifact: bin\liblz4_x64.zip
+  force_update: true
+  on:
+    COMPILER: gcc
+    PLATFORM: "mingw64"
+    appveyor_repo_tag: true
+
+- provider: GitHub
+  auth_token:
+    secure: LgJo8emYc3sFnlNWkGl4/VYK3nk/8+RagcsqDlAi3xeqNGNutnKjcftjg84uJoT4
+  artifact: bin\liblz4_x86.zip
+  force_update: true
+  on:
+    COMPILER: gcc
+    PLATFORM: "mingw32"
+    appveyor_repo_tag: true
