@@ -90,7 +90,7 @@ test_script:
   - ECHO *** &&
       ECHO Testing %COMPILER% %PLATFORM% %CONFIGURATION% &&
       ECHO ***
-  - if not [%COMPILER%]==[unknown] (
+  - if [%COMPILER%]==[unknown] (
       CD programs &&
       lz4 -h &&
       lz4 -i1b lz4.exe && 
@@ -132,5 +132,5 @@ deploy:
   force_update: true
   on:
     COMPILER: gcc
-    PLATFORM: "mingw32"
+    PLATFORM: "mingw64"
     appveyor_repo_tag: true
