@@ -1,4 +1,4 @@
-v1.7.2
+v1.7.3
 Changed : moved to versioning; package, cli and library have same version number
 Improved: Small decompression speed boost
 Improved: Small compression speed improvement on 64-bits systems
