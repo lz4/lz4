@@ -3,16 +3,17 @@ The static and dynamic LZ4 libraries
 
 #### The package contents
 
-- `dll\liblz4.dll` : The DLL of LZ4 library
-- `dll\liblz4.lib` : The import library of LZ4 library for Visual C++
-- `fullbench\` :     The example of usage of LZ4 library
-- `include\` :       Header files required with LZ4 library
+- `lz4.exe` :                  Command Line Utility, supporting gzip-like arguments
+- `dll\liblz4.dll` :           The DLL of LZ4 library
+- `dll\liblz4.lib` :           The import library of LZ4 library for Visual C++
+- `example\` :                 The example of usage of LZ4 library
+- `include\` :                 Header files required with LZ4 library
 - `static\liblz4_static.lib` : The static LZ4 library
 
 
 #### The example of usage of static and dynamic LZ4 libraries with gcc/MinGW
 
-Use `make` to build `fullbench-dll` and `fullbench-lib`.
+Use `cd example` and `make` to build `fullbench-dll` and `fullbench-lib`.
 `fullbench-dll` uses a dynamic LZ4 library from the `dll` directory.
 `fullbench-lib` uses a static LZ4 library from the `lib` directory.
 
@@ -25,14 +26,14 @@ The dynamic library has to be added to linking options.
 It means that if a project that uses LZ4 consists of a single `test-dll.c`
 file it should be compiled with "liblz4.dll". For example:
 ```
-    gcc $(CFLAGS) -Iinclude/ test-dll.c -o test-dll dll\liblz4.dll
+    gcc $(CFLAGS) -Iinclude\ test-dll.c -o test-dll dll\liblz4.dll
 ```
 The compiled executable will require LZ4 DLL which is available at `dll\liblz4.dll`.
 
 
 #### The example of usage of static and dynamic LZ4 libraries with Visual C++
 
-Open `fullbench\fullbench-dll.sln` to compile `fullbench-dll` that uses a
+Open `example\fullbench-dll.sln` to compile `fullbench-dll` that uses a
 dynamic LZ4 library from the `dll` directory. The solution works with Visual C++
 2010 or newer. When one will open the solution with Visual C++ newer than 2010
 then the solution will upgraded to the current version.
