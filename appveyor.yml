@@ -66,19 +66,16 @@ build_script:
       COPY lib\dll\fullbench-dll\Makefile bin\ &&
       COPY lib\dll\fullbench-dll\fullbench-dll.* bin\fullbench\ &&
       COPY lib\dll\README.md bin\ &&
-      COPY lib\liblz4.a bin\static\liblz4_static.lib
+      COPY lib\liblz4.a bin\static\liblz4_static.lib &&
+      COPY programs\lz4.exe bin\lz4.exe
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
-      7z.exe a bin\liblz4_x64.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
-      appveyor PushArtifact bin\liblz4_x64.zip &&
-      COPY programs\lz4.exe bin\lz4.exe &&
-      appveyor PushArtifact bin\lz4.exe
+      7z.exe a bin\liblz4_x64.zip .\bin\lz4.exe .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      appveyor PushArtifact bin\lz4_x64.zip
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
-      7z.exe a bin\liblz4_x86.zip .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
-      appveyor PushArtifact bin\liblz4_x86.zip &&
-      COPY programs\lz4.exe bin\lz4_32.exe &&
-      appveyor PushArtifact bin\lz4_32.exe
+      7z.exe a bin\liblz4_x86.zip .\bin\lz4.exe .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      appveyor PushArtifact bin\lz4_x86.zip
     )
   - if [%COMPILER%]==[gcc] (COPY tests\fullbench.exe programs\)
   - if [%COMPILER%]==[visual] (
@@ -105,7 +102,7 @@ test_script:
   - ECHO *** &&
       ECHO Testing %COMPILER% %PLATFORM% %CONFIGURATION% &&
       ECHO ***
-  - if not [%COMPILER%]==[unknown] (
+  - if [%COMPILER%]==[unknown] (
       CD programs &&
       lz4 -h &&
       lz4 -i1b lz4.exe &&
@@ -117,48 +114,28 @@ test_script:
     )
 
 artifacts:
-  - path: bin\lz4.exe
-  - path: bin\lz4_32.exe
-  - path: bin\liblz4_x64.zip
-  - path: bin\liblz4_x86.zip
+  - path: bin\lz4_x64.zip
+  - path: bin\lz4_x86.zip
 
 deploy:
 - provider: GitHub
+  artifact: bin\lz4_x64.zip
+  release: lz4_x64-v$(appveyor_build_version)
   auth_token:
     secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
-  artifact: bin\lz4.exe
   force_update: true
   on:
     COMPILER: gcc
     PLATFORM: "mingw64"
-    appveyor_repo_tag: true
+    #appveyor_repo_tag: true
 
 - provider: GitHub
+  artifact: bin\lz4_x86.zip
+  release: lz4_x86-v$(appveyor_build_version)
   auth_token:
     secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
-  artifact: bin\lz4_32.exe
   force_update: true
   on:
     COMPILER: gcc
     PLATFORM: "mingw32"
-    appveyor_repo_tag: true
-
-- provider: GitHub
-  auth_token:
-    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
-  artifact: bin\liblz4_x64.zip
-  force_update: true
-  on:
-    COMPILER: gcc
-    PLATFORM: "mingw64"
-    appveyor_repo_tag: true
-
-- provider: GitHub
-  auth_token:
-    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
-  artifact: bin\liblz4_x86.zip
-  force_update: true
-  on:
-    COMPILER: gcc
-    PLATFORM: "mingw32"
-    appveyor_repo_tag: true
+    #appveyor_repo_tag: true
