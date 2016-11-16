@@ -42,12 +42,16 @@ It must be used with static linking ***only***.
 
 DLL can be created using MinGW+MSYS with the `make liblz4` command.
 This command creates `dll\liblz4.dll` and the import library `dll\liblz4.lib`.
-To compile a project the import library has to be added to linking options.
+The import library is only required with Visual C++.
+The header files `lz4.h`, `lz4hc.h`, `lz4frame.h` and the dynamic library
+`dll\liblz4.dll` are required to compile a project using gcc/MinGW.
+The dynamic library has to be added to linking options.
 It means that if a project that uses LZ4 consists of a single `test-dll.c`
 file it should be compiled with "liblz4.lib". For example:
 ```
-    gcc $(CFLAGS) test-dll.c -o test-dll liblz4.lib
+    gcc $(CFLAGS) -Iinclude/ test-dll.c -o test-dll dll\liblz4.dll
 ```
+The compiled executable will require LZ4 DLL which is available at `dll\liblz4.dll`. 
 
 
 #### Miscellaneous 

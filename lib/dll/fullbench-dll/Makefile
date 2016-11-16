@@ -54,7 +54,7 @@ fullbench-lib: fullbench/fullbench.c fullbench/xxhash.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT) static/liblz4_static.lib
 
 fullbench-dll: fullbench/fullbench.c fullbench/xxhash.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 dll/liblz4.lib
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 dll/liblz4.dll
 
 clean:
 	@$(RM) fullbench-dll$(EXT) fullbench-lib$(EXT) \
