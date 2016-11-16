@@ -70,11 +70,11 @@ build_script:
       COPY programs\lz4.exe bin\lz4.exe
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
-      7z.exe a bin\lz4_x64.zip .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
+      7z.exe a bin\lz4_x64.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
       appveyor PushArtifact bin\lz4_x64.zip
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
-      7z.exe a bin\lz4_x86.zip .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
+      7z.exe a bin\lz4_x86.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
       appveyor PushArtifact bin\lz4_x86.zip
     )
   - if [%COMPILER%]==[gcc] (COPY tests\fullbench.exe programs\)
