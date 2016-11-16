@@ -11,6 +11,19 @@ The static and dynamic LZ4 libraries
 - `static\liblz4_static.lib` : The static LZ4 library
 
 
+#### Usage of Command Line Interface
+
+Command Line Interface (CLI) supports gzip-like arguments.
+By default CLI takes an input file and compresses it to an output file:
+```
+Usage: lz4 [arg] [input] [output]
+```
+The full list of commands for CLI can be obtained with `-h` or `-H`.
+The ratio can be improved with commands from `-3` to `-16` but higher levels also have slower compression. 
+CLI supports aggregation of parameters i.e. `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`.
+CLI includes in-memory compression benchmark module with compression levels starting from `-b` and ending with `-e` with iteration time of `-i` seconds.
+
+
 #### The example of usage of static and dynamic LZ4 libraries with gcc/MinGW
 
 Use `cd example` and `make` to build `fullbench-dll` and `fullbench-lib`.

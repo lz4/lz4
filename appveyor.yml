@@ -102,7 +102,7 @@ test_script:
   - ECHO *** &&
       ECHO Testing %COMPILER% %PLATFORM% %CONFIGURATION% &&
       ECHO ***
-  - if [%COMPILER%]==[unknown] (
+  - if not [%COMPILER%]==[unknown] (
       CD programs &&
       lz4 -h &&
       lz4 -i1b lz4.exe &&
@@ -120,7 +120,6 @@ artifacts:
 deploy:
 - provider: GitHub
   artifact: bin\lz4_x64.zip
-  release: lz4_x64-v$(appveyor_build_version)
   auth_token:
     secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
   force_update: true
@@ -128,11 +127,10 @@ deploy:
   on:
     COMPILER: gcc
     PLATFORM: "mingw64"
-    #appveyor_repo_tag: true
+    appveyor_repo_tag: true
 
 - provider: GitHub
   artifact: bin\lz4_x86.zip
-  release: lz4_x86-v$(appveyor_build_version)
   auth_token:
     secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
   force_update: true
@@ -140,4 +138,4 @@ deploy:
   on:
     COMPILER: gcc
     PLATFORM: "mingw32"
-    #appveyor_repo_tag: true
+    appveyor_repo_tag: true
