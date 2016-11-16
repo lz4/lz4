@@ -21,7 +21,7 @@ It makes benchmark more precise as it eliminates I/O overhead.
 
 The benchmark measures ratio, compressed size, compression and decompression speed.
 One can select compression levels starting from `-b` and ending with `-e`.
-The `-i` parameter selects a number of iterations used for each of tested levels.
+The `-i` parameter selects a number of seconds used for each of tested levels.
 
 
 
@@ -39,6 +39,7 @@ Arguments :
  -d     : decompression (default for .lz4 extension)
  -z     : force compression
  -f     : overwrite output without prompting
+--rm    : remove source file(s) after successful de/compression
  -h/-H  : display help/long help and exit
 
 Advanced arguments :
@@ -48,18 +49,20 @@ Advanced arguments :
  -c     : force write to standard output, even if it is the console
  -t     : test compressed file integrity
  -m     : multiple input files (implies automatic output filenames)
+ -r     : operate recursively on directories (sets also -m)
  -l     : compress using Legacy format (Linux kernel compression)
- -B#    : Block size [4-7](default : 7)
+ -B#    : Block size [4-7] (default : 7)
  -BD    : Block dependency (improve compression ratio)
 --no-frame-crc : disable stream checksum (default:enabled)
 --content-size : compressed frame includes original size (default:not present)
 --[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)
 Benchmark arguments :
-Benchmark arguments :
  -b#    : benchmark file(s), using # compression level (default : 1)
- -e#    : test all compression levels from -bX to # (default: 1)
- -i#    : iteration loops [1-9](default : 3), benchmark mode only
- ```
+ -e#    : test all compression levels from -bX to # (default : 1)
+ -i#    : minimum evaluation time in seconds (default : 3s)
+ -B#    : cut file into independent blocks of size # bytes [32+]
+                      or predefined block size [4-7] (default: 7)
+```
 
 #### License
 
