@@ -43,25 +43,29 @@ LZ4 library is provided as open-source software using BSD 2-Clause license.
 Benchmarks
 -------------------------
 
-The benchmark uses the [Open-Source Benchmark program by m^2 (v0.14.3)]
-compiled with GCC v4.8.2 on Linux Mint 64-bits v17.
-The reference system uses a Core i5-4300U @1.9GHz.
+The benchmark uses [lzbench], from @inikep
+compiled with GCC v6.2.0 on Linux 64-bits.
+The reference system uses a Core i7-3930K CPU @ 4.5GHz.
 Benchmark evaluates the compression of reference [Silesia Corpus]
 in single-thread mode.
 
-|  Compressor          | Ratio   | Compression | Decompression |
-|  ----------          | -----   | ----------- | ------------- |
-|  memcpy              |  1.000  | 4200 MB/s   |   4200 MB/s   |
-|**LZ4 fast 17 (r129)**|  1.607  |**690 MB/s** | **2220 MB/s** |
-|**LZ4 default (r129)**|**2.101**|**385 MB/s** | **1850 MB/s** |
-|  LZO 2.06            |  2.108  |  350 MB/s   |    510 MB/s   |
-|  QuickLZ 1.5.1.b6    |  2.238  |  320 MB/s   |    380 MB/s   |
-|  Snappy 1.1.0        |  2.091  |  250 MB/s   |    960 MB/s   |
-|  [Zstandard] 0.5.1   |  2.876  |  240 MB/s   |    620 MB/s   |
-|  LZF v3.6            |  2.073  |  175 MB/s   |    500 MB/s   |
-|  [zlib] 1.2.8 -1     |  2.730  |   59 MB/s   |    250 MB/s   |
-|**LZ4 HC (r129)**     |**2.720**|   22 MB/s   | **1830 MB/s** |
-|  [zlib] 1.2.8 -6     |  3.099  |   18 MB/s   |    270 MB/s   |
+[lzbench]: https://github.com/inikep/lzbench
+[Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
+
+|  Compressor            | Ratio   | Compression | Decompression |
+|  ----------            | -----   | ----------- | ------------- |
+|  memcpy                |  1.000  | 7300 MB/s   |   7300 MB/s   |
+|**LZ4 fast 8  (v1.7.3)**|  1.799  |**911 MB/s** | **3360 MB/s** |
+|**LZ4 default (v1.7.3)**|**2.101**|**625 MB/s** | **3220 MB/s** |
+|  LZO 2.09              |  2.108  |  620 MB/s   |    845 MB/s   |
+|  QuickLZ 1.5.0         |  2.238  |  510 MB/s   |    600 MB/s   |
+|  Snappy 1.1.3          |  2.091  |  450 MB/s   |   1550 MB/s   |
+|  LZF v3.6              |  2.073  |  365 MB/s   |    820 MB/s   |
+|  [Zstandard] 1.1.1 -1  |  2.876  |  330 MB/s   |    930 MB/s   |
+|  [Zstandard] 1.1.1 -3  |  3.164  |  200 MB/s   |    810 MB/s   |
+| [zlib] deflate 1.2.8 -1|  2.730  |  100 MB/s   |    370 MB/s   |
+|**LZ4 HC -9 (v1.7.3)**  |**2.720**|   34 MB/s   | **3240 MB/s** |
+| [zlib] deflate 1.2.8 -6|  3.099  |   33 MB/s   |    390 MB/s   |
 
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
@@ -77,6 +81,9 @@ Organizing these blocks and providing a common header format to handle their con
 is the purpose of the Frame format, defined into [lz4_Frame_format].
 Interoperable versions of LZ4 must respect this frame format.
 
+[lz4_Block_format]: doc/lz4_Block_format.md
+[lz4_Frame_format]: doc/lz4_Frame_format.md
+
 
 Other source versions
 -------------------------
@@ -86,9 +93,4 @@ many contributors have created versions of lz4 in multiple languages
 (Java, C#, Python, Perl, Ruby, etc.).
 A list of known source ports is maintained on the [LZ4 Homepage].
 
-
-[Open-Source Benchmark program by m^2 (v0.14.3)]: http://encode.ru/threads/1371-Filesystem-benchmark?p=34029&viewfull=1#post34029
-[Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
-[lz4_Block_format]: doc/lz4_Block_format.md
-[lz4_Frame_format]: doc/lz4_Frame_format.md
 [LZ4 Homepage]: http://www.lz4.org
