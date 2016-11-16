@@ -32,16 +32,20 @@
 #ifndef LZ4IO_H_237902873
 #define LZ4IO_H_237902873
 
+/*---   Dependency   ---*/
+#include <stddef.h>   /* size_t */
+
+
 /* ************************************************** */
 /* Special input/output values                        */
 /* ************************************************** */
 #define NULL_OUTPUT "null"
-static char const stdinmark[] = "stdin";
-static char const stdoutmark[] = "stdout";
+static const char stdinmark[]  = "stdin";
+static const char stdoutmark[] = "stdout";
 #ifdef _WIN32
-static char const nulmark[] = "nul";
+static const char nulmark[] = "nul";
 #else
-static char const nulmark[] = "/dev/null";
+static const char nulmark[] = "/dev/null";
 #endif
 
 
@@ -69,8 +73,8 @@ int LZ4IO_setOverwrite(int yes);
 int LZ4IO_setTestMode(int yes);
 
 /* blockSizeID : valid values : 4-5-6-7
-   return : -1 if error, blockSize if OK */
-int LZ4IO_setBlockSizeID(int blockSizeID);
+   return : 0 if error, blockSize if OK */
+size_t LZ4IO_setBlockSizeID(unsigned blockSizeID);
 
 /* Default setting : independent blocks */
 typedef enum { LZ4IO_blockLinked=0, LZ4IO_blockIndependent} LZ4IO_blockMode_t;

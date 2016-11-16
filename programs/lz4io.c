@@ -134,9 +134,6 @@ static int g_blockIndependence = 1;
 static int g_sparseFileSupport = 1;
 static int g_contentSizeFlag = 0;
 
-static const int minBlockSizeID = 4;
-static const int maxBlockSizeID = 7;
-
 
 /**************************************
 *  Exceptions
@@ -183,10 +180,12 @@ int LZ4IO_setTestMode(int yes)
 }
 
 /* blockSizeID : valid values : 4-5-6-7 */
-int LZ4IO_setBlockSizeID(int bsid)
+size_t LZ4IO_setBlockSizeID(unsigned bsid)
 {
-    static const int blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
-    if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return -1;
+    static const size_t blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
+    static const unsigned minBlockSizeID = 4;
+    static const unsigned maxBlockSizeID = 7;
+    if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return 0;
     g_blockSizeId = bsid;
     return blockSizeTable[g_blockSizeId-minBlockSizeID];
 }
@@ -777,6 +776,7 @@ static dRess_t LZ4IO_createDResources(void)
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(61, "Allocation error : not enough memory");
 
+    ress.dstFile = NULL;
     return ress;
 }
 

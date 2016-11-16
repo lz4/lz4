@@ -260,6 +260,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
             cSize = 0;
             { U32 blockNb; for (blockNb=0; blockNb<nbBlocks; blockNb++) cSize += blockTable[blockNb].cSize; }
+            cSize += !cSize;  /* avoid div by 0 */
             ratio = (double)srcSize / (double)cSize;
             markNb = (markNb+1) % NB_MARKS;
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",

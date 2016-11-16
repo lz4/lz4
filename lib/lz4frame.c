@@ -817,9 +817,8 @@ static size_t LZ4F_headerSize(const void* src, size_t srcSize)
 */
 static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcSize)
 {
-    BYTE FLG, BD, HC;
+    BYTE FLG, BD;
     unsigned version, blockMode, blockChecksumFlag, contentSizeFlag, contentChecksumFlag, blockSizeID;
-    size_t bufferNeeded;
     size_t frameHeaderSize;
     const BYTE* srcPtr = (const BYTE*)src;
 
@@ -877,9 +876,9 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     if (blockSizeID < 4) return err0r(LZ4F_ERROR_maxBlockSize_invalid);    /* 4-7 only supported values for the time being */
     if (((BD>>0)&_4BITS) != 0) return err0r(LZ4F_ERROR_reservedFlag_set);  /* Reserved bits */
 
-    /* check */
-    HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
-    if (HC != srcPtr[frameHeaderSize-1]) return err0r(LZ4F_ERROR_headerChecksum_invalid);   /* Bad header checksum error */
+    /* check header */
+    { BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
+      if (HC != srcPtr[frameHeaderSize-1]) return err0r(LZ4F_ERROR_headerChecksum_invalid); }
 
     /* save */
     dctxPtr->frameInfo.blockMode = (LZ4F_blockMode_t)blockMode;
@@ -892,17 +891,17 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     /* init */
     if (contentChecksumFlag) XXH32_reset(&(dctxPtr->xxh), 0);
 
-    /* alloc */
-    bufferNeeded = dctxPtr->maxBlockSize + ((dctxPtr->frameInfo.blockMode==LZ4F_blockLinked) * 128 KB);
-    if (bufferNeeded > dctxPtr->maxBufferSize) {   /* tmp buffers too small */
-        FREEMEM(dctxPtr->tmpIn);
-        FREEMEM(dctxPtr->tmpOutBuffer);
-        dctxPtr->maxBufferSize = bufferNeeded;
-        dctxPtr->tmpIn = (BYTE*)ALLOCATOR(dctxPtr->maxBlockSize);
-        if (dctxPtr->tmpIn == NULL) return err0r(LZ4F_ERROR_GENERIC);
-        dctxPtr->tmpOutBuffer= (BYTE*)ALLOCATOR(dctxPtr->maxBufferSize);
-        if (dctxPtr->tmpOutBuffer== NULL) return err0r(LZ4F_ERROR_GENERIC);
-    }
+    /* internal buffers allocation */
+    {   size_t const bufferNeeded = dctxPtr->maxBlockSize + ((dctxPtr->frameInfo.blockMode==LZ4F_blockLinked) * 128 KB);
+        if (bufferNeeded > dctxPtr->maxBufferSize) {   /* tmp buffers too small */
+            FREEMEM(dctxPtr->tmpIn);
+            dctxPtr->tmpIn = (BYTE*)ALLOCATOR(dctxPtr->maxBlockSize);
+            if (dctxPtr->tmpIn == NULL) return err0r(LZ4F_ERROR_allocation_failed);
+            dctxPtr->maxBufferSize = bufferNeeded;
+            FREEMEM(dctxPtr->tmpOutBuffer);
+            dctxPtr->tmpOutBuffer= (BYTE*)ALLOCATOR(bufferNeeded);
+            if (dctxPtr->tmpOutBuffer== NULL) return err0r(LZ4F_ERROR_allocation_failed);
+    }   }
     dctxPtr->tmpInSize = 0;
     dctxPtr->tmpInTarget = 0;
     dctxPtr->dict = dctxPtr->tmpOutBuffer;
@@ -981,9 +980,9 @@ static void LZ4F_updateDict(LZ4F_dctx* dctxPtr, const BYTE* dstPtr, size_t dstSi
     }
 
     if (withinTmp) { /* copy relevant dict portion in front of tmpOut within tmpOutBuffer */
-        size_t preserveSize = dctxPtr->tmpOut - dctxPtr->tmpOutBuffer;
+        size_t const preserveSize = dctxPtr->tmpOut - dctxPtr->tmpOutBuffer;
         size_t copySize = 64 KB - dctxPtr->tmpOutSize;
-        const BYTE* oldDictEnd = dctxPtr->dict + dctxPtr->dictSize - dctxPtr->tmpOutStart;
+        const BYTE* const oldDictEnd = dctxPtr->dict + dctxPtr->dictSize - dctxPtr->tmpOutStart;
         if (dctxPtr->tmpOutSize > 64 KB) copySize = 0;
         if (copySize > preserveSize) copySize = preserveSize;
 
@@ -996,7 +995,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctxPtr, const BYTE* dstPtr, size_t dstSi
 
     if (dctxPtr->dict == dctxPtr->tmpOutBuffer) {    /* copy dst into tmp to complete dict */
         if (dctxPtr->dictSize + dstSize > dctxPtr->maxBufferSize) {  /* tmp buffer not large enough */
-            size_t preserveSize = 64 KB - dstSize;   /* note : dstSize < 64 KB */
+            size_t const preserveSize = 64 KB - dstSize;   /* note : dstSize < 64 KB */
             memcpy(dctxPtr->tmpOutBuffer, dctxPtr->dict + dctxPtr->dictSize - preserveSize, preserveSize);
             dctxPtr->dictSize = preserveSize;
         }

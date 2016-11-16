@@ -81,10 +81,10 @@ typedef BYTE litDistribTable[LTSIZE];
 
 
 
-
 /*********************************************************
 *  Local Functions
 *********************************************************/
+#define MIN(a,b)   ( (a) < (b) ? (a) :(b) )
 #define RDG_rotl32(x,r) ((x << r) | (x >> (32 - r)))
 static unsigned int RDG_rand(U32* src)
 {
@@ -99,24 +99,15 @@ static unsigned int RDG_rand(U32* src)
 
 static void RDG_fillLiteralDistrib(litDistribTable lt, double ld)
 {
-    U32 i = 0;
-    BYTE character = '0';
-    BYTE firstChar = '(';
-    BYTE lastChar = '}';
+    BYTE const firstChar = ld <= 0.0 ? 0 : '(';
+    BYTE const lastChar  = ld <= 0.0 ? 255 : '}';
+    BYTE character = ld <= 0.0 ? 0 : '0';
+    U32 u = 0;
 
-    if (ld==0.0)
-    {
-        character = 0;
-        firstChar = 0;
-        lastChar =255;
-    }
-    while (i<LTSIZE)
-    {
-        U32 weight = (U32)((double)(LTSIZE - i) * ld) + 1;
-        U32 end;
-        if (weight + i > LTSIZE) weight = LTSIZE-i;
-        end = i + weight;
-        while (i < end) lt[i++] = character;
+    while (u<LTSIZE) {
+        U32 const weight = (U32)((double)(LTSIZE - u) * ld) + 1;
+        U32 const end = MIN(u+weight, LTSIZE);
+        while (u < end) lt[u++] = character;
         character++;
         if (character > lastChar) character = firstChar;
     }

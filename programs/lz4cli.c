@@ -288,11 +288,11 @@ int main(int argc, const char** argv)
     const char* input_filename = NULL;
     const char* output_filename= NULL;
     char* dynNameSpace = NULL;
-    const char** inFileNames = NULL;
+    const char** inFileNames = (const char**) calloc(argc, sizeof(char*));
     unsigned ifnIdx=0;
     const char nullOutput[] = NULL_OUTPUT;
     const char extension[] = LZ4_EXTENSION;
-    int  blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
+    size_t blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
     const char* const exeName = argv[0];
 #ifdef UTIL_HAS_CREATEFILELIST
     const char** extendedFileList = NULL;
@@ -301,6 +301,10 @@ int main(int argc, const char** argv)
 #endif
 
     /* Init */
+    if (inFileNames==NULL) {
+        DISPLAY("Allocation error : not enough memory \n");
+        return 1;
+    }
     LZ4IO_setOverwrite(0);
 
     /* lz4cat predefined behavior */
@@ -311,8 +315,6 @@ int main(int argc, const char** argv)
         output_filename=stdoutmark;
         displayLevel=1;
         multiple_inputs=1;
-        inFileNames = (const char**) calloc(argc, sizeof(char*));
-        if (inFileNames==NULL) { perror(exeName); exit(1); }
     }
     if (!strcmp(exeName, UNLZ4)) { mode = om_decompress; }
 
@@ -336,7 +338,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
                 if ((!strcmp(argument, "--decompress"))
                     || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }
-                if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; if (inFileNames==NULL) inFileNames = (const char**)malloc(argc * sizeof(char*)); continue; }
+                if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
                 if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(1); continue; }
                 if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(0); continue; }
@@ -454,10 +456,6 @@ int main(int argc, const char** argv)
 
                     /* Benchmark */
                 case 'b': mode = om_bench; multiple_inputs=1;
-                    if (inFileNames == NULL) {
-                        inFileNames = (const char**) calloc(argc,  sizeof(char*));
-                        if (inFileNames==NULL) { perror(exeName); exit(1); }
-                    }
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
@@ -466,10 +464,6 @@ int main(int argc, const char** argv)
 #endif
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
-                    if (inFileNames == NULL) {
-                        inFileNames = (const char**) calloc(argc,  sizeof(char*));
-                        if (inFileNames==NULL) { perror(exeName); exit(1); }
-                    }
                     break;
 
                     /* Modify Nb Seconds (benchmark only) */
@@ -514,7 +508,7 @@ int main(int argc, const char** argv)
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
-    if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %i KB\n", blockSize>>10);
+    if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %i KB\n", (U32)(blockSize>>10));
 
     if (multiple_inputs) {
         input_filename = inFileNames[0];
