@@ -55,26 +55,26 @@ build_script:
       )
     )
   - if [%COMPILER%]==[gcc] if not [%PLATFORM%]==[clang] (
-      MKDIR bin\dll bin\static bin\fullbench bin\include &&
-      COPY tests\fullbench.c bin\fullbench\ &&
-      COPY lib\xxhash.c bin\fullbench\ &&
-      COPY lib\xxhash.h bin\fullbench\ &&
+      MKDIR bin\dll bin\static bin\example bin\include &&
+      COPY tests\fullbench.c bin\example\ &&
+      COPY lib\xxhash.c bin\example\ &&
+      COPY lib\xxhash.h bin\example\ &&
       COPY lib\lz4.h bin\include\ &&
       COPY lib\lz4hc.h bin\include\ &&
       COPY lib\lz4frame.h bin\include\ &&
-      COPY lib\dll\liblz4.* bin\dll\ &&
-      COPY lib\dll\fullbench-dll\Makefile bin\ &&
-      COPY lib\dll\fullbench-dll\fullbench-dll.* bin\fullbench\ &&
-      COPY lib\dll\README.md bin\ &&
       COPY lib\liblz4.a bin\static\liblz4_static.lib &&
+      COPY lib\dll\liblz4.* bin\dll\ &&
+      COPY lib\dll\example\Makefile bin\example\ &&
+      COPY lib\dll\example\fullbench-dll.* bin\example\ &&
+      COPY lib\dll\example\README.md bin\ &&
       COPY programs\lz4.exe bin\lz4.exe
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
-      7z.exe a bin\liblz4_x64.zip .\bin\lz4.exe .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      7z.exe a bin\lz4_x64.zip .\bin\lz4.exe .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
       appveyor PushArtifact bin\lz4_x64.zip
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
-      7z.exe a bin\liblz4_x86.zip .\bin\lz4.exe .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
+      7z.exe a bin\lz4_x86.zip .\bin\lz4.exe .\bin\fullbench .\bin\dll .\bin\static .\bin\include .\bin\Makefile .\bin\README.md &&
       appveyor PushArtifact bin\lz4_x86.zip
     )
   - if [%COMPILER%]==[gcc] (COPY tests\fullbench.exe programs\)

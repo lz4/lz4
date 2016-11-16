@@ -24,7 +24,9 @@
 # ##########################################################################
 
 VOID    := /dev/null
-LZ4DIR  := ./include
+LZ4DIR  := ../include
+LIBDIR  := ../static
+DLLDIR  := ../dll
 
 CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum \
@@ -50,11 +52,11 @@ default: all
 all: fullbench-dll fullbench-lib
 
 
-fullbench-lib: fullbench/fullbench.c fullbench/xxhash.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT) static/liblz4_static.lib
+fullbench-lib: fullbench.c xxhash.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LIBDIR)/liblz4_static.lib
 
-fullbench-dll: fullbench/fullbench.c fullbench/xxhash.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 dll/liblz4.dll
+fullbench-dll: fullbench.c xxhash.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(DLLDIR)/liblz4.dll
 
 clean:
 	@$(RM) fullbench-dll$(EXT) fullbench-lib$(EXT) \
