@@ -22,7 +22,7 @@ The following projects are included with the lz4 distribution:
 #### Projects available within lz4.sln
 
 The Visual Studio solution file `lz4.sln` contains many projects that will be compiled to the
-`visual\VS2010\bin\$(Platform)_$(Configuration)\lz4.exe` directory. For example `lz4` set to `x64` and
+`visual\VS2010\bin\$(Platform)_$(Configuration)` directory. For example `lz4` set to `x64` and
 `Release` will be compiled to `visual\VS2010\bin\x64_Release\lz4.exe`. The solution file contains the
 following projects:
 
@@ -43,11 +43,11 @@ The header files `lib\lz4.h`, `lib\lz4hc.h`, `lib\lz4frame.h` and the import lib
 project using Visual C++.
 
 1. The path to header files should be added to `Additional Include Directories` that can
-   be found in project properties `C/C++` then `General`.
+   be found in Project Properties of Visual Studio IDE in the `C/C++` Property Pages on the `General` page.
 2. The import library has to be added to `Additional Dependencies` that can
-   be found in project properties `Linker` then `Input`.
+   be found in Project Properties in the `Linker` Property Pages on the `Input` page.
    If one will provide only the name `liblz4.lib` without a full path to the library
-   the directory has to be added to `Linker\General\Additional Library Directories`.
+   then the directory has to be added to `Linker\General\Additional Library Directories`.
 
 The compiled executable will require LZ4 DLL which is available at
 `visual\VS2010\bin\$(Platform)_$(Configuration)\liblz4.dll`.
