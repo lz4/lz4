@@ -21,7 +21,7 @@ make_cmd = 'make'
 git_cmd = 'git'
 test_dat_src = 'README.md'
 test_dat = 'test_dat'
-head = 'r999'
+head = 'v999'
 
 def proc(cmd_args, pipe=True, dummy=False):
     if dummy:
@@ -43,6 +43,8 @@ def git(args, pipe=True):
 def get_git_tags():
     stdout, stderr = git(['tag', '-l', 'r[0-9][0-9][0-9]'])
     tags = stdout.decode('utf-8').split()
+    stdout, stderr = git(['tag', '-l', 'v[1-9].[0-9].[0-9]'])
+    tags += stdout.decode('utf-8').split()
     return tags
 
 # https://stackoverflow.com/a/19711609/2132223

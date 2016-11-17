@@ -104,6 +104,7 @@ datagen : $(PRGDIR)/datagen.c datagencli.c
 
 clean:
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
+	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
