@@ -51,12 +51,6 @@ int test_compress(const char *input, int inSize, char *output, int outSize)
     return 0;
 }
 
-void swap(void **a, void **b) {
-    void *tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
 /* Returns non-zero on failure. Not a safe function. */
 int test_decompress(const char *uncompressed, const char *compressed)
 {
@@ -91,11 +85,10 @@ int test_decompress(const char *uncompressed, const char *compressed)
             lz4StreamDecode, compressed + offset, output, unBytes);
         if(bytes <= 0) return 2;
         /* Check result */
-        {
-            int r = memcmp(uncompressed + unOffset, output, unBytes);
+        {   int const r = memcmp(uncompressed + unOffset, output, unBytes);
             if (r) return 3;
         }
-        swap((void**)&output, (void**)&lastOutput);
+        { char* const tmp = output; output = lastOutput; lastOutput = tmp; }
         offset += bytes;
         unOffset += unBytes;
         lastBytes = unBytes;
