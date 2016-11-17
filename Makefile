@@ -36,8 +36,8 @@ VOID    := /dev/null
 
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
-PRGDIR  = programs
 LZ4DIR  = lib
+PRGDIR  = programs
 TESTDIR = tests
 
 
@@ -51,12 +51,15 @@ endif
 
 .PHONY: default all lib lz4 clean test versionsTest examples
 
-default: lz4
+default: lib lz4
 
-all: lib lz4
+all:
+	@$(MAKE) -C $(LZ4DIR) $@
+	@$(MAKE) -C $(PRGDIR) $@
+	@$(MAKE) -C $(TESTDIR) $@
 
 lib:
-	@$(MAKE) -C $(LZ4DIR) all
+	@$(MAKE) -C $(LZ4DIR)
 
 lz4:
 	@$(MAKE) -C $(PRGDIR)

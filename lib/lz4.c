@@ -141,12 +141,14 @@
   typedef uint32_t U32;
   typedef  int32_t S32;
   typedef uint64_t U64;
+  typedef uintptr_t uptrval;
 #else
   typedef unsigned char       BYTE;
   typedef unsigned short      U16;
   typedef unsigned int        U32;
   typedef   signed int        S32;
   typedef unsigned long long  U64;
+  typedef size_t uptrval;   /* generally true, except OpenVMS-64 */
 #endif
 
 
@@ -1139,8 +1141,8 @@ FORCE_INLINE int LZ4_decompress_generic(
                 s = *ip++;
                 length += s;
             } while ( likely(endOnInput ? ip<iend-RUN_MASK : 1) & (s==255) );
-            if ((safeDecode) && unlikely((size_t)(op+length)<(size_t)(op))) goto _output_error;   /* overflow detection */
-            if ((safeDecode) && unlikely((size_t)(ip+length)<(size_t)(ip))) goto _output_error;   /* overflow detection */
+            if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)(op))) goto _output_error;   /* overflow detection */
+            if ((safeDecode) && unlikely((uptrval)(ip)+length<(uptrval)(ip))) goto _output_error;   /* overflow detection */
         }
 
         /* copy literals */
@@ -1178,7 +1180,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                 if ((endOnInput) && (ip > iend-LASTLITERALS)) goto _output_error;
                 length += s;
             } while (s==255);
-            if ((safeDecode) && unlikely((size_t)(op+length)<(size_t)op)) goto _output_error;   /* overflow detection */
+            if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) goto _output_error;   /* overflow detection */
         }
         length += MINMATCH;
 

@@ -34,6 +34,8 @@
 *  Compiler Options
 **************************************/
 #define _LARGE_FILES           /* Large file support on 32-bits AIX */
+#define _FILE_OFFSET_BITS 64   /* off_t width */
+#define _LARGEFILE_SOURCE
 
 #if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
@@ -74,6 +76,9 @@
 #    define SET_SPARSE_FILE_MODE(file)
 #  endif
 #else
+#  if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || (defined(__APPLE__) && defined(__MACH__))
+#    define fseek fseeko
+#  endif
 #  define SET_BINARY_MODE(file)
 #  define SET_SPARSE_FILE_MODE(file)
 #endif
@@ -102,9 +107,6 @@
 #define LEGACY_BLOCKSIZE   (8 MB)
 #define MIN_STREAM_BUFSIZE (192 KB)
 #define LZ4IO_BLOCKSIZEID_DEFAULT 7
-
-#define sizeT sizeof(size_t)
-#define maskT (sizeT - 1)
 
 
 /**************************************
@@ -623,11 +625,14 @@ static unsigned LZ4IO_readLE32 (const void* s)
     return value32;
 }
 
+#define sizeT sizeof(size_t)
+#define maskT (sizeT - 1)
+
 static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t bufferSize, unsigned storedSkips)
 {
     const size_t* const bufferT = (const size_t*)buffer;   /* Buffer is supposed malloc'ed, hence aligned on size_t */
     const size_t* ptrT = bufferT;
-    size_t  bufferSizeT = bufferSize / sizeT;
+    size_t bufferSizeT = bufferSize / sizeT;
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     static const size_t segmentSizeT = (32 KB) / sizeT;
 
@@ -716,11 +721,11 @@ static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput)
         unsigned int blockSize;
 
         /* Block Size */
-        { size_t const sizeCheck = fread(in_buff, 1, 4, finput);
-          if (sizeCheck == 0) break;                   /* Nothing to read : file read is completed */
-          if (sizeCheck != 4) EXM_THROW(52, "Read error : cannot access block size "); }
-        blockSize = LZ4IO_readLE32(in_buff);       /* Convert to Little Endian */
-        if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
+        {   size_t const sizeCheck = fread(in_buff, 1, 4, finput);
+            if (sizeCheck == 0) break;                   /* Nothing to read : file read is completed */
+            if (sizeCheck != 4) EXM_THROW(52, "Read error : cannot access block size "); }
+            blockSize = LZ4IO_readLE32(in_buff);       /* Convert to Little Endian */
+            if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
             /* Cannot read next block : maybe new stream ? */
             g_magicRead = blockSize;
             break;

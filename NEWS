@@ -1,3 +1,6 @@
+v1.7.4
+cli : fix : Large file support in 32-bits mode on Mac OS-X
+
 v1.7.3
 Changed : moved to versioning; package, cli and library have same version number
 Improved: Small decompression speed boost

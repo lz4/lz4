@@ -17,7 +17,7 @@ matrix:
 
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd="make gpptest-native && make clean && make examples && make clean && make cmake && make clean && make travis-install && make clean && make clangtest-native" COMPILER=cc
+      env: Ubu=12.04cont Cmd="make gpptest-native && make clean examples && make clean cmake && make clean travis-install && make clean clangtest-native" COMPILER=cc
 
 
     # 14.04 LTS Server Edition 64 bit
@@ -87,7 +87,7 @@ matrix:
           packages:
             - valgrind
 
-    - env: Ubu=14.04 Cmd='make -C tests test-lz4 test-lz4c32 CC=gcc-5 MOREFLAGS=-Werror' COMPILER=gcc-5
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4 clean test-lz4c32 CC=gcc-5 MOREFLAGS=-Werror' COMPILER=gcc-5
       dist: trusty
       sudo: required
       addons:

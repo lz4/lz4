@@ -70,11 +70,17 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-default: lib
+default: lib-release
 
 all: lib
 
+all32: CFLAGS+=-m32
+all32: all
+
 lib: liblz4.a liblz4
+
+lib-release: CFLAGS := -O3
+lib-release: lib
 
 liblz4.a: *.c
 ifeq ($(BUILD_STATIC),yes)
@@ -96,7 +102,7 @@ else
 endif
 
 clean:
-	@$(RM) -f core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	@$(RM) core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc dll/liblz4.dll dll/liblz4.lib
 	@echo Cleaning library completed
 
 
