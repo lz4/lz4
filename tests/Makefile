@@ -114,6 +114,7 @@ clean:
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
 
+.PHONY: versionsTest
 versionsTest:
 	$(PYTHON) test-lz4-versions.py
 

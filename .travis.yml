@@ -21,7 +21,7 @@ matrix:
 
 
     # 14.04 LTS Server Edition 64 bit
-    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 clean versionsTest' COMPILER=cc
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
       addons:

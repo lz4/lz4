@@ -84,11 +84,11 @@ if __name__ == '__main__':
                 os.chdir(clone_dir)
                 git(['--work-tree=' + r_dir, 'checkout', tag, '--', '.'], False)
                 os.chdir(r_dir + '/programs')  # /path/to/lz4/lz4test/<TAG>/programs
-                make(['clean', 'lz4c', 'lz4c32'], False)
             else:
                 os.chdir(programs_dir)
-                make(['lz4c', 'lz4c32'], False)
+            make(['clean', 'lz4c'], False)
             shutil.copy2('lz4c',   dst_lz4c)
+            make(['clean', 'lz4c32'], False)
             shutil.copy2('lz4c32', dst_lz4c32)
 
     # Compress test.dat by all released lz4c and lz4c32

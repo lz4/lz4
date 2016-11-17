@@ -68,13 +68,14 @@ lz4-release: lz4
 lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.c datagen.o
 	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c32: CFLAGS += -m32
+lz4c32: CFLAGS+=-m32
 lz4c32: lz4
+	@cp lz4$(EXT) lz4c32$(EXT)
 
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT)
+           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT)
 	@echo Cleaning completed
 
 
