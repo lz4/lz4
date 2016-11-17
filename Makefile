@@ -116,8 +116,8 @@ platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
 	@$(CC) -v
 	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) native
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) native
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) all
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) all
 	$(MAKE) -C $(TESTDIR) test-platform
 
 versionsTest: clean
@@ -151,11 +151,11 @@ gpptest: clean
 	CC=g++ $(MAKE) -C $(PRGDIR)  all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 	CC=g++ $(MAKE) -C $(TESTDIR) all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
-gpptest-native: clean
+gpptest32: clean
 	g++ -v
-	CC=g++ $(MAKE) -C $(LZ4DIR)  all    CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(PRGDIR)  native CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(LZ4DIR)  all    CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(PRGDIR)  native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
 	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror"

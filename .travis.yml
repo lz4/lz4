@@ -17,11 +17,11 @@ matrix:
 
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd="make gpptest-native && make clean examples && make clean cmake && make clean travis-install && make clean clangtest-native" COMPILER=cc
+      env: Ubu=12.04cont Cmd="make gpptest && make clean examples && make clean cmake && make clean travis-install && make clean clangtest" COMPILER=cc
 
 
     # 14.04 LTS Server Edition 64 bit
-    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 versionsTest' COMPILER=cc
+    - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 clean versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
