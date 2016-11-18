@@ -36,8 +36,11 @@ matrix:
       sudo: required
       addons:
         apt:
+          sources:
+            - ubuntu-toolchain-r-test
           packages:
-            - clang
+            - libc6-dev-i386
+            - gcc-multilib
             - gcc-5
             - gcc-5-multilib
 
