@@ -21,6 +21,32 @@ matrix:
 
 
     # 14.04 LTS Server Edition 64 bit
+    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 && make -C tests test-lz4 CC=gcc-6 MOREFLAGS=-Werror' COMPILER=gcc-6
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - gcc-6
+
+    - env: Ubu=14.04 Cmd='make sanitize32' COMPILER=clang
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+
+    - env: Ubu=14.04 Cmd='make sanitize' COMPILER=clang
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+
     - env: Ubu=14.04 Cmd='make -C tests test-lz4c32 test-fullbench32 versionsTest' COMPILER=cc
       dist: trusty
       sudo: required
@@ -39,14 +65,6 @@ matrix:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-
-    - env: Ubu=14.04 Cmd='make sanitize' COMPILER=clang
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - valgrind
 
     - env: Ubu=14.04 Cmd='make staticAnalyze' COMPILER=clang
       dist: trusty
@@ -99,16 +117,6 @@ matrix:
             - gcc-multilib
             - gcc-5
             - gcc-5-multilib
-
-    - env: Ubu=14.04 Cmd='make c_standards CC=gcc-6 && make -C tests test-lz4 CC=gcc-6 MOREFLAGS=-Werror' COMPILER=gcc-6
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - gcc-6
 
     - env: Ubu=14.04 Cmd='make -C tests test-lz4 CC=clang-3.8' COMPILER=clang-3.8
       dist: trusty

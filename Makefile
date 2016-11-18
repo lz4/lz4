@@ -109,6 +109,9 @@ clangtest-native: clean
 sanitize: clean
 	CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
+sanitize32: clean
+	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
+
 staticAnalyze: clean
 	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
 
