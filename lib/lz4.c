@@ -148,7 +148,7 @@
   typedef unsigned int        U32;
   typedef   signed int        S32;
   typedef unsigned long long  U64;
-  typedef size_t uptrval;   /* generally true, except OpenVMS-64 */
+  typedef size_t              uptrval;   /* generally true, except OpenVMS-64 */
 #endif
 
 
