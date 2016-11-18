@@ -31,17 +31,17 @@ matrix:
           packages:
             - gcc-6
 
-    - env: Ubu=14.04 Cmd='make sanitize32' COMPILER=clang
+    - env: Ubu=14.04 Cmd='make usan32' COMPILER=gcc-5
       dist: trusty
       sudo: required
       addons:
         apt:
           packages:
             - clang
-            - libc6-dev-i386
-            - gcc-multilib
+            - gcc-5
+            - gcc-5-multilib
 
-    - env: Ubu=14.04 Cmd='make sanitize' COMPILER=clang
+    - env: Ubu=14.04 Cmd='make usan' COMPILER=clang
       dist: trusty
       sudo: required
       addons:
