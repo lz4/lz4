@@ -31,7 +31,7 @@ matrix:
           packages:
             - gcc-6
 
-    - env: Ubu=14.04 Cmd='make usan32' COMPILER=gcc-5
+    - env: Ubu=14.04 Cmd='make usan32' COMPILER=gcc-6
       dist: trusty
       sudo: required
       addons:
@@ -41,8 +41,8 @@ matrix:
           packages:
             - libc6-dev-i386
             - gcc-multilib
-            - gcc-5
-            - gcc-5-multilib
+            - gcc-6
+            - gcc-6-multilib
 
     - env: Ubu=14.04 Cmd='make usan' COMPILER=clang
       dist: trusty
