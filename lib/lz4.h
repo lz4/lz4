@@ -413,7 +413,9 @@ union LZ4_streamDecode_u {
 #  define LZ4_DEPRECATED(message)   /* disable deprecation warnings */
 #else
 #  define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#  if (LZ4_GCC_VERSION >= 405) || defined(__clang__)
+#  if defined (__cplusplus) && (__cplusplus >= 201402) /* C++14 or greater */
+#    define LZ4_DEPRECATED(message) [[deprecated(message)]]
+#  elif (LZ4_GCC_VERSION >= 405) || defined(__clang__)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
 #  elif (LZ4_GCC_VERSION >= 301)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated))
