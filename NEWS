@@ -1,4 +1,5 @@
 v1.7.4
+Improved : much better speed in -mx32 mode
 cli : fix : Large file support in 32-bits mode on Mac OS-X
 
 v1.7.3

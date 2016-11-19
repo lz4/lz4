@@ -58,6 +58,15 @@ matrix:
             - libc6-dev-i386
             - gcc-multilib
 
+    - env: Ubu=14.04 Cmd='make -C tests test MOREFLAGS=-mx32' COMPILER=cc
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+
     - env: Ubu=14.04 Cmd='make staticAnalyze' COMPILER=clang
       dist: trusty
       sudo: required
