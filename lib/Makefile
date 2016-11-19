@@ -46,7 +46,7 @@ DESTDIR?=
 PREFIX ?= /usr/local
 CPPFLAGS= -DXXH_NAMESPACE=LZ4_
 CFLAGS ?= -O3
-CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
+CFLAGS += -g -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
           -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
@@ -102,7 +102,7 @@ else
 endif
 
 clean:
-	@$(RM) core *.o *.a *.$(SHARED_EXT) *.$(SHARED_EXT).* liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	@$(RM) core *.o *.a *.$(SHARED_EXT) liblz4.pc dll/liblz4.dll dll/liblz4.lib
 	@echo Cleaning library completed
 
 

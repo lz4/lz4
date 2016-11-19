@@ -70,6 +70,8 @@ in single-thread mode.
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
 
+LZ4 is also compatible and well optimized for x32 mode, for which it provides +10% speed performance.
+
 
 Documentation
 -------------------------

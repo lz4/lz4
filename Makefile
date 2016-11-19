@@ -51,7 +51,7 @@ endif
 
 .PHONY: default all lib lz4 clean test versionsTest examples
 
-default: lib lz4
+default: lib lz4-release
 
 all:
 	@$(MAKE) -C $(LZ4DIR) $@
@@ -62,6 +62,10 @@ lib:
 	@$(MAKE) -C $(LZ4DIR)
 
 lz4:
+	@$(MAKE) -C $(PRGDIR) $@
+	@cp $(PRGDIR)/lz4$(EXT) .
+
+lz4-release:
 	@$(MAKE) -C $(PRGDIR)
 	@cp $(PRGDIR)/lz4$(EXT) .
 
