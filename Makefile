@@ -39,6 +39,7 @@ INCLUDEDIR=$(PREFIX)/include
 LZ4DIR  = lib
 PRGDIR  = programs
 TESTDIR = tests
+EXDIR   = examples
 
 
 # Define nul output
@@ -57,6 +58,7 @@ all:
 	@$(MAKE) -C $(LZ4DIR) $@
 	@$(MAKE) -C $(PRGDIR) $@
 	@$(MAKE) -C $(TESTDIR) $@
+	@$(MAKE) -C $(EXDIR) $@
 
 lib:
 	@$(MAKE) -C $(LZ4DIR)
@@ -73,6 +75,7 @@ clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	@$(MAKE) -C $(EXDIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
 	@$(RM) lz4$(EXT)
 	@echo Cleaning completed

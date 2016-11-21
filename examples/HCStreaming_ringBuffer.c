@@ -68,8 +68,9 @@ void test_compress(FILE* outFp, FILE* inpFp)
         if (0 == inpBytes) break;
 
         {
-            char cmpBuf[LZ4_COMPRESSBOUND(MESSAGE_MAX_BYTES)];
-            const int cmpBytes = LZ4_compressHC_continue(lz4Stream, inpPtr, cmpBuf, inpBytes);
+#define CMPBUFSIZE (LZ4_COMPRESSBOUND(MESSAGE_MAX_BYTES))
+            char cmpBuf[CMPBUFSIZE];
+            const int cmpBytes = LZ4_compress_HC_continue(lz4Stream, inpPtr, cmpBuf, inpBytes, CMPBUFSIZE);
 
             if(cmpBytes <= 0) break;
             write_int32(outFp, cmpBytes);
@@ -97,7 +98,7 @@ void test_decompress(FILE* outFp, FILE* inpFp)
     for(;;)
     {
         int  cmpBytes = 0;
-        char cmpBuf[LZ4_COMPRESSBOUND(MESSAGE_MAX_BYTES)];
+        char cmpBuf[CMPBUFSIZE];
 
         {
             const size_t r0 = read_int32(inpFp, &cmpBytes);
