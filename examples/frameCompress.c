@@ -116,6 +116,7 @@ static size_t compress_file(FILE *in, FILE *out, size_t *size_in, size_t *size_o
 
 static size_t get_block_size(const LZ4F_frameInfo_t* info) {
 	switch (info->blockSizeID) {
+        case LZ4F_default:
 		case LZ4F_max64KB:  return 1 << 16;
 		case LZ4F_max256KB: return 1 << 18;
 		case LZ4F_max1MB:   return 1 << 20;
@@ -127,17 +128,14 @@ static size_t get_block_size(const LZ4F_frameInfo_t* info) {
 }
 
 static size_t decompress_file(FILE *in, FILE *out) {
-	void * const src = malloc(BUF_SIZE);
-	void *dst = NULL;
-	void *srcPtr = src;
-	void *srcEnd = src;
-	size_t srcSize = 0;
-	size_t dstSize = 0;
+	void* const src = malloc(BUF_SIZE);
+	void* dst = NULL;
 	size_t dstCapacity = 0;
 	LZ4F_dctx *dctx = NULL;
 	size_t ret;
 
 	/* Initialization */
+    if (!src) { perror("decompress_file(src)"); goto cleanup; }
 	ret = LZ4F_createDecompressionContext(&dctx, 100);
 	if (LZ4F_isError(ret)) {
 		printf("LZ4F_dctx creation error: %s\n", LZ4F_getErrorName(ret));
@@ -147,15 +145,14 @@ static size_t decompress_file(FILE *in, FILE *out) {
 	/* Decompression */
 	ret = 1;
 	while (ret != 0) {
-		/* INVARIANT: At this point srcPtr == srcEnd */
 		/* Load more input */
-		srcSize = fread(src, 1, BUF_SIZE, in);
+		size_t srcSize = fread(src, 1, BUF_SIZE, in);
+		void* srcPtr = src;
+		void* srcEnd = srcPtr + srcSize;
 		if (srcSize == 0 || ferror(in)) {
 			printf("Decompress: not enough input or error reading file\n");
 			goto cleanup;
 		}
-		srcPtr = src;
-		srcEnd = srcPtr + srcSize;
 		/* Allocate destination buffer if it isn't already */
 		if (!dst) {
 			LZ4F_frameInfo_t info;
@@ -169,6 +166,7 @@ static size_t decompress_file(FILE *in, FILE *out) {
 			 */
 			dstCapacity = get_block_size(&info);
 			dst = malloc(dstCapacity);
+            if (!dst) { perror("decompress_file(dst)"); goto cleanup; }
 			srcPtr += srcSize;
 			srcSize = srcEnd - srcPtr;
 		}
@@ -179,7 +177,7 @@ static size_t decompress_file(FILE *in, FILE *out) {
 		 */
 		while (srcPtr != srcEnd && ret != 0) {
 			/* INVARIANT: Any data left in dst has already been written */
-			dstSize = dstCapacity;
+			size_t dstSize = dstCapacity;
 			ret = LZ4F_decompress(dctx, dst, &dstSize, srcPtr, &srcSize, /* LZ4F_decompressOptions_t */ NULL);
 			if (LZ4F_isError(ret)) {
 				printf("Decompression error: %s\n", LZ4F_getErrorName(ret));
