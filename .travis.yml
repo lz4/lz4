@@ -130,6 +130,18 @@ matrix:
           packages:
             - clang
 
+    - env: Ubu=14.04 Cmd='make clean all CC=gcc-4.4 MOREFLAGS=-Werror' COMPILER=gcc-4.4
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - libc6-dev-i386
+            - gcc-multilib
+            - gcc-4.4
+
 script:
   - echo Cmd=$Cmd
   - $COMPILER -v
