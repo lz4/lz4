@@ -130,6 +130,10 @@ typedef LZ4F_frameType_t frameType_t;
 typedef LZ4F_contentChecksum_t contentChecksum_t;
 #endif
 
+/* LZ4F_frameInfo_t :
+ * makes it possible to supply detailed frame parameters to the stream interface.
+ * It's not required to set all fields, as long as the structure was initially memset() to zero.
+ * All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
   LZ4F_blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
@@ -139,6 +143,10 @@ typedef struct {
   unsigned               reserved[2];           /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
+/* LZ4F_preferences_t :
+ * makes it possible to supply detailed compression parameters to the stream interface.
+ * It's not required to set all fields, as long as the structure was initially memset() to zero.
+ * All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16; values below 0 count as 0 */
