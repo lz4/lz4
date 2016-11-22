@@ -189,7 +189,6 @@ static size_t decompress_file(FILE *in, FILE *out) {
 				printf("Writing %zu bytes\n", dstSize);
 				if (written != dstSize) {
 					printf("Decompress: Failed to write to file\n");
-					ret = 1;
 					goto cleanup;
 				}
 			}
@@ -210,9 +209,8 @@ static size_t decompress_file(FILE *in, FILE *out) {
 
 cleanup:
 	free(src);
-	if (dst) free(dst);
-	if (dctx) ret = LZ4F_freeDecompressionContext(dctx);
-	return ret;
+	free(dst);
+	return LZ4F_freeDecompressionContext(dctx);   /* note : free works on NULL */
 }
 
 int compare(FILE* fp0, FILE* fp1)
@@ -238,7 +236,7 @@ int compare(FILE* fp0, FILE* fp1)
 	return result;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, const char **argv) {
 	char inpFilename[256] = { 0 };
 	char lz4Filename[256] = { 0 };
 	char decFilename[256] = { 0 };
@@ -257,9 +255,8 @@ int main(int argc, char **argv) {
 	printf("dec = [%s]\n", decFilename);
 
 	/* compress */
-	{
-		FILE* inpFp = fopen(inpFilename, "rb");
-		FILE* outFp = fopen(lz4Filename, "wb");
+	{   FILE* const inpFp = fopen(inpFilename, "rb");
+		FILE* const outFp = fopen(lz4Filename, "wb");
 		size_t sizeIn = 0;
 		size_t sizeOut = 0;
 		size_t ret;
@@ -280,9 +277,8 @@ int main(int argc, char **argv) {
 	}
 
 	/* decompress */
-	{
-		FILE* inpFp = fopen(lz4Filename, "rb");
-		FILE* outFp = fopen(decFilename, "wb");
+	{   FILE* const inpFp = fopen(lz4Filename, "rb");
+		FILE* const outFp = fopen(decFilename, "wb");
 		size_t ret;
 
 		printf("decompress : %s -> %s\n", lz4Filename, decFilename);
@@ -298,9 +294,8 @@ int main(int argc, char **argv) {
 	}
 
 	/* verify */
-	{
-		FILE* inpFp = fopen(inpFilename, "rb");
-		FILE* decFp = fopen(decFilename, "rb");
+	{   FILE* const inpFp = fopen(inpFilename, "rb");
+		FILE* const decFp = fopen(decFilename, "rb");
 
 		printf("verify : %s <-> %s\n", inpFilename, decFilename);
 		const int cmp = compare(inpFp, decFp);
