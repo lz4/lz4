@@ -47,7 +47,7 @@ The header files `lz4.h`, `lz4hc.h`, `lz4frame.h` and the dynamic library
 `dll\liblz4.dll` are required to compile a project using gcc/MinGW.
 The dynamic library has to be added to linking options.
 It means that if a project that uses LZ4 consists of a single `test-dll.c`
-file it should be compiled with "liblz4.lib". For example:
+file it should be linked with `dll\liblz4.dll`. For example:
 ```
     gcc $(CFLAGS) -Iinclude/ test-dll.c -o test-dll dll\liblz4.dll
 ```
