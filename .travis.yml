@@ -130,7 +130,7 @@ matrix:
           packages:
             - clang
 
-    - env: Ubu=14.04 Cmd='make clean all CC=gcc-4.4 MOREFLAGS=-Werror' COMPILER=gcc-4.4
+    - env: Ubu=14.04 Cmd='make clean all CC=gcc-4.4 MOREFLAGS=-Werror && make clean && CFLAGS=-fPIC LDFLAGS="-pie -fPIE -D_FORTIFY_SOURCE=2" make -C programs' COMPILER=gcc-4.4
       dist: trusty
       sudo: required
       addons:

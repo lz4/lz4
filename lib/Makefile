@@ -85,7 +85,7 @@ lib-release: lib
 liblz4.a: *.c
 ifeq ($(BUILD_STATIC),yes)
 	@echo compiling static library
-	@$(CC) $(FLAGS) -c $^
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs $@ *.o
 endif
 
