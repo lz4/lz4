@@ -6,7 +6,7 @@
  * Compiler Options
  **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS // for MSVC
+#  define _CRT_SECURE_NO_WARNINGS   /* for MSVC */
 #  define snprintf sprintf_s
 #endif
 
@@ -59,17 +59,15 @@ void test_compress(FILE* outFp, FILE* inpFp)
     static char inpBuf[RING_BUFFER_BYTES];
     int inpOffset = 0;
 
-    for(;;)
-    {
+    for(;;) {
         // Read random length ([1,MESSAGE_MAX_BYTES]) data to the ring buffer.
         char* const inpPtr = &inpBuf[inpOffset];
         const int randomLength = (rand() % MESSAGE_MAX_BYTES) + 1;
         const int inpBytes = (int) read_bin(inpFp, inpPtr, randomLength);
         if (0 == inpBytes) break;
 
-        {
 #define CMPBUFSIZE (LZ4_COMPRESSBOUND(MESSAGE_MAX_BYTES))
-            char cmpBuf[CMPBUFSIZE];
+        {   char cmpBuf[CMPBUFSIZE];
             const int cmpBytes = LZ4_compress_HC_continue(lz4Stream, inpPtr, cmpBuf, inpBytes, CMPBUFSIZE);
 
             if(cmpBytes <= 0) break;
@@ -95,13 +93,11 @@ void test_decompress(FILE* outFp, FILE* inpFp)
     LZ4_streamDecode_t lz4StreamDecode_body = { 0 };
     LZ4_streamDecode_t* lz4StreamDecode = &lz4StreamDecode_body;
 
-    for(;;)
-    {
+    for(;;) {
         int  cmpBytes = 0;
         char cmpBuf[CMPBUFSIZE];
 
-        {
-            const size_t r0 = read_int32(inpFp, &cmpBytes);
+        {   const size_t r0 = read_int32(inpFp, &cmpBytes);
             size_t r1;
             if(r0 != 1 || cmpBytes <= 0)
                 break;
@@ -111,8 +107,7 @@ void test_decompress(FILE* outFp, FILE* inpFp)
                 break;
         }
 
-        {
-            char* const decPtr = &decBuf[decOffset];
+        {   char* const decPtr = &decBuf[decOffset];
             const int decBytes = LZ4_decompress_safe_continue(
                 lz4StreamDecode, cmpBuf, decPtr, cmpBytes, MESSAGE_MAX_BYTES);
             if(decBytes <= 0)
@@ -136,8 +131,7 @@ size_t compare(FILE* f0, FILE* f1)
 {
     size_t result = 1;
 
-    for (;;)
-    {
+    for (;;) {
         char b0[65536];
         char b1[65536];
         const size_t r0 = fread(b0, 1, sizeof(b0), f0);
@@ -145,16 +139,14 @@ size_t compare(FILE* f0, FILE* f1)
 
         if ((r0==0) && (r1==0)) return 0;   // success
 
-        if (r0 != r1)
-        {
+        if (r0 != r1) {
             size_t smallest = r0;
             if (r1<r0) smallest = r1;
             result += smallest;
             break;
         }
 
-        if (memcmp(b0, b1, r0))
-        {
+        if (memcmp(b0, b1, r0)) {
             unsigned errorPos = 0;
             while ((errorPos < r0) && (b0[errorPos]==b1[errorPos])) errorPos++;
             result += errorPos;
@@ -168,7 +160,7 @@ size_t compare(FILE* f0, FILE* f1)
 }
 
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
     char inpFilename[256] = { 0 };
     char lz4Filename[256] = { 0 };
@@ -193,9 +185,8 @@ int main(int argc, char** argv)
     printf("decoded = [%s]\n", decFilename);
 
     // compress
-    {
-        FILE* inpFp = fopen(inpFilename, "rb");
-        FILE* outFp = fopen(lz4Filename, "wb");
+    {   FILE* const inpFp = fopen(inpFilename, "rb");
+        FILE* const outFp = fopen(lz4Filename, "wb");
 
         test_compress(outFp, inpFp);
 
@@ -204,9 +195,8 @@ int main(int argc, char** argv)
     }
 
     // decompress
-    {
-        FILE* inpFp = fopen(lz4Filename, "rb");
-        FILE* outFp = fopen(decFilename, "wb");
+    {   FILE* const inpFp = fopen(lz4Filename, "rb");
+        FILE* const outFp = fopen(decFilename, "wb");
 
         test_decompress(outFp, inpFp);
 
@@ -215,9 +205,8 @@ int main(int argc, char** argv)
     }
 
     // verify
-    {
-        FILE* inpFp = fopen(inpFilename, "rb");
-        FILE* decFp = fopen(decFilename, "rb");
+    {   FILE* const inpFp = fopen(inpFilename, "rb");
+        FILE* const decFp = fopen(decFilename, "rb");
 
         const size_t cmp = compare(inpFp, decFp);
         if(0 == cmp) {
@@ -230,10 +219,10 @@ int main(int argc, char** argv)
         fclose(inpFp);
     }
 
-    if (pause)
-    {
+    if (pause) {
+        int unused;
         printf("Press enter to continue ...\n");
-        getchar();
+        unused = getchar(); (void)unused;   /* silence static analyzer */
     }
 
     return 0;
