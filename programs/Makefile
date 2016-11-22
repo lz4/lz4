@@ -29,18 +29,18 @@
 
 DESTDIR ?=
 PREFIX  ?= /usr/local
-VOID    := /dev/null
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
+VOID    := /dev/null
 
 CFLAGS  ?= -O3   # allows custom optimization flags. For example : CFLAGS="-O2 -g" make
-CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
 		   -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
 CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
-FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
 # Define *.exe as extension for Windows systems
@@ -52,27 +52,30 @@ endif
 
 
 
-default: lz4
+default: lz4-release
 
-m32: lz4c32
+all: lz4 lz4c
 
-native: lz4 lz4c
-
-all: native m32
+all32: CFLAGS+=-m32
+all32: all
 
 lz4: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
+lz4-release: CFLAGS := -O3
+lz4-release: lz4
+
+lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.c datagen.o
 	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c32: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/xxhash.c bench.c lz4io.c lz4cli.c datagen.c
-	$(CC) -m32 $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
+lz4c32: CFLAGS+=-m32
+lz4c32: lz4
+	@cp lz4$(EXT) lz4c32$(EXT)
 
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
-        lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) \
+           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT)
 	@echo Cleaning completed
 
 

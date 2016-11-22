@@ -21,7 +21,7 @@ make_cmd = 'make'
 git_cmd = 'git'
 test_dat_src = 'README.md'
 test_dat = 'test_dat'
-head = 'r999'
+head = 'v999'
 
 def proc(cmd_args, pipe=True, dummy=False):
     if dummy:
@@ -43,6 +43,8 @@ def git(args, pipe=True):
 def get_git_tags():
     stdout, stderr = git(['tag', '-l', 'r[0-9][0-9][0-9]'])
     tags = stdout.decode('utf-8').split()
+    stdout, stderr = git(['tag', '-l', 'v[1-9].[0-9].[0-9]'])
+    tags += stdout.decode('utf-8').split()
     return tags
 
 # https://stackoverflow.com/a/19711609/2132223
@@ -82,11 +84,11 @@ if __name__ == '__main__':
                 os.chdir(clone_dir)
                 git(['--work-tree=' + r_dir, 'checkout', tag, '--', '.'], False)
                 os.chdir(r_dir + '/programs')  # /path/to/lz4/lz4test/<TAG>/programs
-                make(['clean', 'lz4c', 'lz4c32'], False)
             else:
                 os.chdir(programs_dir)
-                make(['lz4c', 'lz4c32'], False)
+            make(['clean', 'lz4c'], False)
             shutil.copy2('lz4c',   dst_lz4c)
+            make(['clean', 'lz4c32'], False)
             shutil.copy2('lz4c32', dst_lz4c32)
 
     # Compress test.dat by all released lz4c and lz4c32

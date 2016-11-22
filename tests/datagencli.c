@@ -1,7 +1,7 @@
 /*
     datagencli.c
     compressible data command line generator
-    Copyright (C) Yann Collet 2012-2015
+    Copyright (C) Yann Collet 2012-2016
 
     GPL v2 License
 

@@ -170,7 +170,7 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
 static int FUZ_AddressOverflow(void)
 {
     char* buffers[MAX_NB_BUFF_I134+1];
-    int i, nbBuff=0;
+    int nbBuff=0;
     int highAddress = 0;
 
     DISPLAY("Overflow tests : ");
@@ -185,12 +185,13 @@ static int FUZ_AddressOverflow(void)
     buffers[0] = (char*)malloc(BLOCKSIZE_I134);
     buffers[1] = (char*)malloc(BLOCKSIZE_I134);
     if ((!buffers[0]) || (!buffers[1])) {
+        free(buffers[0]); free(buffers[1]);
         DISPLAY("not enough memory for tests \n");
         return 0;
     }
 
     for (nbBuff=2; nbBuff < MAX_NB_BUFF_I134; nbBuff++) {
-        DISPLAY("%3i \b\b\b\b", nbBuff);
+        DISPLAY("%3i \b\b\b\b", nbBuff); fflush(stdout);
         buffers[nbBuff] = (char*)malloc(BLOCKSIZE_I134);
         if (buffers[nbBuff]==NULL) goto _endOfTests;
 
@@ -201,7 +202,7 @@ static int FUZ_AddressOverflow(void)
         }
 
         {   size_t const sizeToGenerateOverflow = (size_t)(- ((uintptr_t)buffers[nbBuff-1]) + 512);
-            int const nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
+            unsigned const nbOf255 = (unsigned)((sizeToGenerateOverflow / 255) + 1);
             char* const input = buffers[nbBuff-1];
             char* output = buffers[nbBuff];
             int r;
@@ -209,15 +210,15 @@ static int FUZ_AddressOverflow(void)
             input[1] = (char)0xFF;
             input[2] = (char)0xFF;
             input[3] = (char)0xFF;
-            for(i = 4; i <= nbOf255+4; i++) input[i] = (char)0xff;
+            { unsigned u; for(u = 4; u <= nbOf255+4; u++) input[u] = (char)0xff; }
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-            if (r>0) goto _overflowError;
+            if (r>0) { DISPLAY("LZ4_decompress_safe = %i \n", r); goto _overflowError; }
             input[0] = (char)0x1F;   /* Match length overflow */
             input[1] = (char)0x01;
             input[2] = (char)0x01;
             input[3] = (char)0x00;
             r = LZ4_decompress_safe(input, output, nbOf255+64, BLOCKSIZE_I134);
-            if (r>0) goto _overflowError;
+            if (r>0) { DISPLAY("LZ4_decompress_safe = %i \n", r); goto _overflowError; }
 
             output = buffers[nbBuff-2];   /* Reverse in/out pointer order */
             input[0] = (char)0xF0;   /* Literal length overflow */
@@ -237,7 +238,7 @@ static int FUZ_AddressOverflow(void)
 
     nbBuff++;
 _endOfTests:
-    for (i=0 ; i<nbBuff; i++) free(buffers[i]);
+    { int i; for (i=0 ; i<nbBuff; i++) free(buffers[i]); }
     if (!highAddress) DISPLAY("high address not possible \n");
     else DISPLAY("all overflows correctly detected \n");
     return 0;
