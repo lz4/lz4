@@ -34,12 +34,12 @@ MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 VOID    := /dev/null
 
-CFLAGS  ?= -O3   # allows custom optimization flags. For example : CFLAGS="-O2 -g" make
-CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
+CFLAGS  ?= -O3
+DEBUGFLAGS=-g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
-		   -Wpointer-arith -Wstrict-aliasing=1
+           -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -54,17 +54,18 @@ endif
 
 default: lz4-release
 
+lz4-release: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
+	$(CC) $(FLAGS) $^ -o lz4$(EXT)
+
 all: lz4 lz4c
 
 all32: CFLAGS+=-m32
 all32: all
 
-lz4: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+lz4: CFLAGS += $(DEBUGFLAGS)
+lz4: lz4-release
 
-lz4-release: CFLAGS := -O3
-lz4-release: lz4
-
+lz4c: CFLAGS += $(DEBUGFLAGS)
 lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.c datagen.o
 	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
