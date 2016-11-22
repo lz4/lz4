@@ -1,7 +1,10 @@
+v1.7.5
+fix : Makefile : release build compatible with PIE and customized compilation directives provided through environment variables (#274, reported by Antoine Martin)
+
 v1.7.4
 Improved : much better speed in -mx32 mode
 cli : fix : Large file support in 32-bits mode on Mac OS-X
-fix : compilation on gcc 4.4 (#282), reported by Antoine Martin
+fix : compilation on gcc 4.4 (#272), reported by Antoine Martin
 
 v1.7.3
 Changed : moved to versioning; package, cli and library have same version number
