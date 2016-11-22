@@ -1,3 +1,8 @@
+v1.7.4
+Improved : much better speed in -mx32 mode
+cli : fix : Large file support in 32-bits mode on Mac OS-X
+fix : compilation on gcc 4.4 (#282), reported by Antoine Martin
+
 v1.7.3
 Changed : moved to versioning; package, cli and library have same version number
 Improved: Small decompression speed boost

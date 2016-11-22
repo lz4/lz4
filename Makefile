@@ -1,6 +1,6 @@
 # ################################################################
 # LZ4 - Makefile
-# Copyright (C) Yann Collet 2011-2015
+# Copyright (C) Yann Collet 2011-2016
 # All rights reserved.
 #
 # BSD license
@@ -36,9 +36,10 @@ VOID    := /dev/null
 
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
-PRGDIR  = programs
 LZ4DIR  = lib
+PRGDIR  = programs
 TESTDIR = tests
+EXDIR   = examples
 
 
 # Define nul output
@@ -51,14 +52,22 @@ endif
 
 .PHONY: default all lib lz4 clean test versionsTest examples
 
-default: lz4
+default: lib lz4-release
 
-all: lib lz4
+all:
+	@$(MAKE) -C $(LZ4DIR) $@
+	@$(MAKE) -C $(PRGDIR) $@
+	@$(MAKE) -C $(TESTDIR) $@
+	@$(MAKE) -C $(EXDIR) $@
 
 lib:
-	@$(MAKE) -C $(LZ4DIR) all
+	@$(MAKE) -C $(LZ4DIR)
 
 lz4:
+	@$(MAKE) -C $(PRGDIR) $@
+	@cp $(PRGDIR)/lz4$(EXT) .
+
+lz4-release:
 	@$(MAKE) -C $(PRGDIR)
 	@cp $(PRGDIR)/lz4$(EXT) .
 
@@ -66,6 +75,7 @@ clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	@$(MAKE) -C $(EXDIR) $@ > $(VOID)
 	@$(MAKE) -C examples $@ > $(VOID)
 	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
@@ -103,8 +113,11 @@ clangtest-native: clean
 	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  native CC=clang
 	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) native CC=clang
 
-sanitize: clean
-	CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test CC=clang FUZZER_TIME="-T1mn" NB_LOOPS=-i1
+usan: clean
+	CC=clang CFLAGS="-O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T1mn" NB_LOOPS=-i1
+
+usan32: clean
+	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T1mn" NB_LOOPS=-i1
 
 staticAnalyze: clean
 	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
@@ -113,8 +126,8 @@ platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
 	@$(CC) -v
 	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) native
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) native
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) all
+	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) all
 	$(MAKE) -C $(TESTDIR) test-platform
 
 versionsTest: clean
@@ -148,11 +161,11 @@ gpptest: clean
 	CC=g++ $(MAKE) -C $(PRGDIR)  all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 	CC=g++ $(MAKE) -C $(TESTDIR) all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
-gpptest-native: clean
+gpptest32: clean
 	g++ -v
-	CC=g++ $(MAKE) -C $(LZ4DIR)  all    CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(PRGDIR)  native CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(LZ4DIR)  all    CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(PRGDIR)  native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
 	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror"

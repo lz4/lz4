@@ -1,6 +1,6 @@
 /*
     datagen.c - compressible data generator test tool
-    Copyright (C) Yann Collet 2012-2015
+    Copyright (C) Yann Collet 2012-2016
 
     GPL v2 License
 

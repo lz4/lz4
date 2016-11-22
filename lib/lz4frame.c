@@ -897,10 +897,11 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
             FREEMEM(dctxPtr->tmpIn);
             dctxPtr->tmpIn = (BYTE*)ALLOCATOR(dctxPtr->maxBlockSize);
             if (dctxPtr->tmpIn == NULL) return err0r(LZ4F_ERROR_allocation_failed);
-            dctxPtr->maxBufferSize = bufferNeeded;
             FREEMEM(dctxPtr->tmpOutBuffer);
+            dctxPtr->maxBufferSize = 0;
             dctxPtr->tmpOutBuffer= (BYTE*)ALLOCATOR(bufferNeeded);
             if (dctxPtr->tmpOutBuffer== NULL) return err0r(LZ4F_ERROR_allocation_failed);
+            dctxPtr->maxBufferSize = bufferNeeded;
     }   }
     dctxPtr->tmpInSize = 0;
     dctxPtr->tmpInTarget = 0;

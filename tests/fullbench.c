@@ -1,6 +1,6 @@
 /*
     bench.c - Demo program to benchmark open-source compression algorithm
-    Copyright (C) Yann Collet 2012-2015
+    Copyright (C) Yann Collet 2012-2016
 
     GPL v2 License
 
@@ -229,16 +229,6 @@ static int local_LZ4_saveDict(const char* in, char* out, int inSize)
     return LZ4_saveDict(&LZ4_stream, out, inSize);
 }
 
-static int local_LZ4_compress_default(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_default(in, out, inSize, LZ4_compressBound(inSize));
-}
-
-static int local_LZ4_compress_limitedOutput(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_default(in, out, inSize, LZ4_compressBound(inSize)-1);
-}
-
 static int local_LZ4_compress_default_large(const char* in, char* out, int inSize)
 {
     return LZ4_compress_default(in, out, inSize, LZ4_compressBound(inSize));
@@ -279,26 +269,6 @@ static int local_LZ4_compress_fast_continue0(const char* in, char* out, int inSi
     return LZ4_compress_fast_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize), 0);
 }
 
-static int local_LZ4_compress_withState(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_fast_extState(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize), 1);
-}
-
-static int local_LZ4_compress_limitedOutput_withState(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_fast_extState(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1, 1);
-}
-
-static int local_LZ4_compress_continue(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_fast_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize), 1);
-}
-
-static int local_LZ4_compress_limitedOutput_continue(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_fast_continue(&LZ4_stream, in, out, inSize, LZ4_compressBound(inSize)-1, 1);
-}
-
 #ifndef LZ4_DLL_IMPORT
 /* declare hidden function */
 int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
@@ -328,29 +298,14 @@ static int local_LZ4_compress_HC(const char* in, char* out, int inSize)
     return LZ4_compress_HC(in, out, inSize, LZ4_compressBound(inSize), 9);
 }
 
-static int local_LZ4_compressHC_withStateHC(const char* in, char* out, int inSize)
+static int local_LZ4_compress_HC_extStateHC(const char* in, char* out, int inSize)
 {
     return LZ4_compress_HC_extStateHC(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize), 9);
 }
 
-static int local_LZ4_compressHC_limitedOutput_withStateHC(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_HC_extStateHC(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize)-1, 9);
-}
-
-static int local_LZ4_compressHC_limitedOutput(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_HC(in, out, inSize, LZ4_compressBound(inSize)-1, 9);
-}
-
-static int local_LZ4_compressHC_continue(const char* in, char* out, int inSize)
+static int local_LZ4_compress_HC_continue(const char* in, char* out, int inSize)
 {
     return LZ4_compress_HC_continue(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize));
-}
-
-static int local_LZ4_compressHC_limitedOutput_continue(const char* in, char* out, int inSize)
-{
-    return LZ4_compress_HC_continue(&LZ4_streamHC, in, out, inSize, LZ4_compressBound(inSize)-1);
 }
 
 
@@ -530,11 +485,8 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 8 : compressionFunction = local_LZ4_compress_fast_continue0; initFunction = local_LZ4_createStream; compressorName = "LZ4_compress_fast_continue(0)"; break;
 
             case 10: compressionFunction = local_LZ4_compress_HC; compressorName = "LZ4_compress_HC"; break;
-            case 11: compressionFunction = local_LZ4_compressHC_limitedOutput; compressorName = "LZ4_compressHC_limitedOutput"; break;
-            case 12 : compressionFunction = local_LZ4_compressHC_withStateHC; compressorName = "LZ4_compressHC_withStateHC"; break;
-            case 13: compressionFunction = local_LZ4_compressHC_limitedOutput_withStateHC; compressorName = "LZ4_compressHC_limitedOutput_withStateHC"; break;
-            case 14: compressionFunction = local_LZ4_compressHC_continue; initFunction = local_LZ4_resetStreamHC; compressorName = "LZ4_compressHC_continue"; break;
-            case 15: compressionFunction = local_LZ4_compressHC_limitedOutput_continue; initFunction = local_LZ4_resetStreamHC; compressorName = "LZ4_compressHC_limitedOutput_continue"; break;
+            case 12: compressionFunction = local_LZ4_compress_HC_extStateHC; compressorName = "LZ4_compress_HC_extStateHC"; break;
+            case 14: compressionFunction = local_LZ4_compress_HC_continue; initFunction = local_LZ4_resetStreamHC; compressorName = "LZ4_compress_HC_continue"; break;
 #ifndef LZ4_DLL_IMPORT
 			case 20: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
 #endif
@@ -549,13 +501,6 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                         if (chunkP[0].origSize < 8) { DISPLAY(" cannot bench %s with less then 8 bytes \n", compressorName); continue; }
                         LZ4_loadDictHC(&LZ4_streamHC, chunkP[0].origBuffer, chunkP[0].origSize);
                         break;
-            case 60: DISPLAY("Obsolete compression functions : \n"); continue;
-            case 61: compressionFunction = local_LZ4_compress_default; compressorName = "LZ4_compress_default"; break;
-            case 62: compressionFunction = local_LZ4_compress_limitedOutput; compressorName = "LZ4_compress_limitedOutput"; break;
-            case 63: compressionFunction = local_LZ4_compress_withState; compressorName = "LZ4_compress_withState"; break;
-            case 64: compressionFunction = local_LZ4_compress_limitedOutput_withState; compressorName = "LZ4_compress_limitedOutput_withState"; break;
-            case 65: compressionFunction = local_LZ4_compress_continue; initFunction = local_LZ4_createStream; compressorName = "LZ4_compress_continue"; break;
-            case 66: compressionFunction = local_LZ4_compress_limitedOutput_continue; initFunction = local_LZ4_createStream; compressorName = "LZ4_compress_limitedOutput_continue"; break;
             default :
                 continue;   /* unknown ID : just skip */
             }
