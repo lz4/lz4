@@ -32,22 +32,29 @@ The native file format is the `.lz4` format.
 Differences are :
 
   * `lz4` preserves original files
-  * `lz4` compresses a single file by default (use `-m` for multiple files)
+  * `lz4` compresses a single file by default (see `-m` for multiple files)
   * `lz4 file1 file2` means : compress file1 _into_ file2
-  * When no destination name is provided, compressed file name receives
-    a `.lz4` suffix
-  * When no destination name is provided, if `stdout` is _not_ the console,
-    it becomes the output (like a silent `-c`).
-    Therefore `lz4 file > /dev/null` will not create `file.lz4`
-  * `lz4 file` shows real-time statistics during compression
-    (use `-q` to silent them)
+  * `lz4` shows real-time notification statistics
+     during compression or decompression of a single file
+     (use `-q` to silent them)
+  * If no destination name is provided, result is sent to `stdout`
+    _except if stdout is the console_.
+  * If no destination name is provided, __and__ if `stdout` is the console,
+    `file` is compressed into `file.lz4`.
+  * As a consequence of previous rules, note the following example :
+    `lz4 file | consumer` sends compressed data to `consumer` through `stdout`,
+    hence it does _not_ create any `file.lz4`.
 
-Default behaviors can be modified by opt-in commands, described below.
-`lz4 -m` more closely follows `gzip` command line syntax,
-supporting compression of multiple files into `.lz4`,
-the last remaining difference being that source files are preserved by default.
-Since it's also possible to erase source file using opt-in command `--rm`,
-`lz4 -m --rm` behaves the same as `gzip`.
+Default behaviors can be modified by opt-in commands, detailed below.
+
+  * `lz4 -m` makes it possible to provide multiple input filenames,
+    which will be compressed into files using suffix `.lz4`.
+    Progress notifications are also disabled by default.
+    This mode has a behavior which more closely mimics `gzip` command line,
+    with the main difference being that source files are preserved by default.
+  * It's possible to opt-in to erase source files
+    on successful compression or decompression, using `--rm` command.
+  * Consequently, `lz4 -m --rm` behaves the same as `gzip`.
 
 ### Concatenation of .lz4 files
 
@@ -131,20 +138,22 @@ only the latest one will be applied.
   Force write to standard output, even if it is the console.
 
 * `-m` `--multiple`:
-  Multiple file names.
-  By default, the second filename is used as the destination filename
-  for the compressed file.
-  With `-m`, it is possible to specify any number of input filenames.
-  Each of them will be compressed independently, and the resulting name of
-  each compressed file will be `filename.lz4`.
+  Multiple input files.
+  Compressed file names will be appended a `.lz4` suffix.
   This mode also reduces notification level.
+  `lz4 -m` has a behavior equivalent to `gzip -k`
+  (it preserves source files by default).
+
+* `-r` :
+  operate recursively on directories.
+  This mode also sets `-m` (multiple input files).
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>
   `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB
 
 * `-BD`:
-  Block dependency (improves compression ratio on small blocks)
+  Block Dependency (improves compression ratio on small blocks)
 
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)
@@ -159,8 +168,8 @@ only the latest one will be applied.
   Sparse mode support (default:enabled on file, disabled on stdout)
 
 * `-l`:
-  Use Legacy format (typically used for Linux Kernel compression)<br/>
-  Note : `-l` is not compatible with `-m` (`--multiple`)
+  Use Legacy format (typically for Linux Kernel compression)<br/>
+  Note : `-l` is not compatible with `-m` (`--multiple`) nor `-r`
 
 ### Other options
 
@@ -168,8 +177,8 @@ only the latest one will be applied.
   Verbose mode
 
 * `-q` `--quiet`:
-  Suppress warnings and real-time statistics; specify twice to suppress
-  errors too
+  Suppress warnings and real-time statistics;
+  specify twice to suppress errors too
 
 * `-h` `-H` `--help`:
   Display help/long help and exit
@@ -178,9 +187,10 @@ only the latest one will be applied.
   Display Version number and exit
 
 * `-k` `--keep`:
-  Don't delete source file.
-  This is default behavior anyway, so this option is just for compatibility
-  with `gzip(1)` / `xz(1)`.
+  Preserve source files (default behavior)
+
+* `--rm` :
+  Delete source files on successful compression or decompression
 
 
 ### Benchmark mode

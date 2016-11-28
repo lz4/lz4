@@ -26,24 +26,38 @@ When writing scripts that need to decompress files, it is recommended to always 
 \fBlz4\fR preserves original files
 .
 .IP "\(bu" 4
-\fBlz4\fR compresses a single file by default (use \fB\-m\fR for multiple files)
+\fBlz4\fR compresses a single file by default (see \fB\-m\fR for multiple files)
 .
 .IP "\(bu" 4
 \fBlz4 file1 file2\fR means : compress file1 \fIinto\fR file2
 .
 .IP "\(bu" 4
-When no destination name is provided, compressed file name receives a \fB\.lz4\fR suffix
+\fBlz4\fR shows real\-time notification statistics during compression or decompression of a single file (use \fB\-q\fR to silent them)
 .
 .IP "\(bu" 4
-When no destination name is provided, if \fBstdout\fR is \fInot\fR the console, it becomes the output (like a silent \fB\-c\fR)\. Therefore \fBlz4 file > /dev/null\fR will not create \fBfile\.lz4\fR
+If no destination name is provided, result is sent to \fBstdout\fR \fIexcept if stdout is the console\fR\.
 .
 .IP "\(bu" 4
-\fBlz4 file\fR shows real\-time statistics during compression (use \fB\-q\fR to silent them)
+If no destination name is provided, \fBand\fR if \fBstdout\fR is the console, \fBfile\fR is compressed into \fBfile\.lz4\fR\.
+.
+.IP "\(bu" 4
+As a consequence of previous rules, note the following example : \fBlz4 file | consumer\fR sends compressed data to \fBconsumer\fR through \fBstdout\fR, hence it does \fInot\fR create any \fBfile\.lz4\fR\.
 .
 .IP "" 0
 .
 .P
-Default behaviors can be modified by opt\-in commands, described below\. \fBlz4 \-m\fR more closely follows \fBgzip\fR command line syntax, supporting compression of multiple files into \fB\.lz4\fR, the last remaining difference being that source files are preserved by default\. Since it\'s also possible to erase source file using opt\-in command \fB\-\-rm\fR, \fBlz4 \-m \-\-rm\fR behaves the same as \fBgzip\fR\.
+Default behaviors can be modified by opt\-in commands, detailed below\.
+.
+.IP "\(bu" 4
+\fBlz4 \-m\fR makes it possible to provide multiple input filenames, which will be compressed into files using suffix \fB\.lz4\fR\. Progress notifications are also disabled by default\. This mode has a behavior which more closely mimics \fBgzip\fR command line, with the main difference being that source files are preserved by default\.
+.
+.IP "\(bu" 4
+It\'s possible to opt\-in to erase source files on successful compression or decompression, using \fB\-\-rm\fR command\.
+.
+.IP "\(bu" 4
+Consequently, \fBlz4 \-m \-\-rm\fR behaves the same as \fBgzip\fR\.
+.
+.IP "" 0
 .
 .SS "Concatenation of \.lz4 files"
 It is possible to concatenate \fB\.lz4\fR files as is\. \fBlz4\fR will decompress such files as if they were a single \fB\.lz4\fR file\. For example: lz4 file1 > foo\.lz4 lz4 file2 >> foo\.lz4
@@ -102,7 +116,11 @@ Force write to standard output, even if it is the console\.
 .
 .TP
 \fB\-m\fR \fB\-\-multiple\fR
-Multiple file names\. By default, the second filename is used as the destination filename for the compressed file\. With \fB\-m\fR, it is possible to specify any number of input filenames\. Each of them will be compressed independently, and the resulting name of each compressed file will be \fBfilename\.lz4\fR\. This mode also reduces notification level\.
+Multiple input files\. Compressed file names will be appended a \fB\.lz4\fR suffix\. This mode also reduces notification level\. \fBlz4 \-m\fR has a behavior equivalent to \fBgzip \-k\fR (it preserves source files by default)\.
+.
+.TP
+\fB\-r\fR
+operate recursively on directories\. This mode also sets \fB\-m\fR (multiple input files)\.
 .
 .TP
 \fB\-B#\fR
@@ -113,7 +131,7 @@ Block size [4\-7](default : 7)
 .
 .TP
 \fB\-BD\fR
-Block dependency (improves compression ratio on small blocks)
+Block Dependency (improves compression ratio on small blocks)
 .
 .TP
 \fB\-\-[no\-]frame\-crc\fR
@@ -132,10 +150,10 @@ Sparse mode support (default:enabled on file, disabled on stdout)
 .
 .TP
 \fB\-l\fR
-Use Legacy format (typically used for Linux Kernel compression)
+Use Legacy format (typically for Linux Kernel compression)
 .
 .br
-Note : \fB\-l\fR is not compatible with \fB\-m\fR (\fB\-\-multiple\fR)
+Note : \fB\-l\fR is not compatible with \fB\-m\fR (\fB\-\-multiple\fR) nor \fB\-r\fR
 .
 .SS "Other options"
 .
@@ -157,7 +175,11 @@ Display Version number and exit
 .
 .TP
 \fB\-k\fR \fB\-\-keep\fR
-Don\'t delete source file\. This is default behavior anyway, so this option is just for compatibility with \fBgzip(1)\fR / \fBxz(1)\fR\.
+Preserve source files (default behavior)
+.
+.TP
+\fB\-\-rm\fR
+Delete source files on successful compression or decompression
 .
 .SS "Benchmark mode"
 .
