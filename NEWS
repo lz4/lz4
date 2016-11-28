@@ -1,3 +1,6 @@
+v1.7.5
+cli : fix minor notification when using -r recursive mode
+
 v1.7.4.2
 fix : Makefile : release build compatible with PIE and customized compilation directives provided through environment variables (#274, reported by Antoine Martin)
 

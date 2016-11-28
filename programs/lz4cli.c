@@ -129,19 +129,20 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 *****************************/
 static int usage(const char* exeName)
 {
-    DISPLAY( "Usage :\n");
-    DISPLAY( "      %s [arg] [input] [output]\n", exeName);
+    DISPLAY( "Usage : \n");
+    DISPLAY( "      %s [arg] [input] [output] \n", exeName);
     DISPLAY( "\n");
-    DISPLAY( "input   : a filename\n");
+    DISPLAY( "input   : a filename \n");
     DISPLAY( "          with no FILE, or when FILE is - or %s, read standard input\n", stdinmark);
-    DISPLAY( "Arguments :\n");
+    DISPLAY( "Arguments : \n");
     DISPLAY( " -1     : Fast compression (default) \n");
     DISPLAY( " -9     : High compression \n");
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
-    DISPLAY( " -z     : force compression\n");
+    DISPLAY( " -z     : force compression \n");
     DISPLAY( " -f     : overwrite output without prompting \n");
+    DISPLAY( " -k     : preserve source files(s)  (default) \n");
     DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");
-    DISPLAY( " -h/-H  : display help/long help and exit\n");
+    DISPLAY( " -h/-H  : display help/long help and exit \n");
     return 0;
 }
 
@@ -151,33 +152,33 @@ static int usage_advanced(const char* exeName)
     usage(exeName);
     DISPLAY( "\n");
     DISPLAY( "Advanced arguments :\n");
-    DISPLAY( " -V     : display Version number and exit\n");
-    DISPLAY( " -v     : verbose mode\n");
+    DISPLAY( " -V     : display Version number and exit \n");
+    DISPLAY( " -v     : verbose mode \n");
     DISPLAY( " -q     : suppress warnings; specify twice to suppress errors too\n");
     DISPLAY( " -c     : force write to standard output, even if it is the console\n");
     DISPLAY( " -t     : test compressed file integrity\n");
     DISPLAY( " -m     : multiple input files (implies automatic output filenames)\n");
 #ifdef UTIL_HAS_CREATEFILELIST
-    DISPLAY( " -r     : operate recursively on directories (sets also -m)\n");
+    DISPLAY( " -r     : operate recursively on directories (sets also -m) \n");
 #endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
-    DISPLAY( " -B#    : Block size [4-7] (default : 7)\n");
-    DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
+    DISPLAY( " -B#    : Block size [4-7] (default : 7) \n");
+    DISPLAY( " -BD    : Block dependency (improve compression ratio) \n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
-    DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled)\n");
+    DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
-    DISPLAY( "Benchmark arguments :\n");
+    DISPLAY( "Benchmark arguments : \n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
-    DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s)\n");
-    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+]\n");
-    DISPLAY( "                      or predefined block size [4-7] (default: 7)\n");
+    DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s) \n");
+    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+] \n");
+    DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
 #if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
-    DISPLAY( "Legacy arguments :\n");
-    DISPLAY( " -c0    : fast compression\n");
-    DISPLAY( " -c1    : high compression\n");
-    DISPLAY( " -hc    : high compression\n");
+    DISPLAY( "Legacy arguments : \n");
+    DISPLAY( " -c0    : fast compression \n");
+    DISPLAY( " -c1    : high compression \n");
+    DISPLAY( " -hc    : high compression \n");
     DISPLAY( " -y     : overwrite output without prompting \n");
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
     EXTENDED_HELP;
@@ -548,7 +549,7 @@ int main(int argc, const char** argv)
     }
 
     /* No output filename ==> try to select one automatically (when possible) */
-    while (!output_filename) {
+    while ((!output_filename) && (multiple_inputs==0)) {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
             size_t const inSize  = strlen(input_filename);
@@ -582,6 +583,8 @@ int main(int argc, const char** argv)
         }
         break;
     }
+
+    if (!output_filename) output_filename = "*\\dummy^!//";
 
     /* Check if output is defined as console; trigger an error in this case */
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) {

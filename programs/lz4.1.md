@@ -204,9 +204,6 @@ only the latest one will be applied.
 * `-i#`:
   Minimum evaluation in seconds \[1-9\] (default : 3)
 
-* `-r`:
-  Operate recursively on directories
-
 
 BUGS
 ----
