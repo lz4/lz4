@@ -27,6 +27,17 @@
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # ##########################################################################
 
+# Version numbers
+LIBVER_SRC := ../lib/lz4.h
+LIBVER_MAJOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_MINOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_PATCH_SCRIPT:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCRIPT)
+LIBVER_MAJOR := $(shell echo $(LIBVER_MAJOR_SCRIPT))
+LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
+LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
+LIBVER  := $(shell echo $(LIBVER_SCRIPT))
+
 DESTDIR ?=
 PREFIX  ?= /usr/local
 BINDIR  := $(PREFIX)/bin
@@ -41,6 +52,10 @@ DEBUGFLAGS:=-g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+
+LZ4_VERSION=$(LIBVER)
+MD2ROFF  =ronn
+MD2ROFF_FLAGS  = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
 
 # Define *.exe as extension for Windows systems
@@ -78,6 +93,18 @@ clean:
 	@$(RM) core *.o *.test tmp* \
            lz4$(EXT) lz4c$(EXT) lz4c32$(EXT)
 	@echo Cleaning completed
+
+
+lz4.1: lz4.1.md
+	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
+
+man: lz4.1
+
+clean-man:
+	rm lz4.1
+
+preview-man: clean-man man
+	man ./lz4.1
 
 
 #------------------------------------------------------------------------
