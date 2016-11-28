@@ -28,8 +28,7 @@ The native file format is the `.lz4` format.
 
 ### Difference between lz4 and gzip
 
-`lz4` supports a command line syntax similar
-_but not identical_ to `gzip(1)`.
+`lz4` supports a command line syntax similar _but not identical_ to `gzip(1)`.
 Differences are :
 
   * `lz4` preserves original files
@@ -44,7 +43,11 @@ Differences are :
     (use `-q` to silent them)
 
 Default behaviors can be modified by opt-in commands, described below.
-`lz4 --quiet --multiple` more closely mimics `gzip` behavior.
+`lz4 -m` more closely follows `gzip` command line syntax,
+supporting compression of multiple files into `.lz4`,
+the last remaining difference being that source files are preserved by default.
+Since it's also possible to erase source file using opt-in command `--rm`,
+`lz4 -m --rm` behaves the same as `gzip`.
 
 ### Concatenation of .lz4 files
 
@@ -134,6 +137,7 @@ only the latest one will be applied.
   With `-m`, it is possible to specify any number of input filenames.
   Each of them will be compressed independently, and the resulting name of
   each compressed file will be `filename.lz4`.
+  This mode also reduces notification level.
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>
