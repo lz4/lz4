@@ -1102,7 +1102,7 @@ int main(int argc, const char** argv)
         }
     }
 
-    printf("Starting LZ4 fuzzer (%i-bits, v%s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION_STRING);
+    printf("Starting LZ4 fuzzer (%i-bits, v%s)\n", (int)(sizeof(size_t)*8), LZ4_versionString());
 
     if (!seedset) {
         time_t const t = time(NULL);

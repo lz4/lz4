@@ -78,7 +78,7 @@
 ******************************/
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %i-bits v%s, by %s ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION_STRING, AUTHOR
+#define WELCOME_MESSAGE "*** %s %i-bits v%s, by %s ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_versionString(), AUTHOR
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"
