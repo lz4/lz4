@@ -48,8 +48,8 @@
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Index<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 <li><a href="#benchmarks">Benchmarks</a></li>
-                <li><a href="#interoperable-lz4">Interoperable LZ4 versions</a></li>
-                <li><a href="#other-languages">Other Source versions</a></li>
+                <li><a href="#interoperable-lz4">Interoperable LZ4 ports and bindings</a></li>
+                <li><a href="#customs-lz4">Custom LZ4 ports and bindings</a></li>
                 <li><a href="#references">Reference usages</a></li>
               </ul>
             </li>
@@ -169,7 +169,7 @@ a frame format has been established, detailed within the file [lz4_Frame_format]
 
 <br/>
 <a name="interoperable-lz4"></a>
-## Interoperable LZ4 versions
+## Interoperable LZ4 ports and bindings
 The following versions are provided for languages beyond the C reference version.
 They are in conformance with the LZ4 [block] and [frame] specifications, and are therefore interoperable.
 
@@ -190,11 +190,24 @@ They are in conformance with the LZ4 [block] and [frame] specifications, and are
 
 
 <br/>
-<a name="other-languages"></a>
-## Multiple languages
+<a name="lz4-clis"></a>
+## Compatible CLI versions
+Here are a few compatible alternatives to lz4 command line utility :
+
+|Name                    |Author               |URL  |
+|----                    |----                 |---- |
+|__C++11 multi-threads__ | Takayuki Matsuoka   |https://github.com/t-mat/lz4mt |
+|__LZ4X__                | Ilya Muravyov       |https://github.com/encode84/lz4x |
+|__smalLZ4__             | Stephan Brumme      |http://create.stephan-brumme.com/smallz4/ |
+|__7Zip with LZ4__       | Tino Reichardt      |https://github.com/mcmilk/7-Zip-zstd |
+
+
+<br/>
+<a name="customs-lz4"></a>
+## Customs LZ4 ports and bindings
 The following versions compress data blocks with LZ4 compression algorithm in various programming languages.
-They use the [block] compression format, but may add their own frame / header.
-They should not be expected to be interoperable with LZ4 command line utility.
+They use the [block] compression format, but add their own frame / header logic.
+They are not interoperable with LZ4 command line utility.
 
 |Language				|Author			|URL									|
 |--					|--			|--									|
@@ -219,20 +232,7 @@ They should not be expected to be interoperable with LZ4 command line utility.
 |__65c816 assembly__ decoder		|Olivier Zardini	|http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html	|
 |__Atari XL/XE assembly__ decoder	|xxl			|http://xxl.atari.pl/lz4-decompressor/					|
 |__Z80 assembly__ decoder |Edouard Berge |https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8 |
-
-
-<br/>
-<a name="other-versions"></a>
-## Compatible versions
-Here are a few compatible alternatives to lz4 command line utility :
-
-|Name                    |Author               |URL  |
-|----                    |----                 |---- |
-|__C++11 multi-threads__ | Takayuki Matsuoka   |https://github.com/t-mat/lz4mt |
-|__LZ4X__                | Ilya Muravyov       |https://github.com/encode84/lz4x |
-|__smalLZ4__             | Stephan Brumme      |http://create.stephan-brumme.com/smallz4/ |
-|__7Zip with LZ4__       | Tino Reichardt      |https://github.com/mcmilk/7-Zip-zstd |
-
+|__jsonlz4__            | Avi Halachmi  |https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format for Firefox bookmark backup |
 
 
 <br/>
