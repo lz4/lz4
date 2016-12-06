@@ -84,7 +84,7 @@
 *  Local Macros
 **************************************/
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
-/* #define DELTANEXTU16(p)        chainTable[(p) & LZ4HC_MAXD_MASK] */   /* flexible, LZ4HC_MAXD dependent */
+#define DELTANEXTMAXD(p)        chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
 #define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
@@ -499,14 +499,18 @@ static int LZ4HC_compress_generic (
     limitedOutput_directive limit
     )
 {
+/*
+16#silesia_tar       : 211947520 ->  77841782 (2.723),   9.8 MB/s ,1874.4 MB/s
+
+*/
     if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
     if (compressionLevel > 16) {
         switch (compressionLevel) {
-            case 17: ctx->searchNum = 64; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 64, 0);
-            case 18: ctx->searchNum = 256; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 256, 0);
-            case 19: ctx->searchNum = 64; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, 64, 0);
-            case 20:
-            default: ctx->searchNum = 256; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, 256, 0);
+            case 17: ctx->searchNum = 64;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 64);
+            case 18: ctx->searchNum = 256;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 256);
+            case 19: ctx->searchNum = 64;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, 64);
+            default:
+            case 20: ctx->searchNum = 1<<14; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, LZ4_OPT_NUM);
         }
     }
 

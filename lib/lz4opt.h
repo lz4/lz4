@@ -210,8 +210,8 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     ctx->nextToUpdate++;
 
     // check rest of matches
-    ptr0 = &DELTANEXTU16(current*2+1);
-    ptr1 = &DELTANEXTU16(current*2);
+    ptr0 = &DELTANEXTMAXD(current*2+1);
+    ptr1 = &DELTANEXTMAXD(current*2);
     delta0 = delta1 = current - matchIndex;
 
     while ((matchIndex < current) && (matchIndex>=lowLimit) && (nbAttempts))
@@ -265,7 +265,7 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
         if (*(ip+mlt) < *(match+mlt))
         {
             *ptr0 = delta0;
-            ptr0 = &DELTANEXTU16(matchIndex*2);
+            ptr0 = &DELTANEXTMAXD(matchIndex*2);
     //		printf("delta0=%d\n", delta0);
             if (*ptr0 == (U16)-1) break;
             delta0 = *ptr0;
@@ -275,7 +275,7 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
         else
         {
             *ptr1 = delta1;
-            ptr1 = &DELTANEXTU16(matchIndex*2+1);
+            ptr1 = &DELTANEXTMAXD(matchIndex*2+1);
     //		printf("delta1=%d\n", delta1);
             if (*ptr1 == (U16)-1) break;
             delta1 = *ptr1;
@@ -313,14 +313,13 @@ static int LZ4HC_compress_optimal (
     int maxOutputSize,
     limitedOutput_directive limit,
     const int binaryTreeFinder,
-    const size_t sufficient_len,
-    const int faster_get_matches
+    const size_t sufficient_len
     )
 {
 	LZ4HC_optimal_t opt[LZ4_OPT_NUM + 4];
 	LZ4HC_match_t matches[LZ4_OPT_NUM + 1];
 	const BYTE *inr;
-	size_t res, cur, cur2, skip_num = 0;
+	size_t res, cur, cur2;
 	size_t i, llen, litlen, mlen, best_mlen, price, offset, best_off, match_num, last_pos;
 
     const BYTE* ip = (const BYTE*) source;
@@ -330,7 +329,6 @@ static int LZ4HC_compress_optimal (
     const BYTE* const matchlimit = (iend - LASTLITERALS);
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + maxOutputSize;
- 
 
     /* init */
     ctx->end += inputSize;
@@ -343,22 +341,17 @@ static int LZ4HC_compress_optimal (
         last_pos = 0;
         llen = ip - anchor;
 
-        best_mlen = (last_pos) ? last_pos : (MINMATCH-1);
+        best_mlen = MINMATCH-1;
 
-       if (faster_get_matches && last_pos)
-           match_num = 0;
-       else
-       {
-            if (!binaryTreeFinder)
-            {
-                LZ4HC_Insert(ctx, ip);
-                match_num = LZ4HC_GetAllMatches(ctx, ip, ip, matchlimit, best_mlen, matches);
-            }
-            else
-            {
-                match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, best_mlen, matches);
-            }
-       }
+        if (!binaryTreeFinder)
+        {
+            LZ4HC_Insert(ctx, ip);
+            match_num = LZ4HC_GetAllMatches(ctx, ip, ip, matchlimit, best_mlen, matches);
+        }
+        else
+        {
+            match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, best_mlen, matches);
+        }
 
        LZ4_LOG_PARSER("%d: match_num=%d last_pos=%d\n", (int)(ip-source), match_num, last_pos);
        if (!last_pos && !match_num) { ip++; continue; }
@@ -393,7 +386,7 @@ static int LZ4HC_compress_optimal (
         opt[0].mlen = opt[1].mlen = 1;
 
         // check further positions
-        for (skip_num = 0, cur = 1; cur <= last_pos; cur++)
+        for (cur = 1; cur <= last_pos; cur++)
         { 
            inr = ip + cur;
 
@@ -429,14 +422,6 @@ static int LZ4HC_compress_optimal (
            if (cur == last_pos) break;
 
             LZ4_LOG_PARSER("%d: CURRENT price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(inr-source), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen); 
-
-
-            if (faster_get_matches && skip_num > 0)
-            {
-                skip_num--; 
-                continue;
-            }
-
 
             best_mlen = (best_mlen > MINMATCH) ? best_mlen : (MINMATCH-1);
 
@@ -500,7 +485,7 @@ static int LZ4HC_compress_optimal (
                     mlen++;
                 }
             }
-        } //  for (skip_num = 0, cur = 1; cur <= last_pos; cur++)
+        } //  for (cur = 1; cur <= last_pos; cur++)
 
 
         best_mlen = opt[last_pos].mlen;
