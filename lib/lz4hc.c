@@ -305,8 +305,9 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     return 0;
 }
 
+#include "lz4opt.h"
 
-static int LZ4HC_compress_generic (
+static int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
     const char* const source,
     char* const dest,
@@ -336,8 +337,6 @@ static int LZ4HC_compress_generic (
     const BYTE* ref0;
 
     /* init */
-    if (compressionLevel > LZ4HC_MAX_CLEVEL) compressionLevel = LZ4HC_MAX_CLEVEL;
-    if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
     maxNbAttempts = 1 << (compressionLevel-1);
     ctx->end += inputSize;
 
@@ -487,6 +486,31 @@ _Search3:
 
     /* End */
     return (int) (((char*)op)-dest);
+}
+
+
+static int LZ4HC_compress_generic (
+    LZ4HC_CCtx_internal* const ctx,
+    const char* const source,
+    char* const dest,
+    int const inputSize,
+    int const maxOutputSize,
+    int compressionLevel,
+    limitedOutput_directive limit
+    )
+{
+    if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
+    if (compressionLevel > 16) {
+        switch (compressionLevel) {
+            case 17: ctx->searchNum = 64; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 64, 0);
+            case 18: ctx->searchNum = 256; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 256, 0);
+            case 19: ctx->searchNum = 64; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, 64, 0);
+            case 20:
+            default: ctx->searchNum = 256; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, 256, 0);
+        }
+    }
+
+    return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, compressionLevel, limit);
 }
 
 
