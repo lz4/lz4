@@ -63,7 +63,7 @@ FORCE_INLINE size_t LZ4_LIT_ONLY_COST(size_t litlen)
     return price;
 }
 
-FORCE_INLINE size_t LZ4HC_get_price(size_t litlen, size_t offset, size_t mlen)
+FORCE_INLINE size_t LZ4HC_get_price(size_t litlen, size_t mlen)
 {
     size_t price = 16 + 8; /* 16-bit offset + token */
 
@@ -307,7 +307,7 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 
 static int LZ4HC_compress_optimal (
     LZ4HC_CCtx_internal* ctx,
-    const BYTE* source,
+    const char* const source,
     char* dest,
     int inputSize,
     int maxOutputSize,
@@ -374,7 +374,7 @@ static int LZ4HC_compress_optimal (
            while (mlen <= best_mlen)
            {
                 litlen = 0;
-                price = LZ4HC_get_price(llen + litlen, matches[i].off, mlen - MINMATCH) - llen;
+                price = LZ4HC_get_price(llen + litlen, mlen - MINMATCH) - llen;
                 if (mlen > last_pos || price < (size_t)opt[mlen].price)
                     SET_PRICE(mlen, mlen, matches[i].off, litlen, price);
                 mlen++;
@@ -465,14 +465,14 @@ static int LZ4HC_compress_optimal (
                         litlen = opt[cur2].litlen;
 
                         if (cur2 != litlen)
-                            price = opt[cur2 - litlen].price + LZ4HC_get_price(litlen, matches[i].off, mlen - MINMATCH);
+                            price = opt[cur2 - litlen].price + LZ4HC_get_price(litlen, mlen - MINMATCH);
                         else
-                            price = LZ4HC_get_price(llen + litlen, matches[i].off, mlen - MINMATCH) - llen;
+                            price = LZ4HC_get_price(llen + litlen, mlen - MINMATCH) - llen;
                     }
                     else
                     {
                         litlen = 0;
-                        price = opt[cur2].price + LZ4HC_get_price(litlen, matches[i].off, mlen - MINMATCH);
+                        price = opt[cur2].price + LZ4HC_get_price(litlen, mlen - MINMATCH);
                     }
 
                     LZ4_LOG_PARSER("%d: Found2 pred=%d mlen=%d best_mlen=%d off=%d price=%d litlen=%d price[%d]=%d\n", (int)(inr-source), matches[i].back, mlen, best_mlen, matches[i].off, price, litlen, cur - litlen, opt[cur - litlen].price);
