@@ -38,22 +38,23 @@ LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCR
 LIBVER_MAJOR := $(shell echo $(LIBVER_MAJOR_SCRIPT))
 LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
-LIBVER := $(shell echo $(LIBVER_SCRIPT))
+LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
 BUILD_STATIC:= yes
 
-DESTDIR?=
-PREFIX ?= /usr/local
-CPPFLAGS= -DXXH_NAMESPACE=LZ4_
-CFLAGS ?= -O3
-CFLAGS += -g -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
-          -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
-          -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(MOREFLAGS)
-FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
-
-LIBDIR?= $(PREFIX)/lib
+DESTDIR ?=
+PREFIX  ?= /usr/local
+LIBDIR  ?= $(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
+
+CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
+CFLAGS  ?= -O3
+DEBUGFLAGS:=-g -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
+           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
+           -Wpointer-arith -Wstrict-aliasing=1
+CFLAGS  += $(MOREFLAGS)
+FLAGS    = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+
 
 
 # OS X linker doesn't support -soname, and use different extension
@@ -72,20 +73,20 @@ endif
 
 default: lib-release
 
+lib-release: liblz4.a liblz4
+
+lib: CFLAGS += $(DEBUGFLAGS)
+lib: lib-release
+
 all: lib
 
 all32: CFLAGS+=-m32
 all32: all
 
-lib: liblz4.a liblz4
-
-lib-release: CFLAGS := -O3
-lib-release: lib
-
 liblz4.a: *.c
 ifeq ($(BUILD_STATIC),yes)
 	@echo compiling static library
-	@$(CC) $(FLAGS) -c $^
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs $@ *.o
 endif
 
@@ -114,10 +115,10 @@ ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
 	@sed -e 's|@PREFIX@|$(PREFIX)|' \
-            -e 's|@LIBDIR@|$(LIBDIR)|' \
-            -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
-            -e 's|@VERSION@|$(LIBVER)|' \
-             $< >$@
+         -e 's|@LIBDIR@|$(LIBDIR)|' \
+         -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
+         -e 's|@VERSION@|$(LIBVER)|' \
+          $< >$@
 
 install: lib liblz4.pc
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/ $(DESTDIR)$(INCLUDEDIR)/

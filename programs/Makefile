@@ -27,6 +27,17 @@
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # ##########################################################################
 
+# Version numbers
+LIBVER_SRC := ../lib/lz4.h
+LIBVER_MAJOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_MINOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_PATCH_SCRIPT:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCRIPT)
+LIBVER_MAJOR := $(shell echo $(LIBVER_MAJOR_SCRIPT))
+LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
+LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
+LIBVER  := $(shell echo $(LIBVER_SCRIPT))
+
 DESTDIR ?=
 PREFIX  ?= /usr/local
 BINDIR  := $(PREFIX)/bin
@@ -34,13 +45,17 @@ MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 VOID    := /dev/null
 
-CFLAGS  ?= -O3   # allows custom optimization flags. For example : CFLAGS="-O2 -g" make
-CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
+CFLAGS  ?= -O3
+DEBUGFLAGS:=-g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
-		   -Wpointer-arith -Wstrict-aliasing=1
+           -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+
+LZ4_VERSION=$(LIBVER)
+MD2ROFF  =ronn
+MD2ROFF_FLAGS  = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
 
 # Define *.exe as extension for Windows systems
@@ -54,17 +69,18 @@ endif
 
 default: lz4-release
 
+lz4-release: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
+	$(CC) $(FLAGS) $^ -o lz4$(EXT)
+
 all: lz4 lz4c
 
 all32: CFLAGS+=-m32
 all32: all
 
-lz4: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+lz4: CFLAGS += $(DEBUGFLAGS)
+lz4: lz4-release
 
-lz4-release: CFLAGS := -O3
-lz4-release: lz4
-
+lz4c: CFLAGS += $(DEBUGFLAGS)
 lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.c datagen.o
 	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
@@ -77,6 +93,18 @@ clean:
 	@$(RM) core *.o *.test tmp* \
            lz4$(EXT) lz4c$(EXT) lz4c32$(EXT)
 	@echo Cleaning completed
+
+
+lz4.1: lz4.1.md
+	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
+
+man: lz4.1
+
+clean-man:
+	rm lz4.1
+
+preview-man: clean-man man
+	man ./lz4.1
 
 
 #------------------------------------------------------------------------
