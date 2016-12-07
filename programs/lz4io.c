@@ -591,9 +591,10 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
     char* dstFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
-    cRess_t const ress = LZ4IO_createCResources();
+    cRess_t ress;
 
     if (dstFileName == NULL) return ifntSize;   /* not enough memory */
+    ress = LZ4IO_createCResources();
 
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
