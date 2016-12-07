@@ -260,6 +260,13 @@ static void waitEnter(void)
     (void)getchar();
 }
 
+static const char* lastNameFromPath(const char* path)
+{
+    const char* name = strrchr(path, '/');
+    if (name==NULL) name = strrchr(path, '\\');   /* windows */
+    if (name==NULL) name = path-1;
+    return name+1;
+}
 
 /*! readU32FromChar() :
     @return : unsigned integer value reach from input in `char` format
@@ -294,7 +301,7 @@ int main(int argc, const char** argv)
     const char nullOutput[] = NULL_OUTPUT;
     const char extension[] = LZ4_EXTENSION;
     size_t blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
-    const char* const exeName = argv[0];
+    const char* const exeName = lastNameFromPath(argv[0]);
 #ifdef UTIL_HAS_CREATEFILELIST
     const char** extendedFileList = NULL;
     char* fileNamesBuf = NULL;
