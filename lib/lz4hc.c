@@ -506,11 +506,11 @@ static int LZ4HC_compress_generic (
     if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
     if (compressionLevel > 16) {
         switch (compressionLevel) {
-            case 17: ctx->searchNum = 64;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 64);
-            case 18: ctx->searchNum = 256;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 0, 256);
-            case 19: ctx->searchNum = 64;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, 64);
+            case 17: ctx->searchNum = 16;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 16);
+            case 18: ctx->searchNum = 64;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 64);
+            case 19: ctx->searchNum = 256;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 256);
             default:
-            case 20: ctx->searchNum = 1<<14; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 1, LZ4_OPT_NUM);
+            case 20: ctx->searchNum = 1<<14; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM);
         }
     }
 

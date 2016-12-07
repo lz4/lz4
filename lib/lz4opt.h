@@ -42,17 +42,17 @@
 
 typedef struct
 {
-	int off;
-	int len;
-	int back;
+    int off;
+    int len;
+    int back;
 } LZ4HC_match_t;
 
 typedef struct
 {
-	int price;
-	int off;
-	int mlen;
-	int litlen;
+    int price;
+    int off;
+    int mlen;
+    int litlen;
 } LZ4HC_optimal_t;
 
 
@@ -62,6 +62,7 @@ FORCE_INLINE size_t LZ4_LIT_ONLY_COST(size_t litlen)
     if (litlen>=(int)RUN_MASK) { litlen-=RUN_MASK; price+=8*(1+litlen/255); }
     return price;
 }
+
 
 FORCE_INLINE size_t LZ4HC_get_price(size_t litlen, size_t mlen)
 {
@@ -75,107 +76,6 @@ FORCE_INLINE size_t LZ4HC_get_price(size_t litlen, size_t mlen)
 
     return price;
 }
-
-
-FORCE_INLINE int LZ4HC_GetAllMatches (
-    LZ4HC_CCtx_internal* ctx,
-    const BYTE* const ip,
-    const BYTE* const iLowLimit,
-    const BYTE* const iHighLimit,
-    size_t best_mlen,
-    LZ4HC_match_t* matches)
-{
-    U16* const chainTable = ctx->chainTable;
-    U32* const HashTable = ctx->hashTable;
-    const BYTE* const base = ctx->base;
-    const U32 dictLimit = ctx->dictLimit;
-    const BYTE* const lowPrefixPtr = base + dictLimit;
-    const U32 current = (U32)(ip - base);
-    const U32 lowLimit = (ctx->lowLimit + MAX_DISTANCE > current) ? ctx->lowLimit : current - (MAX_DISTANCE - 1);
-    const BYTE* const dictBase = ctx->dictBase;
-    const BYTE* match;
-    U32   matchIndex;
-    int nbAttempts = ctx->searchNum;
-    int mnum = 0;
-    U32* HashPos;
-
-    if (ip + MINMATCH > iHighLimit) return 0;
-
-    /* First Match */
-    HashPos = &HashTable[LZ4HC_hashPtr(ip)];
-    matchIndex = *HashPos;
-
-
-    DELTANEXTU16(current) = (U16)(current - matchIndex);
-    *HashPos =  current;
-    ctx->nextToUpdate++;
-
-
-    while ((matchIndex < current) && (matchIndex>=lowLimit) && (nbAttempts))
-    {
-        nbAttempts--;
-        if (matchIndex >= dictLimit)
-        {
-            match = base + matchIndex;
-
-            if ((ip[best_mlen] == match[best_mlen]) && (LZ4_read32(match) == LZ4_read32(ip)))
-            {
-                size_t mlt = MINMATCH + LZ4_count(ip+MINMATCH, match+MINMATCH, iHighLimit);
-                int back = 0;
-
-                while ((ip+back>iLowLimit)
-                       && (match+back > lowPrefixPtr)
-                       && (ip[back-1] == match[back-1]))
-                        back--;
-
-                mlt -= back;
-
-                if (mlt > best_mlen)
-                {
-                    best_mlen = mlt;
-                    matches[mnum].off = (int)(ip - match);
-                    matches[mnum].len = (int)mlt;
-                    matches[mnum].back = -back;
-                    mnum++;
-                }
-
-                if (best_mlen > LZ4_OPT_NUM) break;
-            }
-        }
-        else
-        {
-            match = dictBase + matchIndex;
-            if (LZ4_read32(match) == LZ4_read32(ip))
-            {
-                size_t mlt;
-                int back=0;
-                const BYTE* vLimit = ip + (dictLimit - matchIndex);
-                if (vLimit > iHighLimit) vLimit = iHighLimit;
-                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
-                if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
-                    mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
-                while ((ip+back > iLowLimit) && (matchIndex+back > lowLimit) && (ip[back-1] == match[back-1])) back--;
-                mlt -= back;
-                
-                if (mlt > best_mlen)
-                {
-                    best_mlen = mlt;
-                    matches[mnum].off = (int)(ip - match);
-                    matches[mnum].len = (int)mlt;
-                    matches[mnum].back = -back;
-                    mnum++;
-                }
-
-                if (best_mlen > LZ4_OPT_NUM) break;
-            }
-        }
-        matchIndex -= DELTANEXTU16(matchIndex);
-    }
-
-
-    return mnum;
-}
-
 
 
 FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
@@ -312,7 +212,6 @@ static int LZ4HC_compress_optimal (
     int inputSize,
     int maxOutputSize,
     limitedOutput_directive limit,
-    const int binaryTreeFinder,
     const size_t sufficient_len
     )
 {
@@ -342,16 +241,7 @@ static int LZ4HC_compress_optimal (
         llen = ip - anchor;
 
         best_mlen = MINMATCH-1;
-
-        if (!binaryTreeFinder)
-        {
-            LZ4HC_Insert(ctx, ip);
-            match_num = LZ4HC_GetAllMatches(ctx, ip, ip, matchlimit, best_mlen, matches);
-        }
-        else
-        {
-            match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, best_mlen, matches);
-        }
+        match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, best_mlen, matches);
 
        LZ4_LOG_PARSER("%d: match_num=%d last_pos=%d\n", (int)(ip-source), match_num, last_pos);
        if (!last_pos && !match_num) { ip++; continue; }
@@ -425,18 +315,8 @@ static int LZ4HC_compress_optimal (
 
             best_mlen = (best_mlen > MINMATCH) ? best_mlen : (MINMATCH-1);
 
-            if (!binaryTreeFinder)
-            {
-                LZ4HC_Insert(ctx, inr);
-                match_num = LZ4HC_GetAllMatches(ctx, inr, ip, matchlimit, best_mlen, matches);
-                LZ4_LOG_PARSER("%d: LZ4HC_GetAllMatches match_num=%d\n", (int)(inr-source), match_num);
-            }
-            else
-            {
-                match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, best_mlen, matches);
-                LZ4_LOG_PARSER("%d: LZ4HC_BinTree_GetAllMatches match_num=%d\n", (int)(inr-source), match_num);
-            }
-
+            match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, best_mlen, matches);
+            LZ4_LOG_PARSER("%d: LZ4HC_BinTree_GetAllMatches match_num=%d\n", (int)(inr-source), match_num);
 
             if (match_num > 0 && (size_t)matches[match_num-1].len > sufficient_len)
             {
