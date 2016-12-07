@@ -110,40 +110,30 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     // check rest of matches
     ptr0 = &DELTANEXTMAXD(current*2+1);
     ptr1 = &DELTANEXTMAXD(current*2);
-    delta0 = delta1 = current - matchIndex;
+    delta0 = delta1 = (U16)(current - matchIndex);
 
     while ((matchIndex < current) && (matchIndex>=lowLimit) && (nbAttempts)) {
         nbAttempts--;
-        mlt = 0;
-        if (matchIndex >= dictLimit)
-        {
+        if (matchIndex >= dictLimit) {
             match = base + matchIndex;
             mlt = LZ4_count(ip, match, iHighLimit);
-            if (mlt > best_mlen) {
-                best_mlen = mlt;
-                matches[mnum].off = (int)(ip - match);
-                matches[mnum].len = (int)mlt;
-                mnum++;
-                if (best_mlen > LZ4_OPT_NUM) break;
-            }
-        }
-        else
-        {
+        } else {
             const BYTE* vLimit = ip + (dictLimit - matchIndex);
             match = dictBase + matchIndex;
             if (vLimit > iHighLimit) vLimit = iHighLimit;
             mlt = LZ4_count(ip, match, vLimit);
             if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
                 mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
-            if (mlt > best_mlen) {
-                best_mlen = mlt;
-                matches[mnum].off = (int)(ip - match);
-                matches[mnum].len = (int)mlt;
-                mnum++;
-                if (best_mlen > LZ4_OPT_NUM) break;
-            }
         }
-        
+
+        if (mlt > best_mlen) {
+            best_mlen = mlt;
+            matches[mnum].off = (int)(ip - match);
+            matches[mnum].len = (int)mlt;
+            mnum++;
+            if (best_mlen > LZ4_OPT_NUM) break;
+        }
+
         if (*(ip+mlt) < *(match+mlt)) {
             *ptr0 = delta0;
             ptr0 = &DELTANEXTMAXD(matchIndex*2);
@@ -170,18 +160,15 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 }
 
 
-
-
-
-#define SET_PRICE(pos, mlen, offset, litlen, price)   \
-    {                                                 \
-        while (last_pos < pos)  { opt[last_pos+1].price = 1<<30; last_pos++; } \
-        opt[pos].mlen = (int)mlen;                         \
-        opt[pos].off = (int)offset;                        \
-        opt[pos].litlen = (int)litlen;                     \
-        opt[pos].price = (int)price;                       \
-        LZ4_LOG_PARSER("%d: SET price[%d/%d]=%d litlen=%d len=%d off=%d\n", (int)(inr-source), pos, last_pos, opt[pos].price, opt[pos].litlen, opt[pos].mlen, opt[pos].off); \
-    }
+#define SET_PRICE(pos, mlen, offset, litlen, price)    \
+{                                                      \
+    while (last_pos < pos)  { opt[last_pos+1].price = 1<<30; last_pos++; } \
+    opt[pos].mlen = (int)mlen;                         \
+    opt[pos].off = (int)offset;                        \
+    opt[pos].litlen = (int)litlen;                     \
+    opt[pos].price = (int)price;                       \
+    LZ4_LOG_PARSER("%d: SET price[%d/%d]=%d litlen=%d len=%d off=%d\n", (int)(inr-source), pos, last_pos, opt[pos].price, opt[pos].litlen, opt[pos].mlen, opt[pos].off); \
+}
 
 
 static int LZ4HC_compress_optimal (
@@ -194,11 +181,11 @@ static int LZ4HC_compress_optimal (
     const size_t sufficient_len
     )
 {
-	LZ4HC_optimal_t opt[LZ4_OPT_NUM + 4];
-	LZ4HC_match_t matches[LZ4_OPT_NUM + 1];
-	const BYTE *inr;
-	size_t res, cur, cur2;
-	size_t i, llen, litlen, mlen, best_mlen, price, offset, best_off, match_num, last_pos;
+    LZ4HC_optimal_t opt[LZ4_OPT_NUM + 1];
+    LZ4HC_match_t matches[LZ4_OPT_NUM + 1];
+    const BYTE *inr;
+    size_t res, cur, cur2;
+    size_t i, llen, litlen, mlen, best_mlen, price, offset, best_off, match_num, last_pos;
 
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
@@ -373,4 +360,3 @@ encode: /* cur, last_pos, best_mlen, best_off have to be set */
     /* End */
     return (int) ((char*)op-dest);
 }
-
