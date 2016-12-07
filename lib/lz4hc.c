@@ -498,8 +498,10 @@ static int LZ4HC_compress_generic (
     )
 {
 /*
-16#silesia_tar       : 211947520 ->  77841782 (2.723),   9.8 MB/s ,1874.4 MB/s
-
+ 9#silesia_tar       : 211947520 ->  77891907 (2.721),  24.3 MB/s ,2142.1 MB/s
+10#silesia_tar       : 211947520 ->  77841782 (2.723),  11.4 MB/s ,2185.3 MB/s
+11#silesia_tar       : 211947520 ->  77408334 (2.738),   6.1 MB/s ,2288.9 MB/s
+12#silesia_tar       : 211947520 ->  77319973 (2.741),   3.3 MB/s ,2361.0 MB/s
 */
     if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
     if (compressionLevel > 9) {
