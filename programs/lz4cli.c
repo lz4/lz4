@@ -319,6 +319,7 @@ int main(int argc, const char** argv)
     if (!strcmp(exeName, LZ4CAT)) {
         mode = om_decompress;
         LZ4IO_setOverwrite(1);
+        LZ4IO_setRemoveSrcFile(0);
         forceStdout=1;
         output_filename=stdoutmark;
         displayLevel=1;

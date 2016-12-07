@@ -91,7 +91,7 @@ lz4c32: lz4
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4
+           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4 lz4cat
 	@echo Cleaning completed
 
 
@@ -114,6 +114,9 @@ ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
 
 unlz4: lz4
 	ln -s lz4 unlz4
+
+lz4cat: lz4
+	ln -s lz4 lz4cat
 
 install: lz4$(EXT) lz4c$(EXT)
 	@echo Installing binaries

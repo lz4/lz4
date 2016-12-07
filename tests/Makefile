@@ -207,9 +207,12 @@ test-lz4-multiple: lz4 datagen
 	@$(RM) tmp*
 
 unlz4:
-	@$(MAKE) -C $(PRGDIR) unlz4
+	@$(MAKE) -C $(PRGDIR) $@
 
-test-lz4-basic: lz4 datagen unlz4
+lz4cat:
+	@$(MAKE) -C $(PRGDIR) $@
+
+test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0     | $(LZ4) -v     | $(LZ4) -t
 	./datagen -g16KB  | $(LZ4) -9     | $(LZ4) -t
@@ -224,13 +227,18 @@ test-lz4-basic: lz4 datagen unlz4
 	./datagen -g33M   | $(LZ4) --no-frame-crc | $(LZ4) -t
 	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
 	@echo "hello world" > tmp
-	$(LZ4) --rm tmp
+	$(LZ4) --rm -f tmp
 	ls -ls tmp         && false || true   # must fail (--rm)
+	ls -ls tmp.lz4
+	$(PRGDIR)/lz4cat tmp.lz4              # must display hello world
 	ls -ls tmp.lz4
 	$(PRGDIR)/unlz4 --rm tmp.lz4
 	ls -ls tmp
 	ls -ls tmp.lz4     && false || true   # must fail (--rm)
 	ls -ls tmp.lz4.lz4 && false || true   # must fail (unlz4)
+	$(PRGDIR)/lz4cat tmp                  # pass-through mode
+	ls -ls tmp
+	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen
