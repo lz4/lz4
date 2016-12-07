@@ -38,7 +38,7 @@ VOID    := /dev/null
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
-CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
+CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
 CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum \
            -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
@@ -207,10 +207,10 @@ test-lz4-multiple: lz4 datagen
 	@$(RM) tmp*
 
 unlz4:
-	@$(MAKE) -C $(PRGDIR) $@
+	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
 lz4cat:
-	@$(MAKE) -C $(PRGDIR) $@
+	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
