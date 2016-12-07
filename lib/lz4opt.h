@@ -94,8 +94,8 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     const BYTE* match;
     int nbAttempts = ctx->searchNum;
     int mnum = 0;
-    U16 *ptr0, *ptr1;
-    U32 matchIndex, delta0, delta1;
+    U16 *ptr0, *ptr1, delta0, delta1;
+    U32 matchIndex;
     size_t mlt = 0;
     U32* HashPos;
     
@@ -129,8 +129,8 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
         }
         else
         {
-            match = dictBase + matchIndex;
             const BYTE* vLimit = ip + (dictLimit - matchIndex);
+            match = dictBase + matchIndex;
             if (vLimit > iHighLimit) vLimit = iHighLimit;
             mlt = LZ4_count(ip, match, vLimit);
             if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
@@ -245,9 +245,8 @@ static int LZ4HC_compress_optimal (
 
         if (last_pos < MINMATCH) { ip++; continue; }
 
-        opt[0].mlen = opt[1].mlen = 1;
-
         /* check further positions */
+        opt[0].mlen = opt[1].mlen = 1;
         for (cur = 1; cur <= last_pos; cur++) {
             inr = ip + cur;
 
@@ -285,7 +284,7 @@ static int LZ4HC_compress_optimal (
                 goto encode;
             }
 
-            // set prices using matches at position = cur
+            /* set prices using matches at position = cur */
             for (i = 0; i < match_num; i++) {
                 mlen = (i>0) ? (size_t)matches[i-1].len+1 : MINMATCH;
                 cur2 = cur;
@@ -312,13 +311,13 @@ static int LZ4HC_compress_optimal (
                     mlen++;
                 }
             }
-        } //  for (cur = 1; cur <= last_pos; cur++)
+        } /* for (cur = 1; cur <= last_pos; cur++) */
 
         best_mlen = opt[last_pos].mlen;
         best_off = opt[last_pos].off;
         cur = last_pos - best_mlen;
 
-encode: // cur, last_pos, best_mlen, best_off have to be set
+encode: /* cur, last_pos, best_mlen, best_off have to be set */
         for (i = 1; i <= last_pos; i++) {
             LZ4_LOG_PARSER("%d: price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+i), i, last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen); 
         }
@@ -363,7 +362,6 @@ encode: // cur, last_pos, best_mlen, best_off have to be set
     /* Encode Last Literals */
     {
         int lastRun = (int)(iend - anchor);
-    //    if (inputSize > LASTLITERALS && lastRun < LASTLITERALS) { printf("ERROR: lastRun=%d\n", lastRun); }
         if ((limit) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;  /* Check output limit */
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
