@@ -224,7 +224,7 @@ static int LZ4HC_compress_optimal (
            while (mlen <= best_mlen) {
                 litlen = 0;
                 price = LZ4HC_get_price(llen + litlen, mlen) - 8*llen;
-                if (mlen > last_pos || price < (size_t)opt[mlen].price)
+                if (mlen > last_pos || price <= (size_t)opt[mlen].price)
                     SET_PRICE(mlen, mlen, matches[i].off, litlen, price);
                 mlen++;
            }
@@ -255,7 +255,7 @@ static int LZ4HC_compress_optimal (
             mlen = 1;
             best_mlen = 0;
             LZ4_LOG_PARSER("%d: TRY price=%d opt[%d].price=%d\n", (int)(inr-source), price, cur, opt[cur].price);
-            if (cur > last_pos || price <= (size_t)opt[cur].price) // || ((price == opt[cur].price) && (opt[cur-1].mlen == 1) && (cur != litlen)))
+            if (cur > last_pos || price < (size_t)opt[cur].price) // || ((price == opt[cur].price) && (opt[cur-1].mlen == 1) && (cur != litlen)))
                 SET_PRICE(cur, mlen, best_mlen, litlen, price);
 
             if (cur == last_pos) break;

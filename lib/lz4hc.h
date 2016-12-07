@@ -131,7 +131,7 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
  * Using these definitions makes the code vulnerable to potential API break when upgrading LZ4
  **************************************/
 #define LZ4HC_DICTIONARY_LOGSIZE 16
-#define LZ4HC_MAXD (1<<(LZ4HC_DICTIONARY_LOGSIZE+1))
+#define LZ4HC_MAXD (1<<(LZ4HC_DICTIONARY_LOGSIZE))
 #define LZ4HC_MAXD_MASK (LZ4HC_MAXD - 1)
 
 #define LZ4HC_HASH_LOG (LZ4HC_DICTIONARY_LOGSIZE-1)
