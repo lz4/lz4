@@ -46,7 +46,7 @@ extern "C" {
 /* --- Useful constants --- */
 #define LZ4HC_MIN_CLEVEL        3
 #define LZ4HC_DEFAULT_CLEVEL    9
-#define LZ4HC_MAX_CLEVEL        20
+#define LZ4HC_MAX_CLEVEL        12
 
 
 /*-************************************
@@ -134,7 +134,7 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
 #define LZ4HC_MAXD (1<<(LZ4HC_DICTIONARY_LOGSIZE+1))
 #define LZ4HC_MAXD_MASK (LZ4HC_MAXD - 1)
 
-#define LZ4HC_HASH_LOG (LZ4HC_DICTIONARY_LOGSIZE-1)
+#define LZ4HC_HASH_LOG (LZ4HC_DICTIONARY_LOGSIZE+2)
 #define LZ4HC_HASHTABLESIZE (1 << LZ4HC_HASH_LOG)
 #define LZ4HC_HASH_MASK (LZ4HC_HASHTABLESIZE - 1)
 

@@ -313,7 +313,7 @@ static int LZ4HC_compress_hashChain (
     char* const dest,
     int const inputSize,
     int const maxOutputSize,
-    int compressionLevel,
+    unsigned maxNbAttempts,
     limitedOutput_directive limit
     )
 {
@@ -326,7 +326,6 @@ static int LZ4HC_compress_hashChain (
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + maxOutputSize;
 
-    unsigned maxNbAttempts;
     int   ml, ml2, ml3, ml0;
     const BYTE* ref = NULL;
     const BYTE* start2 = NULL;
@@ -337,7 +336,6 @@ static int LZ4HC_compress_hashChain (
     const BYTE* ref0;
 
     /* init */
-    maxNbAttempts = 1 << (compressionLevel-1);
     ctx->end += inputSize;
 
     ip++;
@@ -504,17 +502,15 @@ static int LZ4HC_compress_generic (
 
 */
     if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
-    if (compressionLevel > 16) {
+    if (compressionLevel > 9) {
         switch (compressionLevel) {
-            case 17: ctx->searchNum = 16;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 16);
-            case 18: ctx->searchNum = 64;   return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 64);
-            case 19: ctx->searchNum = 256;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 256);
+            case 10: return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, 1 << (16-1), limit);
+            case 11: ctx->searchNum = 256;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 256);
             default:
-            case 20: ctx->searchNum = 1<<14; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM);
+            case 12: ctx->searchNum = 1<<14; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM);
         }
     }
-
-    return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, compressionLevel, limit);
+    return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, 1 << (compressionLevel-1), limit);
 }
 
 
