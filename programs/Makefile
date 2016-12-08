@@ -91,7 +91,7 @@ lz4c32: lz4
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT)
+           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4 lz4cat
 	@echo Cleaning completed
 
 
@@ -112,13 +112,19 @@ preview-man: clean-man man
 #FreeBSD targets
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
 
+unlz4: lz4
+	ln -s lz4 unlz4
+
+lz4cat: lz4
+	ln -s lz4 lz4cat
+
 install: lz4$(EXT) lz4c$(EXT)
 	@echo Installing binaries
 	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4$(EXT)
-	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
-	@ln -sf lz4$(EXT) $(DESTDIR)$(BINDIR)/unlz4$(EXT)
-	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
+	@install -m 755 lz4 $(DESTDIR)$(BINDIR)/lz4
+	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
+	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
+	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c
 	@echo Installing man pages
 	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
@@ -127,10 +133,10 @@ install: lz4$(EXT) lz4c$(EXT)
 	@echo lz4 installation completed
 
 uninstall:
-	@$(RM) $(DESTDIR)$(BINDIR)/lz4cat$(EXT)
-	@$(RM) $(DESTDIR)$(BINDIR)/unlz4$(EXT)
-	@$(RM) $(DESTDIR)$(BINDIR)/lz4$(EXT)
-	@$(RM) $(DESTDIR)$(BINDIR)/lz4c$(EXT)
+	@$(RM) $(DESTDIR)$(BINDIR)/lz4cat
+	@$(RM) $(DESTDIR)$(BINDIR)/unlz4
+	@$(RM) $(DESTDIR)$(BINDIR)/lz4
+	@$(RM) $(DESTDIR)$(BINDIR)/lz4c
 	@$(RM) $(DESTDIR)$(MANDIR)/lz4.1
 	@$(RM) $(DESTDIR)$(MANDIR)/lz4c.1
 	@$(RM) $(DESTDIR)$(MANDIR)/lz4cat.1

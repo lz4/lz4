@@ -38,7 +38,7 @@ VOID    := /dev/null
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
-CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
+CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
 CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum \
            -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
@@ -206,12 +206,18 @@ test-lz4-multiple: lz4 datagen
 	$(LZ4) -f -m tmp1 notHere tmp2; echo $$?
 	@$(RM) tmp*
 
-test-lz4-basic: lz4 datagen
+unlz4:
+	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
+
+lz4cat:
+	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
+
+test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0     | $(LZ4) -v     | $(LZ4) -t
 	./datagen -g16KB  | $(LZ4) -9     | $(LZ4) -t
 	./datagen -g20KB > tmpSrc
-	$(LZ4) < tmpSrc | $(LZ4) -d > tmpRes
+	$(LZ4) < tmpSrc   | $(LZ4) -d > tmpRes
 	diff -q tmpSrc tmpRes
 	$(LZ4) --no-frame-crc < tmpSrc | $(LZ4) -d > tmpRes
 	diff -q tmpSrc tmpRes
@@ -220,6 +226,19 @@ test-lz4-basic: lz4 datagen
 	./datagen -g17M   | $(LZ4) -9v    | $(LZ4) -qt
 	./datagen -g33M   | $(LZ4) --no-frame-crc | $(LZ4) -t
 	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
+	@echo "hello world" > tmp
+	$(LZ4) --rm -f tmp
+	ls -ls tmp         && false || true   # must fail (--rm)
+	ls -ls tmp.lz4
+	$(PRGDIR)/lz4cat tmp.lz4              # must display hello world
+	ls -ls tmp.lz4
+	$(PRGDIR)/unlz4 --rm tmp.lz4
+	ls -ls tmp
+	ls -ls tmp.lz4     && false || true   # must fail (--rm)
+	ls -ls tmp.lz4.lz4 && false || true   # must fail (unlz4)
+	$(PRGDIR)/lz4cat tmp                  # pass-through mode
+	ls -ls tmp
+	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen
