@@ -264,7 +264,7 @@ static const char* lastNameFromPath(const char* path)
 {
     const char* name = strrchr(path, '/');
     if (name==NULL) name = strrchr(path, '\\');   /* windows */
-    if (name==NULL) name = path-1;
+    if (name==NULL) return path;
     return name+1;
 }
 
