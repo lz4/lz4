@@ -313,6 +313,7 @@ int main(int argc, const char** argv)
         DISPLAY("Allocation error : not enough memory \n");
         return 1;
     }
+    inFileNames[0] = stdinmark;
     LZ4IO_setOverwrite(0);
 
     /* lz4cat predefined behavior */
@@ -468,7 +469,7 @@ int main(int argc, const char** argv)
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
-                        /* recursive */
+                    /* recursive */
                 case 'r': recursive=1;  /* without break */
 #endif
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
@@ -482,7 +483,7 @@ int main(int argc, const char** argv)
                         iters = readU32FromChar(&argument);
                         argument--;
                         BMK_setNotificationLevel(displayLevel);
-                        BMK_SetNbSeconds(iters);
+                        BMK_SetNbSeconds(iters);   /* notification if displayLevel >= 3 */
                     }
                     break;
 
@@ -555,6 +556,9 @@ int main(int argc, const char** argv)
         DISPLAYLEVEL(1, "refusing to read from a console\n");
         exit(1);
     }
+    /* if input==stdin and no output defined, stdout becomes default output */
+    if (!strcmp(input_filename, stdinmark) && !output_filename)
+        output_filename = stdoutmark;
 
     /* No output filename ==> try to select one automatically (when possible) */
     while ((!output_filename) && (multiple_inputs==0)) {
@@ -592,20 +596,19 @@ int main(int argc, const char** argv)
         break;
     }
 
-    if (!output_filename) output_filename = "*\\dummy^!//";
-
     /* Check if output is defined as console; trigger an error in this case */
+    if (!output_filename) output_filename = "*\\dummy^!//";
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) {
         DISPLAYLEVEL(1, "refusing to write to console without -c\n");
         exit(1);
     }
-
     /* Downgrade notification level in stdout and multiple file mode */
     if (!strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
     if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
 
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
+    if (ifnIdx == 0) multiple_inputs = 0;
     if (mode == om_decompress) {
         if (multiple_inputs)
             operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION);
