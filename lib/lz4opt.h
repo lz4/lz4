@@ -36,7 +36,7 @@
 #define LZ4_LOG_PARSER(fmt, ...) //printf(fmt, __VA_ARGS__) 
 #define LZ4_LOG_PRICE(fmt, ...) //printf(fmt, __VA_ARGS__) 
 #define LZ4_LOG_ENCODE(fmt, ...) //printf(fmt, __VA_ARGS__) 
-#include <stdio.h>
+
 
 #define LZ4_OPT_NUM   (1<<12)
 
@@ -189,7 +189,7 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     if (ip < ctx->base + ctx->nextToUpdateBT) return 0;   /* skipped area */
     if (fullUpdate) LZ4HC_updateBinTree(ctx, ip, iHighLimit);
     best_mlen = LZ4HC_BinTree_InsertAndGetAllMatches(ctx, ip, iHighLimit, best_mlen, matches, &mnum);
-    ctx->nextToUpdateBT = (U32)(ip - ctx->base) + best_mlen;
+    ctx->nextToUpdateBT = (U32)(ip - ctx->base + best_mlen);
     return mnum;
 }
 

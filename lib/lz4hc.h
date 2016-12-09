@@ -46,6 +46,7 @@ extern "C" {
 /* --- Useful constants --- */
 #define LZ4HC_MIN_CLEVEL        3
 #define LZ4HC_DEFAULT_CLEVEL    9
+#define LZ4HC_MIN_CLEVEL_OPT    11
 #define LZ4HC_MAX_CLEVEL        12
 
 
