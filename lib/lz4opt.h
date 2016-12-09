@@ -36,6 +36,7 @@
 #define LZ4_LOG_PARSER(fmt, ...) //printf(fmt, __VA_ARGS__) 
 #define LZ4_LOG_PRICE(fmt, ...) //printf(fmt, __VA_ARGS__) 
 #define LZ4_LOG_ENCODE(fmt, ...) //printf(fmt, __VA_ARGS__) 
+#include <stdio.h>
 
 #define LZ4_OPT_NUM   (1<<12)
 
@@ -161,8 +162,8 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     *ptr0 = (U16)-1;
     *ptr1 = (U16)-1;
     if (matchNum) *matchNum = mnum;
-   // if (best_mlen > 8) return best_mlen-8;
-    if (!matchNum) return 8;
+  //  if (best_mlen > 8) return best_mlen-8;
+    if (!matchNum) return 1;
     return 1; 
 }
 
@@ -290,7 +291,7 @@ static int LZ4HC_compress_optimal (
             if (cur > last_pos || price < (size_t)opt[cur].price)
                 SET_PRICE(cur, mlen, best_mlen, litlen, price);
 
-            if (cur == last_pos) break;
+            if (cur == last_pos || inr >= mflimit) break;
             LZ4_LOG_PARSER("%d: CURRENT price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(inr-source), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen); 
 
             match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, MINMATCH-1, matches);
@@ -368,7 +369,7 @@ encode: /* cur, last_pos, best_mlen, best_off have to be set */
             offset = opt[cur].off;
             cur += mlen;
 
-            LZ4_LOG_ENCODE("%d: ENCODE literals=%d off=%d mlen=%d ", (int)(ip-source), (int)(ip-anchor), (int)(offset), mlen);
+            LZ4_LOG_ENCODE("%d: ENCODE literals=%d off=%d mlen=%d ", (int)(ip-(const BYTE*)source), (int)(ip-anchor), (int)(offset), (int)mlen);
             res = LZ4HC_encodeSequence(&ip, &op, &anchor, (int)mlen, ip - offset, limit, oend);
             LZ4_LOG_ENCODE("out=%d\n", (int)((char*)op - dest));
 
@@ -379,12 +380,11 @@ encode: /* cur, last_pos, best_mlen, best_off have to be set */
     }
 
     /* Encode Last Literals */
-    {
-        int lastRun = (int)(iend - anchor);
+    {   int lastRun = (int)(iend - anchor);
         if ((limit) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;  /* Check output limit */
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
-        LZ4_LOG_ENCODE("%d: ENCODE_LAST literals=%d out=%d\n", (int)(ip-source), (int)(iend-anchor), (int)((char*)op -dest));
+        LZ4_LOG_ENCODE("%d: ENCODE_LAST literals=%d out=%d\n", (int)(ip-(const BYTE*)source), (int)(iend-anchor), (int)((char*)op-dest));
         memcpy(op, anchor, iend - anchor);
         op += iend-anchor;
     }
