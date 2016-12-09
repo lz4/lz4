@@ -85,7 +85,8 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     const BYTE* const ip,
     const BYTE* const iHighLimit,
     size_t best_mlen,
-    LZ4HC_match_t* matches)
+    LZ4HC_match_t* matches,
+    int* matchNum)
 {
     U16* const chainTable = ctx->chainTable;
     U32* const HashTable = ctx->hashTable;
@@ -102,7 +103,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     size_t matchLength = 0;
     U32* HashPos;
     
-    if (ip + MINMATCH > iHighLimit) return 0;
+    if (ip + MINMATCH > iHighLimit) return 1;
 
     /* First Match */
     HashPos = &HashTable[LZ4HC_hashPtr(ip)];
@@ -127,11 +128,13 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
                 matchLength += LZ4_count(ip+matchLength, base+dictLimit, iHighLimit);
         }
 
-        if (matches && matchLength > best_mlen) {
+        if (matchLength > best_mlen) {
             best_mlen = matchLength;
-            matches[mnum].off = (int)(ip - match);
-            matches[mnum].len = (int)matchLength;
-            mnum++;
+            if (matches) {
+                matches[mnum].off = (int)(ip - match);
+                matches[mnum].len = (int)matchLength;
+                mnum++;
+            }
             if (best_mlen > LZ4_OPT_NUM) break;
         }
 
@@ -157,20 +160,21 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
 
     *ptr0 = (U16)-1;
     *ptr1 = (U16)-1;
-    return mnum;
+    if (matchNum) *matchNum = mnum;
+   // if (best_mlen > 8) return best_mlen-8;
+    if (!matchNum) return 8;
+    return 1; 
 }
 
 
-FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* const ip, const BYTE* const iHighLimit, size_t best_mlen)
+FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* const ip, const BYTE* const iHighLimit)
 {
     const BYTE* const base = ctx->base;
     const U32 target = (U32)(ip - base);
     U32 idx = ctx->nextToUpdate;
 
-    while(idx < target) {
-        LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, best_mlen, NULL);
-        idx++;
-    }
+    while(idx < target)
+        idx += LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, 8, NULL, NULL);
 } 
 
 
@@ -180,11 +184,11 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
                         const BYTE* const ip, const BYTE* const iHighLimit,
                         size_t best_mlen, LZ4HC_match_t* matches)
 {
-    int mnum;
+    int mnum = 0;
     if (ip < ctx->base + ctx->nextToUpdate) return 0;   /* skipped area */
-    LZ4HC_updateBinTree(ctx, ip, iHighLimit, best_mlen);
-    mnum = LZ4HC_BinTree_InsertAndGetAllMatches(ctx, ip, iHighLimit, best_mlen, matches);
-    ctx->nextToUpdate = (U32)(ip - ctx->base)+1;
+    LZ4HC_updateBinTree(ctx, ip, iHighLimit);
+    best_mlen = LZ4HC_BinTree_InsertAndGetAllMatches(ctx, ip, iHighLimit, best_mlen, matches, &mnum);
+    ctx->nextToUpdate = (U32)(ip - ctx->base) + best_mlen;
     return mnum;
 }
 
