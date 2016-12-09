@@ -106,7 +106,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     
     if (ip + MINMATCH > iHighLimit) return 1;
 
-    /* First Match */
+    /* HC4 match finder */
     HashPos = &HashTable[LZ4HC_hashPtr(ip)];
     matchIndex = *HashPos;
     *HashPos = current;
@@ -162,7 +162,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     *ptr0 = (U16)-1;
     *ptr1 = (U16)-1;
     if (matchNum) *matchNum = mnum;
-  //  if (best_mlen > 8) return best_mlen-8;
+  /*  if (best_mlen > 8) return best_mlen-8; */
     if (!matchNum) return 1;
     return 1; 
 }
@@ -172,24 +172,24 @@ FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* cons
 {
     const BYTE* const base = ctx->base;
     const U32 target = (U32)(ip - base);
-    U32 idx = ctx->nextToUpdate;
+    U32 idx = ctx->nextToUpdateBT;
 
     while(idx < target)
         idx += LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, 8, NULL, NULL);
-} 
+}
 
 
 /** Tree updater, providing best match */
 FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
                         LZ4HC_CCtx_internal* ctx,
                         const BYTE* const ip, const BYTE* const iHighLimit,
-                        size_t best_mlen, LZ4HC_match_t* matches)
+                        size_t best_mlen, LZ4HC_match_t* matches, const int fullUpdate)
 {
     int mnum = 0;
-    if (ip < ctx->base + ctx->nextToUpdate) return 0;   /* skipped area */
-    LZ4HC_updateBinTree(ctx, ip, iHighLimit);
+    if (ip < ctx->base + ctx->nextToUpdateBT) return 0;   /* skipped area */
+    if (fullUpdate) LZ4HC_updateBinTree(ctx, ip, iHighLimit);
     best_mlen = LZ4HC_BinTree_InsertAndGetAllMatches(ctx, ip, iHighLimit, best_mlen, matches, &mnum);
-    ctx->nextToUpdate = (U32)(ip - ctx->base) + best_mlen;
+    ctx->nextToUpdateBT = (U32)(ip - ctx->base) + best_mlen;
     return mnum;
 }
 
@@ -212,7 +212,8 @@ static int LZ4HC_compress_optimal (
     int inputSize,
     int maxOutputSize,
     limitedOutput_directive limit,
-    const size_t sufficient_len
+    const size_t sufficient_len,
+    const int fullUpdate
     )
 {
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + 1];
@@ -238,7 +239,7 @@ static int LZ4HC_compress_optimal (
         memset(opt, 0, sizeof(LZ4HC_optimal_t));
         last_pos = 0;
         llen = ip - anchor;
-        match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches);
+        match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
         if (!match_num) { ip++; continue; }
         LZ4_LOG_PARSER("%d: match_num=%d last_pos=%d\n", (int)(ip-source), match_num, last_pos);
 
@@ -294,7 +295,7 @@ static int LZ4HC_compress_optimal (
             if (cur == last_pos || inr >= mflimit) break;
             LZ4_LOG_PARSER("%d: CURRENT price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(inr-source), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen); 
 
-            match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, MINMATCH-1, matches);
+            match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, MINMATCH-1, matches, fullUpdate);
             LZ4_LOG_PARSER("%d: LZ4HC_BinTree_GetAllMatches match_num=%d\n", (int)(inr-source), match_num);
 
             if (match_num > 0 && (size_t)matches[match_num-1].len > sufficient_len) {
