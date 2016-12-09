@@ -37,7 +37,6 @@
 #define LZ4_LOG_PRICE(fmt, ...) //printf(fmt, __VA_ARGS__) 
 #define LZ4_LOG_ENCODE(fmt, ...) //printf(fmt, __VA_ARGS__) 
 
-
 #define LZ4_OPT_NUM   (1<<12)
 
 
@@ -78,7 +77,10 @@ FORCE_INLINE size_t LZ4HC_get_price(size_t litlen, size_t mlen)
 }
 
 
-FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
+/*-*************************************
+*  Binary Tree search
+***************************************/
+FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     LZ4HC_CCtx_internal* ctx,
     const BYTE* const ip,
     const BYTE* const iHighLimit,
@@ -97,7 +99,7 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     int mnum = 0;
     U16 *ptr0, *ptr1, delta0, delta1;
     U32 matchIndex;
-    size_t mlt = 0;
+    size_t matchLength = 0;
     U32* HashPos;
     
     if (ip + MINMATCH > iHighLimit) return 0;
@@ -106,7 +108,6 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     HashPos = &HashTable[LZ4HC_hashPtr(ip)];
     matchIndex = *HashPos;
     *HashPos = current;
-    ctx->nextToUpdate++;
 
     ptr0 = &DELTANEXTMAXD(current*2+1);
     ptr1 = &DELTANEXTMAXD(current*2);
@@ -116,25 +117,28 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             match = base + matchIndex;
-            mlt = LZ4_count(ip, match, iHighLimit);
+            matchLength = LZ4_count(ip, match, iHighLimit);
         } else {
             const BYTE* vLimit = ip + (dictLimit - matchIndex);
             match = dictBase + matchIndex;
             if (vLimit > iHighLimit) vLimit = iHighLimit;
-            mlt = LZ4_count(ip, match, vLimit);
-            if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
-                mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
+            matchLength = LZ4_count(ip, match, vLimit);
+            if ((ip+matchLength == vLimit) && (vLimit < iHighLimit))
+                matchLength += LZ4_count(ip+matchLength, base+dictLimit, iHighLimit);
         }
 
-        if (mlt > best_mlen) {
-            best_mlen = mlt;
+        if (matches && matchLength > best_mlen) {
+            best_mlen = matchLength;
             matches[mnum].off = (int)(ip - match);
-            matches[mnum].len = (int)mlt;
+            matches[mnum].len = (int)matchLength;
             mnum++;
             if (best_mlen > LZ4_OPT_NUM) break;
         }
 
-        if (*(ip+mlt) < *(match+mlt)) {
+        if (ip+matchLength >= iHighLimit)   /* equal : no way to know if inf or sup */
+            break;   /* drop , to guarantee consistency ; miss a bit of compression, but other solutions can corrupt the tree */
+
+        if (*(ip+matchLength) < *(match+matchLength)) {
             *ptr0 = delta0;
             ptr0 = &DELTANEXTMAXD(matchIndex*2);
             if (*ptr0 == (U16)-1) break;
@@ -153,6 +157,34 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 
     *ptr0 = (U16)-1;
     *ptr1 = (U16)-1;
+    return mnum;
+}
+
+
+FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* const ip, const BYTE* const iHighLimit, size_t best_mlen)
+{
+    const BYTE* const base = ctx->base;
+    const U32 target = (U32)(ip - base);
+    U32 idx = ctx->nextToUpdate;
+
+    while(idx < target) {
+        LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, best_mlen, NULL);
+        idx++;
+    }
+} 
+
+
+/** Tree updater, providing best match */
+FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
+                        LZ4HC_CCtx_internal* ctx,
+                        const BYTE* const ip, const BYTE* const iHighLimit,
+                        size_t best_mlen, LZ4HC_match_t* matches)
+{
+    int mnum;
+    if (ip < ctx->base + ctx->nextToUpdate) return 0;   /* skipped area */
+    LZ4HC_updateBinTree(ctx, ip, iHighLimit, best_mlen);
+    mnum = LZ4HC_BinTree_InsertAndGetAllMatches(ctx, ip, iHighLimit, best_mlen, matches);
+    ctx->nextToUpdate = (U32)(ip - ctx->base)+1;
     return mnum;
 }
 
