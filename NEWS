@@ -1,6 +1,7 @@
 v1.7.5
 cli : fix minor notification when using -r recursive mode
-doc : markdown version of man page, by Takayuki Matsuoka
+lz4cat : fix : works with relative path (#284) and stdin (#285) (reported by @beiDei8z)
+doc : markdown version of man page, by Takayuki Matsuoka (#279)
 
 v1.7.4.2
 fix : Makefile : release build compatible with PIE and customized compilation directives provided through environment variables (#274, reported by Antoine Martin)

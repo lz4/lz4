@@ -239,6 +239,11 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(PRGDIR)/lz4cat tmp                  # pass-through mode
 	ls -ls tmp
 	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
+	$(LZ4) tmp                         # creates tmp.lz4
+	$(PRGDIR)/lz4cat < tmp.lz4 > tmp3  # checks lz4cat works with stdin (#285)
+	diff -q tmp tmp3
+	$(PRGDIR)/lz4cat < tmp > tmp2      # checks lz4cat works with stdin (#285)
+	diff -q tmp tmp2
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen

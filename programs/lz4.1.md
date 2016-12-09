@@ -34,6 +34,7 @@ Differences are :
   * `lz4` preserves original files
   * `lz4` compresses a single file by default (see `-m` for multiple files)
   * `lz4 file1 file2` means : compress file1 _into_ file2
+  * `lz4 file.lz4` will default to decompression (use `-z` to force compression)
   * `lz4` shows real-time notification statistics
      during compression or decompression of a single file
      (use `-q` to silent them)
@@ -43,15 +44,16 @@ Differences are :
     `file` is compressed into `file.lz4`.
   * As a consequence of previous rules, note the following example :
     `lz4 file | consumer` sends compressed data to `consumer` through `stdout`,
-    hence it does _not_ create any `file.lz4`.
+    hence it does _not_ create `file.lz4`.
 
 Default behaviors can be modified by opt-in commands, detailed below.
 
   * `lz4 -m` makes it possible to provide multiple input filenames,
     which will be compressed into files using suffix `.lz4`.
-    Progress notifications are also disabled by default.
+    Progress notifications are also disabled by default (use `-v` to enable them).
     This mode has a behavior which more closely mimics `gzip` command line,
-    with the main difference being that source files are preserved by default.
+    with the main remaining difference being that source files are preserved by default.
+  * Similarly, `lz4 -m -d` can decompress multiple `*.lz4` files.
   * It's possible to opt-in to erase source files
     on successful compression or decompression, using `--rm` command.
   * Consequently, `lz4 -m --rm` behaves the same as `gzip`.
