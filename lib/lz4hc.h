@@ -46,7 +46,8 @@ extern "C" {
 /* --- Useful constants --- */
 #define LZ4HC_MIN_CLEVEL        3
 #define LZ4HC_DEFAULT_CLEVEL    9
-#define LZ4HC_MAX_CLEVEL        16
+#define LZ4HC_MIN_CLEVEL_OPT    11
+#define LZ4HC_MAX_CLEVEL        12
 
 
 /*-************************************
@@ -58,7 +59,7 @@ extern "C" {
  * Compression is guaranteed to succeed if `dstCapacity >= LZ4_compressBound(srcSize)` (see "lz4.h")
  * Max supported `srcSize` value is LZ4_MAX_INPUT_SIZE (see "lz4.h")
  * `compressionLevel` : Recommended values are between 4 and 9, although any value between 1 and LZ4HC_MAX_CLEVEL will work.
- *                      Values >LZ4HC_MAX_CLEVEL behave the same as 16.
+ *                      Values >LZ4HC_MAX_CLEVEL behave the same as LZ4HC_MAX_CLEVEL.
  * @return : the number of bytes written into 'dst'
  *           or 0 if compression fails.
  */
@@ -130,11 +131,11 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
  * They are exposed to allow static allocation of `LZ4_streamHC_t`.
  * Using these definitions makes the code vulnerable to potential API break when upgrading LZ4
  **************************************/
-#define LZ4HC_DICTIONARY_LOGSIZE 16
+#define LZ4HC_DICTIONARY_LOGSIZE 17
 #define LZ4HC_MAXD (1<<LZ4HC_DICTIONARY_LOGSIZE)
 #define LZ4HC_MAXD_MASK (LZ4HC_MAXD - 1)
 
-#define LZ4HC_HASH_LOG (LZ4HC_DICTIONARY_LOGSIZE-1)
+#define LZ4HC_HASH_LOG 15
 #define LZ4HC_HASHTABLESIZE (1 << LZ4HC_HASH_LOG)
 #define LZ4HC_HASH_MASK (LZ4HC_HASHTABLESIZE - 1)
 
@@ -153,6 +154,8 @@ typedef struct
     uint32_t   dictLimit;        /* below that point, need extDict */
     uint32_t   lowLimit;         /* below that point, no more dict */
     uint32_t   nextToUpdate;     /* index from which to continue dictionary update */
+    uint32_t   nextToUpdateBT;   /* index from which to continue binary tree update */
+    uint32_t   searchNum;        /* only for optimal parser */
     uint32_t   compressionLevel;
 } LZ4HC_CCtx_internal;
 
@@ -169,12 +172,14 @@ typedef struct
     unsigned int   dictLimit;        /* below that point, need extDict */
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
+    unsigned int   nextToUpdateBT;     /* index from which to continue binary tree update */
+    unsigned int   searchNum;        /* only for optimal parser */
     unsigned int   compressionLevel;
 } LZ4HC_CCtx_internal;
 
 #endif
 
-#define LZ4_STREAMHCSIZE        262192
+#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 56) /* 393268 */
 #define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
 union LZ4_streamHC_u {
     size_t table[LZ4_STREAMHCSIZE_SIZET];

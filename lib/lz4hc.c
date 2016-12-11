@@ -84,7 +84,7 @@
 *  Local Macros
 **************************************/
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
-/* #define DELTANEXTU16(p)        chainTable[(p) & LZ4HC_MAXD_MASK] */   /* flexible, LZ4HC_MAXD dependent */
+#define DELTANEXTMAXD(p)       chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
 #define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
@@ -98,7 +98,7 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
-    hc4->nextToUpdate = 64 KB;
+    hc4->nextToUpdate = hc4->nextToUpdateBT = 64 KB;
     hc4->base = start - 64 KB;
     hc4->end = start;
     hc4->dictBase = start - 64 KB;
@@ -305,14 +305,15 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     return 0;
 }
 
+#include "lz4opt.h"
 
-static int LZ4HC_compress_generic (
+static int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
     const char* const source,
     char* const dest,
     int const inputSize,
     int const maxOutputSize,
-    int compressionLevel,
+    unsigned maxNbAttempts,
     limitedOutput_directive limit
     )
 {
@@ -325,7 +326,6 @@ static int LZ4HC_compress_generic (
     BYTE* op = (BYTE*) dest;
     BYTE* const oend = op + maxOutputSize;
 
-    unsigned maxNbAttempts;
     int   ml, ml2, ml3, ml0;
     const BYTE* ref = NULL;
     const BYTE* start2 = NULL;
@@ -336,9 +336,6 @@ static int LZ4HC_compress_generic (
     const BYTE* ref0;
 
     /* init */
-    if (compressionLevel > LZ4HC_MAX_CLEVEL) compressionLevel = LZ4HC_MAX_CLEVEL;
-    if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
-    maxNbAttempts = 1 << (compressionLevel-1);
     ctx->end += inputSize;
 
     ip++;
@@ -490,6 +487,29 @@ _Search3:
 }
 
 
+static int LZ4HC_compress_generic (
+    LZ4HC_CCtx_internal* const ctx,
+    const char* const source,
+    char* const dest,
+    int const inputSize,
+    int const maxOutputSize,
+    int compressionLevel,
+    limitedOutput_directive limit
+    )
+{
+    if (compressionLevel < 1) compressionLevel = LZ4HC_DEFAULT_CLEVEL;
+    if (compressionLevel > 9) {
+        switch (compressionLevel) {
+            case 10: return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, 1 << (16-1), limit);
+            case 11: ctx->searchNum = 128;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 128, 0);
+            default:
+            case 12: ctx->searchNum = 1<<10; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM, 1);
+        }
+    }
+    return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, 1 << (compressionLevel-1), limit);
+}
+
+
 int LZ4_sizeofStateHC(void) { return sizeof(LZ4_streamHC_t); }
 
 int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
@@ -554,14 +574,18 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
 
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
-    if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    if (ctxPtr->compressionLevel >= LZ4HC_MIN_CLEVEL_OPT) 
+        LZ4HC_updateBinTree(ctxPtr, ctxPtr->end - MFLIMIT, ctxPtr->end - LASTLITERALS);
+    else
+        if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
     ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
     ctxPtr->dictBase  = ctxPtr->base;
     ctxPtr->base = newBlock - ctxPtr->dictLimit;
     ctxPtr->end  = newBlock;
-    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   /* match referencing will resume from there */
+    ctxPtr->nextToUpdate = ctxPtr->nextToUpdateBT = ctxPtr->dictLimit;   /* match referencing will resume from there */
 }
 
 static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
@@ -621,6 +645,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
         streamPtr->dictLimit = endIndex - dictSize;
         streamPtr->lowLimit = endIndex - dictSize;
         if (streamPtr->nextToUpdate < streamPtr->dictLimit) streamPtr->nextToUpdate = streamPtr->dictLimit;
+        if (streamPtr->nextToUpdateBT < streamPtr->dictLimit) streamPtr->nextToUpdateBT = streamPtr->dictLimit;
     }
     return dictSize;
 }
