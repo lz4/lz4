@@ -52,7 +52,9 @@ endif
 
 .PHONY: default all lib lz4 clean test versionsTest examples
 
-default: lib lz4-release
+default:
+	@$(MAKE) -C $(LZ4DIR)
+	@$(MAKE) -C $(PRGDIR)
 
 all:
 	@$(MAKE) -C $(LZ4DIR) $@
