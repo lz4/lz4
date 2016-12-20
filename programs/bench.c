@@ -27,10 +27,11 @@
 /* *************************************
 *  Includes
 ***************************************/
-#include "util.h"        /* Compiler options, UTIL_GetFileSize, UTIL_sleep */
+#include "platform.h"    /* Compiler options */
+#include "util.h"        /* UTIL_GetFileSize, UTIL_sleep */
 #include <stdlib.h>      /* malloc, free */
 #include <string.h>      /* memset */
-#include <stdio.h>       /* fprintf, fopen, ftello64 */
+#include <stdio.h>       /* fprintf, fopen, ftello */
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 
 #include "datagen.h"     /* RDG_genBuffer */

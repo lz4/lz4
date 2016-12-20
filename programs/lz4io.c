@@ -33,10 +33,6 @@
 /**************************************
 *  Compiler Options
 **************************************/
-#define _LARGE_FILES           /* Large file support on 32-bits AIX */
-#define _FILE_OFFSET_BITS 64   /* off_t width */
-#define _LARGEFILE_SOURCE
-
 #if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
 #endif
@@ -44,7 +40,8 @@
 /*****************************
 *  Includes
 *****************************/
-#include "util.h"      /* Compiler options, UTIL_getFileStat */
+#include "platform.h"  /* Compiler options */
+#include "util.h"      /* UTIL_getFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strcmp, strlen */
@@ -56,32 +53,6 @@
 #include "lz4hc.h"     /* still required for legacy format */
 #include "lz4frame.h"
 
-
-/******************************
-*  OS-specific Includes
-******************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
-#  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
-#  if !defined(__DJGPP__)
-#    define SET_BINARY_MODE(file) { int unused=_setmode(_fileno(file), _O_BINARY); (void)unused; }
-#    include <windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
-#    include <winioctl.h> /* FSCTL_SET_SPARSE */
-#    define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
-#    if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
-#      define fseek _fseeki64
-#    endif
-#  else
-#    define SET_BINARY_MODE(file) setmode(fileno(file), O_BINARY)
-#    define SET_SPARSE_FILE_MODE(file)
-#  endif
-#else
-#  if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || (defined(__APPLE__) && defined(__MACH__))
-#    define fseek fseeko
-#  endif
-#  define SET_BINARY_MODE(file)
-#  define SET_SPARSE_FILE_MODE(file)
-#endif
 
 
 /*****************************

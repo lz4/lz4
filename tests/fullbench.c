@@ -23,20 +23,6 @@
     - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-/**************************************
-*  Compiler Options
-**************************************/
-/* Disable some Visual warning messages */
-#define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
-
-/* Unix Large Files support (>4GB) */
-#if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
-#  define _LARGEFILE_SOURCE
-#  define _FILE_OFFSET_BITS 64
-#elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
-#  define _LARGEFILE64_SOURCE
-#endif
 
 // S_ISREG & gettimeofday() are not supported by MSVC
 #if defined(_MSC_VER) || defined(_WIN32)
@@ -48,7 +34,7 @@
 *  Includes
 **************************************/
 #include <stdlib.h>      /* malloc, free */
-#include <stdio.h>       /* fprintf, fopen, ftello64 */
+#include <stdio.h>       /* fprintf, fopen, ftello */
 #include <sys/types.h>   /* stat64 */
 #include <sys/stat.h>    /* stat64 */
 #include <string.h>      /* strcmp */
