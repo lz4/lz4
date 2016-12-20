@@ -498,6 +498,15 @@ int main(int argc, const char** argv)
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
+#ifdef _POSIX_C_SOURCE
+    DISPLAYLEVEL(4, "_POSIX_C_SOURCE defined: %ldL\n", (long) _POSIX_C_SOURCE);
+#endif
+#ifdef _POSIX_VERSION
+    DISPLAYLEVEL(4, "_POSIX_VERSION defined: %ldL\n", (long) _POSIX_VERSION);
+#endif
+#ifdef PLATFORM_POSIX_VERSION
+    DISPLAYLEVEL(4, "PLATFORM_POSIX_VERSION defined: %ldL\n", (long) PLATFORM_POSIX_VERSION);
+#endif
     if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %i KB\n", (U32)(blockSize>>10));
 
     if (multiple_inputs) {
