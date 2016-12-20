@@ -42,8 +42,8 @@
 /****************************
 *  Includes
 *****************************/
-#include "platform.h" /* Compiler options, PLATFORM_POSIX_VERSION */
-#include "util.h"     /* UTIL_HAS_CREATEFILELIST */
+#include "platform.h" /* Compiler options, IS_CONSOLE */
+#include "util.h"     /* UTIL_HAS_CREATEFILELIST, UTIL_createFileList */
 #include <stdio.h>    /* fprintf, getchar */
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */

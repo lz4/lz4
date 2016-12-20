@@ -26,6 +26,7 @@
 /**************************************
 *  Includes
 **************************************/
+#include "platform.h"  /* Compiler options, SET_BINARY_MODE */
 #include <stdlib.h>    /* malloc */
 #include <stdio.h>     /* FILE, fwrite */
 #include <string.h>    /* memcpy */
@@ -47,18 +48,6 @@
   typedef unsigned int        U32;
   typedef   signed int        S32;
   typedef unsigned long long  U64;
-#endif
-
-
-/**************************************
-*  OS-specific Includes
-**************************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _isatty */
-#  define SET_BINARY_MODE(file) _setmode(_fileno(file), _O_BINARY)
-#else
-#  define SET_BINARY_MODE(file)
 #endif
 
 

@@ -24,9 +24,53 @@ extern "C" {
 #  define _CRT_SECURE_NO_WARNINGS   /* Disable some Visual warning messages for fopen, strncpy */
 #  define _CRT_SECURE_NO_DEPRECATE  /* VS2005 */
 #  pragma warning(disable : 4127)   /* disable: C4127: conditional expression is constant */
-#  if _MSC_VER <= 1800              /* (1800 = Visual Studio 2013) */
+#  if (_MSC_VER <= 1800)            /* (1800 = Visual Studio 2013) */
 #    define snprintf sprintf_s      /* snprintf unsupported by Visual <= 2013 */
 #  endif
+#  if (_MSC_VER >= 1400)            /* Avoid MSVC fseek()'s 2GiB barrier */
+#    define fseek _fseeki64
+#  endif
+#endif
+
+
+/* ************************************************************
+*  Detect POSIX version
+*  PLATFORM_POSIX_VERSION = -1 for non-Unix e.g. Windows
+*  PLATFORM_POSIX_VERSION = 0 for Unix-like non-POSIX
+*  PLATFORM_POSIX_VERSION >= 1 is equal to found _POSIX_VERSION
+***************************************************************/
+#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) \
+   || defined(__midipix__) || defined(__VMS))  /* UNIX-like OS */
+#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux)
+     || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)  /* POSIX.1–2001 (SUSv3) conformant */
+#    define PLATFORM_POSIX_VERSION 200112L
+#  else
+#    if defined(__linux__) || defined(__linux)
+#      define _POSIX_C_SOURCE 200112L  /* use feature test macro */
+#    endif
+#    include <unistd.h>  /* declares _POSIX_VERSION */
+#    if defined(_POSIX_VERSION)  /* POSIX compliant */
+#      define PLATFORM_POSIX_VERSION _POSIX_VERSION
+#    else
+#      define PLATFORM_POSIX_VERSION 0
+#    endif
+#  endif
+#endif
+#if !defined(PLATFORM_POSIX_VERSION)
+#  define PLATFORM_POSIX_VERSION -1
+#endif
+
+
+/*-*********************************************
+*  Detect if isatty() and fileno() are available
+************************************************/
+#if (defined(__linux__) && (PLATFORM_POSIX_VERSION >= 1)) || (PLATFORM_POSIX_VERSION >= 200112L) || defined(__DJGPP__)
+#  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
+#elif defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+#  include <io.h>       /* _isatty */
+#  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
+#else
+#  define IS_CONSOLE(stdStream) 0
 #endif
 
 
@@ -48,51 +92,41 @@ extern "C" {
 #endif
 
 
-/* **************************************
-*  Unix Large Files support (>4GB)
-****************************************/
-#if !defined(__64BIT__)                               /* No point defining Large file for 64 bit */
+/* *********************************************************
+*  Turn on Large Files support (>4GB) for 32-bit Linux/Unix
+***********************************************************/
+#if !defined(__64BIT__) && (PLATFORM_POSIX_VERSION >= 200112L) /* No point defining Large file for 64 bit */
 #  if !defined(_FILE_OFFSET_BITS)   
 #    define _FILE_OFFSET_BITS 64                      /* turn off_t into a 64-bit type for ftello, fseeko */
 #  endif
-#  if defined(__sun__) && !defined(_LARGEFILE_SOURCE) /* Sun Solaris 32-bits requires specific definitions */
+#  if !defined(_LARGEFILE_SOURCE)                     /* obsolete macro, replaced with _FILE_OFFSET_BITS */
 #    define _LARGEFILE_SOURCE 1                       /* Large File Support extension (LFS) - fseeko, ftello */
 #  endif
 #  if defined(_AIX) || defined(__hpux)
 #    define _LARGE_FILES                              /* Large file support on 32-bits AIX and HP-UX */
 #  endif
+#  define fseek fseeko
 #endif
 
 
-
-
-
-/* ************************************************************
-*  Detect POSIX version
-*  PLATFORM_POSIX_VERSION = -1 for non-Unix e.g. Windows
-*  PLATFORM_POSIX_VERSION = 0 for Unix-like non-POSIX
-*  PLATFORM_POSIX_VERSION >= 1 is equal to found _POSIX_VERSION
-***************************************************************/
-#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) || defined(__midipix__) || defined(__VMS))
-	/* UNIX-style OS. ------------------------------------------- */
-#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux)
-     || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)  /* POSIX.1–2001 (SUSv3) conformant */
-#    define PLATFORM_POSIX_VERSION 200112L
+/******************************
+*  OS-specific Includes
+******************************/
+#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
+#  include <fcntl.h>   /* _O_BINARY */
+#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
+#  if !defined(__DJGPP__)
+#    define SET_BINARY_MODE(file) { int unused=_setmode(_fileno(file), _O_BINARY); (void)unused; }
+#    include <windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
+#    include <winioctl.h> /* FSCTL_SET_SPARSE */
+#    define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
 #  else
-#    if defined(__linux__) || defined(__linux)
-#      define _POSIX_C_SOURCE 200112L  /* use feature test macro */
-#    endif
-#    include <unistd.h>  /* declares _POSIX_VERSION */
-#    if defined(_POSIX_VERSION)  /* POSIX compliant */
-#      define PLATFORM_POSIX_VERSION _POSIX_VERSION
-#    else
-#      define PLATFORM_POSIX_VERSION 0
-#    endif
+#    define SET_BINARY_MODE(file) setmode(fileno(file), O_BINARY)
+#    define SET_SPARSE_FILE_MODE(file)
 #  endif
-#endif
-
-#if !defined(PLATFORM_POSIX_VERSION)
-#  define PLATFORM_POSIX_VERSION -1
+#else
+#  define SET_BINARY_MODE(file)
+#  define SET_SPARSE_FILE_MODE(file)
 #endif
 
 

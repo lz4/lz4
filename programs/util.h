@@ -48,47 +48,6 @@ extern "C" {
 #include <errno.h>
 
 
-/*-************************************
-*  OS-specific Includes
-**************************************/
-#if (defined(__linux__) && (PLATFORM_POSIX_VERSION >= 1)) || (PLATFORM_POSIX_VERSION >= 200112L) || defined(__DJGPP__)  /* https://sourceforge.net/p/predef/wiki/OperatingSystems/ */
-#  include <unistd.h>   /* isatty */
-#  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
-#elif defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#  include <io.h>       /* _isatty */
-#  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
-#else
-#  define IS_CONSOLE(stdStream) 0
-#endif
-
-
-/******************************
-*  OS-specific Includes
-******************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
-#  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
-#  if !defined(__DJGPP__)
-#    define SET_BINARY_MODE(file) { int unused=_setmode(_fileno(file), _O_BINARY); (void)unused; }
-#    include <windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
-#    include <winioctl.h> /* FSCTL_SET_SPARSE */
-#    define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
-#    if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
-#      define fseek _fseeki64
-#    endif
-#  else
-#    define SET_BINARY_MODE(file) setmode(fileno(file), O_BINARY)
-#    define SET_SPARSE_FILE_MODE(file)
-#  endif
-#else
-#  if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || (defined(__APPLE__) && defined(__MACH__))
-#    define fseek fseeko /* fseeko() added in FreeBSD 3.2 */
-#  endif
-#  define SET_BINARY_MODE(file)
-#  define SET_SPARSE_FILE_MODE(file)
-#endif
-
-
 /*-****************************************
 *  Sleep functions: Windows - Posix - others
 ******************************************/

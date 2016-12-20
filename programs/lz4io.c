@@ -40,8 +40,8 @@
 /*****************************
 *  Includes
 *****************************/
-#include "platform.h"  /* Compiler options */
-#include "util.h"      /* UTIL_getFileStat */
+#include "platform.h"  /* Compiler options, Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE */
+#include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strcmp, strlen */
