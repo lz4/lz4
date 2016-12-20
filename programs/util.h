@@ -34,6 +34,7 @@ extern "C" {
 ******************************************/
 #include "platform.h"   /* Compiler options, PLATFORM_POSIX_VERSION */
 #include <stdlib.h>     /* malloc */
+#include <stddef.h>     /* size_t, ptrdiff_t */
 #include <stdio.h>      /* fprintf */
 #include <sys/types.h>  /* stat, utime */
 #include <sys/stat.h>   /* stat */
@@ -339,6 +340,7 @@ UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_
 #elif defined(__linux__) || (PLATFORM_POSIX_VERSION >= 200112L)  /* opendir, readdir require POSIX.1-2001 */
 #  define UTIL_HAS_CREATEFILELIST
 #  include <dirent.h>       /* opendir, readdir */
+#  include <string.h>       /* strerror, memcpy */
 
 UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_t* pos, char** bufEnd)
 {
