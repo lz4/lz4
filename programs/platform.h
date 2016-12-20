@@ -39,10 +39,10 @@ extern "C" {
 *  PLATFORM_POSIX_VERSION = 0 for Unix-like non-POSIX
 *  PLATFORM_POSIX_VERSION >= 1 is equal to found _POSIX_VERSION
 ***************************************************************/
-#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) \
-   || defined(__midipix__) || defined(__VMS))  /* UNIX-like OS */
-#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux) \
-     || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)  /* POSIX.1–2001 (SUSv3) conformant */
+#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) /* UNIX-like OS */ \
+   || defined(__midipix__) || defined(__VMS))
+#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux) /* POSIX.1–2001 (SUSv3) conformant */ \
+     || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)  /* BSD distros */
 #    define PLATFORM_POSIX_VERSION 200112L
 #  else
 #    if defined(__linux__) || defined(__linux)
@@ -78,14 +78,14 @@ extern "C" {
 *  Detect 64-bit OS
 *  http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
 ****************************************/
-#if defined __ia64 || defined _M_IA64 /* Intel Itanium */
-  || defined __powerpc64__ || defined __ppc64__ || defined __PPC64__ /* POWER 64-bit */
-  || (defined __sparc && (defined __sparcv9 || defined __sparc_v9__ || defined __arch64__)) || defined __sparc64__  /* SPARC 64-bit */
-  || defined __x86_64__ || defined _M_X64 /* x86 64-bit */
-  || defined __arm64__ || defined __aarch64__ || defined __ARM64_ARCH_8__ /* ARM 64-bit */
-  || (defined __mips  && (__mips == 64 || __mips == 4 || __mips == 3)) /* MIPS 64-bit */
-  || defined _LP64 || defined __LP64__ /* NetBSD, OpenBSD */ || defined __64BIT__  /* AIX */ || _ADDR64 /* Cray */ || 
-  || (defined __SIZEOF_POINTER__ && __SIZEOF_POINTER__ == 8) /* gcc */)
+#if defined __ia64 || defined _M_IA64                                                                               /* Intel Itanium */ \
+  || defined __powerpc64__ || defined __ppc64__ || defined __PPC64__                                                /* POWER 64-bit */  \
+  || (defined __sparc && (defined __sparcv9 || defined __sparc_v9__ || defined __arch64__)) || defined __sparc64__  /* SPARC 64-bit */  \
+  || defined __x86_64__s || defined _M_X64                                                                          /* x86 64-bit */    \
+  || defined __arm64__ || defined __aarch64__ || defined __ARM64_ARCH_8__                                           /* ARM 64-bit */    \
+  || (defined __mips  && (__mips == 64 || __mips == 4 || __mips == 3))                                              /* MIPS 64-bit */   \
+  || defined _LP64 || defined __LP64__ /* NetBSD, OpenBSD */ || defined __64BIT__ /* AIX */ || _ADDR64 /* Cray */                       \
+  || (defined __SIZEOF_POINTER__ && __SIZEOF_POINTER__ == 8) /* gcc */
 #  if !defined(__64BIT__)
 #    define __64BIT__  1
 #  endif
