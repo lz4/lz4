@@ -20,6 +20,7 @@
     - LZ4 source repository : https://github.com/lz4/lz4
     - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
+
 #ifndef UTIL_H_MODULE
 #define UTIL_H_MODULE
 
@@ -27,70 +28,64 @@
 extern "C" {
 #endif
 
-/* **************************************
-*  Compiler Options
-****************************************/
-#if defined(__INTEL_COMPILER)
-#  pragma warning(disable : 177)    /* disable: message #177: function was declared but never referenced */
-#endif
-#if defined(_MSC_VER)
-#  define _CRT_SECURE_NO_WARNINGS    /* Disable some Visual warning messages for fopen, strncpy */
-#  define _CRT_SECURE_NO_DEPRECATE   /* VS2005 */
-#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
-#if _MSC_VER <= 1800                 /* (1800 = Visual Studio 2013) */
-    #define snprintf sprintf_s       /* snprintf unsupported by Visual <= 2013 */
-#endif
-#endif
-
-
-/* Unix Large Files support (>4GB) */
-#if !defined(__LP64__)                                  /* No point defining Large file for 64 bit */
-#   define _FILE_OFFSET_BITS 64                         /* turn off_t into a 64-bit type for ftello, fseeko */
-#   if defined(__sun__) && !defined(_LARGEFILE_SOURCE)  /* Sun Solaris 32-bits requires specific definitions */
-#      define _LARGEFILE_SOURCE                         /* fseeko, ftello */
-#   elif !defined(_LARGEFILE64_SOURCE)
-#      define _LARGEFILE64_SOURCE                       /* off64_t, fseeko64, ftello64 */
-#   endif
-#endif
-
 
 /*-****************************************
 *  Dependencies
 ******************************************/
-#include <stdlib.h>     /* features.h with _POSIX_C_SOURCE, malloc */
+#include "platform.h"   /* Compiler options, PLATFORM_POSIX_VERSION */
+#include <stdlib.h>     /* malloc */
 #include <stdio.h>      /* fprintf */
-#include <string.h>     /* strerr, strlen, memcpy */
-#include <stddef.h>     /* ptrdiff_t */
 #include <sys/types.h>  /* stat, utime */
 #include <sys/stat.h>   /* stat */
 #if defined(_MSC_VER)
-	#include <sys/utime.h>   /* utime */
-	#include <io.h>          /* _chmod */
+#  include <sys/utime.h>   /* utime */
+#  include <io.h>          /* _chmod */
 #else
-	#include <unistd.h>     /* chown, stat */
-	#include <utime.h>      /* utime */
+#  include <unistd.h>     /* chown, stat */
+#  include <utime.h>      /* utime */
 #endif
 #include <time.h>       /* time */
 #include <errno.h>
 
 
-/* *************************************
-*  Constants
-***************************************/
-#define LIST_SIZE_INCREASE   (8*1024)
-
-
-/*-****************************************
-*  Compiler specifics
-******************************************/
-#if defined(__GNUC__)
-#  define UTIL_STATIC static __attribute__((unused))
-#elif defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
-#  define UTIL_STATIC static inline
-#elif defined(_MSC_VER)
-#  define UTIL_STATIC static __inline
+/*-************************************
+*  OS-specific Includes
+**************************************/
+#if (defined(__linux__) && (PLATFORM_POSIX_VERSION >= 1)) || (PLATFORM_POSIX_VERSION >= 200112L) || defined(__DJGPP__)  /* https://sourceforge.net/p/predef/wiki/OperatingSystems/ */
+#  include <unistd.h>   /* isatty */
+#  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
+#elif defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+#  include <io.h>       /* _isatty */
+#  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
 #else
-#  define UTIL_STATIC static  /* this version may generate warnings for unused static functions; disable the relevant warning */
+#  define IS_CONSOLE(stdStream) 0
+#endif
+
+
+/******************************
+*  OS-specific Includes
+******************************/
+#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
+#  include <fcntl.h>   /* _O_BINARY */
+#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
+#  if !defined(__DJGPP__)
+#    define SET_BINARY_MODE(file) { int unused=_setmode(_fileno(file), _O_BINARY); (void)unused; }
+#    include <windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
+#    include <winioctl.h> /* FSCTL_SET_SPARSE */
+#    define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
+#    if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
+#      define fseek _fseeki64
+#    endif
+#  else
+#    define SET_BINARY_MODE(file) setmode(fileno(file), O_BINARY)
+#    define SET_SPARSE_FILE_MODE(file)
+#  endif
+#else
+#  if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || (defined(__APPLE__) && defined(__MACH__))
+#    define fseek fseeko /* fseeko() added in FreeBSD 3.2 */
+#  endif
+#  define SET_BINARY_MODE(file)
+#  define SET_SPARSE_FILE_MODE(file)
 #endif
 
 
@@ -102,7 +97,7 @@ extern "C" {
 #  define SET_HIGH_PRIORITY SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS)
 #  define UTIL_sleep(s) Sleep(1000*s)
 #  define UTIL_sleepMilli(milli) Sleep(milli)
-#elif (defined(__unix__) || defined(__unix) || defined(__VMS) || defined(__midipix__) || (defined(__APPLE__) && defined(__MACH__)))
+#elif PLATFORM_POSIX_VERSION >= 0 /* Unix-like operating system */
 #  include <unistd.h>
 #  include <sys/resource.h> /* setpriority */
 #  include <time.h>         /* clock_t, nanosleep, clock, CLOCKS_PER_SEC */
@@ -112,7 +107,7 @@ extern "C" {
 #    define SET_HIGH_PRIORITY /* disabled */
 #  endif
 #  define UTIL_sleep(s) sleep(s)
-#  if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 199309L)
+#  if (defined(__linux__) && (PLATFORM_POSIX_VERSION >= 199309L)) || (PLATFORM_POSIX_VERSION >= 200112L)  /* nanosleep requires POSIX.1-2001 */
 #      define UTIL_sleepMilli(milli) { struct timespec t; t.tv_sec=0; t.tv_nsec=milli*1000000ULL; nanosleep(&t, NULL); }
 #  else
 #      define UTIL_sleepMilli(milli) /* disabled */
@@ -122,6 +117,12 @@ extern "C" {
 #  define UTIL_sleep(s)          /* disabled */
 #  define UTIL_sleepMilli(milli) /* disabled */
 #endif
+
+
+/* *************************************
+*  Constants
+***************************************/
+#define LIST_SIZE_INCREASE   (8*1024)
 
 
 /*-**************************************************************
@@ -145,6 +146,20 @@ extern "C" {
   typedef unsigned long long  U64;
   typedef   signed long long  S64;
 #endif 
+
+
+/*-****************************************
+*  Compiler specifics
+******************************************/
+#if defined(__GNUC__)
+#  define UTIL_STATIC static __attribute__((unused))
+#elif defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#  define UTIL_STATIC static inline
+#elif defined(_MSC_VER)
+#  define UTIL_STATIC static __inline
+#else
+#  define UTIL_STATIC static  /* this version may generate warnings for unused static functions; disable the relevant warning */
+#endif
 
 
 /*-****************************************
@@ -362,8 +377,7 @@ UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_
     return nbFiles;
 }
 
-#elif (defined(__APPLE__) && defined(__MACH__)) || \
-     ((defined(__unix__) || defined(__unix) || defined(__midipix__)) && defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200112L)) /* snprintf, opendir */
+#elif defined(__linux__) || (PLATFORM_POSIX_VERSION >= 200112L)  /* opendir, readdir require POSIX.1-2001 */
 #  define UTIL_HAS_CREATEFILELIST
 #  include <dirent.h>       /* opendir, readdir */
 
@@ -427,7 +441,7 @@ UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_
 UTIL_STATIC int UTIL_prepareFileList(const char *dirName, char** bufStart, size_t* pos, char** bufEnd)
 {
     (void)bufStart; (void)bufEnd; (void)pos;
-    fprintf(stderr, "Directory %s ignored (lz4 compiled without _WIN32 or _POSIX_C_SOURCE)\n", dirName);
+    fprintf(stderr, "Directory %s ignored (compiled without _WIN32 or _POSIX_C_SOURCE)\n", dirName);
     return 0;
 }
 
@@ -443,16 +457,15 @@ UTIL_STATIC const char** UTIL_createFileList(const char **inputNames, unsigned i
 {
     size_t pos;
     unsigned i, nbFiles;
-    char *bufend, *buf;
+    char* buf = (char*)malloc(LIST_SIZE_INCREASE);
+    char* bufend = buf + LIST_SIZE_INCREASE;
     const char** fileTable;
 
-    buf = (char*)malloc(LIST_SIZE_INCREASE);
     if (!buf) return NULL;
-    bufend = buf + LIST_SIZE_INCREASE;
 
     for (i=0, pos=0, nbFiles=0; i<inputNamesNb; i++) {
         if (!UTIL_isDirectory(inputNames[i])) {
-            size_t len = strlen(inputNames[i]);
+            size_t const len = strlen(inputNames[i]);
             if (buf + pos + len >= bufend) {
                 ptrdiff_t newListSize = (bufend - buf) + LIST_SIZE_INCREASE;
                 buf = (char*)UTIL_realloc(buf, newListSize);
@@ -474,8 +487,7 @@ UTIL_STATIC const char** UTIL_createFileList(const char **inputNames, unsigned i
     fileTable = (const char**)malloc((nbFiles+1) * sizeof(const char*));
     if (!fileTable) { free(buf); return NULL; }
 
-    for (i=0, pos=0; i<nbFiles; i++)
-    {
+    for (i=0, pos=0; i<nbFiles; i++) {
         fileTable[i] = buf + pos;
         pos += strlen(fileTable[i]) + 1;
     }
