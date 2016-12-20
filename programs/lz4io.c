@@ -53,7 +53,9 @@
 #include "lz4hc.h"     /* still required for legacy format */
 #include "lz4frame.h"
 
-
+#if !defined(__64BIT__) && (PLATFORM_POSIX_VERSION >= 200112L) /* No point defining Large file for 64 bit */
+#  define fseek fseeko
+#endif
 
 /*****************************
 *  Constants

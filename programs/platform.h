@@ -41,7 +41,7 @@ extern "C" {
 ***************************************************************/
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) \
    || defined(__midipix__) || defined(__VMS))  /* UNIX-like OS */
-#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux)
+#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux) \
      || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)  /* POSIX.1–2001 (SUSv3) conformant */
 #    define PLATFORM_POSIX_VERSION 200112L
 #  else
@@ -105,7 +105,6 @@ extern "C" {
 #  if defined(_AIX) || defined(__hpux)
 #    define _LARGE_FILES                              /* Large file support on 32-bits AIX and HP-UX */
 #  endif
-#  define fseek fseeko
 #endif
 
 
