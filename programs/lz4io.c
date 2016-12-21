@@ -31,9 +31,16 @@
 */
 
 
+/*-************************************
+*  Compiler options
+**************************************/
+#ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
+#endif
 #if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
 #endif
+
 
 /*****************************
 *  Includes
@@ -644,8 +651,10 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
         storedSkips += (unsigned)(nb0T * sizeT);
 
         if (nb0T != seg0SizeT) {   /* not all 0s */
-            int const seekResult = fseek(file, storedSkips, SEEK_CUR);
-            if (seekResult) EXM_THROW(72, "Sparse skip error ; try --no-sparse");
+            errno = 0;
+            {   int const seekResult = fseek(file, storedSkips, SEEK_CUR);
+                if (seekResult) EXM_THROW(72, "Sparse skip error(%d): %s ; try --no-sparse", (int)errno, strerror(errno));
+            }
             storedSkips = 0;
             seg0SizeT -= nb0T;
             ptrT += nb0T;
