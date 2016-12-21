@@ -158,7 +158,7 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 #define LZ4F_BLOCKSIZEID_DEFAULT LZ4F_max64KB
 
 static const size_t minFHSize = 7;
-static const size_t maxFHSize = 15;   /* max Frame Header Size */
+static const size_t maxFHSize = LZ4F_HEADER_SIZE_MAX;   /* 15 */
 static const size_t BHSize = 4;
 
 
@@ -254,20 +254,27 @@ static LZ4F_blockSizeID_t LZ4F_optimalBSID(const LZ4F_blockSizeID_t requestedBSI
     return requestedBSID;
 }
 
+/* LZ4F_compressBound() :
+ * Provides dstCapacity given a srcSize to guarantee operation success in worst case situations.
+ * prefsPtr is optional : you can provide NULL as argument, preferences will be set to cover worst case scenario.
+ * Result is always the same for a srcSize and prefsPtr, so it can be trusted to size reusable buffers.
+ * When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() operations.
+ */
 static size_t LZ4F_compressBound_internal(size_t srcSize, const LZ4F_preferences_t* preferencesPtr, size_t alreadyBuffered)
 {
     LZ4F_preferences_t prefsNull;
     memset(&prefsNull, 0, sizeof(prefsNull));
     prefsNull.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;   /* worst case */
     {   const LZ4F_preferences_t* const prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
+        U32 const flush = prefsPtr->autoFlush | (srcSize==0);
         LZ4F_blockSizeID_t const bid = prefsPtr->frameInfo.blockSizeID;
         size_t const blockSize = LZ4F_getBlockSize(bid);
         size_t const maxBuffered = blockSize - 1;
         size_t const bufferedSize = MIN(alreadyBuffered, maxBuffered);
         size_t const maxSrcSize = srcSize + bufferedSize;
         unsigned const nbFullBlocks = (unsigned)(maxSrcSize / blockSize);
-        size_t const partialBlockSize = srcSize & (blockSize-1);
-        size_t const lastBlockSize = prefsPtr->autoFlush ? partialBlockSize : 0;
+        size_t const partialBlockSize = (srcSize - (srcSize==0)) & (blockSize-1);   /* 0 => -1 == MAX => blockSize-1 */
+        size_t const lastBlockSize = flush ? partialBlockSize : 0;
         unsigned const nbBlocks = nbFullBlocks + (lastBlockSize>0);
 
         size_t const blockHeaderSize = 4;   /* default, without block CRC option (which cannot be generated with current API) */
@@ -398,7 +405,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 
 /*! LZ4F_compressBegin() :
  * will write the frame header into dstBuffer.
- * dstBuffer must be large enough to accommodate a header (dstCapacity). Maximum header size is LZ4F_MAXHEADERFRAME_SIZE bytes.
+ * dstBuffer must be large enough to accommodate a header (dstCapacity). Maximum header size is LZ4F_HEADER_SIZE_MAX bytes.
  * @return : number of bytes written into dstBuffer for the header
  *           or an error code (can be tested using LZ4F_isError())
  */
