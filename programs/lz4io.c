@@ -31,10 +31,14 @@
 */
 
 
+#if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
+#  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
+#endif
+
 /*****************************
 *  Includes
 *****************************/
-#include "platform.h"  /* Compiler options, Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE */
+#include "platform.h"  /* Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE */
 #include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */

@@ -33,6 +33,7 @@
 /**************************************
 *  Includes
 **************************************/
+#include "platform.h"    /* _CRT_SECURE_NO_WARNINGS, Large Files support */
 #include "util.h"        /* U32, UTIL_getFileSize */
 #include <stdlib.h>      /* malloc, free */
 #include <stdio.h>       /* fprintf, fopen, ftello */

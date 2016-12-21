@@ -25,22 +25,16 @@ extern "C" {
 #endif
 
 
+
 /* **************************************
 *  Compiler Options
 ****************************************/
-#if defined(__INTEL_COMPILER)
-#  pragma warning(disable : 177)    /* disable: message #177: function was declared but never referenced */
-#endif
 #if defined(_MSC_VER)
-#  define _CRT_SECURE_NO_WARNINGS   /* Disable some Visual warning messages for fopen, strncpy */
-#  define _CRT_SECURE_NO_DEPRECATE  /* VS2005 */
-#  pragma warning(disable : 4127)   /* disable: C4127: conditional expression is constant */
+#  define _CRT_SECURE_NO_WARNINGS   /* Disable Visual Studio warning messages for fopen, strncpy, strerror */
+#  define _CRT_SECURE_NO_DEPRECATE  /* VS2005 - must be declared before <io.h> and <windows.h> */ 
 #  if (_MSC_VER <= 1800)            /* (1800 = Visual Studio 2013) */
 #    define snprintf sprintf_s      /* snprintf unsupported by Visual <= 2013 */
 #  endif
-#endif
-#if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
-#  define _POSIX_C_SOURCE 1          /* enable __VA_ARGS__ and disable %llu warnings with MinGW on Windows */
 #endif
 
 
@@ -110,6 +104,7 @@ extern "C" {
 *  Detect if isatty() and fileno() are available
 ************************************************/
 #if (defined(__linux__) && (PLATFORM_POSIX_VERSION >= 1)) || (PLATFORM_POSIX_VERSION >= 200112L) || defined(__DJGPP__)
+#  include <unistd.h>   /* isatty */
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
 #elif defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
 #  include <io.h>       /* _isatty */
