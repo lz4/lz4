@@ -47,6 +47,14 @@
 
 
 /*-************************************
+*  Basic Types
+**************************************/
+#if !defined(__cplusplus) && !(defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+typedef size_t uintptr_t;   /* true on most systems, except OpenVMS-64 (which doesn't need address overflow test) */
+#endif
+
+
+/*-************************************
 *  Constants
 **************************************/
 #define NB_ATTEMPTS (1<<16)
@@ -980,7 +988,7 @@ int main(int argc, const char** argv)
     int nbTests = NB_ATTEMPTS;
     int testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
-    int pause = 0;
+    int use_pause = 0;
     const char* programName = argv[0];
     U32 duration = 0;
 
@@ -992,7 +1000,7 @@ int main(int argc, const char** argv)
 
         // Decode command (note : aggregated commands are allowed)
         if (argument[0]=='-') {
-            if (!strcmp(argument, "--no-prompt")) { pause=0; seedset=1; g_displayLevel=1; continue; }
+            if (!strcmp(argument, "--no-prompt")) { use_pause=0; seedset=1; g_displayLevel=1; continue; }
             argument++;
 
             while (*argument!=0) {
@@ -1008,7 +1016,7 @@ int main(int argc, const char** argv)
 
                 case 'p':   /* pause at the end */
                     argument++;
-                    pause=1;
+                    use_pause=1;
                     break;
 
                 case 'i':
@@ -1098,7 +1106,7 @@ int main(int argc, const char** argv)
     if (nbTests<=0) nbTests=1;
 
     {   int const result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
-        if (pause) {
+        if (use_pause) {
             DISPLAY("press enter ... \n");
             (void)getchar();
         }
