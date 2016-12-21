@@ -55,6 +55,7 @@ endif
 default:
 	@$(MAKE) -C $(LZ4DIR)
 	@$(MAKE) -C $(PRGDIR)
+	@cp $(PRGDIR)/lz4$(EXT) .
 
 all:
 	@$(MAKE) -C $(LZ4DIR) $@

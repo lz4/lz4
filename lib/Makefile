@@ -71,6 +71,8 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
+LIBLZ4 = liblz4.$(SHARED_EXT_VER)
+
 default: lib-release
 
 lib-release: liblz4.a liblz4
@@ -90,17 +92,19 @@ ifeq ($(BUILD_STATIC),yes)
 	@$(AR) rcs $@ *.o
 endif
 
-liblz4: *.c
+$(LIBLZ4): *.c
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
 	dlltool -D dll\liblz4.dll -d dll\liblz4.def -l dll\liblz4.lib
 else
-	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
+	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
-	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
-	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
+	@ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
+	@ln -sf $@ liblz4.$(SHARED_EXT)
 endif
+
+liblz4: $(LIBLZ4)
 
 clean:
 	@$(RM) core *.o *.a *.$(SHARED_EXT) liblz4.pc dll/liblz4.dll dll/liblz4.lib
@@ -123,21 +127,21 @@ liblz4.pc: liblz4.pc.in Makefile
 install: lib liblz4.pc
 	@install -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/ $(DESTDIR)$(INCLUDEDIR)/
 	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
-	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+	@install -m 755 liblz4.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)
+	@install -m 755 liblz4.$(SHARED_EXT) $(DESTDIR)$(LIBDIR)
 	@install -m 644 liblz4.pc $(DESTDIR)$(LIBDIR)/pkgconfig/
 ifeq ($(BUILD_STATIC),yes)
-	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)
 endif
-	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	@install -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
+	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)
+	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)
+	@install -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)
 	@echo lz4 static and shared libraries installed
 
 uninstall:
+	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.a
 	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4.h
