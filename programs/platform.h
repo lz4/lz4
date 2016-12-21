@@ -42,6 +42,9 @@ extern "C" {
 #    define fseek _fseeki64
 #  endif
 #endif
+#if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
+#  define _POSIX_C_SOURCE 1          /* enable __VA_ARGS__ and disable %llu warnings with MinGW on Windows */
+#endif
 
 
 /* **************************************

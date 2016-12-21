@@ -92,7 +92,7 @@ static clock_t g_clockTime = 0;
 *****************************************/
 static U32 no_prompt = 0;
 static U32 displayLevel = 2;
-static U32 pause = 0;
+static U32 use_pause = 0;
 
 
 /*-*******************************************************
@@ -705,7 +705,7 @@ _end:
     free(compressedBuffer);
     free(decodedBuffer);
 
-    if (pause) {
+    if (use_pause) {
         DISPLAY("press enter to finish \n");
         (void)getchar();
     }
@@ -777,7 +777,7 @@ int main(int argc, const char** argv)
                     break;
                 case 'p': /* pause at the end */
                     argument++;
-                    pause = 1;
+                    use_pause = 1;
                     break;
 
                 case 'i':
