@@ -27,8 +27,6 @@
 *  Compiler options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS    /* fgets */
-#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4146)    /* disable: C4146: minus unsigned expression */
 #  pragma warning(disable : 4310)    /* disable: C4310: constant char value > 127 */
 #endif
@@ -37,6 +35,8 @@
 /*-************************************
 *  Dependencies
 **************************************/
+#include "platform.h"   /* Compiler options */
+#include "util.h"       /* U32 */
 #include <stdlib.h>
 #include <stdio.h>      /* fgets, sscanf */
 #include <string.h>     /* strcmp */
@@ -44,26 +44,6 @@
 #include "lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
-
-
-/*-************************************
-*  Basic Types
-**************************************/
-#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-typedef size_t uintptr_t;   /* true on most systems, except OpenVMS-64 (which doesn't need address overflow test) */
-#endif
 
 
 /*-************************************

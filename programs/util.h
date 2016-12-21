@@ -15,10 +15,6 @@
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-    You can contact the author at :
-    - LZ4 source repository : https://github.com/lz4/lz4
-    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
 #ifndef UTIL_H_MODULE
@@ -88,7 +84,9 @@ extern "C" {
 /*-**************************************************************
 *  Basic Types
 *****************************************************************/
-#if  !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+#ifndef BASIC_TYPES_DEFINED
+#define BASIC_TYPES_DEFINED
+#if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
 # include <stdint.h>
   typedef  uint8_t BYTE;
   typedef uint16_t U16;
@@ -105,7 +103,8 @@ extern "C" {
   typedef   signed int        S32;
   typedef unsigned long long  U64;
   typedef   signed long long  S64;
-#endif 
+#endif
+#endif
 
 
 /*-****************************************

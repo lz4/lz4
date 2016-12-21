@@ -27,7 +27,6 @@
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4146)        /* disable: C4146: minus unsigned expression */
 #endif
 
@@ -35,6 +34,8 @@
 /*-************************************
 *  Includes
 **************************************/
+#include "platform.h"   /* Compiler options */
+#include "util.h"       /* U32 */
 #include <stdlib.h>     /* malloc, free */
 #include <stdio.h>      /* fprintf */
 #include <string.h>     /* strcmp */
@@ -43,25 +44,6 @@
 #include "lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
-
-
-/*-************************************
-*  Basic Types
-**************************************/
-#if !defined(__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-#endif
 
 
 /* unoptimized version; solves endianess & alignment issues */

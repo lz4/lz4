@@ -33,6 +33,7 @@
 /**************************************
 *  Includes
 **************************************/
+#include "util.h"        /* U32, UTIL_getFileSize */
 #include <stdlib.h>      /* malloc, free */
 #include <stdio.h>       /* fprintf, fopen, ftello */
 #include <sys/types.h>   /* stat64 */
@@ -45,34 +46,6 @@
 #include "lz4frame.h"
 
 #include "xxhash.h"
-
-
-/**************************************
-*  Compiler Options
-**************************************/
-/* S_ISREG & gettimeofday() are not supported by MSVC */
-#if !defined(S_ISREG)
-#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
-#endif
-
-
-/**************************************
-*  Basic Types
-**************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-# include <stdint.h>
-  typedef uint8_t  BYTE;
-  typedef uint16_t U16;
-  typedef uint32_t U32;
-  typedef  int32_t S32;
-  typedef uint64_t U64;
-#else
-  typedef unsigned char       BYTE;
-  typedef unsigned short      U16;
-  typedef unsigned int        U32;
-  typedef   signed int        S32;
-  typedef unsigned long long  U64;
-#endif
 
 
 /**************************************
@@ -177,21 +150,6 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     else requiredMem >>= 1;
 
     return (size_t)requiredMem;
-}
-
-
-static U64 BMK_GetFileSize(const char* infilename)
-{
-    int r;
-#if defined(_MSC_VER)
-    struct _stat64 statbuf;
-    r = _stat64(infilename, &statbuf);
-#else
-    struct stat statbuf;
-    r = stat(infilename, &statbuf);
-#endif
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
-    return (U64)statbuf.st_size;
 }
 
 
@@ -384,7 +342,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
       if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
       /* Memory size adjustments */
-      inFileSize = BMK_GetFileSize(inFileName);
+      inFileSize = UTIL_getFileSize(inFileName);
       if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
       benchedSize = BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
       if (benchedSize==0) { DISPLAY( "not enough memory\n"); fclose(inFile); return 11; }
