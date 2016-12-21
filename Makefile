@@ -99,10 +99,10 @@ uninstall:
 	@$(MAKE) -C $(PRGDIR) $@
 
 travis-install:
-	$(MAKE) install PREFIX=~/install_test_dir
+	$(MAKE) -j1 install PREFIX=~/install_test_dir
 
 test:
-	$(MAKE) -C $(TESTDIR) test
+	$(MAKE) -C $(TESTDIR) $@
 
 clangtest: clean
 	clang -v
