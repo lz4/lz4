@@ -45,7 +45,7 @@
 /*****************************
 *  Includes
 *****************************/
-#include "platform.h"  /* Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE */
+#include "platform.h"  /* Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE, PLATFORM_POSIX_VERSION, __64BIT__ */
 #include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
