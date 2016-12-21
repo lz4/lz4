@@ -107,7 +107,8 @@ endif
 liblz4: $(LIBLZ4)
 
 clean:
-	@$(RM) core *.o *.a *.$(SHARED_EXT) liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	@$(RM) core *.o liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	@$(RM) *.a *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	@echo Cleaning library completed
 
 
