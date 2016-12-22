@@ -43,7 +43,7 @@ CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-e
            -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS:= -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -173,7 +173,7 @@ test-lz4-contentSize: lz4 datagen
 	$(LZ4) -v --content-size tmp | $(LZ4) -d > tmp2
 	diff -s tmp tmp2
 	# test large size [2-4] GB
-	@./datagen -g3G -P100 | $(LZ4) --verbose | $(LZ4) --decompress --force --sparse - tmp
+	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmp
 	@ls -ls tmp
 	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmp2
 	@ls -ls tmp2

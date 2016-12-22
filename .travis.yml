@@ -4,7 +4,9 @@ matrix:
   include:
     # OS X Mavericks
     - os: osx
-      env: Ubu=OS_X_Mavericks Cmd='make -C tests test-lz4 CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion"' COMPILER=clang
+      install:
+        - export CC=clang
+      env: Ubu=OS_X_Mavericks Cmd='make -C tests test-lz4 MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion" && CFLAGS=-m32 make -C tests clean test-lz4-contentSize' COMPILER=clang
 
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
