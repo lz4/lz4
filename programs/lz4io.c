@@ -49,7 +49,7 @@
 #include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
-#include <string.h>    /* strcmp, strlen */
+#include <string.h>    /* strerror, strcmp, strlen */
 #include <time.h>      /* clock */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
