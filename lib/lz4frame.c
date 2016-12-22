@@ -329,7 +329,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBu
     if (prefs.frameInfo.contentSize != 0)
         prefs.frameInfo.contentSize = (U64)srcSize;   /* auto-correct content size if selected (!=0) */
 
-    if (prefs.compressionLevel < LZ4HC_MIN_CLEVEL) {
+    if (prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
         cctxI.lz4CtxPtr = &lz4ctx;
         cctxI.lz4CtxLevel = 1;
     }
@@ -356,7 +356,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBu
       if (LZ4F_isError(tailSize)) return tailSize;
       dstPtr += tailSize; }
 
-    if (prefs.compressionLevel >= LZ4HC_MIN_CLEVEL)   /* no allocation done with lz4 fast */
+    if (prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)   /* no allocation done with lz4 fast */
         FREEMEM(cctxI.lz4CtxPtr);
 
     return (dstPtr - dstStart);
@@ -424,10 +424,10 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
     cctxPtr->prefs = *preferencesPtr;
 
     /* ctx Management */
-    {   U32 const tableID = (cctxPtr->prefs.compressionLevel < LZ4HC_MIN_CLEVEL) ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
+    {   U32 const tableID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
         if (cctxPtr->lz4CtxLevel < tableID) {
             FREEMEM(cctxPtr->lz4CtxPtr);
-            if (cctxPtr->prefs.compressionLevel < LZ4HC_MIN_CLEVEL)
+            if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStream();
             else
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStreamHC();
@@ -452,7 +452,7 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
     cctxPtr->tmpIn = cctxPtr->tmpBuff;
     cctxPtr->tmpInSize = 0;
     XXH32_reset(&(cctxPtr->xxh), 0);
-    if (cctxPtr->prefs.compressionLevel < LZ4HC_MIN_CLEVEL)
+    if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
         LZ4_resetStream((LZ4_stream_t*)(cctxPtr->lz4CtxPtr));
     else
         LZ4_resetStreamHC((LZ4_streamHC_t*)(cctxPtr->lz4CtxPtr), cctxPtr->prefs.compressionLevel);
@@ -533,7 +533,7 @@ static int LZ4F_localLZ4_compressHC_limitedOutput_continue(void* ctx, const char
 
 static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int level)
 {
-    if (level < LZ4HC_MIN_CLEVEL) {
+    if (level < LZ4HC_CLEVEL_MIN) {
         if (blockMode == LZ4F_blockIndependent) return LZ4F_localLZ4_compress_limitedOutput_withState;
         return LZ4F_localLZ4_compress_limitedOutput_continue;
     }
@@ -543,7 +543,7 @@ static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int lev
 
 static int LZ4F_localSaveDict(LZ4F_cctx_t* cctxPtr)
 {
-    if (cctxPtr->prefs.compressionLevel < LZ4HC_MIN_CLEVEL)
+    if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
         return LZ4_saveDict ((LZ4_stream_t*)(cctxPtr->lz4CtxPtr), (char*)(cctxPtr->tmpBuff), 64 KB);
     return LZ4_saveDictHC ((LZ4_streamHC_t*)(cctxPtr->lz4CtxPtr), (char*)(cctxPtr->tmpBuff), 64 KB);
 }
