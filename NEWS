@@ -1,4 +1,5 @@
 v1.7.5
+lz4hc : new high compression mode : levels 10-12 compress more and slower, by @inikep.
 lz4cat : fix : works with relative path (#284) and stdin (#285) (reported by @beiDei8z)
 cli : fix minor notification when using -r recursive mode
 API : lz4frame : LZ4F_frameBound(0) gives upper bound of *flush() and *End() operations (#290, #280)
