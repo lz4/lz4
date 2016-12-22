@@ -122,7 +122,7 @@ versionsTest:
 #------------------------------------------------------------------------
 #make test is validated only for Linux, OSX, kFreeBSD, FreeBSD, Hurd and
 #Solaris targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD SunOS))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))
