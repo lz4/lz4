@@ -108,9 +108,9 @@ preview-man: clean-man man
 
 
 #------------------------------------------------------------------------
-#make install is validated only for Linux, OSX, kFreeBSD, Hurd and
-#FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+#make install is validated only for Linux, OSX, kFreeBSD, FreeBSD, Hurd and
+#Solaris targets
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD SunOS))
 
 unlz4: lz4
 	ln -s lz4 unlz4
