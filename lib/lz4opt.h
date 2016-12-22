@@ -2,7 +2,7 @@
     lz4opt.h - Optimal Mode of LZ4
     Copyright (C) 2015-2016, Przemyslaw Skibinski <inikep@gmail.com>
     Note : this file is intended to be included within lz4hc.c
- 
+
     BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
     Redistribution and use in source and binary forms, with or without
@@ -33,9 +33,9 @@
        - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-#define LZ4_LOG_PARSER(fmt, ...) //printf(fmt, __VA_ARGS__) 
-#define LZ4_LOG_PRICE(fmt, ...) //printf(fmt, __VA_ARGS__) 
-#define LZ4_LOG_ENCODE(fmt, ...) //printf(fmt, __VA_ARGS__) 
+#define LZ4_LOG_PARSER(fmt, ...)  //printf(fmt, __VA_ARGS__)
+#define LZ4_LOG_PRICE(fmt, ...)   //printf(fmt, __VA_ARGS__)
+#define LZ4_LOG_ENCODE(fmt, ...)  //printf(fmt, __VA_ARGS__)
 
 
 #define LZ4_OPT_NUM   (1<<12)
@@ -56,23 +56,24 @@ typedef struct
 } LZ4HC_optimal_t;
 
 
-FORCE_INLINE size_t LZ4HC_GetLiteralsPrice(size_t litlen)
+/* price in bits */
+FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
 {
     size_t price = 8*litlen;
-    if (litlen >= (int)RUN_MASK) price+=8*(1+(litlen-RUN_MASK)/255);
+    if (litlen >= (size_t)RUN_MASK) price+=8*(1+(litlen-RUN_MASK)/255);
     return price;
 }
 
 
-FORCE_INLINE size_t LZ4HC_get_price(size_t litlen, size_t mlen)
+/* requires mlen >= MINMATCH */
+FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
 {
     size_t price = 16 + 8; /* 16-bit offset + token */
 
-    price += 8*litlen;
-    if (litlen >= (int)RUN_MASK) price+=8*(1+(litlen-RUN_MASK)/255);
+    price += LZ4HC_literalsPrice(litlen);
 
     mlen -= MINMATCH;
-    if (mlen >= (int)ML_MASK) price+=8*(1+(mlen-ML_MASK)/255);
+    if (mlen >= (size_t)ML_MASK) price+=8*(1+(mlen-ML_MASK)/255);
 
     return price;
 }
@@ -103,7 +104,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     U32 matchIndex;
     size_t matchLength = 0;
     U32* HashPos;
-    
+
     if (ip + MINMATCH > iHighLimit) return 1;
 
     /* HC4 match finder */
@@ -164,7 +165,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     if (matchNum) *matchNum = mnum;
   /*  if (best_mlen > 8) return best_mlen-8; */
     if (!matchNum) return 1;
-    return 1; 
+    return 1;
 }
 
 
@@ -258,7 +259,7 @@ static int LZ4HC_compress_optimal (
            LZ4_LOG_PARSER("%d: start Found mlen=%d off=%d best_mlen=%d last_pos=%d\n", (int)(ip-source), matches[i].len, matches[i].off, best_mlen, last_pos);
            while (mlen <= best_mlen) {
                 litlen = 0;
-                price = LZ4HC_get_price(llen + litlen, mlen) - LZ4HC_GetLiteralsPrice(llen);
+                price = LZ4HC_sequencePrice(llen + litlen, mlen) - LZ4HC_literalsPrice(llen);
                 SET_PRICE(mlen, mlen, matches[i].off, litlen, price);
                 mlen++;
            }
@@ -274,18 +275,18 @@ static int LZ4HC_compress_optimal (
             if (opt[cur-1].mlen == 1) {
                 litlen = opt[cur-1].litlen + 1;
                 if (cur != litlen) {
-                    price = opt[cur - litlen].price + LZ4HC_GetLiteralsPrice(litlen);
+                    price = opt[cur - litlen].price + LZ4HC_literalsPrice(litlen);
                     LZ4_LOG_PRICE("%d: TRY1 opt[%d].price=%d price=%d cur=%d litlen=%d\n", (int)(inr-source), cur - litlen, opt[cur - litlen].price, price, cur, litlen);
                 } else {
-                    price = LZ4HC_GetLiteralsPrice(llen + litlen) - LZ4HC_GetLiteralsPrice(llen);
+                    price = LZ4HC_literalsPrice(llen + litlen) - LZ4HC_literalsPrice(llen);
                     LZ4_LOG_PRICE("%d: TRY2 price=%d cur=%d litlen=%d llen=%d\n", (int)(inr-source), price, cur, litlen, llen);
                 }
             } else {
                 litlen = 1;
-                price = opt[cur - 1].price + LZ4HC_GetLiteralsPrice(litlen);                  
-                LZ4_LOG_PRICE("%d: TRY3 price=%d cur=%d litlen=%d litonly=%d\n", (int)(inr-source), price, cur, litlen, LZ4HC_GetLiteralsPrice(litlen));
+                price = opt[cur - 1].price + LZ4HC_literalsPrice(litlen);
+                LZ4_LOG_PRICE("%d: TRY3 price=%d cur=%d litlen=%d litonly=%d\n", (int)(inr-source), price, cur, litlen, LZ4HC_literalsPrice(litlen));
             }
-           
+
             mlen = 1;
             best_mlen = 0;
             LZ4_LOG_PARSER("%d: TRY price=%d opt[%d].price=%d\n", (int)(inr-source), price, cur, opt[cur].price);
@@ -293,7 +294,7 @@ static int LZ4HC_compress_optimal (
                 SET_PRICE(cur, mlen, best_mlen, litlen, price);
 
             if (cur == last_pos || inr >= mflimit) break;
-            LZ4_LOG_PARSER("%d: CURRENT price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(inr-source), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen); 
+            LZ4_LOG_PARSER("%d: CURRENT price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(inr-source), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen);
 
             match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, MINMATCH-1, matches, fullUpdate);
             LZ4_LOG_PARSER("%d: LZ4HC_BinTree_GetAllMatches match_num=%d\n", (int)(inr-source), match_num);
@@ -317,12 +318,12 @@ static int LZ4HC_compress_optimal (
                         litlen = opt[cur2].litlen;
 
                         if (cur2 != litlen)
-                            price = opt[cur2 - litlen].price + LZ4HC_get_price(litlen, mlen);
+                            price = opt[cur2 - litlen].price + LZ4HC_sequencePrice(litlen, mlen);
                         else
-                            price = LZ4HC_get_price(llen + litlen, mlen) - LZ4HC_GetLiteralsPrice(llen);
+                            price = LZ4HC_sequencePrice(llen + litlen, mlen) - LZ4HC_literalsPrice(llen);
                     } else {
                         litlen = 0;
-                        price = opt[cur2].price + LZ4HC_get_price(litlen, mlen);
+                        price = opt[cur2].price + LZ4HC_sequencePrice(litlen, mlen);
                     }
 
                     LZ4_LOG_PARSER("%d: Found2 mlen=%d best_mlen=%d off=%d price=%d litlen=%d price[%d]=%d\n", (int)(inr-source), mlen, best_mlen, matches[i].off, price, litlen, cur - litlen, opt[cur - litlen].price);
@@ -340,31 +341,31 @@ static int LZ4HC_compress_optimal (
 
 encode: /* cur, last_pos, best_mlen, best_off have to be set */
         for (i = 1; i <= last_pos; i++) {
-            LZ4_LOG_PARSER("%d: price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+i), i, last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen); 
+            LZ4_LOG_PARSER("%d: price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+i), i, last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen);
         }
 
-        LZ4_LOG_PARSER("%d: cur=%d/%d best_mlen=%d best_off=%d\n", (int)(ip-source+cur), cur, last_pos, best_mlen, best_off); 
+        LZ4_LOG_PARSER("%d: cur=%d/%d best_mlen=%d best_off=%d\n", (int)(ip-source+cur), cur, last_pos, best_mlen, best_off);
 
         opt[0].mlen = 1;
         while (1) {
             mlen = opt[cur].mlen;
             offset = opt[cur].off;
-            opt[cur].mlen = (int)best_mlen; 
+            opt[cur].mlen = (int)best_mlen;
             opt[cur].off = (int)best_off;
             best_mlen = mlen;
             best_off = offset;
             if (mlen > cur) break;
             cur -= mlen;
         }
-          
+
         for (i = 0; i <= last_pos;) {
-            LZ4_LOG_PARSER("%d: price2[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+i), i, last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen); 
+            LZ4_LOG_PARSER("%d: price2[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+i), i, last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen);
             i += opt[i].mlen;
         }
 
         cur = 0;
         while (cur < last_pos) {
-            LZ4_LOG_PARSER("%d: price3[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+cur), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen); 
+            LZ4_LOG_PARSER("%d: price3[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-source+cur), cur, last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen);
             mlen = opt[cur].mlen;
             if (mlen == 1) { ip++; cur++; continue; }
             offset = opt[cur].off;
@@ -374,7 +375,7 @@ encode: /* cur, last_pos, best_mlen, best_off have to be set */
             res = LZ4HC_encodeSequence(&ip, &op, &anchor, (int)mlen, ip - offset, limit, oend);
             LZ4_LOG_ENCODE("out=%d\n", (int)((char*)op - dest));
 
-            if (res) return 0; 
+            if (res) return 0;
 
             LZ4_LOG_PARSER("%d: offset=%d\n", (int)(ip-source), offset);
         }

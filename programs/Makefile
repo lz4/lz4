@@ -43,7 +43,9 @@ PREFIX  ?= /usr/local
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
-VOID    := /dev/null
+
+SRCFILES := $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c)
+OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
 
 CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
@@ -60,17 +62,16 @@ MD2ROFF_FLAGS  = --roff --warnings --manual="User Commands" --organization="lz4 
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
-EXT =.exe
+VOID := nul
+EXT  :=.exe
 else
-EXT =
+VOID := /dev/null
+EXT  :=
 endif
 
 
 
 default: lz4-release
-
-lz4-release: $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.o datagen.o
-	$(CC) $(FLAGS) $^ -o lz4$(EXT)
 
 all: lz4 lz4c
 
@@ -78,15 +79,19 @@ all32: CFLAGS+=-m32
 all32: all
 
 lz4: CFLAGS += $(DEBUGFLAGS)
-lz4: lz4-release
+lz4: $(OBJFILES)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lz4c: CFLAGS += $(DEBUGFLAGS)
-lz4c  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o bench.o lz4io.o lz4cli.c datagen.o
+lz4-release: DEBUGFLAGS=
+lz4-release: lz4
+
+lz4c  : CFLAGS += $(DEBUGFLAGS)
+lz4c  : $(SRCFILES)
 	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c32: CFLAGS+=-m32
-lz4c32: lz4
-	@cp lz4$(EXT) lz4c32$(EXT)
+lz4c32: CFLAGS += -m32 $(DEBUGFLAGS)
+lz4c32: $(SRCFILES)
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
