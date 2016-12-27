@@ -156,9 +156,9 @@ endif
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	@echo Installing includes
-	@$(INSTALL_DATA) -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@$(INSTALL_DATA) -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	@$(INSTALL_DATA) -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
+	@$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	@$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	@$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
 	@echo lz4 static and shared libraries installed
 
 uninstall:
