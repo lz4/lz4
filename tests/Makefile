@@ -279,11 +279,16 @@ test-lz4-testmode: lz4 datagen
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
-	./datagen -g16KB  | $(LZ4)    -12      | $(LZ4)  -t
-	./datagen -P10    | $(LZ4)    -12B4    | $(LZ4)  -t
-	./datagen         | $(LZ4)    -12      | $(LZ4)  -t
-	./datagen -g1M    | $(LZ4)    -11B5    | $(LZ4)  -t
-	./datagen -g256MB | $(LZ4)    -11vqB4D | $(LZ4)  -qt
+	./datagen -g16KB      | $(LZ4) -12      | $(LZ4) -t
+	./datagen -P10        | $(LZ4) -12B4    | $(LZ4) -t
+	./datagen -g256K      | $(LZ4) -12B4D   | $(LZ4) -t
+	./datagen -g512K -P25 | $(LZ4) -12BD    | $(LZ4) -t
+	./datagen -g1M        | $(LZ4) -12B5    | $(LZ4) -t
+	./datagen -g2M -P99   | $(LZ4) -11B4D   | $(LZ4) -t
+	./datagen -g4M        | $(LZ4) -11vq    | $(LZ4) -qt
+	./datagen -g8M        | $(LZ4) -11B4    | $(LZ4) -t
+	./datagen -g16M -P90  | $(LZ4) -11B5    | $(LZ4) -t
+	./datagen -g32M -P10  | $(LZ4) -11B5D   | $(LZ4) -t
 
 test-lz4: lz4 datagen test-lz4-opt-parser test-lz4-basic test-lz4-multiple test-lz4-sparse \
           test-lz4-frame-concatenation test-lz4-testmode test-lz4-contentSize \
