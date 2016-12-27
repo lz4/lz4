@@ -277,7 +277,15 @@ test-lz4-testmode: lz4 datagen
 	$(LZ4) -fm file1-dne file2-dne    && false || true
 	$(LZ4) -fm file1-dne file2-dne    && false || true
 
-test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse \
+test-lz4-opt-parser: lz4 datagen
+	@echo "\n ---- test opt-parser ----"
+	./datagen -g16KB  | $(LZ4)    -12      | $(LZ4)  -t
+	./datagen -P10    | $(LZ4)    -12B4    | $(LZ4)  -t
+	./datagen         | $(LZ4)    -12      | $(LZ4)  -t
+	./datagen -g1M    | $(LZ4)    -11B5    | $(LZ4)  -t
+	./datagen -g256MB | $(LZ4)    -11vqB4D | $(LZ4)  -qt
+
+test-lz4: lz4 datagen test-lz4-opt-parser test-lz4-basic test-lz4-multiple test-lz4-sparse \
           test-lz4-frame-concatenation test-lz4-testmode test-lz4-contentSize \
           test-lz4-hugefile
 
