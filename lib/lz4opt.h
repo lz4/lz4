@@ -133,7 +133,10 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
         if (matchLength > best_mlen) {
             best_mlen = matchLength;
             if (matches) {
-                matches[mnum].off = (int)(ip - match);
+                if (matchIndex >= dictLimit)
+                    matches[mnum].off = (int)(ip - match);
+                else
+                    matches[mnum].off = (int)(ip - (base + matchIndex)); /* virtual matchpos */
                 matches[mnum].len = (int)matchLength;
                 mnum++;
             }
