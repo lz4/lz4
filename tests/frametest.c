@@ -186,6 +186,13 @@ int basicTests(U32 seed, double compressibility)
     FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
     crcOrig = XXH64(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
 
+    /* LZ4F_compressBound() : special case : srcSize == 0 */
+    DISPLAYLEVEL(3, "LZ4F_compressBound(0) = ");
+    {   size_t const cBound = LZ4F_compressBound(0, NULL);
+        if (cBound < 64 KB) goto _output_error;
+        DISPLAYLEVEL(3, " %u \n", (U32)cBound);
+    }
+
     /* Special case : null-content frame */
     testSize = 0;
     DISPLAYLEVEL(3, "LZ4F_compressFrame, compress null content : \n");

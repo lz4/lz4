@@ -66,6 +66,8 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
+LIBLZ4 = liblz4.$(SHARED_EXT_VER)
+
 default: lib-release
 
 lib-release: liblz4.a liblz4
@@ -85,20 +87,23 @@ ifeq ($(BUILD_STATIC),yes)
 	@$(AR) rcs $@ *.o
 endif
 
-liblz4: *.c
+$(LIBLZ4): *.c
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
 	dlltool -D dll\liblz4.dll -d dll\liblz4.def -l dll\liblz4.lib
 else
-	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@.$(SHARED_EXT_VER)
+	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
-	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT_MAJOR)
-	@ln -sf $@.$(SHARED_EXT_VER) $@.$(SHARED_EXT)
+	@ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
+	@ln -sf $@ liblz4.$(SHARED_EXT)
 endif
 
+liblz4: $(LIBLZ4)
+
 clean:
-	@$(RM) core *.o *.a *.$(SHARED_EXT) liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	@$(RM) core *.o liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	@$(RM) *.a *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	@echo Cleaning library completed
 
 
@@ -157,9 +162,9 @@ endif
 	@echo lz4 static and shared libraries installed
 
 uninstall:
+	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
 	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.a
 	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4.h

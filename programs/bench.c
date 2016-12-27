@@ -179,7 +179,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     UTIL_initTimer(&ticksPerSecond);
 
     /* Init */
-    if (cLevel < LZ4HC_MIN_CLEVEL) cfunctionId = 0; else cfunctionId = 1;
+    if (cLevel < LZ4HC_CLEVEL_MIN) cfunctionId = 0; else cfunctionId = 1;
     switch (cfunctionId)
     {
 #ifdef COMPRESSOR0
@@ -503,8 +503,8 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
 {
     double const compressibility = (double)g_compressibilityDefault / 100;
 
-    if (cLevel > LZ4HC_MAX_CLEVEL) cLevel = LZ4HC_MAX_CLEVEL;
-    if (cLevelLast > LZ4HC_MAX_CLEVEL) cLevelLast = LZ4HC_MAX_CLEVEL;
+    if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
+    if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
     if (cLevelLast < cLevel) cLevelLast = cLevel;
     if (cLevelLast > cLevel) DISPLAYLEVEL(2, "Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
 

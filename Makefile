@@ -52,7 +52,10 @@ endif
 
 .PHONY: default all lib lz4 clean test versionsTest examples
 
-default: lib lz4-release
+default:
+	@$(MAKE) -C $(LZ4DIR)
+	@$(MAKE) -C $(PRGDIR)
+	@cp $(PRGDIR)/lz4$(EXT) .
 
 all:
 	@$(MAKE) -C $(LZ4DIR) $@
@@ -96,10 +99,10 @@ uninstall:
 	@$(MAKE) -C $(PRGDIR) $@
 
 travis-install:
-	$(MAKE) install PREFIX=~/install_test_dir
+	$(MAKE) -j1 install PREFIX=~/install_test_dir
 
 test:
-	$(MAKE) -C $(TESTDIR) test
+	$(MAKE) -C $(TESTDIR) $@
 
 clangtest: clean
 	clang -v

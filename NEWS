@@ -1,7 +1,10 @@
 v1.7.5
-cli : fix minor notification when using -r recursive mode
+lz4hc : new high compression mode : levels 10-12 compress more and slower, by @inikep.
 lz4cat : fix : works with relative path (#284) and stdin (#285) (reported by @beiDei8z)
+cli : fix minor notification when using -r recursive mode
+API : lz4frame : LZ4F_frameBound(0) gives upper bound of *flush() and *End() operations (#290, #280)
 doc : markdown version of man page, by Takayuki Matsuoka (#279)
+build : Makefile : fix make -jX lib+exe concurrency (#277)
 
 v1.7.4.2
 fix : Makefile : release build compatible with PIE and customized compilation directives provided through environment variables (#274, reported by Antoine Martin)
