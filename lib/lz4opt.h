@@ -37,6 +37,7 @@
 #define LZ4_LOG_PARSER(fmt, ...)  //printf(fmt, __VA_ARGS__)
 #define LZ4_LOG_PRICE(fmt, ...)   //printf(fmt, __VA_ARGS__)
 #define LZ4_LOG_ENCODE(fmt, ...)  //printf(fmt, __VA_ARGS__)
+#define LZ4_LOG_TREE(fmt, ...)    //printf(fmt, __VA_ARGS__)
 
 
 #define LZ4_OPT_NUM   (1<<12)
@@ -106,6 +107,8 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     size_t matchLength = 0;
     U32* HashPos;
 
+    LZ4_LOG_TREE("LZ4HC_BinTree_InsertAndGetAllMatches nbAttempts=%d\n", nbAttempts);
+
     if (ip + MINMATCH > iHighLimit) return 1;
 
     /* HC4 match finder */
@@ -117,6 +120,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     ptr1 = &DELTANEXTMAXD(current*2);
     delta0 = delta1 = (U16)(current - matchIndex);
 
+    LZ4_LOG_TREE("matchIndex[%u] current[%u] lowLimit[%u]\n", matchIndex, current, lowLimit);
     while ((matchIndex < current) && (matchIndex>=lowLimit) && (nbAttempts)) {
         nbAttempts--;
         if (matchIndex >= dictLimit) {
@@ -141,29 +145,30 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
                 matches[mnum].len = (int)matchLength;
                 mnum++;
             }
-            if (best_mlen > LZ4_OPT_NUM) break;
+            if (best_mlen > LZ4_OPT_NUM) { LZ4_LOG_TREE("best_mlen > LZ4_OPT_NUM\n"); break; }
         }
 
         if (ip+matchLength >= iHighLimit)   /* equal : no way to know if inf or sup */
-            break;   /* drop , to guarantee consistency ; miss a bit of compression, but other solutions can corrupt the tree */
+            { LZ4_LOG_TREE("ip+matchLength > iHighLimit\n"); break; }   /* drop , to guarantee consistency ; miss a bit of compression, but other solutions can corrupt the tree */
 
         if (*(ip+matchLength) < *(match+matchLength)) {
             *ptr0 = delta0;
             ptr0 = &DELTANEXTMAXD(matchIndex*2);
-            if (*ptr0 == (U16)-1) break;
+            if (*ptr0 == (U16)-1) { LZ4_LOG_TREE("*ptr0 == (U16)-1"); break; }
             delta0 = *ptr0;
             delta1 += delta0;
             matchIndex -= delta0;
         } else {
             *ptr1 = delta1;
             ptr1 = &DELTANEXTMAXD(matchIndex*2+1);
-            if (*ptr1 == (U16)-1) break;
+            if (*ptr1 == (U16)-1) { LZ4_LOG_TREE("*ptr1 == (U16)-1\n"); break; }
             delta1 = *ptr1;
             delta0 += delta1;
             matchIndex -= delta1;
         }
     }
 
+    LZ4_LOG_TREE("nbAttempts=%d mnum=%d\n", nbAttempts, mnum);
     *ptr0 = (U16)-1;
     *ptr1 = (U16)-1;
     if (matchNum) *matchNum = mnum;
@@ -178,7 +183,7 @@ FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* cons
     const BYTE* const base = ctx->base;
     const U32 target = (U32)(ip - base);
     U32 idx = ctx->nextToUpdateBT;
-
+    LZ4_LOG_TREE("LZ4HC_updateBinTree %d->%d nbAttempts=%d\n", idx, target, ctx->searchNum);
     while(idx < target)
         idx += LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, 8, NULL, NULL);
 }
@@ -206,7 +211,7 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     opt[pos].off = (int)offset;                        \
     opt[pos].litlen = (int)litlen;                     \
     opt[pos].price = (int)price;                       \
-    LZ4_LOG_PARSER("%d: SET price[%d/%d]=%d litlen=%d len=%d off=%d\n", (int)(inr-(const BYTE*)source), (int)(pos), (int)last_pos, opt[pos].price, opt[pos].litlen, opt[pos].mlen, opt[pos].off); \
+    LZ4_LOG_PARSER("%u: SET price[%d/%d]=%d litlen=%d len=%d off=%d\n", (int)(inr-(const BYTE*)source), (int)(pos), (int)last_pos, opt[pos].price, opt[pos].litlen, opt[pos].mlen, opt[pos].off); \
 }
 
 
@@ -330,7 +335,6 @@ static int LZ4HC_compress_optimal (
                         price = opt[cur2].price + LZ4HC_sequencePrice(litlen, mlen);
                     }
 
-                    LZ4_LOG_PARSER("%d: Found2 mlen=%d best_mlen=%d off=%d price=%d litlen=%d price[%d]=%d\n", (int)(inr-(const BYTE*)source), (int)mlen, (int)best_mlen, matches[i].off, (int)price, (int)litlen, (int)(cur - litlen), opt[cur - litlen].price);
                     if (cur2 + mlen > last_pos || price < (size_t)opt[cur2 + mlen].price) { // || (((int)price == opt[cur2 + mlen].price) && (opt[cur2 + mlen-1].mlen == 1))) {
                         SET_PRICE(cur2 + mlen, mlen, matches[i].off, litlen, price);
                     }

@@ -601,7 +601,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST;
         LZ4_loadDictHC(&LZ4dictHC, dict, dictSize);
         ret = LZ4_compress_HC_continue(&LZ4dictHC, block, compressedBuffer, blockSize, blockContinueCompressedSize-1);
-        FUZ_CHECKTEST(ret>0, "LZ4_compressHC_limitedOutput_continue using ExtDict should fail : one missing byte for output buffer");
+        FUZ_CHECKTEST(ret>0, "LZ4_compressHC_limitedOutput_continue using ExtDict should fail : one missing byte for output buffer (%i != %i)", ret, blockContinueCompressedSize);
 
         FUZ_DISPLAYTEST;
         LZ4_loadDictHC(&LZ4dictHC, dict, dictSize);

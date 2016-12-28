@@ -486,6 +486,14 @@ _Search3:
     return (int) (((char*)op)-dest);
 }
 
+static int LZ4HC_getSearchNum(int compressionLevel)
+{
+    switch (compressionLevel) {
+        default: return 0; /* unused */
+        case 11: return 128; 
+        case 12: return 1<<10; 
+    }
+}
 
 static int LZ4HC_compress_generic (
     LZ4HC_CCtx_internal* const ctx,
@@ -497,13 +505,14 @@ static int LZ4HC_compress_generic (
     limitedOutput_directive limit
     )
 {
+  //  printf("LZ4HC_compress_generic inputSize=%d compressionLevel=%d\n", inputSize, compressionLevel);
     if (compressionLevel < 1) compressionLevel = LZ4HC_CLEVEL_DEFAULT;
     if (compressionLevel > 9) {
         switch (compressionLevel) {
             case 10: return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, 1 << (16-1), limit);
-            case 11: ctx->searchNum = 128;  return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 128, 0);
+            case 11: ctx->searchNum = LZ4HC_getSearchNum(compressionLevel); return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 128, 0);
             default:
-            case 12: ctx->searchNum = 1<<10; return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM, 1);
+            case 12: ctx->searchNum = LZ4HC_getSearchNum(compressionLevel); return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM, 1);
         }
     }
     return LZ4HC_compress_hashChain(ctx, source, dest, inputSize, maxOutputSize, 1 << (compressionLevel-1), limit);
@@ -554,11 +563,13 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= sizeof(size_t) * LZ4_STREAMHCSIZE_SIZET);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.compressionLevel = (unsigned)compressionLevel;
+    LZ4_streamHCPtr->internal_donotuse.searchNum = LZ4HC_getSearchNum(compressionLevel);
 }
 
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+  //  printf("LZ4_loadDictHC dictSize=%d\n", (int)dictSize);
     if (dictSize > 64 KB) {
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
@@ -577,6 +588,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
 
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
+  //  printf("LZ4HC_setExternalDict\n");
     if (ctxPtr->compressionLevel >= LZ4HC_CLEVEL_OPT_MIN)
         LZ4HC_updateBinTree(ctxPtr, ctxPtr->end - MFLIMIT, ctxPtr->end - LASTLITERALS);
     else
