@@ -98,7 +98,7 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
-    hc4->nextToUpdate = hc4->nextToUpdateBT = 64 KB;
+    hc4->nextToUpdate = 64 KB;
     hc4->base = start - 64 KB;
     hc4->end = start;
     hc4->dictBase = start - 64 KB;
@@ -597,7 +597,7 @@ static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBl
     ctxPtr->dictBase  = ctxPtr->base;
     ctxPtr->base = newBlock - ctxPtr->dictLimit;
     ctxPtr->end  = newBlock;
-    ctxPtr->nextToUpdate = ctxPtr->nextToUpdateBT = ctxPtr->dictLimit;   /* match referencing will resume from there */
+    ctxPtr->nextToUpdate = ctxPtr->dictLimit;   /* match referencing will resume from there */
 }
 
 static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
@@ -657,7 +657,6 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
         streamPtr->dictLimit = endIndex - dictSize;
         streamPtr->lowLimit = endIndex - dictSize;
         if (streamPtr->nextToUpdate < streamPtr->dictLimit) streamPtr->nextToUpdate = streamPtr->dictLimit;
-        if (streamPtr->nextToUpdateBT < streamPtr->dictLimit) streamPtr->nextToUpdateBT = streamPtr->dictLimit;
     }
     return dictSize;
 }

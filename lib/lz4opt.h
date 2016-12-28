@@ -171,7 +171,7 @@ FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* cons
 {
     const BYTE* const base = ctx->base;
     const U32 target = (U32)(ip - base);
-    U32 idx = ctx->nextToUpdateBT;
+    U32 idx = ctx->nextToUpdate;
     while(idx < target)
         idx += LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, 8, NULL, NULL);
 }
@@ -184,10 +184,10 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
                         size_t best_mlen, LZ4HC_match_t* matches, const int fullUpdate)
 {
     int mnum = 0;
-    if (ip < ctx->base + ctx->nextToUpdateBT) return 0;   /* skipped area */
+    if (ip < ctx->base + ctx->nextToUpdate) return 0;   /* skipped area */
     if (fullUpdate) LZ4HC_updateBinTree(ctx, ip, iHighLimit);
     best_mlen = LZ4HC_BinTree_InsertAndGetAllMatches(ctx, ip, iHighLimit, best_mlen, matches, &mnum);
-    ctx->nextToUpdateBT = (U32)(ip - ctx->base + best_mlen);
+    ctx->nextToUpdate = (U32)(ip - ctx->base + best_mlen);
     return mnum;
 }
 
