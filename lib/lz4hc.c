@@ -505,7 +505,6 @@ static int LZ4HC_compress_generic (
     limitedOutput_directive limit
     )
 {
-  //  printf("LZ4HC_compress_generic inputSize=%d compressionLevel=%d\n", inputSize, compressionLevel);
     if (compressionLevel < 1) compressionLevel = LZ4HC_CLEVEL_DEFAULT;
     if (compressionLevel > 9) {
         switch (compressionLevel) {
@@ -569,7 +568,6 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
-  //  printf("LZ4_loadDictHC dictSize=%d\n", (int)dictSize);
     if (dictSize > 64 KB) {
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
@@ -588,7 +586,6 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
 
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
-  //  printf("LZ4HC_setExternalDict\n");
     if (ctxPtr->compressionLevel >= LZ4HC_CLEVEL_OPT_MIN)
         LZ4HC_updateBinTree(ctxPtr, ctxPtr->end - MFLIMIT, ctxPtr->end - LASTLITERALS);
     else

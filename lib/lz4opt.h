@@ -33,13 +33,6 @@
        - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-//#include <stdio.h>
-#define LZ4_LOG_PARSER(fmt, ...)  //printf(fmt, __VA_ARGS__)
-#define LZ4_LOG_PRICE(fmt, ...)   //printf(fmt, __VA_ARGS__)
-#define LZ4_LOG_ENCODE(fmt, ...)  //printf(fmt, __VA_ARGS__)
-#define LZ4_LOG_TREE(fmt, ...)    //printf(fmt, __VA_ARGS__)
-
-
 #define LZ4_OPT_NUM   (1<<12)
 
 
@@ -107,8 +100,6 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     size_t matchLength = 0;
     U32* HashPos;
 
-    LZ4_LOG_TREE("LZ4HC_BinTree_InsertAndGetAllMatches nbAttempts=%d\n", nbAttempts);
-
     if (ip + MINMATCH > iHighLimit) return 1;
 
     /* HC4 match finder */
@@ -120,7 +111,6 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     ptr1 = &DELTANEXTMAXD(current*2);
     delta0 = delta1 = (U16)(current - matchIndex);
 
-    LZ4_LOG_TREE("matchIndex[%u] current[%u] lowLimit[%u]\n", matchIndex, current, lowLimit);
     while ((matchIndex < current) && (matchIndex>=lowLimit) && (nbAttempts)) {
         nbAttempts--;
         if (matchIndex >= dictLimit) {
@@ -145,30 +135,29 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
                 matches[mnum].len = (int)matchLength;
                 mnum++;
             }
-            if (best_mlen > LZ4_OPT_NUM) { LZ4_LOG_TREE("best_mlen > LZ4_OPT_NUM\n"); break; }
+            if (best_mlen > LZ4_OPT_NUM) break;
         }
 
         if (ip+matchLength >= iHighLimit)   /* equal : no way to know if inf or sup */
-            { LZ4_LOG_TREE("ip+matchLength > iHighLimit\n"); break; }   /* drop , to guarantee consistency ; miss a bit of compression, but other solutions can corrupt the tree */
+            break;   /* drop , to guarantee consistency ; miss a bit of compression, but other solutions can corrupt the tree */
 
         if (*(ip+matchLength) < *(match+matchLength)) {
             *ptr0 = delta0;
             ptr0 = &DELTANEXTMAXD(matchIndex*2);
-            if (*ptr0 == (U16)-1) { LZ4_LOG_TREE("*ptr0 == (U16)-1"); break; }
+            if (*ptr0 == (U16)-1) break;
             delta0 = *ptr0;
             delta1 += delta0;
             matchIndex -= delta0;
         } else {
             *ptr1 = delta1;
             ptr1 = &DELTANEXTMAXD(matchIndex*2+1);
-            if (*ptr1 == (U16)-1) { LZ4_LOG_TREE("*ptr1 == (U16)-1\n"); break; }
+            if (*ptr1 == (U16)-1) break;
             delta1 = *ptr1;
             delta0 += delta1;
             matchIndex -= delta1;
         }
     }
 
-    LZ4_LOG_TREE("nbAttempts=%d mnum=%d\n", nbAttempts, mnum);
     *ptr0 = (U16)-1;
     *ptr1 = (U16)-1;
     if (matchNum) *matchNum = mnum;
@@ -183,7 +172,6 @@ FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* cons
     const BYTE* const base = ctx->base;
     const U32 target = (U32)(ip - base);
     U32 idx = ctx->nextToUpdateBT;
-    LZ4_LOG_TREE("LZ4HC_updateBinTree %d->%d nbAttempts=%d\n", idx, target, ctx->searchNum);
     while(idx < target)
         idx += LZ4HC_BinTree_InsertAndGetAllMatches(ctx, base+idx, iHighLimit, 8, NULL, NULL);
 }
@@ -211,7 +199,6 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
     opt[pos].off = (int)offset;                        \
     opt[pos].litlen = (int)litlen;                     \
     opt[pos].price = (int)price;                       \
-    LZ4_LOG_PARSER("%u: SET price[%d/%d]=%d litlen=%d len=%d off=%d\n", (int)(inr-(const BYTE*)source), (int)(pos), (int)last_pos, opt[pos].price, opt[pos].litlen, opt[pos].mlen, opt[pos].off); \
 }
 
 
@@ -251,7 +238,6 @@ static int LZ4HC_compress_optimal (
         llen = ip - anchor;
         match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
         if (!match_num) { ip++; continue; }
-        LZ4_LOG_PARSER("%d: match_num=%d last_pos=%d\n", (int)(ip-(const BYTE*)source), (int)match_num, (int)last_pos);
 
         if ((size_t)matches[match_num-1].len > sufficient_len) {
             best_mlen = matches[match_num-1].len;
@@ -265,7 +251,6 @@ static int LZ4HC_compress_optimal (
         for (i = 0; i < match_num; i++) {
            mlen = (i>0) ? (size_t)matches[i-1].len+1 : MINMATCH;
            best_mlen = (matches[i].len < LZ4_OPT_NUM) ? matches[i].len : LZ4_OPT_NUM;
-           LZ4_LOG_PARSER("%d: start Found mlen=%d off=%d best_mlen=%d last_pos=%d\n", (int)(ip-(const BYTE*)source), matches[i].len, matches[i].off, (int)best_mlen, (int)last_pos);
            while (mlen <= best_mlen) {
                 litlen = 0;
                 price = LZ4HC_sequencePrice(llen + litlen, mlen) - LZ4HC_literalsPrice(llen);
@@ -285,29 +270,22 @@ static int LZ4HC_compress_optimal (
                 litlen = opt[cur-1].litlen + 1;
                 if (cur != litlen) {
                     price = opt[cur - litlen].price + LZ4HC_literalsPrice(litlen);
-                    LZ4_LOG_PRICE("%d: TRY1 opt[%d].price=%d price=%d cur=%d litlen=%d\n", (int)(inr-(const BYTE*)source), (int)(cur - litlen), opt[cur - litlen].price, (int)price, (int)cur, (int)litlen);
                 } else {
                     price = LZ4HC_literalsPrice(llen + litlen) - LZ4HC_literalsPrice(llen);
-                    LZ4_LOG_PRICE("%d: TRY2 price=%d cur=%d litlen=%d llen=%d\n", (int)(inr-(const BYTE*)source), (int)price, (int)cur, (int)litlen, (int)llen);
                 }
             } else {
                 litlen = 1;
                 price = opt[cur - 1].price + LZ4HC_literalsPrice(litlen);
-                LZ4_LOG_PRICE("%d: TRY3 price=%d cur=%d litlen=%d litonly=%d\n", (int)(inr-(const BYTE*)source), (int)price, (int)cur, (int)litlen, (int)LZ4HC_literalsPrice(litlen));
             }
 
             mlen = 1;
             best_mlen = 0;
-            LZ4_LOG_PARSER("%d: TRY price=%d opt[%d].price=%d\n", (int)(inr-(const BYTE*)source), (int)price, (int)cur, opt[cur].price);
             if (cur > last_pos || price < (size_t)opt[cur].price)
                 SET_PRICE(cur, mlen, best_mlen, litlen, price);
 
             if (cur == last_pos || inr >= mflimit) break;
-            LZ4_LOG_PARSER("%d: CURRENT price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(inr-(const BYTE*)source), (int)cur, (int)last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen);
 
             match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, MINMATCH-1, matches, fullUpdate);
-            LZ4_LOG_PARSER("%d: LZ4HC_BinTree_GetAllMatches match_num=%d\n", (int)(inr-(const BYTE*)source), (int)match_num);
-
             if (match_num > 0 && (size_t)matches[match_num-1].len > sufficient_len) {
                 best_mlen = matches[match_num-1].len;
                 best_off = matches[match_num-1].off;
@@ -320,7 +298,6 @@ static int LZ4HC_compress_optimal (
                 mlen = (i>0) ? (size_t)matches[i-1].len+1 : MINMATCH;
                 cur2 = cur;
                 best_mlen = (cur2 + matches[i].len < LZ4_OPT_NUM) ? (size_t)matches[i].len : LZ4_OPT_NUM - cur2;
-                LZ4_LOG_PARSER("%d: Found1 cur=%d cur2=%d mlen=%d off=%d best_mlen=%d last_pos=%d\n", (int)(inr-(const BYTE*)source), (int)cur, (int)cur2, matches[i].len, matches[i].off, (int)best_mlen, (int)last_pos);
 
                 while (mlen <= best_mlen) {
                     if (opt[cur2].mlen == 1) {
@@ -348,12 +325,6 @@ static int LZ4HC_compress_optimal (
         cur = last_pos - best_mlen;
 
 encode: /* cur, last_pos, best_mlen, best_off have to be set */
-        for (i = 1; i <= last_pos; i++) {
-            LZ4_LOG_PARSER("%d: price[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-(const BYTE*)source+i), (int)i, (int)last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen);
-        }
-
-        LZ4_LOG_PARSER("%d: cur=%d/%d best_mlen=%d best_off=%d\n", (int)(ip-(const BYTE*)source+cur), (int)cur, (int)last_pos, (int)best_mlen, (int)best_off);
-
         opt[0].mlen = 1;
         while (1) {
             mlen = opt[cur].mlen;
@@ -366,26 +337,15 @@ encode: /* cur, last_pos, best_mlen, best_off have to be set */
             cur -= mlen;
         }
 
-        for (i = 0; i <= last_pos;) {
-            LZ4_LOG_PARSER("%d: price2[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-(const BYTE*)source+i), (int)i, (int)last_pos, opt[i].price, opt[i].off, opt[i].mlen, opt[i].litlen);
-            i += opt[i].mlen;
-        }
-
         cur = 0;
         while (cur < last_pos) {
-            LZ4_LOG_PARSER("%d: price3[%d/%d]=%d off=%d mlen=%d litlen=%d\n", (int)(ip-(const BYTE*)source+cur), (int)cur, (int)last_pos, opt[cur].price, opt[cur].off, opt[cur].mlen, opt[cur].litlen);
             mlen = opt[cur].mlen;
             if (mlen == 1) { ip++; cur++; continue; }
             offset = opt[cur].off;
             cur += mlen;
 
-            LZ4_LOG_ENCODE("%d: ENCODE literals=%d off=%d mlen=%d ", (int)(ip-(const BYTE*)source), (int)(ip-anchor), (int)(offset), (int)mlen);
             res = LZ4HC_encodeSequence(&ip, &op, &anchor, (int)mlen, ip - offset, limit, oend);
-            LZ4_LOG_ENCODE("out=%d\n", (int)((char*)op - dest));
-
             if (res) return 0;
-
-            LZ4_LOG_PARSER("%d: offset=%d\n", (int)(ip-(const BYTE*)source), (int)offset);
         }
     }
 
@@ -394,7 +354,6 @@ encode: /* cur, last_pos, best_mlen, best_off have to be set */
         if ((limit) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;  /* Check output limit */
         if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
         else *op++ = (BYTE)(lastRun<<ML_BITS);
-        LZ4_LOG_ENCODE("%d: ENCODE_LAST literals=%d out=%d\n", (int)(ip-(const BYTE*)source), (int)(iend-anchor), (int)((char*)op-dest));
         memcpy(op, anchor, iend - anchor);
         op += iend-anchor;
     }
