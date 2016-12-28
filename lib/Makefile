@@ -42,11 +42,6 @@ LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
 BUILD_STATIC:= yes
 
-DESTDIR ?=
-PREFIX  ?= /usr/local
-LIBDIR  ?= $(PREFIX)/lib
-INCLUDEDIR=$(PREFIX)/include
-
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
 DEBUGFLAGS:=-g -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
@@ -112,10 +107,30 @@ clean:
 	@echo Cleaning library completed
 
 
-#------------------------------------------------------------------------
-#make install is validated only for Linux, OSX, kFreeBSD, Hurd and
-#FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+#-----------------------------------------------------------------------------
+# make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
+#-----------------------------------------------------------------------------
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
+
+ifneq (,$(filter $(shell uname),SunOS))
+INSTALL ?= ginstall
+else
+INSTALL ?= install
+endif
+
+PREFIX     ?= /usr/local
+DESTDIR    ?=
+LIBDIR     ?= $(PREFIX)/lib
+INCLUDEDIR ?= $(PREFIX)/include
+
+ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly))
+PKGCONFIGDIR ?= $(PREFIX)/libdata/pkgconfig
+else
+PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
+endif
+
+INSTALL_LIB  ?= $(INSTALL) -m 755
+INSTALL_DATA ?= $(INSTALL) -m 644
 
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
@@ -126,17 +141,19 @@ liblz4.pc: liblz4.pc.in Makefile
           $< >$@
 
 install: lib liblz4.pc
-	@install -d -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig/ $(DESTDIR)$(INCLUDEDIR)/
-	@install -m 755 liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
-	@install -m 755 liblz4.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)
-	@install -m 755 liblz4.$(SHARED_EXT) $(DESTDIR)$(LIBDIR)
-	@install -m 644 liblz4.pc $(DESTDIR)$(LIBDIR)/pkgconfig/
+	@$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/
+	@$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(PKGCONFIGDIR)/
+	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
-	@install -m 644 liblz4.a $(DESTDIR)$(LIBDIR)
+	@$(INSTALL_LIB) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
 endif
-	@install -m 644 lz4.h $(DESTDIR)$(INCLUDEDIR)
-	@install -m 644 lz4hc.h $(DESTDIR)$(INCLUDEDIR)
-	@install -m 644 lz4frame.h $(DESTDIR)$(INCLUDEDIR)
+	@$(INSTALL_LIB) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
+	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
+	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+	@echo Installing includes
+	@$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	@$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	@$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
 	@echo lz4 static and shared libraries installed
 
 uninstall:

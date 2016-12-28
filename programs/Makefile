@@ -38,10 +38,6 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
-DESTDIR ?=
-PREFIX  ?= /usr/local
-BINDIR  := $(PREFIX)/bin
-MANDIR  := $(PREFIX)/share/man/man1
 LZ4DIR  := ../lib
 
 SRCFILES := $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c)
@@ -112,10 +108,10 @@ preview-man: clean-man man
 	man ./lz4.1
 
 
-#------------------------------------------------------------------------
-#make install is validated only for Linux, OSX, kFreeBSD, Hurd and
-#FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+#-----------------------------------------------------------------------------
+# make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
+#-----------------------------------------------------------------------------
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 unlz4: lz4
 	ln -s lz4 unlz4
@@ -123,15 +119,37 @@ unlz4: lz4
 lz4cat: lz4
 	ln -s lz4 lz4cat
 
+
+ifneq (,$(filter $(shell uname),SunOS))
+INSTALL ?= ginstall
+else
+INSTALL ?= install
+endif
+
+PREFIX  ?= /usr/local
+DESTDIR ?=
+BINDIR  ?= $(PREFIX)/bin
+
+ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly SunOS))
+MANDIR  ?= $(PREFIX)/man/man1
+else
+MANDIR  ?= $(PREFIX)/share/man/man1
+endif
+
+INSTALL_PROGRAM ?= $(INSTALL) -m 755
+INSTALL_SCRIPT  ?= $(INSTALL) -m 755
+INSTALL_MAN     ?= $(INSTALL) -m 644
+
+
 install: lz4$(EXT) lz4c$(EXT)
 	@echo Installing binaries
-	@install -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@install -m 755 lz4 $(DESTDIR)$(BINDIR)/lz4
+	@$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
+	@$(INSTALL_PROGRAM) lz4 $(DESTDIR)$(BINDIR)/lz4
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
-	@install -m 755 lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c
+	@$(INSTALL_PROGRAM) lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c
 	@echo Installing man pages
-	@install -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
+	@$(INSTALL_MAN) -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1

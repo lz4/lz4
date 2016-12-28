@@ -120,14 +120,20 @@ versionsTest:
 
 
 #------------------------------------------------------------------------
-#make install is validated only for Linux, OSX, kFreeBSD, Hurd and
-#FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+#make test is validated only for Linux, OSX, kFreeBSD, FreeBSD, Hurd and
+#Solaris targets
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))
 MD5:=md5 -r
 endif
+
+DIFF:=diff
+ifneq (,$(filter $(shell uname),SunOS))
+DIFF:=gdiff
+endif
+
 
 test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer
 
@@ -138,18 +144,18 @@ test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
 	./datagen -g5M  -P100 > tmpSrc
 	$(LZ4) -B4D tmpSrc | $(LZ4) -dv --sparse > tmpB4
-	diff -s tmpSrc tmpB4
+	$(DIFF) -s tmpSrc tmpB4
 	$(LZ4) -B5D tmpSrc | $(LZ4) -dv --sparse > tmpB5
-	diff -s tmpSrc tmpB5
+	$(DIFF) -s tmpSrc tmpB5
 	$(LZ4) -B6D tmpSrc | $(LZ4) -dv --sparse > tmpB6
-	diff -s tmpSrc tmpB6
+	$(DIFF) -s tmpSrc tmpB6
 	$(LZ4) -B7D tmpSrc | $(LZ4) -dv --sparse > tmpB7
-	diff -s tmpSrc tmpB7
+	$(DIFF) -s tmpSrc tmpB7
 	$(LZ4) tmpSrc | $(LZ4) -dv --no-sparse > tmpNoSparse
-	diff -s tmpSrc tmpNoSparse
+	$(DIFF) -s tmpSrc tmpNoSparse
 	ls -ls tmp*
 	./datagen -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > tmpOdd   # Odd size file (to generate non-full last block)
-	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
+	./datagen -s1 -g1200007 -P100 | $(DIFF) -s - tmpOdd
 	ls -ls tmpOdd
 	@$(RM) tmp*
 	@echo "\n Compatibility with Console :"
@@ -163,7 +169,7 @@ test-lz4-sparse: lz4 datagen
 	$(LZ4) -d -v tmpC tmpR
 	$(LZ4) -d -v tmpC >> tmpR
 	ls -ls tmp*
-	diff tmp2M tmpR
+	$(DIFF) tmp2M tmpR
 	@$(RM) tmp*
 
 test-lz4-contentSize: lz4 datagen
@@ -171,13 +177,13 @@ test-lz4-contentSize: lz4 datagen
 	./datagen -g15M > tmp
 	$(LZ4) -v tmp | $(LZ4) -t
 	$(LZ4) -v --content-size tmp | $(LZ4) -d > tmp2
-	diff -s tmp tmp2
+	$(DIFF) -s tmp tmp2
 	# test large size [2-4] GB
 	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmp
 	@ls -ls tmp
 	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmp2
 	@ls -ls tmp2
-	diff -s tmp tmp2
+	$(DIFF) -s tmp tmp2
 	@$(RM) tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
@@ -218,9 +224,9 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	./datagen -g16KB  | $(LZ4) -9     | $(LZ4) -t
 	./datagen -g20KB > tmpSrc
 	$(LZ4) < tmpSrc   | $(LZ4) -d > tmpRes
-	diff -q tmpSrc tmpRes
+	$(DIFF) -q tmpSrc tmpRes
 	$(LZ4) --no-frame-crc < tmpSrc | $(LZ4) -d > tmpRes
-	diff -q tmpSrc tmpRes
+	$(DIFF) -q tmpSrc tmpRes
 	./datagen         | $(LZ4)        | $(LZ4) -t
 	./datagen -g6M -P99 | $(LZ4) -9BD | $(LZ4) -t
 	./datagen -g17M   | $(LZ4) -9v    | $(LZ4) -qt
@@ -241,9 +247,9 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
 	$(LZ4) tmp                         # creates tmp.lz4
 	$(PRGDIR)/lz4cat < tmp.lz4 > tmp3  # checks lz4cat works with stdin (#285)
-	diff -q tmp tmp3
+	$(DIFF) -q tmp tmp3
 	$(PRGDIR)/lz4cat < tmp > tmp2      # checks lz4cat works with stdin (#285)
-	diff -q tmp tmp2
+	$(DIFF) -q tmp tmp2
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen
