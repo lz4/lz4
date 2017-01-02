@@ -65,6 +65,11 @@ endif(NOT LZ4_BUNDLED_MODE AND NOT CPack_CMake_INCLUDED)
 # which case we always use static libraries.
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON "NOT LZ4_BUNDLED_MODE" OFF)
+CMAKE_DEPENDENT_OPTION(BUILD_STATIC_LIBS "Build static libraries" OFF "BUILD_SHARED_LIBS" ON)
+
+if(NOT BUILD_SHARED_LIBS AND NOT BUILD_STATIC_LIBS)
+  message(FATAL_ERROR "Both BUILD_SHARED_LIBS and BUILD_STATIC_LIBS have been disabled")
+endif()
 
 set(LZ4_LIB_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/lib")
 set(LZ4_PROG_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/programs")
@@ -90,28 +95,41 @@ set(LZ4_CLI_SOURCES
 # we're building a shared library this is ignored and PIC is always
 # used.
 option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static library (if applicable)" ON)
-if(LZ4_POSITION_INDEPENDENT_LIB OR BUILD_SHARED_LIBS)
-  set(LZ4_POSITION_INDEPENDENT_CODE TRUE)
-else()
-  set(LZ4_POSITION_INDEPENDENT_CODE FALSE)
-endif()
 
 # liblz4
-add_library(lz4 ${LZ4_SOURCES})
-set_target_properties(lz4 PROPERTIES
-  SOVERSION "${LZ4_VERSION_MAJOR}"
-  VERSION "${LZ4_VERSION_STRING}"
-  POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_CODE})
+set(LZ4_LIBRARIES_BUILT)
+if(BUILD_SHARED_LIBS)
+  add_library(lz4_shared SHARED ${LZ4_SOURCES})
+  set_target_properties(lz4_shared PROPERTIES
+    OUTPUT_NAME lz4
+    SOVERSION "${LZ4_VERSION_MAJOR}"
+    VERSION "${LZ4_VERSION_STRING}")
+  list(APPEND LZ4_LIBRARIES_BUILT lz4_shared)
+endif()
+if(BUILD_STATIC_LIBS)
+  add_library(lz4_static STATIC ${LZ4_SOURCES})
+  set_target_properties(lz4_static PROPERTIES
+    OUTPUT_NAME lz4
+    POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_LIB})
+  list(APPEND LZ4_LIBRARIES_BUILT lz4_static)
+endif()
+
+# link to shared whenever possible, to static otherwise
+if(BUILD_SHARED_LIBS)
+  set(LZ4_LINK_LIBRARY lz4_shared)
+else()
+  set(LZ4_LINK_LIBRARY lz4_static)
+endif()
 
 # lz4
 add_executable(lz4cli ${LZ4_CLI_SOURCES})
 set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
-target_link_libraries(lz4cli lz4)
+target_link_libraries(lz4cli ${LZ4_LINK_LIBRARY})
 
 # lz4c
 add_executable(lz4c ${LZ4_CLI_SOURCES})
 set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
-target_link_libraries(lz4c lz4)
+target_link_libraries(lz4c ${LZ4_LINK_LIBRARY})
 
 # Extra warning flags
 include (CheckCCompilerFlag)
@@ -149,7 +167,7 @@ if(NOT LZ4_BUNDLED_MODE)
 
   install(TARGETS lz4cli lz4c
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-  install(TARGETS lz4
+  install(TARGETS ${LZ4_LIBRARIES_BUILT}
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
   install(FILES
