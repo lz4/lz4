@@ -175,6 +175,8 @@ if(NOT LZ4_BUNDLED_MODE)
     "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+  install(FILES "${LZ4_PROG_SOURCE_DIR}/lz4.1"
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 
@@ -188,6 +190,13 @@ if(NOT LZ4_BUNDLED_MODE)
           COMMAND \"${CMAKE_COMMAND}\" -E create_symlink lz4 \"\${dest}\")
       endforeach()
     ")
+
+    # create manpage aliases
+    foreach(f lz4cat unlz4)
+      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${f}.1" ".so man1/lz4.1\n")
+      install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${f}.1"
+        DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+    endforeach()
   endif(UNIX)
 endif(NOT LZ4_BUNDLED_MODE)
 
