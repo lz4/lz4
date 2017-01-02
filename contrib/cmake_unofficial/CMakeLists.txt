@@ -177,6 +177,18 @@ if(NOT LZ4_BUNDLED_MODE)
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+
+  # install lz4cat and unlz4 symlinks on *nix
+  if(UNIX)
+    install(CODE "
+      foreach(f lz4cat unlz4)
+        set(dest \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_BINDIR}/\${f}\")
+        message(STATUS \"Symlinking: \${dest} -> lz4\")
+        execute_process(
+          COMMAND \"${CMAKE_COMMAND}\" -E create_symlink lz4 \"\${dest}\")
+      endforeach()
+    ")
+  endif(UNIX)
 endif(NOT LZ4_BUNDLED_MODE)
 
 # pkg-config
