@@ -332,6 +332,10 @@ LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    const LZ4F_decompressOptions_t* dOptPtr);
 
 
+void LZ4F_disableChecksum(LZ4F_decompressionContext_t decompressionContext);
+/* LZ4F_disableChecksum()
+* Call this function to allow you to read compressed blocks out of order.
+*/
 
 #if defined (__cplusplus)
 }
