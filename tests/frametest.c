@@ -35,6 +35,7 @@
 /*-************************************
 *  Includes
 **************************************/
+#include "util.h"       /* U32 */
 #include <stdlib.h>     /* malloc, free */
 #include <stdio.h>      /* fprintf */
 #include <string.h>     /* strcmp */
@@ -43,25 +44,6 @@
 #include "lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
-
-
-/*-************************************
-*  Basic Types
-**************************************/
-#if !defined(__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
-# include <stdint.h>
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-#else
-typedef unsigned char       BYTE;
-typedef unsigned short      U16;
-typedef unsigned int        U32;
-typedef   signed int        S32;
-typedef unsigned long long  U64;
-#endif
 
 
 /* unoptimized version; solves endianess & alignment issues */
@@ -110,7 +92,7 @@ static clock_t g_clockTime = 0;
 *****************************************/
 static U32 no_prompt = 0;
 static U32 displayLevel = 2;
-static U32 pause = 0;
+static U32 use_pause = 0;
 
 
 /*-*******************************************************
@@ -203,6 +185,13 @@ int basicTests(U32 seed, double compressibility)
     }
     FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
     crcOrig = XXH64(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
+
+    /* LZ4F_compressBound() : special case : srcSize == 0 */
+    DISPLAYLEVEL(3, "LZ4F_compressBound(0) = ");
+    {   size_t const cBound = LZ4F_compressBound(0, NULL);
+        if (cBound < 64 KB) goto _output_error;
+        DISPLAYLEVEL(3, " %u \n", (U32)cBound);
+    }
 
     /* Special case : null-content frame */
     testSize = 0;
@@ -723,7 +712,7 @@ _end:
     free(compressedBuffer);
     free(decodedBuffer);
 
-    if (pause) {
+    if (use_pause) {
         DISPLAY("press enter to finish \n");
         (void)getchar();
     }
@@ -795,7 +784,7 @@ int main(int argc, const char** argv)
                     break;
                 case 'p': /* pause at the end */
                     argument++;
-                    pause = 1;
+                    use_pause = 1;
                     break;
 
                 case 'i':

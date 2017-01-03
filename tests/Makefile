@@ -38,12 +38,12 @@ VOID    := /dev/null
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
-CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
+CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
 CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum \
            -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS:= -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -120,14 +120,20 @@ versionsTest:
 
 
 #------------------------------------------------------------------------
-#make install is validated only for Linux, OSX, kFreeBSD, Hurd and
-#FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+#make test is validated only for Linux, OSX, kFreeBSD, FreeBSD, Hurd and
+#Solaris targets
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))
 MD5:=md5 -r
 endif
+
+DIFF:=diff
+ifneq (,$(filter $(shell uname),SunOS))
+DIFF:=gdiff
+endif
+
 
 test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer
 
@@ -138,18 +144,18 @@ test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
 	./datagen -g5M  -P100 > tmpSrc
 	$(LZ4) -B4D tmpSrc | $(LZ4) -dv --sparse > tmpB4
-	diff -s tmpSrc tmpB4
+	$(DIFF) -s tmpSrc tmpB4
 	$(LZ4) -B5D tmpSrc | $(LZ4) -dv --sparse > tmpB5
-	diff -s tmpSrc tmpB5
+	$(DIFF) -s tmpSrc tmpB5
 	$(LZ4) -B6D tmpSrc | $(LZ4) -dv --sparse > tmpB6
-	diff -s tmpSrc tmpB6
+	$(DIFF) -s tmpSrc tmpB6
 	$(LZ4) -B7D tmpSrc | $(LZ4) -dv --sparse > tmpB7
-	diff -s tmpSrc tmpB7
+	$(DIFF) -s tmpSrc tmpB7
 	$(LZ4) tmpSrc | $(LZ4) -dv --no-sparse > tmpNoSparse
-	diff -s tmpSrc tmpNoSparse
+	$(DIFF) -s tmpSrc tmpNoSparse
 	ls -ls tmp*
 	./datagen -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > tmpOdd   # Odd size file (to generate non-full last block)
-	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
+	./datagen -s1 -g1200007 -P100 | $(DIFF) -s - tmpOdd
 	ls -ls tmpOdd
 	@$(RM) tmp*
 	@echo "\n Compatibility with Console :"
@@ -163,7 +169,7 @@ test-lz4-sparse: lz4 datagen
 	$(LZ4) -d -v tmpC tmpR
 	$(LZ4) -d -v tmpC >> tmpR
 	ls -ls tmp*
-	diff tmp2M tmpR
+	$(DIFF) tmp2M tmpR
 	@$(RM) tmp*
 
 test-lz4-contentSize: lz4 datagen
@@ -171,13 +177,13 @@ test-lz4-contentSize: lz4 datagen
 	./datagen -g15M > tmp
 	$(LZ4) -v tmp | $(LZ4) -t
 	$(LZ4) -v --content-size tmp | $(LZ4) -d > tmp2
-	diff -s tmp tmp2
+	$(DIFF) -s tmp tmp2
 	# test large size [2-4] GB
-	@./datagen -g3G -P100 | $(LZ4) --verbose | $(LZ4) --decompress --force --sparse - tmp
+	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmp
 	@ls -ls tmp
 	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmp2
 	@ls -ls tmp2
-	diff -s tmp tmp2
+	$(DIFF) -s tmp tmp2
 	@$(RM) tmp*
 
 test-lz4-frame-concatenation: lz4 datagen
@@ -206,20 +212,44 @@ test-lz4-multiple: lz4 datagen
 	$(LZ4) -f -m tmp1 notHere tmp2; echo $$?
 	@$(RM) tmp*
 
-test-lz4-basic: lz4 datagen
+unlz4:
+	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
+
+lz4cat:
+	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
+
+test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0     | $(LZ4) -v     | $(LZ4) -t
 	./datagen -g16KB  | $(LZ4) -9     | $(LZ4) -t
 	./datagen -g20KB > tmpSrc
-	$(LZ4) < tmpSrc | $(LZ4) -d > tmpRes
-	diff -q tmpSrc tmpRes
+	$(LZ4) < tmpSrc   | $(LZ4) -d > tmpRes
+	$(DIFF) -q tmpSrc tmpRes
 	$(LZ4) --no-frame-crc < tmpSrc | $(LZ4) -d > tmpRes
-	diff -q tmpSrc tmpRes
+	$(DIFF) -q tmpSrc tmpRes
 	./datagen         | $(LZ4)        | $(LZ4) -t
 	./datagen -g6M -P99 | $(LZ4) -9BD | $(LZ4) -t
 	./datagen -g17M   | $(LZ4) -9v    | $(LZ4) -qt
 	./datagen -g33M   | $(LZ4) --no-frame-crc | $(LZ4) -t
 	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
+	@echo "hello world" > tmp
+	$(LZ4) --rm -f tmp
+	ls -ls tmp         && false || true   # must fail (--rm)
+	ls -ls tmp.lz4
+	$(PRGDIR)/lz4cat tmp.lz4              # must display hello world
+	ls -ls tmp.lz4
+	$(PRGDIR)/unlz4 --rm tmp.lz4
+	ls -ls tmp
+	ls -ls tmp.lz4     && false || true   # must fail (--rm)
+	ls -ls tmp.lz4.lz4 && false || true   # must fail (unlz4)
+	$(PRGDIR)/lz4cat tmp                  # pass-through mode
+	ls -ls tmp
+	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
+	$(LZ4) tmp                         # creates tmp.lz4
+	$(PRGDIR)/lz4cat < tmp.lz4 > tmp3  # checks lz4cat works with stdin (#285)
+	$(DIFF) -q tmp tmp3
+	$(PRGDIR)/lz4cat < tmp > tmp2      # checks lz4cat works with stdin (#285)
+	$(DIFF) -q tmp tmp2
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen
@@ -247,7 +277,20 @@ test-lz4-testmode: lz4 datagen
 	$(LZ4) -fm file1-dne file2-dne    && false || true
 	$(LZ4) -fm file1-dne file2-dne    && false || true
 
-test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse \
+test-lz4-opt-parser: lz4 datagen
+	@echo "\n ---- test opt-parser ----"
+	./datagen -g16KB      | $(LZ4) -12      | $(LZ4) -t
+	./datagen -P10        | $(LZ4) -12B4    | $(LZ4) -t
+	./datagen -g256K      | $(LZ4) -12B4D   | $(LZ4) -t
+	./datagen -g512K -P25 | $(LZ4) -12BD    | $(LZ4) -t
+	./datagen -g1M        | $(LZ4) -12B5    | $(LZ4) -t
+	./datagen -g2M -P99   | $(LZ4) -11B4D   | $(LZ4) -t
+	./datagen -g4M        | $(LZ4) -11vq    | $(LZ4) -qt
+	./datagen -g8M        | $(LZ4) -11B4    | $(LZ4) -t
+	./datagen -g16M -P90  | $(LZ4) -11B5    | $(LZ4) -t
+	./datagen -g32M -P10  | $(LZ4) -11B5D   | $(LZ4) -t
+
+test-lz4: lz4 datagen test-lz4-opt-parser test-lz4-basic test-lz4-multiple test-lz4-sparse \
           test-lz4-frame-concatenation test-lz4-testmode test-lz4-contentSize \
           test-lz4-hugefile
 

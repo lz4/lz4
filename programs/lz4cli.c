@@ -39,17 +39,11 @@
 /* #define ENABLE_LZ4C_LEGACY_OPTIONS */
 
 
-/**************************************
-*  Compiler Options
-***************************************/
-/* cf. http://man7.org/linux/man-pages/man7/feature_test_macros.7.html */
-#define _XOPEN_VERSION 600 /* POSIX.2001, for fileno() within <stdio.h> on unix */
-
-
 /****************************
 *  Includes
 *****************************/
-#include "util.h"     /* Compiler options, UTIL_HAS_CREATEFILELIST */
+#include "platform.h" /* Compiler options, IS_CONSOLE */
+#include "util.h"     /* UTIL_HAS_CREATEFILELIST, UTIL_createFileList */
 #include <stdio.h>    /* fprintf, getchar */
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
@@ -59,26 +53,12 @@
 #include "lz4.h"      /* LZ4_VERSION_STRING */
 
 
-/*-************************************
-*  OS-specific Includes
-**************************************/
-#if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || (defined(__APPLE__) && defined(__MACH__)) || defined(__DJGPP__)  /* https://sourceforge.net/p/predef/wiki/OperatingSystems/ */
-#  include <unistd.h>   /* isatty */
-#  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
-#elif defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#  include <io.h>       /* _isatty */
-#  define IS_CONSOLE(stdStream) _isatty(_fileno(stdStream))
-#else
-#  define IS_CONSOLE(stdStream) 0
-#endif
-
-
 /*****************************
 *  Constants
 ******************************/
 #define COMPRESSOR_NAME "LZ4 command line interface"
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %i-bits v%s, by %s ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_VERSION_STRING, AUTHOR
+#define WELCOME_MESSAGE "*** %s %i-bits v%s, by %s ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_versionString(), AUTHOR
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"
@@ -129,19 +109,20 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 *****************************/
 static int usage(const char* exeName)
 {
-    DISPLAY( "Usage :\n");
-    DISPLAY( "      %s [arg] [input] [output]\n", exeName);
+    DISPLAY( "Usage : \n");
+    DISPLAY( "      %s [arg] [input] [output] \n", exeName);
     DISPLAY( "\n");
-    DISPLAY( "input   : a filename\n");
+    DISPLAY( "input   : a filename \n");
     DISPLAY( "          with no FILE, or when FILE is - or %s, read standard input\n", stdinmark);
-    DISPLAY( "Arguments :\n");
+    DISPLAY( "Arguments : \n");
     DISPLAY( " -1     : Fast compression (default) \n");
     DISPLAY( " -9     : High compression \n");
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
-    DISPLAY( " -z     : force compression\n");
+    DISPLAY( " -z     : force compression \n");
     DISPLAY( " -f     : overwrite output without prompting \n");
+    DISPLAY( " -k     : preserve source files(s)  (default) \n");
     DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");
-    DISPLAY( " -h/-H  : display help/long help and exit\n");
+    DISPLAY( " -h/-H  : display help/long help and exit \n");
     return 0;
 }
 
@@ -151,33 +132,33 @@ static int usage_advanced(const char* exeName)
     usage(exeName);
     DISPLAY( "\n");
     DISPLAY( "Advanced arguments :\n");
-    DISPLAY( " -V     : display Version number and exit\n");
-    DISPLAY( " -v     : verbose mode\n");
+    DISPLAY( " -V     : display Version number and exit \n");
+    DISPLAY( " -v     : verbose mode \n");
     DISPLAY( " -q     : suppress warnings; specify twice to suppress errors too\n");
     DISPLAY( " -c     : force write to standard output, even if it is the console\n");
     DISPLAY( " -t     : test compressed file integrity\n");
     DISPLAY( " -m     : multiple input files (implies automatic output filenames)\n");
 #ifdef UTIL_HAS_CREATEFILELIST
-    DISPLAY( " -r     : operate recursively on directories (sets also -m)\n");
+    DISPLAY( " -r     : operate recursively on directories (sets also -m) \n");
 #endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
-    DISPLAY( " -B#    : Block size [4-7] (default : 7)\n");
-    DISPLAY( " -BD    : Block dependency (improve compression ratio)\n");
+    DISPLAY( " -B#    : Block size [4-7] (default : 7) \n");
+    DISPLAY( " -BD    : Block dependency (improve compression ratio) \n");
     /* DISPLAY( " -BX    : enable block checksum (default:disabled)\n");   *//* Option currently inactive */
-    DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled)\n");
+    DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
-    DISPLAY( "Benchmark arguments :\n");
+    DISPLAY( "Benchmark arguments : \n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
-    DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s)\n");
-    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+]\n");
-    DISPLAY( "                      or predefined block size [4-7] (default: 7)\n");
+    DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s) \n");
+    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+] \n");
+    DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
 #if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
-    DISPLAY( "Legacy arguments :\n");
-    DISPLAY( " -c0    : fast compression\n");
-    DISPLAY( " -c1    : high compression\n");
-    DISPLAY( " -hc    : high compression\n");
+    DISPLAY( "Legacy arguments : \n");
+    DISPLAY( " -c0    : fast compression \n");
+    DISPLAY( " -c1    : high compression \n");
+    DISPLAY( " -hc    : high compression \n");
     DISPLAY( " -y     : overwrite output without prompting \n");
 #endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
     EXTENDED_HELP;
@@ -207,7 +188,7 @@ static int usage_longhelp(const char* exeName)
     DISPLAY( "Compression levels : \n");
     DISPLAY( "---------------------\n");
     DISPLAY( "-0 ... -2  => Fast compression, all identicals\n");
-    DISPLAY( "-3 ... -%d => High compression; higher number == more compression but slower\n", LZ4HC_MAX_CLEVEL);
+    DISPLAY( "-3 ... -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
     DISPLAY( "\n");
     DISPLAY( "stdin, stdout and the console : \n");
     DISPLAY( "--------------------------------\n");
@@ -259,6 +240,13 @@ static void waitEnter(void)
     (void)getchar();
 }
 
+static const char* lastNameFromPath(const char* path)
+{
+    const char* name = strrchr(path, '/');
+    if (name==NULL) name = strrchr(path, '\\');   /* windows */
+    if (name==NULL) return path;
+    return name+1;
+}
 
 /*! readU32FromChar() :
     @return : unsigned integer value reach from input in `char` format
@@ -293,7 +281,7 @@ int main(int argc, const char** argv)
     const char nullOutput[] = NULL_OUTPUT;
     const char extension[] = LZ4_EXTENSION;
     size_t blockSize = LZ4IO_setBlockSizeID(LZ4_BLOCKSIZEID_DEFAULT);
-    const char* const exeName = argv[0];
+    const char* const exeName = lastNameFromPath(argv[0]);
 #ifdef UTIL_HAS_CREATEFILELIST
     const char** extendedFileList = NULL;
     char* fileNamesBuf = NULL;
@@ -305,12 +293,14 @@ int main(int argc, const char** argv)
         DISPLAY("Allocation error : not enough memory \n");
         return 1;
     }
+    inFileNames[0] = stdinmark;
     LZ4IO_setOverwrite(0);
 
     /* lz4cat predefined behavior */
     if (!strcmp(exeName, LZ4CAT)) {
         mode = om_decompress;
         LZ4IO_setOverwrite(1);
+        LZ4IO_setRemoveSrcFile(0);
         forceStdout=1;
         output_filename=stdoutmark;
         displayLevel=1;
@@ -459,7 +449,7 @@ int main(int argc, const char** argv)
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
-                        /* recursive */
+                    /* recursive */
                 case 'r': recursive=1;  /* without break */
 #endif
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
@@ -473,7 +463,7 @@ int main(int argc, const char** argv)
                         iters = readU32FromChar(&argument);
                         argument--;
                         BMK_setNotificationLevel(displayLevel);
-                        BMK_SetNbSeconds(iters);
+                        BMK_SetNbSeconds(iters);   /* notification if displayLevel >= 3 */
                     }
                     break;
 
@@ -508,6 +498,18 @@ int main(int argc, const char** argv)
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
+#ifdef _POSIX_C_SOURCE
+    DISPLAYLEVEL(4, "_POSIX_C_SOURCE defined: %ldL\n", (long) _POSIX_C_SOURCE);
+#endif
+#ifdef _POSIX_VERSION
+    DISPLAYLEVEL(4, "_POSIX_VERSION defined: %ldL\n", (long) _POSIX_VERSION);
+#endif
+#ifdef PLATFORM_POSIX_VERSION
+    DISPLAYLEVEL(4, "PLATFORM_POSIX_VERSION defined: %ldL\n", (long) PLATFORM_POSIX_VERSION);
+#endif
+#ifdef _FILE_OFFSET_BITS
+    DISPLAYLEVEL(4, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
+#endif
     if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %i KB\n", (U32)(blockSize>>10));
 
     if (multiple_inputs) {
@@ -546,9 +548,12 @@ int main(int argc, const char** argv)
         DISPLAYLEVEL(1, "refusing to read from a console\n");
         exit(1);
     }
+    /* if input==stdin and no output defined, stdout becomes default output */
+    if (!strcmp(input_filename, stdinmark) && !output_filename)
+        output_filename = stdoutmark;
 
     /* No output filename ==> try to select one automatically (when possible) */
-    while (!output_filename) {
+    while ((!output_filename) && (multiple_inputs==0)) {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
             size_t const inSize  = strlen(input_filename);
@@ -584,17 +589,18 @@ int main(int argc, const char** argv)
     }
 
     /* Check if output is defined as console; trigger an error in this case */
+    if (!output_filename) output_filename = "*\\dummy^!//";
     if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) {
         DISPLAYLEVEL(1, "refusing to write to console without -c\n");
         exit(1);
     }
-
     /* Downgrade notification level in stdout and multiple file mode */
     if (!strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
     if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
 
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
+    if (ifnIdx == 0) multiple_inputs = 0;
     if (mode == om_decompress) {
         if (multiple_inputs)
             operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION);

@@ -30,24 +30,26 @@
   - The license of this source file is GPLv2.
 */
 
-/**************************************
-*  Compiler Options
-**************************************/
-#define _LARGE_FILES           /* Large file support on 32-bits AIX */
-#define _FILE_OFFSET_BITS 64   /* off_t width */
-#define _LARGEFILE_SOURCE
 
+/*-************************************
+*  Compiler options
+**************************************/
+#ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
+#endif
 #if defined(__MINGW32__) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE 1          /* disable %llu warnings with MinGW on Windows */
 #endif
 
+
 /*****************************
 *  Includes
 *****************************/
-#include "util.h"      /* Compiler options, UTIL_getFileStat */
+#include "platform.h"  /* Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE, PLATFORM_POSIX_VERSION, __64BIT__ */
+#include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
-#include <string.h>    /* strcmp, strlen */
+#include <string.h>    /* strerror, strcmp, strlen */
 #include <time.h>      /* clock */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
@@ -57,30 +59,14 @@
 #include "lz4frame.h"
 
 
-/******************************
-*  OS-specific Includes
-******************************/
-#if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
-#  include <fcntl.h>   /* _O_BINARY */
-#  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
-#  if !defined(__DJGPP__)
-#    define SET_BINARY_MODE(file) { int unused=_setmode(_fileno(file), _O_BINARY); (void)unused; }
-#    include <windows.h> /* DeviceIoControl, HANDLE, FSCTL_SET_SPARSE */
-#    include <winioctl.h> /* FSCTL_SET_SPARSE */
-#    define SET_SPARSE_FILE_MODE(file) { DWORD dw; DeviceIoControl((HANDLE) _get_osfhandle(_fileno(file)), FSCTL_SET_SPARSE, 0, 0, 0, 0, &dw, 0); }
-#    if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Avoid MSVC fseek()'s 2GiB barrier */
-#      define fseek _fseeki64
-#    endif
-#  else
-#    define SET_BINARY_MODE(file) setmode(fileno(file), O_BINARY)
-#    define SET_SPARSE_FILE_MODE(file)
-#  endif
-#else
-#  if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || (defined(__APPLE__) && defined(__MACH__))
-#    define fseek fseeko
-#  endif
-#  define SET_BINARY_MODE(file)
-#  define SET_SPARSE_FILE_MODE(file)
+/* **************************************
+*  Compiler Options
+****************************************/
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)            /* Avoid MSVC fseek()'s 2GiB barrier */
+#  define fseek _fseeki64
+#endif
+#if !defined(__64BIT__) && (PLATFORM_POSIX_VERSION >= 200112L) /* No point defining Large file for 64 bit */
+#  define fseek fseeko
 #endif
 
 
@@ -591,12 +577,15 @@ int LZ4IO_compressMultipleFilenames(const char** inFileNamesTable, int ifntSize,
     char* dstFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
-    cRess_t const ress = LZ4IO_createCResources();
+    cRess_t ress;
+
+    if (dstFileName == NULL) return ifntSize;   /* not enough memory */
+    ress = LZ4IO_createCResources();
 
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
-        if (ofnSize <= ifnSize+suffixSize+1) { free(dstFileName); ofnSize = ifnSize + 20; dstFileName = (char*)malloc(ofnSize); }
+        if (ofnSize <= ifnSize+suffixSize+1) { free(dstFileName); ofnSize = ifnSize + 20; dstFileName = (char*)malloc(ofnSize); if (dstFileName==NULL) { LZ4IO_freeCResources(ress); return ifntSize; } }
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
@@ -660,8 +649,10 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
         storedSkips += (unsigned)(nb0T * sizeT);
 
         if (nb0T != seg0SizeT) {   /* not all 0s */
-            int const seekResult = fseek(file, storedSkips, SEEK_CUR);
-            if (seekResult) EXM_THROW(72, "Sparse skip error ; try --no-sparse");
+            errno = 0;
+            {   int const seekResult = fseek(file, storedSkips, SEEK_CUR);
+                if (seekResult) EXM_THROW(72, "Sparse skip error(%d): %s ; try --no-sparse", (int)errno, strerror(errno));
+            }
             storedSkips = 0;
             seg0SizeT -= nb0T;
             ptrT += nb0T;
@@ -1022,7 +1013,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
     size_t const suffixSize = strlen(suffix);
     dRess_t ress = LZ4IO_createDResources();
 
-    if (outFileName==NULL) exit(1);   /* not enough memory */
+    if (outFileName==NULL) return ifntSize;   /* not enough memory */
     ress.dstFile = LZ4IO_openDstFile(stdoutmark);
 
     for (i=0; i<ifntSize; i++) {
@@ -1032,7 +1023,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
             missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], stdoutmark);
             continue;
         }
-        if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); if (outFileName==NULL) exit(1); }
+        if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); if (outFileName==NULL) return ifntSize; }
         if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
