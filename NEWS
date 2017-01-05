@@ -1,3 +1,6 @@
+v1.7.6
+build : LZ4_MEMORY_USAGE can be modified at compile time, through external define
+
 v1.7.5
 lz4hc : new high compression mode : levels 10-12 compress more and slower, by Przemyslaw Skibinski
 lz4cat : fix : works with relative path (#284) and stdin (#285) (reported by @beiDei8z)
