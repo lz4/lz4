@@ -510,7 +510,7 @@ int main(int argc, const char** argv)
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(4, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
-    if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %i KB\n", (U32)(blockSize>>10));
+    if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));
 
     if (multiple_inputs) {
         input_filename = inFileNames[0];
