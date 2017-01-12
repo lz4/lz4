@@ -231,7 +231,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
         UTIL_getTime(&coolTime);
         DISPLAYLEVEL(2, "\r%79s\r", "");
-        while (!cCompleted | !dCompleted) {
+        while (!cCompleted || !dCompleted) {
             UTIL_time_t clockStart;
             U64 clockLoop = g_nbSeconds ? TIMELOOP_MICROSEC : 1;
 
