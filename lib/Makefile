@@ -3,6 +3,8 @@
 # Copyright (C) Yann Collet 2011-2016
 # All rights reserved.
 #
+# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
+#
 # BSD license
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:

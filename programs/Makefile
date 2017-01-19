@@ -2,6 +2,8 @@
 # LZ4 programs - Makefile
 # Copyright (C) Yann Collet 2011-2016
 #
+# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
+#
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
