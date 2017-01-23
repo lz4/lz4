@@ -48,6 +48,15 @@ extern "C" {
 /* ---   Dependency   --- */
 #include <stddef.h>   /* size_t */
 
+
+/**
+  Introduction
+
+  lz4frame.h implements LZ4 frame specification (doc/lz4_Frame_format.md).
+  lz4frame.h provides frame compression functions that take care
+  of encoding standard metadata alongside LZ4-compressed blocks.
+*/
+
 /*^***************************************************************
 *  Compiler specifics
 *****************************************************************/
