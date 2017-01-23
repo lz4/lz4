@@ -82,7 +82,7 @@ extern "C" {
 #endif
 
 
-/*========== Version =========== */
+/*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    7    /* for new (non-breaking) interface capabilities */
 #define LZ4_VERSION_RELEASE  5    /* for tweaks, bug-fixes, or development */
@@ -94,8 +94,8 @@ extern "C" {
 #define LZ4_EXPAND_AND_QUOTE(str) LZ4_QUOTE(str)
 #define LZ4_VERSION_STRING LZ4_EXPAND_AND_QUOTE(LZ4_LIB_VERSION)
 
-LZ4LIB_API int LZ4_versionNumber (void);
-LZ4LIB_API const char* LZ4_versionString (void);
+LZ4LIB_API int LZ4_versionNumber (void);  /**< library version number; to be used when checking dll version */
+LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; to be used when checking dll version */
 
 
 /*-************************************
@@ -275,7 +275,8 @@ LZ4LIB_API int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dict
 ************************************************/
 typedef union LZ4_streamDecode_u LZ4_streamDecode_t;   /* incomplete type (defined later) */
 
-/* creation / destruction of streaming decompression tracking structure */
+/*! LZ4_createStreamDecode() and LZ4_freeStreamDecode() :
+ *  creation / destruction of streaming decompression tracking structure */
 LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
@@ -401,11 +402,12 @@ union LZ4_streamDecode_u {
 } ;   /* previously typedef'd to LZ4_streamDecode_t */
 
 
-/*=************************************
+/*-************************************
 *  Obsolete Functions
 **************************************/
-/* Deprecation warnings */
-/* Should these warnings be a problem,
+
+/*! Deprecation warnings
+   Should deprecation warnings be a problem,
    it is generally possible to disable them,
    typically with -Wno-deprecated-declarations for gcc
    or _CRT_SECURE_NO_WARNINGS in Visual.
