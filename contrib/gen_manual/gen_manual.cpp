@@ -89,11 +89,13 @@ vector<string> get_lines(vector<string>& input, int& linenum, string terminator)
 /* print line with LZ4LIB_API removed and C++ comments not bold */
 void print_line(stringstream &sout, string line)
 {
-    size_t spos;
+    size_t spos, epos;
 
     if (line.substr(0,11) == "LZ4LIB_API ") line = line.substr(11);
+    if (line.substr(0,12) == "LZ4FLIB_API ") line = line.substr(12);
     spos = line.find("/*");
-    if (spos!=string::npos) {
+    epos = line.find("*/");
+    if (spos!=string::npos && epos!=string::npos) {
         sout << line.substr(0, spos);
         sout << "</b>" << line.substr(spos) << "<b>" << endl;
     } else {
@@ -118,7 +120,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    version = "lz4 " + string(argv[1]) + " Manual";
+    version = string(argv[1]) + " Manual";
 
     istream.open(argv[2], ifstream::in);
     if (!istream.is_open()) {
