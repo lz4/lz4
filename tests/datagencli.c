@@ -49,7 +49,7 @@
 *  Macros
 **************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) do { if (displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while(0)
 static unsigned displayLevel = 2;
 
 
