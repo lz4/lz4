@@ -887,6 +887,8 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
     unsigned magicNumber;
     static unsigned nbCalls = 0;
 
+    const long position = ftell(finput);
+
     /* init */
     nbCalls++;
 
@@ -926,7 +928,7 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
             }
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
         }
-        DISPLAYLEVEL(2, "Stream followed by undecodable data\n");
+        DISPLAYLEVEL(2, "Stream followed by undecodable data at %ld bytes\n", position);
         return ENDOFSTREAM;
     }
 }
