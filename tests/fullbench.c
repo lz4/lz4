@@ -88,7 +88,7 @@ struct chunkParameters
 *  Macros
 **************************************/
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
-#define PROGRESS(...) g_noPrompt ? 0 : DISPLAY(__VA_ARGS__)
+#define PROGRESS(...) ( g_noPrompt ? 0 : DISPLAY(__VA_ARGS__) )
 
 
 /**************************************

@@ -99,13 +99,13 @@
 *  Macros
 **************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) do { if (g_displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while(0)
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
 
-#define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
+#define DISPLAYUPDATE(l, ...) do { if (g_displayLevel>=(l)) \
             if (((clock_t)(g_time - clock()) > refreshRate) || (g_displayLevel>=4)) \
             { g_time = clock(); DISPLAY(__VA_ARGS__); \
-            if (g_displayLevel>=4) fflush(stderr); } }
+            if (g_displayLevel>=4) fflush(stderr); } } while(0)
 static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_time = 0;
 
@@ -129,15 +129,15 @@ static int g_contentSizeFlag = 0;
 #ifndef DEBUG
 #  define DEBUG 0
 #endif
-#define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
+#define DEBUGOUTPUT(...) do { if (DEBUG) DISPLAY(__VA_ARGS__); } while(0)
 #define EXM_THROW(error, ...)                                             \
-{                                                                         \
+do {                                                                      \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                \
+    DISPLAYLEVEL(1, "Error %i : ", (error));                              \
     DISPLAYLEVEL(1, __VA_ARGS__);                                         \
     DISPLAYLEVEL(1, " \n");                                               \
     exit(error);                                                          \
-}
+} while(0)
 
 
 /**************************************
@@ -856,7 +856,7 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
         total += readBytes;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, storedSkips);
     }
-    if (ferror(finput)) EXM_THROW(51, "Read Error")
+    if (ferror(finput)) EXM_THROW(51, "Read Error");
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
     return total;
@@ -886,6 +886,8 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
     unsigned char MNstore[MAGICNUMBER_SIZE];
     unsigned magicNumber;
     static unsigned nbCalls = 0;
+
+    const long position = ftell(finput);
 
     /* init */
     nbCalls++;
@@ -926,7 +928,7 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
             }
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
         }
-        DISPLAYLEVEL(2, "Stream followed by undecodable data\n");
+        DISPLAYLEVEL(2, "Stream followed by undecodable data at %ld bytes\n", position);
         return ENDOFSTREAM;
     }
 }
