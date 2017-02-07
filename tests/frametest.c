@@ -395,7 +395,7 @@ int basicTests(U32 seed, double compressibility)
     prefs.frameInfo.blockSizeID = LZ4F_max4MB;
     prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
     {   size_t const dstCapacity = LZ4F_compressFrameBound(testSize, &prefs);
-        DISPLAYLEVEL(4, "dstCapacity = %u  \n", (U32)dstCapacity)
+        DISPLAYLEVEL(4, "dstCapacity = %u  \n", (U32)dstCapacity);
         cSize = LZ4F_compressFrame(compressedBuffer, dstCapacity, CNBuffer, testSize, &prefs);
         if (LZ4F_isError(cSize)) goto _output_error;
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
@@ -404,7 +404,7 @@ int basicTests(U32 seed, double compressibility)
     DISPLAYLEVEL(3, "without checksum : \n");
     prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
     {   size_t const dstCapacity = LZ4F_compressFrameBound(testSize, &prefs);
-        DISPLAYLEVEL(4, "dstCapacity = %u  \n", (U32)dstCapacity)
+        DISPLAYLEVEL(4, "dstCapacity = %u  \n", (U32)dstCapacity);
         cSize = LZ4F_compressFrame(compressedBuffer, dstCapacity, CNBuffer, testSize, &prefs);
         if (LZ4F_isError(cSize)) goto _output_error;
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
