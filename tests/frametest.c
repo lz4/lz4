@@ -78,11 +78,11 @@ static const U32 prime2 = 2246822519U;
 *  Macros
 **************************************/
 #define DISPLAY(...)          fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...)  if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-#define DISPLAYUPDATE(l, ...) if (displayLevel>=l) { \
+#define DISPLAYLEVEL(l, ...)  do { if (displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while(0)
+#define DISPLAYUPDATE(l, ...) do { if (displayLevel>=(l)) \
             if ((FUZ_GetClockSpan(g_clockTime) > refreshRate) || (displayLevel>=4)) \
             { g_clockTime = clock(); DISPLAY(__VA_ARGS__); \
-            if (displayLevel>=4) fflush(stdout); } }
+            if (displayLevel>=4) fflush(stdout); } } while(0)
 static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_clockTime = 0;
 

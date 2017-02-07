@@ -76,7 +76,7 @@ typedef size_t uintptr_t;   /* true on most systems, except OpenVMS-64 (which do
 *  Macros
 *****************************************/
 #define DISPLAY(...)         fprintf(stdout, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) do { if (g_displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while(0)
 static int g_displayLevel = 2;
 
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
