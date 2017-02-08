@@ -91,8 +91,8 @@ LZ4FLIB_API const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /**< return 
 
 
 /*-************************************
-*  Frame compression types
-**************************************/
+ *  Frame compression types
+ **************************************/
 /* #define LZ4F_DISABLE_OBSOLETE_ENUMS */  /* uncomment to disable obsolete enums */
 #ifndef LZ4F_DISABLE_OBSOLETE_ENUMS
 #  define LZ4F_OBSOLETE_ENUM(x) , LZ4F_DEPRECATE(x) = LZ4F_##x
@@ -100,6 +100,9 @@ LZ4FLIB_API const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /**< return 
 #  define LZ4F_OBSOLETE_ENUM(x)
 #endif
 
+/* The larger the block size, the (slightly) better the compression ratio,
+ * though there are diminishing returns.
+ * Larger blocks also increase memory usage on both compression and decompression sides. */
 typedef enum {
     LZ4F_default=0,
     LZ4F_max64KB=4,
@@ -112,6 +115,9 @@ typedef enum {
     LZ4F_OBSOLETE_ENUM(max4MB)
 } LZ4F_blockSizeID_t;
 
+/* Linked blocks sharply reduce inefficiencies when using small blocks,
+ * they compress better.
+ * However, some LZ4 decoders are only compatible with independent blocks */
 typedef enum {
     LZ4F_blockLinked=0,
     LZ4F_blockIndependent
