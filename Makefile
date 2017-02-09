@@ -89,7 +89,7 @@ clean:
 #------------------------------------------------------------------------
 #make install is validated only for Linux, OSX, kFreeBSD, Hurd and
 #FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD DragonFly))
 HOST_OS = POSIX
 
 install:
