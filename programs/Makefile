@@ -44,6 +44,7 @@ LZ4DIR  := ../lib
 
 SRCFILES := $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c)
 OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
+VOID := /dev/null
 
 CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
@@ -60,10 +61,8 @@ MD2ROFF_FLAGS  = --roff --warnings --manual="User Commands" --organization="lz4 
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
-VOID := nul
 EXT  :=.exe
 else
-VOID := /dev/null
 EXT  :=
 endif
 
