@@ -215,4 +215,6 @@ else()
   set(INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 endif()
 
+# for liblz4.pc substitution
+set(VERSION ${LZ4_VERSION_STRING})
 configure_file(${LZ4_LIB_SOURCE_DIR}/liblz4.pc.in liblz4.pc @ONLY)
