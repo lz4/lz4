@@ -59,7 +59,7 @@ extern "C" {
 /* *********************************************************
 *  Turn on Large Files support (>4GB) for 32-bit Linux/Unix
 ***********************************************************/
-#if !defined(__64BIT__)                               /* No point defining Large file for 64 bit */
+#if !defined(__64BIT__) || defined(__MINGW32__)       /* No point defining Large file for 64 bit but MinGW requires it */
 #  if !defined(_FILE_OFFSET_BITS)   
 #    define _FILE_OFFSET_BITS 64                      /* turn off_t into a 64-bit type for ftello, fseeko */
 #  endif
@@ -85,7 +85,9 @@ extern "C" {
 #    define PLATFORM_POSIX_VERSION 200112L
 #  else
 #    if defined(__linux__) || defined(__linux)
-#      define _POSIX_C_SOURCE 200112L  /* use feature test macro */
+#      ifndef _POSIX_C_SOURCE
+#        define _POSIX_C_SOURCE 200112L  /* use feature test macro */
+#      endif
 #    endif
 #    include <unistd.h>  /* declares _POSIX_VERSION */
 #    if defined(_POSIX_VERSION)  /* POSIX compliant */
