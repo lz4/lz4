@@ -236,17 +236,17 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
 	@echo "hello world" > tmp
 	$(LZ4) --rm -f tmp
-	ls -ls tmp         && false || true   # must fail (--rm)
-	ls -ls tmp.lz4
-	$(PRGDIR)/lz4cat tmp.lz4              # must display hello world
-	ls -ls tmp.lz4
+	test ! -f tmp                      # must fail (--rm)
+	test   -f tmp.lz4
+	$(PRGDIR)/lz4cat tmp.lz4           # must display hello world
+	test   -f tmp.lz4
 	$(PRGDIR)/unlz4 --rm tmp.lz4
-	ls -ls tmp
-	ls -ls tmp.lz4     && false || true   # must fail (--rm)
-	ls -ls tmp.lz4.lz4 && false || true   # must fail (unlz4)
-	$(PRGDIR)/lz4cat tmp                  # pass-through mode
-	ls -ls tmp
-	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
+	test   -f tmp
+	test ! -f tmp.lz4                  # must fail (--rm)
+	test ! -f tmp.lz4.lz4              # must fail (unlz4)
+	$(PRGDIR)/lz4cat tmp               # pass-through mode
+	test   -f tmp
+	test ! -f tmp.lz4                  # must fail (lz4cat)
 	$(LZ4) tmp                         # creates tmp.lz4
 	$(PRGDIR)/lz4cat < tmp.lz4 > tmp3  # checks lz4cat works with stdin (#285)
 	$(DIFF) -q tmp tmp3
@@ -262,22 +262,22 @@ test-lz4-hugefile: lz4 datagen
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
-	$(LZ4) -bi1
+	  $(LZ4) -bi1
 	@echo "\n ---- test mode ----"
-	./datagen | $(LZ4) -t             && false || true
-	./datagen | $(LZ4) -tf            && false || true
+	! ./datagen | $(LZ4) -t
+	! ./datagen | $(LZ4) -tf
 	@echo "\n ---- pass-through mode ----"
-	./datagen | $(LZ4) -d  > $(VOID)  && false || true
-	./datagen | $(LZ4) -df > $(VOID)
+	! ./datagen | $(LZ4) -d  > $(VOID)
+	  ./datagen | $(LZ4) -df > $(VOID)
 	@echo "Hello World !" > tmp1
 	$(LZ4) -dcf tmp1
 	@echo "from underground..." > tmp2
 	$(LZ4) -dcfm tmp1 tmp2
 	@echo "\n ---- test cli ----"
-	$(LZ4)     file-does-not-exist    && false || true
-	$(LZ4) -f  file-does-not-exist    && false || true
-	$(LZ4) -fm file1-dne file2-dne    && false || true
-	$(LZ4) -fm file1-dne file2-dne    && false || true
+	! $(LZ4)     file-does-not-exist
+	! $(LZ4) -f  file-does-not-exist
+	! $(LZ4) -fm file1-dne file2-dne
+	! $(LZ4) -fm file1-dne file2-dne
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
