@@ -301,6 +301,7 @@ test-lz4c: lz4c datagen
 	./datagen -g256MB | $(LZ4)c -l -v    | $(LZ4)c   -t
 
 test-lz4c32: CFLAGS+=-m32
+test-lz4c32: MOREFLAGS+="-I/usr/include/x86_64-linux-gnu"
 test-lz4c32: test-lz4
 
 test-interop-32-64: lz4 lz4c32 datagen
