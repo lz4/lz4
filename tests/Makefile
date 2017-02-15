@@ -78,7 +78,7 @@ lz4c:
 	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="$(CFLAGS)"
 
 lz4c32:   # create a 32-bits version for 32/64 interop tests
-	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="-m32 $(CFLAGS)"
+	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="-m32 $(CFLAGS) -I/usr/include/x86_64-linux-gnu"
 	cp $(LZ4) $(LZ4)c32
 
 fullbench  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/lz4frame.o $(LIBDIR)/xxhash.o fullbench.c
