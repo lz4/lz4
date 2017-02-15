@@ -143,7 +143,7 @@ liblz4.pc: liblz4.pc.in Makefile
           $< >$@
 
 install: lib liblz4.pc
-	@$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/
+	@$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/ $(DESTDIR)$(LIBDIR)/
 	@$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(PKGCONFIGDIR)/
 	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
