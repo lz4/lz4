@@ -86,7 +86,7 @@ lz4c  : CFLAGS += $(DEBUGFLAGS)
 lz4c  : $(SRCFILES)
 	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
 
-lz4c32: CFLAGS += -m32 $(DEBUGFLAGS) -I/usr/include/x86_64-linux-gnu
+lz4c32: CFLAGS += -m32 $(DEBUGFLAGS)
 lz4c32: $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
