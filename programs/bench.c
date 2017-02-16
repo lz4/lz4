@@ -393,7 +393,7 @@ static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
     if (!pch) pch = strrchr(displayName, '/'); /* Linux */
     if (pch) displayName = pch+1;
 
-    SET_HIGH_PRIORITY;
+    SET_REALTIME_PRIORITY;
 
     if (g_displayLevel == 1 && !g_additionalParam)
         DISPLAY("bench %s %s: input %u bytes, %u seconds, %u KB blocks\n", LZ4_VERSION_STRING, LZ4_GIT_COMMIT_STRING, (U32)benchedSize, g_nbSeconds, (U32)(g_blockSize>>10));
