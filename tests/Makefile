@@ -235,19 +235,19 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	./datagen -g33M   | $(LZ4) --no-frame-crc | $(LZ4) -t
 	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
 	@echo "hello world" > tmp
-	$(LZ4) --rm -f tmp
+	$(LZ4) --rm -f tmp tmp.lz4
 	test ! -f tmp                      # must fail (--rm)
 	test   -f tmp.lz4
 	$(PRGDIR)/lz4cat tmp.lz4           # must display hello world
 	test   -f tmp.lz4
-	$(PRGDIR)/unlz4 --rm tmp.lz4
+	$(PRGDIR)/unlz4 --rm tmp.lz4 tmp
 	test   -f tmp
 	test ! -f tmp.lz4                  # must fail (--rm)
 	test ! -f tmp.lz4.lz4              # must fail (unlz4)
 	$(PRGDIR)/lz4cat tmp               # pass-through mode
 	test   -f tmp
 	test ! -f tmp.lz4                  # must fail (lz4cat)
-	$(LZ4) tmp                         # creates tmp.lz4
+	$(LZ4) tmp tmp.lz4                 # creates tmp.lz4
 	$(PRGDIR)/lz4cat < tmp.lz4 > tmp3  # checks lz4cat works with stdin (#285)
 	$(DIFF) -q tmp tmp3
 	$(PRGDIR)/lz4cat < tmp > tmp2      # checks lz4cat works with stdin (#285)
