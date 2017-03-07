@@ -398,7 +398,8 @@ _Search3:
 
         if (start2 + ml2 < mflimit)
             ml3 = LZ4HC_InsertAndGetWiderMatch(ctx, start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3, maxNbAttempts);
-        else ml3 = ml2;
+        else
+            ml3 = ml2;
 
         if (ml3 == ml2) {  /* No better match : 2 sequences to encode */
             /* ip & ref are known; Now for ml */
@@ -474,12 +475,21 @@ _Search3:
     }
 
     /* Encode Last Literals */
-    {   int lastRun = (int)(iend - anchor);
-        if ((limit) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;  /* Check output limit */
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
-        else *op++ = (BYTE)(lastRun<<ML_BITS);
-        memcpy(op, anchor, iend - anchor);
-        op += iend-anchor;
+    {   size_t lastRunSize, litLength, totalSize;
+        lastRunSize = (size_t)(iend - anchor);  /* literals */
+        litLength = (lastRunSize + 255 - RUN_MASK) / 255;
+        totalSize = 1 + litLength + lastRunSize;
+        if ((limit == limitedOutput) && (op + totalSize > oend)) return 0;  /* Check output limit */
+        if (lastRunSize >= RUN_MASK) {
+            size_t accumulator = lastRunSize - RUN_MASK;
+            *op++ = (RUN_MASK << ML_BITS);
+            for(; accumulator >= 255 ; accumulator -= 255) *op++ = 255;
+            *op++ = (BYTE) accumulator;
+        } else {
+            *op++ = (BYTE)(lastRunSize << ML_BITS);
+        }
+        memcpy(op, anchor, lastRunSize);
+        op += lastRunSize;
     }
 
     /* End */
