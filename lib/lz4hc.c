@@ -261,10 +261,10 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     const BYTE** anchor,
     int matchLength,
     const BYTE* const match,
-    limitedOutput_directive limitedOutputBuffer,
+    limitedOutput_directive limit,
     BYTE* oend)
 {
-    int length;
+    size_t length;
     BYTE* token;
 
 #if LZ4HC_DEBUG
@@ -272,11 +272,18 @@ FORCE_INLINE int LZ4HC_encodeSequence (
 #endif
 
     /* Encode Literal length */
-    length = (int)(*ip - *anchor);
+    length = (size_t)(*ip - *anchor);
     token = (*op)++;
-    if ((limitedOutputBuffer) && ((*op + (length>>8) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;   /* Check output limit */
-    if (length>=(int)RUN_MASK) { int len; *token=(RUN_MASK<<ML_BITS); len = length-RUN_MASK; for(; len > 254 ; len-=255) *(*op)++ = 255;  *(*op)++ = (BYTE)len; }
-    else *token = (BYTE)(length<<ML_BITS);
+    if ((limit) && ((*op + (length >> 8) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;   /* Check output limit */
+    if (length >= RUN_MASK) { 
+        size_t len;
+        *token = (RUN_MASK << ML_BITS);
+        len = length - RUN_MASK;
+        for(; len >= 255 ; len -= 255) *(*op)++ = 255;
+        *(*op)++ = (BYTE)len;
+    } else {
+        *token = (BYTE)(length << ML_BITS);
+    }
 
     /* Copy Literals */
     LZ4_wildCopy(*op, *anchor, (*op) + length);
@@ -286,13 +293,13 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
 
     /* Encode MatchLength */
-    length = (int)(matchLength-MINMATCH);
-    if ((limitedOutputBuffer) && (*op + (length>>8) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
-    if (length>=(int)ML_MASK) {
+    length = (size_t)(matchLength - MINMATCH);
+    if ((limit) && (*op + (length >> 8) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
+    if (length >= ML_MASK) {
         *token += ML_MASK;
         length -= ML_MASK;
-        for(; length > 509 ; length-=510) { *(*op)++ = 255; *(*op)++ = 255; }
-        if (length > 254) { length-=255; *(*op)++ = 255; }
+        for(; length >= 510 ; length -= 510) { *(*op)++ = 255; *(*op)++ = 255; }
+        if (length >= 255) { length -= 255; *(*op)++ = 255; }
         *(*op)++ = (BYTE)length;
     } else {
         *token += (BYTE)(length);
