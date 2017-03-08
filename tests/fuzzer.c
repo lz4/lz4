@@ -32,6 +32,7 @@
 #  pragma warning(disable : 4310)    /* disable: C4310: constant char value > 127 */
 #endif
 
+#define LZ4_DISABLE_DEPRECATE_WARNINGS
 
 /*-************************************
 *  Dependencies
@@ -337,6 +338,41 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 decodedBuffer[srcSize] = canary;
                 ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, srcSize);
                 FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe() failed on data compressed by LZ4_compress_destSize");
+                FUZ_CHECKTEST(ret!=srcSize, "LZ4_decompress_safe() failed : did not fully decompressed data");
+                FUZ_CHECKTEST(decodedBuffer[srcSize] != canary, "LZ4_decompress_safe() overwrite dst buffer !");
+                { U32 const crcDec = XXH32(decodedBuffer, srcSize, 0);
+                  FUZ_CHECKTEST(crcDec!=crcBase, "LZ4_decompress_safe() corrupted decoded data"); }
+
+                DISPLAYLEVEL(5, " OK \n");
+            }
+            else
+                DISPLAYLEVEL(5, " \n");
+        }
+
+        /* Test compression HC destSize */
+        FUZ_DISPLAYTEST;
+        {   int srcSize = blockSize;
+            int const targetSize = srcSize * ((FUZ_rand(&randState) & 127)+1) >> 7;
+            char endCheck = FUZ_rand(&randState) & 255;
+            void * ctx = LZ4_createHC(block);
+            FUZ_CHECKTEST(ctx==NULL, "LZ4_createHC() allocation failed");
+            compressedBuffer[targetSize] = endCheck;
+            ret = LZ4_compressHC_destSize(ctx, block, compressedBuffer, &srcSize, targetSize, compressionLevel);
+            LZ4_freeHC(ctx);
+            FUZ_CHECKTEST(ret > targetSize, "LZ4_compressHC_destSize() result larger than dst buffer !");
+            FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compressHC_destSize() overwrite dst buffer !");
+            FUZ_CHECKTEST(srcSize > blockSize, "LZ4_compressHC_destSize() fed more than src buffer !");
+            DISPLAYLEVEL(5, "destSize : %7i/%7i; content%7i/%7i ", ret, targetSize, srcSize, blockSize);
+            if (targetSize>0) {
+                /* check correctness */
+                U32 const crcBase = XXH32(block, srcSize, 0);
+                char const canary = FUZ_rand(&randState) & 255;
+                FUZ_CHECKTEST((ret==0), "LZ4_compressHC_destSize() compression failed");
+                FUZ_DISPLAYTEST;
+                compressedSize = ret;
+                decodedBuffer[srcSize] = canary;
+                ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, srcSize);
+                FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe() failed on data compressed by LZ4_compressHC_destSize");
                 FUZ_CHECKTEST(ret!=srcSize, "LZ4_decompress_safe() failed : did not fully decompressed data");
                 FUZ_CHECKTEST(decodedBuffer[srcSize] != canary, "LZ4_decompress_safe() overwrite dst buffer !");
                 { U32 const crcDec = XXH32(decodedBuffer, srcSize, 0);
@@ -688,7 +724,7 @@ static void FUZ_unitTests(int compressionLevel)
         crcOrig = XXH64(testInput, testCompressedSize, 0);
         LZ4_resetStream(&streamingState);
         result = LZ4_compress_fast_continue(&streamingState, testInput, testCompressed, testCompressedSize, testCompressedSize-1, 1);
-        FUZ_CHECKTEST(result==0, "LZ4_compress_limitedOutput_continue() compression failed");
+        FUZ_CHECKTEST(result==0, "LZ4_compress_fast_continue() compression failed!");
 
         result = LZ4_decompress_safe(testCompressed, testVerify, result, testCompressedSize);
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
@@ -718,7 +754,7 @@ static void FUZ_unitTests(int compressionLevel)
 
                 memcpy (ringBuffer + rNext, testInput + iNext, messageSize);
                 result = LZ4_compress_fast_continue(&streamingState, ringBuffer + rNext, testCompressed, messageSize, testCompressedSize-ringBufferSize, 1);
-                FUZ_CHECKTEST(result==0, "LZ4_compress_limitedOutput_continue() compression failed");
+                FUZ_CHECKTEST(result==0, "LZ4_compress_fast_continue() compression failed");
 
                 result = LZ4_decompress_safe_continue(&decodeState, testCompressed, testVerify + dNext, result, messageSize);
                 FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe() test failed");
