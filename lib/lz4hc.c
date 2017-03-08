@@ -338,7 +338,7 @@ static int LZ4HC_compress_hashChain (
 
     BYTE* optr = (BYTE*) dest;
     BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
+    BYTE* oend = op + maxOutputSize;
 
     int   ml, ml2, ml3, ml0;
     const BYTE* ref = NULL;
@@ -355,6 +355,7 @@ static int LZ4HC_compress_hashChain (
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;              /* Unsupported input size, too large (or negative) */
 
     ctx->end += inputSize;
+    if (limit == limitedDestSize) oend -= LASTLITERALS;                  /* Hack for support limitations LZ4 decompressor */
     if (inputSize < LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     ip++;
@@ -372,7 +373,8 @@ static int LZ4HC_compress_hashChain (
 _Search2:
         if (ip+ml < mflimit)
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2, maxNbAttempts);
-        else ml2 = ml;
+        else
+            ml2 = ml;
 
         if (ml2 == ml) { /* No better match */
             optr = op;
@@ -504,6 +506,7 @@ _last_literals:
         lastRunSize = (size_t)(iend - anchor);  /* literals */
         litLength = (lastRunSize + 255 - RUN_MASK) / 255;
         totalSize = 1 + litLength + lastRunSize;
+        if (limit == limitedDestSize) oend += LASTLITERALS;  /* restore correct value */
         if (limit && (op + totalSize > oend)) {
             if (limit == limitedOutput) return 0;  /* Check output limit */
             /* adapt lastRunSize to fill 'dst' */
