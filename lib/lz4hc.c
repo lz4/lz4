@@ -351,7 +351,7 @@ static int LZ4HC_compress_hashChain (
 
     /* init */
     *srcSizePtr = 0;
-    if (limit && maxOutputSize < 1) return 0;                            /* Impossible to store anything */
+    if (limit == limitedDestSize && maxOutputSize < 1) return 0;         /* Impossible to store anything */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;              /* Unsupported input size, too large (or negative) */
 
     ctx->end += inputSize;
@@ -509,7 +509,7 @@ _last_literals:
         if (limit == limitedDestSize) oend += LASTLITERALS;  /* restore correct value */
         if (limit && (op + totalSize > oend)) {
             if (limit == limitedOutput) return 0;  /* Check output limit */
-            /* adapt lastRunSize to fill 'dst' */
+            /* adapt lastRunSize to fill 'dest' */
             lastRunSize  = (size_t)(oend - op) - 1;
             litLength = (lastRunSize + 255 - RUN_MASK) / 255;
             lastRunSize -= litLength;
