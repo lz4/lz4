@@ -72,11 +72,15 @@ extern "C" {
 /*
 *  LZ4_DLL_EXPORT :
 *  Enable exporting of functions when building a Windows DLL
+*  LZ4LIB_API :
+*  Control library symbols visibility.
 */
 #if defined(LZ4_DLL_EXPORT) && (LZ4_DLL_EXPORT==1)
 #  define LZ4LIB_API __declspec(dllexport)
 #elif defined(LZ4_DLL_IMPORT) && (LZ4_DLL_IMPORT==1)
 #  define LZ4LIB_API __declspec(dllimport) /* It isn't required but allows to generate better code, saving a function pointer load from the IAT and an indirect jump.*/
+#elif defined(__GNUC__) && (__GNUC__ >= 4)
+#  define LZ4LIB_API __attribute__ ((__visibility__ ("default")))
 #else
 #  define LZ4LIB_API
 #endif
