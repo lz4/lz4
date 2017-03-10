@@ -455,8 +455,13 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     benchedSize = BMK_findMaxMem(totalSizeToLoad * 3) / 3;
     if (benchedSize==0) EXM_THROW(12, "not enough memory");
     if ((U64)benchedSize > totalSizeToLoad) benchedSize = (size_t)totalSizeToLoad;
-    if (benchedSize < totalSizeToLoad)
-        DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
+    if (benchedSize > LZ4_MAX_INPUT_SIZE) {
+        benchedSize = LZ4_MAX_INPUT_SIZE; 
+        DISPLAY("File(s) bigger than LZ4's max input size; testing %u MB only...\n", (U32)(benchedSize >> 20));
+    } else { 
+        if (benchedSize < totalSizeToLoad)
+            DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
+    }
     srcBuffer = malloc(benchedSize + !benchedSize);   /* avoid alloc of zero */
     if (!srcBuffer) EXM_THROW(12, "not enough memory");
 
