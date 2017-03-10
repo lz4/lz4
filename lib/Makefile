@@ -95,7 +95,7 @@ ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
 	dlltool -D dll\liblz4.dll -d dll\liblz4.def -l dll\liblz4.lib
 else
-	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@
+	@$(CC) $(FLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
 	@ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf $@ liblz4.$(SHARED_EXT)
