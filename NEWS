@@ -1,5 +1,7 @@
 v1.7.6
+API : added LZ4_compressHC_destSize(), by Oleg (@remittor)
 build : LZ4_MEMORY_USAGE can be modified at compile time, through external define
+
 
 v1.7.5
 lz4hc : new high compression mode : levels 10-12 compress more and slower, by Przemyslaw Skibinski
