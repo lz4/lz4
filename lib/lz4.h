@@ -443,14 +443,8 @@ LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") int LZ4_co
 LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /* Obsolete decompression functions */
-/* These function names are completely deprecated and must no longer be used.
-   They are only provided in lz4.c for compatibility with older programs.
-    - LZ4_uncompress is the same as LZ4_decompress_fast
-    - LZ4_uncompress_unknownOutputSize is the same as LZ4_decompress_safe
-   These function prototypes are now disabled; uncomment them only if you really need them.
-   It is highly recommended to stop using these prototypes and migrate to maintained ones */
-/* int LZ4_uncompress (const char* source, char* dest, int outputSize); */
-/* int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize); */
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_decompress_fast() instead") int LZ4_uncompress (const char* source, char* dest, int outputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_decompress_safe() instead") int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
 /* Obsolete streaming functions; use new streaming interface whenever possible */
 LZ4LIB_API LZ4_DEPRECATED("use LZ4_createStream() instead") void* LZ4_create (char* inputBuffer);
