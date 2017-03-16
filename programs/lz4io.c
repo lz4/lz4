@@ -612,7 +612,7 @@ static unsigned LZ4IO_fwriteSparse(FILE* file, const void* buffer, size_t buffer
     const size_t* ptrT = bufferT;
     size_t bufferSizeT = bufferSize / sizeT;
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
-    static const size_t segmentSizeT = (32 KB) / sizeT;
+    const size_t segmentSizeT = (32 KB) / sizeT;
 
     if (!g_sparseFileSupport) {  /* normal write */
         size_t const sizeCheck = fwrite(buffer, 1, bufferSize, file);
