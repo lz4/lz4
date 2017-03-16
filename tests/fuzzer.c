@@ -43,6 +43,7 @@
 #include <stdio.h>      /* fgets, sscanf */
 #include <string.h>     /* strcmp */
 #include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
+#define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
@@ -353,11 +354,11 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST;
         {   int srcSize = blockSize;
             int const targetSize = srcSize * ((FUZ_rand(&randState) & 127)+1) >> 7;
-            char endCheck = FUZ_rand(&randState) & 255;
-            void * ctx = LZ4_createHC(block);
+            char const endCheck = FUZ_rand(&randState) & 255;
+            void* ctx = LZ4_createHC(block);
             FUZ_CHECKTEST(ctx==NULL, "LZ4_createHC() allocation failed");
             compressedBuffer[targetSize] = endCheck;
-            ret = LZ4_compressHC_destSize(ctx, block, compressedBuffer, &srcSize, targetSize, compressionLevel);
+            ret = LZ4_compress_HC_destSize(ctx, block, compressedBuffer, &srcSize, targetSize, compressionLevel);
             LZ4_freeHC(ctx);
             FUZ_CHECKTEST(ret > targetSize, "LZ4_compressHC_destSize() result larger than dst buffer !");
             FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compressHC_destSize() overwrite dst buffer !");

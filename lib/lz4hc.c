@@ -38,51 +38,37 @@
 *  Tuning Parameter
 ***************************************/
 
-/*!
- * HEAPMODE :
- * Select how default compression function will allocate workplace memory,
- * in stack (0:fastest), or in heap (1:requires malloc()).
- * Since workplace is rather large, heap mode is recommended.
+/*! HEAPMODE :
+ *  Select how default compression function will allocate workplace memory,
+ *  in stack (0:fastest), or in heap (1:requires malloc()).
+ *  Since workplace is rather large, heap mode is recommended.
  */
 #ifndef LZ4HC_HEAPMODE
 #  define LZ4HC_HEAPMODE 1
 #endif
 
 
-/* *************************************
-*  Dependency
-***************************************/
+/*===    Dependency    ===*/
 #include "lz4hc.h"
 
 
-/* *************************************
-*  Local Compiler Options
-***************************************/
+/*===   Common LZ4 definitions   ===*/
 #if defined(__GNUC__)
 #  pragma GCC diagnostic ignored "-Wunused-function"
 #endif
-
 #if defined (__clang__)
 #  pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
-
-/* *************************************
-*  Common LZ4 definition
-***************************************/
 #define LZ4_COMMONDEFS_ONLY
 #include "lz4.c"
 
 
-/* *************************************
-*  Local Constants
-***************************************/
+/*===   Constants   ===*/
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
 
 
-/**************************************
-*  Local Macros
-**************************************/
+/*===   Macros   ===*/
 #define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
 #define DELTANEXTMAXD(p)       chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
 #define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
@@ -141,8 +127,8 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* In
     const U32 dictLimit = hc4->dictLimit;
     const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
     U32 matchIndex;
-    int nbAttempts=maxNbAttempts;
-    size_t ml=0;
+    int nbAttempts = maxNbAttempts;
+    size_t ml = 0;
 
     /* HC4 match finder */
     LZ4HC_Insert(hc4, ip);
@@ -223,9 +209,7 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                         longest = (int)mlt;
                         *matchpos = matchPtr+back;
                         *startpos = ip+back;
-                    }
-                }
-            }
+            }   }   }
         } else {
             const BYTE* const matchPtr = dictBase + matchIndex;
             if (LZ4_read32(matchPtr) == LZ4_read32(ip)) {
@@ -279,10 +263,9 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     length = (size_t)(*ip - *anchor);
     token = (*op)++;
     if ((limit) && ((*op + (length >> 8) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;   /* Check output limit */
-    if (length >= RUN_MASK) { 
-        size_t len;
+    if (length >= RUN_MASK) {
+        size_t len = length - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
-        len = length - RUN_MASK;
         for(; len >= 255 ; len -= 255) *(*op)++ = 255;
         *(*op)++ = (BYTE)len;
     } else {
@@ -316,7 +299,9 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     return 0;
 }
 
+/* btopt */
 #include "lz4opt.h"
+
 
 static int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
@@ -399,11 +384,9 @@ _Search2:
         }
 
 _Search3:
-        /*
-        * Currently we have :
-        * ml2 > ml1, and
-        * ip1+3 <= ip2 (usually < ip1+ml1)
-        */
+        /* At this stage, we have :
+        *  ml2 > ml1, and
+        *  ip1+3 <= ip2 (usually < ip1+ml1) */
         if ((start2 - ip) < OPTIMAL_ML) {
             int correction;
             int new_ml = ml;
@@ -502,10 +485,9 @@ _Search3:
 
 _last_literals:
     /* Encode Last Literals */
-    {   size_t lastRunSize, litLength, totalSize;
-        lastRunSize = (size_t)(iend - anchor);  /* literals */
-        litLength = (lastRunSize + 255 - RUN_MASK) / 255;
-        totalSize = 1 + litLength + lastRunSize;
+    {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
+        size_t litLength = (lastRunSize + 255 - RUN_MASK) / 255;
+        size_t const totalSize = 1 + litLength + lastRunSize;
         if (limit == limitedDestSize) oend += LASTLITERALS;  /* restore correct value */
         if (limit && (op + totalSize > oend)) {
             if (limit == limitedOutput) return 0;  /* Check output limit */
@@ -544,8 +526,8 @@ static int LZ4HC_getSearchNum(int compressionLevel)
 {
     switch (compressionLevel) {
         default: return 0; /* unused */
-        case 11: return 128; 
-        case 12: return 1<<10; 
+        case 11: return 128;
+        case 12: return 1<<10;
     }
 }
 
@@ -563,10 +545,15 @@ static int LZ4HC_compress_generic (
     if (compressionLevel < 1) compressionLevel = LZ4HC_CLEVEL_DEFAULT;
     if (compressionLevel > 9) {
         switch (compressionLevel) {
-            case 10: return LZ4HC_compress_hashChain(ctx, source, dest, &srcSize, maxOutputSize, 1 << (16-1), limit);
-            case 11: ctx->searchNum = LZ4HC_getSearchNum(compressionLevel); return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 128, 0);
+            case 10:
+                return LZ4HC_compress_hashChain(ctx, source, dest, &srcSize, maxOutputSize, 1 << (16-1), limit);
+            case 11:
+                ctx->searchNum = LZ4HC_getSearchNum(compressionLevel);
+                return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, 128, 0);
             default:
-            case 12: ctx->searchNum = LZ4HC_getSearchNum(compressionLevel); return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM, 1);
+            case 12:
+                ctx->searchNum = LZ4HC_getSearchNum(compressionLevel);
+                return LZ4HC_compress_optimal(ctx, source, dest, inputSize, maxOutputSize, limit, LZ4_OPT_NUM, 1);
         }
     }
     return LZ4HC_compress_hashChain(ctx, source, dest, &srcSize, maxOutputSize, 1 << (compressionLevel-1), limit);
@@ -577,7 +564,7 @@ int LZ4_sizeofStateHC(void) { return sizeof(LZ4_streamHC_t); }
 
 int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel)
 {
-    LZ4HC_CCtx_internal* ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
+    LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
     if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
     LZ4HC_init (ctx, (const BYTE*)src);
     if (maxDstSize < LZ4_compressBound(srcSize))
@@ -622,7 +609,7 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
-    LZ4HC_CCtx_internal* ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     if (dictSize > 64 KB) {
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
@@ -659,7 +646,7 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
                                             const char* source, char* dest,
                                             int inputSize, int maxOutputSize, limitedOutput_directive limit)
 {
-    LZ4HC_CCtx_internal* ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     /* auto-init if forgotten */
     if (ctxPtr->base == NULL) LZ4HC_init (ctxPtr, (const BYTE*) source);
 
@@ -697,13 +684,21 @@ int LZ4_compress_HC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* sourc
 
 int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int* sourceSizePtr, int targetDestSize)
 {
-    LZ4HC_CCtx_internal* ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     unsigned maxNbAttempts = 1 << (ctxPtr->compressionLevel - 1);
 
     /* destSize: always auto-init */
     LZ4HC_init(ctxPtr, (const BYTE*) source);
 
     return LZ4HC_compress_hashChain(ctxPtr, source, dest, sourceSizePtr, targetDestSize, maxNbAttempts, limitedDestSize);
+}
+
+int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int compressionLevel)
+{
+    LZ4HC_CCtx_internal * const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
+    unsigned maxNbAttempts = 1 << (compressionLevel - 1);
+    LZ4HC_init(ctx, (const BYTE*) source);
+    return LZ4HC_compress_hashChain(ctx, source, dest, sourceSizePtr, targetDestSize, maxNbAttempts, limitedDestSize);
 }
 
 
@@ -783,12 +778,4 @@ char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
     LZ4HC_CCtx_internal* const hc4 = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
     int const dictSize = LZ4_saveDictHC((LZ4_streamHC_t*)LZ4HC_Data, (char*)(hc4->inputBuffer), 64 KB);
     return (char*)(hc4->inputBuffer + dictSize);
-}
-
-int LZ4_compressHC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int compressionLevel)
-{
-    LZ4HC_CCtx_internal * const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
-    unsigned maxNbAttempts = 1 << (compressionLevel - 1);
-    LZ4HC_init(ctx, (const BYTE*) source);
-    return LZ4HC_compress_hashChain(ctx, source, dest, sourceSizePtr, targetDestSize, maxNbAttempts, limitedDestSize);
 }
