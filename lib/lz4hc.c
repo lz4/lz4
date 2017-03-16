@@ -543,6 +543,7 @@ static int LZ4HC_compress_generic (
 {
     if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe to reconsider */
     if (cLevel > 9) {
+        if (limit == limitedDestSize) cLevel = 10;
         switch (cLevel) {
             case 10:
                 return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1 << (16-1), limit);
@@ -589,11 +590,10 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
 
 /* LZ4_compress_HC_destSize() :
  * currently, only compatible with Hash Chain implementation,
- * limit compression level to LZ4HC_CLEVEL_OPT_MIN-1*/
+ * hence limit compression level to LZ4HC_CLEVEL_OPT_MIN-1*/
 int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
-    if (cLevel >= LZ4HC_CLEVEL_OPT_MIN) cLevel = LZ4HC_CLEVEL_OPT_MIN-1;   /* this only works with hash chain */
     LZ4HC_init(ctx, (const BYTE*) source);
     return LZ4HC_compress_generic(ctx, source, dest, sourceSizePtr, targetDestSize, cLevel, limitedDestSize);
 }
@@ -654,12 +654,13 @@ static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBl
 }
 
 static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
-                                            const char* source, char* dest,
-                                            int inputSize, int maxOutputSize, limitedOutput_directive limit)
+                                            const char* src, char* dst,
+                                            int* srcSizePtr, int dstCapacity,
+                                            limitedOutput_directive limit)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     /* auto-init if forgotten */
-    if (ctxPtr->base == NULL) LZ4HC_init (ctxPtr, (const BYTE*) source);
+    if (ctxPtr->base == NULL) LZ4HC_init (ctxPtr, (const BYTE*) src);
 
     /* Check overflow */
     if ((size_t)(ctxPtr->end - ctxPtr->base) > 2 GB) {
@@ -669,37 +670,35 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
     }
 
     /* Check if blocks follow each other */
-    if ((const BYTE*)source != ctxPtr->end) LZ4HC_setExternalDict(ctxPtr, (const BYTE*)source);
+    if ((const BYTE*)src != ctxPtr->end) LZ4HC_setExternalDict(ctxPtr, (const BYTE*)src);
 
     /* Check overlapping input/dictionary space */
-    {   const BYTE* sourceEnd = (const BYTE*) source + inputSize;
+    {   const BYTE* sourceEnd = (const BYTE*) src + *srcSizePtr;
         const BYTE* const dictBegin = ctxPtr->dictBase + ctxPtr->lowLimit;
         const BYTE* const dictEnd   = ctxPtr->dictBase + ctxPtr->dictLimit;
-        if ((sourceEnd > dictBegin) && ((const BYTE*)source < dictEnd)) {
+        if ((sourceEnd > dictBegin) && ((const BYTE*)src < dictEnd)) {
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
             ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictBase);
             if (ctxPtr->dictLimit - ctxPtr->lowLimit < 4) ctxPtr->lowLimit = ctxPtr->dictLimit;
         }
     }
 
-    return LZ4HC_compress_generic (ctxPtr, source, dest, &inputSize, maxOutputSize, ctxPtr->compressionLevel, limit);
+    return LZ4HC_compress_generic (ctxPtr, src, dst, srcSizePtr, dstCapacity, ctxPtr->compressionLevel, limit);
 }
 
 int LZ4_compress_HC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, char* dst, int srcSize, int dstCapacity)
 {
     if (dstCapacity < LZ4_compressBound(srcSize))
-        return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, srcSize, dstCapacity, limitedOutput);
+        return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, &srcSize, dstCapacity, limitedOutput);
     else
-        return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, srcSize, dstCapacity, noLimit);
+        return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, &srcSize, dstCapacity, noLimit);
 }
 
-int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int* sourceSizePtr, int targetDestSize)
+int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, char* dst, int* srcSizePtr, int targetDestSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
-    int const cLevel = (ctxPtr->compressionLevel < 1) ? 1 : ctxPtr->compressionLevel;  /* guaranteed <= LZ4HC_CLEVEL_MAX */
-    unsigned const maxNbAttempts = 1 << (cLevel - 1);
-    LZ4HC_init(ctxPtr, (const BYTE*) source);   /* LZ4_compress_HC_continue_destSize: always auto-init - only compatible with hash chain - miss continuity check */
-    return LZ4HC_compress_hashChain(ctxPtr, source, dest, sourceSizePtr, targetDestSize, maxNbAttempts, limitedDestSize);
+    if (ctxPtr->compressionLevel >= LZ4HC_CLEVEL_OPT_MIN) LZ4HC_init(ctxPtr, (const BYTE*)src);   /* not compatible with btopt implementation */
+    return LZ4_compressHC_continue_generic(LZ4_streamHCPtr, src, dst, srcSizePtr, targetDestSize, limitedDestSize);
 }
 
 
