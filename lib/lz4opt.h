@@ -1,6 +1,6 @@
 /*
     lz4opt.h - Optimal Mode of LZ4
-    Copyright (C) 2015-2016, Przemyslaw Skibinski <inikep@gmail.com>
+    Copyright (C) 2015-2017, Przemyslaw Skibinski <inikep@gmail.com>
     Note : this file is intended to be included within lz4hc.c
 
     BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)

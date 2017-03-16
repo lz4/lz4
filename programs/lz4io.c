@@ -1,6 +1,6 @@
 /*
   LZ4io.c - LZ4 File/Stream Interface
-  Copyright (C) Yann Collet 2011-2016
+  Copyright (C) Yann Collet 2011-2017
 
   GPL v2 License
 

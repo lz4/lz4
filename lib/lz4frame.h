@@ -1,7 +1,7 @@
 /*
    LZ4 auto-framing library
    Header File
-   Copyright (C) 2011-2016, Yann Collet.
+   Copyright (C) 2011-2017, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -168,7 +168,7 @@ typedef struct {
  * All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
-  int      compressionLevel;       /* 0 == default (fast mode); values above 16 count as 16; values below 0 count as 0 */
+  int      compressionLevel;       /* 0 == default (fast mode); values above LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values below 0 count as 0 */
   unsigned autoFlush;              /* 1 == always flush (reduce usage of tmp buffer) */
   unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;

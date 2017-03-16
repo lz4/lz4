@@ -1,7 +1,7 @@
 /*
    LZ4 HC - High Compression Mode of LZ4
    Header File
-   Copyright (C) 2011-2016, Yann Collet.
+   Copyright (C) 2011-2017, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -145,14 +145,14 @@ typedef struct
 {
     uint32_t   hashTable[LZ4HC_HASHTABLESIZE];
     uint16_t   chainTable[LZ4HC_MAXD];
-    const uint8_t* end;        /* next block here to continue on current prefix */
-    const uint8_t* base;       /* All index relative to this position */
-    const uint8_t* dictBase;   /* alternate base for extDict */
-    uint8_t* inputBuffer;      /* deprecated */
-    uint32_t   dictLimit;        /* below that point, need extDict */
-    uint32_t   lowLimit;         /* below that point, no more dict */
-    uint32_t   nextToUpdate;     /* index from which to continue dictionary update */
-    uint32_t   searchNum;        /* only for optimal parser */
+    const uint8_t* end;         /* next block here to continue on current prefix */
+    const uint8_t* base;        /* All index relative to this position */
+    const uint8_t* dictBase;    /* alternate base for extDict */
+    uint8_t* inputBuffer;       /* deprecated */
+    uint32_t   dictLimit;       /* below that point, need extDict */
+    uint32_t   lowLimit;        /* below that point, no more dict */
+    uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
+    uint32_t   searchNum;       /* only for optimal parser */
     uint32_t   compressionLevel;
 } LZ4HC_CCtx_internal;
 
@@ -170,7 +170,7 @@ typedef struct
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
     unsigned int   searchNum;        /* only for optimal parser */
-    unsigned int   compressionLevel;
+    int            compressionLevel;
 } LZ4HC_CCtx_internal;
 
 #endif
