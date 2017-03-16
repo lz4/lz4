@@ -1,6 +1,10 @@
 v1.7.6
+cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
 API : added LZ4_compressHC_destSize(), by Oleg (@remittor)
+API : fix : expose obsolete decoding functions, reported by Chen Yufei
+build : dragonFlyBSD, OpenBSD, NetBSD supported
 build : LZ4_MEMORY_USAGE can be modified at compile time, through external define
+doc : lz4 api manual, by Przemyslaw Skibinski
 
 
 v1.7.5
