@@ -65,8 +65,8 @@ FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
 
     price += LZ4HC_literalsPrice(litlen);
 
-    mlen -= MINMATCH;
-    if (mlen >= (size_t)ML_MASK) price+= 1+(mlen-ML_MASK)/255;
+    if (mlen >= (size_t)(ML_MASK+MINMATCH))
+        price+= 1+(mlen-(ML_MASK+MINMATCH))/255;
 
     return price;
 }
@@ -190,12 +190,12 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 }
 
 
-#define SET_PRICE(pos, mlen, offset, litlen, price)    \
+#define SET_PRICE(pos, mlen, offset, ll, price)        \
 {                                                      \
     while (last_pos < pos)  { opt[last_pos+1].price = 1<<30; last_pos++; } \
     opt[pos].mlen = (int)mlen;                         \
     opt[pos].off = (int)offset;                        \
-    opt[pos].litlen = (int)litlen;                     \
+    opt[pos].litlen = (int)ll;                         \
     opt[pos].price = (int)price;                       \
 }
 
@@ -207,7 +207,7 @@ static int LZ4HC_compress_optimal (
     int inputSize,
     int maxOutputSize,
     limitedOutput_directive limit,
-    const size_t sufficient_len,
+    size_t sufficient_len,
     const int fullUpdate
     )
 {
@@ -226,6 +226,7 @@ static int LZ4HC_compress_optimal (
     BYTE* const oend = op + maxOutputSize;
 
     /* init */
+    if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
     ctx->end += inputSize;
     ip++;
 
@@ -247,14 +248,13 @@ static int LZ4HC_compress_optimal (
 
         /* set prices using matches at position = 0 */
         for (i = 0; i < match_num; i++) {
-           mlen = (i>0) ? (size_t)matches[i-1].len+1 : MINMATCH;
-           best_mlen = (matches[i].len < LZ4_OPT_NUM) ? matches[i].len : LZ4_OPT_NUM;
-           while (mlen <= best_mlen) {
-                litlen = 0;
-                price = LZ4HC_sequencePrice(llen + litlen, mlen) - LZ4HC_literalsPrice(llen);
-                SET_PRICE(mlen, mlen, matches[i].off, litlen, price);
+            mlen = (i>0) ? (size_t)matches[i-1].len+1 : MINMATCH;
+            best_mlen = matches[i].len;   /* necessarily < LZ4_OPT_NUM */
+            while (mlen <= best_mlen) {
+                price = LZ4HC_sequencePrice(llen, mlen) - LZ4HC_literalsPrice(llen);
+                SET_PRICE(mlen, mlen, matches[i].off, 0, price);   /* updates last_pos and opt[pos] */
                 mlen++;
-           }
+            }
         }
 
         if (last_pos < MINMATCH) { ip++; continue; }
