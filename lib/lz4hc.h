@@ -237,6 +237,10 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead")  int   LZ4_resetStreamStateHC(
 #ifndef LZ4_HC_SLO_098092834
 #define LZ4_HC_SLO_098092834
 
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 /*! LZ4_compress_HC_destSize() :
  *  Will try to compress as much data from `src` as possible
  *  that can fit in `targetDstSize` budget.
@@ -264,6 +268,10 @@ LZ4LIB_API int LZ4_compress_HC_destSize(void* LZ4HC_Data,
 LZ4LIB_API int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
                             const char* src, char* dst,
                             int* srcSizePtr, int targetDstSize);
+
+#if defined (__cplusplus)
+}
+#endif
 
 #endif   /* LZ4_HC_SLO_098092834 */
 #endif   /* LZ4_HC_STATIC_LINKING_ONLY */
