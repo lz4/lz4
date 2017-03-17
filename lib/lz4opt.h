@@ -36,14 +36,12 @@
 #define LZ4_OPT_NUM   (1<<12)
 
 
-typedef struct
-{
+typedef struct {
     int off;
     int len;
 } LZ4HC_match_t;
 
-typedef struct
-{
+typedef struct {
     int price;
     int off;
     int mlen;
@@ -54,8 +52,8 @@ typedef struct
 /* price in bits */
 FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
 {
-    size_t price = 8*litlen;
-    if (litlen >= (size_t)RUN_MASK) price+=8*(1+(litlen-RUN_MASK)/255);
+    size_t price = litlen;
+    if (litlen >= (size_t)RUN_MASK) price += 1+(litlen-RUN_MASK)/255;
     return price;
 }
 
@@ -63,12 +61,12 @@ FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
 /* requires mlen >= MINMATCH */
 FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
 {
-    size_t price = 16 + 8; /* 16-bit offset + token */
+    size_t price = 2 + 1; /* 16-bit offset + token */
 
     price += LZ4HC_literalsPrice(litlen);
 
     mlen -= MINMATCH;
-    if (mlen >= (size_t)ML_MASK) price+=8*(1+(mlen-ML_MASK)/255);
+    if (mlen >= (size_t)ML_MASK) price+= 1+(mlen-ML_MASK)/255;
 
     return price;
 }
