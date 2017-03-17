@@ -819,13 +819,12 @@ static size_t LZ4F_headerSize(const void* src, size_t srcSize)
    output  : set internal values of dctx, such as
              dctxPtr->frameInfo and dctxPtr->dStage.
              Also allocates internal buffers.
-   @return : nb Bytes read from srcVoidPtr (necessarily <= srcSize)
+   @return : nb Bytes read from src (necessarily <= srcSize)
              or an error code (testable with LZ4F_isError())
 */
 static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcSize)
 {
-    BYTE FLG, BD;
-    unsigned version, blockMode, blockChecksumFlag, contentSizeFlag, contentChecksumFlag, blockSizeID;
+    unsigned blockMode, contentSizeFlag, contentChecksumFlag, blockSizeID;
     size_t frameHeaderSize;
     const BYTE* srcPtr = (const BYTE*)src;
 
@@ -852,12 +851,17 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     dctxPtr->frameInfo.frameType = LZ4F_frame;
 
     /* Flags */
-    FLG = srcPtr[4];
-    version = (FLG>>6) & _2BITS;
-    blockMode = (FLG>>5) & _1BIT;
-    blockChecksumFlag = (FLG>>4) & _1BIT;
-    contentSizeFlag = (FLG>>3) & _1BIT;
-    contentChecksumFlag = (FLG>>2) & _1BIT;
+    {   U32 const FLG = srcPtr[4];
+        U32 const version = (FLG>>6) & _2BITS;
+        U32 const blockChecksumFlag = (FLG>>4) & _1BIT;
+        blockMode = (FLG>>5) & _1BIT;
+        contentSizeFlag = (FLG>>3) & _1BIT;
+        contentChecksumFlag = (FLG>>2) & _1BIT;
+        /* validate */
+        if (((FLG>>0)&_2BITS) != 0) return err0r(LZ4F_ERROR_reservedFlag_set); /* Reserved bits */
+        if (version != 1) return err0r(LZ4F_ERROR_headerVersion_wrong);        /* Version Number, only supported value */
+        if (blockChecksumFlag != 0) return err0r(LZ4F_ERROR_blockChecksum_unsupported); /* Not supported for the time being */
+    }
 
     /* Frame Header Size */
     frameHeaderSize = contentSizeFlag ? maxFHSize : minFHSize;
@@ -872,16 +876,13 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
         return srcSize;
     }
 
-    BD = srcPtr[5];
-    blockSizeID = (BD>>4) & _3BITS;
-
-    /* validate */
-    if (version != 1) return err0r(LZ4F_ERROR_headerVersion_wrong);        /* Version Number, only supported value */
-    if (blockChecksumFlag != 0) return err0r(LZ4F_ERROR_blockChecksum_unsupported); /* Not supported for the time being */
-    if (((FLG>>0)&_2BITS) != 0) return err0r(LZ4F_ERROR_reservedFlag_set); /* Reserved bits */
-    if (((BD>>7)&_1BIT) != 0) return err0r(LZ4F_ERROR_reservedFlag_set);   /* Reserved bit */
-    if (blockSizeID < 4) return err0r(LZ4F_ERROR_maxBlockSize_invalid);    /* 4-7 only supported values for the time being */
-    if (((BD>>0)&_4BITS) != 0) return err0r(LZ4F_ERROR_reservedFlag_set);  /* Reserved bits */
+    {   U32 const BD = srcPtr[5];
+        blockSizeID = (BD>>4) & _3BITS;
+        /* validate */
+        if (((BD>>7)&_1BIT) != 0) return err0r(LZ4F_ERROR_reservedFlag_set);   /* Reserved bit */
+        if (blockSizeID < 4) return err0r(LZ4F_ERROR_maxBlockSize_invalid);    /* 4-7 only supported values for the time being */
+        if (((BD>>0)&_4BITS) != 0) return err0r(LZ4F_ERROR_reservedFlag_set);  /* Reserved bits */
+    }
 
     /* check header */
     { BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
@@ -901,11 +902,11 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     /* internal buffers allocation */
     {   size_t const bufferNeeded = dctxPtr->maxBlockSize + ((dctxPtr->frameInfo.blockMode==LZ4F_blockLinked) * 128 KB);
         if (bufferNeeded > dctxPtr->maxBufferSize) {   /* tmp buffers too small */
+            dctxPtr->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
             FREEMEM(dctxPtr->tmpIn);
             dctxPtr->tmpIn = (BYTE*)ALLOCATOR(dctxPtr->maxBlockSize);
             if (dctxPtr->tmpIn == NULL) return err0r(LZ4F_ERROR_allocation_failed);
             FREEMEM(dctxPtr->tmpOutBuffer);
-            dctxPtr->maxBufferSize = 0;
             dctxPtr->tmpOutBuffer= (BYTE*)ALLOCATOR(bufferNeeded);
             if (dctxPtr->tmpOutBuffer== NULL) return err0r(LZ4F_ERROR_allocation_failed);
             dctxPtr->maxBufferSize = bufferNeeded;
@@ -1072,7 +1073,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
 
         case dstage_getHeader:
             if ((size_t)(srcEnd-srcPtr) >= maxFHSize) {  /* enough to decode - shortcut */
-                LZ4F_errorCode_t const hSize = LZ4F_decodeHeader(dctxPtr, srcPtr, srcEnd-srcPtr);
+                LZ4F_errorCode_t const hSize = LZ4F_decodeHeader(dctxPtr, srcPtr, srcEnd-srcPtr);  /* will change dStage appropriately */
                 if (LZ4F_isError(hSize)) return hSize;
                 srcPtr += hSize;
                 break;

@@ -257,7 +257,7 @@ LZ4LIB_API int LZ4_compress_HC_destSize(void* LZ4HC_Data,
  *  Result is provided in 2 parts :
  * @return : the number of bytes written into 'dst'
  *           or 0 if compression fails.
- * `sourceSizePtr` : value will be updated to indicate how much bytes were read from `source`
+ * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
  * Important : due to limitations, this prototype only works well up to cLevel < LZ4HC_CLEVEL_OPT_MIN
  *             beyond that level, compression performance will be much reduced due to internal incompatibilities
  */

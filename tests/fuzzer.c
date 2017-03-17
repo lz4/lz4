@@ -664,7 +664,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             LZ4_resetStreamHC (&LZ4dictHC, compressionLevel);
             LZ4_loadDictHC(&LZ4dictHC, dict, dictSize);
             blockContinueCompressedSize = LZ4_compress_HC_continue_destSize(&LZ4dictHC, block, compressedBuffer, &consumedSize, availableSpace);
-            DISPLAYLEVEL(3, " LZ4_compress_HC_continue_destSize : compressed %6i/%6i into %6i/%6i at cLevel=%i\n", consumedSize, blockSize, blockContinueCompressedSize, availableSpace, compressionLevel);
+            DISPLAYLEVEL(5, " LZ4_compress_HC_continue_destSize : compressed %6i/%6i into %6i/%6i at cLevel=%i\n", consumedSize, blockSize, blockContinueCompressedSize, availableSpace, compressionLevel);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue_destSize failed");
             FUZ_CHECKTEST(blockContinueCompressedSize > availableSpace, "LZ4_compress_HC_continue_destSize write overflow");
             FUZ_CHECKTEST(consumedSize > blockSize, "LZ4_compress_HC_continue_destSize read overflow");

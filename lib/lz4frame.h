@@ -57,15 +57,14 @@ extern "C" {
   of encoding standard metadata alongside LZ4-compressed blocks.
 */
 
-/*^***************************************************************
-*  Compiler specifics
-*****************************************************************/
-/*
-*  LZ4_DLL_EXPORT :
-*  Enable exporting of functions when building a Windows DLL
-*  LZ4FLIB_API :
-*  Control library symbols visibility.
-*/
+/*-***************************************************************
+ *  Compiler specifics
+ *****************************************************************/
+/*  LZ4_DLL_EXPORT :
+ *  Enable exporting of functions when building a Windows DLL
+ *  LZ4FLIB_API :
+ *  Control library symbols visibility.
+ */
 #if defined(LZ4_DLL_EXPORT) && (LZ4_DLL_EXPORT==1)
 #  define LZ4FLIB_API __declspec(dllexport)
 #elif defined(LZ4_DLL_IMPORT) && (LZ4_DLL_IMPORT==1)
@@ -86,8 +85,8 @@ extern "C" {
 
 
 /*-************************************
-*  Error management
-**************************************/
+ *  Error management
+ **************************************/
 typedef size_t LZ4F_errorCode_t;
 
 LZ4FLIB_API unsigned    LZ4F_isError(LZ4F_errorCode_t code);   /**< tells if a `LZ4F_errorCode_t` function result is an error code */
@@ -207,7 +206,7 @@ typedef struct {
   unsigned reserved[3];
 } LZ4F_compressOptions_t;
 
-/* Resource Management */
+/*---   Resource Management   ---*/
 
 #define LZ4F_VERSION 100
 LZ4FLIB_API unsigned LZ4F_getVersion(void);
@@ -223,7 +222,7 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, 
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 
-/* Compression */
+/*----    Compression    ----*/
 
 #define LZ4F_HEADER_SIZE_MAX 15
 /*! LZ4F_compressBegin() :
