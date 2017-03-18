@@ -278,13 +278,14 @@ static int LZ4HC_compress_optimal (
 
             mlen = 1;
             best_mlen = 0;
-            if (cur > last_pos || price < (size_t)opt[cur].price)
-                SET_PRICE(cur, mlen, best_mlen, litlen, price);
+            if (price < (size_t)opt[cur].price)
+                SET_PRICE(cur, mlen, best_mlen, litlen, price);   /* note : increases last_pos */
 
             if (cur == last_pos || inr >= mflimit) break;
 
             match_num = LZ4HC_BinTree_GetAllMatches(ctx, inr, matchlimit, MINMATCH-1, matches, fullUpdate);
-            if (match_num > 0 && (size_t)matches[match_num-1].len > sufficient_len) {
+            if ((match_num > 0) && (size_t)matches[match_num-1].len > sufficient_len) {
+                /* immediate encoding */
                 best_mlen = matches[match_num-1].len;
                 best_off = matches[match_num-1].off;
                 last_pos = cur + 1;
