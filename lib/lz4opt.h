@@ -190,13 +190,13 @@ FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 }
 
 
-#define SET_PRICE(pos, mlen, offset, ll, price)        \
+#define SET_PRICE(pos, ml, offset, ll, cost)           \
 {                                                      \
     while (last_pos < pos)  { opt[last_pos+1].price = 1<<30; last_pos++; } \
-    opt[pos].mlen = (int)mlen;                         \
+    opt[pos].mlen = (int)ml;                           \
     opt[pos].off = (int)offset;                        \
     opt[pos].litlen = (int)ll;                         \
-    opt[pos].price = (int)price;                       \
+    opt[pos].price = (int)cost;                        \
 }
 
 
@@ -211,7 +211,7 @@ static int LZ4HC_compress_optimal (
     const int fullUpdate
     )
 {
-    LZ4HC_optimal_t opt[LZ4_OPT_NUM + 1];
+    LZ4HC_optimal_t opt[LZ4_OPT_NUM + 1];   /* this uses a bit too much stack memory to my taste ... */
     LZ4HC_match_t matches[LZ4_OPT_NUM + 1];
     const BYTE *inr = NULL;
     size_t res, cur, cur2;
