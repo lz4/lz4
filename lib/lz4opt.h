@@ -278,7 +278,6 @@ static int LZ4HC_compress_optimal (
                     price = opt[cur - 1].price + LZ4HC_literalsPrice(1);
                 }
 
-                best_mlen = 0;
                 if (price < (size_t)opt[cur].price)
                     SET_PRICE(cur, 1, 0, litlen, price);   /* note : increases last_pos */
             }
