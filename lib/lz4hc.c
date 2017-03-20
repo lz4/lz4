@@ -243,6 +243,10 @@ typedef enum {
 static unsigned debug = 0;
 #endif
 
+
+/* LZ4HC_encodeSequence() :
+ * @return : 0 if ok,
+ *           1 if buffer issue detected */
 FORCE_INLINE int LZ4HC_encodeSequence (
     const BYTE** ip,
     BYTE** op,
