@@ -271,6 +271,7 @@ int main(int argc, const char** argv)
         forceStdout=0,
         main_pause=0,
         multiple_inputs=0,
+        all_arguments_are_files=0,
         operationResult=0;
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
@@ -315,7 +316,7 @@ int main(int argc, const char** argv)
         if(!argument) continue;   /* Protection if argument empty */
 
         /* Short commands (note : aggregated short commands are allowed) */
-        if (argument[0]=='-') {
+        if (!all_arguments_are_files && argument[0]=='-') {
             /* '-' means stdin/stdout */
             if (argument[1]==0) {
                 if (!input_filename) input_filename=stdinmark;
@@ -325,6 +326,7 @@ int main(int argc, const char** argv)
 
             /* long commands (--long-word) */
             if (argument[1]=='-') {
+                if (!strcmp(argument,  "--")) { all_arguments_are_files = 1; continue; }
                 if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
                 if ((!strcmp(argument, "--decompress"))
                     || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }

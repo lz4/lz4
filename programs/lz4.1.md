@@ -194,6 +194,9 @@ only the latest one will be applied.
 * `--rm` :
   Delete source files on successful compression or decompression
 
+* `--` :
+  Treat all subsequent arguments as files
+
 
 ### Benchmark mode
 
