@@ -252,6 +252,14 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(DIFF) -q tmp tmp3
 	$(PRGDIR)/lz4cat < tmp > tmp2      # checks lz4cat works with stdin (#285)
 	$(DIFF) -q tmp tmp2
+	cp tmp ./-d
+	$(LZ4) --rm -- -d -d.lz4           # compresses ./d into ./-d.lz4
+	test   -f ./-d.lz4
+	test ! -f ./-d
+	mv ./-d.lz4 ./-z
+	$(LZ4) -d --rm -- -z tmp4          # uncompresses ./-z into tmp4
+	test ! -f ./-z
+	$(DIFF) -q tmp tmp4
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen

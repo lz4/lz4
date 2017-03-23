@@ -1,5 +1,6 @@
 v1.7.6
 cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
+cli : added GNU separator -- specifying that all following arguments are files
 API : added LZ4_compress_HC_destSize(), by Oleg (@remittor)
 API : fix : expose obsolete decoding functions, reported by Chen Yufei
 build : dragonFlyBSD, OpenBSD, NetBSD supported
