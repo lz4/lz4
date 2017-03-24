@@ -550,7 +550,7 @@ static int LZ4HC_compress_generic (
         if (limit == limitedDestSize) cLevel = 10;
         switch (cLevel) {
             case 10:
-                return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1 << (16-1), limit);
+                return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1 << (15-1), limit);
             case 11:
                 ctx->searchNum = LZ4HC_getSearchNum(cLevel);
                 return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 128, 0);
