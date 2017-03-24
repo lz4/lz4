@@ -242,10 +242,19 @@ static void waitEnter(void)
 
 static const char* lastNameFromPath(const char* path)
 {
-    const char* name = strrchr(path, '/');
-    if (name==NULL) name = strrchr(path, '\\');   /* windows */
-    if (name==NULL) return path;
-    return name+1;
+    const char* name = path;
+    if (strrchr(name, '/')) name = strrchr(name, '/') + 1;
+    if (strrchr(name, '\\')) name = strrchr(name, '\\') + 1; /* windows */
+    return name;
+}
+
+/*! exeNameMatch() :
+    @return : a non-zero value if exeName matches test, excluding the extension
+   */
+static int exeNameMatch(const char* exeName, const char* test)
+{
+    return !strncmp(exeName, test, strlen(test)) &&
+        (exeName[strlen(test)] == '\0' || exeName[strlen(test)] == '.');
 }
 
 /*! readU32FromChar() :
@@ -297,7 +306,7 @@ int main(int argc, const char** argv)
     LZ4IO_setOverwrite(0);
 
     /* lz4cat predefined behavior */
-    if (!strcmp(exeName, LZ4CAT)) {
+    if (exeNameMatch(exeName, LZ4CAT)) {
         mode = om_decompress;
         LZ4IO_setOverwrite(1);
         LZ4IO_setRemoveSrcFile(0);
@@ -306,7 +315,7 @@ int main(int argc, const char** argv)
         displayLevel=1;
         multiple_inputs=1;
     }
-    if (!strcmp(exeName, UNLZ4)) { mode = om_decompress; }
+    if (exeNameMatch(exeName, UNLZ4)) { mode = om_decompress; }
 
     /* command switches */
     for(i=1; i<argc; i++) {
