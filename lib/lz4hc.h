@@ -198,25 +198,25 @@ union LZ4_streamHC_u {
 
 /* deprecated compression functions */
 /* these functions will trigger warning messages in future releases */
-LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC               (const char* source, char* dest, int inputSize);
-LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
-LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC2 (const char* source, char* dest, int inputSize, int compressionLevel);
-LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC2_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
-LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC_withStateHC               (void* state, const char* source, char* dest, int inputSize);
-LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
-LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC2_withStateHC (void* state, const char* source, char* dest, int inputSize, int compressionLevel);
-LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC2_limitedOutput_withStateHC(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
-LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC_continue               (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize);
-LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC               (const char* source, char* dest, int inputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC2 (const char* source, char* dest, int inputSize, int compressionLevel);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC() instead") int LZ4_compressHC2_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC_withStateHC               (void* state, const char* source, char* dest, int inputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC2_withStateHC (void* state, const char* source, char* dest, int inputSize, int compressionLevel);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") int LZ4_compressHC2_limitedOutput_withStateHC(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC_continue               (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /* Deprecated Streaming functions using older model; should no longer be used */
-LZ4_DEPRECATED("use LZ4_createStreamHC() instead") void* LZ4_createHC (char* inputBuffer);
-LZ4_DEPRECATED("use LZ4_saveDictHC() instead")     char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
-LZ4_DEPRECATED("use LZ4_freeStreamHC() instead")   int   LZ4_freeHC (void* LZ4HC_Data);
-LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
-LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
-LZ4_DEPRECATED("use LZ4_createStreamHC() instead") int   LZ4_sizeofStreamStateHC(void);
-LZ4_DEPRECATED("use LZ4_resetStreamHC() instead")  int   LZ4_resetStreamStateHC(void* state, char* inputBuffer);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_createStreamHC() instead") void* LZ4_createHC (char* inputBuffer);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_saveDictHC() instead")     char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_freeStreamHC() instead")   int   LZ4_freeHC (void* LZ4HC_Data);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_createStreamHC() instead") int   LZ4_sizeofStreamStateHC(void);
+LZ4LIB_API LZ4_DEPRECATED("use LZ4_resetStreamHC() instead")  int   LZ4_resetStreamStateHC(void* state, char* inputBuffer);
 
 
 #if defined (__cplusplus)
