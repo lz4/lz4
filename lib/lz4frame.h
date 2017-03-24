@@ -212,7 +212,7 @@ typedef struct {
 LZ4FLIB_API unsigned LZ4F_getVersion(void);
 /*! LZ4F_createCompressionContext() :
  * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
- * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version and an LZ4F_preferences_t structure.
+ * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version.
  * The version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
  * The function will provide a pointer to a fully allocated LZ4F_cctx object.
  * If @return != zero, there was an error during context creation.
