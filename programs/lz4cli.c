@@ -74,7 +74,7 @@
 *  Macros
 ***************************************/
 #define DISPLAY(...)           fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...)   if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...)   do { if (displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while(0)
 static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : downgradable normal ; 3 : non-downgradable normal; 4 : + information */
 
 
@@ -82,15 +82,15 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 *  Exceptions
 ***************************************/
 #define DEBUG 0
-#define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
+#define DEBUGOUTPUT(...) do { if (DEBUG) DISPLAY(__VA_ARGS__); } while(0)
 #define EXM_THROW(error, ...)                                             \
-{                                                                         \
+do {                                                                      \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                \
+    DISPLAYLEVEL(1, "Error %i : ", (error));                              \
     DISPLAYLEVEL(1, __VA_ARGS__);                                         \
     DISPLAYLEVEL(1, "\n");                                                \
     exit(error);                                                          \
-}
+} while(0)
 
 
 /*-************************************

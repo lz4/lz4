@@ -83,13 +83,13 @@ static U32 g_compressibilityDefault = 50;
 *  console display
 ***************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) do { if (g_displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while(0)
 static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 
-#define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
+#define DISPLAYUPDATE(l, ...) do { if (g_displayLevel>=(l)) \
             if ((clock() - g_time > refreshRate) || (g_displayLevel>=4)) \
             { g_time = clock(); DISPLAY(__VA_ARGS__); \
-            if (g_displayLevel>=4) fflush(stdout); } }
+            if (g_displayLevel>=4) fflush(stdout); } } while(0)
 static const clock_t refreshRate = CLOCKS_PER_SEC * 15 / 100;
 static clock_t g_time = 0;
 
@@ -100,15 +100,15 @@ static clock_t g_time = 0;
 #ifndef DEBUG
 #  define DEBUG 0
 #endif
-#define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
+#define DEBUGOUTPUT(...) do { if (DEBUG) DISPLAY(__VA_ARGS__); } while(0)
 #define EXM_THROW(error, ...)                                             \
-{                                                                         \
+do {                                                                      \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                \
+    DISPLAYLEVEL(1, "Error %i : ", (error));                              \
     DISPLAYLEVEL(1, __VA_ARGS__);                                         \
     DISPLAYLEVEL(1, "\n");                                                \
     exit(error);                                                          \
-}
+} while(0)
 
 
 /* *************************************
