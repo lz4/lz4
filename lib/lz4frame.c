@@ -764,7 +764,7 @@ LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** LZ4F_decompressionC
     return LZ4F_OK_NoError;
 }
 
-LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* const dctxPtr)
+LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctxPtr)
 {
     LZ4F_errorCode_t result = LZ4F_OK_NoError;
     if (dctxPtr != NULL) {   /* can accept NULL input, like free() */
