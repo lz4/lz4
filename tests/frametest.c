@@ -276,17 +276,25 @@ int basicTests(U32 seed, double compressibility)
             if (LZ4F_isError(errorCode)) goto _output_error;
             DISPLAYLEVEL(3, " %u  \n", (unsigned)errorCode);
 
-            DISPLAYLEVEL(3, "get FrameInfo on null input : ");
-            errorCode = LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize);
-            if (errorCode != (size_t)-LZ4F_ERROR_frameHeader_incomplete) goto _output_error;
-            DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(errorCode));
+            DISPLAYLEVEL(3, "LZ4F_getFrameInfo on zero-size input : ");
+            {   size_t nullSize = 0;
+                size_t const fiError = LZ4F_getFrameInfo(dCtx, &fi, ip, &nullSize);
+                if (LZ4F_getErrorCode(fiError) != LZ4F_ERROR_frameHeader_incomplete) {
+                    DISPLAYLEVEL(3, "incorrect error : %s != ERROR_frameHeader_incomplete \n", LZ4F_getErrorName(fiError));
+                    goto _output_error;
+                }
+                DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(fiError));
+            }
 
             DISPLAYLEVEL(3, "get FrameInfo on not enough input : ");
-            iSize = 6;
-            errorCode = LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize);
-            if (errorCode != (size_t)-LZ4F_ERROR_frameHeader_incomplete) goto _output_error;
-            DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(errorCode));
-            ip += iSize;
+            {   size_t inputSize = 6;
+                size_t const fiError = LZ4F_getFrameInfo(dCtx, &fi, ip, &inputSize);
+                if (LZ4F_getErrorCode(fiError) != LZ4F_ERROR_frameHeader_incomplete) {
+                    DISPLAYLEVEL(3, "incorrect error : %s != ERROR_frameHeader_incomplete \n", LZ4F_getErrorName(fiError));
+                    goto _output_error;
+                }
+                DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(fiError));
+            }
 
             DISPLAYLEVEL(3, "get FrameInfo on enough input : ");
             iSize = 15 - iSize;

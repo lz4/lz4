@@ -43,7 +43,7 @@ extern "C" {
 /* lz4frame_static.h should be used solely in the context of static linking.
  * It contains definitions which are not stable and may change in the future.
  * Never use it in the context of DLL linking.
- * */
+ */
 
 
 /* ---   Dependency   --- */
@@ -52,25 +52,32 @@ extern "C" {
 
 /* ---   Error List   --- */
 #define LZ4F_LIST_ERRORS(ITEM) \
-        ITEM(OK_NoError) ITEM(ERROR_GENERIC) \
-        ITEM(ERROR_maxBlockSize_invalid) ITEM(ERROR_blockMode_invalid) ITEM(ERROR_contentChecksumFlag_invalid) \
+        ITEM(OK_NoError) \
+        ITEM(ERROR_GENERIC) \
+        ITEM(ERROR_maxBlockSize_invalid) \
+        ITEM(ERROR_blockMode_invalid) \
+        ITEM(ERROR_contentChecksumFlag_invalid) \
         ITEM(ERROR_compressionLevel_invalid) \
-        ITEM(ERROR_headerVersion_wrong) ITEM(ERROR_blockChecksum_unsupported) ITEM(ERROR_reservedFlag_set) \
+        ITEM(ERROR_headerVersion_wrong) \
+        ITEM(ERROR_blockChecksum_unsupported) \
+        ITEM(ERROR_reservedFlag_set) \
         ITEM(ERROR_allocation_failed) \
-        ITEM(ERROR_srcSize_tooLarge) ITEM(ERROR_dstMaxSize_tooSmall) \
-        ITEM(ERROR_frameHeader_incomplete) ITEM(ERROR_frameType_unknown) ITEM(ERROR_frameSize_wrong) \
+        ITEM(ERROR_srcSize_tooLarge) \
+        ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_frameHeader_incomplete) \
+        ITEM(ERROR_frameType_unknown) \
+        ITEM(ERROR_frameSize_wrong) \
         ITEM(ERROR_srcPtr_wrong) \
         ITEM(ERROR_decompressionFailed) \
-        ITEM(ERROR_headerChecksum_invalid) ITEM(ERROR_contentChecksum_invalid) \
+        ITEM(ERROR_headerChecksum_invalid) \
+        ITEM(ERROR_contentChecksum_invalid) \
+        ITEM(ERROR_frameDecoding_alreadyStarted) \
         ITEM(ERROR_maxCode)
 
-#define LZ4F_DISABLE_OLD_ENUMS   /* comment to enable deprecated enums */
-#ifndef LZ4F_DISABLE_OLD_ENUMS
-#  define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM, ENUM = LZ4F_##ENUM,
-#else
-#  define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
-#endif
-typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;  /* enum is exposed, to handle specific errors; compare function result to -enum value */
+#define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
+
+/* enum list is exposed, to handle specific errors */
+typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;
 
 LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
