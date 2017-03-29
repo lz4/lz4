@@ -50,6 +50,15 @@ extern "C" {
 #include "lz4frame.h"
 
 
+/* ---   Experimental functions   --- */
+/* LZ4F_resetDecompressionContext() :
+ * LZ4F_decompress() does not guarantee to leave dctx in clean state in case of errors.
+ * In order to re-use a dctx after a decompression error,
+ * use LZ4F_resetDecompressionContext() first.
+ * dctx will be able to start decompression on a new frame */
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);
+
+
 /* ---   Error List   --- */
 #define LZ4F_LIST_ERRORS(ITEM) \
         ITEM(OK_NoError) \

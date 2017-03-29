@@ -792,6 +792,12 @@ typedef enum {
     dstage_skipSkippable
 } dStage_t;
 
+LZ4F_errorCode_t LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
+{
+    dctx->dStage = dstage_getHeader;
+    return 0;
+}
+
 
 /*! LZ4F_headerSize() :
 *   @return : size of frame header

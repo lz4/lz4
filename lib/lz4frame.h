@@ -300,7 +300,7 @@ typedef struct {
  * That is, it should be == 0 if decompression has been completed fully and correctly.
  */
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* const dctx);
+LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 
 
 /*-***********************************
@@ -309,12 +309,15 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* const dctx
 
 /*! LZ4F_getFrameInfo() :
  * This function extracts frame parameters (such as max blockSize, frame checksum, etc.).
- * Its usage is optional. The objective is to provide relevant information for allocation purposes.
+ * Its usage is optional. Extracted information can be useful for allocation purposes, typically.
  * This function works in 2 situations :
  *   - At the beginning of a new frame, in which case it will decode this information from `srcBuffer`, and start the decoding process.
- *     Amount of input data provided must be large enough to successfully decode the frame header.
- *     A header size is variable, but is guaranteed to be <= LZ4F_HEADER_SIZE_MAX bytes. It's possible to provide more input data than this minimum.
- *   - After decoding has been started. In which case, no input is read, frame parameters are extracted from dctx.
+ *     Input size must be large enough to successfully decode the entire frame header.
+ *     Frame header size is variable, but is guaranteed to be <= LZ4F_HEADER_SIZE_MAX bytes.
+ *     It's allowed to provide more input data than this minimum.
+ *   - After decoding has been started.
+ *     In which case, no input is read, frame parameters are extracted from dctx.
+ *     If decoding has just started, but not yet extracted information from header, LZ4F_getFrameInfo() will fail.
  * The number of bytes consumed from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
  * Decompression must resume from (srcBuffer + *srcSizePtr).
  * @return : an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
@@ -348,6 +351,7 @@ LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  * If decompression failed, @return is an error code, which can be tested using LZ4F_isError().
  *
  * After a frame is fully decoded, dctx can be used again to decompress another frame.
+ * After a decompression error, use LZ4F_resetDecompressionContext() before re-using dctx, to return to clean state.
  */
 LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    void* dstBuffer, size_t* dstSizePtr,
