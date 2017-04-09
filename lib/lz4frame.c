@@ -445,10 +445,11 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
         requiredBuffSize = (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) * 64 KB;   /* just needs dict */
 
     if (cctxPtr->maxBufferSize < requiredBuffSize) {
-        cctxPtr->maxBufferSize = requiredBuffSize;
+        cctxPtr->maxBufferSize = 0;
         FREEMEM(cctxPtr->tmpBuff);
         cctxPtr->tmpBuff = (BYTE*)ALLOCATOR(requiredBuffSize);
         if (cctxPtr->tmpBuff == NULL) return err0r(LZ4F_ERROR_allocation_failed);
+        cctxPtr->maxBufferSize = requiredBuffSize;
     }
     cctxPtr->tmpIn = cctxPtr->tmpBuff;
     cctxPtr->tmpInSize = 0;
