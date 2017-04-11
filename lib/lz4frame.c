@@ -316,11 +316,11 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBu
     BYTE* dstPtr = dstStart;
     BYTE* const dstEnd = dstStart + dstCapacity;
 
-    memset(&cctxI, 0, sizeof(cctxI));   /* works because no allocation */
+    memset(&cctxI, 0, sizeof(cctxI));
     memset(&options, 0, sizeof(options));
 
     cctxI.version = LZ4F_VERSION;
-    cctxI.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent allocation; works because autoflush==1 & stableSrc==1 */
+    cctxI.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works because autoflush==1 & stableSrc==1 */
 
     if (preferencesPtr!=NULL)
         prefs = *preferencesPtr;
@@ -332,7 +332,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBu
     if (prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
         cctxI.lz4CtxPtr = &lz4ctx;
         cctxI.lz4CtxLevel = 1;
-    }
+    }  /* otherwise : will be created within LZ4F_compressBegin */
 
     prefs.frameInfo.blockSizeID = LZ4F_optimalBSID(prefs.frameInfo.blockSizeID, srcSize);
     prefs.autoFlush = 1;
@@ -341,7 +341,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBu
 
     options.stableSrc = 1;
 
-    if (dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs))
+    if (dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs))   /* condition to guarantee success */
         return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
 
     { size_t const headerSize = LZ4F_compressBegin(&cctxI, dstBuffer, dstCapacity, &prefs);  /* write header */
@@ -356,7 +356,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBu
       if (LZ4F_isError(tailSize)) return tailSize;
       dstPtr += tailSize; }
 
-    if (prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)   /* no allocation done with lz4 fast */
+    if (prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)   /* Ctx allocation only for lz4hc */
         FREEMEM(cctxI.lz4CtxPtr);
 
     return (dstPtr - dstStart);
@@ -423,7 +423,7 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
     if (preferencesPtr == NULL) preferencesPtr = &prefNull;
     cctxPtr->prefs = *preferencesPtr;
 
-    /* ctx Management */
+    /* Ctx Management */
     {   U32 const tableID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
         if (cctxPtr->lz4CtxLevel < tableID) {
             FREEMEM(cctxPtr->lz4CtxPtr);
@@ -431,6 +431,7 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStream();
             else
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStreamHC();
+            if (cctxPtr->lz4CtxPtr == NULL) return err0r(LZ4F_ERROR_allocation_failed);
             cctxPtr->lz4CtxLevel = tableID;
         }
     }
@@ -444,10 +445,11 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
         requiredBuffSize = (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) * 64 KB;   /* just needs dict */
 
     if (cctxPtr->maxBufferSize < requiredBuffSize) {
-        cctxPtr->maxBufferSize = requiredBuffSize;
+        cctxPtr->maxBufferSize = 0;
         FREEMEM(cctxPtr->tmpBuff);
         cctxPtr->tmpBuff = (BYTE*)ALLOCATOR(requiredBuffSize);
         if (cctxPtr->tmpBuff == NULL) return err0r(LZ4F_ERROR_allocation_failed);
+        cctxPtr->maxBufferSize = requiredBuffSize;
     }
     cctxPtr->tmpIn = cctxPtr->tmpBuff;
     cctxPtr->tmpInSize = 0;
@@ -515,14 +517,14 @@ static size_t LZ4F_compressBlock(void* dst, const void* src, size_t srcSize, com
 
 static int LZ4F_localLZ4_compress_limitedOutput_withState(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level)
 {
-    (void) level;
-    return LZ4_compress_fast_extState(ctx, src, dst, srcSize, dstCapacity, 1);
+    int const acceleration = (level < -1) ? -level : 1;
+    return LZ4_compress_fast_extState(ctx, src, dst, srcSize, dstCapacity, acceleration);
 }
 
 static int LZ4F_localLZ4_compress_limitedOutput_continue(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level)
 {
-    (void) level;
-    return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, 1);
+    int const acceleration = (level < -1) ? -level : 1;
+    return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
 }
 
 static int LZ4F_localLZ4_compressHC_limitedOutput_continue(void* ctx, const char* src, char* dst, int srcSize, int dstSize, int level)
@@ -617,7 +619,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapaci
         if (compressOptionsPtr->stableSrc) {
             cctxPtr->tmpIn = cctxPtr->tmpBuff;
         } else {
-            int realDictSize = LZ4F_localSaveDict(cctxPtr);
+            int const realDictSize = LZ4F_localSaveDict(cctxPtr);
             if (realDictSize==0) return err0r(LZ4F_ERROR_GENERIC);
             cctxPtr->tmpIn = cctxPtr->tmpBuff + realDictSize;
         }
@@ -627,7 +629,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapaci
     if ((cctxPtr->tmpIn + blockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize)   /* necessarily LZ4F_blockLinked && lastBlockCompressed==fromTmpBuffer */
         && !(cctxPtr->prefs.autoFlush))
     {
-        int realDictSize = LZ4F_localSaveDict(cctxPtr);
+        int const realDictSize = LZ4F_localSaveDict(cctxPtr);
         cctxPtr->tmpIn = cctxPtr->tmpBuff + realDictSize;
     }
 

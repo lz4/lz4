@@ -167,7 +167,7 @@ typedef struct {
  * All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
-  int      compressionLevel;       /* 0 == default (fast mode); values above LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values below 0 count as 0 */
+  int      compressionLevel;       /* 0 == default (fast mode); values above LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values below 0 trigger "fast acceleration", proportional to value */
   unsigned autoFlush;              /* 1 == always flush (reduce usage of tmp buffer) */
   unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;

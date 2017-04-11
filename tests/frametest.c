@@ -218,6 +218,16 @@ int basicTests(U32 seed, double compressibility)
 
     /* test one-pass frame compression */
     testSize = COMPRESSIBLE_NOISE_LENGTH;
+
+    DISPLAYLEVEL(3, "LZ4F_compressFrame, using fast level -3 : ");
+    {   LZ4F_preferences_t fastCompressPrefs;
+        memset(&fastCompressPrefs, 0, sizeof(fastCompressPrefs));
+        fastCompressPrefs.compressionLevel = -3;
+        cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, &fastCompressPrefs);
+        if (LZ4F_isError(cSize)) goto _output_error;
+        DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
+    }
+
     DISPLAYLEVEL(3, "LZ4F_compressFrame, using default preferences : ");
     cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
     if (LZ4F_isError(cSize)) goto _output_error;
@@ -618,7 +628,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)(FUZ_rand(&randState) & 1);
         prefs.frameInfo.contentSize = ((FUZ_rand(&randState) & 0xF) == 1) ? srcSize : 0;
         prefs.autoFlush = neverFlush ? 0 : (FUZ_rand(&randState) & 7) == 2;
-        prefs.compressionLevel = FUZ_rand(&randState) % 5;
+        prefs.compressionLevel = -5 + (int)(FUZ_rand(&randState) % 11);
         if ((FUZ_rand(&randState) & 0xF) == 1) prefsPtr = NULL;
 
         DISPLAYUPDATE(2, "\r%5u   ", testNb);
