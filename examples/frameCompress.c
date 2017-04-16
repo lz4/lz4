@@ -53,6 +53,14 @@ static size_t compress_file(FILE *in, FILE *out, size_t *size_in, size_t *size_o
 	}
 
 	printf("Buffer size is %zu bytes, header size %zu bytes\n", size, n);
+	k = fwrite(buf, 1, offset, out);
+	if (k < offset) {
+		if (ferror(out))
+			printf("Write failed");
+		else
+			printf("Short write");
+		goto cleanup;
+	}
 
 	for (;;) {
 		k = fread(src, 1, BUF_SIZE, in);
