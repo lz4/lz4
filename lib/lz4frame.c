@@ -1440,3 +1440,16 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
     *dstSizePtr = (dstPtr - dstStart);
     return nextSrcSizeHint;
 }
+
+
+
+/* LZ4F_disableChecksum()
+* Call this function to allow you to read compressed blocks out of order.
+*/
+void LZ4F_disableChecksum(LZ4F_decompressionContext_t decompressionContext)
+{
+    LZ4F_dctx_t* dctxPtr = (LZ4F_dctx_t*)decompressionContext;
+
+    dctxPtr->frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
+}
+
