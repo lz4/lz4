@@ -75,12 +75,16 @@ extern "C" {
 #  define LZ4FLIB_API
 #endif
 
-#if defined(_MSC_VER)
-#  define LZ4F_DEPRECATE(x) x   /* __declspec(deprecated) x - only works with C++ */
-#elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 6))
-#  define LZ4F_DEPRECATE(x) x __attribute__((deprecated))
+#ifdef LZ4F_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4F_DEPRECATE(x) x
 #else
-#  define LZ4F_DEPRECATE(x) x   /* no deprecation warning for this compiler */
+#  if defined(_MSC_VER)
+#    define LZ4F_DEPRECATE(x) x   /* __declspec(deprecated) x - only works with C++ */
+#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 6))
+#    define LZ4F_DEPRECATE(x) x __attribute__((deprecated))
+#  else
+#    define LZ4F_DEPRECATE(x) x   /* no deprecation warning for this compiler */
+#  endif
 #endif
 
 
