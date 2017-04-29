@@ -58,8 +58,8 @@ extern "C" {
  * `dst` must be already allocated.
  * Compression is guaranteed to succeed if `dstCapacity >= LZ4_compressBound(srcSize)` (see "lz4.h")
  * Max supported `srcSize` value is LZ4_MAX_INPUT_SIZE (see "lz4.h")
- * `compressionLevel` : Recommended values are between 4 and 9, although any value between 1 and LZ4HC_MAX_CLEVEL will work.
- *                      Values >LZ4HC_MAX_CLEVEL behave the same as LZ4HC_MAX_CLEVEL.
+ * `compressionLevel` : Recommended values are between 4 and 9, although any value between 1 and LZ4HC_CLEVEL_MAX will work.
+ *                      Values >LZ4HC_CLEVEL_MAX behave the same as LZ4HC_CLEVEL_MAX.
  * @return : the number of bytes written into 'dst'
  *           or 0 if compression fails.
  */
