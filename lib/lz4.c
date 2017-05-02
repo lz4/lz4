@@ -37,12 +37,12 @@
 *  Tuning parameters
 **************************************/
 /*
- * HEAPMODE :
+ * LZ4_HEAPMODE :
  * Select how default compression functions will allocate memory for their hash table,
  * in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
  */
-#ifndef HEAPMODE
-#  define HEAPMODE 0
+#ifndef LZ4_HEAPMODE
+#  define LZ4_HEAPMODE 0
 #endif
 
 /*
@@ -677,7 +677,7 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 
 int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctx;
@@ -686,7 +686,7 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 
     int const result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     FREEMEM(ctxPtr);
 #endif
     return result;
@@ -890,7 +890,7 @@ static int LZ4_compress_destSize_extState (LZ4_stream_t* state, const char* src,
 
 int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targetDstSize)
 {
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     LZ4_stream_t* ctx = (LZ4_stream_t*)ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctxBody;
@@ -899,7 +899,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 
     int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
 
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     FREEMEM(ctx);
 #endif
     return result;

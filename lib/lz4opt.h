@@ -49,11 +49,12 @@ typedef struct {
 } LZ4HC_optimal_t;
 
 
-/* price in bits */
+/* price in bytes */
 FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
 {
     size_t price = litlen;
-    if (litlen >= (size_t)RUN_MASK) price += 1 + (litlen-RUN_MASK)/255;
+    if (litlen >= (size_t)RUN_MASK)
+        price += 1 + (litlen-RUN_MASK)/255;
     return price;
 }
 
@@ -66,7 +67,7 @@ FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
     price += LZ4HC_literalsPrice(litlen);
 
     if (mlen >= (size_t)(ML_MASK+MINMATCH))
-        price+= 1+(mlen-(ML_MASK+MINMATCH))/255;
+        price+= 1 + (mlen-(ML_MASK+MINMATCH))/255;
 
     return price;
 }
@@ -232,7 +233,7 @@ static int LZ4HC_compress_optimal (
         size_t const llen = ip - anchor;
         size_t last_pos = 0;
         size_t match_num, cur, best_mlen, best_off;
-        memset(opt, 0, sizeof(LZ4HC_optimal_t));
+        memset(opt, 0, sizeof(LZ4HC_optimal_t));  /* memset only the first one */
 
         match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
         if (!match_num) { ip++; continue; }
@@ -279,7 +280,7 @@ static int LZ4HC_compress_optimal (
                 }
 
                 if (price < (size_t)opt[cur].price)
-                    SET_PRICE(cur, 1, 0, litlen, price);   /* note : increases last_pos */
+                    SET_PRICE(cur, 1 /*mlen*/, 0 /*off*/, litlen, price);   /* note : increases last_pos */
             }
 
             if (cur == last_pos || curPtr >= mflimit) break;
@@ -331,7 +332,7 @@ encode: /* cur, last_pos, best_mlen, best_off must be set */
             opt[cur].off = (int)best_off;
             best_mlen = ml;
             best_off = offset;
-            if (ml > cur) break;
+            if (ml > cur) break;   /* can this happen ? */
             cur -= ml;
         }
 
