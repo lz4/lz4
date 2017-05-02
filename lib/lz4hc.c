@@ -69,9 +69,9 @@
 
 
 /*===   Macros   ===*/
-#define HASH_FUNCTION(i)       (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
-#define DELTANEXTMAXD(p)       chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
-#define DELTANEXTU16(p)        chainTable[(U16)(p)]   /* faster */
+#define HASH_FUNCTION(i)         (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
+#define DELTANEXTMAXD(p)         chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
+#define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
@@ -106,7 +106,7 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
         U32 const h = LZ4HC_hashPtr(base+idx);
         size_t delta = idx - hashTable[h];
         if (delta>MAX_DISTANCE) delta = MAX_DISTANCE;
-        DELTANEXTU16(idx) = (U16)delta;
+        DELTANEXTU16(chainTable, idx) = (U16)delta;
         hashTable[h] = idx;
         idx++;
     }
@@ -115,8 +115,8 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
 }
 
 
-FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* Index table will be updated */
-                                               const BYTE* ip, const BYTE* const iLimit,
+FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
+                                               const BYTE* const ip, const BYTE* const iLimit,
                                                const BYTE** matchpos,
                                                const int maxNbAttempts)
 {
@@ -138,8 +138,8 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* In
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             const BYTE* const match = base + matchIndex;
-            if (*(match+ml) == *(ip+ml)
-                && (LZ4_read32(match) == LZ4_read32(ip)))
+            if ( (*(match+ml) == *(ip+ml))   /* can be longer */
+               && (LZ4_read32(match) == LZ4_read32(ip)) )
             {
                 size_t const mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
                 if (mlt > ml) { ml = mlt; *matchpos = match; }
@@ -156,7 +156,7 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* hc4,   /* In
                 if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   /* virtual matchpos */
             }
         }
-        matchIndex -= DELTANEXTU16(matchIndex);
+        matchIndex -= DELTANEXTU16(chainTable, matchIndex);
     }
 
     return (int)ml;
@@ -180,9 +180,9 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     const BYTE* const lowPrefixPtr = base + dictLimit;
     const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
     const BYTE* const dictBase = hc4->dictBase;
-    U32   matchIndex;
+    int const delta = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
-    int delta = (int)(ip-iLowLimit);
+    U32   matchIndex;
 
 
     /* First Match */
@@ -206,14 +206,14 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                     mlt -= back;
 
                     if (mlt > longest) {
-                        longest = (int)mlt;
+                        longest = mlt;
                         *matchpos = matchPtr+back;
                         *startpos = ip+back;
             }   }   }
         } else {
             const BYTE* const matchPtr = dictBase + matchIndex;
             if (LZ4_read32(matchPtr) == LZ4_read32(ip)) {
-                size_t mlt;
+                int mlt;
                 int back=0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
@@ -222,10 +222,10 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                     mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
                 while ((ip+back > iLowLimit) && (matchIndex+back > lowLimit) && (ip[back-1] == matchPtr[back-1])) back--;
                 mlt -= back;
-                if ((int)mlt > longest) { longest = (int)mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
+                if (mlt > longest) { longest = mlt; *matchpos = base + matchIndex + back; *startpos = ip+back; }
             }
         }
-        matchIndex -= DELTANEXTU16(matchIndex);
+        matchIndex -= DELTANEXTU16(chainTable, matchIndex);
     }
 
     return longest;
@@ -238,11 +238,9 @@ typedef enum {
     limitedDestSize = 2,
 } limitedOutput_directive;
 
-#define LZ4HC_DEBUG 0
-#if LZ4HC_DEBUG
-static unsigned debug = 0;
+#ifndef LZ4HC_DEBUG
+#  define LZ4HC_DEBUG 0
 #endif
-
 
 /* LZ4HC_encodeSequence() :
  * @return : 0 if ok,
@@ -257,15 +255,15 @@ FORCE_INLINE int LZ4HC_encodeSequence (
     BYTE* oend)
 {
     size_t length;
-    BYTE* token;
+    BYTE* const token = (*op)++;
 
 #if LZ4HC_DEBUG
-    if (debug) printf("literal : %u  --  match : %u  --  offset : %u\n", (U32)(*ip - *anchor), (U32)matchLength, (U32)(*ip-match));
+    printf("literal : %u  --  match : %u  --  offset : %u\n",
+           (U32)(*ip - *anchor), (U32)matchLength, (U32)(*ip-match));
 #endif
 
     /* Encode Literal length */
     length = (size_t)(*ip - *anchor);
-    token = (*op)++;
     if ((limit) && ((*op + (length >> 8) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;   /* Check output limit */
     if (length >= RUN_MASK) {
         size_t len = length - RUN_MASK;
