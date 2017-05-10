@@ -290,7 +290,8 @@ int basicTests(U32 seed, double compressibility)
             {   size_t nullSize = 0;
                 size_t const fiError = LZ4F_getFrameInfo(dCtx, &fi, ip, &nullSize);
                 if (LZ4F_getErrorCode(fiError) != LZ4F_ERROR_frameHeader_incomplete) {
-                    DISPLAYLEVEL(3, "incorrect error : %s != ERROR_frameHeader_incomplete \n", LZ4F_getErrorName(fiError));
+                    DISPLAYLEVEL(3, "incorrect error : %s != ERROR_frameHeader_incomplete \n",
+                                    LZ4F_getErrorName(fiError));
                     goto _output_error;
                 }
                 DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(fiError));

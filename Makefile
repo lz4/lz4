@@ -56,7 +56,10 @@ endif
 default: lib lz4-release
 
 .PHONY: all
-all: default examples manuals
+all: allmost manuals
+
+.PHONY: allmost
+allmost: lib lz4 examples
 
 .PHONY: lib
 lib:
@@ -68,7 +71,7 @@ lz4 lz4-release: lib
 	@cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
-examples: lib lz4-release
+examples: lib lz4
 	$(MAKE) -C $(EXDIR) test
 
 .PHONY: manuals
@@ -115,6 +118,10 @@ endif
 #make tests validated only for MSYS, Linux, OSX, kFreeBSD and Hurd targets
 #------------------------------------------------------------------------
 ifneq (,$(filter $(HOST_OS),MSYS POSIX))
+
+.PHONY: list
+list:
+	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 .PHONY: test
 test:
@@ -166,13 +173,10 @@ gpptest32: clean
 	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
 
 c_standards: clean
-	$(MAKE) all MOREFLAGS="-std=gnu90 -Werror"
-	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=c99 -Werror"
-	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=gnu99 -Werror"
-	$(MAKE) clean
-	$(MAKE) all MOREFLAGS="-std=c11 -Werror"
-	$(MAKE) clean
+	# note : lz4 is not C90 compatible, because it requires long long support
+	CFLAGS="-std=gnu90 -Werror" $(MAKE) clean allmost
+	CFLAGS="-std=c99   -Werror" $(MAKE) clean allmost
+	CFLAGS="-std=gnu99 -Werror" $(MAKE) clean allmost
+	CFLAGS="-std=c11   -Werror" $(MAKE) clean allmost
 
 endif
