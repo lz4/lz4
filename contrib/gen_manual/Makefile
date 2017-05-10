@@ -35,7 +35,15 @@ CFLAGS += -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow -Wstrict-aliasing=1 -W
 CFLAGS += $(MOREFLAGS)
 FLAGS   = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
-
+LZ4API = ../../lib/lz4.h
+LZ4MANUAL = ../../doc/lz4_manual.html
+LZ4FAPI = ../../lib/lz4frame.h
+LZ4FMANUAL = ../../doc/lz4frame_manual.html
+LIBVER_MAJOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
+LIBVER_MINOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
+LIBVER_PATCH_SCRIPT:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
+LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCRIPT)
+LZ4VER := $(shell echo $(LIBVER_SCRIPT))
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -45,14 +53,24 @@ EXT =
 endif
 
 
-.PHONY: default gen_manual
-
+.PHONY: default
 default: gen_manual
 
 gen_manual: gen_manual.cpp
-	$(CXX)      $(FLAGS) $^ -o $@$(EXT)
+	$(CXX) $(FLAGS) $^ -o $@$(EXT)
 
+$(LZ4MANUAL) : gen_manual $(LZ4API)
+	echo "Update lz4 manual in /doc"
+	./gen_manual $(LZ4VER) $(LZ4API) $@
 
+$(LZ4FMANUAL) : gen_manual $(LZ4FAPI)
+	echo "Update lz4frame manual in /doc"
+	./gen_manual $(LZ4VER) $(LZ4FAPI) $@
+
+.PHONY: manuals
+manuals: gen_manual $(LZ4MANUAL) $(LZ4FMANUAL)
+
+.PHONY: clean
 clean:
 	@$(RM) gen_manual$(EXT)
 	@echo Cleaning completed

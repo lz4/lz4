@@ -363,7 +363,7 @@ LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    const LZ4F_decompressOptions_t* dOptPtr);
 
 
-/*! LZ4F_resetDecompressionContext() :
+/*! LZ4F_resetDecompressionContext() : v1.8.0
  *  When decompression ends successfully,
  *  it's possible to start a new decompression immediately
  *  re-using the same context.
