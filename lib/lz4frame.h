@@ -363,6 +363,14 @@ LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    const LZ4F_decompressOptions_t* dOptPtr);
 
 
+/*! LZ4F_resetDecompressionContext() : v1.8.0
+ *  In case of an error, the context is left in "undefined" state.
+ *  In which case, it's necessary to reset it, before re-using it.
+ *  This method can also be used to abruptly stop an unfinished decompression,
+ *  and start a new with the same context. */
+LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always successful */
+
+
 
 #if defined (__cplusplus)
 }

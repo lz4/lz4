@@ -40,6 +40,7 @@
 #include <stdio.h>      /* fprintf */
 #include <string.h>     /* strcmp */
 #include <time.h>       /* clock_t, clock(), CLOCKS_PER_SEC */
+#include <assert.h>
 #include "lz4frame_static.h"
 #include "lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
@@ -67,7 +68,6 @@ static void FUZ_writeLE32 (void* dstVoidPtr, U32 value32)
 #define GB *(1U<<30)
 
 static const U32 nbTestsDefault = 256 KB;
-#define COMPRESSIBLE_NOISE_LENGTH (2 MB)
 #define FUZ_COMPRESSIBILITY_DEFAULT 50
 static const U32 prime1 = 2654435761U;
 static const U32 prime2 = 2246822519U;
@@ -166,7 +166,7 @@ static unsigned FUZ_highbit(U32 v32)
 *********************************************************/
 int basicTests(U32 seed, double compressibility)
 {
-    int testResult = 0;
+#define COMPRESSIBLE_NOISE_LENGTH (2 MB)
     void* const CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
     size_t const cBuffSize = LZ4F_compressFrameBound(COMPRESSIBLE_NOISE_LENGTH, NULL);
     void* const compressedBuffer = malloc(cBuffSize);
@@ -176,9 +176,10 @@ int basicTests(U32 seed, double compressibility)
     LZ4F_decompressionContext_t dCtx = NULL;
     LZ4F_compressionContext_t cctx = NULL;
     U64 crcOrig;
-
+    int basicTests_error = 0;
     LZ4F_preferences_t prefs;
     memset(&prefs, 0, sizeof(prefs));
+
     if (!CNBuffer || !compressedBuffer || !decodedBuffer) {
         DISPLAY("allocation error, not enough memory to start fuzzer tests \n");
         goto _output_error;
@@ -198,7 +199,7 @@ int basicTests(U32 seed, double compressibility)
     DISPLAYLEVEL(3, "LZ4F_compressFrame, compress null content : ");
     cSize = LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL);
     if (LZ4F_isError(cSize)) goto _output_error;
-    DISPLAYLEVEL(3, "Compressed null content into a %i bytes frame \n", (int)cSize);
+    DISPLAYLEVEL(3, "null content encoded into a %u bytes frame \n", (unsigned)cSize);
 
     DISPLAYLEVEL(3, "LZ4F_createDecompressionContext \n");
     { LZ4F_errorCode_t const errorCode = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
@@ -236,8 +237,6 @@ int basicTests(U32 seed, double compressibility)
     DISPLAYLEVEL(3, "Decompression test : \n");
     {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
         size_t compressedBufferSize = cSize;
-        BYTE* ip = (BYTE*)compressedBuffer;
-        BYTE* const iend = (BYTE*)compressedBuffer + cSize;
 
         LZ4F_errorCode_t errorCode = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
         if (LZ4F_isError(errorCode)) goto _output_error;
@@ -280,6 +279,7 @@ int basicTests(U32 seed, double compressibility)
         {   size_t oSize = 0;
             size_t iSize = 0;
             LZ4F_frameInfo_t fi;
+            const BYTE* ip = (BYTE*)compressedBuffer;
 
             DISPLAYLEVEL(3, "Start by feeding 0 bytes, to get next input size : ");
             errorCode = LZ4F_decompress(dCtx, NULL, &oSize, ip, &iSize, NULL);
@@ -290,7 +290,8 @@ int basicTests(U32 seed, double compressibility)
             {   size_t nullSize = 0;
                 size_t const fiError = LZ4F_getFrameInfo(dCtx, &fi, ip, &nullSize);
                 if (LZ4F_getErrorCode(fiError) != LZ4F_ERROR_frameHeader_incomplete) {
-                    DISPLAYLEVEL(3, "incorrect error : %s != ERROR_frameHeader_incomplete \n", LZ4F_getErrorName(fiError));
+                    DISPLAYLEVEL(3, "incorrect error : %s != ERROR_frameHeader_incomplete \n",
+                                    LZ4F_getErrorName(fiError));
                     goto _output_error;
                 }
                 DISPLAYLEVEL(3, " correctly failed : %s \n", LZ4F_getErrorName(fiError));
@@ -314,10 +315,30 @@ int basicTests(U32 seed, double compressibility)
             ip += iSize;
         }
 
+        DISPLAYLEVEL(3, "Decode a buggy input : ");
+        assert(COMPRESSIBLE_NOISE_LENGTH > 64);
+        assert(cSize > 48);
+        memcpy(decodedBuffer, (char*)compressedBuffer+16, 32);  /* save correct data */
+        memcpy((char*)compressedBuffer+16, (const char*)decodedBuffer+32, 32);  /* insert noise */
+        {   size_t dbSize = COMPRESSIBLE_NOISE_LENGTH;
+            size_t cbSize = cSize;
+            size_t const decompressError = LZ4F_decompress(dCtx, decodedBuffer, &dbSize,
+                                                               compressedBuffer, &cbSize,
+                                                               NULL);
+            if (!LZ4F_isError(decompressError)) goto _output_error;
+            DISPLAYLEVEL(3, "error detected : %s \n", LZ4F_getErrorName(decompressError));
+        }
+        memcpy((char*)compressedBuffer+16, decodedBuffer, 32);  /* restore correct data */
+
+        DISPLAYLEVEL(3, "Reset decompression context, since it's left in error state \n");
+        LZ4F_resetDecompressionContext(dCtx);   /* always successful */
+
         DISPLAYLEVEL(3, "Byte after byte : ");
         {   BYTE* const ostart = (BYTE*)decodedBuffer;
             BYTE* op = ostart;
             BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
+            const BYTE* ip = (const BYTE*) compressedBuffer;
+            const BYTE* const iend = ip + cSize;
             while (ip < iend) {
                 size_t oSize = oend-op;
                 size_t iSize = 1;
@@ -329,11 +350,7 @@ int basicTests(U32 seed, double compressibility)
             { U64 const crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
               if (crcDest != crcOrig) goto _output_error; }
             DISPLAYLEVEL(3, "Regenerated %u/%u bytes \n", (unsigned)(op-ostart), COMPRESSIBLE_NOISE_LENGTH);
-            }
-
-        errorCode = LZ4F_freeDecompressionContext(dCtx);
-        if (LZ4F_isError(errorCode)) goto _output_error;
-        dCtx = NULL;
+        }
     }
 
     DISPLAYLEVEL(3, "Using 64 KB block : ");
@@ -364,9 +381,6 @@ int basicTests(U32 seed, double compressibility)
         BYTE* const oend = ostart + COMPRESSIBLE_NOISE_LENGTH;
         const BYTE* ip = (const BYTE*)compressedBuffer;
         const BYTE* const iend = (const BYTE*)compressedBuffer + cSize;
-
-        { LZ4F_errorCode_t const createError = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
-          if (LZ4F_isError(createError)) goto _output_error; }
 
         DISPLAYLEVEL(3, "random segment sizes : ");
         while (ip < iend) {
@@ -551,10 +565,10 @@ _end:
     free(decodedBuffer);
     LZ4F_freeDecompressionContext(dCtx); dCtx = NULL;
     LZ4F_freeCompressionContext(cctx); cctx = NULL;
-    return testResult;
+    return basicTests_error;
 
 _output_error:
-    testResult = 1;
+    basicTests_error = 1;
     DISPLAY("Error detected ! \n");
     goto _end;
 }

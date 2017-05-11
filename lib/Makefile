@@ -46,10 +46,10 @@ BUILD_STATIC:= yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
-DEBUGFLAGS:=-g -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
+DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
            -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(MOREFLAGS)
+CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS    = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 
@@ -70,12 +70,13 @@ endif
 
 LIBLZ4 = liblz4.$(SHARED_EXT_VER)
 
+.PHONY: default
 default: lib-release
 
-lib-release: liblz4.a liblz4
+lib-release: DEBUGFLAGS :=
+lib-release: lib
 
-lib: CFLAGS += $(DEBUGFLAGS)
-lib: lib-release
+lib: liblz4.a liblz4
 
 all: lib
 
@@ -83,7 +84,7 @@ all32: CFLAGS+=-m32
 all32: all
 
 liblz4.a: *.c
-ifeq ($(BUILD_STATIC),yes)
+ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs $@ *.o

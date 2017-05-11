@@ -51,7 +51,7 @@ CFLAGS  ?= -O3
 DEBUGFLAGS:=-g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(MOREFLAGS)
+CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 LZ4_VERSION=$(LIBVER)
@@ -75,27 +75,16 @@ all: lz4 lz4c
 all32: CFLAGS+=-m32
 all32: all
 
-lz4: CFLAGS += $(DEBUGFLAGS)
 lz4: $(OBJFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 lz4-release: DEBUGFLAGS=
 lz4-release: lz4
 
-lz4c  : CFLAGS += $(DEBUGFLAGS)
-lz4c  : $(SRCFILES)
-	$(CC) $(FLAGS) -DENABLE_LZ4C_LEGACY_OPTIONS $^ -o $@$(EXT)
-
-lz4c32: CFLAGS += -m32 $(DEBUGFLAGS)
-lz4c32: $(SRCFILES)
+lz4c32: CFLAGS += -m32
+lz4c: CPPFLAGS += -DENABLE_LZ4C_LEGACY_OPTIONS
+lz4c lz4c32 : $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
-
-clean:
-	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
-	@$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4 lz4cat
-	@echo Cleaning completed
-
 
 lz4.1: lz4.1.md
 	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
@@ -108,6 +97,12 @@ clean-man:
 preview-man: clean-man man
 	man ./lz4.1
 
+clean:
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	@$(RM) core *.o *.test tmp* \
+           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4 lz4cat
+	@echo Cleaning completed
+
 
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
@@ -119,7 +114,6 @@ unlz4: lz4
 
 lz4cat: lz4
 	ln -s lz4 lz4cat
-
 
 ifneq (,$(filter $(shell uname),SunOS))
 INSTALL ?= ginstall
