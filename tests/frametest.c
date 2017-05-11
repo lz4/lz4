@@ -337,7 +337,7 @@ int basicTests(U32 seed, double compressibility)
         {   BYTE* const ostart = (BYTE*)decodedBuffer;
             BYTE* op = ostart;
             BYTE* const oend = (BYTE*)decodedBuffer + COMPRESSIBLE_NOISE_LENGTH;
-            const BYTE* ip = compressedBuffer;
+            const BYTE* ip = (const BYTE*) compressedBuffer;
             const BYTE* const iend = ip + cSize;
             while (ip < iend) {
                 size_t oSize = oend-op;
