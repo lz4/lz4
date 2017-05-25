@@ -1,7 +1,7 @@
 LZ4 Frame Format Description
 ============================
 
-###Notices
+### Notices
 
 Copyright (c) 2013-2015 Yann Collet
 
@@ -14,7 +14,7 @@ and that any substantive changes or deletions from the original
 are clearly marked.
 Distribution of this document is unlimited.
 
-###Version
+### Version
 
 1.5.1 (31/03/2015)
 
