@@ -258,14 +258,22 @@ static int exeNameMatch(const char* exeName, const char* test)
 }
 
 /*! readU32FromChar() :
-    @return : unsigned integer value reach from input in `char` format
+    @return : unsigned integer value read from input in `char` format
+    allows and interprets K, KB, KiB, M, MB and MiB suffix.
     Will also modify `*stringPtr`, advancing it to position where it stopped reading.
-    Note : this function can overflow if result > MAX_UINT */
+    Note : function result can overflow if digit string > MAX_UINT */
 static unsigned readU32FromChar(const char** stringPtr)
 {
     unsigned result = 0;
     while ((**stringPtr >='0') && (**stringPtr <='9'))
         result *= 10, result += **stringPtr - '0', (*stringPtr)++ ;
+    if ((**stringPtr=='K') || (**stringPtr=='M')) {
+        result <<= 10;
+        if (**stringPtr=='M') result <<= 10;
+        (*stringPtr)++ ;
+        if (**stringPtr=='i') (*stringPtr)++;
+        if (**stringPtr=='B') (*stringPtr)++;
+    }
     return result;
 }
 
