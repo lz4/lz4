@@ -1,0 +1,34 @@
+language: ruby
+
+cache: bundler
+
+sudo: false
+
+script: "bundle exec rspec spec"
+before_deploy: ruby script/build_s3_index_html.rb
+
+deploy:
+  provider: s3
+  access_key_id:
+    secure: bxFEFpuTK00a/ZKQJK9B3ausZweNSd5ZmaeKSk9ozSkaXtqIQEt56C3hlq62PEyltXnnZhirbtYjw9QIrgggMhupKQCkwXEB7l/zgq/y9BDjDNZK8PW2YsJUkLIM5K3hITbW2zgWLJX7zic9W0EHQdoSZ7NW4FlNg47FlyIIJss=
+  secret_access_key:
+    secure: XZWMXcs2XxJwyQw/uEQbXNADwfzP7R5dGRzSrM8xvA6ErgIEh+ZcMuT7p7iPPWyaGUO9+MOTqM9HqdBcUuigGH4Vqn1e4MQ/LQsxAQWyuostzjuuo7k2q8OgOIXwcvg1+4LaVA4b4GQftw3lqkQ09Xa7yB/X8Y2/IlzpbbpB2YY=
+  bucket: travis-build-examples
+  local-dir: examples
+  skip-cleanup: true
+  endpoint: travis-build-examples.s3-website-us-east-1.amazonaws.com
+  region: us-east-1
+  on:
+    branch: master
+
+# addons:
+#   artifacts:
+#     debug: yep
+#     permissions: public-read
+#     paths:
+#       - examples
+#     bucket: travis-build-examples
+#     key:
+#       secure: bxFEFpuTK00a/ZKQJK9B3ausZweNSd5ZmaeKSk9ozSkaXtqIQEt56C3hlq62PEyltXnnZhirbtYjw9QIrgggMhupKQCkwXEB7l/zgq/y9BDjDNZK8PW2YsJUkLIM5K3hITbW2zgWLJX7zic9W0EHQdoSZ7NW4FlNg47FlyIIJss=
+#     secret:
+#       secure: XZWMXcs2XxJwyQw/uEQbXNADwfzP7R5dGRzSrM8xvA6ErgIEh+ZcMuT7p7iPPWyaGUO9+MOTqM9HqdBcUuigGH4Vqn1e4MQ/LQsxAQWyuostzjuuo7k2q8OgOIXwcvg1+4LaVA4b4GQftw3lqkQ09Xa7yB/X8Y2/IlzpbbpB2YY=
