@@ -75,6 +75,7 @@ int main(void) {
   // where the regen_buffer memory location is, and how large regen_buffer (uncompressed) output will be.
   // Again, save the return_value.
   const int decompressed_size = LZ4_decompress_safe(compressed_data, regen_buffer, compressed_data_size, src_size);
+  free(compressed_data);   /* no longer useful */
   if (decompressed_size < 0)
     run_screaming("A negative result from LZ4_decompress_safe indicates a failure trying to decompress the data.  See exit code (echo $?) for value returned.", decompressed_size);
   if (decompressed_size == 0)
