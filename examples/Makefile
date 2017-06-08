@@ -27,9 +27,10 @@
 # kindly provided by Takayuki Matsuoka
 # ##########################################################################
 
-CFLAGS ?= -O3
-CFLAGS += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
-FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+CPPFLAGS += -I../lib
+CFLAGS   ?= -O3
+CFLAGS   += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
+FLAGS    := $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 TESTFILE= Makefile
 LZ4DIR := ../lib
@@ -48,7 +49,8 @@ endif
 
 default: all
 
-all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC lineCompress frameCompress
+all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC \
+     lineCompress frameCompress simpleBuffer
 
 printVersion: $(LZ4DIR)/lz4.c printVersion.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
@@ -85,6 +87,7 @@ test : all
 	./ringBufferHC$(EXT) $(TESTFILE)
 	./lineCompress$(EXT) $(TESTFILE)
 	./frameCompress$(EXT) $(TESTFILE)
+	./simpleBuffer$(EXT)
 	$(LZ4) -vt $(TESTFILE).lz4
 
 clean:
