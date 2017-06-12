@@ -1,7 +1,8 @@
-v1.7.6
+v1.8.0
 cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
 cli : added GNU separator -- specifying that all following arguments are files
 API : added LZ4_compress_HC_destSize(), by Oleg (@remittor)
+API : added LZ4F_resetDecompressionContext()
 API : lz4frame : negative compression levels trigger fast acceleration
 API : fix : expose obsolete decoding functions, reported by Chen Yufei
 build : dragonFlyBSD, OpenBSD, NetBSD supported

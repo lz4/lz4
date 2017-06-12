@@ -237,9 +237,9 @@ LZ4LIB_API LZ4_DEPRECATED("use LZ4_resetStreamHC() instead")  int   LZ4_resetStr
 #ifndef LZ4_HC_SLO_098092834
 #define LZ4_HC_SLO_098092834
 
-/*! LZ4_compress_HC_destSize() :
+/*! LZ4_compress_HC_destSize() : v1.8.0 (experimental)
  *  Will try to compress as much data from `src` as possible
- *  that can fit in `targetDstSize` budget.
+ *  that can fit into `targetDstSize` budget.
  *  Result is provided in 2 parts :
  * @return : the number of bytes written into 'dst'
  *           or 0 if compression fails.
