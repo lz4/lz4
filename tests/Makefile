@@ -260,6 +260,9 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(LZ4) -d --rm -- -z tmp4          # uncompresses ./-z into tmp4
 	test ! -f ./-z
 	$(DIFF) -q tmp tmp4
+	$(LZ4) -f tmp
+	cat tmp >> tmp.lz4
+	$(LZ4) -f tmp.lz4         # uncompress valid frame followed by invalid data
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen

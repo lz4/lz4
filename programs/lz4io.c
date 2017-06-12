@@ -218,7 +218,9 @@ void LZ4IO_setRemoveSrcFile(unsigned flag) { g_removeSrcFile = (flag>0); }
 ** ************************************************************************ */
 
 static int LZ4IO_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
-static int LZ4IO_isSkippableMagicNumber(unsigned int magic) { return (magic & LZ4IO_SKIPPABLEMASK) == LZ4IO_SKIPPABLE0; }
+static int LZ4IO_isSkippableMagicNumber(unsigned int magic) {
+    return (magic & LZ4IO_SKIPPABLEMASK) == LZ4IO_SKIPPABLE0;
+}
 
 
 /** LZ4IO_openSrcFile() :
@@ -321,7 +323,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
 
     /* Init */
     clock_t const clockStart = clock();
-    if (compressionlevel < 3) compressionFunction = LZ4IO_LZ4_compress; else compressionFunction = LZ4_compress_HC;
+    compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
 
     finput = LZ4IO_openSrcFile(input_filename);
     if (finput == NULL) EXM_THROW(20, "%s : open file error ", input_filename);
@@ -350,12 +352,14 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         /* Compress Block */
         outSize = compressionFunction(in_buff, out_buff+4, (int)inSize, outBuffSize, compressionlevel);
         compressedfilesize += outSize+4;
-        DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ", (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+        DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ",
+                (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
         LZ4IO_writeLE32(out_buff, outSize);
         {   size_t const sizeCheck = fwrite(out_buff, 1, outSize+4, foutput);
-            if (sizeCheck!=(size_t)(outSize+4)) EXM_THROW(24, "Write error : cannot write compressed block");
+            if (sizeCheck!=(size_t)(outSize+4))
+                EXM_THROW(24, "Write error : cannot write compressed block");
     }   }
     if (ferror(finput)) EXM_THROW(25, "Error while reading %s ", input_filename);
 
@@ -367,7 +371,8 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         filesize, compressedfilesize, (double)compressedfilesize / filesize * 100);
     {   double const seconds = (double)(clockEnd - clockStart) / CLOCKS_PER_SEC;
-        DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MB/s\n", seconds, (double)filesize / seconds / 1024 / 1024);
+        DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MB/s\n", seconds,
+                        (double)filesize / seconds / 1024 / 1024);
     }
 
     /* Close & Free */
@@ -870,22 +875,24 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
 {
     unsigned char MNstore[MAGICNUMBER_SIZE];
     unsigned magicNumber;
-    static unsigned nbCalls = 0;
+    static unsigned nbFrames = 0;
 
     /* init */
-    nbCalls++;
+    nbFrames++;
 
     /* Check Archive Header */
     if (g_magicRead) {  /* magic number already read from finput (see legacy frame)*/
-      magicNumber = g_magicRead;
-      g_magicRead = 0;
+        magicNumber = g_magicRead;
+        g_magicRead = 0;
     } else {
-      size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
-      if (nbReadBytes==0) { nbCalls = 0; return ENDOFSTREAM; }   /* EOF */
-      if (nbReadBytes != MAGICNUMBER_SIZE) EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
-      magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
+        size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
+        if (nbReadBytes==0) { nbFrames = 0; return ENDOFSTREAM; }   /* EOF */
+        if (nbReadBytes != MAGICNUMBER_SIZE)
+          EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
+        magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
     }
-    if (LZ4IO_isSkippableMagicNumber(magicNumber)) magicNumber = LZ4IO_SKIPPABLE0;  /* fold skippable magic numbers */
+    if (LZ4IO_isSkippableMagicNumber(magicNumber))
+        magicNumber = LZ4IO_SKIPPABLE0;   /* fold skippable magic numbers */
 
     switch(magicNumber)
     {
@@ -896,22 +903,32 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
         return LZ4IO_decodeLegacyStream(finput, foutput);
     case LZ4IO_SKIPPABLE0:
         DISPLAYLEVEL(4, "Skipping detected skippable area \n");
-        { size_t const nbReadBytes = fread(MNstore, 1, 4, finput);
-          if (nbReadBytes != 4) EXM_THROW(42, "Stream error : skippable size unreadable"); }
-        { unsigned const size = LZ4IO_readLE32(MNstore);     /* Little Endian format */
-          int const errorNb = fseek_u32(finput, size, SEEK_CUR);
-          if (errorNb != 0) EXM_THROW(43, "Stream error : cannot skip skippable area"); }
+        {   size_t const nbReadBytes = fread(MNstore, 1, 4, finput);
+            if (nbReadBytes != 4)
+                EXM_THROW(42, "Stream error : skippable size unreadable");
+        }
+        {   unsigned const size = LZ4IO_readLE32(MNstore);
+            int const errorNb = fseek_u32(finput, size, SEEK_CUR);
+            if (errorNb != 0)
+                EXM_THROW(43, "Stream error : cannot skip skippable area");
+        }
         return 0;
     EXTENDED_FORMAT;  /* macro extension for custom formats */
     default:
-        if (nbCalls == 1) {  /* just started */
+        if (nbFrames == 1) {  /* just started */
+            /* Wrong magic number at the beginning of 1st stream */
             if (!g_testMode && g_overwrite) {
-                nbCalls = 0;
+                nbFrames = 0;
                 return LZ4IO_passThrough(finput, foutput, MNstore);
             }
-            EXM_THROW(44,"Unrecognized header : file cannot be decoded");   /* Wrong magic number at the beginning of 1st stream */
+            EXM_THROW(44,"Unrecognized header : file cannot be decoded");
         }
-        DISPLAYLEVEL(2, "Stream followed by undecodable data\n");
+        {   long int const position = ftell(finput);  /* only works for files < 2 GB */
+            DISPLAYLEVEL(2, "Stream followed by undecodable data ");
+            if (position != -1L)
+                DISPLAYLEVEL(2, "at position %i ", (int)position);
+            DISPLAYLEVEL(2, "\n");
+        }
         return ENDOFSTREAM;
     }
 }
@@ -920,23 +937,26 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
 static int LZ4IO_decompressSrcFile(dRess_t ress, const char* input_filename, const char* output_filename)
 {
     FILE* const foutput = ress.dstFile;
-    unsigned long long filesize = 0, decodedSize=0;
+    unsigned long long filesize = 0;
 
     /* Init */
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     if (finput==NULL) return 1;
 
     /* Loop over multiple streams */
-    do {
-        decodedSize = selectDecoder(ress, finput, foutput);
-        if (decodedSize != ENDOFSTREAM)
-            filesize += decodedSize;
-    } while (decodedSize != ENDOFSTREAM);
+    for ( ; ; ) {  /* endless loop, see break condition */
+        unsigned long long const decodedSize =
+                        selectDecoder(ress, finput, foutput);
+        if (decodedSize == ENDOFSTREAM) break;
+        filesize += decodedSize;
+    }
 
-    /* Close */
+    /* Close input */
     fclose(finput);
-
-    if (g_removeSrcFile) { if (remove(input_filename)) EXM_THROW(45, "Remove error : %s: %s", input_filename, strerror(errno)); }  /* remove source file : --rm */
+    if (g_removeSrcFile) {  /* --rm */
+        if (remove(input_filename))
+            EXM_THROW(45, "Remove error : %s: %s", input_filename, strerror(errno));
+    }
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
@@ -949,7 +969,7 @@ static int LZ4IO_decompressSrcFile(dRess_t ress, const char* input_filename, con
 
 static int LZ4IO_decompressDstFile(dRess_t ress, const char* input_filename, const char* output_filename)
 {
-    FILE* const foutput = LZ4IO_openDstFile(output_filename);   /* success or die */
+    FILE* const foutput = LZ4IO_openDstFile(output_filename);
     if (foutput==NULL) return 1;   /* failure */
 
     ress.dstFile = foutput;
@@ -959,12 +979,13 @@ static int LZ4IO_decompressDstFile(dRess_t ress, const char* input_filename, con
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
-        if (strcmp (input_filename, stdinmark)
-            && strcmp (output_filename, stdoutmark)
-            && strcmp (output_filename, nulmark)
-            && UTIL_getFileStat(input_filename, &statbuf))
-            UTIL_setFileStat(output_filename, &statbuf);  /* should return value be read ? or is silent fail good enough ? */
-    }
+        if ( strcmp (input_filename, stdinmark)
+          && strcmp (output_filename, stdoutmark)
+          && strcmp (output_filename, nulmark)
+          && UTIL_getFileStat(input_filename, &statbuf) ) {
+            UTIL_setFileStat(output_filename, &statbuf);
+            /* should return value be read ? or is silent fail good enough ? */
+    }   }
 
     return 0;
 }
