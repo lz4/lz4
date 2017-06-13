@@ -3,12 +3,11 @@ cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
 cli : added GNU separator -- specifying that all following arguments are files
 API : added LZ4_compress_HC_destSize(), by Oleg (@remittor)
 API : added LZ4F_resetDecompressionContext()
-API : lz4frame : negative compression levels trigger fast acceleration
+API : lz4frame : negative compression levels trigger fast acceleration, request by Lawrence Chan
 API : fix : expose obsolete decoding functions, reported by Chen Yufei
 build : dragonFlyBSD, OpenBSD, NetBSD supported
 build : LZ4_MEMORY_USAGE can be modified at compile time, through external define
 doc : lz4 api manual, by Przemyslaw Skibinski
-
 
 v1.7.5
 lz4hc : new high compression mode : levels 10-12 compress more and slower, by Przemyslaw Skibinski

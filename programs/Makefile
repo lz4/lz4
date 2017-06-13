@@ -48,7 +48,7 @@ VOID := /dev/null
 
 CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
-DEBUGFLAGS:=-g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+DEBUGFLAGS:=-Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
