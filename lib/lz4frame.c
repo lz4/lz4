@@ -1096,7 +1096,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
             if (srcEnd-srcPtr == 0) return minFHSize;   /* 0-size input */
             dctxPtr->tmpInTarget = minFHSize;   /* minimum to attempt decode */
             dctxPtr->dStage = dstage_storeHeader;
-            /* pass-through */
+            /* fall-through */
 
         case dstage_storeHeader:
             {   size_t sizeToCopy = dctxPtr->tmpInTarget - dctxPtr->tmpInSize;
@@ -1138,7 +1138,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
             dctxPtr->tmpOutSize = 0;
 
             dctxPtr->dStage = dstage_getCBlockSize;
-            /* pass-through */
+            /* fall-through */
 
         case dstage_getCBlockSize:
             if ((size_t)(srcEnd - srcPtr) >= BHSize) {
@@ -1236,8 +1236,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
                 }
                 selectedIn = dctxPtr->tmpIn;
                 dctxPtr->dStage = dstage_decodeCBlock;
-                /* pass-through */
             }
+            /* fall-through */
 
         case dstage_decodeCBlock:
             if ((size_t)(dstEnd-dstPtr) < dctxPtr->maxBlockSize)   /* not enough place into dst : decode into tmpOut */

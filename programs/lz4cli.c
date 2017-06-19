@@ -469,8 +469,9 @@ int main(int argc, const char** argv)
 
 #ifdef UTIL_HAS_CREATEFILELIST
                     /* recursive */
-                case 'r': recursive=1;  /* without break */
+                case 'r': recursive=1;
 #endif
+                    /* fall-through */
                     /* Treat non-option args as input files.  See https://code.google.com/p/lz4/issues/detail?id=151 */
                 case 'm': multiple_inputs=1;
                     break;

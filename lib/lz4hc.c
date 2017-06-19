@@ -555,7 +555,7 @@ static int LZ4HC_compress_generic (
                 return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 128, 0);
             default:
                 cLevel = 12;
-                /* pass-through */
+                /* fall-through */
             case 12:
                 ctx->searchNum = LZ4HC_getSearchNum(cLevel);
                 return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, LZ4_OPT_NUM, 1);
