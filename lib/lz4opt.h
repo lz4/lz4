@@ -122,6 +122,8 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
             matchLength = LZ4_count(ip, match, vLimit);
             if ((ip+matchLength == vLimit) && (vLimit < iHighLimit))
                 matchLength += LZ4_count(ip+matchLength, base+dictLimit, iHighLimit);
+            if (matchIndex+matchLength >= dictLimit)
+                match = base + matchIndex;   /* to prepare for next usage of match[matchLength] */
         }
 
         if (matchLength > best_mlen) {
@@ -140,6 +142,8 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
         if (ip+matchLength >= iHighLimit)   /* equal : no way to know if inf or sup */
             break;   /* drop , to guarantee consistency ; miss a bit of compression, but other solutions can corrupt the tree */
 
+        DEBUGLOG(6, "ip   :%016llX", (U64)ip);
+        DEBUGLOG(6, "match:%016llX", (U64)match);
         if (*(ip+matchLength) < *(match+matchLength)) {
             *ptr0 = delta0;
             ptr0 = &DELTANEXTMAXD(matchIndex*2);
@@ -224,6 +228,7 @@ static int LZ4HC_compress_optimal (
     BYTE* const oend = op + maxOutputSize;
 
     /* init */
+    DEBUGLOG(5, "LZ4HC_compress_optimal");
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
     ctx->end += inputSize;
     ip++;

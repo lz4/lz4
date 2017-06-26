@@ -280,9 +280,21 @@ static const int LZ4_minLength = (MFLIMIT+1);
 
 
 /*-************************************
-*  Common Utils
+*  Error detection
 **************************************/
 #define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
+#  include <stdio.h>
+#  define DEBUGLOG(l, ...) {                          \
+                if (l<=LZ4_DEBUG) {                   \
+                    fprintf(stderr, __FILE__ ": ");   \
+                    fprintf(stderr, __VA_ARGS__);     \
+                    fprintf(stderr, " \n");           \
+            }   }
+#else
+#  define DEBUGLOG(l, ...)      {}    /* disabled */
+#endif
 
 
 /*-************************************
