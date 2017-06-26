@@ -34,7 +34,7 @@ DESTDIR ?=
 PREFIX  ?= /usr/local
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
-LIBDIR  := ../lib
+LZ4DIR  := ../lib
 PRGDIR  := ../programs
 VOID    := /dev/null
 TESTDIR := versionsTest
@@ -45,7 +45,7 @@ CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-e
            -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS:= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -81,31 +81,31 @@ lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="-m32 $(CFLAGS)"
 	cp $(LZ4) $(LZ4)c32
 
-fullbench  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/lz4frame.o $(LIBDIR)/xxhash.o fullbench.c
+fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fullbench-lib: fullbench.c $(LIBDIR)/xxhash.c
-	$(MAKE) -C $(LIBDIR) liblz4.a
-	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LIBDIR)/liblz4.a
+fullbench-lib: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.a
 
-fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
-	$(MAKE) -C $(LIBDIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/liblz4.dll
+fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/liblz4.dll
 
-fuzzer  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/xxhash.o fuzzer.c
+fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LIBDIR)/lz4frame.o $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/xxhash.o frametest.c
+frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o frametest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fasttest: $(LIBDIR)/lz4.o fasttest.c
+fasttest: $(LZ4DIR)/lz4.o fasttest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
 clean:
-	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
