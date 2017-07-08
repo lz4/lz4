@@ -63,15 +63,11 @@ Default behaviors can be modified by opt-in commands, detailed below.
 It is possible to concatenate `.lz4` files as is.
 `lz4` will decompress such files as if they were a single `.lz4` file.
 For example:
+
     lz4 file1  > foo.lz4
     lz4 file2 >> foo.lz4
 
-then
-    lz4cat foo.lz4
-
-is equivalent to :
-    cat file1 file2
-
+Then `lz4cat foo.lz4` is equivalent to `cat file1 file2`.
 
 OPTIONS
 -------
