@@ -60,13 +60,15 @@ Consequently, \fBlz4 \-m \-\-rm\fR behaves the same as \fBgzip\fR\.
 .IP "" 0
 .
 .SS "Concatenation of \.lz4 files"
-It is possible to concatenate \fB\.lz4\fR files as is\. \fBlz4\fR will decompress such files as if they were a single \fB\.lz4\fR file\. For example: lz4 file1 > foo\.lz4 lz4 file2 >> foo\.lz4
+It is possible to concatenate \fB\.lz4\fR files as is\. \fBlz4\fR will decompress such files as if they were a single \fB\.lz4\fR file\. For example:
 .
-.P
-then lz4cat foo\.lz4
+.IP "" 4
+lz4 file1 > foo\.lz4
+.br
+lz4 file2 >> foo\.lz4
 .
-.P
-is equivalent to : cat file1 file2
+.IP "" 0
+Then \fBlz4cat foo\.lz4\fR is equivalent to \fBcat file1 file2\fR\.
 .
 .SH "OPTIONS"
 .
