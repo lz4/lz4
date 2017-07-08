@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "November 2016" "lz4 1.7.4" "User Commands"
+.TH "LZ4" "1" "July 2017" "lz4 1.8.0" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -32,6 +32,9 @@ When writing scripts that need to decompress files, it is recommended to always 
 \fBlz4 file1 file2\fR means : compress file1 \fIinto\fR file2
 .
 .IP "\(bu" 4
+\fBlz4 file\.lz4\fR will default to decompression (use \fB\-z\fR to force compression)
+.
+.IP "\(bu" 4
 \fBlz4\fR shows real\-time notification statistics during compression or decompression of a single file (use \fB\-q\fR to silent them)
 .
 .IP "\(bu" 4
@@ -41,7 +44,7 @@ If no destination name is provided, result is sent to \fBstdout\fR \fIexcept if 
 If no destination name is provided, \fBand\fR if \fBstdout\fR is the console, \fBfile\fR is compressed into \fBfile\.lz4\fR\.
 .
 .IP "\(bu" 4
-As a consequence of previous rules, note the following example : \fBlz4 file | consumer\fR sends compressed data to \fBconsumer\fR through \fBstdout\fR, hence it does \fInot\fR create any \fBfile\.lz4\fR\.
+As a consequence of previous rules, note the following example : \fBlz4 file | consumer\fR sends compressed data to \fBconsumer\fR through \fBstdout\fR, hence it does \fInot\fR create \fBfile\.lz4\fR\.
 .
 .IP "" 0
 .
@@ -49,7 +52,10 @@ As a consequence of previous rules, note the following example : \fBlz4 file | c
 Default behaviors can be modified by opt\-in commands, detailed below\.
 .
 .IP "\(bu" 4
-\fBlz4 \-m\fR makes it possible to provide multiple input filenames, which will be compressed into files using suffix \fB\.lz4\fR\. Progress notifications are also disabled by default\. This mode has a behavior which more closely mimics \fBgzip\fR command line, with the main difference being that source files are preserved by default\.
+\fBlz4 \-m\fR makes it possible to provide multiple input filenames, which will be compressed into files using suffix \fB\.lz4\fR\. Progress notifications are also disabled by default (use \fB\-v\fR to enable them)\. This mode has a behavior which more closely mimics \fBgzip\fR command line, with the main remaining difference being that source files are preserved by default\.
+.
+.IP "\(bu" 4
+Similarly, \fBlz4 \-m \-d\fR can decompress multiple \fB*\.lz4\fR files\.
 .
 .IP "\(bu" 4
 It\'s possible to opt\-in to erase source files on successful compression or decompression, using \fB\-\-rm\fR command\.
@@ -60,13 +66,21 @@ Consequently, \fBlz4 \-m \-\-rm\fR behaves the same as \fBgzip\fR\.
 .IP "" 0
 .
 .SS "Concatenation of \.lz4 files"
-It is possible to concatenate \fB\.lz4\fR files as is\. \fBlz4\fR will decompress such files as if they were a single \fB\.lz4\fR file\. For example: lz4 file1 > foo\.lz4 lz4 file2 >> foo\.lz4
+It is possible to concatenate \fB\.lz4\fR files as is\. \fBlz4\fR will decompress such files as if they were a single \fB\.lz4\fR file\. For example:
+.
+.IP "" 4
+.
+.nf
+
+lz4 file1  > foo\.lz4
+lz4 file2 >> foo\.lz4
+.
+.fi
+.
+.IP "" 0
 .
 .P
-then lz4cat foo\.lz4
-.
-.P
-is equivalent to : cat file1 file2
+Then \fBlz4cat foo\.lz4\fR is equivalent to \fBcat file1 file2\fR\.
 .
 .SH "OPTIONS"
 .
@@ -181,6 +195,10 @@ Preserve source files (default behavior)
 \fB\-\-rm\fR
 Delete source files on successful compression or decompression
 .
+.TP
+\fB\-\-\fR
+Treat all subsequent arguments as files
+.
 .SS "Benchmark mode"
 .
 .TP
@@ -194,10 +212,6 @@ Benchmark multiple compression levels, from b# to e# (included)
 .TP
 \fB\-i#\fR
 Minimum evaluation in seconds [1\-9] (default : 3)
-.
-.TP
-\fB\-r\fR
-Operate recursively on directories
 .
 .SH "BUGS"
 Report bugs at: https://github\.com/lz4/lz4/issues
