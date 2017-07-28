@@ -96,19 +96,26 @@
 *  Compiler Options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
 #  include <intrin.h>
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
-#else
-#  if defined(__GNUC__) || defined(__clang__)
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  elif defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
-#    define FORCE_INLINE static inline
-#  else
-#    define FORCE_INLINE static
-#  endif
 #endif  /* _MSC_VER */
+
+#ifndef FORCE_INLINE
+#  ifdef _MSC_VER    /* Visual Studio */
+#    define FORCE_INLINE static __forceinline
+#  else
+#    if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
+#      ifdef __GNUC__
+#        define FORCE_INLINE static inline __attribute__((always_inline))
+#      else
+#        define FORCE_INLINE static inline
+#      endif
+#    else
+#      define FORCE_INLINE static
+#    endif /* __STDC_VERSION__ */
+#  endif  /* _MSC_VER */
+#endif /* FORCE_INLINE */
 
 #if (defined(__GNUC__) && (__GNUC__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )

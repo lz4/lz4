@@ -113,18 +113,23 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcp
 ***************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
-#  define FORCE_INLINE static __forceinline
-#else
-#  if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-#    ifdef __GNUC__
-#      define FORCE_INLINE static inline __attribute__((always_inline))
-#    else
-#      define FORCE_INLINE static inline
-#    endif
-#  else
-#    define FORCE_INLINE static
-#  endif /* __STDC_VERSION__ */
 #endif
+
+#ifndef FORCE_INLINE
+#  ifdef _MSC_VER    /* Visual Studio */
+#    define FORCE_INLINE static __forceinline
+#  else
+#    if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
+#      ifdef __GNUC__
+#        define FORCE_INLINE static inline __attribute__((always_inline))
+#      else
+#        define FORCE_INLINE static inline
+#      endif
+#    else
+#      define FORCE_INLINE static
+#    endif /* __STDC_VERSION__ */
+#  endif  /* _MSC_VER */
+#endif /* FORCE_INLINE */
 
 
 /* *************************************
