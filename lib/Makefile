@@ -42,7 +42,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
-BUILD_STATIC:= yes
+BUILD_STATIC:=yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
@@ -149,6 +149,7 @@ install: lib liblz4.pc
 	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
 	@$(INSTALL_LIB) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
 endif
 	@$(INSTALL_LIB) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
