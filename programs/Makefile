@@ -132,7 +132,6 @@ MANDIR  ?= $(PREFIX)/share/man/man1
 endif
 
 INSTALL_PROGRAM ?= $(INSTALL) -m 755
-INSTALL_SCRIPT  ?= $(INSTALL) -m 755
 INSTALL_MAN     ?= $(INSTALL) -m 644
 
 
@@ -144,7 +143,7 @@ install: lz4$(EXT) lz4c$(EXT)
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
 	@$(INSTALL_PROGRAM) lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c
 	@echo Installing man pages
-	@$(INSTALL_MAN) -m 644 lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
+	@$(INSTALL_MAN) lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1
