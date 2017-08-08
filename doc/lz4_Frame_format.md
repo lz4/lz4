@@ -16,7 +16,7 @@ Distribution of this document is unlimited.
 
 ### Version
 
-1.5.1 (31/03/2015)
+1.6.0 (08/08/2017)
 
 
 Introduction
@@ -63,7 +63,7 @@ General Structure of LZ4 Frame format
 
 | MagicNb | F. Descriptor | Block | (...) | EndMark | C. Checksum |
 |:-------:|:-------------:| ----- | ----- | ------- | ----------- |
-| 4 bytes |  3-11 bytes   |       |       | 4 bytes | 0-4 bytes   |
+| 4 bytes |  3-15 bytes   |       |       | 4 bytes | 0-4 bytes   |
 
 __Magic Number__
 
@@ -72,7 +72,7 @@ Value : 0x184D2204
 
 __Frame Descriptor__
 
-3 to 11 Bytes, to be detailed in the next part.
+3 to 15 Bytes, to be detailed in the next part.
 Most important part of the spec.
 
 __Data Blocks__
@@ -118,31 +118,31 @@ to decode all concatenated frames in their sequential order.
 Frame Descriptor
 ----------------
 
-| FLG     | BD      | (Content Size) | HC      |
-| ------- | ------- |:--------------:| ------- |
-| 1 byte  | 1 byte  |  0 - 8 bytes   | 1 byte  |
+| FLG     | BD      | (Content Size) | (Dictionary ID) | HC      |
+| ------- | ------- |:--------------:|:---------------:| ------- |
+| 1 byte  | 1 byte  |  0 - 8 bytes   |   0 - 4 bytes   | 1 byte  |
 
 The descriptor uses a minimum of 3 bytes,
-and up to 11 bytes depending on optional parameters.
+and up to 15 bytes depending on optional parameters.
 
 __FLG byte__
 
-|  BitNb  |   7-6   |    5    |     4     |   3     |     2     |    1-0   |
-| ------- | ------- | ------- | --------- | ------- | --------- | -------- |
-|FieldName| Version | B.Indep | B.Checksum| C.Size  | C.Checksum|*Reserved*|
+|  BitNb  |  7-6  |   5   |    4     |  3   |    2     |    1     |   0  |
+| ------- |-------|-------|----------|------|----------|----------|------|
+|FieldName|Version|B.Indep|B.Checksum|C.Size|C.Checksum|*Reserved*|DictID|
 
 
 __BD byte__
 
-|  BitNb  |     7    |     6-5-4    |  3-2-1-0 |
-| ------- | -------- | ------------ | -------- |
-|FieldName|*Reserved*| Block MaxSize|*Reserved*|
+|  BitNb  |     7    |     6-5-4     |  3-2-1-0 |
+| ------- | -------- | ------------- | -------- |
+|FieldName|*Reserved*| Block MaxSize |*Reserved*|
 
 In the tables, bit 7 is highest bit, while bit 0 is lowest.
 
 __Version Number__
 
-2-bits field, must be set to “01”.
+2-bits field, must be set to `01`.
 Any other value cannot be decoded by this version of the specification.
 Other version numbers will use different flag layouts.
 
@@ -154,7 +154,7 @@ If this flag is set to “0”, each block depends on previous ones
 In such case, it’s necessary to decode all blocks in sequence.
 
 Block dependency improves compression ratio, especially for small blocks.
-On the other hand, it makes direct jumps or multi-threaded decoding impossible.
+On the other hand, it makes random access or multi-threaded decoding impossible.
 
 __Block checksum flag__
 
@@ -172,13 +172,17 @@ Content Size usage is optional.
 
 __Content checksum flag__
 
-If this flag is set, a content checksum will be appended after the EndMark.
+If this flag is set, a 32-bits content checksum will be appended
+after the EndMark.
 
-Recommended value : “1” (content checksum is present)
+__Dictionary ID flag__
+
+If this flag is set, a 4-bytes Dict-ID field will be present,
+after the descriptor flags and the Content Size.
 
 __Block Maximum Size__
 
-This information is intended to help the decoder allocate memory.
+This information is useful to help the decoder allocate memory.
 Size here refers to the original (uncompressed) data size.
 Block Maximum Size is one value among the following table :
 
@@ -186,17 +190,17 @@ Block Maximum Size is one value among the following table :
 | --- | --- | --- | --- | ----- | ------ | ---- | ---- |
 | N/A | N/A | N/A | N/A | 64 KB | 256 KB | 1 MB | 4 MB |
 
-The decoder may refuse to allocate block sizes above a (system-specific) size.
+The decoder may refuse to allocate block sizes above any system-specific size.
 Unused values may be used in a future revision of the spec.
-A decoder conformant to the current version of the spec
-is only able to decode blocksizes defined in this spec.
+A decoder conformant with the current version of the spec
+is only able to decode block sizes defined in this spec.
 
 __Reserved bits__
 
 Value of reserved bits **must** be 0 (zero).
 Reserved bit might be used in a future version of the specification,
 typically enabling new optional features.
-If this happens, a decoder respecting the current version of the specification
+When this happens, a decoder respecting the current specification version
 shall not be able to decode such a frame.
 
 __Content Size__
@@ -208,10 +212,31 @@ Format is Little endian.
 This value is informational, typically for display or memory allocation.
 It can be skipped by a decoder, or used to validate content correctness.
 
+__Dictionary ID__
+
+Dict-ID is only present if the associated flag is set.
+It's an unsigned 32-bits value, stored using little-endian convention.
+A dictionary is useful to compress short input sequences.
+The compressor can take advantage of the dictionary context
+to encode the input in a more compact manner.
+It works as a kind of “known prefix” which is used by
+both the compressor and the decompressor to “warm-up” reference tables.
+
+The decompressor can use Dict-ID identifier to determine
+which dictionary must be used to correctly decode data.
+The compressor and the decompressor must use exactly the same dictionary.
+It's presumed that the 32-bits dictID uniquely identifies a dictionary.
+
+Within a single frame, a single dictionary can be defined.
+When the frame descriptor defines independent blocks,
+each block will be initialized with the same dictionary.
+If the frame descriptor defines linked blocks,
+the dictionary will only be used once, at the beginning of the frame.
+
 __Header Checksum__
 
 One-byte checksum of combined descriptor fields, including optional ones.
-The value is the second byte of xxh32() : ` (xxh32()>>8) & 0xFF `
+The value is the second byte of `xxh32()` : ` (xxh32()>>8) & 0xFF `
 using zero as a seed,
 and the full Frame Descriptor as an input
 (including optional fields when they are present).
@@ -347,7 +372,7 @@ wether it is a file or a stream.
 
 Alternatively, if the frame is followed by a valid Frame Magic Number,
 it is considered completed.
-It makes legacy frames compatible with frame concatenation.
+This policy makes it possible to concatenate legacy frames.
 
 Any other value will be interpreted as a block size,
 and trigger an error if it does not fit within acceptable range.
@@ -356,7 +381,9 @@ and trigger an error if it does not fit within acceptable range.
 Version changes
 ---------------
 
-1.5.1 : changed format to MarkDown compatible
+1.6.0 : restored Dictionary ID field in Frame header
+
+1.5.1 : changed document format to MarkDown
 
 1.5 : removed Dictionary ID from specification
 
