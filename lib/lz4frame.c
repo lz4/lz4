@@ -158,7 +158,7 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 #define LZ4F_BLOCKSIZEID_DEFAULT LZ4F_max64KB
 
 static const size_t minFHSize = 7;
-static const size_t maxFHSize = LZ4F_HEADER_SIZE_MAX;   /* 15 */
+static const size_t maxFHSize = LZ4F_HEADER_SIZE_MAX;   /* 19 */
 static const size_t BHSize = 4;
 
 
@@ -291,7 +291,7 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_preferences_t prefs;
-    size_t const headerSize = maxFHSize;      /* max header size, including magic number and frame content size */
+    size_t const headerSize = maxFHSize;      /* max header size, including optional fields */
 
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
     else memset(&prefs, 0, sizeof(prefs));
@@ -470,9 +470,10 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
 
     /* FLG Byte */
     *dstPtr++ = (BYTE)(((1 & _2BITS) << 6)    /* Version('01') */
-        + ((cctxPtr->prefs.frameInfo.blockMode & _1BIT ) << 5)    /* Block mode */
+        + ((cctxPtr->prefs.frameInfo.blockMode & _1BIT ) << 5)  /* Block mode */
+        + ((cctxPtr->prefs.frameInfo.contentSize > 0) << 3)     /* Frame content size */
         + ((cctxPtr->prefs.frameInfo.contentChecksumFlag & _1BIT ) << 2)   /* Frame checksum */
-        + ((cctxPtr->prefs.frameInfo.contentSize > 0) << 3));   /* Frame content size */
+        +  (cctxPtr->prefs.frameInfo.dictID > 0) );   /* Dictionary ID */
     /* BD Byte */
     *dstPtr++ = (BYTE)((cctxPtr->prefs.frameInfo.blockSizeID & _3BITS) << 4);
     /* Optional Frame content size field */
@@ -480,6 +481,11 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacit
         LZ4F_writeLE64(dstPtr, cctxPtr->prefs.frameInfo.contentSize);
         dstPtr += 8;
         cctxPtr->totalInSize = 0;
+    }
+    /* Optional dictionary ID field */
+    if (cctxPtr->prefs.frameInfo.dictID) {
+        LZ4F_writeLE32(dstPtr, cctxPtr->prefs.frameInfo.dictID);
+        dstPtr += 4;
     }
     /* CRC Byte */
     *dstPtr = LZ4F_headerChecksum(headerStart, dstPtr - headerStart);
@@ -817,12 +823,14 @@ static size_t LZ4F_headerSize(const void* src, size_t srcSize)
     if ((LZ4F_readLE32(src) & 0xFFFFFFF0U) == LZ4F_MAGIC_SKIPPABLE_START) return 8;
 
     /* control magic number */
-    if (LZ4F_readLE32(src) != LZ4F_MAGICNUMBER) return err0r(LZ4F_ERROR_frameType_unknown);
+    if (LZ4F_readLE32(src) != LZ4F_MAGICNUMBER)
+        return err0r(LZ4F_ERROR_frameType_unknown);
 
     /* Frame Header Size */
     {   BYTE const FLG = ((const BYTE*)src)[4];
         U32 const contentSizeFlag = (FLG>>3) & _1BIT;
-        return contentSizeFlag ? maxFHSize : minFHSize;
+        U32 const dictIDFlag = FLG & _1BIT;
+        return minFHSize + (contentSizeFlag*8) + (dictIDFlag*4);
     }
 }
 
@@ -837,7 +845,7 @@ static size_t LZ4F_headerSize(const void* src, size_t srcSize)
  */
 static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcSize)
 {
-    unsigned blockMode, contentSizeFlag, contentChecksumFlag, blockSizeID;
+    unsigned blockMode, contentSizeFlag, contentChecksumFlag, dictIDFlag, blockSizeID;
     size_t frameHeaderSize;
     const BYTE* srcPtr = (const BYTE*)src;
 
@@ -860,7 +868,8 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     }
 
     /* control magic number */
-    if (LZ4F_readLE32(srcPtr) != LZ4F_MAGICNUMBER) return err0r(LZ4F_ERROR_frameType_unknown);
+    if (LZ4F_readLE32(srcPtr) != LZ4F_MAGICNUMBER)
+        return err0r(LZ4F_ERROR_frameType_unknown);
     dctxPtr->frameInfo.frameType = LZ4F_frame;
 
     /* Flags */
@@ -870,14 +879,15 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
         blockMode = (FLG>>5) & _1BIT;
         contentSizeFlag = (FLG>>3) & _1BIT;
         contentChecksumFlag = (FLG>>2) & _1BIT;
+        dictIDFlag = FLG & _1BIT;
         /* validate */
-        if (((FLG>>0)&_2BITS) != 0) return err0r(LZ4F_ERROR_reservedFlag_set); /* Reserved bits */
+        if (((FLG>>1)&_1BIT) != 0) return err0r(LZ4F_ERROR_reservedFlag_set); /* Reserved bits */
         if (version != 1) return err0r(LZ4F_ERROR_headerVersion_wrong);        /* Version Number, only supported value */
         if (blockChecksumFlag != 0) return err0r(LZ4F_ERROR_blockChecksum_unsupported); /* Not supported for the time being */
     }
 
     /* Frame Header Size */
-    frameHeaderSize = contentSizeFlag ? maxFHSize : minFHSize;
+    frameHeaderSize = minFHSize + (contentSizeFlag*8) + (dictIDFlag*4);
 
     if (srcSize < frameHeaderSize) {
         /* not enough input to fully decode frame header */
@@ -898,8 +908,10 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     }
 
     /* check header */
-    { BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
-      if (HC != srcPtr[frameHeaderSize-1]) return err0r(LZ4F_ERROR_headerChecksum_invalid); }
+    {   BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
+        if (HC != srcPtr[frameHeaderSize-1])
+            return err0r(LZ4F_ERROR_headerChecksum_invalid);
+    }
 
     /* save */
     dctxPtr->frameInfo.blockMode = (LZ4F_blockMode_t)blockMode;
@@ -907,7 +919,10 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctxPtr, const void* src, size_t srcS
     dctxPtr->frameInfo.blockSizeID = (LZ4F_blockSizeID_t)blockSizeID;
     dctxPtr->maxBlockSize = LZ4F_getBlockSize(blockSizeID);
     if (contentSizeFlag)
-        dctxPtr->frameRemainingSize = dctxPtr->frameInfo.contentSize = LZ4F_readLE64(srcPtr+6);
+        dctxPtr->frameRemainingSize =
+            dctxPtr->frameInfo.contentSize = LZ4F_readLE64(srcPtr+6);
+    if (dictIDFlag)
+        dctxPtr->frameInfo.dictID = LZ4F_readLE32(srcPtr + frameHeaderSize - 5);
 
     dctxPtr->dStage = dstage_init;
 

@@ -237,8 +237,7 @@ __Header Checksum__
 
 One-byte checksum of combined descriptor fields, including optional ones.
 The value is the second byte of `xxh32()` : ` (xxh32()>>8) & 0xFF `
-using zero as a seed,
-and the full Frame Descriptor as an input
+using zero as a seed, and the full Frame Descriptor as an input
 (including optional fields when they are present).
 A wrong checksum indicates an error in the descriptor.
 Header checksum is informational and can be skipped.

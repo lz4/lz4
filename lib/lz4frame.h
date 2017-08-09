@@ -162,7 +162,8 @@ typedef struct {
   LZ4F_contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
   LZ4F_frameType_t       frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
   unsigned long long     contentSize;           /* Size of uncompressed (original) content ; 0 == unknown */
-  unsigned               reserved[2];           /* must be zero for forward compatibility */
+  unsigned               dictID;                /* Dictionary ID, sent by the compressor, to help the decoder select the right dictionary; 0 == no dictionary used */
+  unsigned               reserved[1];           /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
 /*! LZ4F_preferences_t :
@@ -228,7 +229,7 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 /*----    Compression    ----*/
 
-#define LZ4F_HEADER_SIZE_MAX 15
+#define LZ4F_HEADER_SIZE_MAX 19
 /*! LZ4F_compressBegin() :
  * will write the frame header into dstBuffer.
  * dstCapacity must be large enough to store the header. Maximum header size is LZ4F_HEADER_SIZE_MAX bytes.
