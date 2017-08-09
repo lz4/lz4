@@ -380,7 +380,7 @@ typedef struct {
  * init this structure before first use.
  * note : only use in association with static linking !
  *        this definition is not API/ABI safe,
- *        and may change in a future version !
+ *        it may change in a future version !
  */
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
 #define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))

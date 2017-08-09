@@ -157,13 +157,13 @@ typedef LZ4F_contentChecksum_t contentChecksum_t;
  * It's not required to set all fields, as long as the structure was initially memset() to zero.
  * All reserved fields must be set to zero. */
 typedef struct {
-  LZ4F_blockSizeID_t     blockSizeID;           /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
-  LZ4F_blockMode_t       blockMode;             /* blockLinked, blockIndependent ; 0 == default */
-  LZ4F_contentChecksum_t contentChecksumFlag;   /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  LZ4F_frameType_t       frameType;             /* LZ4F_frame, skippableFrame ; 0 == default */
-  unsigned long long     contentSize;           /* Size of uncompressed (original) content ; 0 == unknown */
-  unsigned               dictID;                /* Dictionary ID, sent by the compressor, to help the decoder select the right dictionary; 0 == no dictionary used */
-  unsigned               reserved[1];           /* must be zero for forward compatibility */
+  LZ4F_blockSizeID_t     blockSizeID;          /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
+  LZ4F_blockMode_t       blockMode;            /* blockLinked, blockIndependent ; 0 == default */
+  LZ4F_contentChecksum_t contentChecksumFlag;  /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
+  LZ4F_frameType_t       frameType;            /* LZ4F_frame, skippableFrame ; 0 == default */
+  unsigned long long     contentSize;          /* Size of uncompressed content ; 0 == unknown */
+  unsigned               dictID;               /* Dictionary ID, sent by the compressor, to help the decoder select the right dictionary; 0 == no dictionary used */
+  unsigned               reserved[1];          /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
 /*! LZ4F_preferences_t :
@@ -173,7 +173,7 @@ typedef struct {
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;       /* 0 == default (fast mode); values above LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values below 0 trigger "fast acceleration", proportional to value */
-  unsigned autoFlush;              /* 1 == always flush (reduce usage of tmp buffer) */
+  unsigned autoFlush;              /* 1 == always flush, to reduce usage of internal buffers */
   unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
@@ -187,17 +187,16 @@ typedef struct {
  */
 LZ4FLIB_API size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
-/*!LZ4F_compressFrame() :
- * Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.5.1
- * An important rule is that dstBuffer MUST be large enough (dstCapacity) to store the result in worst case situation.
- * This value is supplied by LZ4F_compressFrameBound().
- * If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode).
- * The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+/*! LZ4F_compressFrame() :
+ *  Compress an entire srcBuffer into a valid LZ4 frame.
+ *  dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ *  The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError())
  */
-LZ4FLIB_API size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
-
+LZ4FLIB_API size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
+                                const void* srcBuffer, size_t srcSize,
+                                const LZ4F_preferences_t* preferencesPtr);
 
 
 /*-***********************************
@@ -231,13 +230,15 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 #define LZ4F_HEADER_SIZE_MAX 19
 /*! LZ4F_compressBegin() :
- * will write the frame header into dstBuffer.
- * dstCapacity must be large enough to store the header. Maximum header size is LZ4F_HEADER_SIZE_MAX bytes.
+ *  will write the frame header into dstBuffer.
+ *  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
  * `prefsPtr` is optional : you can provide NULL as argument, all preferences will then be set to default.
  * @return : number of bytes written into dstBuffer for the header
  *           or an error code (which can be tested using LZ4F_isError())
  */
-LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_preferences_t* prefsPtr);
+LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
+                                      void* dstBuffer, size_t dstCapacity,
+                                      const LZ4F_preferences_t* prefsPtr);
 
 /*! LZ4F_compressBound() :
  * Provides dstCapacity given a srcSize to guarantee operation success in worst case situations.

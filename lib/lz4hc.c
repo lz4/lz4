@@ -610,7 +610,11 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 **************************************/
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) { return (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t)); }
-int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) { free(LZ4_streamHCPtr); return 0; }
+int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
+    if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
+    free(LZ4_streamHCPtr);
+    return 0;
+}
 
 
 /* initialization */
@@ -767,7 +771,11 @@ void* LZ4_createHC (char* inputBuffer)
     return hc4;
 }
 
-int LZ4_freeHC (void* LZ4HC_Data) { FREEMEM(LZ4HC_Data); return 0; }
+int LZ4_freeHC (void* LZ4HC_Data) {
+    if (!LZ4HC_Data) return 0;  /* support free on NULL */
+    FREEMEM(LZ4HC_Data);
+    return 0;
+}
 
 int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int cLevel)
 {

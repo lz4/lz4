@@ -482,9 +482,35 @@ int basicTests(U32 seed, double compressibility)
         if (prefs.frameInfo.dictID != dictID) goto _output_error;
         DISPLAYLEVEL(3, "%u \n", (U32)prefs.frameInfo.dictID);
 
-        CHECK( LZ4F_freeCompressionContext(cctx) ); cctx = NULL;
         CHECK( LZ4F_freeDecompressionContext(dCtx) ); dCtx = NULL;
+        CHECK( LZ4F_freeCompressionContext(cctx) ); cctx = NULL;
     }
+
+
+    /* Dictionary compression test */
+    {   size_t const dictSize = 63 KB;
+        size_t const dstCapacity = LZ4F_compressFrameBound(dictSize, NULL);
+        size_t cSizeNoDict, cSizeWithDict;
+        LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
+        if (cdict == NULL) goto _output_error;
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with NULL dict : ");
+        CHECK_V(cSizeNoDict,
+                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                                              CNBuffer, dictSize,
+                                              NULL, NULL) );
+        DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeNoDict);
+
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict : ");
+        CHECK_V(cSizeWithDict,
+                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                                              CNBuffer, dictSize,
+                                              cdict, NULL) );
+        DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeWithDict);
+        if (cSizeWithDict >= cSizeNoDict) goto _output_error;  /* must be more efficient */
+
+        LZ4F_freeCDict(cdict);
+    }
+
 
     DISPLAYLEVEL(3, "Skippable frame test : \n");
     {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
