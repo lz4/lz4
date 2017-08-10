@@ -177,7 +177,7 @@ typedef struct {
   unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
-LZ4FLIB_API int LZ4F_compressionLevel_max();
+LZ4FLIB_API int LZ4F_compressionLevel_max(void);
 
 
 /*-*********************************
