@@ -505,8 +505,28 @@ int basicTests(U32 seed, double compressibility)
                 LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
                                               CNBuffer, dictSize,
                                               cdict, NULL) );
-        DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeWithDict);
+        DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
+                        (unsigned)dictSize, (unsigned)cSizeWithDict);
         if (cSizeWithDict >= cSizeNoDict) goto _output_error;  /* must be more efficient */
+        crcOrig = XXH64(CNBuffer, dictSize, 0);
+
+        DISPLAYLEVEL(3, "LZ4F_decompress_usingDict : ");
+        {   LZ4F_dctx* dctx;
+            size_t decodedSize = COMPRESSIBLE_NOISE_LENGTH;
+            size_t compressedSize = cSizeWithDict;
+            CHECK( LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION) );
+            CHECK( LZ4F_decompress_usingDict(dctx,
+                                        decodedBuffer, &decodedSize,
+                                        compressedBuffer, &compressedSize,
+                                        CNBuffer, dictSize,
+                                        NULL) );
+            if (compressedSize != cSizeWithDict) goto _output_error;
+            if (decodedSize != dictSize) goto _output_error;
+            { U64 const crcDest = XXH64(decodedBuffer, decodedSize, 0);
+              if (crcDest != crcOrig) goto _output_error; }
+            DISPLAYLEVEL(3, "Regenerated %u bytes \n", (U32)decodedSize);
+            CHECK( LZ4F_freeDecompressionContext(dctx) );
+        }
 
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict, negative level : ");
         {   size_t cSizeLevelMax;
@@ -544,8 +564,29 @@ int basicTests(U32 seed, double compressibility)
                 LZ4F_compressFrame_usingCDict(compressedBuffer, outCapacity,
                                               CNBuffer, inSize,
                                               cdict, &cParams) );
-            DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeContiguous);
+            DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
+                        (unsigned)inSize, (unsigned)cSizeContiguous);
+
+            DISPLAYLEVEL(3, "LZ4F_decompress_usingDict on multiple linked blocks : ");
+            {   LZ4F_dctx* dctx;
+                size_t decodedSize = COMPRESSIBLE_NOISE_LENGTH;
+                size_t compressedSize = cSizeContiguous;
+                CHECK( LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION) );
+                CHECK( LZ4F_decompress_usingDict(dctx,
+                                            decodedBuffer, &decodedSize,
+                                            compressedBuffer, &compressedSize,
+                                            CNBuffer, dictSize,
+                                            NULL) );
+                if (compressedSize != cSizeContiguous) goto _output_error;
+                if (decodedSize != inSize) goto _output_error;
+                crcOrig = XXH64(CNBuffer, inSize, 0);
+                { U64 const crcDest = XXH64(decodedBuffer, decodedSize, 0);
+                  if (crcDest != crcOrig) goto _output_error; }
+                DISPLAYLEVEL(3, "Regenerated %u bytes \n", (U32)decodedSize);
+                CHECK( LZ4F_freeDecompressionContext(dctx) );
+            }
         }
+
 
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, multiple independent blocks : ");
         {   size_t cSizeIndep;
@@ -559,7 +600,27 @@ int basicTests(U32 seed, double compressibility)
                 LZ4F_compressFrame_usingCDict(compressedBuffer, outCapacity,
                                               CNBuffer, inSize,
                                               cdict, &cParams) );
-            DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeIndep);
+            DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
+                        (unsigned)inSize, (unsigned)cSizeIndep);
+
+            DISPLAYLEVEL(3, "LZ4F_decompress_usingDict on multiple independent blocks : ");
+            {   LZ4F_dctx* dctx;
+                size_t decodedSize = COMPRESSIBLE_NOISE_LENGTH;
+                size_t compressedSize = cSizeIndep;
+                CHECK( LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION) );
+                CHECK( LZ4F_decompress_usingDict(dctx,
+                                            decodedBuffer, &decodedSize,
+                                            compressedBuffer, &compressedSize,
+                                            CNBuffer, dictSize,
+                                            NULL) );
+                if (compressedSize != cSizeIndep) goto _output_error;
+                if (decodedSize != inSize) goto _output_error;
+                crcOrig = XXH64(CNBuffer, inSize, 0);
+                { U64 const crcDest = XXH64(decodedBuffer, decodedSize, 0);
+                  if (crcDest != crcOrig) goto _output_error; }
+                DISPLAYLEVEL(3, "Regenerated %u bytes \n", (U32)decodedSize);
+                CHECK( LZ4F_freeDecompressionContext(dctx) );
+            }
         }
 
         LZ4F_freeCDict(cdict);

@@ -273,13 +273,13 @@ LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx, void* dstBuffer, size_t 
 LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_compressOptions_t* cOptPtr);
 
 /*! LZ4F_compressEnd() :
- * To properly finish an LZ4 frame, invoke LZ4F_compressEnd().
- * It will flush whatever data remained within `cctx` (like LZ4_flush())
- * and properly finalize the frame, with an endMark and a checksum.
+ *  To properly finish an LZ4 frame, invoke LZ4F_compressEnd().
+ *  It will flush whatever data remained within `cctx` (like LZ4_flush())
+ *  and properly finalize the frame, with an endMark and a checksum.
  * `cOptPtr` is optional : NULL can be provided, in which case all options will be set to default.
  * @return : number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
  *           or an error code if it fails (which can be tested using LZ4F_isError())
- * A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
+ *  A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
  */
 LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_compressOptions_t* cOptPtr);
 
@@ -292,7 +292,7 @@ typedef LZ4F_dctx* LZ4F_decompressionContext_t;   /* compatibility with previous
 
 typedef struct {
   unsigned stableDst;    /* pledge that at least 64KB+64Bytes of previously decompressed data remain unmodifed where it was decoded. This optimization skips storage operations in tmp buffers */
-  unsigned reserved[3];
+  unsigned reserved[3];  /* must be set to zero for forward compatibility */
 } LZ4F_decompressOptions_t;
 
 

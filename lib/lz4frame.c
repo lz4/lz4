@@ -926,6 +926,8 @@ typedef enum {
 void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
 {
     dctx->dStage = dstage_getHeader;
+    dctx->dict = NULL;
+    dctx->dictSize = 0;
 }
 
 
@@ -1101,19 +1103,6 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctxPtr, LZ4F_frameInfo_t* frameIn
 }
 
 
-/* trivial redirector, for common prototype */
-static int LZ4F_decompress_safe (const char* src,
-                                 char* dst,
-                                 int compressedSize,
-                                 int dstCapacity,
-                                 const char* dictStart,
-                                 int dictSize)
-{
-    (void)dictStart; (void)dictSize;
-    return LZ4_decompress_safe (src, dst, compressedSize, dstCapacity);
-}
-
-
 static void LZ4F_updateDict(LZ4F_dctx* dctxPtr, const BYTE* dstPtr, size_t dstSize, const BYTE* dstPtr0, unsigned withinTmp)
 {
     if (dctxPtr->dictSize==0)
@@ -1174,21 +1163,22 @@ static void LZ4F_updateDict(LZ4F_dctx* dctxPtr, const BYTE* dstPtr, size_t dstSi
 
 
 /*! LZ4F_decompress() :
- * Call this function repetitively to regenerate data compressed within srcBuffer.
- * The function will attempt to decode up to *srcSizePtr bytes from srcBuffer, into dstBuffer of capacity *dstSizePtr.
+ *  Call this function repetitively to regenerate compressed data in srcBuffer.
+ *  The function will attempt to decode up to *srcSizePtr bytes from srcBuffer
+ *  into dstBuffer of capacity *dstSizePtr.
  *
- * The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
+ *  The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
  *
- * The number of bytes effectively read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
- * Remaining data will have to be presented again in a subsequent invocation.
+ *  The number of bytes effectively read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
+ *  If number of bytes read is < number of bytes provided, then decompression operation is not complete.
+ *  Remaining data will have to be presented again in a subsequent invocation.
  *
- * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
- * Basically, it's the size of the current (or remaining) compressed block + header of next block.
- * Respecting the hint provides some boost to performance, since it allows less buffer shuffling.
- * Note that this is just a hint, it's always possible to any srcSize value.
- * When a frame is fully decoded, @return will be 0.
- * If decompression failed, @return is an error code which can be tested using LZ4F_isError().
+ *  The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
+ *  Schematically, it's the size of the current (or remaining) compressed block + header of next block.
+ *  Respecting the hint provides a small boost to performance, since it allows less buffer shuffling.
+ *  Note that this is just a hint, and it's always possible to any srcSize value.
+ *  When a frame is fully decoded, @return will be 0.
+ *  If decompression failed, @return is an error code which can be tested using LZ4F_isError().
  */
 size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
                        void* dstBuffer, size_t* dstSizePtr,
@@ -1265,8 +1255,6 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
             }   }
             dctxPtr->tmpInSize = 0;
             dctxPtr->tmpInTarget = 0;
-            dctxPtr->dict = dctxPtr->tmpOutBuffer;
-            dctxPtr->dictSize = 0;
             dctxPtr->tmpOut = dctxPtr->tmpOutBuffer;
             dctxPtr->tmpOutStart = 0;
             dctxPtr->tmpOutSize = 0;
@@ -1381,15 +1369,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
             break;
 
         case dstage_decodeCBlock_intoDst:
-            {   int (*decoder)(const char*, char*, int, int, const char*, int);
-                int decodedSize;
-
-                if (dctxPtr->frameInfo.blockMode == LZ4F_blockLinked)
-                    decoder = LZ4_decompress_safe_usingDict;
-                else
-                    decoder = LZ4F_decompress_safe;
-
-                decodedSize = decoder((const char*)selectedIn, (char*)dstPtr,
+            {   int const decodedSize = LZ4_decompress_safe_usingDict(
+                        (const char*)selectedIn, (char*)dstPtr,
                         (int)dctxPtr->tmpInTarget, (int)dctxPtr->maxBlockSize,
                         (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
                 if (decodedSize < 0) return err0r(LZ4F_ERROR_GENERIC);   /* decompression failed */
@@ -1409,13 +1390,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
 
         case dstage_decodeCBlock_intoTmp:
             /* not enough place into dst : decode into tmpOut */
-            {   int (*decoder)(const char*, char*, int, int, const char*, int);
-                int decodedSize;
-
-                if (dctxPtr->frameInfo.blockMode == LZ4F_blockLinked)
-                    decoder = LZ4_decompress_safe_usingDict;
-                else
-                    decoder = LZ4F_decompress_safe;
+            {   int decodedSize;
 
                 /* ensure enough place for tmpOut */
                 if (dctxPtr->frameInfo.blockMode == LZ4F_blockLinked) {
@@ -1433,7 +1408,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
                 }
 
                 /* Decode */
-                decodedSize = decoder((const char*)selectedIn, (char*)dctxPtr->tmpOut,
+                decodedSize = LZ4_decompress_safe_usingDict(
+                        (const char*)selectedIn, (char*)dctxPtr->tmpOut,
                         (int)dctxPtr->tmpInTarget, (int)dctxPtr->maxBlockSize,
                         (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
                 if (decodedSize < 0)
@@ -1476,7 +1452,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
                     return err0r(LZ4F_ERROR_frameSize_wrong);   /* incorrect frame size decoded */
                 if (suffixSize == 0) {  /* frame completed */
                     nextSrcSizeHint = 0;
-                    dctxPtr->dStage = dstage_getHeader;
+                    LZ4F_resetDecompressionContext(dctxPtr);
                     doAnotherStage = 0;
                     break;
                 }
@@ -1510,7 +1486,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
                 U32 const resultCRC = XXH32_digest(&(dctxPtr->xxh));
                 if (readCRC != resultCRC) return err0r(LZ4F_ERROR_contentChecksum_invalid);
                 nextSrcSizeHint = 0;
-                dctxPtr->dStage = dstage_getHeader;
+                LZ4F_resetDecompressionContext(dctxPtr);
                 doAnotherStage = 0;
                 break;
             }
@@ -1530,7 +1506,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
         case dstage_storeSFrameSize:
             {
                 size_t sizeToCopy = dctxPtr->tmpInTarget - dctxPtr->tmpInSize;
-                if (sizeToCopy > (size_t)(srcEnd - srcPtr)) sizeToCopy = srcEnd - srcPtr;
+                if (sizeToCopy > (size_t)(srcEnd - srcPtr))
+                    sizeToCopy = srcEnd - srcPtr;
                 memcpy(dctxPtr->header + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dctxPtr->tmpInSize += sizeToCopy;
@@ -1553,24 +1530,25 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
 
         case dstage_skipSkippable:
             {   size_t skipSize = dctxPtr->tmpInTarget;
-                if (skipSize > (size_t)(srcEnd-srcPtr)) skipSize = srcEnd-srcPtr;
+                if (skipSize > (size_t)(srcEnd-srcPtr))
+                    skipSize = srcEnd-srcPtr;
                 srcPtr += skipSize;
                 dctxPtr->tmpInTarget -= skipSize;
                 doAnotherStage = 0;
                 nextSrcSizeHint = dctxPtr->tmpInTarget;
                 if (nextSrcSizeHint) break;
-                dctxPtr->dStage = dstage_getHeader;
+                LZ4F_resetDecompressionContext(dctxPtr);
                 break;
             }
         }
     }
 
-    /* preserve dictionary within tmp if necessary */
+    /* preserve history within tmp if necessary */
     if ( (dctxPtr->frameInfo.blockMode==LZ4F_blockLinked)
-        &&(dctxPtr->dict != dctxPtr->tmpOutBuffer)
-        &&(!decompressOptionsPtr->stableDst)
-        &&((unsigned)(dctxPtr->dStage-1) < (unsigned)(dstage_getSuffix-1))
-        )
+      && (dctxPtr->dict != dctxPtr->tmpOutBuffer)
+      && (dctxPtr->dStage != dstage_getHeader)
+      && (!decompressOptionsPtr->stableDst)
+      && ((unsigned)(dctxPtr->dStage-1) < (unsigned)(dstage_getSuffix-1)) )
     {
         if (dctxPtr->dStage == dstage_flushOut) {
             size_t preserveSize = dctxPtr->tmpOut - dctxPtr->tmpOutBuffer;
@@ -1599,4 +1577,24 @@ size_t LZ4F_decompress(LZ4F_dctx* dctxPtr,
     *srcSizePtr = (srcPtr - srcStart);
     *dstSizePtr = (dstPtr - dstStart);
     return nextSrcSizeHint;
+}
+
+/*! LZ4F_decompress_usingDict() :
+ *  Same as LZ4F_decompress(), using a predefined dictionary.
+ *  Dictionary is used "in place", without any preprocessing.
+ *  It must remain accessible throughout the entire frame decoding.
+ */
+size_t LZ4F_decompress_usingDict(LZ4F_dctx* dctxPtr,
+                       void* dstBuffer, size_t* dstSizePtr,
+                       const void* srcBuffer, size_t* srcSizePtr,
+                       const void* dict, size_t dictSize,
+                       const LZ4F_decompressOptions_t* decompressOptionsPtr)
+{
+    if (dctxPtr->dStage <= dstage_init) {
+        dctxPtr->dict = (const BYTE*)dict;
+        dctxPtr->dictSize = dictSize;
+    }
+    return LZ4F_decompress(dctxPtr, dstBuffer, dstSizePtr,
+                           srcBuffer, srcSizePtr,
+                           decompressOptionsPtr);
 }
