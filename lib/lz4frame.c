@@ -327,10 +327,6 @@ size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
     memset(&cctxI, 0, sizeof(cctxI));
     cctxI.version = LZ4F_VERSION;
     cctxI.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
-    if (prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
-        cctxI.lz4CtxPtr = &lz4ctx;
-        cctxI.lz4CtxLevel = 1;
-    }  /* fast compression context pre-created on stack */
 
     if (preferencesPtr!=NULL)
         prefs = *preferencesPtr;
@@ -343,6 +339,11 @@ size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
     prefs.autoFlush = 1;
     if (srcSize <= LZ4F_getBlockSize(prefs.frameInfo.blockSizeID))
         prefs.frameInfo.blockMode = LZ4F_blockIndependent;   /* only one block => no need for inter-block link */
+
+    if (prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
+        cctxI.lz4CtxPtr = &lz4ctx;
+        cctxI.lz4CtxLevel = 1;
+    }  /* fast compression context pre-created on stack */
 
     memset(&options, 0, sizeof(options));
     options.stableSrc = 1;
