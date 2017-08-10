@@ -421,9 +421,9 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
     }
     memcpy(cdict->dictContent, dictStart, dictSize);
     LZ4_resetStream(cdict->fastCtx);
-    LZ4_loadDict (cdict->fastCtx, cdict->dictContent, (int)dictSize);
+    LZ4_loadDict (cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
     LZ4_resetStreamHC(cdict->HCCtx, LZ4HC_CLEVEL_DEFAULT);
-    LZ4_loadDictHC(cdict->HCCtx, cdict->dictContent, (int)dictSize);
+    LZ4_loadDictHC(cdict->HCCtx, (const char*)cdict->dictContent, (int)dictSize);
     return cdict;
 }
 
