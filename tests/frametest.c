@@ -532,6 +532,36 @@ int basicTests(U32 seed, double compressibility)
             DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeLevelMax);
         }
 
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, multiple linked blocks : ");
+        {   size_t cSizeContiguous;
+            size_t const inSize = dictSize * 3;
+            size_t const outCapacity = LZ4F_compressFrameBound(inSize, NULL);
+            LZ4F_preferences_t cParams;
+            memset(&cParams, 0, sizeof(cParams));
+            cParams.frameInfo.blockMode = LZ4F_blockLinked;
+            cParams.frameInfo.blockSizeID = LZ4F_max64KB;
+            CHECK_V(cSizeContiguous,
+                LZ4F_compressFrame_usingCDict(compressedBuffer, outCapacity,
+                                              CNBuffer, inSize,
+                                              cdict, &cParams) );
+            DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeContiguous);
+        }
+
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, multiple independent blocks : ");
+        {   size_t cSizeIndep;
+            size_t const inSize = dictSize * 3;
+            size_t const outCapacity = LZ4F_compressFrameBound(inSize, NULL);
+            LZ4F_preferences_t cParams;
+            memset(&cParams, 0, sizeof(cParams));
+            cParams.frameInfo.blockMode = LZ4F_blockIndependent;
+            cParams.frameInfo.blockSizeID = LZ4F_max64KB;
+            CHECK_V(cSizeIndep,
+                LZ4F_compressFrame_usingCDict(compressedBuffer, outCapacity,
+                                              CNBuffer, inSize,
+                                              cdict, &cParams) );
+            DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeIndep);
+        }
+
         LZ4F_freeCDict(cdict);
     }
 
