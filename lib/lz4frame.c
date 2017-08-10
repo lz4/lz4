@@ -61,6 +61,7 @@ You can contact the author at :
 **************************************/
 #include "lz4frame_static.h"
 #include "lz4.h"
+#define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
@@ -217,6 +218,8 @@ static LZ4F_errorCode_t err0r(LZ4F_errorCodes code)
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
+int LZ4F_compressionLevel_max(void) { return LZ4HC_CLEVEL_MAX; }
+
 
 /*-************************************
 *  Private functions
@@ -308,7 +311,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
  *  dstBuffer MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
  *  The LZ4F_preferences_t structure is optional : you may provide NULL as argument,
  *  however, it's the only way to provide a dictID, so it's not recommended.
- * @return : number of bytes written into dstBuffer.
+ * @return : number of bytes written into dstBuffer,
  *           or an error code if it fails (can be tested using LZ4F_isError())
  */
 size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
@@ -535,8 +538,10 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     if (cdict) {
         if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
             memcpy(cctxPtr->lz4CtxPtr, cdict->fastCtx, sizeof(*cdict->fastCtx));
-        } else
+        } else {
             memcpy(cctxPtr->lz4CtxPtr, cdict->HCCtx, sizeof(*cdict->HCCtx));
+            LZ4_setCompressionLevel((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel);
+        }
     } else {
         if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
             LZ4_resetStream((LZ4_stream_t*)(cctxPtr->lz4CtxPtr));
@@ -659,14 +664,12 @@ static int LZ4F_localSaveDict(LZ4F_cctx_t* cctxPtr)
 typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;
 
 /*! LZ4F_compressUpdate() :
-* LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
-* The most important rule is that dstBuffer MUST be large enough (dstCapacity) to ensure compression completion even in worst case.
-* If this condition is not respected, LZ4F_compress() will fail (result is an errorCode)
-* You can get the minimum value of dstCapacity by using LZ4F_compressBound()
-* The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
-* The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just buffered.
-* The function outputs an error code if it fails (can be tested using LZ4F_isError())
-*/
+ *  LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
+ *  dstBuffer MUST be >= LZ4F_compressBound(srcSize, preferencesPtr).
+ *  LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
+ * @return : the number of bytes written into dstBuffer. It can be zero, meaning input data was just buffered.
+ *           or an error code if it fails (which can be tested using LZ4F_isError())
+ */
 size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacity, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
     LZ4F_compressOptions_t cOptionsNull;

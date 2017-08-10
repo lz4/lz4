@@ -74,7 +74,7 @@
   LZ4F_contentChecksum_t contentChecksumFlag;  </b>/* noContentChecksum, contentChecksumEnabled ; 0 == default  */<b>
   LZ4F_frameType_t       frameType;            </b>/* LZ4F_frame, skippableFrame ; 0 == default */<b>
   unsigned long long     contentSize;          </b>/* Size of uncompressed content ; 0 == unknown */<b>
-  unsigned               dictID;               </b>/* Dictionary ID, sent by the compressor, to help the decoder select the right dictionary; 0 == no dictionary used */<b>
+  unsigned               dictID;               </b>/* Dictionary ID, sent by the compressor to help decoder select the correct dictionary; 0 == no dictID provided */<b>
   unsigned               reserved[1];          </b>/* must be zero for forward compatibility */<b>
 } LZ4F_frameInfo_t;
 </b><p> makes it possible to supply detailed frame parameters to the stream interface.

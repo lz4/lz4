@@ -175,8 +175,8 @@ int           LZ4_freeStream (LZ4_stream_t* streamPtr);
   Important : Previous data blocks are assumed to remain present and unmodified !
   'dst' buffer must be already allocated.
   If dstCapacity >= LZ4_compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
-  If not, and if compressed data cannot fit into 'dst' buffer size, compression stops, and function returns a zero.
-  After an error, the stream status is invalid, and it can only be reset or freed.
+  If not, and if compressed data cannot fit into 'dst' buffer size, compression stops, and function @return==0.
+  After an error, the stream status is invalid, it can only be reset or freed.
  
 </p></pre><BR>
 
@@ -205,20 +205,20 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
 <pre><b>int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
-</b><p>    These decoding functions allow decompression of multiple blocks in "streaming" mode.
-    Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
-    In the case of a ring buffers, decoding buffer must be either :
-    - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
-      In which case, the decoding & encoding ring buffer can have any size, including very small ones ( < 64 KB).
-    - Larger than encoding buffer, by a minimum of maxBlockSize more bytes.
-      maxBlockSize is implementation dependent. It's the maximum size you intend to compress into a single block.
-      In which case, encoding and decoding buffers do not need to be synchronized,
-      and encoding ring buffer can have any size, including small ones ( < 64 KB).
-    - _At least_ 64 KB + 8 bytes + maxBlockSize.
-      In which case, encoding and decoding buffers do not need to be synchronized,
-      and encoding ring buffer can have any size, including larger than decoding buffer.
-    Whenever these conditions are not possible, save the last 64KB of decoded data into a safe buffer,
-    and indicate where it is saved using LZ4_setStreamDecode()
+</b><p>  These decoding functions allow decompression of multiple blocks in "streaming" mode.
+  Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
+  In the case of a ring buffers, decoding buffer must be either :
+  - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
+    In which case, the decoding & encoding ring buffer can have any size, including very small ones ( < 64 KB).
+  - Larger than encoding buffer, by a minimum of maxBlockSize more bytes.
+    maxBlockSize is implementation dependent. It's the maximum size you intend to compress into a single block.
+    In which case, encoding and decoding buffers do not need to be synchronized,
+    and encoding ring buffer can have any size, including small ones ( < 64 KB).
+  - _At least_ 64 KB + 8 bytes + maxBlockSize.
+    In which case, encoding and decoding buffers do not need to be synchronized,
+    and encoding ring buffer can have any size, including larger than decoding buffer.
+  Whenever these conditions are not possible, save the last 64KB of decoded data into a safe buffer,
+  and indicate where it is saved using LZ4_setStreamDecode()
 </p></pre><BR>
 
 <pre><b>int LZ4_decompress_safe_usingDict (const char* source, char* dest, int compressedSize, int maxDecompressedSize, const char* dictStart, int dictSize);
@@ -321,5 +321,9 @@ union LZ4_streamDecode_u {
    Otherwise, it's also possible to define LZ4_DISABLE_DEPRECATE_WARNINGS 
 </p></pre><BR>
 
+<h3>Experimental API section</h3><pre></pre><b><pre>#ifdef LZ4_HC_STATIC_LINKING_ONLY
+#ifndef LZ4_SLO_299387928743
+#define LZ4_SLO_299387928743
+</pre></b><BR>
 </html>
 </body>

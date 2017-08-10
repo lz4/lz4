@@ -161,7 +161,7 @@ typedef struct
 typedef struct
 {
     unsigned int   hashTable[LZ4HC_HASHTABLESIZE];
-    unsigned short   chainTable[LZ4HC_MAXD];
+    unsigned short chainTable[LZ4HC_MAXD];
     const unsigned char* end;        /* next block here to continue on current prefix */
     const unsigned char* base;       /* All index relative to this position */
     const unsigned char* dictBase;   /* alternate base for extDict */
@@ -245,25 +245,34 @@ LZ4LIB_API LZ4_DEPRECATED("use LZ4_resetStreamHC() instead")  int   LZ4_resetStr
  *           or 0 if compression fails.
  * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
  */
-LZ4LIB_API int LZ4_compress_HC_destSize(void* LZ4HC_Data,
+int LZ4_compress_HC_destSize(void* LZ4HC_Data,
                             const char* src, char* dst,
                             int* srcSizePtr, int targetDstSize,
                             int compressionLevel);
 
-/*! LZ4_compress_HC_continue_destSize() :
+/*! LZ4_compress_HC_continue_destSize() : v1.8.0 (experimental)
  *  Similar as LZ4_compress_HC_continue(),
  *  but will read a variable nb of bytes from `src`
  *  to fit into `targetDstSize` budget.
  *  Result is provided in 2 parts :
  * @return : the number of bytes written into 'dst'
  *           or 0 if compression fails.
- * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
- * Important : due to limitations, this prototype only works well up to cLevel < LZ4HC_CLEVEL_OPT_MIN
- *             beyond that level, compression performance will be much reduced due to internal incompatibilities
+ * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`.
+ *  Important : due to limitations, this prototype only works well up to cLevel < LZ4HC_CLEVEL_OPT_MIN
+ *              beyond that level, compression performance will be much reduced due to internal incompatibilities
  */
-LZ4LIB_API int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
+int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
                             const char* src, char* dst,
                             int* srcSizePtr, int targetDstSize);
+
+/*! LZ4_setCompressionLevel() : v1.8.0 (experimental)
+ *  It's possible to change compression level after LZ4_resetStreamHC(), between 2 invocations of LZ4_compress_HC_continue*(),
+ *  but that requires to stay in the same mode (aka 1-10 or 11-12).
+ *  This function ensures this condition.
+ */
+void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
+
+
 
 #endif   /* LZ4_HC_SLO_098092834 */
 #endif   /* LZ4_HC_STATIC_LINKING_ONLY */

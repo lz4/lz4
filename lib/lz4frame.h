@@ -162,7 +162,7 @@ typedef struct {
   LZ4F_contentChecksum_t contentChecksumFlag;  /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
   LZ4F_frameType_t       frameType;            /* LZ4F_frame, skippableFrame ; 0 == default */
   unsigned long long     contentSize;          /* Size of uncompressed content ; 0 == unknown */
-  unsigned               dictID;               /* Dictionary ID, sent by the compressor, to help the decoder select the right dictionary; 0 == no dictionary used */
+  unsigned               dictID;               /* Dictionary ID, sent by the compressor to help decoder select the correct dictionary; 0 == no dictID provided */
   unsigned               reserved[1];          /* must be zero for forward compatibility */
 } LZ4F_frameInfo_t;
 
@@ -176,6 +176,8 @@ typedef struct {
   unsigned autoFlush;              /* 1 == always flush, to reduce usage of internal buffers */
   unsigned reserved[4];            /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
+
+LZ4FLIB_API int LZ4F_compressionLevel_max();
 
 
 /*-*********************************

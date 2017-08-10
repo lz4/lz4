@@ -508,6 +508,30 @@ int basicTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeWithDict);
         if (cSizeWithDict >= cSizeNoDict) goto _output_error;  /* must be more efficient */
 
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict, negative level : ");
+        {   size_t cSizeLevelMax;
+            LZ4F_preferences_t cParams;
+            memset(&cParams, 0, sizeof(cParams));
+            cParams.compressionLevel = -3;
+            CHECK_V(cSizeLevelMax,
+                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                                              CNBuffer, dictSize,
+                                              cdict, &cParams) );
+            DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeLevelMax);
+        }
+
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict, level max : ");
+        {   size_t cSizeLevelMax;
+            LZ4F_preferences_t cParams;
+            memset(&cParams, 0, sizeof(cParams));
+            cParams.compressionLevel = LZ4F_compressionLevel_max();
+            CHECK_V(cSizeLevelMax,
+                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                                              CNBuffer, dictSize,
+                                              cdict, &cParams) );
+            DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeLevelMax);
+        }
+
         LZ4F_freeCDict(cdict);
     }
 
