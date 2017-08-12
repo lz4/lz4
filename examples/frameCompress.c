@@ -14,7 +14,7 @@
 
 static const LZ4F_preferences_t lz4_preferences = {
     { LZ4F_max256KB, LZ4F_blockLinked, LZ4F_noContentChecksum, LZ4F_frame,
-      0 /* content size unknown */, 0 /* no dictID */ , { 0 } /* reserved */ },
+      0 /* content size unknown */, 0 /* no dictID */ , LZ4F_noBlockChecksum },
     0,   /* compression level */
     0,   /* autoflush */
     { 0, 0, 0, 0 },  /* reserved, must be set to 0 */
@@ -266,7 +266,7 @@ int main(int argc, const char **argv) {
         ret = compress_file(inpFp, outFp, &sizeIn, &sizeOut);
         if (ret) {
             printf("compress : failed with code %zu\n", ret);
-            return ret;
+            return (int)ret;
         }
         printf("%s: %zu → %zu bytes, %.1f%%\n",
             inpFilename, sizeIn, sizeOut,
@@ -286,7 +286,7 @@ int main(int argc, const char **argv) {
         ret = decompress_file(inpFp, outFp);
         if (ret) {
             printf("decompress : failed with code %zu\n", ret);
-            return ret;
+            return (int)ret;
         }
         printf("decompress : done\n");
 
