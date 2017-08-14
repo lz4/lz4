@@ -32,12 +32,6 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-DESTDIR ?=
-PREFIX  ?= /usr/local
-VOID    := /dev/null
-
-LIBDIR ?= $(PREFIX)/lib
-INCLUDEDIR=$(PREFIX)/include
 LZ4DIR  = lib
 PRGDIR  = programs
 TESTDIR = tests
@@ -46,14 +40,16 @@ EXDIR   = examples
 
 # Define nul output
 ifneq (,$(filter Windows%,$(OS)))
-EXT = .exe
+EXT  = .exe
+VOID = nul
 else
-EXT =
+EXT  =
+VOID = /dev/null
 endif
 
 
 .PHONY: default
-default: lib lz4-release
+default: lib-release lz4-release
 
 .PHONY: all
 all: allmost manuals
@@ -61,9 +57,9 @@ all: allmost manuals
 .PHONY: allmost
 allmost: lib lz4 examples
 
-.PHONY: lib
-lib:
-	@$(MAKE) -C $(LZ4DIR)
+.PHONY: lib lib-release
+lib lib-release:
+	@$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
 lz4 lz4-release: lib
@@ -100,7 +96,7 @@ install uninstall:
 	@$(MAKE) -C $(PRGDIR) $@
 
 travis-install:
-	$(MAKE) -j1 install PREFIX=~/install_test_dir
+	$(MAKE) -j1 install DESTDIR=~/install_test_dir
 
 cmake:
 	@cd contrib/cmake_unofficial; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
