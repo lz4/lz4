@@ -75,15 +75,17 @@ LZ4 is also compatible and well optimized for x32 mode, for which it provides an
 Installation
 -------------------------
 
-`make`
-`make install`     # this command may require root access
+```
+make
+make install     # this command may require root access
+```
 
 LZ4's `Makefile` supports standard [Makefile conventions],
-including [staged installs], [directory redirection], or [command redefinition].
+including [staged installs], [redirection], or [command redefinition].
 
 [Makefile conventions]: https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
 [staged installs]: https://www.gnu.org/prep/standards/html_node/DESTDIR.html
-[directory redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
+[redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
 [command redefinition]: https://www.gnu.org/prep/standards/html_node/Utilities-in-Makefiles.html
 
 
