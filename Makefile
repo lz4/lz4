@@ -62,7 +62,9 @@ lib lib-release:
 	@$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
-lz4 lz4-release: lib
+lz4 : lib
+lz4-release : lib-release
+lz4 lz4-release :
 	@$(MAKE) -C $(PRGDIR) $@
 	@cp $(PRGDIR)/lz4$(EXT) .
 
@@ -91,6 +93,7 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 HOST_OS = POSIX
 
+.PHONY: install uninstall
 install uninstall:
 	@$(MAKE) -C $(LZ4DIR) $@
 	@$(MAKE) -C $(PRGDIR) $@

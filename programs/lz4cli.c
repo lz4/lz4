@@ -30,14 +30,6 @@
   The license of this compression CLI program is GPLv2.
 */
 
-/**************************************
-*  Tuning parameters
-***************************************/
-/* ENABLE_LZ4C_LEGACY_OPTIONS :
-   Control the availability of -c0, -c1 and -hc legacy arguments
-   Default : Legacy options are disabled */
-/* #define ENABLE_LZ4C_LEGACY_OPTIONS */
-
 
 /****************************
 *  Includes
@@ -62,6 +54,8 @@
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"
+#define LZ4_LEGACY "lz4c"
+static int g_lz4c_legacy_commands = 0;
 
 #define KB *(1U<<10)
 #define MB *(1U<<20)
@@ -154,13 +148,13 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s) \n");
     DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+] \n");
     DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
-#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
-    DISPLAY( "Legacy arguments : \n");
-    DISPLAY( " -c0    : fast compression \n");
-    DISPLAY( " -c1    : high compression \n");
-    DISPLAY( " -hc    : high compression \n");
-    DISPLAY( " -y     : overwrite output without prompting \n");
-#endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
+    if (g_lz4c_legacy_commands) {
+        DISPLAY( "Legacy arguments : \n");
+        DISPLAY( " -c0    : fast compression \n");
+        DISPLAY( " -c1    : high compression \n");
+        DISPLAY( " -hc    : high compression \n");
+        DISPLAY( " -y     : overwrite output without prompting \n");
+    }
     EXTENDED_HELP;
     return 0;
 }
@@ -212,17 +206,17 @@ static int usage_longhelp(const char* exeName)
     DISPLAY( "-------------------------------------\n");
     DISPLAY( "3 : compress data stream from 'generator', send result to 'consumer'\n");
     DISPLAY( "          generator | %s | consumer \n", exeName);
-#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
-    DISPLAY( "\n");
-    DISPLAY( "***** Warning  *****\n");
-    DISPLAY( "Legacy arguments take precedence. Therefore : \n");
-    DISPLAY( "---------------------------------\n");
-    DISPLAY( "          %s -hc filename\n", exeName);
-    DISPLAY( "means 'compress filename in high compression mode'\n");
-    DISPLAY( "It is not equivalent to :\n");
-    DISPLAY( "          %s -h -c filename\n", exeName);
-    DISPLAY( "which would display help text and exit\n");
-#endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
+    if (g_lz4c_legacy_commands) {
+        DISPLAY( "\n");
+        DISPLAY( "***** Warning  *****\n");
+        DISPLAY( "Legacy arguments take precedence. Therefore : \n");
+        DISPLAY( "---------------------------------\n");
+        DISPLAY( "          %s -hc filename\n", exeName);
+        DISPLAY( "means 'compress filename in high compression mode'\n");
+        DISPLAY( "It is not equivalent to :\n");
+        DISPLAY( "          %s -h -c filename\n", exeName);
+        DISPLAY( "which would display help text and exit\n");
+    }
     return 0;
 }
 
@@ -314,7 +308,7 @@ int main(int argc, const char** argv)
     inFileNames[0] = stdinmark;
     LZ4IO_setOverwrite(0);
 
-    /* lz4cat predefined behavior */
+    /* predefined behaviors, based on binary/link name */
     if (exeNameMatch(exeName, LZ4CAT)) {
         mode = om_decompress;
         LZ4IO_setOverwrite(1);
@@ -325,6 +319,7 @@ int main(int argc, const char** argv)
         multiple_inputs=1;
     }
     if (exeNameMatch(exeName, UNLZ4)) { mode = om_decompress; }
+    if (exeNameMatch(exeName, LZ4_LEGACY)) { g_lz4c_legacy_commands=1; }
 
     /* command switches */
     for(i=1; i<argc; i++) {
@@ -370,13 +365,13 @@ int main(int argc, const char** argv)
             while (argument[1]!=0) {
                 argument ++;
 
-#if defined(ENABLE_LZ4C_LEGACY_OPTIONS)
-                /* Legacy arguments (-c0, -c1, -hc, -y, -s) */
-                if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }  /* -c0 (fast compression) */
-                if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }  /* -c1 (high compression) */
-                if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }  /* -hc (high compression) */
-                if (*argument=='y') { LZ4IO_setOverwrite(1); continue; }                           /* -y (answer 'yes' to overwrite permission) */
-#endif /* ENABLE_LZ4C_LEGACY_OPTIONS */
+                if (g_lz4c_legacy_commands) {
+                    /* Legacy commands (-c0, -c1, -hc, -y) */
+                    if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }  /* -c0 (fast compression) */
+                    if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }  /* -c1 (high compression) */
+                    if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }  /* -hc (high compression) */
+                    if (argument[0]=='y') { LZ4IO_setOverwrite(1); continue; }                         /* -y (answer 'yes' to overwrite permission) */
+                }
 
                 if ((*argument>='0') && (*argument<='9')) {
                     cLevel = readU32FromChar(&argument);
@@ -530,7 +525,8 @@ int main(int argc, const char** argv)
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(4, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
-    if ((mode == om_compress) || (mode == om_bench)) DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));
+    if ((mode == om_compress) || (mode == om_bench))
+        DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));
 
     if (multiple_inputs) {
         input_filename = inFileNames[0];

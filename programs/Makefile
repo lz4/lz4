@@ -82,9 +82,11 @@ lz4-release: DEBUGFLAGS=
 lz4-release: lz4
 
 lz4c32: CFLAGS += -m32
-lz4c: CPPFLAGS += -DENABLE_LZ4C_LEGACY_OPTIONS
-lz4c lz4c32 : $(SRCFILES)
+lz4c32 : $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+lz4c: lz4
+	ln -s lz4 lz4c
 
 lz4.1: lz4.1.md
 	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
