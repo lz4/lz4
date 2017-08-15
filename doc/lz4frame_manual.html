@@ -84,7 +84,7 @@
 } LZ4F_frameInfo_t;
 </b><p>  makes it possible to set or read frame parameters.
   It's not required to set all fields, as long as the structure was initially memset() to zero.
-  For all fields, 0 sets it to default value
+  For all fields, 0 sets it to default value 
 </p></pre><BR>
 
 <pre><b>typedef struct {
@@ -95,7 +95,7 @@
 } LZ4F_preferences_t;
 </b><p>  makes it possible to supply detailed compression parameters to the stream interface.
   It's not required to set all fields, as long as the structure was initially memset() to zero.
-  All reserved fields must be set to zero.
+  All reserved fields must be set to zero. 
 </p></pre><BR>
 
 <a name="Chapter5"></a><h2>Simple compression function</h2><pre></pre>
@@ -103,7 +103,7 @@
 <pre><b>size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 </b><p>  Returns the maximum possible size of a frame compressed with LZ4F_compressFrame() given srcSize content and preferences.
   Note : this result is only usable with LZ4F_compressFrame(), not with multi-segments compression.
-
+ 
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
@@ -114,7 +114,7 @@
   The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
  @return : number of bytes written into dstBuffer.
            or an error code if it fails (can be tested using LZ4F_isError())
-
+ 
 </p></pre><BR>
 
 <a name="Chapter6"></a><h2>Advanced compression functions</h2><pre></pre>
@@ -134,7 +134,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  The function will provide a pointer to a fully allocated LZ4F_cctx object.
  If @return != zero, there was an error during context creation.
  Object can release its memory using LZ4F_freeCompressionContext();
-
+ 
 </p></pre><BR>
 
 <a name="Chapter8"></a><h2>Compression</h2><pre></pre>
@@ -147,7 +147,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  `prefsPtr` is optional : you can provide NULL as argument, all preferences will then be set to default.
  @return : number of bytes written into dstBuffer for the header
            or an error code (which can be tested using LZ4F_isError())
-
+ 
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* prefsPtr);
@@ -155,7 +155,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  prefsPtr is optional : you can provide NULL as argument, preferences will be set to cover worst case scenario.
  Result is always the same for a srcSize and prefsPtr, so it can be trusted to size reusable buffers.
  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() operations.
-
+ 
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_compressUpdate(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* cOptPtr);
@@ -167,7 +167,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
            or an error code if it fails (which can be tested using LZ4F_isError())
-
+ 
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_flush(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_compressOptions_t* cOptPtr);
@@ -177,7 +177,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
  @return : number of bytes written into dstBuffer (it can be zero, which means there was no data stored within cctx)
            or an error code if it fails (which can be tested using LZ4F_isError())
-
+ 
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_compressEnd(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_compressOptions_t* cOptPtr);
@@ -188,7 +188,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  @return : number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
            or an error code if it fails (which can be tested using LZ4F_isError())
   A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
-
+ 
 </p></pre><BR>
 
 <a name="Chapter9"></a><h2>Decompression functions</h2><pre></pre>
@@ -207,7 +207,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
  dctx memory can be released using LZ4F_freeDecompressionContext();
  The result of LZ4F_freeDecompressionContext() is indicative of the current state of decompressionContext when being released.
  That is, it should be == 0 if decompression has been completed fully and correctly.
-
+ 
 </p></pre><BR>
 
 <a name="Chapter10"></a><h2>Streaming decompression functions</h2><pre></pre>
@@ -234,7 +234,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
            or an error code which can be tested using LZ4F_isError().
   note 1 : in case of error, dctx is not modified. Decoding operation can resume from beginning safely.
   note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
-
+ 
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_decompress(LZ4F_dctx* dctx,
@@ -263,14 +263,14 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 
   After a frame is fully decoded, dctx can be used again to decompress another frame.
   After a decompression error, use LZ4F_resetDecompressionContext() before re-using dctx, to return to clean state.
-
+ 
 </p></pre><BR>
 
 <pre><b>void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   </b>/* always successful */<b>
 </b><p>  In case of an error, the context is left in "undefined" state.
   In which case, it's necessary to reset it, before re-using it.
   This method can also be used to abruptly stop an unfinished decompression,
-  and start a new one using the same context.
+  and start a new one using the same context. 
 </p></pre><BR>
 
 </html>
