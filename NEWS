@@ -4,6 +4,7 @@ cli : added GNU separator -- specifying that all following arguments are files
 API : added LZ4_compress_HC_destSize(), by Oleg (@remittor)
 API : added LZ4F_resetDecompressionContext()
 API : lz4frame : negative compression levels trigger fast acceleration, request by Lawrence Chan
+API : lz4frame : can control block checksum and dictionary ID
 API : fix : expose obsolete decoding functions, reported by Chen Yufei
 build : fix : static lib installation, by Ido Rosen
 build : dragonFlyBSD, OpenBSD, NetBSD supported

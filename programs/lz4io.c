@@ -173,17 +173,17 @@ int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode)
     return g_blockIndependence;
 }
 
-/* Default setting : no checksum */
-int LZ4IO_setBlockChecksumMode(int xxhash)
+/* Default setting : no block checksum */
+int LZ4IO_setBlockChecksumMode(int enable)
 {
-    g_blockChecksum = (xxhash != 0);
+    g_blockChecksum = (enable != 0);
     return g_blockChecksum;
 }
 
 /* Default setting : checksum enabled */
-int LZ4IO_setStreamChecksumMode(int xxhash)
+int LZ4IO_setStreamChecksumMode(int enable)
 {
-    g_streamChecksum = (xxhash != 0);
+    g_streamChecksum = (enable != 0);
     return g_streamChecksum;
 }
 
@@ -455,6 +455,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     prefs.compressionLevel = compressionLevel;
     prefs.frameInfo.blockMode = (LZ4F_blockMode_t)g_blockIndependence;
     prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
+    prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)g_blockChecksum;
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
     if (g_contentSizeFlag) {
       U64 const fileSize = UTIL_getFileSize(srcFileName);
