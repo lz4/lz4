@@ -69,6 +69,8 @@
 
 
 /*===   Macros   ===*/
+#define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
+#define MAX(a,b)   ( (a) > (b) ? (a) : (b) )
 #define HASH_FUNCTION(i)         (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
 #define DELTANEXTMAXD(p)         chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
 #define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
@@ -610,7 +612,11 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 **************************************/
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) { return (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t)); }
-int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) { free(LZ4_streamHCPtr); return 0; }
+int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
+    if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
+    free(LZ4_streamHCPtr);
+    return 0;
+}
 
 
 /* initialization */
@@ -621,6 +627,16 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
     if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;  /* cap compression level */
     LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
     LZ4_streamHCPtr->internal_donotuse.searchNum = LZ4HC_getSearchNum(compressionLevel);
+}
+
+void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
+{
+    int const currentCLevel = LZ4_streamHCPtr->internal_donotuse.compressionLevel;
+    int const minCLevel = currentCLevel < LZ4HC_CLEVEL_OPT_MIN ? 1 : LZ4HC_CLEVEL_OPT_MIN;
+    int const maxCLevel = currentCLevel < LZ4HC_CLEVEL_OPT_MIN ? LZ4HC_CLEVEL_OPT_MIN-1 : LZ4HC_CLEVEL_MAX;
+    compressionLevel = MIN(compressionLevel, minCLevel);
+    compressionLevel = MAX(compressionLevel, maxCLevel);
+    LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
 }
 
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
@@ -767,7 +783,11 @@ void* LZ4_createHC (char* inputBuffer)
     return hc4;
 }
 
-int LZ4_freeHC (void* LZ4HC_Data) { FREEMEM(LZ4HC_Data); return 0; }
+int LZ4_freeHC (void* LZ4HC_Data) {
+    if (!LZ4HC_Data) return 0;  /* support free on NULL */
+    FREEMEM(LZ4HC_Data);
+    return 0;
+}
 
 int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int cLevel)
 {

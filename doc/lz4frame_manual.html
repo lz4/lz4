@@ -69,12 +69,13 @@
 } LZ4F_frameType_t;
 </b></pre><BR>
 <pre><b>typedef struct {
-  LZ4F_blockSizeID_t     blockSizeID;           </b>/* max64KB, max256KB, max1MB, max4MB ; 0 == default */<b>
-  LZ4F_blockMode_t       blockMode;             </b>/* blockLinked, blockIndependent ; 0 == default */<b>
-  LZ4F_contentChecksum_t contentChecksumFlag;   </b>/* noContentChecksum, contentChecksumEnabled ; 0 == default  */<b>
-  LZ4F_frameType_t       frameType;             </b>/* LZ4F_frame, skippableFrame ; 0 == default */<b>
-  unsigned long long     contentSize;           </b>/* Size of uncompressed (original) content ; 0 == unknown */<b>
-  unsigned               reserved[2];           </b>/* must be zero for forward compatibility */<b>
+  LZ4F_blockSizeID_t     blockSizeID;          </b>/* max64KB, max256KB, max1MB, max4MB ; 0 == default */<b>
+  LZ4F_blockMode_t       blockMode;            </b>/* blockLinked, blockIndependent ; 0 == default */<b>
+  LZ4F_contentChecksum_t contentChecksumFlag;  </b>/* noContentChecksum, contentChecksumEnabled ; 0 == default  */<b>
+  LZ4F_frameType_t       frameType;            </b>/* LZ4F_frame, skippableFrame ; 0 == default */<b>
+  unsigned long long     contentSize;          </b>/* Size of uncompressed content ; 0 == unknown */<b>
+  unsigned               dictID;               </b>/* Dictionary ID, sent by the compressor to help decoder select the correct dictionary; 0 == no dictID provided */<b>
+  unsigned               reserved[1];          </b>/* must be zero for forward compatibility */<b>
 } LZ4F_frameInfo_t;
 </b><p> makes it possible to supply detailed frame parameters to the stream interface.
  It's not required to set all fields, as long as the structure was initially memset() to zero.
@@ -84,7 +85,7 @@
 <pre><b>typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;       </b>/* 0 == default (fast mode); values above LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values below 0 trigger "fast acceleration", proportional to value */<b>
-  unsigned autoFlush;              </b>/* 1 == always flush (reduce usage of tmp buffer) */<b>
+  unsigned autoFlush;              </b>/* 1 == always flush, to reduce usage of internal buffers */<b>
   unsigned reserved[4];            </b>/* must be zero for forward compatibility */<b>
 } LZ4F_preferences_t;
 </b><p> makes it possible to supply detailed compression parameters to the stream interface.
@@ -95,17 +96,17 @@
 <a name="Chapter5"></a><h2>Simple compression function</h2><pre></pre>
 
 <pre><b>size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
-</b><p> Returns the maximum possible size of a frame compressed with LZ4F_compressFrame() given srcSize content and preferences.
- Note : this result is only usable with LZ4F_compressFrame(), not with multi-segments compression.
+</b><p>  Returns the maximum possible size of a frame compressed with LZ4F_compressFrame() given srcSize content and preferences.
+  Note : this result is only usable with LZ4F_compressFrame(), not with multi-segments compression.
  
 </p></pre><BR>
 
-<pre><b>size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
-</b><p> Compress an entire srcBuffer into a valid LZ4 frame, as defined by specification v1.5.1
- An important rule is that dstBuffer MUST be large enough (dstCapacity) to store the result in worst case situation.
- This value is supplied by LZ4F_compressFrameBound().
- If this condition is not respected, LZ4F_compressFrame() will fail (result is an errorCode).
- The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+<pre><b>size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
+                                const void* srcBuffer, size_t srcSize,
+                                const LZ4F_preferences_t* preferencesPtr);
+</b><p>  Compress an entire srcBuffer into a valid LZ4 frame.
+  dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+  The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
  @return : number of bytes written into dstBuffer.
            or an error code if it fails (can be tested using LZ4F_isError())
  
@@ -133,9 +134,11 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 <a name="Chapter8"></a><h2>Compression</h2><pre></pre>
 
-<pre><b>size_t LZ4F_compressBegin(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_preferences_t* prefsPtr);
-</b><p> will write the frame header into dstBuffer.
- dstCapacity must be large enough to store the header. Maximum header size is LZ4F_HEADER_SIZE_MAX bytes.
+<pre><b>size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
+                                      void* dstBuffer, size_t dstCapacity,
+                                      const LZ4F_preferences_t* prefsPtr);
+</b><p>  will write the frame header into dstBuffer.
+  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
  `prefsPtr` is optional : you can provide NULL as argument, all preferences will then be set to default.
  @return : number of bytes written into dstBuffer for the header
            or an error code (which can be tested using LZ4F_isError())
@@ -173,28 +176,28 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 </p></pre><BR>
 
 <pre><b>size_t LZ4F_compressEnd(LZ4F_cctx* cctx, void* dstBuffer, size_t dstCapacity, const LZ4F_compressOptions_t* cOptPtr);
-</b><p> To properly finish an LZ4 frame, invoke LZ4F_compressEnd().
- It will flush whatever data remained within `cctx` (like LZ4_flush())
- and properly finalize the frame, with an endMark and a checksum.
+</b><p>  To properly finish an LZ4 frame, invoke LZ4F_compressEnd().
+  It will flush whatever data remained within `cctx` (like LZ4_flush())
+  and properly finalize the frame, with an endMark and a checksum.
  `cOptPtr` is optional : NULL can be provided, in which case all options will be set to default.
  @return : number of bytes written into dstBuffer (necessarily >= 4 (endMark), or 8 if optional frame checksum is enabled)
            or an error code if it fails (which can be tested using LZ4F_isError())
- A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
+  A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
  
 </p></pre><BR>
 
 <a name="Chapter9"></a><h2>Decompression functions</h2><pre></pre>
 
 <pre><b>typedef struct {
-  unsigned stableDst;       </b>/* guarantee that decompressed data will still be there on next function calls (avoid storage into tmp buffers) */<b>
-  unsigned reserved[3];
+  unsigned stableDst;    </b>/* pledge that at least 64KB+64Bytes of previously decompressed data remain unmodifed where it was decoded. This optimization skips storage operations in tmp buffers */<b>
+  unsigned reserved[3];  </b>/* must be set to zero for forward compatibility */<b>
 } LZ4F_decompressOptions_t;
 </b></pre><BR>
 <pre><b>LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
-</b><p> Create an LZ4F_decompressionContext_t object, which will be used to track all decompression operations.
- The version provided MUST be LZ4F_VERSION. It is intended to track potential breaking differences between different versions.
- The function will provide a pointer to a fully allocated and initialized LZ4F_decompressionContext_t object.
+</b><p> Create an LZ4F_dctx object, to track all decompression operations.
+ The version provided MUST be LZ4F_VERSION.
+ The function provides a pointer to an allocated and initialized LZ4F_dctx object.
  The result is an errorCode, which can be tested using LZ4F_isError().
  dctx memory can be released using LZ4F_freeDecompressionContext();
  The result of LZ4F_freeDecompressionContext() is indicative of the current state of decompressionContext when being released.
@@ -207,22 +210,25 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 <pre><b>size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
                                      LZ4F_frameInfo_t* frameInfoPtr,
                                      const void* srcBuffer, size_t* srcSizePtr);
-</b><p> This function extracts frame parameters (such as max blockSize, frame checksum, etc.).
- Its usage is optional. Extracted information can be useful for allocation purposes, typically.
- This function works in 2 situations :
-   - At the beginning of a new frame, in which case it will decode this information from `srcBuffer`, and start the decoding process.
+</b><p>  This function extracts frame parameters (max blockSize, dictID, etc.).
+  Its usage is optional.
+  Extracted information is typically useful for allocation and dictionary.
+  This function works in 2 situations :
+   - At the beginning of a new frame, in which case
+     it will decode information from `srcBuffer`, starting the decoding process.
      Input size must be large enough to successfully decode the entire frame header.
      Frame header size is variable, but is guaranteed to be <= LZ4F_HEADER_SIZE_MAX bytes.
      It's allowed to provide more input data than this minimum.
    - After decoding has been started.
      In which case, no input is read, frame parameters are extracted from dctx.
-     If decoding has just started, but not yet extracted information from header, LZ4F_getFrameInfo() will fail.
- The number of bytes consumed from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
- Decompression must resume from (srcBuffer + *srcSizePtr).
+   - If decoding has barely started, but not yet extracted information from header,
+     LZ4F_getFrameInfo() will fail.
+  The number of bytes consumed from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
+  Decompression must resume from (srcBuffer + *srcSizePtr).
  @return : an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
-           or an error code which can be tested using LZ4F_isError()
- note 1 : in case of error, dctx is not modified. Decoding operations can resume from where they stopped.
- note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
+           or an error code which can be tested using LZ4F_isError().
+  note 1 : in case of error, dctx is not modified. Decoding operation can resume from beginning safely.
+  note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
  
 </p></pre><BR>
 
@@ -230,28 +236,28 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
                                    void* dstBuffer, size_t* dstSizePtr,
                                    const void* srcBuffer, size_t* srcSizePtr,
                                    const LZ4F_decompressOptions_t* dOptPtr);
-</b><p> Call this function repetitively to regenerate data compressed within `srcBuffer`.
- The function will attempt to decode up to *srcSizePtr bytes from srcBuffer, into dstBuffer of capacity *dstSizePtr.
+</b><p>  Call this function repetitively to regenerate compressed data from `srcBuffer`.
+  The function will attempt to decode up to *srcSizePtr bytes from srcBuffer, into dstBuffer of capacity *dstSizePtr.
 
- The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
+  The number of bytes regenerated into dstBuffer is provided within *dstSizePtr (necessarily <= original value).
 
- The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
- Number of bytes read can be < number of bytes provided, meaning there is some more data to decode.
- It typically happens when dstBuffer is not large enough to contain all decoded data.
- Remaining data will have to be presented again in a subsequent invocation.
+  The number of bytes consumed from srcBuffer is provided within *srcSizePtr (necessarily <= original value).
+  Number of bytes consumed can be < number of bytes provided.
+  It typically happens when dstBuffer is not large enough to contain all decoded data.
+  Unconsumed source data must be presented again in subsequent invocations.
 
  `dstBuffer` content is expected to be flushed between each invocation, as its content will be overwritten.
- `dstBuffer` can be changed at will between each consecutive function invocation.
+ `dstBuffer` itself can be changed at will between each consecutive function invocation.
 
- @return is an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
- Schematically, it's the size of the current (or remaining) compressed block + header of next block.
- Respecting the hint provides some small speed benefit, because it skips intermediate buffers.
- This is just a hint though, it's always possible to provide any srcSize.
- When a frame is fully decoded, @return will be 0 (no more data expected).
- If decompression failed, @return is an error code, which can be tested using LZ4F_isError().
+ @return : an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
+  Schematically, it's the size of the current (or remaining) compressed block + header of next block.
+  Respecting the hint provides some small speed benefit, because it skips intermediate buffers.
+  This is just a hint though, it's always possible to provide any srcSize.
+  When a frame is fully decoded, @return will be 0 (no more data expected).
+  If decompression failed, @return is an error code, which can be tested using LZ4F_isError().
 
- After a frame is fully decoded, dctx can be used again to decompress another frame.
- After a decompression error, use LZ4F_resetDecompressionContext() before re-using dctx, to return to clean state.
+  After a frame is fully decoded, dctx can be used again to decompress another frame.
+  After a decompression error, use LZ4F_resetDecompressionContext() before re-using dctx, to return to clean state.
  
 </p></pre><BR>
 
@@ -259,7 +265,7 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 </b><p>  In case of an error, the context is left in "undefined" state.
   In which case, it's necessary to reset it, before re-using it.
   This method can also be used to abruptly stop an unfinished decompression,
-  and start a new with the same context. 
+  and start a new one using the same context. 
 </p></pre><BR>
 
 </html>

@@ -945,6 +945,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
+    if (!LZ4_stream) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return (0);
 }
@@ -1284,11 +1285,6 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 
 /*===== streaming decompression functions =====*/
 
-/*
- * If you prefer dynamic allocation methods,
- * LZ4_createStreamDecode()
- * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
- */
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(1, sizeof(LZ4_streamDecode_t));
@@ -1297,6 +1293,7 @@ LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
+    if (!LZ4_stream) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return 0;
 }
