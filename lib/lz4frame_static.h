@@ -59,7 +59,7 @@ extern "C" {
         ITEM(ERROR_contentChecksumFlag_invalid) \
         ITEM(ERROR_compressionLevel_invalid) \
         ITEM(ERROR_headerVersion_wrong) \
-        ITEM(ERROR_blockChecksum_unsupported) \
+        ITEM(ERROR_blockChecksum_invalid) \
         ITEM(ERROR_reservedFlag_set) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) \

@@ -63,6 +63,11 @@
 } LZ4F_contentChecksum_t;
 </b></pre><BR>
 <pre><b>typedef enum {
+    LZ4F_noBlockChecksum=0,
+    LZ4F_blockChecksumEnabled
+} LZ4F_blockChecksum_t;
+</b></pre><BR>
+<pre><b>typedef enum {
     LZ4F_frame=0,
     LZ4F_skippableFrame
     LZ4F_OBSOLETE_ENUM(skippableFrame)
@@ -70,16 +75,16 @@
 </b></pre><BR>
 <pre><b>typedef struct {
   LZ4F_blockSizeID_t     blockSizeID;          </b>/* max64KB, max256KB, max1MB, max4MB ; 0 == default */<b>
-  LZ4F_blockMode_t       blockMode;            </b>/* blockLinked, blockIndependent ; 0 == default */<b>
-  LZ4F_contentChecksum_t contentChecksumFlag;  </b>/* noContentChecksum, contentChecksumEnabled ; 0 == default  */<b>
-  LZ4F_frameType_t       frameType;            </b>/* LZ4F_frame, skippableFrame ; 0 == default */<b>
+  LZ4F_blockMode_t       blockMode;            </b>/* LZ4F_blockLinked, LZ4F_blockIndependent ; 0 == default */<b>
+  LZ4F_contentChecksum_t contentChecksumFlag;  </b>/* if enabled, frame is terminated with a 32-bits checksum of decompressed data ; 0 == disabled (default)  */<b>
+  LZ4F_frameType_t       frameType;            </b>/* read-only field : LZ4F_frame or LZ4F_skippableFrame */<b>
   unsigned long long     contentSize;          </b>/* Size of uncompressed content ; 0 == unknown */<b>
   unsigned               dictID;               </b>/* Dictionary ID, sent by the compressor to help decoder select the correct dictionary; 0 == no dictID provided */<b>
-  unsigned               reserved[1];          </b>/* must be zero for forward compatibility */<b>
+  LZ4F_blockChecksum_t   blockChecksumFlag;    </b>/* if enabled, each block is followed by a checksum of block's compressed data ; 0 == disabled (default)  */<b>
 } LZ4F_frameInfo_t;
-</b><p> makes it possible to supply detailed frame parameters to the stream interface.
- It's not required to set all fields, as long as the structure was initially memset() to zero.
- All reserved fields must be set to zero. 
+</b><p>  makes it possible to set or read frame parameters.
+  It's not required to set all fields, as long as the structure was initially memset() to zero.
+  For all fields, 0 sets it to default value 
 </p></pre><BR>
 
 <pre><b>typedef struct {
@@ -88,9 +93,9 @@
   unsigned autoFlush;              </b>/* 1 == always flush, to reduce usage of internal buffers */<b>
   unsigned reserved[4];            </b>/* must be zero for forward compatibility */<b>
 } LZ4F_preferences_t;
-</b><p> makes it possible to supply detailed compression parameters to the stream interface.
- It's not required to set all fields, as long as the structure was initially memset() to zero.
- All reserved fields must be set to zero. 
+</b><p>  makes it possible to supply detailed compression parameters to the stream interface.
+  It's not required to set all fields, as long as the structure was initially memset() to zero.
+  All reserved fields must be set to zero. 
 </p></pre><BR>
 
 <a name="Chapter5"></a><h2>Simple compression function</h2><pre></pre>

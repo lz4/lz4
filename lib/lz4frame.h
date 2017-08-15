@@ -140,6 +140,11 @@ typedef enum {
 } LZ4F_contentChecksum_t;
 
 typedef enum {
+    LZ4F_noBlockChecksum=0,
+    LZ4F_blockChecksumEnabled
+} LZ4F_blockChecksum_t;
+
+typedef enum {
     LZ4F_frame=0,
     LZ4F_skippableFrame
     LZ4F_OBSOLETE_ENUM(skippableFrame)
@@ -153,23 +158,23 @@ typedef LZ4F_contentChecksum_t contentChecksum_t;
 #endif
 
 /*! LZ4F_frameInfo_t :
- * makes it possible to supply detailed frame parameters to the stream interface.
- * It's not required to set all fields, as long as the structure was initially memset() to zero.
- * All reserved fields must be set to zero. */
+ *  makes it possible to set or read frame parameters.
+ *  It's not required to set all fields, as long as the structure was initially memset() to zero.
+ *  For all fields, 0 sets it to default value */
 typedef struct {
   LZ4F_blockSizeID_t     blockSizeID;          /* max64KB, max256KB, max1MB, max4MB ; 0 == default */
-  LZ4F_blockMode_t       blockMode;            /* blockLinked, blockIndependent ; 0 == default */
-  LZ4F_contentChecksum_t contentChecksumFlag;  /* noContentChecksum, contentChecksumEnabled ; 0 == default  */
-  LZ4F_frameType_t       frameType;            /* LZ4F_frame, skippableFrame ; 0 == default */
+  LZ4F_blockMode_t       blockMode;            /* LZ4F_blockLinked, LZ4F_blockIndependent ; 0 == default */
+  LZ4F_contentChecksum_t contentChecksumFlag;  /* if enabled, frame is terminated with a 32-bits checksum of decompressed data ; 0 == disabled (default)  */
+  LZ4F_frameType_t       frameType;            /* read-only field : LZ4F_frame or LZ4F_skippableFrame */
   unsigned long long     contentSize;          /* Size of uncompressed content ; 0 == unknown */
   unsigned               dictID;               /* Dictionary ID, sent by the compressor to help decoder select the correct dictionary; 0 == no dictID provided */
-  unsigned               reserved[1];          /* must be zero for forward compatibility */
+  LZ4F_blockChecksum_t   blockChecksumFlag;    /* if enabled, each block is followed by a checksum of block's compressed data ; 0 == disabled (default)  */
 } LZ4F_frameInfo_t;
 
 /*! LZ4F_preferences_t :
- * makes it possible to supply detailed compression parameters to the stream interface.
- * It's not required to set all fields, as long as the structure was initially memset() to zero.
- * All reserved fields must be set to zero. */
+ *  makes it possible to supply detailed compression parameters to the stream interface.
+ *  It's not required to set all fields, as long as the structure was initially memset() to zero.
+ *  All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;       /* 0 == default (fast mode); values above LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values below 0 trigger "fast acceleration", proportional to value */
