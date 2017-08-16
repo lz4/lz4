@@ -30,7 +30,8 @@
 # ##########################################################################
 
 # Version numbers
-LIBVER_SRC := ../lib/lz4.h
+LZ4DIR   := ../lib
+LIBVER_SRC := $(LZ4DIR)/lz4.h
 LIBVER_MAJOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_MINOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_PATCH_SCRIPT:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
@@ -38,32 +39,31 @@ LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCR
 LIBVER_MAJOR := $(shell echo $(LIBVER_MAJOR_SCRIPT))
 LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
-LIBVER  := $(shell echo $(LIBVER_SCRIPT))
-
-LZ4DIR  := ../lib
+LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
 SRCFILES := $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c)
 OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
-VOID := /dev/null
 
-CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
-CFLAGS  ?= -O3
+CPPFLAGS += -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
+CFLAGS   ?= -O3
 DEBUGFLAGS:=-Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
-FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+CFLAGS   += $(DEBUGFLAGS) $(MOREFLAGS)
+FLAGS     = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 LZ4_VERSION=$(LIBVER)
-MD2ROFF  =ronn
-MD2ROFF_FLAGS  = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
+MD2ROFF   = ronn
+MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
 EXT  :=.exe
+VOID := nul
 else
 EXT  :=
+VOID := /dev/null
 endif
 
 
@@ -82,9 +82,11 @@ lz4-release: DEBUGFLAGS=
 lz4-release: lz4
 
 lz4c32: CFLAGS += -m32
-lz4c: CPPFLAGS += -DENABLE_LZ4C_LEGACY_OPTIONS
-lz4c lz4c32 : $(SRCFILES)
+lz4c32 : $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+lz4c: lz4
+	ln -s lz4 lz4c
 
 lz4.1: lz4.1.md
 	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
@@ -121,18 +123,25 @@ else
 INSTALL ?= install
 endif
 
-PREFIX  ?= /usr/local
-DESTDIR ?=
-BINDIR  ?= $(PREFIX)/bin
+DESTDIR     ?=
+# directory variables : GNU convention prefers lowercase
+# support both lower and uppercase (BSD), use uppercase in script
+prefix      ?= /usr/local
+PREFIX      ?= $(prefix)
+exec_prefix ?= $(PREFIX)
+bindir      ?= $(exec_prefix)/bin
+BINDIR      ?= $(bindir)
+datarootdir ?= $(PREFIX)/share
+mandir      ?= $(datarootdir)/man
 
 ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly SunOS))
 MANDIR  ?= $(PREFIX)/man/man1
 else
-MANDIR  ?= $(PREFIX)/share/man/man1
+MANDIR  ?= $(mandir)
 endif
 
 INSTALL_PROGRAM ?= $(INSTALL) -m 755
-INSTALL_MAN     ?= $(INSTALL) -m 644
+INSTALL_DATA    ?= $(INSTALL) -m 644
 
 
 install: lz4$(EXT) lz4c$(EXT)
@@ -143,7 +152,7 @@ install: lz4$(EXT) lz4c$(EXT)
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
 	@$(INSTALL_PROGRAM) lz4c$(EXT) $(DESTDIR)$(BINDIR)/lz4c
 	@echo Installing man pages
-	@$(INSTALL_MAN) lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
+	@$(INSTALL_DATA) lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
 	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1

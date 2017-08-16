@@ -69,7 +69,24 @@ in single-thread mode.
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
 
-LZ4 is also compatible and well optimized for x32 mode, for which it provides +10% speed performance.
+LZ4 is also compatible and well optimized for x32 mode, for which it provides an additional +10% speed performance.
+
+
+Installation
+-------------------------
+
+```
+make
+make install     # this command may require root access
+```
+
+LZ4's `Makefile` supports standard [Makefile conventions],
+including [staged installs], [redirection], or [command redefinition].
+
+[Makefile conventions]: https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
+[staged installs]: https://www.gnu.org/prep/standards/html_node/DESTDIR.html
+[redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
+[command redefinition]: https://www.gnu.org/prep/standards/html_node/Utilities-in-Makefiles.html
 
 
 Documentation
