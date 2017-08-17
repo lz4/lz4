@@ -70,7 +70,7 @@ You can contact the author at :
 /*-************************************
 *  Debug
 **************************************/
-#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+#define LZ4F_STATIC_ASSERT(c)    { enum { LZ4F_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
 /*-************************************
@@ -212,7 +212,7 @@ LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult)
 static LZ4F_errorCode_t err0r(LZ4F_errorCodes code)
 {
     /* A compilation error here means sizeof(ptrdiff_t) is not large enough */
-    LZ4_STATIC_ASSERT(sizeof(ptrdiff_t) >= sizeof(size_t));
+    LZ4F_STATIC_ASSERT(sizeof(ptrdiff_t) >= sizeof(size_t));
     return (LZ4F_errorCode_t)-(ptrdiff_t)code;
 }
 
@@ -912,7 +912,7 @@ struct LZ4F_dctx_s {
     size_t tmpOutStart;
     XXH32_state_t xxh;
     XXH32_state_t blockChecksum;
-    BYTE   header[16];
+    BYTE   header[LZ4F_HEADER_SIZE_MAX];
 };  /* typedef'd to LZ4F_dctx in lz4frame.h */
 
 

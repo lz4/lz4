@@ -6,6 +6,7 @@ API : added LZ4F_resetDecompressionContext()
 API : lz4frame : negative compression levels trigger fast acceleration, request by Lawrence Chan
 API : lz4frame : can control block checksum and dictionary ID
 API : fix : expose obsolete decoding functions, reported by Chen Yufei
+API : experimental : lz4frame_static : new dictionary compression API
 build : fix : static lib installation, by Ido Rosen
 build : dragonFlyBSD, OpenBSD, NetBSD supported
 build : LZ4_MEMORY_USAGE can be modified at compile time, through external define
