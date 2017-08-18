@@ -2,6 +2,8 @@
 # LZ4 programs - Makefile
 # Copyright (C) Yann Collet 2011-2016
 #
+# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
+#
 # GPL v2 License
 #
 # This program is free software; you can redistribute it and/or modify
@@ -32,7 +34,7 @@ DESTDIR ?=
 PREFIX  ?= /usr/local
 BINDIR  := $(PREFIX)/bin
 MANDIR  := $(PREFIX)/share/man/man1
-LIBDIR  := ../lib
+LZ4DIR  := ../lib
 PRGDIR  := ../programs
 VOID    := /dev/null
 TESTDIR := versionsTest
@@ -43,7 +45,7 @@ CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-e
            -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS:= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -79,31 +81,31 @@ lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="-m32 $(CFLAGS)"
 	cp $(LZ4) $(LZ4)c32
 
-fullbench  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/lz4frame.o $(LIBDIR)/xxhash.o fullbench.c
+fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fullbench-lib: fullbench.c $(LIBDIR)/xxhash.c
-	$(MAKE) -C $(LIBDIR) liblz4.a
-	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LIBDIR)/liblz4.a
+fullbench-lib: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.a
 
-fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
-	$(MAKE) -C $(LIBDIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/liblz4.dll
+fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/liblz4.dll
 
-fuzzer  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/xxhash.o fuzzer.c
+fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LIBDIR)/lz4frame.o $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/xxhash.o frametest.c
+frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o frametest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fasttest: $(LIBDIR)/lz4.o fasttest.c
+fasttest: $(LZ4DIR)/lz4.o fasttest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
 clean:
-	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
@@ -119,9 +121,9 @@ versionsTest:
 	$(PYTHON) test-lz4-versions.py
 
 
-#------------------------------------------------------------------------
-#make test is validated only for Linux, OSX, kFreeBSD, FreeBSD, Hurd and
-#Solaris targets
+#-----------------------------------------------------------------------------
+# make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
+#-----------------------------------------------------------------------------
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 MD5:=md5sum
@@ -233,23 +235,35 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	./datagen -g33M   | $(LZ4) --no-frame-crc | $(LZ4) -t
 	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
 	@echo "hello world" > tmp
-	$(LZ4) --rm -f tmp
-	ls -ls tmp         && false || true   # must fail (--rm)
-	ls -ls tmp.lz4
-	$(PRGDIR)/lz4cat tmp.lz4              # must display hello world
-	ls -ls tmp.lz4
-	$(PRGDIR)/unlz4 --rm tmp.lz4
-	ls -ls tmp
-	ls -ls tmp.lz4     && false || true   # must fail (--rm)
-	ls -ls tmp.lz4.lz4 && false || true   # must fail (unlz4)
-	$(PRGDIR)/lz4cat tmp                  # pass-through mode
-	ls -ls tmp
-	ls -ls tmp.lz4     && false || true   # must fail (lz4cat)
-	$(LZ4) tmp                         # creates tmp.lz4
+	$(LZ4) --rm -f tmp tmp.lz4
+	test ! -f tmp                      # must fail (--rm)
+	test   -f tmp.lz4
+	$(PRGDIR)/lz4cat tmp.lz4           # must display hello world
+	test   -f tmp.lz4
+	$(PRGDIR)/unlz4 --rm tmp.lz4 tmp
+	test   -f tmp
+	test ! -f tmp.lz4                  # must fail (--rm)
+	test ! -f tmp.lz4.lz4              # must fail (unlz4)
+	$(PRGDIR)/lz4cat tmp               # pass-through mode
+	test   -f tmp
+	test ! -f tmp.lz4                  # must fail (lz4cat)
+	$(LZ4) tmp tmp.lz4                 # creates tmp.lz4
 	$(PRGDIR)/lz4cat < tmp.lz4 > tmp3  # checks lz4cat works with stdin (#285)
 	$(DIFF) -q tmp tmp3
 	$(PRGDIR)/lz4cat < tmp > tmp2      # checks lz4cat works with stdin (#285)
 	$(DIFF) -q tmp tmp2
+	cp tmp ./-d
+	$(LZ4) --rm -- -d -d.lz4           # compresses ./d into ./-d.lz4
+	test   -f ./-d.lz4
+	test ! -f ./-d
+	mv ./-d.lz4 ./-z
+	$(LZ4) -d --rm -- -z tmp4          # uncompresses ./-z into tmp4
+	test ! -f ./-z
+	$(DIFF) -q tmp tmp4
+	$(LZ4) -f tmp
+	cat tmp >> tmp.lz4
+	$(LZ4) -f tmp.lz4         # uncompress valid frame followed by invalid data
+	$(LZ4) -BX tmp -c -q | $(LZ4) -tv  # test block checksum
 	@$(RM) tmp*
 
 test-lz4-hugefile: lz4 datagen
@@ -260,22 +274,22 @@ test-lz4-hugefile: lz4 datagen
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
-	$(LZ4) -bi1
+	  $(LZ4) -bi1
 	@echo "\n ---- test mode ----"
-	./datagen | $(LZ4) -t             && false || true
-	./datagen | $(LZ4) -tf            && false || true
+	! ./datagen | $(LZ4) -t
+	! ./datagen | $(LZ4) -tf
 	@echo "\n ---- pass-through mode ----"
-	./datagen | $(LZ4) -d  > $(VOID)  && false || true
-	./datagen | $(LZ4) -df > $(VOID)
+	! ./datagen | $(LZ4) -d  > $(VOID)
+	  ./datagen | $(LZ4) -df > $(VOID)
 	@echo "Hello World !" > tmp1
 	$(LZ4) -dcf tmp1
 	@echo "from underground..." > tmp2
 	$(LZ4) -dcfm tmp1 tmp2
 	@echo "\n ---- test cli ----"
-	$(LZ4)     file-does-not-exist    && false || true
-	$(LZ4) -f  file-does-not-exist    && false || true
-	$(LZ4) -fm file1-dne file2-dne    && false || true
-	$(LZ4) -fm file1-dne file2-dne    && false || true
+	! $(LZ4)     file-does-not-exist
+	! $(LZ4) -f  file-does-not-exist
+	! $(LZ4) -fm file1-dne file2-dne
+	! $(LZ4) -fm file1-dne file2-dne
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"

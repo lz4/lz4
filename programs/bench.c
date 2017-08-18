@@ -231,7 +231,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
         UTIL_getTime(&coolTime);
         DISPLAYLEVEL(2, "\r%79s\r", "");
-        while (!cCompleted | !dCompleted) {
+        while (!cCompleted || !dCompleted) {
             UTIL_time_t clockStart;
             U64 clockLoop = g_nbSeconds ? TIMELOOP_MICROSEC : 1;
 
@@ -393,7 +393,7 @@ static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
     if (!pch) pch = strrchr(displayName, '/'); /* Linux */
     if (pch) displayName = pch+1;
 
-    SET_HIGH_PRIORITY;
+    SET_REALTIME_PRIORITY;
 
     if (g_displayLevel == 1 && !g_additionalParam)
         DISPLAY("bench %s %s: input %u bytes, %u seconds, %u KB blocks\n", LZ4_VERSION_STRING, LZ4_GIT_COMMIT_STRING, (U32)benchedSize, g_nbSeconds, (U32)(g_blockSize>>10));
@@ -455,8 +455,13 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     benchedSize = BMK_findMaxMem(totalSizeToLoad * 3) / 3;
     if (benchedSize==0) EXM_THROW(12, "not enough memory");
     if ((U64)benchedSize > totalSizeToLoad) benchedSize = (size_t)totalSizeToLoad;
-    if (benchedSize < totalSizeToLoad)
-        DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
+    if (benchedSize > LZ4_MAX_INPUT_SIZE) {
+        benchedSize = LZ4_MAX_INPUT_SIZE; 
+        DISPLAY("File(s) bigger than LZ4's max input size; testing %u MB only...\n", (U32)(benchedSize >> 20));
+    } else { 
+        if (benchedSize < totalSizeToLoad)
+            DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
+    }
     srcBuffer = malloc(benchedSize + !benchedSize);   /* avoid alloc of zero */
     if (!srcBuffer) EXM_THROW(12, "not enough memory");
 

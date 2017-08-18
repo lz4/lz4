@@ -90,10 +90,18 @@ A 255 value means there is another byte to read and add.
 There is no limit to the number of optional bytes that can be output this way.
 (This points towards a maximum achievable compression ratio of about 250).
 
-With the offset and the matchlength,
-the decoder can now proceed to copy the data from the already decoded buffer.
-On decoding the matchlength, we reach the end of the compressed sequence,
-and therefore start another one.
+Decoding the matchlength reaches the end of current sequence.
+Next byte will be the start of another sequence.
+But before moving to next sequence,
+it's time to use the decoded match position and length.
+The decoder copies matchlength bytes from match position to current position.
+
+In some cases, matchlength is larger than offset.
+Therefore, match pos + match length > current pos,
+which means that later bytes to copy are not yet decoded.
+This is called an "overlap match", and must be handled with special care.
+The most common case is an offset of 1,
+meaning the last byte is repeated matchlength times.
 
 
 Parsing restrictions

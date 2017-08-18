@@ -6,4 +6,5 @@
 /ringBufferHC
 /lineCompress
 /frameCompress
+/simpleBuffer
 /*.exe

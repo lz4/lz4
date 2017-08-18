@@ -3,6 +3,8 @@
 # Copyright (C) Yann Collet 2011-2016
 # All rights reserved.
 #
+# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
+#
 # BSD license
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -40,14 +42,14 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
-BUILD_STATIC:= yes
+BUILD_STATIC:=yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
-DEBUGFLAGS:=-g -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
+DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
            -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(MOREFLAGS)
+CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS    = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 
@@ -58,7 +60,7 @@ ifeq ($(shell uname), Darwin)
 	SHARED_EXT = dylib
 	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
 	SHARED_EXT_VER = $(LIBVER).$(SHARED_EXT)
-	SONAME_FLAGS = -install_name $(PREFIX)/lib/liblz4.$(SHARED_EXT_MAJOR) -compatibility_version $(LIBVER_MAJOR) -current_version $(LIBVER)
+	SONAME_FLAGS = -install_name $(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR) -compatibility_version $(LIBVER_MAJOR) -current_version $(LIBVER)
 else
 	SONAME_FLAGS = -Wl,-soname=liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
 	SHARED_EXT = so
@@ -68,12 +70,13 @@ endif
 
 LIBLZ4 = liblz4.$(SHARED_EXT_VER)
 
+.PHONY: default
 default: lib-release
 
-lib-release: liblz4.a liblz4
+lib-release: DEBUGFLAGS :=
+lib-release: lib
 
-lib: CFLAGS += $(DEBUGFLAGS)
-lib: lib-release
+lib: liblz4.a liblz4
 
 all: lib
 
@@ -81,7 +84,7 @@ all32: CFLAGS+=-m32
 all32: all
 
 liblz4.a: *.c
-ifeq ($(BUILD_STATIC),yes)
+ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs $@ *.o
@@ -93,7 +96,7 @@ ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
 	dlltool -D dll\liblz4.dll -d dll\liblz4.def -l dll\liblz4.lib
 else
-	@$(CC) $(FLAGS) -shared $^ -fPIC $(SONAME_FLAGS) -o $@
+	@$(CC) $(FLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
 	@ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf $@ liblz4.$(SHARED_EXT)
@@ -112,16 +115,16 @@ clean:
 #-----------------------------------------------------------------------------
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
-ifneq (,$(filter $(shell uname),SunOS))
-INSTALL ?= ginstall
-else
-INSTALL ?= install
-endif
-
-PREFIX     ?= /usr/local
-DESTDIR    ?=
-LIBDIR     ?= $(PREFIX)/lib
-INCLUDEDIR ?= $(PREFIX)/include
+DESTDIR     ?=
+# directory variables : GNU convention prefers lowercase
+# support both lower and uppercase (BSD), use uppercase in script
+prefix      ?= /usr/local
+PREFIX      ?= $(prefix)
+exec_prefix ?= $(PREFIX)
+libdir      ?= $(exec_prefix)/lib
+LIBDIR      ?= $(libdir)
+includedir  ?= $(PREFIX)/include
+INCLUDEDIR  ?= $(includedir)
 
 ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly))
 PKGCONFIGDIR ?= $(PREFIX)/libdata/pkgconfig
@@ -129,8 +132,14 @@ else
 PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
 endif
 
-INSTALL_LIB  ?= $(INSTALL) -m 755
-INSTALL_DATA ?= $(INSTALL) -m 644
+ifneq (,$(filter $(shell uname),SunOS))
+INSTALL ?= ginstall
+else
+INSTALL ?= install
+endif
+
+INSTALL_PROGRAM ?= $(INSTALL)
+INSTALL_DATA    ?= $(INSTALL) -m 644
 
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
@@ -141,20 +150,21 @@ liblz4.pc: liblz4.pc.in Makefile
           $< >$@
 
 install: lib liblz4.pc
-	@$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/
+	@$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/ $(DESTDIR)$(LIBDIR)/
 	@$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(PKGCONFIGDIR)/
 	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
-	@$(INSTALL_LIB) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@$(INSTALL_DATA) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	@$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
 endif
-	@$(INSTALL_LIB) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
+	@$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
-	@echo Installing includes
+	@echo Installing headers in $(INCLUDEDIR)
 	@$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
 	@$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
-	@echo lz4 static and shared libraries installed
+	@echo lz4 libraries installed
 
 uninstall:
 	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc

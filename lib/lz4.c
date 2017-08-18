@@ -1,6 +1,6 @@
 /*
    LZ4 - Fast LZ compression algorithm
-   Copyright (C) 2011-2016, Yann Collet.
+   Copyright (C) 2011-2017, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -37,12 +37,12 @@
 *  Tuning parameters
 **************************************/
 /*
- * HEAPMODE :
+ * LZ4_HEAPMODE :
  * Select how default compression functions will allocate memory for their hash table,
  * in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
  */
-#ifndef HEAPMODE
-#  define HEAPMODE 0
+#ifndef LZ4_HEAPMODE
+#  define LZ4_HEAPMODE 0
 #endif
 
 /*
@@ -63,16 +63,15 @@
  * Method 1 : `__packed` statement. It depends on compiler extension (ie, not portable).
  *            This method is safe if your compiler supports it, and *generally* as fast or faster than `memcpy`.
  * Method 2 : direct access. This method is portable but violate C standard.
- *            It can generate buggy code on targets which generate assembly depending on alignment.
+ *            It can generate buggy code on targets which assembly generation depends on alignment.
  *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
  * See https://fastcompression.blogspot.fr/2015/08/accessing-unaligned-memory.html for details.
  * Prefer these methods in priority order (0 > 1 > 2)
  */
-#ifndef LZ4_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
+#ifndef LZ4_FORCE_MEMORY_ACCESS   /* can be defined externally */
 #  if defined(__GNUC__) && ( defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || defined(__ARM_ARCH_6T2__) )
 #    define LZ4_FORCE_MEMORY_ACCESS 2
-#  elif defined(__INTEL_COMPILER) || \
-  (defined(__GNUC__) && ( defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7S__) ))
+#  elif defined(__INTEL_COMPILER) || defined(__GNUC__)
 #    define LZ4_FORCE_MEMORY_ACCESS 1
 #  endif
 #endif
@@ -97,19 +96,26 @@
 *  Compiler Options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
 #  include <intrin.h>
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
-#else
-#  if defined(__GNUC__) || defined(__clang__)
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  elif defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
-#    define FORCE_INLINE static inline
-#  else
-#    define FORCE_INLINE static
-#  endif
 #endif  /* _MSC_VER */
+
+#ifndef FORCE_INLINE
+#  ifdef _MSC_VER    /* Visual Studio */
+#    define FORCE_INLINE static __forceinline
+#  else
+#    if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
+#      ifdef __GNUC__
+#        define FORCE_INLINE static inline __attribute__((always_inline))
+#      else
+#        define FORCE_INLINE static inline
+#      endif
+#    else
+#      define FORCE_INLINE static
+#    endif /* __STDC_VERSION__ */
+#  endif  /* _MSC_VER */
+#endif /* FORCE_INLINE */
 
 #if (defined(__GNUC__) && (__GNUC__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
@@ -281,9 +287,21 @@ static const int LZ4_minLength = (MFLIMIT+1);
 
 
 /*-************************************
-*  Common Utils
+*  Error detection
 **************************************/
 #define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
+#  include <stdio.h>
+#  define DEBUGLOG(l, ...) {                          \
+                if (l<=LZ4_DEBUG) {                   \
+                    fprintf(stderr, __FILE__ ": ");   \
+                    fprintf(stderr, __VA_ARGS__);     \
+                    fprintf(stderr, " \n");           \
+            }   }
+#else
+#  define DEBUGLOG(l, ...)      {}    /* disabled */
+#endif
 
 
 /*-************************************
@@ -678,7 +696,7 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 
 int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     void* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctx;
@@ -687,7 +705,7 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 
     int const result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     FREEMEM(ctxPtr);
 #endif
     return result;
@@ -891,7 +909,7 @@ static int LZ4_compress_destSize_extState (LZ4_stream_t* state, const char* src,
 
 int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targetDstSize)
 {
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     LZ4_stream_t* ctx = (LZ4_stream_t*)ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
 #else
     LZ4_stream_t ctxBody;
@@ -900,7 +918,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 
     int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
 
-#if (HEAPMODE)
+#if (LZ4_HEAPMODE)
     FREEMEM(ctx);
 #endif
     return result;
@@ -927,6 +945,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
+    if (!LZ4_stream) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return (0);
 }
@@ -1266,11 +1285,6 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 
 /*===== streaming decompression functions =====*/
 
-/*
- * If you prefer dynamic allocation methods,
- * LZ4_createStreamDecode()
- * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
- */
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(1, sizeof(LZ4_streamDecode_t));
@@ -1279,6 +1293,7 @@ LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
+    if (!LZ4_stream) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return 0;
 }
