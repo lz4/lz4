@@ -101,21 +101,21 @@
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #endif  /* _MSC_VER */
 
-#ifndef FORCE_INLINE
+#ifndef LZ4_FORCE_INLINE
 #  ifdef _MSC_VER    /* Visual Studio */
-#    define FORCE_INLINE static __forceinline
+#    define LZ4_FORCE_INLINE static __forceinline
 #  else
 #    if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 #      ifdef __GNUC__
-#        define FORCE_INLINE static inline __attribute__((always_inline))
+#        define LZ4_FORCE_INLINE static inline __attribute__((always_inline))
 #      else
-#        define FORCE_INLINE static inline
+#        define LZ4_FORCE_INLINE static inline
 #      endif
 #    else
-#      define FORCE_INLINE static
+#      define LZ4_FORCE_INLINE static
 #    endif /* __STDC_VERSION__ */
 #  endif  /* _MSC_VER */
-#endif /* FORCE_INLINE */
+#endif /* LZ4_FORCE_INLINE */
 
 #if (defined(__GNUC__) && (__GNUC__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
@@ -436,7 +436,7 @@ static U32 LZ4_hash5(U64 sequence, tableType_t const tableType)
         return (U32)(((sequence >> 24) * prime8bytes) >> (64 - hashLog));
 }
 
-FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tableType)
+LZ4_FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tableType)
 {
     if ((sizeof(reg_t)==8) && (tableType != byU16)) return LZ4_hash5(LZ4_read_ARCH(p), tableType);
     return LZ4_hash4(LZ4_read32(p), tableType);
@@ -452,7 +452,7 @@ static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableTy
     }
 }
 
-FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+LZ4_FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     LZ4_putPositionOnHash(p, h, tableBase, tableType, srcBase);
@@ -465,7 +465,7 @@ static const BYTE* LZ4_getPositionOnHash(U32 h, void* tableBase, tableType_t tab
     { const U16* const hashTable = (U16*) tableBase; return hashTable[h] + srcBase; }   /* default, to ensure a return */
 }
 
-FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+LZ4_FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
@@ -474,7 +474,7 @@ FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableTy
 
 /** LZ4_compress_generic() :
     inlined, to ensure branches are decided at compilation time */
-FORCE_INLINE int LZ4_compress_generic(
+LZ4_FORCE_INLINE int LZ4_compress_generic(
                  LZ4_stream_t_internal* const cctx,
                  const char* const source,
                  char* const dest,
@@ -1105,7 +1105,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
  *  Note that it is important this generic function is really inlined,
  *  in order to remove useless branches during compilation optimization.
  */
-FORCE_INLINE int LZ4_decompress_generic(
+LZ4_FORCE_INLINE int LZ4_decompress_generic(
                  const char* const source,
                  char* const dest,
                  int inputSize,
@@ -1382,7 +1382,7 @@ Advanced decoding functions :
     the dictionary must be explicitly provided within parameters
 */
 
-FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest, int compressedSize, int maxOutputSize, int safe, const char* dictStart, int dictSize)
+LZ4_FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest, int compressedSize, int maxOutputSize, int safe, const char* dictStart, int dictSize)
 {
     if (dictSize==0)
         return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, noDict, (BYTE*)dest, NULL, 0);
