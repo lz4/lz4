@@ -96,7 +96,7 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 
 
 /* Update chains up to ip (excluded) */
-FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
+LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
 {
     U16* const chainTable = hc4->chainTable;
     U32* const hashTable  = hc4->hashTable;
@@ -117,7 +117,7 @@ FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
 }
 
 
-FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
+LZ4_FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                                                const BYTE* const ip, const BYTE* const iLimit,
                                                const BYTE** matchpos,
                                                const int maxNbAttempts)
@@ -165,7 +165,7 @@ FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,  
 }
 
 
-FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
+LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     LZ4HC_CCtx_internal* hc4,
     const BYTE* const ip,
     const BYTE* const iLowLimit,
@@ -248,7 +248,7 @@ typedef enum {
 /* LZ4HC_encodeSequence() :
  * @return : 0 if ok,
  *           1 if buffer issue detected */
-FORCE_INLINE int LZ4HC_encodeSequence (
+LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     const BYTE** ip,
     BYTE** op,
     const BYTE** anchor,
