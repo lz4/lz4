@@ -309,4 +309,6 @@ int main(int argc, const char **argv) {
         fclose(decFp);
         fclose(inpFp);
     }
+
+    return 0;
 }
