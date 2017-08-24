@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-2017
 #
 # This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #
@@ -76,7 +76,6 @@ lz4c:
 
 lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
-	cp $(LZ4) $(LZ4)c32
 
 fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)

@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-2017
 #
 # This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #

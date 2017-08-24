@@ -1,8 +1,33 @@
+/*
+    fasttest.c -
+    Copyright (C) Yann Collet 2012-2017
+
+    GPL v2 License
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+    You can contact the author at :
+    - LZ4 homepage : http://www.lz4.org
+    - LZ4 source repo : https://github.com/lz4/lz4
+*/
+
 /**************************************
  * Compiler Options
  **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS // for MSVC
+#  define _CRT_SECURE_NO_WARNINGS  /* for MSVC */
 #  define snprintf sprintf_s
 #endif
 #ifdef __GNUC__
@@ -35,16 +60,15 @@ int test_compress(const char *input, int inSize, char *output, int outSize)
         const int length = inSize >> 2;
         if (inSize > 1024) return -2;
         if (outSize - (outOffset + 8) < LZ4_compressBound(length)) return -3;
-        {
-            const int outBytes = LZ4_compress_fast_continue(
-                lz4Stream, input + inOffset, output + outOffset + 8, length, outSize-outOffset, 1);
+        {   const int outBytes = LZ4_compress_fast_continue(
+                lz4Stream, input + inOffset, output + outOffset + 8,
+                length, outSize-outOffset, 1);
             if(outBytes <= 0) return -4;
             memcpy(output + outOffset, &length, 4); /* input length */
             memcpy(output + outOffset + 4, &outBytes, 4); /* output length */
             inOffset += length;
             outOffset += outBytes + 8;
-        }
-    }
+    }   }
     if (outOffset + 8 > outSize) return -5;
     memset(output + outOffset, 0, 4);
     memset(output + outOffset + 4, 0, 4);
