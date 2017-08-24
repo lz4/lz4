@@ -50,7 +50,7 @@ typedef struct {
 
 
 /* price in bytes */
-FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
+LZ4_FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
 {
     size_t price = litlen;
     if (litlen >= (size_t)RUN_MASK)
@@ -60,7 +60,7 @@ FORCE_INLINE size_t LZ4HC_literalsPrice(size_t litlen)
 
 
 /* requires mlen >= MINMATCH */
-FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
+LZ4_FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
 {
     size_t price = 2 + 1; /* 16-bit offset + token */
 
@@ -76,7 +76,7 @@ FORCE_INLINE size_t LZ4HC_sequencePrice(size_t litlen, size_t mlen)
 /*-*************************************
 *  Binary Tree search
 ***************************************/
-FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
+LZ4_FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
     LZ4HC_CCtx_internal* ctx,
     const BYTE* const ip,
     const BYTE* const iHighLimit,
@@ -170,7 +170,7 @@ FORCE_INLINE int LZ4HC_BinTree_InsertAndGetAllMatches (
 }
 
 
-FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* const ip, const BYTE* const iHighLimit)
+LZ4_FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* const ip, const BYTE* const iHighLimit)
 {
     const BYTE* const base = ctx->base;
     const U32 target = (U32)(ip - base);
@@ -181,7 +181,7 @@ FORCE_INLINE void LZ4HC_updateBinTree(LZ4HC_CCtx_internal* ctx, const BYTE* cons
 
 
 /** Tree updater, providing best match */
-FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
+LZ4_FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
                         LZ4HC_CCtx_internal* ctx,
                         const BYTE* const ip, const BYTE* const iHighLimit,
                         size_t best_mlen, LZ4HC_match_t* matches, const int fullUpdate)
