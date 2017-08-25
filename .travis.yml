@@ -11,7 +11,7 @@ matrix:
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fasttest test-fullbench' COMPILER=cc
+      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fullbench' COMPILER=cc
 
     - os: linux
       sudo: false

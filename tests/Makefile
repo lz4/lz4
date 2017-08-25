@@ -296,7 +296,7 @@ test-lz4: lz4 datagen test-lz4-basic test-lz4-opt-parser test-lz4-multiple \
 	@$(RM) tmp*
 
 test-lz4c: lz4c datagen
-	@echo "\n ---- test lz4c version ----"
+	@echo "\n ---- test lz4c variant ----"
 	./datagen -g256MB | $(LZ4)c -l -v    | $(LZ4)c   -t
 
 test-lz4c32: CFLAGS+=-m32
