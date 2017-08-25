@@ -71,8 +71,8 @@ all32: all
 lz4:
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
-lz4c:
-	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
+lz4c unlz4 lz4cat: lz4
+	ln -sf $(LZ4) $(PRGDIR)/$@
 
 lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
@@ -115,7 +115,7 @@ versionsTest:
 
 
 #-----------------------------------------------------------------------------
-# make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
+# validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
@@ -206,12 +206,6 @@ test-lz4-multiple: lz4 datagen
 	ls -ls tmp-tlm*
 	$(LZ4) -f -m tmp-tlm1 notHere tmp-tlm2; echo $$?
 	@$(RM) tmp-tlm*
-
-unlz4:
-	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
-
-lz4cat:
-	@$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
