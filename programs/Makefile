@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-2017
 #
 # This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #
@@ -42,7 +42,8 @@ LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
 SRCFILES := $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c)
-OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
+#OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
+OBJFILES := $(SRCFILES:.c=.o)
 
 CPPFLAGS += -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 CFLAGS   ?= -O3
@@ -81,12 +82,12 @@ lz4: $(OBJFILES)
 lz4-release: DEBUGFLAGS=
 lz4-release: lz4
 
+lz4c: lz4
+	ln -s lz4 lz4c
+
 lz4c32: CFLAGS += -m32
 lz4c32 : $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
-
-lz4c: lz4
-	ln -s lz4 lz4c
 
 lz4.1: lz4.1.md
 	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@

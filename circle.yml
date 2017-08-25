@@ -19,7 +19,6 @@ test:
     - make cmake               && make clean
     - make -C tests test-lz4
     - make -C tests test-lz4c
-    - make -C tests test-fasttest
     - make -C tests test-frametest
     - make -C tests test-fullbench
     - make -C tests test-fuzzer && make clean
