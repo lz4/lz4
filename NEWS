@@ -1,3 +1,7 @@
+v1.8.1
+install: fix : correct man page directory (#387), reported by Stuart Cardall (@itoffshore)
+build  : `make` and `make test` compatible with `-jX`, reported by @mwgamera
+
 v1.8.0
 cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
 cli : added GNU separator -- specifying that all following arguments are files
