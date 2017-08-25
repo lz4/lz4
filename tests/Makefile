@@ -63,7 +63,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest datagen fasttest
+all: fullbench fuzzer frametest datagen
 
 all32: CFLAGS+=-m32
 all32: all
@@ -92,9 +92,6 @@ fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o frametest.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
-
-fasttest: $(LZ4DIR)/lz4.o fasttest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
@@ -133,7 +130,7 @@ DIFF:=gdiff
 endif
 
 
-test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer
 
 test32: CFLAGS+=-m32
 test32: test
@@ -354,9 +351,6 @@ test-frametest: frametest
 
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
-
-test-fasttest: fasttest
-	./fasttest
 
 test-mem: lz4 datagen fuzzer frametest fullbench
 	@echo "\n ---- valgrind tests : memory analyzer ----"
