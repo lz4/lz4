@@ -47,11 +47,12 @@ BUILD_STATIC:=yes
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
-           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
-           -Wpointer-arith -Wstrict-aliasing=1
+             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
+             -Wundef -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS    = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
+SRCFILES := $(sort $(wildcard *.c))
 
 
 # OS X linker doesn't support -soname, and use different extension

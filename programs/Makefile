@@ -41,15 +41,15 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
-SRCFILES := $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c)
+SRCFILES := $(sort $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c))
 #OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
 OBJFILES := $(SRCFILES:.c=.o)
 
 CPPFLAGS += -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 CFLAGS   ?= -O3
 DEBUGFLAGS:=-Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
-           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
-           -Wpointer-arith -Wstrict-aliasing=1
+            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
+            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS   += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS     = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
