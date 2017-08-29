@@ -84,14 +84,14 @@ all: lib
 all32: CFLAGS+=-m32
 all32: all
 
-liblz4.a: *.c
+liblz4.a: $(SRCFILES)
 ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs $@ *.o
 endif
 
-$(LIBLZ4): *.c
+$(LIBLZ4): $(SRCFILES)
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
