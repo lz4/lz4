@@ -242,24 +242,29 @@ LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
 
 /*! LZ4_resetStream() :
  *  An LZ4_stream_t structure can be allocated once and re-used multiple times.
- *  Use this function to init an allocated `LZ4_stream_t` structure and start a new compression.
+ *  Use this function to start compressing a new stream.
  */
 LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
 
 /*! LZ4_loadDict() :
- *  Use this function to load a static dictionary into LZ4_stream.
+ *  Use this function to load a static dictionary into LZ4_stream_t.
  *  Any previous data will be forgotten, only 'dictionary' will remain in memory.
- *  Loading a size of 0 is allowed.
- *  Return : dictionary size, in bytes (necessarily <= 64 KB)
+ *  Loading a size of 0 is allowed, and is the same as reset.
+ * @return : dictionary size, in bytes (necessarily <= 64 KB)
  */
 LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, int dictSize);
 
 /*! LZ4_compress_fast_continue() :
- *  Compress buffer content 'src', using data from previously compressed blocks as dictionary to improve compression ratio.
- *  Important : Previous data blocks are assumed to remain present and unmodified !
+ *  Compress content into 'src' using data from previously compressed blocks, improving compression ratio.
  *  'dst' buffer must be already allocated.
  *  If dstCapacity >= LZ4_compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
- *  If not, and if compressed data cannot fit into 'dst' buffer size, compression stops, and function @return==0.
+ *
+ *  Important : Up to 64KB of previously compressed data is assumed to remain present and unmodified in memory !
+ *  Special 1 : If input buffer is a double-buffer, it can have any size, including < 64 KB.
+ *  Special 2 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
+ *
+ * @return : size of compressed block
+ *           or 0 if there is an error (typically, compressed data cannot fit into 'dst')
  *  After an error, the stream status is invalid, it can only be reset or freed.
  */
 LZ4LIB_API int LZ4_compress_fast_continue (LZ4_stream_t* streamPtr, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
@@ -286,6 +291,7 @@ LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
 /*! LZ4_setStreamDecode() :
+ *  An LZ4_streamDecode_t structure can be allocated once and re-used multiple times.
  *  Use this function to start decompression of a new stream of blocks.
  *  A dictionary can optionnally be set. Use NULL or size 0 for a simple reset order.
  * @return : 1 if OK, 0 if error
@@ -309,7 +315,7 @@ LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const 
  *    In which case, encoding and decoding buffers do not need to be synchronized,
  *    and encoding ring buffer can have any size, including larger than decoding buffer.
  *  Whenever these conditions are not possible, save the last 64KB of decoded data into a safe buffer,
- *  and indicate where it is saved using LZ4_setStreamDecode() before decompressin next block.
+ *  and indicate where it is saved using LZ4_setStreamDecode() before decompressing next block.
 */
 LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
