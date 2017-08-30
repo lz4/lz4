@@ -280,32 +280,36 @@ LZ4LIB_API int LZ4_saveDict (LZ4_stream_t* streamPtr, char* safeBuffer, int dict
 typedef union LZ4_streamDecode_u LZ4_streamDecode_t;   /* incomplete type (defined later) */
 
 /*! LZ4_createStreamDecode() and LZ4_freeStreamDecode() :
- *  creation / destruction of streaming decompression tracking structure */
+ *  creation / destruction of streaming decompression tracking structure.
+ *  A tracking structure can be re-used multiple times sequentially. */
 LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
 /*! LZ4_setStreamDecode() :
- *  Use this function to instruct where to find the dictionary.
- *  Setting a size of 0 is allowed (same effect as reset).
- *  @return : 1 if OK, 0 if error
+ *  Use this function to start decompression of a new stream of blocks.
+ *  A dictionary can optionnally be set. Use NULL or size 0 for a simple reset order.
+ * @return : 1 if OK, 0 if error
  */
 LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize);
 
 /*! LZ4_decompress_*_continue() :
- *  These decoding functions allow decompression of multiple blocks in "streaming" mode.
- *  Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB)
- *  In the case of a ring buffers, decoding buffer must be either :
+ *  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
+ *  A block is an unsplittable entity, it must be presented entirely to a decompression function.
+ *  Decompression functions only accept one block at a time.
+ *  Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB).
+ *
+ *  Special : if application sets a ring buffer for decompression, it must respect one of the following conditions :
  *  - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
  *    In which case, the decoding & encoding ring buffer can have any size, including very small ones ( < 64 KB).
  *  - Larger than encoding buffer, by a minimum of maxBlockSize more bytes.
- *    maxBlockSize is implementation dependent. It's the maximum size you intend to compress into a single block.
+ *    maxBlockSize is implementation dependent. It's the maximum size of any single block.
  *    In which case, encoding and decoding buffers do not need to be synchronized,
  *    and encoding ring buffer can have any size, including small ones ( < 64 KB).
  *  - _At least_ 64 KB + 8 bytes + maxBlockSize.
  *    In which case, encoding and decoding buffers do not need to be synchronized,
  *    and encoding ring buffer can have any size, including larger than decoding buffer.
  *  Whenever these conditions are not possible, save the last 64KB of decoded data into a safe buffer,
- *  and indicate where it is saved using LZ4_setStreamDecode()
+ *  and indicate where it is saved using LZ4_setStreamDecode() before decompressin next block.
 */
 LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxDecompressedSize);
 LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize);
