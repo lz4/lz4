@@ -82,7 +82,7 @@ make install     # this command may require root access
 
 LZ4's `Makefile` supports standard [Makefile conventions],
 including [staged installs], [redirection], or [command redefinition].
-It is compatible with parallel builds (`'-j#'`).
+It is compatible with parallel builds (`-j#`).
 
 [Makefile conventions]: https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
 [staged installs]: https://www.gnu.org/prep/standards/html_node/DESTDIR.html
