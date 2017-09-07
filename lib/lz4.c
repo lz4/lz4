@@ -289,7 +289,7 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Error detection
 **************************************/
-#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+#define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
 #  include <stdio.h>
@@ -1100,31 +1100,30 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 *  Decompression functions
 *******************************/
 /*! LZ4_decompress_generic() :
- *  This generic decompression function cover all use cases.
- *  It shall be instantiated several times, using different sets of directives
- *  Note that it is important this generic function is really inlined,
+ *  This generic decompression function covers all use cases.
+ *  It shall be instantiated several times, using different sets of directives.
+ *  Note that it is important for performance that this function really get inlined,
  *  in order to remove useless branches during compilation optimization.
  */
 LZ4_FORCE_INLINE int LZ4_decompress_generic(
-                 const char* const source,
-                 char* const dest,
-                 int inputSize,
-                 int outputSize,         /* If endOnInput==endOnInputSize, this value is the max size of Output Buffer. */
+                 const char* const src,
+                 char* const dst,
+                 int srcSize,
+                 int outputSize,         /* If endOnInput==endOnInputSize, this value is `dstCapacity` */
 
                  int endOnInput,         /* endOnOutputSize, endOnInputSize */
                  int partialDecoding,    /* full, partial */
                  int targetOutputSize,   /* only used if partialDecoding==partial */
                  int dict,               /* noDict, withPrefix64k, usingExtDict */
-                 const BYTE* const lowPrefix,  /* == dest when no prefix */
+                 const BYTE* const lowPrefix,  /* == dst when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
                  const size_t dictSize         /* note : = 0 if noDict */
                  )
 {
-    /* Local Variables */
-    const BYTE* ip = (const BYTE*) source;
-    const BYTE* const iend = ip + inputSize;
+    const BYTE* ip = (const BYTE*) src;
+    const BYTE* const iend = ip + srcSize;
 
-    BYTE* op = (BYTE*) dest;
+    BYTE* op = (BYTE*) dst;
     BYTE* const oend = op + outputSize;
     BYTE* cpy;
     BYTE* oexit = op + targetOutputSize;
@@ -1140,7 +1139,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
     /* Special cases */
     if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
-    if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
+    if ((endOnInput) && (unlikely(outputSize==0))) return ((srcSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
     /* Main Loop : decode sequences */
@@ -1257,13 +1256,13 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
     /* end of decoding */
     if (endOnInput)
-       return (int) (((char*)op)-dest);     /* Nb of output bytes decoded */
+       return (int) (((char*)op)-dst);     /* Nb of output bytes decoded */
     else
-       return (int) (((const char*)ip)-source);   /* Nb of input bytes read */
+       return (int) (((const char*)ip)-src);   /* Nb of input bytes read */
 
     /* Overflow error detected */
 _output_error:
-    return (int) (-(((const char*)ip)-source))-1;
+    return (int) (-(((const char*)ip)-src))-1;
 }
 
 

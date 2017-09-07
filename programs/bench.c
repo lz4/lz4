@@ -68,7 +68,7 @@ static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSi
 #define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
 #define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
 #define COOLPERIOD_SEC        10
-#define DECOMP_MULT           2 /* test decompression DECOMP_MULT times longer than compression */
+#define DECOMP_MULT           1 /* test decompression DECOMP_MULT times longer than compression */
 
 #define KB *(1 <<10)
 #define MB *(1 <<20)
@@ -456,9 +456,9 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     if (benchedSize==0) EXM_THROW(12, "not enough memory");
     if ((U64)benchedSize > totalSizeToLoad) benchedSize = (size_t)totalSizeToLoad;
     if (benchedSize > LZ4_MAX_INPUT_SIZE) {
-        benchedSize = LZ4_MAX_INPUT_SIZE; 
+        benchedSize = LZ4_MAX_INPUT_SIZE;
         DISPLAY("File(s) bigger than LZ4's max input size; testing %u MB only...\n", (U32)(benchedSize >> 20));
-    } else { 
+    } else {
         if (benchedSize < totalSizeToLoad)
             DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
     }
