@@ -1,4 +1,5 @@
 v1.8.1
+fix : decompression failed when using a combination of extDict + low memory address (#397), reported and fixed by Julian Scheid (@jscheid)
 install: fix : correct man page directory (#387), reported by Stuart Cardall (@itoffshore)
 build  : `make` and `make test` compatible with `-jX`, reported by @mwgamera
 
