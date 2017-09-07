@@ -42,7 +42,6 @@ LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
 SRCFILES := $(sort $(wildcard $(LZ4DIR)/*.c) $(wildcard *.c))
-#OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
 OBJFILES := $(SRCFILES:.c=.o)
 
 CPPFLAGS += -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
@@ -118,14 +117,9 @@ unlz4: lz4
 lz4cat: lz4
 	ln -s lz4 lz4cat
 
-ifneq (,$(filter $(shell uname),SunOS))
-INSTALL ?= ginstall
-else
-INSTALL ?= install
-endif
-
 DESTDIR     ?=
-# directory variables : GNU convention prefers lowercase
+# directory variables : GNU conventions prefer lowercase
+# see https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
 # support both lower and uppercase (BSD), use uppercase in script
 prefix      ?= /usr/local
 PREFIX      ?= $(prefix)
@@ -140,6 +134,12 @@ ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly SunOS))
 MANDIR  ?= $(PREFIX)/man/man1
 else
 MANDIR  ?= $(man1dir)
+endif
+
+ifneq (,$(filter $(shell uname),SunOS))
+INSTALL ?= ginstall
+else
+INSTALL ?= install
 endif
 
 INSTALL_PROGRAM ?= $(INSTALL) -m 755

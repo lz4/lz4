@@ -117,7 +117,8 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 DESTDIR     ?=
-# directory variables : GNU convention prefers lowercase
+# directory variables : GNU conventions prefer lowercase
+# see https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
 # support both lower and uppercase (BSD), use uppercase in script
 prefix      ?= /usr/local
 PREFIX      ?= $(prefix)
