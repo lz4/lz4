@@ -33,7 +33,7 @@ matrix:
             - gcc-multilib
 
     # presume clang >= v3.9.0
-    - env: Ubu=14.04 Cmd='make usan MOREFLAGS=-Wcomma' COMPILER=clang
+    - env: Ubu=14.04 Cmd='make usan MOREFLAGS=-Wcomma -Werror' COMPILER=clang
       dist: trusty
       sudo: required
       addons:
