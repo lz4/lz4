@@ -32,7 +32,8 @@ matrix:
             - libc6-dev-i386
             - gcc-multilib
 
-    - env: Ubu=14.04 Cmd='make usan' COMPILER=clang
+    # presume clang >= v3.9.0
+    - env: Ubu=14.04 Cmd='make usan MOREFLAGS=-Wcomma' COMPILER=clang
       dist: trusty
       sudo: required
       addons:
