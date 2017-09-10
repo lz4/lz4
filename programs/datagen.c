@@ -119,7 +119,10 @@ void RDG_genBlock(void* buffer, size_t buffSize, size_t prefixSize, double match
     }
 
     /* init */
-    if (pos==0) buffPtr[0] = RDG_genChar(seed, lt), pos=1;
+    if (pos==0) {
+        buffPtr[0] = RDG_genChar(seed, lt);
+        pos=1;
+    }
 
     /* Generate compressible data */
     while (pos < buffSize)

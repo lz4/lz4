@@ -259,8 +259,11 @@ static int exeNameMatch(const char* exeName, const char* test)
 static unsigned readU32FromChar(const char** stringPtr)
 {
     unsigned result = 0;
-    while ((**stringPtr >='0') && (**stringPtr <='9'))
-        result *= 10, result += **stringPtr - '0', (*stringPtr)++ ;
+    while ((**stringPtr >='0') && (**stringPtr <='9')) {
+        result *= 10;
+        result += **stringPtr - '0';
+        (*stringPtr)++ ;
+    }
     if ((**stringPtr=='K') || (**stringPtr=='M')) {
         result <<= 10;
         if (**stringPtr=='M') result <<= 10;
