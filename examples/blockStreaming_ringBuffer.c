@@ -6,7 +6,7 @@
  * Compiler Options
  **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS // for MSVC
+#  define _CRT_SECURE_NO_WARNINGS
 #  define snprintf sprintf_s
 #endif
 
@@ -24,7 +24,7 @@
 enum {
     MESSAGE_MAX_BYTES   = 1024,
     RING_BUFFER_BYTES   = 1024 * 8 + MESSAGE_MAX_BYTES,
-    DECODE_RING_BUFFER  = RING_BUFFER_BYTES + MESSAGE_MAX_BYTES   // Intentionally larger, to test unsynchronized ring buffers
+    DECODE_RING_BUFFER  = RING_BUFFER_BYTES + MESSAGE_MAX_BYTES   /* Intentionally larger, to test unsynchronized ring buffers */
 };
 
 
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
     char lz4Filename[256] = { 0 };
     char decFilename[256] = { 0 };
 
-    if(argc < 2) {
+    if (argc < 2) {
         printf("Please specify input filename\n");
         return 0;
     }
@@ -176,7 +176,7 @@ int main(int argc, char** argv)
         FILE* const decFp = fopen(decFilename, "rb");
 
         const int cmp = compare(inpFp, decFp);
-        if(0 == cmp) {
+        if (0 == cmp) {
             printf("Verify : OK\n");
         } else {
             printf("Verify : NG\n");
