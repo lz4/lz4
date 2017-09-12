@@ -137,5 +137,5 @@ int main() {
         DISPLAY("FAIL: %d", result);
     }
 
-    return 0;
+    return result;
 }
