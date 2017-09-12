@@ -548,7 +548,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
                 match = LZ4_getPositionOnHash(h, cctx->hashTable, tableType, base);
                 if (dict==usingExtDict) {
-                    if ((int)match < (int)source) {
+                    if ((ptrdiff_t)match < (ptrdiff_t)source) {
                         refDelta = dictDelta;
                         lowLimit = dictionary;
                     } else {
@@ -558,13 +558,13 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
 
-            } while ( ((dictIssue==dictSmall) ? ((int)match < (int)lowRefLimit) : 0)
-                || ((tableType==byU16) ? 0 : ((int)(match + MAX_DISTANCE) < (int)ip))
+            } while ( ((dictIssue==dictSmall) ? ((ptrdiff_t)match < (ptrdiff_t)lowRefLimit) : 0)
+                || ((tableType==byU16) ? 0 : ((ptrdiff_t)(match + MAX_DISTANCE) < (ptrdiff_t)ip))
                 || (LZ4_read32(match+refDelta) != LZ4_read32(ip)) );
         }
 
         /* Catch up */
-        while (((ip>anchor) & ((int)(match+refDelta) > (int)(lowLimit))) && (unlikely(ip[-1]==match[refDelta-1]))) { ip--; match--; }
+        while (((ip>anchor) & ((ptrdiff_t)(match+refDelta) > (ptrdiff_t)lowLimit)) && (unlikely(ip[-1]==match[refDelta-1]))) { ip--; match--; }
 
         /* Encode Literals */
         {   unsigned const litLength = (unsigned)(ip - anchor);
@@ -634,7 +634,7 @@ _next_match:
         /* Test next position */
         match = LZ4_getPosition(ip, cctx->hashTable, tableType, base);
         if (dict==usingExtDict) {
-            if ((int)match < (int)source) {
+            if ((ptrdiff_t)match < (ptrdiff_t)source) {
                 refDelta = dictDelta;
                 lowLimit = dictionary;
             } else {
@@ -642,7 +642,7 @@ _next_match:
                 lowLimit = (const BYTE*)source;
         }   }
         LZ4_putPosition(ip, cctx->hashTable, tableType, base);
-        if ( ((dictIssue==dictSmall) ? ((int)match>=(int)lowRefLimit) : 1)
+        if ( ((dictIssue==dictSmall) ? ((ptrdiff_t)match>=(ptrdiff_t)lowRefLimit) : 1)
             && (match+MAX_DISTANCE>=ip)
             && (LZ4_read32(match+refDelta)==LZ4_read32(ip)) )
         { token=op++; *token=0; goto _next_match; }
@@ -799,7 +799,7 @@ static int LZ4_compress_destSize_generic(
         }
 
         /* Catch up */
-        while ((ip>anchor) && ((int)match > (int)lowLimit) && (unlikely(ip[-1]==match[-1]))) { ip--; match--; }
+        while ((ip>anchor) && ((ptrdiff_t)match > (ptrdiff_t)lowLimit) && (unlikely(ip[-1]==match[-1]))) { ip--; match--; }
 
         /* Encode Literal length */
         {   unsigned litLength = (unsigned)(ip - anchor);
@@ -1184,7 +1184,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         /* get offset */
         offset = LZ4_readLE16(ip); ip+=2;
         match = op - offset;
-        if ((checkOffset) && (unlikely((int)match < (int)lowLimit))) goto _output_error;   /* Error : offset outside buffers */
+        if ((checkOffset) && (unlikely((ptrdiff_t)match < (ptrdiff_t)lowLimit))) goto _output_error;   /* Error : offset outside buffers */
         LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */
 
         /* get matchlength */
@@ -1201,7 +1201,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         length += MINMATCH;
 
         /* check external dictionary */
-        if ((dict==usingExtDict) && ((int)match < (int)lowPrefix)) {
+        if ((dict==usingExtDict) && ((ptrdiff_t)match < (ptrdiff_t)lowPrefix)) {
             if (unlikely(op+length > oend-LASTLITERALS)) goto _output_error;   /* doesn't respect parsing restriction */
 
             if (length <= (size_t)(lowPrefix-match)) {
