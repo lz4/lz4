@@ -8,6 +8,9 @@ fullbench32
 fuzzer
 fuzzer32
 fasttest
+*.html
+*.html.mem
+*.js
 
 # test artefacts
 tmp*

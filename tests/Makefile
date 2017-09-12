@@ -43,6 +43,7 @@ CFLAGS  += $(MOREFLAGS)
 CPPFLAGS:= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
+EMCC_FLAGS = --emrun
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -77,6 +78,9 @@ lz4c unlz4 lz4cat: lz4
 lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
 
+emscripten-tests.html: emscripten-tests.c $(LZ4DIR)/lz4.c
+	emcc ${CFLAGS} ${CPPFLAGS} ${EMCC_FLAGS} $^ -o $@
+
 fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
@@ -100,7 +104,7 @@ datagen : $(PRGDIR)/datagen.c datagencli.c
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) core *.o *.test tmp* \
+	@$(RM) core *.o *.test tmp* *.html* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
@@ -333,6 +337,9 @@ test-fullbench: fullbench
 
 test-fullbench32: CFLAGS += -m32
 test-fullbench32: test-fullbench
+
+test-emscripten: emscripten-tests.html
+	emrun ${EMRUN_FLAGS} $<
 
 test-fuzzer: fuzzer
 	./fuzzer $(FUZZER_TIME)
