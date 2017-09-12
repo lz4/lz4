@@ -79,7 +79,7 @@ lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
 
 emscripten-tests.html: emscripten-tests.c $(LZ4DIR)/lz4.c
-	emcc ${CFLAGS} ${CPPFLAGS} ${EMCCFLAGS} $^ -o $@
+	emcc ${CFLAGS} ${CPPFLAGS} ${EMCC_FLAGS} $^ -o $@
 
 fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
@@ -104,7 +104,7 @@ datagen : $(PRGDIR)/datagen.c datagencli.c
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) core *.o *.test tmp* \
+	@$(RM) core *.o *.test tmp* *.html* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
