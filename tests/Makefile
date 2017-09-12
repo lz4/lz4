@@ -339,7 +339,7 @@ test-fullbench32: CFLAGS += -m32
 test-fullbench32: test-fullbench
 
 test-emscripten: emscripten-tests.html
-	emrun --browser=chrome $<
+	emrun ${EMRUN_FLAGS} $<
 
 test-fuzzer: fuzzer
 	./fuzzer $(FUZZER_TIME)
