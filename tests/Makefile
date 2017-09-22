@@ -129,6 +129,8 @@ ifneq (,$(filter $(shell uname),SunOS))
 DIFF:=gdiff
 endif
 
+DD:=dd
+
 
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer
 
@@ -253,6 +255,31 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
 	@$(RM) tmp-tlb*
 
+test-lz4-dict: lz4 datagen
+	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
+	./datagen -g16KB > tmp-dict
+	./datagen -g32KB > tmp-dict-sample-32k
+	< tmp-dict-sample-32k $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-32k
+	./datagen -g128MB > tmp-dict-sample-128m
+	< tmp-dict-sample-128m $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-128m
+	touch tmp-dict-sample-0
+	< tmp-dict-sample-0 $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-0
+
+	< tmp-dict-sample-32k $(LZ4) -D tmp-dict-sample-0 | $(LZ4) -dD tmp-dict-sample-0 | diff - tmp-dict-sample-32k
+	< tmp-dict-sample-0 $(LZ4) -D tmp-dict-sample-0 | $(LZ4) -dD tmp-dict-sample-0 | diff - tmp-dict-sample-0
+
+	@echo "\n ---- test lz4 dictionary loading ----"
+	./datagen -g128KB > tmp-dict-data-128KB
+	set -e; \
+	for l in 0 1 4 128 32767 32768 32769 65535 65536 65537 98303 98304 98305 131071 131072 131073; do \
+		./datagen -g$$l > tmp-dict-$$l; \
+		$(DD) if=tmp-dict-$$l of=tmp-dict-$$l-tail bs=1 count=65536 skip=$$((l > 65536 ? l - 65536 : 0)); \
+		< tmp-dict-$$l      $(LZ4) -D stdin tmp-dict-data-128KB | $(LZ4) -dD tmp-dict-$$l-tail | $(DIFF) - tmp-dict-data-128KB; \
+		< tmp-dict-$$l-tail $(LZ4) -D stdin tmp-dict-data-128KB | $(LZ4) -dD tmp-dict-$$l      | $(DIFF) - tmp-dict-data-128KB; \
+	done
+
+	@$(RM) tmp-dict*
+
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
@@ -292,7 +319,7 @@ test-lz4-opt-parser: lz4 datagen
 
 test-lz4: lz4 datagen test-lz4-basic test-lz4-opt-parser test-lz4-multiple \
           test-lz4-sparse test-lz4-frame-concatenation test-lz4-testmode \
-          test-lz4-contentSize test-lz4-hugefile
+          test-lz4-contentSize test-lz4-hugefile test-lz4-dict
 	@$(RM) tmp*
 
 test-lz4c: lz4c datagen
