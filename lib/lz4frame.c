@@ -1616,6 +1616,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     if ( (dctx->frameInfo.blockMode==LZ4F_blockLinked)
       && (dctx->dict != dctx->tmpOutBuffer)
       && (dctx->dStage != dstage_getFrameHeader)
+      && (dctx->dStage != dstage_storeFrameHeader)
       && (!decompressOptionsPtr->stableDst)
       && ((unsigned)(dctx->dStage-1) < (unsigned)(dstage_getSuffix-1)) )
     {
