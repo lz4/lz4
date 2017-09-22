@@ -57,6 +57,7 @@
 #include "lz4.h"       /* still required for legacy format */
 #include "lz4hc.h"     /* still required for legacy format */
 #include "lz4frame.h"
+#include "lz4frame_static.h"
 
 
 /*****************************
@@ -110,6 +111,8 @@ static int g_streamChecksum = 1;
 static int g_blockIndependence = 1;
 static int g_sparseFileSupport = 1;
 static int g_contentSizeFlag = 0;
+static int g_useDictionary = 0;
+static const char* g_dictionaryFilename = NULL;
 
 
 /**************************************
@@ -141,6 +144,12 @@ static int g_contentSizeFlag = 0;
 /* ************************************************** */
 /* ****************** Parameters ******************** */
 /* ************************************************** */
+
+int LZ4IO_setDictionaryFilename(const char* dictionaryFilename) {
+    g_dictionaryFilename = dictionaryFilename;
+    g_useDictionary = dictionaryFilename != NULL;
+    return g_useDictionary;
+}
 
 /* Default setting : overwrite = 1; return : overwrite mode (0/1) */
 int LZ4IO_setOverwrite(int yes)
@@ -395,7 +404,52 @@ typedef struct {
     void*  dstBuffer;
     size_t dstBufferSize;
     LZ4F_compressionContext_t ctx;
+    LZ4F_CDict* cdict;
 } cRess_t;
+
+static void* LZ4IO_createDict(const char* dictionaryFilename, size_t *dictionarySize) {
+    FILE* dictionaryFile;
+    size_t blockSize = 64 KB;
+    size_t dictionaryBufferSize = blockSize;
+    size_t readSize;
+    void* dictionaryBuffer;
+    *dictionarySize = 0;
+    dictionaryBuffer = malloc(dictionaryBufferSize);
+
+    if (!dictionaryBuffer) EXM_THROW(25, "Allocation error : not enough memory");
+
+    if (!dictionaryFilename) EXM_THROW(25, "Dictionary error : no filename provided");
+
+    dictionaryFile = LZ4IO_openSrcFile(g_dictionaryFilename);
+    if (!dictionaryFile) EXM_THROW(25, "Dictionary error : could not open dictionary file");
+
+    do {
+        if (*dictionarySize + blockSize > dictionaryBufferSize) {
+            dictionaryBufferSize *= 2;
+            dictionaryBuffer = realloc(dictionaryBuffer, dictionaryBufferSize);
+            if (!dictionaryBuffer) EXM_THROW(26, "Allocation error : not enough memory");
+        }
+        /* Read next block */
+        readSize = fread((char*)dictionaryBuffer + *dictionarySize, (size_t)1, (size_t)blockSize, dictionaryFile);
+        *dictionarySize += readSize;
+    } while (readSize>0);
+
+    return dictionaryBuffer;
+}
+
+static LZ4F_CDict* LZ4IO_createCDict(void) {
+    size_t dictionarySize;
+    void* dictionaryBuffer;
+    LZ4F_CDict* cdict;
+    if (!g_useDictionary) {
+        return NULL;
+    }
+    dictionaryBuffer = LZ4IO_createDict(g_dictionaryFilename, &dictionarySize);
+    if (!dictionaryBuffer) EXM_THROW(25, "Dictionary error : could not create dictionary");
+    cdict = LZ4F_createCDict(dictionaryBuffer, dictionarySize);
+    free(dictionaryBuffer);
+    return cdict;
+}
 
 static cRess_t LZ4IO_createCResources(void)
 {
@@ -412,6 +466,8 @@ static cRess_t LZ4IO_createCResources(void)
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(31, "Allocation error : not enough memory");
 
+    ress.cdict = LZ4IO_createCDict();
+
     return ress;
 }
 
@@ -419,6 +475,10 @@ static void LZ4IO_freeCResources(cRess_t ress)
 {
     free(ress.srcBuffer);
     free(ress.dstBuffer);
+
+    LZ4F_freeCDict(ress.cdict);
+    ress.cdict = NULL;
+
     { LZ4F_errorCode_t const errorCode = LZ4F_freeCompressionContext(ress.ctx);
       if (LZ4F_isError(errorCode)) EXM_THROW(38, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode)); }
 }
@@ -472,7 +532,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* single-block file */
     if (readSize < blockSize) {
         /* Compress in single pass */
-        size_t const cSize = LZ4F_compressFrame(dstBuffer, dstBufferSize, srcBuffer, readSize, &prefs);
+        size_t cSize = LZ4F_compressFrame_usingCDict(dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
         if (LZ4F_isError(cSize)) EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
@@ -488,7 +548,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* multiple-blocks file */
     {
         /* Write Archive Header */
-        size_t headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
+        size_t headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
         if (LZ4F_isError(headerSize)) EXM_THROW(33, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
         { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
           if (sizeCheck!=headerSize) EXM_THROW(34, "Write error : cannot write header"); }
@@ -745,7 +805,20 @@ typedef struct {
     size_t dstBufferSize;
     FILE*  dstFile;
     LZ4F_decompressionContext_t dCtx;
+    void*  dictBuffer;
+    size_t dictBufferSize;
 } dRess_t;
+
+static void LZ4IO_loadDDict(dRess_t* ress) {
+    if (!g_useDictionary) {
+        ress->dictBuffer = NULL;
+        ress->dictBufferSize = 0;
+        return;
+    }
+
+    ress->dictBuffer = LZ4IO_createDict(g_dictionaryFilename, &ress->dictBufferSize);
+    if (!ress->dictBuffer) EXM_THROW(25, "Dictionary error : could not create dictionary");
+}
 
 static const size_t LZ4IO_dBufferSize = 64 KB;
 static dRess_t LZ4IO_createDResources(void)
@@ -763,6 +836,8 @@ static dRess_t LZ4IO_createDResources(void)
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(61, "Allocation error : not enough memory");
 
+    LZ4IO_loadDDict(&ress);
+
     ress.dstFile = NULL;
     return ress;
 }
@@ -773,6 +848,7 @@ static void LZ4IO_freeDResources(dRess_t ress)
     if (LZ4F_isError(errorCode)) EXM_THROW(69, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode));
     free(ress.srcBuffer);
     free(ress.dstBuffer);
+    free(ress.dictBuffer);
 }
 
 
@@ -786,7 +862,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
     {   size_t inSize = MAGICNUMBER_SIZE;
         size_t outSize= 0;
         LZ4IO_writeLE32(ress.srcBuffer, LZ4IO_MAGICNUMBER);
-        nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &outSize, ress.srcBuffer, &inSize, NULL);
+        nextToLoad = LZ4F_decompress_usingDict(ress.dCtx, ress.dstBuffer, &outSize, ress.srcBuffer, &inSize, ress.dictBuffer, ress.dictBufferSize, NULL);
         if (LZ4F_isError(nextToLoad)) EXM_THROW(62, "Header error : %s", LZ4F_getErrorName(nextToLoad));
     }
 
@@ -805,7 +881,7 @@ static unsigned long long LZ4IO_decompressLZ4F(dRess_t ress, FILE* srcFile, FILE
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
             decodedBytes = ress.dstBufferSize;
-            nextToLoad = LZ4F_decompress(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
+            nextToLoad = LZ4F_decompress_usingDict(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, ress.dictBuffer, ress.dictBufferSize, NULL);
             if (LZ4F_isError(nextToLoad)) EXM_THROW(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             pos += remaining;
 
