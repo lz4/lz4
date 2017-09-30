@@ -334,7 +334,7 @@ static unsigned LZ4_NbCommonBytes (register reg_t val)
 #       endif
         }
     } else   /* Big Endian CPU */ {
-        if (sizeof(val)==8) {
+        if (sizeof(val)==8) {   /* 64-bits */
 #       if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r = 0;
             _BitScanReverse64( &r, val );
@@ -342,8 +342,11 @@ static unsigned LZ4_NbCommonBytes (register reg_t val)
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_clzll((U64)val) >> 3);
 #       else
+            static const U32 by32 = sizeof(val)*4;  /* 32 on 64 bits (goal), 16 on 32 bits.
+                Just to avoid some static analyzer complaining about shift by 32 on 32-bits target.
+                Note that this code path is never triggered in 32-bits mode. */
             unsigned r;
-            if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+            if (!(val>>by32)) { r=4; } else { r=0; val>>=by32; }
             if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
             r += (!val);
             return r;
