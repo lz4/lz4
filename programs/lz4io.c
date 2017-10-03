@@ -83,6 +83,7 @@
 #define LEGACY_BLOCKSIZE   (8 MB)
 #define MIN_STREAM_BUFSIZE (192 KB)
 #define LZ4IO_BLOCKSIZEID_DEFAULT 7
+#define LZ4_MAX_DICT_SIZE (64 KB)
 
 
 /**************************************
@@ -407,34 +408,60 @@ typedef struct {
     LZ4F_CDict* cdict;
 } cRess_t;
 
-static void* LZ4IO_createDict(const char* dictionaryFilename, size_t *dictionarySize) {
-    FILE* dictionaryFile;
-    size_t blockSize = 64 KB;
-    size_t dictionaryBufferSize = blockSize;
+static void* LZ4IO_createDict(const char* dictFilename, size_t *dictSize) {
     size_t readSize;
-    void* dictionaryBuffer;
-    *dictionarySize = 0;
-    dictionaryBuffer = malloc(dictionaryBufferSize);
+    size_t dictEnd = 0;
+    size_t dictLen = 0;
+    size_t dictStart;
+    size_t circularBufSize = LZ4_MAX_DICT_SIZE;
+    char* circularBuf;
+    char* dictBuf;
+    FILE* dictFile;
 
-    if (!dictionaryBuffer) EXM_THROW(25, "Allocation error : not enough memory");
+    if (!dictFilename) EXM_THROW(25, "Dictionary error : no filename provided");
 
-    if (!dictionaryFilename) EXM_THROW(25, "Dictionary error : no filename provided");
+    circularBuf = (char *) malloc(circularBufSize);
+    if (!circularBuf) EXM_THROW(25, "Allocation error : not enough memory");
 
-    dictionaryFile = LZ4IO_openSrcFile(g_dictionaryFilename);
-    if (!dictionaryFile) EXM_THROW(25, "Dictionary error : could not open dictionary file");
+    dictFile = LZ4IO_openSrcFile(dictFilename);
+    if (!dictFile) EXM_THROW(25, "Dictionary error : could not open dictionary file");
+
+    /* opportunistically seek to the part of the file we care about. If this */
+    /* fails it's not a problem since we'll just read everything anyways.    */
+    if (strcmp(dictFilename, stdinmark)) {
+        UTIL_fseek(dictFile, -LZ4_MAX_DICT_SIZE, SEEK_END);
+    }
 
     do {
-        if (*dictionarySize + blockSize > dictionaryBufferSize) {
-            dictionaryBufferSize *= 2;
-            dictionaryBuffer = realloc(dictionaryBuffer, dictionaryBufferSize);
-            if (!dictionaryBuffer) EXM_THROW(26, "Allocation error : not enough memory");
-        }
-        /* Read next block */
-        readSize = fread((char*)dictionaryBuffer + *dictionarySize, (size_t)1, (size_t)blockSize, dictionaryFile);
-        *dictionarySize += readSize;
+        readSize = fread(circularBuf + dictEnd, 1, circularBufSize - dictEnd, dictFile);
+        dictEnd = (dictEnd + readSize) % circularBufSize;
+        dictLen += readSize;
     } while (readSize>0);
 
-    return dictionaryBuffer;
+    if (dictLen > LZ4_MAX_DICT_SIZE) {
+        dictLen = LZ4_MAX_DICT_SIZE;
+    }
+
+    *dictSize = dictLen;
+
+    dictStart = (circularBufSize + dictEnd - dictLen) % circularBufSize;
+
+    if (dictStart == 0) {
+        /* We're in the simple case where the dict starts at the beginning of our circular buffer. */
+        dictBuf = circularBuf;
+        circularBuf = NULL;
+    } else {
+        /* Otherwise, we will alloc a new buffer and copy our dict into that. */
+        dictBuf = (char *) malloc(dictLen ? dictLen : 1);
+        if (!dictBuf) EXM_THROW(25, "Allocation error : not enough memory");
+
+        memcpy(dictBuf, circularBuf + dictStart, circularBufSize - dictStart);
+        memcpy(dictBuf + circularBufSize - dictStart, circularBuf, dictLen - (circularBufSize - dictStart));
+    }
+
+    free(circularBuf);
+
+    return dictBuf;
 }
 
 static LZ4F_CDict* LZ4IO_createCDict(void) {
