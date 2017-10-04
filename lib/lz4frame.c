@@ -1268,12 +1268,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             if (dctx->frameInfo.contentChecksumFlag) XXH32_reset(&(dctx->xxh), 0);
             /* internal buffers allocation */
             {   size_t const bufferNeeded = dctx->maxBlockSize
-                    + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) * 128 KB)
-                    + 4 /* block checksum */;
+                    + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) * 128 KB);
                 if (bufferNeeded > dctx->maxBufferSize) {   /* tmp buffers too small */
                     dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
                     FREEMEM(dctx->tmpIn);
-                    dctx->tmpIn = (BYTE*)ALLOCATOR(dctx->maxBlockSize);
+                    dctx->tmpIn = (BYTE*)ALLOCATOR(dctx->maxBlockSize + 4 /* block checksum */);
                     if (dctx->tmpIn == NULL)
                         return err0r(LZ4F_ERROR_allocation_failed);
                     FREEMEM(dctx->tmpOutBuffer);
@@ -1407,7 +1406,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             dctx->dStage = dstage_getBlockHeader;  /* new block */
             break;
 
-        case dstage_getCBlock:   /* entry from dstage_decodeCBlockSize */
+        case dstage_getCBlock:
             if ((size_t)(srcEnd-srcPtr) < dctx->tmpInTarget) {
                 dctx->tmpInSize = 0;
                 dctx->dStage = dstage_storeCBlock;
