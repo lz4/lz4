@@ -272,7 +272,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     return longest;
 }
 
-#if 0
+#if 1
 LZ4_FORCE_INLINE
 int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                                 const BYTE* const ip, const BYTE* const iLimit,
