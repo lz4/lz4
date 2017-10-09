@@ -116,55 +116,6 @@ LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
     hc4->nextToUpdate = target;
 }
 
-#if 0
-LZ4_FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
-                                               const BYTE* const ip, const BYTE* const iLimit,
-                                               const BYTE** matchpos,
-                                               const int maxNbAttempts)
-{
-    U16* const chainTable = hc4->chainTable;
-    U32* const HashTable = hc4->hashTable;
-    const BYTE* const base = hc4->base;
-    const BYTE* const dictBase = hc4->dictBase;
-    const U32 dictLimit = hc4->dictLimit;
-    const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
-    U32 matchIndex;
-    int nbAttempts = maxNbAttempts;
-    size_t ml = 0;
-
-    /* HC4 match finder */
-    LZ4HC_Insert(hc4, ip);
-    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
-
-    while ((matchIndex>=lowLimit) && (nbAttempts)) {
-        nbAttempts--;
-        if (matchIndex >= dictLimit) {
-            const BYTE* const match = base + matchIndex;
-            if ( (*(match+ml) == *(ip+ml))   /* can be longer */
-               && (LZ4_read32(match) == LZ4_read32(ip)) )
-            {
-                size_t const mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
-                if (mlt > ml) { ml = mlt; *matchpos = match; }
-            }
-        } else {
-            const BYTE* const match = dictBase + matchIndex;
-            if (LZ4_read32(match) == LZ4_read32(ip)) {
-                size_t mlt;
-                const BYTE* vLimit = ip + (dictLimit - matchIndex);
-                if (vLimit > iLimit) vLimit = iLimit;
-                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
-                if ((ip+mlt == vLimit) && (vLimit < iLimit))
-                    mlt += LZ4_count(ip+mlt, base+dictLimit, iLimit);
-                if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   /* virtual matchpos */
-            }
-        }
-        matchIndex -= DELTANEXTU16(chainTable, matchIndex);
-    }
-
-    return (int)ml;
-}
-#endif
-
 /** LZ4HC_countBack() :
  * @return : negative value, nb of common bytes before ip/match */
 static int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
@@ -308,26 +259,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
 
                         if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
                           && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
-#if 1
                             matchIndex += (U32)forwardPatternLength - (U32)srcPatternLength;  /* best position, full pattern, might be followed by more match */
-#else
-                            const BYTE* const matchCandidate = matchPtr + (U32)forwardPatternLength - (U32)srcPatternLength;  /* best position, pattern might be followed by more match */
-                            int matchLength = (int)(LZ4_count(ip + srcPatternLength, matchCandidate + srcPatternLength, iHighLimit) + srcPatternLength);
-                            int back = 0;
-                            while ( (ip+back > iLowLimit)
-                                 && (matchPtr+back > lowPrefixPtr)
-                                 && (ip[back-1] == matchPtr[back-1])) {
-                                    back--;
-                            }
-                            matchLength -= back;
-                            if (matchLength > longest) {
-                                longest = matchLength;
-                                *matchpos = base + matchIndex + back;
-                                *startpos = ip + back;
-                            }
-                            matchIndex -= (U32)backLength;
-                            matchIndex -= DELTANEXTU16(chainTable, matchIndex);   /* skip directly to next potential pattern segment */
-#endif
                         } else {
                             matchIndex -= (U32)backLength;   /* let's go to farthest segment position, will find a match of length currentSegmentLength + maybe some back */
                             //matchIndex -= DELTANEXTU16(chainTable, matchIndex);   /* skip directly to following candidate; slightly faster, but miss some rare corner cases (likely when back is useful)*/
@@ -338,6 +270,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     return longest;
 }
 
+#if 0
 LZ4_FORCE_INLINE
 int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                                 const BYTE* const ip, const BYTE* const iLimit,
@@ -347,6 +280,58 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
     const BYTE* uselessPtr = ip;
     return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts);
 }
+
+#else
+
+LZ4_FORCE_INLINE
+int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
+                                const BYTE* const ip, const BYTE* const iLimit,
+                                const BYTE** matchpos,
+                                const int maxNbAttempts)
+{
+    U16* const chainTable = hc4->chainTable;
+    U32* const HashTable = hc4->hashTable;
+    const BYTE* const base = hc4->base;
+    const BYTE* const dictBase = hc4->dictBase;
+    const U32 dictLimit = hc4->dictLimit;
+    const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
+    U32 matchIndex;
+    int nbAttempts = maxNbAttempts;
+    size_t ml = 0;
+
+    /* HC4 match finder */
+    LZ4HC_Insert(hc4, ip);
+    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
+
+    while ((matchIndex>=lowLimit) && (nbAttempts)) {
+        nbAttempts--;
+        if (matchIndex >= dictLimit) {
+            const BYTE* const match = base + matchIndex;
+            if ( (*(match+ml) == *(ip+ml))   /* can be longer */
+               && (LZ4_read32(match) == LZ4_read32(ip)) )
+            {
+                size_t const mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
+                if (mlt > ml) { ml = mlt; *matchpos = match; }
+            }
+        } else {
+            const BYTE* const match = dictBase + matchIndex;
+            if (LZ4_read32(match) == LZ4_read32(ip)) {
+                size_t mlt;
+                const BYTE* vLimit = ip + (dictLimit - matchIndex);
+                if (vLimit > iLimit) vLimit = iLimit;
+                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
+                if ((ip+mlt == vLimit) && (vLimit < iLimit))
+                    mlt += LZ4_count(ip+mlt, base+dictLimit, iLimit);
+                if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   /* virtual matchpos */
+            }
+        }
+        matchIndex -= DELTANEXTU16(chainTable, matchIndex);
+    }
+
+    return (int)ml;
+}
+#endif
+
 
 
 typedef enum {
