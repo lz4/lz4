@@ -116,7 +116,7 @@ LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
     hc4->nextToUpdate = target;
 }
 
-
+#if 0
 LZ4_FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                                                const BYTE* const ip, const BYTE* const iLimit,
                                                const BYTE** matchpos,
@@ -163,7 +163,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc
 
     return (int)ml;
 }
-
+#endif
 
 LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     LZ4HC_CCtx_internal* hc4,
@@ -232,6 +232,16 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     }
 
     return longest;
+}
+
+LZ4_FORCE_INLINE
+int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
+                                const BYTE* const ip, const BYTE* const iLimit,
+                                const BYTE** matchpos,
+                                const int maxNbAttempts)
+{
+    const BYTE* uselessPtr = ip;
+    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts);
 }
 
 
@@ -353,7 +363,7 @@ static int LZ4HC_compress_hashChain (
     /* Main Loop */
     while (ip < mflimit) {
         ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, (&ref), maxNbAttempts);
-        if (!ml) { ip++; continue; }
+        if (ml<MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
         start0 = ip;
