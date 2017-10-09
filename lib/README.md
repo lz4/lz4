@@ -15,7 +15,7 @@ They generate and decode data using [LZ4 block format].
 
 For more compression ratio at the cost of compression speed,
 the High Compression variant called **lz4hc** is available.
-Add files **`lz4hc.c`** and **`lz4hc.h`**.
+Add files **`lz4hc.c`**, **`lz4hc.h`** and **`lz4opt.h`**.
 The variant still depends on regular `lib/lz4.*` source files.
 
 

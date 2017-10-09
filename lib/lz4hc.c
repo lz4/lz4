@@ -262,7 +262,6 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                             matchIndex += (U32)forwardPatternLength - (U32)srcPatternLength;  /* best position, full pattern, might be followed by more match */
                         } else {
                             matchIndex -= (U32)backLength;   /* let's go to farthest segment position, will find a match of length currentSegmentLength + maybe some back */
-                            //matchIndex -= DELTANEXTU16(chainTable, matchIndex);   /* skip directly to following candidate; slightly faster, but miss some rare corner cases (likely when back is useful)*/
                         }
         }   }   }   }
     }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
