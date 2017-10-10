@@ -113,6 +113,7 @@ static int usage(const char* exeName)
     DISPLAY( " -9     : High compression \n");
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -z     : force compression \n");
+    DISPLAY( " -D FILE: use dictionary in FILE \n");
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -k     : preserve source files(s)  (default) \n");
     DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");
@@ -290,6 +291,7 @@ int main(int argc, const char** argv)
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
+    const char* dictionary_filename = NULL;
     char* dynNameSpace = NULL;
     const char** inFileNames = (const char**) calloc(argc, sizeof(char*));
     unsigned ifnIdx=0;
@@ -398,6 +400,22 @@ int main(int argc, const char** argv)
 
                     /* Compression (default) */
                 case 'z': mode = om_compress; break;
+
+                case 'D':
+                    if (argument[1] == '\0') {
+                        /* path is next arg */
+                        if (i + 1 == argc) {
+                            /* there is no next arg */
+                            badusage(exeName);
+                        }
+                        dictionary_filename = argv[++i];
+                    } else {
+                        /* path follows immediately */
+                        dictionary_filename = argument + 1;
+                    }
+                    /* skip to end of argument so that we jump to parsing next argument */
+                    argument += strlen(argument) - 1;
+                    break;
 
                     /* Use Legacy format (ex : Linux kernel compression) */
                 case 'l': legacy_format = 1; blockSize = 8 MB; break;
@@ -558,6 +576,15 @@ int main(int argc, const char** argv)
         LZ4IO_setTestMode(1);
         output_filename = nulmark;
         mode = om_decompress;   /* defer to decompress */
+    }
+
+    if (dictionary_filename) {
+        if (!strcmp(dictionary_filename, stdinmark) && IS_CONSOLE(stdin)) {
+            DISPLAYLEVEL(1, "refusing to read from a console\n");
+            exit(1);
+        }
+
+        LZ4IO_setDictionaryFilename(dictionary_filename);
     }
 
     /* compress or decompress */
