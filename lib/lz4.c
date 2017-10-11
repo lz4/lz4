@@ -1018,18 +1018,16 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     if ((dict->initCheck) || (dict->currentOffset > 1 GB))  /* Uninitialized structure, or reuse overflow */
         LZ4_resetStream(LZ4_dict);
 
-    if (dictSize < (int)HASH_UNIT) {
-        dict->dictionary = NULL;
-        dict->dictSize = 0;
-        return 0;
-    }
-
     if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
     dict->currentOffset += 64 KB;
     base = p - dict->currentOffset;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
     dict->currentOffset += dict->dictSize;
+
+    if (dictSize < (int)HASH_UNIT) {
+        return 0;
+    }
 
     while (p <= dictEnd-HASH_UNIT) {
         LZ4_putPosition(p, dict->hashTable, byU32, base);
