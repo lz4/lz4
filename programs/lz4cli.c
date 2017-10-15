@@ -150,7 +150,7 @@ static int usage_advanced(const char* exeName)
         DISPLAY( "Legacy arguments : \n");
         DISPLAY( " -c0    : fast compression \n");
         DISPLAY( " -c1    : high compression \n");
-        DISPLAY( " -hc    : high compression \n");
+        DISPLAY( " -c2,-hc: very high compression \n");
         DISPLAY( " -y     : overwrite output without prompting \n");
     }
     return 0;
@@ -205,14 +205,14 @@ static int usage_longhelp(const char* exeName)
     DISPLAY( "          generator | %s | consumer \n", exeName);
     if (g_lz4c_legacy_commands) {
         DISPLAY( "\n");
-        DISPLAY( "***** Warning  *****\n");
+        DISPLAY( "***** Warning  ***** \n");
         DISPLAY( "Legacy arguments take precedence. Therefore : \n");
-        DISPLAY( "---------------------------------\n");
-        DISPLAY( "          %s -hc filename\n", exeName);
-        DISPLAY( "means 'compress filename in high compression mode'\n");
-        DISPLAY( "It is not equivalent to :\n");
-        DISPLAY( "          %s -h -c filename\n", exeName);
-        DISPLAY( "which would display help text and exit\n");
+        DISPLAY( "--------------------------------- \n");
+        DISPLAY( "          %s -hc filename \n", exeName);
+        DISPLAY( "means 'compress filename in high compression mode' \n");
+        DISPLAY( "It is not equivalent to : \n");
+        DISPLAY( "          %s -h -c filename \n", exeName);
+        DISPLAY( "which displays help text and exits \n");
     }
     return 0;
 }
@@ -368,10 +368,11 @@ int main(int argc, const char** argv)
 
                 if (g_lz4c_legacy_commands) {
                     /* Legacy commands (-c0, -c1, -hc, -y) */
-                    if ((argument[0]=='c') && (argument[1]=='0')) { cLevel=0; argument++; continue; }  /* -c0 (fast compression) */
-                    if ((argument[0]=='c') && (argument[1]=='1')) { cLevel=9; argument++; continue; }  /* -c1 (high compression) */
-                    if ((argument[0]=='h') && (argument[1]=='c')) { cLevel=9; argument++; continue; }  /* -hc (high compression) */
-                    if (argument[0]=='y') { LZ4IO_setOverwrite(1); continue; }                         /* -y (answer 'yes' to overwrite permission) */
+                    if (!strcmp(argument,  "c0")) { cLevel=0; argument++; continue; }  /* -c0 (fast compression) */
+                    if (!strcmp(argument,  "c1")) { cLevel=9; argument++; continue; }  /* -c1 (high compression) */
+                    if (!strcmp(argument,  "c2")) { cLevel=12; argument++; continue; } /* -c2 (very high compression) */
+                    if (!strcmp(argument,  "hc")) { cLevel=12; argument++; continue; } /* -hc (very high compression) */
+                    if (!strcmp(argument,  "y"))  { LZ4IO_setOverwrite(1); continue; } /* -y (answer 'yes' to overwrite permission) */
                 }
 
                 if ((*argument>='0') && (*argument<='9')) {
