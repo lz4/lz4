@@ -90,9 +90,6 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 /*-************************************
 *  Version modifiers
 ***************************************/
-#define EXTENDED_ARGUMENTS
-#define EXTENDED_HELP
-#define EXTENDED_FORMAT
 #define DEFAULT_COMPRESSOR   LZ4IO_compressFilename
 #define DEFAULT_DECOMPRESSOR LZ4IO_decompressFilename
 int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel);   /* hidden function */
@@ -156,7 +153,6 @@ static int usage_advanced(const char* exeName)
         DISPLAY( " -hc    : high compression \n");
         DISPLAY( " -y     : overwrite output without prompting \n");
     }
-    EXTENDED_HELP;
     return 0;
 }
 
@@ -506,9 +502,6 @@ int main(int argc, const char** argv)
                     /* Pause at the end (hidden option) */
                 case 'p': main_pause=1; break;
 
-                    /* Specific commands for customized versions */
-                EXTENDED_ARGUMENTS;
-
                     /* Unrecognised command */
                 default : badusage(exeName);
                 }
@@ -560,8 +553,7 @@ int main(int argc, const char** argv)
                 free((void*)inFileNames);
                 inFileNames = extendedFileList;
                 ifnIdx = fileNamesNb;
-            }
-        }
+        }   }
 #endif
     }
 
@@ -583,7 +575,6 @@ int main(int argc, const char** argv)
             DISPLAYLEVEL(1, "refusing to read from a console\n");
             exit(1);
         }
-
         LZ4IO_setDictionaryFilename(dictionary_filename);
     }
 
@@ -654,7 +645,7 @@ int main(int argc, const char** argv)
             operationResult = DEFAULT_DECOMPRESSOR(input_filename, output_filename);
     } else {   /* compression is default action */
         if (legacy_format) {
-            DISPLAYLEVEL(3, "! Generating compressed LZ4 using Legacy format (deprecated) ! \n");
+            DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
             LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel);
         } else {
             if (multiple_inputs)
@@ -666,12 +657,13 @@ int main(int argc, const char** argv)
 
 _cleanup:
     if (main_pause) waitEnter();
-    if (dynNameSpace) free(dynNameSpace);
+    free(dynNameSpace);
 #ifdef UTIL_HAS_CREATEFILELIST
-    if (extendedFileList)
+    if (extendedFileList) {
         UTIL_freeFileList(extendedFileList, fileNamesBuf);
-    else
+        inFileNames = NULL;
+    }
 #endif
-        free((void*)inFileNames);
+    free((void*)inFileNames);
     return operationResult;
 }
