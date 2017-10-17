@@ -1515,37 +1515,6 @@ int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
 
 
-/* Obsolete Streaming functions */
-
-int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
-
-static void LZ4_init(LZ4_stream_t* lz4ds, BYTE* base)
-{
-    MEM_INIT(lz4ds, 0, sizeof(LZ4_stream_t));
-    lz4ds->internal_donotuse.bufferStart = base;
-}
-
-int LZ4_resetStreamState(void* state, char* inputBuffer)
-{
-    if ((((uptrval)state) & 3) != 0) return 1;   /* Error : pointer is not aligned on 4-bytes boundary */
-    LZ4_init((LZ4_stream_t*)state, (BYTE*)inputBuffer);
-    return 0;
-}
-
-void* LZ4_create (char* inputBuffer)
-{
-    LZ4_stream_t* lz4ds = (LZ4_stream_t*)ALLOCATOR(8, sizeof(LZ4_stream_t));
-    LZ4_init (lz4ds, (BYTE*)inputBuffer);
-    return lz4ds;
-}
-
-char* LZ4_slideInputBuffer (void* LZ4_Data)
-{
-    LZ4_stream_t_internal* ctx = &((LZ4_stream_t*)LZ4_Data)->internal_donotuse;
-    int dictSize = LZ4_saveDict((LZ4_stream_t*)LZ4_Data, (char*)ctx->bufferStart, 64 KB);
-    return (char*)(ctx->bufferStart + dictSize);
-}
-
 /* Obsolete streaming decompression functions */
 
 int LZ4_decompress_safe_withPrefix64k(const char* source, char* dest, int compressedSize, int maxOutputSize)
