@@ -166,7 +166,6 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     void* const compressedBuffer = malloc(maxCompressedSize);
     void* const resultBuffer = malloc(srcSize);
     U32 nbBlocks;
-    UTIL_time_t ticksPerSecond;
     struct compressionParameters compP;
     int cfunctionId;
 
@@ -176,7 +175,6 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
     /* init */
     if (strlen(displayName)>17) displayName += strlen(displayName)-17;   /* can only display 17 characters */
-    UTIL_initTimer(&ticksPerSecond);
 
     /* Init */
     if (cLevel < LZ4HC_CLEVEL_MIN) cfunctionId = 0; else cfunctionId = 1;
@@ -229,17 +227,17 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         size_t cSize = 0;
         double ratio = 0.;
 
-        UTIL_getTime(&coolTime);
+        coolTime = UTIL_getTime();
         DISPLAYLEVEL(2, "\r%79s\r", "");
         while (!cCompleted || !dCompleted) {
             UTIL_time_t clockStart;
             U64 clockLoop = g_nbSeconds ? TIMELOOP_MICROSEC : 1;
 
             /* overheat protection */
-            if (UTIL_clockSpanMicro(coolTime, ticksPerSecond) > ACTIVEPERIOD_MICROSEC) {
+            if (UTIL_clockSpanMicro(coolTime) > ACTIVEPERIOD_MICROSEC) {
                 DISPLAYLEVEL(2, "\rcooling down ...    \r");
                 UTIL_sleep(COOLPERIOD_SEC);
-                UTIL_getTime(&coolTime);
+                coolTime = UTIL_getTime();
             }
 
             /* Compression */
@@ -247,8 +245,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase result buffer */
 
             UTIL_sleepMilli(1);  /* give processor time to other processes */
-            UTIL_waitForNextTick(ticksPerSecond);
-            UTIL_getTime(&clockStart);
+            UTIL_waitForNextTick();
+            clockStart = UTIL_getTime();
 
             if (!cCompleted) {   /* still some time to do compression tests */
                 U32 nbLoops = 0;
@@ -260,8 +258,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         blockTable[blockNb].cSize = rSize;
                     }
                     nbLoops++;
-                } while (UTIL_clockSpanMicro(clockStart, ticksPerSecond) < clockLoop);
-                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart, ticksPerSecond);
+                } while (UTIL_clockSpanMicro(clockStart) < clockLoop);
+                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart);
                     if (clockSpan < fastestC*nbLoops) fastestC = clockSpan / nbLoops;
                     totalCTime += clockSpan;
                     cCompleted = totalCTime>maxTime;
@@ -282,8 +280,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
 
             UTIL_sleepMilli(1); /* give processor time to other processes */
-            UTIL_waitForNextTick(ticksPerSecond);
-            UTIL_getTime(&clockStart);
+            UTIL_waitForNextTick();
+            clockStart = UTIL_getTime();
 
             if (!dCompleted) {
                 U32 nbLoops = 0;
@@ -300,8 +298,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         blockTable[blockNb].resSize = regenSize;
                     }
                     nbLoops++;
-                } while (UTIL_clockSpanMicro(clockStart, ticksPerSecond) < DECOMP_MULT*clockLoop);
-                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart, ticksPerSecond);
+                } while (UTIL_clockSpanMicro(clockStart) < DECOMP_MULT*clockLoop);
+                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart);
                     if (clockSpan < fastestD*nbLoops) fastestD = clockSpan / nbLoops;
                     totalDTime += clockSpan;
                     dCompleted = totalDTime>(DECOMP_MULT*maxTime);
