@@ -262,7 +262,7 @@ static int LZ4HC_compress_optimal (
                     SET_PRICE(mlen, mlen, matches[matchNb].off, 0, cost);   /* updates last_match_pos and opt[pos] */
         }   }   }
 
-        if (last_match_pos < MINMATCH) { ip++; continue; }  /* note : on clang at least, this test improves performance */
+        assert(last_match_pos >= MINMATCH);
 
         /* check further positions */
         opt[0].mlen = opt[1].mlen = 1;
