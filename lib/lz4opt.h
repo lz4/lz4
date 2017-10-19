@@ -245,11 +245,11 @@ static int LZ4HC_compress_optimal (
 
         if ((size_t)matches[match_num-1].len > sufficient_len) {
             /* good enough solution : immediate encoding */
-            best_mlen = matches[match_num-1].len;
-            best_off = matches[match_num-1].off;
-            cur = 0;
-            last_pos = 1;
-            goto encode;
+            int const firstML = (int)matches[match_num-1].len;
+            const BYTE* const matchPos = ip - matches[match_num-1].off;
+            if ( LZ4HC_encodeSequence(&ip, &op, &anchor, (int)firstML, matchPos, limit, oend) )   /* updates ip, op and anchor */
+                return 0;  /* error */
+            continue;
         }
 
         /* set prices using matches at position = 0 */
