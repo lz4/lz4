@@ -197,7 +197,7 @@ LZ4_FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 
 #define SET_PRICE(pos, ml, offset, ll, cost)           \
 {                                                      \
-    while (last_match_pos < pos)  { opt[last_match_pos+1].price = 1<<30; last_match_pos++; } \
+    while (last_match_pos < pos) { opt[last_match_pos+1].price = 1<<30; last_match_pos++; } \
     opt[pos].mlen = (int)ml;                           \
     opt[pos].off = (int)offset;                        \
     opt[pos].litlen = (int)ll;                         \
@@ -237,16 +237,15 @@ static int LZ4HC_compress_optimal (
     while (ip < mflimit) {
         size_t const llen = ip - anchor;
         size_t last_match_pos = 0;
-        size_t match_num, cur, best_mlen, best_off;
-        memset(opt, 0, sizeof(LZ4HC_optimal_t));  /* memset only the first one */
+        size_t cur, best_mlen, best_off;
 
-        match_num = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
-        if (!match_num) { ip++; continue; }
+        size_t const nb_matches_initial = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
+        if (!nb_matches_initial) { ip++; continue; }
 
-        if ((size_t)matches[match_num-1].len > sufficient_len) {
+        if ((size_t)matches[nb_matches_initial-1].len > sufficient_len) {
             /* good enough solution : immediate encoding */
-            int const firstML = (int)matches[match_num-1].len;
-            const BYTE* const matchPos = ip - matches[match_num-1].off;
+            int const firstML = (int)matches[nb_matches_initial-1].len;
+            const BYTE* const matchPos = ip - matches[nb_matches_initial-1].off;
             if ( LZ4HC_encodeSequence(&ip, &op, &anchor, (int)firstML, matchPos, limit, oend) )   /* updates ip, op and anchor */
                 return 0;  /* error */
             continue;
@@ -265,7 +264,7 @@ static int LZ4HC_compress_optimal (
         }   }
         /* set prices using matches found for rPos = 0 */
         {   size_t matchNb;
-            for (matchNb = 0; matchNb < match_num; matchNb++) {
+            for (matchNb = 0; matchNb < nb_matches_initial; matchNb++) {
                 size_t mlen = (matchNb>0) ? (size_t)matches[matchNb-1].len+1 : MINMATCH;
                 best_mlen = matches[matchNb].len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
                 for ( ; mlen <= best_mlen ; mlen++) {
@@ -277,6 +276,7 @@ static int LZ4HC_compress_optimal (
         /* check further positions */
         for (cur = 1; cur <= last_match_pos; cur++) {
             const BYTE* const curPtr = ip + cur;
+            size_t nb_matches;
 
             /* establish baseline price if cur is literal */
             {   size_t price, litlen;
@@ -295,18 +295,18 @@ static int LZ4HC_compress_optimal (
 
             if (cur == last_match_pos || curPtr >= mflimit) break;
 
-            match_num = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
-            if ((match_num > 0) && (size_t)matches[match_num-1].len > sufficient_len) {
+            nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
+            if ((nb_matches > 0) && (size_t)matches[nb_matches-1].len > sufficient_len) {
                 /* immediate encoding */
-                best_mlen = matches[match_num-1].len;
-                best_off = matches[match_num-1].off;
+                best_mlen = matches[nb_matches-1].len;
+                best_off = matches[nb_matches-1].off;
                 last_match_pos = cur + 1;
                 goto encode;
             }
 
             /* set prices using matches at position = cur */
             {   size_t matchNb;
-                for (matchNb = 0; matchNb < match_num; matchNb++) {
+                for (matchNb = 0; matchNb < nb_matches; matchNb++) {
                     size_t ml = (matchNb>0) ? (size_t)matches[matchNb-1].len+1 : MINMATCH;
                     best_mlen = (cur + matches[matchNb].len < LZ4_OPT_NUM) ?
                                 (size_t)matches[matchNb].len : LZ4_OPT_NUM - cur;
