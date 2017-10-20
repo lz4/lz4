@@ -195,16 +195,6 @@ LZ4_FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 }
 
 
-#define SET_PRICE(pos, ml, offset, ll, cost)           \
-{                                                      \
-    while (last_match_pos < pos) { opt[last_match_pos+1].price = 1<<30; last_match_pos++; } \
-    opt[pos].mlen = (int)ml;                           \
-    opt[pos].off = (int)offset;                        \
-    opt[pos].litlen = (int)ll;                         \
-    opt[pos].price = (int)cost;                        \
-}
-
-
 static int LZ4HC_compress_optimal (
     LZ4HC_CCtx_internal* ctx,
     const char* const source,
@@ -319,22 +309,29 @@ static int LZ4HC_compress_optimal (
             /* set prices using matches at position = cur */
             {   size_t matchNb;
                 for (matchNb = 0; matchNb < nb_matches; matchNb++) {
-                    size_t ml = (matchNb>0) ? (size_t)matches[matchNb-1].len+1 : MINMATCH;
-                    size_t const matchML = (cur + matches[matchNb].len < LZ4_OPT_NUM) ?
-                                (size_t)matches[matchNb].len : LZ4_OPT_NUM - cur;
+                    int ml = (matchNb>0) ? matches[matchNb-1].len+1 : MINMATCH;
+                    int const matchML = (cur + matches[matchNb].len < LZ4_OPT_NUM) ?
+                                matches[matchNb].len : (int)(LZ4_OPT_NUM - cur);
 
                     for ( ; ml <= matchML ; ml++) {
-                        size_t ll, price;
+                        int const pos = cur + ml;
+                        int const offset = matches[matchNb].off;
+                        size_t price;
+                        int ll;
                         if (opt[cur].mlen == 1) {
                             ll = opt[cur].litlen;
-                            price = ((cur > ll) ? opt[cur - ll].price : 0) + LZ4HC_sequencePrice(ll, ml);
+                            price = ((cur > (size_t)ll) ? opt[cur - ll].price : 0) + LZ4HC_sequencePrice(ll, ml);
                         } else {
                             ll = 0;
                             price = opt[cur].price + LZ4HC_sequencePrice(0, ml);
                         }
 
-                        if (cur + ml > last_match_pos || price < (size_t)opt[cur + ml].price) {
-                            SET_PRICE(cur + ml, ml, matches[matchNb].off, ll, price);
+                        if ((size_t)pos > last_match_pos || price < (size_t)opt[pos].price) {
+                            while (last_match_pos < (size_t)pos) opt[++last_match_pos].price = 1<<30;
+                            opt[pos].mlen = ml;
+                            opt[pos].off = offset;
+                            opt[pos].litlen = ll;
+                            opt[pos].price = (int)price;
             }   }   }   }
         }  /* for (cur = 1; cur <= last_match_pos; cur++) */
 
