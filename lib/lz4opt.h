@@ -252,20 +252,29 @@ static int LZ4HC_compress_optimal (
             continue;
         }
 
-        /* set prices using matches at position = 0 */
+        /* set prices for first positions (literals) */
+        {   size_t rPos;
+            for (rPos = 0 ; rPos < MINMATCH ; rPos++) {
+                int const cost = (int)LZ4HC_literalsPrice(llen + rPos);
+                opt[rPos].mlen = 1;
+                opt[rPos].off = 0;
+                opt[rPos].litlen = (int)(llen + rPos);
+                opt[rPos].price = cost;
+                DEBUGLOG(7, "rPos:%3u => cost:%3i (litlen=%i)",
+                            (U32)rPos, cost, opt[rPos].litlen);
+        }   }
+        /* set prices using matches found for rPos = 0 */
         {   size_t matchNb;
             for (matchNb = 0; matchNb < match_num; matchNb++) {
                 size_t mlen = (matchNb>0) ? (size_t)matches[matchNb-1].len+1 : MINMATCH;
                 best_mlen = matches[matchNb].len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
                 for ( ; mlen <= best_mlen ; mlen++) {
-                    size_t const cost = LZ4HC_sequencePrice(llen, mlen) - LZ4HC_literalsPrice(llen);
+                    size_t const cost = LZ4HC_sequencePrice(llen, mlen);
                     SET_PRICE(mlen, mlen, matches[matchNb].off, 0, cost);   /* updates last_match_pos and opt[pos] */
         }   }   }
-
         assert(last_match_pos >= MINMATCH);
 
         /* check further positions */
-        opt[0].mlen = opt[1].mlen = 1;
         for (cur = 1; cur <= last_match_pos; cur++) {
             const BYTE* const curPtr = ip + cur;
 
@@ -274,11 +283,7 @@ static int LZ4HC_compress_optimal (
                 if (opt[cur-1].mlen == 1) {
                     /* no match at previous position */
                     litlen = opt[cur-1].litlen + 1;
-                    if (cur > litlen) {
-                        price = opt[cur - litlen].price + LZ4HC_literalsPrice(litlen);
-                    } else {
-                        price = LZ4HC_literalsPrice(llen + litlen) - LZ4HC_literalsPrice(llen);
-                    }
+                    price = opt[cur-1].price - LZ4HC_literalsPrice(litlen-1) + LZ4HC_literalsPrice(litlen);
                 } else {
                     litlen = 1;
                     price = opt[cur - 1].price + LZ4HC_literalsPrice(1);
@@ -313,7 +318,7 @@ static int LZ4HC_compress_optimal (
                             if (cur > ll)
                                 price = opt[cur - ll].price + LZ4HC_sequencePrice(ll, ml);
                             else
-                                price = LZ4HC_sequencePrice(llen + ll, ml) - LZ4HC_literalsPrice(llen);
+                                price = LZ4HC_sequencePrice(ll, ml);
                         } else {
                             ll = 0;
                             price = opt[cur].price + LZ4HC_sequencePrice(0, ml);
