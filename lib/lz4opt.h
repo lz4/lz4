@@ -284,7 +284,8 @@ static int LZ4HC_compress_optimal (
             size_t nb_matches;
 
             /* establish baseline price if cur is literal */
-            {   size_t price, litlen;
+            {   size_t price;
+                int litlen;
                 if (opt[cur-1].mlen == 1) {
                     /* no match at previous position */
                     litlen = opt[cur-1].litlen + 1;
@@ -293,12 +294,18 @@ static int LZ4HC_compress_optimal (
                     litlen = 1;
                     price = opt[cur - 1].price + LZ4HC_literalsPrice(1);
                 }
-
-                if (price < (size_t)opt[cur].price)
-                    SET_PRICE(cur, 1 /*mlen*/, 0 /*off*/, litlen, price);   /* note : increases last_match_pos */
+                if (price < (size_t)opt[cur].price) {
+                    opt[cur].mlen = 1;
+                    opt[cur].off = 0;
+                    opt[cur].litlen = litlen;
+                    opt[cur].price = (int)price;
+                }
             }
 
             if (cur == last_match_pos || curPtr >= mflimit) break;
+
+            //assert(cur+2 <= last_match_pos);
+            //assert(cur+3 <= last_match_pos);
 
             nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             if ((nb_matches > 0) && (size_t)matches[nb_matches-1].len > sufficient_len) {
