@@ -265,13 +265,18 @@ static int LZ4HC_compress_optimal (
         /* set prices using matches found for rPos = 0 */
         {   size_t matchNb;
             for (matchNb = 0; matchNb < nb_matches_initial; matchNb++) {
-                size_t mlen = (matchNb>0) ? (size_t)matches[matchNb-1].len+1 : MINMATCH;
-                best_mlen = matches[matchNb].len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
-                for ( ; mlen <= best_mlen ; mlen++) {
+                int mlen = (matchNb>0) ? matches[matchNb-1].len+1 : MINMATCH;
+                int const matchML = matches[matchNb].len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
+                int const offset = matches[matchNb].off;
+                assert(matchML < LZ4_OPT_NUM);
+                for ( ; mlen <= matchML ; mlen++) {
                     size_t const cost = LZ4HC_sequencePrice(llen, mlen);
-                    SET_PRICE(mlen, mlen, matches[matchNb].off, 0, cost);   /* updates last_match_pos and opt[pos] */
+                    opt[mlen].mlen = mlen;
+                    opt[mlen].off = offset;
+                    opt[mlen].litlen = (int)llen;
+                    opt[mlen].price = (int)cost;
         }   }   }
-        assert(last_match_pos >= MINMATCH);
+        last_match_pos = matches[nb_matches_initial-1].len;
 
         /* check further positions */
         for (cur = 1; cur <= last_match_pos; cur++) {
@@ -308,17 +313,14 @@ static int LZ4HC_compress_optimal (
             {   size_t matchNb;
                 for (matchNb = 0; matchNb < nb_matches; matchNb++) {
                     size_t ml = (matchNb>0) ? (size_t)matches[matchNb-1].len+1 : MINMATCH;
-                    best_mlen = (cur + matches[matchNb].len < LZ4_OPT_NUM) ?
+                    size_t const matchML = (cur + matches[matchNb].len < LZ4_OPT_NUM) ?
                                 (size_t)matches[matchNb].len : LZ4_OPT_NUM - cur;
 
-                    for ( ; ml <= best_mlen ; ml++) {
+                    for ( ; ml <= matchML ; ml++) {
                         size_t ll, price;
                         if (opt[cur].mlen == 1) {
                             ll = opt[cur].litlen;
-                            if (cur > ll)
-                                price = opt[cur - ll].price + LZ4HC_sequencePrice(ll, ml);
-                            else
-                                price = LZ4HC_sequencePrice(ll, ml);
+                            price = ((cur > ll) ? opt[cur - ll].price : 0) + LZ4HC_sequencePrice(ll, ml);
                         } else {
                             ll = 0;
                             price = opt[cur].price + LZ4HC_sequencePrice(0, ml);
@@ -327,7 +329,7 @@ static int LZ4HC_compress_optimal (
                         if (cur + ml > last_match_pos || price < (size_t)opt[cur + ml].price) {
                             SET_PRICE(cur + ml, ml, matches[matchNb].off, ll, price);
             }   }   }   }
-        } /* for (cur = 1; cur <= last_match_pos; cur++) */
+        }  /* for (cur = 1; cur <= last_match_pos; cur++) */
 
         best_mlen = opt[last_match_pos].mlen;
         best_off = opt[last_match_pos].off;
@@ -337,7 +339,6 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
         assert(cur < LZ4_OPT_NUM);
         assert(last_match_pos >= 1);  /* == 1 when only one candidate */
         opt[0].mlen = 1;
-        DEBUGLOG(6, "sequence reverse traversal");
         {   int candidate_pos = (int)cur;
             int selected_matchLength = (int)best_mlen;
             int selected_offset = (int)best_off;
@@ -347,31 +348,37 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                 assert(next_matchLength > 0); /* note : can be 1, means literal */
                 opt[candidate_pos].mlen = selected_matchLength;
                 opt[candidate_pos].off = selected_offset;
-                DEBUGLOG(6, "rPos:%3i, matchLength:%3i", candidate_pos, selected_matchLength);
                 selected_matchLength = next_matchLength;
                 selected_offset = next_offset;
                 if (next_matchLength > candidate_pos) break; /* last match elected, first match to encode */
                 candidate_pos -= next_matchLength;
         }   }
 
-        /* encode all recorded sequences */
-        cur = 0;
-        while (cur < last_match_pos) {
-            int const ml = opt[cur].mlen;
-            int const offset = opt[cur].off;
-            if (ml == 1) { ip++; cur++; continue; }
-            assert(ml >= MINMATCH);
-            cur += ml;
-            assert((offset >= 1) && (offset <=65535));
-            if ( LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ip - offset, limit, oend) ) return 0;
-        }
+        /* encode all recorded sequences in order */
+        {   size_t rPos = 0;  /* relative position (to ip) */
+            while (rPos < last_match_pos) {
+                int const ml = opt[rPos].mlen;
+                int const offset = opt[rPos].off;
+                if (ml == 1) { ip++; rPos++; continue; }  /* literal */
+                rPos += ml;
+                assert(ml >= MINMATCH);
+                assert((offset >= 1) && (offset <=65535));
+                if ( LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ip - offset, limit, oend) )   /* updates ip, op and anchor */
+                    return 0;  /* error */
+        }   }
     }  /* while (ip < mflimit) */
 
     /* Encode Last Literals */
     {   int lastRun = (int)(iend - anchor);
-        if ((limit) && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize)) return 0;  /* Check output limit */
-        if (lastRun>=(int)RUN_MASK) { *op++=(RUN_MASK<<ML_BITS); lastRun-=RUN_MASK; for(; lastRun > 254 ; lastRun-=255) *op++ = 255; *op++ = (BYTE) lastRun; }
-        else *op++ = (BYTE)(lastRun<<ML_BITS);
+        if ( (limit)
+          && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize))
+            return 0;  /* Check output limit */
+        if (lastRun>=(int)RUN_MASK) {
+            *op++=(RUN_MASK<<ML_BITS);
+            lastRun-=RUN_MASK;
+            for (; lastRun > 254 ; lastRun-=255) *op++ = 255;
+            *op++ = (BYTE) lastRun;
+        } else *op++ = (BYTE)(lastRun<<ML_BITS);
         memcpy(op, anchor, iend - anchor);
         op += iend-anchor;
     }
