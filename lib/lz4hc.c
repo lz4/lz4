@@ -183,7 +183,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     const BYTE* const dictBase = hc4->dictBase;
     int const delta = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
-    reg_t const pattern = LZ4_read_ARCH(ip);
+    U32 const pattern = LZ4_read32(ip);
     U32 matchIndex;
     repeat_state_e repeat = rep_untested;
     size_t srcPatternLength = 0;
@@ -195,10 +195,16 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
 
     while ((matchIndex>=lowLimit) && (nbAttempts)) {
         nbAttempts--;
+        int trace = 0;
+        if (nbAttempts==0) {
+            trace = 1;
+            DEBUGLOG(2, "reached max nb of attempts ! : %08X => %08X ",
+                pattern, HASH_FUNCTION(pattern));
+        }
         if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
             if (*(iLowLimit + longest) == *(matchPtr - delta + longest)) {
-                if (LZ4_read32(matchPtr) == (U32)pattern) {
+                if (LZ4_read32(matchPtr) == pattern) {
                     int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
     #if 0
                     /* more generic but unfortunately slower ... */
@@ -221,9 +227,9 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
             }
         } else {   /* matchIndex < dictLimit */
             const BYTE* const matchPtr = dictBase + matchIndex;
-            if (LZ4_read32(matchPtr) == (U32)pattern) {
+            if (LZ4_read32(matchPtr) == pattern) {
                 int mlt;
-                int back=0;
+                int back = 0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
@@ -243,22 +249,25 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex);
             matchIndex -= nextOffset;
             if (1 && (nextOffset==1)) {
+                if (trace) DEBUGLOG(2, "check repeat mode : %u", repeat);
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
-                    if (LZ4_read32(ip+4) == (U32)pattern) {  /* should check ip limit */
+                    if ((pattern & 0xFFFF) == (pattern >> 16)) {   /* is it enough ? */
                         repeat = rep_confirmed;
-                        srcPatternLength = LZ4HC_countPattern(ip+8, iHighLimit, pattern) + 8;
+                        srcPatternLength = LZ4HC_countPattern(ip+4, iHighLimit, pattern) + 4;
                     } else {
                         repeat = rep_not;
                 }   }
                 if ( (repeat == rep_confirmed)   /* proven repeated pattern (1-2-4) */
                   && (matchIndex >= dictLimit) ) {   /* same segment only */
                     const BYTE* const matchPtr = base + matchIndex;
-                    if (LZ4_read_ARCH(matchPtr) == pattern) {  /* good candidate */
+                    if (trace) DEBUGLOG(2, "search direct pattern position");
+                    if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
                         size_t const forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
                         const BYTE* const maxLowPtr = (lowPrefixPtr + MAX_DISTANCE >= ip) ? lowPrefixPtr : ip - MAX_DISTANCE;
-                        size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, maxLowPtr, (U32)pattern);
+                        size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, maxLowPtr, pattern);
                         size_t const currentSegmentLength = backLength + forwardPatternLength;
+                        if (trace) DEBUGLOG(2, "good start position (match == pattern)");
 
                         if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
                           && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
@@ -633,7 +642,7 @@ static int LZ4HC_getSearchNum(int compressionLevel)
     switch (compressionLevel) {
         default: return 0; /* unused */
         case 11: return 128;
-        case 12: return 1<<10;
+        case 12: return 1<<13;
     }
 }
 

@@ -195,12 +195,39 @@ LZ4_FORCE_INLINE int LZ4HC_BinTree_GetAllMatches (
 }
 
 
+LZ4_FORCE_INLINE
+int LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,   /* Index table will be updated */
+                        const BYTE* const ip, const BYTE* const iHighLimit,
+                        int longest,
+                        const BYTE** matchpos,
+                        const int maxNbAttempts)
+{
+    const BYTE* uselessPtr = ip;
+    return LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, longest, matchpos, &uselessPtr, maxNbAttempts);
+}
+
+LZ4_FORCE_INLINE int LZ4HC_HashChain_GetAllMatches (
+                        LZ4HC_CCtx_internal* ctx,
+                        const BYTE* const ip, const BYTE* const iHighLimit,
+                        size_t best_mlen, LZ4HC_match_t* matches, const int fullUpdate)
+{
+    const BYTE* matchPtr;
+    int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, ctx->searchNum);
+    if (matchLength < MINMATCH) return 0;
+    assert(matches != NULL);
+    matches[0].len = matchLength;
+    matches[0].off = (int)(ip-matchPtr);
+    (void)fullUpdate;
+    return 1;
+}
+
+
 static int LZ4HC_compress_optimal (
     LZ4HC_CCtx_internal* ctx,
     const char* const source,
-    char* dest,
+    char* dst,
     int inputSize,
-    int maxOutputSize,
+    int dstCapacity,
     limitedOutput_directive limit,
     size_t sufficient_len,
     const int fullUpdate
@@ -214,8 +241,8 @@ static int LZ4HC_compress_optimal (
     const BYTE* const iend = ip + inputSize;
     const BYTE* const mflimit = iend - MFLIMIT;
     const BYTE* const matchlimit = (iend - LASTLITERALS);
-    BYTE* op = (BYTE*) dest;
-    BYTE* const oend = op + maxOutputSize;
+    BYTE* op = (BYTE*) dst;
+    BYTE* const oend = op + dstCapacity;
 
     /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal");
@@ -230,7 +257,8 @@ static int LZ4HC_compress_optimal (
         int best_mlen, best_off;
         int cur, last_match_pos = 0;
 
-        int const nb_matches_initial = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
+        //int const nb_matches_initial = LZ4HC_BinTree_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
+        int const nb_matches_initial = LZ4HC_HashChain_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
         if (!nb_matches_initial) { ip++; continue; }
 
         if ((size_t)matches[nb_matches_initial-1].len > sufficient_len) {
@@ -274,7 +302,9 @@ static int LZ4HC_compress_optimal (
             const BYTE* const curPtr = ip + cur;
             int nb_matches;
 
-            /* establish baseline price if cur is literal */
+            /* establish baseline price for cur as a literal.
+             * fixes unused positions (between 2 matches)
+             * and inefficient match stack */
             {   int price;
                 int litlen;
                 if (opt[cur-1].mlen == 1) {
@@ -295,7 +325,8 @@ static int LZ4HC_compress_optimal (
 
             if (cur == last_match_pos || curPtr >= mflimit) break;
 
-            nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
+            //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
+            nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             if ((nb_matches > 0) && (size_t)matches[nb_matches-1].len > sufficient_len) {
                 /* immediate encoding */
                 best_mlen = matches[nb_matches-1].len;
@@ -307,9 +338,9 @@ static int LZ4HC_compress_optimal (
             /* set prices using matches at position = cur */
             {   int matchNb;
                 for (matchNb = 0; matchNb < nb_matches; matchNb++) {
-                    int ml = (matchNb>0) ? matches[matchNb-1].len+1 : MINMATCH;
                     int const matchML = (cur + matches[matchNb].len < LZ4_OPT_NUM) ?
                                 matches[matchNb].len : (int)(LZ4_OPT_NUM - cur);
+                    int ml = (matchNb>0) ? matches[matchNb-1].len+1 : MINMATCH;
 
                     for ( ; ml <= matchML ; ml++) {
                         int const pos = cur + ml;
@@ -341,19 +372,18 @@ static int LZ4HC_compress_optimal (
 encode: /* cur, last_match_pos, best_mlen, best_off must be set */
         assert(cur < LZ4_OPT_NUM);
         assert(last_match_pos >= 1);  /* == 1 when only one candidate */
-        opt[0].mlen = 1;
         {   int candidate_pos = cur;
             int selected_matchLength = best_mlen;
             int selected_offset = best_off;
             while (1) {  /* from end to beginning */
-                int const next_matchLength = opt[candidate_pos].mlen;
+                int const next_matchLength = opt[candidate_pos].mlen;  /* can be 1, means literal */
                 int const next_offset = opt[candidate_pos].off;
-                assert(next_matchLength > 0); /* note : can be 1, means literal */
                 opt[candidate_pos].mlen = selected_matchLength;
                 opt[candidate_pos].off = selected_offset;
                 selected_matchLength = next_matchLength;
                 selected_offset = next_offset;
                 if (next_matchLength > candidate_pos) break; /* last match elected, first match to encode */
+                assert(next_matchLength > 0);  /* can be 1, means literal */
                 candidate_pos -= next_matchLength;
         }   }
 
@@ -362,7 +392,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
             while (rPos < last_match_pos) {
                 int const ml = opt[rPos].mlen;
                 int const offset = opt[rPos].off;
-                if (ml == 1) { ip++; rPos++; continue; }  /* literal */
+                if (ml == 1) { ip++; rPos++; continue; }  /* literal; note: can end up with several literals, in which case, skip them */
                 rPos += ml;
                 assert(ml >= MINMATCH);
                 assert((offset >= 1) && (offset <=65535));
@@ -374,7 +404,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
     /* Encode Last Literals */
     {   int lastRun = (int)(iend - anchor);
         if ( (limit)
-          && (((char*)op - dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize))
+          && (((char*)op - dst) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)dstCapacity))
             return 0;  /* Check output limit */
         if (lastRun >= (int)RUN_MASK) {
             *op++=(RUN_MASK<<ML_BITS);
@@ -387,5 +417,5 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
     }
 
     /* End */
-    return (int) ((char*)op-dest);
+    return (int) ((char*)op-dst);
 }
