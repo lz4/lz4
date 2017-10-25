@@ -1180,6 +1180,22 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
         /* get literal length */
         unsigned const token = *ip++;
+
+        if (1)
+        if (ip + 14 + 2 <= iend)
+        if ((token < 15*16) & ((token & 0xF) <= 12)) {
+            size_t const ll = token >> ML_BITS;
+            size_t const off = LZ4_readLE16(ip+ll);   /* check input validity */
+            if (off >= 16) {
+                size_t const ml = (token & 0xF) + MINMATCH;
+                DEBUGLOG(2, "rest:%u, ll:%2u, ml:%2u, off:%u",
+                    (U32)(oend-op), (U32)ll, (U32)ml, (U32)off);
+                memcpy(op, ip, 16); op += ll; ip += ll + 2 /* offset */;
+                memcpy(op, op - off, 16); op += ml;
+                continue;
+            }
+        }
+
         if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
             do {
