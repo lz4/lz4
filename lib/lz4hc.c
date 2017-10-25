@@ -195,12 +195,6 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
 
     while ((matchIndex>=lowLimit) && (nbAttempts)) {
         nbAttempts--;
-        int trace = 0;
-        if (nbAttempts==0) {
-            trace = 1;
-            DEBUGLOG(2, "reached max nb of attempts ! : %08X => %08X ",
-                pattern, HASH_FUNCTION(pattern));
-        }
         if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
             if (*(iLowLimit + longest) == *(matchPtr - delta + longest)) {
@@ -249,7 +243,6 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex);
             matchIndex -= nextOffset;
             if (1 && (nextOffset==1)) {
-                if (trace) DEBUGLOG(2, "check repeat mode : %u", repeat);
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
                     if ((pattern & 0xFFFF) == (pattern >> 16)) {   /* is it enough ? */
@@ -261,13 +254,11 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                 if ( (repeat == rep_confirmed)   /* proven repeated pattern (1-2-4) */
                   && (matchIndex >= dictLimit) ) {   /* same segment only */
                     const BYTE* const matchPtr = base + matchIndex;
-                    if (trace) DEBUGLOG(2, "search direct pattern position");
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
                         size_t const forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
                         const BYTE* const maxLowPtr = (lowPrefixPtr + MAX_DISTANCE >= ip) ? lowPrefixPtr : ip - MAX_DISTANCE;
                         size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, maxLowPtr, pattern);
                         size_t const currentSegmentLength = backLength + forwardPatternLength;
-                        if (trace) DEBUGLOG(2, "good start position (match == pattern)");
 
                         if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
                           && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */

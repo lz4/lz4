@@ -213,7 +213,7 @@ LZ4_FORCE_INLINE int LZ4HC_HashChain_GetAllMatches (
 {
     const BYTE* matchPtr;
     int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, ctx->searchNum);
-    if (matchLength < MINMATCH) return 0;
+    if ((size_t)matchLength <= best_mlen) return 0;
     assert(matches != NULL);
     matches[0].len = matchLength;
     matches[0].off = (int)(ip-matchPtr);
@@ -327,6 +327,7 @@ static int LZ4HC_compress_optimal (
 
             //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
+            //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur + 1, matches, fullUpdate);   /* only works if last_match_pos is really the last match pos */
             if ((nb_matches > 0) && (size_t)matches[nb_matches-1].len > sufficient_len) {
                 /* immediate encoding */
                 best_mlen = matches[nb_matches-1].len;
