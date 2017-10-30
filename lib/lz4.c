@@ -1146,7 +1146,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
                  int partialDecoding,    /* full, partial */
                  int targetOutputSize,   /* only used if partialDecoding==partial */
                  int dict,               /* noDict, withPrefix64k, usingExtDict */
-                 const BYTE* const lowPrefix,  /* == dst when no prefix */
+                 const BYTE* const lowPrefix,  /* always <= dst, == dst when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
                  const size_t dictSize         /* note : = 0 if noDict */
                  )
@@ -1168,7 +1168,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
 
     /* Special cases */
-    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
+    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                      /* targetOutputSize too high => just decode everything */
     if ((endOnInput) && (unlikely(outputSize==0))) return ((srcSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
@@ -1178,24 +1178,25 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         const BYTE* match;
         size_t offset;
 
-        /* get literal length */
         unsigned const token = *ip++;
 
-        if (1)
-        if (ip + 14 + 2 <= iend)
-        if ((token < 15*16) & ((token & 0xF) <= 12)) {
+        /* shortcut for common case */
+        /* this shortcut was tested on x86 and x64, where it improves decoding speed.
+         * it has not yet been benchmarked on ARM, Power, mips, etc. */
+        if (((ip + 14 + 2 <= iend) & (op + 14 + 16 <= oend))
+          & ((token < 15*16) & ((token & 0xF) <= 12)) ) {
             size_t const ll = token >> ML_BITS;
-            size_t const off = LZ4_readLE16(ip+ll);   /* check input validity */
-            if (off >= 16) {
+            size_t const off = LZ4_readLE16(ip+ll);
+            const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
+            if ((off >= 16) & (matchPtr >= lowPrefix)) {
                 size_t const ml = (token & 0xF) + MINMATCH;
-                DEBUGLOG(2, "rest:%u, ll:%2u, ml:%2u, off:%u",
-                    (U32)(oend-op), (U32)ll, (U32)ml, (U32)off);
-                memcpy(op, ip, 16); op += ll; ip += ll + 2 /* offset */;
-                memcpy(op, op - off, 16); op += ml;
+                memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
+                memcpy(op, matchPtr, 16); op += ml;
                 continue;
             }
         }
 
+        /* decode literal length */
         if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
             do {
