@@ -211,7 +211,7 @@ LZ4_FORCE_INLINE int LZ4HC_HashChain_GetAllMatches (
                         const BYTE* const ip, const BYTE* const iHighLimit,
                         size_t best_mlen, LZ4HC_match_t* matches, const int fullUpdate)
 {
-    const BYTE* matchPtr;
+    const BYTE* matchPtr = NULL;
     int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, ctx->searchNum);
     if ((size_t)matchLength <= best_mlen) return 0;
     assert(matches != NULL);
