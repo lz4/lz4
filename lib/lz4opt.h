@@ -328,7 +328,10 @@ static int LZ4HC_compress_optimal (
             //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur + 1, matches, fullUpdate);   /* only works if last_match_pos is really the last match pos */
-            if ((nb_matches > 0) && (size_t)matches[nb_matches-1].len > sufficient_len) {
+            if (!nb_matches) continue;
+
+            if ( ((size_t)matches[nb_matches-1].len > sufficient_len)
+              || (matches[nb_matches-1].len + cur >= LZ4_OPT_NUM) ) {
                 /* immediate encoding */
                 best_mlen = matches[nb_matches-1].len;
                 best_off = matches[nb_matches-1].off;
@@ -357,6 +360,7 @@ static int LZ4HC_compress_optimal (
                         }
 
                         if (pos > last_match_pos || price < opt[pos].price) {
+                            assert(pos < LZ4_OPT_NUM);
                             while (last_match_pos < pos) opt[++last_match_pos].price = 1<<30;
                             opt[pos].mlen = ml;
                             opt[pos].off = offset;
