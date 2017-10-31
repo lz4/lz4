@@ -1160,8 +1160,8 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
     BYTE* oexit = op + targetOutputSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const unsigned dec32table[] = {0, 1, 2, 1, 4, 4, 4, 4};
-    const int dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+    const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
+    const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
@@ -1276,14 +1276,13 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         /* copy match within block */
         cpy = op + length;
         if (unlikely(offset<8)) {
-            const int dec64 = dec64table[offset];
             op[0] = match[0];
             op[1] = match[1];
             op[2] = match[2];
             op[3] = match[3];
-            match += dec32table[offset];
+            match += inc32table[offset];
             memcpy(op+4, match, 4);
-            match -= dec64;
+            match -= dec64table[offset];
         } else { LZ4_copy8(op, match); match+=8; }
         op += 8;
 
@@ -1300,7 +1299,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
             LZ4_copy8(op, match);
             if (length>16) LZ4_wildCopy(op+8, match+8, cpy);
         }
-        op=cpy;   /* correction */
+        op = cpy;   /* correction */
     }
 
     /* end of decoding */
