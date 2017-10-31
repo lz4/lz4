@@ -1181,18 +1181,19 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         unsigned const token = *ip++;
 
         /* shortcut for common case :
-         * in most circumstances, we expect to decode small matches (<= 16 bytes) separated by few literals (<= 14 bytes).
+         * in most circumstances, we expect to decode small matches (<= 18 bytes) separated by few literals (<= 14 bytes).
          * this shortcut was tested on x86 and x64, where it improves decoding speed.
          * it has not yet been benchmarked on ARM, Power, mips, etc. */
-        if (((ip + 14 + 2 <= iend) & (op + 14 + 16 <= oend))
-          & ((token < (15<<ML_BITS)) & ((token & ML_MASK) <= 12)) ) {
+        if (((ip + 14 /*maxLL*/ + 2 /*offset*/ <= iend)
+          & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
+          & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
             size_t const ll = token >> ML_BITS;
             size_t const off = LZ4_readLE16(ip+ll);
             const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
-            if ((off >= 16) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
+            if ((off >= 18) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
                 size_t const ml = (token & ML_MASK) + MINMATCH;
                 memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
-                memcpy(op, matchPtr, 16); op += ml;
+                memcpy(op, matchPtr, 18); op += ml;
                 continue;
             }
         }
