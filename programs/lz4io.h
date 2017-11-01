@@ -64,6 +64,8 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 /* ****************** Parameters ******************** */
 /* ************************************************** */
 
+int LZ4IO_setDictionaryFilename(const char* dictionaryFilename);
+
 /* Default setting : overwrite = 1;
    return : overwrite mode (0/1) */
 int LZ4IO_setOverwrite(int yes);
