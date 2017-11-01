@@ -1146,7 +1146,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
                  int partialDecoding,    /* full, partial */
                  int targetOutputSize,   /* only used if partialDecoding==partial */
                  int dict,               /* noDict, withPrefix64k, usingExtDict */
-                 const BYTE* const lowPrefix,  /* == dst when no prefix */
+                 const BYTE* const lowPrefix,  /* always <= dst, == dst when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
                  const size_t dictSize         /* note : = 0 if noDict */
                  )
@@ -1160,15 +1160,15 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
     BYTE* oexit = op + targetOutputSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const unsigned dec32table[] = {0, 1, 2, 1, 4, 4, 4, 4};
-    const int dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+    const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
+    const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
 
 
     /* Special cases */
-    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
+    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                      /* targetOutputSize too high => just decode everything */
     if ((endOnInput) && (unlikely(outputSize==0))) return ((srcSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
@@ -1178,8 +1178,27 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         const BYTE* match;
         size_t offset;
 
-        /* get literal length */
         unsigned const token = *ip++;
+
+        /* shortcut for common case :
+         * in most circumstances, we expect to decode small matches (<= 18 bytes) separated by few literals (<= 14 bytes).
+         * this shortcut was tested on x86 and x64, where it improves decoding speed.
+         * it has not yet been benchmarked on ARM, Power, mips, etc. */
+        if (((ip + 14 /*maxLL*/ + 2 /*offset*/ <= iend)
+          & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
+          & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
+            size_t const ll = token >> ML_BITS;
+            size_t const off = LZ4_readLE16(ip+ll);
+            const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
+            if ((off >= 18) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
+                size_t const ml = (token & ML_MASK) + MINMATCH;
+                memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
+                memcpy(op, matchPtr, 18); op += ml;
+                continue;
+            }
+        }
+
+        /* decode literal length */
         if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
             do {
@@ -1257,14 +1276,13 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         /* copy match within block */
         cpy = op + length;
         if (unlikely(offset<8)) {
-            const int dec64 = dec64table[offset];
             op[0] = match[0];
             op[1] = match[1];
             op[2] = match[2];
             op[3] = match[3];
-            match += dec32table[offset];
+            match += inc32table[offset];
             memcpy(op+4, match, 4);
-            match -= dec64;
+            match -= dec64table[offset];
         } else { LZ4_copy8(op, match); match+=8; }
         op += 8;
 
@@ -1281,7 +1299,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
             LZ4_copy8(op, match);
             if (length>16) LZ4_wildCopy(op+8, match+8, cpy);
         }
-        op=cpy;   /* correction */
+        op = cpy;   /* correction */
     }
 
     /* end of decoding */
