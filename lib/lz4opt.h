@@ -299,7 +299,7 @@ static int LZ4HC_compress_optimal (
         }   }   }
         last_match_pos = matches[nb_matches_initial-1].len;
         {   int addLit;
-            for (addLit = 1; addLit <= 2; addLit ++) {
+            for (addLit = 1; addLit <= 3; addLit ++) {
                 opt[last_match_pos+addLit].mlen = 1; /* literal */
                 opt[last_match_pos+addLit].off = 0;
                 opt[last_match_pos+addLit].litlen = addLit;
@@ -315,6 +315,7 @@ static int LZ4HC_compress_optimal (
 
             if (curPtr >= mflimit) break;
 
+            DEBUGLOG(7, "search at rPos:%u", cur);
             //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur + 1, matches, fullUpdate);   /* only works if last_match_pos is really the last match pos */
@@ -367,7 +368,7 @@ static int LZ4HC_compress_optimal (
                             price = opt[cur].price + LZ4HC_sequencePrice(0, ml);
                         }
 
-                        if (pos > last_match_pos+2 || price <= opt[pos].price) {
+                        if (pos > last_match_pos+3 || price <= opt[pos].price) {
                             DEBUGLOG(7, "rPos:%3i => price:%3i (matchlen=%i)",
                                         pos, price, ml);
                             assert(pos < LZ4_OPT_NUM);
@@ -382,7 +383,7 @@ static int LZ4HC_compress_optimal (
             }   }   }   }
             /* complete following positions with literals */
             {   int addLit;
-                for (addLit = 1; addLit <= 2; addLit ++) {
+                for (addLit = 1; addLit <= 3; addLit ++) {
                     opt[last_match_pos+addLit].mlen = 1; /* literal */
                     opt[last_match_pos+addLit].off = 0;
                     opt[last_match_pos+addLit].litlen = addLit;

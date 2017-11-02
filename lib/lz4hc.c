@@ -188,12 +188,15 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     repeat_state_e repeat = rep_untested;
     size_t srcPatternLength = 0;
 
-
+    DEBUGLOG(7, "LZ4HC_InsertAndGetWiderMatch");
     /* First Match */
     LZ4HC_Insert(hc4, ip);
     matchIndex = HashTable[LZ4HC_hashPtr(ip)];
+    DEBUGLOG(7, "First match at index %u / %u (lowLimit)",
+                matchIndex, lowLimit);
 
     while ((matchIndex>=lowLimit) && (nbAttempts)) {
+        DEBUGLOG(7, "remaining attempts : %i", nbAttempts);
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
@@ -360,16 +363,18 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 2)
     static const BYTE* start = NULL;
     static U32 totalCost = 0;
+    U32 const pos = (U32)(*anchor - start);
     U32 const ll = (U32)(*ip - *anchor);
     U32 const llAdd = (ll>=15) ? ((ll-15) / 255) + 1 : 0;
     U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = *anchor;  /* only works for single segment */
-    totalCost += cost;
-    DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u/%7u",
-                (U32)(*anchor - start),
+    //g_debuglog_enable = (pos >= 112705) & (pos <= 112760);
+    DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u / %u",
+                pos,
                 (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
                 cost, totalCost);
+    totalCost += cost;
 #endif
 
     /* Encode Literal length */
