@@ -318,7 +318,7 @@ static int LZ4HC_compress_optimal (
             DEBUGLOG(7, "search at rPos:%u", cur);
             //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
-            //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur + 1, matches, fullUpdate);   /* only works if last_match_pos is really the last match pos */
+            //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur - 1, matches, fullUpdate);   /* only test matches of a minimum length */
             if (!nb_matches) continue;
 
             if ( ((size_t)matches[nb_matches-1].len > sufficient_len)
