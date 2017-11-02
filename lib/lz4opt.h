@@ -46,6 +46,7 @@ typedef struct {
     int off;
     int mlen;
     int litlen;
+    int toSearch;
 } LZ4HC_optimal_t;
 
 
@@ -278,6 +279,7 @@ static int LZ4HC_compress_optimal (
                 opt[rPos].off = 0;
                 opt[rPos].litlen = llen + rPos;
                 opt[rPos].price = cost;
+                opt[rPos].toSearch = 1;
                 DEBUGLOG(7, "rPos:%3i => price:%3i (litlen=%i) -- initial setup",
                             rPos, cost, opt[rPos].litlen);
         }   }
@@ -294,16 +296,21 @@ static int LZ4HC_compress_optimal (
                     opt[mlen].off = offset;
                     opt[mlen].litlen = llen;
                     opt[mlen].price = cost;
+                    opt[mlen].toSearch = (((mlen - 18) % 255) == 0);
                     DEBUGLOG(7, "rPos:%3i => price:%3i (matchlen=%i) -- initial setup",
                                 mlen, cost, mlen);
         }   }   }
         last_match_pos = matches[nb_matches_initial-1].len;
+        opt[last_match_pos-2].toSearch = 1;
+        opt[last_match_pos-1].toSearch = 1;
+        opt[last_match_pos].toSearch = 1;
         {   int addLit;
             for (addLit = 1; addLit <= 3; addLit ++) {
                 opt[last_match_pos+addLit].mlen = 1; /* literal */
                 opt[last_match_pos+addLit].off = 0;
                 opt[last_match_pos+addLit].litlen = addLit;
                 opt[last_match_pos+addLit].price = opt[last_match_pos].price + LZ4HC_literalsPrice(addLit);
+                opt[last_match_pos+addLit].toSearch = 1;
                 DEBUGLOG(7, "rPos:%3i => price:%3i (litlen=%i) -- initial setup",
                             last_match_pos+addLit, opt[last_match_pos+addLit].price, addLit);
         }   }
@@ -314,6 +321,7 @@ static int LZ4HC_compress_optimal (
             int nb_matches;
 
             if (curPtr >= mflimit) break;
+            if (opt[cur].toSearch == 0) continue;
 
             DEBUGLOG(7, "search at rPos:%u", cur);
             //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
@@ -341,6 +349,7 @@ static int LZ4HC_compress_optimal (
                         opt[pos].off = 0;
                         opt[pos].litlen = baseLitlen+litlen;
                         opt[pos].price = price;
+                        opt[pos].toSearch = 1;
                         DEBUGLOG(7, "rPos:%3i => price:%3i (litlen=%i)",
                                     pos, price, opt[pos].litlen);
             }   }   }
@@ -380,14 +389,19 @@ static int LZ4HC_compress_optimal (
                             opt[pos].off = offset;
                             opt[pos].litlen = ll;
                             opt[pos].price = price;
+                            opt[pos].toSearch = (((ml-18) % 255) == 0);
             }   }   }   }
             /* complete following positions with literals */
+            opt[last_match_pos-2].toSearch = 1;
+            opt[last_match_pos-1].toSearch = 1;
+            opt[last_match_pos].toSearch = 1;
             {   int addLit;
                 for (addLit = 1; addLit <= 3; addLit ++) {
                     opt[last_match_pos+addLit].mlen = 1; /* literal */
                     opt[last_match_pos+addLit].off = 0;
                     opt[last_match_pos+addLit].litlen = addLit;
                     opt[last_match_pos+addLit].price = opt[last_match_pos].price + LZ4HC_literalsPrice(addLit);
+                    opt[last_match_pos+addLit].toSearch = 1;
                     DEBUGLOG(7, "rPos:%3i => price:%3i (litlen=%i)", last_match_pos+addLit, opt[last_match_pos+addLit].price, addLit);
             }   }
         }  /* for (cur = 1; cur <= last_match_pos; cur++) */

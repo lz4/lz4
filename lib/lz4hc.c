@@ -363,14 +363,14 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 2)
     static const BYTE* start = NULL;
     static U32 totalCost = 0;
-    U32 const pos = (U32)(*anchor - start);
+    U32 const pos = (start==NULL) ? 0 : (U32)(*anchor - start);
     U32 const ll = (U32)(*ip - *anchor);
     U32 const llAdd = (ll>=15) ? ((ll-15) / 255) + 1 : 0;
     U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = *anchor;  /* only works for single segment */
     //g_debuglog_enable = (pos >= 112705) & (pos <= 112760);
-    DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u / %u",
+    DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u + %u",
                 pos,
                 (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
                 cost, totalCost);
