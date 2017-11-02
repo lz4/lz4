@@ -342,10 +342,6 @@ typedef enum {
     limitedDestSize = 2,
 } limitedOutput_directive;
 
-#ifndef LZ4HC_DEBUG
-#  define LZ4HC_DEBUG 0
-#endif
-
 /* LZ4HC_encodeSequence() :
  * @return : 0 if ok,
  *           1 if buffer issue detected */
@@ -361,9 +357,19 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     size_t length;
     BYTE* const token = (*op)++;
 
-#if LZ4HC_DEBUG
-    printf("literal : %u  --  match : %u  --  offset : %u\n",
-           (U32)(*ip - *anchor), (U32)matchLength, (U32)(*ip-match));
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 2)
+    static const BYTE* start = NULL;
+    static U32 totalCost = 0;
+    U32 const ll = (U32)(*ip - *anchor);
+    U32 const llAdd = (ll>=15) ? ((ll-15) / 255) + 1 : 0;
+    U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
+    U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
+    if (start==NULL) start = *anchor;  /* only works for single segment */
+    totalCost += cost;
+    DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u/%7u",
+                (U32)(*anchor - start),
+                (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
+                cost, totalCost);
 #endif
 
     /* Encode Literal length */
@@ -386,6 +392,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
 
     /* Encode MatchLength */
+    assert(matchLength >= MINMATCH);
     length = (size_t)(matchLength - MINMATCH);
     if ((limit) && (*op + (length >> 8) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
     if (length >= ML_MASK) {
