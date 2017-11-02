@@ -301,8 +301,8 @@ static int LZ4HC_compress_optimal (
                                 mlen, cost, mlen);
         }   }   }
         last_match_pos = matches[nb_matches_initial-1].len;
-        opt[last_match_pos-2].toSearch = 1;
-        opt[last_match_pos-1].toSearch = 1;
+        if (fullUpdate) opt[last_match_pos-2].toSearch = 1;   /* 1 byte on calgary */
+        if (fullUpdate) opt[last_match_pos-1].toSearch = 1;   /* 1 byte on calgary */
         opt[last_match_pos].toSearch = 1;
         {   int addLit;
             for (addLit = 1; addLit <= 3; addLit ++) {
@@ -349,7 +349,6 @@ static int LZ4HC_compress_optimal (
                         opt[pos].off = 0;
                         opt[pos].litlen = baseLitlen+litlen;
                         opt[pos].price = price;
-                        opt[pos].toSearch = 1;
                         DEBUGLOG(7, "rPos:%3i => price:%3i (litlen=%i)",
                                     pos, price, opt[pos].litlen);
             }   }   }
@@ -392,8 +391,8 @@ static int LZ4HC_compress_optimal (
                             opt[pos].toSearch = (((ml-18) % 255) == 0);
             }   }   }   }
             /* complete following positions with literals */
-            opt[last_match_pos-2].toSearch = 1;
-            opt[last_match_pos-1].toSearch = 1;
+            if (fullUpdate) opt[last_match_pos-2].toSearch = 1;   /* 2 bytes on enwik7 */
+            if (fullUpdate) opt[last_match_pos-1].toSearch = 1;   /* 53 bytes on enwik7, 13 bytes on calgary */
             opt[last_match_pos].toSearch = 1;
             {   int addLit;
                 for (addLit = 1; addLit <= 3; addLit ++) {
@@ -439,7 +438,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                 if (ml == 1) { ip++; rPos++; continue; }  /* literal; note: can end up with several literals, in which case, skip them */
                 rPos += ml;
                 assert(ml >= MINMATCH);
-                assert((offset >= 1) && (offset <=65535));
+                assert((offset >= 1) && (offset <= MAX_DISTANCE));
                 if ( LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ip - offset, limit, oend) )   /* updates ip, op and anchor */
                     return 0;  /* error */
         }   }

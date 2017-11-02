@@ -644,7 +644,7 @@ static int LZ4HC_getSearchNum(int compressionLevel)
 {
     switch (compressionLevel) {
         default: return 0; /* unused */
-        case 11: return 128;
+        case 11: return 256;
         case 12: return 1<<13;
     }
 }
