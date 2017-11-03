@@ -91,7 +91,7 @@ int LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,   /* Index table will 
 LZ4_FORCE_INLINE int LZ4HC_HashChain_GetAllMatches (
                         LZ4HC_CCtx_internal* ctx,
                         const BYTE* const ip, const BYTE* const iHighLimit,
-                        size_t best_mlen, LZ4HC_match_t* matches, const int fullUpdate)
+                        size_t best_mlen, LZ4HC_match_t* matches)
 {
     const BYTE* matchPtr = NULL;
     int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, ctx->searchNum);
@@ -99,7 +99,6 @@ LZ4_FORCE_INLINE int LZ4HC_HashChain_GetAllMatches (
     assert(matches != NULL);
     matches[0].len = matchLength;
     matches[0].off = (int)(ip-matchPtr);
-    (void)fullUpdate;
     return 1;
 }
 
@@ -139,7 +138,7 @@ static int LZ4HC_compress_optimal (
         int best_mlen, best_off;
         int cur, last_match_pos = 0;
 
-        int const nb_matches_initial = LZ4HC_HashChain_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches, fullUpdate);
+        int const nb_matches_initial = LZ4HC_HashChain_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, matches);
         if (!nb_matches_initial) { ip++; continue; }
 
         if ((size_t)matches[nb_matches_initial-1].len > sufficient_len) {
@@ -205,9 +204,9 @@ static int LZ4HC_compress_optimal (
 
             DEBUGLOG(7, "search at rPos:%u", cur);
             if (fullUpdate)
-                nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
+                nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches);
             else
-                nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur, matches, fullUpdate);   /* only test matches of a minimum length; slightly faster, but misses a few bytes */
+                nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur, matches);   /* only test matches of a minimum length; slightly faster, but misses a few bytes */
             if (!nb_matches) continue;
 
             if ( ((size_t)matches[nb_matches-1].len > sufficient_len)
