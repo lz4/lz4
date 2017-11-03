@@ -265,8 +265,7 @@ int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
 
 /*! LZ4_setCompressionLevel() : v1.8.0 (experimental)
  *  It's possible to change compression level between 2 invocations of LZ4_compress_HC_continue*(),
- *  but it requires to stay in the same mode (aka 1-10 or 11-12).
- *  This function ensures this condition.
+ *  though it requires to stay in the same mode (aka fast or HC).
  */
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 

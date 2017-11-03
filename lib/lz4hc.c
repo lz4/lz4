@@ -49,6 +49,7 @@
 
 
 /*===    Dependency    ===*/
+#define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 
 
@@ -726,18 +727,13 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= sizeof(size_t) * LZ4_STREAMHCSIZE_SIZET);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
-    if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;  /* cap compression level */
-    LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
+    LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
-    /* note : 1-10 / 11-12 separation might no longer be necessary since optimal parser uses hash chain too */
-    int const currentCLevel = LZ4_streamHCPtr->internal_donotuse.compressionLevel;
-    int const minCLevel = currentCLevel < LZ4HC_CLEVEL_OPT_MIN ? 1 : LZ4HC_CLEVEL_OPT_MIN;
-    int const maxCLevel = currentCLevel < LZ4HC_CLEVEL_OPT_MIN ? LZ4HC_CLEVEL_OPT_MIN-1 : LZ4HC_CLEVEL_MAX;
-    compressionLevel = MIN(compressionLevel, minCLevel);
-    compressionLevel = MAX(compressionLevel, maxCLevel);
+    if (compressionLevel < 1) compressionLevel = 1;
+    if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;
     LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
 }
 

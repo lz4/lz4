@@ -376,9 +376,9 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe() failed on data compressed by LZ4_compressHC_destSize");
                 FUZ_CHECKTEST(ret!=srcSize, "LZ4_decompress_safe() failed : did not fully decompressed data");
                 FUZ_CHECKTEST(decodedBuffer[srcSize] != canary, "LZ4_decompress_safe() overwrite dst buffer !");
-                { U32 const crcDec = XXH32(decodedBuffer, srcSize, 0);
-                  FUZ_CHECKTEST(crcDec!=crcBase, "LZ4_decompress_safe() corrupted decoded data"); }
-
+                {   U32 const crcDec = XXH32(decodedBuffer, srcSize, 0);
+                    FUZ_CHECKTEST(crcDec!=crcBase, "LZ4_decompress_safe() corrupted decoded data");
+                }
                 DISPLAYLEVEL(5, " OK \n");
             }
             else
@@ -460,8 +460,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         // Test decoding with output size being 10 bytes too short => must fail
         FUZ_DISPLAYTEST;
-        if (blockSize>10)
-        {
+        if (blockSize>10) {
             decodedBuffer[blockSize-10] = 0;
             ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize-10);
             FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to Output Size being 10 bytes too short");
@@ -632,6 +631,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_resetStreamHC (&LZ4dictHC, compressionLevel);
         LZ4_loadDictHC(&LZ4dictHC, dict, dictSize);
+        LZ4_setCompressionLevel(&LZ4dictHC, compressionLevel-1);
         blockContinueCompressedSize = LZ4_compress_HC_continue(&LZ4dictHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue failed");
 
@@ -657,7 +657,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe_usingDict corrupted decoded data");
 
         /* Compress HC continue destSize */
-            FUZ_DISPLAYTEST;
+        FUZ_DISPLAYTEST;
         {   int const availableSpace = (FUZ_rand(&randState) % blockSize) + 5;
             int consumedSize = blockSize;
             FUZ_DISPLAYTEST;
