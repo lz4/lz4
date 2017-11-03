@@ -761,10 +761,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
     }
     LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
-    if (ctxPtr->compressionLevel >= LZ4HC_CLEVEL_OPT_MIN)
-        LZ4HC_updateBinTree(ctxPtr, ctxPtr->end - MFLIMIT, ctxPtr->end - LASTLITERALS);
-    else
-        if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
+    if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
     return dictSize;
 }
 
@@ -773,10 +770,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
 
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
-    if (ctxPtr->compressionLevel >= LZ4HC_CLEVEL_OPT_MIN)
-        LZ4HC_updateBinTree(ctxPtr, ctxPtr->end - MFLIMIT, ctxPtr->end - LASTLITERALS);
-    else
-        if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;

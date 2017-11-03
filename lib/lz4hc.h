@@ -129,7 +129,7 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
  * They are exposed to allow static allocation of `LZ4_streamHC_t`.
  * Using these definitions makes the code vulnerable to potential API break when upgrading LZ4
  **************************************/
-#define LZ4HC_DICTIONARY_LOGSIZE 17   /* due to btree, hc would only need 16 */
+#define LZ4HC_DICTIONARY_LOGSIZE 16
 #define LZ4HC_MAXD (1<<LZ4HC_DICTIONARY_LOGSIZE)
 #define LZ4HC_MAXD_MASK (LZ4HC_MAXD - 1)
 
@@ -175,7 +175,7 @@ typedef struct
 
 #endif
 
-#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 56) /* 393268 */
+#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 56) /* 262200 */
 #define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
 union LZ4_streamHC_u {
     size_t table[LZ4_STREAMHCSIZE_SIZET];
