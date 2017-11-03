@@ -91,11 +91,11 @@ int LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,   /* Index table will 
 LZ4_FORCE_INLINE
 LZ4HC_match_t LZ4HC_HashChain_GetAllMatches (LZ4HC_CCtx_internal* const ctx,
                         const BYTE* const ip, const BYTE* const iHighLimit,
-                        size_t best_mlen)
+                        size_t best_mlen, int nbSearches)
 {
     LZ4HC_match_t match = {0 , 0};
     const BYTE* matchPtr = NULL;
-    int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, ctx->searchNum);
+    int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, nbSearches);
     if ((size_t)matchLength <= best_mlen) return match;
     match.len = matchLength;
     match.off = (int)(ip-matchPtr);
@@ -110,8 +110,9 @@ static int LZ4HC_compress_optimal (
     int inputSize,
     int dstCapacity,
     limitedOutput_directive limit,
+    int const nbSearches,
     size_t sufficient_len,
-    const int fullUpdate
+    int const fullUpdate
     )
 {
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + 3];   /* this uses a bit too much stack memory to my taste ... */
@@ -137,7 +138,7 @@ static int LZ4HC_compress_optimal (
         int best_mlen, best_off;
         int cur, last_match_pos = 0;
 
-        LZ4HC_match_t const firstMatch = LZ4HC_HashChain_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1);
+        LZ4HC_match_t const firstMatch = LZ4HC_HashChain_GetAllMatches(ctx, ip, matchlimit, MINMATCH-1, nbSearches);
         if (firstMatch.len==0) { ip++; continue; }
 
         if ((size_t)firstMatch.len > sufficient_len) {
@@ -201,9 +202,10 @@ static int LZ4HC_compress_optimal (
 
             DEBUGLOG(7, "search at rPos:%u", cur);
             if (fullUpdate)
-                newMatch = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1);
+                newMatch = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, nbSearches);
             else
-                newMatch = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur);   /* only test matches of a minimum length; slightly faster, but misses a few bytes */
+                /* only test matches of minimum length; slightly faster, but misses a few bytes */
+                newMatch = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur, nbSearches);
             if (!newMatch.len) continue;
 
             if ( ((size_t)newMatch.len > sufficient_len)

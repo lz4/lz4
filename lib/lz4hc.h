@@ -152,8 +152,7 @@ typedef struct
     uint32_t   dictLimit;       /* below that point, need extDict */
     uint32_t   lowLimit;        /* below that point, no more dict */
     uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
-    uint32_t   searchNum;       /* only for optimal parser */
-    uint32_t   compressionLevel;
+    int        compressionLevel;
 } LZ4HC_CCtx_internal;
 
 #else
@@ -169,7 +168,6 @@ typedef struct
     unsigned int   dictLimit;        /* below that point, need extDict */
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
-    unsigned int   searchNum;        /* only for optimal parser */
     int            compressionLevel;
 } LZ4HC_CCtx_internal;
 

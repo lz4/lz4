@@ -640,17 +640,6 @@ _dest_overflow:
     return 0;
 }
 
-static int LZ4HC_getSearchNum(int compressionLevel)
-{
-    assert(compressionLevel >= 1);
-    assert(compressionLevel <= LZ4HC_CLEVEL_MAX);
-    switch (compressionLevel) {
-        default: return 1 << (compressionLevel-1);
-        case 10: return 1 << 12;
-        case 11: return 512;
-        case 12: return 1<<13;
-    }
-}
 
 static int LZ4HC_compress_generic (
     LZ4HC_CCtx_internal* const ctx,
@@ -667,16 +656,14 @@ static int LZ4HC_compress_generic (
         if (limit == limitedDestSize) cLevel = 10;
         switch (cLevel) {
             case 10:
-                return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1 << 12, limit);
+                return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1<<12, limit);
             case 11:
-                ctx->searchNum = LZ4HC_getSearchNum(cLevel);
-                return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 128, 0);
+                return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 512, 128, 0);
             default:
                 cLevel = 12;
                 /* fall-through */
             case 12:
-                ctx->searchNum = LZ4HC_getSearchNum(cLevel);
-                return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, LZ4_OPT_NUM, 1);
+                return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 1<<13, LZ4_OPT_NUM, 1);
         }
     }
     return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1 << (cLevel-1), limit);  /* levels 1-9 */
@@ -741,7 +728,6 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;  /* cap compression level */
     LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
-    LZ4_streamHCPtr->internal_donotuse.searchNum = LZ4HC_getSearchNum(compressionLevel);
 }
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
