@@ -457,7 +457,6 @@ static int LZ4HC_compress_hashChain (
     if (limit == limitedDestSize && maxOutputSize < 1) return 0;         /* Impossible to store anything */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;              /* Unsupported input size, too large (or negative) */
 
-    ctx->end += inputSize;
     if (limit == limitedDestSize) oend -= LASTLITERALS;                  /* Hack for support limitations LZ4 decompressor */
     if (inputSize < LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
@@ -651,7 +650,8 @@ static int LZ4HC_compress_generic (
     limitedOutput_directive limit
     )
 {
-    if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe to reconsider */
+    ctx->end += *srcSizePtr;
+    if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
     if (cLevel > 9) {
         if (limit == limitedDestSize) cLevel = 10;
         switch (cLevel) {

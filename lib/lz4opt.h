@@ -128,7 +128,6 @@ static int LZ4HC_compress_optimal (
     /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal");
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
-    ctx->end += inputSize;
     ip++;
 
     /* Main Loop */
