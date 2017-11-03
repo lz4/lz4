@@ -35,12 +35,6 @@
 
 #define LZ4_OPT_NUM   (1<<12)
 
-
-typedef struct {
-    int off;
-    int len;
-} LZ4HC_match_t;
-
 typedef struct {
     int price;
     int off;
@@ -88,12 +82,17 @@ int LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,   /* Index table will 
     return LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, longest, matchpos, &uselessPtr, maxNbAttempts);
 }
 
+typedef struct {
+    int off;
+    int len;
+} LZ4HC_match_t;
+
 LZ4_FORCE_INLINE
 LZ4HC_match_t LZ4HC_HashChain_GetAllMatches (LZ4HC_CCtx_internal* const ctx,
                         const BYTE* const ip, const BYTE* const iHighLimit,
                         size_t best_mlen, int nbSearches)
 {
-    LZ4HC_match_t match = {0 , 0};
+    LZ4HC_match_t match = { 0 , 0 };
     const BYTE* matchPtr = NULL;
     int matchLength = LZ4HC_FindLongerMatch(ctx, ip, iHighLimit, (int)best_mlen, &matchPtr, nbSearches);
     if ((size_t)matchLength <= best_mlen) return match;

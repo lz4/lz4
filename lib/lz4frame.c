@@ -322,7 +322,7 @@ size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
                                const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_cctx_t cctxI;
-    LZ4_stream_t lz4ctx;
+    LZ4_stream_t lz4ctx;   /* pretty large on stack */
     LZ4F_preferences_t prefs;
     LZ4F_compressOptions_t options;
     BYTE* const dstStart = (BYTE*) dstBuffer;
@@ -504,15 +504,15 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     cctxPtr->prefs = *preferencesPtr;
 
     /* Ctx Management */
-    {   U32 const tableID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
-        if (cctxPtr->lz4CtxLevel < tableID) {
+    {   U32 const ctxTypeID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;  /* 0:nothing ; 1:LZ4 table ; 2:HC tables */
+        if (cctxPtr->lz4CtxLevel < ctxTypeID) {
             FREEMEM(cctxPtr->lz4CtxPtr);
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStream();
             else
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStreamHC();
             if (cctxPtr->lz4CtxPtr == NULL) return err0r(LZ4F_ERROR_allocation_failed);
-            cctxPtr->lz4CtxLevel = tableID;
+            cctxPtr->lz4CtxLevel = ctxTypeID;
     }   }
 
     /* Buffer Management */
