@@ -160,7 +160,7 @@ static int LZ4HC_compress_optimal (
                 DEBUGLOG(7, "rPos:%3i => price:%3i (litlen=%i) -- initial setup",
                             rPos, cost, opt[rPos].litlen);
         }   }
-        /* set prices using matches found for rPos = 0 */
+        /* set prices using initial match */
         {   int mlen = MINMATCH;
             int const matchML = firstMatch.len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
             int const offset = firstMatch.off;
@@ -215,7 +215,7 @@ static int LZ4HC_compress_optimal (
                 goto encode;
             }
 
-            /* before first match : set price with literals at beginning */
+            /* before match : set price with literals at beginning */
             {   int const baseLitlen = opt[cur].litlen;
                 int litlen;
                 for (litlen = 1; litlen < MINMATCH; litlen++) {
@@ -230,10 +230,10 @@ static int LZ4HC_compress_optimal (
                                     pos, price, opt[pos].litlen);
             }   }   }
 
-            /* set prices using matches at position = cur */
+            /* set prices using match at position = cur */
             {   int const matchML = newMatch.len;
                 int ml = MINMATCH;
-                
+
                 assert(cur + newMatch.len < LZ4_OPT_NUM);
                 for ( ; ml <= matchML ; ml++) {
                     int const pos = cur + ml;
@@ -255,7 +255,7 @@ static int LZ4HC_compress_optimal (
                         DEBUGLOG(7, "rPos:%3i => price:%3i (matchlen=%i)",
                                     pos, price, ml);
                         assert(pos < LZ4_OPT_NUM);
-                        if ( (ml == matchML)  /* last post of last match */
+                        if ( (ml == matchML)  /* last pos of last match */
                           && (last_match_pos < pos) )
                             last_match_pos = pos;
                         opt[pos].mlen = ml;

@@ -642,8 +642,11 @@ _dest_overflow:
 
 static int LZ4HC_getSearchNum(int compressionLevel)
 {
+    assert(compressionLevel >= 1);
+    assert(compressionLevel <= LZ4HC_CLEVEL_MAX);
     switch (compressionLevel) {
-        default: return 0; /* unused */
+        default: return 1 << (compressionLevel-1);
+        case 10: return 1 << 12;
         case 11: return 512;
         case 12: return 1<<13;
     }
@@ -709,8 +712,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
 }
 
 /* LZ4_compress_HC_destSize() :
- * currently, only compatible with Hash Chain implementation,
- * hence limit compression level to LZ4HC_CLEVEL_OPT_MIN-1*/
+ * only compatible with Hash Chain match finder */
 int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
@@ -744,6 +746,7 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
+    /* note : 1-10 / 11-12 separation might no longer be necessary since optimal parser uses hash chain too */
     int const currentCLevel = LZ4_streamHCPtr->internal_donotuse.compressionLevel;
     int const minCLevel = currentCLevel < LZ4HC_CLEVEL_OPT_MIN ? 1 : LZ4HC_CLEVEL_OPT_MIN;
     int const maxCLevel = currentCLevel < LZ4HC_CLEVEL_OPT_MIN ? LZ4HC_CLEVEL_OPT_MIN-1 : LZ4HC_CLEVEL_MAX;
@@ -824,8 +827,6 @@ int LZ4_compress_HC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, 
 
 int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, char* dst, int* srcSizePtr, int targetDestSize)
 {
-    LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
-    if (ctxPtr->compressionLevel >= LZ4HC_CLEVEL_OPT_MIN) LZ4HC_init(ctxPtr, (const BYTE*)src);   /* not compatible with btopt implementation */
     return LZ4_compressHC_continue_generic(LZ4_streamHCPtr, src, dst, srcSizePtr, targetDestSize, limitedDestSize);
 }
 
