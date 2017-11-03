@@ -243,7 +243,6 @@ static int LZ4HC_compress_optimal (
     const BYTE* const matchlimit = iend - LASTLITERALS;
     BYTE* op = (BYTE*) dst;
     BYTE* const oend = op + dstCapacity;
-    int const front = fullUpdate ? 2 : 1;
 
     /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal");
@@ -317,12 +316,16 @@ static int LZ4HC_compress_optimal (
             if (curPtr >= mflimit) break;
             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
                     cur, opt[cur].price, opt[cur+1].price, cur+1);
-            if (opt[cur+front].price <= opt[cur].price) continue;
+            if (fullUpdate) {
+                if ((opt[cur+1].price <= opt[cur].price) && (opt[cur+4].price < opt[cur].price+3)) continue;
+            } else {
+                if (opt[cur+1].price <= opt[cur].price) continue;
+            }
 
             DEBUGLOG(7, "search at rPos:%u", cur);
             //nb_matches = LZ4HC_BinTree_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
             nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, MINMATCH-1, matches, fullUpdate);
-            //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur - 1, matches, fullUpdate);   /* only test matches of a minimum length */
+            //nb_matches = LZ4HC_HashChain_GetAllMatches(ctx, curPtr, matchlimit, last_match_pos - cur, matches, fullUpdate);   /* only test matches of a minimum length */
             if (!nb_matches) continue;
 
             if ( ((size_t)matches[nb_matches-1].len > sufficient_len)
