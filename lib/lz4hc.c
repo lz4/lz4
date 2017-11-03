@@ -661,7 +661,6 @@ static int LZ4HC_compress_generic (
             case 11:
                 return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 512, 128, 0);
             default:
-                cLevel = 12;
                 /* fall-through */
             case 12:
                 return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 1<<13, LZ4_OPT_NUM, 1);
