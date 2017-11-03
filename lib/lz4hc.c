@@ -369,7 +369,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = *anchor;  /* only works for single segment */
-    //g_debuglog_enable = (pos >= 112705) & (pos <= 112760);
+    //g_debuglog_enable = (pos >= 2228) & (pos <= 2262);
     DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u + %u",
                 pos,
                 (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
