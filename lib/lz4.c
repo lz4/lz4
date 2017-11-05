@@ -85,6 +85,17 @@
 #endif
 
 
+/*
+ * register is ignored when the code built with a C++ compiler
+ * Remove the keyword when built with C++ to silent the warning
+ */
+#ifdef __cplusplus
+#  define REGISTER
+#else
+#  define REGISTER register
+#endif
+
+
 /*-************************************
 *  Dependency
 **************************************/
@@ -330,7 +341,7 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Common functions
 **************************************/
-static unsigned LZ4_NbCommonBytes (register reg_t val)
+static unsigned LZ4_NbCommonBytes (REGISTER reg_t val)
 {
     if (LZ4_isLittleEndian()) {
         if (sizeof(val)==8) {
