@@ -86,10 +86,10 @@
 
 
 /*
- * register is ignored when the code built with a C++ compiler
- * Remove the keyword when built with C++ to silent the warning
+ * register is ignored when the code built with a C++-17 compiler
+ * Remove the keyword when built with C++-17 to silent the warning
  */
-#ifdef __cplusplus
+#if defined(__cplusplus) &&  __cplusplus > 201402L
 #  define REGISTER
 #else
 #  define REGISTER register
