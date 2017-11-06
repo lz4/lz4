@@ -57,12 +57,12 @@ all: allmost manuals
 .PHONY: allmost
 allmost: lib lz4 examples
 
-.PHONY: lib lib-release
-lib lib-release:
+.PHONY: lib lib-release liblz4.a
+lib lib-release liblz4.a:
 	@$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
-lz4 : lib
+lz4 : liblz4.a
 lz4-release : lib-release
 lz4 lz4-release :
 	@$(MAKE) -C $(PRGDIR) $@
