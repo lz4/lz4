@@ -275,7 +275,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                     } else {
                         repeat = rep_not;
                 }   }
-                if ( (repeat == rep_confirmed)   /* proven repeated pattern (1-2-4) */
+                if ( (repeat == rep_confirmed)
                   && (matchIndex >= dictLimit) ) {   /* same segment only */
                     const BYTE* const matchPtr = base + matchIndex;
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
@@ -296,7 +296,6 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     return longest;
 }
 
-#if 1
 LZ4_FORCE_INLINE
 int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                                 const BYTE* const ip, const BYTE* const iLimit,
@@ -306,57 +305,6 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
     const BYTE* uselessPtr = ip;
     return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts);
 }
-
-#else
-
-LZ4_FORCE_INLINE
-int LZ4HC_InsertAndFindBestMatch (LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
-                                const BYTE* const ip, const BYTE* const iLimit,
-                                const BYTE** matchpos,
-                                const int maxNbAttempts)
-{
-    U16* const chainTable = hc4->chainTable;
-    U32* const HashTable = hc4->hashTable;
-    const BYTE* const base = hc4->base;
-    const BYTE* const dictBase = hc4->dictBase;
-    const U32 dictLimit = hc4->dictLimit;
-    const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
-    U32 matchIndex;
-    int nbAttempts = maxNbAttempts;
-    size_t ml = 0;
-
-    /* HC4 match finder */
-    LZ4HC_Insert(hc4, ip);
-    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
-
-    while ((matchIndex>=lowLimit) && (nbAttempts)) {
-        nbAttempts--;
-        if (matchIndex >= dictLimit) {
-            const BYTE* const match = base + matchIndex;
-            if ( (*(match+ml) == *(ip+ml))   /* can be longer */
-               && (LZ4_read32(match) == LZ4_read32(ip)) )
-            {
-                size_t const mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, iLimit) + MINMATCH;
-                if (mlt > ml) { ml = mlt; *matchpos = match; }
-            }
-        } else {
-            const BYTE* const match = dictBase + matchIndex;
-            if (LZ4_read32(match) == LZ4_read32(ip)) {
-                size_t mlt;
-                const BYTE* vLimit = ip + (dictLimit - matchIndex);
-                if (vLimit > iLimit) vLimit = iLimit;
-                mlt = LZ4_count(ip+MINMATCH, match+MINMATCH, vLimit) + MINMATCH;
-                if ((ip+mlt == vLimit) && (vLimit < iLimit))
-                    mlt += LZ4_count(ip+mlt, base+dictLimit, iLimit);
-                if (mlt > ml) { ml = mlt; *matchpos = base + matchIndex; }   /* virtual matchpos */
-            }
-        }
-        matchIndex -= DELTANEXTU16(chainTable, matchIndex);
-    }
-
-    return (int)ml;
-}
-#endif
 
 
 
