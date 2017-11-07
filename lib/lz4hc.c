@@ -130,20 +130,34 @@ static int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
     return back;
 }
 
-static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, reg_t pattern)
+/* LZ4HC_countPattern() :
+ * pattern32 must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!) */
+static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 {
     const BYTE* const iStart = ip;
+    reg_t const pattern = (sizeof(pattern)==8) ? (reg_t)pattern32 + (((reg_t)pattern32) << 32) : pattern32;
 
-    while (likely(ip<iEnd-(sizeof(pattern)-1))) {
+    while (likely(ip < iEnd-(sizeof(pattern)-1))) {
         reg_t const diff = LZ4_read_ARCH(ip) ^ pattern;
         if (!diff) { ip+=sizeof(pattern); continue; }
         ip += LZ4_NbCommonBytes(diff);
         return (unsigned)(ip - iStart);
     }
 
-    if ((sizeof(pattern)==8) && (ip<(iEnd-3)) && (LZ4_read32(ip)==(U32)pattern)) { ip+=4; }
-    if ((ip<(iEnd-1)) && (LZ4_read16(ip)==(U16)pattern)) { ip+=2; }
-    if ((ip<iEnd) && (*ip == (BYTE)pattern)) ip++;
+    if (LZ4_isLittleEndian()) {
+        reg_t patternByte = pattern;
+        while ((ip<iEnd) && (*ip == (BYTE)patternByte)) {
+            ip++; patternByte >>= 8;
+        }
+    } else {  /* big endian */
+        U32 bitOffset = (sizeof(pattern)*8) - 8;
+        while (ip < iEnd) {
+            BYTE const byte = (BYTE)(pattern >> bitOffset);
+            if (*ip != byte) break;
+            ip ++; bitOffset -= 8;
+        }
+    }
+
     return (unsigned)(ip - iStart);
 }
 
