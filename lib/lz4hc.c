@@ -268,7 +268,8 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
             if (nextOffset==1) {
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
-                    if ((pattern & 0xFFFF) == (pattern >> 16)) {   /* is it enough ? */
+                    if ( ((pattern & 0xFFFF) == (pattern >> 16))
+                      &  ((pattern & 0xFF)   == (pattern >> 24)) ) {
                         repeat = rep_confirmed;
                         srcPatternLength = LZ4HC_countPattern(ip+4, iHighLimit, pattern) + 4;
                     } else {
