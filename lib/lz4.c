@@ -403,7 +403,8 @@ static unsigned LZ4_NbCommonBytes (REGISTER reg_t val)
 }
 
 #define STEPSIZE sizeof(reg_t)
-static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
+LZ4_FORCE_INLINE
+unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
