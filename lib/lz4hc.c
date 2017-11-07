@@ -161,17 +161,21 @@ static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 c
     return (unsigned)(ip - iStart);
 }
 
+/* LZ4HC_reverseCountPattern() :
+ * pattern must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!)
+ * read using natural platform endianess */
 static unsigned LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
 {
     const BYTE* const iStart = ip;
 
-    while (likely(ip>=iLow+4)) {
+    while (likely(ip >= iLow+4)) {
         if (LZ4_read32(ip-4) != pattern) break;
         ip -= 4;
     }
     while (likely(ip>iLow)) {
-        if (ip[-1] != (BYTE)pattern) break;
-        ip--;
+        const BYTE* bytePtr = (const BYTE*)(&pattern) + 3; /* works for any endianess */
+        if (ip[-1] != *bytePtr) break;
+        ip--; bytePtr--;
     }
 
     return (unsigned)(iStart - ip);
