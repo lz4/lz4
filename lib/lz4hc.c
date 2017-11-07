@@ -119,8 +119,9 @@ LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
 
 /** LZ4HC_countBack() :
  * @return : negative value, nb of common bytes before ip/match */
-static int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
-                           const BYTE* const iMin, const BYTE* const mMin)
+LZ4_FORCE_INLINE
+int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
+                    const BYTE* const iMin, const BYTE* const mMin)
 {
     int back=0;
     while ( (ip+back > iMin)
@@ -264,7 +265,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
 
         {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex);
             matchIndex -= nextOffset;
-            if (1 && (nextOffset==1)) {
+            if (nextOffset==1) {
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
                     if ((pattern & 0xFFFF) == (pattern >> 16)) {   /* is it enough ? */
