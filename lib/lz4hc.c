@@ -173,12 +173,11 @@ static unsigned LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow
         if (LZ4_read32(ip-4) != pattern) break;
         ip -= 4;
     }
-    while (likely(ip>iLow)) {
-        const BYTE* bytePtr = (const BYTE*)(&pattern) + 3; /* works for any endianess */
-        if (ip[-1] != *bytePtr) break;
-        ip--; bytePtr--;
-    }
-
+    {   const BYTE* bytePtr = (const BYTE*)(&pattern) + 3; /* works for any endianess */
+        while (likely(ip>iLow)) {
+            if (ip[-1] != *bytePtr) break;
+            ip--; bytePtr--;
+    }   }
     return (unsigned)(iStart - ip);
 }
 
