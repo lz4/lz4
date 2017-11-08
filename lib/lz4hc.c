@@ -429,8 +429,6 @@ static int LZ4HC_compress_hashChain (
     if (limit == limitedDestSize) oend -= LASTLITERALS;                  /* Hack for support limitations LZ4 decompressor */
     if (inputSize < LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
-    ip++;
-
     /* Main Loop */
     while (ip < mflimit) {
         ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, (&ref), maxNbAttempts);
