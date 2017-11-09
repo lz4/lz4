@@ -105,7 +105,8 @@ static int LZ4HC_compress_optimal (
     int const fullUpdate
     )
 {
-    LZ4HC_optimal_t opt[LZ4_OPT_NUM + 3];   /* this uses a bit too much stack memory to my taste ... */
+#define TRAILING_LITERALS 3
+    LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* this uses a bit too much stack memory to my taste ... */
 
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
@@ -165,7 +166,7 @@ static int LZ4HC_compress_optimal (
         }   }
         last_match_pos = firstMatch.len;
         {   int addLit;
-            for (addLit = 1; addLit <= 3; addLit ++) {
+            for (addLit = 1; addLit <= TRAILING_LITERALS; addLit ++) {
                 opt[last_match_pos+addLit].mlen = 1; /* literal */
                 opt[last_match_pos+addLit].off = 0;
                 opt[last_match_pos+addLit].litlen = addLit;
@@ -183,7 +184,7 @@ static int LZ4HC_compress_optimal (
             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
                     cur, opt[cur].price, opt[cur+1].price, cur+1);
             if (fullUpdate) {
-                if ((opt[cur+1].price <= opt[cur].price) && (opt[cur+4].price < opt[cur].price+3)) continue;
+                if ((opt[cur+1].price <= opt[cur].price) && (opt[cur+MINMATCH].price < opt[cur].price + 3/*min seq price*/)) continue;
             } else {
                 if (opt[cur+1].price <= opt[cur].price) continue;
             }
@@ -241,7 +242,7 @@ static int LZ4HC_compress_optimal (
                         price = opt[cur].price + LZ4HC_sequencePrice(0, ml);
                     }
 
-                    if (pos > last_match_pos+3 || price <= opt[pos].price) {
+                    if (pos > last_match_pos+TRAILING_LITERALS || price <= opt[pos].price) {
                         DEBUGLOG(7, "rPos:%3i => price:%3i (matchlen=%i)",
                                     pos, price, ml);
                         assert(pos < LZ4_OPT_NUM);
@@ -255,7 +256,7 @@ static int LZ4HC_compress_optimal (
             }   }   }
             /* complete following positions with literals */
             {   int addLit;
-                for (addLit = 1; addLit <= 3; addLit ++) {
+                for (addLit = 1; addLit <= TRAILING_LITERALS; addLit ++) {
                     opt[last_match_pos+addLit].mlen = 1; /* literal */
                     opt[last_match_pos+addLit].off = 0;
                     opt[last_match_pos+addLit].litlen = addLit;
