@@ -184,8 +184,13 @@ static int LZ4HC_compress_optimal (
             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
                     cur, opt[cur].price, opt[cur+1].price, cur+1);
             if (fullUpdate) {
-                if ((opt[cur+1].price <= opt[cur].price) && (opt[cur+MINMATCH].price < opt[cur].price + 3/*min seq price*/)) continue;
+                /* not useful to search here if next position has same (or lower) cost */
+                if ( (opt[cur+1].price <= opt[cur].price)
+                  /* in some cases, next position has same cost, but cost rises sharply after, so a small match would still be beneficial */
+                  && (opt[cur+MINMATCH].price < opt[cur].price + 3/*min seq price*/) )
+                    continue;
             } else {
+                /* not useful to search here if next position has same (or lower) cost */
                 if (opt[cur+1].price <= opt[cur].price) continue;
             }
 
