@@ -304,7 +304,7 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
     const BYTE* uselessPtr = ip;
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
-     * so LZ4HC_InsertAndGetWiderMatch() will not be allowed to search past ip */
+     * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
     return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts);
 }
 
