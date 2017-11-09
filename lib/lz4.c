@@ -323,15 +323,24 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Error detection
 **************************************/
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
+#  include <assert.h>
+#else
+#  ifndef assert
+#    define assert(condition) ((void)0)
+#  endif
+#endif
+
 #define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
 #  include <stdio.h>
-#  define DEBUGLOG(l, ...) {                          \
-                if (l<=LZ4_DEBUG) {                   \
-                    fprintf(stderr, __FILE__ ": ");   \
-                    fprintf(stderr, __VA_ARGS__);     \
-                    fprintf(stderr, " \n");           \
+static int g_debuglog_enable = 1;
+#  define DEBUGLOG(l, ...) {                                  \
+                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
+                    fprintf(stderr, __FILE__ ": ");           \
+                    fprintf(stderr, __VA_ARGS__);             \
+                    fprintf(stderr, " \n");                   \
             }   }
 #else
 #  define DEBUGLOG(l, ...)      {}    /* disabled */
@@ -990,6 +999,7 @@ LZ4_stream_t* LZ4_createStream(void)
 
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
+    DEBUGLOG(4, "LZ4_resetStream");
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
 
