@@ -1,7 +1,12 @@
 v1.8.1
+perf : faster and stronger ultra modes (level 11 and 12)
+perf : slightly faster compression and decompression speed
+perf : fix bad degenerative case, reported by @c-morgenstern
 fix : decompression failed when using a combination of extDict + low memory address (#397), reported and fixed by Julian Scheid (@jscheid)
-install: fix : correct man page directory (#387), reported by Stuart Cardall (@itoffshore)
+cli : support for dictionary compression (`-D`), by Felix Handte @felixhandte
 build  : `make` and `make test` compatible with `-jX`, reported by @mwgamera
+build  : can control LZ4LIB_VISIBILITY macro, by @mikir
+install: fix man page directory (#387), reported by Stuart Cardall (@itoffshore)
 
 v1.8.0
 cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
