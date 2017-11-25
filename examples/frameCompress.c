@@ -21,17 +21,15 @@ static const LZ4F_preferences_t lz4_preferences = {
 };
 
 static size_t compress_file(FILE *in, FILE *out, size_t *size_in, size_t *size_out) {
-    LZ4F_errorCode_t r;
+    size_t r=1;  /* function result; 1 == error, default (early exit) */
     LZ4F_compressionContext_t ctx;
     char *src, *buf = NULL;
-    size_t size, n, k, count_in = 0, count_out, offset = 0, frame_size;
+    size_t size, count_in = 0, count_out, offset = 0, frame_size;
 
-    r = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
-    if (LZ4F_isError(r)) {
+    if (LZ4F_isError( LZ4F_createCompressionContext(&ctx, LZ4F_VERSION) )) {
         printf("Failed to create context: error %zu\n", r);
         return 1;
     }
-    r = 1;  /* function result; 1 == error, by default (early exit) */
 
     src = malloc(BUF_SIZE);
     if (!src) {
@@ -40,41 +38,45 @@ static size_t compress_file(FILE *in, FILE *out, size_t *size_in, size_t *size_o
     }
 
     frame_size = LZ4F_compressBound(BUF_SIZE, &lz4_preferences);
-    size =  frame_size + LZ4_HEADER_SIZE + LZ4_FOOTER_SIZE;
+    size = frame_size + LZ4_HEADER_SIZE + LZ4_FOOTER_SIZE;
     buf = malloc(size);
     if (!buf) {
         printf("Not enough memory\n");
         goto cleanup;
     }
 
-    n = offset = count_out = LZ4F_compressBegin(ctx, buf, size, &lz4_preferences);
-    if (LZ4F_isError(n)) {
-        printf("Failed to start compression: error %zu\n", n);
-        goto cleanup;
-    }
-
-    printf("Buffer size is %zu bytes, header size %zu bytes\n", size, n);
-
-    for (;;) {
-        k = fread(src, 1, BUF_SIZE, in);
-        if (k == 0)
-            break;
-        count_in += k;
-
-        n = LZ4F_compressUpdate(ctx, buf + offset, size - offset, src, k, NULL);
-        if (LZ4F_isError(n)) {
-            printf("Compression failed: error %zu\n", n);
+    {   size_t const headerSize = LZ4F_compressBegin(ctx, buf, size, &lz4_preferences);
+        if (LZ4F_isError(headerSize)) {
+            printf("Failed to start compression: error %zu\n", headerSize);
             goto cleanup;
         }
+        offset = count_out = headerSize;
+        printf("Buffer size is %zu bytes, header size %zu bytes\n", size, headerSize);
+    }
 
-        offset += n;
-        count_out += n;
+
+    for (;;) {
+        size_t const readSize = fread(src, 1, BUF_SIZE, in);
+        if (readSize == 0)
+            break;
+        count_in += readSize;
+
+        {   size_t const compressedSize = LZ4F_compressUpdate(ctx, buf + offset, size - offset, src, readSize, NULL);
+            if (LZ4F_isError(compressedSize)) {
+                printf("Compression failed: error %zu\n", compressedSize);
+                goto cleanup;
+            }
+            offset += compressedSize;
+            count_out += compressedSize;
+        }
+
         if (size - offset < frame_size + LZ4_FOOTER_SIZE) {
+            size_t writtenSize;
             printf("Writing %zu bytes\n", offset);
 
-            k = fwrite(buf, 1, offset, out);
-            if (k < offset) {
-                if (ferror(out))
+            writtenSize = fwrite(buf, 1, offset, out);
+            if (writtenSize < offset) {
+                if (ferror(out))  /* note : ferror() must follow fwrite */
                     printf("Write failed\n");
                 else
                     printf("Short write\n");
@@ -85,31 +87,31 @@ static size_t compress_file(FILE *in, FILE *out, size_t *size_in, size_t *size_o
         }
     }
 
-    n = LZ4F_compressEnd(ctx, buf + offset, size - offset, NULL);
-    if (LZ4F_isError(n)) {
-        printf("Failed to end compression: error %zu\n", n);
-        goto cleanup;
+    {   size_t const compressedSize = LZ4F_compressEnd(ctx, buf + offset, size - offset, NULL);
+        if (LZ4F_isError(compressedSize)) {
+            printf("Failed to end compression: error %zu\n", compressedSize);
+            goto cleanup;
+        }
+        offset += compressedSize;
+        count_out += compressedSize;
     }
 
-    offset += n;
-    count_out += n;
     printf("Writing %zu bytes\n", offset);
-
-    k = fwrite(buf, 1, offset, out);
-    if (k < offset) {
-        if (ferror(out))
-            printf("Write failed\n");
-        else
-            printf("Short write\n");
-        goto cleanup;
-    }
+    {   size_t const writtenSize = fwrite(buf, 1, offset, out);
+        if (writtenSize < offset) {
+            if (ferror(out))
+                printf("Write failed\n");
+            else
+                printf("Short write\n");
+            goto cleanup;
+    }   }
 
     *size_in = count_in;
     *size_out = count_out;
-    r = 0;
+    r = 0;   /* success */
+
  cleanup:
-    if (ctx)
-        LZ4F_freeCompressionContext(ctx);
+    LZ4F_freeCompressionContext(ctx);   /* supports free on NULL */
     free(src);
     free(buf);
     return r;
@@ -128,28 +130,27 @@ static size_t get_block_size(const LZ4F_frameInfo_t* info) {
     }
 }
 
-static size_t decompress_file(FILE *in, FILE *out) {
+static size_t decompress_file(FILE* in, FILE* out) {
     void* const src = malloc(BUF_SIZE);
     void* dst = NULL;
     size_t dstCapacity = 0;
-    LZ4F_dctx *dctx = NULL;
-    size_t ret;
+    LZ4F_dctx* dctx = NULL;
+    size_t ret = 1;
 
     /* Initialization */
     if (!src) { perror("decompress_file(src)"); goto cleanup; }
-    ret = LZ4F_createDecompressionContext(&dctx, 100);
-    if (LZ4F_isError(ret)) {
-        printf("LZ4F_dctx creation error: %s\n", LZ4F_getErrorName(ret));
-        goto cleanup;
-    }
+    {   size_t const dctxStatus = LZ4F_createDecompressionContext(&dctx, 100);
+        if (LZ4F_isError(dctxStatus)) {
+            printf("LZ4F_dctx creation error: %s\n", LZ4F_getErrorName(dctxStatus));
+            goto cleanup;
+    }   }
 
     /* Decompression */
-    ret = 1;
     while (ret != 0) {
         /* Load more input */
         size_t srcSize = fread(src, 1, BUF_SIZE, in);
-        void* srcPtr = src;
-        void* srcEnd = srcPtr + srcSize;
+        const void* srcPtr = src;
+        const void* const srcEnd = srcPtr + srcSize;
         if (srcSize == 0 || ferror(in)) {
             printf("Decompress: not enough input or error reading file\n");
             goto cleanup;
