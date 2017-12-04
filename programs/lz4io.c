@@ -616,7 +616,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
-        if (strcmp (srcFileName, stdinmark) && strcmp (dstFileName, stdoutmark) && UTIL_getFileStat(srcFileName, &statbuf))
+        if (strcmp (srcFileName, stdinmark) && strcmp (dstFileName, stdoutmark) && strcmp (dstFileName, nulmark) && UTIL_getFileStat(srcFileName, &statbuf))
             UTIL_setFileStat(dstFileName, &statbuf);
     }
 
