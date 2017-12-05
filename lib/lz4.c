@@ -88,9 +88,17 @@
 /*
  * register is ignored when the code built with a C++-17 compiler
  * Remove the keyword when built with C++-17 to silent the warning
+ * Ignore the warning with other C++ versions
  */
-#if defined(__cplusplus) &&  __cplusplus > 201402L
+#ifdef __cplusplus
+#if __cplusplus > 201402L
+/* C++ 17 */
 #  define REGISTER
+#else
+/* Before C++ 17 */
+#  pragma GCC diagnostic ignored "-Wdeprecated-register"
+#  define REGISTER register
+#endif
 #else
 #  define REGISTER register
 #endif
