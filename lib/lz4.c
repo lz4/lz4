@@ -85,16 +85,6 @@
 #endif
 
 
-/*
- * register is ignored when the code built with a C++-17 compiler
- * Remove the keyword when built with C++-17 to silent the warning
- */
-#if defined(__cplusplus) &&  __cplusplus > 201402L
-#  define REGISTER
-#else
-#  define REGISTER register
-#endif
-
 
 /*-************************************
 *  Dependency
@@ -350,7 +340,7 @@ static int g_debuglog_enable = 1;
 /*-************************************
 *  Common functions
 **************************************/
-static unsigned LZ4_NbCommonBytes (REGISTER reg_t val)
+static unsigned LZ4_NbCommonBytes (reg_t val)
 {
     if (LZ4_isLittleEndian()) {
         if (sizeof(val)==8) {
@@ -361,7 +351,14 @@ static unsigned LZ4_NbCommonBytes (REGISTER reg_t val)
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_ctzll((U64)val) >> 3);
 #       else
-            static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+            static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2,
+                                                     0, 3, 1, 3, 1, 4, 2, 7,
+                                                     0, 2, 3, 6, 1, 5, 3, 5,
+                                                     1, 3, 4, 4, 2, 5, 6, 7,
+                                                     7, 0, 1, 2, 3, 3, 4, 6,
+                                                     2, 6, 5, 5, 3, 4, 5, 6,
+                                                     7, 1, 2, 4, 6, 4, 4, 5,
+                                                     7, 2, 6, 5, 7, 6, 7, 7 };
             return DeBruijnBytePos[((U64)((val & -(long long)val) * 0x0218A392CDABBD3FULL)) >> 58];
 #       endif
         } else /* 32 bits */ {
@@ -372,7 +369,10 @@ static unsigned LZ4_NbCommonBytes (REGISTER reg_t val)
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_ctz((U32)val) >> 3);
 #       else
-            static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+            static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0,
+                                                     3, 2, 2, 1, 3, 2, 0, 1,
+                                                     3, 3, 1, 2, 2, 2, 2, 0,
+                                                     3, 1, 2, 0, 1, 0, 1, 1 };
             return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
 #       endif
         }
