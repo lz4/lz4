@@ -603,7 +603,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
                 match = LZ4_getPositionOnHash(h, cctx->hashTable, tableType, base);
                 if (dict==usingExtDict) {
-                    if (match < (const BYTE*)source) {
+                    if ((ptrdiff_t)match < (ptrdiff_t)source) {
                         refDelta = dictDelta;
                         lowLimit = dictionary;
                     } else {
@@ -613,7 +613,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
 
-            } while ( ((dictIssue==dictSmall) ? (match < lowRefLimit) : 0)
+            } while ( ((dictIssue==dictSmall) ? ((ptrdiff_t)match < (ptrdiff_t)lowRefLimit) : 0)
                 || ((tableType==byU16) ? 0 : (match + MAX_DISTANCE < ip))
                 || (LZ4_read32(match+refDelta) != LZ4_read32(ip)) );
         }
@@ -693,7 +693,7 @@ _next_match:
         /* Test next position */
         match = LZ4_getPosition(ip, cctx->hashTable, tableType, base);
         if (dict==usingExtDict) {
-            if (match < (const BYTE*)source) {
+            if ((ptrdiff_t)match < (ptrdiff_t)source) {
                 refDelta = dictDelta;
                 lowLimit = dictionary;
             } else {
@@ -701,7 +701,7 @@ _next_match:
                 lowLimit = (const BYTE*)source;
         }   }
         LZ4_putPosition(ip, cctx->hashTable, tableType, base);
-        if ( ((dictIssue==dictSmall) ? (match>=lowRefLimit) : 1)
+        if ( ((dictIssue==dictSmall) ? ((ptrdiff_t)match>=(ptrdiff_t)lowRefLimit) : 1)
             && (match+MAX_DISTANCE>=ip)
             && (LZ4_read32(match+refDelta)==LZ4_read32(ip)) )
         { token=op++; *token=0; goto _next_match; }
@@ -1220,7 +1220,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
             size_t const ll = token >> ML_BITS;
             size_t const off = LZ4_readLE16(ip+ll);
             const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
-            if ((off >= 18) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
+            if ((off >= 18) /* do not deal with overlapping matches */ & ((ptrdiff_t)matchPtr >= (ptrdiff_t)lowPrefix)) {
                 size_t const ml = (token & ML_MASK) + MINMATCH;
                 memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
                 memcpy(op, matchPtr, 18); op += ml;
@@ -1279,7 +1279,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         length += MINMATCH;
 
         /* check external dictionary */
-        if ((dict==usingExtDict) && (match < lowPrefix)) {
+        if ((dict==usingExtDict) && ((ptrdiff_t)match < (ptrdiff_t)lowPrefix)) {
             if (unlikely(op+length > oend-LASTLITERALS)) goto _output_error;   /* doesn't respect parsing restriction */
 
             if (length <= (size_t)(lowPrefix-match)) {
