@@ -619,22 +619,46 @@ static int LZ4HC_compress_generic (
     limitedOutput_directive limit
     )
 {
+    typedef enum { lz4hc, lz4opt } lz4hc_strat_e;
+    typedef struct {
+        lz4hc_strat_e strat;
+        U32 nbSearches;
+        U32 targetLength;
+    } cParams_t;
+    static const cParams_t clTable[LZ4HC_CLEVEL_MAX+1] = {
+        { lz4hc,    2, 16 },  /* 0, unused */
+        { lz4hc,    2, 16 },  /* 1, unused */
+        { lz4hc,    2, 16 },  /* 2, unused */
+        { lz4hc,    4, 16 },  /* 3 */
+        { lz4hc,    8, 16 },  /* 4 */
+        { lz4hc,   16, 16 },  /* 5 */
+        { lz4hc,   32, 16 },  /* 6 */
+        { lz4hc,   64, 16 },  /* 7 */
+        { lz4hc,  128, 16 },  /* 8 */
+        { lz4hc,  256, 16 },  /* 9 */
+        { lz4opt,  96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+        { lz4opt, 512,128 },  /*11 */
+        { lz4opt,8192, LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
+    };
+
     ctx->end += *srcSizePtr;
     if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
-    if (cLevel > 9) {
-        if (limit == limitedDestSize) cLevel = 10;
-        switch (cLevel) {
-            case 10:
-                return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1<<12, limit);
-            case 11:
-                return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 512, 128, 0);
-            default:
-                /* fall-through */
-            case 12:
-                return LZ4HC_compress_optimal(ctx, src, dst, *srcSizePtr, dstCapacity, limit, 1<<13, LZ4_OPT_NUM, 1);
-        }
+    cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
+    if (limit == limitedDestSize)
+        cLevel = MIN(LZ4HC_CLEVEL_OPT_MIN-1, cLevel);  /* no limitedDestSize variant for lz4opt */
+    assert(cLevel >= 0);
+    assert(cLevel <= LZ4HC_CLEVEL_MAX);
+    {   cParams_t const cParam = clTable[cLevel];
+        if (cParam.strat == lz4hc)
+            return LZ4HC_compress_hashChain(ctx,
+                                src, dst, srcSizePtr, dstCapacity,
+                                cParam.nbSearches, limit);
+        assert(cParam.strat == lz4opt);
+        return LZ4HC_compress_optimal(ctx,
+                            src, dst, *srcSizePtr, dstCapacity, limit,
+                            cParam.nbSearches, cParam.targetLength,
+                            cLevel == LZ4HC_CLEVEL_MAX);  /* ultra mode */
     }
-    return LZ4HC_compress_hashChain(ctx, src, dst, srcSizePtr, dstCapacity, 1 << (cLevel-1), limit);  /* levels 1-9 */
 }
 
 
@@ -667,7 +691,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
 }
 
 /* LZ4_compress_HC_destSize() :
- * only compatible with Hash Chain match finder */
+ * only compatible with regular HC parser */
 int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
