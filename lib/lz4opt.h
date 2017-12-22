@@ -97,11 +97,11 @@ static int LZ4HC_compress_optimal (
     LZ4HC_CCtx_internal* ctx,
     const char* const source,
     char* dst,
-    int inputSize,
+    int* srcSizePtr,
     int dstCapacity,
-    limitedOutput_directive limit,
     int const nbSearches,
     size_t sufficient_len,
+    limitedOutput_directive limit,
     int const fullUpdate
     )
 {
@@ -110,14 +110,17 @@ static int LZ4HC_compress_optimal (
 
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
-    const BYTE* const iend = ip + inputSize;
+    const BYTE* const iend = ip + *srcSizePtr;
     const BYTE* const mflimit = iend - MFLIMIT;
     const BYTE* const matchlimit = iend - LASTLITERALS;
     BYTE* op = (BYTE*) dst;
-    BYTE* const oend = op + dstCapacity;
+    BYTE* opSaved = (BYTE*) dst;
+    BYTE* oend = op + dstCapacity;
 
     /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal");
+    *srcSizePtr = 0;
+    if (limit == limitedDestSize) oend -= LASTLITERALS;   /* Hack for support LZ4 format restriction */
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
 
     /* Main Loop */
@@ -134,8 +137,9 @@ static int LZ4HC_compress_optimal (
             /* good enough solution : immediate encoding */
             int const firstML = firstMatch.len;
             const BYTE* const matchPos = ip - firstMatch.off;
+            opSaved = op;
             if ( LZ4HC_encodeSequence(&ip, &op, &anchor, firstML, matchPos, limit, oend) )   /* updates ip, op and anchor */
-                return 0;  /* error */
+                goto _dest_overflow;
             continue;
         }
 
@@ -304,26 +308,47 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                 rPos += ml;
                 assert(ml >= MINMATCH);
                 assert((offset >= 1) && (offset <= MAX_DISTANCE));
+                opSaved = op;
                 if ( LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ip - offset, limit, oend) )   /* updates ip, op and anchor */
-                    return 0;  /* error */
+                    goto _dest_overflow;
         }   }
     }  /* while (ip < mflimit) */
 
+_last_literals:
     /* Encode Last Literals */
-    {   int lastRun = (int)(iend - anchor);
-        if ( (limit)
-          && (((char*)op - dst) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)dstCapacity))
-            return 0;  /* Check output limit */
-        if (lastRun >= (int)RUN_MASK) {
-            *op++=(RUN_MASK<<ML_BITS);
-            lastRun-=RUN_MASK;
-            for (; lastRun > 254 ; lastRun-=255) *op++ = 255;
-            *op++ = (BYTE) lastRun;
-        } else *op++ = (BYTE)(lastRun<<ML_BITS);
-        memcpy(op, anchor, iend - anchor);
-        op += iend-anchor;
+    {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
+        size_t litLength = (lastRunSize + 255 - RUN_MASK) / 255;
+        size_t const totalSize = 1 + litLength + lastRunSize;
+        if (limit == limitedDestSize) oend += LASTLITERALS;  /* restore correct value */
+        if (limit && (op + totalSize > oend)) {
+            if (limit == limitedOutput) return 0;  /* Check output limit */
+            /* adapt lastRunSize to fill 'dst' */
+            lastRunSize  = (size_t)(oend - op) - 1;
+            litLength = (lastRunSize + 255 - RUN_MASK) / 255;
+            lastRunSize -= litLength;
+        }
+        ip = anchor + lastRunSize;
+
+        if (lastRunSize >= RUN_MASK) {
+            size_t accumulator = lastRunSize - RUN_MASK;
+            *op++ = (RUN_MASK << ML_BITS);
+            for(; accumulator >= 255 ; accumulator -= 255) *op++ = 255;
+            *op++ = (BYTE) accumulator;
+        } else {
+            *op++ = (BYTE)(lastRunSize << ML_BITS);
+        }
+        memcpy(op, anchor, lastRunSize);
+        op += lastRunSize;
     }
 
     /* End */
+    *srcSizePtr = (int) (((const char*)ip) - source);
     return (int) ((char*)op-dst);
+
+_dest_overflow:
+    if (limit == limitedDestSize) {
+        op = opSaved;  /* restore correct out pointer */
+        goto _last_literals;
+    }
+    return 0;
 }

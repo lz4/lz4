@@ -345,10 +345,9 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                   FUZ_CHECKTEST(crcDec!=crcBase, "LZ4_decompress_safe() corrupted decoded data"); }
 
                 DISPLAYLEVEL(5, " OK \n");
-            }
-            else
+            } else {
                 DISPLAYLEVEL(5, " \n");
-        }
+        }   }
 
         /* Test compression HC destSize */
         FUZ_DISPLAYTEST;
@@ -359,11 +358,14 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_CHECKTEST(ctx==NULL, "LZ4_createHC() allocation failed");
             compressedBuffer[targetSize] = endCheck;
             ret = LZ4_compress_HC_destSize(ctx, block, compressedBuffer, &srcSize, targetSize, compressionLevel);
+            DISPLAYLEVEL(5, "LZ4_compress_HC_destSize(%i): destSize : %7i/%7i; content%7i/%7i ",
+                            compressionLevel, ret, targetSize, srcSize, blockSize);
             LZ4_freeHC(ctx);
             FUZ_CHECKTEST(ret > targetSize, "LZ4_compress_HC_destSize() result larger than dst buffer !");
             FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compress_HC_destSize() overwrite dst buffer !");
             FUZ_CHECKTEST(srcSize > blockSize, "LZ4_compress_HC_destSize() fed more than src buffer !");
-            DISPLAYLEVEL(5, "destSize : %7i/%7i; content%7i/%7i ", ret, targetSize, srcSize, blockSize);
+            DISPLAYLEVEL(5, "LZ4_compress_HC_destSize(%i): destSize : %7i/%7i; content%7i/%7i ",
+                            compressionLevel, ret, targetSize, srcSize, blockSize);
             if (targetSize>0) {
                 /* check correctness */
                 U32 const crcBase = XXH32(block, srcSize, 0);
@@ -380,10 +382,9 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                     FUZ_CHECKTEST(crcDec!=crcBase, "LZ4_decompress_safe() corrupted decoded data");
                 }
                 DISPLAYLEVEL(5, " OK \n");
-            }
-            else
+            } else {
                 DISPLAYLEVEL(5, " \n");
-        }
+        }   }
 
         /* Test compression HC */
         FUZ_DISPLAYTEST;

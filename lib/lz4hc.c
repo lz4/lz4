@@ -425,10 +425,7 @@ static int LZ4HC_compress_hashChain (
 
     /* init */
     *srcSizePtr = 0;
-    if (limit == limitedDestSize && maxOutputSize < 1) return 0;         /* Impossible to store anything */
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;              /* Unsupported input size, too large (or negative) */
-
-    if (limit == limitedDestSize) oend -= LASTLITERALS;                  /* Hack for support limitations LZ4 decompressor */
+    if (limit == limitedDestSize) oend -= LASTLITERALS;                  /* Hack for support LZ4 format restriction */
     if (inputSize < LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     /* Main Loop */
@@ -641,11 +638,12 @@ static int LZ4HC_compress_generic (
         { lz4opt,8192, LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
     };
 
+    if (limit == limitedDestSize && dstCapacity < 1) return 0;         /* Impossible to store anything */
+    if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;          /* Unsupported input size (too large or negative) */
+
     ctx->end += *srcSizePtr;
     if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
     cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
-    if (limit == limitedDestSize)
-        cLevel = MIN(LZ4HC_CLEVEL_OPT_MIN-1, cLevel);  /* no limitedDestSize variant for lz4opt */
     assert(cLevel >= 0);
     assert(cLevel <= LZ4HC_CLEVEL_MAX);
     {   cParams_t const cParam = clTable[cLevel];
@@ -655,8 +653,8 @@ static int LZ4HC_compress_generic (
                                 cParam.nbSearches, limit);
         assert(cParam.strat == lz4opt);
         return LZ4HC_compress_optimal(ctx,
-                            src, dst, *srcSizePtr, dstCapacity, limit,
-                            cParam.nbSearches, cParam.targetLength,
+                            src, dst, srcSizePtr, dstCapacity,
+                            cParam.nbSearches, cParam.targetLength, limit,
                             cLevel == LZ4HC_CLEVEL_MAX);  /* ultra mode */
     }
 }
