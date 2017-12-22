@@ -35,11 +35,12 @@ PRGDIR  := ../programs
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
+DEBUGFLAGS = -g -DLZ4_DEBUG=1
 CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
-CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(MOREFLAGS)
+CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 CPPFLAGS:= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
