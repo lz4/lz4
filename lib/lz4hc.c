@@ -191,7 +191,8 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
     int longest,
     const BYTE** matchpos,
     const BYTE** startpos,
-    const int maxNbAttempts)
+    const int maxNbAttempts,
+    const int patternAnalysis)
 {
     U16* const chainTable = hc4->chainTable;
     U32* const HashTable = hc4->hashTable;
@@ -264,7 +265,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
 
         {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex);
             matchIndex -= nextOffset;
-            if (nextOffset==1) {
+            if (patternAnalysis && nextOffset==1) {
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
                     if ( ((pattern & 0xFFFF) == (pattern >> 16))
@@ -299,13 +300,14 @@ LZ4_FORCE_INLINE
 int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                                  const BYTE* const ip, const BYTE* const iLimit,
                                  const BYTE** matchpos,
-                                 const int maxNbAttempts)
+                                 const int maxNbAttempts,
+                                 const int patternAnalysis)
 {
     const BYTE* uselessPtr = ip;
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts);
+    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, patternAnalysis);
 }
 
 
@@ -403,6 +405,7 @@ static int LZ4HC_compress_hashChain (
     )
 {
     const int inputSize = *srcSizePtr;
+    const int patternAnalysis = (maxNbAttempts > 64);   /* levels 8+ */
 
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
@@ -433,7 +436,7 @@ static int LZ4HC_compress_hashChain (
 
     /* Main Loop */
     while (ip < mflimit) {
-        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, &ref, maxNbAttempts);
+        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis);
         if (ml<MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
@@ -443,7 +446,9 @@ static int LZ4HC_compress_hashChain (
 
 _Search2:
         if (ip+ml < mflimit)
-            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx, ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2, maxNbAttempts);
+            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
+                            ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
+                            maxNbAttempts, patternAnalysis);
         else
             ml2 = ml;
 
@@ -488,7 +493,9 @@ _Search3:
         /* Now, we have start2 = ip+new_ml, with new_ml = min(ml, OPTIMAL_ML=18) */
 
         if (start2 + ml2 < mflimit)
-            ml3 = LZ4HC_InsertAndGetWiderMatch(ctx, start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3, maxNbAttempts);
+            ml3 = LZ4HC_InsertAndGetWiderMatch(ctx,
+                            start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3,
+                            maxNbAttempts, patternAnalysis);
         else
             ml3 = ml2;
 
