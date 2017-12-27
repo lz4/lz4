@@ -78,21 +78,26 @@ lz4c unlz4 lz4cat: lz4
 lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
 
-fullbench  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/lz4frame.o $(LZ4DIR)/xxhash.o fullbench.c
+%.o : $(LZ4DIR)/%.c $(LZ4DIR)/%.h
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+
+fullbench  : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fullbench-lib: fullbench.c $(LZ4DIR)/xxhash.c
+$(LZ4DIR)/liblz4.a:
 	$(MAKE) -C $(LZ4DIR) liblz4.a
-	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.a
+
+fullbench-lib: fullbench.c $(LZ4DIR)/liblz4.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
 	$(MAKE) -C $(LZ4DIR) liblz4
 	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/liblz4.dll
 
-fuzzer  : $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o fuzzer.c
+fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LZ4DIR)/lz4frame.o $(LZ4DIR)/lz4.o $(LZ4DIR)/lz4hc.o $(LZ4DIR)/xxhash.o frametest.c
+frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
