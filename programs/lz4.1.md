@@ -45,6 +45,9 @@ Differences are :
   * As a consequence of previous rules, note the following example :
     `lz4 file | consumer` sends compressed data to `consumer` through `stdout`,
     hence it does _not_ create `file.lz4`.
+  * Another consequence of those rules is that to run `lz4` under `nohup`,
+    you should provide a destination file: `nohup lz4 file file.lz4`,
+    because `nohup` writes the specified command's output to a file.
 
 Default behaviors can be modified by opt-in commands, detailed below.
 
