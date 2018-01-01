@@ -37,7 +37,7 @@ Differences are :
   * `lz4 file.lz4` will default to decompression (use `-z` to force compression)
   * `lz4` shows real-time notification statistics
      during compression or decompression of a single file
-     (use `-q` to silent them)
+     (use `-q` to silence them)
   * If no destination name is provided, result is sent to `stdout`
     _except if stdout is the console_.
   * If no destination name is provided, __and__ if `stdout` is the console,
