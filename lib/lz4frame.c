@@ -1631,7 +1631,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             if (dctx->tmpOutSize > 64 KB) copySize = 0;
             if (copySize > preserveSize) copySize = preserveSize;
 
-            memcpy(dctx->tmpOutBuffer + preserveSize - copySize, oldDictEnd - copySize, copySize);
+            if (copySize > 0)
+                memcpy(dctx->tmpOutBuffer + preserveSize - copySize, oldDictEnd - copySize, copySize);
 
             dctx->dict = dctx->tmpOutBuffer;
             dctx->dictSize = preserveSize + dctx->tmpOutStart;
@@ -1639,7 +1640,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             const BYTE* const oldDictEnd = dctx->dict + dctx->dictSize;
             size_t const newDictSize = MIN(dctx->dictSize, 64 KB);
 
-            memcpy(dctx->tmpOutBuffer, oldDictEnd - newDictSize, newDictSize);
+            if (newDictSize > 0)
+                memcpy(dctx->tmpOutBuffer, oldDictEnd - newDictSize, newDictSize);
 
             dctx->dict = dctx->tmpOutBuffer;
             dctx->dictSize = newDictSize;
