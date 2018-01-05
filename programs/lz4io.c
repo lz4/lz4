@@ -1073,8 +1073,14 @@ static int LZ4IO_decompressSrcFile(dRess_t ress, const char* input_filename, con
 
 static int LZ4IO_decompressDstFile(dRess_t ress, const char* input_filename, const char* output_filename)
 {
+    stat_t statbuf;
+    int stat_result = 0;
     FILE* const foutput = LZ4IO_openDstFile(output_filename);
     if (foutput==NULL) return 1;   /* failure */
+
+    if ( strcmp(input_filename, stdinmark)
+      && UTIL_getFileStat(input_filename, &statbuf))
+        stat_result = 1;
 
     ress.dstFile = foutput;
     LZ4IO_decompressSrcFile(ress, input_filename, output_filename);
@@ -1082,14 +1088,12 @@ static int LZ4IO_decompressDstFile(dRess_t ress, const char* input_filename, con
     fclose(foutput);
 
     /* Copy owner, file permissions and modification time */
-    {   stat_t statbuf;
-        if ( strcmp (input_filename, stdinmark)
-          && strcmp (output_filename, stdoutmark)
-          && strcmp (output_filename, nulmark)
-          && UTIL_getFileStat(input_filename, &statbuf) ) {
-            UTIL_setFileStat(output_filename, &statbuf);
-            /* should return value be read ? or is silent fail good enough ? */
-    }   }
+    if ( stat_result != 0
+      && strcmp (output_filename, stdoutmark)
+      && strcmp (output_filename, nulmark)) {
+        UTIL_setFileStat(output_filename, &statbuf);
+        /* should return value be read ? or is silent fail good enough ? */
+    }
 
     return 0;
 }
