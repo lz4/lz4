@@ -85,7 +85,9 @@ LZ4HC_match_t LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    int const matchLength = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &matchPtr, &ip, nbSearches);
+    int const matchLength = LZ4HC_InsertAndGetWiderMatch(ctx,
+                                ip, ip, iHighLimit, minLen, &matchPtr, &ip,
+                                nbSearches, 1 /* patternAnalysis */);
     if (matchLength <= minLen) return match;
     match.len = matchLength;
     match.off = (int)(ip-matchPtr);
