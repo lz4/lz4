@@ -43,7 +43,15 @@ extern "C" {
 /* lz4frame_static.h should be used solely in the context of static linking.
  * It contains definitions which are not stable and may change in the future.
  * Never use it in the context of DLL linking.
+ *
+ * Defining LZ4F_PUBLISH_STATIC_FUNCTIONS allows one to override this. Use at
+ * your own risk.
  */
+#ifdef LZ4F_PUBLISH_STATIC_FUNCTIONS
+#define LZ4FLIB_STATIC_API LZ4FLIB_API
+#else
+#define LZ4FLIB_STATIC_API
+#endif
 
 
 /* ---   Dependency   --- */
@@ -79,7 +87,7 @@ extern "C" {
 /* enum list is exposed, to handle specific errors */
 typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;
 
-LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
+LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
 
 
@@ -93,8 +101,8 @@ typedef struct LZ4F_CDict_s LZ4F_CDict;
  *  LZ4_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
  *  LZ4_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
  * `dictBuffer` can be released after LZ4_CDict creation, since its content is copied within CDict */
-LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
-void        LZ4F_freeCDict(LZ4F_CDict* CDict);
+LZ4FLIB_STATIC_API LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
+LZ4FLIB_STATIC_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
 
 
 /*! LZ4_compressFrame_usingCDict() :
@@ -106,10 +114,11 @@ void        LZ4F_freeCDict(LZ4F_CDict* CDict);
  *  but it's not recommended, as it's the only way to provide dictID in the frame header.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError()) */
-size_t LZ4F_compressFrame_usingCDict(void* dst, size_t dstCapacity,
-                               const void* src, size_t srcSize,
-                               const LZ4F_CDict* cdict,
-                               const LZ4F_preferences_t* preferencesPtr);
+LZ4FLIB_STATIC_API size_t LZ4F_compressFrame_usingCDict(
+    void* dst, size_t dstCapacity,
+    const void* src, size_t srcSize,
+    const LZ4F_CDict* cdict,
+    const LZ4F_preferences_t* preferencesPtr);
 
 
 /*! LZ4F_compressBegin_usingCDict() :
@@ -119,21 +128,23 @@ size_t LZ4F_compressFrame_usingCDict(void* dst, size_t dstCapacity,
  *  however, it's the only way to provide dictID in the frame header.
  * @return : number of bytes written into dstBuffer for the header,
  *           or an error code (which can be tested using LZ4F_isError()) */
-size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctx,
-                                     void* dstBuffer, size_t dstCapacity,
-                                     const LZ4F_CDict* cdict,
-                                     const LZ4F_preferences_t* prefsPtr);
+LZ4FLIB_STATIC_API size_t LZ4F_compressBegin_usingCDict(
+    LZ4F_cctx* cctx,
+    void* dstBuffer, size_t dstCapacity,
+    const LZ4F_CDict* cdict,
+    const LZ4F_preferences_t* prefsPtr);
 
 
 /*! LZ4F_decompress_usingDict() :
  *  Same as LZ4F_decompress(), using a predefined dictionary.
  *  Dictionary is used "in place", without any preprocessing.
  *  It must remain accessible throughout the entire frame decoding. */
-size_t LZ4F_decompress_usingDict(LZ4F_dctx* dctxPtr,
-                       void* dstBuffer, size_t* dstSizePtr,
-                       const void* srcBuffer, size_t* srcSizePtr,
-                       const void* dict, size_t dictSize,
-                       const LZ4F_decompressOptions_t* decompressOptionsPtr);
+LZ4FLIB_STATIC_API size_t LZ4F_decompress_usingDict(
+    LZ4F_dctx* dctxPtr,
+    void* dstBuffer, size_t* dstSizePtr,
+    const void* srcBuffer, size_t* srcSizePtr,
+    const void* dict, size_t dictSize,
+    const LZ4F_decompressOptions_t* decompressOptionsPtr);
 
 
 #if defined (__cplusplus)
