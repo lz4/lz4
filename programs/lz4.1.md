@@ -37,7 +37,7 @@ Differences are :
   * `lz4 file.lz4` will default to decompression (use `-z` to force compression)
   * `lz4` shows real-time notification statistics
      during compression or decompression of a single file
-     (use `-q` to silent them)
+     (use `-q` to silence them)
   * If no destination name is provided, result is sent to `stdout`
     _except if stdout is the console_.
   * If no destination name is provided, __and__ if `stdout` is the console,
@@ -45,6 +45,9 @@ Differences are :
   * As a consequence of previous rules, note the following example :
     `lz4 file | consumer` sends compressed data to `consumer` through `stdout`,
     hence it does _not_ create `file.lz4`.
+  * Another consequence of those rules is that to run `lz4` under `nohup`,
+    you should provide a destination file: `nohup lz4 file file.lz4`,
+    because `nohup` writes the specified command's output to a file.
 
 Default behaviors can be modified by opt-in commands, detailed below.
 

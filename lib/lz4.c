@@ -85,6 +85,7 @@
 #endif
 
 
+
 /*-************************************
 *  Dependency
 **************************************/
@@ -101,21 +102,43 @@
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #endif  /* _MSC_VER */
 
-#ifndef FORCE_INLINE
+#ifndef LZ4_FORCE_INLINE
 #  ifdef _MSC_VER    /* Visual Studio */
-#    define FORCE_INLINE static __forceinline
+#    define LZ4_FORCE_INLINE static __forceinline
 #  else
 #    if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
 #      ifdef __GNUC__
-#        define FORCE_INLINE static inline __attribute__((always_inline))
+#        define LZ4_FORCE_INLINE static inline __attribute__((always_inline))
 #      else
-#        define FORCE_INLINE static inline
+#        define LZ4_FORCE_INLINE static inline
 #      endif
 #    else
-#      define FORCE_INLINE static
+#      define LZ4_FORCE_INLINE static
 #    endif /* __STDC_VERSION__ */
 #  endif  /* _MSC_VER */
-#endif /* FORCE_INLINE */
+#endif /* LZ4_FORCE_INLINE */
+
+/* LZ4_FORCE_O2_GCC_PPC64LE and LZ4_FORCE_O2_INLINE_GCC_PPC64LE
+ * Gcc on ppc64le generates an unrolled SIMDized loop for LZ4_wildCopy,
+ * together with a simple 8-byte copy loop as a fall-back path.
+ * However, this optimization hurts the decompression speed by >30%,
+ * because the execution does not go to the optimized loop
+ * for typical compressible data, and all of the preamble checks
+ * before going to the fall-back path become useless overhead.
+ * This optimization happens only with the -O3 flag, and -O2 generates
+ * a simple 8-byte copy loop.
+ * With gcc on ppc64le, all of the LZ4_decompress_* and LZ4_wildCopy
+ * functions are annotated with __attribute__((optimize("O2"))),
+ * and also LZ4_wildCopy is forcibly inlined, so that the O2 attribute
+ * of LZ4_wildCopy does not affect the compression speed.
+ */
+#if defined(__PPC64__) && defined(__LITTLE_ENDIAN__) && defined(__GNUC__)
+#  define LZ4_FORCE_O2_GCC_PPC64LE __attribute__((optimize("O2")))
+#  define LZ4_FORCE_O2_INLINE_GCC_PPC64LE __attribute__((optimize("O2"))) LZ4_FORCE_INLINE
+#else
+#  define LZ4_FORCE_O2_GCC_PPC64LE
+#  define LZ4_FORCE_O2_INLINE_GCC_PPC64LE static
+#endif
 
 #if (defined(__GNUC__) && (__GNUC__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
@@ -253,7 +276,8 @@ static void LZ4_copy8(void* dst, const void* src)
 }
 
 /* customized variant of memcpy, which can overwrite up to 8 bytes beyond dstEnd */
-static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE
+void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
@@ -289,15 +313,24 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Error detection
 **************************************/
-#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
+#  include <assert.h>
+#else
+#  ifndef assert
+#    define assert(condition) ((void)0)
+#  endif
+#endif
+
+#define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
 #  include <stdio.h>
-#  define DEBUGLOG(l, ...) {                          \
-                if (l<=LZ4_DEBUG) {                   \
-                    fprintf(stderr, __FILE__ ": ");   \
-                    fprintf(stderr, __VA_ARGS__);     \
-                    fprintf(stderr, " \n");           \
+static int g_debuglog_enable = 1;
+#  define DEBUGLOG(l, ...) {                                  \
+                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
+                    fprintf(stderr, __FILE__ ": ");           \
+                    fprintf(stderr, __VA_ARGS__);             \
+                    fprintf(stderr, " \n");                   \
             }   }
 #else
 #  define DEBUGLOG(l, ...)      {}    /* disabled */
@@ -307,7 +340,7 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Common functions
 **************************************/
-static unsigned LZ4_NbCommonBytes (register reg_t val)
+static unsigned LZ4_NbCommonBytes (reg_t val)
 {
     if (LZ4_isLittleEndian()) {
         if (sizeof(val)==8) {
@@ -318,7 +351,14 @@ static unsigned LZ4_NbCommonBytes (register reg_t val)
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_ctzll((U64)val) >> 3);
 #       else
-            static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5, 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+            static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2,
+                                                     0, 3, 1, 3, 1, 4, 2, 7,
+                                                     0, 2, 3, 6, 1, 5, 3, 5,
+                                                     1, 3, 4, 4, 2, 5, 6, 7,
+                                                     7, 0, 1, 2, 3, 3, 4, 6,
+                                                     2, 6, 5, 5, 3, 4, 5, 6,
+                                                     7, 1, 2, 4, 6, 4, 4, 5,
+                                                     7, 2, 6, 5, 7, 6, 7, 7 };
             return DeBruijnBytePos[((U64)((val & -(long long)val) * 0x0218A392CDABBD3FULL)) >> 58];
 #       endif
         } else /* 32 bits */ {
@@ -329,12 +369,15 @@ static unsigned LZ4_NbCommonBytes (register reg_t val)
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_ctz((U32)val) >> 3);
 #       else
-            static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+            static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0,
+                                                     3, 2, 2, 1, 3, 2, 0, 1,
+                                                     3, 3, 1, 2, 2, 2, 2, 0,
+                                                     3, 1, 2, 0, 1, 0, 1, 1 };
             return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
 #       endif
         }
     } else   /* Big Endian CPU */ {
-        if (sizeof(val)==8) {
+        if (sizeof(val)==8) {   /* 64-bits */
 #       if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r = 0;
             _BitScanReverse64( &r, val );
@@ -342,8 +385,11 @@ static unsigned LZ4_NbCommonBytes (register reg_t val)
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
             return (__builtin_clzll((U64)val) >> 3);
 #       else
+            static const U32 by32 = sizeof(val)*4;  /* 32 on 64 bits (goal), 16 on 32 bits.
+                Just to avoid some static analyzer complaining about shift by 32 on 32-bits target.
+                Note that this code path is never triggered in 32-bits mode. */
             unsigned r;
-            if (!(val>>32)) { r=4; } else { r=0; val>>=32; }
+            if (!(val>>by32)) { r=4; } else { r=0; val>>=by32; }
             if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
             r += (!val);
             return r;
@@ -366,11 +412,20 @@ static unsigned LZ4_NbCommonBytes (register reg_t val)
 }
 
 #define STEPSIZE sizeof(reg_t)
-static unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
+LZ4_FORCE_INLINE
+unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
-    while (likely(pIn<pInLimit-(STEPSIZE-1))) {
+    if (likely(pIn < pInLimit-(STEPSIZE-1))) {
+        reg_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
+        if (!diff) {
+            pIn+=STEPSIZE; pMatch+=STEPSIZE;
+        } else {
+            return LZ4_NbCommonBytes(diff);
+    }   }
+
+    while (likely(pIn < pInLimit-(STEPSIZE-1))) {
         reg_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
         if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
         pIn += LZ4_NbCommonBytes(diff);
@@ -436,7 +491,7 @@ static U32 LZ4_hash5(U64 sequence, tableType_t const tableType)
         return (U32)(((sequence >> 24) * prime8bytes) >> (64 - hashLog));
 }
 
-FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tableType)
+LZ4_FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tableType)
 {
     if ((sizeof(reg_t)==8) && (tableType != byU16)) return LZ4_hash5(LZ4_read_ARCH(p), tableType);
     return LZ4_hash4(LZ4_read32(p), tableType);
@@ -452,7 +507,7 @@ static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableTy
     }
 }
 
-FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+LZ4_FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     LZ4_putPositionOnHash(p, h, tableBase, tableType, srcBase);
@@ -465,7 +520,7 @@ static const BYTE* LZ4_getPositionOnHash(U32 h, void* tableBase, tableType_t tab
     { const U16* const hashTable = (U16*) tableBase; return hashTable[h] + srcBase; }   /* default, to ensure a return */
 }
 
-FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
+LZ4_FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
@@ -474,7 +529,7 @@ FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, void* tableBase, tableTy
 
 /** LZ4_compress_generic() :
     inlined, to ensure branches are decided at compilation time */
-FORCE_INLINE int LZ4_compress_generic(
+LZ4_FORCE_INLINE int LZ4_compress_generic(
                  LZ4_stream_t_internal* const cctx,
                  const char* const source,
                  char* const dest,
@@ -616,7 +671,11 @@ _next_match:
                 *token += ML_MASK;
                 matchCode -= ML_MASK;
                 LZ4_write32(op, 0xFFFFFFFF);
-                while (matchCode >= 4*255) op+=4, LZ4_write32(op, 0xFFFFFFFF), matchCode -= 4*255;
+                while (matchCode >= 4*255) {
+                    op+=4;
+                    LZ4_write32(op, 0xFFFFFFFF);
+                    matchCode -= 4*255;
+                }
                 op += matchCode / 255;
                 *op++ = (BYTE)(matchCode % 255);
             } else
@@ -940,6 +999,7 @@ LZ4_stream_t* LZ4_createStream(void)
 
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
+    DEBUGLOG(4, "LZ4_resetStream");
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
 
@@ -1100,47 +1160,46 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 *  Decompression functions
 *******************************/
 /*! LZ4_decompress_generic() :
- *  This generic decompression function cover all use cases.
- *  It shall be instantiated several times, using different sets of directives
- *  Note that it is important this generic function is really inlined,
+ *  This generic decompression function covers all use cases.
+ *  It shall be instantiated several times, using different sets of directives.
+ *  Note that it is important for performance that this function really get inlined,
  *  in order to remove useless branches during compilation optimization.
  */
-FORCE_INLINE int LZ4_decompress_generic(
-                 const char* const source,
-                 char* const dest,
-                 int inputSize,
-                 int outputSize,         /* If endOnInput==endOnInputSize, this value is the max size of Output Buffer. */
+LZ4_FORCE_O2_GCC_PPC64LE
+LZ4_FORCE_INLINE int LZ4_decompress_generic(
+                 const char* const src,
+                 char* const dst,
+                 int srcSize,
+                 int outputSize,         /* If endOnInput==endOnInputSize, this value is `dstCapacity` */
 
                  int endOnInput,         /* endOnOutputSize, endOnInputSize */
                  int partialDecoding,    /* full, partial */
                  int targetOutputSize,   /* only used if partialDecoding==partial */
                  int dict,               /* noDict, withPrefix64k, usingExtDict */
-                 const BYTE* const lowPrefix,  /* == dest when no prefix */
+                 const BYTE* const lowPrefix,  /* always <= dst, == dst when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
                  const size_t dictSize         /* note : = 0 if noDict */
                  )
 {
-    /* Local Variables */
-    const BYTE* ip = (const BYTE*) source;
-    const BYTE* const iend = ip + inputSize;
+    const BYTE* ip = (const BYTE*) src;
+    const BYTE* const iend = ip + srcSize;
 
-    BYTE* op = (BYTE*) dest;
+    BYTE* op = (BYTE*) dst;
     BYTE* const oend = op + outputSize;
     BYTE* cpy;
     BYTE* oexit = op + targetOutputSize;
-    const BYTE* const lowLimit = lowPrefix - dictSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const unsigned dec32table[] = {0, 1, 2, 1, 4, 4, 4, 4};
-    const int dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+    const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
+    const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
 
 
     /* Special cases */
-    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                        /* targetOutputSize too high => decode everything */
-    if ((endOnInput) && (unlikely(outputSize==0))) return ((inputSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
+    if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                      /* targetOutputSize too high => just decode everything */
+    if ((endOnInput) && (unlikely(outputSize==0))) return ((srcSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
 
     /* Main Loop : decode sequences */
@@ -1149,8 +1208,27 @@ FORCE_INLINE int LZ4_decompress_generic(
         const BYTE* match;
         size_t offset;
 
-        /* get literal length */
         unsigned const token = *ip++;
+
+        /* shortcut for common case :
+         * in most circumstances, we expect to decode small matches (<= 18 bytes) separated by few literals (<= 14 bytes).
+         * this shortcut was tested on x86 and x64, where it improves decoding speed.
+         * it has not yet been benchmarked on ARM, Power, mips, etc. */
+        if (((ip + 14 /*maxLL*/ + 2 /*offset*/ <= iend)
+          & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
+          & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
+            size_t const ll = token >> ML_BITS;
+            size_t const off = LZ4_readLE16(ip+ll);
+            const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
+            if ((off >= 18) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
+                size_t const ml = (token & ML_MASK) + MINMATCH;
+                memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
+                memcpy(op, matchPtr, 18); op += ml;
+                continue;
+            }
+        }
+
+        /* decode literal length */
         if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
             do {
@@ -1184,7 +1262,7 @@ FORCE_INLINE int LZ4_decompress_generic(
         /* get offset */
         offset = LZ4_readLE16(ip); ip+=2;
         match = op - offset;
-        if ((checkOffset) && (unlikely(match < lowLimit))) goto _output_error;   /* Error : offset outside buffers */
+        if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
         LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */
 
         /* get matchlength */
@@ -1228,14 +1306,13 @@ FORCE_INLINE int LZ4_decompress_generic(
         /* copy match within block */
         cpy = op + length;
         if (unlikely(offset<8)) {
-            const int dec64 = dec64table[offset];
             op[0] = match[0];
             op[1] = match[1];
             op[2] = match[2];
             op[3] = match[3];
-            match += dec32table[offset];
+            match += inc32table[offset];
             memcpy(op+4, match, 4);
-            match -= dec64;
+            match -= dec64table[offset];
         } else { LZ4_copy8(op, match); match+=8; }
         op += 8;
 
@@ -1252,31 +1329,34 @@ FORCE_INLINE int LZ4_decompress_generic(
             LZ4_copy8(op, match);
             if (length>16) LZ4_wildCopy(op+8, match+8, cpy);
         }
-        op=cpy;   /* correction */
+        op = cpy;   /* correction */
     }
 
     /* end of decoding */
     if (endOnInput)
-       return (int) (((char*)op)-dest);     /* Nb of output bytes decoded */
+       return (int) (((char*)op)-dst);     /* Nb of output bytes decoded */
     else
-       return (int) (((const char*)ip)-source);   /* Nb of input bytes read */
+       return (int) (((const char*)ip)-src);   /* Nb of input bytes read */
 
     /* Overflow error detected */
 _output_error:
-    return (int) (-(((const char*)ip)-source))-1;
+    return (int) (-(((const char*)ip)-src))-1;
 }
 
 
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_safe(const char* source, char* dest, int compressedSize, int maxDecompressedSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxDecompressedSize, endOnInputSize, full, 0, noDict, (BYTE*)dest, NULL, 0);
 }
 
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSize, int targetOutputSize, int maxDecompressedSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxDecompressedSize, endOnInputSize, partial, targetOutputSize, noDict, (BYTE*)dest, NULL, 0);
 }
 
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
     return LZ4_decompress_generic(source, dest, 0, originalSize, endOnOutputSize, full, 0, withPrefix64k, (BYTE*)(dest - 64 KB), NULL, 64 KB);
@@ -1322,6 +1402,7 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
     If it's not possible, save the relevant part of decoded data into a safe buffer,
     and indicate where it stands using LZ4_setStreamDecode()
 */
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int compressedSize, int maxOutputSize)
 {
     LZ4_streamDecode_t_internal* lz4sd = &LZ4_streamDecode->internal_donotuse;
@@ -1348,6 +1429,7 @@ int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
     return result;
 }
 
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize)
 {
     LZ4_streamDecode_t_internal* lz4sd = &LZ4_streamDecode->internal_donotuse;
@@ -1382,7 +1464,8 @@ Advanced decoding functions :
     the dictionary must be explicitly provided within parameters
 */
 
-FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest, int compressedSize, int maxOutputSize, int safe, const char* dictStart, int dictSize)
+LZ4_FORCE_O2_GCC_PPC64LE
+LZ4_FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest, int compressedSize, int maxOutputSize, int safe, const char* dictStart, int dictSize)
 {
     if (dictSize==0)
         return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, noDict, (BYTE*)dest, NULL, 0);
@@ -1394,17 +1477,20 @@ FORCE_INLINE int LZ4_decompress_usingDict_generic(const char* source, char* dest
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, safe, full, 0, usingExtDict, (BYTE*)dest, (const BYTE*)dictStart, dictSize);
 }
 
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_safe_usingDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
 {
     return LZ4_decompress_usingDict_generic(source, dest, compressedSize, maxOutputSize, 1, dictStart, dictSize);
 }
 
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
 {
     return LZ4_decompress_usingDict_generic(source, dest, 0, originalSize, 0, dictStart, dictSize);
 }
 
 /* debug function */
+LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_safe_forceExtDict(const char* source, char* dest, int compressedSize, int maxOutputSize, const char* dictStart, int dictSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize, endOnInputSize, full, 0, usingExtDict, (BYTE*)dest, (const BYTE*)dictStart, dictSize);

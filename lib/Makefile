@@ -47,11 +47,12 @@ BUILD_STATIC:=yes
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
-           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef \
-           -Wpointer-arith -Wstrict-aliasing=1
+             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
+             -Wundef -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS    = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
+SRCFILES := $(sort $(wildcard *.c))
 
 
 # OS X linker doesn't support -soname, and use different extension
@@ -83,14 +84,14 @@ all: lib
 all32: CFLAGS+=-m32
 all32: all
 
-liblz4.a: *.c
+liblz4.a: $(SRCFILES)
 ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
 	@$(AR) rcs $@ *.o
 endif
 
-$(LIBLZ4): *.c
+$(LIBLZ4): $(SRCFILES)
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
@@ -116,7 +117,8 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 DESTDIR     ?=
-# directory variables : GNU convention prefers lowercase
+# directory variables : GNU conventions prefer lowercase
+# see https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
 # support both lower and uppercase (BSD), use uppercase in script
 prefix      ?= /usr/local
 PREFIX      ?= $(prefix)

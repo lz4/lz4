@@ -68,7 +68,7 @@ static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSi
 #define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
 #define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
 #define COOLPERIOD_SEC        10
-#define DECOMP_MULT           2 /* test decompression DECOMP_MULT times longer than compression */
+#define DECOMP_MULT           1 /* test decompression DECOMP_MULT times longer than compression */
 
 #define KB *(1 <<10)
 #define MB *(1 <<20)
@@ -166,7 +166,6 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     void* const compressedBuffer = malloc(maxCompressedSize);
     void* const resultBuffer = malloc(srcSize);
     U32 nbBlocks;
-    UTIL_time_t ticksPerSecond;
     struct compressionParameters compP;
     int cfunctionId;
 
@@ -176,7 +175,6 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
     /* init */
     if (strlen(displayName)>17) displayName += strlen(displayName)-17;   /* can only display 17 characters */
-    UTIL_initTimer(&ticksPerSecond);
 
     /* Init */
     if (cLevel < LZ4HC_CLEVEL_MIN) cfunctionId = 0; else cfunctionId = 1;
@@ -229,17 +227,17 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         size_t cSize = 0;
         double ratio = 0.;
 
-        UTIL_getTime(&coolTime);
+        coolTime = UTIL_getTime();
         DISPLAYLEVEL(2, "\r%79s\r", "");
         while (!cCompleted || !dCompleted) {
             UTIL_time_t clockStart;
             U64 clockLoop = g_nbSeconds ? TIMELOOP_MICROSEC : 1;
 
             /* overheat protection */
-            if (UTIL_clockSpanMicro(coolTime, ticksPerSecond) > ACTIVEPERIOD_MICROSEC) {
+            if (UTIL_clockSpanMicro(coolTime) > ACTIVEPERIOD_MICROSEC) {
                 DISPLAYLEVEL(2, "\rcooling down ...    \r");
                 UTIL_sleep(COOLPERIOD_SEC);
-                UTIL_getTime(&coolTime);
+                coolTime = UTIL_getTime();
             }
 
             /* Compression */
@@ -247,8 +245,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase result buffer */
 
             UTIL_sleepMilli(1);  /* give processor time to other processes */
-            UTIL_waitForNextTick(ticksPerSecond);
-            UTIL_getTime(&clockStart);
+            UTIL_waitForNextTick();
+            clockStart = UTIL_getTime();
 
             if (!cCompleted) {   /* still some time to do compression tests */
                 U32 nbLoops = 0;
@@ -260,8 +258,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         blockTable[blockNb].cSize = rSize;
                     }
                     nbLoops++;
-                } while (UTIL_clockSpanMicro(clockStart, ticksPerSecond) < clockLoop);
-                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart, ticksPerSecond);
+                } while (UTIL_clockSpanMicro(clockStart) < clockLoop);
+                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart);
                     if (clockSpan < fastestC*nbLoops) fastestC = clockSpan / nbLoops;
                     totalCTime += clockSpan;
                     cCompleted = totalCTime>maxTime;
@@ -282,8 +280,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
 
             UTIL_sleepMilli(1); /* give processor time to other processes */
-            UTIL_waitForNextTick(ticksPerSecond);
-            UTIL_getTime(&clockStart);
+            UTIL_waitForNextTick();
+            clockStart = UTIL_getTime();
 
             if (!dCompleted) {
                 U32 nbLoops = 0;
@@ -300,8 +298,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         blockTable[blockNb].resSize = regenSize;
                     }
                     nbLoops++;
-                } while (UTIL_clockSpanMicro(clockStart, ticksPerSecond) < DECOMP_MULT*clockLoop);
-                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart, ticksPerSecond);
+                } while (UTIL_clockSpanMicro(clockStart) < DECOMP_MULT*clockLoop);
+                {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart);
                     if (clockSpan < fastestD*nbLoops) fastestD = clockSpan / nbLoops;
                     totalDTime += clockSpan;
                     dCompleted = totalDTime>(DECOMP_MULT*maxTime);
@@ -428,7 +426,10 @@ static void BMK_loadFiles(void* buffer, size_t bufferSize,
         f = fopen(fileNamesTable[n], "rb");
         if (f==NULL) EXM_THROW(10, "impossible to open file %s", fileNamesTable[n]);
         DISPLAYUPDATE(2, "Loading %s...       \r", fileNamesTable[n]);
-        if (fileSize > bufferSize-pos) fileSize = bufferSize-pos, nbFiles=n;   /* buffer too small - stop after this file */
+        if (fileSize > bufferSize-pos) { /* buffer too small - stop after this file */
+            fileSize = bufferSize-pos;
+            nbFiles=n;
+        }
         { size_t const readSize = fread(((char*)buffer)+pos, 1, (size_t)fileSize, f);
           if (readSize != (size_t)fileSize) EXM_THROW(11, "could not read %s", fileNamesTable[n]);
           pos += readSize; }
@@ -456,9 +457,9 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     if (benchedSize==0) EXM_THROW(12, "not enough memory");
     if ((U64)benchedSize > totalSizeToLoad) benchedSize = (size_t)totalSizeToLoad;
     if (benchedSize > LZ4_MAX_INPUT_SIZE) {
-        benchedSize = LZ4_MAX_INPUT_SIZE; 
+        benchedSize = LZ4_MAX_INPUT_SIZE;
         DISPLAY("File(s) bigger than LZ4's max input size; testing %u MB only...\n", (U32)(benchedSize >> 20));
-    } else { 
+    } else {
         if (benchedSize < totalSizeToLoad)
             DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
     }

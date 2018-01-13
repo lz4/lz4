@@ -11,7 +11,7 @@ matrix:
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fasttest test-fullbench' COMPILER=cc
+      env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fullbench' COMPILER=cc
 
     - os: linux
       sudo: false
@@ -32,7 +32,8 @@ matrix:
             - libc6-dev-i386
             - gcc-multilib
 
-    - env: Ubu=14.04 Cmd='make usan' COMPILER=clang
+    # presume clang >= v3.9.0
+    - env: Ubu=14.04 Cmd='make usan MOREFLAGS=-Wcomma -Werror' COMPILER=clang
       dist: trusty
       sudo: required
       addons:

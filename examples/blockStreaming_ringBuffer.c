@@ -1,16 +1,13 @@
-// LZ4 streaming API example : ring buffer
-// Based on sample code from Takayuki Matsuoka
+/* LZ4 streaming API example : ring buffer
+ * Based on sample code from Takayuki Matsuoka */
 
 
 /**************************************
  * Compiler Options
  **************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS // for MSVC
+#if defined(_MSC_VER) && (_MSC_VER <= 1800)  /* Visual Studio <= 2013 */
+#  define _CRT_SECURE_NO_WARNINGS
 #  define snprintf sprintf_s
-#endif
-#ifdef __GNUC__
-#  pragma GCC diagnostic ignored "-Wmissing-braces"   /* GCC bug 53119 : doesn't accept { 0 } as initializer (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119) */
 #endif
 
 
@@ -27,7 +24,7 @@
 enum {
     MESSAGE_MAX_BYTES   = 1024,
     RING_BUFFER_BYTES   = 1024 * 8 + MESSAGE_MAX_BYTES,
-    DECODE_RING_BUFFER  = RING_BUFFER_BYTES + MESSAGE_MAX_BYTES   // Intentionally larger, to test unsynchronized ring buffers
+    DECODE_RING_BUFFER  = RING_BUFFER_BYTES + MESSAGE_MAX_BYTES   /* Intentionally larger, to test unsynchronized ring buffers */
 };
 
 
@@ -50,7 +47,7 @@ size_t read_bin(FILE* fp, void* array, int arrayBytes) {
 
 void test_compress(FILE* outFp, FILE* inpFp)
 {
-    LZ4_stream_t lz4Stream_body = { 0 };
+    LZ4_stream_t lz4Stream_body = { { 0 } };
     LZ4_stream_t* lz4Stream = &lz4Stream_body;
 
     static char inpBuf[RING_BUFFER_BYTES];
@@ -85,24 +82,22 @@ void test_compress(FILE* outFp, FILE* inpFp)
 void test_decompress(FILE* outFp, FILE* inpFp)
 {
     static char decBuf[DECODE_RING_BUFFER];
-    int   decOffset    = 0;
-    LZ4_streamDecode_t lz4StreamDecode_body = { 0 };
+    int decOffset = 0;
+    LZ4_streamDecode_t lz4StreamDecode_body = { { 0 } };
     LZ4_streamDecode_t* lz4StreamDecode = &lz4StreamDecode_body;
 
     for(;;) {
         int cmpBytes = 0;
         char cmpBuf[CMPBUFSIZE];
 
-        {
-            const size_t r0 = read_int32(inpFp, &cmpBytes);
+        {   const size_t r0 = read_int32(inpFp, &cmpBytes);
             if(r0 != 1 || cmpBytes <= 0) break;
 
             const size_t r1 = read_bin(inpFp, cmpBuf, cmpBytes);
             if(r1 != (size_t) cmpBytes) break;
         }
 
-        {
-            char* const decPtr = &decBuf[decOffset];
+        {   char* const decPtr = &decBuf[decOffset];
             const int decBytes = LZ4_decompress_safe_continue(
                 lz4StreamDecode, cmpBuf, decPtr, cmpBytes, MESSAGE_MAX_BYTES);
             if(decBytes <= 0) break;
@@ -120,7 +115,7 @@ int compare(FILE* f0, FILE* f1)
 {
     int result = 0;
 
-    while(0 == result) {
+    while (0 == result) {
         char b0[65536];
         char b1[65536];
         const size_t r0 = fread(b0, 1, sizeof(b0), f0);
@@ -128,12 +123,9 @@ int compare(FILE* f0, FILE* f1)
 
         result = (int) r0 - (int) r1;
 
-        if(0 == r0 || 0 == r1) {
-            break;
-        }
-        if(0 == result) {
-            result = memcmp(b0, b1, r0);
-        }
+        if (0 == r0 || 0 == r1) break;
+
+        if (0 == result) result = memcmp(b0, b1, r0);
     }
 
     return result;
@@ -146,7 +138,7 @@ int main(int argc, char** argv)
     char lz4Filename[256] = { 0 };
     char decFilename[256] = { 0 };
 
-    if(argc < 2) {
+    if (argc < 2) {
         printf("Please specify input filename\n");
         return 0;
     }
@@ -160,9 +152,8 @@ int main(int argc, char** argv)
     printf("dec = [%s]\n", decFilename);
 
     // compress
-    {
-        FILE* inpFp = fopen(inpFilename, "rb");
-        FILE* outFp = fopen(lz4Filename, "wb");
+    {   FILE* const inpFp = fopen(inpFilename, "rb");
+        FILE* const outFp = fopen(lz4Filename, "wb");
 
         test_compress(outFp, inpFp);
 
@@ -171,9 +162,8 @@ int main(int argc, char** argv)
     }
 
     // decompress
-    {
-        FILE* inpFp = fopen(lz4Filename, "rb");
-        FILE* outFp = fopen(decFilename, "wb");
+    {   FILE* const inpFp = fopen(lz4Filename, "rb");
+        FILE* const outFp = fopen(decFilename, "wb");
 
         test_decompress(outFp, inpFp);
 
@@ -182,12 +172,11 @@ int main(int argc, char** argv)
     }
 
     // verify
-    {
-        FILE* inpFp = fopen(inpFilename, "rb");
-        FILE* decFp = fopen(decFilename, "rb");
+    {   FILE* const inpFp = fopen(inpFilename, "rb");
+        FILE* const decFp = fopen(decFilename, "rb");
 
         const int cmp = compare(inpFp, decFp);
-        if(0 == cmp) {
+        if (0 == cmp) {
             printf("Verify : OK\n");
         } else {
             printf("Verify : NG\n");

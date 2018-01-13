@@ -2,7 +2,7 @@
 // Copyright : Takayuki Matsuoka
 
 
-#ifdef _MSC_VER    /* Visual Studio */
+#if defined(_MSC_VER) && (_MSC_VER <= 1800)  /* Visual Studio <= 2013 */
 #  define _CRT_SECURE_NO_WARNINGS
 #  define snprintf sprintf_s
 #endif
