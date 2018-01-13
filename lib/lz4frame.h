@@ -347,27 +347,32 @@ LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
 
 /*! LZ4F_decompress() :
  *  Call this function repetitively to regenerate compressed data from `srcBuffer`.
- *  The function will attempt to decode up to *srcSizePtr bytes from srcBuffer, into dstBuffer of capacity *dstSizePtr.
+ *  The function will read up to *srcSizePtr bytes from srcBuffer,
+ *  and decompress data into dstBuffer, of capacity *dstSizePtr.
  *
- *  The number of bytes regenerated into dstBuffer is provided within *dstSizePtr (necessarily <= original value).
+ *  The number of bytes consumed from srcBuffer will be written into *srcSizePtr (necessarily <= original value).
+ *  The number of bytes decompressed into dstBuffer will be written into *dstSizePtr (necessarily <= original value).
  *
- *  The number of bytes consumed from srcBuffer is provided within *srcSizePtr (necessarily <= original value).
- *  Number of bytes consumed can be < number of bytes provided.
- *  It typically happens when dstBuffer is not large enough to contain all decoded data.
+ *  The function does not necessarily read all input bytes, so always check value in *srcSizePtr.
  *  Unconsumed source data must be presented again in subsequent invocations.
  *
- * `dstBuffer` content is expected to be flushed between each invocation, as its content will be overwritten.
- * `dstBuffer` itself can be changed at will between each consecutive function invocation.
+ * `dstBuffer` can freely change between each consecutive function invocation.
+ * `dstBuffer` content will be overwritten.
  *
  * @return : an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
  *  Schematically, it's the size of the current (or remaining) compressed block + header of next block.
  *  Respecting the hint provides some small speed benefit, because it skips intermediate buffers.
  *  This is just a hint though, it's always possible to provide any srcSize.
+ *
  *  When a frame is fully decoded, @return will be 0 (no more data expected).
+ *  When provided with more bytes than necessary to decode a frame,
+ *  LZ4F_decompress() will stop reading exactly at end of current frame, and @return 0.
+ *
  *  If decompression failed, @return is an error code, which can be tested using LZ4F_isError().
+ *  After a decompression error, the `dctx` context is not resumable.
+ *  Use LZ4F_resetDecompressionContext() to return to clean state.
  *
  *  After a frame is fully decoded, dctx can be used again to decompress another frame.
- *  After a decompression error, use LZ4F_resetDecompressionContext() before re-using dctx, to return to clean state.
  */
 LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    void* dstBuffer, size_t* dstSizePtr,
@@ -375,11 +380,11 @@ LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
                                    const LZ4F_decompressOptions_t* dOptPtr);
 
 
-/*! LZ4F_resetDecompressionContext() : v1.8.0
+/*! LZ4F_resetDecompressionContext() : added in v1.8.0
  *  In case of an error, the context is left in "undefined" state.
  *  In which case, it's necessary to reset it, before re-using it.
- *  This method can also be used to abruptly stop an unfinished decompression,
- *  and start a new one using the same context. */
+ *  This method can also be used to abruptly stop any unfinished decompression,
+ *  and start a new one using same context resources. */
 LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always successful */
 
 
