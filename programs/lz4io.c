@@ -429,7 +429,7 @@ static void* LZ4IO_createDict(const char* dictFilename, size_t *dictSize) {
     /* opportunistically seek to the part of the file we care about. If this */
     /* fails it's not a problem since we'll just read everything anyways.    */
     if (strcmp(dictFilename, stdinmark)) {
-        UTIL_fseek(dictFile, -LZ4_MAX_DICT_SIZE, SEEK_END);
+        (void)UTIL_fseek(dictFile, -LZ4_MAX_DICT_SIZE, SEEK_END);
     }
 
     do {
