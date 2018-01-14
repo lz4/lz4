@@ -82,7 +82,7 @@ clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
 	@$(MAKE) -C $(EXDIR) $@ > $(VOID)
-	@$(MAKE) -C contrib/gen_manual $@
+	@$(MAKE) -C contrib/gen_manual $@ > $(VOID)
 	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
