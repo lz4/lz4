@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "July 2017" "lz4 1.8.0" "User Commands"
+.TH "LZ4" "1" "2018-01-13" "lz4 1.8.1" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -45,6 +45,9 @@ If no destination name is provided, \fBand\fR if \fBstdout\fR is the console, \f
 .
 .IP "\(bu" 4
 As a consequence of previous rules, note the following example : \fBlz4 file | consumer\fR sends compressed data to \fBconsumer\fR through \fBstdout\fR, hence it does \fInot\fR create \fBfile\.lz4\fR\.
+.
+.IP "\(bu" 4
+Another consequence of those rules is that to run \fBlz4\fR under \fBnohup\fR, you should provide a destination file: \fBnohup lz4 file file\.lz4\fR, because \fBnohup\fR writes the specified command\'s output to a file\.
 .
 .IP "" 0
 .
