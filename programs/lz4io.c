@@ -459,6 +459,7 @@ static void* LZ4IO_createDict(const char* dictFilename, size_t *dictSize) {
         memcpy(dictBuf + circularBufSize - dictStart, circularBuf, dictLen - (circularBufSize - dictStart));
     }
 
+    fclose(dictFile);
     free(circularBuf);
 
     return dictBuf;
