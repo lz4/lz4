@@ -14,7 +14,7 @@ env:
 addons:
   coverity_scan:
     project:
-      name: "lz4/lz4"
+      name: "Cyan4973/lz4"
       description: "Build submitted via Travis CI"
     notification_email: yann.collet.73@gmail.com
     build_command_prepend: "make clean"
