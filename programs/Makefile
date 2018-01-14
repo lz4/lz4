@@ -88,8 +88,8 @@ lz4c32: CFLAGS += -m32
 lz4c32 : $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lz4.1: lz4.1.md
-	cat $^ | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
+lz4.1: lz4.1.md $(LIBVER_SRC)
+	cat $< | $(MD2ROFF) $(MD2ROFF_FLAGS) | sed -n '/^\.\\\".*/!p' > $@
 
 man: lz4.1
 
