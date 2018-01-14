@@ -25,14 +25,13 @@ LZ4 library is provided as open-source software using BSD 2-Clause license.
 [travisMasterBadge]: https://travis-ci.org/lz4/lz4.svg?branch=master "Continuous Integration test suite"
 [travisDevBadge]: https://travis-ci.org/lz4/lz4.svg?branch=dev "Continuous Integration test suite"
 [travisLink]: https://travis-ci.org/lz4/lz4
-[AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/jc2yhgwyc7qqtsko/branch/master?svg=true "Windows test suite"
-[AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/jc2yhgwyc7qqtsko/branch/dev?svg=true "Windows test suite"
+[AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/github/lz4/lz4?branch=master&svg=true "Windows test suite"
+[AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/github/lz4/lz4?branch=dev&svg=true "Windows test suite"
 [AppveyorLink]: https://ci.appveyor.com/project/YannCollet/lz4-1lndh
 [coverBadge]: https://scan.coverity.com/projects/4735/badge.svg "Static code analysis of Master branch"
 [coverlink]: https://scan.coverity.com/projects/4735
 
 > **Branch Policy:**
-
 > - The "master" branch is considered stable, at all times.
 > - The "dev" branch is the one where all contributions must be merged
     before being promoted to master.
@@ -70,7 +69,25 @@ in single-thread mode.
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
 
-LZ4 is also compatible and well optimized for x32 mode, for which it provides +10% speed performance.
+LZ4 is also compatible and well optimized for x32 mode, for which it provides an additional +10% speed performance.
+
+
+Installation
+-------------------------
+
+```
+make
+make install     # this command may require root access
+```
+
+LZ4's `Makefile` supports standard [Makefile conventions],
+including [staged installs], [redirection], or [command redefinition].
+It is compatible with parallel builds (`-j#`).
+
+[Makefile conventions]: https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
+[staged installs]: https://www.gnu.org/prep/standards/html_node/DESTDIR.html
+[redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
+[command redefinition]: https://www.gnu.org/prep/standards/html_node/Utilities-in-Makefiles.html
 
 
 Documentation

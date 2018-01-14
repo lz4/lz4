@@ -23,20 +23,6 @@
     - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-/**************************************
-*  Compiler Options
-**************************************/
-/* Disable some Visual warning messages */
-#define _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_DEPRECATE     /* VS2005 */
-
-/* Unix Large Files support (>4GB) */
-#if (defined(__sun__) && (!defined(__LP64__)))   // Sun Solaris 32-bits requires specific definitions
-#  define _LARGEFILE_SOURCE
-#  define _FILE_OFFSET_BITS 64
-#elif ! defined(__LP64__)                        // No point defining Large file for 64 bit
-#  define _LARGEFILE64_SOURCE
-#endif
 
 // S_ISREG & gettimeofday() are not supported by MSVC
 #if defined(_MSC_VER) || defined(_WIN32)
@@ -47,8 +33,10 @@
 /**************************************
 *  Includes
 **************************************/
+#include "platform.h"    /* _CRT_SECURE_NO_WARNINGS, Large Files support */
+#include "util.h"        /* U32, UTIL_getFileSize */
 #include <stdlib.h>      /* malloc, free */
-#include <stdio.h>       /* fprintf, fopen, ftello64 */
+#include <stdio.h>       /* fprintf, fopen, ftello */
 #include <sys/types.h>   /* stat64 */
 #include <sys/stat.h>    /* stat64 */
 #include <string.h>      /* strcmp */
@@ -59,34 +47,6 @@
 #include "lz4frame.h"
 
 #include "xxhash.h"
-
-
-/**************************************
-*  Compiler Options
-**************************************/
-/* S_ISREG & gettimeofday() are not supported by MSVC */
-#if !defined(S_ISREG)
-#  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
-#endif
-
-
-/**************************************
-*  Basic Types
-**************************************/
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-# include <stdint.h>
-  typedef uint8_t  BYTE;
-  typedef uint16_t U16;
-  typedef uint32_t U32;
-  typedef  int32_t S32;
-  typedef uint64_t U64;
-#else
-  typedef unsigned char       BYTE;
-  typedef unsigned short      U16;
-  typedef unsigned int        U32;
-  typedef   signed int        S32;
-  typedef unsigned long long  U64;
-#endif
 
 
 /**************************************
@@ -191,21 +151,6 @@ static size_t BMK_findMaxMem(U64 requiredMem)
     else requiredMem >>= 1;
 
     return (size_t)requiredMem;
-}
-
-
-static U64 BMK_GetFileSize(const char* infilename)
-{
-    int r;
-#if defined(_MSC_VER)
-    struct _stat64 statbuf;
-    r = _stat64(infilename, &statbuf);
-#else
-    struct stat statbuf;
-    r = stat(infilename, &statbuf);
-#endif
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
-    return (U64)statbuf.st_size;
 }
 
 
@@ -398,7 +343,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
       if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
 
       /* Memory size adjustments */
-      inFileSize = BMK_GetFileSize(inFileName);
+      inFileSize = UTIL_getFileSize(inFileName);
       if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
       benchedSize = BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
       if (benchedSize==0) { DISPLAY( "not enough memory\n"); fclose(inFile); return 11; }

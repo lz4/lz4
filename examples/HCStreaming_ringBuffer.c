@@ -1,12 +1,12 @@
 // LZ4 HC streaming API example : ring buffer
-// Based on previous work from Takayuki Matsuoka
+// Based on a previous example by Takayuki Matsuoka
 
 
 /**************************************
  * Compiler Options
  **************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  define _CRT_SECURE_NO_WARNINGS   /* for MSVC */
+#if defined(_MSC_VER) && (_MSC_VER <= 1800)  /* Visual Studio <= 2013 */
+#  define _CRT_SECURE_NO_WARNINGS
 #  define snprintf sprintf_s
 #endif
 

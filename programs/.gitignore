@@ -1,5 +1,7 @@
 # local binary (Makefile)
 lz4
+unlz4
+lz4cat
 lz4c
 lz4c32
 datagen

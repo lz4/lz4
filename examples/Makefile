@@ -27,13 +27,14 @@
 # kindly provided by Takayuki Matsuoka
 # ##########################################################################
 
-CFLAGS ?= -O3
-CFLAGS += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
-FLAGS  := -I../lib $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
+CPPFLAGS += -I../lib
+CFLAGS   ?= -O3
+CFLAGS   += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes
+FLAGS    := $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(MOREFLAGS)
 
-TESTFILE= Makefile
-LZ4DIR := ../lib
-LZ4 = ../programs/lz4
+TESTFILE  = Makefile
+LZ4DIR   := ../lib
+LZ4       = ../programs/lz4
 
 
 # Define *.exe as extension for Windows systems
@@ -48,7 +49,8 @@ endif
 
 default: all
 
-all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC lineCompress frameCompress
+all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC \
+     lineCompress frameCompress simpleBuffer
 
 printVersion: $(LZ4DIR)/lz4.c printVersion.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
@@ -78,12 +80,21 @@ simpleBuffer: $(LZ4DIR)/lz4.c simple_buffer.c
 	$(CC)      $(FLAGS) $^ -o $@$(EXT)
 
 test : all
+	@echo "\n=== Print Version ==="
 	./printVersion$(EXT)
+	@echo "\n=== Simple compression example ==="
+	./simpleBuffer$(EXT)
+	@echo "\n=== Double-buffer ==="
 	./doubleBuffer$(EXT) $(TESTFILE)
-	./dictionaryRandomAccess$(EXT) $(TESTFILE) $(TESTFILE) 1100 1400
+	@echo "\n=== Ring Buffer ==="
 	./ringBuffer$(EXT)   $(TESTFILE)
+	@echo "\n=== Ring Buffer + LZ4 HC ==="
 	./ringBufferHC$(EXT) $(TESTFILE)
+	@echo "\n=== Compress line by line ==="
 	./lineCompress$(EXT) $(TESTFILE)
+	@echo "\n=== Dictionary Random Access ==="
+	./dictionaryRandomAccess$(EXT) $(TESTFILE) $(TESTFILE) 1100 1400
+	@echo "\n=== Frame compression ==="
 	./frameCompress$(EXT) $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
 

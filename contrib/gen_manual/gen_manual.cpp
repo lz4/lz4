@@ -89,11 +89,13 @@ vector<string> get_lines(vector<string>& input, int& linenum, string terminator)
 /* print line with LZ4LIB_API removed and C++ comments not bold */
 void print_line(stringstream &sout, string line)
 {
-    size_t spos;
+    size_t spos, epos;
 
     if (line.substr(0,11) == "LZ4LIB_API ") line = line.substr(11);
+    if (line.substr(0,12) == "LZ4FLIB_API ") line = line.substr(12);
     spos = line.find("/*");
-    if (spos!=string::npos) {
+    epos = line.find("*/");
+    if (spos!=string::npos && epos!=string::npos) {
         sout << line.substr(0, spos);
         sout << "</b>" << line.substr(spos) << "<b>" << endl;
     } else {
@@ -118,7 +120,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    version = "lz4 " + string(argv[1]) + " Manual";
+    version = string(argv[1]) + " Manual";
 
     istream.open(argv[2], ifstream::in);
     if (!istream.is_open()) {
@@ -158,36 +160,28 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        /* comments of type /*= and /**= mean: use a <H3> header and show also all functions until first empty line */
-        if ((line.substr(0,3) == "/*=" || line.substr(0,4) == "/**=") && line.find("*/")!=string::npos) {
-            trim_comments(line);
-            trim(line, "= ");
-            sout << "<h3>" << line << "</h3><pre><b>";
-            lines = get_lines(input, ++linenum, "");
-            for (l=0; l<lines.size(); l++) {
-                print_line(sout, lines[l]);
-            }
-            sout << "</b></pre><BR>" << endl;
-            continue;
+        spos = line.find("/**=");
+        if (spos==string::npos) {
+            spos = line.find("/*!");
+            if (spos==string::npos)
+                spos = line.find("/**");
+            if (spos==string::npos)
+                spos = line.find("/*-");
+            if (spos==string::npos)
+                spos = line.find("/*=");
+            if (spos==string::npos)
+                continue;
+            exclam = line[spos+2];
         }
+        else exclam = '=';
 
-        spos = line.find("/*!");
-        if (spos==string::npos)
-            spos = line.find("/**");
-        if (spos==string::npos)
-            spos = line.find("/*-");
-
-        if (spos==string::npos)
-            continue;
-
-        exclam = line[spos+2];
         comments = get_lines(input, linenum, "*/");
         if (!comments.empty()) comments[0] = line.substr(spos+3);
         if (!comments.empty()) comments[comments.size()-1] = comments[comments.size()-1].substr(0, comments[comments.size()-1].find("*/"));
         for (l=0; l<comments.size(); l++) {
             if (comments[l].find(" *")==0) comments[l] = comments[l].substr(2);
             else if (comments[l].find("  *")==0) comments[l] = comments[l].substr(3);
-            trim(comments[l], "*-");
+            trim(comments[l], "*-=");
         }
         while (!comments.empty() && comments[comments.size()-1].empty()) comments.pop_back(); // remove empty line at the end
         while (!comments.empty() && comments[0].empty()) comments.erase(comments.begin()); // remove empty line at the start
@@ -208,6 +202,18 @@ int main(int argc, char *argv[]) {
                 print_line(sout, comments[l]);
             }
             sout << "</p></pre><BR>" << endl << endl;
+        } else if (exclam == '=') { /* comments of type /*= and /**= mean: use a <H3> header and show also all functions until first empty line */
+            trim(comments[0], " ");
+            sout << "<h3>" << comments[0] << "</h3><pre>";
+            for (l=1; l<comments.size(); l++) {
+                print_line(sout, comments[l]);
+            }
+            sout << "</pre><b><pre>";
+            lines = get_lines(input, ++linenum, "");
+            for (l=0; l<lines.size(); l++) {
+                print_line(sout, lines[l]);
+            }
+            sout << "</pre></b><BR>" << endl;
         } else { /* comments of type /** and /*- mean: this is a comment; use a <H2> header for the first line */
             if (comments.empty()) continue;
 

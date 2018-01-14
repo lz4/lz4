@@ -1,7 +1,47 @@
+v1.8.1
+perf : faster and stronger ultra modes (levels 10+)
+perf : slightly faster compression and decompression speed
+perf : fix bad degenerative case, reported by @c-morgenstern
+fix : decompression failed when using a combination of extDict + low memory address (#397), reported and fixed by Julian Scheid (@jscheid)
+cli : support for dictionary compression (`-D`), by Felix Handte @felixhandte
+cli : fix : `lz4 -d --rm` preserves timestamp (#441)
+cli : fix : do not modify /dev/null permission as root, by @aliceatlas
+api : `_destSize()` variant supported for all compression levels
+build  : `make` and `make test` compatible with `-jX`, reported by @mwgamera
+build  : can control LZ4LIB_VISIBILITY macro, by @mikir
+install: fix man page directory (#387), reported by Stuart Cardall (@itoffshore)
+
+v1.8.0
+cli : fix : do not modify /dev/null permissions, reported by @Maokaman1
+cli : added GNU separator -- specifying that all following arguments are files
+API : added LZ4_compress_HC_destSize(), by Oleg (@remittor)
+API : added LZ4F_resetDecompressionContext()
+API : lz4frame : negative compression levels trigger fast acceleration, request by Lawrence Chan
+API : lz4frame : can control block checksum and dictionary ID
+API : fix : expose obsolete decoding functions, reported by Chen Yufei
+API : experimental : lz4frame_static : new dictionary compression API
+build : fix : static lib installation, by Ido Rosen
+build : dragonFlyBSD, OpenBSD, NetBSD supported
+build : LZ4_MEMORY_USAGE can be modified at compile time, through external define
+doc : Updated LZ4 Frame format to v1.6.0, restoring Dictionary-ID field
+doc : lz4 api manual, by Przemyslaw Skibinski
+
+v1.7.5
+lz4hc : new high compression mode : levels 10-12 compress more and slower, by Przemyslaw Skibinski
+lz4cat : fix : works with relative path (#284) and stdin (#285) (reported by @beiDei8z)
+cli : fix minor notification when using -r recursive mode
+API : lz4frame : LZ4F_frameBound(0) gives upper bound of *flush() and *End() operations (#290, #280)
+doc : markdown version of man page, by Takayuki Matsuoka (#279)
+build : Makefile : fix make -jX lib+exe concurrency (#277)
+build : cmake : improvements by Michał Górny (#296)
+
+v1.7.4.2
+fix : Makefile : release build compatible with PIE and customized compilation directives provided through environment variables (#274, reported by Antoine Martin)
+
 v1.7.4
 Improved : much better speed in -mx32 mode
 cli : fix : Large file support in 32-bits mode on Mac OS-X
-fix : compilation on gcc 4.4 (#282), reported by Antoine Martin
+fix : compilation on gcc 4.4 (#272), reported by Antoine Martin
 
 v1.7.3
 Changed : moved to versioning; package, cli and library have same version number

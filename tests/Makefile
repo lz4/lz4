@@ -1,6 +1,8 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-2017
+#
+# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #
 # GPL v2 License
 #
@@ -28,30 +30,28 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-DESTDIR ?=
-PREFIX  ?= /usr/local
-BINDIR  := $(PREFIX)/bin
-MANDIR  := $(PREFIX)/share/man/man1
-LIBDIR  := ../lib
+LZ4DIR  := ../lib
 PRGDIR  := ../programs
-VOID    := /dev/null
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
-CFLAGS  ?= -O3   # can select custom flags. For example : CFLAGS="-O2 -g" make
-CFLAGS  += -g -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wswitch-enum \
-           -Wdeclaration-after-statement -Wstrict-prototypes \
+DEBUGFLAGS = -g -DLZ4_DEBUG=1
+CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
+CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
+           -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(MOREFLAGS)
-CPPFLAGS:= -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
+CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
+CPPFLAGS:= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
-EXT =.exe
+EXT  =.exe
+VOID = nul
 else
-EXT =
+EXT  =
+VOID = /dev/null
 endif
 LZ4     := $(PRGDIR)/lz4$(EXT)
 
@@ -64,46 +64,47 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest datagen fasttest
+all: fullbench fuzzer frametest datagen
 
 all32: CFLAGS+=-m32
 all32: all
 
 lz4:
-	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="$(CFLAGS)"
+	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
-lz4c:
-	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="$(CFLAGS)"
+lz4c unlz4 lz4cat: lz4
+	ln -sf $(LZ4) $(PRGDIR)/$@
 
 lz4c32:   # create a 32-bits version for 32/64 interop tests
-	$(MAKE) -C $(PRGDIR) clean $@ CFLAGS="-m32 $(CFLAGS)"
-	cp $(LZ4) $(LZ4)c32
+	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
 
-fullbench  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/lz4frame.o $(LIBDIR)/xxhash.o fullbench.c
+%.o : $(LZ4DIR)/%.c $(LZ4DIR)/%.h
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+
+fullbench  : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fullbench-lib: fullbench.c $(LIBDIR)/xxhash.c
-	$(MAKE) -C $(LIBDIR) liblz4.a
-	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LIBDIR)/liblz4.a
+$(LZ4DIR)/liblz4.a:
+	$(MAKE) -C $(LZ4DIR) liblz4.a
 
-fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
-	$(MAKE) -C $(LIBDIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/liblz4.dll
-
-fuzzer  : $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/xxhash.o fuzzer.c
+fullbench-lib: fullbench.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-frametest: $(LIBDIR)/lz4frame.o $(LIBDIR)/lz4.o $(LIBDIR)/lz4hc.o $(LIBDIR)/xxhash.o frametest.c
+fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
+	$(MAKE) -C $(LZ4DIR) liblz4
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/liblz4.dll
+
+fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-fasttest: $(LIBDIR)/lz4.o fasttest.c
+frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
 clean:
-	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
+	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
@@ -119,140 +120,216 @@ versionsTest:
 	$(PYTHON) test-lz4-versions.py
 
 
-#------------------------------------------------------------------------
-#make install is validated only for Linux, OSX, kFreeBSD, Hurd and
-#FreeBSD targets
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU FreeBSD))
+#-----------------------------------------------------------------------------
+# validated only for Linux, OSX, BSD, Hurd and Solaris targets
+#-----------------------------------------------------------------------------
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))
 MD5:=md5 -r
 endif
 
-test: test-lz4 test-lz4c test-fasttest test-frametest test-fullbench test-fuzzer
+DIFF:=diff
+ifneq (,$(filter $(shell uname),SunOS))
+DIFF:=gdiff
+endif
+
+DD:=dd
+
+
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer
 
 test32: CFLAGS+=-m32
 test32: test
 
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
-	./datagen -g5M  -P100 > tmpSrc
-	$(LZ4) -B4D tmpSrc | $(LZ4) -dv --sparse > tmpB4
-	diff -s tmpSrc tmpB4
-	$(LZ4) -B5D tmpSrc | $(LZ4) -dv --sparse > tmpB5
-	diff -s tmpSrc tmpB5
-	$(LZ4) -B6D tmpSrc | $(LZ4) -dv --sparse > tmpB6
-	diff -s tmpSrc tmpB6
-	$(LZ4) -B7D tmpSrc | $(LZ4) -dv --sparse > tmpB7
-	diff -s tmpSrc tmpB7
-	$(LZ4) tmpSrc | $(LZ4) -dv --no-sparse > tmpNoSparse
-	diff -s tmpSrc tmpNoSparse
-	ls -ls tmp*
-	./datagen -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > tmpOdd   # Odd size file (to generate non-full last block)
-	./datagen -s1 -g1200007 -P100 | diff -s - tmpOdd
-	ls -ls tmpOdd
-	@$(RM) tmp*
+	./datagen -g5M  -P100 > tmplsdg5M
+	$(LZ4) -B4D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB4
+	$(DIFF) -s tmplsdg5M tmplscB4
+	$(LZ4) -B5D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB5
+	$(DIFF) -s tmplsdg5M tmplscB5
+	$(LZ4) -B6D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB6
+	$(DIFF) -s tmplsdg5M tmplscB6
+	$(LZ4) -B7D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB7
+	$(DIFF) -s tmplsdg5M tmplscB7
+	$(LZ4) tmplsdg5M | $(LZ4) -dv --no-sparse > tmplsnosparse
+	$(DIFF) -s tmplsdg5M tmplsnosparse
+	ls -ls tmpls*
+	./datagen -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > tmplsodd   # Odd size file (to generate non-full last block)
+	./datagen -s1 -g1200007 -P100 | $(DIFF) -s - tmplsodd
+	ls -ls tmplsodd
+	@$(RM) tmpls*
 	@echo "\n Compatibility with Console :"
 	echo "Hello World 1 !" | $(LZ4) | $(LZ4) -d -c
 	echo "Hello World 2 !" | $(LZ4) | $(LZ4) -d | cat
 	echo "Hello World 3 !" | $(LZ4) --no-frame-crc | $(LZ4) -d -c
 	@echo "\n Compatibility with Append :"
-	./datagen -P100 -g1M > tmp1M
-	cat tmp1M tmp1M > tmp2M
-	$(LZ4) -B5 -v tmp1M tmpC
-	$(LZ4) -d -v tmpC tmpR
-	$(LZ4) -d -v tmpC >> tmpR
+	./datagen -P100 -g1M > tmplsdg1M
+	cat tmplsdg1M tmplsdg1M > tmpls2M
+	$(LZ4) -B5 -v tmplsdg1M tmplsc
+	$(LZ4) -d -v tmplsc tmplsr
+	$(LZ4) -d -v tmplsc >> tmplsr
 	ls -ls tmp*
-	diff tmp2M tmpR
-	@$(RM) tmp*
+	$(DIFF) tmpls2M tmplsr
+	@$(RM) tmpls*
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
-	./datagen -g15M > tmp
-	$(LZ4) -v tmp | $(LZ4) -t
-	$(LZ4) -v --content-size tmp | $(LZ4) -d > tmp2
-	diff -s tmp tmp2
+	./datagen -g15M > tmplc1
+	$(LZ4) -v tmplc1 | $(LZ4) -t
+	$(LZ4) -v --content-size tmplc1 | $(LZ4) -d > tmplc2
+	$(DIFF) -s tmplc1 tmplc2
 	# test large size [2-4] GB
-	@./datagen -g3G -P100 | $(LZ4) --verbose | $(LZ4) --decompress --force --sparse - tmp
-	@ls -ls tmp
-	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmp2
-	@ls -ls tmp2
-	diff -s tmp tmp2
-	@$(RM) tmp*
+	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmplc1
+	@ls -ls tmplc1
+	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmplc2
+	@ls -ls tmplc2
+	$(DIFF) -s tmplc1 tmplc2
+	@$(RM) tmplc*
 
 test-lz4-frame-concatenation: lz4 datagen
 	@echo "\n ---- test frame concatenation ----"
-	@echo -n > empty.test
-	@echo hi > nonempty.test
-	cat nonempty.test empty.test nonempty.test > orig.test
-	@$(LZ4) -zq empty.test > empty.lz4.test
-	@$(LZ4) -zq nonempty.test > nonempty.lz4.test
-	cat nonempty.lz4.test empty.lz4.test nonempty.lz4.test > concat.lz4.test
-	$(LZ4) -d concat.lz4.test > result.test
-	sdiff orig.test result.test
-	@$(RM) *.test
+	@echo -n > tmp-lfc-empty
+	@echo hi > tmp-lfc-nonempty
+	cat tmp-lfc-nonempty tmp-lfc-empty tmp-lfc-nonempty > tmp-lfc-src
+	@$(LZ4) -zq tmp-lfc-empty > tmp-lfc-empty.lz4
+	@$(LZ4) -zq tmp-lfc-nonempty > tmp-lfc-nonempty.lz4
+	cat tmp-lfc-nonempty.lz4 tmp-lfc-empty.lz4 tmp-lfc-nonempty.lz4 > tmp-lfc-concat.lz4
+	$(LZ4) -d tmp-lfc-concat.lz4 > tmp-lfc-result
+	sdiff tmp-lfc-src tmp-lfc-result
+	@$(RM) tmp-lfc-*
 	@echo frame concatenation test completed
 
 test-lz4-multiple: lz4 datagen
 	@echo "\n ---- test multiple files ----"
-	@./datagen -s1        > tmp1 2> $(VOID)
-	@./datagen -s2 -g100K > tmp2 2> $(VOID)
-	@./datagen -s3 -g1M   > tmp3 2> $(VOID)
-	$(LZ4) -f -m tmp*
-	ls -ls tmp*
-	@$(RM) tmp1 tmp2 tmp3
-	$(LZ4) -df -m *.lz4
-	ls -ls tmp*
-	$(LZ4) -f -m tmp1 notHere tmp2; echo $$?
-	@$(RM) tmp*
+	@./datagen -s1        > tmp-tlm1 2> $(VOID)
+	@./datagen -s2 -g100K > tmp-tlm2 2> $(VOID)
+	@./datagen -s3 -g1M   > tmp-tlm3 2> $(VOID)
+	$(LZ4) -f -m tmp-tlm*
+	ls -ls tmp-tlm*
+	@$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
+	$(LZ4) -df -m tmp-tlm*.lz4
+	ls -ls tmp-tlm*
+	$(LZ4) -f -m tmp-tlm1 notHere tmp-tlm2; echo $$?
+	@$(RM) tmp-tlm*
 
-test-lz4-basic: lz4 datagen
+test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
-	./datagen -g0     | $(LZ4) -v     | $(LZ4) -t
-	./datagen -g16KB  | $(LZ4) -9     | $(LZ4) -t
-	./datagen -g20KB > tmpSrc
-	$(LZ4) < tmpSrc | $(LZ4) -d > tmpRes
-	diff -q tmpSrc tmpRes
-	$(LZ4) --no-frame-crc < tmpSrc | $(LZ4) -d > tmpRes
-	diff -q tmpSrc tmpRes
-	./datagen         | $(LZ4)        | $(LZ4) -t
-	./datagen -g6M -P99 | $(LZ4) -9BD | $(LZ4) -t
-	./datagen -g17M   | $(LZ4) -9v    | $(LZ4) -qt
-	./datagen -g33M   | $(LZ4) --no-frame-crc | $(LZ4) -t
-	./datagen -g256MB | $(LZ4) -vqB4D | $(LZ4) -t
-	@$(RM) tmp*
+	./datagen -g0       | $(LZ4) -v     | $(LZ4) -t
+	./datagen -g16KB    | $(LZ4) -9     | $(LZ4) -t
+	./datagen -g20KB > tmp-tlb-dg20k
+	$(LZ4) < tmp-tlb-dg20k | $(LZ4) -d > tmp-tlb-dec
+	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
+	$(LZ4) --no-frame-crc < tmp-tlb-dg20k | $(LZ4) -d > tmp-tlb-dec
+	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
+	./datagen           | $(LZ4)        | $(LZ4) -t
+	./datagen -g6M -P99 | $(LZ4) -9BD   | $(LZ4) -t
+	./datagen -g17M     | $(LZ4) -9v    | $(LZ4) -qt
+	./datagen -g33M     | $(LZ4) --no-frame-crc | $(LZ4) -t
+	./datagen -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t
+	@echo "hello world" > tmp-tlb-hw
+	$(LZ4) --rm -f tmp-tlb-hw tmp-tlb-hw.lz4
+	test ! -f tmp-tlb-hw                      # must fail (--rm)
+	test   -f tmp-tlb-hw.lz4
+	$(PRGDIR)/lz4cat tmp-tlb-hw.lz4           # must display hello world
+	test   -f tmp-tlb-hw.lz4
+	$(PRGDIR)/unlz4 --rm tmp-tlb-hw.lz4 tmp-tlb-hw
+	test   -f tmp-tlb-hw
+	test ! -f tmp-tlb-hw.lz4                  # must fail (--rm)
+	test ! -f tmp-tlb-hw.lz4.lz4              # must fail (unlz4)
+	$(PRGDIR)/lz4cat tmp-tlb-hw               # pass-through mode
+	test   -f tmp-tlb-hw
+	test ! -f tmp-tlb-hw.lz4                  # must fail (lz4cat)
+	$(LZ4) tmp-tlb-hw tmp-tlb-hw.lz4          # creates tmp-tlb-hw.lz4
+	$(PRGDIR)/lz4cat < tmp-tlb-hw.lz4 > tmp-tlb3  # checks lz4cat works with stdin (#285)
+	$(DIFF) -q tmp-tlb-hw tmp-tlb3
+	$(PRGDIR)/lz4cat < tmp-tlb-hw > tmp-tlb2      # checks lz4cat works in pass-through mode
+	$(DIFF) -q tmp-tlb-hw tmp-tlb2
+	cp tmp-tlb-hw ./-d
+	$(LZ4) --rm -- -d -d.lz4               # compresses ./d into ./-d.lz4
+	test   -f ./-d.lz4
+	test ! -f ./-d
+	mv ./-d.lz4 ./-z
+	$(LZ4) -d --rm -- -z tmp-tlb4          # uncompresses ./-z into tmp-tlb4
+	test ! -f ./-z
+	$(DIFF) -q tmp-tlb-hw tmp-tlb4
+	$(LZ4) -f tmp-tlb-hw
+	cat tmp-tlb-hw >> tmp-tlb-hw.lz4
+	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
+	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
+	@$(RM) tmp-tlb*
+
+test-lz4-dict: lz4 datagen
+	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
+	./datagen -g16KB > tmp-dict
+	./datagen -g32KB > tmp-dict-sample-32k
+	< tmp-dict-sample-32k $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-32k
+	./datagen -g128MB > tmp-dict-sample-128m
+	< tmp-dict-sample-128m $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-128m
+	touch tmp-dict-sample-0
+	< tmp-dict-sample-0 $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-0
+
+	< tmp-dict-sample-32k $(LZ4) -D tmp-dict-sample-0 | $(LZ4) -dD tmp-dict-sample-0 | diff - tmp-dict-sample-32k
+	< tmp-dict-sample-0 $(LZ4) -D tmp-dict-sample-0 | $(LZ4) -dD tmp-dict-sample-0 | diff - tmp-dict-sample-0
+
+	@echo "\n ---- test lz4 dictionary loading ----"
+	./datagen -g128KB > tmp-dict-data-128KB
+	set -e; \
+	for l in 0 1 4 128 32767 32768 32769 65535 65536 65537 98303 98304 98305 131071 131072 131073; do \
+		./datagen -g$$l > tmp-dict-$$l; \
+		$(DD) if=tmp-dict-$$l of=tmp-dict-$$l-tail bs=1 count=65536 skip=$$((l > 65536 ? l - 65536 : 0)); \
+		< tmp-dict-$$l      $(LZ4) -D stdin tmp-dict-data-128KB | $(LZ4) -dD tmp-dict-$$l-tail | $(DIFF) - tmp-dict-data-128KB; \
+		< tmp-dict-$$l-tail $(LZ4) -D stdin tmp-dict-data-128KB | $(LZ4) -dD tmp-dict-$$l      | $(DIFF) - tmp-dict-data-128KB; \
+	done
+
+	@$(RM) tmp-dict*
 
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
 	./datagen -g6GB   | $(LZ4) -v5BD  | $(LZ4) -qt
-	@$(RM) tmp*
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
 	$(LZ4) -bi1
 	@echo "\n ---- test mode ----"
-	./datagen | $(LZ4) -t             && false || true
-	./datagen | $(LZ4) -tf            && false || true
+	! ./datagen | $(LZ4) -t
+	! ./datagen | $(LZ4) -tf
 	@echo "\n ---- pass-through mode ----"
-	./datagen | $(LZ4) -d  > $(VOID)  && false || true
+	! ./datagen | $(LZ4) -d  > $(VOID)
 	./datagen | $(LZ4) -df > $(VOID)
-	@echo "Hello World !" > tmp1
-	$(LZ4) -dcf tmp1
-	@echo "from underground..." > tmp2
-	$(LZ4) -dcfm tmp1 tmp2
-	@echo "\n ---- test cli ----"
-	$(LZ4)     file-does-not-exist    && false || true
-	$(LZ4) -f  file-does-not-exist    && false || true
-	$(LZ4) -fm file1-dne file2-dne    && false || true
-	$(LZ4) -fm file1-dne file2-dne    && false || true
+	@echo "Hello World !" > tmp-tlt1
+	$(LZ4) -dcf tmp-tlt1
+	@echo "from underground..." > tmp-tlt2
+	$(LZ4) -dcfm tmp-tlt1 tmp-tlt2
+	@echo "\n ---- non-existing source ----"
+	! $(LZ4)     file-does-not-exist
+	! $(LZ4) -f  file-does-not-exist
+	! $(LZ4) -fm file1-dne file2-dne
+	@$(RM) tmp-tlt
 
-test-lz4: lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-sparse \
-          test-lz4-frame-concatenation test-lz4-testmode test-lz4-contentSize \
-          test-lz4-hugefile
+test-lz4-opt-parser: lz4 datagen
+	@echo "\n ---- test opt-parser ----"
+	./datagen -g16KB      | $(LZ4) -12      | $(LZ4) -t
+	./datagen -P10        | $(LZ4) -12B4    | $(LZ4) -t
+	./datagen -g256K      | $(LZ4) -12B4D   | $(LZ4) -t
+	./datagen -g512K -P25 | $(LZ4) -12BD    | $(LZ4) -t
+	./datagen -g1M        | $(LZ4) -12B5    | $(LZ4) -t
+	./datagen -g2M -P99   | $(LZ4) -11B4D   | $(LZ4) -t
+	./datagen -g4M        | $(LZ4) -11vq    | $(LZ4) -qt
+	./datagen -g8M        | $(LZ4) -11B4    | $(LZ4) -t
+	./datagen -g16M -P90  | $(LZ4) -11B5    | $(LZ4) -t
+	./datagen -g32M -P10  | $(LZ4) -11B5D   | $(LZ4) -t
+
+test-lz4: lz4 datagen test-lz4-basic test-lz4-opt-parser test-lz4-multiple \
+          test-lz4-sparse test-lz4-frame-concatenation test-lz4-testmode \
+          test-lz4-contentSize test-lz4-hugefile test-lz4-dict
+	@$(RM) tmp*
 
 test-lz4c: lz4c datagen
-	@echo "\n ---- test lz4c version ----"
+	@echo "\n ---- test lz4c variant ----"
 	./datagen -g256MB | $(LZ4)c -l -v    | $(LZ4)c   -t
 
 test-lz4c32: CFLAGS+=-m32
@@ -302,25 +379,22 @@ test-frametest: frametest
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
 
-test-fasttest: fasttest
-	./fasttest
-
 test-mem: lz4 datagen fuzzer frametest fullbench
 	@echo "\n ---- valgrind tests : memory analyzer ----"
 	valgrind --leak-check=yes --error-exitcode=1 ./datagen -g50M > $(VOID)
-	./datagen -g16KB > tmp
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -BD -f tmp $(VOID)
-	./datagen -g16KB -s2 > tmp2
-	./datagen -g16KB -s3 > tmp3
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --force --multiple tmp tmp2 tmp3
-	./datagen -g16MB > tmp
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f tmp tmp2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -t tmp2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 tmp
-	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 tmp tmp2
-	./datagen -g256MB > tmp
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq tmp $(VOID)
-	$(RM) tmp*
+	./datagen -g16KB > ftmdg16K
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -BD -f ftmdg16K $(VOID)
+	./datagen -g16KB -s2 > ftmdg16K2
+	./datagen -g16KB -s3 > ftmdg16K3
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --force --multiple ftmdg16K ftmdg16K2 ftmdg16K3
+	./datagen -g16MB > ftmdg16M
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f ftmdg16M ftmdg16K2
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -t ftmdg16K2
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg16M
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg16M ftmdg16K2
+	./datagen -g256MB > ftmdg256M
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg256M $(VOID)
+	$(RM) ftm*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
 
