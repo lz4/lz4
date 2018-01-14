@@ -70,6 +70,14 @@ You can contact the author at :
 /*-************************************
 *  Debug
 **************************************/
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
+#  include <assert.h>
+#else
+#  ifndef assert
+#    define assert(condition) ((void)0)
+#  endif
+#endif
+
 #define LZ4F_STATIC_ASSERT(c)    { enum { LZ4F_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
@@ -281,7 +289,7 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
         size_t const bufferedSize = MIN(alreadyBuffered, maxBuffered);
         size_t const maxSrcSize = srcSize + bufferedSize;
         unsigned const nbFullBlocks = (unsigned)(maxSrcSize / blockSize);
-        size_t const partialBlockSize = (srcSize - (srcSize==0)) & (blockSize-1);   /* 0 => -1 == MAX => blockSize-1 */
+        size_t const partialBlockSize = maxSrcSize & (blockSize-1);
         size_t const lastBlockSize = flush ? partialBlockSize : 0;
         unsigned const nbBlocks = nbFullBlocks + (lastBlockSize>0);
 
@@ -604,10 +612,10 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr,
 }
 
 
-/* LZ4F_compressBound() :
- *      @ return size of Dst buffer given a srcSize to handle worst case situations.
- *      The LZ4F_frameInfo_t structure is optional : if NULL, preferences will be set to cover worst case situations.
- *      This function cannot fail.
+/*  LZ4F_compressBound() :
+ * @return minimum capacity of dstBuffer for a given srcSize to handle worst case scenario.
+ *  LZ4F_preferences_t structure is optional : if NULL, preferences will be set to cover worst case scenario.
+ *  This function cannot fail.
  */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
@@ -1439,6 +1447,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
         case dstage_decodeCBlock:
             if (dctx->frameInfo.blockChecksumFlag) {
                 dctx->tmpInTarget -= 4;
+                assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
                 {   U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
                     U32 const calcBlockCrc = XXH32(selectedIn, dctx->tmpInTarget, 0);
                     if (readBlockCrc != calcBlockCrc)
