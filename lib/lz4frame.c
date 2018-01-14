@@ -70,6 +70,14 @@ You can contact the author at :
 /*-************************************
 *  Debug
 **************************************/
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
+#  include <assert.h>
+#else
+#  ifndef assert
+#    define assert(condition) ((void)0)
+#  endif
+#endif
+
 #define LZ4F_STATIC_ASSERT(c)    { enum { LZ4F_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
@@ -1439,6 +1447,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
         case dstage_decodeCBlock:
             if (dctx->frameInfo.blockChecksumFlag) {
                 dctx->tmpInTarget -= 4;
+                assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
                 {   U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
                     U32 const calcBlockCrc = XXH32(selectedIn, dctx->tmpInTarget, 0);
                     if (readBlockCrc != calcBlockCrc)
