@@ -895,8 +895,7 @@ typedef enum {
     dstage_getBlockHeader, dstage_storeBlockHeader,
     dstage_copyDirect, dstage_getBlockChecksum,
     dstage_getCBlock, dstage_storeCBlock,
-    dstage_decodeCBlock, dstage_decodeCBlock_intoDst,
-    dstage_decodeCBlock_intoTmp, dstage_flushOut,
+    dstage_flushOut,
     dstage_getSuffix, dstage_storeSuffix,
     dstage_getSFrameSize, dstage_storeSFrameSize,
     dstage_skipSkippable
@@ -1423,9 +1422,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             /* input large enough to read full block directly */
             selectedIn = srcPtr;
             srcPtr += dctx->tmpInTarget;
-            dctx->dStage = dstage_decodeCBlock;
-            break;
 
+            if (0)  /* jump over next block */
         case dstage_storeCBlock:
             {   size_t const wantedData = dctx->tmpInTarget - dctx->tmpInSize;
                 size_t const inputLeft = (size_t)(srcEnd-srcPtr);
@@ -1439,12 +1437,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     break;
                 }
                 selectedIn = dctx->tmpIn;
-                dctx->dStage = dstage_decodeCBlock;
             }
-            /* fall-through */
 
-        /* At this stage, input is large enough to decode a block */
-        case dstage_decodeCBlock:
+            /* At this stage, input is large enough to decode a block */
             if (dctx->frameInfo.blockChecksumFlag) {
                 dctx->tmpInTarget -= 4;
                 assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
@@ -1453,14 +1448,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     if (readBlockCrc != calcBlockCrc)
                         return err0r(LZ4F_ERROR_blockChecksum_invalid);
             }   }
-            if ((size_t)(dstEnd-dstPtr) < dctx->maxBlockSize)   /* not enough place into dst : decode into tmpOut */
-                dctx->dStage = dstage_decodeCBlock_intoTmp;
-            else
-                dctx->dStage = dstage_decodeCBlock_intoDst;
-            break;
 
-        case dstage_decodeCBlock_intoDst:
-            {   int const decodedSize = LZ4_decompress_safe_usingDict(
+            if ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize) {
+                /* enough capacity in `dst` to decompress directly there */
+                int const decodedSize = LZ4_decompress_safe_usingDict(
                         (const char*)selectedIn, (char*)dstPtr,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
                         (const char*)dctx->dict, (int)dctx->dictSize);
@@ -1479,7 +1470,6 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 break;
             }
 
-        case dstage_decodeCBlock_intoTmp:
             /* not enough place into dst : decode into tmpOut */
             /* ensure enough place for tmpOut */
             if (dctx->frameInfo.blockMode == LZ4F_blockLinked) {
