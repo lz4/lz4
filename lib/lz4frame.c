@@ -281,7 +281,7 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
         size_t const bufferedSize = MIN(alreadyBuffered, maxBuffered);
         size_t const maxSrcSize = srcSize + bufferedSize;
         unsigned const nbFullBlocks = (unsigned)(maxSrcSize / blockSize);
-        size_t const partialBlockSize = (srcSize - (srcSize==0)) & (blockSize-1);   /* 0 => -1 == MAX => blockSize-1 */
+        size_t const partialBlockSize = maxSrcSize & (blockSize-1);
         size_t const lastBlockSize = flush ? partialBlockSize : 0;
         unsigned const nbBlocks = nbFullBlocks + (lastBlockSize>0);
 
@@ -604,10 +604,10 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr,
 }
 
 
-/* LZ4F_compressBound() :
- *      @ return size of Dst buffer given a srcSize to handle worst case situations.
- *      The LZ4F_frameInfo_t structure is optional : if NULL, preferences will be set to cover worst case situations.
- *      This function cannot fail.
+/*  LZ4F_compressBound() :
+ * @return minimum capacity of dstBuffer for a given srcSize to handle worst case scenario.
+ *  LZ4F_preferences_t structure is optional : if NULL, preferences will be set to cover worst case scenario.
+ *  This function cannot fail.
  */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
