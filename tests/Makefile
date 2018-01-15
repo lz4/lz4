@@ -111,13 +111,16 @@ clean:
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
-        fasttest$(EXT) datagen$(EXT)
+        fasttest$(EXT) datagen$(EXT) checkTag$(EXT)
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
 versionsTest:
 	$(PYTHON) test-lz4-versions.py
+
+checkTag: checkTag.c $(LZ4DIR)/lz4.h
+	$(CC) $(FLAGS) $< -o $@$(EXT)
 
 
 #-----------------------------------------------------------------------------

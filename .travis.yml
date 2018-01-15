@@ -145,7 +145,15 @@ matrix:
             - gcc-multilib
             - gcc-4.4
 
+    # tag-specific test
+    - if: tag =~ ^v[0-9]\.[0-9]
+      os: linux
+      sudo: false
+      env: Cmd="make -C tests checkTag && tests/checkTag $TRAVIS_BRANCH " COMPILER=cc
+
+
 script:
+  - uname -a
   - echo Cmd=$Cmd
   - $COMPILER -v
   - sh -c "$Cmd"
