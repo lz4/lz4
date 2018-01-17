@@ -264,8 +264,8 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  *  If dstCapacity >= LZ4_compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
  *
  *  Important : Up to 64KB of previously compressed data is assumed to remain present and unmodified in memory !
- *  Special 1 : If input buffer is a double-buffer, it can have any size, including < 64 KB.
- *  Special 2 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
+ *  Special 1 : If input buffer is a double-buffer, it can have any size, including < 64 KB.
+ *  Special 2 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
  *
  * @return : size of compressed block
  *           or 0 if there is an error (typically, compressed data cannot fit into 'dst')
