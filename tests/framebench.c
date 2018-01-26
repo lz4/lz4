@@ -30,6 +30,7 @@ typedef struct {
 
 size_t compress_frame(bench_params_t *p) {
   size_t iter = p->iter;
+  LZ4F_cctx *cctx = p->cctx;
   char *obuf = p->obuf;
   size_t osize = p->osize;
   const char* ibuf = p->ibuf;
@@ -43,6 +44,7 @@ size_t compress_frame(bench_params_t *p) {
   prefs->frameInfo.contentSize = isize;
 
   oused = LZ4F_compressFrame_usingCDict(
+    cctx,
     obuf,
     osize,
     ibuf + ((iter * 2654435761U) % num_ibuf) * isize,

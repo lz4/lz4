@@ -47,6 +47,19 @@ You can contact the author at :
 
 
 /*-************************************
+*  Tuning parameters
+**************************************/
+/*
+ * LZ4_HEAPMODE :
+ * Select how default compression functions will allocate memory for their hash table,
+ * in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
+ */
+#ifndef LZ4_HEAPMODE
+#  define LZ4_HEAPMODE 0
+#endif
+
+
+/*-************************************
 *  Memory routines
 **************************************/
 #include <stdlib.h>   /* malloc, calloc, free */
@@ -332,22 +345,17 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
  * @return : number of bytes written into dstBuffer,
  *           or an error code if it fails (can be tested using LZ4F_isError())
  */
-size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
+size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
+                                     void* dstBuffer, size_t dstCapacity,
                                const void* srcBuffer, size_t srcSize,
                                const LZ4F_CDict* cdict,
                                const LZ4F_preferences_t* preferencesPtr)
 {
-    LZ4F_cctx_t cctxI;
-    LZ4_stream_t lz4ctx;   /* pretty large on stack */
     LZ4F_preferences_t prefs;
     LZ4F_compressOptions_t options;
     BYTE* const dstStart = (BYTE*) dstBuffer;
     BYTE* dstPtr = dstStart;
     BYTE* const dstEnd = dstStart + dstCapacity;
-
-    memset(&cctxI, 0, sizeof(cctxI));
-    cctxI.version = LZ4F_VERSION;
-    cctxI.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
 
     if (preferencesPtr!=NULL)
         prefs = *preferencesPtr;
@@ -361,32 +369,23 @@ size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
     if (srcSize <= LZ4F_getBlockSize(prefs.frameInfo.blockSizeID))
         prefs.frameInfo.blockMode = LZ4F_blockIndependent;   /* only one block => no need for inter-block link */
 
-    if (prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
-        LZ4_resetStream(&lz4ctx);
-        cctxI.lz4CtxPtr = &lz4ctx;
-        cctxI.lz4CtxLevel = 2;
-    }  /* fast compression context pre-created on stack */
-
     memset(&options, 0, sizeof(options));
     options.stableSrc = 1;
 
     if (dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs))  /* condition to guarantee success */
         return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
 
-    { size_t const headerSize = LZ4F_compressBegin_usingCDict(&cctxI, dstBuffer, dstCapacity, cdict, &prefs);  /* write header */
+    { size_t const headerSize = LZ4F_compressBegin_usingCDict(cctx, dstBuffer, dstCapacity, cdict, &prefs);  /* write header */
       if (LZ4F_isError(headerSize)) return headerSize;
       dstPtr += headerSize;   /* header size */ }
 
-    { size_t const cSize = LZ4F_compressUpdate(&cctxI, dstPtr, dstEnd-dstPtr, srcBuffer, srcSize, &options);
+    { size_t const cSize = LZ4F_compressUpdate(cctx, dstPtr, dstEnd-dstPtr, srcBuffer, srcSize, &options);
       if (LZ4F_isError(cSize)) return cSize;
       dstPtr += cSize; }
 
-    { size_t const tailSize = LZ4F_compressEnd(&cctxI, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
+    { size_t const tailSize = LZ4F_compressEnd(cctx, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
       if (LZ4F_isError(tailSize)) return tailSize;
       dstPtr += tailSize; }
-
-    if (prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)  /* Ctx allocation only for lz4hc */
-        FREEMEM(cctxI.lz4CtxPtr);
 
     return (dstPtr - dstStart);
 }
@@ -403,9 +402,41 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
                     const void* srcBuffer, size_t srcSize,
                     const LZ4F_preferences_t* preferencesPtr)
 {
-    return LZ4F_compressFrame_usingCDict(dstBuffer, dstCapacity,
-                                         srcBuffer, srcSize,
-                                         NULL, preferencesPtr);
+    size_t result;
+#if (LZ4_HEAPMODE)
+    LZ4F_cctx_t *cctxPtr;
+    LZ4F_createCompressionContext(&cctxPtr, LZ4F_VERSION);
+#else
+    LZ4F_cctx_t cctx;
+    LZ4_stream_t lz4ctx;
+    LZ4F_cctx_t *cctxPtr = &cctx;
+
+    MEM_INIT(&cctx, 0, sizeof(cctx));
+    cctx.version = LZ4F_VERSION;
+    cctx.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
+    if (preferencesPtr == NULL ||
+        preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN
+    ) {
+        LZ4_resetStream(&lz4ctx);
+        cctxPtr->lz4CtxPtr = &lz4ctx;
+        cctxPtr->lz4CtxLevel = 2;
+    }
+#endif
+
+    result = LZ4F_compressFrame_usingCDict(cctxPtr, dstBuffer, dstCapacity,
+                                           srcBuffer, srcSize,
+                                           NULL, preferencesPtr);
+
+#if (LZ4_HEAPMODE)
+    LZ4F_freeCompressionContext(cctxPtr);
+#else
+    if (preferencesPtr != NULL &&
+        preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN
+    ) {
+        FREEMEM(cctxPtr->lz4CtxPtr);
+    }
+#endif
+    return result;
 }
 
 
