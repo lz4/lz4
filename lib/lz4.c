@@ -1205,20 +1205,25 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
     /* external dictionary mode */
     {   int result;
-        if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
-            if (streamPtr->dictCtx) {
-                LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDictCtx);
+        if (streamPtr->dictCtx && inputSize < 2 KB) {
+            LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDictCtx);
+            if ((streamPtr->dictCtx->dictSize < 64 KB) && (streamPtr->dictCtx->dictSize < streamPtr->currentOffset)) {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, dictSmall, acceleration);
             } else {
-                LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDict);
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, noDictIssue, acceleration);
             }
         } else {
             if (streamPtr->dictCtx) {
-                LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDictCtx);
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, noDictIssue, acceleration);
+              /* For compressing large blobs, it is faster to pay the setup
+               * cost to copy the dictionary's tables into the active context,
+               * so that the compression loop is only looking in one table.
+               */
+              memcpy(streamPtr, streamPtr->dictCtx, sizeof(LZ4_stream_t));
+            }
+            LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDict);
+            if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
             } else {
-                LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDict);
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, noDictIssue, acceleration);
             }
         }
