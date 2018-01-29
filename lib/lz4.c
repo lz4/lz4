@@ -523,6 +523,29 @@ LZ4_FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p, const void* tableBas
 }
 
 
+LZ4_FORCE_INLINE void LZ4_resetTable(
+        LZ4_stream_t_internal* const cctx,
+        const int inputSize,
+        const tableType_t tableType) {
+  /* If the table hasn't been used, it's guaranteed to be zeroed out, and is
+   * therefore safe to use no matter what mode we're in. Otherwise, we figure
+   * out if it's safe to leave as is or whether it needs to be reset.
+   */
+  if (cctx->tableType != unusedTable && (
+      cctx->tableType != tableType ||
+      (tableType == byU16 &&
+       cctx->currentOffset + inputSize >= 0xFFFFU) ||
+      (tableType == byU32 &&
+       cctx->currentOffset > 1 GB) ||
+      tableType == byPtr))
+  {
+      DEBUGLOG(4, "Resetting table in %p", cctx);
+      MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
+      cctx->currentOffset = 1;
+      cctx->tableType = unusedTable;
+  }
+}
+
 /** LZ4_compress_generic() :
     inlined, to ensure branches are decided at compilation time */
 LZ4_FORCE_INLINE int LZ4_compress_generic(
@@ -539,18 +562,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 {
     const BYTE* ip = (const BYTE*) source;
 
-    /* If the table hasn't been used, it's guaranteed to be zeroed out, and is
-     * therefore safe to use no matter what mode we're in. Otherwise, we figure
-     * out if it's safe to leave as is or whether it needs to be reset.
-     */
-    const int resetTable = cctx->tableType != unusedTable && (
-                           cctx->tableType != tableType ||
-                            (tableType == byU16 &&
-                             cctx->currentOffset + inputSize >= 0xFFFFU) ||
-                           tableType == byPtr);
-
-    size_t currentOffset = ((tableType == byU32 || tableType == byU16) &&
-                            !resetTable) ? cctx->currentOffset : 1;
+    size_t currentOffset = cctx->currentOffset;
     const BYTE* base = (const BYTE*) source - currentOffset;
     const BYTE* lowLimit;
 
@@ -603,12 +615,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         break;
     }
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
-
-    if (resetTable) {
-      DEBUGLOG(4, "Resetting table in %p", cctx);
-      MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
-      cctx->currentOffset = 1;
-    }
 
     if (inputSize<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
@@ -819,15 +825,25 @@ int LZ4_compress_fast_safeExtState(void* state, const char* source, char* dest, 
     ctx->dictCtx = NULL;
 
     if (maxOutputSize >= LZ4_compressBound(inputSize)) {
-        if (inputSize < LZ4_64Klimit)
-            return LZ4_compress_generic(ctx, source, dest, inputSize,             0,    notLimited,                        byU16, noDict, noDictIssue, acceleration);
-        else
-            return LZ4_compress_generic(ctx, source, dest, inputSize,             0,    notLimited, (sizeof(void*)==8) ? byU32 : byPtr, noDict, noDictIssue, acceleration);
+        if (inputSize < LZ4_64Klimit) {
+            const tableType_t tableType = byU16;
+            LZ4_resetTable(ctx, inputSize, tableType);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
+        } else {
+            const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
+            LZ4_resetTable(ctx, inputSize, tableType);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
+        }
     } else {
-        if (inputSize < LZ4_64Klimit)
-            return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput,                        byU16, noDict, noDictIssue, acceleration);
-        else
-            return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, (sizeof(void*)==8) ? byU32 : byPtr, noDict, noDictIssue, acceleration);
+        if (inputSize < LZ4_64Klimit) {
+            const tableType_t tableType = byU16;
+            LZ4_resetTable(ctx, inputSize, tableType);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
+        } else {
+            const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
+            LZ4_resetTable(ctx, inputSize, tableType);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
+        }
     }
 }
 
@@ -842,7 +858,8 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     LZ4_stream_t ctx;
     LZ4_stream_t* const ctxPtr = &ctx;
 #endif
-    LZ4_resetStream(ctxPtr);
+    ctxPtr->internal_donotuse.initCheck = 0;
+    ctxPtr->internal_donotuse.tableType = byPtr; /* always triggers a reset */
     result = LZ4_compress_fast_safeExtState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
 #if (LZ4_HEAPMODE)
@@ -1154,6 +1171,7 @@ static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, const BYTE* src)
 
 int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
+    const tableType_t tableType = byU32;
     LZ4_stream_t_internal* streamPtr = &LZ4_stream->internal_donotuse;
     const BYTE* const dictEnd = streamPtr->dictionary + streamPtr->dictSize;
 
@@ -1173,27 +1191,29 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
         }
     }
 
+    LZ4_resetTable(streamPtr, inputSize, tableType);
+
     /* prefix mode : source data follows dictionary */
     if (dictEnd == (const BYTE*)source) {
         if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset))
-            return LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, withPrefix64k, dictSmall, acceleration);
+            return LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, withPrefix64k, dictSmall, acceleration);
         else
-            return LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, withPrefix64k, noDictIssue, acceleration);
+            return LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, withPrefix64k, noDictIssue, acceleration);
     }
 
     /* external dictionary mode */
     {   int result;
         if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
             if (streamPtr->dictCtx) {
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, usingExtDictCtx, dictSmall, acceleration);
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, dictSmall, acceleration);
             } else {
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, usingExtDict, dictSmall, acceleration);
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
             }
         } else {
             if (streamPtr->dictCtx) {
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, usingExtDictCtx, noDictIssue, acceleration);
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, noDictIssue, acceleration);
             } else {
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, byU32, usingExtDict, noDictIssue, acceleration);
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, noDictIssue, acceleration);
             }
         }
         streamPtr->dictionary = (const BYTE*)source;
