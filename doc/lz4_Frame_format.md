@@ -75,6 +75,10 @@ __Frame Descriptor__
 3 to 15 Bytes, to be detailed in the next part.
 Most important part of the spec.
 
+__Frame Header__
+
+7 to 15 Bytes, is the concatenation of the magic number and the frame descriptor.
+
 __Data Blocks__
 
 To be detailed later on.
@@ -114,6 +118,9 @@ is left outside of this specification.
 As an example, the reference lz4 command line utility behavior is
 to decode all concatenated frames in their sequential order.
 
+__Frame Footer__
+
+4 to Bytes, is the concatenation of the EndMark and the (optional) Content Checksum.
 
 Frame Descriptor
 ----------------
