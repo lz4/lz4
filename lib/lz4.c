@@ -590,6 +590,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         (const BYTE*) source - dictCtx->currentOffset :
         (const BYTE*) source - dictSize - currentOffset;
     const ptrdiff_t dictDelta = dictionary ? dictEnd - (const BYTE*) source : 0;
+    const BYTE* dictLowLimit;
 
     BYTE* op = (BYTE*) dest;
     BYTE* const olimit = op + maxOutputSize;
@@ -619,6 +620,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         lowLimit = (const BYTE*)source;
         break;
     }
+
+    dictLowLimit = dictionary ? dictionary : lowLimit;
+
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
 
     if (inputSize<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
@@ -653,15 +657,15 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                         /* TODO: use precalc-ed hash? */
                         match = LZ4_getPosition(ip, dictCtx->hashTable, byU32, dictBase);
                         refDelta = dictDelta;
-                        lowLimit = dictionary;
+                        lowLimit = dictLowLimit;
                     } else {
                         refDelta = 0;
                         lowLimit = (const BYTE*)source;
                     }
                 } else if (dictDirective==usingExtDict) {
-                    if (match < (const BYTE*)source && dictionary != NULL) {
+                    if (match < (const BYTE*)source) {
                         refDelta = dictDelta;
-                        lowLimit = dictionary;
+                        lowLimit = dictLowLimit;
                     } else {
                         refDelta = 0;
                         lowLimit = (const BYTE*)source;
@@ -703,7 +707,7 @@ _next_match:
         /* Encode MatchLength */
         {   unsigned matchCode;
 
-            if ((dictDirective==usingExtDict || dictDirective==usingExtDictCtx) && (dictionary != NULL) && (lowLimit==dictionary)) {
+            if ((dictDirective==usingExtDict || dictDirective==usingExtDictCtx) && (dictionary != NULL) && (lowLimit==dictLowLimit)) {
                 const BYTE* limit;
                 match += refDelta;
                 limit = ip + (dictEnd-match);
@@ -754,15 +758,15 @@ _next_match:
                 /* TODO: use precalc-ed hash? */
                 match = LZ4_getPosition(ip, dictCtx->hashTable, byU32, dictBase);
                 refDelta = dictDelta;
-                lowLimit = dictionary;
+                lowLimit = dictLowLimit;
             } else {
                 refDelta = 0;
                 lowLimit = (const BYTE*)source;
             }
         } else if (dictDirective==usingExtDict) {
-            if (match < (const BYTE*)source && dictionary != NULL) {
+            if (match < (const BYTE*)source) {
                 refDelta = dictDelta;
-                lowLimit = dictionary;
+                lowLimit = dictLowLimit;
             } else {
                 refDelta = 0;
                 lowLimit = (const BYTE*)source;
