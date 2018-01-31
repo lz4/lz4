@@ -726,7 +726,8 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
 
 
     if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_GENERIC);
-    if (dstCapacity < LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize)) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
+    if (dstCapacity < LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize))
+        return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     memset(&cOptionsNull, 0, sizeof(cOptionsNull));
     if (compressOptionsPtr == NULL) compressOptionsPtr = &cOptionsNull;
 

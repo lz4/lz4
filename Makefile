@@ -70,7 +70,7 @@ lz4 lz4-release :
 
 .PHONY: examples
 examples: lib lz4
-	$(MAKE) -C $(EXDIR) test
+	$(MAKE) -C $(EXDIR) all
 
 .PHONY: manuals
 manuals:
@@ -125,6 +125,7 @@ list:
 .PHONY: test
 test:
 	$(MAKE) -C $(TESTDIR) $@
+	$(MAKE) -C $(EXDIR) $@
 
 clangtest: clean
 	clang -v
