@@ -76,7 +76,7 @@ __Frame Descriptor__
 as it is the most important part of the spec.
 
 The combined __Magic Number__ and __Frame Descriptor__ fields are sometimes
-called ___LZ4 Frame Header___. Its size vary between 7 and 19 bytes.
+called ___LZ4 Frame Header___. Its size varies between 7 and 19 bytes.
 
 __Data Blocks__
 
@@ -102,7 +102,7 @@ and also that the encoding/decoding process itself generated no distortion.
 Its usage is recommended.
 
 The combined __EndMark__ and __Content Checksum__ fields might sometimes be
-referred as ___LZ4 Frame Footer___. Its size vary between 4 and 8 bytes.
+referred to as ___LZ4 Frame Footer___. Its size varies between 4 and 8 bytes.
 
 __Frame Concatenation__
 
