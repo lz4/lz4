@@ -52,34 +52,40 @@ default: all
 all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC \
      lineCompress frameCompress simpleBuffer
 
-printVersion: $(LZ4DIR)/lz4.c printVersion.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+$(LZ4DIR)/liblz4.a: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4opt.h $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.h $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h
+	$(MAKE) -C $(LZ4DIR) liblz4.a
 
-doubleBuffer: $(LZ4DIR)/lz4.c blockStreaming_doubleBuffer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+printVersion: $(LZ4DIR)/liblz4.a printVersion.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-dictionaryRandomAccess: $(LZ4DIR)/lz4.c dictionaryRandomAccess.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+doubleBuffer: $(LZ4DIR)/liblz4.a blockStreaming_doubleBuffer.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-ringBuffer  : $(LZ4DIR)/lz4.c blockStreaming_ringBuffer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+dictionaryRandomAccess: $(LZ4DIR)/liblz4.a dictionaryRandomAccess.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-ringBufferHC: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c HCStreaming_ringBuffer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+ringBuffer  : $(LZ4DIR)/liblz4.a blockStreaming_ringBuffer.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lineCompress: $(LZ4DIR)/lz4.c blockStreaming_lineByLine.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+ringBufferHC: $(LZ4DIR)/liblz4.a HCStreaming_ringBuffer.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-frameCompress: frameCompress.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT) $(LZ4DIR)/liblz4.a
+lineCompress: $(LZ4DIR)/liblz4.a blockStreaming_lineByLine.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-compressFunctions: $(LZ4DIR)/lz4.c compress_functions.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT) -lrt
+frameCompress: $(LZ4DIR)/liblz4.a frameCompress.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-simpleBuffer: $(LZ4DIR)/lz4.c simple_buffer.c
-	$(CC)      $(FLAGS) $^ -o $@$(EXT)
+compressFunctions: $(LZ4DIR)/liblz4.a compress_functions.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -lrt
 
-test : all
+simpleBuffer: $(LZ4DIR)/liblz4.a simple_buffer.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+$(LZ4) :
+	$(MAKE) -C ../programs lz4
+
+test : all $(LZ4)
 	@echo "\n=== Print Version ==="
 	./printVersion$(EXT)
 	@echo "\n=== Simple compression example ==="
