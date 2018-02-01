@@ -84,7 +84,7 @@ compress_file(FILE* in, FILE* out,
 
     /* stream file */
     for (;;) {
-        size_t const readSize = fread(src, 1, outbufCapacity, in);
+        size_t const readSize = fread(src, 1, IN_CHUNK_SIZE, in);
         if (readSize == 0) break;
         count_in += readSize;
 
