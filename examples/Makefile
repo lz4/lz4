@@ -55,31 +55,31 @@ all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC \
 $(LZ4DIR)/liblz4.a: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4opt.h $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.h $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h
 	$(MAKE) -C $(LZ4DIR) liblz4.a
 
-printVersion: $(LZ4DIR)/liblz4.a printVersion.c
+printVersion: printVersion.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-doubleBuffer: $(LZ4DIR)/liblz4.a blockStreaming_doubleBuffer.c
+doubleBuffer: blockStreaming_doubleBuffer.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-dictionaryRandomAccess: $(LZ4DIR)/liblz4.a dictionaryRandomAccess.c
+dictionaryRandomAccess: dictionaryRandomAccess.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-ringBuffer  : $(LZ4DIR)/liblz4.a blockStreaming_ringBuffer.c
+ringBuffer  : blockStreaming_ringBuffer.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-ringBufferHC: $(LZ4DIR)/liblz4.a HCStreaming_ringBuffer.c
+ringBufferHC: HCStreaming_ringBuffer.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-lineCompress: $(LZ4DIR)/liblz4.a blockStreaming_lineByLine.c
+lineCompress: blockStreaming_lineByLine.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-frameCompress: $(LZ4DIR)/liblz4.a frameCompress.c
+frameCompress: frameCompress.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-compressFunctions: $(LZ4DIR)/liblz4.a compress_functions.c
+compressFunctions: compress_functions.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT) -lrt
 
-simpleBuffer: $(LZ4DIR)/liblz4.a simple_buffer.c
+simpleBuffer: simple_buffer.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 $(LZ4) :

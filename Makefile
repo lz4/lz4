@@ -69,7 +69,7 @@ lz4 lz4-release :
 	@cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
-examples: lib lz4
+examples:
 	$(MAKE) -C $(EXDIR) all
 
 .PHONY: manuals
