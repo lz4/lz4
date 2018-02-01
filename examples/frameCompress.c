@@ -1,5 +1,5 @@
 /* LZ4frame API example : compress a file
- * Based on sample code from Zbigniew Jędrzejewski-Szmek
+ * Modified from an example code by Zbigniew Jędrzejewski-Szmek
  *
  * This example streams an input file into an output file
  * using a bounded memory budget.
@@ -52,7 +52,7 @@ typedef struct {
 } compressResult_t;
 
 static compressResult_t
-compress_file_internal(FILE* in, FILE* out,
+compress_file_internal(FILE* f_in, FILE* f_out,
                     LZ4F_compressionContext_t ctx,
                     void* inBuff, size_t inChunkSize,
                     void* outBuff, size_t outCapacity)
@@ -60,6 +60,7 @@ compress_file_internal(FILE* in, FILE* out,
     compressResult_t result = { 1, 0, 0 };  /* result for an error */
     unsigned long long count_in = 0, count_out;
 
+    assert(f_in != NULL); assert(f_out != NULL);
     assert(ctx != NULL);
     assert(outCapacity >= LZ4F_HEADER_SIZE_MAX);
     assert(outCapacity >= LZ4F_compressBound(inChunkSize, &kPrefs));
@@ -72,13 +73,13 @@ compress_file_internal(FILE* in, FILE* out,
         }
         count_out = headerSize;
         printf("Buffer size is %zu bytes, header size %zu bytes\n", outCapacity, headerSize);
-        safe_fwrite(outBuff, 1, headerSize, out);
+        safe_fwrite(outBuff, 1, headerSize, f_out);
     }
 
     /* stream file */
     for (;;) {
-        size_t const readSize = fread(inBuff, 1, IN_CHUNK_SIZE, in);
-        if (readSize == 0) break;
+        size_t const readSize = fread(inBuff, 1, IN_CHUNK_SIZE, f_in);
+        if (readSize == 0) break; /* nothing left to read from input file */
         count_in += readSize;
 
         size_t const compressedSize = LZ4F_compressUpdate(ctx,
@@ -91,21 +92,21 @@ compress_file_internal(FILE* in, FILE* out,
         }
 
         printf("Writing %zu bytes\n", compressedSize);
-        safe_fwrite(outBuff, 1, compressedSize, out);
+        safe_fwrite(outBuff, 1, compressedSize, f_out);
         count_out += compressedSize;
     }
 
     /* flush whatever remains within internal buffers */
     {   size_t const compressedSize = LZ4F_compressEnd(ctx,
-                                            outBuff, outCapacity,
-                                            NULL);
+                                                outBuff, outCapacity,
+                                                NULL);
         if (LZ4F_isError(compressedSize)) {
             printf("Failed to end compression: error %zu\n", compressedSize);
             return result;
         }
 
         printf("Writing %zu bytes\n", compressedSize);
-        safe_fwrite(outBuff, 1, compressedSize, out);
+        safe_fwrite(outBuff, 1, compressedSize, f_out);
         count_out += compressedSize;
     }
 
@@ -118,8 +119,6 @@ compress_file_internal(FILE* in, FILE* out,
 static compressResult_t
 compress_file(FILE* f_in, FILE* f_out)
 {
-    compressResult_t result = { 1, 0, 0 };  /* == error (default) */
-
     assert(f_in != NULL);
     assert(f_out != NULL);
 
@@ -130,6 +129,7 @@ compress_file(FILE* f_in, FILE* f_out)
     size_t const outbufCapacity = LZ4F_compressBound(IN_CHUNK_SIZE, &kPrefs);   /* large enough for any input <= IN_CHUNK_SIZE */
     void* const outbuff = malloc(outbufCapacity);
 
+    compressResult_t result = { 1, 0, 0 };  /* == error (default) */
     if (!LZ4F_isError(ctxCreation) && src && outbuff) {
         result = compress_file_internal(f_in, f_out,
                                         ctx,
@@ -158,115 +158,152 @@ static size_t get_block_size(const LZ4F_frameInfo_t* info) {
         case LZ4F_max1MB:   return 1 << 20;
         case LZ4F_max4MB:   return 1 << 22;
         default:
-            printf("Impossible unless more block sizes are allowed\n");
+            printf("Impossible with expected frame specification (<=v1.6.1)\n");
             exit(1);
     }
 }
 
-static size_t decompress_file(FILE* in, FILE* out) {
-    void* const src = malloc(IN_CHUNK_SIZE);
-    void* dst = NULL;
-    size_t dstCapacity = 0;
-    LZ4F_dctx* dctx = NULL;
+/* @return : 1==error, 0==success */
+static int
+decompress_file_internal(FILE* f_in, FILE* f_out,
+                        LZ4F_dctx* dctx,
+                        void* src, size_t srcCapacity, size_t filled, size_t alreadyConsumed,
+                        void* dst, size_t dstCapacity)
+{
+    int firstChunk = 1;
     size_t ret = 1;
 
-    /* Initialization */
-    if (!src) { perror("decompress_file(src)"); goto cleanup; }
-    {   size_t const dctxStatus = LZ4F_createDecompressionContext(&dctx, 100);
-        if (LZ4F_isError(dctxStatus)) {
-            printf("LZ4F_dctx creation error: %s\n", LZ4F_getErrorName(dctxStatus));
-            goto cleanup;
-    }   }
+    assert(f_in != NULL); assert(f_out != NULL);
+    assert(dctx != NULL);
+    assert(src != NULL); assert(srcCapacity > 0); assert(filled <= srcCapacity); assert(alreadyConsumed <= filled);
+    assert(dst != NULL); assert(dstCapacity > 0);
 
     /* Decompression */
     while (ret != 0) {
         /* Load more input */
-        size_t srcSize = fread(src, 1, IN_CHUNK_SIZE, in);
-        const void* srcPtr = src;
-        const void* const srcEnd = srcPtr + srcSize;
-        if (srcSize == 0 || ferror(in)) {
+        size_t readSize = firstChunk ? filled : fread(src, 1, srcCapacity, f_in); firstChunk=0;
+        const void* srcPtr = src + alreadyConsumed; alreadyConsumed=0;
+        const void* const srcEnd = srcPtr + readSize;
+        if (readSize == 0 || ferror(f_in)) {
             printf("Decompress: not enough input or error reading file\n");
-            goto cleanup;
+            return 1;
         }
-        /* Allocate destination buffer if it isn't already */
-        if (!dst) {
-            LZ4F_frameInfo_t info;
-            ret = LZ4F_getFrameInfo(dctx, &info, src, &srcSize);
-            if (LZ4F_isError(ret)) {
-                printf("LZ4F_getFrameInfo error: %s\n", LZ4F_getErrorName(ret));
-                goto cleanup;
-            }
-            /* Allocating enough space for an entire block isn't necessary for
-             * correctness, but it allows some memcpy's to be elided.
-             */
-            dstCapacity = get_block_size(&info);
-            dst = malloc(dstCapacity);
-            if (!dst) { perror("decompress_file(dst)"); goto cleanup; }
-            srcPtr += srcSize;
-            srcSize = srcEnd - srcPtr;
-        }
+
         /* Decompress:
-         * Continue while there is more input to read and the frame isn't over.
-         * If srcPtr == srcEnd then we know that there is no more output left in the
-         * internal buffer left to flush.
+         * Continue while there is more input to read (srcPtr != srcEnd)
+         * and the frame isn't over (ret != 0)
          */
         while (srcPtr != srcEnd && ret != 0) {
-            /* INVARIANT: Any data left in dst has already been written */
+            /* Any data within dst has been flushed at this stage */
             size_t dstSize = dstCapacity;
+            size_t srcSize = srcEnd - srcPtr;
             ret = LZ4F_decompress(dctx, dst, &dstSize, srcPtr, &srcSize, /* LZ4F_decompressOptions_t */ NULL);
             if (LZ4F_isError(ret)) {
                 printf("Decompression error: %s\n", LZ4F_getErrorName(ret));
-                goto cleanup;
+                return 1;
             }
             /* Flush output */
-            if (dstSize != 0){
-                size_t written = fwrite(dst, 1, dstSize, out);
-                printf("Writing %zu bytes\n", dstSize);
-                if (written != dstSize) {
-                    printf("Decompress: Failed to write to file\n");
-                    goto cleanup;
-                }
-            }
+            if (dstSize != 0) safe_fwrite(dst, 1, dstSize, f_out);
             /* Update input */
             srcPtr += srcSize;
-            srcSize = srcEnd - srcPtr;
         }
     }
-    /* Check that there isn't trailing input data after the frame.
-     * It is valid to have multiple frames in the same file, but this example
-     * doesn't support it.
-     */
-    ret = fread(src, 1, 1, in);
-    if (ret != 0 || !feof(in)) {
-        printf("Decompress: Trailing data left in file after frame\n");
-        goto cleanup;
-    }
 
-cleanup:
-    free(src);
-    free(dst);
-    return LZ4F_freeDecompressionContext(dctx);   /* note : free works on NULL */
+    /* Check that there isn't trailing input data after the frame.
+     * It is valid to have multiple frames in the same file,
+     * but this example only supports one frame.
+     */
+    {   size_t const readSize = fread(src, 1, 1, f_in);
+        if (readSize != 0 || !feof(f_in)) {
+            printf("Decompress: Trailing data left in file after frame\n");
+            return 1;
+    }   }
+
+    return 0;
 }
 
 
-int compare(FILE* fp0, FILE* fp1)
+/* @return : 1==error, 0==completed */
+static int
+decompress_file_allocDst(FILE* f_in, FILE* f_out,
+                        LZ4F_dctx* dctx,
+                        void* src, size_t srcCapacity)
+{
+    assert(f_in != NULL); assert(f_out != NULL);
+    assert(dctx != NULL);
+    assert(src != NULL);
+    assert(srcCapacity >= LZ4F_HEADER_SIZE_MAX);  /* ensure LZ4F_getFrameInfo() can read enough data */
+
+    /* Read Frame header */
+    size_t const readSize = fread(src, 1, srcCapacity, f_in);
+    if (readSize == 0 || ferror(f_in)) {
+        printf("Decompress: not enough input or error reading file\n");
+        return 1;
+    }
+
+    LZ4F_frameInfo_t info;
+    size_t consumedSize = readSize;
+    {   size_t const fires = LZ4F_getFrameInfo(dctx, &info, src, &consumedSize);
+        if (LZ4F_isError(fires)) {
+            printf("LZ4F_getFrameInfo error: %s\n", LZ4F_getErrorName(fires));
+            return 1;
+    }   }
+
+    /* Allocating enough space for an entire block isn't necessary for
+     * correctness, but it allows some memcpy's to be elided.
+     */
+    size_t const dstCapacity = get_block_size(&info);
+    void* const dst = malloc(dstCapacity);
+    if (!dst) { perror("decompress_file(dst)"); return 1; }
+
+    int const decompressionResult = decompress_file_internal(
+                        f_in, f_out,
+                        dctx,
+                        src, srcCapacity, readSize, consumedSize,
+                        dst, dstCapacity);
+
+    free(dst);
+    return decompressionResult;
+}
+
+
+/* @result : 1==error, 0==success */
+static int decompress_file(FILE* f_in, FILE* f_out)
+{
+    assert(f_in != NULL); assert(f_out != NULL);
+
+    /* Ressource allocation */
+    void* const src = malloc(IN_CHUNK_SIZE);
+    if (!src) { perror("decompress_file(src)"); return 1; }
+
+    LZ4F_dctx* dctx;
+    {   size_t const dctxStatus = LZ4F_createDecompressionContext(&dctx, 100);
+        if (LZ4F_isError(dctxStatus)) {
+            printf("LZ4F_dctx creation error: %s\n", LZ4F_getErrorName(dctxStatus));
+    }   }
+
+    int const result = !dctx ? 1 /* error */ :
+                       decompress_file_allocDst(f_in, f_out, dctx, src, IN_CHUNK_SIZE);
+
+    free(src);
+    LZ4F_freeDecompressionContext(dctx);   /* note : free works on NULL */
+    return result;
+}
+
+
+int compareFiles(FILE* fp0, FILE* fp1)
 {
     int result = 0;
 
-    while(0 == result) {
+    while (result==0) {
         char b0[1024];
         char b1[1024];
-        const size_t r0 = fread(b0, 1, sizeof(b0), fp0);
-        const size_t r1 = fread(b1, 1, sizeof(b1), fp1);
+        size_t const r0 = fread(b0, 1, sizeof(b0), fp0);
+        size_t const r1 = fread(b1, 1, sizeof(b1), fp1);
 
-        result = (int) r0 - (int) r1;
-
-        if (0 == r0 || 0 == r1) {
-            break;
-        }
-        if (0 == result) {
-            result = memcmp(b0, b1, r0);
-        }
+        result = (r0 != r1);
+        if (!r0 || !r1) break;
+        if (!result) result = memcmp(b0, b1, r0);
     }
 
     return result;
@@ -278,7 +315,7 @@ int main(int argc, const char **argv) {
     char lz4Filename[256] = { 0 };
     char decFilename[256] = { 0 };
 
-    if(argc < 2) {
+    if (argc < 2) {
         printf("Please specify input filename\n");
         return 0;
     }
@@ -297,35 +334,36 @@ int main(int argc, const char **argv) {
 
         printf("compress : %s -> %s\n", inpFilename, lz4Filename);
         compressResult_t const ret = compress_file(inpFp, outFp);
+
+        fclose(outFp);
+        fclose(inpFp);
+
         if (ret.error) {
             printf("compress : failed with code %i\n", ret.error);
             return ret.error;
         }
         printf("%s: %zu → %zu bytes, %.1f%%\n",
             inpFilename,
-            (size_t)ret.size_in, (size_t)ret.size_out,  /* might overflow */
+            (size_t)ret.size_in, (size_t)ret.size_out,  /* might overflow is size_t is 32 bits and size_{in,out} > 4 GB */
             (double)ret.size_out / ret.size_in * 100);
         printf("compress : done\n");
-
-        fclose(outFp);
-        fclose(inpFp);
     }
 
     /* decompress */
     {   FILE* const inpFp = fopen(lz4Filename, "rb");
         FILE* const outFp = fopen(decFilename, "wb");
-        size_t ret;
 
         printf("decompress : %s -> %s\n", lz4Filename, decFilename);
-        ret = decompress_file(inpFp, outFp);
-        if (ret) {
-            printf("decompress : failed with code %zu\n", ret);
-            return (int)ret;
-        }
-        printf("decompress : done\n");
+        int const ret = decompress_file(inpFp, outFp);
 
         fclose(outFp);
         fclose(inpFp);
+
+        if (ret) {
+            printf("decompress : failed with code %i\n", ret);
+            return ret;
+        }
+        printf("decompress : done\n");
     }
 
     /* verify */
@@ -333,15 +371,16 @@ int main(int argc, const char **argv) {
         FILE* const decFp = fopen(decFilename, "rb");
 
         printf("verify : %s <-> %s\n", inpFilename, decFilename);
-        const int cmp = compare(inpFp, decFp);
-        if(0 == cmp) {
-            printf("verify : OK\n");
-        } else {
-            printf("verify : NG\n");
-        }
+        int const cmp = compareFiles(inpFp, decFp);
 
         fclose(decFp);
         fclose(inpFp);
+
+        if (cmp) {
+            printf("corruption detected : decompressed file differs from original\n");
+            return cmp;
+        }
+        printf("verify : OK\n");
     }
 
     return 0;
