@@ -159,17 +159,14 @@ platformTest: clean
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@
 
-gpptest: clean
-	g++ -v
-	CC=g++ $(MAKE) -C $(LZ4DIR)  all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(PRGDIR)  all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(TESTDIR) all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-
-gpptest32: clean
-	g++ -v
-	CC=g++ $(MAKE) -C $(LZ4DIR)  all    CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(PRGDIR)  native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
-	CC=g++ $(MAKE) -C $(TESTDIR) native CFLAGS="-m32 -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror"
+gpptest gpptest32: CC = "$(CXX) -Wno-deprecated"
+gpptest gpptest32: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
+gpptest32: CFLAGS += -m32
+gpptest gpptest32: clean
+	$(CXX) -v
+	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
+	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
+	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
 
 c_standards: clean
 	# note : lz4 is not C90 compatible, because it requires long long support
