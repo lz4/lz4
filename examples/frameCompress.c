@@ -16,7 +16,7 @@
 
 #define IN_CHUNK_SIZE  (16*1024)
 
-static const LZ4F_preferences_t lz4_preferences = {
+static const LZ4F_preferences_t kPrefs = {
     { LZ4F_max256KB, LZ4F_blockLinked, LZ4F_noContentChecksum, LZ4F_frame,
       0 /* unknown content size */, 0 /* no dictID */ , LZ4F_noBlockChecksum },
     0,   /* compression level; 0 == default */
@@ -41,15 +41,89 @@ static void safe_fwrite(void* buf, size_t eltSize, size_t nbElt, FILE* f)
 }
 
 
-static size_t
-compress_file(FILE* in, FILE* out,
-              unsigned long long* size_in,
-              unsigned long long* size_out)
+/* ================================================= */
+/*     Streaming Compression example               */
+/* ================================================= */
+
+typedef struct {
+    int error;
+    unsigned long long size_in;
+    unsigned long long size_out;
+} compressResult_t;
+
+static compressResult_t
+compress_file_internal(FILE* in, FILE* out,
+                    LZ4F_compressionContext_t ctx,
+                    void* inBuff, size_t inChunkSize,
+                    void* outBuff, size_t outCapacity)
 {
-    size_t result = 1;  /* function result; 1 == error, default (early exit) */
+    compressResult_t result = { 1, 0, 0 };  /* result for an error */
     unsigned long long count_in = 0, count_out;
 
-    /* init */
+    assert(ctx != NULL);
+    assert(outCapacity >= LZ4F_HEADER_SIZE_MAX);
+    assert(outCapacity >= LZ4F_compressBound(inChunkSize, &kPrefs));
+
+    /* write frame header */
+    {   size_t const headerSize = LZ4F_compressBegin(ctx, outBuff, outCapacity, &kPrefs);
+        if (LZ4F_isError(headerSize)) {
+            printf("Failed to start compression: error %zu\n", headerSize);
+            return result;
+        }
+        count_out = headerSize;
+        printf("Buffer size is %zu bytes, header size %zu bytes\n", outCapacity, headerSize);
+        safe_fwrite(outBuff, 1, headerSize, out);
+    }
+
+    /* stream file */
+    for (;;) {
+        size_t const readSize = fread(inBuff, 1, IN_CHUNK_SIZE, in);
+        if (readSize == 0) break;
+        count_in += readSize;
+
+        size_t const compressedSize = LZ4F_compressUpdate(ctx,
+                                                outBuff, outCapacity,
+                                                inBuff, readSize,
+                                                NULL);
+        if (LZ4F_isError(compressedSize)) {
+            printf("Compression failed: error %zu\n", compressedSize);
+            return result;
+        }
+
+        printf("Writing %zu bytes\n", compressedSize);
+        safe_fwrite(outBuff, 1, compressedSize, out);
+        count_out += compressedSize;
+    }
+
+    /* flush whatever remains within internal buffers */
+    {   size_t const compressedSize = LZ4F_compressEnd(ctx,
+                                            outBuff, outCapacity,
+                                            NULL);
+        if (LZ4F_isError(compressedSize)) {
+            printf("Failed to end compression: error %zu\n", compressedSize);
+            return result;
+        }
+
+        printf("Writing %zu bytes\n", compressedSize);
+        safe_fwrite(outBuff, 1, compressedSize, out);
+        count_out += compressedSize;
+    }
+
+    result.size_in = count_in;
+    result.size_out = count_out;
+    result.error = 0;
+    return result;
+}
+
+static compressResult_t
+compress_file(FILE* in, FILE* out)
+{
+    compressResult_t result = { 1, 0, 0 };  /* == error, default (early exit) */
+
+    assert(in != NULL);
+    assert(out != NULL);
+
+    /* allocate ressources */
     LZ4F_compressionContext_t ctx;
     if (LZ4F_isError( LZ4F_createCompressionContext(&ctx, LZ4F_VERSION) )) {
         printf("error: failed to create context \n");
@@ -63,62 +137,17 @@ compress_file(FILE* in, FILE* out,
         goto cleanup;
     }
 
-    size_t const outbufCapacity = LZ4F_compressBound(IN_CHUNK_SIZE, &lz4_preferences);   /* large enough for any input <= IN_CHUNK_SIZE */
+    size_t const outbufCapacity = LZ4F_compressBound(IN_CHUNK_SIZE, &kPrefs);   /* large enough for any input <= IN_CHUNK_SIZE */
     outbuff = malloc(outbufCapacity);
     if (!outbuff) {
         printf("Not enough memory\n");
         goto cleanup;
     }
 
-    /* write frame header */
-    assert(outbufCapacity >= LZ4F_HEADER_SIZE_MAX);
-    {   size_t const headerSize = LZ4F_compressBegin(ctx, outbuff, outbufCapacity, &lz4_preferences);
-        if (LZ4F_isError(headerSize)) {
-            printf("Failed to start compression: error %zu\n", headerSize);
-            goto cleanup;
-        }
-        count_out = headerSize;
-        printf("Buffer size is %zu bytes, header size %zu bytes\n", outbufCapacity, headerSize);
-        safe_fwrite(outbuff, 1, headerSize, out);
-    }
-
-    /* stream file */
-    for (;;) {
-        size_t const readSize = fread(src, 1, IN_CHUNK_SIZE, in);
-        if (readSize == 0) break;
-        count_in += readSize;
-
-        size_t const compressedSize = LZ4F_compressUpdate(ctx,
-                                                outbuff, outbufCapacity,
-                                                src, readSize,
-                                                NULL);
-        if (LZ4F_isError(compressedSize)) {
-            printf("Compression failed: error %zu\n", compressedSize);
-            goto cleanup;
-        }
-
-        printf("Writing %zu bytes\n", compressedSize);
-        safe_fwrite(outbuff, 1, compressedSize, out);
-        count_out += compressedSize;
-    }
-
-    /* flush whatever remains within internal buffers */
-    {   size_t const compressedSize = LZ4F_compressEnd(ctx,
-                                            outbuff, outbufCapacity,
-                                            NULL);
-        if (LZ4F_isError(compressedSize)) {
-            printf("Failed to end compression: error %zu\n", compressedSize);
-            goto cleanup;
-        }
-
-        printf("Writing %zu bytes\n", compressedSize);
-        safe_fwrite(outbuff, 1, compressedSize, out);
-        count_out += compressedSize;
-    }
-
-    *size_in = count_in;
-    *size_out = count_out;
-    result = 0;   /* success */
+    result = compress_file_internal(in, out,
+                                        ctx,
+                                        src, IN_CHUNK_SIZE,
+                                        outbuff, outbufCapacity);
 
  cleanup:
     LZ4F_freeCompressionContext(ctx);   /* supports free on NULL */
@@ -127,6 +156,10 @@ compress_file(FILE* in, FILE* out,
     return result;
 }
 
+
+/* ================================================= */
+/*     Streaming decompression example               */
+/* ================================================= */
 
 static size_t get_block_size(const LZ4F_frameInfo_t* info) {
     switch (info->blockSizeID) {
@@ -272,20 +305,17 @@ int main(int argc, const char **argv) {
     /* compress */
     {   FILE* const inpFp = fopen(inpFilename, "rb");
         FILE* const outFp = fopen(lz4Filename, "wb");
-        unsigned long long sizeIn = 0;
-        unsigned long long sizeOut = 0;
-        size_t ret;
 
         printf("compress : %s -> %s\n", inpFilename, lz4Filename);
-        ret = compress_file(inpFp, outFp, &sizeIn, &sizeOut);
-        if (ret) {
-            printf("compress : failed with code %zu\n", ret);
-            return (int)ret;
+        compressResult_t const ret = compress_file(inpFp, outFp);
+        if (ret.error) {
+            printf("compress : failed with code %i\n", ret.error);
+            return ret.error;
         }
         printf("%s: %zu → %zu bytes, %.1f%%\n",
             inpFilename,
-            (size_t)sizeIn, (size_t)sizeOut,  /* might overflow */
-            (double)sizeOut / sizeIn * 100);
+            (size_t)ret.size_in, (size_t)ret.size_out,  /* might overflow */
+            (double)ret.size_out / ret.size_in * 100);
         printf("compress : done\n");
 
         fclose(outFp);
