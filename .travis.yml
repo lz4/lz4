@@ -19,7 +19,7 @@ matrix:
 
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd="make gpptest && make clean examples && make clean cmake && make clean travis-install && make clean clangtest" COMPILER=cc
+      env: Ubu=12.04cont Cmd="make gpptest && make clean && make examples && make clean cmake && make clean travis-install && make clean clangtest" COMPILER=cc
 
 
     # 14.04 LTS Server Edition 64 bit
