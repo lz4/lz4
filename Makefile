@@ -69,8 +69,8 @@ lz4 lz4-release :
 	@cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
-examples: lib lz4
-	$(MAKE) -C $(EXDIR) test
+examples:
+	$(MAKE) -C $(EXDIR) all
 
 .PHONY: manuals
 manuals:
@@ -125,6 +125,7 @@ list:
 .PHONY: test
 test:
 	$(MAKE) -C $(TESTDIR) $@
+	$(MAKE) -C $(EXDIR) $@
 
 clangtest: clean
 	clang -v
