@@ -116,40 +116,29 @@ compress_file_internal(FILE* in, FILE* out,
 }
 
 static compressResult_t
-compress_file(FILE* in, FILE* out)
+compress_file(FILE* f_in, FILE* f_out)
 {
-    compressResult_t result = { 1, 0, 0 };  /* == error, default (early exit) */
+    compressResult_t result = { 1, 0, 0 };  /* == error (default) */
 
-    assert(in != NULL);
-    assert(out != NULL);
+    assert(f_in != NULL);
+    assert(f_out != NULL);
 
-    /* allocate ressources */
+    /* ressource allocation */
     LZ4F_compressionContext_t ctx;
-    if (LZ4F_isError( LZ4F_createCompressionContext(&ctx, LZ4F_VERSION) )) {
-        printf("error: failed to create context \n");
-        return result;
-    }
-
-    char* outbuff = NULL;
+    size_t const ctxCreation = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
     void* const src = malloc(IN_CHUNK_SIZE);
-    if (!src) {
-        printf("Not enough memory\n");
-        goto cleanup;
-    }
-
     size_t const outbufCapacity = LZ4F_compressBound(IN_CHUNK_SIZE, &kPrefs);   /* large enough for any input <= IN_CHUNK_SIZE */
-    outbuff = malloc(outbufCapacity);
-    if (!outbuff) {
-        printf("Not enough memory\n");
-        goto cleanup;
-    }
+    void* const outbuff = malloc(outbufCapacity);
 
-    result = compress_file_internal(in, out,
+    if (!LZ4F_isError(ctxCreation) && src && outbuff) {
+        result = compress_file_internal(f_in, f_out,
                                         ctx,
                                         src, IN_CHUNK_SIZE,
                                         outbuff, outbufCapacity);
+    } else {
+        printf("error : ressource allocation failed \n");
+    }
 
- cleanup:
     LZ4F_freeCompressionContext(ctx);   /* supports free on NULL */
     free(src);
     free(outbuff);
