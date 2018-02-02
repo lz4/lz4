@@ -739,9 +739,17 @@ _clean_up:
 
 int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
+  LZ4_resetStream((LZ4_stream_t*)state);
+  return LZ4_compress_fast_safeExtState(state, source, dest, inputSize, maxOutputSize, acceleration);
+}
+
+
+int LZ4_compress_fast_safeExtState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
+{
     LZ4_stream_t_internal* ctx = &((LZ4_stream_t*)state)->internal_donotuse;
-    LZ4_resetStream((LZ4_stream_t*)state);
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
+    ctx->dictionary = NULL;
+    ctx->dictSize = 0;
 
     if (maxOutputSize >= LZ4_compressBound(inputSize)) {
         if (inputSize < LZ4_64Klimit)
