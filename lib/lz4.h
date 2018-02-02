@@ -263,7 +263,8 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  *  'dst' buffer must be already allocated.
  *  If dstCapacity >= LZ4_compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
  *
- *  Important : Up to 64KB of previously compressed data is assumed to remain present and unmodified in memory !
+ *  Important : The previous 64KB of compressed data is assumed to remain preset and unmodified in memory!
+ *              If less than 64KB has been compressed all the data must be present.
  *  Special 1 : If input buffer is a double-buffer, it can have any size, including < 64 KB.
  *  Special 2 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
  *
@@ -306,7 +307,8 @@ LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const 
  *  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
  *  A block is an unsplittable entity, it must be presented entirely to a decompression function.
  *  Decompression functions only accept one block at a time.
- *  Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB).
+ *  The last 64KB of previously decoded data *must* remain available and unmodified at the memory position where they were decoded.
+ *  If less than 64KB of data has been decoded all the data must be present.
  *
  *  Special : if application sets a ring buffer for decompression, it must respect one of the following conditions :
  *  - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
