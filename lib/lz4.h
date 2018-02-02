@@ -360,7 +360,8 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 typedef struct {
     uint32_t hashTable[LZ4_HASH_SIZE_U32];
     uint32_t currentOffset;
-    uint32_t initCheck;
+    uint16_t initCheck;
+    uint16_t tableType;
     const uint8_t* dictionary;
     uint8_t* bufferStart;   /* obsolete, used for slideInputBuffer */
     uint32_t dictSize;
@@ -378,7 +379,8 @@ typedef struct {
 typedef struct {
     unsigned int hashTable[LZ4_HASH_SIZE_U32];
     unsigned int currentOffset;
-    unsigned int initCheck;
+    unsigned short initCheck;
+    unsigned short tableType;
     const unsigned char* dictionary;
     unsigned char* bufferStart;   /* obsolete, used for slideInputBuffer */
     unsigned int dictSize;

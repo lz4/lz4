@@ -446,7 +446,7 @@ static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression ru
 *  Local Structures and types
 **************************************/
 typedef enum { notLimited = 0, limitedOutput = 1 } limitedOutput_directive;
-typedef enum { byPtr, byU32, byU16 } tableType_t;
+typedef enum { unusedTable = 0, byPtr = 1, byU32 = 2, byU16 = 3 } tableType_t;
 
 typedef enum { noDict = 0, withPrefix64k, usingExtDict } dict_directive;
 typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
@@ -496,6 +496,7 @@ static void LZ4_putPositionOnHash(const BYTE* p, U32 h, void* tableBase, tableTy
 {
     switch (tableType)
     {
+    case unusedTable: { /* illegal! */ assert(0); return; }
     case byPtr: { const BYTE** hashTable = (const BYTE**)tableBase; hashTable[h] = p; return; }
     case byU32: { U32* hashTable = (U32*) tableBase; hashTable[h] = (U32)(p-srcBase); return; }
     case byU16: { U16* hashTable = (U16*) tableBase; hashTable[h] = (U16)(p-srcBase); return; }
@@ -550,6 +551,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
     BYTE* op = (BYTE*) dest;
     BYTE* const olimit = op + maxOutputSize;
+
+    ptrdiff_t retval = 0;
 
     U32 forwardH;
 
@@ -622,7 +625,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             token = op++;
             if ((outputLimited) &&  /* Check output buffer overflow */
                 (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
-                return 0;
+                goto _clean_up;
             if (litLength >= RUN_MASK) {
                 int len = (int)litLength-RUN_MASK;
                 *token = (RUN_MASK<<ML_BITS);
@@ -662,7 +665,7 @@ _next_match:
 
             if ( outputLimited &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) )
-                return 0;
+                goto _clean_up;
             if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
                 matchCode -= ML_MASK;
@@ -711,7 +714,7 @@ _last_literals:
     {   size_t const lastRun = (size_t)(iend - anchor);
         if ( (outputLimited) &&  /* Check output buffer overflow */
             ((op - (BYTE*)dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) )
-            return 0;
+            goto _clean_up;
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
             *op++ = RUN_MASK << ML_BITS;
@@ -724,8 +727,13 @@ _last_literals:
         op += lastRun;
     }
 
+    retval = (((char*)op)-dest);
+
+_clean_up:
+    cctx->tableType = tableType;
+
     /* End */
-    return (int) (((char*)op)-dest);
+    return (int)retval;
 }
 
 
@@ -997,6 +1005,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     DEBUGLOG(4, "LZ4_resetStream");
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
+    LZ4_stream->internal_donotuse.tableType = unusedTable;
 }
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
@@ -1015,7 +1024,9 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
-    if ((dict->initCheck) || (dict->currentOffset > 1 GB))  /* Uninitialized structure, or reuse overflow */
+    if ((dict->initCheck)
+      || (dict->tableType != byU32 && dict->tableType != unusedTable)
+      || (dict->currentOffset > 1 GB))  /* Uninitialized structure, or reuse overflow */
         LZ4_resetStream(LZ4_dict);
 
     if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
@@ -1024,6 +1035,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
     dict->currentOffset += dict->dictSize;
+    dict->tableType = byU32;
 
     if (dictSize < (int)HASH_UNIT) {
         return 0;
