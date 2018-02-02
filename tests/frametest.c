@@ -730,15 +730,17 @@ _output_error:
 
 static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, unsigned nonContiguous)
 {
-    int p=0;
+    size_t p=0;
     const BYTE* b1=(const BYTE*)buff1;
     const BYTE* b2=(const BYTE*)buff2;
     if (nonContiguous) {
         DISPLAY("Non-contiguous output test (%i bytes)\n", (int)size);
         return;
     }
-    while (b1[p]==b2[p]) p++;
-    DISPLAY("Error at pos %i/%i : %02X != %02X \n", p, (int)size, b1[p], b2[p]);
+    while (p < size && b1[p]==b2[p]) p++;
+    if (p != size) {
+        DISPLAY("Error at pos %i/%i : %02X != %02X \n", (int)p, (int)size, b1[p], b2[p]);
+    }
 }
 
 
