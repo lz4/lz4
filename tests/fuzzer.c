@@ -240,6 +240,42 @@ _overflowError:
 }
 
 
+#ifdef __unix__   /* is expected to be triggered on linux+gcc */
+
+#include <sys/mman.h>   /* mmap */
+
+static void* FUZ_createLowAddr(size_t size)
+{
+    void* const lowBuff = mmap((void*)(0x1000), size,
+                    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
+                    -1, 0);
+    DISPLAYLEVEL(2, "generating low buffer at address %p \n", lowBuff);
+    return lowBuff;
+}
+
+static void FUZ_freeLowAddr(void* buffer, size_t size)
+{
+    if (munmap(buffer, size)) {
+        perror("fuzzer: freeing low address buffer");
+        abort();
+    }
+}
+
+#else
+
+static void* FUZ_createLowAddr(size_t size)
+{
+    return malloc(size);
+}
+
+static void FUZ_freeLowAddr(void* buffer, size_t size)
+{
+    (void)size;
+    free(buffer);
+}
+
+#endif
+
 /*! FUZ_findDiff() :
 *   find the first different byte between buff1 and buff2.
 *   presumes buff1 != buff2.
@@ -266,6 +302,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     size_t const compressedBufferSize = LZ4_compressBound(FUZ_MAX_BLOCK_SIZE);
     char* const compressedBuffer = (char*)malloc(compressedBufferSize);
     char* const decodedBuffer = (char*)malloc(FUZ_MAX_DICT_SIZE + FUZ_MAX_BLOCK_SIZE);
+    size_t const labSize = 96 KB;
+    void* const lowAddrBuffer = FUZ_createLowAddr(labSize);
     void* const stateLZ4   = malloc(LZ4_sizeofState());
     void* const stateLZ4HC = malloc(LZ4_sizeofStateHC());
     LZ4_stream_t LZ4dict;
@@ -306,7 +344,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         int const dictSizeRand = FUZ_rand(&randState) % FUZ_MAX_DICT_SIZE;
         int const dictSize = MIN(dictSizeRand, blockStart);
         int const compressionLevel = FUZ_rand(&randState) % (LZ4HC_CLEVEL_MAX+1);
-        char* const block = ((char*)CNBuffer) + blockStart;
+        const char* block = ((char*)CNBuffer) + blockStart;
         const char* dict = block - dictSize;
         int compressedSize, HCcompressedSize;
         int blockContinueCompressedSize;
@@ -317,6 +355,11 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_displayUpdate(cycleNb);
 
         /* Compression tests */
+        if ( ((FUZ_rand(&randState) & 63) == 2)
+          && ((size_t)blockSize < labSize) ) {
+            memcpy(lowAddrBuffer, block, blockSize);
+            block = lowAddrBuffer;
+        }
 
         /* Test compression destSize */
         FUZ_DISPLAYTEST;
@@ -705,6 +748,7 @@ _exit:
         free(CNBuffer);
         free(compressedBuffer);
         free(decodedBuffer);
+        FUZ_freeLowAddr(lowAddrBuffer, labSize);
         free(stateLZ4);
         free(stateLZ4HC);
         return result;
