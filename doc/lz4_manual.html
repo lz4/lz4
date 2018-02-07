@@ -42,9 +42,9 @@
 
 <a name="Chapter2"></a><h2>Version</h2><pre></pre>
 
-<pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; to be used when checking dll version */<b>
+<pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; useful to check dll version */<b>
 </b></pre><BR>
-<pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; to be used when checking dll version */<b>
+<pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; unseful to check dll version */<b>
 </b></pre><BR>
 <a name="Chapter3"></a><h2>Tuning parameter</h2><pre></pre>
 
@@ -53,7 +53,7 @@
 #endif
 </b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
  Increasing memory usage improves compression ratio
- Reduced memory usage can improve speed, due to cache effect
+ Reduced memory usage may improve speed, thanks to cache effect
  Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  
 </p></pre><BR>
@@ -65,12 +65,12 @@
     into already allocated 'dst' buffer of size 'dstCapacity'.
     Compression is guaranteed to succeed if 'dstCapacity' >= LZ4_compressBound(srcSize).
     It also runs faster, so it's a recommended setting.
-    If the function cannot compress 'src' into a limited 'dst' budget,
+    If the function cannot compress 'src' into a more limited 'dst' budget,
     compression stops *immediately*, and the function result is zero.
-    As a consequence, 'dst' content is not valid.
-    This function never writes outside 'dst' buffer, nor read outside 'source' buffer.
-        srcSize : supported max value is LZ4_MAX_INPUT_VALUE
-        dstCapacity : full or partial size of buffer 'dst' (which must be already allocated)
+    Note : as a consequence, 'dst' content is not valid.
+    Note 2 : This function is protected against buffer overflow scenarios (never writes outside 'dst' buffer, nor read outside 'source' buffer).
+        srcSize : max supported value is LZ4_MAX_INPUT_SIZE.
+        dstCapacity : size of buffer 'dst' (which must be already allocated)
         return  : the number of bytes written into buffer 'dst' (necessarily <= dstCapacity)
                   or 0 if compression fails 
 </p></pre><BR>
@@ -81,8 +81,7 @@
     return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
              If destination buffer is not large enough, decoding will stop and output an error code (negative value).
              If the source stream is detected malformed, the function will stop decoding and return a negative result.
-             This function is protected against buffer overflow exploits, including malicious data packets.
-             It never writes outside output buffer, nor reads outside input buffer.
+             This function is protected against malicious data packets.
 </p></pre><BR>
 
 <a name="Chapter5"></a><h2>Advanced Functions</h2><pre></pre>
@@ -91,18 +90,18 @@
 </b><p>    Provides the maximum size that LZ4 compression may output in a "worst case" scenario (input data not compressible)
     This function is primarily useful for memory allocation purposes (destination buffer size).
     Macro LZ4_COMPRESSBOUND() is also provided for compilation-time evaluation (stack memory allocation for example).
-    Note that LZ4_compress_default() compress faster when dest buffer size is >= LZ4_compressBound(srcSize)
+    Note that LZ4_compress_default() compresses faster when dstCapacity is >= LZ4_compressBound(srcSize)
         inputSize  : max supported value is LZ4_MAX_INPUT_SIZE
         return : maximum output size in a "worst case" scenario
-              or 0, if input size is too large ( > LZ4_MAX_INPUT_SIZE)
+              or 0, if input size is incorrect (too large or negative)
 </p></pre><BR>
 
 <pre><b>int LZ4_compress_fast (const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
-</b><p>    Same as LZ4_compress_default(), but allows to select an "acceleration" factor.
+</b><p>    Same as LZ4_compress_default(), but allows selection of "acceleration" factor.
     The larger the acceleration value, the faster the algorithm, but also the lesser the compression.
     It's a trade-off. It can be fine tuned, with each successive value providing roughly +~3% to speed.
     An acceleration value of "1" is the same as regular LZ4_compress_default()
-    Values <= 0 will be replaced by ACCELERATION_DEFAULT (see lz4.c), which is 1.
+    Values <= 0 will be replaced by ACCELERATION_DEFAULT (currently == 1, see lz4.c).
 </p></pre><BR>
 
 <pre><b>int LZ4_sizeofState(void);
@@ -125,26 +124,28 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 </p></pre><BR>
 
 <pre><b>int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
-</b><p>    originalSize : is the original uncompressed size
-    return : the number of bytes read from the source buffer (in other words, the compressed size)
-             If the source stream is detected malformed, the function will stop decoding and return a negative result.
-             Destination buffer must be already allocated. Its size must be >= 'originalSize' bytes.
+</b><p>This function is a bit faster than LZ4_decompress_safe(),
+but doesn't provide any security guarantee.
+    originalSize : is the uncompressed size to regenerate
+                   Destination buffer must be already allocated, and its size must be >= 'originalSize' bytes.
+    return : number of bytes read from source buffer (== compressed size).
+             If the source stream is detected malformed, the function stops decoding and return a negative result.
     note : This function respects memory boundaries for *properly formed* compressed data.
-           It is a bit faster than LZ4_decompress_safe().
-           However, it does not provide any protection against intentionally modified data stream (malicious input).
-           Use this function in trusted environment only (data to decode comes from a trusted source).
+           However, it does not provide any protection against malicious input.
+           It also doesn't know 'src' size, and implies it's >= compressed size.
+           Use this function in trusted environment **only**.
 </p></pre><BR>
 
 <pre><b>int LZ4_decompress_safe_partial (const char* src, char* dst, int srcSize, int targetOutputSize, int dstCapacity);
 </b><p>    This function decompress a compressed block of size 'srcSize' at position 'src'
     into destination buffer 'dst' of size 'dstCapacity'.
     The function will decompress a minimum of 'targetOutputSize' bytes, and stop after that.
-    However, it's not accurate, and may write more than 'targetOutputSize' (but <= dstCapacity).
+    However, it's not accurate, and may write more than 'targetOutputSize' (but always <= dstCapacity).
    @return : the number of bytes decoded in the destination buffer (necessarily <= dstCapacity)
-       Note : this number can be < 'targetOutputSize' should the compressed block contain less data.
-             Always control how many bytes were decoded.
-             If the source stream is detected malformed, the function will stop decoding and return a negative result.
-             This function never writes outside of output buffer, and never reads outside of input buffer. It is therefore protected against malicious data packets.
+        Note : this number can also be < targetOutputSize, if compressed block contains less data.
+            Therefore, always control how many bytes were decoded.
+            If source stream is detected malformed, function returns a negative result.
+            This function is protected against malicious data packets.
 </p></pre><BR>
 
 <a name="Chapter6"></a><h2>Streaming Compression Functions</h2><pre></pre>
@@ -175,7 +176,8 @@ int           LZ4_freeStream (LZ4_stream_t* streamPtr);
   'dst' buffer must be already allocated.
   If dstCapacity >= LZ4_compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
 
-  Important : Up to 64KB of previously compressed data is assumed to remain present and unmodified in memory !
+  Important : The previous 64KB of compressed data is assumed to remain preset and unmodified in memory!
+              If less than 64KB has been compressed all the data must be present.
   Special 1 : If input buffer is a double-buffer, it can have any size, including < 64 KB.
   Special 2 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
 
@@ -215,7 +217,8 @@ int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
 </b><p>  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
   A block is an unsplittable entity, it must be presented entirely to a decompression function.
   Decompression functions only accept one block at a time.
-  Previously decoded blocks *must* remain available at the memory position where they were decoded (up to 64 KB).
+  The last 64KB of previously decoded data *must* remain available and unmodified at the memory position where they were decoded.
+  If less than 64KB of data has been decoded all the data must be present.
 
   Special : if application sets a ring buffer for decompression, it must respect one of the following conditions :
   - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
@@ -311,11 +314,9 @@ union LZ4_streamDecode_u {
 #  define LZ4_DEPRECATED(message)   </b>/* disable deprecation warnings */<b>
 #else
 #  define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#  if defined(__clang__) </b>/* clang doesn't handle mixed C++11 and CNU attributes */<b>
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif defined (__cplusplus) && (__cplusplus >= 201402) </b>/* C++14 or greater */<b>
+#  if defined (__cplusplus) && (__cplusplus >= 201402) </b>/* C++14 or greater */<b>
 #    define LZ4_DEPRECATED(message) [[deprecated(message)]]
-#  elif (LZ4_GCC_VERSION >= 405)
+#  elif (LZ4_GCC_VERSION >= 405) || defined(__clang__)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
 #  elif (LZ4_GCC_VERSION >= 301)
 #    define LZ4_DEPRECATED(message) __attribute__((deprecated))
