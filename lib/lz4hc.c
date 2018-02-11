@@ -220,7 +220,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
-            if (*(iLowLimit + longest) == *(matchPtr - delta + longest)) {
+            if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - delta + longest - 1)) {
                 if (LZ4_read32(matchPtr) == pattern) {
                     int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
     #if 0
