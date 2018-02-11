@@ -1220,10 +1220,13 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
             size_t const ll = token >> ML_BITS;
             size_t const off = LZ4_readLE16(ip+ll);
             const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
-            if ((off >= 18) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
+            if ((off >= 8) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
                 size_t const ml = (token & ML_MASK) + MINMATCH;
                 memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
-                memcpy(op, matchPtr, 18); op += ml;
+                memcpy(op+ 0, matchPtr+ 0, 8);
+                memcpy(op+ 8, matchPtr+ 8, 8);
+                memcpy(op+16, matchPtr+16, 2);
+                op += ml;
                 continue;
             }
         }
