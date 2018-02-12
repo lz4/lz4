@@ -365,15 +365,16 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #include <stdint.h>
 
-typedef struct {
+typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
+struct LZ4_stream_t_internal {
     uint32_t hashTable[LZ4_HASH_SIZE_U32];
     uint32_t currentOffset;
     uint16_t initCheck;
     uint16_t tableType;
     const uint8_t* dictionary;
-    uint8_t* bufferStart;   /* obsolete, used for slideInputBuffer */
+    const LZ4_stream_t_internal* dictCtx;
     uint32_t dictSize;
-} LZ4_stream_t_internal;
+};
 
 typedef struct {
     const uint8_t* externalDict;
@@ -384,15 +385,16 @@ typedef struct {
 
 #else
 
-typedef struct {
+typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
+struct LZ4_stream_t_internal {
     unsigned int hashTable[LZ4_HASH_SIZE_U32];
     unsigned int currentOffset;
     unsigned short initCheck;
     unsigned short tableType;
     const unsigned char* dictionary;
-    unsigned char* bufferStart;   /* obsolete, used for slideInputBuffer */
+    const LZ4_stream_t_internal* dictCtx;
     unsigned int dictSize;
-} LZ4_stream_t_internal;
+};
 
 typedef struct {
     const unsigned char* externalDict;
