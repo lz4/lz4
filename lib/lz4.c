@@ -550,7 +550,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                            tableType == byPtr);
 
     size_t currentOffset = ((tableType == byU32 || tableType == byU16) &&
-                            !resetTable) ? cctx->currentOffset : 0;
+                            !resetTable) ? cctx->currentOffset : 1;
     const BYTE* base = (const BYTE*) source - currentOffset;
     const BYTE* lowLimit;
     const BYTE* const lowRefLimit = ip - cctx->dictSize;
@@ -593,7 +593,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     if (resetTable) {
       DEBUGLOG(4, "Resetting table in %p", cctx);
       MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
-      cctx->currentOffset = 0;
+      cctx->currentOffset = 1;
     }
 
     if (inputSize<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
@@ -793,7 +793,7 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     int result;
 #if (LZ4_HEAPMODE)
     LZ4_stream_t* ctxPtr = ALLOCATOR(1, sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
-    ctxPtr->internal_donotuse.currentOffset = 0;
+    ctxPtr->internal_donotuse.currentOffset = 1;
 #else
     LZ4_stream_t ctx;
     LZ4_stream_t* const ctxPtr = &ctx;
@@ -1039,7 +1039,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     DEBUGLOG(5, "LZ4_resetStream %p", LZ4_stream);
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
-    LZ4_stream->internal_donotuse.currentOffset = 0;
+    LZ4_stream->internal_donotuse.currentOffset = 1;
     LZ4_stream->internal_donotuse.tableType = unusedTable;
 }
 
