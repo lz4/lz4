@@ -571,16 +571,36 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
         /* frame init only for blockLinked : blockIndependent will be init at each block */
         if (cdict) {
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
-                memcpy(cctxPtr->lz4CtxPtr, cdict->fastCtx, sizeof(*cdict->fastCtx));
+                LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t*)cctxPtr->lz4CtxPtr)->internal_donotuse;
+                assert(!internal_ctx->initCheck);
+                if (internal_ctx->currentOffset > 1 GB) {
+                    /* Init the context */
+                    LZ4_resetStream((LZ4_stream_t*)cctxPtr->lz4CtxPtr);
+                }
+                /* Clear any local dictionary */
+                internal_ctx->dictionary = NULL;
+                internal_ctx->dictSize = 0;
+                /* Point to the dictionary context */
+                internal_ctx->dictCtx = &(cdict->fastCtx->internal_donotuse);
             } else {
                 memcpy(cctxPtr->lz4CtxPtr, cdict->HCCtx, sizeof(*cdict->HCCtx));
                 LZ4_setCompressionLevel((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel);
             }
         } else {
-            if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
-                LZ4_resetStream((LZ4_stream_t*)(cctxPtr->lz4CtxPtr));
-            else
+            if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
+                LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t*)cctxPtr->lz4CtxPtr)->internal_donotuse;
+                assert(!internal_ctx->initCheck);
+                if (internal_ctx->currentOffset > 1 GB) {
+                    /* Init the context */
+                    LZ4_resetStream((LZ4_stream_t*)cctxPtr->lz4CtxPtr);
+                }
+                /* Clear any local dictionary */
+                internal_ctx->dictionary = NULL;
+                internal_ctx->dictSize = 0;
+                internal_ctx->dictCtx = NULL;
+            } else {
                 LZ4_resetStreamHC((LZ4_streamHC_t*)(cctxPtr->lz4CtxPtr), cctxPtr->prefs.compressionLevel);
+            }
         }
     }
 
@@ -686,10 +706,13 @@ static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize
     internal_ctx->dictionary = NULL;
     internal_ctx->dictSize = 0;
     if (cdict) {
-        memcpy(ctx, cdict->fastCtx, sizeof(*cdict->fastCtx));
+        /* Point to the dictionary context */
+        internal_ctx->dictCtx = &(cdict->fastCtx->internal_donotuse);
         return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
+    } else {
+        internal_ctx->dictCtx = NULL;
+        return LZ4_compress_fast_safeExtState(ctx, src, dst, srcSize, dstCapacity, acceleration);
     }
-    return LZ4_compress_fast_safeExtState(ctx, src, dst, srcSize, dstCapacity, acceleration);
 }
 
 static int LZ4F_compressBlock_continue(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
