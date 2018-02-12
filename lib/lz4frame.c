@@ -354,6 +354,7 @@ size_t LZ4F_compressFrame_usingCDict(void* dstBuffer, size_t dstCapacity,
         prefs.frameInfo.blockMode = LZ4F_blockIndependent;   /* only one block => no need for inter-block link */
 
     if (prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
+        LZ4_resetStream(&lz4ctx);
         cctxI.lz4CtxPtr = &lz4ctx;
         cctxI.lz4CtxLevel = 1;
     }  /* fast compression context pre-created on stack */
@@ -521,7 +522,14 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStreamHC();
             if (cctxPtr->lz4CtxPtr == NULL) return err0r(LZ4F_ERROR_allocation_failed);
             cctxPtr->lz4CtxLevel = ctxTypeID;
-    }   }
+        } else if (cctxPtr->lz4CtxLevel != ctxTypeID) {
+            /* otherwise, we must be transitioning from HC -> LZ4.
+             * In that case, avoid reallocating, since a LZ4 ctx
+             * fits in an HC ctx. Just reset. */
+            LZ4_resetStream((LZ4_stream_t *) cctxPtr->lz4CtxPtr);
+            cctxPtr->lz4CtxLevel = ctxTypeID;
+        }
+    }
 
     /* Buffer Management */
     if (cctxPtr->prefs.frameInfo.blockSizeID == 0)
@@ -654,11 +662,20 @@ static size_t LZ4F_makeBlock(void* dst, const void* src, size_t srcSize,
 static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
     int const acceleration = (level < -1) ? -level : 1;
+    LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t*)ctx)->internal_donotuse;
+    assert(!internal_ctx->initCheck);
+    if (internal_ctx->currentOffset > 1 GB) {
+        /* Init the context */
+        LZ4_resetStream((LZ4_stream_t*)ctx);
+    }
+    /* Clear any local dictionary */
+    internal_ctx->dictionary = NULL;
+    internal_ctx->dictSize = 0;
     if (cdict) {
         memcpy(ctx, cdict->fastCtx, sizeof(*cdict->fastCtx));
         return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
     }
-    return LZ4_compress_fast_extState(ctx, src, dst, srcSize, dstCapacity, acceleration);
+    return LZ4_compress_fast_safeExtState(ctx, src, dst, srcSize, dstCapacity, acceleration);
 }
 
 static int LZ4F_compressBlock_continue(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
