@@ -951,7 +951,7 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
         total += readBytes;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, storedSkips);
     }
-    if (ferror(finput)) EXM_THROW(51, "Read Error")
+    if (ferror(finput)) EXM_THROW(51, "Read Error");
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
     return total;
