@@ -539,7 +539,8 @@ LZ4_FORCE_INLINE void LZ4_resetTable(
        cctx->currentOffset + inputSize >= 0xFFFFU) ||
       (tableType == byU32 &&
        cctx->currentOffset > 1 GB) ||
-      tableType == byPtr))
+      tableType == byPtr ||
+      inputSize >= 2 KB))
   {
       DEBUGLOG(4, "Resetting table in %p", cctx);
       MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
