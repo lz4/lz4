@@ -266,7 +266,9 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  *
  *  Important : The previous 64KB of compressed data is assumed to remain preset and unmodified in memory!
  *              If less than 64KB has been compressed all the data must be present.
- *  Special 1 : If input buffer is a double-buffer, it can have any size, including < 64 KB.
+ *  Special 1 : When input is a double-buffer, they can have any size, including < 64 KB.
+ *              Make sure that buffers are separated by at least one byte.
+ *              This way, rule becomes simple : each block depends on previous block only.
  *  Special 2 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
  *
  * @return : size of compressed block
