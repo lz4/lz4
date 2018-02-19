@@ -1185,7 +1185,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
     BYTE* oexit = op + targetOutputSize;
 
     const BYTE* const dictEnd = (const BYTE*)dictStart + dictSize;
-    const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
+    const unsigned inc32table[8] = {0, 0, 0,  1,  0,  4, 4, 4};
     const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
     const int safeDecode = (endOnInput==endOnInputSize);
