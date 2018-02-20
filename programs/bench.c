@@ -221,8 +221,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         U64 const crcOrig = XXH64(srcBuffer, srcSize, 0);
         UTIL_time_t coolTime;
         U64 const maxTime = (g_nbSeconds * TIMELOOP_NANOSEC) + 100;
-        U32 nbCompressionLoops = ((5 MB) / (srcSize+1)) + 1;  /* conservative initial compression speed estimate */
-        U32 nbDecodeLoops = ((200 MB) / (srcSize+1)) + 1;  /* conservative initial decode speed estimate */
+        U32 nbCompressionLoops = (U32)((5 MB) / (srcSize+1)) + 1;  /* conservative initial compression speed estimate */
+        U32 nbDecodeLoops = (U32)((200 MB) / (srcSize+1)) + 1;  /* conservative initial decode speed estimate */
         U64 totalCTime=0, totalDTime=0;
         U32 cCompleted=0, dCompleted=0;
 #       define NB_MARKS 4
