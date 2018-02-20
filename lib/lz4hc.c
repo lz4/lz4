@@ -135,7 +135,8 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
 
 /* LZ4HC_countPattern() :
  * pattern32 must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!) */
-static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
+static unsigned
+LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 {
     const BYTE* const iStart = ip;
     reg_t const pattern = (sizeof(pattern)==8) ? (reg_t)pattern32 + (((reg_t)pattern32) << 32) : pattern32;
@@ -167,7 +168,8 @@ static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 c
 /* LZ4HC_reverseCountPattern() :
  * pattern must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!)
  * read using natural platform endianess */
-static unsigned LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
+static unsigned
+LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
 {
     const BYTE* const iStart = ip;
 
@@ -185,7 +187,8 @@ static unsigned LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow
 
 typedef enum { rep_untested, rep_not, rep_confirmed } repeat_state_e;
 
-LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
+LZ4_FORCE_INLINE int
+LZ4HC_InsertAndGetWiderMatch (
     LZ4HC_CCtx_internal* hc4,
     const BYTE* const ip,
     const BYTE* const iLowLimit,
@@ -222,6 +225,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
+            assert(longest >= 1);
             if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - delta + longest - 1)) {
                 if (LZ4_read32(matchPtr) == pattern) {
                     int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
