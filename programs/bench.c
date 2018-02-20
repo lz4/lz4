@@ -41,6 +41,7 @@
 #include <string.h>      /* memset */
 #include <stdio.h>       /* fprintf, fopen, ftello */
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
+#include <assert.h>      /* assert */
 
 #include "datagen.h"     /* RDG_genBuffer */
 #include "xxhash.h"
@@ -219,6 +220,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         U64 const crcOrig = XXH64(srcBuffer, srcSize, 0);
         UTIL_time_t coolTime;
         U64 const maxTime = (g_nbSeconds * TIMELOOP_MICROSEC) + 100;
+        U32 nbDecodeLoops = ((200 MB) / (srcSize+1)) + 1;  /* conservative decode speed estimate */
         U64 totalCTime=0, totalDTime=0;
         U32 cCompleted=0, dCompleted=0;
 #       define NB_MARKS 4
@@ -279,13 +281,13 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             /* Decompression */
             if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
 
-            UTIL_sleepMilli(1); /* give processor time to other processes */
+            UTIL_sleepMilli(5); /* give processor time to other processes */
             UTIL_waitForNextTick();
-            clockStart = UTIL_getTime();
 
             if (!dCompleted) {
-                U32 nbLoops = 0;
-                do {
+                U32 nbLoops;
+                clockStart = UTIL_getTime();
+                for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
                     U32 blockNb;
                     for (blockNb=0; blockNb<nbBlocks; blockNb++) {
                         size_t const regenSize = LZ4_decompress_safe(blockTable[blockNb].cPtr, blockTable[blockNb].resPtr, (int)blockTable[blockNb].cSize, (int)blockTable[blockNb].srcSize);
@@ -294,15 +296,13 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             clockLoop = 0;   /* force immediate test end */
                             break;
                         }
-
                         blockTable[blockNb].resSize = regenSize;
-                    }
-                    nbLoops++;
-                } while (UTIL_clockSpanMicro(clockStart) < DECOMP_MULT*clockLoop);
+                }   }
                 {   U64 const clockSpan = UTIL_clockSpanMicro(clockStart);
                     if (clockSpan < fastestD*nbLoops) fastestD = clockSpan / nbLoops;
+                    nbDecodeLoops = (U32)(1000000/*1sec*/ / fastestD) + 1;  /* aim for ~1sec */
                     totalDTime += clockSpan;
-                    dCompleted = totalDTime>(DECOMP_MULT*maxTime);
+                    dCompleted = totalDTime > (DECOMP_MULT*maxTime);
             }   }
 
             markNb = (markNb+1) % NB_MARKS;
