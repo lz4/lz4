@@ -263,7 +263,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         if (clockSpan < fastestC * nbCompressionLoops)
                             fastestC = clockSpan / nbCompressionLoops;
                         assert(fastestC > 0);
-                        nbCompressionLoops = (U32)(1000000000/*1sec*/ / fastestC) + 1;  /* aim for ~1sec */
+                        nbCompressionLoops = (U32)(TIMELOOP_NANOSEC / fastestC) + 1;  /* aim for ~1sec */
                     } else {
                         assert(nbCompressionLoops < 40000000);   /* avoid overflow */
                         nbCompressionLoops *= 100;
@@ -307,7 +307,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         if (clockSpan < fastestD * nbDecodeLoops)
                             fastestD = clockSpan / nbDecodeLoops;
                         assert(fastestD > 0);
-                        nbDecodeLoops = (U32)(1000000000/*1sec*/ / fastestD) + 1;  /* aim for ~1sec */
+                        nbDecodeLoops = (U32)(TIMELOOP_NANOSEC / fastestD) + 1;  /* aim for ~1sec */
                     } else {
                         assert(nbDecodeLoops < 40000000);   /* avoid overflow */
                         nbDecodeLoops *= 100;
