@@ -123,17 +123,20 @@ LZ4_FORCE_INLINE
 int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
                     const BYTE* const iMin, const BYTE* const mMin)
 {
-    int back=0;
-    while ( (ip+back > iMin)
-         && (match+back > mMin)
-         && (ip[back-1] == match[back-1]))
+    int back = 0;
+    int const min = (int)MAX(iMin - ip, mMin - match);
+    assert(ip >= iMin); assert((size_t)(ip-iMin) < (1U<<31));
+    assert(match >= mMin); assert((size_t)(match - mMin) < (1U<<31));
+    while ( (back > min)
+         && (ip[back-1] == match[back-1]) )
             back--;
     return back;
 }
 
 /* LZ4HC_countPattern() :
  * pattern32 must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!) */
-static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
+static unsigned
+LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 {
     const BYTE* const iStart = ip;
     reg_t const pattern = (sizeof(pattern)==8) ? (reg_t)pattern32 + (((reg_t)pattern32) << 32) : pattern32;
@@ -165,7 +168,8 @@ static unsigned LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 c
 /* LZ4HC_reverseCountPattern() :
  * pattern must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!)
  * read using natural platform endianess */
-static unsigned LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
+static unsigned
+LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
 {
     const BYTE* const iStart = ip;
 
@@ -183,7 +187,8 @@ static unsigned LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow
 
 typedef enum { rep_untested, rep_not, rep_confirmed } repeat_state_e;
 
-LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
+LZ4_FORCE_INLINE int
+LZ4HC_InsertAndGetWiderMatch (
     LZ4HC_CCtx_internal* hc4,
     const BYTE* const ip,
     const BYTE* const iLowLimit,
@@ -220,20 +225,11 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
         nbAttempts--;
         if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
-            if (*(iLowLimit + longest) == *(matchPtr - delta + longest)) {
+            assert(longest >= 1);
+            if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - delta + longest - 1)) {
                 if (LZ4_read32(matchPtr) == pattern) {
                     int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
-    #if 0
-                    /* more generic but unfortunately slower on clang */
-                    int const back = LZ4HC_countBack(ip, matchPtr, iLowLimit, lowPrefixPtr);
-    #else
-                    int back = 0;
-                    while ( (ip+back > iLowLimit)
-                         && (matchPtr+back > lowPrefixPtr)
-                         && (ip[back-1] == matchPtr[back-1])) {
-                            back--;
-                    }
-    #endif
+                    int const back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, lowPrefixPtr) : 0;
                     mlt -= back;
 
                     if (mlt > longest) {
@@ -252,10 +248,7 @@ LZ4_FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch (
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
                     mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
-                while ( (ip+back > iLowLimit)
-                     && (matchIndex+back > lowLimit)
-                     && (ip[back-1] == matchPtr[back-1]))
-                        back--;
+                back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictBase+lowLimit) : 0;
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
@@ -333,7 +326,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     size_t length;
     BYTE* const token = (*op)++;
 
-#if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 2)
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 6)
     static const BYTE* start = NULL;
     static U32 totalCost = 0;
     U32 const pos = (start==NULL) ? 0 : (U32)(*anchor - start);
@@ -343,7 +336,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = *anchor;  /* only works for single segment */
     //g_debuglog_enable = (pos >= 2228) & (pos <= 2262);
-    DEBUGLOG(2, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u + %u",
+    DEBUGLOG(6, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u + %u",
                 pos,
                 (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
                 cost, totalCost);
