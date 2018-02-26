@@ -1,3 +1,8 @@
+v1.8.2
+perf: slightly faster HC compression and decompression speed
+perf: very small compression ratio improvement
+cli : benchmark mode more accurate for small inputs
+
 v1.8.1
 perf : faster and stronger ultra modes (levels 10+)
 perf : slightly faster compression and decompression speed
