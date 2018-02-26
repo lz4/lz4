@@ -52,7 +52,7 @@ default: all
 all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC \
      lineCompress frameCompress simpleBuffer
 
-$(LZ4DIR)/liblz4.a: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4opt.h $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.h $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h
+$(LZ4DIR)/liblz4.a: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.h $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h
 	$(MAKE) -C $(LZ4DIR) liblz4.a
 
 printVersion: printVersion.c $(LZ4DIR)/liblz4.a
