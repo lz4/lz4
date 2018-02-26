@@ -1,9 +1,7 @@
 # ################################################################
 # LZ4 - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-present
 # All rights reserved.
-#
-# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #
 # BSD license
 # Redistribution and use in source and binary forms, with or without modification,
@@ -121,6 +119,10 @@ ifneq (,$(filter $(HOST_OS),MSYS POSIX))
 .PHONY: list
 list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
+
+.PHONY: check
+check:
+	$(MAKE) -C $(TESTDIR) test-lz4-essentials
 
 .PHONY: test
 test:
