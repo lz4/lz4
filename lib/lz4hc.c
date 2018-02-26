@@ -425,7 +425,7 @@ static int LZ4HC_compress_hashChain (
     if (inputSize < LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     /* Main Loop */
-    while (ip < mflimit) {
+    while (ip <= mflimit) {
         ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis);
         if (ml<MINMATCH) { ip++; continue; }
 
@@ -435,7 +435,7 @@ static int LZ4HC_compress_hashChain (
         ml0 = ml;
 
 _Search2:
-        if (ip+ml < mflimit)
+        if (ip+ml <= mflimit)
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
                             maxNbAttempts, patternAnalysis);
@@ -482,7 +482,7 @@ _Search3:
         }
         /* Now, we have start2 = ip+new_ml, with new_ml = min(ml, OPTIMAL_ML=18) */
 
-        if (start2 + ml2 < mflimit)
+        if (start2 + ml2 <= mflimit)
             ml3 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3,
                             maxNbAttempts, patternAnalysis);

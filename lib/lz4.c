@@ -545,7 +545,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     const ptrdiff_t dictDelta = dictEnd - (const BYTE*)source;
     const BYTE* anchor = (const BYTE*) source;
     const BYTE* const iend = ip + inputSize;
-    const BYTE* const mflimit = iend - MFLIMIT;
+    const BYTE* const mflimitPlusOne = iend - MFLIMIT + 1;
     const BYTE* const matchlimit = iend - LASTLITERALS;
 
     BYTE* op = (BYTE*) dest;
@@ -594,7 +594,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 forwardIp += step;
                 step = (searchMatchNb++ >> LZ4_skipTrigger);
 
-                if (unlikely(forwardIp > mflimit)) goto _last_literals;
+                if (unlikely(forwardIp > mflimitPlusOne)) goto _last_literals;
+                assert(ip < mflimitPlusOne);
 
                 match = LZ4_getPositionOnHash(h, cctx->hashTable, tableType, base);
                 if (dict==usingExtDict) {
@@ -680,7 +681,7 @@ _next_match:
         anchor = ip;
 
         /* Test end of chunk */
-        if (ip > mflimit) break;
+        if (ip >= mflimitPlusOne) break;
 
         /* Fill table */
         LZ4_putPosition(ip-2, cctx->hashTable, tableType, base);

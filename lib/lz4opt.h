@@ -127,7 +127,7 @@ static int LZ4HC_compress_optimal (
 
     /* Main Loop */
     assert(ip - anchor < LZ4_MAX_INPUT_SIZE);
-    while (ip < mflimit) {
+    while (ip <= mflimit) {
         int const llen = (int)(ip - anchor);
         int best_mlen, best_off;
         int cur, last_match_pos = 0;
@@ -186,7 +186,7 @@ static int LZ4HC_compress_optimal (
             const BYTE* const curPtr = ip + cur;
             LZ4HC_match_t newMatch;
 
-            if (curPtr >= mflimit) break;
+            if (curPtr > mflimit) break;
             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
                     cur, opt[cur].price, opt[cur+1].price, cur+1);
             if (fullUpdate) {
@@ -314,7 +314,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                 if ( LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ip - offset, limit, oend) )   /* updates ip, op and anchor */
                     goto _dest_overflow;
         }   }
-    }  /* while (ip < mflimit) */
+    }  /* while (ip <= mflimit) */
 
 _last_literals:
     /* Encode Last Literals */
