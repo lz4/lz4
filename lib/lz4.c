@@ -546,7 +546,10 @@ LZ4_FORCE_INLINE void LZ4_resetTable(
       cctx->currentOffset = 0;
       cctx->tableType = unusedTable;
   }
-  if (dictDirective == usingExtDictCtx && cctx->currentOffset == 0) {
+  if (dictDirective == usingExtDictCtx &&
+      tableType != byPtr &&
+      cctx->currentOffset == 0)
+  {
       cctx->currentOffset = 1;
   }
 }
@@ -842,11 +845,8 @@ int LZ4_compress_fast_safeExtState(void* state, const char* source, char* dest, 
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_resetTable(ctx, inputSize, tableType, noDict);
-            if (ctx->currentOffset) {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, dictSmall, acceleration);
-            } else {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
-            }
+            ctx->currentOffset += 64 KB;
+            return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
         }
     } else {
         if (inputSize < LZ4_64Klimit) {
@@ -860,11 +860,8 @@ int LZ4_compress_fast_safeExtState(void* state, const char* source, char* dest, 
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_resetTable(ctx, inputSize, tableType, noDict);
-            if (ctx->currentOffset) {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, dictSmall, acceleration);
-            } else {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
-            }
+            ctx->currentOffset += 64 KB;
+            return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
         }
     }
 }
@@ -1222,21 +1219,25 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
     /* external dictionary mode */
     {   int result;
-        if (streamPtr->dictCtx && inputSize < 2 KB) {
-            LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDictCtx);
-            if ((streamPtr->dictCtx->dictSize < 64 KB) && (streamPtr->dictCtx->dictSize < streamPtr->currentOffset)) {
-                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, dictSmall, acceleration);
+        if (streamPtr->dictCtx) {
+            /* We depend here on the fact that dictCtx'es (produced by
+             * LZ4_loadDict) guarantee that their tables contain no references
+             * to offsets between dictCtx->currentOffset - 64 KB and
+             * dictCtx->currentOffset - dictCtx->dictSize. This makes it safe
+             * to use noDictIssue even when the dict isn't a full 64 KB.
+             */
+            if (inputSize > 2 KB) {
+                /* For compressing large blobs, it is faster to pay the setup
+                 * cost to copy the dictionary's tables into the active context,
+                 * so that the compression loop is only looking in one table.
+                 */
+                memcpy(streamPtr, streamPtr->dictCtx, sizeof(LZ4_stream_t));
+                result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, noDictIssue, acceleration);
             } else {
+                LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDictCtx);
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDictCtx, noDictIssue, acceleration);
             }
         } else {
-            if (streamPtr->dictCtx) {
-              /* For compressing large blobs, it is faster to pay the setup
-               * cost to copy the dictionary's tables into the active context,
-               * so that the compression loop is only looking in one table.
-               */
-              memcpy(streamPtr, streamPtr->dictCtx, sizeof(LZ4_stream_t));
-            }
             LZ4_resetTable(streamPtr, inputSize, tableType, usingExtDict);
             if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
