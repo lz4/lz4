@@ -540,7 +540,7 @@ LZ4_FORCE_INLINE void LZ4_resetTable(
       (tableType == byU32 &&
        cctx->currentOffset > 1 GB) ||
       tableType == byPtr ||
-      inputSize >= 2 KB))
+      inputSize >= 4 KB))
   {
       DEBUGLOG(4, "Resetting table in %p", cctx);
       MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
@@ -1227,7 +1227,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
              * dictCtx->currentOffset - dictCtx->dictSize. This makes it safe
              * to use noDictIssue even when the dict isn't a full 64 KB.
              */
-            if (inputSize > 2 KB) {
+            if (inputSize > 4 KB) {
                 /* For compressing large blobs, it is faster to pay the setup
                  * cost to copy the dictionary's tables into the active context,
                  * so that the compression loop is only looking in one table.
