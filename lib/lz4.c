@@ -846,7 +846,9 @@ int LZ4_compress_fast_safeExtState(void* state, const char* source, char* dest, 
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_resetTable(ctx, inputSize, tableType, noDict);
-            ctx->currentOffset += 64 KB;
+            if (ctx->currentOffset) {
+              ctx->currentOffset += 64 KB;
+            }
             return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
         }
     } else {
@@ -861,7 +863,9 @@ int LZ4_compress_fast_safeExtState(void* state, const char* source, char* dest, 
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_resetTable(ctx, inputSize, tableType, noDict);
-            ctx->currentOffset += 64 KB;
+            if (ctx->currentOffset) {
+              ctx->currentOffset += 64 KB;
+            }
             return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
         }
     }
