@@ -708,7 +708,7 @@ _next_match:
         /* Encode MatchLength */
         {   unsigned matchCode;
 
-            if ((dictDirective==usingExtDict || dictDirective==usingExtDictCtx) && ((lowLimit==dictLowLimit) & (dictionary != NULL))) {
+            if ((dictDirective==usingExtDict || dictDirective==usingExtDictCtx) && lowLimit==dictionary) {
                 const BYTE* limit;
                 match += refDelta;
                 limit = ip + (dictEnd-match);
