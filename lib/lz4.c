@@ -605,27 +605,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
     /* Init conditions */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
-    switch(dictDirective)
-    {
-    case noDict:
-    default:
-        lowLimit = (const BYTE*)source;
-        break;
-    case withPrefix64k:
-        lowLimit = (const BYTE*)source - dictSize;
-        break;
-    case usingExtDict:
-        lowLimit = (const BYTE*)source;
-        break;
-    case usingExtDictCtx:
-        lowLimit = (const BYTE*)source;
-        break;
-    }
 
+    lowLimit = (const BYTE*)source - (dictDirective == withPrefix64k ? dictSize : 0);
     dictLowLimit = dictionary ? dictionary : lowLimit;
 
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
-
     if (inputSize<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     /* First Byte */
