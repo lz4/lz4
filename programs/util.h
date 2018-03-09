@@ -180,7 +180,7 @@ extern "C" {
             mach_timebase_info(&rate);
             init = 1;
         }
-        return (((clockEnd - clockStart) * (U64)rate.numer) / ((U64)rate.denom))/1000ULL;
+        return (((clockEnd - clockStart) * (U64)rate.numer) / ((U64)rate.denom)) / 1000ULL;
     }
     UTIL_STATIC U64 UTIL_getSpanTimeNano(UTIL_time_t clockStart, UTIL_time_t clockEnd)
     {
@@ -249,6 +249,12 @@ UTIL_STATIC U64 UTIL_clockSpanMicro(UTIL_time_t clockStart)
     return UTIL_getSpanTimeMicro(clockStart, clockEnd);
 }
 
+/* returns time span in nanoseconds */
+UTIL_STATIC U64 UTIL_clockSpanNano(UTIL_time_t clockStart)
+{
+    UTIL_time_t const clockEnd = UTIL_getTime();
+    return UTIL_getSpanTimeNano(clockStart, clockEnd);
+}
 
 UTIL_STATIC void UTIL_waitForNextTick(void)
 {

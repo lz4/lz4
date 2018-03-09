@@ -1,8 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2017
-#
-# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
+# Copyright (C) Yann Collet 2011-present
 #
 # GPL v2 License
 #
@@ -53,7 +51,7 @@ else
 EXT  =
 VOID = /dev/null
 endif
-LZ4     := $(PRGDIR)/lz4$(EXT)
+LZ4 := $(PRGDIR)/lz4$(EXT)
 
 
 # Default test parameters
@@ -184,12 +182,6 @@ test-lz4-contentSize: lz4 datagen
 	$(LZ4) -v tmplc1 | $(LZ4) -t
 	$(LZ4) -v --content-size tmplc1 | $(LZ4) -d > tmplc2
 	$(DIFF) -s tmplc1 tmplc2
-	# test large size [2-4] GB
-	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmplc1
-	@ls -ls tmplc1
-	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmplc2
-	@ls -ls tmplc2
-	$(DIFF) -s tmplc1 tmplc2
 	@$(RM) tmplc*
 
 test-lz4-frame-concatenation: lz4 datagen
@@ -293,6 +285,13 @@ test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
 	./datagen -g6GB   | $(LZ4) -v5BD  | $(LZ4) -qt
+	# test large file size [2-4] GB
+	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
+	@ls -ls tmphf1
+	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmphf2
+	@ls -ls tmphf2
+	$(DIFF) -s tmphf1 tmphf2
+	@$(RM) tmphf*
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
@@ -326,9 +325,13 @@ test-lz4-opt-parser: lz4 datagen
 	./datagen -g16M -P90  | $(LZ4) -11B5    | $(LZ4) -t
 	./datagen -g32M -P10  | $(LZ4) -11B5D   | $(LZ4) -t
 
-test-lz4: lz4 datagen test-lz4-basic test-lz4-opt-parser test-lz4-multiple \
-          test-lz4-sparse test-lz4-frame-concatenation test-lz4-testmode \
-          test-lz4-contentSize test-lz4-hugefile test-lz4-dict
+test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple \
+                      test-lz4-frame-concatenation test-lz4-testmode \
+                      test-lz4-contentSize
+	@$(RM) tmp*
+
+test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
+          test-lz4-sparse test-lz4-hugefile test-lz4-dict
 	@$(RM) tmp*
 
 test-lz4c: lz4c datagen
