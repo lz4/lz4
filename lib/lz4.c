@@ -582,9 +582,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
     const LZ4_stream_t_internal* dictCtx = (const LZ4_stream_t_internal*) cctx->dictCtx;
     const BYTE* const dictionary =
-        (dictDirective == usingExtDictCtx ? dictCtx : cctx)->dictionary;
+        dictDirective == usingExtDictCtx ? dictCtx->dictionary : cctx->dictionary;
     const U32 dictSize =
-        (dictDirective == usingExtDictCtx ? dictCtx : cctx)->dictSize;
+        dictDirective == usingExtDictCtx ? dictCtx->dictSize : cctx->dictSize;
 
     const BYTE* const lowRefLimit = (const BYTE*) source - dictSize;
     const BYTE* const dictEnd = dictionary + dictSize;
