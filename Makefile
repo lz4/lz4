@@ -56,6 +56,7 @@ all: allmost manuals
 allmost: lib lz4 examples
 
 .PHONY: lib lib-release liblz4.a
+lib: liblz4.a
 lib lib-release liblz4.a:
 	@$(MAKE) -C $(LZ4DIR) $@
 
@@ -67,7 +68,7 @@ lz4 lz4-release :
 	@cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
-examples:
+examples: liblz4.a
 	$(MAKE) -C $(EXDIR) all
 
 .PHONY: manuals
