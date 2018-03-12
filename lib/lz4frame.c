@@ -722,7 +722,7 @@ static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize
     if (cdict) {
         return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
     } else {
-        return LZ4_compress_fast_safeExtState(ctx, src, dst, srcSize, dstCapacity, acceleration);
+        return LZ4_compress_fast_extState_noReset(ctx, src, dst, srcSize, dstCapacity, acceleration);
     }
 }
 

@@ -120,7 +120,7 @@ size_t compress_extState(bench_params_t *p) {
   char *oend = obuf + osize;
   size_t oused;
 
-  oused = LZ4_compress_fast_safeExtState(ctx, ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf, isize, oend - obuf, 0);
+  oused = LZ4_compress_fast_extState_noReset(ctx, ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf, isize, oend - obuf, 0);
   obuf += oused;
 
   return obuf - p->obuf;

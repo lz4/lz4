@@ -179,21 +179,21 @@ LZ4LIB_API int LZ4_compress_fast (const char* src, char* dst, int srcSize, int d
 
 
 /*!
-LZ4_compress_fast_safeExtState() :
+LZ4_compress_fast_extState_noReset() :
 LZ4_compress_fast_extState() :
     Same compression function, just using an externally allocated memory space to store compression state.
     Use LZ4_sizeofState() to know how much memory must be allocated,
     and allocate it on 8-bytes boundaries (using malloc() typically).
     Then, provide it as 'void* state' to compression function.
 
-    Use _safeExtState variant if LZ4_resetStream() was called on the state
-    buffer before being used for the first time (calls to this function leave
-    the state in a safe state, so zeroing is not required between calls).
-    Otherwise, using legacy _extState requires LZ4 to reinitialize the state
-    internally for every call.
+    Use the _noReset variant if LZ4_resetStream() was called on the state
+    buffer before being used for the first time (calls to both extState
+    functions leave the state in a safe state, so zeroing is not required
+    between calls). Otherwise, using the legacy _extState requires LZ4 to
+    reinitialize the state internally for every call.
 */
 LZ4LIB_API int LZ4_sizeofState(void);
-LZ4LIB_API int LZ4_compress_fast_safeExtState (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
+LZ4LIB_API int LZ4_compress_fast_extState_noReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
 
