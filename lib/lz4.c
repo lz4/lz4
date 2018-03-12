@@ -529,35 +529,34 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
         const int inputSize,
         const tableType_t tableType,
         const dict_directive dictDirective) {
-  /* If the table hasn't been used, it's guaranteed to be zeroed out, and is
-   * therefore safe to use no matter what mode we're in. Otherwise, we figure
-   * out if it's safe to leave as is or whether it needs to be reset.
-   */
-  if (cctx->tableType != unusedTable && (
-      cctx->tableType != tableType ||
-      (tableType == byU16 &&
-       cctx->currentOffset + inputSize >= 0xFFFFU) ||
-      (tableType == byU32 &&
-       cctx->currentOffset > 1 GB) ||
-      tableType == byPtr ||
-      inputSize >= 4 KB))
-  {
-      DEBUGLOG(4, "Resetting table in %p", cctx);
-      MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
-      cctx->currentOffset = 0;
-      cctx->tableType = unusedTable;
-  }
-  /* If the current offset is zero, we will never look in the external
-   * dictionary context, since there is no value a table entry can take that
-   * indicates a miss. In that case, we need to bump the offset to something
-   * non-zero.
-   */
-  if (dictDirective == usingExtDictCtx &&
-      tableType != byPtr &&
-      cctx->currentOffset == 0)
-  {
-      cctx->currentOffset = 1;
-  }
+    /* If the table hasn't been used, it's guaranteed to be zeroed out, and is
+     * therefore safe to use no matter what mode we're in. Otherwise, we figure
+     * out if it's safe to leave as is or whether it needs to be reset.
+     */
+    if (cctx->tableType != unusedTable) {
+        if (cctx->tableType != tableType
+          || (tableType == byU16 && cctx->currentOffset + inputSize >= 0xFFFFU)
+          || (tableType == byU32 && cctx->currentOffset > 1 GB)
+          || tableType == byPtr
+          || inputSize >= 4 KB)
+        {
+            DEBUGLOG(4, "Resetting table in %p", cctx);
+            MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
+            cctx->currentOffset = 0;
+            cctx->tableType = unusedTable;
+        }
+    }
+    /* If the current offset is zero, we will never look in the external
+     * dictionary context, since there is no value a table entry can take that
+     * indicates a miss. In that case, we need to bump the offset to something
+     * non-zero.
+     */
+    if (dictDirective == usingExtDictCtx &&
+        tableType != byPtr &&
+        cctx->currentOffset == 0)
+    {
+        cctx->currentOffset = 1;
+    }
 }
 
 /** LZ4_compress_generic() :
@@ -793,12 +792,12 @@ _last_literals:
 
 _clean_up:
     if (dictDirective == usingExtDictCtx) {
-      /* Subsequent linked blocks can't use the dictionary. */
-      /* Instead, they use the block we just compressed. */
-      cctx->dictCtx = NULL;
-      cctx->dictSize = (U32)inputSize;
+        /* Subsequent linked blocks can't use the dictionary. */
+        /* Instead, they use the block we just compressed. */
+        cctx->dictCtx = NULL;
+        cctx->dictSize = (U32)inputSize;
     } else {
-      cctx->dictSize += (U32)inputSize;
+        cctx->dictSize += (U32)inputSize;
     }
     cctx->currentOffset += (U32)inputSize;
     cctx->tableType = tableType;
@@ -815,10 +814,10 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
     LZ4_resetStream((LZ4_stream_t*)state);
     if (maxOutputSize >= LZ4_compressBound(inputSize)) {
         if (inputSize < LZ4_64Klimit) {
-            return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, byU16, noDict, noDictIssue, acceleration);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, byU16, noDict, noDictIssue, acceleration);
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
-            return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, tableType, noDict, noDictIssue, acceleration);
         }
     } else {
         if (inputSize < LZ4_64Klimit) {;
@@ -851,32 +850,32 @@ int LZ4_compress_fast_extState_noReset(void* state, const char* source, char* de
             const tableType_t tableType = byU16;
             LZ4_prepareTable(ctx, inputSize, tableType, noDict);
             if (ctx->currentOffset) {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, dictSmall, acceleration);
+                return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, tableType, noDict, dictSmall, acceleration);
             } else {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
+                return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, tableType, noDict, noDictIssue, acceleration);
             }
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_prepareTable(ctx, inputSize, tableType, noDict);
             if (ctx->currentOffset) {
-              ctx->currentOffset += 64 KB;
+                ctx->currentOffset += 64 KB;
             }
-            return LZ4_compress_generic(ctx, source, dest, inputSize, 0,    notLimited, tableType, noDict, noDictIssue, acceleration);
+            return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, tableType, noDict, noDictIssue, acceleration);
         }
     } else {
         if (inputSize < LZ4_64Klimit) {
             const tableType_t tableType = byU16;
             LZ4_prepareTable(ctx, inputSize, tableType, noDict);
             if (ctx->currentOffset) {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, dictSmall, acceleration);
+                return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, dictSmall, acceleration);
             } else {
-              return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
+                return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
             }
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_prepareTable(ctx, inputSize, tableType, noDict);
             if (ctx->currentOffset) {
-              ctx->currentOffset += 64 KB;
+                ctx->currentOffset += 64 KB;
             }
             return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
         }
@@ -1282,9 +1281,9 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
     LZ4_renormDictT(streamPtr, smallest);
 
     if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
-      result = LZ4_compress_generic(streamPtr, source, dest, inputSize, 0, notLimited, byU32, usingExtDict, dictSmall, 1);
+        result = LZ4_compress_generic(streamPtr, source, dest, inputSize, 0, notLimited, byU32, usingExtDict, dictSmall, 1);
     } else {
-      result = LZ4_compress_generic(streamPtr, source, dest, inputSize, 0, notLimited, byU32, usingExtDict, noDictIssue, 1);
+        result = LZ4_compress_generic(streamPtr, source, dest, inputSize, 0, notLimited, byU32, usingExtDict, noDictIssue, 1);
     }
 
     streamPtr->dictionary = (const BYTE*)source;
