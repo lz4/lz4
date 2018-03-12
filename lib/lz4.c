@@ -889,6 +889,7 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     int result;
 #if (LZ4_HEAPMODE)
     LZ4_stream_t* ctxPtr = ALLOC(sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
+    if (ctxPtr == NULL) return 0;
 #else
     LZ4_stream_t ctx;
     LZ4_stream_t* const ctxPtr = &ctx;
@@ -1101,6 +1102,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 {
 #if (LZ4_HEAPMODE)
     LZ4_stream_t* ctx = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));   /* malloc-calloc always properly aligned */
+    if (ctx == NULL) return 0;
 #else
     LZ4_stream_t ctxBody;
     LZ4_stream_t* ctx = &ctxBody;
@@ -1125,6 +1127,7 @@ LZ4_stream_t* LZ4_createStream(void)
     LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
     LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
     DEBUGLOG(4, "LZ4_createStream %p", lz4s);
+    if (lz4s == NULL) return NULL;
     LZ4_resetStream(lz4s);
     return lz4s;
 }
