@@ -50,12 +50,12 @@ You can contact the author at :
 *  Tuning parameters
 **************************************/
 /*
- * LZ4_HEAPMODE :
+ * LZ4F_HEAPMODE :
  * Select how default compression functions will allocate memory for their hash table,
  * in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
  */
-#ifndef LZ4_HEAPMODE
-#  define LZ4_HEAPMODE 0
+#ifndef LZ4F_HEAPMODE
+#  define LZ4F_HEAPMODE 0
 #endif
 
 
@@ -404,7 +404,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
                     const LZ4F_preferences_t* preferencesPtr)
 {
     size_t result;
-#if (LZ4_HEAPMODE)
+#if (LZ4F_HEAPMODE)
     LZ4F_cctx_t *cctxPtr;
     LZ4F_createCompressionContext(&cctxPtr, LZ4F_VERSION);
 #else
@@ -416,8 +416,8 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
     cctx.version = LZ4F_VERSION;
     cctx.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
     if (preferencesPtr == NULL ||
-        preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN
-    ) {
+        preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN)
+    {
         LZ4_resetStream(&lz4ctx);
         cctxPtr->lz4CtxPtr = &lz4ctx;
         cctxPtr->lz4CtxLevel = 2;
@@ -428,12 +428,12 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
                                            srcBuffer, srcSize,
                                            NULL, preferencesPtr);
 
-#if (LZ4_HEAPMODE)
+#if (LZ4F_HEAPMODE)
     LZ4F_freeCompressionContext(cctxPtr);
 #else
     if (preferencesPtr != NULL &&
-        preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN
-    ) {
+        preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN)
+    {
         FREEMEM(cctxPtr->lz4CtxPtr);
     }
 #endif
