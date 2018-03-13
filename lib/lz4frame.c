@@ -406,7 +406,8 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
     size_t result;
 #if (LZ4F_HEAPMODE)
     LZ4F_cctx_t *cctxPtr;
-    LZ4F_createCompressionContext(&cctxPtr, LZ4F_VERSION);
+    result = LZ4F_createCompressionContext(&cctxPtr, LZ4F_VERSION);
+    if (LZ4F_isError(result)) return result;
 #else
     LZ4F_cctx_t cctx;
     LZ4_stream_t lz4ctx;
