@@ -202,15 +202,8 @@ typedef struct LZ4F_cctx_s
     U64    totalInSize;
     XXH32_state_t xxh;
     void*  lz4CtxPtr;
-    /* lz4CtxLevel records both what size of memory has been allocated into the
-     * ctx pointer field and what it's being used as.
-     * - The low bit (& 1) value indicates whether the ctx is being used for
-     *   hc (1) or not (0).
-     * - The next bit (& 2) indicates whether the allocated memory is big
-     *   enough for a non-hc context.
-     * - The next bit (& 4) indicates whether the allocated memory is big
-     *   enough for an hc context. */
-    U32    lz4CtxLevel;
+    U16    lz4CtxAlloc; // sized for: 0 = none, 1 = lz4 ctx, 2 = lz4hc ctx
+    U16    lz4CtxState; // in use as: 0 = none, 1 = lz4 ctx, 2 = lz4hc ctx
 } LZ4F_cctx_t;
 
 
@@ -421,7 +414,8 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
     {
         LZ4_resetStream(&lz4ctx);
         cctxPtr->lz4CtxPtr = &lz4ctx;
-        cctxPtr->lz4CtxLevel = 2;
+        cctxPtr->lz4CtxAlloc = 1;
+        cctxPtr->lz4CtxState = 1;
     }
 #endif
 
@@ -576,9 +570,8 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     cctxPtr->prefs = *preferencesPtr;
 
     /* Ctx Management */
-    {   U32 const ctxSufficientAllocBits = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 2 : 6;
-        U32 const ctxTypeBit = cctxPtr->prefs.compressionLevel >= LZ4HC_CLEVEL_MIN;
-        if ((cctxPtr->lz4CtxLevel & ctxSufficientAllocBits) != ctxSufficientAllocBits) {
+    {   U16 const ctxTypeID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;
+        if (cctxPtr->lz4CtxAlloc < ctxTypeID) {
             FREEMEM(cctxPtr->lz4CtxPtr);
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStream();
@@ -586,17 +579,17 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
                 cctxPtr->lz4CtxPtr = (void*)LZ4_createStreamHC();
             }
             if (cctxPtr->lz4CtxPtr == NULL) return err0r(LZ4F_ERROR_allocation_failed);
-            cctxPtr->lz4CtxLevel = ctxSufficientAllocBits | ctxTypeBit;
-        } else if ((cctxPtr->lz4CtxLevel & 1) != ctxTypeBit) {
+            cctxPtr->lz4CtxAlloc = ctxTypeID;
+            cctxPtr->lz4CtxState = ctxTypeID;
+        } else if (cctxPtr->lz4CtxState != ctxTypeID) {
             /* otherwise, a sufficient buffer is allocated, but we need to
              * reset it to the correct context type */
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
                 LZ4_resetStream((LZ4_stream_t *) cctxPtr->lz4CtxPtr);
-                cctxPtr->lz4CtxLevel &= ~1;
             } else {
                 LZ4_resetStreamHC((LZ4_streamHC_t *) cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel);
-                cctxPtr->lz4CtxLevel |= 1;
             }
+            cctxPtr->lz4CtxState = ctxTypeID;
         }
     }
 
