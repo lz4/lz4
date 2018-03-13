@@ -113,7 +113,7 @@ clean:
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
         framebench$(EXT) \
-        fasttest$(EXT) datagen$(EXT)
+        fasttest$(EXT) datagen$(EXT) checkTag$(EXT)
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
 
