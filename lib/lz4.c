@@ -1703,6 +1703,9 @@ They are only provided here for compatibility with older user programs.
 int LZ4_uncompress (const char* source, char* dest, int outputSize) { return LZ4_decompress_fast(source, dest, outputSize); }
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) { return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
 
+/* Obsolete Streaming functions */
+
+int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
 
 /* Obsolete streaming decompression functions */
 
