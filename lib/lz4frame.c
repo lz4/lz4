@@ -605,7 +605,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
         if (cctxPtr->maxBufferSize < requiredBuffSize) {
             cctxPtr->maxBufferSize = 0;
             FREEMEM(cctxPtr->tmpBuff);
-            cctxPtr->tmpBuff = (BYTE*)ALLOC(requiredBuffSize);
+            cctxPtr->tmpBuff = (BYTE*)ALLOC_AND_ZERO(requiredBuffSize);
             if (cctxPtr->tmpBuff == NULL) return err0r(LZ4F_ERROR_allocation_failed);
             cctxPtr->maxBufferSize = requiredBuffSize;
     }   }
