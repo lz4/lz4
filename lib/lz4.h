@@ -179,21 +179,13 @@ LZ4LIB_API int LZ4_compress_fast (const char* src, char* dst, int srcSize, int d
 
 
 /*!
-LZ4_compress_fast_extState_noReset() :
 LZ4_compress_fast_extState() :
     Same compression function, just using an externally allocated memory space to store compression state.
     Use LZ4_sizeofState() to know how much memory must be allocated,
     and allocate it on 8-bytes boundaries (using malloc() typically).
     Then, provide it as 'void* state' to compression function.
-
-    Use the _noReset variant if LZ4_resetStream() was called on the state
-    buffer before being used for the first time (calls to both extState
-    functions leave the state in a safe state, so zeroing is not required
-    between calls). Otherwise, using the legacy _extState requires LZ4 to
-    reinitialize the state internally for every call.
 */
 LZ4LIB_API int LZ4_sizeofState(void);
-LZ4LIB_API int LZ4_compress_fast_extState_noReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
 
@@ -351,6 +343,29 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 /*^**********************************************
  * !!!!!!   STATIC LINKING ONLY   !!!!!!
  ***********************************************/
+
+/*-************************************
+ *  Unstable declarations
+ **************************************
+ * Declarations in this section should be considered unstable.
+ * Use at your own peril, etc., etc.
+ * They may be removed in the future.
+ * Their signatures may change.
+ **************************************/
+
+/*!
+LZ4_compress_fast_extState_noReset() :
+    A variant of LZ4_compress_fast_extState().
+
+    Use the _noReset variant if LZ4_resetStream() was called on the state
+    buffer before being used for the first time (calls to both extState
+    functions leave the state in a safe state, so zeroing is not required
+    between calls). Otherwise, using the plain _extState requires LZ4 to
+    reinitialize the state internally for every call.
+*/
+LZ4LIB_API int LZ4_compress_fast_extState_noReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
+
+
 /*-************************************
  *  Private definitions
  **************************************
