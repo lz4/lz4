@@ -117,9 +117,9 @@ only the latest one will be applied.
 ### Operation modifiers
 
 * `-#`:
-  Compression level, with # being any value from 1 to 16.
+  Compression level, with # being any value from 1 to 12.
   Higher values trade compression speed for compression ratio.
-  Values above 16 are considered the same as 16.
+  Values above 12 are considered the same as 12.
   Recommended values are 1 for fast compression (default),
   and 9 for high compression.
   Speed/compression trade-off will vary depending on data to compress.
@@ -206,7 +206,7 @@ only the latest one will be applied.
   Benchmark multiple compression levels, from b# to e# (included)
 
 * `-i#`:
-  Minimum evaluation in seconds \[1-9\] (default : 3)
+  Minimum evaluation time in seconds \[1-9\] (default : 3)
 
 
 BUGS
