@@ -141,7 +141,8 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #include <stdint.h>
 
-typedef struct
+typedef struct LZ4HC_CCtx_internal LZ4HC_CCtx_internal;
+struct LZ4HC_CCtx_internal
 {
     uint32_t   hashTable[LZ4HC_HASHTABLESIZE];
     uint16_t   chainTable[LZ4HC_MAXD];
@@ -153,11 +154,13 @@ typedef struct
     uint32_t   lowLimit;        /* below that point, no more dict */
     uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
     int        compressionLevel;
-} LZ4HC_CCtx_internal;
+    const LZ4HC_CCtx_internal* dictCtx;
+};
 
 #else
 
-typedef struct
+typedef struct LZ4HC_CCtx_internal LZ4HC_CCtx_internal;
+struct LZ4HC_CCtx_internal
 {
     unsigned int   hashTable[LZ4HC_HASHTABLESIZE];
     unsigned short chainTable[LZ4HC_MAXD];
@@ -169,11 +172,12 @@ typedef struct
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
     int            compressionLevel;
-} LZ4HC_CCtx_internal;
+    const LZ4HC_CCtx_internal* dictCtx;
+};
 
 #endif
 
-#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 56) /* 262200 */
+#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 64) /* 262200 */
 #define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
 union LZ4_streamHC_u {
     size_t table[LZ4_STREAMHCSIZE_SIZET];
