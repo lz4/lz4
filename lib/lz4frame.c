@@ -95,6 +95,18 @@ You can contact the author at :
 
 #define LZ4F_STATIC_ASSERT(c)    { enum { LZ4F_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
+#  include <stdio.h>
+static int g_debuglog_enable = 1;
+#  define DEBUGLOG(l, ...) {                                  \
+                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
+                    fprintf(stderr, __FILE__ ": ");           \
+                    fprintf(stderr, __VA_ARGS__);             \
+                    fprintf(stderr, " \n");                   \
+            }   }
+#else
+#  define DEBUGLOG(l, ...)      {}    /* disabled */
+#endif
 
 /*-************************************
 *  Basic Types
@@ -457,6 +469,7 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
     LZ4F_CDict* cdict = (LZ4F_CDict*) malloc(sizeof(*cdict));
+    DEBUGLOG(4, "LZ4F_createCDict(%p) -> %p", dictBuffer, cdict);
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
         dictStart += dictSize - 64 KB;
@@ -479,6 +492,7 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 
 void LZ4F_freeCDict(LZ4F_CDict* cdict)
 {
+    DEBUGLOG(4, "LZ4F_freeCDict(%p)", cdict);
     if (cdict==NULL) return;  /* support free on NULL */
     FREEMEM(cdict->dictContent);
     LZ4_freeStream(cdict->fastCtx);
@@ -530,6 +544,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 static void LZ4F_applyCDict(void* ctx,
                             const LZ4F_CDict* cdict,
                             int level) {
+    DEBUGLOG(5, "LZ4F_applyCDict(%p, %p)", ctx, cdict);
     if (level < LZ4HC_CLEVEL_MIN) {
         LZ4_resetStream_fast((LZ4_stream_t *)ctx);
         LZ4_attach_dictionary((LZ4_stream_t *)ctx, cdict ? cdict->fastCtx : NULL);
@@ -559,6 +574,8 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
     BYTE* headerStart;
+
+    DEBUGLOG(4, "LZ4F_compressBegin_usingCDict(%p, %p)", cctxPtr, cdict);
 
     if (dstCapacity < maxFHSize) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     MEM_INIT(&prefNull, 0, sizeof(prefNull));
@@ -778,6 +795,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
     LZ4F_lastBlockStatus lastBlockCompressed = notDone;
     compressFunc_t const compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel);
 
+    DEBUGLOG(4, "LZ4F_compressUpdate(%p, %p, %zd)", cctxPtr, srcBuffer, srcSize);
 
     if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_GENERIC);
     if (dstCapacity < LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize))
@@ -916,6 +934,9 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstMaxSize, 
     BYTE* dstPtr = dstStart;
 
     size_t const flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstMaxSize, compressOptionsPtr);
+
+    DEBUGLOG(4, "LZ4F_compressEnd(%p)", cctxPtr);
+
     if (LZ4F_isError(flushSize)) return flushSize;
     dstPtr += flushSize;
 

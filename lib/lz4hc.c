@@ -86,6 +86,7 @@ static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)
 **************************************/
 static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
+    DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
     hc4->nextToUpdate = 64 KB;
@@ -641,6 +642,8 @@ static int LZ4HC_compress_generic (
         { lz4opt,8192, LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
     };
 
+    DEBUGLOG(4, "LZ4HC_compress_generic(%p, %p, %d)", ctx, src, *srcSizePtr);
+
     if (limit == limitedDestSize && dstCapacity < 1) return 0;         /* Impossible to store anything */
     if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;          /* Unsupported input size (too large or negative) */
 
@@ -706,8 +709,14 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 *  Streaming Functions
 **************************************/
 /* allocation */
-LZ4_streamHC_t* LZ4_createStreamHC(void) { return (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t)); }
-int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
+LZ4_streamHC_t* LZ4_createStreamHC(void) {
+    LZ4_streamHC_t* LZ4_streamHCPtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
+    DEBUGLOG(4, "LZ4_createStreamHC() -> %p", LZ4_streamHCPtr);
+    return LZ4_streamHCPtr;
+}
+
+int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
+    DEBUGLOG(4, "LZ4_freeStreamHC(%p)", LZ4_streamHCPtr);
     if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
     free(LZ4_streamHCPtr);
     return 0;
@@ -718,6 +727,7 @@ int             LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
 void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= sizeof(size_t) * LZ4_STREAMHCSIZE_SIZET);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
+    DEBUGLOG(4, "LZ4_resetStreamHC(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
@@ -732,6 +742,7 @@ void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    DEBUGLOG(4, "LZ4_loadDictHC(%p, %p, %d)", LZ4_streamHCPtr, dictionary, dictSize);
     if (dictSize > 64 KB) {
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
@@ -747,6 +758,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
 
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
+    DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
     if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
@@ -764,6 +776,7 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
                                             limitedOutput_directive limit)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    DEBUGLOG(4, "LZ4_compressHC_continue_generic(%p, %p, %d)", LZ4_streamHCPtr, src, *srcSizePtr);
     /* auto-init if forgotten */
     if (ctxPtr->base == NULL) LZ4HC_init (ctxPtr, (const BYTE*) src);
 
@@ -812,6 +825,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
 {
     LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
     int const prefixSize = (int)(streamPtr->end - (streamPtr->base + streamPtr->dictLimit));
+    DEBUGLOG(4, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 4) dictSize = 0;
     if (dictSize > prefixSize) dictSize = prefixSize;
