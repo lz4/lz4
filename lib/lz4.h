@@ -343,6 +343,29 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 /*^**********************************************
  * !!!!!!   STATIC LINKING ONLY   !!!!!!
  ***********************************************/
+
+/*-************************************
+ *  Unstable declarations
+ **************************************
+ * Declarations in this section should be considered unstable.
+ * Use at your own peril, etc., etc.
+ * They may be removed in the future.
+ * Their signatures may change.
+ **************************************/
+
+/*!
+LZ4_compress_fast_extState_noReset() :
+    A variant of LZ4_compress_fast_extState().
+
+    Use the _noReset variant if LZ4_resetStream() was called on the state
+    buffer before being used for the first time (calls to both extState
+    functions leave the state in a safe state, so zeroing is not required
+    between calls). Otherwise, using the plain _extState requires LZ4 to
+    reinitialize the state internally for every call.
+*/
+LZ4LIB_API int LZ4_compress_fast_extState_noReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
+
+
 /*-************************************
  *  Private definitions
  **************************************
@@ -357,14 +380,16 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #include <stdint.h>
 
-typedef struct {
+typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
+struct LZ4_stream_t_internal {
     uint32_t hashTable[LZ4_HASH_SIZE_U32];
     uint32_t currentOffset;
-    uint32_t initCheck;
+    uint16_t initCheck;
+    uint16_t tableType;
     const uint8_t* dictionary;
-    uint8_t* bufferStart;   /* obsolete, used for slideInputBuffer */
+    const LZ4_stream_t_internal* dictCtx;
     uint32_t dictSize;
-} LZ4_stream_t_internal;
+};
 
 typedef struct {
     const uint8_t* externalDict;
@@ -375,14 +400,16 @@ typedef struct {
 
 #else
 
-typedef struct {
+typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
+struct LZ4_stream_t_internal {
     unsigned int hashTable[LZ4_HASH_SIZE_U32];
     unsigned int currentOffset;
-    unsigned int initCheck;
+    unsigned short initCheck;
+    unsigned short tableType;
     const unsigned char* dictionary;
-    unsigned char* bufferStart;   /* obsolete, used for slideInputBuffer */
+    const LZ4_stream_t_internal* dictCtx;
     unsigned int dictSize;
-} LZ4_stream_t_internal;
+};
 
 typedef struct {
     const unsigned char* externalDict;
@@ -465,11 +492,15 @@ LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_co
 LZ4_DEPRECATED("use LZ4_decompress_fast() instead") LZ4LIB_API int LZ4_uncompress (const char* source, char* dest, int outputSize);
 LZ4_DEPRECATED("use LZ4_decompress_safe() instead") LZ4LIB_API int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
-/* Obsolete streaming functions; use new streaming interface whenever possible */
-LZ4_DEPRECATED("use LZ4_createStream() instead") LZ4LIB_API void* LZ4_create (char* inputBuffer);
-LZ4_DEPRECATED("use LZ4_createStream() instead") LZ4LIB_API int   LZ4_sizeofStreamState(void);
-LZ4_DEPRECATED("use LZ4_resetStream() instead") LZ4LIB_API  int   LZ4_resetStreamState(void* state, char* inputBuffer);
-LZ4_DEPRECATED("use LZ4_saveDict() instead") LZ4LIB_API     char* LZ4_slideInputBuffer (void* state);
+/* Broken, obsolete streaming functions; do not use!
+ *
+ * These functions depended on data that is no longer tracked in the state. They
+ * are therefore broken--they don't retain any history across compressions.
+ */
+LZ4_DEPRECATED("Broken!!! Use LZ4_createStream() instead") LZ4LIB_API void* LZ4_create (char* inputBuffer);
+LZ4_DEPRECATED("Use LZ4_createStream() instead") LZ4LIB_API int   LZ4_sizeofStreamState(void);
+LZ4_DEPRECATED("Broken!!! Use LZ4_resetStream() instead") LZ4LIB_API  int   LZ4_resetStreamState(void* state, char* inputBuffer);
+LZ4_DEPRECATED("Broken!!! Use LZ4_saveDict() instead") LZ4LIB_API     char* LZ4_slideInputBuffer (void* state);
 
 /* Obsolete streaming decoding functions */
 LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") LZ4LIB_API int LZ4_decompress_safe_withPrefix64k (const char* src, char* dst, int compressedSize, int maxDstSize);

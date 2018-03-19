@@ -107,6 +107,7 @@ LZ4FLIB_STATIC_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
 
 /*! LZ4_compressFrame_usingCDict() :
  *  Compress an entire srcBuffer into a valid LZ4 frame using a digested Dictionary.
+ *  cctx must point to a context created by LZ4F_createCompressionContext().
  *  If cdict==NULL, compress without a dictionary.
  *  dstBuffer MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
  *  If this condition is not respected, function will fail (@return an errorCode).
@@ -115,6 +116,7 @@ LZ4FLIB_STATIC_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError()) */
 LZ4FLIB_STATIC_API size_t LZ4F_compressFrame_usingCDict(
+    LZ4F_cctx* cctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     const LZ4F_CDict* cdict,
