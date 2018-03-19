@@ -63,7 +63,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest datagen
+all: fullbench fuzzer frametest datagen framebench
 
 all32: CFLAGS+=-m32
 all32: all
@@ -99,6 +99,9 @@ fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+framebench: lz4frame.o lz4.o lz4hc.o xxhash.o framebench.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
@@ -110,6 +113,7 @@ clean:
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
+        framebench$(EXT) \
         fasttest$(EXT) datagen$(EXT) checkTag$(EXT)
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
