@@ -858,7 +858,7 @@ int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
 
 void* LZ4_createHC (char* inputBuffer)
 {
-    LZ4_streamHC_t* hc4 = (LZ4_streamHC_t*)ALLOCATOR(1, sizeof(LZ4_streamHC_t));
+    LZ4_streamHC_t* hc4 = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
     if (hc4 == NULL) return NULL;   /* not enough memory */
     LZ4HC_init (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
     hc4->internal_donotuse.inputBuffer = (BYTE*)inputBuffer;
