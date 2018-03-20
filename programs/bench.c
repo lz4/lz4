@@ -119,21 +119,21 @@ static clock_t g_time = 0;
 static U32 g_nbSeconds = NBSECONDS;
 static size_t g_blockSize = 0;
 int g_additionalParam = 0;
+int g_benchSeparately = 0;
 
 void BMK_setNotificationLevel(unsigned level) { g_displayLevel=level; }
 
 void BMK_setAdditionalParam(int additionalParam) { g_additionalParam=additionalParam; }
 
-void BMK_SetNbSeconds(unsigned nbSeconds)
+void BMK_setNbSeconds(unsigned nbSeconds)
 {
     g_nbSeconds = nbSeconds;
     DISPLAYLEVEL(3, "- test >= %u seconds per compression / decompression -\n", g_nbSeconds);
 }
 
-void BMK_SetBlockSize(size_t blockSize)
-{
-    g_blockSize = blockSize;
-}
+void BMK_setBlockSize(size_t blockSize) { g_blockSize = blockSize; }
+
+void BMK_setBenchSeparately(int separate) { g_benchSeparately = (separate!=0); }
 
 
 /* ********************************************************
@@ -515,6 +515,22 @@ static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility
 }
 
 
+int BMK_benchFilesSeparately(const char** fileNamesTable, unsigned nbFiles,
+                   int cLevel, int cLevelLast)
+{
+    unsigned fileNb;
+    if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
+    if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
+    if (cLevelLast < cLevel) cLevelLast = cLevel;
+    if (cLevelLast > cLevel) DISPLAYLEVEL(2, "Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
+
+    for (fileNb=0; fileNb<nbFiles; fileNb++)
+        BMK_benchFileTable(fileNamesTable+fileNb, 1, cLevel, cLevelLast);
+
+    return 0;
+}
+
+
 int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast)
 {
@@ -527,7 +543,11 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
 
     if (nbFiles == 0)
         BMK_syntheticTest(cLevel, cLevelLast, compressibility);
-    else
-        BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast);
+    else {
+        if (g_benchSeparately)
+            BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast);
+        else
+            BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast);
+    }
     return 0;
 }
