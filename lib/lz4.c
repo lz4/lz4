@@ -1722,7 +1722,7 @@ void* LZ4_create (char* inputBuffer)
 
 char* LZ4_slideInputBuffer (void* state)
 {
-    // avoid const char * -> char * conversion warning
+    /* avoid const char * -> char * conversion warning */
     return (char *)(uptrval)((LZ4_stream_t*)state)->internal_donotuse.dictionary;
 }
 

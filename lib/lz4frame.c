@@ -202,8 +202,8 @@ typedef struct LZ4F_cctx_s
     U64    totalInSize;
     XXH32_state_t xxh;
     void*  lz4CtxPtr;
-    U16    lz4CtxAlloc; // sized for: 0 = none, 1 = lz4 ctx, 2 = lz4hc ctx
-    U16    lz4CtxState; // in use as: 0 = none, 1 = lz4 ctx, 2 = lz4hc ctx
+    U16    lz4CtxAlloc; /* sized for: 0 = none, 1 = lz4 ctx, 2 = lz4hc ctx */
+    U16    lz4CtxState; /* in use as: 0 = none, 1 = lz4 ctx, 2 = lz4hc ctx */
 } LZ4F_cctx_t;
 
 
