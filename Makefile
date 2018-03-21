@@ -173,7 +173,7 @@ gpptest gpptest32: clean
 	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
 
 c_standards: clean
-	# note : lz4 is not C90 compatible, because it requires long long support
+	CFLAGS="-std=c90   -Werror" $(MAKE) clean allmost
 	CFLAGS="-std=gnu90 -Werror" $(MAKE) clean allmost
 	CFLAGS="-std=c99   -Werror" $(MAKE) clean allmost
 	CFLAGS="-std=gnu99 -Werror" $(MAKE) clean allmost
