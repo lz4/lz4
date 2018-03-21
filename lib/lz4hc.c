@@ -222,7 +222,7 @@ LZ4HC_InsertAndGetWiderMatch (
     DEBUGLOG(7, "First match at index %u / %u (lowLimit)",
                 matchIndex, lowLimit);
 
-    while ((matchIndex>=lowLimit) && (nbAttempts)) {
+    while ((matchIndex>=lowLimit) && (matchIndex < (ip - base)) && (nbAttempts)) {
         DEBUGLOG(7, "remaining attempts : %i", nbAttempts);
         nbAttempts--;
         if (matchIndex >= dictLimit) {
@@ -286,7 +286,7 @@ LZ4HC_InsertAndGetWiderMatch (
                             matchIndex -= (U32)backLength;   /* let's go to farthest segment position, will find a match of length currentSegmentLength + maybe some back */
                         }
         }   }   }   }
-    }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
+    }  /* while ((matchIndex>=lowLimit) && (matchIndex < (ip - base)) && (nbAttempts)) */
 
     return longest;
 }
