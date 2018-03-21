@@ -327,7 +327,7 @@ test-lz4-opt-parser: lz4 datagen
 
 test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple \
                       test-lz4-frame-concatenation test-lz4-testmode \
-                      test-lz4-contentSize
+                      test-lz4-contentSize test-lz4-dict
 	@$(RM) tmp*
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
