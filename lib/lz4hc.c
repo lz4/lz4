@@ -203,6 +203,7 @@ LZ4HC_InsertAndGetWiderMatch (
 {
     U16* const chainTable = hc4->chainTable;
     U32* const HashTable = hc4->hashTable;
+    const LZ4HC_CCtx_internal * const dictCtx = hc4->dictCtx;
     const BYTE* const base = hc4->base;
     const U32 dictLimit = hc4->dictLimit;
     const BYTE* const lowPrefixPtr = base + dictLimit;
@@ -212,6 +213,7 @@ LZ4HC_InsertAndGetWiderMatch (
     int nbAttempts = maxNbAttempts;
     U32 const pattern = LZ4_read32(ip);
     U32 matchIndex;
+    U32 dictMatchIndex;
     repeat_state_e repeat = rep_untested;
     size_t srcPatternLength = 0;
 
@@ -287,6 +289,39 @@ LZ4HC_InsertAndGetWiderMatch (
                         }
         }   }   }   }
     }  /* while ((matchIndex>=lowLimit) && (matchIndex < (ip - base)) && (nbAttempts)) */
+
+    if (dictCtx != NULL) {
+        ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
+        dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
+        matchIndex = dictMatchIndex + dictIndexDelta;
+        while (dictMatchIndex >= dictCtx->dictLimit && dictMatchIndex + dictCtx->base < dictCtx->end && dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
+            const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
+
+            if (LZ4_read32(matchPtr) == pattern) {
+                int mlt;
+                int back = 0;
+                const BYTE* vLimit = ip + (dictCtx->end - matchPtr);
+                if (vLimit > iHighLimit) vLimit = iHighLimit;
+                mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
+                // if ((ip+mlt == vLimit) && (vLimit < iHighLimit)) {
+                //     mlt += LZ4_count(ip+mlt, base+lowLimit, iHighLimit);
+                // }
+                back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
+                mlt -= back;
+                if (mlt > longest) {
+                    longest = mlt;
+                    *matchpos = base + matchIndex + back;
+                    *startpos = ip + back;
+                }
+            }
+
+            {
+                U32 const nextOffset = DELTANEXTU16(dictCtx->chainTable, dictMatchIndex);
+                dictMatchIndex -= nextOffset;
+                matchIndex -= nextOffset;
+            }
+        }
+    }
 
     return longest;
 }
