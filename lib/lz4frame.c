@@ -549,12 +549,9 @@ static void LZ4F_applyCDict(void* ctx,
         LZ4_resetStream_fast((LZ4_stream_t *)ctx);
         LZ4_attach_dictionary((LZ4_stream_t *)ctx, cdict ? cdict->fastCtx : NULL);
     } else {
-        if (cdict) {
-            memcpy(ctx, cdict->HCCtx, sizeof(*cdict->HCCtx));
-            LZ4_setCompressionLevel((LZ4_streamHC_t*)ctx, level);
-        } else {
-            LZ4_resetStreamHC((LZ4_streamHC_t*)(ctx), level);
-        }
+        LZ4HC_CCtx_internal *internal_ctx = &((LZ4_streamHC_t *)ctx)->internal_donotuse;
+        LZ4_resetStreamHC((LZ4_streamHC_t*)ctx, level);
+        internal_ctx->dictCtx = cdict ? &(cdict->HCCtx->internal_donotuse) : NULL;
     }
 }
 
