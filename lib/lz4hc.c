@@ -87,7 +87,6 @@ static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)
 static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
-    MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
     hc4->nextToUpdate = 64 KB;
     hc4->base = start - 64 KB;
