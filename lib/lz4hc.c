@@ -288,7 +288,7 @@ LZ4HC_InsertAndGetWiderMatch (
         }   }   }   }
     }  /* while ((matchIndex>=lowLimit) && (matchIndex < (ip - base)) && (nbAttempts)) */
 
-    if (dictCtx != NULL) {
+    if (dictCtx != NULL && nbAttempts) {
         ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         matchIndex = dictMatchIndex + dictIndexDelta;
