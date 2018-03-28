@@ -294,11 +294,11 @@ LZ4HC_InsertAndGetWiderMatch (
         }   }   }   }
     }  /* while ((matchIndex>=lowLimit) && (matchIndex < (ip - base)) && (nbAttempts)) */
 
-    if (dictCtx != NULL && nbAttempts) {
+    if (dictCtx != NULL && nbAttempts && ip - base - lowLimit < MAX_DISTANCE) {
         ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         matchIndex = dictMatchIndex + dictIndexDelta;
-        while (dictMatchIndex >= dictCtx->dictLimit && dictMatchIndex + dictCtx->base < dictCtx->end && dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
+        while (dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
             if (LZ4_read32(matchPtr) == pattern) {
