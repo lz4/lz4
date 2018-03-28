@@ -111,7 +111,9 @@ size_t compress_default(bench_params_t *p) {
   char *oend = obuf + osize;
   size_t oused;
 
-  oused = LZ4_compress_default(ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf, isize, oend - obuf);
+  oused = LZ4_compress_default(
+      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
+      isize, oend - obuf);
   obuf += oused;
 
   return obuf - p->obuf;
@@ -130,7 +132,10 @@ size_t compress_extState(bench_params_t *p) {
   char *oend = obuf + osize;
   size_t oused;
 
-  oused = LZ4_compress_fast_extState_fastReset(ctx, ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf, isize, oend - obuf, clevel);
+  oused = LZ4_compress_fast_extState_fastReset(
+      ctx,
+      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
+      isize, oend - obuf, clevel);
   obuf += oused;
 
   return obuf - p->obuf;
@@ -148,7 +153,9 @@ size_t compress_hc(bench_params_t *p) {
   char *oend = obuf + osize;
   size_t oused;
 
-  oused = LZ4_compress_HC(ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf, isize, oend - obuf, clevel);
+  oused = LZ4_compress_HC(
+      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
+      isize, oend - obuf, clevel);
   obuf += oused;
 
   return obuf - p->obuf;
@@ -167,7 +174,10 @@ size_t compress_hc_extState(bench_params_t *p) {
   char *oend = obuf + osize;
   size_t oused;
 
-  oused = LZ4_compress_HC_extStateHC(hcctx, ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf, isize, oend - obuf, clevel);
+  oused = LZ4_compress_HC_extStateHC(
+      hcctx,
+      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
+      isize, oend - obuf, clevel);
   obuf += oused;
 
   return obuf - p->obuf;
@@ -176,7 +186,8 @@ size_t compress_hc_extState(bench_params_t *p) {
 size_t check_lz4(bench_params_t *p, size_t csize) {
   (void)csize;
   memset(p->checkbuf, 0xFF, p->checksize);
-  return LZ4_decompress_fast_usingDict(p->obuf, p->checkbuf, p->isize, p->dictbuf, p->dictsize)
+  return LZ4_decompress_fast_usingDict(p->obuf, p->checkbuf, p->isize,
+                                       p->dictbuf, p->dictsize)
       && !memcmp(p->ibuf, p->checkbuf, p->isize);
 }
 
@@ -190,7 +201,9 @@ size_t check_lz4f(bench_params_t *p, size_t csize) {
   memset(p->checkbuf, 0xFF, p->checksize);
   LZ4F_resetDecompressionContext(p->dctx);
   do {
-    ret = LZ4F_decompress_usingDict(p->dctx, p->checkbuf + dp, &dleft, p->obuf + cp, &cleft, p->dictbuf, p->dictsize, NULL);
+    ret = LZ4F_decompress_usingDict(
+        p->dctx, p->checkbuf + dp, &dleft, p->obuf + cp, &cleft,
+        p->dictbuf, p->dictsize, NULL);
     cp += cleft;
     dp += dleft;
     cleft = csize - cp;
@@ -200,15 +213,17 @@ size_t check_lz4f(bench_params_t *p, size_t csize) {
   return !memcmp(p->ibuf, p->checkbuf, p->isize);
 }
 
+
 uint64_t bench(
+    char *bench_name,
     size_t (*fun)(bench_params_t *),
     size_t (*checkfun)(bench_params_t *, size_t),
     uint64_t repetitions,
-    bench_params_t *params,
-    size_t *osizePtr
+    bench_params_t *params
 ) {
   struct timespec start, end;
   size_t i, osize = 0, o = 0;
+  size_t time_taken;
 
   if (clock_gettime(CLOCK_MONOTONIC_RAW, &start)) return 0;
 
@@ -224,8 +239,19 @@ uint64_t bench(
   o = checkfun(params, o);
   if (!o) return 0;
 
-  *osizePtr = osize / repetitions;
-  return (1000 * 1000 * 1000 * end.tv_sec + end.tv_nsec) - (1000 * 1000 * 1000 * start.tv_sec + start.tv_nsec);
+  time_taken = (1000 * 1000 * 1000 * end.tv_sec + end.tv_nsec) -
+               (1000 * 1000 * 1000 * start.tv_sec + start.tv_nsec);
+
+  fprintf(
+      stderr,
+      "%-30s @ lvl %2d: %8ld B -> %8ld B, %8ld iters, %12ld ns, %9ld ns/iter, %7.2lf MB/s\n",
+      bench_name, params->clevel,
+      params->isize, osize / repetitions,
+      repetitions, time_taken, time_taken / repetitions,
+      ((double) 1000 * params->isize * repetitions) / time_taken
+  );
+
+  return time_taken;
 }
 
 int main(int argc, char *argv[]) {
@@ -260,9 +286,8 @@ int main(int argc, char *argv[]) {
   LZ4F_preferences_t prefs;
   LZ4F_compressOptions_t options;
 
-  size_t out_used;
+  int clevels[] = {1, 2, 3, 6, 9, 10, 12};
 
-  uint64_t time_taken;
   uint64_t repetitions;
 
   bench_params_t params;
@@ -364,49 +389,23 @@ int main(int argc, char *argv[]) {
   params.prefs = &prefs;
   params.options = &options;
 
-  time_taken = bench(compress_default, check_lz4, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4_compress_default            : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
+  for (unsigned int clevelidx = 0; clevelidx < sizeof(clevels) / sizeof(clevels[0]); clevelidx++) {
+    params.clevel = clevels[clevelidx];
+    params.prefs->compressionLevel = clevels[clevelidx];
+    params.cdict = NULL;
 
-  time_taken = bench(compress_extState, check_lz4, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4_compress_fast_extState      : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
+    bench("LZ4_compress_default"         , compress_default    , check_lz4 , repetitions, &params);
+    bench("LZ4_compress_fast_extState"   , compress_extState   , check_lz4 , repetitions, &params);
+    bench("LZ4_compress_HC"              , compress_hc         , check_lz4 , repetitions, &params);
+    bench("LZ4_compress_HC_extStateHC"   , compress_hc_extState, check_lz4 , repetitions, &params);
+    bench("LZ4F_compressFrame"           , compress_frame      , check_lz4f, repetitions, &params);
+    bench("LZ4F_compressBegin"           , compress_begin      , check_lz4f, repetitions, &params);
 
-  time_taken = bench(compress_frame, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressFrame              : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
+    params.cdict = cdict;
 
-  time_taken = bench(compress_begin, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressBegin              : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  params.cdict = cdict;
-
-  time_taken = bench(compress_frame, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressFrame_usingCDict   : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  time_taken = bench(compress_begin, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressBegin_usingCDict   : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  params.cdict = NULL;
-  params.clevel = LZ4HC_CLEVEL_MIN;
-  params.prefs->compressionLevel = LZ4HC_CLEVEL_MIN;
-
-  time_taken = bench(compress_hc, check_lz4, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4_compress_HC                 : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  time_taken = bench(compress_hc_extState, check_lz4, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4_compress_HC_extStateHC      : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  time_taken = bench(compress_frame, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressFrame_HC           : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  time_taken = bench(compress_begin, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressBegin_HC           : %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  params.cdict = cdict;
-
-  time_taken = bench(compress_frame, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressFrame_usingCDict_HC: %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
-
-  time_taken = bench(compress_begin, check_lz4f, repetitions, &params, &out_used);
-  fprintf(stderr, "LZ4F_compressBegin_usingCDict_HC: %8ld B -> %8ld B, %9ld ns/iter, %6.1lf MB/s\n", in_size, out_used, time_taken / repetitions, ((double) 1000 * in_size * repetitions) / time_taken);
+    bench("LZ4F_compressFrame_usingCDict", compress_frame      , check_lz4f, repetitions, &params);
+    bench("LZ4F_compressBegin_usingCDict", compress_begin      , check_lz4f, repetitions, &params);
+  }
 
   return 0;
 }
