@@ -218,33 +218,41 @@ uint64_t bench(
     char *bench_name,
     size_t (*fun)(bench_params_t *),
     size_t (*checkfun)(bench_params_t *, size_t),
-    uint64_t repetitions,
     bench_params_t *params
 ) {
   struct timespec start, end;
   size_t i, osize = 0, o = 0;
-  size_t time_taken;
+  size_t time_taken = 0;
+  uint64_t total_repetitions = 0;
+  uint64_t repetitions = 2;
 
   if (clock_gettime(CLOCK_MONOTONIC_RAW, &start)) return 0;
 
-  for (i = 0; i < repetitions; i++) {
-    params->iter = i;
-    o = fun(params);
-    if (!o) return 0;
-    osize += o;
-  }
+  while (time_taken < 25 * 1000 * 1000) { // benchmark over at least 1ms
+    if (total_repetitions) {
+      repetitions = total_repetitions; // double previous
+    }
 
-  if (clock_gettime(CLOCK_MONOTONIC_RAW, &end)) return 0;
+    for (i = 0; i < repetitions; i++) {
+      params->iter = i;
+      o = fun(params);
+      if (!o) return 0;
+      osize += o;
+    }
+
+    if (clock_gettime(CLOCK_MONOTONIC_RAW, &end)) return 0;
+
+    time_taken = (1000 * 1000 * 1000 * end.tv_sec + end.tv_nsec) -
+                 (1000 * 1000 * 1000 * start.tv_sec + start.tv_nsec);
+    total_repetitions += repetitions;
+  }
 
   o = checkfun(params, o);
   if (!o) return 0;
 
-  time_taken = (1000 * 1000 * 1000 * end.tv_sec + end.tv_nsec) -
-               (1000 * 1000 * 1000 * start.tv_sec + start.tv_nsec);
-
   fprintf(
       stderr,
-      "%-30s @ lvl %2d: %8ld B -> %8ld B, %8ld iters, %12ld ns, %9ld ns/iter, %7.2lf MB/s\n",
+      "%-30s @ lvl %2d: %8ld B -> %8ld B, %8ld iters, %10ld ns, %10ld ns/iter, %7.2lf MB/s\n",
       bench_name, params->clevel,
       params->isize, osize / repetitions,
       repetitions, time_taken, time_taken / repetitions,
@@ -288,8 +296,6 @@ int main(int argc, char *argv[]) {
 
   int clevels[] = {1, 2, 3, 6, 9, 10, 12};
 
-  uint64_t repetitions;
-
   bench_params_t params;
 
   if (argc != 3) return 1;
@@ -324,21 +330,6 @@ int main(int argc, char *argv[]) {
   check_size = in_size;
   check_buf = (char *)malloc(check_size);
   if (!check_buf) return 1;
-
-  if (in_size <= 1024) {
-    repetitions = 10000;
-  } else
-  if (in_size <= 16384) {
-    repetitions = 1000;
-  } else
-  if (in_size <= 131072) {
-    repetitions = 100;
-  } else
-  if (in_size <= 1048576) {
-    repetitions = 10;
-  } else {
-    repetitions = 5;
-  }
 
   memset(&prefs, 0, sizeof(prefs));
   prefs.autoFlush = 1;
@@ -394,17 +385,17 @@ int main(int argc, char *argv[]) {
     params.prefs->compressionLevel = clevels[clevelidx];
     params.cdict = NULL;
 
-    bench("LZ4_compress_default"         , compress_default    , check_lz4 , repetitions, &params);
-    bench("LZ4_compress_fast_extState"   , compress_extState   , check_lz4 , repetitions, &params);
-    bench("LZ4_compress_HC"              , compress_hc         , check_lz4 , repetitions, &params);
-    bench("LZ4_compress_HC_extStateHC"   , compress_hc_extState, check_lz4 , repetitions, &params);
-    bench("LZ4F_compressFrame"           , compress_frame      , check_lz4f, repetitions, &params);
-    bench("LZ4F_compressBegin"           , compress_begin      , check_lz4f, repetitions, &params);
+    bench("LZ4_compress_default"         , compress_default    , check_lz4 , &params);
+    bench("LZ4_compress_fast_extState"   , compress_extState   , check_lz4 , &params);
+    bench("LZ4_compress_HC"              , compress_hc         , check_lz4 , &params);
+    bench("LZ4_compress_HC_extStateHC"   , compress_hc_extState, check_lz4 , &params);
+    bench("LZ4F_compressFrame"           , compress_frame      , check_lz4f, &params);
+    bench("LZ4F_compressBegin"           , compress_begin      , check_lz4f, &params);
 
     params.cdict = cdict;
 
-    bench("LZ4F_compressFrame_usingCDict", compress_frame      , check_lz4f, repetitions, &params);
-    bench("LZ4F_compressBegin_usingCDict", compress_begin      , check_lz4f, repetitions, &params);
+    bench("LZ4F_compressFrame_usingCDict", compress_frame      , check_lz4f, &params);
+    bench("LZ4F_compressBegin_usingCDict", compress_begin      , check_lz4f, &params);
   }
 
   return 0;
