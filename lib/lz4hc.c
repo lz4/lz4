@@ -95,6 +95,12 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
     hc4->lowLimit = 64 KB;
 }
 
+static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
+{
+    MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
+    MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
+}
+
 
 /* Update chains up to ip (excluded) */
 LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
@@ -782,6 +788,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
         dictSize = 64 KB;
     }
     LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
+    LZ4HC_clearTables (ctxPtr);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
     return dictSize;
