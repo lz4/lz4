@@ -17,6 +17,7 @@
 #define LZ4F_CHECK(x) { typeof(x) _x = (x); if (LZ4F_isError(_x)) { fprintf(stderr, "Error!: %s\n", LZ4F_getErrorName(_x)); return 0; } }
 
 typedef struct {
+  const char *run_name;
   size_t iter;
   LZ4_stream_t *ctx;
   LZ4_streamHC_t *hcctx;
@@ -252,8 +253,8 @@ uint64_t bench(
 
   fprintf(
       stderr,
-      "%-30s @ lvl %2d: %8ld B -> %8ld B, %8ld iters, %10ld ns, %10ld ns/iter, %7.2lf MB/s\n",
-      bench_name, params->clevel,
+      "%-19s: %-30s @ lvl %2d: %8ld B -> %8ld B, %6ld iters, %10ld ns, %10ld ns/iter, %7.2lf MB/s\n",
+      params->run_name, bench_name, params->clevel,
       params->isize, osize / repetitions,
       repetitions, time_taken, time_taken / repetitions,
       ((double) 1000 * params->isize * repetitions) / time_taken
@@ -263,7 +264,7 @@ uint64_t bench(
 }
 
 int main(int argc, char *argv[]) {
-
+  char *run_name;
 
   struct stat st;
   size_t bytes_read;
@@ -298,9 +299,10 @@ int main(int argc, char *argv[]) {
 
   bench_params_t params;
 
-  if (argc != 3) return 1;
-  dict_fn = argv[1];
-  in_fn = argv[2];
+  if (argc != 4) return 1;
+  run_name = argv[1];
+  dict_fn = argv[2];
+  in_fn = argv[3];
 
   if (stat(dict_fn, &st)) return 1;
   dict_size = st.st_size;
@@ -362,6 +364,7 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "dict  size: %zd\n", dict_size);
   fprintf(stderr, "input size: %zd\n", in_size);
 
+  params.run_name = run_name;
   params.ctx = ctx;
   params.hcctx = hcctx;
   params.cctx = cctx;
