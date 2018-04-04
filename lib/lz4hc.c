@@ -96,7 +96,7 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
     U32 startingOffset = hc4->end - hc4->base + 64 KB;
     DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
     if (startingOffset > 1 GB || startingOffset > (uptrval)start) {
-        LZ4HC_clearTables(hc4);
+        MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
         startingOffset = 64 KB;
     }
     hc4->nextToUpdate = startingOffset;
