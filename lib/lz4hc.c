@@ -84,21 +84,27 @@ static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)
 /**************************************
 *  HC Compression
 **************************************/
-static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
-{
-    DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
-    hc4->nextToUpdate = 64 KB;
-    hc4->base = start - 64 KB;
-    hc4->end = start;
-    hc4->dictBase = start - 64 KB;
-    hc4->dictLimit = 64 KB;
-    hc4->lowLimit = 64 KB;
-}
-
 static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 {
+    DEBUGLOG(4, "LZ4HC_clearTables(%p)", hc4);
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
+}
+
+static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
+{
+    U32 startingOffset = hc4->end - hc4->base + 64 KB;
+    DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
+    if (startingOffset > 1 GB || startingOffset > (uptrval)start) {
+        LZ4HC_clearTables(hc4);
+        startingOffset = 64 KB;
+    }
+    hc4->nextToUpdate = startingOffset;
+    hc4->base = start - startingOffset;
+    hc4->end = start;
+    hc4->dictBase = start - startingOffset;
+    hc4->dictLimit = startingOffset;
+    hc4->lowLimit = startingOffset;
 }
 
 
@@ -751,6 +757,9 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 LZ4_streamHC_t* LZ4_createStreamHC(void) {
     LZ4_streamHC_t* LZ4_streamHCPtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
     DEBUGLOG(4, "LZ4_createStreamHC() -> %p", LZ4_streamHCPtr);
+    LZ4_streamHCPtr->internal_donotuse.end = (void *)-1;
+    LZ4_streamHCPtr->internal_donotuse.base = NULL;
+    LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     return LZ4_streamHCPtr;
 }
 
@@ -767,6 +776,7 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= sizeof(size_t) * LZ4_STREAMHCSIZE_SIZET);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     DEBUGLOG(4, "LZ4_resetStreamHC(%p, %d)", LZ4_streamHCPtr, compressionLevel);
+    LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.base;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
