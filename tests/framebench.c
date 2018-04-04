@@ -28,6 +28,7 @@ typedef struct {
   char *obuf;
   size_t osize;
   const char* ibuf;
+  const char* isample;
   size_t isize;
   size_t num_ibuf;
   char *checkbuf;
@@ -39,13 +40,11 @@ typedef struct {
 } bench_params_t;
 
 size_t compress_frame(bench_params_t *p) {
-  size_t iter = p->iter;
   LZ4F_cctx *cctx = p->cctx;
   char *obuf = p->obuf;
   size_t osize = p->osize;
-  const char* ibuf = p->ibuf;
+  const char* isample = p->isample;
   size_t isize = p->isize;
-  size_t num_ibuf = p->num_ibuf;
   const LZ4F_CDict* cdict = p->cdict;
   LZ4F_preferences_t* prefs = p->prefs;
 
@@ -57,7 +56,7 @@ size_t compress_frame(bench_params_t *p) {
     cctx,
     obuf,
     osize,
-    ibuf + ((iter * 2654435761U) % num_ibuf) * isize,
+    isample,
     isize,
     cdict,
     prefs);
@@ -67,13 +66,11 @@ size_t compress_frame(bench_params_t *p) {
 }
 
 size_t compress_begin(bench_params_t *p) {
-  size_t iter = p->iter;
   LZ4F_cctx *cctx = p->cctx;
   char *obuf = p->obuf;
   size_t osize = p->osize;
-  const char* ibuf = p->ibuf;
+  const char* isample = p->isample;
   size_t isize = p->isize;
-  size_t num_ibuf = p->num_ibuf;
   const LZ4F_CDict* cdict = p->cdict;
   LZ4F_preferences_t* prefs = p->prefs;
   const LZ4F_compressOptions_t* options = p->options;
@@ -90,7 +87,7 @@ size_t compress_begin(bench_params_t *p) {
     cctx,
     obuf,
     oend - obuf,
-    ibuf + ((iter * 2654435761U) % num_ibuf) * isize,
+    isample,
     isize,
     options);
   LZ4F_CHECK(oused);
@@ -102,74 +99,61 @@ size_t compress_begin(bench_params_t *p) {
 }
 
 size_t compress_default(bench_params_t *p) {
-  size_t iter = p->iter;
   char *obuf = p->obuf;
   size_t osize = p->osize;
-  const char* ibuf = p->ibuf;
+  const char* isample = p->isample;
   size_t isize = p->isize;
-  size_t num_ibuf = p->num_ibuf;
 
   char *oend = obuf + osize;
   size_t oused;
 
-  oused = LZ4_compress_default(
-      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
-      isize, oend - obuf);
+  oused = LZ4_compress_default(isample, obuf, isize, oend - obuf);
   obuf += oused;
 
   return obuf - p->obuf;
 }
 
 size_t compress_extState(bench_params_t *p) {
-  size_t iter = p->iter;
   LZ4_stream_t *ctx = p->ctx;
   char *obuf = p->obuf;
   size_t osize = p->osize;
-  const char* ibuf = p->ibuf;
+  const char* isample = p->isample;
   size_t isize = p->isize;
-  size_t num_ibuf = p->num_ibuf;
   int clevel = p->clevel;
 
   char *oend = obuf + osize;
   size_t oused;
 
   oused = LZ4_compress_fast_extState_fastReset(
-      ctx,
-      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
-      isize, oend - obuf, clevel);
+      ctx, isample, obuf, isize, oend - obuf, clevel);
   obuf += oused;
 
   return obuf - p->obuf;
 }
 
 size_t compress_hc(bench_params_t *p) {
-  size_t iter = p->iter;
   char *obuf = p->obuf;
   size_t osize = p->osize;
-  const char* ibuf = p->ibuf;
+  const char* isample = p->isample;
   size_t isize = p->isize;
-  size_t num_ibuf = p->num_ibuf;
   int clevel = p->clevel;
 
   char *oend = obuf + osize;
   size_t oused;
 
   oused = LZ4_compress_HC(
-      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
-      isize, oend - obuf, clevel);
+      isample, obuf, isize, oend - obuf, clevel);
   obuf += oused;
 
   return obuf - p->obuf;
 }
 
 size_t compress_hc_extState(bench_params_t *p) {
-  size_t iter = p->iter;
   LZ4_streamHC_t *hcctx = p->hcctx;
   char *obuf = p->obuf;
   size_t osize = p->osize;
-  const char* ibuf = p->ibuf;
+  const char* isample = p->isample;
   size_t isize = p->isize;
-  size_t num_ibuf = p->num_ibuf;
   int clevel = p->clevel;
 
   char *oend = obuf + osize;
@@ -177,7 +161,7 @@ size_t compress_hc_extState(bench_params_t *p) {
 
   oused = LZ4_compress_HC_extStateHC(
       hcctx,
-      ibuf + ((iter * 2654435761U) % num_ibuf) * isize, obuf,
+      isample, obuf,
       isize, oend - obuf, clevel);
   obuf += oused;
 
@@ -189,7 +173,7 @@ size_t check_lz4(bench_params_t *p, size_t csize) {
   memset(p->checkbuf, 0xFF, p->checksize);
   return LZ4_decompress_fast_usingDict(p->obuf, p->checkbuf, p->isize,
                                        p->dictbuf, p->dictsize)
-      && !memcmp(p->ibuf, p->checkbuf, p->isize);
+      && !memcmp(p->isample, p->checkbuf, p->isize);
 }
 
 size_t check_lz4f(bench_params_t *p, size_t csize) {
@@ -211,7 +195,7 @@ size_t check_lz4f(bench_params_t *p, size_t csize) {
     dleft = dsize - dp;
     if (LZ4F_isError(ret)) return 0;
   } while (cleft);
-  return !memcmp(p->ibuf, p->checkbuf, p->isize);
+  return !memcmp(p->isample, p->checkbuf, p->isize);
 }
 
 
@@ -236,6 +220,11 @@ uint64_t bench(
 
     for (i = 0; i < repetitions; i++) {
       params->iter = i;
+      if (params->num_ibuf == 1) {
+        params->isample = params->ibuf;
+      } else {
+        params->isample = params->ibuf + ((i * 2654435761U) % ((params->num_ibuf - 1) * params->isize));
+      }
       o = fun(params);
       if (!o) return 0;
       osize += o;
@@ -295,7 +284,7 @@ int main(int argc, char *argv[]) {
   LZ4F_preferences_t prefs;
   LZ4F_compressOptions_t options;
 
-  int clevels[] = {1, 2, 3, 6, 9, 10, 12};
+  int clevels[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 
   bench_params_t params;
 
