@@ -560,7 +560,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* single-block file */
     if (readSize < blockSize) {
         /* Compress in single pass */
-        size_t cSize = LZ4F_compressFrame_usingCDict(dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
+        size_t cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
         if (LZ4F_isError(cSize)) EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
@@ -951,7 +951,7 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
         total += readBytes;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, storedSkips);
     }
-    if (ferror(finput)) EXM_THROW(51, "Read Error")
+    if (ferror(finput)) EXM_THROW(51, "Read Error");
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
     return total;

@@ -1,9 +1,7 @@
 # ################################################################
 # LZ4 - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-present
 # All rights reserved.
-#
-# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #
 # BSD license
 # Redistribution and use in source and binary forms, with or without modification,
@@ -58,6 +56,7 @@ all: allmost manuals
 allmost: lib lz4 examples
 
 .PHONY: lib lib-release liblz4.a
+lib: liblz4.a
 lib lib-release liblz4.a:
 	@$(MAKE) -C $(LZ4DIR) $@
 
@@ -69,7 +68,7 @@ lz4 lz4-release :
 	@cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
-examples:
+examples: liblz4.a
 	$(MAKE) -C $(EXDIR) all
 
 .PHONY: manuals
@@ -122,6 +121,10 @@ ifneq (,$(filter $(HOST_OS),MSYS POSIX))
 list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
+.PHONY: check
+check:
+	$(MAKE) -C $(TESTDIR) test-lz4-essentials
+
 .PHONY: test
 test:
 	$(MAKE) -C $(TESTDIR) $@
@@ -170,7 +173,7 @@ gpptest gpptest32: clean
 	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
 
 c_standards: clean
-	# note : lz4 is not C90 compatible, because it requires long long support
+	CFLAGS="-std=c90   -Werror" $(MAKE) clean allmost
 	CFLAGS="-std=gnu90 -Werror" $(MAKE) clean allmost
 	CFLAGS="-std=c99   -Werror" $(MAKE) clean allmost
 	CFLAGS="-std=gnu99 -Werror" $(MAKE) clean allmost

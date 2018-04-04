@@ -458,11 +458,11 @@ int main(int argc, const char** argv)
                                 if (B < 4) badusage(exeName);
                                 if (B <= 7) {
                                     blockSize = LZ4IO_setBlockSizeID(B);
-                                    BMK_SetBlockSize(blockSize);
+                                    BMK_setBlockSize(blockSize);
                                     DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
                                 } else {
                                     if (B < 32) badusage(exeName);
-                                    BMK_SetBlockSize(B);
+                                    BMK_setBlockSize(B);
                                     if (B >= 1024) {
                                         DISPLAYLEVEL(2, "bench: using blocks of size %u KB \n", (U32)(B>>10));
                                     } else {
@@ -478,6 +478,10 @@ int main(int argc, const char** argv)
 
                     /* Benchmark */
                 case 'b': mode = om_bench; multiple_inputs=1;
+                    break;
+
+                    /* hidden command : benchmark files, but do not fuse result */
+                case 'S': BMK_setBenchSeparately(1);
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
@@ -496,7 +500,7 @@ int main(int argc, const char** argv)
                         iters = readU32FromChar(&argument);
                         argument--;
                         BMK_setNotificationLevel(displayLevel);
-                        BMK_SetNbSeconds(iters);   /* notification if displayLevel >= 3 */
+                        BMK_setNbSeconds(iters);   /* notification if displayLevel >= 3 */
                     }
                     break;
 

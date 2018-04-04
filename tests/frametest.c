@@ -164,7 +164,7 @@ static unsigned FUZ_highbit(U32 v32)
 /*-*******************************************************
 *  Tests
 *********************************************************/
-#define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) goto _output_error
+#define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s\n", LZ4F_getErrorName(v)); goto _output_error; }
 #define CHECK(f)   { LZ4F_errorCode_t const CHECK_V(err_ , f); }
 
 int basicTests(U32 seed, double compressibility)
@@ -509,23 +509,25 @@ int basicTests(U32 seed, double compressibility)
         CHECK( LZ4F_freeCompressionContext(cctx) ); cctx = NULL;
     }
 
-
     /* Dictionary compression test */
     {   size_t const dictSize = 63 KB;
         size_t const dstCapacity = LZ4F_compressFrameBound(dictSize, NULL);
         size_t cSizeNoDict, cSizeWithDict;
         LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
         if (cdict == NULL) goto _output_error;
+        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with NULL dict : ");
         CHECK_V(cSizeNoDict,
-                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
                                               CNBuffer, dictSize,
                                               NULL, NULL) );
         DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeNoDict);
 
+        CHECK( LZ4F_freeCompressionContext(cctx) );
+        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict : ");
         CHECK_V(cSizeWithDict,
-                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
                                               CNBuffer, dictSize,
                                               cdict, NULL) );
         DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
@@ -557,7 +559,7 @@ int basicTests(U32 seed, double compressibility)
             memset(&cParams, 0, sizeof(cParams));
             cParams.compressionLevel = -3;
             CHECK_V(cSizeLevelMax,
-                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
                                               CNBuffer, dictSize,
                                               cdict, &cParams) );
             DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeLevelMax);
@@ -569,7 +571,7 @@ int basicTests(U32 seed, double compressibility)
             memset(&cParams, 0, sizeof(cParams));
             cParams.compressionLevel = LZ4F_compressionLevel_max();
             CHECK_V(cSizeLevelMax,
-                LZ4F_compressFrame_usingCDict(compressedBuffer, dstCapacity,
+                LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
                                               CNBuffer, dictSize,
                                               cdict, &cParams) );
             DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeLevelMax);
@@ -584,7 +586,7 @@ int basicTests(U32 seed, double compressibility)
             cParams.frameInfo.blockMode = LZ4F_blockLinked;
             cParams.frameInfo.blockSizeID = LZ4F_max64KB;
             CHECK_V(cSizeContiguous,
-                LZ4F_compressFrame_usingCDict(compressedBuffer, outCapacity,
+                LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, outCapacity,
                                               CNBuffer, inSize,
                                               cdict, &cParams) );
             DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
@@ -620,7 +622,7 @@ int basicTests(U32 seed, double compressibility)
             cParams.frameInfo.blockMode = LZ4F_blockIndependent;
             cParams.frameInfo.blockSizeID = LZ4F_max64KB;
             CHECK_V(cSizeIndep,
-                LZ4F_compressFrame_usingCDict(compressedBuffer, outCapacity,
+                LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, outCapacity,
                                               CNBuffer, inSize,
                                               cdict, &cParams) );
             DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
@@ -647,6 +649,7 @@ int basicTests(U32 seed, double compressibility)
         }
 
         LZ4F_freeCDict(cdict);
+        CHECK( LZ4F_freeCompressionContext(cctx) ); cctx = NULL;
     }
 
 
@@ -730,15 +733,17 @@ _output_error:
 
 static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, unsigned nonContiguous)
 {
-    int p=0;
+    size_t p=0;
     const BYTE* b1=(const BYTE*)buff1;
     const BYTE* b2=(const BYTE*)buff2;
     if (nonContiguous) {
         DISPLAY("Non-contiguous output test (%i bytes)\n", (int)size);
         return;
     }
-    while (b1[p]==b2[p]) p++;
-    DISPLAY("Error at pos %i/%i : %02X != %02X \n", p, (int)size, b1[p], b2[p]);
+    while (p < size && b1[p]==b2[p]) p++;
+    if (p != size) {
+        DISPLAY("Error at pos %i/%i : %02X != %02X \n", (int)p, (int)size, b1[p], b2[p]);
+    }
 }
 
 
