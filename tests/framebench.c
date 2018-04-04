@@ -255,9 +255,9 @@ uint64_t bench(
       stderr,
       "%-19s: %-30s @ lvl %2d: %8ld B -> %8ld B, %6ld iters, %10ld ns, %10ld ns/iter, %7.2lf MB/s\n",
       params->run_name, bench_name, params->clevel,
-      params->isize, osize / repetitions,
-      repetitions, time_taken, time_taken / repetitions,
-      ((double) 1000 * params->isize * repetitions) / time_taken
+      params->isize, osize / total_repetitions,
+      total_repetitions, time_taken, time_taken / total_repetitions,
+      ((double) 1000 * params->isize * total_repetitions) / time_taken
   );
 
   return time_taken;
