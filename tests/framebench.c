@@ -226,7 +226,14 @@ uint64_t bench(
         params->isample = params->ibuf + ((i * 2654435761U) % ((params->num_ibuf - 1) * params->isize));
       }
       o = fun(params);
-      if (!o) return 0;
+      if (!o) {
+        fprintf(
+            stderr,
+            "%-19s: %-30s @ lvl %2d: %8ld B: FAILED!\n",
+            params->run_name, bench_name, params->clevel,
+            params->isize);
+        return 0;
+      }
       osize += o;
     }
 
@@ -238,7 +245,14 @@ uint64_t bench(
   }
 
   o = checkfun(params, o);
-  if (!o) return 0;
+  if (!o) {
+    fprintf(
+        stderr,
+        "%-19s: %-30s @ lvl %2d: %8ld B: CHECK FAILED!\n",
+        params->run_name, bench_name, params->clevel,
+        params->isize);
+    return 0;
+  }
 
   fprintf(
       stderr,
