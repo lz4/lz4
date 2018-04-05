@@ -322,7 +322,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 #   define FUZ_DISPLAYTEST(...) {                 \
                 testNb++;                         \
                 if (g_displayLevel>=4) {          \
-                    printf("\r%4u - %2u ", seed, testNb);  \
+                    printf("\r%4u - %2u ", cycleNb, testNb);  \
                     printf(" " __VA_ARGS__);      \
                     printf("   ");                \
                     fflush(stdout);               \

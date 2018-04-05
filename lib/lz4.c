@@ -533,6 +533,20 @@ LZ4_FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_
     LZ4_putPositionOnHash(p, h, tableBase, tableType, srcBase);
 }
 
+/* LZ4_getIndexOnHash() :
+ * Index of match position registered in hash table.
+ * hash position must be calculated by using base+index, or dictBase+index.
+ * Assumption 1 : only valid if tableType == byU32 or byU16.
+ * Assumption 2 : h is presumed valid (within limits of hash table)
+ */
+static U32 LZ4_getIndexOnHash(U32 h, const void* tableBase, tableType_t tableType)
+{
+    LZ4_STATIC_ASSERT(LZ4_MEMORY_USAGE > 2);
+    if (tableType == byU32) { const U32* const hashTable = (const U32*) tableBase; assert(h < (1U << (LZ4_MEMORY_USAGE-2))); return hashTable[h]; }
+    if (tableType == byU16) { const U16* const hashTable = (const U16*) tableBase; assert(h < (1U << (LZ4_MEMORY_USAGE-1))); return hashTable[h]; }
+    assert(0); return 0;  /* forbidden case */
+}
+
 static const BYTE* LZ4_getPositionOnHash(U32 h, const void* tableBase, tableType_t tableType, const BYTE* srcBase)
 {
     if (tableType == byPtr) { const BYTE* const* hashTable = (const BYTE* const*) tableBase; return hashTable[h]; }
@@ -598,7 +612,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 {
     const BYTE* ip = (const BYTE*) source;
 
-    size_t currentOffset = cctx->currentOffset;
+    size_t const currentOffset = cctx->currentOffset;
     const BYTE* base = (const BYTE*) source - currentOffset;
     const BYTE* lowLimit;
 
@@ -650,7 +664,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         BYTE* token;
 
         /* Find a match */
-        {   const BYTE* forwardIp = ip;
+        if (tableType == byPtr) {
+            const BYTE* forwardIp = ip;
             unsigned step = 1;
             unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
             do {
@@ -681,6 +696,54 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                         refDelta = 0;
                         lowLimit = (const BYTE*)source;
                 }   }
+                forwardH = LZ4_hashPosition(forwardIp, tableType);
+                LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
+
+            } while ( ((dictIssue==dictSmall) ? (match < lowRefLimit) : 0)
+                || ((tableType==byU16) ? 0 : (match + MAX_DISTANCE < ip))
+                || (LZ4_read32(match+refDelta) != LZ4_read32(ip)) );
+
+        } else {   /* byU32, byU16 */
+
+            const BYTE* forwardIp = ip;
+            unsigned step = 1;
+            unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
+            do {
+                U32 const h = forwardH;
+                U32 const matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
+                ip = forwardIp;
+                forwardIp += step;
+                step = (searchMatchNb++ >> LZ4_skipTrigger);
+
+                if (unlikely(forwardIp > mflimitPlusOne)) goto _last_literals;
+                assert(ip < mflimitPlusOne);
+
+                if (dictDirective == usingDictCtx) {
+                    if (matchIndex < currentOffset) {
+                        /* there was no match, try the dictionary */
+                        match = LZ4_getPosition(ip, dictCtx->hashTable, byU32, dictBase);
+                        refDelta = dictDelta;
+                        lowLimit = dictLowLimit;
+                    } else {
+                        match = base + matchIndex;
+                        refDelta = 0;
+                        lowLimit = (const BYTE*)source;
+                    }
+                } else if (dictDirective==usingExtDict) {
+                    if (matchIndex < currentOffset) {
+                        match = dictBase + matchIndex;
+                        refDelta = dictDelta;
+                        lowLimit = dictLowLimit;
+                    } else {
+                        match = base + matchIndex;
+                        refDelta = 0;
+                        lowLimit = (const BYTE*)source;
+                    }
+                } else {   /* single continuous memory segment */
+                    match = base + matchIndex;
+                    refDelta = 0;
+                    lowLimit = (const BYTE*)source;
+                }
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
 
@@ -718,7 +781,8 @@ _next_match:
         /* Encode MatchLength */
         {   unsigned matchCode;
 
-            if ((dictDirective==usingExtDict || dictDirective==usingDictCtx) && lowLimit==dictionary) {
+            if ( (dictDirective==usingExtDict || dictDirective==usingDictCtx)
+              && (lowLimit==dictionary) ) {
                 const BYTE* limit;
                 match += refDelta;
                 limit = ip + (dictEnd-match);
