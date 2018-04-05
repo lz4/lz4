@@ -732,7 +732,10 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
     LZ4_streamHC_t state;
     LZ4_streamHC_t* const statePtr = &state;
 #endif
-    int const cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
+    int cSize;
+    statePtr->internal_donotuse.end = (void *)-1;
+    LZ4_resetStreamHC(statePtr, compressionLevel);
+    cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     free(statePtr);
 #endif
