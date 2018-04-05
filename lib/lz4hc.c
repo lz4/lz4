@@ -93,12 +93,13 @@ static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 
 static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
-    U32 startingOffset = hc4->end - hc4->base + 64 KB;
+    uptrval startingOffset = hc4->end - hc4->base;
     DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
     if (startingOffset > 1 GB || startingOffset > (uptrval)start) {
         MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
-        startingOffset = 64 KB;
+        startingOffset = 0;
     }
+    startingOffset += MAX_DISTANCE;
     hc4->nextToUpdate = startingOffset;
     hc4->base = start - startingOffset;
     hc4->end = start;
