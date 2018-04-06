@@ -624,7 +624,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 {
     const BYTE* ip = (const BYTE*) source;
 
-    size_t const startIndex = cctx->currentOffset;
+    U32 const startIndex = cctx->currentOffset;
     const BYTE* base = (const BYTE*) source - startIndex;
     const BYTE* lowLimit;
 
@@ -645,8 +645,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     /* the dictCtx currentOffset is indexed on the start of the dictionary,
      * while a dictionary in the current context precedes the currentOffset */
     const BYTE* dictBase = dictDirective == usingDictCtx ?
-        (const BYTE*) source - dictCtx->currentOffset :
-        (const BYTE*) source - dictSize - startIndex;
+        dictionary + dictSize - dictCtx->currentOffset :   /* is it possible that dictCtx->currentOffset != dictCtx->dictSize ? */
+        dictionary + dictSize - startIndex;
     const BYTE* dictLowLimit;
 
     BYTE* op = (BYTE*) dest;
@@ -800,8 +800,6 @@ _next_match:
                 ip += MINMATCH + matchCode;
             }
 
-            DEBUGLOG(2,"matchLength:%7u ", matchCode+MINMATCH);
-
             if ( outputLimited &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) )
                 goto _clean_up;
@@ -845,7 +843,7 @@ _next_match:
             U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
             assert(matchIndex < current);
             if (dictDirective == usingDictCtx) {
-                if (match < (const BYTE*)source) {
+                if (matchIndex < startIndex) {
                     /* there was no match, try the dictionary */
                     matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
                     match = dictBase + matchIndex;
@@ -853,7 +851,7 @@ _next_match:
                     match = base + matchIndex;
                 }
             } else if (dictDirective==usingExtDict) {
-                if (match < (const BYTE*)source) {
+                if (matchIndex < startIndex) {
                     match = dictBase + matchIndex;
                 } else {
                     match = base + matchIndex;
