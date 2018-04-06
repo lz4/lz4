@@ -593,6 +593,9 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
             MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
             cctx->currentOffset = 0;
             cctx->tableType = clearedTable;
+        } else {
+            DEBUGLOG(4, "Re-use hash table (no reset)");
+            //if (tableType == byU32) cctx->currentOffset += 64 KB;
         }
     }
     /* If the current offset is zero, we will never look in the external
@@ -1098,8 +1101,6 @@ static int LZ4_compress_destSize_generic(
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putPositionOnHash(ip, h, ctx->hashTable, tableType, base);
 
-                DEBUGLOG(2, "match:%p , ip:%p", match, ip);
-
             } while ( ((tableType==byU16) ? 0 : (match + MAX_DISTANCE < ip))
                 || (LZ4_read32(match) != LZ4_read32(ip)) );
         }
@@ -1371,7 +1372,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
                 LZ4_prepareTable(streamPtr, inputSize, tableType, usingDictCtx);
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingDictCtx, noDictIssue, acceleration);
             }
-        } else {
+        } else {  /* no dictCtx */
             LZ4_prepareTable(streamPtr, inputSize, tableType, usingExtDict);
             if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
