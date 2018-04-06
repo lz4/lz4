@@ -574,11 +574,16 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
      * indicates a miss. In that case, we need to bump the offset to something
      * non-zero.
      */
-    if (dictDirective == usingDictCtx &&
-        tableType != byPtr &&
-        cctx->currentOffset == 0)
-    {
-        cctx->currentOffset = 1;
+    if (cctx->currentOffset == 0) {
+        if (dictDirective == usingDictCtx) {
+            if (tableType == byU16) {
+                cctx->currentOffset = 1;
+            } else if (tableType == byU32) {
+                cctx->currentOffset = 64 KB;
+            }
+        }
+    } else if (tableType == byU32) {
+        cctx->currentOffset += 64 KB;
     }
 }
 
@@ -874,9 +879,6 @@ int LZ4_compress_fast_extState_noReset(void* state, const char* source, char* de
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_prepareTable(ctx, inputSize, tableType, noDict);
-            if (ctx->currentOffset) {
-                ctx->currentOffset += 64 KB;
-            }
             return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, tableType, noDict, noDictIssue, acceleration);
         }
     } else {
@@ -891,9 +893,6 @@ int LZ4_compress_fast_extState_noReset(void* state, const char* source, char* de
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
             LZ4_prepareTable(ctx, inputSize, tableType, noDict);
-            if (ctx->currentOffset) {
-                ctx->currentOffset += 64 KB;
-            }
             return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
         }
     }
@@ -1168,31 +1167,28 @@ int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 {
     LZ4_stream_t_internal* dict = &LZ4_dict->internal_donotuse;
+    const tableType_t tableType = byU32;
     const BYTE* p = (const BYTE*)dictionary;
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
     DEBUGLOG(4, "LZ4_loadDict %p", LZ4_dict);
 
-    if ((dict->initCheck)
-      || (dict->tableType != byU32 && dict->tableType != clearedTable)
-      || (dict->currentOffset > 1 GB))  /* Uninitialized structure, or reuse overflow */
-        LZ4_resetStream(LZ4_dict);
+    LZ4_prepareTable(dict, 0, tableType, usingExtDict);
 
     if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
-    dict->currentOffset += 64 KB;
     base = p - dict->currentOffset;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
     dict->currentOffset += dict->dictSize;
-    dict->tableType = byU32;
+    dict->tableType = tableType;
 
     if (dictSize < (int)HASH_UNIT) {
         return 0;
     }
 
     while (p <= dictEnd-HASH_UNIT) {
-        LZ4_putPosition(p, dict->hashTable, byU32, base);
+        LZ4_putPosition(p, dict->hashTable, tableType, base);
         p+=3;
     }
 
@@ -1244,7 +1240,6 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
     /* prefix mode : source data follows dictionary */
     if (dictEnd == (const BYTE*)source) {
-        LZ4_prepareTable(streamPtr, inputSize, tableType, withPrefix64k);
         if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset))
             return LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, withPrefix64k, dictSmall, acceleration);
         else
@@ -1272,7 +1267,6 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingDictCtx, noDictIssue, acceleration);
             }
         } else {
-            LZ4_prepareTable(streamPtr, inputSize, tableType, usingExtDict);
             if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
             } else {
