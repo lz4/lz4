@@ -100,12 +100,12 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
         startingOffset = 0;
     }
     startingOffset += MAX_DISTANCE;
-    hc4->nextToUpdate = startingOffset;
+    hc4->nextToUpdate = (U32) startingOffset;
     hc4->base = start - startingOffset;
     hc4->end = start;
     hc4->dictBase = start - startingOffset;
-    hc4->dictLimit = startingOffset;
-    hc4->lowLimit = startingOffset;
+    hc4->dictLimit = (U32) startingOffset;
+    hc4->lowLimit = (U32) startingOffset;
 }
 
 
@@ -304,7 +304,7 @@ LZ4HC_InsertAndGetWiderMatch (
     if (dictCtx != NULL && nbAttempts && ip - base - lowLimit < MAX_DISTANCE) {
         ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
-        matchIndex = dictMatchIndex + dictIndexDelta;
+        matchIndex = dictMatchIndex + (int)dictIndexDelta;
         while (dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
@@ -314,9 +314,11 @@ LZ4HC_InsertAndGetWiderMatch (
                 const BYTE* vLimit = ip + (dictCtx->end - matchPtr);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
-                // if ((ip+mlt == vLimit) && (vLimit < iHighLimit)) {
-                //     mlt += LZ4_count(ip+mlt, base+lowLimit, iHighLimit);
-                // }
+                /*
+                if ((ip+mlt == vLimit) && (vLimit < iHighLimit)) {
+                    mlt += LZ4_count(ip+mlt, base+lowLimit, iHighLimit);
+                }
+                */
                 back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
                 mlt -= back;
                 if (mlt > longest) {
@@ -734,7 +736,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
     LZ4_streamHC_t* const statePtr = &state;
 #endif
     int cSize;
-    statePtr->internal_donotuse.end = (void *)-1;
+    statePtr->internal_donotuse.end = (const BYTE*)-1;
     LZ4_resetStreamHC(statePtr, compressionLevel);
     cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
@@ -761,7 +763,7 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 LZ4_streamHC_t* LZ4_createStreamHC(void) {
     LZ4_streamHC_t* LZ4_streamHCPtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
     DEBUGLOG(4, "LZ4_createStreamHC() -> %p", LZ4_streamHCPtr);
-    LZ4_streamHCPtr->internal_donotuse.end = (void *)-1;
+    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)-1;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     return LZ4_streamHCPtr;
