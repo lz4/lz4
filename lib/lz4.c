@@ -694,7 +694,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
 
-            } while ( LZ4_read32(match) != LZ4_read32(ip) );
+            } while ( (match+MAX_DISTANCE < ip)
+                   || (LZ4_read32(match) != LZ4_read32(ip)) );
 
         } else {   /* byU32, byU16 */
 
