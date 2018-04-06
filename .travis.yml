@@ -15,7 +15,7 @@ matrix:
 
     - os: linux
       sudo: false
-      env: Ubu=12.04cont Cmd='make -C tests test-frametest test-fuzzer' COMPILER=cc
+      env: Ubu=12.04cont Cmd='sudo sysctl -w vm.mmap_min_addr="4096" && make -C tests test-frametest test-fuzzer' COMPILER=cc
 
     - os: linux
       sudo: false
@@ -59,7 +59,7 @@ matrix:
             - libc6-dev-i386
             - gcc-multilib
 
-    - env: Ubu=14.04 Cmd='make -C tests test-frametest32 test-fuzzer32' COMPILER=cc
+    - env: Ubu=14.04 Cmd='sudo sysctl -w vm.mmap_min_addr="4096" && make -C tests test-frametest32 test-fuzzer32' COMPILER=cc
       dist: trusty
       sudo: required
       addons:
