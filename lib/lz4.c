@@ -656,8 +656,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     BYTE* const olimit = op + maxOutputSize;
 
     U32 offset = 0;
-    ptrdiff_t retval = 0;
-
     U32 forwardH;
 
     /* Init conditions */
@@ -668,6 +666,19 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     dictLowLimit = dictionary ? dictionary : lowLimit;
 
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
+
+    /* Update context state */
+    if (dictDirective == usingDictCtx) {
+        /* Subsequent linked blocks can't use the dictionary. */
+        /* Instead, they use the block we just compressed. */
+        cctx->dictCtx = NULL;
+        cctx->dictSize = (U32)inputSize;
+    } else {
+        cctx->dictSize += (U32)inputSize;
+    }
+    cctx->currentOffset += (U32)inputSize;
+    cctx->tableType = tableType;
+
     if (inputSize<LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     /* First Byte */
@@ -760,7 +771,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             token = op++;
             if ((outputLimited) &&  /* Check output buffer overflow */
                 (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
-                goto _clean_up;
+                return 0;
             if (litLength >= RUN_MASK) {
                 int len = (int)litLength-RUN_MASK;
                 *token = (RUN_MASK<<ML_BITS);
@@ -806,7 +817,7 @@ _next_match:
 
             if ( outputLimited &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) )
-                goto _clean_up;
+                return 0;
             if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
                 matchCode -= ML_MASK;
@@ -892,7 +903,7 @@ _last_literals:
     {   size_t const lastRun = (size_t)(iend - anchor);
         if ( (outputLimited) &&  /* Check output buffer overflow */
             ((op - (BYTE*)dest) + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > (U32)maxOutputSize) )
-            goto _clean_up;
+            return 0;
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
             *op++ = RUN_MASK << ML_BITS;
@@ -905,22 +916,7 @@ _last_literals:
         op += lastRun;
     }
 
-    retval = (((char*)op)-dest);
-
-_clean_up:
-    if (dictDirective == usingDictCtx) {
-        /* Subsequent linked blocks can't use the dictionary. */
-        /* Instead, they use the block we just compressed. */
-        cctx->dictCtx = NULL;
-        cctx->dictSize = (U32)inputSize;
-    } else {
-        cctx->dictSize += (U32)inputSize;
-    }
-    cctx->currentOffset += (U32)inputSize;
-    cctx->tableType = tableType;
-
-    /* End */
-    return (int)retval;
+    return (int)(((char*)op) - dest);
 }
 
 
