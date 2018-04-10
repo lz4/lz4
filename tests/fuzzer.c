@@ -367,7 +367,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         if ( ((FUZ_rand(&randState) & 63) == 2)
           && ((size_t)blockSize < labSize) ) {
             memcpy(lowAddrBuffer, block, blockSize);
-            block = lowAddrBuffer;
+            block = (const char*)lowAddrBuffer;
         }
 
         /* Test compression destSize */
