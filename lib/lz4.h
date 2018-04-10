@@ -366,6 +366,14 @@ LZ4_compress_fast_extState_noReset() :
 LZ4LIB_API int LZ4_compress_fast_extState_noReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
 
+
+/*! LZ4_resetStream_fast() :
+ *  An LZ4_stream_t structure can be allocated once and re-used multiple times.
+ *  Use this function to start compressing a new stream.
+ */
+LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
+
+
 /*-************************************
  *  Private definitions
  **************************************

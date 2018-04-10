@@ -532,9 +532,7 @@ static void LZ4F_applyCDict(void* ctx,
     if (level < LZ4HC_CLEVEL_MIN) {
         LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t *)ctx)->internal_donotuse;
         assert(!internal_ctx->initCheck);
-        /* Clear any local dictionary */
-        internal_ctx->dictionary = NULL;
-        internal_ctx->dictSize = 0;
+        LZ4_resetStream_fast((LZ4_stream_t *)ctx);
         /* Point to the dictionary context */
         internal_ctx->dictCtx = cdict ? &(cdict->fastCtx->internal_donotuse) : NULL;
     } else {
