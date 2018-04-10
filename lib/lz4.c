@@ -717,9 +717,10 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
             do {
                 U32 const h = forwardH;
-                U32 const current = forwardIp - base;
+                U32 const current = (U32)(forwardIp - base);
                 U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
                 assert(matchIndex <= current);
+                assert(forwardIp - base < (ptrdiff_t)(2 GB - 1));
                 ip = forwardIp;
                 assert(searchMatchNb >= (1<<LZ4_skipTrigger));
                 forwardIp += (searchMatchNb++ >> LZ4_skipTrigger);
