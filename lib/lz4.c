@@ -953,7 +953,7 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
  * (see comment in lz4.h on LZ4_resetStream_fast() for a definition of
  * "correctly initialized").
  */
-int LZ4_compress_fast_extState_fastReset(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
+int LZ4_compress_fast_extState_fastReset(void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration)
 {
     LZ4_stream_t_internal* ctx = &((LZ4_stream_t*)state)->internal_donotuse;
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
@@ -961,8 +961,7 @@ int LZ4_compress_fast_extState_fastReset(void* state, const char* source, char* 
     if (dstCapacity >= LZ4_compressBound(srcSize)) {
         if (srcSize < LZ4_64Klimit) {
             const tableType_t tableType = byU16;
-            LZ4_prepareTable(ctx, inputSize, tableType);
-LZ4_prepareTable>>> dev
+            LZ4_prepareTable(ctx, srcSize, tableType);
             if (ctx->currentOffset) {
                 return LZ4_compress_generic(ctx, src, dst, srcSize, 0, notLimited, tableType, noDict, dictSmall, acceleration);
             } else {
@@ -970,13 +969,13 @@ LZ4_prepareTable>>> dev
             }
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
-            LZ4_prepareTable(ctx, inputSize, tableType);
-            return LZ4_compress_generic(ctx, source, dest, inputSize, 0, notLimited, tableType, noDict, noDictIssue, acceleration);
+            LZ4_prepareTable(ctx, srcSize, tableType);
+            return LZ4_compress_generic(ctx, src, dst, srcSize, 0, notLimited, tableType, noDict, noDictIssue, acceleration);
         }
     } else {
         if (srcSize < LZ4_64Klimit) {
             const tableType_t tableType = byU16;
-            LZ4_prepareTable(ctx, inputSize, tableType);
+            LZ4_prepareTable(ctx, srcSize, tableType);
             if (ctx->currentOffset) {
                 return LZ4_compress_generic(ctx, src, dst, srcSize, dstCapacity, limitedOutput, tableType, noDict, dictSmall, acceleration);
             } else {
@@ -984,8 +983,8 @@ LZ4_prepareTable>>> dev
             }
         } else {
             const tableType_t tableType = (sizeof(void*)==8) ? byU32 : byPtr;
-            LZ4_prepareTable(ctx, inputSize, tableType);
-            return LZ4_compress_generic(ctx, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, noDict, noDictIssue, acceleration);
+            LZ4_prepareTable(ctx, srcSize, tableType);
+            return LZ4_compress_generic(ctx, src, dst, srcSize, dstCapacity, limitedOutput, tableType, noDict, noDictIssue, acceleration);
         }
     }
 }
