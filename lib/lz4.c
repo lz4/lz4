@@ -582,10 +582,6 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
     cctx->dictSize = 0;
 }
 
-void LZ4_resetStream_fast(LZ4_stream_t* const ctx) {
-    LZ4_prepareTable(&(ctx->internal_donotuse), 0, byU32);
-}
-
 /** LZ4_compress_generic() :
     inlined, to ensure branches are decided at compilation time */
 LZ4_FORCE_INLINE int LZ4_compress_generic(
@@ -851,14 +847,15 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 }
 
 /**
- * LZ4_compress_fast_extState_noReset is a variant of LZ4_compress_fast_extState
- * that can be used when the state is known to have already been initialized
- * (via LZ4_resetStream or an earlier call to LZ4_compress_fast_extState /
- * LZ4_compress_fast_extState_noReset). This can provide significantly better
- * performance when the context reset would otherwise be a significant part of
- * the cost of the compression, e.g., when the data to be compressed is small.
+ * LZ4_compress_fast_extState_fastReset() :
+ * A variant of LZ4_compress_fast_extState().
+ *
+ * Using this variant avoids an expensive initialization step. It is only safe
+ * to call if the state buffer is known to be correctly initialized already
+ * (see comment in lz4.h on LZ4_resetStream_fast() for a definition of
+ * "correctly initialized").
  */
-int LZ4_compress_fast_extState_noReset(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
+int LZ4_compress_fast_extState_fastReset(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
     LZ4_stream_t_internal* ctx = &((LZ4_stream_t*)state)->internal_donotuse;
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
@@ -1147,6 +1144,10 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     DEBUGLOG(5, "LZ4_resetStream %p", LZ4_stream);
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
+}
+
+void LZ4_resetStream_fast(LZ4_stream_t* const ctx) {
+    LZ4_prepareTable(&(ctx->internal_donotuse), 0, byU32);
 }
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)

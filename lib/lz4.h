@@ -353,25 +353,38 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
  * Their signatures may change.
  **************************************/
 
-/*!
-LZ4_compress_fast_extState_noReset() :
-    A variant of LZ4_compress_fast_extState().
-
-    Use the _noReset variant if LZ4_resetStream() was called on the state
-    buffer before being used for the first time (calls to both extState
-    functions leave the state in a safe state, so zeroing is not required
-    between calls). Otherwise, using the plain _extState requires LZ4 to
-    reinitialize the state internally for every call.
-*/
-LZ4LIB_API int LZ4_compress_fast_extState_noReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
-
-
 
 /*! LZ4_resetStream_fast() :
- *  An LZ4_stream_t structure can be allocated once and re-used multiple times.
- *  Use this function to start compressing a new stream.
+ *  When an LZ4_stream_t is known to be in a internally coherent state,
+ *  it can often be prepared for a new compression with almost no work, only
+ *  sometimes falling back to the full, expensive reset that is always required
+ *  when the stream is in an indeterminate state (i.e., the reset performed by
+ *  LZ4_resetStream()).
+ *
+ *  LZ4_streams are guaranteed to be in a valid state when:
+ *  - returned from LZ4_createStream()
+ *  - reset by LZ4_resetStream()
+ *  - memset(stream, 0, sizeof(LZ4_stream_t))
+ *  - the stream was in a valid state and was reset by LZ4_resetStream_fast()
+ *  - the stream was in a valid state and was then used in any compression call
+ *    that returned success
+ *  - the stream was in an indeterminate state and was used in a compression
+ *    call that fully reset the state (LZ4_compress_fast_extState()) and that
+ *    returned success
  */
 LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
+
+/*! LZ4_compress_fast_extState_fastReset() :
+ *  A variant of LZ4_compress_fast_extState().
+ *
+ *  Using this variant avoids an expensive initialization step. It is only safe
+ *  to call if the state buffer is known to be correctly initialized already
+ *  (see above comment on LZ4_resetStream_fast() for a definition of "correctly
+ *  initialized"). From a high level, the difference is that this function
+ *  initializes the provided state with a call to LZ4_resetStream_fast() while
+ *  LZ4_compress_fast_extState() starts with a call to LZ4_resetStream().
+ */
+LZ4LIB_API int LZ4_compress_fast_extState_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
 
 /*-************************************
