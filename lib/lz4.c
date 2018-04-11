@@ -1147,7 +1147,6 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     DEBUGLOG(5, "LZ4_resetStream %p", LZ4_stream);
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
-    LZ4_stream->internal_donotuse.tableType = clearedTable;
 }
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
