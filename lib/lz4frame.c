@@ -74,6 +74,7 @@ You can contact the author at :
 *  Includes
 **************************************/
 #include "lz4frame_static.h"
+#define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
@@ -530,13 +531,8 @@ static void LZ4F_applyCDict(void* ctx,
                             const LZ4F_CDict* cdict,
                             int level) {
     if (level < LZ4HC_CLEVEL_MIN) {
-        LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t *)ctx)->internal_donotuse;
-        assert(!internal_ctx->initCheck);
-        /* Clear any local dictionary */
-        internal_ctx->dictionary = NULL;
-        internal_ctx->dictSize = 0;
-        /* Point to the dictionary context */
-        internal_ctx->dictCtx = cdict ? &(cdict->fastCtx->internal_donotuse) : NULL;
+        LZ4_resetStream_fast((LZ4_stream_t *)ctx);
+        LZ4_attach_dictionary((LZ4_stream_t *)ctx, cdict ? cdict->fastCtx : NULL);
     } else {
         if (cdict) {
             memcpy(ctx, cdict->HCCtx, sizeof(*cdict->HCCtx));
@@ -716,7 +712,7 @@ static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize
     if (cdict) {
         return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
     } else {
-        return LZ4_compress_fast_extState_noReset(ctx, src, dst, srcSize, dstCapacity, acceleration);
+        return LZ4_compress_fast_extState_fastReset(ctx, src, dst, srcSize, dstCapacity, acceleration);
     }
 }
 
