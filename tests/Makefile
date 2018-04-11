@@ -56,7 +56,7 @@ LZ4 := $(PRGDIR)/lz4$(EXT)
 
 # Default test parameters
 TEST_FILES   := COPYING
-FUZZER_TIME  := -T3mn
+FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
 
 
@@ -393,13 +393,12 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	./datagen -g16KB -s2 > ftmdg16K2
 	./datagen -g16KB -s3 > ftmdg16K3
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --force --multiple ftmdg16K ftmdg16K2 ftmdg16K3
-	./datagen -g16MB > ftmdg16M
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f ftmdg16M ftmdg16K2
+	./datagen -g7MB > ftmdg7M
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f ftmdg7M ftmdg16K2
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -t ftmdg16K2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg16M
-	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg16M ftmdg16K2
-	./datagen -g256MB > ftmdg256M
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg256M $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg7M
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg7M ftmdg16K2
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg7M $(VOID)
 	$(RM) ftm*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
