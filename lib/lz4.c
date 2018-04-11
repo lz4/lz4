@@ -1147,7 +1147,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
 
-void LZ4_resetStream_fast(LZ4_stream_t* const ctx) {
+void LZ4_resetStream_fast(LZ4_stream_t* ctx) {
     LZ4_prepareTable(&(ctx->internal_donotuse), 0, byU32);
 }
 
