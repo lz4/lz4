@@ -353,6 +353,7 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
  * Their signatures may change.
  **************************************/
 
+#ifdef LZ4_STATIC_LINKING_ONLY
 
 /*! LZ4_resetStream_fast() :
  *  When an LZ4_stream_t is known to be in a internally coherent state,
@@ -414,6 +415,7 @@ LZ4LIB_API int LZ4_compress_fast_extState_fastReset (void* state, const char* sr
  */
 LZ4LIB_API void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dictionary_stream);
 
+#endif
 
 /*-************************************
  *  Private definitions

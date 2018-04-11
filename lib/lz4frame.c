@@ -74,6 +74,7 @@ You can contact the author at :
 *  Includes
 **************************************/
 #include "lz4frame_static.h"
+#define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"

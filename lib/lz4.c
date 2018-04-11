@@ -89,6 +89,7 @@
 /*-************************************
 *  Dependency
 **************************************/
+#define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
 /* see also "memory routines" below */
 
