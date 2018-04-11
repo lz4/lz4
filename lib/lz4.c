@@ -1193,7 +1193,19 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dictionary_stream) {
-    working_stream->internal_donotuse.dictCtx = dictionary_stream != NULL ? &(dictionary_stream->internal_donotuse) : NULL;
+    if (dictionary_stream != NULL) {
+        /* If the current offset is zero, we will never look in the
+         * external dictionary context, since there is no value a table
+         * entry can take that indicate a miss. In that case, we need
+         * to bump the offset to something non-zero.
+         */
+        if (working_stream->internal_donotuse.currentOffset == 0) {
+            working_stream->internal_donotuse.currentOffset = 64 KB;
+        }
+        working_stream->internal_donotuse.dictCtx = &(dictionary_stream->internal_donotuse);
+    } else {
+        working_stream->internal_donotuse.dictCtx = NULL;
+    }
 }
 
 
@@ -1264,14 +1276,6 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
                 memcpy(streamPtr, streamPtr->dictCtx, sizeof(LZ4_stream_t));
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingExtDict, noDictIssue, acceleration);
             } else {
-                /* If the current offset is zero, we will never look in the
-                 * external dictionary context, since there is no value a table
-                 * entry can take that indicate a miss. In that case, we need
-                 * to bump the offset to something non-zero.
-                 */
-                if (streamPtr->currentOffset == 0) {
-                    streamPtr->currentOffset = 64 KB;
-                }
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, maxOutputSize, limitedOutput, tableType, usingDictCtx, noDictIssue, acceleration);
             }
         } else {

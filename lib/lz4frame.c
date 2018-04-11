@@ -531,8 +531,6 @@ static void LZ4F_applyCDict(void* ctx,
                             const LZ4F_CDict* cdict,
                             int level) {
     if (level < LZ4HC_CLEVEL_MIN) {
-        LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t *)ctx)->internal_donotuse;
-        assert(!internal_ctx->initCheck);
         LZ4_resetStream_fast((LZ4_stream_t *)ctx);
         LZ4_attach_dictionary((LZ4_stream_t *)ctx, cdict ? cdict->fastCtx : NULL);
     } else {
