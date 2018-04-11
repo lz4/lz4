@@ -200,7 +200,7 @@ size_t check_lz4f(bench_params_t *p, size_t csize) {
 
 
 uint64_t bench(
-    char *bench_name,
+    const char *bench_name,
     size_t (*fun)(bench_params_t *),
     size_t (*checkfun)(bench_params_t *, size_t),
     bench_params_t *params
@@ -299,6 +299,7 @@ int main(int argc, char *argv[]) {
   LZ4F_compressOptions_t options;
 
   int clevels[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  unsigned int clevelidx;
 
   bench_params_t params;
 
@@ -386,7 +387,7 @@ int main(int argc, char *argv[]) {
   params.prefs = &prefs;
   params.options = &options;
 
-  for (unsigned int clevelidx = 0; clevelidx < sizeof(clevels) / sizeof(clevels[0]); clevelidx++) {
+  for (clevelidx = 0; clevelidx < sizeof(clevels) / sizeof(clevels[0]); clevelidx++) {
     params.clevel = clevels[clevelidx];
     params.prefs->compressionLevel = clevels[clevelidx];
     params.cdict = NULL;
