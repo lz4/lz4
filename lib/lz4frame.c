@@ -533,8 +533,7 @@ static void LZ4F_applyCDict(void* ctx,
         LZ4_stream_t_internal* internal_ctx = &((LZ4_stream_t *)ctx)->internal_donotuse;
         assert(!internal_ctx->initCheck);
         LZ4_resetStream_fast((LZ4_stream_t *)ctx);
-        /* Point to the dictionary context */
-        internal_ctx->dictCtx = cdict ? &(cdict->fastCtx->internal_donotuse) : NULL;
+        LZ4_attach_dictionary((LZ4_stream_t *)ctx, cdict ? cdict->fastCtx : NULL);
     } else {
         if (cdict) {
             memcpy(ctx, cdict->HCCtx, sizeof(*cdict->HCCtx));

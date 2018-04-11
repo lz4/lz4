@@ -386,6 +386,34 @@ LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
  */
 LZ4LIB_API int LZ4_compress_fast_extState_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
+/*! LZ4_attach_dictionary() :
+ *  This is an experimental API that allows for the efficient use of a
+ *  static dictionary many times.
+ *
+ *  Rather than re-loading the dictionary buffer into a working context before
+ *  each compression, or copying a pre-loaded dictionary's LZ4_stream_t into a
+ *  working LZ4_stream_t, this function introduces a no-copy setup mechanism,
+ *  in which the working stream references the dictionary stream in-place.
+ *
+ *  Several assumptions are made about the state of the dictionary stream.
+ *  Currently, only streams which have been prepared by LZ4_loadDict() should
+ *  be expected to work.
+ *
+ *  Alternatively, the provided dictionary stream pointer may be NULL, in which
+ *  case any existing dictionary stream is unset.
+ *
+ *  If a dictionary is provided, it replaces any pre-existing stream history.
+ *  The dictionary contents are the only history that can be referenced and
+ *  logically immediately precede the data compressed in the first subsequent
+ *  compression call.
+ *
+ *  The dictionary will only remain attached to the working stream through the
+ *  first compression call, at the end of which it is cleared. The dictionary
+ *  stream (and source buffer) must remain in-place / accessible / unchanged
+ *  through the completion of the first compression call on the stream.
+ */
+LZ4LIB_API void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dictionary_stream);
+
 
 /*-************************************
  *  Private definitions
