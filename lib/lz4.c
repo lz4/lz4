@@ -594,7 +594,6 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
             cctx->tableType = clearedTable;
         } else {
             DEBUGLOG(4, "Re-use hash table (no reset)");
-            //if (tableType == byU32) cctx->currentOffset += 64 KB;
         }
     }
 
@@ -602,9 +601,11 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
      * than compressing without a gap. However, compressing with
      * currentOffset == 0 is faster still, so we preserve that case.
      */
+     DEBUGLOG(2, "tableType=%u, currentOffset=%u", cctx->tableType, cctx->currentOffset);
     if (cctx->currentOffset != 0 && tableType == byU32) {
         cctx->currentOffset += 64 KB;
     }
+    DEBUGLOG(2, "currentOffset: %u", cctx->currentOffset);
 
     /* Finally, clear history */
     cctx->dictCtx = NULL;
@@ -1267,7 +1268,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     const BYTE* const dictEnd = p + dictSize;
     const BYTE* base;
 
-    DEBUGLOG(4, "LZ4_loadDict %p", LZ4_dict);
+    DEBUGLOG(4, "LZ4_loadDict (%p into %p)", dictionary, LZ4_dict);
 
     LZ4_prepareTable(dict, 0, tableType);
 
