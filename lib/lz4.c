@@ -601,11 +601,9 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
      * than compressing without a gap. However, compressing with
      * currentOffset == 0 is faster still, so we preserve that case.
      */
-     DEBUGLOG(2, "tableType=%u, currentOffset=%u", cctx->tableType, cctx->currentOffset);
     if (cctx->currentOffset != 0 && tableType == byU32) {
         cctx->currentOffset += 64 KB;
     }
-    DEBUGLOG(2, "currentOffset: %u", cctx->currentOffset);
 
     /* Finally, clear history */
     cctx->dictCtx = NULL;
@@ -652,7 +650,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     const BYTE* dictBase = dictDirective == usingDictCtx ?
         dictionary + dictSize - dictCtx->currentOffset :   /* is it possible that dictCtx->currentOffset != dictCtx->dictSize ? */
         dictionary + dictSize - startIndex;
-    const BYTE* dictLowLimit;
 
     BYTE* op = (BYTE*) dest;
     BYTE* const olimit = op + maxOutputSize;
@@ -665,7 +662,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
 
     lowLimit = (const BYTE*)source - (dictDirective == withPrefix64k ? dictSize : 0);
-    dictLowLimit = dictionary ? dictionary : lowLimit;
 
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;   /* Size too large (not within 64K limit) */
 
@@ -735,15 +731,16 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                         /* there was no match, try the dictionary */
                         matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
                         match = dictBase + matchIndex;
-                        lowLimit = dictLowLimit;
+                        lowLimit = dictionary;
                     } else {
                         match = base + matchIndex;
                         lowLimit = (const BYTE*)source;
                     }
                 } else if (dictDirective==usingExtDict) {
                     if (matchIndex < startIndex) {
+                        DEBUGLOG(7, "extDict candidate: matchIndex=%5u  <  startIndex=%5u", matchIndex, startIndex);
                         match = dictBase + matchIndex;
-                        lowLimit = dictLowLimit;
+                        lowLimit = dictionary;
                     } else {
                         match = base + matchIndex;
                         lowLimit = (const BYTE*)source;
@@ -786,6 +783,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             /* Copy Literals */
             LZ4_wildCopy(op, anchor, op+litLength);
             op+=litLength;
+            DEBUGLOG(6, "seq.start:%zi, literals=%u, match.start:%zi", anchor-(const BYTE*)source, litLength, ip-(const BYTE*)source);
         }
 
 _next_match:
@@ -793,29 +791,33 @@ _next_match:
         if (maybe_ext_memSegment) {   /* static test */
             assert(offset <= MAX_DISTANCE && offset > 0);
             LZ4_writeLE16(op, (U16)offset); op+=2;
+            DEBUGLOG(6, "                with offset=%u  (ext if > %zi)", offset, ip - (const BYTE*)source);
         } else  {
             assert(ip-match <= MAX_DISTANCE);
             LZ4_writeLE16(op, (U16)(ip - match)); op+=2;
+            DEBUGLOG(6, "                with offset=%u  (same segment)", (U32)(ip - match));
         }
 
         /* Encode MatchLength */
         {   unsigned matchCode;
 
             if ( (dictDirective==usingExtDict || dictDirective==usingDictCtx)
-              && (lowLimit==dictionary) ) {
-                const BYTE* limit;
-                limit = ip + (dictEnd-match);
+              && (lowLimit==dictionary) /* match within extDict */ ) {
+                const BYTE* limit = ip + (dictEnd-match);
+                assert(dictEnd > match);
                 if (limit > matchlimit) limit = matchlimit;
                 matchCode = LZ4_count(ip+MINMATCH, match+MINMATCH, limit);
                 ip += MINMATCH + matchCode;
                 if (ip==limit) {
-                    unsigned const more = LZ4_count(ip, (const BYTE*)source, matchlimit);
+                    unsigned const more = LZ4_count(limit, (const BYTE*)source, matchlimit);
                     matchCode += more;
                     ip += more;
                 }
+                DEBUGLOG(6, "                with matchLength=%u starting in extDict", matchCode+MINMATCH);
             } else {
                 matchCode = LZ4_count(ip+MINMATCH, match+MINMATCH, matchlimit);
                 ip += MINMATCH + matchCode;
+                DEBUGLOG(6, "                with matchLength=%u", matchCode+MINMATCH);
             }
 
             if ( outputLimited &&    /* Check output buffer overflow */
@@ -865,14 +867,18 @@ _next_match:
                     /* there was no match, try the dictionary */
                     matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
                     match = dictBase + matchIndex;
+                    lowLimit = dictionary;   /* required for match length counter */
                 } else {
                     match = base + matchIndex;
+                    lowLimit = (const BYTE*)source;  /* required for match length counter */
                 }
             } else if (dictDirective==usingExtDict) {
                 if (matchIndex < startIndex) {
                     match = dictBase + matchIndex;
+                    lowLimit = dictionary;   /* required for match length counter */
                 } else {
                     match = base + matchIndex;
+                    lowLimit = (const BYTE*)source;   /* required for match length counter */
                 }
             } else {   /* single memory segment */
                 match = base + matchIndex;
@@ -885,6 +891,7 @@ _next_match:
                 *token=0;
                 if (maybe_ext_memSegment)
                     offset = current - matchIndex;
+                DEBUGLOG(6, "seq.start:%zi, literals=%u, match.start:%zi", anchor-(const BYTE*)source, 0, ip-(const BYTE*)source);
                 goto _next_match;
             }
         }
