@@ -23,7 +23,7 @@ test:
     - make -C tests test-fullbench
     - make -C tests test-fuzzer && make clean
     - make -C lib all          && make clean
-    - pyenv global 3.4.4; CPPFLAGS=-I/usr/include/x86_64-linux-gnu make versionsTest && make clean
+    - pyenv global 3.4.4; make versionsTest MOREFLAGS=-I/usr/include/x86_64-linux-gnu && make clean
     - make travis-install      && make clean
   # Longer tests
     - gcc -v; CFLAGS="-O2 -m32 -Werror" CPPFLAGS=-I/usr/include/x86_64-linux-gnu make check && make clean
