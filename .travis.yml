@@ -14,7 +14,7 @@ matrix:
       env: Ubu=12.04cont Cmd='make -C tests test-lz4 test-lz4c test-fullbench' COMPILER=cc
 
     - os: linux
-      sudo: false
+      sudo: required
       env: Ubu=12.04cont Cmd='sudo sysctl -w vm.mmap_min_addr="4096" && make -C tests test-frametest test-fuzzer' COMPILER=cc
 
     - os: linux
