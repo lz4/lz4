@@ -787,6 +787,14 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         }
 
 _next_match:
+        /* at this stage, the following variables must be correctly set :
+         * - ip : at start of LZ operation
+         * - match : at start of previous pattern occurence; can be within current prefix, or within extDict
+         * - offset : if maybe_ext_memSegment==1 (constant)
+         * - lowLimit : must be == dictionary to mean "match is within extDict"; must be == source otherwise
+         * - token and *token : position to write 4-bits for match length; higher 4-bits for literal length supposed already written
+         */
+
         /* Encode Offset */
         if (maybe_ext_memSegment) {   /* static test */
             assert(offset <= MAX_DISTANCE && offset > 0);
