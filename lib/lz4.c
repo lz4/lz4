@@ -517,15 +517,15 @@ LZ4_FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tab
     return LZ4_hash4(LZ4_read32(p), tableType);
 }
 
-static void LZ4_putIndexOnHash(U32 index, U32 h, void* tableBase, tableType_t const tableType)
+static void LZ4_putIndexOnHash(U32 idx, U32 h, void* tableBase, tableType_t const tableType)
 {
     switch (tableType)
     {
     default: /* fallthrough */
     case clearedTable: /* fallthrough */
     case byPtr: { /* illegal! */ assert(0); return; }
-    case byU32: { U32* hashTable = (U32*) tableBase; hashTable[h] = index; return; }
-    case byU16: { U16* hashTable = (U16*) tableBase; assert(index < 65536); hashTable[h] = (U16)index; return; }
+    case byU32: { U32* hashTable = (U32*) tableBase; hashTable[h] = idx; return; }
+    case byU16: { U16* hashTable = (U16*) tableBase; assert(idx < 65536); hashTable[h] = (U16)idx; return; }
     }
 }
 
