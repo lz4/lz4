@@ -785,7 +785,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             /* Copy Literals */
             LZ4_wildCopy(op, anchor, op+litLength);
             op+=litLength;
-            DEBUGLOG(6, "seq.start:%zi, literals=%u, match.start:%zi", anchor-(const BYTE*)source, litLength, ip-(const BYTE*)source);
+            DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i", (int)(anchor-(const BYTE*)source), litLength, (int)(ip-(const BYTE*)source));
         }
 
 _next_match:
@@ -801,7 +801,7 @@ _next_match:
         if (maybe_ext_memSegment) {   /* static test */
             assert(offset <= MAX_DISTANCE && offset > 0);
             LZ4_writeLE16(op, (U16)offset); op+=2;
-            DEBUGLOG(6, "                with offset=%u  (ext if > %zi)", offset, ip - (const BYTE*)source);
+            DEBUGLOG(6, "                with offset=%u  (ext if > %i)", offset, (int)(ip - (const BYTE*)source));
         } else  {
             assert(ip-match <= MAX_DISTANCE);
             LZ4_writeLE16(op, (U16)(ip - match)); op+=2;
@@ -901,7 +901,7 @@ _next_match:
                 *token=0;
                 if (maybe_ext_memSegment)
                     offset = current - matchIndex;
-                DEBUGLOG(6, "seq.start:%zi, literals=%u, match.start:%zi", anchor-(const BYTE*)source, 0, ip-(const BYTE*)source);
+                DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i", (int)(anchor-(const BYTE*)source), 0, (int)(ip-(const BYTE*)source));
                 goto _next_match;
             }
         }
