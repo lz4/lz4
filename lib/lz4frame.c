@@ -743,7 +743,7 @@ static int LZ4F_compressBlockHC(void* ctx, const char* src, char* dst, int srcSi
     if (cdict) {
         return LZ4_compress_HC_continue((LZ4_streamHC_t*)ctx, src, dst, srcSize, dstCapacity);
     }
-    return LZ4_compress_HC_extStateHC(ctx, src, dst, srcSize, dstCapacity, level);
+    return LZ4_compress_HC_extStateHC_fastReset(ctx, src, dst, srcSize, dstCapacity, level);
 }
 
 static int LZ4F_compressBlockHC_continue(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
