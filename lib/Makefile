@@ -145,9 +145,9 @@ INSTALL_DATA    ?= $(INSTALL) -m 644
 
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
-	@sed -e 's|@PREFIX@|$(PREFIX)|' \
-         -e 's|@LIBDIR@|$(LIBDIR)|' \
-         -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
+	@sed -e 's|@PREFIX@|$(DESTDIR)$(PREFIX)|' \
+         -e 's|@LIBDIR@|$(DESTDIR)$(LIBDIR)|' \
+         -e 's|@INCLUDEDIR@|$(DESTDIR)$(INCLUDEDIR)|' \
          -e 's|@VERSION@|$(LIBVER)|' \
           $< >$@
 
