@@ -660,6 +660,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     /* Init conditions */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
+    assert(acceleration >= 1);
 
     lowLimit = (const BYTE*)source - (dictDirective == withPrefix64k ? dictSize : 0);
 
@@ -712,6 +713,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         } else {   /* byU32, byU16 */
 
             const BYTE* forwardIp = ip;
+            unsigned step = 1;
             unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
             do {
                 U32 const h = forwardH;
@@ -720,8 +722,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 assert(matchIndex <= current);
                 assert(forwardIp - base < (ptrdiff_t)(2 GB - 1));
                 ip = forwardIp;
-                assert(searchMatchNb >= (1<<LZ4_skipTrigger));
-                forwardIp += (searchMatchNb++ >> LZ4_skipTrigger);
+                forwardIp += step;
+                step = (searchMatchNb++ >> LZ4_skipTrigger);
 
                 if (unlikely(forwardIp > mflimitPlusOne)) goto _last_literals;
                 assert(ip < mflimitPlusOne);
