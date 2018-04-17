@@ -1173,11 +1173,18 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 
     LZ4_prepareTable(dict, 0, tableType);
 
+    /* We always increment the offset by 64 KB, since, if the dict is longer,
+     * we truncate it to the last 64k, and if it's shorter, we still want to
+     * advance by a whole window length so we can provide the guarantee that
+     * there are only valid offsets in the window, which allows an optimization
+     * in LZ4_compress_fast_continue() where it uses noDictIssue even when the
+     * dictionary isn't a full 64k. */
+
     if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
-    base = p - dict->currentOffset;
+    base = dictEnd - 64 KB - dict->currentOffset;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
-    dict->currentOffset += dict->dictSize;
+    dict->currentOffset += 64 KB;
     dict->tableType = tableType;
 
     if (dictSize < (int)HASH_UNIT) {
