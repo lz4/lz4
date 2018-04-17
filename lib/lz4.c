@@ -758,9 +758,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
-                if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) continue;    /* match outside of valid area */
-                if ((tableType != byU16) && (matchIndex+MAX_DISTANCE < current)) continue;  /* too far */
-                if (tableType == byU16) assert((current - matchIndex) <= MAX_DISTANCE);     /* too_far presumed impossible with byU16 */
+                if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) continue;     /* match outside of valid area */
+                if ((tableType != byU16) && (current - matchIndex > MAX_DISTANCE)) continue; /* too far - note: works even if matchIndex overflows */
+                if (tableType == byU16) assert((current - matchIndex) <= MAX_DISTANCE);      /* too_far presumed impossible with byU16 */
 
                 if (LZ4_read32(match) == LZ4_read32(ip)) {
                     if (maybe_extMem) offset = current - matchIndex;
@@ -861,7 +861,6 @@ _next_match:
         /* Fill table */
         LZ4_putPosition(ip-2, cctx->hashTable, tableType, base);
 
-#if 1
         /* Test next position */
         if (tableType == byPtr) {
 
@@ -901,7 +900,7 @@ _next_match:
             }
             LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
-              && ((tableType==byU16) ? 1 : (matchIndex+MAX_DISTANCE >= current))
+              && ((tableType==byU16) ? 1 : (current - matchIndex <= MAX_DISTANCE))
               && (LZ4_read32(match) == LZ4_read32(ip)) ) {
                 token=op++;
                 *token=0;
@@ -913,13 +912,6 @@ _next_match:
 
         /* Prepare next loop */
         forwardH = LZ4_hashPosition(++ip, tableType);
-
-#else
-
-        /* Prepare next loop */
-        forwardH = LZ4_hashPosition(ip, tableType);
-
-#endif
 
     }
 
