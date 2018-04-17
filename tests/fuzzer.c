@@ -687,19 +687,19 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         }   }
 
         /* Compress using external dictionary stream */
-        FUZ_DISPLAYTEST();
         {
             LZ4_stream_t LZ4_stream;
             int expectedSize;
             U32 expectedCrc;
 
+            FUZ_DISPLAYTEST("LZ4_compress_fast_continue() after LZ4_loadDict()");
             LZ4_loadDict(&LZ4dict, dict, dictSize);
             expectedSize = LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
             FUZ_CHECKTEST(expectedSize<=0, "LZ4_compress_fast_continue reference compression for extDictCtx should have succeeded");
             expectedCrc = XXH32(compressedBuffer, expectedSize, 0);
 
+            FUZ_DISPLAYTEST("LZ4_compress_fast_continue() after LZ4_attach_dictionary()");
             LZ4_loadDict(&LZ4dict, dict, dictSize);
-
             LZ4_resetStream(&LZ4_stream);
             LZ4_attach_dictionary(&LZ4_stream, &LZ4dict);
             blockContinueCompressedSize = LZ4_compress_fast_continue(&LZ4_stream, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
@@ -713,7 +713,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_CHECKTEST(blockContinueCompressedSize != expectedSize, "LZ4_compress_fast_continue using extDictCtx produced different-sized output (%d expected vs %d actual)", expectedSize, blockContinueCompressedSize);
             FUZ_CHECKTEST(XXH32(compressedBuffer, blockContinueCompressedSize, 0) != expectedCrc, "LZ4_compress_fast_continue using extDictCtx produced different output");
 
-            FUZ_DISPLAYTEST();
+            FUZ_DISPLAYTEST("LZ4_compress_fast_continue() after LZ4_attach_dictionary(), but output buffer is 1 byte too short");
             LZ4_resetStream(&LZ4_stream);
             LZ4_attach_dictionary(&LZ4_stream, &LZ4dict);
             ret = LZ4_compress_fast_continue(&LZ4_stream, block, compressedBuffer, blockSize, blockContinueCompressedSize-1, 1);

@@ -588,12 +588,12 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
           || tableType == byPtr
           || inputSize >= 4 KB)
         {
-            DEBUGLOG(4, "Resetting table in %p", cctx);
+            DEBUGLOG(4, "LZ4_prepareTable: Resetting table in %p", cctx);
             MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
             cctx->currentOffset = 0;
             cctx->tableType = clearedTable;
         } else {
-            DEBUGLOG(4, "Re-use hash table (no reset)");
+            DEBUGLOG(4, "LZ4_prepareTable: Re-use hash table (no reset)");
         }
     }
 
@@ -799,13 +799,13 @@ _next_match:
 
         /* Encode Offset */
         if (maybe_ext_memSegment) {   /* static test */
+            DEBUGLOG(6, "             with offset=%u  (ext if > %i)", offset, (int)(ip - (const BYTE*)source));
             assert(offset <= MAX_DISTANCE && offset > 0);
             LZ4_writeLE16(op, (U16)offset); op+=2;
-            DEBUGLOG(6, "                with offset=%u  (ext if > %i)", offset, (int)(ip - (const BYTE*)source));
         } else  {
+            DEBUGLOG(6, "             with offset=%u  (same segment)", (U32)(ip - match));
             assert(ip-match <= MAX_DISTANCE);
             LZ4_writeLE16(op, (U16)(ip - match)); op+=2;
-            DEBUGLOG(6, "                with offset=%u  (same segment)", (U32)(ip - match));
         }
 
         /* Encode MatchLength */
@@ -823,11 +823,11 @@ _next_match:
                     matchCode += more;
                     ip += more;
                 }
-                DEBUGLOG(6, "                with matchLength=%u starting in extDict", matchCode+MINMATCH);
+                DEBUGLOG(6, "             with matchLength=%u starting in extDict", matchCode+MINMATCH);
             } else {
                 matchCode = LZ4_count(ip+MINMATCH, match+MINMATCH, matchlimit);
                 ip += MINMATCH + matchCode;
-                DEBUGLOG(6, "                with matchLength=%u", matchCode+MINMATCH);
+                DEBUGLOG(6, "             with matchLength=%u", matchCode+MINMATCH);
             }
 
             if ( outputLimited &&    /* Check output buffer overflow */
@@ -1259,7 +1259,7 @@ LZ4_stream_t* LZ4_createStream(void)
 
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
-    DEBUGLOG(5, "LZ4_resetStream %p", LZ4_stream);
+    DEBUGLOG(5, "LZ4_resetStream (ctx:%p)", LZ4_stream);
     MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
 
