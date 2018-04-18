@@ -79,6 +79,8 @@
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
+/*===   Enums   ===*/
+typedef enum { noDictCtx, usingDictCtx } dictCtx_directive;
 
 
 /**************************************
@@ -210,7 +212,8 @@ LZ4HC_InsertAndGetWiderMatch (
     const BYTE** matchpos,
     const BYTE** startpos,
     const int maxNbAttempts,
-    const int patternAnalysis)
+    const int patternAnalysis,
+    const dictCtx_directive dict)
 {
     U16* const chainTable = hc4->chainTable;
     U32* const HashTable = hc4->hashTable;
@@ -301,7 +304,7 @@ LZ4HC_InsertAndGetWiderMatch (
         }   }   }   }
     }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
 
-    if (dictCtx != NULL && nbAttempts && ip - base - lowLimit < MAX_DISTANCE) {
+    if (dict == usingDictCtx && nbAttempts && ip - base - lowLimit < MAX_DISTANCE) {
         ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         matchIndex = dictMatchIndex + (int)dictIndexDelta;
@@ -344,13 +347,14 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
                                  const BYTE* const ip, const BYTE* const iLimit,
                                  const BYTE** matchpos,
                                  const int maxNbAttempts,
-                                 const int patternAnalysis)
+                                 const int patternAnalysis,
+                                 const dictCtx_directive dict)
 {
     const BYTE* uselessPtr = ip;
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, patternAnalysis);
+    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, patternAnalysis, dict);
 }
 
 
@@ -440,7 +444,8 @@ static int LZ4HC_compress_hashChain (
     int* srcSizePtr,
     int const maxOutputSize,
     unsigned maxNbAttempts,
-    limitedOutput_directive limit
+    const limitedOutput_directive limit,
+    const dictCtx_directive dict
     )
 {
     const int inputSize = *srcSizePtr;
@@ -472,7 +477,7 @@ static int LZ4HC_compress_hashChain (
 
     /* Main Loop */
     while (ip <= mflimit) {
-        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis);
+        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis, dict);
         if (ml<MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
@@ -484,7 +489,7 @@ _Search2:
         if (ip+ml <= mflimit)
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
-                            maxNbAttempts, patternAnalysis);
+                            maxNbAttempts, patternAnalysis, dict);
         else
             ml2 = ml;
 
@@ -531,7 +536,7 @@ _Search3:
         if (start2 + ml2 <= mflimit)
             ml3 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3,
-                            maxNbAttempts, patternAnalysis);
+                            maxNbAttempts, patternAnalysis, dict);
         else
             ml3 = ml2;
 
@@ -655,17 +660,19 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const char* const source, char* dst,
     int* srcSizePtr, int dstCapacity,
     int const nbSearches, size_t sufficient_len,
-    limitedOutput_directive limit, int const fullUpdate);
+    const limitedOutput_directive limit, int const fullUpdate,
+    const dictCtx_directive dict);
 
 
-static int LZ4HC_compress_generic (
+LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
     char* const dst,
     int* const srcSizePtr,
     int const dstCapacity,
     int cLevel,
-    limitedOutput_directive limit
+    const limitedOutput_directive limit,
+    const dictCtx_directive dict
     )
 {
     typedef enum { lz4hc, lz4opt } lz4hc_strat_e;
@@ -704,12 +711,57 @@ static int LZ4HC_compress_generic (
         if (cParam.strat == lz4hc)
             return LZ4HC_compress_hashChain(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
-                                cParam.nbSearches, limit);
+                                cParam.nbSearches, limit, dict);
         assert(cParam.strat == lz4opt);
         return LZ4HC_compress_optimal(ctx,
                             src, dst, srcSizePtr, dstCapacity,
                             cParam.nbSearches, cParam.targetLength, limit,
-                            cLevel == LZ4HC_CLEVEL_MAX);  /* ultra mode */
+                            cLevel == LZ4HC_CLEVEL_MAX, dict);  /* ultra mode */
+    }
+}
+
+static int LZ4HC_compress_generic_noDictCtx (
+    LZ4HC_CCtx_internal* const ctx,
+    const char* const src,
+    char* const dst,
+    int* const srcSizePtr,
+    int const dstCapacity,
+    int cLevel,
+    limitedOutput_directive limit
+    )
+{
+    assert(ctx->dictCtx == NULL);
+    return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, noDictCtx);
+}
+
+static int LZ4HC_compress_generic_dictCtx (
+    LZ4HC_CCtx_internal* const ctx,
+    const char* const src,
+    char* const dst,
+    int* const srcSizePtr,
+    int const dstCapacity,
+    int cLevel,
+    limitedOutput_directive limit
+    )
+{
+    assert(ctx->dictCtx != NULL);
+    return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
+}
+
+static int LZ4HC_compress_generic (
+    LZ4HC_CCtx_internal* const ctx,
+    const char* const src,
+    char* const dst,
+    int* const srcSizePtr,
+    int const dstCapacity,
+    int cLevel,
+    limitedOutput_directive limit
+    )
+{
+    if (ctx->dictCtx == NULL) {
+        return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
+    } else {
+        return LZ4HC_compress_generic_dictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     }
 }
 
@@ -1019,7 +1071,8 @@ typedef struct {
 LZ4_FORCE_INLINE LZ4HC_match_t
 LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
                       const BYTE* ip, const BYTE* const iHighLimit,
-                      int minLen, int nbSearches)
+                      int minLen, int nbSearches,
+                      const dictCtx_directive dict)
 {
     LZ4HC_match_t match = { 0 , 0 };
     const BYTE* matchPtr = NULL;
@@ -1028,7 +1081,7 @@ LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
     int const matchLength = LZ4HC_InsertAndGetWiderMatch(ctx,
                                 ip, ip, iHighLimit, minLen, &matchPtr, &ip,
-                                nbSearches, 1 /* patternAnalysis */);
+                                nbSearches, 1 /* patternAnalysis */, dict);
     if (matchLength <= minLen) return match;
     match.len = matchLength;
     match.off = (int)(ip-matchPtr);
@@ -1044,8 +1097,9 @@ static int LZ4HC_compress_optimal (
     int dstCapacity,
     int const nbSearches,
     size_t sufficient_len,
-    limitedOutput_directive limit,
-    int const fullUpdate
+    const limitedOutput_directive limit,
+    int const fullUpdate,
+    const dictCtx_directive dict
     )
 {
 #define TRAILING_LITERALS 3
@@ -1073,7 +1127,7 @@ static int LZ4HC_compress_optimal (
          int best_mlen, best_off;
          int cur, last_match_pos = 0;
 
-         LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches);
+         LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches, dict);
          if (firstMatch.len==0) { ip++; continue; }
 
          if ((size_t)firstMatch.len > sufficient_len) {
@@ -1143,10 +1197,10 @@ static int LZ4HC_compress_optimal (
 
              DEBUGLOG(7, "search at rPos:%u", cur);
              if (fullUpdate)
-                 newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit, MINMATCH-1, nbSearches);
+                 newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit, MINMATCH-1, nbSearches, dict);
              else
                  /* only test matches of minimum length; slightly faster, but misses a few bytes */
-                 newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit, last_match_pos - cur, nbSearches);
+                 newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit, last_match_pos - cur, nbSearches, dict);
              if (!newMatch.len) continue;
 
              if ( ((size_t)newMatch.len > sufficient_len)
