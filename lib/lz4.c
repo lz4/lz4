@@ -147,8 +147,12 @@
 #  define expect(expr,value)    (expr)
 #endif
 
+#ifndef likely
 #define likely(expr)     expect((expr) != 0, 1)
+#endif
+#ifndef unlikely
 #define unlikely(expr)   expect((expr) != 0, 0)
+#endif
 
 
 /*-************************************
