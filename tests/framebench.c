@@ -347,6 +347,9 @@ int main(int argc, char *argv[]) {
   options.stableSrc = 1;
 
   out_size = LZ4F_compressFrameBound(in_size, &prefs);
+  if ((size_t)LZ4_compressBound(in_size) > out_size) {
+    out_size = LZ4_compressBound(in_size);
+  }
   out_buf = (char *)malloc(out_size);
   if (!out_buf) return 1;
 
