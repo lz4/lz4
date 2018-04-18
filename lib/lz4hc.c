@@ -336,7 +336,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = *anchor;  /* only works for single segment */
-    //g_debuglog_enable = (pos >= 2228) & (pos <= 2262);
+    /* g_debuglog_enable = (pos >= 2228) & (pos <= 2262); */
     DEBUGLOG(6, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u + %u",
                 pos,
                 (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
@@ -852,16 +852,17 @@ int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
     LZ4HC_CCtx_internal *ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
     if ((((size_t)state) & (sizeof(void*)-1)) != 0) return 1;   /* Error : pointer is not aligned for pointer (32 or 64 bits) */
     LZ4HC_init(ctx, (const BYTE*)inputBuffer);
-    ctx->inputBuffer = (BYTE*)inputBuffer;
+    ctx->inputBuffer = inputBuffer;
     return 0;
 }
 
-void* LZ4_createHC (char* inputBuffer)
+void* LZ4_createHC (const char* inputBuffer)
 {
     LZ4_streamHC_t* hc4 = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
     if (hc4 == NULL) return NULL;   /* not enough memory */
     LZ4HC_init (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
-    hc4->internal_donotuse.inputBuffer = (BYTE*)inputBuffer;
+    assert(sizeof(size_t) == sizeof(void*));
+    hc4->internal_donotuse.inputBuffer = (void*)(size_t)inputBuffer;   /* ugly hack, circumvent -Wcast-qual */
     return hc4;
 }
 
@@ -885,7 +886,7 @@ char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 {
     LZ4HC_CCtx_internal* const hc4 = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
     int const dictSize = LZ4_saveDictHC((LZ4_streamHC_t*)LZ4HC_Data, (char*)(hc4->inputBuffer), 64 KB);
-    return (char*)(hc4->inputBuffer + dictSize);
+    return (char*)(hc4->inputBuffer) + dictSize;
 }
 
 
@@ -1136,15 +1137,14 @@ static int LZ4HC_compress_optimal (
  encode: /* cur, last_match_pos, best_mlen, best_off must be set */
          assert(cur < LZ4_OPT_NUM);
          assert(last_match_pos >= 1);  /* == 1 when only one candidate */
-         DEBUGLOG(6, "reverse traversal, looking for shortest path")
-         DEBUGLOG(6, "last_match_pos = %i", last_match_pos);
+         DEBUGLOG(6, "reverse traversal, looking for shortest path (last_match_pos=%i)", last_match_pos);
          {   int candidate_pos = cur;
              int selected_matchLength = best_mlen;
              int selected_offset = best_off;
              while (1) {  /* from end to beginning */
                  int const next_matchLength = opt[candidate_pos].mlen;  /* can be 1, means literal */
                  int const next_offset = opt[candidate_pos].off;
-                 DEBUGLOG(6, "pos %i: sequence length %i", candidate_pos, selected_matchLength);
+                 DEBUGLOG(7, "pos %i: sequence length %i", candidate_pos, selected_matchLength);
                  opt[candidate_pos].mlen = selected_matchLength;
                  opt[candidate_pos].off = selected_offset;
                  selected_matchLength = next_matchLength;

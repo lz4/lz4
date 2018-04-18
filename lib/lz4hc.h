@@ -148,7 +148,7 @@ typedef struct
     const uint8_t* end;         /* next block here to continue on current prefix */
     const uint8_t* base;        /* All index relative to this position */
     const uint8_t* dictBase;    /* alternate base for extDict */
-    uint8_t* inputBuffer;       /* deprecated */
+    void*      inputBuffer;     /* deprecated */
     uint32_t   dictLimit;       /* below that point, need extDict */
     uint32_t   lowLimit;        /* below that point, no more dict */
     uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
@@ -164,7 +164,7 @@ typedef struct
     const unsigned char* end;        /* next block here to continue on current prefix */
     const unsigned char* base;       /* All index relative to this position */
     const unsigned char* dictBase;   /* alternate base for extDict */
-    unsigned char* inputBuffer;      /* deprecated */
+    void*          inputBuffer;      /* deprecated */
     unsigned int   dictLimit;        /* below that point, need extDict */
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
@@ -206,8 +206,8 @@ LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") LZ4LIB_API int LZ4_co
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC_continue               (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize);
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
-/* Deprecated Streaming functions using older model; should no longer be used */
-LZ4_DEPRECATED("use LZ4_createStreamHC() instead") LZ4LIB_API void* LZ4_createHC (char* inputBuffer);
+/* Deprecated Streaming functions; should no longer be used */
+LZ4_DEPRECATED("use LZ4_createStreamHC() instead") LZ4LIB_API void* LZ4_createHC (const char* inputBuffer);
 LZ4_DEPRECATED("use LZ4_saveDictHC() instead") LZ4LIB_API     char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
 LZ4_DEPRECATED("use LZ4_freeStreamHC() instead") LZ4LIB_API   int   LZ4_freeHC (void* LZ4HC_Data);
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);

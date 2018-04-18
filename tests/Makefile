@@ -33,7 +33,8 @@ PRGDIR  := ../programs
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
-DEBUGFLAGS = -g -DLZ4_DEBUG=1
+DEBUGLEVEL?= 1
+DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
 CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
