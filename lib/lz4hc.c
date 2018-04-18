@@ -437,7 +437,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     return 0;
 }
 
-static int LZ4HC_compress_hashChain (
+LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
     const char* const source,
     char* const dest,
