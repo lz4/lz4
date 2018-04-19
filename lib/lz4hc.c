@@ -746,15 +746,18 @@ static int LZ4HC_compress_generic_dictCtx (
     limitedOutput_directive limit
     )
 {
+    size_t position = ctx->end - ctx->base - ctx->lowLimit;
     assert(ctx->dictCtx != NULL);
-    if (*srcSizePtr > 4 KB) {
+    if (position >= 64 KB) {
+        ctx->dictCtx = NULL;
+        return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
+    } else if (position == 0 && *srcSizePtr > 4 KB) {
         memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
         LZ4HC_setExternalDict(ctx, (const BYTE *)src);
         ctx->compressionLevel = cLevel;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else {
         int result = LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
-        ctx->dictCtx = NULL;
         return result;
     }
 }
