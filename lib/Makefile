@@ -42,6 +42,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
+BUILD_SHARED:=yes
 BUILD_STATIC:=yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
@@ -92,6 +93,7 @@ ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 endif
 
 $(LIBLZ4): $(SRCFILES)
+ifeq ($(BUILD_SHARED),yes)  # can be disabled on command line
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS)))
 	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
@@ -101,6 +103,7 @@ else
 	@echo creating versioned links
 	@ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf $@ liblz4.$(SHARED_EXT)
+endif
 endif
 
 liblz4: $(LIBLZ4)
@@ -159,9 +162,11 @@ ifeq ($(BUILD_STATIC),yes)
 	@$(INSTALL_DATA) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
 	@$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
 endif
+ifeq ($(BUILD_SHARED),yes)
 	@$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
 	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+endif
 	@echo Installing headers in $(INCLUDEDIR)
 	@$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
 	@$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
