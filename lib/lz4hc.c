@@ -720,6 +720,8 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     }
 }
 
+static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock);
+
 static int LZ4HC_compress_generic_noDictCtx (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
@@ -745,7 +747,16 @@ static int LZ4HC_compress_generic_dictCtx (
     )
 {
     assert(ctx->dictCtx != NULL);
-    return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
+    if (*srcSizePtr > 4 KB) {
+        memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
+        LZ4HC_setExternalDict(ctx, (const BYTE *)src);
+        ctx->compressionLevel = cLevel;
+        return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
+    } else {
+        int result = LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
+        ctx->dictCtx = NULL;
+        return result;
+    }
 }
 
 static int LZ4HC_compress_generic (
