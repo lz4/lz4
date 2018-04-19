@@ -308,7 +308,7 @@ LZ4HC_InsertAndGetWiderMatch (
         ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         matchIndex = dictMatchIndex + (int)dictIndexDelta;
-        while (dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
+        while ((ptrdiff_t) dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
             if (LZ4_read32(matchPtr) == pattern) {
