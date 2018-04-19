@@ -1825,29 +1825,45 @@ int LZ4_decompress_safe_forceExtDict(const char* source, char* dest, int compres
 *  Obsolete Functions
 ***************************************************/
 /* obsolete compression functions */
-int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) {
-    return LZ4_compress_default(source, dest, inputSize, maxOutputSize); }
-int LZ4_compress(const char* source, char* dest, int inputSize) {
-    return LZ4_compress_default(source, dest, inputSize, LZ4_compressBound(inputSize)); }
-int LZ4_compress_limitedOutput_withState (void* state, const char* src, char* dst, int srcSize, int dstSize) {
-    return LZ4_compress_fast_extState(state, src, dst, srcSize, dstSize, 1); }
-int LZ4_compress_withState (void* state, const char* src, char* dst, int srcSize) {
-    return LZ4_compress_fast_extState(state, src, dst, srcSize, LZ4_compressBound(srcSize), 1); }
-int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* src, char* dst, int srcSize, int maxDstSize) {
-    return LZ4_compress_fast_continue(LZ4_stream, src, dst, srcSize, maxDstSize, 1); }
-int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize) {
-    return LZ4_compress_fast_continue(LZ4_stream, source, dest, inputSize, LZ4_compressBound(inputSize), 1); }
+int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize)
+{
+    return LZ4_compress_default(source, dest, inputSize, maxOutputSize);
+}
+int LZ4_compress(const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_default(source, dest, inputSize, LZ4_compressBound(inputSize));
+}
+int LZ4_compress_limitedOutput_withState (void* state, const char* src, char* dst, int srcSize, int dstSize)
+{
+    return LZ4_compress_fast_extState(state, src, dst, srcSize, dstSize, 1);
+}
+int LZ4_compress_withState (void* state, const char* src, char* dst, int srcSize)
+{
+    return LZ4_compress_fast_extState(state, src, dst, srcSize, LZ4_compressBound(srcSize), 1);
+}
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_stream, const char* src, char* dst, int srcSize, int dstCapacity)
+{
+    return LZ4_compress_fast_continue(LZ4_stream, src, dst, srcSize, dstCapacity, 1);
+}
+int LZ4_compress_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize)
+{
+    return LZ4_compress_fast_continue(LZ4_stream, source, dest, inputSize, LZ4_compressBound(inputSize), 1);
+}
 
 /*
-These function names are deprecated and should no longer be used.
+These decompression functions are deprecated and should no longer be used.
 They are only provided here for compatibility with older user programs.
 - LZ4_uncompress is totally equivalent to LZ4_decompress_fast
 - LZ4_uncompress_unknownOutputSize is totally equivalent to LZ4_decompress_safe
 */
-int LZ4_uncompress (const char* source, char* dest, int outputSize) {
-    return LZ4_decompress_fast(source, dest, outputSize); }
-int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize) {
-    return LZ4_decompress_safe(source, dest, isize, maxOutputSize); }
+int LZ4_uncompress (const char* source, char* dest, int outputSize)
+{
+    return LZ4_decompress_fast(source, dest, outputSize);
+}
+int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize)
+{
+    return LZ4_decompress_safe(source, dest, isize, maxOutputSize);
+}
 
 /* Obsolete Streaming functions */
 
