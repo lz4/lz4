@@ -275,8 +275,37 @@ int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
  */
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
+/*! LZ4_resetStreamHC_fast() :
+ *  When an LZ4_streamHC_t is known to be in a internally coherent state,
+ *  it can often be prepared for a new compression with almost no work, only
+ *  sometimes falling back to the full, expensive reset that is always required
+ *  when the stream is in an indeterminate state (i.e., the reset performed by
+ *  LZ4_resetStreamHC()).
+ *
+ *  LZ4_streamHCs are guaranteed to be in a valid state when:
+ *  - returned from LZ4_createStreamHC()
+ *  - reset by LZ4_resetStreamHC()
+ *  - memset(stream, 0, sizeof(LZ4_streamHC_t))
+ *  - the stream was in a valid state and was reset by LZ4_resetStreamHC_fast()
+ *  - the stream was in a valid state and was then used in any compression call
+ *    that returned success
+ *  - the stream was in an indeterminate state and was used in a compression
+ *    call that fully reset the state (LZ4_compress_HC_extStateHC()) and that
+ *    returned success
+ */
 void LZ4_resetStreamHC_fast(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
+/*! LZ4_compress_HC_extStateHC_fastReset() :
+ *  A variant of LZ4_compress_HC_extStateHC().
+ *
+ *  Using this variant avoids an expensive initialization step. It is only safe
+ *  to call if the state buffer is known to be correctly initialized already
+ *  (see above comment on LZ4_resetStreamHC_fast() for a definition of
+ *  "correctly initialized"). From a high level, the difference is that this
+ *  function initializes the provided state with a call to
+ *  LZ4_resetStreamHC_fast() while LZ4_compress_HC_extStateHC() starts with a
+ *  call to LZ4_resetStreamHC().
+ */
 int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel);
 
 /*! LZ4_attach_HC_dictionary() :
