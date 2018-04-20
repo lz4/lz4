@@ -317,11 +317,6 @@ LZ4HC_InsertAndGetWiderMatch (
                 const BYTE* vLimit = ip + (dictCtx->end - matchPtr);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
-                /*
-                if ((ip+mlt == vLimit) && (vLimit < iHighLimit)) {
-                    mlt += LZ4_count(ip+mlt, base+lowLimit, iHighLimit);
-                }
-                */
                 back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
                 mlt -= back;
                 if (mlt > longest) {
