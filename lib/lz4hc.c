@@ -101,7 +101,7 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
         LZ4HC_clearTables(hc4);
         startingOffset = 0;
     }
-    startingOffset += MAX_DISTANCE;
+    startingOffset += 64 KB;
     hc4->nextToUpdate = (U32) startingOffset;
     hc4->base = start - startingOffset;
     hc4->end = start;
