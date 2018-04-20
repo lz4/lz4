@@ -221,7 +221,8 @@ LZ4HC_InsertAndGetWiderMatch (
     const BYTE* const base = hc4->base;
     const U32 dictLimit = hc4->dictLimit;
     const BYTE* const lowPrefixPtr = base + dictLimit;
-    const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip-base)) ? hc4->lowLimit : (U32)(ip - base) - MAX_DISTANCE;
+    const U32 ipIndex = (U32)(ip - base);
+    const U32 lowLimit = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
     const BYTE* const dictBase = hc4->dictBase;
     int const delta = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
@@ -304,14 +305,12 @@ LZ4HC_InsertAndGetWiderMatch (
         }   }   }   }
     }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
 
-    if (dict == usingDictCtx && nbAttempts && ip - base - lowLimit < MAX_DISTANCE) {
-        const ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
-        /* bounds check, since we need to downcast */
-        assert(dictIndexDelta <= 1 GB);
-        assert(dictIndexDelta >= -1 GB);
+    if (dict == usingDictCtx && nbAttempts && ipIndex - lowLimit < MAX_DISTANCE) {
+        size_t const dictEndOffset = dictCtx->end - dictCtx->base;
+        assert(dictEndOffset <= 1 GB);
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
-        matchIndex = dictMatchIndex + (int)dictIndexDelta;
-        while ((ptrdiff_t) matchIndex + MAX_DISTANCE > ip - base && nbAttempts--) {
+        matchIndex = dictMatchIndex + lowLimit - (U32)dictEndOffset;
+        while (ipIndex - matchIndex <= MAX_DISTANCE && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
             if (LZ4_read32(matchPtr) == pattern) {
