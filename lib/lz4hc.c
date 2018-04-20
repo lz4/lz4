@@ -999,8 +999,8 @@ int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
 {
     LZ4HC_CCtx_internal *ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
     if ((((size_t)state) & (sizeof(void*)-1)) != 0) return 1;   /* Error : pointer is not aligned for pointer (32 or 64 bits) */
+    LZ4_resetStreamHC((LZ4_streamHC_t*)state, ((LZ4_streamHC_t*)state)->internal_donotuse.compressionLevel);
     LZ4HC_init(ctx, (const BYTE*)inputBuffer);
-    ctx->inputBuffer = inputBuffer;
     return 0;
 }
 
@@ -1008,9 +1008,8 @@ void* LZ4_createHC (const char* inputBuffer)
 {
     LZ4_streamHC_t* hc4 = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
     if (hc4 == NULL) return NULL;   /* not enough memory */
+    LZ4_resetStreamHC(hc4, 0 /* compressionLevel */);
     LZ4HC_init (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
-    assert(sizeof(size_t) == sizeof(void*));
-    hc4->internal_donotuse.inputBuffer = (void*)(size_t)inputBuffer;   /* ugly hack, circumvent -Wcast-qual */
     return hc4;
 }
 
@@ -1032,9 +1031,11 @@ int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* src, c
 
 char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 {
-    LZ4HC_CCtx_internal* const hc4 = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
-    int const dictSize = LZ4_saveDictHC((LZ4_streamHC_t*)LZ4HC_Data, (char*)(hc4->inputBuffer), 64 KB);
-    return (char*)(hc4->inputBuffer) + dictSize;
+    LZ4_streamHC_t *ctx = (LZ4_streamHC_t*)LZ4HC_Data;
+    const BYTE *bufferStart = ctx->internal_donotuse.base + ctx->internal_donotuse.lowLimit;
+    LZ4_resetStreamHC_fast(ctx, ctx->internal_donotuse.compressionLevel);
+    /* avoid const char * -> char * conversion warning :( */
+    return (char *)(uptrval)bufferStart;
 }
 
 
