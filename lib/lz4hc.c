@@ -305,10 +305,13 @@ LZ4HC_InsertAndGetWiderMatch (
     }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
 
     if (dict == usingDictCtx && nbAttempts && ip - base - lowLimit < MAX_DISTANCE) {
-        ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
+        const ptrdiff_t dictIndexDelta = dictCtx->base - dictCtx->end + lowLimit;
+        /* bounds check, since we need to downcast */
+        assert(dictIndexDelta <= 1 GB);
+        assert(dictIndexDelta >= -1 GB);
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         matchIndex = dictMatchIndex + (int)dictIndexDelta;
-        while ((ptrdiff_t) dictMatchIndex + MAX_DISTANCE > ip - base - dictIndexDelta && nbAttempts--) {
+        while ((ptrdiff_t) matchIndex + MAX_DISTANCE > ip - base && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
             if (LZ4_read32(matchPtr) == pattern) {
@@ -741,7 +744,7 @@ static int LZ4HC_compress_generic_dictCtx (
     limitedOutput_directive limit
     )
 {
-    size_t position = ctx->end - ctx->base - ctx->lowLimit;
+    const size_t position = ctx->end - ctx->base - ctx->lowLimit;
     assert(ctx->dictCtx != NULL);
     if (position >= 64 KB) {
         ctx->dictCtx = NULL;
@@ -752,8 +755,7 @@ static int LZ4HC_compress_generic_dictCtx (
         ctx->compressionLevel = cLevel;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else {
-        int result = LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
-        return result;
+        return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
     }
 }
 
@@ -804,7 +806,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
     LZ4_streamHC_t state;
     LZ4_streamHC_t* const statePtr = &state;
 #endif
-    int cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
+    int const cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     free(statePtr);
 #endif
