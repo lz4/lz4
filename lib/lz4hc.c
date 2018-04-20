@@ -830,9 +830,11 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) {
     LZ4_streamHC_t* LZ4_streamHCPtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
-    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
-    LZ4_streamHCPtr->internal_donotuse.base = NULL;
-    LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
+    if (LZ4_streamHCPtr != NULL) {
+        LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
+        LZ4_streamHCPtr->internal_donotuse.base = NULL;
+        LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
+    }
     return LZ4_streamHCPtr;
 }
 
