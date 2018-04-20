@@ -88,7 +88,6 @@ typedef enum { noDictCtx, usingDictCtx } dictCtx_directive;
 **************************************/
 static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 {
-    DEBUGLOG(4, "LZ4HC_clearTables(%p)", hc4);
     MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
 }
@@ -96,7 +95,6 @@ static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     uptrval startingOffset = hc4->end - hc4->base;
-    DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
     if (startingOffset > 1 GB) {
         LZ4HC_clearTables(hc4);
         startingOffset = 0;
@@ -830,11 +828,9 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) {
     LZ4_streamHC_t* LZ4_streamHCPtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
-    if (LZ4_streamHCPtr != NULL) {
-        LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
-        LZ4_streamHCPtr->internal_donotuse.base = NULL;
-        LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
-    }
+    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
+    LZ4_streamHCPtr->internal_donotuse.base = NULL;
+    LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     return LZ4_streamHCPtr;
 }
 
@@ -881,8 +877,8 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    LZ4_resetStreamHC(LZ4_streamHCPtr, LZ4_streamHCPtr->internal_donotuse.compressionLevel);
     LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
+    LZ4HC_clearTables (ctxPtr);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
     return dictSize;
@@ -897,7 +893,7 @@ void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
     DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
-    if (ctxPtr->end - ctxPtr->base - ctxPtr->nextToUpdate >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
