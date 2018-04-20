@@ -830,8 +830,7 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void) {
     LZ4_streamHC_t* LZ4_streamHCPtr = (LZ4_streamHC_t*)malloc(sizeof(LZ4_streamHC_t));
-    DEBUGLOG(4, "LZ4_createStreamHC() -> %p", LZ4_streamHCPtr);
-    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)-1;
+    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     return LZ4_streamHCPtr;
@@ -850,7 +849,7 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= sizeof(size_t) * LZ4_STREAMHCSIZE_SIZET);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     DEBUGLOG(4, "LZ4_resetStreamHC(%p, %d)", LZ4_streamHCPtr, compressionLevel);
-    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)-1;
+    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
