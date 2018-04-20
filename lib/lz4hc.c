@@ -97,7 +97,7 @@ static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     uptrval startingOffset = hc4->end - hc4->base;
     DEBUGLOG(4, "LZ4HC_init(%p, %p)", hc4, start);
-    if (startingOffset > 1 GB || startingOffset > (uptrval)start) {
+    if (startingOffset > 1 GB) {
         LZ4HC_clearTables(hc4);
         startingOffset = 0;
     }
@@ -898,7 +898,7 @@ void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
     DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
-    if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    if (ctxPtr->end - ctxPtr->base - ctxPtr->nextToUpdate >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
