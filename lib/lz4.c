@@ -776,10 +776,10 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
-                if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) continue;     /* match outside of valid area */
+                if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) continue;    /* match outside of valid area */
                 assert(matchIndex < current);
-                if ((tableType != byU16) && (matchIndex+MAX_DISTANCE < current)) continue; /* too far - note: works even if matchIndex overflows */
-                if (tableType == byU16) assert((current - matchIndex) <= MAX_DISTANCE);      /* too_far presumed impossible with byU16 */
+                if ((tableType != byU16) && (matchIndex+MAX_DISTANCE < current)) continue;  /* too far */
+                if (tableType == byU16) assert((current - matchIndex) <= MAX_DISTANCE);     /* too_far presumed impossible with byU16 */
 
                 if (LZ4_read32(match) == LZ4_read32(ip)) {
                     if (maybe_extMem) offset = current - matchIndex;
