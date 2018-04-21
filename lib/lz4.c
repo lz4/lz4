@@ -777,7 +777,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
                 if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) continue;     /* match outside of valid area */
-                if ((tableType != byU16) && (current - matchIndex > MAX_DISTANCE)) continue; /* too far - note: works even if matchIndex overflows */
+                assert(matchIndex < current);
+                if ((tableType != byU16) && (matchIndex+MAX_DISTANCE < current)) continue; /* too far - note: works even if matchIndex overflows */
                 if (tableType == byU16) assert((current - matchIndex) <= MAX_DISTANCE);      /* too_far presumed impossible with byU16 */
 
                 if (LZ4_read32(match) == LZ4_read32(ip)) {
@@ -918,8 +919,9 @@ _next_match:
                 match = base + matchIndex;
             }
             LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
+            assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
-              && ((tableType==byU16) ? 1 : (current - matchIndex <= MAX_DISTANCE))
+              && ((tableType==byU16) ? 1 : (matchIndex+MAX_DISTANCE >= current))
               && (LZ4_read32(match) == LZ4_read32(ip)) ) {
                 token=op++;
                 *token=0;
@@ -1304,7 +1306,11 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 
     DEBUGLOG(4, "LZ4_loadDict (%i bytes from %p into %p)", dictSize, dictionary, LZ4_dict);
 
-    LZ4_prepareTable(dict, 0, tableType);
+    /* It's necessary to reset the context,
+     * and not just continue it with prepareTable()
+     * to avoid any risk of generating overflowing matchIndex
+     * when compressing using this dictionary */
+    LZ4_resetStream(LZ4_dict);
 
     /* We always increment the offset by 64 KB, since, if the dict is longer,
      * we truncate it to the last 64k, and if it's shorter, we still want to
