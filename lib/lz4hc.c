@@ -316,7 +316,7 @@ LZ4HC_InsertAndGetWiderMatch (
             if (LZ4_read32(matchPtr) == pattern) {
                 int mlt;
                 int back = 0;
-                const BYTE* vLimit = ip + (dictCtx->end - matchPtr);
+                const BYTE* vLimit = ip + (dictEndOffset - dictMatchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
