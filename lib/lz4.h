@@ -206,15 +206,17 @@ LZ4LIB_API int LZ4_compress_destSize (const char* src, char* dst, int* srcSizePt
 /*!
 LZ4_decompress_fast() : **unsafe!**
 This function is a bit faster than LZ4_decompress_safe(),
-but doesn't provide any security guarantee.
+but it may misbehave on malformed input because it doesn't perform full validation of compressed data.
     originalSize : is the uncompressed size to regenerate
                    Destination buffer must be already allocated, and its size must be >= 'originalSize' bytes.
     return : number of bytes read from source buffer (== compressed size).
              If the source stream is detected malformed, the function stops decoding and return a negative result.
-    note : This function respects memory boundaries for *properly formed* compressed data.
-           However, it does not provide any protection against malicious input.
-           It also doesn't know 'src' size, and implies it's >= compressed size.
-           Use this function in trusted environment **only**.
+    note : This function is only usable if the originalSize of uncompressed data is known in advance.
+           The caller should also check that all the compressed input has been consumed properly,
+           i.e. that the return value matches the size of the buffer with compressed input.
+           The function never writes past the output buffer.  However, since it doesn't know its 'src' size,
+           it may read past the intended input.  Also, because match offsets are not validated during decoding,
+           reads from 'src' may underflow.  Use this function in trusted environment **only**.
 */
 LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
 
