@@ -30,8 +30,9 @@ extern "C" {
 *  Dependencies
 ******************************************/
 #include "platform.h"     /* PLATFORM_POSIX_VERSION */
-#include <stdlib.h>       /* malloc */
 #include <stddef.h>       /* size_t, ptrdiff_t */
+#include <stdlib.h>       /* malloc */
+#include <string.h>       /* strlen, strncpy */
 #include <stdio.h>        /* fprintf */
 #include <sys/types.h>    /* stat, utime */
 #include <sys/stat.h>     /* stat */
