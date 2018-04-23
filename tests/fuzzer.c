@@ -487,6 +487,31 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         ret = LZ4_decompress_fast(compressedBuffer, decodedBuffer, blockSize+1);
         FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
 
+        /* Test decoding with empty input */
+        FUZ_DISPLAYTEST("LZ4_decompress_safe() with empty input");
+        LZ4_decompress_safe(NULL, decodedBuffer, 0, blockSize);
+
+        /* Test decoding with a one byte input */
+        FUZ_DISPLAYTEST("LZ4_decompress_safe() with one byte input");
+        {   char const tmp = 0xFF;
+            LZ4_decompress_safe(&tmp, decodedBuffer, 1, blockSize);
+        }
+
+        /* Test decoding shortcut edge case */
+        FUZ_DISPLAYTEST("LZ4_decompress_safe() with shortcut edge case");
+        {   char tmp[17];
+            /* 14 bytes of literals, followed by a 14 byte match.
+             * Should not read beyond the end of the buffer.
+             * See https://github.com/lz4/lz4/issues/508. */
+            *tmp = 0xEE;
+            memset(tmp + 1, 0, 14);
+            tmp[15] = 14;
+            tmp[16] = 0;
+            ret = LZ4_decompress_safe(tmp, decodedBuffer, sizeof(tmp), blockSize);
+            FUZ_CHECKTEST(ret >= 0, "LZ4_decompress_safe() should fail");
+        }
+
+
         /* Test decoding with output size exactly what's necessary => must work */
         FUZ_DISPLAYTEST();
         decodedBuffer[blockSize] = 0;
