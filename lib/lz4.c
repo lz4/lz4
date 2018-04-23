@@ -1536,9 +1536,10 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
          * this shortcut was tested on x86 and x64, where it improves decoding speed.
          * it has not yet been benchmarked on ARM, Power, mips, etc.
          * NOTE: The loop begins with a read, so we must have one byte left at the end. */
-        if (((ip + 14 /*maxLL*/ + 2 /*offset*/ < iend)
-          & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
-          & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
+        if (endOnInput
+          && ((ip + 14 /*maxLL*/ + 2 /*offset*/ < iend)
+            & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
+            & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
             size_t const ll = token >> ML_BITS;
             size_t const off = LZ4_readLE16(ip+ll);
             const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
