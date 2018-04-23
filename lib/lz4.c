@@ -1530,7 +1530,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
         unsigned const token = *ip++;
 
-        assert(ip <= iend); /* ip < iend before the increment */
+        assert(!endOnInput || ip <= iend); /* ip < iend before the increment */
         /* shortcut for common case :
          * in most circumstances, we expect to decode small matches (<= 18 bytes) separated by few literals (<= 14 bytes).
          * this shortcut was tested on x86 and x64, where it improves decoding speed.

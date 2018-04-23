@@ -500,7 +500,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Test decoding shortcut edge case */
         FUZ_DISPLAYTEST("LZ4_decompress_safe() with shortcut edge case");
         {   char tmp[17];
-            unsigned long i;
             /* 14 bytes of literals, followed by a 14 byte match.
              * Should not read beyond the end of the buffer.
              * See https://github.com/lz4/lz4/issues/508. */
