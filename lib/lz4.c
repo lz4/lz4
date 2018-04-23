@@ -1520,6 +1520,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
     if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                      /* targetOutputSize too high => just decode everything */
     if ((endOnInput) && (unlikely(outputSize==0))) return ((srcSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0?1:-1);
+    if ((endOnInput) && unlikely(srcSize==0)) return -1;
 
     /* Main Loop : decode sequences */
     while (1) {
@@ -1529,11 +1530,13 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
         unsigned const token = *ip++;
 
+        assert(ip <= iend); /* ip < iend before the increment */
         /* shortcut for common case :
          * in most circumstances, we expect to decode small matches (<= 18 bytes) separated by few literals (<= 14 bytes).
          * this shortcut was tested on x86 and x64, where it improves decoding speed.
-         * it has not yet been benchmarked on ARM, Power, mips, etc. */
-        if (((ip + 14 /*maxLL*/ + 2 /*offset*/ <= iend)
+         * it has not yet been benchmarked on ARM, Power, mips, etc.
+         * NOTE: The loop begins with a read, so we must have one byte left at the end. */
+        if (((ip + 14 /*maxLL*/ + 2 /*offset*/ < iend)
           & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
           & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
             size_t const ll = token >> ML_BITS;
@@ -1553,6 +1556,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         /* decode literal length */
         if ((length=(token>>ML_BITS)) == RUN_MASK) {
             unsigned s;
+            if (unlikely(endOnInput ? ip >= iend-RUN_MASK : 0)) goto _output_error;   /* overflow detection */
             do {
                 s = *ip++;
                 length += s;
