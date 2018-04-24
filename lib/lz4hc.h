@@ -141,35 +141,37 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #include <stdint.h>
 
-typedef struct
+typedef struct LZ4HC_CCtx_internal LZ4HC_CCtx_internal;
+struct LZ4HC_CCtx_internal
 {
     uint32_t   hashTable[LZ4HC_HASHTABLESIZE];
     uint16_t   chainTable[LZ4HC_MAXD];
     const uint8_t* end;         /* next block here to continue on current prefix */
     const uint8_t* base;        /* All index relative to this position */
     const uint8_t* dictBase;    /* alternate base for extDict */
-    void*      inputBuffer;     /* deprecated */
     uint32_t   dictLimit;       /* below that point, need extDict */
     uint32_t   lowLimit;        /* below that point, no more dict */
     uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
     int        compressionLevel;
-} LZ4HC_CCtx_internal;
+    const LZ4HC_CCtx_internal* dictCtx;
+};
 
 #else
 
-typedef struct
+typedef struct LZ4HC_CCtx_internal LZ4HC_CCtx_internal;
+struct LZ4HC_CCtx_internal
 {
     unsigned int   hashTable[LZ4HC_HASHTABLESIZE];
     unsigned short chainTable[LZ4HC_MAXD];
     const unsigned char* end;        /* next block here to continue on current prefix */
     const unsigned char* base;       /* All index relative to this position */
     const unsigned char* dictBase;   /* alternate base for extDict */
-    void*          inputBuffer;      /* deprecated */
     unsigned int   dictLimit;        /* below that point, need extDict */
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
     int            compressionLevel;
-} LZ4HC_CCtx_internal;
+    const LZ4HC_CCtx_internal* dictCtx;
+};
 
 #endif
 
@@ -206,7 +208,14 @@ LZ4_DEPRECATED("use LZ4_compress_HC_extStateHC() instead") LZ4LIB_API int LZ4_co
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC_continue               (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize);
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
-/* Deprecated Streaming functions; should no longer be used */
+/* Obsolete streaming functions; degraded functionality; do not use!
+ *
+ * In order to perform streaming compression, these functions depended on data
+ * that is no longer tracked in the state. They have been preserved as well as
+ * possible: using them will still produce a correct output. However, use of
+ * LZ4_slideInputBufferHC() will truncate the history of the stream, rather
+ * than preserve a window-sized chunk of history.
+ */
 LZ4_DEPRECATED("use LZ4_createStreamHC() instead") LZ4LIB_API void* LZ4_createHC (const char* inputBuffer);
 LZ4_DEPRECATED("use LZ4_saveDictHC() instead") LZ4LIB_API     char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
 LZ4_DEPRECATED("use LZ4_freeStreamHC() instead") LZ4LIB_API   int   LZ4_freeHC (void* LZ4HC_Data);
@@ -266,7 +275,65 @@ int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
  */
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
+/*! LZ4_resetStreamHC_fast() :
+ *  When an LZ4_streamHC_t is known to be in a internally coherent state,
+ *  it can often be prepared for a new compression with almost no work, only
+ *  sometimes falling back to the full, expensive reset that is always required
+ *  when the stream is in an indeterminate state (i.e., the reset performed by
+ *  LZ4_resetStreamHC()).
+ *
+ *  LZ4_streamHCs are guaranteed to be in a valid state when:
+ *  - returned from LZ4_createStreamHC()
+ *  - reset by LZ4_resetStreamHC()
+ *  - memset(stream, 0, sizeof(LZ4_streamHC_t))
+ *  - the stream was in a valid state and was reset by LZ4_resetStreamHC_fast()
+ *  - the stream was in a valid state and was then used in any compression call
+ *    that returned success
+ *  - the stream was in an indeterminate state and was used in a compression
+ *    call that fully reset the state (LZ4_compress_HC_extStateHC()) and that
+ *    returned success
+ */
+void LZ4_resetStreamHC_fast(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
+/*! LZ4_compress_HC_extStateHC_fastReset() :
+ *  A variant of LZ4_compress_HC_extStateHC().
+ *
+ *  Using this variant avoids an expensive initialization step. It is only safe
+ *  to call if the state buffer is known to be correctly initialized already
+ *  (see above comment on LZ4_resetStreamHC_fast() for a definition of
+ *  "correctly initialized"). From a high level, the difference is that this
+ *  function initializes the provided state with a call to
+ *  LZ4_resetStreamHC_fast() while LZ4_compress_HC_extStateHC() starts with a
+ *  call to LZ4_resetStreamHC().
+ */
+int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel);
+
+/*! LZ4_attach_HC_dictionary() :
+ *  This is an experimental API that allows for the efficient use of a
+ *  static dictionary many times.
+ *
+ *  Rather than re-loading the dictionary buffer into a working context before
+ *  each compression, or copying a pre-loaded dictionary's LZ4_streamHC_t into a
+ *  working LZ4_streamHC_t, this function introduces a no-copy setup mechanism,
+ *  in which the working stream references the dictionary stream in-place.
+ *
+ *  Several assumptions are made about the state of the dictionary stream.
+ *  Currently, only streams which have been prepared by LZ4_loadDictHC() should
+ *  be expected to work.
+ *
+ *  Alternatively, the provided dictionary stream pointer may be NULL, in which
+ *  case any existing dictionary stream is unset.
+ *
+ *  A dictionary should only be attached to a stream without any history (i.e.,
+ *  a stream that has just been reset).
+ *
+ *  The dictionary will remain attached to the working stream only for the
+ *  current stream session. Calls to LZ4_resetStreamHC(_fast) will remove the
+ *  dictionary context association from the working stream. The dictionary
+ *  stream (and source buffer) must remain in-place / accessible / unchanged
+ *  through the lifetime of the stream session.
+ */
+LZ4LIB_API void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC_t *dictionary_stream);
 
 #endif   /* LZ4_HC_SLO_098092834 */
 #endif   /* LZ4_HC_STATIC_LINKING_ONLY */
