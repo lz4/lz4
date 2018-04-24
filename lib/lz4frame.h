@@ -409,3 +409,123 @@ LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always su
 #endif
 
 #endif  /* LZ4F_H_09782039843 */
+
+#if defined(LZ4F_STATIC_LINKING_ONLY) && !defined(LZ4F_H_STATIC_09782039843)
+#define LZ4F_H_STATIC_09782039843
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
+/* These declarations are not stable and may change in the future. They are
+ * therefore only safe to depend on when the caller is statically linked
+ * against the library. To access their declarations, define
+ * LZ4F_STATIC_LINKING_ONLY.
+ *
+ * There is a further protection mechanism where these symbols aren't published
+ * into shared/dynamic libraries. You can override this behavior and force
+ * them to be published by defining LZ4F_PUBLISH_STATIC_FUNCTIONS. Use at
+ * your own risk.
+ */
+#ifdef LZ4F_PUBLISH_STATIC_FUNCTIONS
+#define LZ4FLIB_STATIC_API LZ4FLIB_API
+#else
+#define LZ4FLIB_STATIC_API
+#endif
+
+
+/* ---   Error List   --- */
+#define LZ4F_LIST_ERRORS(ITEM) \
+        ITEM(OK_NoError) \
+        ITEM(ERROR_GENERIC) \
+        ITEM(ERROR_maxBlockSize_invalid) \
+        ITEM(ERROR_blockMode_invalid) \
+        ITEM(ERROR_contentChecksumFlag_invalid) \
+        ITEM(ERROR_compressionLevel_invalid) \
+        ITEM(ERROR_headerVersion_wrong) \
+        ITEM(ERROR_blockChecksum_invalid) \
+        ITEM(ERROR_reservedFlag_set) \
+        ITEM(ERROR_allocation_failed) \
+        ITEM(ERROR_srcSize_tooLarge) \
+        ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_frameHeader_incomplete) \
+        ITEM(ERROR_frameType_unknown) \
+        ITEM(ERROR_frameSize_wrong) \
+        ITEM(ERROR_srcPtr_wrong) \
+        ITEM(ERROR_decompressionFailed) \
+        ITEM(ERROR_headerChecksum_invalid) \
+        ITEM(ERROR_contentChecksum_invalid) \
+        ITEM(ERROR_frameDecoding_alreadyStarted) \
+        ITEM(ERROR_maxCode)
+
+#define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
+
+/* enum list is exposed, to handle specific errors */
+typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;
+
+LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
+
+
+
+/**********************************
+ *  Bulk processing dictionary API
+ *********************************/
+typedef struct LZ4F_CDict_s LZ4F_CDict;
+
+/*! LZ4_createCDict() :
+ *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
+ *  LZ4_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
+ *  LZ4_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
+ * `dictBuffer` can be released after LZ4_CDict creation, since its content is copied within CDict */
+LZ4FLIB_STATIC_API LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
+LZ4FLIB_STATIC_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
+
+
+/*! LZ4_compressFrame_usingCDict() :
+ *  Compress an entire srcBuffer into a valid LZ4 frame using a digested Dictionary.
+ *  cctx must point to a context created by LZ4F_createCompressionContext().
+ *  If cdict==NULL, compress without a dictionary.
+ *  dstBuffer MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ *  If this condition is not respected, function will fail (@return an errorCode).
+ *  The LZ4F_preferences_t structure is optional : you may provide NULL as argument,
+ *  but it's not recommended, as it's the only way to provide dictID in the frame header.
+ * @return : number of bytes written into dstBuffer.
+ *           or an error code if it fails (can be tested using LZ4F_isError()) */
+LZ4FLIB_STATIC_API size_t LZ4F_compressFrame_usingCDict(
+    LZ4F_cctx* cctx,
+    void* dst, size_t dstCapacity,
+    const void* src, size_t srcSize,
+    const LZ4F_CDict* cdict,
+    const LZ4F_preferences_t* preferencesPtr);
+
+
+/*! LZ4F_compressBegin_usingCDict() :
+ *  Inits streaming dictionary compression, and writes the frame header into dstBuffer.
+ *  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
+ * `prefsPtr` is optional : you may provide NULL as argument,
+ *  however, it's the only way to provide dictID in the frame header.
+ * @return : number of bytes written into dstBuffer for the header,
+ *           or an error code (which can be tested using LZ4F_isError()) */
+LZ4FLIB_STATIC_API size_t LZ4F_compressBegin_usingCDict(
+    LZ4F_cctx* cctx,
+    void* dstBuffer, size_t dstCapacity,
+    const LZ4F_CDict* cdict,
+    const LZ4F_preferences_t* prefsPtr);
+
+
+/*! LZ4F_decompress_usingDict() :
+ *  Same as LZ4F_decompress(), using a predefined dictionary.
+ *  Dictionary is used "in place", without any preprocessing.
+ *  It must remain accessible throughout the entire frame decoding. */
+LZ4FLIB_STATIC_API size_t LZ4F_decompress_usingDict(
+    LZ4F_dctx* dctxPtr,
+    void* dstBuffer, size_t* dstSizePtr,
+    const void* srcBuffer, size_t* srcSizePtr,
+    const void* dict, size_t dictSize,
+    const LZ4F_decompressOptions_t* decompressOptionsPtr);
+
+#if defined (__cplusplus)
+}
+#endif
+
+#endif  /* defined(LZ4F_STATIC_LINKING_ONLY) && !defined(LZ4F_H_STATIC_09782039843) */

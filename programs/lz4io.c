@@ -56,8 +56,8 @@
 #include "lz4io.h"
 #include "lz4.h"       /* still required for legacy format */
 #include "lz4hc.h"     /* still required for legacy format */
+#define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
-#include "lz4frame_static.h"
 
 
 /*****************************

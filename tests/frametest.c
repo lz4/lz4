@@ -41,7 +41,11 @@
 #include <string.h>     /* strcmp */
 #include <time.h>       /* clock_t, clock(), CLOCKS_PER_SEC */
 #include <assert.h>
-#include "lz4frame_static.h"
+#include "lz4frame.h"   /* include multiple times to test correctness/safety */
+#include "lz4frame.h"
+#define LZ4F_STATIC_LINKING_ONLY
+#include "lz4frame.h"
+#include "lz4frame.h"
 #include "lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
