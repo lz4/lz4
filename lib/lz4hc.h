@@ -175,7 +175,7 @@ struct LZ4HC_CCtx_internal
 
 #endif
 
-#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 64) /* 262200 */
+#define LZ4_STREAMHCSIZE       (4*LZ4HC_HASHTABLESIZE + 2*LZ4HC_MAXD + 56) /* 262200 */
 #define LZ4_STREAMHCSIZE_SIZET (LZ4_STREAMHCSIZE / sizeof(size_t))
 union LZ4_streamHC_u {
     size_t table[LZ4_STREAMHCSIZE_SIZET];
