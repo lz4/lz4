@@ -1538,8 +1538,9 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
          * NOTE: The loop begins with a read, so we must have one byte left at the end. */
         if (endOnInput
           && ((ip + 14 /*maxLL*/ + 2 /*offset*/ < iend)
-            & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend))
-            & ((token < (15<<ML_BITS)) & ((token & ML_MASK) != 15)) ) {
+            & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend)
+            & (token < (15<<ML_BITS))
+            & ((token & ML_MASK) != 15) ) ) {
             size_t const ll = token >> ML_BITS;
             size_t const off = LZ4_readLE16(ip+ll);
             const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
