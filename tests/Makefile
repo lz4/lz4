@@ -80,7 +80,8 @@ lz4c32:   # create a 32-bits version for 32/64 interop tests
 %.o : $(LZ4DIR)/%.c $(LZ4DIR)/%.h
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
-fullbench  : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
+fullbench : DEBUGLEVEL=0
+fullbench : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 $(LZ4DIR)/liblz4.a:
