@@ -109,15 +109,24 @@ Parsing restrictions
 There are specific parsing rules to respect in order to remain compatible
 with assumptions made by the decoder :
 
-1. The last 5 bytes are always literals
+1. The last 5 bytes are always literals.  In other words, the last five bytes
+   from the uncompressed input (or all bytes, if the input has less than five
+   bytes) must be encoded as literals on behalf of the last sequence.
+   The last sequence is incomplete, and stops right after the literals.
 2. The last match must start at least 12 bytes before end of block.
    Consequently, a block with less than 13 bytes cannot be compressed.
 
 These rules are in place to ensure that the decoder
 will never read beyond the input buffer, nor write beyond the output buffer.
 
-Note that the last sequence is also incomplete,
-and stops right after literals.
+1. To copy literals from a non-last sequence, an 8-byte copy instruction
+   can always be safely issued (without reading past the input), because
+   the literals are followed by a 2-byte offset, and the last sequence
+   is at least 1+5 bytes long.
+2. TODO: explain the benefits of the second restriction.
+
+Empty inputs are either unrepresentable or can be represented with a null byte,
+which can be interpreted as a token without literals and without a match.
 
 
 Additional notes
