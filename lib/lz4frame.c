@@ -613,7 +613,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
         LZ4F_applyCDict(cctxPtr->lz4CtxPtr, cdict, cctxPtr->prefs.compressionLevel);
     }
     if (preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN) {
-          LZ4_favorDecompressionSpeed(cctxPtr->lz4CtxPtr, preferencesPtr->favorDecSpeed);
+          LZ4_favorDecompressionSpeed(cctxPtr->lz4CtxPtr, (int)preferencesPtr->favorDecSpeed);
     }
 
     /* Magic Number */

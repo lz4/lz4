@@ -116,6 +116,7 @@ static int g_blockIndependence = 1;
 static int g_sparseFileSupport = 1;
 static int g_contentSizeFlag = 0;
 static int g_useDictionary = 0;
+static unsigned g_favorDecSpeed = 0;
 static const char* g_dictionaryFilename = NULL;
 
 
@@ -219,6 +220,12 @@ int LZ4IO_setContentSize(int enable)
 {
     g_contentSizeFlag = (enable!=0);
     return g_contentSizeFlag;
+}
+
+/* Default setting : 0 (disabled) */
+void LZ4IO_favorDecSpeed(int favor)
+{
+    g_favorDecSpeed = (favor!=0);
 }
 
 static U32 g_removeSrcFile = 0;
@@ -548,6 +555,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)g_blockChecksum;
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
+    prefs.favorDecSpeed = g_favorDecSpeed;
     if (g_contentSizeFlag) {
       U64 const fileSize = UTIL_getFileSize(srcFileName);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */

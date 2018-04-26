@@ -718,7 +718,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
                             cParam.nbSearches, cParam.targetLength, limit,
                             cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
                             dict,
-                            favorDecompressionSpeed);
+                            ctx->favorDecSpeed);
     }
 }
 
