@@ -277,7 +277,7 @@ static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int in
 }
 
 #ifndef LZ4_DLL_IMPORT
-extern int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize, const char* dict, int dictSize);
+extern int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize, const void* dict, size_t dictSize);
 
 static int local_LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize)
 {
