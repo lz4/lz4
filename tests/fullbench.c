@@ -184,6 +184,11 @@ static int local_LZ4_compress_default_small(const char* in, char* out, int inSiz
     return LZ4_compress_default(in, out, inSize, LZ4_compressBound(inSize)-1);
 }
 
+static int local_LZ4_compress_destSize(const char* in, char* out, int inSize)
+{
+    return LZ4_compress_destSize(in, out, &inSize, LZ4_compressBound(inSize)-1);
+}
+
 static int local_LZ4_compress_fast0(const char* in, char* out, int inSize)
 {
     return LZ4_compress_fast(in, out, inSize, LZ4_compressBound(inSize), 0);
@@ -422,12 +427,13 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 0 : DISPLAY("Compression functions : \n"); continue;
             case 1 : compressionFunction = local_LZ4_compress_default_large; compressorName = "LZ4_compress_default"; break;
             case 2 : compressionFunction = local_LZ4_compress_default_small; compressorName = "LZ4_compress_default(small dst)"; break;
-            case 3 : compressionFunction = local_LZ4_compress_fast0; compressorName = "LZ4_compress_fast(0)"; break;
-            case 4 : compressionFunction = local_LZ4_compress_fast1; compressorName = "LZ4_compress_fast(1)"; break;
-            case 5 : compressionFunction = local_LZ4_compress_fast2; compressorName = "LZ4_compress_fast(2)"; break;
-            case 6 : compressionFunction = local_LZ4_compress_fast17; compressorName = "LZ4_compress_fast(17)"; break;
-            case 7 : compressionFunction = local_LZ4_compress_fast_extState0; compressorName = "LZ4_compress_fast_extState(0)"; break;
-            case 8 : compressionFunction = local_LZ4_compress_fast_continue0; initFunction = local_LZ4_createStream; compressorName = "LZ4_compress_fast_continue(0)"; break;
+            case 3 : compressionFunction = local_LZ4_compress_destSize; compressorName = "LZ4_compress_destSize"; break;
+            case 4 : compressionFunction = local_LZ4_compress_fast0; compressorName = "LZ4_compress_fast(0)"; break;
+            case 5 : compressionFunction = local_LZ4_compress_fast1; compressorName = "LZ4_compress_fast(1)"; break;
+            case 6 : compressionFunction = local_LZ4_compress_fast2; compressorName = "LZ4_compress_fast(2)"; break;
+            case 7 : compressionFunction = local_LZ4_compress_fast17; compressorName = "LZ4_compress_fast(17)"; break;
+            case 8 : compressionFunction = local_LZ4_compress_fast_extState0; compressorName = "LZ4_compress_fast_extState(0)"; break;
+            case 9 : compressionFunction = local_LZ4_compress_fast_continue0; initFunction = local_LZ4_createStream; compressorName = "LZ4_compress_fast_continue(0)"; break;
 
             case 10: compressionFunction = local_LZ4_compress_HC; compressorName = "LZ4_compress_HC"; break;
             case 12: compressionFunction = local_LZ4_compress_HC_extStateHC; compressorName = "LZ4_compress_HC_extStateHC"; break;
