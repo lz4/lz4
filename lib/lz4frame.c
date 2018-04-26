@@ -1502,11 +1502,19 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   }
 
             if ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize) {
+                const char *dict = (const char *)dctx->dict;
+                size_t dictSize = dctx->dictSize;
+                int decodedSize;
+                if (dict && dictSize > 1 GB) {
+                    /* the dictSize param is an int, avoid truncation / sign issues */
+                    dict += dictSize - 1 GB;
+                    dictSize = 1 GB;
+                }
                 /* enough capacity in `dst` to decompress directly there */
-                int const decodedSize = LZ4_decompress_safe_usingDict(
+                decodedSize = LZ4_decompress_safe_usingDict(
                         (const char*)selectedIn, (char*)dstPtr,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
-                        (const char*)dctx->dict, (int)dctx->dictSize);
+                        dict, (int)dictSize);
                 if (decodedSize < 0) return err0r(LZ4F_ERROR_GENERIC);   /* decompression failed */
                 if (dctx->frameInfo.contentChecksumFlag)
                     XXH32_update(&(dctx->xxh), dstPtr, decodedSize);
@@ -1538,10 +1546,19 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }
 
             /* Decode block */
-            {   int const decodedSize = LZ4_decompress_safe_usingDict(
+            {
+                const char *dict = (const char *)dctx->dict;
+                size_t dictSize = dctx->dictSize;
+                int decodedSize;
+                if (dict && dictSize > 1 GB) {
+                    /* the dictSize param is an int, avoid truncation / sign issues */
+                    dict += dictSize - 1 GB;
+                    dictSize = 1 GB;
+                }
+                decodedSize = LZ4_decompress_safe_usingDict(
                         (const char*)selectedIn, (char*)dctx->tmpOut,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
-                        (const char*)dctx->dict, (int)dctx->dictSize);
+                        dict, (int)dictSize);
                 if (decodedSize < 0)  /* decompression failed */
                     return err0r(LZ4F_ERROR_decompressionFailed);
                 if (dctx->frameInfo.contentChecksumFlag)
