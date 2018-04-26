@@ -876,6 +876,11 @@ void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
     LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
 }
 
+void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor)
+{
+    LZ4_streamHCPtr->internal_donotuse.favorDecSpeed = (favor!=0);
+}
+
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
@@ -1120,7 +1125,7 @@ static int LZ4HC_compress_optimal (
     const limitedOutput_directive limit,
     int const fullUpdate,
     const dictCtx_directive dict,
-    HCfavor_e favorDecSpeed
+    const HCfavor_e favorDecSpeed
     )
 {
 #define TRAILING_LITERALS 3
@@ -1136,7 +1141,6 @@ static int LZ4HC_compress_optimal (
     BYTE* oend = op + dstCapacity;
 
     /* init */
-    favorDecSpeed = favorCompressionRatio;
     DEBUGLOG(5, "LZ4HC_compress_optimal");
     *srcSizePtr = 0;
     if (limit == limitedDestSize) oend -= LASTLITERALS;   /* Hack for support LZ4 format restriction */

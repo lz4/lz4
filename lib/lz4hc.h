@@ -152,7 +152,8 @@ struct LZ4HC_CCtx_internal
     uint32_t   dictLimit;       /* below that point, need extDict */
     uint32_t   lowLimit;        /* below that point, no more dict */
     uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
-    int        compressionLevel;
+    short      compressionLevel;
+    short      favorDecSpeed;
     const LZ4HC_CCtx_internal* dictCtx;
 };
 
@@ -169,7 +170,8 @@ struct LZ4HC_CCtx_internal
     unsigned int   dictLimit;        /* below that point, need extDict */
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
-    int            compressionLevel;
+    short          compressionLevel;
+    short          favorDecSpeed;
     const LZ4HC_CCtx_internal* dictCtx;
 };
 
@@ -253,9 +255,9 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStr
  * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
  */
 int LZ4_compress_HC_destSize(void* LZ4HC_Data,
-                            const char* src, char* dst,
-                            int* srcSizePtr, int targetDstSize,
-                            int compressionLevel);
+                             const char* src, char* dst,
+                             int* srcSizePtr, int targetDstSize,
+                             int compressionLevel);
 
 /*! LZ4_compress_HC_continue_destSize() : v1.8.0 (experimental)
  *  Similar as LZ4_compress_HC_continue(),
@@ -274,6 +276,12 @@ int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
  *  It's possible to change compression level between 2 invocations of LZ4_compress_HC_continue*()
  */
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
+
+/*! LZ4_favorDecompressionSpeed() : v1.8.2 (experimental)
+ *  Parser will select decisions favoring decompression over compression ratio.
+ *  Only work at highest compression settings (level >= LZ4HC_CLEVEL_OPT_MIN)
+ */
+void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor);
 
 /*! LZ4_resetStreamHC_fast() :
  *  When an LZ4_streamHC_t is known to be in a internally coherent state,

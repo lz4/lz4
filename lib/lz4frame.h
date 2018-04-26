@@ -173,13 +173,14 @@ typedef struct {
 
 /*! LZ4F_preferences_t :
  *  makes it possible to supply detailed compression parameters to the stream interface.
- *  It's not required to set all fields, as long as the structure was initially memset() to zero.
+ *  Structure is presumed initially memset() to zero, representing default settings.
  *  All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
-  int      compressionLevel;       /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
-  unsigned autoFlush;              /* 1 == always flush, to reduce usage of internal buffers */
-  unsigned reserved[4];            /* must be zero for forward compatibility */
+  int      compressionLevel;    /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
+  unsigned autoFlush;           /* 1: always flush, to reduce usage of internal buffers */
+  unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4LZ4HC_CLEVEL_OPT_MIN) */  /* >= v1.8.2 */
+  unsigned reserved[3];         /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
 LZ4FLIB_API int LZ4F_compressionLevel_max(void);
