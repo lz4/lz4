@@ -612,6 +612,9 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
         /* frame init only for blockLinked : blockIndependent will be init at each block */
         LZ4F_applyCDict(cctxPtr->lz4CtxPtr, cdict, cctxPtr->prefs.compressionLevel);
     }
+    if (preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN) {
+          LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, (int)preferencesPtr->favorDecSpeed);
+    }
 
     /* Magic Number */
     LZ4F_writeLE32(dstPtr, LZ4F_MAGICNUMBER);

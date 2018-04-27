@@ -94,10 +94,15 @@ int LZ4IO_setNotificationLevel(int level);
 /* Default setting : 0 (disabled) */
 int LZ4IO_setSparseFile(int enable);
 
-/* Default setting : 0 (disabled) */
+/* Default setting : 0 == no content size present in frame header */
 int LZ4IO_setContentSize(int enable);
 
+/* Default setting : 0 == src file preserved */
 void LZ4IO_setRemoveSrcFile(unsigned flag);
+
+/* Default setting : 0 == favor compression ratio
+ * Note : 1 only works for high compression levels (10+) */
+void LZ4IO_favorDecSpeed(int favor);
 
 
 #endif  /* LZ4IO_H_237902873 */
