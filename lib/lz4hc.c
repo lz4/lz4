@@ -708,6 +708,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     assert(cLevel >= 0);
     assert(cLevel <= LZ4HC_CLEVEL_MAX);
     {   cParams_t const cParam = clTable[cLevel];
+        HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
         if (cParam.strat == lz4hc)
             return LZ4HC_compress_hashChain(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
@@ -717,8 +718,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
                             src, dst, srcSizePtr, dstCapacity,
                             cParam.nbSearches, cParam.targetLength, limit,
                             cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
-                            dict,
-                            ctx->favorDecSpeed);
+                            dict, favor);
     }
 }
 
@@ -756,7 +756,7 @@ static int LZ4HC_compress_generic_dictCtx (
     } else if (position == 0 && *srcSizePtr > 4 KB) {
         memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
         LZ4HC_setExternalDict(ctx, (const BYTE *)src);
-        ctx->compressionLevel = cLevel;
+        ctx->compressionLevel = (short)cLevel;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else {
         return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
@@ -873,7 +873,7 @@ void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
 {
     if (compressionLevel < 1) compressionLevel = LZ4HC_CLEVEL_DEFAULT;
     if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;
-    LZ4_streamHCPtr->internal_donotuse.compressionLevel = compressionLevel;
+    LZ4_streamHCPtr->internal_donotuse.compressionLevel = (short)compressionLevel;
 }
 
 void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor)
@@ -1274,7 +1274,6 @@ static int LZ4HC_compress_optimal (
                          price = opt[cur].price + LZ4HC_sequencePrice(0, ml);
                      }
 
-                    assert(opt[pos].price > 1);
                     assert((U32)favorDecSpeed <= 1);
                      if (pos > last_match_pos+TRAILING_LITERALS
                       || price <= opt[pos].price - (int)favorDecSpeed) {
