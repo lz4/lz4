@@ -699,8 +699,6 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     ctx->end += *srcSizePtr;
     if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
     cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
-    assert(cLevel >= 0);
-    assert(cLevel <= LZ4HC_CLEVEL_MAX);
     {   cParams_t const cParam = clTable[cLevel];
         if (cParam.strat == lz4hc)
             return LZ4HC_compress_hashChain(ctx,
@@ -892,7 +890,8 @@ void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
     DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
-    if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    if (ctxPtr->end >= ctxPtr->base + ctxPtr->dictLimit + 4)
+        LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
