@@ -457,7 +457,7 @@ struct LZ4F_CDict_s {
 LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
-    LZ4F_CDict* cdict = (LZ4F_CDict*) malloc(sizeof(*cdict));
+    LZ4F_CDict* cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
         dictStart += dictSize - 64 KB;
@@ -471,9 +471,8 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
         return NULL;
     }
     memcpy(cdict->dictContent, dictStart, dictSize);
-    LZ4_resetStream(cdict->fastCtx);
     LZ4_loadDict (cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
-    LZ4_resetStreamHC(cdict->HCCtx, LZ4HC_CLEVEL_DEFAULT);
+    LZ4_setCompressionLevel(cdict->HCCtx, LZ4HC_CLEVEL_DEFAULT);
     LZ4_loadDictHC(cdict->HCCtx, (const char*)cdict->dictContent, (int)dictSize);
     return cdict;
 }
@@ -528,7 +527,15 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_comp
 }
 
 
-static void LZ4F_applyCDict(void* ctx,
+/**
+ * This function prepares the internal LZ4(HC) stream for a new compression,
+ * resetting the context and attaching the dictionary, if there is one.
+ *
+ * It needs to be called at the beginning of each independent compression
+ * stream (i.e., at the beginning of a frame in blockLinked mode, or at the
+ * beginning of each block in blockIndependent mode).
+ */
+static void LZ4F_initStream(void* ctx,
                             const LZ4F_CDict* cdict,
                             int level) {
     if (level < LZ4HC_CLEVEL_MIN) {
@@ -610,7 +617,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     cctxPtr->cdict = cdict;
     if (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) {
         /* frame init only for blockLinked : blockIndependent will be init at each block */
-        LZ4F_applyCDict(cctxPtr->lz4CtxPtr, cdict, cctxPtr->prefs.compressionLevel);
+        LZ4F_initStream(cctxPtr->lz4CtxPtr, cdict, cctxPtr->prefs.compressionLevel);
     }
     if (preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN) {
           LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, (int)preferencesPtr->favorDecSpeed);
@@ -708,7 +715,7 @@ static size_t LZ4F_makeBlock(void* dst, const void* src, size_t srcSize,
 static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
     int const acceleration = (level < -1) ? -level : 1;
-    LZ4F_applyCDict(ctx, cdict, level);
+    LZ4F_initStream(ctx, cdict, level);
     if (cdict) {
         return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
     } else {
@@ -725,7 +732,7 @@ static int LZ4F_compressBlock_continue(void* ctx, const char* src, char* dst, in
 
 static int LZ4F_compressBlockHC(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
-    LZ4F_applyCDict(ctx, cdict, level);
+    LZ4F_initStream(ctx, cdict, level);
     if (cdict) {
         return LZ4_compress_HC_continue((LZ4_streamHC_t*)ctx, src, dst, srcSize, dstCapacity);
     }

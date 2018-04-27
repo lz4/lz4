@@ -889,8 +889,8 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
     }
+    LZ4_resetStreamHC(LZ4_streamHCPtr, ctxPtr->compressionLevel);
     LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
-    LZ4HC_clearTables (ctxPtr);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
     return dictSize;
