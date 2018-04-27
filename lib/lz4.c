@@ -161,11 +161,11 @@
 *  Memory routines
 **************************************/
 #include <stdlib.h>   /* malloc, calloc, free */
-#define ALLOC(s) malloc(s)
+#define ALLOC(s)          malloc(s)
 #define ALLOC_AND_ZERO(s) calloc(1,s)
-#define FREEMEM        free
+#define FREEMEM(p)        free(p)
 #include <string.h>   /* memset, memcpy */
-#define MEM_INIT       memset
+#define MEM_INIT(p,v,s)   memset((p),(v),(s))
 
 
 /*-************************************
