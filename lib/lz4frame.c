@@ -457,7 +457,7 @@ struct LZ4F_CDict_s {
 LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
-    LZ4F_CDict* cdict = (LZ4F_CDict*) malloc(sizeof(*cdict));
+    LZ4F_CDict* cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
         dictStart += dictSize - 64 KB;
@@ -471,7 +471,6 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
         return NULL;
     }
     memcpy(cdict->dictContent, dictStart, dictSize);
-    LZ4_resetStream(cdict->fastCtx);
     LZ4_loadDict (cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
     LZ4_resetStreamHC(cdict->HCCtx, LZ4HC_CLEVEL_DEFAULT);
     LZ4_loadDictHC(cdict->HCCtx, (const char*)cdict->dictContent, (int)dictSize);
