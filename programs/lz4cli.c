@@ -140,6 +140,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
+    DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "Benchmark arguments : \n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
@@ -355,6 +356,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(0); continue; }
                 if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(2); continue; }
                 if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(0); continue; }
+                if (!strcmp(argument,  "--favor-decSpeed")) { LZ4IO_favorDecSpeed(1); continue; }
                 if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
                 if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
                 if (!strcmp(argument,  "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
