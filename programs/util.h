@@ -194,7 +194,7 @@ extern "C" {
         return ((clockEnd - clockStart) * (U64)rate.numer) / ((U64)rate.denom);
     }
 
-#elif (PLATFORM_POSIX_VERSION >= 200112L) && (defined __UCLIBC__ || ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 17) || __GLIBC__ > 2))
+#elif (PLATFORM_POSIX_VERSION >= 200112L) && (defined __UCLIBC__ || (defined(__GLIBC__) && ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 17) || __GLIBC__ > 2) ) )
 
     #include <time.h>
     typedef struct timespec UTIL_time_t;
