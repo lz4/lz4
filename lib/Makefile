@@ -85,32 +85,38 @@ all: lib
 all32: CFLAGS+=-m32
 all32: all
 
+ifeq ($(V), 1)
+Q =
+else
+Q = @
+endif
+
 liblz4.a: $(SRCFILES)
 ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
-	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
-	@$(AR) rcs $@ *.o
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $^
+	$(Q)$(AR) rcs $@ *.o
 endif
 
 $(LIBLZ4): $(SRCFILES)
 ifeq ($(BUILD_SHARED),yes)  # can be disabled on command line
 	@echo compiling dynamic library $(LIBVER)
 ifneq (,$(filter Windows%,$(OS)))
-	@$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
+	$(Q)$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll\$@.dll
 	dlltool -D dll\liblz4.dll -d dll\liblz4.def -l dll\liblz4.lib
 else
-	@$(CC) $(FLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
+	$(Q)$(CC) $(FLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
-	@ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
-	@ln -sf $@ liblz4.$(SHARED_EXT)
+	$(Q)ln -sf $@ liblz4.$(SHARED_EXT_MAJOR)
+	$(Q)ln -sf $@ liblz4.$(SHARED_EXT)
 endif
 endif
 
 liblz4: $(LIBLZ4)
 
 clean:
-	@$(RM) core *.o liblz4.pc dll/liblz4.dll dll/liblz4.lib
-	@$(RM) *.a *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
+	$(Q)$(RM) core *.o liblz4.pc dll/liblz4.dll dll/liblz4.lib
+	$(Q)$(RM) *.a *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	@echo Cleaning library completed
 
 
@@ -152,41 +158,41 @@ INSTALL_DATA    ?= $(INSTALL) -m 644
 
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
-	@sed -e 's|@PREFIX@|$(PREFIX)|' \
+	$(Q)sed -e 's|@PREFIX@|$(PREFIX)|' \
          -e 's|@LIBDIR@|$(LIBDIR)|' \
          -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
          -e 's|@VERSION@|$(LIBVER)|' \
           $< >$@
 
 install: lib liblz4.pc
-	@$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/ $(DESTDIR)$(LIBDIR)/
-	@$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(PKGCONFIGDIR)/
+	$(Q)$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/ $(DESTDIR)$(LIBDIR)/
+	$(Q)$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(PKGCONFIGDIR)/
 	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
-	@$(INSTALL_DATA) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
-	@$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
+	$(Q)$(INSTALL_DATA) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
+	$(Q)$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
 endif
 ifeq ($(BUILD_SHARED),yes)
-	@$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
-	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	@ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+	$(Q)$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
+	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
+	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
 endif
 	@echo Installing headers in $(INCLUDEDIR)
-	@$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	@$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
+	$(Q)$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	$(Q)$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	$(Q)$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
 	@echo lz4 libraries installed
 
 uninstall:
-	@$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
-	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
-	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
-	@$(RM) $(DESTDIR)$(LIBDIR)/liblz4.a
-	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
-	@$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
+	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
+	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
+	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
+	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.a
+	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4.h
+	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
+	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
+	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
 	@echo lz4 libraries successfully uninstalled
 
 endif
