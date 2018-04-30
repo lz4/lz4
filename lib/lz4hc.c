@@ -264,7 +264,7 @@ LZ4HC_InsertAndGetWiderMatch (
         } else {   /* matchIndex < dictLimit */
             const BYTE* const matchPtr = dictBase + matchIndex;
             if (LZ4_read32(matchPtr) == pattern) {
-                const BYTE* const dictLowLimit = dictBase + hc4->lowLimit;
+                const BYTE* const dictStart = dictBase + hc4->lowLimit;
                 int mlt;
                 int back = 0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
@@ -272,7 +272,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
                     mlt += LZ4_count(ip+mlt, lowPrefixPtr, iHighLimit);
-                back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictLowLimit) : 0;
+                back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictStart) : 0;
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
