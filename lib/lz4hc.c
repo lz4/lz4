@@ -223,7 +223,7 @@ LZ4HC_InsertAndGetWiderMatch (
     const U32 dictLimit = hc4->dictLimit;
     const BYTE* const lowPrefixPtr = base + dictLimit;
     const U32 ipIndex = (U32)(ip - base);
-    const U32 lowLimit = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
+    const U32 lowestMatchIndex = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
     const BYTE* const dictBase = hc4->dictBase;
     int const lookBackLength = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
@@ -237,10 +237,10 @@ LZ4HC_InsertAndGetWiderMatch (
     /* First Match */
     LZ4HC_Insert(hc4, ip);
     matchIndex = HashTable[LZ4HC_hashPtr(ip)];
-    DEBUGLOG(7, "First match at index %u / %u (lowLimit)",
-                matchIndex, lowLimit);
+    DEBUGLOG(7, "First match at index %u / %u (lowestMatchIndex)",
+                matchIndex, lowestMatchIndex);
 
-    while ((matchIndex>=lowLimit) && (nbAttempts)) {
+    while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) {
         DEBUGLOG(7, "remaining attempts : %i", nbAttempts);
         nbAttempts--;
         assert(matchIndex < ipIndex);
@@ -308,13 +308,13 @@ LZ4HC_InsertAndGetWiderMatch (
                             matchIndex -= (U32)backLength;   /* let's go to farthest segment position, will find a match of length currentSegmentLength + maybe some back */
                         }
         }   }   }   }
-    }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
+    }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
-    if (dict == usingDictCtx && nbAttempts && ipIndex - lowLimit < MAX_DISTANCE) {
+    if (dict == usingDictCtx && nbAttempts && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
         size_t const dictEndOffset = dictCtx->end - dictCtx->base;
         assert(dictEndOffset <= 1 GB);
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
-        matchIndex = dictMatchIndex + lowLimit - (U32)dictEndOffset;
+        matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
         while (ipIndex - matchIndex <= MAX_DISTANCE && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
