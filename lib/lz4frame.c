@@ -96,6 +96,19 @@ You can contact the author at :
 
 #define LZ4F_STATIC_ASSERT(c)    { enum { LZ4F_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2) && !defined(DEBUGLOG)
+#  include <stdio.h>
+static int g_debuglog_enable = 1;
+#  define DEBUGLOG(l, ...) {                                  \
+                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
+                    fprintf(stderr, __FILE__ ": ");           \
+                    fprintf(stderr, __VA_ARGS__);             \
+                    fprintf(stderr, " \n");                   \
+            }   }
+#else
+#  define DEBUGLOG(l, ...)      {}    /* disabled */
+#endif
+
 
 /*-************************************
 *  Basic Types
@@ -408,6 +421,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
     LZ4_stream_t lz4ctx;
     LZ4F_cctx_t *cctxPtr = &cctx;
 
+    DEBUGLOG(4, "LZ4F_compressFrame");
     MEM_INIT(&cctx, 0, sizeof(cctx));
     cctx.version = LZ4F_VERSION;
     cctx.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
@@ -1198,24 +1212,31 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx, LZ4F_frameInfo_t* frameInfoP
 
 /* LZ4F_updateDict() :
  * only used for LZ4F_blockLinked mode */
-static void LZ4F_updateDict(LZ4F_dctx* dctx, const BYTE* dstPtr, size_t dstSize, const BYTE* dstPtr0, unsigned withinTmp)
+static void LZ4F_updateDict(LZ4F_dctx* dctx,
+                      const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
+                      unsigned withinTmp)
 {
     if (dctx->dictSize==0)
         dctx->dict = (const BYTE*)dstPtr;   /* priority to dictionary continuity */
 
-    if (dctx->dict + dctx->dictSize == dstPtr) {  /* dictionary continuity */
+    if (dctx->dict + dctx->dictSize == dstPtr) {  /* dictionary continuity, directly within dstBuffer */
         dctx->dictSize += dstSize;
         return;
     }
 
-    if (dstPtr - dstPtr0 + dstSize >= 64 KB) {  /* dstBuffer large enough to become dictionary */
-        dctx->dict = (const BYTE*)dstPtr0;
-        dctx->dictSize = dstPtr - dstPtr0 + dstSize;
+    if (dstPtr - dstBufferStart + dstSize >= 64 KB) {  /* history in dstBuffer becomes large enough to become dictionary */
+        dctx->dict = (const BYTE*)dstBufferStart;
+        dctx->dictSize = dstPtr - dstBufferStart + dstSize;
         return;
     }
 
-    if ((withinTmp) && (dctx->dict == dctx->tmpOutBuffer)) {
-        /* assumption : dctx->dict + dctx->dictSize == dctx->tmpOut + dctx->tmpOutStart */
+    assert(dstSize < 64 KB);   /* if dstSize >= 64 KB, dictionary would be set into dstBuffer directly */
+
+    /* dstBuffer does not contain whole useful history (64 KB), so it must be saved within tmpOut */
+
+    if ((withinTmp) && (dctx->dict == dctx->tmpOutBuffer)) {   /* continue history within tmpOutBuffer */
+        /* withinTmp expectation : content of [dstPtr,dstSize] is same as [dict+dictSize,dstSize], so we just extend it */
+        assert(dctx->dict + dctx->dictSize == dctx->tmpOut + dctx->tmpOutStart);
         dctx->dictSize += dstSize;
         return;
     }
@@ -1236,7 +1257,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx, const BYTE* dstPtr, size_t dstSize,
 
     if (dctx->dict == dctx->tmpOutBuffer) {    /* copy dst into tmp to complete dict */
         if (dctx->dictSize + dstSize > dctx->maxBufferSize) {  /* tmp buffer not large enough */
-            size_t const preserveSize = 64 KB - dstSize;   /* note : dstSize < 64 KB */
+            size_t const preserveSize = 64 KB - dstSize;
             memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
             dctx->dictSize = preserveSize;
         }
@@ -1246,7 +1267,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx, const BYTE* dstPtr, size_t dstSize,
     }
 
     /* join dict & dest into tmp */
-    {   size_t preserveSize = 64 KB - dstSize;   /* note : dstSize < 64 KB */
+    {   size_t preserveSize = 64 KB - dstSize;
         if (preserveSize > dctx->dictSize) preserveSize = dctx->dictSize;
         memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
         memcpy(dctx->tmpOutBuffer + preserveSize, dstPtr, dstSize);
@@ -1313,7 +1334,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }
             dctx->tmpInSize = 0;
             if (srcEnd-srcPtr == 0) return minFHSize;   /* 0-size input */
-            dctx->tmpInTarget = minFHSize;   /* minimum to attempt decode */
+            dctx->tmpInTarget = minFHSize;   /* minimum size to decode header */
             dctx->dStage = dstage_storeFrameHeader;
             /* fall-through */
 
@@ -1470,8 +1491,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     U32 const calcCRC = XXH32_digest(&dctx->blockChecksum);
                     if (readCRC != calcCRC)
                         return err0r(LZ4F_ERROR_blockChecksum_invalid);
-                }
-            }
+            }   }
             dctx->dStage = dstage_getBlockHeader;  /* new block */
             break;
 
@@ -1512,13 +1532,13 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   }
 
             if ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize) {
-                const char *dict = (const char *)dctx->dict;
+                const char* dict = (const char*)dctx->dict;
                 size_t dictSize = dctx->dictSize;
                 int decodedSize;
                 if (dict && dictSize > 1 GB) {
                     /* the dictSize param is an int, avoid truncation / sign issues */
-                    dict += dictSize - 1 GB;
-                    dictSize = 1 GB;
+                    dict += dictSize - 64 KB;
+                    dictSize = 64 KB;
                 }
                 /* enough capacity in `dst` to decompress directly there */
                 decodedSize = LZ4_decompress_safe_usingDict(
@@ -1552,18 +1572,16 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 } else {  /* dict not within tmp */
                     size_t const reservedDictSpace = MIN(dctx->dictSize, 64 KB);
                     dctx->tmpOut = dctx->tmpOutBuffer + reservedDictSpace;
-                }
-            }
+            }   }
 
             /* Decode block */
-            {
-                const char *dict = (const char *)dctx->dict;
+            {   const char* dict = (const char*)dctx->dict;
                 size_t dictSize = dctx->dictSize;
                 int decodedSize;
                 if (dict && dictSize > 1 GB) {
                     /* the dictSize param is an int, avoid truncation / sign issues */
-                    dict += dictSize - 1 GB;
-                    dictSize = 1 GB;
+                    dict += dictSize - 64 KB;
+                    dictSize = 64 KB;
                 }
                 decodedSize = LZ4_decompress_safe_usingDict(
                         (const char*)selectedIn, (char*)dctx->tmpOut,
@@ -1586,8 +1604,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 memcpy(dstPtr, dctx->tmpOut + dctx->tmpOutStart, sizeToCopy);
 
                 /* dictionary management */
-                if (dctx->frameInfo.blockMode==LZ4F_blockLinked)
-                    LZ4F_updateDict(dctx, dstPtr, sizeToCopy, dstStart, 1);
+                if (dctx->frameInfo.blockMode == LZ4F_blockLinked)
+                    LZ4F_updateDict(dctx, dstPtr, sizeToCopy, dstStart, 1 /*withinTmp*/);
 
                 dctx->tmpOutStart += sizeToCopy;
                 dstPtr += sizeToCopy;
@@ -1596,8 +1614,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     dctx->dStage = dstage_getBlockHeader;  /* get next block */
                     break;
                 }
+                /* could not flush everything : stop there, just request a block header */
+                doAnotherStage = 0;
                 nextSrcSizeHint = BHSize;
-                doAnotherStage = 0;   /* still some data to flush */
                 break;
             }
 
@@ -1634,7 +1653,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 selectedIn = dctx->tmpIn;
             }   /* if (dctx->dStage == dstage_storeSuffix) */
 
-        /* case dstage_checkSuffix: */   /* no direct call, avoid scan-build warning */
+        /* case dstage_checkSuffix: */   /* no direct entry, avoid initialization risks */
             {   U32 const readCRC = LZ4F_readLE32(selectedIn);
                 U32 const resultCRC = XXH32_digest(&(dctx->xxh));
                 if (readCRC != resultCRC)
@@ -1658,8 +1677,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 
             if (dctx->dStage == dstage_storeSFrameSize)
         case dstage_storeSFrameSize:
-            {
-                size_t const sizeToCopy = MIN(dctx->tmpInTarget - dctx->tmpInSize,
+            {   size_t const sizeToCopy = MIN(dctx->tmpInTarget - dctx->tmpInSize,
                                              (size_t)(srcEnd - srcPtr) );
                 memcpy(dctx->header + dctx->tmpInSize, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
@@ -1673,7 +1691,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 selectedIn = dctx->header + 4;
             }   /* if (dctx->dStage == dstage_storeSFrameSize) */
 
-        /* case dstage_decodeSFrameSize: */   /* no direct access */
+        /* case dstage_decodeSFrameSize: */   /* no direct entry */
             {   size_t const SFrameSize = LZ4F_readLE32(selectedIn);
                 dctx->frameInfo.contentSize = SFrameSize;
                 dctx->tmpInTarget = SFrameSize;
@@ -1692,7 +1710,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 LZ4F_resetDecompressionContext(dctx);
                 break;
             }
-        }
+        }   /* switch (dctx->dStage) */
     }   /* while (doAnotherStage) */
 
     /* preserve history within tmp whenever necessary */
