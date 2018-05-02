@@ -1232,7 +1232,6 @@ static void FUZ_unitTests(int compressionLevel)
 
             /* first block */
             messageSize = BSIZE1;   /* note : we cheat a bit here, in theory no message should be > maxMessageSize. We just want to fill the decoding ring buffer once. */
-            assert(messageSize < dBufferSize);
             XXH64_update(&xxhOrig, testInput + iNext, messageSize);
             crcOrig = XXH64_digest(&xxhOrig);
 
@@ -1276,7 +1275,7 @@ static void FUZ_unitTests(int compressionLevel)
                 assert(dBufferSize - dNext >= maxMessageSize);
                 result = LZ4_decompress_safe_continue(&decodeStateSafe,
                                                       testCompressed, ringBufferSafe + dNext,
-                                                      compressedSize, dBufferSize - dNext);   /* works without knowing messageSize, but under assumption that messageSize < maxMessageSize */
+                                                      compressedSize, dBufferSize - dNext);   /* works without knowing messageSize, under assumption that messageSize <= maxMessageSize */
                 FUZ_CHECKTEST(result!=messageSize, "D.ringBuffer : LZ4_decompress_safe_continue() test failed");
                 XXH64_update(&xxhNewSafe, ringBufferSafe + dNext, messageSize);
                 {   U64 const crcNew = XXH64_digest(&xxhNewSafe);
