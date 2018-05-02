@@ -1429,62 +1429,29 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
          */
         if ((endOnInput ? length != RUN_MASK : length <= 8) &&
             /* strictly "less than" on input, to re-enter the loop with at least one byte */
-            likely((endOnInput ? ip < shortiend : 1) && (op <= shortoend)))
+            likely((endOnInput ? ip < shortiend : 1) & (op <= shortoend)))
         {
-            /* Can we copy the literals with a single memcpy invocation?  Sometimes we can't
-             * copy 16 bytes, because they can clobber the dictionary in the ring buffer. */
-            if (!endOnInput /* only 8 bytes */ || /* nothing to clobber */ dict != usingExtDict) {
-                /* Copy the literals. */
-                memcpy(op, ip, endOnInput ? 16 : 8);
-                op += length; ip += length;
+            /* Copy the literals. */
+            memcpy(op, ip, endOnInput ? 16 : 8);
+            op += length; ip += length;
 
-                /* The second stage: prepare for match copying, decode full info.
-                 * It if doesn't work out, the info won't be wasted. */
-                length = token & ML_MASK; /* match length */
-                offset = LZ4_readLE16(ip); ip += 2;
-                match = op - offset;
+            /* The second stage: prepare for match copying, decode full info.
+             * If it doesn't work out, the info won't be wasted. */
+            length = token & ML_MASK; /* match length */
+            offset = LZ4_readLE16(ip); ip += 2;
+            match = op - offset;
 
-                /* Do not deal with overlapping matches. */
-                if ((length != 15) && (offset >= 8) &&
-                    (dict==withPrefix64k || match >= lowPrefix))
-                {
-                    /* Copy the match. */
-                    memcpy(op + 0, match + 0, 8);
-                    memcpy(op + 8, match + 8, 8);
-                    memcpy(op +16, match +16, 2);
-                    op += length + MINMATCH;
-                    /* Both stages worked, load the next token. */
-                    continue;
-                }
-            } else {
-                /* Save the literal length, can't copy 16 bytes just yet. */
-                size_t ll = length;
-
-                /* Prepare for the second satge. */
-                length = token & ML_MASK;
-                offset = LZ4_readLE16(ip+ll);
-                match = op + ll - offset;
-
-                if ((length != 15) && (offset >= 8) &&
-                    (dict==withPrefix64k || match >= lowPrefix))
-                {
-                    /* Copy the literals. */
-                    memcpy(op, ip, 16);
-                    op += ll; ip += ll + 2;
-                    /* Copy the match. */
-                    memcpy(op + 0, match + 0, 8);
-                    memcpy(op + 8, match + 8, 8);
-                    memcpy(op +16, match +16, 2);
-                    op += length + MINMATCH;
-                    /* Both stages worked, load the next token. */
-                    continue;
-                }
-
-                /* So we took the literlas, but the second stage didn't work. */
-                memcpy(op, ip, 8);
-                if (ll > 8)
-                    memcpy(op + 8, ip + 8, 8);
-                op += ll; ip += ll + 2;
+            /* Do not deal with overlapping matches. */
+            if ((length != 15) && (offset >= 8) &&
+                (dict==withPrefix64k || match >= lowPrefix))
+            {
+                /* Copy the match. */
+                memcpy(op + 0, match + 0, 8);
+                memcpy(op + 8, match + 8, 8);
+                memcpy(op +16, match +16, 2);
+                op += length + MINMATCH;
+                /* Both stages worked, load the next token. */
+                continue;
             }
 
             /* The second stage didn't work out, but the info is ready.
