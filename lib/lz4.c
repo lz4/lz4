@@ -1431,7 +1431,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
             /* strictly "less than" on input, to re-enter the loop with at least one byte */
             likely((endOnInput ? ip < shortiend : 1) & (op <= shortoend)))
         {
-            /* Copy the literals. */
+            /* Copy the literals */
             memcpy(op, ip, endOnInput ? 16 : 8);
             op += length; ip += length;
 
@@ -1688,12 +1688,11 @@ int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
     return 0;
 }
 
-/*!
- * LZ4_setStreamDecode() :
- * Use this function to instruct where to find the dictionary.
- * This function is not necessary if previous data is still available where it was decoded.
- * Loading a size of 0 is allowed (same effect as no dictionary).
- * Return : 1 if OK, 0 if error
+/*! LZ4_setStreamDecode() :
+ *  Use this function to instruct where to find the dictionary.
+ *  This function is not necessary if previous data is still available where it was decoded.
+ *  Loading a size of 0 is allowed (same effect as no dictionary).
+ * @return : 1 if OK, 0 if error
  */
 int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize)
 {
@@ -1703,6 +1702,26 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
     lz4sd->externalDict = NULL;
     lz4sd->extDictSize  = 0;
     return 1;
+}
+
+/*! LZ4_decoderRingBufferSize() :
+ *  when setting a ring buffer for streaming decompression (optional scenario),
+ *  provides the minimum size of this ring buffer
+ *  to be compatible with any source respecting maxBlockSize condition.
+ *  Note : in a ring buffer scenario,
+ *  blocks are presumed decompressed next to each other
+ *  up to the moment there is not enough remaining space for next block (remainingSize < maxBlockSize),
+ *  at which stage it resumes from beginning of ring buffer.
+ * @return : minimum ring buffer size,
+ *           or 0 if there is an error (invalid maxBlockSize).
+ */
+
+int LZ4_decoderRingBufferSize(int maxBlockSize)
+{
+    if (maxBlockSize < 0) return 0;
+    if (maxBlockSize > LZ4_MAX_INPUT_SIZE) return 0;
+    if (maxBlockSize < 16) maxBlockSize = 16;
+    return LZ4_DECODER_RING_BUFFER_SIZE(maxBlockSize);
 }
 
 /*
