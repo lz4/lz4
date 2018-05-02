@@ -681,19 +681,19 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
         U32 targetLength;
     } cParams_t;
     static const cParams_t clTable[LZ4HC_CLEVEL_MAX+1] = {
-        { lz4hc,    2, 16 },  /* 0, unused */
-        { lz4hc,    2, 16 },  /* 1, unused */
-        { lz4hc,    2, 16 },  /* 2, unused */
-        { lz4hc,    4, 16 },  /* 3 */
-        { lz4hc,    8, 16 },  /* 4 */
-        { lz4hc,   16, 16 },  /* 5 */
-        { lz4hc,   32, 16 },  /* 6 */
-        { lz4hc,   64, 16 },  /* 7 */
-        { lz4hc,  128, 16 },  /* 8 */
-        { lz4hc,  256, 16 },  /* 9 */
-        { lz4opt,  96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-        { lz4opt, 512,128 },  /*11 */
-        { lz4opt,8192, LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
+        { lz4hc,     2, 16 },  /* 0, unused */
+        { lz4hc,     2, 16 },  /* 1, unused */
+        { lz4hc,     2, 16 },  /* 2, unused */
+        { lz4hc,     4, 16 },  /* 3 */
+        { lz4hc,     8, 16 },  /* 4 */
+        { lz4hc,    16, 16 },  /* 5 */
+        { lz4hc,    32, 16 },  /* 6 */
+        { lz4hc,    64, 16 },  /* 7 */
+        { lz4hc,   128, 16 },  /* 8 */
+        { lz4hc,   256, 16 },  /* 9 */
+        { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+        { lz4opt,  512,128 },  /*11 */
+        { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
     };
 
     DEBUGLOG(4, "LZ4HC_compress_generic(%p, %p, %d)", ctx, src, *srcSizePtr);
