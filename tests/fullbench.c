@@ -267,10 +267,17 @@ static int local_LZ4_decompress_fast(const char* in, char* out, int inSize, int 
     return outSize;
 }
 
-static int local_LZ4_decompress_fast_usingDict(const char* in, char* out, int inSize, int outSize)
+static int local_LZ4_decompress_fast_usingDict_prefix(const char* in, char* out, int inSize, int outSize)
 {
     (void)inSize;
     LZ4_decompress_fast_usingDict(in, out, outSize, out - 65536, 65536);
+    return outSize;
+}
+
+static int local_LZ4_decompress_fast_usingExtDict(const char* in, char* out, int inSize, int outSize)
+{
+    (void)inSize;
+    LZ4_decompress_fast_usingDict(in, out, outSize, out - 65536, 65535);
     return outSize;
 }
 
@@ -460,7 +467,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 double averageTime;
                 clock_t clockTime;
 
-                PROGRESS("%1i- %-28.28s :%9i ->\r", loopNb, compressorName, (int)benchedSize);
+                PROGRESS("%2i-%-34.34s :%10i ->\r", loopNb, compressorName, (int)benchedSize);
                 { size_t i; for (i=0; i<benchedSize; i++) compressed_buff[i]=(char)i; }     /* warming up memory */
 
                 nb_loops = 0;
@@ -471,7 +478,8 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                     if (initFunction!=NULL) initFunction();
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
-                        if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", compressorName), exit(1);
+                        if (chunkP[chunkNb].compressedSize==0)
+                            DISPLAY("ERROR ! %s() = 0 !! \n", compressorName), exit(1);
                     }
                     nb_loops++;
                 }
@@ -482,13 +490,13 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 if (averageTime < bestTime) bestTime = averageTime;
                 cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
                 ratio = (double)cSize/(double)benchedSize*100.;
-                PROGRESS("%1i- %-28.28s :%9i ->%9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
+                PROGRESS("%2i-%-34.34s :%10i ->%9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
             }
 
             if (ratio<100.)
-                DISPLAY("%2i-%-28.28s :%9i ->%9i (%5.2f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
+                DISPLAY("%2i-%-34.34s :%10i ->%9i (%5.2f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
             else
-                DISPLAY("%2i-%-28.28s :%9i ->%9i (%5.1f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 100000);
+                DISPLAY("%2i-%-34.34s :%10i ->%9i (%5.1f%%),%7.1f MB/s\n", cAlgNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 100000);
         }
 
         /* Prepare layout for decompression */
@@ -509,11 +517,12 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
         }
         for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
             chunkP[chunkNb].compressedSize = LZ4_compress_default(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize, maxCompressedChunkSize);
-            if (chunkP[chunkNb].compressedSize==0) DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress"), exit(1);
+            if (chunkP[chunkNb].compressedSize==0)
+                DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress"), exit(1);
         }
 
         /* Decompression Algorithms */
-        for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && (g_decompressionTest); dAlgNb++) {
+        for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && g_decompressionTest; dAlgNb++) {
             const char* dName;
             int (*decompressionFunction)(const char*, char*, int, int);
             double bestTime = 100000000.;
@@ -524,7 +533,8 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             {
             case 0: DISPLAY("Decompression functions : \n"); continue;
             case 1: decompressionFunction = local_LZ4_decompress_fast; dName = "LZ4_decompress_fast"; break;
-            case 3: decompressionFunction = local_LZ4_decompress_fast_usingDict; dName = "LZ4_decompress_fast_usingDict"; break;
+            case 2: decompressionFunction = local_LZ4_decompress_fast_usingDict_prefix; dName = "LZ4_decompress_fast_usingDict(prefix)"; break;
+            case 3: decompressionFunction = local_LZ4_decompress_fast_usingExtDict; dName = "LZ4_decompress_fast_using(Ext)Dict"; break;
             case 4: decompressionFunction = LZ4_decompress_safe; dName = "LZ4_decompress_safe"; break;
             case 6: decompressionFunction = local_LZ4_decompress_safe_usingDict; dName = "LZ4_decompress_safe_usingDict"; break;
             case 7: decompressionFunction = local_LZ4_decompress_safe_partial; dName = "LZ4_decompress_safe_partial"; break;
@@ -555,7 +565,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 clock_t clockTime;
                 U32 crcDecoded;
 
-                PROGRESS("%1i- %-29.29s :%10i ->\r", loopNb, dName, (int)benchedSize);
+                PROGRESS("%2i-%-34.34s :%10i ->\r", loopNb, dName, (int)benchedSize);
 
                 nb_loops = 0;
                 clockTime = clock();
@@ -574,14 +584,14 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 averageTime = (double)clockTime / nb_loops / CLOCKS_PER_SEC;
                 if (averageTime < bestTime) bestTime = averageTime;
 
-                PROGRESS("%1i- %-29.29s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000000);
+                PROGRESS("%2i-%-34.34s :%10i -> %7.1f MB/s\r", loopNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000000);
 
                 /* CRC Checking */
                 crcDecoded = XXH32(orig_buff, (int)benchedSize, 0);
                 if (crcOriginal!=crcDecoded) { DISPLAY("\n!!! WARNING !!! %14s : Invalid Checksum : %x != %x\n", inFileName, (unsigned)crcOriginal, (unsigned)crcDecoded); exit(1); }
             }
 
-            DISPLAY("%2i-%-29.29s :%10i -> %7.1f MB/s\n", dAlgNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000000);
+            DISPLAY("%2i-%-34.34s :%10i -> %7.1f MB/s\n", dAlgNb, dName, (int)benchedSize, (double)benchedSize / bestTime / 1000000);
         }
       }
       free(orig_buff);

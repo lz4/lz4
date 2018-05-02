@@ -138,6 +138,7 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
 {
     int back = 0;
     int const min = (int)MAX(iMin - ip, mMin - match);
+    assert(min <= 0);
     assert(ip >= iMin); assert((size_t)(ip-iMin) < (1U<<31));
     assert(match >= mMin); assert((size_t)(match - mMin) < (1U<<31));
     while ( (back > min)
@@ -222,9 +223,9 @@ LZ4HC_InsertAndGetWiderMatch (
     const U32 dictLimit = hc4->dictLimit;
     const BYTE* const lowPrefixPtr = base + dictLimit;
     const U32 ipIndex = (U32)(ip - base);
-    const U32 lowLimit = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
+    const U32 lowestMatchIndex = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
     const BYTE* const dictBase = hc4->dictBase;
-    int const delta = (int)(ip-iLowLimit);
+    int const lookBackLength = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
     U32 const pattern = LZ4_read32(ip);
     U32 matchIndex;
@@ -236,10 +237,10 @@ LZ4HC_InsertAndGetWiderMatch (
     /* First Match */
     LZ4HC_Insert(hc4, ip);
     matchIndex = HashTable[LZ4HC_hashPtr(ip)];
-    DEBUGLOG(7, "First match at index %u / %u (lowLimit)",
-                matchIndex, lowLimit);
+    DEBUGLOG(7, "First match at index %u / %u (lowestMatchIndex)",
+                matchIndex, lowestMatchIndex);
 
-    while ((matchIndex>=lowLimit) && (nbAttempts)) {
+    while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) {
         DEBUGLOG(7, "remaining attempts : %i", nbAttempts);
         nbAttempts--;
         assert(matchIndex < ipIndex);
@@ -247,34 +248,35 @@ LZ4HC_InsertAndGetWiderMatch (
             /* do nothing */
         } else if (matchIndex >= dictLimit) {
             const BYTE* const matchPtr = base + matchIndex;
+            assert(matchPtr >= lowPrefixPtr);
+            assert(matchPtr < ip);
             assert(longest >= 1);
-            if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - delta + longest - 1)) {
+            if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - lookBackLength + longest - 1)) {
                 if (LZ4_read32(matchPtr) == pattern) {
                     int mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
-                    int const back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, lowPrefixPtr) : 0;
+                    int const back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, lowPrefixPtr) : 0;
                     mlt -= back;
-
                     if (mlt > longest) {
                         longest = mlt;
                         *matchpos = matchPtr+back;
                         *startpos = ip+back;
-                }   }
-            }
+            }   }   }
         } else {   /* matchIndex < dictLimit */
             const BYTE* const matchPtr = dictBase + matchIndex;
             if (LZ4_read32(matchPtr) == pattern) {
+                const BYTE* const dictStart = dictBase + hc4->lowLimit;
                 int mlt;
                 int back = 0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
-                    mlt += LZ4_count(ip+mlt, base+dictLimit, iHighLimit);
-                back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictBase+lowLimit) : 0;
+                    mlt += LZ4_count(ip+mlt, lowPrefixPtr, iHighLimit);
+                back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictStart) : 0;
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
-                    *matchpos = base + matchIndex + back;
+                    *matchpos = base + matchIndex + back;   /* virtual pos, relative to ip, to retrieve offset */
                     *startpos = ip + back;
         }   }   }
 
@@ -306,13 +308,13 @@ LZ4HC_InsertAndGetWiderMatch (
                             matchIndex -= (U32)backLength;   /* let's go to farthest segment position, will find a match of length currentSegmentLength + maybe some back */
                         }
         }   }   }   }
-    }  /* while ((matchIndex>=lowLimit) && (nbAttempts)) */
+    }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
-    if (dict == usingDictCtx && nbAttempts && ipIndex - lowLimit < MAX_DISTANCE) {
+    if (dict == usingDictCtx && nbAttempts && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
         size_t const dictEndOffset = dictCtx->end - dictCtx->base;
         assert(dictEndOffset <= 1 GB);
         dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
-        matchIndex = dictMatchIndex + lowLimit - (U32)dictEndOffset;
+        matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
         while (ipIndex - matchIndex <= MAX_DISTANCE && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
@@ -322,7 +324,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 const BYTE* vLimit = ip + (dictEndOffset - dictMatchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
                 mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
-                back = delta ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
+                back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
@@ -459,14 +461,14 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     BYTE* op = (BYTE*) dest;
     BYTE* oend = op + maxOutputSize;
 
-    int   ml, ml2, ml3, ml0;
+    int   ml0, ml, ml2, ml3;
+    const BYTE* start0;
+    const BYTE* ref0;
     const BYTE* ref = NULL;
     const BYTE* start2 = NULL;
     const BYTE* ref2 = NULL;
     const BYTE* start3 = NULL;
     const BYTE* ref3 = NULL;
-    const BYTE* start0;
-    const BYTE* ref0;
 
     /* init */
     *srcSizePtr = 0;
@@ -479,31 +481,27 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
         if (ml<MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
-        start0 = ip;
-        ref0 = ref;
-        ml0 = ml;
+        start0 = ip; ref0 = ref; ml0 = ml;
 
 _Search2:
-        if (ip+ml <= mflimit)
+        if (ip+ml <= mflimit) {
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
                             maxNbAttempts, patternAnalysis, dict, favorCompressionRatio);
-        else
+        } else {
             ml2 = ml;
+        }
 
-        if (ml2 == ml) { /* No better match */
+        if (ml2 == ml) { /* No better match => encode ML1 */
             optr = op;
             if (LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ref, limit, oend)) goto _dest_overflow;
             continue;
         }
 
-        if (start0 < ip) {
-            if (start2 < ip + ml0) {  /* empirical */
-                ip = start0;
-                ref = ref0;
-                ml = ml0;
-            }
-        }
+        if (start0 < ip) {   /* first match was skipped at least once */
+            if (start2 < ip + ml0) {  /* squeezing ML1 between ML0(original ML1) and ML2 */
+                ip = start0; ref = ref0; ml = ml0;  /* restore initial ML1 */
+        }   }
 
         /* Here, start0==ip */
         if ((start2 - ip) < 3) {  /* First Match too small : removed */
@@ -531,14 +529,15 @@ _Search3:
         }
         /* Now, we have start2 = ip+new_ml, with new_ml = min(ml, OPTIMAL_ML=18) */
 
-        if (start2 + ml2 <= mflimit)
+        if (start2 + ml2 <= mflimit) {
             ml3 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3,
                             maxNbAttempts, patternAnalysis, dict, favorCompressionRatio);
-        else
+        } else {
             ml3 = ml2;
+        }
 
-        if (ml3 == ml2) {  /* No better match : 2 sequences to encode */
+        if (ml3 == ml2) {  /* No better match => encode ML1 and ML2 */
             /* ip & ref are known; Now for ml */
             if (start2 < ip+ml)  ml = (int)(start2 - ip);
             /* Now, encode 2 sequences */
@@ -583,11 +582,12 @@ _Search3:
         }
 
         /*
-        * OK, now we have 3 ascending matches; let's write at least the first one
-        * ip & ref are known; Now for ml
+        * OK, now we have 3 ascending matches;
+        * let's write the first one ML1.
+        * ip & ref are known; Now decide ml.
         */
         if (start2 < ip+ml) {
-            if ((start2 - ip) < (int)ML_MASK) {
+            if ((start2 - ip) < OPTIMAL_ML) {
                 int correction;
                 if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
                 if (ip + ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
@@ -604,14 +604,13 @@ _Search3:
         optr = op;
         if (LZ4HC_encodeSequence(&ip, &op, &anchor, ml, ref, limit, oend)) goto _dest_overflow;
 
-        ip = start2;
-        ref = ref2;
-        ml = ml2;
+        /* ML2 becomes ML1 */
+        ip = start2; ref = ref2; ml = ml2;
 
-        start2 = start3;
-        ref2 = ref3;
-        ml2 = ml3;
+        /* ML3 becomes ML2 */
+        start2 = start3; ref2 = ref3; ml2 = ml3;
 
+        /* let's find a new ML3 */
         goto _Search3;
     }
 
@@ -705,8 +704,6 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     ctx->end += *srcSizePtr;
     if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
     cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
-    assert(cLevel >= 0);
-    assert(cLevel <= LZ4HC_CLEVEL_MAX);
     {   cParams_t const cParam = clTable[cLevel];
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
         if (cParam.strat == lz4hc)
@@ -905,7 +902,8 @@ void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
     DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
-    if (ctxPtr->end >= ctxPtr->base + 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
+    if (ctxPtr->end >= ctxPtr->base + ctxPtr->dictLimit + 4)
+        LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;

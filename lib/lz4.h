@@ -317,15 +317,19 @@ LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const 
  *  If less than 64KB of data has been decoded all the data must be present.
  *
  *  Special : if application sets a ring buffer for decompression, it must respect one of the following conditions :
- *  - Exactly same size as encoding buffer, with same update rule (block boundaries at same positions)
- *    In which case, the decoding & encoding ring buffer can have any size, including very small ones ( < 64 KB).
- *  - Larger than encoding buffer, by a minimum of maxBlockSize more bytes.
- *    maxBlockSize is implementation dependent. It's the maximum size of any single block.
+ *  - Decompression buffer is larger than encoding buffer, by a minimum of maxBlockSize more bytes.
+ *    maxBlockSize is the maximum size of any single block. It is implementation dependent, and can have any value (presumed > 16 bytes).
  *    In which case, encoding and decoding buffers do not need to be synchronized,
  *    and encoding ring buffer can have any size, including small ones ( < 64 KB).
- *  - _At least_ 64 KB + 8 bytes + maxBlockSize.
+ *  - Decompression buffer size is _at least_ 64 KB + 8 bytes + maxBlockSize.
  *    In which case, encoding and decoding buffers do not need to be synchronized,
  *    and encoding ring buffer can have any size, including larger than decoding buffer.
+ *  - Decompression buffer size is exactly the same as compression buffer size,
+ *    and follows exactly same update rule (block boundaries at same positions).
+ *    If the decoding function is provided with the exact decompressed size of each block,
+ *    then decoding & encoding ring buffer can have any size, including very small ones ( < 64 KB).
+ *    If the decoding function only knows the compressed size,
+ *    then buffer size must be a minimum of 64 KB + 8 bytes + maxBlockSize.
  *  Whenever these conditions are not possible, save the last 64KB of decoded data into a safe buffer,
  *  and indicate where it is saved using LZ4_setStreamDecode() before decompressing next block.
 */
