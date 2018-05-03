@@ -1398,6 +1398,9 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
     const int safeDecode = (endOnInput==endOnInputSize);
     const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
 
+    /* Set up the "end" pointers for the shortcut. */
+    const BYTE* const shortiend = iend - (endOnInput ? 14 : 8) /*maxLL*/ - 2 /*offset*/;
+    const BYTE* const shortoend = oend - (endOnInput ? 14 : 8) /*maxLL*/ - 18 /*maxML*/;
 
     /* Special cases */
     if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                      /* targetOutputSize too high => just decode everything */
@@ -1407,39 +1410,56 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
 
     /* Main Loop : decode sequences */
     while (1) {
-        size_t length;
         const BYTE* match;
         size_t offset;
 
         unsigned const token = *ip++;
+        size_t length = token >> ML_BITS; /* literal length */
 
         assert(!endOnInput || ip <= iend); /* ip < iend before the increment */
-        /* shortcut for common case :
-         * in most circumstances, we expect to decode small matches (<= 18 bytes) separated by few literals (<= 14 bytes).
-         * this shortcut was tested on x86 and x64, where it improves decoding speed.
-         * it has not yet been benchmarked on ARM, Power, mips, etc.
-         * NOTE: The loop begins with a read, so we must have one byte left at the end. */
-        if (endOnInput
-          && ((ip + 14 /*maxLL*/ + 2 /*offset*/ < iend)
-            & (op + 14 /*maxLL*/ + 18 /*maxML*/ <= oend)
-            & (token < (15<<ML_BITS))
-            & ((token & ML_MASK) != 15) ) ) {
-            size_t const ll = token >> ML_BITS;
-            size_t const off = LZ4_readLE16(ip+ll);
-            const BYTE* const matchPtr = op + ll - off;  /* pointer underflow risk ? */
-            if ((off >= 8) /* do not deal with overlapping matches */ & (matchPtr >= lowPrefix)) {
-                size_t const ml = (token & ML_MASK) + MINMATCH;
-                memcpy(op, ip, 16); op += ll; ip += ll + 2 /*offset*/;
-                memcpy(op + 0, matchPtr + 0, 8);
-                memcpy(op + 8, matchPtr + 8, 8);
-                memcpy(op +16, matchPtr +16, 2);
-                op += ml;
+
+        /* A two-stage shortcut for the most common case:
+         * 1) If the literal length is 0..14, and there is enough space,
+         * enter the shortcut and copy 16 bytes on behalf of the literals
+         * (in the fast mode, only 8 bytes can be safely copied this way).
+         * 2) Further if the match length is 4..18, copy 18 bytes in a similar
+         * manner; but we ensure that there's enough space in the output for
+         * those 18 bytes earlier, upon entering the shortcut (in other words,
+         * there is a combined check for both stages).
+         */
+        if ( (endOnInput ? length != RUN_MASK : length <= 8)
+            /* strictly "less than" on input, to re-enter the loop with at least one byte */
+          && likely((endOnInput ? ip < shortiend : 1) & (op <= shortoend)) ) {
+            /* Copy the literals */
+            memcpy(op, ip, endOnInput ? 16 : 8);
+            op += length; ip += length;
+
+            /* The second stage: prepare for match copying, decode full info.
+             * If it doesn't work out, the info won't be wasted. */
+            length = token & ML_MASK; /* match length */
+            offset = LZ4_readLE16(ip); ip += 2;
+            match = op - offset;
+
+            /* Do not deal with overlapping matches. */
+            if ( (length != ML_MASK)
+              && (offset >= 8)
+              && (dict==withPrefix64k || match >= lowPrefix) ) {
+                /* Copy the match. */
+                memcpy(op + 0, match + 0, 8);
+                memcpy(op + 8, match + 8, 8);
+                memcpy(op +16, match +16, 2);
+                op += length + MINMATCH;
+                /* Both stages worked, load the next token. */
                 continue;
             }
+
+            /* The second stage didn't work out, but the info is ready.
+             * Propel it right to the point of match copying. */
+            goto _copy_match;
         }
 
         /* decode literal length */
-        if ((length=(token>>ML_BITS)) == RUN_MASK) {
+        if (length == RUN_MASK) {
             unsigned s;
             if (unlikely(endOnInput ? ip >= iend-RUN_MASK : 0)) goto _output_error;   /* overflow detection */
             do {
@@ -1473,11 +1493,14 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
         /* get offset */
         offset = LZ4_readLE16(ip); ip+=2;
         match = op - offset;
-        if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
-        LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */
 
         /* get matchlength */
         length = token & ML_MASK;
+
+_copy_match:
+        if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
+        LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */
+
         if (length == ML_MASK) {
             unsigned s;
             do {
@@ -1664,12 +1687,11 @@ int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
     return 0;
 }
 
-/*!
- * LZ4_setStreamDecode() :
- * Use this function to instruct where to find the dictionary.
- * This function is not necessary if previous data is still available where it was decoded.
- * Loading a size of 0 is allowed (same effect as no dictionary).
- * Return : 1 if OK, 0 if error
+/*! LZ4_setStreamDecode() :
+ *  Use this function to instruct where to find the dictionary.
+ *  This function is not necessary if previous data is still available where it was decoded.
+ *  Loading a size of 0 is allowed (same effect as no dictionary).
+ * @return : 1 if OK, 0 if error
  */
 int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dictionary, int dictSize)
 {
@@ -1679,6 +1701,25 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
     lz4sd->externalDict = NULL;
     lz4sd->extDictSize  = 0;
     return 1;
+}
+
+/*! LZ4_decoderRingBufferSize() :
+ *  when setting a ring buffer for streaming decompression (optional scenario),
+ *  provides the minimum size of this ring buffer
+ *  to be compatible with any source respecting maxBlockSize condition.
+ *  Note : in a ring buffer scenario,
+ *  blocks are presumed decompressed next to each other.
+ *  When not enough space remains for next block (remainingSize < maxBlockSize),
+ *  decoding resumes from beginning of ring buffer.
+ * @return : minimum ring buffer size,
+ *           or 0 if there is an error (invalid maxBlockSize).
+ */
+int LZ4_decoderRingBufferSize(int maxBlockSize)
+{
+    if (maxBlockSize < 0) return 0;
+    if (maxBlockSize > LZ4_MAX_INPUT_SIZE) return 0;
+    if (maxBlockSize < 16) maxBlockSize = 16;
+    return LZ4_DECODER_RING_BUFFER_SIZE(maxBlockSize);
 }
 
 /*
