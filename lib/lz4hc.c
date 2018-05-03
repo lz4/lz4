@@ -1099,6 +1099,7 @@ LZ4HC_FindLongestMatch (LZ4HC_CCtx_internal* hc4,
     int nbAttempts = maxNbAttempts;
     U32 const pattern = LZ4_read32(ip);
     U32 matchIndex;
+    int fromMStart = 0;
 
     DEBUGLOG(7, "LZ4HC_InsertAndGetWiderMatch");
     /* First Match */
@@ -1132,8 +1133,8 @@ LZ4HC_FindLongestMatch (LZ4HC_CCtx_internal* hc4,
     }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
     assert(longest > MINMATCH);
-    while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) {
-        const BYTE* const matchPtr = base + matchIndex;
+    while ((matchIndex-fromMStart>=lowestMatchIndex) && (nbAttempts)) {
+        const BYTE* const matchPtr = base + matchIndex - fromMStart;
         assert(matchIndex < ipIndex);
         assert(matchIndex >= dictLimit);
         assert(matchPtr >= lowPrefixPtr);
@@ -1146,6 +1147,21 @@ LZ4HC_FindLongestMatch (LZ4HC_CCtx_internal* hc4,
                 if (mlt > longest) {
                     longest = mlt;
                     *matchpos = matchPtr;
+                    matchIndex -= fromMStart;   /* beginning of match */
+                    if (1 && matchIndex + longest <= ipIndex) {
+                        U32 distanceToNextMatch = 1;
+                        int pos;
+                        for (pos = 0; pos <= longest - MINMATCH; pos++) {
+                            U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + pos);
+                            if (candidateDist > distanceToNextMatch) {
+                                distanceToNextMatch = candidateDist;
+                                fromMStart = pos;
+                            }
+                        }
+                        if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
+                        matchIndex -= distanceToNextMatch - fromMStart;
+                        continue;
+                    }
         }   }   }
 
         {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex);
