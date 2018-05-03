@@ -1427,10 +1427,9 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
          * those 18 bytes earlier, upon entering the shortcut (in other words,
          * there is a combined check for both stages).
          */
-        if ((endOnInput ? length != RUN_MASK : length <= 8) &&
+        if ( (endOnInput ? length != RUN_MASK : length <= 8)
             /* strictly "less than" on input, to re-enter the loop with at least one byte */
-            likely((endOnInput ? ip < shortiend : 1) & (op <= shortoend)))
-        {
+          && likely((endOnInput ? ip < shortiend : 1) & (op <= shortoend)) ) {
             /* Copy the literals */
             memcpy(op, ip, endOnInput ? 16 : 8);
             op += length; ip += length;
@@ -1442,9 +1441,9 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
             match = op - offset;
 
             /* Do not deal with overlapping matches. */
-            if ((length != 15) && (offset >= 8) &&
-                (dict==withPrefix64k || match >= lowPrefix))
-            {
+            if ( (length != ML_MASK)
+              && (offset >= 8)
+              && (dict==withPrefix64k || match >= lowPrefix) ) {
                 /* Copy the match. */
                 memcpy(op + 0, match + 0, 8);
                 memcpy(op + 8, match + 8, 8);
@@ -1709,13 +1708,12 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
  *  provides the minimum size of this ring buffer
  *  to be compatible with any source respecting maxBlockSize condition.
  *  Note : in a ring buffer scenario,
- *  blocks are presumed decompressed next to each other
- *  up to the moment there is not enough remaining space for next block (remainingSize < maxBlockSize),
- *  at which stage it resumes from beginning of ring buffer.
+ *  blocks are presumed decompressed next to each other.
+ *  When not enough space remains for next block (remainingSize < maxBlockSize),
+ *  decoding resumes from beginning of ring buffer.
  * @return : minimum ring buffer size,
  *           or 0 if there is an error (invalid maxBlockSize).
  */
-
 int LZ4_decoderRingBufferSize(int maxBlockSize)
 {
     if (maxBlockSize < 0) return 0;
