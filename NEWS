@@ -1,13 +1,13 @@
 v1.8.2
 perf: *much* faster dictionary compression on small files, by @felixhandte
+perf: improved decompression speed and binary size, by Alexey Tourbin (@svpv)
 perf: slightly faster HC compression and decompression speed
 perf: very small compression ratio improvement
-perf: improved decompression binary size and speed, by Alexey Tourbin (@svpv)
 fix : compression compatible with low memory addresses (< 0xFFFF)
 fix : decompression segfault when provided with NULL input, by @terrelln
 cli : new command --favor-decSpeed
 cli : benchmark mode more accurate for small inputs
-fullbench : can measure _destSize() variants, by @felixhandte
+fullbench : can bench _destSize() variants, by @felixhandte
 doc : clarified block format parsing restrictions, by Alexey Tourbin (@svpv)
 
 v1.8.1
