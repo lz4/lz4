@@ -71,6 +71,9 @@ all32: all
 lz4:
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
+lib liblz4.pc:
+	$(MAKE) -C $(LZ4DIR) $@ CFLAGS="$(CFLAGS)"
+
 lz4c unlz4 lz4cat: lz4
 	ln -sf $(LZ4) $(PRGDIR)/$@
 
@@ -141,10 +144,13 @@ endif
 DD:=dd
 
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install
 
 test32: CFLAGS+=-m32
 test32: test
+
+test-install: lz4 lib liblz4.pc
+	lz4_root=.. ./test_install.sh
 
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"

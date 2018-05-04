@@ -120,21 +120,19 @@ lz4cat: lz4
 DESTDIR     ?=
 # directory variables : GNU conventions prefer lowercase
 # see https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
-# support both lower and uppercase (BSD), use uppercase in script
-prefix      ?= /usr/local
-PREFIX      ?= $(prefix)
-exec_prefix ?= $(PREFIX)
-bindir      ?= $(exec_prefix)/bin
-BINDIR      ?= $(bindir)
-datarootdir ?= $(PREFIX)/share
-mandir      ?= $(datarootdir)/man
-man1dir     ?= $(mandir)/man1
-
-ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly SunOS))
-MANDIR  ?= $(PREFIX)/man/man1
-else
-MANDIR  ?= $(man1dir)
-endif
+# support both lower and uppercase (BSD), use lowercase in script
+PREFIX      ?= /usr/local
+prefix      ?= $(PREFIX)
+EXEC_PREFIX ?= $(prefix)
+exec_prefix ?= $(EXEC_PREFIX)
+BINDIR      ?= $(exec_prefix)/bin
+bindir      ?= $(BINDIR)
+DATAROOTDIR ?= $(prefix)/share
+datarootdir ?= $(DATAROOTDIR)
+MANDIR      ?= $(datarootdir)/man
+mandir      ?= $(MANDIR)
+MAN1DIR     ?= $(mandir)/man1
+man1dir     ?= $(MAN1DIR)
 
 ifneq (,$(filter $(shell uname),SunOS))
 INSTALL ?= ginstall
@@ -148,27 +146,27 @@ INSTALL_DATA    ?= $(INSTALL) -m 644
 
 install: lz4
 	@echo Installing binaries
-	@$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
-	@$(INSTALL_PROGRAM) lz4 $(DESTDIR)$(BINDIR)/lz4
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4c
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
-	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
+	@$(INSTALL) -d -m 755 $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
+	@$(INSTALL_PROGRAM) lz4 $(DESTDIR)$(bindir)/lz4
+	@ln -sf lz4 $(DESTDIR)$(bindir)/lz4c
+	@ln -sf lz4 $(DESTDIR)$(bindir)/lz4cat
+	@ln -sf lz4 $(DESTDIR)$(bindir)/unlz4
 	@echo Installing man pages
-	@$(INSTALL_DATA) lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1
+	@$(INSTALL_DATA) lz4.1 $(DESTDIR)$(man1dir)/lz4.1
+	@ln -sf lz4.1 $(DESTDIR)$(man1dir)/lz4c.1
+	@ln -sf lz4.1 $(DESTDIR)$(man1dir)/lz4cat.1
+	@ln -sf lz4.1 $(DESTDIR)$(man1dir)/unlz4.1
 	@echo lz4 installation completed
 
 uninstall:
-	@$(RM) $(DESTDIR)$(BINDIR)/lz4cat
-	@$(RM) $(DESTDIR)$(BINDIR)/unlz4
-	@$(RM) $(DESTDIR)$(BINDIR)/lz4
-	@$(RM) $(DESTDIR)$(BINDIR)/lz4c
-	@$(RM) $(DESTDIR)$(MANDIR)/lz4.1
-	@$(RM) $(DESTDIR)$(MANDIR)/lz4c.1
-	@$(RM) $(DESTDIR)$(MANDIR)/lz4cat.1
-	@$(RM) $(DESTDIR)$(MANDIR)/unlz4.1
+	@$(RM) $(DESTDIR)$(bindir)/lz4cat
+	@$(RM) $(DESTDIR)$(bindir)/unlz4
+	@$(RM) $(DESTDIR)$(bindir)/lz4
+	@$(RM) $(DESTDIR)$(bindir)/lz4c
+	@$(RM) $(DESTDIR)$(man1dir)/lz4.1
+	@$(RM) $(DESTDIR)$(man1dir)/lz4c.1
+	@$(RM) $(DESTDIR)$(man1dir)/lz4cat.1
+	@$(RM) $(DESTDIR)$(man1dir)/unlz4.1
 	@echo lz4 programs successfully uninstalled
 
 endif
