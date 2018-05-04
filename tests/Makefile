@@ -141,10 +141,13 @@ endif
 DD:=dd
 
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install
 
 test32: CFLAGS+=-m32
 test32: test
+
+test-install:
+	lz4_root=.. ./test_install.sh
 
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"

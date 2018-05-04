@@ -62,7 +62,7 @@ ifeq ($(shell uname), Darwin)
 	SHARED_EXT = dylib
 	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
 	SHARED_EXT_VER = $(LIBVER).$(SHARED_EXT)
-	SONAME_FLAGS = -install_name $(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR) -compatibility_version $(LIBVER_MAJOR) -current_version $(LIBVER)
+	SONAME_FLAGS = -install_name $(libdir)/liblz4.$(SHARED_EXT_MAJOR) -compatibility_version $(LIBVER_MAJOR) -current_version $(LIBVER)
 else
 	SONAME_FLAGS = -Wl,-soname=liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
 	SHARED_EXT = so
@@ -132,20 +132,22 @@ listL120:  # extract lines >= 120 characters in *.{c,h}, by Takayuki Matsuoka (n
 DESTDIR     ?=
 # directory variables : GNU conventions prefer lowercase
 # see https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
-# support both lower and uppercase (BSD), use uppercase in script
-prefix      ?= /usr/local
-PREFIX      ?= $(prefix)
-exec_prefix ?= $(PREFIX)
-libdir      ?= $(exec_prefix)/lib
-LIBDIR      ?= $(libdir)
-includedir  ?= $(PREFIX)/include
-INCLUDEDIR  ?= $(includedir)
+# support both lower and uppercase (BSD), use lower in script
+PREFIX      ?= /usr/local
+prefix      ?= $(PREFIX)
+EXEC_PREFIX ?= $(prefix)
+exec_prefix ?= $(EXEC_PREFIX)
+LIBDIR      ?= $(exec_prefix)/lib
+libdir      ?= $(LIBDIR)
+INCLUDEDIR  ?= $(prefix)/include
+includedir  ?= $(INCLUDEDIR)
 
 ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly))
-PKGCONFIGDIR ?= $(PREFIX)/libdata/pkgconfig
+PKGCONFIGDIR ?= $(prefix)/libdata/pkgconfig
 else
-PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
+PKGCONFIGDIR ?= $(libdir)/pkgconfig
 endif
+pkgconfigdir ?= $(PKGCONFIGDIR)
 
 ifneq (,$(filter $(shell uname),SunOS))
 INSTALL ?= ginstall
@@ -158,41 +160,41 @@ INSTALL_DATA    ?= $(INSTALL) -m 644
 
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
-	$(Q)sed -e 's|@PREFIX@|$(PREFIX)|' \
-         -e 's|@LIBDIR@|$(LIBDIR)|' \
-         -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|' \
+	$(Q)sed -e 's|@PREFIX@|$(prefix)|' \
+         -e 's|@LIBDIR@|$(libdir)|' \
+         -e 's|@INCLUDEDIR@|$(includedir)|' \
          -e 's|@VERSION@|$(LIBVER)|' \
           $< >$@
 
 install: lib liblz4.pc
-	$(Q)$(INSTALL) -d -m 755 $(DESTDIR)$(PKGCONFIGDIR)/ $(DESTDIR)$(INCLUDEDIR)/ $(DESTDIR)$(LIBDIR)/
-	$(Q)$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(PKGCONFIGDIR)/
+	$(Q)$(INSTALL) -d -m 755 $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/
+	$(Q)$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(pkgconfigdir)/
 	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
-	$(Q)$(INSTALL_DATA) liblz4.a $(DESTDIR)$(LIBDIR)/liblz4.a
-	$(Q)$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
+	$(Q)$(INSTALL_DATA) liblz4.a $(DESTDIR)$(libdir)/liblz4.a
+	$(Q)$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(includedir)/lz4frame_static.h
 endif
 ifeq ($(BUILD_SHARED),yes)
-	$(Q)$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)
-	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
+	$(Q)$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)
+	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_MAJOR)
+	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
 endif
-	@echo Installing headers in $(INCLUDEDIR)
-	$(Q)$(INSTALL_DATA) lz4.h $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	$(Q)$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	$(Q)$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
+	@echo Installing headers in $(includedir)
+	$(Q)$(INSTALL_DATA) lz4.h $(DESTDIR)$(includedir)/lz4.h
+	$(Q)$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(includedir)/lz4hc.h
+	$(Q)$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(includedir)/lz4frame.h
 	@echo lz4 libraries installed
 
 uninstall:
-	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/liblz4.pc
-	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT)
-	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_MAJOR)
-	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.$(SHARED_EXT_VER)
-	$(Q)$(RM) $(DESTDIR)$(LIBDIR)/liblz4.a
-	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4.h
-	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4hc.h
-	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame.h
-	$(Q)$(RM) $(DESTDIR)$(INCLUDEDIR)/lz4frame_static.h
+	$(Q)$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
+	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
+	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_MAJOR)
+	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_VER)
+	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.a
+	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4.h
+	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4hc.h
+	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4frame.h
+	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4frame_static.h
 	@echo lz4 libraries successfully uninstalled
 
 endif
