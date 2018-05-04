@@ -131,10 +131,12 @@ mandir      ?= $(datarootdir)/man
 man1dir     ?= $(mandir)/man1
 
 ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly SunOS))
-MANDIR  ?= $(PREFIX)/man/man1
+MANDIR  ?= $(PREFIX)/man
 else
-MANDIR  ?= $(man1dir)
+MANDIR  ?= $(mandir)
 endif
+
+MAN1DIR ?= $(MANDIR)/man1
 
 ifneq (,$(filter $(shell uname),SunOS))
 INSTALL ?= ginstall
@@ -148,16 +150,16 @@ INSTALL_DATA    ?= $(INSTALL) -m 644
 
 install: lz4
 	@echo Installing binaries
-	@$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MANDIR)/
+	@$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)/ $(DESTDIR)$(MAN1DIR)/
 	@$(INSTALL_PROGRAM) lz4 $(DESTDIR)$(BINDIR)/lz4
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4c
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/lz4cat
 	@ln -sf lz4 $(DESTDIR)$(BINDIR)/unlz4
 	@echo Installing man pages
-	@$(INSTALL_DATA) lz4.1 $(DESTDIR)$(MANDIR)/lz4.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4c.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/lz4cat.1
-	@ln -sf lz4.1 $(DESTDIR)$(MANDIR)/unlz4.1
+	@$(INSTALL_DATA) lz4.1 $(DESTDIR)$(MAN1DIR)/lz4.1
+	@ln -sf lz4.1 $(DESTDIR)$(MAN1DIR)/lz4c.1
+	@ln -sf lz4.1 $(DESTDIR)$(MAN1DIR)/lz4cat.1
+	@ln -sf lz4.1 $(DESTDIR)$(MAN1DIR)/unlz4.1
 	@echo lz4 installation completed
 
 uninstall:
@@ -165,10 +167,10 @@ uninstall:
 	@$(RM) $(DESTDIR)$(BINDIR)/unlz4
 	@$(RM) $(DESTDIR)$(BINDIR)/lz4
 	@$(RM) $(DESTDIR)$(BINDIR)/lz4c
-	@$(RM) $(DESTDIR)$(MANDIR)/lz4.1
-	@$(RM) $(DESTDIR)$(MANDIR)/lz4c.1
-	@$(RM) $(DESTDIR)$(MANDIR)/lz4cat.1
-	@$(RM) $(DESTDIR)$(MANDIR)/unlz4.1
+	@$(RM) $(DESTDIR)$(MAN1DIR)/lz4.1
+	@$(RM) $(DESTDIR)$(MAN1DIR)/lz4c.1
+	@$(RM) $(DESTDIR)$(MAN1DIR)/lz4cat.1
+	@$(RM) $(DESTDIR)$(MAN1DIR)/unlz4.1
 	@echo lz4 programs successfully uninstalled
 
 endif
