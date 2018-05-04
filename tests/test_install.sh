@@ -2,7 +2,6 @@
 set -e
 
 make="make -C $lz4_root"
-$make CFLAGS=-O0 > /dev/null
 for cmd in install uninstall; do
   for upper in DUMMY PREFIX EXEC_PREFIX LIBDIR INCLUDEDIR PKGCONFIGDIR BINDIR MANDIR MAN1DIR ; do
     lower=$(echo $upper | tr '[:upper:]' '[:lower:]')
