@@ -280,9 +280,9 @@ LZ4HC_InsertAndGetWiderMatch (
                     *startpos = ip + back;
         }   }   }
 
-        if (mlt == longest) {  /* better match => select a better chain */
-            assert(longest >= MINMATCH);
-            if (1 && matchIndex + longest <= ipIndex) {
+        if ( lookBackLength==0  /* search forward only */
+          && mlt==longest) {    /* better match => select a better chain */
+            if (matchIndex + longest <= ipIndex) {
                 U32 distanceToNextMatch = 1;
                 int pos;
                 for (pos = 0; pos <= longest - MINMATCH; pos++) {
@@ -301,7 +301,7 @@ LZ4HC_InsertAndGetWiderMatch (
         }
 
         {   U32 const distNextMatch = DELTANEXTU16(chainTable, matchIndex);
-            if (1 && patternAnalysis && distNextMatch==1 && matchChainPos==0) {
+            if (patternAnalysis && distNextMatch==1 && matchChainPos==0) {
                 U32 const matchCandidateIdx = matchIndex-1;
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
