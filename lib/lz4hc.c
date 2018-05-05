@@ -382,7 +382,7 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, 0 /* chainSwap */, patternAnalysis, dict, favorCompressionRatio);
+    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, patternAnalysis, 0 /*chainSwap*/, dict, favorCompressionRatio);
 }
 
 
@@ -477,7 +477,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     )
 {
     const int inputSize = *srcSizePtr;
-    const int patternAnalysis = (maxNbAttempts > 64);   /* levels 8+ */
+    const int patternAnalysis = (maxNbAttempts > 128);   /* levels 9+ */
 
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
@@ -515,7 +515,7 @@ _Search2:
         if (ip+ml <= mflimit) {
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
-                            maxNbAttempts, 0, patternAnalysis, dict, favorCompressionRatio);
+                            maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
         } else {
             ml2 = ml;
         }
@@ -560,7 +560,7 @@ _Search3:
         if (start2 + ml2 <= mflimit) {
             ml3 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3,
-                            maxNbAttempts, 0, patternAnalysis, dict, favorCompressionRatio);
+                            maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
         } else {
             ml3 = ml2;
         }
@@ -1128,7 +1128,7 @@ LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    int matchLength = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &matchPtr, &ip, nbSearches, 1 /*chainSwap*/, 1 /*patternAnalysis*/, dict, favorDecSpeed);
+    int matchLength = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &matchPtr, &ip, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
     if (matchLength <= minLen) return match;
     if (favorDecSpeed) {
         if ((matchLength>18) & (matchLength<=36)) matchLength=18;   /* favor shortcut */
