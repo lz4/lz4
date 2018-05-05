@@ -280,10 +280,29 @@ LZ4HC_InsertAndGetWiderMatch (
                     *startpos = ip + back;
         }   }   }
 
+        if (mlt == longest) {  /* better match => select a better chain */
+            assert(longest >= MINMATCH);
+            if (1 && matchIndex + longest <= ipIndex) {
+                U32 distanceToNextMatch = 1;
+                int pos;
+                for (pos = 0; pos <= longest - MINMATCH; pos++) {
+                    U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + pos);
+                    if (candidateDist > distanceToNextMatch) {
+                        distanceToNextMatch = candidateDist;
+                        matchChainPos = pos;
+                    }
+                }
+                if (distanceToNextMatch > 1) {
+                    if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
+                    matchIndex -= distanceToNextMatch;
+                    continue;
+                }
+            }
+        }
+
         {   U32 const distNextMatch = DELTANEXTU16(chainTable, matchIndex);
             if (1 && patternAnalysis && distNextMatch==1 && matchChainPos==0) {
                 U32 const matchCandidateIdx = matchIndex-1;
-                //static U64 g_nbPatternAnalysis = 0; g_nbPatternAnalysis++; if (g_nbPatternAnalysis % (((g_nbPatternAnalysis/1000000)+1)*100)==0) DEBUGLOG(2, "g_nbPatternAnalysis=%llu ", g_nbPatternAnalysis);
                 /* may be a repeated pattern */
                 if (repeat == rep_untested) {
                     if ( ((pattern & 0xFFFF) == (pattern >> 16))
@@ -301,7 +320,6 @@ LZ4HC_InsertAndGetWiderMatch (
                         const BYTE* const maxLowPtr = (lowPrefixPtr + MAX_DISTANCE >= ip) ? lowPrefixPtr : ip - MAX_DISTANCE;
                         size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, maxLowPtr, pattern);
                         size_t const currentSegmentLength = backLength + forwardPatternLength;
-                        //static U64 g_nbPatternAnalysis_confirmed = 0; g_nbPatternAnalysis_confirmed++; if (g_nbPatternAnalysis_confirmed%(((g_nbPatternAnalysis_confirmed/100000)+1)*100)==0) DEBUGLOG(2, "g_nbPatternAnalysis_confirmed=%llu ", g_nbPatternAnalysis_confirmed);
 
                         if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
                           && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
@@ -313,25 +331,6 @@ LZ4HC_InsertAndGetWiderMatch (
                         continue;
                 }   }
         }   }
-
-        if (mlt == longest) {  /* better match => select a better chain */
-            assert(longest >= MINMATCH);
-            if (1 && matchIndex + longest <= ipIndex) {
-                U32 distanceToNextMatch = 1;
-                int pos;
-                //static U64 g_nbChainSwapper = 0; g_nbChainSwapper++; if (g_nbChainSwapper%(((g_nbChainSwapper/100000)+1)*100)==0) DEBUGLOG(2, "g_nbChainSwapper=%llu ", g_nbChainSwapper);
-                for (pos = matchChainPos; pos <= longest - MINMATCH; pos++) {
-                    U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + pos);
-                    if (candidateDist > distanceToNextMatch) {
-                        distanceToNextMatch = candidateDist;
-                        matchChainPos = pos;
-                    }
-                }
-                if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
-                matchIndex -= distanceToNextMatch;
-                continue;
-            }
-        }
 
         /* follow current chain */
         matchIndex -= DELTANEXTU16(chainTable, matchIndex+matchChainPos);
@@ -1112,98 +1111,6 @@ LZ4_FORCE_INLINE int LZ4HC_sequencePrice(int litlen, int mlen)
 }
 
 
-int
-LZ4HC_FindLongestMatch (LZ4HC_CCtx_internal* hc4,
-                        const BYTE* const ip,
-                        const BYTE* const iHighLimit,
-                        int longest,
-                        const BYTE** matchpos,
-                        const int maxNbAttempts)
-{
-    U16* const chainTable = hc4->chainTable;
-    U32* const HashTable = hc4->hashTable;
-    const BYTE* const base = hc4->base;
-    const U32 ipIndex = (U32)(ip - base);
-    const U32 lowestMatchIndex = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
-    int nbAttempts = maxNbAttempts;
-    U32 const pattern = LZ4_read32(ip);
-    U32 matchIndex;
-    int matchChainPos = 0;
-
-    DEBUGLOG(7, "LZ4HC_InsertAndGetWiderMatch");
-    /* First Match */
-    LZ4HC_Insert(hc4, ip);
-    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
-    DEBUGLOG(7, "First match at index %u / %u (lowestMatchIndex)",
-                matchIndex, lowestMatchIndex);
-
-    /* find first match */
-    while ( 1 && (longest < MINMATCH)
-      && (matchIndex>=lowestMatchIndex)
-      && (nbAttempts) ) {
-        const BYTE* const matchPtr = base + matchIndex;
-        assert(matchIndex < ipIndex);
-        assert(matchPtr < ip);
-        assert(longest >= 1);
-        nbAttempts--;
-        if (LZ4_read32(matchPtr) == pattern) {
-            int const mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
-            if (mlt > longest) {
-                longest = mlt;
-                *matchpos = matchPtr;
-        }   }
-
-        {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex);
-            matchIndex -= nextOffset;
-        }
-    }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
-
-    /* search longer matches */
-    while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) {
-        const BYTE* const matchPtr = base + matchIndex;
-        int mlt = 0;
-        assert(matchIndex < ipIndex);
-        assert(matchPtr < ip);
-        assert(longest >= MINMATCH);
-        nbAttempts--;
-        if (LZ4_read16(ip + longest - 1) == LZ4_read16(matchPtr + longest - 1)) {
-            if (LZ4_read32(matchPtr) == pattern) {
-                mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
-                if (mlt > longest) {
-                    longest = mlt;
-                    *matchpos = matchPtr;
-                }
-            }
-        }
-
-        /* search more promising chain */
-        if (mlt == longest) {
-            if (1 && matchIndex + longest <= ipIndex) {
-                U32 distanceToNextMatch = 1;
-                int pos;
-                for (pos = matchChainPos; pos <= longest - MINMATCH; pos++) {
-                    U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + pos);
-                    if (candidateDist > distanceToNextMatch) {
-                        distanceToNextMatch = candidateDist;
-                        matchChainPos = pos;
-                    }
-                }
-                if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
-                matchIndex -= distanceToNextMatch;
-                continue;
-            }
-        }
-
-        /* continue current chain */
-        {   U32 const nextOffset = DELTANEXTU16(chainTable, matchIndex+matchChainPos);
-            matchIndex -= nextOffset;
-        }
-    }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
-
-    return longest;
-}
-
-
 typedef struct {
     int off;
     int len;
@@ -1222,7 +1129,6 @@ LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
     int matchLength = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &matchPtr, &ip, nbSearches, 1 /* patternAnalysis */, dict, favorDecSpeed);
-    //int matchLength = LZ4HC_FindLongestMatch(ctx, ip, iHighLimit, minLen, &matchPtr, nbSearches); (void)dict;
     if (matchLength <= minLen) return match;
     if (favorDecSpeed) {
         if ((matchLength>18) & (matchLength<=36)) matchLength=18;   /* favor shortcut */
