@@ -291,15 +291,12 @@ LZ4HC_InsertAndGetWiderMatch (
                     if (candidateDist > distanceToNextMatch) {
                         distanceToNextMatch = candidateDist;
                         matchChainPos = pos;
-                    }
-                }
+                }   }
                 if (distanceToNextMatch > 1) {
                     if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
                     matchIndex -= distanceToNextMatch;
                     continue;
-                }
-            }
-        }
+        }   }   }
 
         {   U32 const distNextMatch = DELTANEXTU16(chainTable, matchIndex);
             if (patternAnalysis && distNextMatch==1 && matchChainPos==0) {
@@ -309,7 +306,7 @@ LZ4HC_InsertAndGetWiderMatch (
                     if ( ((pattern & 0xFFFF) == (pattern >> 16))
                       &  ((pattern & 0xFF)   == (pattern >> 24)) ) {
                         repeat = rep_confirmed;
-                        srcPatternLength = LZ4HC_countPattern(ip+4, iHighLimit, pattern) + 4;
+                        srcPatternLength = LZ4HC_countPattern(ip+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
                     } else {
                         repeat = rep_not;
                 }   }
@@ -318,19 +315,29 @@ LZ4HC_InsertAndGetWiderMatch (
                     const BYTE* const matchPtr = base + matchCandidateIdx;
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
                         size_t const forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
-                        const BYTE* const maxLowPtr = (lowPrefixPtr + MAX_DISTANCE >= ip) ? lowPrefixPtr : ip - MAX_DISTANCE;
-                        size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, maxLowPtr, pattern);
+                        const BYTE* const lowestMatchPtr = (lowPrefixPtr + MAX_DISTANCE >= ip) ? lowPrefixPtr : ip - MAX_DISTANCE;
+                        size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, lowestMatchPtr, pattern);
                         size_t const currentSegmentLength = backLength + forwardPatternLength;
 
                         if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
                           && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
                             matchIndex = matchCandidateIdx + (U32)forwardPatternLength - (U32)srcPatternLength;  /* best position, full pattern, might be followed by more match */
                         } else {
-                            matchIndex = matchCandidateIdx - (U32)backLength;   /* let's go to farthest segment position, will find a match of length currentSegmentLength + maybe some back */
-                        }
+                            matchIndex = matchCandidateIdx - (U32)backLength;   /* farthest position in current segment, will find a match of length currentSegmentLength + maybe some back */
+                            if (lookBackLength==0) {  /* no back possible */
+                                size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
+                                if ((size_t)longest < maxML) {
+                                    longest = maxML;
+                                    *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
+                                    *startpos = ip;
+                                }
+                                {   U32 const distToNextPattern = DELTANEXTU16(chainTable, matchIndex);
+                                    if (distToNextPattern > matchIndex) break;  /* avoid overflow */
+                                    matchIndex -= distToNextPattern;
+                        }   }   }
                         continue;
                 }   }
-        }   }
+        }   }   /* PA optimization */
 
         /* follow current chain */
         matchIndex -= DELTANEXTU16(chainTable, matchIndex+matchChainPos);
