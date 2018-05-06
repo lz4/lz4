@@ -472,6 +472,7 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
     LZ4F_CDict* cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
+    DEBUGLOG(4, "LZ4F_createCDict");
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
         dictStart += dictSize - 64 KB;

@@ -683,12 +683,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     /* Init conditions */
     if (outputLimited == fillOutput && maxOutputSize < 1) return 0; /* Impossible to store anything */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
+    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
 
     lowLimit = (const BYTE*)source - (dictDirective == withPrefix64k ? dictSize : 0);
-
-    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
 
     /* Update context state */
     if (dictDirective == usingDictCtx) {
@@ -1259,12 +1258,16 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
     LZ4_stream_t_internal* streamPtr = &LZ4_stream->internal_donotuse;
     const BYTE* dictEnd = streamPtr->dictionary + streamPtr->dictSize;
 
+    DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
+
     if (streamPtr->initCheck) return 0;   /* Uninitialized structure detected */
     LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
 
     /* invalidate tiny dictionaries */
-    if (streamPtr->dictSize < 4) {
+    if ( (streamPtr->dictSize-1 < 4)   /* intentional underflow */
+      && (dictEnd != (const BYTE*)source) ) {
+        DEBUGLOG(5, "LZ4_compress_fast_continue: dictSize(%u) at addr:%p is too small", streamPtr->dictSize, streamPtr->dictionary);
         streamPtr->dictSize = 0;
         streamPtr->dictionary = (const BYTE*)source;
         dictEnd = (const BYTE*)source;
