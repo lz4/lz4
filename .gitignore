@@ -29,3 +29,7 @@ bin/
 # Mac
 .DS_Store
 *.dSYM
+
+# Windows / Msys
+nul
+ld.exe*

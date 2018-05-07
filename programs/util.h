@@ -30,8 +30,9 @@ extern "C" {
 *  Dependencies
 ******************************************/
 #include "platform.h"     /* PLATFORM_POSIX_VERSION */
-#include <stdlib.h>       /* malloc */
 #include <stddef.h>       /* size_t, ptrdiff_t */
+#include <stdlib.h>       /* malloc */
+#include <string.h>       /* strlen, strncpy */
 #include <stdio.h>        /* fprintf */
 #include <sys/types.h>    /* stat, utime */
 #include <sys/stat.h>     /* stat */
@@ -141,6 +142,7 @@ extern "C" {
 *  Time functions
 ******************************************/
 #if defined(_WIN32)   /* Windows */
+
     typedef LARGE_INTEGER UTIL_time_t;
     UTIL_STATIC UTIL_time_t UTIL_getTime(void) { UTIL_time_t x; QueryPerformanceCounter(&x); return x; }
     UTIL_STATIC U64 UTIL_getSpanTimeMicro(UTIL_time_t clockStart, UTIL_time_t clockEnd)
@@ -165,7 +167,9 @@ extern "C" {
         }
         return 1000000000ULL*(clockEnd.QuadPart - clockStart.QuadPart)/ticksPerSecond.QuadPart;
     }
+
 #elif defined(__APPLE__) && defined(__MACH__)
+
     #include <mach/mach_time.h>
     typedef U64 UTIL_time_t;
     UTIL_STATIC UTIL_time_t UTIL_getTime(void) { return mach_absolute_time(); }
@@ -177,7 +181,7 @@ extern "C" {
             mach_timebase_info(&rate);
             init = 1;
         }
-        return (((clockEnd - clockStart) * (U64)rate.numer) / ((U64)rate.denom))/1000ULL;
+        return (((clockEnd - clockStart) * (U64)rate.numer) / ((U64)rate.denom)) / 1000ULL;
     }
     UTIL_STATIC U64 UTIL_getSpanTimeNano(UTIL_time_t clockStart, UTIL_time_t clockEnd)
     {
@@ -189,7 +193,9 @@ extern "C" {
         }
         return ((clockEnd - clockStart) * (U64)rate.numer) / ((U64)rate.denom);
     }
-#elif (PLATFORM_POSIX_VERSION >= 200112L)
+
+#elif (PLATFORM_POSIX_VERSION >= 200112L) && (defined __UCLIBC__ || (defined(__GLIBC__) && ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 17) || __GLIBC__ > 2) ) )
+
     #include <time.h>
     typedef struct timespec UTIL_time_t;
     UTIL_STATIC UTIL_time_t UTIL_getTime(void)
@@ -227,7 +233,9 @@ extern "C" {
         nano += diff.tv_nsec;
         return nano;
     }
+
 #else   /* relies on standard C (note : clock_t measurements can be wrong when using multi-threading) */
+
     typedef clock_t UTIL_time_t;
     UTIL_STATIC UTIL_time_t UTIL_getTime(void) { return clock(); }
     UTIL_STATIC U64 UTIL_getSpanTimeMicro(UTIL_time_t clockStart, UTIL_time_t clockEnd) { return 1000000ULL * (clockEnd - clockStart) / CLOCKS_PER_SEC; }
@@ -242,6 +250,12 @@ UTIL_STATIC U64 UTIL_clockSpanMicro(UTIL_time_t clockStart)
     return UTIL_getSpanTimeMicro(clockStart, clockEnd);
 }
 
+/* returns time span in nanoseconds */
+UTIL_STATIC U64 UTIL_clockSpanNano(UTIL_time_t clockStart)
+{
+    UTIL_time_t const clockEnd = UTIL_getTime();
+    return UTIL_getSpanTimeNano(clockStart, clockEnd);
+}
 
 UTIL_STATIC void UTIL_waitForNextTick(void)
 {

@@ -16,7 +16,7 @@ Distribution of this document is unlimited.
 
 ### Version
 
-1.6.0 (08/08/2017)
+1.6.1 (30/01/2018)
 
 
 Introduction
@@ -72,12 +72,15 @@ Value : 0x184D2204
 
 __Frame Descriptor__
 
-3 to 15 Bytes, to be detailed in the next part.
-Most important part of the spec.
+3 to 15 Bytes, to be detailed in its own paragraph,
+as it is the most important part of the spec.
+
+The combined __Magic Number__ and __Frame Descriptor__ fields are sometimes
+called ___LZ4 Frame Header___. Its size varies between 7 and 19 bytes.
 
 __Data Blocks__
 
-To be detailed later on.
+To be detailed in its own paragraph.
 That’s where compressed data is stored.
 
 __EndMark__
@@ -97,6 +100,9 @@ Content Checksum validates the result,
 that all blocks were fully transmitted in the correct order and without error,
 and also that the encoding/decoding process itself generated no distortion.
 Its usage is recommended.
+
+The combined __EndMark__ and __Content Checksum__ fields might sometimes be
+referred to as ___LZ4 Frame Footer___. Its size varies between 4 and 8 bytes.
 
 __Frame Concatenation__
 
@@ -379,6 +385,8 @@ and trigger an error if it does not fit within acceptable range.
 
 Version changes
 ---------------
+
+1.6.1 : introduced terms "LZ4 Frame Header" and "LZ4 Frame Footer"
 
 1.6.0 : restored Dictionary ID field in Frame header
 

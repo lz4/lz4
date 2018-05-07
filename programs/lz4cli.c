@@ -140,6 +140,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
+    DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "Benchmark arguments : \n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
@@ -355,6 +356,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(0); continue; }
                 if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(2); continue; }
                 if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(0); continue; }
+                if (!strcmp(argument,  "--favor-decSpeed")) { LZ4IO_favorDecSpeed(1); continue; }
                 if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
                 if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
                 if (!strcmp(argument,  "--version")) { DISPLAY(WELCOME_MESSAGE); return 0; }
@@ -458,11 +460,11 @@ int main(int argc, const char** argv)
                                 if (B < 4) badusage(exeName);
                                 if (B <= 7) {
                                     blockSize = LZ4IO_setBlockSizeID(B);
-                                    BMK_SetBlockSize(blockSize);
+                                    BMK_setBlockSize(blockSize);
                                     DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
                                 } else {
                                     if (B < 32) badusage(exeName);
-                                    BMK_SetBlockSize(B);
+                                    BMK_setBlockSize(B);
                                     if (B >= 1024) {
                                         DISPLAYLEVEL(2, "bench: using blocks of size %u KB \n", (U32)(B>>10));
                                     } else {
@@ -478,6 +480,10 @@ int main(int argc, const char** argv)
 
                     /* Benchmark */
                 case 'b': mode = om_bench; multiple_inputs=1;
+                    break;
+
+                    /* hidden command : benchmark files, but do not fuse result */
+                case 'S': BMK_setBenchSeparately(1);
                     break;
 
 #ifdef UTIL_HAS_CREATEFILELIST
@@ -496,7 +502,7 @@ int main(int argc, const char** argv)
                         iters = readU32FromChar(&argument);
                         argument--;
                         BMK_setNotificationLevel(displayLevel);
-                        BMK_SetNbSeconds(iters);   /* notification if displayLevel >= 3 */
+                        BMK_setNbSeconds(iters);   /* notification if displayLevel >= 3 */
                     }
                     break;
 

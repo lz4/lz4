@@ -56,8 +56,8 @@
 #include "lz4io.h"
 #include "lz4.h"       /* still required for legacy format */
 #include "lz4hc.h"     /* still required for legacy format */
+#define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
-#include "lz4frame_static.h"
 
 
 /*****************************
@@ -94,9 +94,12 @@
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
-            if (((clock_t)(g_time - clock()) > refreshRate) || (g_displayLevel>=4)) \
-            { g_time = clock(); DISPLAY(__VA_ARGS__); \
-            if (g_displayLevel>=4) fflush(stderr); } }
+            if ( ((clock() - g_time) > refreshRate)    \
+              || (g_displayLevel>=4) ) {               \
+                g_time = clock();                      \
+                DISPLAY(__VA_ARGS__);                  \
+                if (g_displayLevel>=4) fflush(stderr); \
+        }   }
 static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_time = 0;
 
@@ -113,6 +116,7 @@ static int g_blockIndependence = 1;
 static int g_sparseFileSupport = 1;
 static int g_contentSizeFlag = 0;
 static int g_useDictionary = 0;
+static unsigned g_favorDecSpeed = 0;
 static const char* g_dictionaryFilename = NULL;
 
 
@@ -216,6 +220,12 @@ int LZ4IO_setContentSize(int enable)
 {
     g_contentSizeFlag = (enable!=0);
     return g_contentSizeFlag;
+}
+
+/* Default setting : 0 (disabled) */
+void LZ4IO_favorDecSpeed(int favor)
+{
+    g_favorDecSpeed = (favor!=0);
 }
 
 static U32 g_removeSrcFile = 0;
@@ -545,6 +555,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_blockSizeId;
     prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)g_blockChecksum;
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)g_streamChecksum;
+    prefs.favorDecSpeed = g_favorDecSpeed;
     if (g_contentSizeFlag) {
       U64 const fileSize = UTIL_getFileSize(srcFileName);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
@@ -560,7 +571,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     /* single-block file */
     if (readSize < blockSize) {
         /* Compress in single pass */
-        size_t cSize = LZ4F_compressFrame_usingCDict(dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
+        size_t cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
         if (LZ4F_isError(cSize)) EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
@@ -951,7 +962,7 @@ static unsigned long long LZ4IO_passThrough(FILE* finput, FILE* foutput, unsigne
         total += readBytes;
         storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, storedSkips);
     }
-    if (ferror(finput)) EXM_THROW(51, "Read Error")
+    if (ferror(finput)) EXM_THROW(51, "Read Error");
 
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
     return total;

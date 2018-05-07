@@ -1,8 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2017
-#
-# This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
+# Copyright (C) Yann Collet 2011-present
 #
 # GPL v2 License
 #
@@ -35,13 +33,14 @@ PRGDIR  := ../programs
 TESTDIR := versionsTest
 PYTHON  ?= python3
 
-DEBUGFLAGS = -g -DLZ4_DEBUG=1
+DEBUGLEVEL?= 1
+DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
 CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
-CPPFLAGS:= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS+= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
@@ -53,12 +52,12 @@ else
 EXT  =
 VOID = /dev/null
 endif
-LZ4     := $(PRGDIR)/lz4$(EXT)
+LZ4 := $(PRGDIR)/lz4$(EXT)
 
 
 # Default test parameters
 TEST_FILES   := COPYING
-FUZZER_TIME  := -T3mn
+FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
 
 
@@ -72,6 +71,9 @@ all32: all
 lz4:
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
+lib liblz4.pc:
+	$(MAKE) -C $(LZ4DIR) $@ CFLAGS="$(CFLAGS)"
+
 lz4c unlz4 lz4cat: lz4
 	ln -sf $(LZ4) $(PRGDIR)/$@
 
@@ -81,7 +83,8 @@ lz4c32:   # create a 32-bits version for 32/64 interop tests
 %.o : $(LZ4DIR)/%.c $(LZ4DIR)/%.h
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
-fullbench  : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
+fullbench : DEBUGLEVEL=0
+fullbench : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 $(LZ4DIR)/liblz4.a:
@@ -111,13 +114,16 @@ clean:
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
-        fasttest$(EXT) datagen$(EXT)
+        fasttest$(EXT) datagen$(EXT) checkTag$(EXT)
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
 versionsTest:
 	$(PYTHON) test-lz4-versions.py
+
+checkTag: checkTag.c $(LZ4DIR)/lz4.h
+	$(CC) $(FLAGS) $< -o $@$(EXT)
 
 
 #-----------------------------------------------------------------------------
@@ -138,10 +144,13 @@ endif
 DD:=dd
 
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install
 
 test32: CFLAGS+=-m32
 test32: test
+
+test-install: lz4 lib liblz4.pc
+	lz4_root=.. ./test_install.sh
 
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
@@ -180,12 +189,6 @@ test-lz4-contentSize: lz4 datagen
 	./datagen -g15M > tmplc1
 	$(LZ4) -v tmplc1 | $(LZ4) -t
 	$(LZ4) -v --content-size tmplc1 | $(LZ4) -d > tmplc2
-	$(DIFF) -s tmplc1 tmplc2
-	# test large size [2-4] GB
-	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmplc1
-	@ls -ls tmplc1
-	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmplc2
-	@ls -ls tmplc2
 	$(DIFF) -s tmplc1 tmplc2
 	@$(RM) tmplc*
 
@@ -290,6 +293,13 @@ test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
 	./datagen -g6GB   | $(LZ4) -v5BD  | $(LZ4) -qt
+	# test large file size [2-4] GB
+	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
+	@ls -ls tmphf1
+	@./datagen -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmphf2
+	@ls -ls tmphf2
+	$(DIFF) -s tmphf1 tmphf2
+	@$(RM) tmphf*
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
@@ -323,9 +333,13 @@ test-lz4-opt-parser: lz4 datagen
 	./datagen -g16M -P90  | $(LZ4) -11B5    | $(LZ4) -t
 	./datagen -g32M -P10  | $(LZ4) -11B5D   | $(LZ4) -t
 
-test-lz4: lz4 datagen test-lz4-basic test-lz4-opt-parser test-lz4-multiple \
-          test-lz4-sparse test-lz4-frame-concatenation test-lz4-testmode \
-          test-lz4-contentSize test-lz4-hugefile test-lz4-dict
+test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple \
+                      test-lz4-frame-concatenation test-lz4-testmode \
+                      test-lz4-contentSize test-lz4-dict
+	@$(RM) tmp*
+
+test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
+          test-lz4-sparse test-lz4-hugefile test-lz4-dict
 	@$(RM) tmp*
 
 test-lz4c: lz4c datagen
@@ -387,13 +401,12 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	./datagen -g16KB -s2 > ftmdg16K2
 	./datagen -g16KB -s3 > ftmdg16K3
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --force --multiple ftmdg16K ftmdg16K2 ftmdg16K3
-	./datagen -g16MB > ftmdg16M
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f ftmdg16M ftmdg16K2
+	./datagen -g7MB > ftmdg7M
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f ftmdg7M ftmdg16K2
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -t ftmdg16K2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg16M
-	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg16M ftmdg16K2
-	./datagen -g256MB > ftmdg256M
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg256M $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg7M
+	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg7M ftmdg16K2
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg7M $(VOID)
 	$(RM) ftm*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
