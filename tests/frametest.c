@@ -520,6 +520,7 @@ int basicTests(U32 seed, double compressibility)
         LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
         if (cdict == NULL) goto _output_error;
         CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+        
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with NULL dict : ");
         CHECK_V(cSizeNoDict,
                 LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
@@ -740,8 +741,9 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, un
     size_t p=0;
     const BYTE* b1=(const BYTE*)buff1;
     const BYTE* b2=(const BYTE*)buff2;
+    DISPLAY("locateBuffDiff: looking for error position \n");
     if (nonContiguous) {
-        DISPLAY("Non-contiguous output test (%i bytes)\n", (int)size);
+        DISPLAY("mode %u: non-contiguous output (%zu bytes), cannot search \n", nonContiguous, size);
         return;
     }
     while (p < size && b1[p]==b2[p]) p++;
@@ -838,6 +840,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t const iSize = MIN(sampleMax, (size_t)(iend-ip));
                 size_t const oSize = LZ4F_compressBound(iSize, prefsPtr);
                 cOptions.stableSrc = ((FUZ_rand(&randState) & 3) == 1);
+                DISPLAYLEVEL(6, "Sending %zi bytes to compress (stableSrc:%u) \n",
+                                iSize, cOptions.stableSrc);
 
                 result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &cOptions);
                 CHECK(LZ4F_isError(result), "Compression failed (error %i : %s)", (int)result, LZ4F_getErrorName(result));
@@ -882,7 +886,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 dOptions.stableDst = FUZ_rand(&randState) & 1;
                 if (nonContiguousDst==2) dOptions.stableDst = 0;   /* overwrite mode */
                 result = LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, &dOptions);
-                if (LZ4F_getErrorCode(result) == LZ4F_ERROR_contentChecksum_invalid) locateBuffDiff(srcStart, decodedBuffer, srcSize, nonContiguousDst);
+                if (LZ4F_getErrorCode(result) == LZ4F_ERROR_contentChecksum_invalid)
+                    locateBuffDiff(srcStart, decodedBuffer, srcSize, nonContiguousDst);
                 CHECK(LZ4F_isError(result), "Decompression failed (error %i:%s)", (int)result, LZ4F_getErrorName(result));
                 XXH64_update(&xxh64, op, (U32)oSize);
                 totalOut += oSize;

@@ -683,12 +683,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     /* Init conditions */
     if (outputLimited == fillOutput && maxOutputSize < 1) return 0; /* Impossible to store anything */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
+    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
 
     lowLimit = (const BYTE*)source - (dictDirective == withPrefix64k ? dictSize : 0);
-
-    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
 
     /* Update context state */
     if (dictDirective == usingDictCtx) {
@@ -767,6 +766,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 } else if (dictDirective==usingExtDict) {
                     if (matchIndex < startIndex) {
                         DEBUGLOG(7, "extDict candidate: matchIndex=%5u  <  startIndex=%5u", matchIndex, startIndex);
+                        assert(startIndex - matchIndex >= MINMATCH);
                         match = dictBase + matchIndex;
                         lowLimit = dictionary;
                     } else {
@@ -989,6 +989,7 @@ _last_literals:
     if (outputLimited == fillOutput) {
         *inputConsumed = (int) (((const char*)ip)-source);
     }
+    DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, (int)(((char*)op) - dest));
     return (int)(((char*)op) - dest);
 }
 
@@ -1255,11 +1256,22 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 {
     const tableType_t tableType = byU32;
     LZ4_stream_t_internal* streamPtr = &LZ4_stream->internal_donotuse;
-    const BYTE* const dictEnd = streamPtr->dictionary + streamPtr->dictSize;
+    const BYTE* dictEnd = streamPtr->dictionary + streamPtr->dictSize;
+
+    DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
 
     if (streamPtr->initCheck) return 0;   /* Uninitialized structure detected */
     LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
+
+    /* invalidate tiny dictionaries */
+    if ( (streamPtr->dictSize-1 < 4)   /* intentional underflow */
+      && (dictEnd != (const BYTE*)source) ) {
+        DEBUGLOG(5, "LZ4_compress_fast_continue: dictSize(%u) at addr:%p is too small", streamPtr->dictSize, streamPtr->dictionary);
+        streamPtr->dictSize = 0;
+        streamPtr->dictionary = (const BYTE*)source;
+        dictEnd = (const BYTE*)source;
+    }
 
     /* Check overlapping input/dictionary space */
     {   const BYTE* sourceEnd = (const BYTE*) source + inputSize;
@@ -1401,6 +1413,8 @@ LZ4_FORCE_INLINE int LZ4_decompress_generic(
     /* Set up the "end" pointers for the shortcut. */
     const BYTE* const shortiend = iend - (endOnInput ? 14 : 8) /*maxLL*/ - 2 /*offset*/;
     const BYTE* const shortoend = oend - (endOnInput ? 14 : 8) /*maxLL*/ - 18 /*maxML*/;
+
+    DEBUGLOG(5, "LZ4_decompress_generic (srcSize:%i)", srcSize);
 
     /* Special cases */
     if ((partialDecoding) && (oexit > oend-MFLIMIT)) oexit = oend-MFLIMIT;                      /* targetOutputSize too high => just decode everything */

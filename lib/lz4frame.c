@@ -472,6 +472,7 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
     LZ4F_CDict* cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
+    DEBUGLOG(4, "LZ4F_createCDict");
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
         dictStart += dictSize - 64 KB;
@@ -808,6 +809,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
     LZ4F_lastBlockStatus lastBlockCompressed = notDone;
     compressFunc_t const compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel);
 
+    DEBUGLOG(4, "LZ4F_compressUpdate (srcSize=%zu)", srcSize);
 
     if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_GENERIC);
     if (dstCapacity < LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize))
