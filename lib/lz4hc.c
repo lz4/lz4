@@ -327,7 +327,8 @@ LZ4HC_InsertAndGetWiderMatch (
                             if (lookBackLength==0) {  /* no back possible */
                                 size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
                                 if ((size_t)longest < maxML) {
-                                    longest = maxML;
+                                    assert(maxML < 2 GB);
+                                    longest = (int)maxML;
                                     *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
                                     *startpos = ip;
                                 }
