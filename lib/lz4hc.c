@@ -243,7 +243,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 matchIndex, lowestMatchIndex);
 
     while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) {
-        int mlt=0;
+        int matchLength=0;
         nbAttempts--;
         assert(matchIndex < ipIndex);
         if (favorDecSpeed && (ipIndex - matchIndex < 8)) {
@@ -256,10 +256,10 @@ LZ4HC_InsertAndGetWiderMatch (
             if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - lookBackLength + longest - 1)) {
                 if (LZ4_read32(matchPtr) == pattern) {
                     int const back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, lowPrefixPtr) : 0;
-                    mlt = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
-                    mlt -= back;
-                    if (mlt > longest) {
-                        longest = mlt;
+                    matchLength = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
+                    matchLength -= back;
+                    if (matchLength > longest) {
+                        longest = matchLength;
                         *matchpos = matchPtr + back;
                         *startpos = ip + back;
             }   }   }
@@ -270,18 +270,18 @@ LZ4HC_InsertAndGetWiderMatch (
                 int back = 0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
-                mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
-                if ((ip+mlt == vLimit) && (vLimit < iHighLimit))
-                    mlt += LZ4_count(ip+mlt, lowPrefixPtr, iHighLimit);
+                matchLength = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
+                if ((ip+matchLength == vLimit) && (vLimit < iHighLimit))
+                    matchLength += LZ4_count(ip+matchLength, lowPrefixPtr, iHighLimit);
                 back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictStart) : 0;
-                mlt -= back;
-                if (mlt > longest) {
-                    longest = mlt;
+                matchLength -= back;
+                if (matchLength > longest) {
+                    longest = matchLength;
                     *matchpos = base + matchIndex + back;   /* virtual pos, relative to ip, to retrieve offset */
                     *startpos = ip + back;
         }   }   }
 
-        if (chainSwap && mlt==longest) {    /* better match => select a better chain */
+        if (chainSwap && matchLength==longest) {    /* better match => select a better chain */
             assert(lookBackLength==0);   /* search forward only */
             if (matchIndex + longest <= ipIndex) {
                 U32 distanceToNextMatch = 1;
