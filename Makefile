@@ -89,7 +89,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku))
 HOST_OS = POSIX
 
 .PHONY: install uninstall
