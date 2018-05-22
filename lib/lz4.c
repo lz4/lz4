@@ -505,7 +505,7 @@ extern "C" {
 
 int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
 
-int LZ4_decompress_safe_extDict(const char* in, char* out, int inSize, int outSize, const void* dict, size_t dictSize);
+int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize, const void* dict, size_t dictSize);
 
 #if defined (__cplusplus)
 }
@@ -1660,10 +1660,10 @@ static int LZ4_decompress_safe_withSmallPrefix(const char* source, char* dest, i
                                   (BYTE*)dest-prefixSize, NULL, 0);
 }
 
-LZ4_FORCE_O2_GCC_PPC64LE /* Exported under another name, for tests/fullbench.c */
-#define LZ4_decompress_safe_extDict LZ4_decompress_safe_forceExtDict
-int LZ4_decompress_safe_extDict(const char* source, char* dest, int compressedSize, int maxOutputSize,
-                                const void* dictStart, size_t dictSize)
+LZ4_FORCE_O2_GCC_PPC64LE
+int LZ4_decompress_safe_forceExtDict(const char* source, char* dest,
+                                     int compressedSize, int maxOutputSize,
+                                     const void* dictStart, size_t dictSize)
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize,
                                   endOnInputSize, full, 0, usingExtDict,
@@ -1788,8 +1788,8 @@ int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
         /* The buffer wraps around, or they're switching to another buffer. */
         lz4sd->extDictSize = lz4sd->prefixSize;
         lz4sd->externalDict = lz4sd->prefixEnd - lz4sd->extDictSize;
-        result = LZ4_decompress_safe_extDict(source, dest, compressedSize, maxOutputSize,
-                                             lz4sd->externalDict, lz4sd->extDictSize);
+        result = LZ4_decompress_safe_forceExtDict(source, dest, compressedSize, maxOutputSize,
+                                                  lz4sd->externalDict, lz4sd->extDictSize);
         if (result <= 0) return result;
         lz4sd->prefixSize = result;
         lz4sd->prefixEnd  = (BYTE*)dest + result;
@@ -1849,7 +1849,7 @@ int LZ4_decompress_safe_usingDict(const char* source, char* dest, int compressed
             return LZ4_decompress_safe_withPrefix64k(source, dest, compressedSize, maxOutputSize);
         return LZ4_decompress_safe_withSmallPrefix(source, dest, compressedSize, maxOutputSize, dictSize);
     }
-    return LZ4_decompress_safe_extDict(source, dest, compressedSize, maxOutputSize, dictStart, dictSize);
+    return LZ4_decompress_safe_forceExtDict(source, dest, compressedSize, maxOutputSize, dictStart, dictSize);
 }
 
 int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
