@@ -45,6 +45,7 @@ LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 BUILD_SHARED:=yes
 BUILD_STATIC:=yes
 
+OS ?= $(shell uname)
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
@@ -58,7 +59,7 @@ SRCFILES := $(sort $(wildcard *.c))
 
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
-ifeq ($(shell uname), Darwin)
+ifeq ($(OS), Darwin)
 	SHARED_EXT = dylib
 	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
 	SHARED_EXT_VER = $(LIBVER).$(SHARED_EXT)
@@ -142,14 +143,14 @@ libdir      ?= $(LIBDIR)
 INCLUDEDIR  ?= $(prefix)/include
 includedir  ?= $(INCLUDEDIR)
 
-ifneq (,$(filter $(shell uname),OpenBSD FreeBSD NetBSD DragonFly))
+ifneq (,$(filter $(OS),OpenBSD FreeBSD NetBSD DragonFly))
 PKGCONFIGDIR ?= $(prefix)/libdata/pkgconfig
 else
 PKGCONFIGDIR ?= $(libdir)/pkgconfig
 endif
 pkgconfigdir ?= $(PKGCONFIGDIR)
 
-ifneq (,$(filter $(shell uname),SunOS))
+ifneq (,$(filter $(OS),SunOS))
 INSTALL ?= ginstall
 else
 INSTALL ?= install
