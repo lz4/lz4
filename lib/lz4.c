@@ -496,6 +496,21 @@ int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
 
 
+/*-************************************
+*  Internal Definitions used in Tests
+**************************************/
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
+int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
+
+int LZ4_decompress_safe_extDict(const char* in, char* out, int inSize, int outSize, const void* dict, size_t dictSize);
+
+#if defined (__cplusplus)
+}
+#endif
+
 /*-******************************
 *  Compression functions
 ********************************/

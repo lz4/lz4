@@ -220,8 +220,16 @@ static int local_LZ4_compress_fast_continue0(const char* in, char* out, int inSi
 }
 
 #ifndef LZ4_DLL_IMPORT
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 /* declare hidden function */
-int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
+extern int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize);
+
+#if defined (__cplusplus)
+}
+#endif
 
 static int local_LZ4_compress_forceDict(const char* in, char* out, int inSize)
 {
@@ -289,7 +297,15 @@ static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int in
 }
 
 #ifndef LZ4_DLL_IMPORT
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 extern int LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize, const void* dict, size_t dictSize);
+
+#if defined (__cplusplus)
+}
+#endif
 
 static int local_LZ4_decompress_safe_forceExtDict(const char* in, char* out, int inSize, int outSize)
 {

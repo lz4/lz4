@@ -11,6 +11,7 @@ test:
     - clang -v; make clangtest && make clean
     - g++ -v; make gpptest     && make clean
     - gcc -v; make c_standards && make clean
+    - gcc -v; g++ -v; make ctocpptest && make clean
     - gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -Werror" make check && make clean
     - gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -m32 -Werror" CPPFLAGS=-I/usr/include/x86_64-linux-gnu make check && make clean
     - gcc-6 -v; CC=gcc-6 make c_standards && make clean
