@@ -38,7 +38,7 @@
 /*-************************************
 *  Dependencies
 **************************************/
-#ifdef __unix__   /* must be included before platform.h for MAP_ANONYMOUS */
+#if defined(__unix__) && !defined(_AIX)   /* must be included before platform.h for MAP_ANONYMOUS */
 #  include <sys/mman.h>   /* mmap */
 #endif
 #include "platform.h"   /* _CRT_SECURE_NO_WARNINGS */
@@ -48,6 +48,10 @@
 #include <string.h>     /* strcmp */
 #include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>
+#if defined(__unix__) && defined(_AIX)
+#  include <sys/mman.h>   /* mmap */
+#endif
+
 #define LZ4_STATIC_LINKING_ONLY
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
