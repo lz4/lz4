@@ -407,8 +407,6 @@ static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
     if (g_displayLevel == 1 && !g_additionalParam)
         DISPLAY("bench %s %s: input %u bytes, %u seconds, %u KB blocks\n", LZ4_VERSION_STRING, LZ4_GIT_COMMIT_STRING, (U32)benchedSize, g_nbSeconds, (U32)(g_blockSize>>10));
 
-    // if (cLevelLast < cLevel) cLevelLast = cLevel;
-
     for (l=cLevel; l <= cLevelLast; l++) {
         BMK_benchMem(srcBuffer, benchedSize,
                      displayName, l,
