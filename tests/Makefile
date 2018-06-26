@@ -262,7 +262,13 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	cat tmp-tlb-hw >> tmp-tlb-hw.lz4
 	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
+	./datagen -g256KB > tmp-tlb-dg256k
+	test "$(shell lz4 -c --fast tmp-tlb-dg256k| wc -c)" -lt "$(shell lz4 -c --fast=9 tmp-tlb-dg256k| wc -c)"
+	test "$(shell lz4 -c --fast=1 tmp-tlb-dg256k| wc -c)" -eq "$(shell lz4 -c --fast tmp-tlb-dg256k| wc -c)"
+	test "$(shell lz4 -c -9 tmp-tlb-dg256k| wc -c)" -lt "$(shell lz4 -c --fast=1 tmp-tlb-dg256k| wc -c)"
 	@$(RM) tmp-tlb*
+
+
 
 test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
