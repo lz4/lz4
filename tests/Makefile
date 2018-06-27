@@ -268,8 +268,8 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell ./datagen -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
 	test "$(shell ./datagen -g20KB | $(LZ4) -c -3 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=1 | wc -c)" # 3 vs -1
 	test "$(shell ./datagen -g20KB | $(LZ4) -c -1 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=2 | wc -c)" # 1 vs -2
-	test "$(shell $(LZ4) -c --fast=0 tmp-tlb-dg20k | wc -c)" -eq 0 # lz4 should fail when fast=0
-	test "$(shell $(LZ4) -c --fast=-1 tmp-tlb-dg20k | wc -c)" -eq 0 # lz4 should fail when fast=-1
+	! $(LZ4) -c --fast=0 tmp-tlb-dg20K # lz4 should fail when fast=0
+	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
 	@$(RM) tmp-tlb*
 
 

@@ -385,8 +385,7 @@ int main(int argc, const char** argv)
                             fastLevel = readU32FromChar(&argument);
                             if (fastLevel) {
                               cLevel = -(int)fastLevel;
-                            }
-                            else {
+                            } else {
                               badusage(exeName);
                             }
                         } else if (*argument != 0) {
