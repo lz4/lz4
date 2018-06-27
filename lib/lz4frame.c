@@ -738,7 +738,7 @@ static size_t LZ4F_makeBlock(void* dst, const void* src, size_t srcSize,
 
 static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
-    int const acceleration = (level < -1) ? -level : 1;
+    int const acceleration = (level < 0) ? -level + 1 : 1;
     LZ4F_initStream(ctx, cdict, level, LZ4F_blockIndependent);
     if (cdict) {
         return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
@@ -749,7 +749,7 @@ static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize
 
 static int LZ4F_compressBlock_continue(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
-    int const acceleration = (level < -1) ? -level : 1;
+    int const acceleration = (level < 0) ? -level + 1 : 1;
     (void)cdict; /* init once at beginning of frame */
     return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
 }

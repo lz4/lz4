@@ -265,9 +265,8 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	# ./datagen -g20KB generates the same file every single time
 	# cannot save output of ./datagen -g20KB as input file to lz4 because the following shell commands are run before ./datagen -g20KB
 	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast | wc -c)" -lt "$(shell ./datagen -g20KB | $(LZ4) -c --fast=9 | wc -c)" # -1 vs -9
+	test "$(shell ./datagen -g20KB | $(LZ4) -c -1 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=1 | wc -c)" # 1 vs -1
 	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell ./datagen -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
-	test "$(shell ./datagen -g20KB | $(LZ4) -c -3 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=1 | wc -c)" # 3 vs -1
-	test "$(shell ./datagen -g20KB | $(LZ4) -c -1 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=2 | wc -c)" # 1 vs -2
 	! $(LZ4) -c --fast=0 tmp-tlb-dg20K # lz4 should fail when fast=0
 	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
 	@$(RM) tmp-tlb*
