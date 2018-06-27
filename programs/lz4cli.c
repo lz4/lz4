@@ -288,8 +288,6 @@ static unsigned longCommandWArg(const char** stringPtr, const char* longCommand)
 
 typedef enum { om_auto, om_compress, om_decompress, om_test, om_bench } operationMode_e;
 
-#define CLEAN_RETURN(i) { operationResult = (i); goto _cleanup; }
-
 int main(int argc, const char** argv)
 {
     int i,
@@ -380,7 +378,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(0); continue; }   /* keep source file (default) */
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(1); continue; }
                 if (longCommandWArg(&argument, "--fast")) {
-                        /* Parse optional window log */
+                        /* Parse optional acceleration factor */
                         if (*argument == '=') {
                             U32 fastLevel;
                             ++argument;
@@ -388,9 +386,12 @@ int main(int argc, const char** argv)
                             if (fastLevel) {
                               cLevel = -(int)fastLevel;
                             }
+                            else {
+                              badusage(exeName);
+                            }
                         } else if (*argument != 0) {
                             /* Invalid character following --fast */
-                            CLEAN_RETURN(badusage(exeName));
+                            badusage(exeName);
                         } else {
                             cLevel = -1;  /* default for --fast */
                         }

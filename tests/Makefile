@@ -262,9 +262,14 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	cat tmp-tlb-hw >> tmp-tlb-hw.lz4
 	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
-	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast | wc -c)" -lt "$(shell ./datagen -g20KB | $(LZ4) -c --fast=9 | wc -c)" # compressed size of compression level -1 should be lower than -9
+	# ./datagen -g20KB generates the same file every single time
+	# cannot save output of ./datagen -g20KB as input file to lz4 because the following shell commands are run before ./datagen -g20KB
+	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast | wc -c)" -lt "$(shell ./datagen -g20KB | $(LZ4) -c --fast=9 | wc -c)" # -1 vs -9
 	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell ./datagen -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
-	test "$(shell ./datagen -g20KB | $(LZ4) -c -9 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=1 | wc -c)" # compressed size of compression level 9 should be lower than -1
+	test "$(shell ./datagen -g20KB | $(LZ4) -c -3 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=1 | wc -c)" # 3 vs -1
+	test "$(shell ./datagen -g20KB | $(LZ4) -c -1 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=2 | wc -c)" # 1 vs -2
+	test "$(shell $(LZ4) -c --fast=0 tmp-tlb-dg20k | wc -c)" -eq 0 # lz4 should fail when fast=0
+	test "$(shell $(LZ4) -c --fast=-1 tmp-tlb-dg20k | wc -c)" -eq 0 # lz4 should fail when fast=-1
 	@$(RM) tmp-tlb*
 
 
