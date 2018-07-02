@@ -260,7 +260,7 @@ decompress_file_allocDst(FILE* f_in, FILE* f_out,
     int const decompressionResult = decompress_file_internal(
                         f_in, f_out,
                         dctx,
-                        src, srcCapacity, readSize, consumedSize,
+                        src, srcCapacity, readSize-consumedSize, consumedSize,
                         dst, dstCapacity);
 
     free(dst);
