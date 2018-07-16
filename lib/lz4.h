@@ -266,7 +266,7 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  *  'dst' buffer must be already allocated.
  *  If dstCapacity >= LZ4_compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
  *
- *  Important : The previous 64KB of compressed data is assumed to remain present and unmodified in memory!
+ *  Important : The previous 64KB of source data is assumed to remain present and unmodified in memory!
  *
  *  Special 1 : When input is a double-buffer, they can have any size, including < 64 KB.
  *              Make sure that buffers are separated by at least one byte.
