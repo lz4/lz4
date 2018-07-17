@@ -262,7 +262,16 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	cat tmp-tlb-hw >> tmp-tlb-hw.lz4
 	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
+	# ./datagen -g20KB generates the same file every single time
+	# cannot save output of ./datagen -g20KB as input file to lz4 because the following shell commands are run before ./datagen -g20KB
+	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast | wc -c)" -lt "$(shell ./datagen -g20KB | $(LZ4) -c --fast=9 | wc -c)" # -1 vs -9
+	test "$(shell ./datagen -g20KB | $(LZ4) -c -1 | wc -c)" -lt "$(shell ./datagen -g20KB| $(LZ4) -c --fast=1 | wc -c)" # 1 vs -1
+	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell ./datagen -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
+	! $(LZ4) -c --fast=0 tmp-tlb-dg20K # lz4 should fail when fast=0
+	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
 	@$(RM) tmp-tlb*
+
+
 
 test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"

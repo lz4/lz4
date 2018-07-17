@@ -156,6 +156,13 @@ only the latest one will be applied.
 * `-BD`:
   Block Dependency (improves compression ratio on small blocks)
 
+* `--fast[=#]`:
+  switch to ultra-fast compression levels.
+  If `=#` is not present, it defaults to `1`.
+  The higher the value, the faster the compression speed, at the cost of some compression ratio.
+  This setting overwrites compression level if one was set previously.
+  Similarly, if a compression level is set after `--fast`, it overrides it.
+
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)
 

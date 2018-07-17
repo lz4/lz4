@@ -141,6 +141,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
+    DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %u)\n", 1);
     DISPLAY( "Benchmark arguments : \n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
@@ -272,13 +273,26 @@ static unsigned readU32FromChar(const char** stringPtr)
     return result;
 }
 
+/** longCommandWArg() :
+ *  check if *stringPtr is the same as longCommand.
+ *  If yes, @return 1 and advances *stringPtr to the position which immediately follows longCommand.
+ * @return 0 and doesn't modify *stringPtr otherwise.
+ */
+static unsigned longCommandWArg(const char** stringPtr, const char* longCommand)
+{
+    size_t const comSize = strlen(longCommand);
+    int const result = !strncmp(*stringPtr, longCommand, comSize);
+    if (result) *stringPtr += comSize;
+    return result;
+}
+
 typedef enum { om_auto, om_compress, om_decompress, om_test, om_bench } operationMode_e;
 
 int main(int argc, const char** argv)
 {
     int i,
         cLevel=1,
-        cLevelLast=1,
+        cLevelLast=-10000,
         legacy_format=0,
         forceStdout=0,
         main_pause=0,
@@ -363,6 +377,25 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--help")) { usage_advanced(exeName); goto _cleanup; }
                 if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(0); continue; }   /* keep source file (default) */
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(1); continue; }
+                if (longCommandWArg(&argument, "--fast")) {
+                        /* Parse optional acceleration factor */
+                        if (*argument == '=') {
+                            U32 fastLevel;
+                            ++argument;
+                            fastLevel = readU32FromChar(&argument);
+                            if (fastLevel) {
+                              cLevel = -(int)fastLevel;
+                            } else {
+                              badusage(exeName);
+                            }
+                        } else if (*argument != 0) {
+                            /* Invalid character following --fast */
+                            badusage(exeName);
+                        } else {
+                            cLevel = -1;  /* default for --fast */
+                        }
+                        continue;
+                    }
             }
 
             while (argument[1]!=0) {
