@@ -82,7 +82,7 @@ lz4-release: DEBUGFLAGS=
 lz4-release: lz4
 
 lz4c: lz4
-	ln -s lz4 lz4c
+	ln -s lz4$(EXT) lz4c$(EXT)
 
 lz4c32: CFLAGS += -m32
 lz4c32 : $(SRCFILES)
@@ -102,7 +102,7 @@ preview-man: clean-man man
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4 lz4cat
+           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) unlz4$(EXT) lz4cat$(EXT)
 	@echo Cleaning completed
 
 
@@ -112,10 +112,10 @@ clean:
 ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS))
 
 unlz4: lz4
-	ln -s lz4 unlz4
+	ln -s lz4$(EXT) unlz4$(EXT)
 
 lz4cat: lz4
-	ln -s lz4 lz4cat
+	ln -s lz4$(EXT) lz4cat$(EXT)
 
 DESTDIR     ?=
 # directory variables : GNU conventions prefer lowercase
@@ -147,10 +147,10 @@ INSTALL_DATA    ?= $(INSTALL) -m 644
 install: lz4
 	@echo Installing binaries
 	@$(INSTALL) -d -m 755 $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
-	@$(INSTALL_PROGRAM) lz4 $(DESTDIR)$(bindir)/lz4
-	@ln -sf lz4 $(DESTDIR)$(bindir)/lz4c
-	@ln -sf lz4 $(DESTDIR)$(bindir)/lz4cat
-	@ln -sf lz4 $(DESTDIR)$(bindir)/unlz4
+	@$(INSTALL_PROGRAM) lz4$(EXT) $(DESTDIR)$(bindir)/lz4$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(bindir)/lz4c$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(bindir)/lz4cat$(EXT)
+	@ln -sf lz4$(EXT) $(DESTDIR)$(bindir)/unlz4$(EXT)
 	@echo Installing man pages
 	@$(INSTALL_DATA) lz4.1 $(DESTDIR)$(man1dir)/lz4.1
 	@ln -sf lz4.1 $(DESTDIR)$(man1dir)/lz4c.1
@@ -159,10 +159,10 @@ install: lz4
 	@echo lz4 installation completed
 
 uninstall:
-	@$(RM) $(DESTDIR)$(bindir)/lz4cat
-	@$(RM) $(DESTDIR)$(bindir)/unlz4
-	@$(RM) $(DESTDIR)$(bindir)/lz4
-	@$(RM) $(DESTDIR)$(bindir)/lz4c
+	@$(RM) $(DESTDIR)$(bindir)/lz4cat$(EXT)
+	@$(RM) $(DESTDIR)$(bindir)/unlz4$(EXT)
+	@$(RM) $(DESTDIR)$(bindir)/lz4$(EXT)
+	@$(RM) $(DESTDIR)$(bindir)/lz4c$(EXT)
 	@$(RM) $(DESTDIR)$(man1dir)/lz4.1
 	@$(RM) $(DESTDIR)$(man1dir)/lz4c.1
 	@$(RM) $(DESTDIR)$(man1dir)/lz4cat.1
