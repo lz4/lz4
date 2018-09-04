@@ -8,6 +8,7 @@ fullbench32
 fuzzer
 fuzzer32
 fasttest
+roundTripTest
 checkTag
 
 # test artefacts
