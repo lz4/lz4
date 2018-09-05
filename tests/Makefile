@@ -63,7 +63,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest datagen
+all: fullbench fuzzer frametest roundTripTest datagen
 
 all32: CFLAGS+=-m32
 all32: all
@@ -101,6 +101,9 @@ fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+roundTripTest : lz4.o lz4hc.o xxhash.o roundTripTest.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
