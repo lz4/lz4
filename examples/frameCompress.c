@@ -31,12 +31,13 @@ static const LZ4F_preferences_t kPrefs = {
 static void safe_fwrite(void* buf, size_t eltSize, size_t nbElt, FILE* f)
 {
     size_t const writtenSize = fwrite(buf, eltSize, nbElt, f);
-    size_t const expectedSize = eltSize * nbElt;   /* note : should check for overflow */
+    size_t const expectedSize = eltSize * nbElt;
+    assert(expectedSize / nbElt == eltSize);   /* check overflow */
     if (writtenSize < expectedSize) {
         if (ferror(f))  /* note : ferror() must follow fwrite */
-            printf("Write failed\n");
+            fprintf(stderr, "Write failed \n");
         else
-            printf("Short write\n");
+            fprintf(stderr, "Short write \n");
         exit(1);
     }
 }
@@ -54,9 +55,9 @@ typedef struct {
 
 static compressResult_t
 compress_file_internal(FILE* f_in, FILE* f_out,
-                    LZ4F_compressionContext_t ctx,
-                    void* inBuff, size_t inChunkSize,
-                    void* outBuff, size_t outCapacity)
+                       LZ4F_compressionContext_t ctx,
+                       void* inBuff,  size_t inChunkSize,
+                       void* outBuff, size_t outCapacity)
 {
     compressResult_t result = { 1, 0, 0 };  /* result for an error */
     unsigned long long count_in = 0, count_out;
@@ -167,9 +168,9 @@ static size_t get_block_size(const LZ4F_frameInfo_t* info) {
 /* @return : 1==error, 0==success */
 static int
 decompress_file_internal(FILE* f_in, FILE* f_out,
-                        LZ4F_dctx* dctx,
-                        void* src, size_t srcCapacity, size_t filled, size_t alreadyConsumed,
-                        void* dst, size_t dstCapacity)
+                         LZ4F_dctx* dctx,
+                         void* src, size_t srcCapacity, size_t filled, size_t alreadyConsumed,
+                         void* dst, size_t dstCapacity)
 {
     int firstChunk = 1;
     size_t ret = 1;
@@ -278,7 +279,7 @@ static int decompress_file(FILE* f_in, FILE* f_out)
     if (!src) { perror("decompress_file(src)"); return 1; }
 
     LZ4F_dctx* dctx;
-    {   size_t const dctxStatus = LZ4F_createDecompressionContext(&dctx, 100);
+    {   size_t const dctxStatus = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
         if (LZ4F_isError(dctxStatus)) {
             printf("LZ4F_dctx creation error: %s\n", LZ4F_getErrorName(dctxStatus));
     }   }

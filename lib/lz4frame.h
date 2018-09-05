@@ -33,7 +33,7 @@
 */
 
 /* LZ4F is a stand-alone API to create LZ4-compressed frames
- * conformant with specification v1.5.1.
+ * conformant with specification v1.6.1.
  * It also offers streaming capabilities.
  * lz4.h is not required when using lz4frame.h.
  * */
@@ -159,8 +159,9 @@ typedef LZ4F_contentChecksum_t contentChecksum_t;
 
 /*! LZ4F_frameInfo_t :
  *  makes it possible to set or read frame parameters.
- *  It's not required to set all fields, as long as the structure was initially memset() to zero.
- *  For all fields, 0 sets it to default value */
+ *  Structure must be first init to 0, using memset() or LZ4F_INIT_FRAMEINFO,
+ *  setting all parameters to default.
+ *  It's then possible to update selectively some parameters */
 typedef struct {
   LZ4F_blockSizeID_t     blockSizeID;         /* max64KB, max256KB, max1MB, max4MB; 0 == default */
   LZ4F_blockMode_t       blockMode;           /* LZ4F_blockLinked, LZ4F_blockIndependent; 0 == default */
@@ -171,24 +172,30 @@ typedef struct {
   LZ4F_blockChecksum_t   blockChecksumFlag;   /* 1: each block followed by a checksum of block's compressed data; 0: disabled (default) */
 } LZ4F_frameInfo_t;
 
+#define LZ4F_INIT_FRAMEINFO   { 0, 0, 0, 0, 0, 0, 0 }
+
 /*! LZ4F_preferences_t :
- *  makes it possible to supply detailed compression parameters to the stream interface.
- *  Structure is presumed initially memset() to zero, representing default settings.
+ *  makes it possible to supply advanced compression instructions to streaming interface.
+ *  Structure must be first init to 0, using memset() or LZ4F_INIT_PREFERENCES,
+ *  setting all parameters to default.
  *  All reserved fields must be set to zero. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;    /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
-  unsigned autoFlush;           /* 1: always flush, to reduce usage of internal buffers */
-  unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4LZ4HC_CLEVEL_OPT_MIN) */  /* >= v1.8.2 */
+  unsigned autoFlush;           /* 1: always flush; reduces usage of internal buffers */
+  unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* >= v1.8.2 */
   unsigned reserved[3];         /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
-LZ4FLIB_API int LZ4F_compressionLevel_max(void);
+#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0, 0, { 0, 0, 0 } }
 
 
 /*-*********************************
 *  Simple compression function
 ***********************************/
+
+LZ4FLIB_API int LZ4F_compressionLevel_max(void);
+
 /*! LZ4F_compressFrameBound() :
  *  Returns the maximum possible compressed size with LZ4F_compressFrame() given srcSize and preferences.
  * `preferencesPtr` is optional. It can be replaced by NULL, in which case, the function will assume default preferences.
@@ -222,8 +229,9 @@ typedef struct {
 
 /*---   Resource Management   ---*/
 
-#define LZ4F_VERSION 100
+#define LZ4F_VERSION 100       /* API version, signal an API breaking change */
 LZ4FLIB_API unsigned LZ4F_getVersion(void);
+
 /*! LZ4F_createCompressionContext() :
  * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
  * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version.
