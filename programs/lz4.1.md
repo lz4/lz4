@@ -125,6 +125,19 @@ only the latest one will be applied.
   Speed/compression trade-off will vary depending on data to compress.
   Decompression speed remains fast at all settings.
 
+* `--fast[=#]`:
+  switch to ultra-fast compression levels.
+  The higher the value, the faster the compression speed, at the cost of some compression ratio.
+  If `=#` is not present, it defaults to `1`.
+  This setting overrides compression level if one was set previously.
+  Similarly, if a compression level is set after `--fast`, it overrides it.
+
+* `-D dictionaryName`:
+  Compress, decompress or benchmark using dictionary _dictionaryName_.
+  Compression and decompression must use the same dictionary to be compatible.
+  Using a different dictionary during decompression will either
+  abort due to decompression error, or generate a checksum error.
+
 * `-f` `--[no-]force`:
   This option has several effects:
 
@@ -155,13 +168,6 @@ only the latest one will be applied.
 
 * `-BD`:
   Block Dependency (improves compression ratio on small blocks)
-
-* `--fast[=#]`:
-  switch to ultra-fast compression levels.
-  If `=#` is not present, it defaults to `1`.
-  The higher the value, the faster the compression speed, at the cost of some compression ratio.
-  This setting overwrites compression level if one was set previously.
-  Similarly, if a compression level is set after `--fast`, it overrides it.
 
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)

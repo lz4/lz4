@@ -110,7 +110,7 @@ static int usage(const char* exeName)
     DISPLAY( " -9     : High compression \n");
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -z     : force compression \n");
-    DISPLAY( " -D FILE: use dictionary in FILE \n");
+    DISPLAY( " -D FILE: use FILE as dictionary \n");
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -k     : preserve source files(s)  (default) \n");
     DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");

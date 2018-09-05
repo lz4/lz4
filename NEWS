@@ -1,3 +1,9 @@
+v1.8.3
+fix : data corruption for files > 64KB at level 9 under specific conditions (#560)
+cli : new command --fast, by @jennifermliu
+build : added Haiku target, by @fbrosson
+doc : updated documentation regarding dictionary compression
+
 v1.8.2
 perf: *much* faster dictionary compression on small files, by @felixhandte
 perf: improved decompression speed and binary size, by Alexey Tourbin (@svpv)
