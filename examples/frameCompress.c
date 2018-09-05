@@ -195,7 +195,7 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
          * Continue while there is more input to read (srcPtr != srcEnd)
          * and the frame isn't over (ret != 0)
          */
-        while (srcPtr != srcEnd && ret != 0) {
+        while (srcPtr < srcEnd && ret != 0) {
             /* Any data within dst has been flushed at this stage */
             size_t dstSize = dstCapacity;
             size_t srcSize = srcEnd - srcPtr;
@@ -209,9 +209,20 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
             /* Update input */
             srcPtr += srcSize;
         }
+
+        assert(srcPtr <= srcEnd);
+
+        /* Ensure all input data has been consumed.
+         * It is valid to have multiple frames in the same file,
+         * but this example only supports one frame.
+         */
+        if (srcPtr < srcEnd) {
+            printf("Decompress: Trailing data left in file after frame\n");
+            return 1;
+        }
     }
 
-    /* Check that there isn't trailing input data after the frame.
+    /* Check that there isn't trailing data in the file after the frame.
      * It is valid to have multiple frames in the same file,
      * but this example only supports one frame.
      */
