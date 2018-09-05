@@ -327,6 +327,8 @@ LZ4HC_InsertAndGetWiderMatch (
                             if (lookBackLength==0) {  /* no back possible */
                                 size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
                                 if ((size_t)longest < maxML) {
+                                    assert(base + matchIndex < ip);
+                                    if (ip - (base+matchIndex) > MAX_DISTANCE) break;
                                     assert(maxML < 2 GB);
                                     longest = (int)maxML;
                                     *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
@@ -450,6 +452,8 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     *op += length;
 
     /* Encode Offset */
+    assert(*ip > match);
+    assert( (*ip - match) <= MAX_DISTANCE );
     LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
 
     /* Encode MatchLength */
