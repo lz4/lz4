@@ -82,10 +82,10 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
     int const randL = h32 % (cLevelSpan+1);
     int const cLevel = minCLevel + randL;
     int const realCLevel = (cLevel * 0) + 9;    /*  <=== Currently : only test level 9 */
-    int const cSize = LZ4_compress_HC(srcBuff, compressedBuff, srcSize, compressedBuffCapacity, realCLevel);
+    int const cSize = LZ4_compress_HC((const char*)srcBuff, (char*)compressedBuff, (int)srcSize, (int)compressedBuffCapacity, realCLevel);
     CONTROL_MSG(cSize == 0, "Compression error !");
 
-    {   int const dSize = LZ4_decompress_safe(compressedBuff, resultBuff, cSize, resultBuffCapacity);
+    {   int const dSize = LZ4_decompress_safe((const char*)compressedBuff, (char*)resultBuff, cSize, (int)resultBuffCapacity);
         CONTROL_MSG(dSize < 0, "Decompression detected an error !");
         CONTROL_MSG(dSize != (int)srcSize, "Decompression corruption error : wrong decompressed size !");
     }
@@ -102,7 +102,7 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
 
 static void roundTripCheck(const void* srcBuff, size_t srcSize)
 {
-    size_t const cBuffSize = LZ4_compressBound(srcSize);
+    size_t const cBuffSize = LZ4_compressBound((int)srcSize);
     void* const cBuff = malloc(cBuffSize);
     void* const rBuff = malloc(cBuffSize);
 
