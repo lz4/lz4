@@ -323,12 +323,17 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     int result = 0;
     unsigned cycleNb;
 
-#   define FUZ_CHECKTEST(cond, ...) if (cond) { printf("Test %u : ", testNb); printf(__VA_ARGS__); \
-                                                printf(" (seed %u, cycle %u) \n", seed, cycleNb); goto _output_error; }
+#   define FUZ_CHECKTEST(cond, ...)                            \
+        if (cond) {                                            \
+            printf("Test %u : ", testNb); printf(__VA_ARGS__); \
+            printf(" (seed %u, cycle %u) \n", seed, cycleNb);  \
+            goto _output_error;                                \
+        }
+
 #   define FUZ_DISPLAYTEST(...) {                 \
                 testNb++;                         \
                 if (g_displayLevel>=4) {          \
-                    printf("\r%4u - %2u ", cycleNb, testNb);  \
+                    printf("\r%4u - %2u :", cycleNb, testNb);  \
                     printf(" " __VA_ARGS__);      \
                     printf("   ");                \
                     fflush(stdout);               \
@@ -805,7 +810,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : not enough output size (-1 byte)");
         FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_safe_usingDict overrun specified output buffer size");
 
-        FUZ_DISPLAYTEST();
+        FUZ_DISPLAYTEST("LZ4_decompress_safe_usingDict with a too small output buffer");
         {   U32 const missingBytes = (FUZ_rand(&randState) & 0xF) + 2;
             if ((U32)blockSize > missingBytes) {
                 decodedBuffer[blockSize-missingBytes] = 0;
@@ -815,7 +820,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         }   }
 
         /* Compress HC using External dictionary */
-        FUZ_DISPLAYTEST();
+        FUZ_DISPLAYTEST("LZ4_compress_HC_continue with an external dictionary");
         dict -= (FUZ_rand(&randState) & 7);    /* even bigger separation */
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_resetStreamHC (&LZ4dictHC, compressionLevel);
