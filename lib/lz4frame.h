@@ -35,7 +35,8 @@
 /* LZ4F is a stand-alone API to create LZ4-compressed frames
  * conformant with specification v1.6.1.
  * It also offers streaming capabilities.
- * lz4.h is not required when using lz4frame.h.
+ * lz4.h is not required when using lz4frame.h,
+ * except to get constant such as LZ4_VERSION_NUMBER.
  * */
 
 #ifndef LZ4F_H_09782039843
@@ -172,7 +173,7 @@ typedef struct {
   LZ4F_blockChecksum_t   blockChecksumFlag;   /* 1: each block followed by a checksum of block's compressed data; 0: disabled (default) */
 } LZ4F_frameInfo_t;
 
-#define LZ4F_INIT_FRAMEINFO   { 0, 0, 0, 0, 0, 0, 0 }
+#define LZ4F_INIT_FRAMEINFO   { 0, 0, 0, 0, 0, 0, 0 }    /* v1.8.3+ */
 
 /*! LZ4F_preferences_t :
  *  makes it possible to supply advanced compression instructions to streaming interface.
@@ -183,11 +184,11 @@ typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;    /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
   unsigned autoFlush;           /* 1: always flush; reduces usage of internal buffers */
-  unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* >= v1.8.2 */
+  unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* v1.8.2+ */
   unsigned reserved[3];         /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
-#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0, 0, { 0, 0, 0 } }
+#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0, 0, { 0, 0, 0 } }    /* v1.8.3+ */
 
 
 /*-*********************************
@@ -229,7 +230,7 @@ typedef struct {
 
 /*---   Resource Management   ---*/
 
-#define LZ4F_VERSION 100       /* API version, signal an API breaking change */
+#define LZ4F_VERSION 100    /* This number can be used to check for an incompatible API breaking change */
 LZ4FLIB_API unsigned LZ4F_getVersion(void);
 
 /*! LZ4F_createCompressionContext() :
