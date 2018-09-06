@@ -628,16 +628,23 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
-        if (strcmp (srcFileName, stdinmark) && strcmp (dstFileName, stdoutmark) && strcmp (dstFileName, nulmark) && UTIL_getFileStat(srcFileName, &statbuf))
+        if (strcmp (srcFileName, stdinmark)
+         && strcmp (dstFileName, stdoutmark)
+         && strcmp (dstFileName, nulmark)
+         && UTIL_getFileStat(srcFileName, &statbuf)) {
             UTIL_setFileStat(dstFileName, &statbuf);
-    }
+    }   }
 
-    if (g_removeSrcFile) { if (remove(srcFileName)) EXM_THROW(40, "Remove error : %s: %s", srcFileName, strerror(errno)); } /* remove source file : --rm */
+    if (g_removeSrcFile) {  /* remove source file : --rm */
+        if (remove(srcFileName))
+            EXM_THROW(40, "Remove error : %s: %s", srcFileName, strerror(errno));
+    }
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-        filesize, compressedfilesize, (double)compressedfilesize/(filesize + !filesize)*100);   /* avoid division by zero */
+                    filesize, compressedfilesize,
+                    (double)compressedfilesize / (filesize + !filesize /* avoid division by zero */ ) * 100);
 
     return 0;
 }
@@ -645,21 +652,25 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
-    clock_t const start = clock();
+    UTIL_time_t const timeStart = UTIL_getTime();
+    clock_t const cpuStart = clock();
     cRess_t const ress = LZ4IO_createCResources();
 
-    int const issueWithSrcFile = LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel);
+    int const result = LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel);
 
     /* Free resources */
     LZ4IO_freeCResources(ress);
 
     /* Final Status */
-    {   clock_t const end = clock();
-        double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
-        DISPLAYLEVEL(4, "Completed in %.2f sec \n", seconds);
+    {   clock_t const cpuEnd = clock();
+        double const cpuLoad_s = (double)(cpuEnd - cpuStart) / CLOCKS_PER_SEC;
+        U64 const timeLength_ns = UTIL_clockSpanNano(timeStart);
+        double const timeLength_s = (double)timeLength_ns / 1000000000;
+        DISPLAYLEVEL(4, "Completed in %.2f sec  (cpu load : %.0f%%)\n",
+                        timeLength_s, (cpuLoad_s / timeLength_s) * 100);
     }
 
-    return issueWithSrcFile;
+    return result;
 }
 
 
