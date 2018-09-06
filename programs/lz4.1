@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "2018-01-13" "lz4 1.8.1" "User Commands"
+.TH "LZ4" "1" "September 2018" "lz4 1.8.3" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -115,7 +115,11 @@ Benchmark mode, using \fB#\fR compression level\.
 .
 .TP
 \fB\-#\fR
-Compression level, with # being any value from 1 to 16\. Higher values trade compression speed for compression ratio\. Values above 16 are considered the same as 16\. Recommended values are 1 for fast compression (default), and 9 for high compression\. Speed/compression trade\-off will vary depending on data to compress\. Decompression speed remains fast at all settings\.
+Compression level, with # being any value from 1 to 12\. Higher values trade compression speed for compression ratio\. Values above 12 are considered the same as 12\. Recommended values are 1 for fast compression (default), and 9 for high compression\. Speed/compression trade\-off will vary depending on data to compress\. Decompression speed remains fast at all settings\.
+.
+.TP
+\fB\-D dictionaryName\fR
+Compress, decompress or benchmark using dictionary \fIdictionaryName\fR\. Compression and decompression must use the same dictionary to be compatible\. Using a different dictionary during decompression will either abort due to decompression error, or generate a checksum error\.
 .
 .TP
 \fB\-f\fR \fB\-\-[no\-]force\fR
@@ -149,6 +153,10 @@ Block size [4\-7](default : 7)
 .TP
 \fB\-BD\fR
 Block Dependency (improves compression ratio on small blocks)
+.
+.TP
+\fB\-\-fast[=#]\fR
+switch to ultra\-fast compression levels\. If \fB=#\fR is not present, it defaults to \fB1\fR\. The higher the value, the faster the compression speed, at the cost of some compression ratio\. This setting overwrites compression level if one was set previously\. Similarly, if a compression level is set after \fB\-\-fast\fR, it overrides it\.
 .
 .TP
 \fB\-\-[no\-]frame\-crc\fR
@@ -214,7 +222,7 @@ Benchmark multiple compression levels, from b# to e# (included)
 .
 .TP
 \fB\-i#\fR
-Minimum evaluation in seconds [1\-9] (default : 3)
+Minimum evaluation time in seconds [1\-9] (default : 3)
 .
 .SH "BUGS"
 Report bugs at: https://github\.com/lz4/lz4/issues

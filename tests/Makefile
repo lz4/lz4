@@ -117,7 +117,8 @@ clean:
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
-        fasttest$(EXT) datagen$(EXT) checkTag$(EXT)
+        fasttest$(EXT) roundTripTest$(EXT) \
+        datagen$(EXT) checkTag$(EXT)
 	@rm -fR $(TESTDIR)
 	@echo Cleaning completed
 

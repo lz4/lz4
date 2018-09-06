@@ -2,17 +2,22 @@ LZ4 - Extremely fast compression
 ================================
 
 LZ4 is lossless compression algorithm,
-providing compression speed at 400 MB/s per core,
+providing compression speed > 500 MB/s per core,
 scalable with multi-cores CPU.
 It features an extremely fast decoder,
 with speed in multiple GB/s per core,
 typically reaching RAM speed limits on multi-core systems.
 
 Speed can be tuned dynamically, selecting an "acceleration" factor
-which trades compression ratio for more speed up.
+which trades compression ratio for faster speed.
 On the other end, a high compression derivative, LZ4_HC, is also provided,
 trading CPU time for improved compression ratio.
 All versions feature the same decompression speed.
+
+LZ4 is also compatible with [dictionary compression](https://github.com/facebook/zstd#the-case-for-small-data-compression),
+and can ingest any input file as dictionary,
+including those created by [Zstandard Dictionary Builder](https://github.com/facebook/zstd/blob/v1.3.5/programs/zstd.1.md#dictionary-builder).
+(note: only the final 64KB are used).
 
 LZ4 library is provided as open-source software using BSD 2-Clause license.
 
@@ -67,8 +72,8 @@ in single-thread mode.
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
 
-LZ4 is also compatible and well optimized for x32 mode,
-for which it provides some additional speed performance.
+LZ4 is also compatible and optimized for x32 mode,
+for which it provides additional speed performance.
 
 
 Installation
@@ -76,7 +81,7 @@ Installation
 
 ```
 make
-make install     # this command may require root access
+make install     # this command may require root permissions
 ```
 
 LZ4's `Makefile` supports standard [Makefile conventions],
@@ -94,10 +99,10 @@ Documentation
 
 The raw LZ4 block compression format is detailed within [lz4_Block_format].
 
-To compress an arbitrarily long file or data stream, multiple blocks are required.
-Organizing these blocks and providing a common header format to handle their content
-is the purpose of the Frame format, defined into [lz4_Frame_format].
-Interoperable versions of LZ4 must respect this frame format.
+Arbitrarily long files or data streams are compressed using multiple blocks,
+for streaming requirements. These blocks are organized into a frame,
+defined into [lz4_Frame_format].
+Interoperable versions of LZ4 must also respect the frame format.
 
 [lz4_Block_format]: doc/lz4_Block_format.md
 [lz4_Frame_format]: doc/lz4_Frame_format.md
