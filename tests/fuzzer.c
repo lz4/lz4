@@ -504,7 +504,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test decoding with empty input */
         FUZ_DISPLAYTEST("LZ4_decompress_safe() with empty input");
-        LZ4_decompress_safe(NULL, decodedBuffer, 0, blockSize);
+        LZ4_decompress_safe(compressedBuffer, decodedBuffer, 0, blockSize);
 
         /* Test decoding with a one byte input */
         FUZ_DISPLAYTEST("LZ4_decompress_safe() with one byte input");
@@ -545,7 +545,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize+1);
         FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe failed despite amply sufficient space");
         FUZ_CHECKTEST(ret!=blockSize, "LZ4_decompress_safe did not regenerate original data");
-        //FUZ_CHECKTEST(decodedBuffer[blockSize], "LZ4_decompress_safe wrote more than (unknown) target size");   // well, is that an issue ?
         FUZ_CHECKTEST(decodedBuffer[blockSize+1], "LZ4_decompress_safe overrun specified output buffer size");
         {   U32 const crcCheck = XXH32(decodedBuffer, blockSize, 0);
             FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe corrupted decoded data");
@@ -579,15 +578,16 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to input size being too large");
         FUZ_CHECKTEST(decodedBuffer[blockSize], "LZ4_decompress_safe overrun specified output buffer size");
 
-        // Test partial decoding with target output size being max/2 => must work
-        FUZ_DISPLAYTEST();
-        ret = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, compressedSize, blockSize/2, blockSize);
-        FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe_partial failed despite sufficient space");
-
-        // Test partial decoding with target output size being just below max => must work
-        FUZ_DISPLAYTEST();
-        ret = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, compressedSize, blockSize-3, blockSize);
-        FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe_partial failed despite sufficient space");
+        /* Test partial decoding => must work */
+        FUZ_DISPLAYTEST("test LZ4_decompress_safe_partial");
+        {   size_t const missingBytes = FUZ_rand(&randState) % blockSize;
+            int const targetSize = (int)(blockSize - missingBytes);
+            char const sentinel = compressedBuffer[targetSize] = block[targetSize] ^ 0x5A;
+            int const decResult = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, compressedSize, targetSize, blockSize);
+            FUZ_CHECKTEST(decResult<0, "LZ4_decompress_safe_partial failed despite valid input data");
+            FUZ_CHECKTEST(decResult != targetSize, "LZ4_decompress_safe_partial did not regenerated required amount of data (%i < %i <= %i)", decResult, targetSize, blockSize);
+            FUZ_CHECKTEST(compressedBuffer[targetSize] != sentinel, "LZ4_decompress_safe_partial overwrite beyond requested size (though %i <= %i <= %i)", decResult, targetSize, blockSize);
+        }
 
         /* Test Compression with limited output size */
 

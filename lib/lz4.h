@@ -272,12 +272,12 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  * @return : size of compressed block
  *           or 0 if there is an error (typically, cannot fit into 'dst').
  *
- *  Note 1 : Each invocation to LZ4_compress_fast_continue() will generate a new block.
+ *  Note 1 : Each invocation to LZ4_compress_fast_continue() generates a new block.
  *           Each block has precise boundaries.
  *           It's not possible to append blocks together and expect a single invocation of LZ4_decompress_*() to decompress them together.
  *           Each block must be decompressed separately, calling LZ4_decompress_*() with associated metadata.
  *
- *  Note 2 : The previous 64KB of source data is assumed to remain present, unmodified, at same address in memory!
+ *  Note 2 : The previous 64KB of source data is __assumed__ to remain present, unmodified, at same address in memory!
  *
  *  Note 3 : When input is structured as a double-buffer, each buffer can have any size, including < 64 KB.
  *           Make sure that buffers are separated, by at least one byte.
