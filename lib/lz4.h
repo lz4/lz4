@@ -226,14 +226,28 @@ LZ4LIB_API int LZ4_compress_destSize (const char* src, char* dst, int* srcSizePt
 LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
 
 /*! LZ4_decompress_safe_partial() :
- *  This function decompresses a compressed block of size 'srcSize' at position 'src'
+ *  Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
  *  into destination buffer 'dst' of size 'dstCapacity'.
- *  The function will decompress a minimum of 'targetOutputSize' bytes, and stop after that.
- *  However, it's not accurate, and may write more than 'targetOutputSize' (but always <= dstCapacity).
+ *  Up to 'targetOutputSize' bytes will be decoded.
+ *  The function stops decoding on reaching this objective,
+ *  which can boost performance when only the beginning of a block is required.
+ *
  * @return : the number of bytes decoded in `dst` (necessarily <= dstCapacity)
- *    Note : this number can also be < targetOutputSize, if compressed block contains less data.
  *           If source stream is detected malformed, function returns a negative result.
- *  This function is protected against malicious data packets.
+ *
+ *  Note : @return can be < targetOutputSize, if compressed block contains less data.
+ *
+ *  Note 2 : this function features 2 parameters, targetOutputSize and dstCapacity,
+ *           and expects targetOutputSize <= dstCapacity.
+ *           It effectively stops decoding on reaching targetOutputSize,
+ *           so dstCapacity is kind of redundant.
+ *           This is because in a previous version of this function,
+ *           decoding operation would not "break" a sequence in the middle.
+ *           As a consequence, there was no guarantee that decoding would stop at exactly targetOutputSize,
+ *           it could write more bytes, though only up to dstCapacity.
+ *           Some "margin" used to be required for this operation to work properly.
+ *           This is no longer necessary.
+ *           The function nonetheless keeps its signature, in an effort to not break API.
  */
 LZ4LIB_API int LZ4_decompress_safe_partial (const char* src, char* dst, int srcSize, int targetOutputSize, int dstCapacity);
 
