@@ -582,11 +582,12 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST("test LZ4_decompress_safe_partial");
         {   size_t const missingBytes = FUZ_rand(&randState) % blockSize;
             int const targetSize = (int)(blockSize - missingBytes);
-            char const sentinel = compressedBuffer[targetSize] = block[targetSize] ^ 0x5A;
+            char const sentinel = decodedBuffer[targetSize] = block[targetSize] ^ 0x5A;
+            assert(decodedBuffer[targetSize] == sentinel);
             int const decResult = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, compressedSize, targetSize, blockSize);
-            FUZ_CHECKTEST(decResult<0, "LZ4_decompress_safe_partial failed despite valid input data");
+            FUZ_CHECKTEST(decResult<0, "LZ4_decompress_safe_partial failed despite valid input data (error:%i)", decResult);
             FUZ_CHECKTEST(decResult != targetSize, "LZ4_decompress_safe_partial did not regenerated required amount of data (%i < %i <= %i)", decResult, targetSize, blockSize);
-            FUZ_CHECKTEST(compressedBuffer[targetSize] != sentinel, "LZ4_decompress_safe_partial overwrite beyond requested size (though %i <= %i <= %i)", decResult, targetSize, blockSize);
+            FUZ_CHECKTEST(decodedBuffer[targetSize] != sentinel, "LZ4_decompress_safe_partial overwrite beyond requested size (though %i <= %i <= %i)", decResult, targetSize, blockSize);
         }
 
         /* Test Compression with limited output size */

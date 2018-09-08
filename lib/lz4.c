@@ -1398,8 +1398,7 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  *  Note that it is important for performance that this function really get inlined,
  *  in order to remove useless branches during compilation optimization.
  */
-LZ4_FORCE_INLINE
-int
+LZ4_FORCE_INLINE int
 LZ4_decompress_generic(
                  const char* const src,
                  char* const dst,
@@ -1432,7 +1431,7 @@ LZ4_decompress_generic(
     const BYTE* const shortiend = iend - (endOnInput ? 14 : 8) /*maxLL*/ - 2 /*offset*/;
     const BYTE* const shortoend = oend - (endOnInput ? 14 : 8) /*maxLL*/ - 18 /*maxML*/;
 
-    DEBUGLOG(5, "LZ4_decompress_generic (srcSize:%i)", srcSize);
+    DEBUGLOG(5, "LZ4_decompress_generic (srcSize:%i, dstSize:%i)", srcSize, outputSize);
 
     /* Special cases */
     assert(src != NULL);
@@ -1537,7 +1536,7 @@ LZ4_decompress_generic(
 
 _copy_match:
         if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
-        LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */
+        // LZ4_write32(op, (U32)offset);   /* costs ~1%; silence an msan warning when offset==0 */   /* note : no longer valid with partialDecoding, since there is no guarantee that at least 4 bytes are available */
 
         if (length == ML_MASK) {
             unsigned s;
@@ -1584,15 +1583,18 @@ _copy_match:
         /* specific : partial decode : does not respect end parsing restrictions */
         assert(op<=oend);
         if (partialDecoding && (cpy > oend-12)) {
+            DEBUGLOG(2, "match copy close to the end");
             size_t const mlen = MIN(length, (size_t)(oend-op));
             const BYTE* const matchEnd = match + mlen;
             BYTE* const copyEnd = op + mlen;
             if (matchEnd > op) {   /* overlap copy */
                 while (op < copyEnd) *op++ = *match++;
             } else {
+                DEBUGLOG(2, "let's memcopy %zu bytes (non overlapping)", mlen);
                 memcpy(op, match, mlen);
             }
             op = copyEnd;
+            if (op==oend) break;
             continue;
         }
 
