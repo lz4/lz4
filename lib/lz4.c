@@ -1394,8 +1394,8 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
  *  Note that it is important for performance that this function really get inlined,
  *  in order to remove useless branches during compilation optimization.
  */
-LZ4_FORCE_O2_GCC_PPC64LE
-LZ4_FORCE_INLINE int LZ4_decompress_generic(
+LZ4_FORCE_INLINE int
+LZ4_decompress_generic(
                  const char* const src,
                  char* const dst,
                  int srcSize,
