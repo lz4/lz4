@@ -583,7 +583,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         {   size_t const missingBytes = FUZ_rand(&randState) % blockSize;
             int const targetSize = (int)(blockSize - missingBytes);
             char const sentinel = decodedBuffer[targetSize] = block[targetSize] ^ 0x5A;
-            assert(decodedBuffer[targetSize] == sentinel);
             int const decResult = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, compressedSize, targetSize, blockSize);
             FUZ_CHECKTEST(decResult<0, "LZ4_decompress_safe_partial failed despite valid input data (error:%i)", decResult);
             FUZ_CHECKTEST(decResult != targetSize, "LZ4_decompress_safe_partial did not regenerated required amount of data (%i < %i <= %i)", decResult, targetSize, blockSize);

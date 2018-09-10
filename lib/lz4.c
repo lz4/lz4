@@ -1,6 +1,6 @@
 /*
    LZ4 - Fast LZ compression algorithm
-   Copyright (C) 2011-2017, Yann Collet.
+   Copyright (C) 2011-present, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -1405,9 +1405,9 @@ LZ4_decompress_generic(
                  int srcSize,
                  int outputSize,         /* If endOnInput==endOnInputSize, this value is `dstCapacity` */
 
-                 endCondition_directive endOnInput,     /* endOnOutputSize, endOnInputSize */
-                 earlyEnd_directive partialDecoding,    /* full, partial */
-                 int dict,               /* noDict, withPrefix64k, usingExtDict */
+                 endCondition_directive endOnInput,   /* endOnOutputSize, endOnInputSize */
+                 earlyEnd_directive partialDecoding,  /* full, partial */
+                 dict_directive dict,                 /* noDict, withPrefix64k, usingExtDict */
                  const BYTE* const lowPrefix,  /* always <= dst, == dst when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
                  const size_t dictSize         /* note : = 0 if noDict */
@@ -1434,6 +1434,7 @@ LZ4_decompress_generic(
     DEBUGLOG(5, "LZ4_decompress_generic (srcSize:%i, dstSize:%i)", srcSize, outputSize);
 
     /* Special cases */
+    assert(lowPrefix <= op);
     assert(src != NULL);
     if ((endOnInput) && (unlikely(outputSize==0))) return ((srcSize==1) && (*ip==0)) ? 0 : -1;  /* Empty output buffer */
     if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0 ? 1 : -1);
@@ -1504,6 +1505,7 @@ LZ4_decompress_generic(
 
         /* copy literals */
         cpy = op+length;
+        LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
         if ( ((endOnInput) && ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) )
           || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)) )
         {
@@ -1523,7 +1525,7 @@ LZ4_decompress_generic(
             }
 
         } else {
-            LZ4_wildCopy(op, ip, cpy);
+            LZ4_wildCopy(op, ip, cpy);   /* may overwrite up to WILDCOPYLENGTH beyond cpy */
             ip += length; op = cpy;
         }
 
@@ -1584,7 +1586,7 @@ _copy_match:
         /* copy match within block */
         cpy = op + length;
 
-        /* specific : partial decode : does not respect end parsing restrictions */
+        /* partialDecoding : may not respect endBlock parsing restrictions */
         assert(op<=oend);
         if (partialDecoding && (cpy > oend-12)) {
             size_t const mlen = MIN(length, (size_t)(oend-op));
