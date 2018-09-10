@@ -1583,14 +1583,12 @@ _copy_match:
         /* specific : partial decode : does not respect end parsing restrictions */
         assert(op<=oend);
         if (partialDecoding && (cpy > oend-12)) {
-            DEBUGLOG(2, "match copy close to the end");
             size_t const mlen = MIN(length, (size_t)(oend-op));
             const BYTE* const matchEnd = match + mlen;
             BYTE* const copyEnd = op + mlen;
             if (matchEnd > op) {   /* overlap copy */
                 while (op < copyEnd) *op++ = *match++;
             } else {
-                DEBUGLOG(2, "let's memcopy %zu bytes (non overlapping)", mlen);
                 memcpy(op, match, mlen);
             }
             op = copyEnd;
