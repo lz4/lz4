@@ -1,7 +1,7 @@
 /*
  *  LZ4 - Fast LZ compression algorithm
  *  Header File
- *  Copyright (C) 2011-2017, Yann Collet.
+ *  Copyright (C) 2011-present, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -46,7 +46,7 @@ extern "C" {
 /**
   Introduction
 
-  LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core,
+  LZ4 is lossless compression algorithm, providing compression speed at 500 MB/s per core,
   scalable with multi-cores CPU. It features an extremely fast decoder, with speed in
   multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
 
@@ -62,8 +62,8 @@ extern "C" {
 
   An additional format, called LZ4 frame specification (doc/lz4_Frame_format.md),
   take care of encoding standard metadata alongside LZ4-compressed blocks.
-  If your application requires interoperability, it's recommended to use it.
-  A library is provided to take care of it, see lz4frame.h.
+  Frame format is required for interoperability.
+  It is delivered through a companion API, declared in lz4frame.h.
 */
 
 /*^***************************************************************
@@ -226,14 +226,28 @@ LZ4LIB_API int LZ4_compress_destSize (const char* src, char* dst, int* srcSizePt
 LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
 
 /*! LZ4_decompress_safe_partial() :
- *  This function decompresses a compressed block of size 'srcSize' at position 'src'
+ *  Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
  *  into destination buffer 'dst' of size 'dstCapacity'.
- *  The function will decompress a minimum of 'targetOutputSize' bytes, and stop after that.
- *  However, it's not accurate, and may write more than 'targetOutputSize' (but always <= dstCapacity).
+ *  Up to 'targetOutputSize' bytes will be decoded.
+ *  The function stops decoding on reaching this objective,
+ *  which can boost performance when only the beginning of a block is required.
+ *
  * @return : the number of bytes decoded in `dst` (necessarily <= dstCapacity)
- *    Note : this number can also be < targetOutputSize, if compressed block contains less data.
  *           If source stream is detected malformed, function returns a negative result.
- *  This function is protected against malicious data packets.
+ *
+ *  Note : @return can be < targetOutputSize, if compressed block contains less data.
+ *
+ *  Note 2 : this function features 2 parameters, targetOutputSize and dstCapacity,
+ *           and expects targetOutputSize <= dstCapacity.
+ *           It effectively stops decoding on reaching targetOutputSize,
+ *           so dstCapacity is kind of redundant.
+ *           This is because in a previous version of this function,
+ *           decoding operation would not "break" a sequence in the middle.
+ *           As a consequence, there was no guarantee that decoding would stop at exactly targetOutputSize,
+ *           it could write more bytes, though only up to dstCapacity.
+ *           Some "margin" used to be required for this operation to work properly.
+ *           This is no longer necessary.
+ *           The function nonetheless keeps its signature, in an effort to not break API.
  */
 LZ4LIB_API int LZ4_decompress_safe_partial (const char* src, char* dst, int srcSize, int targetOutputSize, int dstCapacity);
 
@@ -272,12 +286,12 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  * @return : size of compressed block
  *           or 0 if there is an error (typically, cannot fit into 'dst').
  *
- *  Note 1 : Each invocation to LZ4_compress_fast_continue() will generate a new block.
+ *  Note 1 : Each invocation to LZ4_compress_fast_continue() generates a new block.
  *           Each block has precise boundaries.
  *           It's not possible to append blocks together and expect a single invocation of LZ4_decompress_*() to decompress them together.
  *           Each block must be decompressed separately, calling LZ4_decompress_*() with associated metadata.
  *
- *  Note 2 : The previous 64KB of source data is assumed to remain present, unmodified, at same address in memory!
+ *  Note 2 : The previous 64KB of source data is __assumed__ to remain present, unmodified, at same address in memory!
  *
  *  Note 3 : When input is structured as a double-buffer, each buffer can have any size, including < 64 KB.
  *           Make sure that buffers are separated, by at least one byte.
