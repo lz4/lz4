@@ -297,8 +297,9 @@ void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 #define MINMATCH 4
 
 #define WILDCOPYLENGTH 8
-#define LASTLITERALS 5
-#define MFLIMIT (WILDCOPYLENGTH+MINMATCH)
+#define LASTLITERALS   5   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
+#define MFLIMIT       12   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
+#define MATCH_SAFEGUARD_DISTANCE  ((2*WILDCOPYLENGTH) - MINMATCH)   /* ensure it's possible to write 2 x wildcopyLength without overflowing output buffer */
 static const int LZ4_minLength = (MFLIMIT+1);
 
 #define KB *(1 <<10)
@@ -1588,7 +1589,7 @@ _copy_match:
 
         /* partialDecoding : may not respect endBlock parsing restrictions */
         assert(op<=oend);
-        if (partialDecoding && (cpy > oend-12)) {
+        if (partialDecoding && (cpy > oend-MATCH_SAFEGUARD_DISTANCE)) {
             size_t const mlen = MIN(length, (size_t)(oend-op));
             const BYTE* const matchEnd = match + mlen;
             BYTE* const copyEnd = op + mlen;
@@ -1616,7 +1617,7 @@ _copy_match:
         }
         op += 8;
 
-        if (unlikely(cpy > oend-12)) {
+        if (unlikely(cpy > oend-MATCH_SAFEGUARD_DISTANCE)) {
             BYTE* const oCopyLimit = oend - (WILDCOPYLENGTH-1);
             if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals (uncompressed) */
             if (op < oCopyLimit) {
