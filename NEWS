@@ -1,7 +1,9 @@
 v1.8.3
-fix : data corruption for files > 64KB at level 9 under specific conditions (#560)
+perf: minor decompression speed improvement (~+2%) with gcc
+fix : corruption in v1.8.2 at level 9 for files > 64KB under rare conditions (#560)
 cli : new command --fast, by @jennifermliu
-build : added Haiku target, by @fbrosson
+api : LZ4_decompress_safe_partial() now decodes exactly the nb of bytes requested (feature request #566)
+build : added Haiku target, by @fbrosson, and MidnightBSD, by @laffer1
 doc : updated documentation regarding dictionary compression
 
 v1.8.2
