@@ -246,6 +246,10 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStr
 #ifndef LZ4_HC_SLO_098092834
 #define LZ4_HC_SLO_098092834
 
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 /*! LZ4_compress_HC_destSize() : v1.8.0 (experimental)
  *  Will try to compress as much data from `src` as possible
  *  that can fit into `targetDstSize` budget.
@@ -342,6 +346,10 @@ int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* ds
  *  through the lifetime of the stream session.
  */
 LZ4LIB_API void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC_t *dictionary_stream);
+
+#if defined (__cplusplus)
+}
+#endif
 
 #endif   /* LZ4_HC_SLO_098092834 */
 #endif   /* LZ4_HC_STATIC_LINKING_ONLY */

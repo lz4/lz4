@@ -49,7 +49,10 @@
 
 #include "lz4.h"
 #define COMPRESSOR0 LZ4_compress_local
-static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSize, int clevel) { (void)clevel; return LZ4_compress_default(src, dst, srcSize, dstSize); }
+static int LZ4_compress_local(const char* src, char* dst, int srcSize, int dstSize, int clevel) {
+  int const acceleration = (clevel < 0) ? -clevel + 1 : 1;
+  return LZ4_compress_fast(src, dst, srcSize, dstSize, acceleration);
+}
 #include "lz4hc.h"
 #define COMPRESSOR1 LZ4_compress_HC
 #define DEFAULTCOMPRESSOR COMPRESSOR0
@@ -326,7 +329,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             {   U64 const crcCheck = XXH64(resultBuffer, srcSize, 0);
                 if (crcOrig!=crcCheck) {
                     size_t u;
-                    DISPLAY("!!! WARNING !!! %14s : Invalid Checksum : %x != %x   \n", displayName, (unsigned)crcOrig, (unsigned)crcCheck);
+                    DISPLAY("\n!!! WARNING !!! %17s : Invalid Checksum : %x != %x   \n", displayName, (unsigned)crcOrig, (unsigned)crcCheck);
                     for (u=0; u<srcSize; u++) {
                         if (((const BYTE*)srcBuffer)[u] != ((const BYTE*)resultBuffer)[u]) {
                             U32 segNb, bNb, pos;
