@@ -16,10 +16,10 @@ They generate and decode data using [LZ4 block format].
 For more compression ratio at the cost of compression speed,
 the High Compression variant called **lz4hc** is available.
 Add files **`lz4hc.c`** and **`lz4hc.h`**.
-The variant still depends on regular `lib/lz4.*` source files.
+This variant also depends on regular `lib/lz4.*` source files.
 
 
-#### Frame variant, for interoperability
+#### Frame support, for interoperability
 
 In order to produce compressed data compatible with `lz4` command line utility,
 it's necessary to encode lz4-compressed blocks using the [official interoperable frame format].
@@ -32,9 +32,14 @@ So it's necessary to include all `*.c` and `*.h` files present in `/lib`.
 
 #### Advanced / Experimental API
 
-A complex API defined in `lz4frame_static.h` contains definitions
-which are not guaranteed to remain stable in future versions.
-As a consequence, it must be used with static linking ***only***.
+Definitions which are not guaranteed to remain stable in future versions,
+are protected behind macros, such as `LZ4_STATIC_LINKING_ONLY`.
+As the name implies, these definitions can only be invoked
+in the context of static linking ***only***.
+Otherwise, dependent application may fail on API or ABI break in the future.
+The associated symbols are also not present in dynamic library by default.
+Should they be nonetheless needed, it's possible to force their publication
+by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
 
 
 #### Windows : using MinGW+MSYS to create DLL
@@ -48,7 +53,7 @@ The dynamic library has to be added to linking options.
 It means that if a project that uses LZ4 consists of a single `test-dll.c`
 file it should be linked with `dll\liblz4.dll`. For example:
 ```
-    gcc $(CFLAGS) -Iinclude/ test-dll.c -o test-dll dll\liblz4.dll
+    $(CC) $(CFLAGS) -Iinclude/ test-dll.c -o test-dll dll\liblz4.dll
 ```
 The compiled executable will require LZ4 DLL which is available at `dll\liblz4.dll`.
 
