@@ -50,10 +50,10 @@ endif
 default: lib-release lz4-release
 
 .PHONY: all
-all: allmost manuals
+all: allmost examples manuals
 
 .PHONY: allmost
-allmost: lib lz4 examples
+allmost: lib lz4
 
 .PHONY: lib lib-release liblz4.a
 lib: liblz4.a
@@ -181,10 +181,10 @@ ctocpptest: clean
 	CC=$(TESTCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
 c_standards: clean
-	CFLAGS="-std=c90   -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=gnu90 -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=c99   -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=gnu99 -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=c11   -Werror" $(MAKE) clean allmost
+	$(MAKE) clean; CFLAGS="-std=c90   -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=c99   -Werror -pedantic" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=gnu99 -Werror -pedantic" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=c11   -Werror" $(MAKE) all
 
 endif

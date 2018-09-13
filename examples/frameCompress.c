@@ -184,8 +184,8 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
     while (ret != 0) {
         /* Load more input */
         size_t readSize = firstChunk ? filled : fread(src, 1, srcCapacity, f_in); firstChunk=0;
-        const void* srcPtr = src + alreadyConsumed; alreadyConsumed=0;
-        const void* const srcEnd = srcPtr + readSize;
+        const void* srcPtr = (const char*)src + alreadyConsumed; alreadyConsumed=0;
+        const void* const srcEnd = (const char*)srcPtr + readSize;
         if (readSize == 0 || ferror(f_in)) {
             printf("Decompress: not enough input or error reading file\n");
             return 1;
@@ -198,7 +198,7 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
         while (srcPtr < srcEnd && ret != 0) {
             /* Any data within dst has been flushed at this stage */
             size_t dstSize = dstCapacity;
-            size_t srcSize = srcEnd - srcPtr;
+            size_t srcSize = (const char*)srcEnd - (const char*)srcPtr;
             ret = LZ4F_decompress(dctx, dst, &dstSize, srcPtr, &srcSize, /* LZ4F_decompressOptions_t */ NULL);
             if (LZ4F_isError(ret)) {
                 printf("Decompression error: %s\n", LZ4F_getErrorName(ret));
@@ -207,7 +207,7 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
             /* Flush output */
             if (dstSize != 0) safe_fwrite(dst, 1, dstSize, f_out);
             /* Update input */
-            srcPtr += srcSize;
+            srcPtr = (const char*)srcPtr + srcSize;
         }
 
         assert(srcPtr <= srcEnd);

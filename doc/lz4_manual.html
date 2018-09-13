@@ -21,7 +21,7 @@
 </ol>
 <hr>
 <a name="Chapter1"></a><h2>Introduction</h2><pre>
-  LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core,
+  LZ4 is lossless compression algorithm, providing compression speed at 500 MB/s per core,
   scalable with multi-cores CPU. It features an extremely fast decoder, with speed in
   multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
 
@@ -37,8 +37,8 @@
 
   An additional format, called LZ4 frame specification (doc/lz4_Frame_format.md),
   take care of encoding standard metadata alongside LZ4-compressed blocks.
-  If your application requires interoperability, it's recommended to use it.
-  A library is provided to take care of it, see lz4frame.h.
+  Frame format is required for interoperability.
+  It is delivered through a companion API, declared in lz4frame.h.
 <BR></pre>
 
 <a name="Chapter2"></a><h2>Version</h2><pre></pre>

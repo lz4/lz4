@@ -400,7 +400,7 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
 typedef enum {
     noLimit = 0,
     limitedOutput = 1,
-    limitedDestSize = 2,
+    limitedDestSize = 2
 } limitedOutput_directive;
 
 /* LZ4HC_encodeSequence() :

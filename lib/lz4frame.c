@@ -33,8 +33,8 @@ You can contact the author at :
 */
 
 /* LZ4F is a stand-alone API to create LZ4-compressed Frames
-*  in full conformance with specification v1.5.0
-*  All related operations, including memory management, are handled by the library.
+*  in full conformance with specification v1.6.1 .
+*  This library rely upon memory management capabilities.
 * */
 
 
@@ -63,9 +63,9 @@ You can contact the author at :
 *  Memory routines
 **************************************/
 #include <stdlib.h>   /* malloc, calloc, free */
-#define ALLOC(s)   malloc(s)
-#define ALLOC_AND_ZERO(s)   calloc(1,s)
-#define FREEMEM        free
+#define ALLOC(s)       malloc(s)
+#define ALLOC_AND_ZERO(s)  calloc(1,(s))
+#define FREEMEM(p)     free(p)
 #include <string.h>   /* memset, memcpy, memmove */
 #define MEM_INIT       memset
 
