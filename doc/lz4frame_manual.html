@@ -84,19 +84,21 @@
   LZ4F_blockChecksum_t   blockChecksumFlag;   </b>/* 1: each block followed by a checksum of block's compressed data; 0: disabled (default) */<b>
 } LZ4F_frameInfo_t;
 </b><p>  makes it possible to set or read frame parameters.
-  It's not required to set all fields, as long as the structure was initially memset() to zero.
-  For all fields, 0 sets it to default value 
+  Structure must be first init to 0, using memset() or LZ4F_INIT_FRAMEINFO,
+  setting all parameters to default.
+  It's then possible to update selectively some parameters 
 </p></pre><BR>
 
 <pre><b>typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;    </b>/* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */<b>
-  unsigned autoFlush;           </b>/* 1: always flush, to reduce usage of internal buffers */<b>
-  unsigned favorDecSpeed;       </b>/* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4LZ4HC_CLEVEL_OPT_MIN) */  /* >= v1.8.2 */<b>
+  unsigned autoFlush;           </b>/* 1: always flush; reduces usage of internal buffers */<b>
+  unsigned favorDecSpeed;       </b>/* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* v1.8.2+ */<b>
   unsigned reserved[3];         </b>/* must be zero for forward compatibility */<b>
 } LZ4F_preferences_t;
-</b><p>  makes it possible to supply detailed compression parameters to the stream interface.
-  Structure is presumed initially memset() to zero, representing default settings.
+</b><p>  makes it possible to supply advanced compression instructions to streaming interface.
+  Structure must be first init to 0, using memset() or LZ4F_INIT_PREFERENCES,
+  setting all parameters to default.
   All reserved fields must be set to zero. 
 </p></pre><BR>
 
