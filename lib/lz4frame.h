@@ -427,15 +427,15 @@ LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always su
 extern "C" {
 #endif
 
-/* These declarations are not stable and may change in the future. They are
- * therefore only safe to depend on when the caller is statically linked
- * against the library. To access their declarations, define
- * LZ4F_STATIC_LINKING_ONLY.
+/* These declarations are not stable and may change in the future.
+ * They are therefore only safe to depend on
+ * when the caller is statically linked against the library.
+ * To access their declarations, define LZ4F_STATIC_LINKING_ONLY.
  *
- * There is a further protection mechanism where these symbols aren't published
- * into shared/dynamic libraries. You can override this behavior and force
- * them to be published by defining LZ4F_PUBLISH_STATIC_FUNCTIONS. Use at
- * your own risk.
+ * By default, these symbols aren't published into shared/dynamic libraries.
+ * You can override this behavior and force them to be published
+ * by defining LZ4F_PUBLISH_STATIC_FUNCTIONS.
+ * Use at your own risk.
  */
 #ifdef LZ4F_PUBLISH_STATIC_FUNCTIONS
 #define LZ4FLIB_STATIC_API LZ4FLIB_API
@@ -471,10 +471,10 @@ extern "C" {
 #define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
 
 /* enum list is exposed, to handle specific errors */
-typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM) } LZ4F_errorCodes;
+typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
+              _LZ4F_dummy_error_enum_for_c89_never_used } LZ4F_errorCodes;
 
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
-
 
 
 /**********************************
