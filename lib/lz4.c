@@ -694,9 +694,18 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
     DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, tableType=%u", inputSize, tableType);
     /* Init conditions */
-    if (outputLimited == fillOutput && maxOutputSize < 1) return 0; /* Impossible to store anything */
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
-    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
+    if (outputLimited == fillOutput && maxOutputSize < 1) {
+        cctx->lastError = stream_unable_to_store;
+        return 0; /* Impossible to store anything */
+    }
+    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) {
+        cctx->lastError = stream_unsupported_input_size;
+        return 0;   /* Unsupported inputSize, too large (or negative) */
+    }
+    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) {
+        cctx->lastError = stream_size_too_large;
+        return 0;  /* Size too large (not within 64K limit) */
+    }
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
 
@@ -812,8 +821,10 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         {   unsigned const litLength = (unsigned)(ip - anchor);
             token = op++;
             if ((outputLimited == limitedOutput) &&  /* Check output buffer overflow */
-                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
+                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit))) {
+                cctx->lastError = stream_buffer_overflow;
                 return 0;
+            }
             if ((outputLimited == fillOutput) &&
                 (unlikely(op + (litLength+240)/255 /* litlen */ + litLength /* literals */ + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit))) {
                 op--;
@@ -885,8 +896,10 @@ _next_match:
 
             if ((outputLimited) &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) ) {
-                if (outputLimited == limitedOutput)
-                  return 0;
+                if (outputLimited == limitedOutput) {
+                    cctx->lastError = stream_buffer_overflow;
+                    return 0;
+                }
                 if (outputLimited == fillOutput) {
                     /* Match description too long : reduce it */
                     U32 newMatchCode = 15 /* in token */ - 1 /* to avoid needing a zero byte */ + ((U32)(olimit - op) - 2 - 1 - LASTLITERALS) * 255;
@@ -983,8 +996,10 @@ _last_literals:
                 lastRun  = (olimit-op) - 1;
                 lastRun -= (lastRun+240)/255;
             }
-            if (outputLimited == limitedOutput)
+            if (outputLimited == limitedOutput) {
+                cctx->lastError = stream_buffer_overflow;
                 return 0;
+            }
         }
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
@@ -1003,7 +1018,9 @@ _last_literals:
         *inputConsumed = (int) (((const char*)ip)-source);
     }
     DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, (int)(((char*)op) - dest));
-    return (int)(((char*)op) - dest);
+    int result = (int)(((char*)op) - dest);
+    if (result <= 0) cctx->lastError = stream_unknown_error;
+    return result;
 }
 
 
@@ -1246,6 +1263,22 @@ void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dic
 }
 
 
+const char *LZ4_stream_error_desc(const LZ4_stream_t *stream) {
+    // TODO: validate that stream is not null
+    switch (stream->internal_donotuse.lastError) {
+        case stream_no_error: return "No errors";
+        case stream_not_initialized: return "Stream is not initialized";
+        case stream_unable_to_store: return "Unable to store anything";
+        case stream_unsupported_input_size: return "Unsupported input size";
+        case stream_size_too_large: return "Size is too large";
+        case stream_buffer_overflow: return "Buffer overflow";
+        case stream_unknown_error:
+        default:
+            return "Unknown error";
+    }
+}
+
+
 static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, int nextSize)
 {
     if (LZ4_dict->currentOffset + nextSize > 0x80000000) {   /* potential ptrdiff_t overflow (32-bits mode) */
@@ -1273,7 +1306,10 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
 
-    if (streamPtr->initCheck) return 0;   /* Uninitialized structure detected */
+    if (streamPtr->initCheck) {
+        streamPtr->lastError = stream_not_initialized;
+        return 0;   /* Uninitialized structure detected */
+    }
     LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
 

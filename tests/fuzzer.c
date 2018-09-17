@@ -676,6 +676,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         LZ4_loadDict(&LZ4dict, dict, dictSize);
         ret = LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize-1, 1);
         FUZ_CHECKTEST(ret>0, "LZ4_compress_fast_continue using ExtDict should fail : one missing byte for output buffer : %i written, %i buffer", ret, blockContinueCompressedSize);
+        FUZ_CHECKTEST(LZ4dict.internal_donotuse.lastError!=stream_buffer_overflow, "Should be buffer overflow");
 
         FUZ_DISPLAYTEST("test LZ4_compress_fast_continue() with dictionary loaded with LZ4_loadDict()");
         DISPLAYLEVEL(5, " compress %i bytes from buffer(%p) into dst(%p) using dict(%p) of size %i \n", blockSize, block, decodedBuffer, dict, dictSize);
@@ -990,6 +991,7 @@ static void FUZ_unitTests(int compressionLevel)
         LZ4_resetStream(&streamingState);
         result = LZ4_compress_fast_continue(&streamingState, testInput, testCompressed, testCompressedSize, testCompressedSize-1, 1);
         FUZ_CHECKTEST(result==0, "LZ4_compress_fast_continue() compression failed!");
+        FUZ_CHECKTEST(streamingState.internal_donotuse.lastError!=stream_no_error, "LZ4_compress_fast_continue() compression failed!");
 
         result = LZ4_decompress_safe(testCompressed, testVerify, result, testCompressedSize);
         FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
