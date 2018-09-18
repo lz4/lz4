@@ -148,8 +148,13 @@ usan: clean
 usan32: clean
 	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
+.PHONY: staticAnalyze
 staticAnalyze: clean
 	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
+
+.PHONY: cppcheck
+cppcheck:
+	cppcheck . --force --enable=warning,portability,performance,style --error-exitcode=1 > /dev/null
 
 platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"

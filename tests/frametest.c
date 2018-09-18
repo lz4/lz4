@@ -520,7 +520,7 @@ int basicTests(U32 seed, double compressibility)
         LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
         if (cdict == NULL) goto _output_error;
         CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
-        
+
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with NULL dict : ");
         CHECK_V(cSizeNoDict,
                 LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
@@ -840,7 +840,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t const iSize = MIN(sampleMax, (size_t)(iend-ip));
                 size_t const oSize = LZ4F_compressBound(iSize, prefsPtr);
                 cOptions.stableSrc = ((FUZ_rand(&randState) & 3) == 1);
-                DISPLAYLEVEL(6, "Sending %zi bytes to compress (stableSrc:%u) \n",
+                DISPLAYLEVEL(6, "Sending %zu bytes to compress (stableSrc:%u) \n",
                                 iSize, cOptions.stableSrc);
 
                 result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &cOptions);

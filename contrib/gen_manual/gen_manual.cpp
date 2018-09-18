@@ -180,9 +180,9 @@ int main(int argc, char *argv[]) {
         if (!comments.empty())
             comments[comments.size()-1] = comments[comments.size()-1].substr(0, comments[comments.size()-1].find("*/"));
         for (l=0; l<comments.size(); l++) {
-            if (comments[l].find(" *") == 0)
+            if (comments[l].compare(0, 2, " *") == 0)
                 comments[l] = comments[l].substr(2);
-            else if (comments[l].find("  *") == 0)
+            else if (comments[l].compare(0, 3, "  *") == 0)
                 comments[l] = comments[l].substr(3);
             trim(comments[l], "*-=");
         }
