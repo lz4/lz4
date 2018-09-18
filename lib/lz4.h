@@ -485,6 +485,8 @@ LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const c
  */
 LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream);
 
+LZ4LIB_API const char *LZ4_stream_error_desc(const LZ4_stream_t *stream);
+
 #endif
 
 
@@ -499,6 +501,16 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
 #define LZ4_HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
 #define LZ4_HASH_SIZE_U32 (1 << LZ4_HASHLOG)       /* required as macro for static allocation */
 
+typedef enum {
+    stream_no_error = 0,
+    stream_not_initialized = 1,
+    stream_unable_to_store = 2,
+    stream_unsupported_input_size = 3,
+    stream_size_too_large = 4,
+    stream_buffer_overflow = 5,
+    stream_unknown_error = 128
+} stream_error_t;
+
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #include <stdint.h>
 
@@ -511,6 +523,7 @@ struct LZ4_stream_t_internal {
     const uint8_t* dictionary;
     const LZ4_stream_t_internal* dictCtx;
     uint32_t dictSize;
+    stream_error_t lastError;
 };
 
 typedef struct {
@@ -531,6 +544,7 @@ struct LZ4_stream_t_internal {
     const unsigned char* dictionary;
     const LZ4_stream_t_internal* dictCtx;
     unsigned int dictSize;
+    stream_error_t lastError;
 };
 
 typedef struct {
