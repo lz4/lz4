@@ -99,7 +99,7 @@ static void test_decompress(
         uint16_t cmpBytes = 0;
 
         if (read_uint16(inpFp, &cmpBytes) != 1) break;
-        if (cmpBytes <= 0) break;
+        if (cmpBytes == 0) break;
         if (read_bin(inpFp, cmpBuf, cmpBytes) != cmpBytes) break;
 
         {

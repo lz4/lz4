@@ -16,10 +16,9 @@
 /*
  * Easy show-error-and-bail function.
  */
-void run_screaming(const char *message, const int code) {
-  printf("%s\n", message);
+void run_screaming(const char* message, const int code) {
+  printf("%s \n", message);
   exit(code);
-  return;
 }
 
 
