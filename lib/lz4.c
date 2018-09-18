@@ -1747,12 +1747,13 @@ int LZ4_decompress_fast_doubleDict(const char* source, char* dest, int originalS
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOC_AND_ZERO(sizeof(LZ4_streamDecode_t));
+    LZ4_STATIC_ASSERT(LZ4_STREAMDECODESIZE >= sizeof(LZ4_streamDecode_t_internal));    /* A compilation error here means LZ4_STREAMDECODESIZE is not large enough */
     return lz4s;
 }
 
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
-    if (!LZ4_stream) return 0;   /* support free on NULL */
+    if (LZ4_stream == NULL) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return 0;
 }
