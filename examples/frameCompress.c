@@ -70,11 +70,12 @@ compress_file_internal(FILE* f_in, FILE* f_out,
     /* write frame header */
     {   size_t const headerSize = LZ4F_compressBegin(ctx, outBuff, outCapacity, &kPrefs);
         if (LZ4F_isError(headerSize)) {
-            printf("Failed to start compression: error %zu\n", headerSize);
+            printf("Failed to start compression: error %u \n", (unsigned)headerSize);
             return result;
         }
         count_out = headerSize;
-        printf("Buffer size is %zu bytes, header size %zu bytes\n", outCapacity, headerSize);
+        printf("Buffer size is %u bytes, header size %u bytes \n",
+                (unsigned)outCapacity, (unsigned)headerSize);
         safe_fwrite(outBuff, 1, headerSize, f_out);
     }
 
@@ -89,11 +90,11 @@ compress_file_internal(FILE* f_in, FILE* f_out,
                                                 inBuff, readSize,
                                                 NULL);
         if (LZ4F_isError(compressedSize)) {
-            printf("Compression failed: error %zu\n", compressedSize);
+            printf("Compression failed: error %u \n", (unsigned)compressedSize);
             return result;
         }
 
-        printf("Writing %zu bytes\n", compressedSize);
+        printf("Writing %u bytes\n", (unsigned)compressedSize);
         safe_fwrite(outBuff, 1, compressedSize, f_out);
         count_out += compressedSize;
     }
@@ -103,11 +104,11 @@ compress_file_internal(FILE* f_in, FILE* f_out,
                                                 outBuff, outCapacity,
                                                 NULL);
         if (LZ4F_isError(compressedSize)) {
-            printf("Failed to end compression: error %zu\n", compressedSize);
+            printf("Failed to end compression: error %u \n", (unsigned)compressedSize);
             return result;
         }
 
-        printf("Writing %zu bytes\n", compressedSize);
+        printf("Writing %u bytes \n", (unsigned)compressedSize);
         safe_fwrite(outBuff, 1, compressedSize, f_out);
         count_out += compressedSize;
     }

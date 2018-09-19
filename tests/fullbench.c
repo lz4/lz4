@@ -367,7 +367,6 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
       size_t readSize;
       int compressedBuffSize;
       U32 crcOriginal;
-      size_t errorCode;
 
       /* Check file existence */
       if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
@@ -561,7 +560,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
 #endif
             case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
-                    errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
+                {   size_t const errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
                     if (LZ4F_isError(errorCode)) {
                         DISPLAY("Error while preparing compressed frame\n");
                         free(orig_buff);
@@ -573,6 +572,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                     chunkP[0].compressedSize = (int)errorCode;
                     nbChunks = 1;
                     break;
+                }
             default :
                 continue;   /* skip if unknown ID */
             }

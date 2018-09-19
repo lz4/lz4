@@ -331,42 +331,48 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
  * It generates compressed streams using the old 'legacy' format */
 int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename, int compressionlevel)
 {
-    int (*compressionFunction)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
+    typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
+    compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = MAGICNUMBER_SIZE;
     char* in_buff;
     char* out_buff;
     const int outBuffSize = LZ4_compressBound(LEGACY_BLOCKSIZE);
-    FILE* finput;
+    FILE* const finput = LZ4IO_openSrcFile(input_filename);
     FILE* foutput;
     clock_t clockEnd;
 
     /* Init */
     clock_t const clockStart = clock();
-    compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
+    if (finput == NULL)
+        EXM_THROW(20, "%s : open file error ", input_filename);
 
-    finput = LZ4IO_openSrcFile(input_filename);
-    if (finput == NULL) EXM_THROW(20, "%s : open file error ", input_filename);
     foutput = LZ4IO_openDstFile(output_filename);
-    if (foutput == NULL) { fclose(finput); EXM_THROW(20, "%s : open file error ", input_filename); }
+    if (foutput == NULL) {
+        fclose(finput);
+        EXM_THROW(20, "%s : open file error ", input_filename);
+    }
 
     /* Allocate Memory */
     in_buff = (char*)malloc(LEGACY_BLOCKSIZE);
-    out_buff = (char*)malloc(outBuffSize);
-    if (!in_buff || !out_buff) EXM_THROW(21, "Allocation error : not enough memory");
+    out_buff = (char*)malloc(outBuffSize + 4);
+    if (!in_buff || !out_buff)
+        EXM_THROW(21, "Allocation error : not enough memory");
 
     /* Write Archive Header */
     LZ4IO_writeLE32(out_buff, LEGACY_MAGICNUMBER);
-    { size_t const sizeCheck = fwrite(out_buff, 1, MAGICNUMBER_SIZE, foutput);
-      if (sizeCheck != MAGICNUMBER_SIZE) EXM_THROW(22, "Write error : cannot write header"); }
+    {   size_t const writeSize = fwrite(out_buff, 1, MAGICNUMBER_SIZE, foutput);
+        if (writeSize != MAGICNUMBER_SIZE)
+            EXM_THROW(22, "Write error : cannot write header");
+    }
 
     /* Main Loop */
     while (1) {
-        unsigned int outSize;
+        int outSize;
         /* Read Block */
-        size_t const inSize = (int) fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
+        size_t const inSize = fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
+        assert(inSize <= LEGACY_BLOCKSIZE);
         if (inSize == 0) break;
-        if (inSize > LEGACY_BLOCKSIZE) EXM_THROW(23, "Read error : wrong fread() size report ");   /* should be impossible */
         filesize += inSize;
 
         /* Compress Block */
@@ -376,9 +382,11 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
                 (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
-        LZ4IO_writeLE32(out_buff, outSize);
-        {   size_t const sizeCheck = fwrite(out_buff, 1, outSize+4, foutput);
-            if (sizeCheck!=(size_t)(outSize+4))
+        assert(outSize > 0);
+        assert(outSize < outBuffSize);
+        LZ4IO_writeLE32(out_buff, (unsigned)outSize);
+        {   size_t const writeSize = fwrite(out_buff, 1, outSize+4, foutput);
+            if (writeSize != (size_t)(outSize+4))
                 EXM_THROW(24, "Write error : cannot write compressed block");
     }   }
     if (ferror(finput)) EXM_THROW(25, "Error while reading %s ", input_filename);

@@ -343,9 +343,10 @@ int basicTests(U32 seed, double compressibility)
                 op += oSize;
                 ip += iSize;
             }
-            { U64 const crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
-              if (crcDest != crcOrig) goto _output_error; }
-            DISPLAYLEVEL(3, "Regenerated %u/%u bytes \n", (unsigned)(op-ostart), COMPRESSIBLE_NOISE_LENGTH);
+            {   U64 const crcDest = XXH64(decodedBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
+                if (crcDest != crcOrig) goto _output_error;
+            }
+            DISPLAYLEVEL(3, "Regenerated %u/%u bytes \n", (unsigned)(op-ostart), (unsigned)COMPRESSIBLE_NOISE_LENGTH);
         }
     }
 
@@ -520,7 +521,7 @@ int basicTests(U32 seed, double compressibility)
         LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
         if (cdict == NULL) goto _output_error;
         CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
-        
+
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with NULL dict : ");
         CHECK_V(cSizeNoDict,
                 LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
@@ -840,8 +841,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t const iSize = MIN(sampleMax, (size_t)(iend-ip));
                 size_t const oSize = LZ4F_compressBound(iSize, prefsPtr);
                 cOptions.stableSrc = ((FUZ_rand(&randState) & 3) == 1);
-                DISPLAYLEVEL(6, "Sending %zi bytes to compress (stableSrc:%u) \n",
-                                iSize, cOptions.stableSrc);
+                DISPLAYLEVEL(6, "Sending %u bytes to compress (stableSrc:%u) \n",
+                                (unsigned)iSize, cOptions.stableSrc);
 
                 result = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &cOptions);
                 CHECK(LZ4F_isError(result), "Compression failed (error %i : %s)", (int)result, LZ4F_getErrorName(result));

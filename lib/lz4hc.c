@@ -231,7 +231,6 @@ LZ4HC_InsertAndGetWiderMatch (
     int matchChainPos = 0;
     U32 const pattern = LZ4_read32(ip);
     U32 matchIndex;
-    U32 dictMatchIndex;
     repeat_state_e repeat = rep_untested;
     size_t srcPatternLength = 0;
 
@@ -349,8 +348,8 @@ LZ4HC_InsertAndGetWiderMatch (
 
     if (dict == usingDictCtx && nbAttempts && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
         size_t const dictEndOffset = dictCtx->end - dictCtx->base;
+        U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         assert(dictEndOffset <= 1 GB);
-        dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
         while (ipIndex - matchIndex <= MAX_DISTANCE && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
