@@ -535,8 +535,8 @@ struct LZ4_stream_t_internal {
 
 typedef struct {
     const unsigned char* externalDict;
-    size_t extDictSize;
     const unsigned char* prefixEnd;
+    size_t extDictSize;
     size_t prefixSize;
 } LZ4_streamDecode_t_internal;
 

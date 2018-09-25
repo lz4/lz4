@@ -16,7 +16,7 @@
 <li><a href="#Chapter6">Streaming Compression Functions</a></li>
 <li><a href="#Chapter7">Streaming Decompression Functions</a></li>
 <li><a href="#Chapter8">Unstable declarations</a></li>
-<li><a href="#Chapter9">Private definitions</a></li>
+<li><a href="#Chapter9">PRIVATE DEFINITIONS</a></li>
 <li><a href="#Chapter10">Obsolete Functions</a></li>
 </ol>
 <hr>
@@ -375,7 +375,7 @@ int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize,
  
 </p></pre><BR>
 
-<a name="Chapter9"></a><h2>Private definitions</h2><pre>
+<a name="Chapter9"></a><h2>PRIVATE DEFINITIONS</h2><pre>
  Do not use these definitions directly.
  They are only exposed to allow static allocation of `LZ4_stream_t` and `LZ4_streamDecode_t`.
  Accessing members will expose code to API and/or ABI break in future versions of the library.
@@ -390,12 +390,12 @@ int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize,
 </b></pre><BR>
 <pre><b>typedef struct {
     const unsigned char* externalDict;
-    size_t extDictSize;
     const unsigned char* prefixEnd;
+    size_t extDictSize;
     size_t prefixSize;
 } LZ4_streamDecode_t_internal;
 </b></pre><BR>
-<pre><b>#define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
+<pre><b>#define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4 + ((sizeof(void*)==16) ? 4 : 0) </b>/*AS-400*/ )<b>
 #define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))
 union LZ4_stream_u {
     unsigned long long table[LZ4_STREAMSIZE_U64];
@@ -409,7 +409,7 @@ union LZ4_stream_u {
  
 </p></pre><BR>
 
-<pre><b>#define LZ4_STREAMDECODESIZE_U64  4
+<pre><b>#define LZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 2 : 0) </b>/*AS-400*/ )<b>
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
 union LZ4_streamDecode_u {
     unsigned long long table[LZ4_STREAMDECODESIZE_U64];
@@ -442,11 +442,11 @@ union LZ4_streamDecode_u {
 #    define LZ4_DEPRECATED(message)
 #  endif
 #endif </b>/* LZ4_DISABLE_DEPRECATE_WARNINGS */<b>
-</b><p>   Should deprecation warnings be a problem,
-   it is generally possible to disable them,
-   typically with -Wno-deprecated-declarations for gcc
-   or _CRT_SECURE_NO_WARNINGS in Visual.
-   Otherwise, it's also possible to define LZ4_DISABLE_DEPRECATE_WARNINGS 
+</b><p>  Should deprecation warnings be a problem,
+  it is generally possible to disable them,
+  typically with -Wno-deprecated-declarations for gcc
+  or _CRT_SECURE_NO_WARNINGS in Visual.
+  Otherwise, it's also possible to define LZ4_DISABLE_DEPRECATE_WARNINGS 
 </p></pre><BR>
 
 </html>
