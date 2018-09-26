@@ -1095,23 +1095,25 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 }
 
 
-int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize)
+int LZ4_compress_default(const char* src, char* dst, int srcSize, int maxOutputSize)
 {
-    return LZ4_compress_fast(source, dest, inputSize, maxOutputSize, 1);
+    return LZ4_compress_fast(src, dst, srcSize, maxOutputSize, 1);
 }
 
 
 /* hidden debug function */
 /* strangely enough, gcc generates faster code when this function is uncommented, even if unused */
-int LZ4_compress_fast_force(const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
+int LZ4_compress_fast_force(const char* src, char* dst, int srcSize, int dstCapacity, int acceleration)
 {
     LZ4_stream_t ctx;
     LZ4_resetStream(&ctx);
 
-    if (inputSize < LZ4_64Klimit)
-        return LZ4_compress_generic(&ctx.internal_donotuse, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, byU16,                        noDict, noDictIssue, acceleration);
-    else
-        return LZ4_compress_generic(&ctx.internal_donotuse, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, sizeof(void*)==8 ? byU32 : byPtr, noDict, noDictIssue, acceleration);
+    if (srcSize < LZ4_64Klimit) {
+        return LZ4_compress_generic(&ctx.internal_donotuse, src, dst, srcSize, NULL, dstCapacity, limitedOutput, byU16,    noDict, noDictIssue, acceleration);
+    } else {
+        tableType_t const addrMode = (sizeof(void*) > 4) ? byU32 : byPtr;
+        return LZ4_compress_generic(&ctx.internal_donotuse, src, dst, srcSize, NULL, dstCapacity, limitedOutput, addrMode, noDict, noDictIssue, acceleration);
+    }
 }
 
 
@@ -1128,8 +1130,8 @@ static int LZ4_compress_destSize_extState (LZ4_stream_t* state, const char* src,
         if (*srcSizePtr < LZ4_64Klimit) {
             return LZ4_compress_generic(&state->internal_donotuse, src, dst, *srcSizePtr, srcSizePtr, targetDstSize, fillOutput, byU16, noDict, noDictIssue, 1);
         } else {
-            tableType_t const tableType = ((sizeof(void*)==4) && ((uptrval)src > MAX_DISTANCE)) ? byPtr : byU32;
-            return LZ4_compress_generic(&state->internal_donotuse, src, dst, *srcSizePtr, srcSizePtr, targetDstSize, fillOutput, tableType, noDict, noDictIssue, 1);
+            tableType_t const addrMode = ((sizeof(void*)==4) && ((uptrval)src > MAX_DISTANCE)) ? byPtr : byU32;
+            return LZ4_compress_generic(&state->internal_donotuse, src, dst, *srcSizePtr, srcSizePtr, targetDstSize, fillOutput, addrMode, noDict, noDictIssue, 1);
     }   }
 }
 
@@ -1160,7 +1162,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 
 LZ4_stream_t* LZ4_createStream(void)
 {
-    LZ4_stream_t* lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
+    LZ4_stream_t* const lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
     LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
     DEBUGLOG(4, "LZ4_createStream %p", lz4s);
     if (lz4s == NULL) return NULL;
@@ -1748,12 +1750,13 @@ int LZ4_decompress_fast_doubleDict(const char* source, char* dest, int originalS
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOC_AND_ZERO(sizeof(LZ4_streamDecode_t));
+    LZ4_STATIC_ASSERT(LZ4_STREAMDECODESIZE >= sizeof(LZ4_streamDecode_t_internal));    /* A compilation error here means LZ4_STREAMDECODESIZE is not large enough */
     return lz4s;
 }
 
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
-    if (!LZ4_stream) return 0;   /* support free on NULL */
+    if (LZ4_stream == NULL) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return 0;
 }
