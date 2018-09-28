@@ -101,9 +101,9 @@ void frameCheck(const char *srcFileName, unsigned bsid, size_t blockSize)
 {
     FILE *srcFile;
     LZ4F_decompressionContext_t dctx = NULL;
-    size_t srcBufferSize = 4 MB;
+    const size_t srcBufferSize = 4 MB;
     void *srcBuffer = malloc(srcBufferSize);
-    size_t dstBufferSize = 4 MB;
+    const size_t dstBufferSize = 4 MB;
     void *dstBuffer = malloc(dstBufferSize);
     LZ4F_errorCode_t nextToLoad = 0;
     size_t curblocksize = 0;
