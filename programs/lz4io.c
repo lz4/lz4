@@ -256,7 +256,6 @@ void LZ4IO_setRemoveSrcFile(unsigned flag) { g_removeSrcFile = (flag>0); }
 ** ********************** LZ4 File / Pipe compression ********************* **
 ** ************************************************************************ */
 
-static int LZ4IO_GetBlockSize_FromBlockId (int id) { return (1 << (8 + (2 * id))); }
 static int LZ4IO_isSkippableMagicNumber(unsigned int magic) {
     return (magic & LZ4IO_SKIPPABLEMASK) == LZ4IO_SKIPPABLE0;
 }

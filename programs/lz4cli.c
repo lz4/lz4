@@ -134,7 +134,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -r     : operate recursively on directories (sets also -m) \n");
 #endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
-    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+] \n");
+    DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
     DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio) \n");
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
