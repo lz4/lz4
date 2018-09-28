@@ -110,6 +110,7 @@ static clock_t g_time = 0;
 static int g_overwrite = 1;
 static int g_testMode = 0;
 static int g_blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
+static int g_blockSize = 0;
 static int g_blockChecksum = 0;
 static int g_streamChecksum = 1;
 static int g_blockIndependence = 1;
@@ -178,7 +179,25 @@ size_t LZ4IO_setBlockSizeID(unsigned bsid)
     static const unsigned maxBlockSizeID = 7;
     if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return 0;
     g_blockSizeId = bsid;
-    return blockSizeTable[g_blockSizeId-minBlockSizeID];
+    g_blockSize = blockSizeTable[g_blockSizeId-minBlockSizeID];
+    return g_blockSize;
+}
+
+size_t LZ4IO_setBlockSize(size_t blockSize)
+{
+    static const size_t minBlockSize = 32;
+    static const size_t maxBlockSize = 4 MB;
+    unsigned bsid = 0;
+    if (blockSize < minBlockSize) blockSize = minBlockSize;
+    if (blockSize > maxBlockSize) blockSize = maxBlockSize;
+    g_blockSize = blockSize;
+    blockSize--;
+    /* find which of { 64k, 256k, 1MB, 4MB } is closest to blockSize */
+    while (blockSize >>= 2)
+        bsid++;
+    if (bsid < 7) bsid = 7;
+    g_blockSizeId = bsid-3;
+    return g_blockSize;
 }
 
 int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode)
@@ -499,7 +518,7 @@ static LZ4F_CDict* LZ4IO_createCDict(void) {
 
 static cRess_t LZ4IO_createCResources(void)
 {
-    const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
+    const size_t blockSize = g_blockSize;
     cRess_t ress;
 
     LZ4F_errorCode_t const errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
@@ -543,7 +562,7 @@ static int LZ4IO_compressFilename_extRess(cRess_t ress, const char* srcFileName,
     void* const srcBuffer = ress.srcBuffer;
     void* const dstBuffer = ress.dstBuffer;
     const size_t dstBufferSize = ress.dstBufferSize;
-    const size_t blockSize = (size_t)LZ4IO_GetBlockSize_FromBlockId (g_blockSizeId);
+    const size_t blockSize = g_blockSize;
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress.ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;

@@ -134,7 +134,8 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -r     : operate recursively on directories (sets also -m) \n");
 #endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
-    DISPLAY( " -B#    : Block size [4-7] (default : 7) \n");
+    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+] \n");
+    DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
     DISPLAY( " -BD    : Block dependency (improve compression ratio) \n");
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
@@ -146,8 +147,6 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
     DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s) \n");
-    DISPLAY( " -B#    : cut file into independent blocks of size # bytes [32+] \n");
-    DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
     if (g_lz4c_legacy_commands) {
         DISPLAY( "Legacy arguments : \n");
         DISPLAY( " -c0    : fast compression \n");
@@ -497,11 +496,12 @@ int main(int argc, const char** argv)
                                     DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
                                 } else {
                                     if (B < 32) badusage(exeName);
-                                    BMK_setBlockSize(B);
-                                    if (B >= 1024) {
-                                        DISPLAYLEVEL(2, "bench: using blocks of size %u KB \n", (U32)(B>>10));
+                                    blockSize = LZ4IO_setBlockSize(B);
+                                    BMK_setBlockSize(blockSize);
+                                    if (blockSize >= 1024) {
+                                        DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
                                     } else {
-                                        DISPLAYLEVEL(2, "bench: using blocks of size %u bytes \n", (U32)(B));
+                                        DISPLAYLEVEL(2, "using blocks of size %u bytes \n", (U32)(blockSize));
                                     }
                                 }
                                 break;
