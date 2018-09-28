@@ -414,19 +414,22 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 #endif
 
 /*! LZ4_resetStream_fast() :
- *  Use this, like LZ4_resetStream(), to prepare a context for a new chain of
- *  calls to a streaming API (e.g., LZ4_compress_fast_continue()).
+ *  Use this to prepare a context for a new chain of calls to a streaming API
+ *  (e.g., LZ4_compress_fast_continue()).
+ *
+ *  Note:
+ *  To stay on the safe side, when LZ4_stream_t is used for the first time,
+ *  it should be either created using LZ4_createStream() or
+ *  initialized using LZ4_resetStream().
  *
  *  Note:
  *  Using this in advance of a non-streaming-compression function is redundant,
  *  since they all perform their own custom reset internally.
  *
  *  Differences from LZ4_resetStream():
- *  When an LZ4_stream_t is known to be in a internally coherent state,
- *  it can often be prepared for a new compression with almost no work,
- *  only sometimes falling back to the full, expensive reset
- *  that is always required when the stream is in an indeterminate state
- *  (i.e., the reset performed by LZ4_resetStream()).
+ *  When an LZ4_stream_t is known to be in an internally coherent state,
+ *  it will be prepared for a new compression with almost no work.
+ *  Otherwise, it will fall back to the full, expensive reset.
  *
  *  LZ4_streams are guaranteed to be in a valid state when:
  *  - returned from LZ4_createStream()
@@ -439,9 +442,11 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
  *    call that fully reset the state (e.g., LZ4_compress_fast_extState()) and
  *    that returned success
  *
- *  When a stream isn't known to be in a valid state, it is not safe to pass to
- *  any fastReset or streaming function. It must first be cleansed by the full
- *  LZ4_resetStream().
+ *  Note:
+ *  A stream that was used in a compression call that did not return success
+ *  (e.g., LZ4_compress_fast_continue()), can still be passed to this function,
+ *  however, it's history is not preserved because of previous compression
+ *  failure.
  */
 LZ4LIB_STATIC_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
 
@@ -506,7 +511,7 @@ typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
 struct LZ4_stream_t_internal {
     uint32_t hashTable[LZ4_HASH_SIZE_U32];
     uint32_t currentOffset;
-    uint16_t initCheck;
+    uint16_t dirtyContext;
     uint16_t tableType;
     const uint8_t* dictionary;
     const LZ4_stream_t_internal* dictCtx;
@@ -526,7 +531,7 @@ typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
 struct LZ4_stream_t_internal {
     unsigned int hashTable[LZ4_HASH_SIZE_U32];
     unsigned int currentOffset;
-    unsigned short initCheck;
+    unsigned short dirtyContext;
     unsigned short tableType;
     const unsigned char* dictionary;
     const LZ4_stream_t_internal* dictCtx;
