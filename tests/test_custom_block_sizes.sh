@@ -13,10 +13,10 @@ TMPFILE2=/tmp/test_custom_block_sizes2.$$
 $DATAGEN -g12345678 > $TMPFILE1
 $DATAGEN -g12345678 > $TMPFILE2
 
-echo Testing -B32
-$LZ4 -f -B32 $TMPFILE && failures="31 (should fail) "
+echo Testing -B31
+$LZ4 -f -B31 $TMPFILE1 && failures="31 (should fail) "
 
-for blocksize in 512 65535 65536
+for blocksize in 32 65535 65536
 do
   echo Testing -B$blocksize
   $LZ4 -f -B$blocksize $TMPFILE1
