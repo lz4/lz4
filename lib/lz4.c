@@ -610,6 +610,15 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
         LZ4_stream_t_internal* const cctx,
         const int inputSize,
         const tableType_t tableType) {
+    /* If compression failed during the previous step, then the context
+     * is marked as dirty, therefore, it has to be fully reset.
+     */
+    if (cctx->dirtyContext) {
+        DEBUGLOG(5, "LZ4_prepareTable: Full reset for %p", cctx);
+        MEM_INIT(cctx, 0, sizeof(LZ4_stream_t_internal));
+        return;
+    }
+
     /* If the table hasn't been used, it's guaranteed to be zeroed out, and is
      * therefore safe to use no matter what mode we're in. Otherwise, we figure
      * out if it's safe to leave as is or whether it needs to be reset.
@@ -660,6 +669,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                  const dictIssue_directive dictIssue,
                  const U32 acceleration)
 {
+    int result;
     const BYTE* ip = (const BYTE*) source;
 
     U32 const startIndex = cctx->currentOffset;
@@ -695,9 +705,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
     DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, tableType=%u", inputSize, tableType);
     /* Init conditions */
-    if (outputLimited == fillOutput && maxOutputSize < 1) return 0; /* Impossible to store anything */
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;   /* Unsupported inputSize, too large (or negative) */
-    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
+    if (outputLimited == fillOutput && maxOutputSize < 1) goto _failure;  /* Impossible to store anything */
+    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) goto _failure;   /* Unsupported inputSize, too large (or negative) */
+    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) goto _failure;  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
 
@@ -814,7 +824,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             token = op++;
             if ((outputLimited == limitedOutput) &&  /* Check output buffer overflow */
                 (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
-                return 0;
+                goto _failure;
+
             if ((outputLimited == fillOutput) &&
                 (unlikely(op + (litLength+240)/255 /* litlen */ + litLength /* literals */ + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit))) {
                 op--;
@@ -887,7 +898,7 @@ _next_match:
             if ((outputLimited) &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) ) {
                 if (outputLimited == limitedOutput)
-                  return 0;
+                    goto _failure;
                 if (outputLimited == fillOutput) {
                     /* Match description too long : reduce it */
                     U32 newMatchCode = 15 /* in token */ - 1 /* to avoid needing a zero byte */ + ((U32)(olimit - op) - 2 - 1 - LASTLITERALS) * 255;
@@ -985,7 +996,7 @@ _last_literals:
                 lastRun -= (lastRun+240)/255;
             }
             if (outputLimited == limitedOutput)
-                return 0;
+                goto _failure;
         }
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
@@ -1004,7 +1015,14 @@ _last_literals:
         *inputConsumed = (int) (((const char*)ip)-source);
     }
     DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, (int)(((char*)op) - dest));
-    return (int)(((char*)op) - dest);
+    result = (int)(((char*)op) - dest);
+    assert(result > 0);
+    return result;
+
+_failure:
+    /* Mark stream as having dirty context, so, it has to be fully reset */
+    cctx->dirtyContext = 1;
+    return 0;
 }
 
 
@@ -1233,6 +1251,12 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dictionary_stream) {
+    /* Calling LZ4_resetStream_fast() here makes sure that changes will not be
+     * erased by subsequent calls to LZ4_resetStream_fast() in case stream was
+     * marked as having dirty context, e.g. requiring full reset.
+     */
+    LZ4_resetStream_fast(working_stream);
+
     if (dictionary_stream != NULL) {
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
@@ -1276,7 +1300,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
 
-    if (streamPtr->initCheck) return 0;   /* Uninitialized structure detected */
+    if (streamPtr->dirtyContext) return 0;   /* Uninitialized structure detected */
     LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
 

@@ -1474,7 +1474,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
                 dctx->tmpInTarget -= sizeToCopy;  /* need to copy more */
                 nextSrcSizeHint = dctx->tmpInTarget +
-                                + dctx->frameInfo.contentChecksumFlag * 4  /* block checksum */
+                                + dctx->frameInfo.blockChecksumFlag * 4   /* size for block checksum */
                                 + BHSize /* next header size */;
                 doAnotherStage = 0;
                 break;
@@ -1525,8 +1525,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 dctx->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
                 if (dctx->tmpInSize < dctx->tmpInTarget) { /* need more input */
-                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize) + BHSize;
-                    doAnotherStage=0;
+                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)
+                                    + dctx->frameInfo.blockChecksumFlag * 4   /* size for block checksum */
+                                    + BHSize /* next header size */;
+                    doAnotherStage = 0;
                     break;
                 }
                 selectedIn = dctx->tmpIn;
