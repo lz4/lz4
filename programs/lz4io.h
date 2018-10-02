@@ -78,6 +78,10 @@ int LZ4IO_setTestMode(int yes);
    return : 0 if error, blockSize if OK */
 size_t LZ4IO_setBlockSizeID(unsigned blockSizeID);
 
+/* blockSize : valid values : 32 -> 4MB
+   return : 0 if error, actual blocksize if OK */
+size_t LZ4IO_setBlockSize(size_t blockSize);
+
 /* Default setting : independent blocks */
 typedef enum { LZ4IO_blockLinked=0, LZ4IO_blockIndependent} LZ4IO_blockMode_t;
 int LZ4IO_setBlockMode(LZ4IO_blockMode_t blockMode);
