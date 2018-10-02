@@ -97,32 +97,59 @@ static U32 use_pause = 0;
 #define MIN(a,b)  ( (a) < (b) ? (a) : (b) )
 #define MAX(a,b)  ( (a) > (b) ? (a) : (b) )
 
-int frameCheck(FILE* const srcFile, unsigned bsid, size_t blockSize)
+typedef struct {
+    void*  srcBuffer;
+    size_t srcBufferSize;
+    void*  dstBuffer;
+    size_t dstBufferSize;
+    LZ4F_decompressionContext_t ctx;
+} cRess_t;
+
+static int createCResources(cRess_t *ress)
 {
-    LZ4F_decompressionContext_t dctx = NULL;
-    const size_t srcBufferSize = 4 MB;
-    void* const srcBuffer = malloc(srcBufferSize);
-    const size_t dstBufferSize = 4 MB;
-    void* const dstBuffer = malloc(dstBufferSize);
+    ress->srcBufferSize = 4 MB;
+    ress->srcBuffer = malloc(ress->srcBufferSize);
+    ress->dstBufferSize = 4 MB;
+    ress->dstBuffer = malloc(ress->dstBufferSize);
+
+    if (!ress->srcBuffer || !ress->dstBuffer) {
+        free(ress->srcBuffer);
+        free(ress->dstBuffer);
+        EXM_THROW(20, "Allocation error : not enough memory");
+    }
+
+    if (LZ4F_isError( LZ4F_createDecompressionContext(&(ress->ctx), LZ4F_VERSION) )) {
+        free(ress->srcBuffer);
+        free(ress->dstBuffer);
+        EXM_THROW(21, "Unable to create decompression context");
+    }
+    return 0;
+}
+
+static void freeCResources(cRess_t ress)
+{
+    free(ress.srcBuffer);
+    free(ress.dstBuffer);
+
+    (void) LZ4F_freeDecompressionContext(ress.ctx);
+}
+
+int frameCheck(cRess_t ress, FILE* const srcFile, unsigned bsid, size_t blockSize)
+{
     LZ4F_errorCode_t nextToLoad = 0;
     size_t curblocksize = 0;
     int partialBlock = 0;
 
-    if (!srcBuffer || !dstBuffer) EXM_THROW(20, "Allocation error : not enough memory");
-
-    if (LZ4F_isError( LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION) )) {
-        EXM_THROW(21, "Unable to create decompression context");
-    }
     /* Main Loop */
     for (;;) {
         size_t readSize;
         size_t pos = 0;
-        size_t decodedBytes = dstBufferSize;
+        size_t decodedBytes = ress.dstBufferSize;
         size_t remaining;
         LZ4F_frameInfo_t frameInfo;
 
         /* Read input */
-        readSize = fread(srcBuffer, 1, srcBufferSize, srcFile);
+        readSize = fread(ress.srcBuffer, 1, ress.srcBufferSize, srcFile);
         if (!readSize) break;   /* reached end of file or stream */
 
         while (pos < readSize) {  /* still to read */
@@ -131,18 +158,18 @@ int frameCheck(FILE* const srcFile, unsigned bsid, size_t blockSize)
                 /* LZ4F_decompress returned 0 : starting new frame */
                 curblocksize = 0;
                 remaining = readSize - pos;
-                nextToLoad = LZ4F_getFrameInfo(dctx, &frameInfo, (char*)(srcBuffer)+pos, &remaining);
+                nextToLoad = LZ4F_getFrameInfo(ress.ctx, &frameInfo, (char*)(ress.srcBuffer)+pos, &remaining);
                 if (LZ4F_isError(nextToLoad)) EXM_THROW(22, "Error getting frame info: %s", LZ4F_getErrorName(nextToLoad)); /* XXX */
                 if (frameInfo.blockSizeID != bsid) EXM_THROW(23, "Block size ID %u != expected %u", frameInfo.blockSizeID, bsid);
                 pos += remaining;
                 /* nextToLoad should be block header size */
                 remaining = nextToLoad;
-                decodedBytes = dstBufferSize;
-                nextToLoad = LZ4F_decompress(dctx, dstBuffer, &decodedBytes, (char*)(srcBuffer)+pos, &remaining, NULL);
+                decodedBytes = ress.dstBufferSize;
+                nextToLoad = LZ4F_decompress(ress.ctx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
                 if (LZ4F_isError(nextToLoad)) EXM_THROW(24, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
                 pos += remaining;
             }
-            decodedBytes = dstBufferSize;
+            decodedBytes = ress.dstBufferSize;
             /* nextToLoad should be just enough to cover the next block */
             if (nextToLoad > (readSize - pos)) {
                 /* block is not fully contained in current buffer */
@@ -154,7 +181,7 @@ int frameCheck(FILE* const srcFile, unsigned bsid, size_t blockSize)
                 }
                 remaining = nextToLoad;
             }
-            nextToLoad = LZ4F_decompress(dctx, dstBuffer, &decodedBytes, (char*)(srcBuffer)+pos, &remaining, NULL);
+            nextToLoad = LZ4F_decompress(ress.ctx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, NULL);
             if (LZ4F_isError(nextToLoad)) EXM_THROW(24, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             curblocksize += decodedBytes;
             pos += remaining;
@@ -193,7 +220,6 @@ int FUZ_usage(const char* programName)
 int main(int argc, const char** argv)
 {
     int argNb;
-    int err;
     int bsid=0;
     size_t blockSize=0;
     const char* const programName = argv[0];
@@ -257,13 +283,21 @@ int main(int argc, const char** argv)
                 }
             }
         } else {
+            int err;
             FILE *srcFile;
+            cRess_t ress;
             if (bsid == 0 || blockSize == 0)
               return FUZ_usage(programName);
             DISPLAY("Starting frame checker (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION_STRING);
+            err = createCResources(&ress);
+            if (err) return (err);
             srcFile = fopen(argument, "rb");
-            if ( srcFile==NULL ) EXM_THROW(1, "%s: %s \n", argument, strerror(errno));
-            err = frameCheck(srcFile, bsid, blockSize);
+            if ( srcFile==NULL ) {
+                freeCResources(ress);
+                EXM_THROW(1, "%s: %s \n", argument, strerror(errno));
+            }
+            err = frameCheck(ress, srcFile, bsid, blockSize);
+            freeCResources(ress);
             fclose(srcFile);
             return (err);
         }
