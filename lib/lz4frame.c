@@ -951,14 +951,18 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
 
     size_t const flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
     if (LZ4F_isError(flushSize)) return flushSize;
-    assert(flushSize <= dstCapacity);
     dstPtr += flushSize;
 
+    assert(flushSize <= dstCapacity);
+    dstCapacity -= flushSize;
+
+    if (dstCapacity < 4) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     LZ4F_writeLE32(dstPtr, 0);
     dstPtr += 4;   /* endMark */
 
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
         U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
+        if (dstCapacity < 8) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */
     }
