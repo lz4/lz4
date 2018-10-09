@@ -857,8 +857,18 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 }   }
             }
             CHECK(op>=oend, "LZ4F_compressFrameBound overflow");
-            result = LZ4F_compressEnd(cCtx, op, oend-op, &cOptions);
-            CHECK(LZ4F_isError(result), "Compression completion failed (error %i : %s)", (int)result, LZ4F_getErrorName(result));
+            {   size_t const dstEndSafeSize = LZ4F_compressBound(0, prefsPtr);
+                int const tooSmallDstEnd = ((FUZ_rand(&randState) & 31) == 3);
+                size_t const dstEndTooSmallSize = (FUZ_rand(&randState) % dstEndSafeSize) + 1;
+                size_t const dstEndSize = tooSmallDstEnd ? dstEndTooSmallSize : dstEndSafeSize;
+                BYTE const canaryByte = (BYTE)(FUZ_rand(&randState) & 255);
+                op[dstEndSize] = canaryByte;
+                result = LZ4F_compressEnd(cCtx, op, dstEndSize, &cOptions);
+                CHECK(op[dstEndSize] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
+                if (LZ4F_isError(result)) {
+                    if (tooSmallDstEnd) /* failure is allowed */ continue;
+                    CHECK(1, "Compression completion failed (error %i : %s)", (int)result, LZ4F_getErrorName(result));
+            }   }
             op += result;
             cSize = op-(BYTE*)compressedBuffer;
             DISPLAYLEVEL(5, "\nCompressed %u bytes into %u \n", (U32)srcSize, (U32)cSize);

@@ -686,7 +686,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
  *  dstBuffer must be >= LZ4F_HEADER_SIZE_MAX bytes.
  *  preferencesPtr can be NULL, in which case default parameters are selected.
  * @return : number of bytes written into dstBuffer for the header
- *           or an error code (can be tested using LZ4F_isError())
+ *        or an error code (can be tested using LZ4F_isError())
  */
 size_t LZ4F_compressBegin(LZ4F_cctx* cctxPtr,
                           void* dstBuffer, size_t dstCapacity,
@@ -934,28 +934,35 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstCapacity, const
 
 
 /*! LZ4F_compressEnd() :
- * When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
- * It will flush whatever data remained within compressionContext (like LZ4_flush())
- * but also properly finalize the frame, with an endMark and a checksum.
- * The result of the function is the number of bytes written into dstBuffer (necessarily >= 4 (endMark size))
- * The function outputs an error code if it fails (can be tested using LZ4F_isError())
- * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * compressionContext can then be used again, starting with LZ4F_compressBegin(). The preferences will remain the same.
+ *  When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
+ *  It will flush whatever data remained within compressionContext (like LZ4_flush())
+ *  but also properly finalize the frame, with an endMark and an (optional) checksum.
+ *  LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
+ * @return: the number of bytes written into dstBuffer (necessarily >= 4 (endMark size))
+ *       or an error code if it fails (can be tested using LZ4F_isError())
+ *  The context can then be used again to compress a new frame, starting with LZ4F_compressBegin().
  */
-size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstMaxSize, const LZ4F_compressOptions_t* compressOptionsPtr)
+size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
+                        void* dstBuffer, size_t dstCapacity,
+                  const LZ4F_compressOptions_t* compressOptionsPtr)
 {
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
 
-    size_t const flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstMaxSize, compressOptionsPtr);
+    size_t const flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
     if (LZ4F_isError(flushSize)) return flushSize;
     dstPtr += flushSize;
 
+    assert(flushSize <= dstCapacity);
+    dstCapacity -= flushSize;
+
+    if (dstCapacity < 4) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     LZ4F_writeLE32(dstPtr, 0);
-    dstPtr+=4;   /* endMark */
+    dstPtr += 4;   /* endMark */
 
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
         U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
+        if (dstCapacity < 8) return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */
     }
