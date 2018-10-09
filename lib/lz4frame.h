@@ -295,6 +295,7 @@ LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx,
  * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
  * @return : nb of bytes written into dstBuffer (can be zero, when there is no data stored within cctx)
  *           or an error code if it fails (which can be tested using LZ4F_isError())
+ *  Note : LZ4F_flush() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
  */
 LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
                               void* dstBuffer, size_t dstCapacity,
@@ -307,6 +308,7 @@ LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
  * `cOptPtr` is optional : NULL can be provided, in which case all options will be set to default.
  * @return : nb of bytes written into dstBuffer, necessarily >= 4 (endMark),
  *           or an error code if it fails (which can be tested using LZ4F_isError())
+ *  Note : LZ4F_compressEnd() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
  *  A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
  */
 LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx,
