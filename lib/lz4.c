@@ -613,7 +613,7 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
     /* If compression failed during the previous step, then the context
      * is marked as dirty, therefore, it has to be fully reset.
      */
-    if (cctx->dirtyContext) {
+    if (cctx->dirty) {
         DEBUGLOG(5, "LZ4_prepareTable: Full reset for %p", cctx);
         MEM_INIT(cctx, 0, sizeof(LZ4_stream_t_internal));
         return;
@@ -704,10 +704,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     U32 forwardH;
 
     DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, tableType=%u", inputSize, tableType);
-    /* Init conditions */
-    if (outputLimited == fillOutput && maxOutputSize < 1) goto _failure;  /* Impossible to store anything */
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) goto _failure;   /* Unsupported inputSize, too large (or negative) */
-    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) goto _failure;  /* Size too large (not within 64K limit) */
+    /* If init conditions are not met, we don't have to mark stream
+     * as having dirty context, since no action was taken yet */
+    if (outputLimited == fillOutput && maxOutputSize < 1) return 0;   /* Impossible to store anything */
+    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;           /* Unsupported inputSize, too large (or negative) */
+    if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
 
@@ -1021,7 +1022,7 @@ _last_literals:
 
 _failure:
     /* Mark stream as having dirty context, so, it has to be fully reset */
-    cctx->dirtyContext = 1;
+    cctx->dirty = 1;
     return 0;
 }
 
@@ -1300,7 +1301,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
 
-    if (streamPtr->dirtyContext) return 0;   /* Uninitialized structure detected */
+    if (streamPtr->dirty) return 0;   /* Uninitialized structure detected */
     LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
 
