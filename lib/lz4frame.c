@@ -1,6 +1,7 @@
 /*
 LZ4 auto-framing library
 Copyright (C) 2011-2016, Yann Collet.
+Copyright (C) 2018, Google.
 
 BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -951,10 +952,16 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr, void* dstBuffer, size_t dstMaxSize, 
     if (LZ4F_isError(flushSize)) return flushSize;
     dstPtr += flushSize;
 
+    if ((size_t)((dstPtr+4) - dstStart) > dstMaxSize) {
+        return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
+    }
     LZ4F_writeLE32(dstPtr, 0);
     dstPtr+=4;   /* endMark */
 
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
+        if ((size_t)((dstPtr+4) - dstStart) > dstMaxSize) {
+            return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
+        }
         U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */
