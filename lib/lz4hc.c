@@ -744,16 +744,22 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
     {   cParams_t const cParam = clTable[cLevel];
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
-        if (cParam.strat == lz4hc)
-            return LZ4HC_compress_hashChain(ctx,
+        int result;
+
+        if (cParam.strat == lz4hc) {
+            result = LZ4HC_compress_hashChain(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
                                 cParam.nbSearches, limit, dict);
-        assert(cParam.strat == lz4opt);
-        return LZ4HC_compress_optimal(ctx,
-                            src, dst, srcSizePtr, dstCapacity,
-                            cParam.nbSearches, cParam.targetLength, limit,
-                            cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
-                            dict, favor);
+        } else {
+            assert(cParam.strat == lz4opt);
+            result = LZ4HC_compress_optimal(ctx,
+                                src, dst, srcSizePtr, dstCapacity,
+                                cParam.nbSearches, cParam.targetLength, limit,
+                                cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
+                                dict, favor);
+        }
+        if (result <= 0) ctx->dirty = 1;
+        return result;
     }
 }
 
@@ -892,16 +898,21 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     LZ4_streamHCPtr->internal_donotuse.favorDecSpeed = 0;
+    LZ4_streamHCPtr->internal_donotuse.dirty = 0;
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     DEBUGLOG(4, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
-    LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.base;
-    LZ4_streamHCPtr->internal_donotuse.base = NULL;
-    LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
-    LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
+    if (LZ4_streamHCPtr->internal_donotuse.dirty) {
+        LZ4_resetStreamHC(LZ4_streamHCPtr, compressionLevel);
+    } else {
+        LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.base;
+        LZ4_streamHCPtr->internal_donotuse.base = NULL;
+        LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
+        LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
+    }
 }
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)

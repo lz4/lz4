@@ -161,7 +161,9 @@ struct LZ4HC_CCtx_internal
     uint32_t   lowLimit;        /* below that point, no more dict */
     uint32_t   nextToUpdate;    /* index from which to continue dictionary update */
     short      compressionLevel;
-    short      favorDecSpeed;
+    int8_t     favorDecSpeed;   /* favor decompression speed if this flag set,
+                                   otherwise, favor compression ratio */
+    int8_t     dirty;           /* stream has to be fully reset if this flag is set */
     const LZ4HC_CCtx_internal* dictCtx;
 };
 
@@ -179,7 +181,9 @@ struct LZ4HC_CCtx_internal
     unsigned int   lowLimit;         /* below that point, no more dict */
     unsigned int   nextToUpdate;     /* index from which to continue dictionary update */
     short          compressionLevel;
-    short          favorDecSpeed;
+    char           favorDecSpeed;    /* favor decompression speed if this flag set,
+                                        otherwise, favor compression ratio */
+    char           dirty;            /* stream has to be fully reset if this flag is set */
     const LZ4HC_CCtx_internal* dictCtx;
 };
 
@@ -314,6 +318,11 @@ void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor);
  *  - the stream was in an indeterminate state and was used in a compression
  *    call that fully reset the state (LZ4_compress_HC_extStateHC()) and that
  *    returned success
+ *
+ *  Note:
+ *  A stream that was last used in a compression call that returned an error
+ *  may be passed to this function. However, it will be fully reset, which will
+ *  clear any existing history and settings from the context.
  */
 void LZ4_resetStreamHC_fast(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
