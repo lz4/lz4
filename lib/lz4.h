@@ -385,33 +385,34 @@ LZ4LIB_API int LZ4_decompress_safe_usingDict (const char* src, char* dst, int sr
 LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
 
 
-/*^**********************************************
+/*^*************************************
  * !!!!!!   STATIC LINKING ONLY   !!!!!!
- ***********************************************/
+ ***************************************/
 
-/*-************************************
- *  Unstable declarations
- **************************************
- * Declarations in this section must be considered unstable.
- * Their signatures may change, or may be removed in the future.
- * They are therefore only safe to depend on
- * when the caller is statically linked against the library.
- * To access their declarations, define LZ4_STATIC_LINKING_ONLY.
- **************************************/
-
-#ifdef LZ4_STATIC_LINKING_ONLY
-
-/* By default, symbols in this section aren't published into shared/dynamic libraries.
- * You can override this behavior and force them to be published
- * by defining LZ4_PUBLISH_STATIC_FUNCTIONS.
- * Use at your own risk.
- */
+/*-****************************************************************************
+ * Symbols declared in this section must be considered unstable. Their
+ * signatures or semantics may change, or they may be removed altogether in the
+ * future. They are therefore only safe to depend on when the caller is
+ * statically linked against the library.
+ *
+ * To protect against unsafe usage, not only are the declarations guarded, the
+ * definitions are hidden by default when building LZ4 as a shared/dynamic
+ * library.
+ *
+ * In order to access these declarations, define LZ4_STATIC_LINKING_ONLY in
+ * your application before including LZ4's headers.
+ *
+ * In order to make their implementations accessible dynamically, you must
+ * define LZ4_PUBLISH_STATIC_FUNCTIONS when building the LZ4 library.
+ ******************************************************************************/
 
 #ifdef LZ4_PUBLISH_STATIC_FUNCTIONS
 #define LZ4LIB_STATIC_API LZ4LIB_API
 #else
 #define LZ4LIB_STATIC_API
 #endif
+
+#ifdef LZ4_STATIC_LINKING_ONLY
 
 /*! LZ4_resetStream_fast() :
  *  Use this to prepare a context for a new chain of calls to a streaming API
