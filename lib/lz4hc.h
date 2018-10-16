@@ -272,10 +272,11 @@ extern "C" {
  *           or 0 if compression fails.
  * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
  */
-int LZ4_compress_HC_destSize(void* LZ4HC_Data,
-                             const char* src, char* dst,
-                             int* srcSizePtr, int targetDstSize,
-                             int compressionLevel);
+LZ4LIB_STATIC_API int LZ4_compress_HC_destSize(
+    void* LZ4HC_Data,
+    const char* src, char* dst,
+    int* srcSizePtr, int targetDstSize,
+    int compressionLevel);
 
 /*! LZ4_compress_HC_continue_destSize() : v1.8.0 (experimental)
  *  Similar as LZ4_compress_HC_continue(),
@@ -286,20 +287,23 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data,
  *           or 0 if compression fails.
  * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`.
  */
-int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
-                            const char* src, char* dst,
-                            int* srcSizePtr, int targetDstSize);
+LZ4LIB_STATIC_API int LZ4_compress_HC_continue_destSize(
+    LZ4_streamHC_t* LZ4_streamHCPtr,
+    const char* src, char* dst,
+    int* srcSizePtr, int targetDstSize);
 
 /*! LZ4_setCompressionLevel() : v1.8.0 (experimental)
  *  It's possible to change compression level between 2 invocations of LZ4_compress_HC_continue*()
  */
-void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
+LZ4LIB_STATIC_API void LZ4_setCompressionLevel(
+    LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
 /*! LZ4_favorDecompressionSpeed() : v1.8.2 (experimental)
  *  Parser will select decisions favoring decompression over compression ratio.
  *  Only work at highest compression settings (level >= LZ4HC_CLEVEL_OPT_MIN)
  */
-void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor);
+LZ4LIB_STATIC_API void LZ4_favorDecompressionSpeed(
+    LZ4_streamHC_t* LZ4_streamHCPtr, int favor);
 
 /*! LZ4_resetStreamHC_fast() :
  *  When an LZ4_streamHC_t is known to be in a internally coherent state,
@@ -324,7 +328,8 @@ void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor);
  *  may be passed to this function. However, it will be fully reset, which will
  *  clear any existing history and settings from the context.
  */
-void LZ4_resetStreamHC_fast(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
+LZ4LIB_STATIC_API void LZ4_resetStreamHC_fast(
+    LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
 /*! LZ4_compress_HC_extStateHC_fastReset() :
  *  A variant of LZ4_compress_HC_extStateHC().
@@ -337,7 +342,11 @@ void LZ4_resetStreamHC_fast(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLeve
  *  LZ4_resetStreamHC_fast() while LZ4_compress_HC_extStateHC() starts with a
  *  call to LZ4_resetStreamHC().
  */
-int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel);
+LZ4LIB_STATIC_API int LZ4_compress_HC_extStateHC_fastReset (
+    void* state,
+    const char* src, char* dst,
+    int srcSize, int dstCapacity,
+    int compressionLevel);
 
 /*! LZ4_attach_HC_dictionary() :
  *  This is an experimental API that allows for the efficient use of a
@@ -364,7 +373,9 @@ int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* ds
  *  stream (and source buffer) must remain in-place / accessible / unchanged
  *  through the lifetime of the stream session.
  */
-LZ4LIB_API void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC_t *dictionary_stream);
+LZ4LIB_STATIC_API void LZ4_attach_HC_dictionary(
+          LZ4_streamHC_t *working_stream,
+    const LZ4_streamHC_t *dictionary_stream);
 
 #if defined (__cplusplus)
 }
