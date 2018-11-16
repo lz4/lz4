@@ -152,10 +152,16 @@ endif
 DD:=dd
 
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation
 
 test32: CFLAGS+=-m32
 test32: test
+
+test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
+	cat $(LZ4DIR)/lz4.c > lz4_all.c
+	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
+	$(CC) -I$(LZ4DIR) -c lz4_all.c
+	$(RM) lz4_all.c
 
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
