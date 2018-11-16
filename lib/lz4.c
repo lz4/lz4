@@ -32,6 +32,13 @@
     - LZ4 source repository : https://github.com/lz4/lz4
 */
 
+/*
+ * LZ4_SRC_INCLUDED:
+ * Amalgamation flag, whether lz4.c is included
+ */
+#ifndef LZ4_SRC_INCLUDED
+#  define LZ4_SRC_INCLUDED 1
+#endif
 
 /*-************************************
 *  Tuning parameters
@@ -455,7 +462,13 @@ static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression ru
 /*-************************************
 *  Local Structures and types
 **************************************/
-typedef enum { notLimited = 0, limitedOutput = 1, fillOutput = 2 } limitedOutput_directive;
+typedef enum { 
+    noLimit = 0,
+    notLimited = 1,
+    limitedOutput = 2,
+    fillOutput = 3,
+    limitedDestSize = 4
+} limitedOutput_directive;
 typedef enum { clearedTable = 0, byPtr, byU32, byU16 } tableType_t;
 
 /**
