@@ -61,9 +61,21 @@
 #  pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
-#define LZ4_COMMONDEFS_ONLY
-#include "lz4.c"   /* LZ4_count, constants, mem */
+/*===   Enums   ===*/
+typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
+#ifndef LZ4_SRC_INCLUDED
+typedef enum {
+    noLimit = 0,
+    limitedOutput = 1,
+    limitedDestSize = 2
+} limitedOutput_directive;
+#endif
 
+
+#define LZ4_COMMONDEFS_ONLY
+#ifndef LZ4_SRC_INCLUDED
+#include "lz4.c"   /* LZ4_count, constants, mem */
+#endif
 
 /*===   Constants   ===*/
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
@@ -78,9 +90,6 @@
 #define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
-
-/*===   Enums   ===*/
-typedef enum { noDictCtx, usingDictCtx } dictCtx_directive;
 
 
 /**************************************
@@ -346,7 +355,7 @@ LZ4HC_InsertAndGetWiderMatch (
 
     }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
-    if (dict == usingDictCtx && nbAttempts && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
+    if (dict == usingDictCtxHc && nbAttempts && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
         size_t const dictEndOffset = dictCtx->end - dictCtx->base;
         U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         assert(dictEndOffset <= 1 GB);
@@ -393,14 +402,6 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
     return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, patternAnalysis, 0 /*chainSwap*/, dict, favorCompressionRatio);
 }
-
-
-
-typedef enum {
-    noLimit = 0,
-    limitedOutput = 1,
-    limitedDestSize = 2
-} limitedOutput_directive;
 
 /* LZ4HC_encodeSequence() :
  * @return : 0 if ok,
@@ -800,7 +801,7 @@ static int LZ4HC_compress_generic_dictCtx (
         ctx->compressionLevel = (short)cLevel;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else {
-        return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtx);
+        return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtxHc);
     }
 }
 
