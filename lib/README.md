@@ -46,6 +46,10 @@ by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
 
 DLL can be created using MinGW+MSYS with the `make liblz4` command.
 This command creates `dll\liblz4.dll` and the import library `dll\liblz4.lib`.
+To override the `dlltool` command  when cross-compiling on Linux, just set the `DLLTOOL` variable. Example of cross compilation on Linux with mingw-w64 64 bits:
+```
+make BUILD_STATIC=no CC=x86_64-w64-mingw32-gcc DLLTOOL=x86_64-w64-mingw32-dlltool OS=Windows_NT
+```
 The import library is only required with Visual C++.
 The header files `lz4.h`, `lz4hc.h`, `lz4frame.h` and the dynamic library
 `dll\liblz4.dll` are required to compile a project using gcc/MinGW.
@@ -64,7 +68,6 @@ Other files present in the directory are not source code. There are :
 
  - `LICENSE` : contains the BSD license text
  - `Makefile` : `make` script to compile and install lz4 library (static and dynamic)
- - dlltool can be overrided by setting DLLTOOL variable (useful when cross-compiling on Linux for Windows)
  - `liblz4.pc.in` : for `pkg-config` (used in `make install`)
  - `README.md` : this file
 
