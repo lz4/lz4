@@ -64,6 +64,7 @@ Other files present in the directory are not source code. There are :
 
  - `LICENSE` : contains the BSD license text
  - `Makefile` : `make` script to compile and install lz4 library (static and dynamic)
+ - dlltool can be overrided by setting DLLTOOL variable (useful when cross-compiling on Linux for Windows)
  - `liblz4.pc.in` : for `pkg-config` (used in `make install`)
  - `README.md` : this file
 
