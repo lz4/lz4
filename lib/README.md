@@ -46,6 +46,10 @@ by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
 
 DLL can be created using MinGW+MSYS with the `make liblz4` command.
 This command creates `dll\liblz4.dll` and the import library `dll\liblz4.lib`.
+To override the `dlltool` command  when cross-compiling on Linux, just set the `DLLTOOL` variable. Example of cross compilation on Linux with mingw-w64 64 bits:
+```
+make BUILD_STATIC=no CC=x86_64-w64-mingw32-gcc DLLTOOL=x86_64-w64-mingw32-dlltool OS=Windows_NT
+```
 The import library is only required with Visual C++.
 The header files `lz4.h`, `lz4hc.h`, `lz4frame.h` and the dynamic library
 `dll\liblz4.dll` are required to compile a project using gcc/MinGW.
