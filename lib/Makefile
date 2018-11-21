@@ -204,9 +204,14 @@ endif
 
 uninstall:
 	$(Q)$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
+ifneq (,$(filter Windows%,$(OS)))
+	$(Q)$(RM) $(DESTDIR)$(bindir)/$(LIBLZ4).dll
+	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.lib
+else
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_MAJOR)
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_VER)
+endif
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.a
 	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4.h
 	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4hc.h
