@@ -73,7 +73,11 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
+ifneq (,$(filter Windows%,$(OS)))
+LIBLZ4 = liblz4-$(LIBVER_MAJOR)
+else
 LIBLZ4 = liblz4.$(SHARED_EXT_VER)
+endif
 
 .PHONY: default
 default: lib-release
@@ -126,7 +130,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW32_NT-6.1 MINGW64_NT-6.1))
 
 .PHONY: listL120
 listL120:  # extract lines >= 120 characters in *.{c,h}, by Takayuki Matsuoka (note : $$, for Makefile compatibility)
@@ -140,6 +144,8 @@ PREFIX      ?= /usr/local
 prefix      ?= $(PREFIX)
 EXEC_PREFIX ?= $(prefix)
 exec_prefix ?= $(EXEC_PREFIX)
+BINDIR      ?= $(exec_prefix)/bin
+bindir      ?= $(BINDIR)
 LIBDIR      ?= $(exec_prefix)/lib
 libdir      ?= $(LIBDIR)
 INCLUDEDIR  ?= $(prefix)/include
@@ -170,7 +176,7 @@ liblz4.pc: liblz4.pc.in Makefile
           $< >$@
 
 install: lib liblz4.pc
-	$(Q)$(INSTALL) -d -m 755 $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/
+	$(Q)$(INSTALL) -d -m 755 $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
 	$(Q)$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(pkgconfigdir)/
 	@echo Installing libraries
 ifeq ($(BUILD_STATIC),yes)
@@ -178,9 +184,17 @@ ifeq ($(BUILD_STATIC),yes)
 	$(Q)$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(includedir)/lz4frame_static.h
 endif
 ifeq ($(BUILD_SHARED),yes)
+# Traditionnally, one installs the DLLs in the bin directory as programs
+# search them first in their directory. This allows to not pollute system
+# directories (like c:/windows/system32), nor modify the PATH variable.
+ifneq (,$(filter Windows%,$(OS)))
+	$(Q)$(INSTALL_PROGRAM) dll/$(LIBLZ4).dll $(DESTDIR)$(bindir)
+	$(Q)$(INSTALL_PROGRAM) dll/liblz4.lib $(DESTDIR)$(libdir)
+else
 	$(Q)$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)
 	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_MAJOR)
 	$(Q)ln -sf liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
+endif
 endif
 	@echo Installing headers in $(includedir)
 	$(Q)$(INSTALL_DATA) lz4.h $(DESTDIR)$(includedir)/lz4.h
@@ -190,9 +204,14 @@ endif
 
 uninstall:
 	$(Q)$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
+ifneq (,$(filter Windows%,$(OS)))
+	$(Q)$(RM) $(DESTDIR)$(bindir)/$(LIBLZ4).dll
+	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.lib
+else
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_MAJOR)
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_VER)
+endif
 	$(Q)$(RM) $(DESTDIR)$(libdir)/liblz4.a
 	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4.h
 	$(Q)$(RM) $(DESTDIR)$(includedir)/lz4hc.h
