@@ -160,6 +160,7 @@ test32: test
 test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
 	cat $(LZ4DIR)/lz4.c > lz4_all.c
 	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
+	cat $(LZ4DIR)/lz4frame.c >> lz4_all.c
 	$(CC) -I$(LZ4DIR) -c lz4_all.c
 	$(RM) lz4_all.c
 

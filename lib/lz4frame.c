@@ -64,10 +64,15 @@ You can contact the author at :
 **************************************/
 #include <stdlib.h>   /* malloc, calloc, free */
 #define ALLOC(s)       malloc(s)
+#ifndef LZ4_SRC_INCLUDED
 #define ALLOC_AND_ZERO(s)  calloc(1,(s))
+#endif
 #define FREEMEM(p)     free(p)
 #include <string.h>   /* memset, memcpy, memmove */
+#ifndef LZ4_SRC_INCLUDED
 #define MEM_INIT       memset
+#endif
+
 
 
 /*-************************************
@@ -180,9 +185,11 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 /*-************************************
 *  Constants
 **************************************/
+#ifndef LZ4_SRC_INCLUDED
 #define KB *(1<<10)
 #define MB *(1<<20)
 #define GB *(1<<30)
+#endif
 
 #define _1BIT  0x01
 #define _2BITS 0x03
