@@ -42,6 +42,19 @@ Should they be nonetheless needed, it's possible to force their publication
 by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
 
 
+#### Amalgamation
+
+lz4 code is able to be amalgamated into a single file.
+We can combine all source code in `lz4_all.c` by using following command, 
+```
+cat lz4.c > lz4_all.c
+cat lz4hc.c >> lz4_all.c
+cat lz4frame.c >> lz4_all.c
+```
+and compile `lz4_all.c`.
+It's necessary to include all `*.h` files present in `/lib` together with `lz4_all.c`.
+
+
 #### Windows : using MinGW+MSYS to create DLL
 
 DLL can be created using MinGW+MSYS with the `make liblz4` command.
