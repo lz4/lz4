@@ -168,10 +168,14 @@ script:
         && curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
         && python3 get-pip.py --user && rm get-pip.py
         && pip3 install --user meson ninja
-        && meson --buildtype=debug -Dauto_features=enabled -Ddefault_library=both
-                 -Dbuild_{programs,contrib,tests,examples}=true contrib/meson build
+        && export CC=clang CXX=clang++
+        && meson --buildtype=debug
+                 -Db_lundef=false
+                 -Dauto_features=enabled
+                 -Ddefault_library=both
+                 -Dbuild_{programs,contrib,tests,examples}=true
+                 contrib/meson build
         && cd "$_"
-        && ninja
         && DESTDIR=./staging ninja install
         && tree ./staging;
       travis_terminate "$?";
