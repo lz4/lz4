@@ -508,7 +508,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test decoding with a one byte input */
         FUZ_DISPLAYTEST("LZ4_decompress_safe() with one byte input");
-        {   char const tmp = 0xFF;
+        {   char const tmp = (char)0xFF;
             LZ4_decompress_safe(&tmp, decodedBuffer, 1, blockSize);
         }
 
@@ -518,7 +518,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             /* 14 bytes of literals, followed by a 14 byte match.
              * Should not read beyond the end of the buffer.
              * See https://github.com/lz4/lz4/issues/508. */
-            *tmp = 0xEE;
+            *tmp = (char)0xEE;
             memset(tmp + 1, 0, 14);
             tmp[15] = 14;
             tmp[16] = 0;
@@ -678,7 +678,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(ret>0, "LZ4_compress_fast_continue using ExtDict should fail : one missing byte for output buffer : %i written, %i buffer", ret, blockContinueCompressedSize);
 
         FUZ_DISPLAYTEST("test LZ4_compress_fast_continue() with dictionary loaded with LZ4_loadDict()");
-        DISPLAYLEVEL(5, " compress %i bytes from buffer(%p) into dst(%p) using dict(%p) of size %i \n", blockSize, block, decodedBuffer, dict, dictSize);
+        DISPLAYLEVEL(5, " compress %i bytes from buffer(%p) into dst(%p) using dict(%p) of size %i \n",
+                     blockSize, (void *)block, (void *)decodedBuffer, (void *)dict, dictSize);
         LZ4_loadDict(&LZ4dict, dict, dictSize);
         ret = LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, blockContinueCompressedSize, 1);
         FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_limitedOutput_compressed size is different (%i != %i)", ret, blockContinueCompressedSize);
@@ -686,7 +687,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Decompress with dictionary as external */
         FUZ_DISPLAYTEST("test LZ4_decompress_fast_usingDict() with dictionary as extDict");
-        DISPLAYLEVEL(5, " decoding %i bytes from buffer(%p) using dict(%p) of size %i \n", blockSize, decodedBuffer, dict, dictSize);
+        DISPLAYLEVEL(5, " decoding %i bytes from buffer(%p) using dict(%p) of size %i \n", blockSize, (void *)decodedBuffer, (void *)dict, dictSize);
         decodedBuffer[blockSize] = 0;
         ret = LZ4_decompress_fast_usingDict(compressedBuffer, decodedBuffer, blockSize, dict, dictSize);
         FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_decompress_fast_usingDict did not read all compressed block input");
