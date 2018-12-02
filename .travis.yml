@@ -156,8 +156,26 @@ matrix:
       sudo: false
       env: Cmd="make -C tests checkTag && tests/checkTag $TRAVIS_BRANCH " COMPILER=cc
 
+    - dist: xenial
+      sudo: required
+      env: BUILD_SYSTEM='meson'
+  allow_failures:
+    - env: BUILD_SYSTEM='meson'
 
 script:
+  - if [ "${BUILD_SYSTEM}" = meson ]; then
+      sudo apt-get install -qq python3 tree
+        && curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+        && python3 get-pip.py --user && rm get-pip.py
+        && pip3 install --user meson ninja
+        && meson --buildtype=debug -Dauto_features=enabled -Ddefault_library=both
+                 -Dbuild_{programs,contrib,tests,examples}=true contrib/meson build
+        && cd "$_"
+        && ninja
+        && DESTDIR=./staging ninja install
+        && tree ./staging;
+      travis_terminate "$?";
+    fi
   - uname -a
   - echo Cmd=$Cmd
   - $COMPILER -v
