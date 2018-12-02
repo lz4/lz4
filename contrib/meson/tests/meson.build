@@ -15,7 +15,7 @@ lib_dir_inc = include_directories(join_paths(lz4_root_dir, 'lib'))
 # Test flags
 # =============================================================================
 
-TEST_FILES   = join_paths(lz4_root_dir, 'tests/COPYING')
+TEST_FILES   = join_paths(meson.current_source_dir(), lz4_root_dir, 'tests/COPYING')
 FUZZER_TIME  = '-T90s'
 NB_LOOPS     = '-i1'
 
@@ -76,6 +76,18 @@ checkTag = executable('checkTag',
 # Tests (Use "meson test --list" to list all tests)
 # =============================================================================
 
-test('test-fullbench', fullbench, args: ['--no-prompt', NB_LOOPS, TEST_FILES])
-test('test-fuzzer', fuzzer, args: [FUZZER_TIME])
-test('test-frametest', frametest, args: [FUZZER_TIME])
+# XXX: (Need TEST) These timeouts (in seconds) when running on a HDD should be
+# at least six times bigger than on a SSD
+
+test('test-fullbench',
+  fullbench,
+  args: ['--no-prompt', NB_LOOPS, TEST_FILES],
+  timeout: 420) # Should enough when running on HDD
+test('test-fuzzer',
+  fuzzer,
+  args: [FUZZER_TIME],
+  timeout: 100)
+test('test-frametest',
+  frametest,
+  args: [FUZZER_TIME],
+  timeout: 100)
