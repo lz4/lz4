@@ -32,13 +32,14 @@ liblz4 = library('lz4',
   include_directories: liblz4_includes,
   c_args: liblz4_c_args,
   install: true,
-  soversion: lz4_libversion)
+  version: lz4_libversion,
+  soversion: '1')
 
 liblz4_dep = declare_dependency(link_with: liblz4,
   include_directories: liblz4_includes)
 
 pkgconfig.generate(name: 'lz4',
-  filebase: 'lz4',
+  filebase: 'liblz4',
   libraries: [liblz4],
   description: 'extremely fast lossless compression algorithm library',
   version: lz4_libversion,
