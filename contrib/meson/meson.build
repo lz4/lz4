@@ -112,9 +112,8 @@ add_project_arguments(['-DXXH_NAMESPACE=LZ4_'], language: 'c')
 
 if [compiler_gcc, compiler_clang].contains(cc_id)
   common_warning_flags = []
-  if buildtype == 'release'
-    common_warning_flags = ['-Werror']
-  endif
+  # Should use Meson's own --werror build option
+  #common_warning_flags += ['-Werror']
   if c_std == 'c89' or c_std == 'gnu89'
     common_warning_flags += ['-pedantic', '-Wno-long-long', '-Wno-variadic-macros']
   elif c_std == 'c99' or c_std == 'gnu99'
