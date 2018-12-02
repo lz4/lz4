@@ -11,11 +11,6 @@ import re
 import sys
 
 
-def usage():
-  print('usage: python3 GetLz4LibraryVersion.py <path/to/lz4.h>')
-  sys.exit(1)
-
-
 def find_version(filepath):
   version_file_data = None
   with open(filepath) as fd:
@@ -33,10 +28,11 @@ def find_version(filepath):
 
 
 def main():
-  if len(sys.argv) < 2:
-    usage()
-
-  filepath = sys.argv[1]
+  import argparse
+  parser = argparse.ArgumentParser(description='Print lz4 version from lib/lz4.h')
+  parser.add_argument('file', help='path to lib/lz4.h')
+  args = parser.parse_args()
+  filepath = args.file
   version_tup = find_version(filepath)
   print('.'.join(version_tup))
 
