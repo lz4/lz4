@@ -42,6 +42,8 @@ if r.returncode() == 0
     lz4_version = output
     message('Project version is now: @0@'.format(lz4_version))
   endif
+else
+  message('Cannot find project version in @0@'.format(lz4_h_file))
 endif
 
 lz4_version_array = lz4_version.split('.')
