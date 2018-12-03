@@ -33,7 +33,7 @@ liblz4 = library('lz4',
   c_args: liblz4_c_args,
   install: true,
   version: lz4_libversion,
-  soversion: '1')
+  soversion: lz4_libsoversion)
 
 liblz4_dep = declare_dependency(link_with: liblz4,
   include_directories: liblz4_includes)
