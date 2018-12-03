@@ -33,7 +33,7 @@ compiler_msvc = 'msvc'
 
 lz4_version = meson.project_version()
 
-lz4_h_file = join_paths(meson.current_source_dir(), 'lib/lz4.h')
+lz4_h_file = join_paths(meson.current_source_dir(), '../../lib/lz4.h')
 GetLz4LibraryVersion_py = files('GetLz4LibraryVersion.py')
 r = run_command(python3, GetLz4LibraryVersion_py, lz4_h_file)
 if r.returncode() == 0
