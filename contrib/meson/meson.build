@@ -46,18 +46,16 @@ else
   message('Cannot find project version in @0@'.format(lz4_h_file))
 endif
 
-lz4_version_array = lz4_version.split('.')
 lz4_libversion = lz4_version
-lz4_libsoversion = lz4_version_array[0]
 
 # =============================================================================
 # Installation directories
 # =============================================================================
 
 lz4_prefix = get_option('prefix')
-lz4_bindir = join_paths(lz4_prefix, get_option('bindir'))
-lz4_datadir = join_paths(lz4_prefix, get_option('datadir'))
-lz4_mandir = join_paths(lz4_prefix, get_option('mandir'))
+lz4_bindir = get_option('bindir')
+lz4_datadir = get_option('datadir')
+lz4_mandir = get_option('mandir')
 lz4_docdir = join_paths(lz4_datadir, 'doc', meson.project_name())
 
 # =============================================================================
