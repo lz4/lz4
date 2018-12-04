@@ -1271,7 +1271,9 @@ void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dic
      */
     LZ4_resetStream_fast(working_stream);
 
-    if (dictionary_stream != NULL) {
+    if (dictionary_stream != NULL
+     && dictionary_stream->internal_donotuse.dictSize - 1 >= 4
+        /* intentional underflow */) {
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
          * entry can take that indicate a miss. In that case, we need
