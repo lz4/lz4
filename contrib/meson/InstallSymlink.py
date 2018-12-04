@@ -12,23 +12,6 @@ import os
 import pathlib  # since Python 3.4
 
 
-def prepend_destdir(path):
-  """prepend_destdir(path) -> Path
-
-  Needed because pathlib.Path.joinpath() discards the first path if the
-  second one is absolute, which is usually the case here.
-  """
-  path = pathlib.Path(path)
-  DESTDIR = os.environ.get('DESTDIR')
-
-  if DESTDIR:
-    if not path.is_absolute():
-      raise Exception('{!r} must be an absolute path when DESTDIR is set'.format(path))
-
-    path = pathlib.Path(DESTDIR).joinpath(*path.resolve().parts[1:])
-  return path
-
-
 def install_symlink(src, dst, install_dir, dst_is_dir=False, dir_mode=0o777):
   if not install_dir.exists():
     install_dir.mkdir(mode=dir_mode, parents=True, exist_ok=True)
@@ -48,8 +31,7 @@ def main():
   parser = argparse.ArgumentParser(description='Install a symlink',
       usage='InstallSymlink.py [-h] [-d] [-m MODE] src dst install_dir\n\n'
             'example:\n'
-            '\tInstallSymlink.py dash sh /bin\n'
-            '\tDESTDIR=./staging InstallSymlink.py dash sh /bin')
+            '\tInstallSymlink.py dash sh /bin')
   parser.add_argument('src', help='target to link')
   parser.add_argument('dst', help='link name')
   parser.add_argument('install_dir', help='installation directory')
@@ -65,8 +47,11 @@ def main():
   dst = args.dst
   dst_is_dir = args.isdir
   dir_mode = int(args.mode, 8)
+  install_dir = pathlib.Path(args.install_dir)
 
-  install_dir = prepend_destdir(args.install_dir)
+  meson_destdir = os.environ.get('MESON_INSTALL_DESTDIR_PREFIX')
+  if meson_destdir:
+    install_dir = pathlib.Path(meson_destdir).joinpath(install_dir)
   install_symlink(src, dst, install_dir, dst_is_dir, dir_mode)
 
 
