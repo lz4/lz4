@@ -1271,9 +1271,7 @@ void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dic
      */
     LZ4_resetStream_fast(working_stream);
 
-    if (dictionary_stream != NULL
-     && dictionary_stream->internal_donotuse.dictSize - 1 >= 4
-        /* intentional underflow */) {
+    if (dictionary_stream != NULL) {
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
          * entry can take that indicate a miss. In that case, we need
@@ -1321,7 +1319,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, ch
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
 
     /* invalidate tiny dictionaries */
-    if ( (streamPtr->dictSize-1 < 4)   /* intentional underflow */
+    if ( (streamPtr->dictSize-1 < 4-1)   /* intentional underflow */
       && (dictEnd != (const BYTE*)source) ) {
         DEBUGLOG(5, "LZ4_compress_fast_continue: dictSize(%u) at addr:%p is too small", streamPtr->dictSize, streamPtr->dictionary);
         streamPtr->dictSize = 0;
