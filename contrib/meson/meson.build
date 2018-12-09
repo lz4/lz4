@@ -17,6 +17,7 @@ project('lz4', ['c'],
 cc = meson.get_compiler('c')
 pkgconfig = import('pkgconfig')
 python3 = import('python').find_installation()
+c_std = get_option('c_std')
 
 host_machine_os = host_machine.system()
 os_windows = 'windows'
@@ -31,26 +32,30 @@ compiler_clang = 'clang'
 compiler_msvc = 'msvc'
 
 lz4_version = meson.project_version()
-lz4_libversion = ''
 
-c_std = get_option('c_std')
+lz4_h_file = join_paths(meson.current_source_dir(), '../../lib/lz4.h')
+GetLz4LibraryVersion_py = files('GetLz4LibraryVersion.py')
+r = run_command(python3, GetLz4LibraryVersion_py, lz4_h_file)
+if r.returncode() == 0
+  output = r.stdout().strip()
+  if output.version_compare('>@0@'.format(lz4_version))
+    lz4_version = output
+    message('Project version is now: @0@'.format(lz4_version))
+  endif
+else
+  message('Cannot find project version in @0@'.format(lz4_h_file))
+endif
+
+lz4_libversion = lz4_version
 
 # =============================================================================
 # Installation directories
 # =============================================================================
 
-if host_machine_os == os_windows
-  lz4_prefix = '.'
-  lz4_bindir = 'bin'
-  lz4_datadir = 'share'
-  lz4_mandir = join_paths(lz4_datadir, 'man')
-else
-  lz4_prefix = get_option('prefix')
-  lz4_bindir = join_paths(lz4_prefix, get_option('bindir'))
-  lz4_datadir = join_paths(lz4_prefix, get_option('datadir'))
-  lz4_mandir = join_paths(lz4_prefix, get_option('mandir'))
-endif
-
+lz4_prefix = get_option('prefix')
+lz4_bindir = get_option('bindir')
+lz4_datadir = get_option('datadir')
+lz4_mandir = get_option('mandir')
 lz4_docdir = join_paths(lz4_datadir, 'doc', meson.project_name())
 
 # =============================================================================
@@ -73,30 +78,6 @@ build_examples = get_option('build_examples')
 #feature_multi_thread = get_option('multi_thread')
 
 # =============================================================================
-# Helper scripts for Meson
-# =============================================================================
-
-GetLz4LibraryVersion_py = files('GetLz4LibraryVersion.py')
-
-# =============================================================================
-# Getting project version from lz4.h
-# =============================================================================
-
-lz4_h_file = join_paths(meson.current_source_dir(), 'lib/lz4.h')
-r = run_command(python3, GetLz4LibraryVersion_py, lz4_h_file)
-if r.returncode() == 0
-  output = r.stdout().strip()
-  if output.version_compare('>@0@'.format(lz4_version))
-    lz4_version = output
-    message('Project version is now: @0@'.format(lz4_version))
-  endif
-endif
-
-if host_machine_os != os_windows
-  lz4_libversion = lz4_version
-endif
-
-# =============================================================================
 # Dependencies
 # =============================================================================
 
@@ -112,9 +93,8 @@ add_project_arguments(['-DXXH_NAMESPACE=LZ4_'], language: 'c')
 
 if [compiler_gcc, compiler_clang].contains(cc_id)
   common_warning_flags = []
-  if buildtype == 'release'
-    common_warning_flags = ['-Werror']
-  endif
+  # Should use Meson's own --werror build option
+  #common_warning_flags += ['-Werror']
   if c_std == 'c89' or c_std == 'gnu89'
     common_warning_flags += ['-pedantic', '-Wno-long-long', '-Wno-variadic-macros']
   elif c_std == 'c99' or c_std == 'gnu99'

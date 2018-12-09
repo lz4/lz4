@@ -43,9 +43,10 @@ install_man(join_paths(lz4_root_dir, 'programs/lz4.1'))
 
 InstallSymlink_py = '../InstallSymlink.py'
 lz4_man1_dir = join_paths(lz4_mandir, 'man1')
-man1_EXT = host_machine_os != os_windows ? '.1.gz' : '.1'
+bin_EXT = host_machine_os == os_windows ? '.exe' : ''
+man1_EXT = '.1.gz' # Meson automatically compresses manpages
 
 foreach f : ['lz4c', 'lz4cat', 'unlz4']
-  meson.add_install_script(InstallSymlink_py, 'lz4', f, lz4_bindir)
+  meson.add_install_script(InstallSymlink_py, 'lz4' + bin_EXT, f + bin_EXT, lz4_bindir)
   meson.add_install_script(InstallSymlink_py, 'lz4' + man1_EXT, f + man1_EXT, lz4_man1_dir)
 endforeach
