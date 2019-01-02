@@ -265,20 +265,23 @@ The highest bit is “1” if data in the block is uncompressed.
 
 The highest bit is “0” if data in the block is compressed by LZ4.
 
-All other bits give the size, in bytes, of the following data block
-(the size does not include the block checksum if present).
+All other bits give the size, in bytes, of the following data block.
+The size does not include the block checksum if present.
 
 Block Size shall never be larger than Block Maximum Size.
-Such a thing could happen for incompressible source data.
-In such case, such a data block shall be passed in uncompressed format.
+Such a thing could potentially happen for non-compressible sources.
+In such a case, such data block shall be passed using uncompressed format.
 
 __Data__
 
 Where the actual data to decode stands.
 It might be compressed or not, depending on previous field indications.
-Uncompressed size of Data can be any size, up to “block maximum size”.
-Note that data block is not necessarily full :
-an arbitrary “flush” may happen anytime. Any block can be “partially filled”.
+
+When compressed, the data must respect the [LZ4 block format specification](https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md).
+
+Note that the block is not necessarily full.
+Uncompressed size of data can be any size, up to "Block Maximum Size”,
+so it may contain less data than the maximum block size.
 
 __Block checksum__
 
