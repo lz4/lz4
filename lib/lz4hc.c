@@ -437,7 +437,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 
     /* Encode Literal length */
     length = (size_t)(*ip - *anchor);
-    if ((limit) && ((*op + (length >> 8) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;   /* Check output limit */
+    if ((limit) && ((*op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;   /* Check output limit */
     if (length >= RUN_MASK) {
         size_t len = length - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
@@ -458,7 +458,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
     length = (size_t)(matchLength - MINMATCH);
-    if ((limit) && (*op + (length >> 8) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
+    if ((limit) && (*op + (length / 255) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
     if (length >= ML_MASK) {
         *token += ML_MASK;
         length -= ML_MASK;
