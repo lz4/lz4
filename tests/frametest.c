@@ -660,7 +660,8 @@ int basicTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "getBlockSize test: \n");
     { size_t result;
-      for (unsigned blockSizeID = 4; blockSizeID < 8; ++blockSizeID) {
+      unsigned blockSizeID;
+      for (blockSizeID = 4; blockSizeID < 8; ++blockSizeID) {
         result = LZ4F_getBlockSize(blockSizeID);
         CHECK(result);
         DISPLAYLEVEL(3, "Returned block size of %zu bytes for blockID %u \n",
