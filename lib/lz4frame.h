@@ -483,6 +483,7 @@ typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
 
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
+LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
 
 /**********************************
  *  Bulk processing dictionary API

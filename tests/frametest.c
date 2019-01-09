@@ -658,6 +658,28 @@ int basicTests(U32 seed, double compressibility)
         CHECK( LZ4F_freeCompressionContext(cctx) ); cctx = NULL;
     }
 
+    DISPLAYLEVEL(3, "getBlockSize test: \n");
+    { size_t result;
+      for (unsigned blockSizeID = 4; blockSizeID < 8; ++blockSizeID) {
+        result = LZ4F_getBlockSize(blockSizeID);
+        CHECK(result);
+        DISPLAYLEVEL(3, "Returned block size of %zu bytes for blockID %u \n",
+                         result, blockSizeID);
+      }
+
+      /* Test an invalid input that's too large */
+      result = LZ4F_getBlockSize(8);
+      if(!LZ4F_isError(result) ||
+          LZ4F_getErrorCode(result) != LZ4F_ERROR_maxBlockSize_invalid)
+        goto _output_error;
+
+      /* Test an invalid input that's too small */
+      result = LZ4F_getBlockSize(3);
+      if(!LZ4F_isError(result) ||
+          LZ4F_getErrorCode(result) != LZ4F_ERROR_maxBlockSize_invalid)
+        goto _output_error;
+    }
+
 
     DISPLAYLEVEL(3, "Skippable frame test : \n");
     {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
