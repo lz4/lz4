@@ -1109,7 +1109,7 @@ static void FUZ_unitTests(int compressionLevel)
             assert(blockSize < INT_MAX);
             srcSize = (int)blockSize;
             assert(targetSize < INT_MAX);
-            result = LZ4_compress_HC_destSize(&sHC, block, dstBlock, &srcSize, (int)targetSize, 3);
+            result = LZ4_compress_HC_destSize(&sHC, (const char*)block, (char*)dstBlock, &srcSize, (int)targetSize, 3);
             DISPLAYLEVEL(4, "cSize=%i; readSize=%i; ", result, srcSize);
             FUZ_CHECKTEST(result!=4116, "LZ4_compress_HC_destSize() : compression must fill dstBuffer completely, but no more !");
             FUZ_CHECKTEST(((char*)dstBlock)[targetSize] != sentinel, "LZ4_compress_HC_destSize()")
