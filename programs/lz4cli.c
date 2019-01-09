@@ -287,6 +287,19 @@ static unsigned longCommandWArg(const char** stringPtr, const char* longCommand)
 
 typedef enum { om_auto, om_compress, om_decompress, om_test, om_bench } operationMode_e;
 
+/** determineOpMode() :
+ *  auto-determine operation mode, based on input filename extension
+ *  @return `om_decompress` if input filename has .lz4 extension and `om_compress` otherwise.
+ */
+static operationMode_e determineOpMode(const char* inputFilename)
+{
+    size_t const inSize  = strlen(inputFilename);
+    size_t const extSize = strlen(LZ4_EXTENSION);
+    size_t const extStart= (inSize > extSize) ? inSize-extSize : 0;
+    if (!strcmp(inputFilename+extStart, LZ4_EXTENSION)) return om_decompress;
+    else return om_compress;
+}
+
 int main(int argc, const char** argv)
 {
     int i,
@@ -633,11 +646,7 @@ int main(int argc, const char** argv)
     while ((!output_filename) && (multiple_inputs==0)) {
         if (!IS_CONSOLE(stdout)) { output_filename=stdoutmark; break; }   /* Default to stdout whenever possible (i.e. not a console) */
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
-            size_t const inSize  = strlen(input_filename);
-            size_t const extSize = strlen(LZ4_EXTENSION);
-            size_t const extStart= (inSize > extSize) ? inSize-extSize : 0;
-            if (!strcmp(input_filename+extStart, LZ4_EXTENSION)) mode = om_decompress;
-            else mode = om_compress;
+            mode = determineOpMode(input_filename);
         }
         if (mode == om_compress) {   /* compression to file */
             size_t const l = strlen(input_filename);
@@ -674,6 +683,11 @@ int main(int argc, const char** argv)
     /* Downgrade notification level in stdout and multiple file mode */
     if (!strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
     if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
+
+    /* Auto-determine compression or decompression, based on file extension */
+    if (mode == om_auto) {
+        mode = determineOpMode(input_filename);
+    }
 
     /* IO Stream/File */
     LZ4IO_setNotificationLevel(displayLevel);
