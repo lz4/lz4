@@ -419,6 +419,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 {
     size_t length;
     BYTE* const token = (*op)++;
+    size_t maxLength;
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 6)
     static const BYTE* start = NULL;
@@ -462,8 +463,8 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     length = (size_t)(matchLength - MINMATCH);
     if (limit) {
         if (*op + (1 + LASTLITERALS) > oend) return 1;    /* Check output limit */
-        size_t maxLength = (oend - *op - LASTLITERALS) * 255;
-        if (length > maxLength) { length = maxLength; matchLength = length + MINMATCH; }
+        maxLength = (oend - *op - LASTLITERALS) * 255;
+        if (length > maxLength) { length = maxLength; matchLength = (size_t)(length + MINMATCH); }
     }
     if (length >= ML_MASK) {
         *token += ML_MASK;
