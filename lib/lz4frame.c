@@ -265,21 +265,20 @@ unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
 int LZ4F_compressionLevel_max(void) { return LZ4HC_CLEVEL_MAX; }
 
+size_t LZ4F_getBlockSize(unsigned blockSizeID)
+{
+    static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
+
+    if (blockSizeID == 0) blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
+    if (blockSizeID < 4 || blockSizeID > 7) return err0r(LZ4F_ERROR_maxBlockSize_invalid);
+    blockSizeID -= 4;
+    return blockSizes[blockSizeID];
+}
 
 /*-************************************
 *  Private functions
 **************************************/
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
-
-static size_t LZ4F_getBlockSize(unsigned blockSizeID)
-{
-    static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
-
-    if (blockSizeID == 0) blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
-    blockSizeID -= 4;
-    if (blockSizeID > 3) return err0r(LZ4F_ERROR_maxBlockSize_invalid);
-    return blockSizes[blockSizeID];
-}
 
 static BYTE LZ4F_headerChecksum (const void* header, size_t length)
 {
