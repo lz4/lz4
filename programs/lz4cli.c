@@ -340,6 +340,7 @@ int main(int argc, const char** argv)
     if (exeNameMatch(exeName, LZ4CAT)) {
         mode = om_decompress;
         LZ4IO_setOverwrite(1);
+        LZ4IO_setPassThrough(1);
         LZ4IO_setRemoveSrcFile(0);
         forceStdout=1;
         output_filename=stdoutmark;
@@ -468,7 +469,11 @@ int main(int argc, const char** argv)
                 case 'd': mode = om_decompress; break;
 
                     /* Force stdout, even if stdout==console */
-                case 'c': forceStdout=1; output_filename=stdoutmark; break;
+                case 'c':
+                  forceStdout=1;
+                  output_filename=stdoutmark;
+                  LZ4IO_setPassThrough(1);
+                  break;
 
                     /* Test integrity */
                 case 't': mode = om_test; break;

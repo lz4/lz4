@@ -337,8 +337,11 @@ test-lz4-testmode: lz4 datagen
 	! ./datagen | $(LZ4) -t
 	! ./datagen | $(LZ4) -tf
 	@echo "\n ---- pass-through mode ----"
-	! ./datagen | $(LZ4) -d  > $(VOID)
-	./datagen | $(LZ4) -df > $(VOID)
+	@echo "Why hello there " > tmp-tlt2.lz4
+	! $(LZ4) -f tmp-tlt2.lz4 > $(VOID)
+	! ./datagen | $(LZ4) -dc  > $(VOID)
+	! ./datagen | $(LZ4) -df > $(VOID)
+	./datagen | $(LZ4) -dcf > $(VOID)
 	@echo "Hello World !" > tmp-tlt1
 	$(LZ4) -dcf tmp-tlt1
 	@echo "from underground..." > tmp-tlt2
@@ -347,7 +350,7 @@ test-lz4-testmode: lz4 datagen
 	! $(LZ4)     file-does-not-exist
 	! $(LZ4) -f  file-does-not-exist
 	! $(LZ4) -fm file1-dne file2-dne
-	@$(RM) tmp-tlt
+	@$(RM) tmp-tlt tmp-tlt1 tmp-tlt2 tmp-tlt2.lz4
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"

@@ -107,6 +107,7 @@ static clock_t g_time = 0;
 /**************************************
 *  Local Parameters
 **************************************/
+static int g_passThrough = 0;
 static int g_overwrite = 1;
 static int g_testMode = 0;
 static int g_blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
@@ -156,6 +157,14 @@ int LZ4IO_setDictionaryFilename(const char* dictionaryFilename) {
     g_useDictionary = dictionaryFilename != NULL;
     return g_useDictionary;
 }
+
+/* Default setting : passThrough = 0; return : passThrough mode (0/1) */
+int LZ4IO_setPassThrough(int yes)
+{
+   g_passThrough = (yes!=0);
+   return g_passThrough;
+}
+
 
 /* Default setting : overwrite = 1; return : overwrite mode (0/1) */
 int LZ4IO_setOverwrite(int yes)
@@ -1070,7 +1079,7 @@ static unsigned long long selectDecoder(dRess_t ress, FILE* finput, FILE* foutpu
     default:
         if (nbFrames == 1) {  /* just started */
             /* Wrong magic number at the beginning of 1st stream */
-            if (!g_testMode && g_overwrite) {
+            if (!g_testMode && g_overwrite && g_passThrough) {
                 nbFrames = 0;
                 return LZ4IO_passThrough(finput, foutput, MNstore);
             }
