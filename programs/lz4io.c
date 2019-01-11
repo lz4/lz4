@@ -157,7 +157,7 @@ struct LZ4IO_prefs_s {
 
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
 {
-  LZ4IO_prefs_t* const ret = malloc(sizeof(LZ4IO_prefs_t));
+  LZ4IO_prefs_t* const ret = (LZ4IO_prefs_t*)malloc(sizeof(LZ4IO_prefs_t));
   if (!ret) EXM_THROW(21, "Allocation error : not enough memory");
   ret->passThrough = 0;
   ret->overwrite = 1;
