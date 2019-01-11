@@ -92,7 +92,7 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 ***************************************/
 #define DEFAULT_COMPRESSOR   LZ4IO_compressFilename
 #define DEFAULT_DECOMPRESSOR LZ4IO_decompressFilename
-int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* prefs, const char* input_filename, const char* output_filename, int compressionlevel);   /* hidden function */
+int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename, int compressionlevel);   /* hidden function */
 
 
 /*-***************************
@@ -318,7 +318,7 @@ int main(int argc, const char** argv)
     char* dynNameSpace = NULL;
     const char** inFileNames = (const char**) calloc(argc, sizeof(char*));
     unsigned ifnIdx=0;
-    LZ4IO_prefs_t* prefs = LZ4IO_defaultPreferences();
+    LZ4IO_prefs_t* const prefs = LZ4IO_defaultPreferences();
     const char nullOutput[] = NULL_OUTPUT;
     const char extension[] = LZ4_EXTENSION;
     size_t blockSize = LZ4IO_setBlockSizeID(prefs, LZ4_BLOCKSIZEID_DEFAULT);

@@ -157,7 +157,8 @@ struct LZ4IO_prefs_s {
 
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
 {
-  LZ4IO_prefs_t* ret = malloc(sizeof(LZ4IO_prefs_t));
+  LZ4IO_prefs_t* const ret = malloc(sizeof(LZ4IO_prefs_t));
+  if (!ret) EXM_THROW(21, "Allocation error : not enough memory");
   ret->passThrough = 0;
   ret->overwrite = 1;
   ret->testMode = 0;
@@ -175,13 +176,13 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
   return ret;
 }
 
-void LZ4IO_freePreferences(LZ4IO_prefs_t* prefs)
+void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs)
 {
   free(prefs);
 }
 
 
-int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* prefs, const char* dictionaryFilename)
+int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename)
 {
     prefs->dictionaryFilename = dictionaryFilename;
     prefs->useDictionary = dictionaryFilename != NULL;
@@ -189,7 +190,7 @@ int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* prefs, const char* dictionaryFile
 }
 
 /* Default setting : passThrough = 0; return : passThrough mode (0/1) */
-int LZ4IO_setPassThrough(LZ4IO_prefs_t* prefs, int yes)
+int LZ4IO_setPassThrough(LZ4IO_prefs_t* const prefs, int yes)
 {
    prefs->passThrough = (yes!=0);
    return prefs->passThrough;
@@ -197,21 +198,21 @@ int LZ4IO_setPassThrough(LZ4IO_prefs_t* prefs, int yes)
 
 
 /* Default setting : overwrite = 1; return : overwrite mode (0/1) */
-int LZ4IO_setOverwrite(LZ4IO_prefs_t* prefs, int yes)
+int LZ4IO_setOverwrite(LZ4IO_prefs_t* const prefs, int yes)
 {
    prefs->overwrite = (yes!=0);
    return prefs->overwrite;
 }
 
 /* Default setting : testMode = 0; return : testMode (0/1) */
-int LZ4IO_setTestMode(LZ4IO_prefs_t* prefs, int yes)
+int LZ4IO_setTestMode(LZ4IO_prefs_t* const prefs, int yes)
 {
    prefs->testMode = (yes!=0);
    return prefs->testMode;
 }
 
 /* blockSizeID : valid values : 4-5-6-7 */
-size_t LZ4IO_setBlockSizeID(LZ4IO_prefs_t* prefs, unsigned bsid)
+size_t LZ4IO_setBlockSizeID(LZ4IO_prefs_t* const prefs, unsigned bsid)
 {
     static const size_t blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
     static const unsigned minBlockSizeID = 4;
@@ -222,7 +223,7 @@ size_t LZ4IO_setBlockSizeID(LZ4IO_prefs_t* prefs, unsigned bsid)
     return prefs->blockSize;
 }
 
-size_t LZ4IO_setBlockSize(LZ4IO_prefs_t* prefs, size_t blockSize)
+size_t LZ4IO_setBlockSize(LZ4IO_prefs_t* const prefs, size_t blockSize)
 {
     static const size_t minBlockSize = 32;
     static const size_t maxBlockSize = 4 MB;
@@ -239,21 +240,21 @@ size_t LZ4IO_setBlockSize(LZ4IO_prefs_t* prefs, size_t blockSize)
     return prefs->blockSize;
 }
 
-int LZ4IO_setBlockMode(LZ4IO_prefs_t* prefs, LZ4IO_blockMode_t blockMode)
+int LZ4IO_setBlockMode(LZ4IO_prefs_t* const prefs, LZ4IO_blockMode_t blockMode)
 {
     prefs->blockIndependence = (blockMode == LZ4IO_blockIndependent);
     return prefs->blockIndependence;
 }
 
 /* Default setting : no block checksum */
-int LZ4IO_setBlockChecksumMode(LZ4IO_prefs_t* prefs, int enable)
+int LZ4IO_setBlockChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->blockChecksum = (enable != 0);
     return prefs->blockChecksum;
 }
 
 /* Default setting : checksum enabled */
-int LZ4IO_setStreamChecksumMode(LZ4IO_prefs_t* prefs, int enable)
+int LZ4IO_setStreamChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->streamChecksum = (enable != 0);
     return prefs->streamChecksum;
@@ -267,26 +268,26 @@ int LZ4IO_setNotificationLevel(int level)
 }
 
 /* Default setting : 0 (disabled) */
-int LZ4IO_setSparseFile(LZ4IO_prefs_t* prefs, int enable)
+int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->sparseFileSupport = (enable!=0);
     return prefs->sparseFileSupport;
 }
 
 /* Default setting : 0 (disabled) */
-int LZ4IO_setContentSize(LZ4IO_prefs_t* prefs, int enable)
+int LZ4IO_setContentSize(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->contentSizeFlag = (enable!=0);
     return prefs->contentSizeFlag;
 }
 
 /* Default setting : 0 (disabled) */
-void LZ4IO_favorDecSpeed(LZ4IO_prefs_t* prefs, int favor)
+void LZ4IO_favorDecSpeed(LZ4IO_prefs_t* const prefs, int favor)
 {
     prefs->favorDecSpeed = (favor!=0);
 }
 
-void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* prefs, unsigned flag)
+void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* const prefs, unsigned flag)
 {
   prefs->removeSrcFile = (flag>0);
 }
@@ -324,7 +325,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 /** FIO_openDstFile() :
  * condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
-static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* prefs, const char* dstFileName)
+static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileName)
 {
     FILE* f;
 
@@ -388,7 +389,7 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* prefs, const char* input_filename, const char* output_filename, int compressionlevel)
+int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename, int compressionlevel)
 {
     typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
@@ -485,7 +486,7 @@ typedef struct {
     LZ4F_CDict* cdict;
 } cRess_t;
 
-static void* LZ4IO_createDict(LZ4IO_prefs_t* prefs, size_t *dictSize) {
+static void* LZ4IO_createDict(LZ4IO_prefs_t* const prefs, size_t *dictSize) {
     size_t readSize;
     size_t dictEnd = 0;
     size_t dictLen = 0;
@@ -543,7 +544,7 @@ static void* LZ4IO_createDict(LZ4IO_prefs_t* prefs, size_t *dictSize) {
     return dictBuf;
 }
 
-static LZ4F_CDict* LZ4IO_createCDict(LZ4IO_prefs_t* prefs) {
+static LZ4F_CDict* LZ4IO_createCDict(LZ4IO_prefs_t* const prefs) {
     size_t dictionarySize;
     void* dictionaryBuffer;
     LZ4F_CDict* cdict;
@@ -557,7 +558,7 @@ static LZ4F_CDict* LZ4IO_createCDict(LZ4IO_prefs_t* prefs) {
     return cdict;
 }
 
-static cRess_t LZ4IO_createCResources(LZ4IO_prefs_t* prefs)
+static cRess_t LZ4IO_createCResources(LZ4IO_prefs_t* const prefs)
 {
     const size_t blockSize = prefs->blockSize;
     cRess_t ress;
@@ -594,7 +595,7 @@ static void LZ4IO_freeCResources(cRess_t ress)
  * result : 0 : compression completed correctly
  *          1 : missing or pb opening srcFileName
  */
-static int LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* io_prefs, cRess_t ress, const char* srcFileName, const char* dstFileName, int compressionLevel)
+static int LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress, const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -718,7 +719,7 @@ static int LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* io_prefs, cRess_t ress,
 }
 
 
-int LZ4IO_compressFilename(LZ4IO_prefs_t* prefs, const char* srcFileName, const char* dstFileName, int compressionLevel)
+int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, const char* dstFileName, int compressionLevel)
 {
     UTIL_time_t const timeStart = UTIL_getTime();
     clock_t const cpuStart = clock();
@@ -743,7 +744,7 @@ int LZ4IO_compressFilename(LZ4IO_prefs_t* prefs, const char* srcFileName, const 
 
 
 #define FNSPACE 30
-int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* prefs, const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionLevel)
+int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionLevel)
 {
     int i;
     int missed_files = 0;
@@ -788,7 +789,7 @@ static unsigned LZ4IO_readLE32 (const void* s)
 }
 
 
-static unsigned LZ4IO_fwriteSparse(LZ4IO_prefs_t* prefs, FILE* file, const void* buffer, size_t bufferSize, unsigned storedSkips)
+static unsigned LZ4IO_fwriteSparse(LZ4IO_prefs_t* const prefs, FILE* file, const void* buffer, size_t bufferSize, unsigned storedSkips)
 {
     const size_t sizeT = sizeof(size_t);
     const size_t maskT = sizeT -1 ;
@@ -867,7 +868,7 @@ static void LZ4IO_fwriteSparseEnd(FILE* file, unsigned storedSkips)
 
 
 static unsigned g_magicRead = 0;   /* out-parameter of LZ4IO_decodeLegacyStream() */
-static unsigned long long LZ4IO_decodeLegacyStream(LZ4IO_prefs_t* prefs, FILE* finput, FILE* foutput)
+static unsigned long long LZ4IO_decodeLegacyStream(LZ4IO_prefs_t* const prefs, FILE* finput, FILE* foutput)
 {
     unsigned long long streamSize = 0;
     unsigned storedSkips = 0;
@@ -927,7 +928,7 @@ typedef struct {
     size_t dictBufferSize;
 } dRess_t;
 
-static void LZ4IO_loadDDict(LZ4IO_prefs_t* prefs, dRess_t* ress) {
+static void LZ4IO_loadDDict(LZ4IO_prefs_t* const prefs, dRess_t* ress) {
     if (!prefs->useDictionary) {
         ress->dictBuffer = NULL;
         ress->dictBufferSize = 0;
@@ -939,7 +940,7 @@ static void LZ4IO_loadDDict(LZ4IO_prefs_t* prefs, dRess_t* ress) {
 }
 
 static const size_t LZ4IO_dBufferSize = 64 KB;
-static dRess_t LZ4IO_createDResources(LZ4IO_prefs_t* prefs)
+static dRess_t LZ4IO_createDResources(LZ4IO_prefs_t* const prefs)
 {
     dRess_t ress;
 
@@ -970,7 +971,7 @@ static void LZ4IO_freeDResources(dRess_t ress)
 }
 
 
-static unsigned long long LZ4IO_decompressLZ4F(LZ4IO_prefs_t* prefs, dRess_t ress, FILE* srcFile, FILE* dstFile)
+static unsigned long long LZ4IO_decompressLZ4F(LZ4IO_prefs_t* const prefs, dRess_t ress, FILE* srcFile, FILE* dstFile)
 {
     unsigned long long filesize = 0;
     LZ4F_errorCode_t nextToLoad;
@@ -1026,7 +1027,7 @@ static unsigned long long LZ4IO_decompressLZ4F(LZ4IO_prefs_t* prefs, dRess_t res
 
 #define PTSIZE  (64 KB)
 #define PTSIZET (PTSIZE / sizeof(size_t))
-static unsigned long long LZ4IO_passThrough(LZ4IO_prefs_t* prefs, FILE* finput, FILE* foutput, unsigned char MNstore[MAGICNUMBER_SIZE])
+static unsigned long long LZ4IO_passThrough(LZ4IO_prefs_t* const prefs, FILE* finput, FILE* foutput, unsigned char MNstore[MAGICNUMBER_SIZE])
 {
 	size_t buffer[PTSIZET];
     size_t readBytes = 1;
@@ -1066,7 +1067,7 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
 }
 
 #define ENDOFSTREAM ((unsigned long long)-1)
-static unsigned long long selectDecoder(LZ4IO_prefs_t* prefs, dRess_t ress, FILE* finput, FILE* foutput)
+static unsigned long long selectDecoder(LZ4IO_prefs_t* const prefs, dRess_t ress, FILE* finput, FILE* foutput)
 {
     unsigned char MNstore[MAGICNUMBER_SIZE];
     unsigned magicNumber;
@@ -1129,7 +1130,7 @@ static unsigned long long selectDecoder(LZ4IO_prefs_t* prefs, dRess_t ress, FILE
 }
 
 
-static int LZ4IO_decompressSrcFile(LZ4IO_prefs_t* prefs, dRess_t ress, const char* input_filename, const char* output_filename)
+static int LZ4IO_decompressSrcFile(LZ4IO_prefs_t* const prefs, dRess_t ress, const char* input_filename, const char* output_filename)
 {
     FILE* const foutput = ress.dstFile;
     unsigned long long filesize = 0;
@@ -1162,7 +1163,7 @@ static int LZ4IO_decompressSrcFile(LZ4IO_prefs_t* prefs, dRess_t ress, const cha
 }
 
 
-static int LZ4IO_decompressDstFile(LZ4IO_prefs_t* prefs, dRess_t ress, const char* input_filename, const char* output_filename)
+static int LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs, dRess_t ress, const char* input_filename, const char* output_filename)
 {
     stat_t statbuf;
     int stat_result = 0;
@@ -1190,7 +1191,7 @@ static int LZ4IO_decompressDstFile(LZ4IO_prefs_t* prefs, dRess_t ress, const cha
 }
 
 
-int LZ4IO_decompressFilename(LZ4IO_prefs_t* prefs, const char* input_filename, const char* output_filename)
+int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
     clock_t const start = clock();
@@ -1206,7 +1207,7 @@ int LZ4IO_decompressFilename(LZ4IO_prefs_t* prefs, const char* input_filename, c
 }
 
 
-int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* prefs, const char** inFileNamesTable, int ifntSize, const char* suffix)
+int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix)
 {
     int i;
     int skippedFiles = 0;
