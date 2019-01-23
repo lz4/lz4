@@ -18,6 +18,7 @@ cc = meson.get_compiler('c')
 pkgconfig = import('pkgconfig')
 python3 = import('python').find_installation()
 c_std = get_option('c_std')
+default_library = get_option('default_library')
 
 host_machine_os = host_machine.system()
 os_windows = 'windows'
