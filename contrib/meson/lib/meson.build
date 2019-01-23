@@ -27,6 +27,10 @@ if use_debug
 endif
 liblz4_c_args += cc.get_supported_arguments(liblz4_debug_cflags)
 
+if host_machine_os == os_windows and default_library != 'static'
+  liblz4_c_args += '-DLZ4_DLL_EXPORT=1'
+endif
+
 liblz4 = library('lz4',
   liblz4_sources,
   include_directories: liblz4_includes,
@@ -47,6 +51,7 @@ pkgconfig.generate(liblz4,
 install_headers(join_paths(lz4_root_dir, 'lib/lz4.h'),
   join_paths(lz4_root_dir, 'lib/lz4hc.h'),
   join_paths(lz4_root_dir, 'lib/lz4frame.h'))
-if get_option('default_library') != 'shared'
+
+if default_library != 'shared'
   install_headers(join_paths(lz4_root_dir, 'lib/lz4frame_static.h'))
 endif
