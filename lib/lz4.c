@@ -297,6 +297,16 @@ void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
+/* customized variant of memcpy, which can overwrite up to 16 bytes beyond dstEnd */
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE
+void LZ4_wildCopy16(void* dstPtr, const void* srcPtr, void* dstEnd)
+{
+    BYTE* d = (BYTE*)dstPtr;
+    const BYTE* s = (const BYTE*)srcPtr;
+    BYTE* const e = (BYTE*)dstEnd;
+
+    do { memcpy(d,s,16); d+=16; s+=16; } while (d<e);
+}
 
 /*-************************************
 *  Common Constants
@@ -1627,33 +1637,28 @@ LZ4_decompress_generic(
                 continue;
             }
 
-            if (unlikely(offset<8)) {
-                op[0] = match[0];
-                op[1] = match[1];
-                op[2] = match[2];
-                op[3] = match[3];
-                match += inc32table[offset];
-                memcpy(op+4, match, 4);
-                match -= dec64table[offset];
-            } else {
-                memcpy(op, match, 8);
-                match += 8;
-            }
-            op += 8;
-
-            if (unlikely(cpy > oend-MATCH_SAFEGUARD_DISTANCE)) {
-                BYTE* const oCopyLimit = oend - (WILDCOPYLENGTH-1);
-                if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals (uncompressed) */
-                if (op < oCopyLimit) {
-                    LZ4_wildCopy(op, match, oCopyLimit);
-                    match += oCopyLimit - op;
-                    op = oCopyLimit;
+            if (unlikely(offset<16)) {
+                if (offset < 8) {
+                    op[0] = match[0];
+                    op[1] = match[1];
+                    op[2] = match[2];
+                    op[3] = match[3];
+                    match += inc32table[offset];
+                    memcpy(op+4, match, 4);
+                    match -= dec64table[offset];
+                    op += 8;
+                } else {
+                    memcpy(op, match, 8);
+                    op += 8;
+                    match += 8;
                 }
-                while (op < cpy) *op++ = *match++;
-            } else {
+
                 memcpy(op, match, 8);
                 if (length > 16) LZ4_wildCopy(op+8, match+8, cpy);
+            } else {
+                LZ4_wildCopy16(op, match, cpy);
             }
+            
             op = cpy;   /* wildcopy correction */
         }
 
