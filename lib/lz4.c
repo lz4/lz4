@@ -1632,20 +1632,6 @@ LZ4_decompress_generic(
 
             /* partialDecoding : may not respect endBlock parsing restrictions */
             assert(op<=oend);
-            if (partialDecoding && (cpy > oend-MATCH_SAFEGUARD_DISTANCE)) {
-                size_t const mlen = MIN(length, (size_t)(oend-op));
-                const BYTE* const matchEnd = match + mlen;
-                BYTE* const copyEnd = op + mlen;
-                if (matchEnd > op) {   /* overlap copy */
-                    while (op < copyEnd) *op++ = *match++;
-                } else {
-                    memcpy(op, match, mlen);
-                }
-                op = copyEnd;
-                if (op==oend) goto decode_done;
-                continue;
-            }
-
             if (unlikely(offset<16)) {
                 if (offset < 8) {
                     op[0] = match[0];
@@ -1858,7 +1844,6 @@ LZ4_decompress_generic(
             }
             op = cpy;   /* wildcopy correction */
         }
-    decode_done:
 
         /* end of decoding */
         if (endOnInput)
