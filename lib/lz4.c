@@ -1545,22 +1545,31 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-              variable_length_error error = ok;
-              length += read_variable_length(&ip, iend-RUN_MASK, endOnInput, endOnInput, &error);
-              if (error == initial_error) goto _output_error;
+                variable_length_error error = ok;
+                length += read_variable_length(&ip, iend-RUN_MASK, endOnInput, endOnInput, &error);
+                if (error == initial_error) goto _output_error;
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)(op))) goto _output_error;   /* overflow detection */
                 if ((safeDecode) && unlikely((uptrval)(ip)+length<(uptrval)(ip))) goto _output_error;   /* overflow detection */
-            }
 
-            /* copy literals */
-            cpy = op+length;
-            LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
-            if ( ((endOnInput) && ((cpy>oend-FASTLOOP_SAFE_DISTANCE) || (ip+length>iend-(2+1+LASTLITERALS))) )
-              || ((!endOnInput) && (cpy>oend-FASTLOOP_SAFE_DISTANCE)) )
-            {
-                goto safe_literal_copy;
+                /* copy literals */
+                cpy = op+length;
+                LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
+                if ( ((endOnInput) && ((cpy>oend-FASTLOOP_SAFE_DISTANCE) || (ip+length>iend-(2+1+LASTLITERALS))) )
+                     || ((!endOnInput) && (cpy>oend-FASTLOOP_SAFE_DISTANCE)) )
+                    {
+                        goto safe_literal_copy;
+                    }
+                LZ4_wildCopy16(op, ip, cpy);
+                ip += length; op = cpy;
             } else {
-                LZ4_wildCopy(op, ip, cpy);   /* may overwrite up to WILDCOPYLENGTH beyond cpy */
+                cpy = op+length;
+                /* We don't need to check oend, since we check it once for each loop below */
+                if ( ((endOnInput) && (ip+16>iend-(2+1+LASTLITERALS))))
+                    {
+                        goto safe_literal_copy;
+                    }
+                /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
+                memcpy(op, ip, 16);
                 ip += length; op = cpy;
             }
 
