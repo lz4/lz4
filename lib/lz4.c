@@ -1592,11 +1592,26 @@ LZ4_decompress_generic(
               length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
               if (error != ok) goto _output_error;
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) goto _output_error;   /* overflow detection */
-            }
-            length += MINMATCH;
+                length += MINMATCH;
+                if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
+                    goto safe_match_copy;
+                }
+            } else {
+                length += MINMATCH;
+                if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
+                    goto safe_match_copy;
+                }
 
-            if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
-                goto safe_match_copy;
+                /* Fastpath check: Avoids a branch in LZ4_wildCopy16 if true */
+                if (!(dict == usingExtDict) || (match >= lowPrefix)) {
+                    if (offset >= 8) {
+                        memcpy(op, match, 8);
+                        memcpy(op+8, match+8, 8);
+                        memcpy(op+16, match+16, 2);
+                        op += length;
+                        continue;
+                    }
+                }
             }
 
             /* match starting within external dictionary */
