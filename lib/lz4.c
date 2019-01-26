@@ -1581,11 +1581,6 @@ LZ4_decompress_generic(
             length = token & ML_MASK;
 
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
-            if (!partialDecoding) {
-                assert(oend > op);
-                assert(oend - op >= 4);
-                LZ4_write32(op, 0);   /* silence an msan warning when offset==0; costs <1%; */
-            }   /* note : when partialDecoding, there is no guarantee that at least 4 bytes remain available in output buffer */
 
             if (length == ML_MASK) {
               variable_length_error error = ok;
