@@ -297,15 +297,15 @@ void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
-/* customized variant of memcpy, which can overwrite up to 16 bytes beyond dstEnd */
+/* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd */
 LZ4_FORCE_O2_INLINE_GCC_PPC64LE
-void LZ4_wildCopy16(void* dstPtr, const void* srcPtr, void* dstEnd)
+void LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
-    do { memcpy(d,s,16); d+=16; s+=16; } while (d<e);
+    do { memcpy(d,s,16); memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 }
 
 /*-************************************
@@ -317,7 +317,7 @@ void LZ4_wildCopy16(void* dstPtr, const void* srcPtr, void* dstEnd)
 #define LASTLITERALS   5   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
 #define MFLIMIT       12   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
 #define MATCH_SAFEGUARD_DISTANCE  ((2*WILDCOPYLENGTH) - MINMATCH)   /* ensure it's possible to write 2 x wildcopyLength without overflowing output buffer */
-#define FASTLOOP_SAFE_DISTANCE 32
+#define FASTLOOP_SAFE_DISTANCE 64
 static const int LZ4_minLength = (MFLIMIT+1);
 
 #define KB *(1 <<10)
@@ -1559,7 +1559,7 @@ LZ4_decompress_generic(
                     {
                         goto safe_literal_copy;
                     }
-                LZ4_wildCopy16(op, ip, cpy);
+                LZ4_wildCopy32(op, ip, cpy);
                 ip += length; op = cpy;
             } else {
                 cpy = op+length;
@@ -1597,7 +1597,7 @@ LZ4_decompress_generic(
                     goto safe_match_copy;
                 }
 
-                /* Fastpath check: Avoids a branch in LZ4_wildCopy16 if true */
+                /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
                 if (!(dict == usingExtDict) || (match >= lowPrefix)) {
                     if (offset >= 8) {
                         memcpy(op, match, 8);
@@ -1661,7 +1661,7 @@ LZ4_decompress_generic(
                 memcpy(op, match, 8);
                 if (length > 16) LZ4_wildCopy(op+8, match+8, cpy);
             } else {
-                LZ4_wildCopy16(op, match, cpy);
+                LZ4_wildCopy32(op, match, cpy);
             }
             
             op = cpy;   /* wildcopy correction */
