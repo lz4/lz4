@@ -297,6 +297,30 @@ void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
+static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
+static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
+
+
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE
+void LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
+    if (offset < 8) {
+        dstPtr[0] = srcPtr[0];
+        dstPtr[1] = srcPtr[1];
+        dstPtr[2] = srcPtr[2];
+        dstPtr[3] = srcPtr[3];
+        srcPtr += inc32table[offset];
+        memcpy(dstPtr+4, srcPtr, 4);
+        srcPtr -= dec64table[offset];
+        dstPtr += 8;
+    } else {
+        memcpy(dstPtr, srcPtr, 8);
+        dstPtr += 8;
+        srcPtr += 8;
+    }
+
+    LZ4_wildCopy(dstPtr, srcPtr, dstEnd);
+}
+
 /* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd */
 LZ4_FORCE_O2_INLINE_GCC_PPC64LE
 void LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
@@ -306,6 +330,40 @@ void LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* const e = (BYTE*)dstEnd;
 
     do { memcpy(d,s,16); memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+}
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE
+void LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
+    BYTE v[8];
+    switch(offset) {
+    case 1: 
+        memset(v, *srcPtr, 8);
+        goto copy_loop;
+    case 2: 
+        memcpy(v, srcPtr, 2);
+        memcpy(&v[2], srcPtr, 2);
+        memcpy(&v[4], &v[0], 4);
+        goto copy_loop;
+    case 4: 
+        memcpy(v, srcPtr, 4);
+        memcpy(&v[4], srcPtr, 4);
+        goto copy_loop;
+    case 3:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+    default: 
+        LZ4_memcpy_using_offset_base(dstPtr, srcPtr, dstEnd, offset);
+        return;
+    }
+
+ copy_loop:
+    memcpy(dstPtr, v, 8);
+    dstPtr += 8;
+    while (dstPtr < dstEnd) {
+        memcpy(dstPtr, v, 8);
+        dstPtr += 8;
+    }
 }
 
 /*-************************************
@@ -1505,8 +1563,6 @@ LZ4_decompress_generic(
         BYTE* cpy;
 
         const BYTE* const dictEnd = (dictStart == NULL) ? NULL : dictStart + dictSize;
-        const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
-        const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
         const int safeDecode = (endOnInput==endOnInputSize);
         const int checkOffset = ((safeDecode) && (dictSize < (int)(64 KB)));
@@ -1643,23 +1699,7 @@ LZ4_decompress_generic(
             /* partialDecoding : may not respect endBlock parsing restrictions */
             assert(op<=oend);
             if (unlikely(offset<16)) {
-                if (offset < 8) {
-                    op[0] = match[0];
-                    op[1] = match[1];
-                    op[2] = match[2];
-                    op[3] = match[3];
-                    match += inc32table[offset];
-                    memcpy(op+4, match, 4);
-                    match -= dec64table[offset];
-                    op += 8;
-                } else {
-                    memcpy(op, match, 8);
-                    op += 8;
-                    match += 8;
-                }
-
-                memcpy(op, match, 8);
-                if (length > 16) LZ4_wildCopy(op+8, match+8, cpy);
+                LZ4_memcpy_using_offset(op, match, cpy, offset);
             } else {
                 LZ4_wildCopy32(op, match, cpy);
             }
