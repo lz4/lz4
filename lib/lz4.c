@@ -143,7 +143,7 @@
  * and also LZ4_wildCopy is forcibly inlined, so that the O2 attribute
  * of LZ4_wildCopy does not affect the compression speed.
  */
-#if defined(__PPC64__) && defined(__LITTLE_ENDIAN__) && defined(__GNUC__)
+#if defined(__PPC64__) && defined(__LITTLE_ENDIAN__) && defined(__GNUC__) && !defined(__clang__)
 #  define LZ4_FORCE_O2_GCC_PPC64LE __attribute__((optimize("O2")))
 #  define LZ4_FORCE_O2_INLINE_GCC_PPC64LE __attribute__((optimize("O2"))) LZ4_FORCE_INLINE
 #else
