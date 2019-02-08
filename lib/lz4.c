@@ -301,6 +301,7 @@ static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
 static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
 
+#if defined(__i386__) || defined(__x86_64__)
 LZ4_FORCE_O2_INLINE_GCC_PPC64LE
 void LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
     if (offset < 8) {
@@ -365,7 +366,7 @@ void LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
         dstPtr += 8;
     }
 }
-
+#endif
 /*-************************************
 *  Common Constants
 **************************************/
@@ -1586,6 +1587,8 @@ LZ4_decompress_generic(
         if ((!endOnInput) && (unlikely(outputSize==0))) return (*ip==0 ? 1 : -1);
         if ((endOnInput) && unlikely(srcSize==0)) return -1;
 
+	/* Currently the fast loop shows a regression on qualcomm arm chips. */
+#if defined(__i386__) || defined(__x86_64__)
         if ((oend - op) < FASTLOOP_SAFE_DISTANCE)
             goto safe_decode;
 
@@ -1706,8 +1709,8 @@ LZ4_decompress_generic(
             
             op = cpy;   /* wildcopy correction */
         }
-
     safe_decode:
+#endif
         
         /* Main Loop : decode remaining sequences where output < FASTLOOP_SAFE_DISTANCE */
         while (1) {
@@ -1768,7 +1771,9 @@ LZ4_decompress_generic(
 
             /* copy literals */
             cpy = op+length;
+#if defined(__i386__) || defined(__x86_64__)
         safe_literal_copy:
+#endif
             LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
             if ( ((endOnInput) && ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) )
               || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)) )
@@ -1816,8 +1821,9 @@ LZ4_decompress_generic(
             }
             length += MINMATCH;
 
+#if defined(__i386__) || defined(__x86_64__)
         safe_match_copy:
-
+#endif
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
