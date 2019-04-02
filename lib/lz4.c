@@ -202,6 +202,7 @@
   typedef size_t reg_t;   /* 32-bits in x32 mode */
 #endif
 
+
 /*-************************************
 *  Reading and writing into memory
 **************************************/
@@ -235,7 +236,7 @@ static reg_t LZ4_read_ARCH(const void* ptr) { return ((const unalign*)ptr)->uArc
 static void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
 static void LZ4_write32(void* memPtr, U32 value) { ((unalign*)memPtr)->u32 = value; }
 
-#else  /* safe and portable access through memcpy() */
+#else  /* safe and portable access using memcpy() */
 
 static U16 LZ4_read16(const void* memPtr)
 {
@@ -301,7 +302,15 @@ static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
 static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
 
-#if defined(__i386__) || defined(__x86_64__)
+#ifndef LZ4_FAST_DEC_LOOP
+#  if defined(__i386__) || defined(__x86_64__)
+#    define LZ4_FAST_DEC_LOOP 1
+#  else
+#    define LZ4_FAST_DEC_LOOP 0
+#  endif
+#endif
+
+#if LZ4_FAST_DEC_LOOP
 LZ4_FORCE_O2_INLINE_GCC_PPC64LE
 void LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
     if (offset < 8) {
@@ -367,6 +376,8 @@ void LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
     }
 }
 #endif
+
+
 /*-************************************
 *  Common Constants
 **************************************/
@@ -1590,7 +1601,7 @@ LZ4_decompress_generic(
         if ((endOnInput) && unlikely(srcSize==0)) return -1;
 
 	/* Currently the fast loop shows a regression on qualcomm arm chips. */
-#if defined(__i386__) || defined(__x86_64__)
+#if LZ4_FAST_DEC_LOOP
         if ((oend - op) < FASTLOOP_SAFE_DISTANCE)
             goto safe_decode;
 
@@ -1773,7 +1784,7 @@ LZ4_decompress_generic(
 
             /* copy literals */
             cpy = op+length;
-#if defined(__i386__) || defined(__x86_64__)
+#if LZ4_FAST_DEC_LOOP
         safe_literal_copy:
 #endif
             LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
@@ -1823,7 +1834,7 @@ LZ4_decompress_generic(
             }
             length += MINMATCH;
 
-#if defined(__i386__) || defined(__x86_64__)
+#if LZ4_FAST_DEC_LOOP
         safe_match_copy:
 #endif
             /* match starting within external dictionary */
