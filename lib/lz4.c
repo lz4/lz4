@@ -336,15 +336,15 @@ LZ4_FORCE_O2_INLINE_GCC_PPC64LE
 void LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
     BYTE v[8];
     switch(offset) {
-    case 1: 
+    case 1:
         memset(v, *srcPtr, 8);
         goto copy_loop;
-    case 2: 
+    case 2:
         memcpy(v, srcPtr, 2);
         memcpy(&v[2], srcPtr, 2);
         memcpy(&v[4], &v[0], 4);
         goto copy_loop;
-    case 4: 
+    case 4:
         memcpy(v, srcPtr, 4);
         memcpy(&v[4], srcPtr, 4);
         goto copy_loop;
@@ -353,7 +353,7 @@ void LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
     case 6:
     case 7:
     case 8:
-    default: 
+    default:
         LZ4_memcpy_using_offset_base(dstPtr, srcPtr, dstEnd, offset);
         return;
     }
@@ -532,7 +532,7 @@ static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression ru
 /*-************************************
 *  Local Structures and types
 **************************************/
-typedef enum { 
+typedef enum {
     noLimit = 0,
     notLimited = 1,
     limitedOutput = 2,
@@ -750,7 +750,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                  const tableType_t tableType,
                  const dict_directive dictDirective,
                  const dictIssue_directive dictIssue,
-                 const U32 acceleration)
+                 const int acceleration)
 {
     int result;
     const BYTE* ip = (const BYTE*) source;
@@ -823,8 +823,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         /* Find a match */
         if (tableType == byPtr) {
             const BYTE* forwardIp = ip;
-            unsigned step = 1;
-            unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
+            int step = 1;
+            int searchMatchNb = acceleration << LZ4_skipTrigger;
             do {
                 U32 const h = forwardH;
                 ip = forwardIp;
@@ -844,8 +844,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         } else {   /* byU32, byU16 */
 
             const BYTE* forwardIp = ip;
-            unsigned step = 1;
-            unsigned searchMatchNb = acceleration << LZ4_skipTrigger;
+            int step = 1;
+            int searchMatchNb = acceleration << LZ4_skipTrigger;
             do {
                 U32 const h = forwardH;
                 U32 const current = (U32)(forwardIp - base);
@@ -916,7 +916,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 goto _last_literals;
             }
             if (litLength >= RUN_MASK) {
-                int len = (int)litLength-RUN_MASK;
+                int len = (int)(litLength - RUN_MASK);
                 *token = (RUN_MASK<<ML_BITS);
                 for(; len >= 255 ; len-=255) *op++ = 255;
                 *op++ = (BYTE)len;
@@ -1076,7 +1076,8 @@ _last_literals:
             (op + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > olimit)) {
             if (outputLimited == fillOutput) {
                 /* adapt lastRun to fill 'dst' */
-                lastRun  = (olimit-op) - 1;
+                assert(olimit >= op);
+                lastRun  = (size_t)(olimit-op) - 1;
                 lastRun -= (lastRun+240)/255;
             }
             if (outputLimited == limitedOutput)
@@ -1331,7 +1332,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
         p+=3;
     }
 
-    return dict->dictSize;
+    return (int)dict->dictSize;
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dictionary_stream) {
@@ -1359,7 +1360,8 @@ void LZ4_attach_dictionary(LZ4_stream_t *working_stream, const LZ4_stream_t *dic
 
 static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, int nextSize)
 {
-    if (LZ4_dict->currentOffset + nextSize > 0x80000000) {   /* potential ptrdiff_t overflow (32-bits mode) */
+    assert(nextSize >= 0);
+    if (LZ4_dict->currentOffset + (unsigned)nextSize > 0x80000000) {   /* potential ptrdiff_t overflow (32-bits mode) */
         /* rescale hash table */
         U32 const delta = LZ4_dict->currentOffset - 64 KB;
         const BYTE* dictEnd = LZ4_dict->dictionary + LZ4_dict->dictSize;
@@ -1482,7 +1484,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
     const BYTE* const previousDictEnd = dict->dictionary + dict->dictSize;
 
     if ((U32)dictSize > 64 KB) dictSize = 64 KB;   /* useless to define a dictionary > 64 KB */
-    if ((U32)dictSize > dict->dictSize) dictSize = dict->dictSize;
+    if ((U32)dictSize > dict->dictSize) dictSize = (int)dict->dictSize;
 
     memmove(safeBuffer, previousDictEnd - dictSize, dictSize);
 
@@ -1510,7 +1512,7 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  * lencheck - end ip.  Return an error if ip advances >= lencheck.
  * loop_check - check ip >= lencheck in body of loop.  Returns loop_error if so.
  * initial_check - check ip >= lencheck before start of loop.  Returns initial_error if so.
- * error (output) - error code.  Should be set to 0 before call.  
+ * error (output) - error code.  Should be set to 0 before call.
  */
 typedef enum { loop_error = -2, initial_error = -1, ok = 0} variable_length_error;
 LZ4_FORCE_INLINE unsigned read_variable_length(const BYTE**ip, const BYTE* lencheck, int loop_check, int initial_check, variable_length_error* error) {
@@ -1596,7 +1598,7 @@ LZ4_decompress_generic(
         while (1) {
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
             assert(oend - op >= FASTLOOP_SAFE_DISTANCE);
-            
+
             token = *ip++;
             length = token >> ML_BITS;  /* literal length */
 
@@ -1706,12 +1708,12 @@ LZ4_decompress_generic(
             } else {
                 LZ4_wildCopy32(op, match, cpy);
             }
-            
+
             op = cpy;   /* wildcopy correction */
         }
     safe_decode:
 #endif
-        
+
         /* Main Loop : decode remaining sequences where output < FASTLOOP_SAFE_DISTANCE */
         while (1) {
             token = *ip++;
@@ -1779,7 +1781,7 @@ LZ4_decompress_generic(
               || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)) )
             {
                 if (partialDecoding) {
-                    if (cpy > oend) { cpy = oend; length = oend-op; }             /* Partial decoding : stop in the middle of literal segment */
+                    if (cpy > oend) { cpy = oend; assert(op<=oend); length = (size_t)(oend-op); }  /* Partial decoding : stop in the middle of literal segment */
                     if ((endOnInput) && (ip+length > iend)) goto _output_error;   /* Error : read attempt beyond end of input buffer */
                 } else {
                     if ((!endOnInput) && (cpy != oend)) goto _output_error;       /* Error : block decoding must stop exactly there */
