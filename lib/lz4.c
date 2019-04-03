@@ -311,8 +311,10 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #endif
 
 #if LZ4_FAST_DEC_LOOP
-LZ4_FORCE_O2_INLINE_GCC_PPC64LE
-void LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
+
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE void
+LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
+{
     if (offset < 8) {
         dstPtr[0] = srcPtr[0];
         dstPtr[1] = srcPtr[1];
@@ -331,9 +333,11 @@ void LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd
     LZ4_wildCopy(dstPtr, srcPtr, dstEnd);
 }
 
-/* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd */
-LZ4_FORCE_O2_INLINE_GCC_PPC64LE
-void LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
+/* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd
+ * this version copies two times 16 bytes (instead of one time 32 bytes)
+ * because it must be compatible with offsets >= 16. */
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE void
+LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
@@ -342,8 +346,9 @@ void LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { memcpy(d,s,16); memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 }
 
-LZ4_FORCE_O2_INLINE_GCC_PPC64LE
-void LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset) {
+LZ4_FORCE_O2_INLINE_GCC_PPC64LE void
+LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
+{
     BYTE v[8];
     switch(offset) {
     case 1:
@@ -1521,8 +1526,10 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  * initial_check - check ip >= lencheck before start of loop.  Returns initial_error if so.
  * error (output) - error code.  Should be set to 0 before call.
  */
-typedef enum { loop_error = -2, initial_error = -1, ok = 0} variable_length_error;
-LZ4_FORCE_INLINE unsigned read_variable_length(const BYTE**ip, const BYTE* lencheck, int loop_check, int initial_check, variable_length_error* error) {
+typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
+LZ4_FORCE_INLINE unsigned
+read_variable_length(const BYTE**ip, const BYTE* lencheck, int loop_check, int initial_check, variable_length_error* error)
+{
   unsigned length = 0;
   unsigned s;
   if (initial_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
@@ -1673,9 +1680,7 @@ LZ4_decompress_generic(
                         memcpy(op+16, match+16, 2);
                         op += length;
                         continue;
-                    }
-                }
-            }
+            }   }   }
 
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
