@@ -42,17 +42,28 @@ Should they be nonetheless needed, it's possible to force their publication
 by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
 
 
+#### Build macros
+
+The following build macro can be determined at compilation time :
+
+- `LZ4_FAST_DEC_LOOP` : this triggers the optimized decompression loop.
+  This loops works great on x86/x64 cpus, and is automatically enabled on this platform.
+  It's possible to enable or disable it manually, by passing `LZ4_FAST_DEC_LOOP=1` or `0` to the preprocessor.
+  Typically with `gcc` : `-DLZ4_FAST_DEC_LOOP=1`,
+  and with `make` : `CPPFLAGS+=-DLZ4_FAST_DEC_LOOP=1 make lz4`.
+
+
 #### Amalgamation
 
-lz4 code is able to be amalgamated into a single file.
-We can combine all source code in `lz4_all.c` by using following command, 
+lz4 source code can be amalgamated into a single file.
+One can combine all source code into `lz4_all.c` by using following command:
 ```
 cat lz4.c > lz4_all.c
 cat lz4hc.c >> lz4_all.c
 cat lz4frame.c >> lz4_all.c
 ```
-and compile `lz4_all.c`.
-It's necessary to include all `*.h` files present in `/lib` together with `lz4_all.c`.
+(`cat` file order is important) then compile `lz4_all.c`.
+All `*.h` files present in `/lib` remain necessary to compile `lz4_all.c`.
 
 
 #### Windows : using MinGW+MSYS to create DLL
