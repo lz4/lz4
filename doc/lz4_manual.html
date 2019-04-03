@@ -15,7 +15,7 @@
 <li><a href="#Chapter5">Advanced Functions</a></li>
 <li><a href="#Chapter6">Streaming Compression Functions</a></li>
 <li><a href="#Chapter7">Streaming Decompression Functions</a></li>
-<li><a href="#Chapter8">Unstable declarations</a></li>
+<li><a href="#Chapter8">Symbols declared in this section must be considered unstable. Their</a></li>
 <li><a href="#Chapter9">PRIVATE DEFINITIONS</a></li>
 <li><a href="#Chapter10">Obsolete Functions</a></li>
 </ol>
@@ -295,12 +295,19 @@ int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize,
  
 </p></pre><BR>
 
-<a name="Chapter8"></a><h2>Unstable declarations</h2><pre>
- Declarations in this section must be considered unstable.
- Their signatures may change, or may be removed in the future.
- They are therefore only safe to depend on
- when the caller is statically linked against the library.
- To access their declarations, define LZ4_STATIC_LINKING_ONLY.
+<a name="Chapter8"></a><h2>Symbols declared in this section must be considered unstable. Their</h2><pre> signatures or semantics may change, or they may be removed altogether in the
+ future. They are therefore only safe to depend on when the caller is
+ statically linked against the library.
+
+ To protect against unsafe usage, not only are the declarations guarded, the
+ definitions are hidden by default when building LZ4 as a shared/dynamic
+ library.
+
+ In order to access these declarations, define LZ4_STATIC_LINKING_ONLY in
+ your application before including LZ4's headers.
+
+ In order to make their implementations accessible dynamically, you must
+ define LZ4_PUBLISH_STATIC_FUNCTIONS when building the LZ4 library.
 <BR></pre>
 
 <pre><b>LZ4LIB_STATIC_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);

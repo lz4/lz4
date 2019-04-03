@@ -54,7 +54,7 @@ extern "C" {
  *  Block Compression
  **************************************/
 /*! LZ4_compress_HC() :
- *  Compress data from `src` into `dst`, using the more powerful but slower "HC" algorithm.
+ *  Compress data from `src` into `dst`, using the powerful but slower "HC" algorithm.
  * `dst` must be already allocated.
  *  Compression is guaranteed to succeed if `dstCapacity >= LZ4_compressBound(srcSize)` (see "lz4.h")
  *  Max supported `srcSize` value is LZ4_MAX_INPUT_SIZE (see "lz4.h")
@@ -77,7 +77,21 @@ LZ4LIB_API int LZ4_compress_HC (const char* src, char* dst, int srcSize, int dst
  *  Memory segment must be aligned on 8-bytes boundaries (which a normal malloc() should do properly).
  */
 LZ4LIB_API int LZ4_sizeofStateHC(void);
-LZ4LIB_API int LZ4_compress_HC_extStateHC(void* state, const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel);
+LZ4LIB_API int LZ4_compress_HC_extStateHC(void* stateHC, const char* src, char* dst, int srcSize, int maxDstSize, int compressionLevel);
+
+
+/*! LZ4_compress_HC_destSize() : v1.9.0+
+ *  Will compress as much data as possible from `src`
+ *  to fit into `targetDstSize` budget.
+ *  Result is provided in 2 parts :
+ * @return : the number of bytes written into 'dst'
+ *           or 0 if compression fails.
+ * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
+ */
+LZ4LIB_API int LZ4_compress_HC_destSize(void* stateHC,
+                                  const char* src, char* dst,
+                                        int* srcSizePtr, int targetDstSize,
+                                        int compressionLevel);
 
 
 /*-************************************
@@ -95,13 +109,6 @@ LZ4LIB_API int LZ4_compress_HC_extStateHC(void* state, const char* src, char* ds
 LZ4LIB_API LZ4_streamHC_t* LZ4_createStreamHC(void);
 LZ4LIB_API int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
 
-LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
-LZ4LIB_API int  LZ4_loadDictHC (LZ4_streamHC_t* streamHCPtr, const char* dictionary, int dictSize);
-
-LZ4LIB_API int LZ4_compress_HC_continue (LZ4_streamHC_t* streamHCPtr, const char* src, char* dst, int srcSize, int maxDstSize);
-
-LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, int maxDictSize);
-
 /*
   These functions compress data in successive blocks of any size, using previous blocks as dictionary.
   One key assumption is that previous blocks (up to 64 KB) remain read-accessible while compressing next blocks.
@@ -114,14 +121,35 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
   Then, use LZ4_compress_HC_continue() to compress each successive block.
   Previous memory blocks (including initial dictionary when present) must remain accessible and unmodified during compression.
   'dst' buffer should be sized to handle worst case scenarios (see LZ4_compressBound()), to ensure operation success.
-  Because in case of failure, the API does not guarantee context recovery, and context will have to be reset.
-  If `dst` buffer budget cannot be >= LZ4_compressBound(), consider using LZ4_compress_HC_continue_destSize() instead.
+  In case of failure, the API does not guarantee context recovery, therefore context must be reset, using `LZ4_resetStreamHC()`.
+  If `dst` buffer size cannot be made >= LZ4_compressBound(), consider using LZ4_compress_HC_continue_destSize() instead.
 
   If, for any reason, previous data block can't be preserved unmodified in memory for next compression block,
   you can save it to a more stable memory space, using LZ4_saveDictHC().
   Return value of LZ4_saveDictHC() is the size of dictionary effectively saved into 'safeBuffer'.
 */
 
+LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
+LZ4LIB_API int  LZ4_loadDictHC (LZ4_streamHC_t* streamHCPtr, const char* dictionary, int dictSize);
+
+LZ4LIB_API int LZ4_compress_HC_continue (LZ4_streamHC_t* streamHCPtr,
+                                   const char* src, char* dst,
+                                         int srcSize, int maxDstSize);
+
+LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, int maxDictSize);
+
+/*! LZ4_compress_HC_continue_destSize() : v1.9.0+
+ *  Similar as LZ4_compress_HC_continue(),
+ *  but will read as much data as possible from `src`
+ *  to fit into `targetDstSize` budget.
+ *  Result is provided into 2 parts :
+ * @return : the number of bytes written into 'dst' (necessarily <= targetDstSize)
+ *           or 0 if compression fails.
+ * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`.
+ */
+LZ4LIB_API int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr,
+                                           const char* src, char* dst,
+                                                 int* srcSizePtr, int targetDstSize);
 
 
 
@@ -264,41 +292,13 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStr
 extern "C" {
 #endif
 
-/*! LZ4_compress_HC_destSize() : v1.8.0 (experimental)
- *  Will try to compress as much data from `src` as possible
- *  that can fit into `targetDstSize` budget.
- *  Result is provided in 2 parts :
- * @return : the number of bytes written into 'dst'
- *           or 0 if compression fails.
- * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`
- */
-LZ4LIB_STATIC_API int LZ4_compress_HC_destSize(
-    void* LZ4HC_Data,
-    const char* src, char* dst,
-    int* srcSizePtr, int targetDstSize,
-    int compressionLevel);
-
-/*! LZ4_compress_HC_continue_destSize() : v1.8.0 (experimental)
- *  Similar as LZ4_compress_HC_continue(),
- *  but will read a variable nb of bytes from `src`
- *  to fit into `targetDstSize` budget.
- *  Result is provided in 2 parts :
- * @return : the number of bytes written into 'dst'
- *           or 0 if compression fails.
- * `srcSizePtr` : value will be updated to indicate how much bytes were read from `src`.
- */
-LZ4LIB_STATIC_API int LZ4_compress_HC_continue_destSize(
-    LZ4_streamHC_t* LZ4_streamHCPtr,
-    const char* src, char* dst,
-    int* srcSizePtr, int targetDstSize);
-
-/*! LZ4_setCompressionLevel() : v1.8.0 (experimental)
+/*! LZ4_setCompressionLevel() : v1.8.0+ (experimental)
  *  It's possible to change compression level between 2 invocations of LZ4_compress_HC_continue*()
  */
 LZ4LIB_STATIC_API void LZ4_setCompressionLevel(
     LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
-/*! LZ4_favorDecompressionSpeed() : v1.8.2 (experimental)
+/*! LZ4_favorDecompressionSpeed() : v1.8.2+ (experimental)
  *  Parser will select decisions favoring decompression over compression ratio.
  *  Only work at highest compression settings (level >= LZ4HC_CLEVEL_OPT_MIN)
  */
