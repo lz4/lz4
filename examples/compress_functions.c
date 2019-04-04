@@ -60,6 +60,7 @@
 #define _POSIX_C_SOURCE 199309L
 
 /* Includes, for Power! */
+#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
 #include "lz4.h"
 #include <stdio.h>    /* for printf() */
 #include <stdlib.h>   /* for exit() */

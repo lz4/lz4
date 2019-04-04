@@ -32,8 +32,6 @@
 #  pragma warning(disable : 4310)    /* disable: C4310: constant char value > 127 */
 #endif
 
-#define LZ4_DISABLE_DEPRECATE_WARNINGS
-
 
 /*-************************************
 *  Dependencies
@@ -53,7 +51,9 @@
 #  include <sys/mman.h>   /* mmap */
 #endif
 
+#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
 #define LZ4_STATIC_LINKING_ONLY
+#include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY

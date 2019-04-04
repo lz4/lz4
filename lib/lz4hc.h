@@ -145,7 +145,7 @@ LZ4LIB_API int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
   Return value of LZ4_saveDictHC() is the size of dictionary effectively saved into 'safeBuffer' (<= 64 KB)
 
   After completing a streaming compression,
-  it's possible to start a new stream and re-use the LZ4_streamHC_t state 
+  it's possible to start a new stream of blocks, and re-use the same LZ4_streamHC_t state 
   by resetting it, using LZ4_resetStreamHC_fast().
 */
 
