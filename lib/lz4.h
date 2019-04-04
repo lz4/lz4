@@ -92,8 +92,8 @@ extern "C" {
 
 /*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
-#define LZ4_VERSION_MINOR    8    /* for new (non-breaking) interface capabilities */
-#define LZ4_VERSION_RELEASE  3    /* for tweaks, bug-fixes, or development */
+#define LZ4_VERSION_MINOR    9    /* for new (non-breaking) interface capabilities */
+#define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 
@@ -390,17 +390,20 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
  ***************************************/
 
 /*-****************************************************************************
+ * Experimental section
+ *
  * Symbols declared in this section must be considered unstable. Their
  * signatures or semantics may change, or they may be removed altogether in the
  * future. They are therefore only safe to depend on when the caller is
  * statically linked against the library.
  *
- * To protect against unsafe usage, not only are the declarations guarded, the
- * definitions are hidden by default when building LZ4 as a shared/dynamic
- * library.
+ * To protect against unsafe usage, not only are the declarations guarded,
+ * the definitions are hidden by default
+ * when building LZ4 as a shared/dynamic library.
  *
- * In order to access these declarations, define LZ4_STATIC_LINKING_ONLY in
- * your application before including LZ4's headers.
+ * In order to access these declarations,
+ * define LZ4_STATIC_LINKING_ONLY in your application
+ * before including LZ4's headers.
  *
  * In order to make their implementations accessible dynamically, you must
  * define LZ4_PUBLISH_STATIC_FUNCTIONS when building the LZ4 library.
