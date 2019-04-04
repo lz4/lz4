@@ -7,8 +7,8 @@ not all of them are necessary.
 #### Minimal LZ4 build
 
 The minimum required is **`lz4.c`** and **`lz4.h`**,
-which provides the fast compression and decompression algorithm.
-They generate and decode data using [LZ4 block format].
+which provides the fast compression and decompression algorithms.
+They generate and decode data using the [LZ4 block format].
 
 
 #### High Compression variant
@@ -49,8 +49,16 @@ The following build macro can be determined at compilation time :
 - `LZ4_FAST_DEC_LOOP` : this triggers the optimized decompression loop.
   This loops works great on x86/x64 cpus, and is automatically enabled on this platform.
   It's possible to enable or disable it manually, by passing `LZ4_FAST_DEC_LOOP=1` or `0` to the preprocessor.
-  Typically with `gcc` : `-DLZ4_FAST_DEC_LOOP=1`,
+  For example, with `gcc` : `-DLZ4_FAST_DEC_LOOP=1`,
   and with `make` : `CPPFLAGS+=-DLZ4_FAST_DEC_LOOP=1 make lz4`.
+
+- `LZ4_DISABLE_DEPRECATE_WARNINGS` : invoking a deprecated function will make the compiler generate a warning.
+  This is meant to invite users to update their source code.
+  Should this be a problem, it's generally to make the compiler ignore these warnings,
+  for example with `-Wno-deprecated-declarations` on `gcc`,
+  or `_CRT_SECURE_NO_WARNINGS` for Visual Studio.
+  Another method is to define `LZ4_DISABLE_DEPRECATE_WARNINGS`
+  before including the LZ4 header files.
 
 
 #### Amalgamation

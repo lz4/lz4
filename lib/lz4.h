@@ -563,11 +563,16 @@ union LZ4_streamDecode_u {
 **************************************/
 
 /*! Deprecation warnings
- *  Should deprecation warnings be a problem,
- *  it is generally possible to disable them,
+ *
+ *  Deprecated functions make the compiler generate a warning when invoked.
+ *  This is meant to invite users to update their source code.
+ *  Should deprecation warnings be a problem, it is generally possible to disable them,
  *  typically with -Wno-deprecated-declarations for gcc
  *  or _CRT_SECURE_NO_WARNINGS in Visual.
- *  Otherwise, it's also possible to define LZ4_DISABLE_DEPRECATE_WARNINGS */
+ *
+ *  Another method is to define LZ4_DISABLE_DEPRECATE_WARNINGS
+ *  before including the header file.
+ */
 #ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DEPRECATED(message)   /* disable deprecation warnings */
 #else
@@ -640,9 +645,12 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4
  *         But they may happen if input data is invalid (error or intentional tampering).
  *         As a consequence, use these functions in trusted environments with trusted data **only**.
  */
-LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
-LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
-LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead") LZ4LIB_API
+int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead") LZ4LIB_API
+int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_usingDict() instead") LZ4LIB_API
+int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
 
 
 #endif /* LZ4_H_2983827168210 */
