@@ -155,9 +155,23 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 
 <a name="Chapter6"></a><h2>Streaming Compression Functions</h2><pre></pre>
 
-<pre><b>void LZ4_resetStream (LZ4_stream_t* streamPtr);
-</b><p>  An LZ4_stream_t structure can be allocated once and re-used multiple times.
-  Use this function to start compressing a new stream.
+<pre><b>void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
+</b><p>  Use this to prepare an LZ4_stream_t for a new chain of dependent blocks
+  (e.g., LZ4_compress_fast_continue()).
+
+  An LZ4_stream_t must be initialized once.
+  This is automatically done when created by LZ4_createStream().
+  However, should the LZ4_stream_t be simply declared on stack (for example),
+  it's necessary to initialize first using LZ4_initStream().
+
+  After that, start any new stream with LZ4_resetStream_fast().
+  A same LZ4_stream_t can be re-used multiple times consecutively
+  and compress multiple streams,
+  provided that it starts each new stream with LZ4_resetStream_fast().
+
+  LZ4_resetStream_fast() is much faster than LZ4_initStream(),
+  but is not compatible with memory regions containing garbage data.
+  For this reason, LZ4_stream_t must be initialized at least once,
  
 </p></pre><BR>
 
@@ -290,43 +304,6 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  define LZ4_PUBLISH_STATIC_FUNCTIONS when building the LZ4 library.
 <BR></pre>
 
-<pre><b>LZ4LIB_STATIC_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
-</b><p>  Use this to prepare a context for a new chain of calls to a streaming API
-  (e.g., LZ4_compress_fast_continue()).
-
-  Note:
-  To stay on the safe side, when LZ4_stream_t is used for the first time,
-  it should be either created using LZ4_createStream() or
-  initialized using LZ4_resetStream().
-
-  Note:
-  Using this in advance of a non-streaming-compression function is redundant,
-  since they all perform their own custom reset internally.
-
-  Differences from LZ4_resetStream():
-  When an LZ4_stream_t is known to be in an internally coherent state,
-  it will be prepared for a new compression with almost no work.
-  Otherwise, it will fall back to the full, expensive reset.
-
-  LZ4_streams are guaranteed to be in a valid state when:
-  - returned from LZ4_createStream()
-  - reset by LZ4_resetStream()
-  - memset(stream, 0, sizeof(LZ4_stream_t)), though this is discouraged
-  - the stream was in a valid state and was reset by LZ4_resetStream_fast()
-  - the stream was in a valid state and was then used in any compression call
-    that returned success
-  - the stream was in an indeterminate state and was used in a compression
-    call that fully reset the state (e.g., LZ4_compress_fast_extState()) and
-    that returned success
-
-  Note:
-  A stream that was used in a compression call that did not return success
-  (e.g., LZ4_compress_fast_continue()), can still be passed to this function,
-  however, it's history is not preserved because of previous compression
-  failure.
- 
-</p></pre><BR>
-
 <pre><b>LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 </b><p>  A variant of LZ4_compress_fast_extState().
 
@@ -394,10 +371,24 @@ union LZ4_stream_u {
     LZ4_stream_t_internal internal_donotuse;
 } ;  </b>/* previously typedef'd to LZ4_stream_t */<b>
 </b><p>  information structure to track an LZ4 stream.
-  init this structure with LZ4_resetStream() before first use.
-  note : only use in association with static linking !
-         this definition is not API/ABI safe,
-         it may change in a future version !
+  LZ4_stream_t can also be created using LZ4_createStream(), which is recommended.
+  The structure definition can be convenient for static allocation
+  (on stack, or as part of larger structure).
+  Init this structure with LZ4_initStream() before first use.
+  note : only use this definition in association with static linking !
+    this definition is not API/ABI safe, and may change in a future version.
+ 
+</p></pre><BR>
+
+<pre><b>LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
+</b><p>  An LZ4_stream_t structure must be initialized at least once.
+  While this is automatically done when invoking LZ4_createStream(),
+  it's not when the structure is simply declared on stack (for example).
+  Use this function to properly initialize a newly declared LZ4_stream_t.
+  It can also accept any arbitrary buffer of sufficient size as input,
+  and will return a pointer of proper type upon initialization.
+  Note : initialization can fail if size < sizeof(LZ4_stream_t).
+  In which case, the function will @return NULL.
  
 </p></pre><BR>
 
@@ -474,6 +465,14 @@ int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize,
          These issues never happen if input data is correct.
          But they may happen if input data is invalid (error or intentional tampering).
          As a consequence, use these functions in trusted environments with trusted data **only**.
+ 
+</p></pre><BR>
+
+<pre><b>//LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
+</b><p>  An LZ4_stream_t structure must be initialized at least once.
+  This is done with LZ4_initStream(), or LZ4_resetStream().
+  Consider switching to LZ4_initStream(),
+  invoking LZ4_resetStream() will trigger deprecation warnings in the future.
  
 </p></pre><BR>
 

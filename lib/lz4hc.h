@@ -152,7 +152,7 @@ LZ4LIB_API int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
   just by resetting it, using LZ4_resetStreamHC_fast().
 */
 
-LZ4LIB_API void LZ4_resetStreamHC_fast(LZ4_streamHC_t* streamHCPtr, int compressionLevel);
+LZ4LIB_API void LZ4_resetStreamHC_fast(LZ4_streamHC_t* streamHCPtr, int compressionLevel);   /* v1.9.0+ */
 LZ4LIB_API int  LZ4_loadDictHC (LZ4_streamHC_t* streamHCPtr, const char* dictionary, int dictSize);
 
 LZ4LIB_API int LZ4_compress_HC_continue (LZ4_streamHC_t* streamHCPtr,
@@ -265,7 +265,7 @@ union LZ4_streamHC_u {
  * Static allocation shall only be used in combination with static linking.
  */
 
-LZ4LIB_API void LZ4_initStreamHC (void* streamHCPtr, int compressionLevel);
+LZ4LIB_API void LZ4_initStreamHC (void* streamHCPtr, int compressionLevel);  /* v1.9.0+ */
 
 
 /*-************************************

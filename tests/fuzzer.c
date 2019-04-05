@@ -641,7 +641,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Compress using dictionary */
         FUZ_DISPLAYTEST("test LZ4_compress_fast_continue() with dictionary of size %i", dictSize);
         {   LZ4_stream_t LZ4_stream;
-            LZ4_resetStream(&LZ4_stream);
+            LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
             LZ4_compress_fast_continue (&LZ4_stream, dict, compressedBuffer, dictSize, (int)compressedBufferSize, 1);   /* Just to fill hash tables */
             blockContinueCompressedSize = LZ4_compress_fast_continue (&LZ4_stream, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_fast_continue failed");
@@ -742,7 +742,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
             FUZ_DISPLAYTEST("LZ4_compress_fast_continue() after LZ4_attach_dictionary()");
             LZ4_loadDict(&LZ4dict, dict, dictSize);
-            LZ4_resetStream(&LZ4_stream);
+            LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
             LZ4_attach_dictionary(&LZ4_stream, &LZ4dict);
             blockContinueCompressedSize = LZ4_compress_fast_continue(&LZ4_stream, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_fast_continue using extDictCtx failed");
@@ -1000,7 +1000,7 @@ static void FUZ_unitTests(int compressionLevel)
 
         /* simple compression test */
         crcOrig = XXH64(testInput, testCompressedSize, 0);
-        LZ4_resetStream(&streamingState);
+        LZ4_initStream(&streamingState, sizeof(streamingState));
         result = LZ4_compress_fast_continue(&streamingState, testInput, testCompressed, testCompressedSize, testCompressedSize-1, 1);
         FUZ_CHECKTEST(result==0, "LZ4_compress_fast_continue() compression failed!");
         FUZ_CHECKTEST(streamingState.internal_donotuse.dirty, "context should be clean")

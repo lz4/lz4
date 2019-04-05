@@ -161,12 +161,12 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 static LZ4_stream_t LZ4_stream;
 static void local_LZ4_resetDictT(void)
 {
-    LZ4_resetStream(&LZ4_stream);
+    LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
 }
 
 static void local_LZ4_createStream(void)
 {
-    LZ4_resetStream(&LZ4_stream);
+    LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
 }
 
 static int local_LZ4_saveDict(const char* in, char* out, int inSize)

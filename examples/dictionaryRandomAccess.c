@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MIN(x, y) (x) < (y) ? (x) : (y)
+#define MIN(x, y)  ((x) < (y) ? (x) : (y))
 
 enum {
     BLOCK_BYTES = 1024,  /* 1 KiB of uncompressed data in a block */
@@ -63,7 +63,7 @@ void test_compress(FILE* outFp, FILE* inpFp, void *dict, int dictSize)
     int *offsetsEnd = offsets;
 
 
-    LZ4_resetStream(lz4Stream);
+    LZ4_initStream(lz4Stream, sizeof(*lz4Stream));
 
     /* Write header magic */
     write_bin(outFp, kTestMagic, sizeof(kTestMagic));

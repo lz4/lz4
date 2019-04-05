@@ -446,7 +446,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
     if (preferencesPtr == NULL ||
         preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN)
     {
-        LZ4_resetStream(&lz4ctx);
+        LZ4_initStream(&lz4ctx, sizeof(lz4ctx));
         cctxPtr->lz4CtxPtr = &lz4ctx;
         cctxPtr->lz4CtxAlloc = 1;
         cctxPtr->lz4CtxState = 1;
@@ -628,7 +628,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
             /* otherwise, a sufficient buffer is allocated, but we need to
              * reset it to the correct context type */
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
-                LZ4_resetStream((LZ4_stream_t *) cctxPtr->lz4CtxPtr);
+                LZ4_initStream((LZ4_stream_t *) cctxPtr->lz4CtxPtr, sizeof (LZ4_stream_t));
             } else {
                 LZ4_initStreamHC((LZ4_streamHC_t *) cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel);
             }
