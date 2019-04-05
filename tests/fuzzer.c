@@ -37,6 +37,7 @@
 *  Dependencies
 **************************************/
 #if defined(__unix__) && !defined(_AIX)   /* must be included before platform.h for MAP_ANONYMOUS */
+#  define _GNU_SOURCE     /* MAP_ANONYMOUS even in -std=c99 mode */
 #  include <sys/mman.h>   /* mmap */
 #endif
 #include "platform.h"   /* _CRT_SECURE_NO_WARNINGS */
@@ -47,9 +48,6 @@
 #include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>
 #include <limits.h>     /* INT_MAX */
-#if defined(__unix__) && defined(_AIX)
-#  include <sys/mman.h>   /* mmap */
-#endif
 
 #define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
 #define LZ4_STATIC_LINKING_ONLY

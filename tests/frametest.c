@@ -270,7 +270,7 @@ int basicTests(U32 seed, double compressibility)
             if (decResult != 0) goto _output_error;   /* should finish now */
             op += oSize;
             if (op>oend) { DISPLAY("decompression write overflow \n"); goto _output_error; }
-            {   U64 const crcDest = XXH64(decodedBuffer, op-ostart, 1);
+            {   U64 const crcDest = XXH64(decodedBuffer, (size_t)(op-ostart), 1);
                 if (crcDest != crcOrig) goto _output_error;
         }   }
 
@@ -309,7 +309,6 @@ int basicTests(U32 seed, double compressibility)
             iSize = 15 - iSize;
             CHECK( LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize) );
             DISPLAYLEVEL(3, " correctly decoded \n");
-            ip += iSize;
         }
 
         DISPLAYLEVEL(3, "Decode a buggy input : ");
@@ -337,7 +336,7 @@ int basicTests(U32 seed, double compressibility)
             const BYTE* ip = (const BYTE*) compressedBuffer;
             const BYTE* const iend = ip + cSize;
             while (ip < iend) {
-                size_t oSize = oend-op;
+                size_t oSize = (size_t)(oend-op);
                 size_t iSize = 1;
                 CHECK( LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL) );
                 op += oSize;
@@ -380,8 +379,8 @@ int basicTests(U32 seed, double compressibility)
         while (ip < iend) {
             unsigned const nbBits = FUZ_rand(&randState) % maxBits;
             size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
-            size_t oSize = oend-op;
-            if (iSize > (size_t)(iend-ip)) iSize = iend-ip;
+            size_t oSize = (size_t)(oend-op);
+            if (iSize > (size_t)(iend-ip)) iSize = (size_t)(iend-ip);
             CHECK( LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL) );
             op += oSize;
             ip += iSize;
