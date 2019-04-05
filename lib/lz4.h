@@ -242,19 +242,23 @@ LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
  *  Use this to prepare an LZ4_stream_t for a new chain of dependent blocks
  *  (e.g., LZ4_compress_fast_continue()).
  *
- *  An LZ4_stream_t must be initialized once.
+ *  An LZ4_stream_t must be initialized once before usage.
  *  This is automatically done when created by LZ4_createStream().
  *  However, should the LZ4_stream_t be simply declared on stack (for example),
- *  it's necessary to initialize first using LZ4_initStream().
+ *  it's necessary to initialize it first, using LZ4_initStream().
  *
- *  After that, start any new stream with LZ4_resetStream_fast().
+ *  After init, start any new stream with LZ4_resetStream_fast().
  *  A same LZ4_stream_t can be re-used multiple times consecutively
  *  and compress multiple streams,
  *  provided that it starts each new stream with LZ4_resetStream_fast().
  *
  *  LZ4_resetStream_fast() is much faster than LZ4_initStream(),
  *  but is not compatible with memory regions containing garbage data.
- *  For this reason, LZ4_stream_t must be initialized at least once,
+ *
+ *  Note: it's only useful to call LZ4_resetStream_fast()
+ *        in the context of streaming compression.
+ *        The *extState* functions perform their own resets.
+ *        Invoking LZ4_resetStream_fast() before is redundant, and even counterproductive.
  */
 LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
 
