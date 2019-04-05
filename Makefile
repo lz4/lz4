@@ -50,7 +50,7 @@ endif
 default: lib-release lz4-release
 
 .PHONY: all
-all: allmost examples manuals
+all: allmost examples manuals build_tests
 
 .PHONY: allmost
 allmost: lib lz4
@@ -74,6 +74,10 @@ examples: liblz4.a
 .PHONY: manuals
 manuals:
 	@$(MAKE) -C contrib/gen_manual $@
+
+.PHONY: build_tests
+build_tests:
+	@$(MAKE) -C $(TESTDIR) all
 
 .PHONY: clean
 clean:

@@ -105,7 +105,7 @@ static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 
 static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
-    uptrval startingOffset = hc4->end - hc4->base;
+    uptrval startingOffset = (uptrval)(hc4->end - hc4->base);
     if (startingOffset > 1 GB) {
         LZ4HC_clearTables(hc4);
         startingOffset = 0;
@@ -266,7 +266,7 @@ LZ4HC_InsertAndGetWiderMatch (
             if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - lookBackLength + longest - 1)) {
                 if (LZ4_read32(matchPtr) == pattern) {
                     int const back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, lowPrefixPtr) : 0;
-                    matchLength = MINMATCH + LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
+                    matchLength = MINMATCH + (int)LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, iHighLimit);
                     matchLength -= back;
                     if (matchLength > longest) {
                         longest = matchLength;
@@ -280,7 +280,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 int back = 0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
-                matchLength = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
+                matchLength = (int)LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 if ((ip+matchLength == vLimit) && (vLimit < iHighLimit))
                     matchLength += LZ4_count(ip+matchLength, lowPrefixPtr, iHighLimit);
                 back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictStart) : 0;
@@ -293,11 +293,11 @@ LZ4HC_InsertAndGetWiderMatch (
 
         if (chainSwap && matchLength==longest) {    /* better match => select a better chain */
             assert(lookBackLength==0);   /* search forward only */
-            if (matchIndex + longest <= ipIndex) {
+            if (matchIndex + (U32)longest <= ipIndex) {
                 U32 distanceToNextMatch = 1;
                 int pos;
                 for (pos = 0; pos <= longest - MINMATCH; pos++) {
-                    U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + pos);
+                    U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + (U32)pos);
                     if (candidateDist > distanceToNextMatch) {
                         distanceToNextMatch = candidateDist;
                         matchChainPos = pos;
@@ -353,12 +353,14 @@ LZ4HC_InsertAndGetWiderMatch (
         }   }   /* PA optimization */
 
         /* follow current chain */
-        matchIndex -= DELTANEXTU16(chainTable, matchIndex+matchChainPos);
+        matchIndex -= DELTANEXTU16(chainTable, matchIndex + matchChainPos);
 
     }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
-    if (dict == usingDictCtxHc && nbAttempts && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
-        size_t const dictEndOffset = dictCtx->end - dictCtx->base;
+    if ( dict == usingDictCtxHc
+      && nbAttempts
+      && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
+        size_t const dictEndOffset = (size_t)(dictCtx->end - dictCtx->base);
         U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         assert(dictEndOffset <= 1 GB);
         matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
@@ -370,22 +372,19 @@ LZ4HC_InsertAndGetWiderMatch (
                 int back = 0;
                 const BYTE* vLimit = ip + (dictEndOffset - dictMatchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
-                mlt = LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
+                mlt = (int)LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
                 back = lookBackLength ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->base + dictCtx->dictLimit) : 0;
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
                     *matchpos = base + matchIndex + back;
                     *startpos = ip + back;
-                }
-            }
+            }   }
 
             {   U32 const nextOffset = DELTANEXTU16(dictCtx->chainTable, dictMatchIndex);
                 dictMatchIndex -= nextOffset;
                 matchIndex -= nextOffset;
-            }
-        }
-    }
+    }   }   }
 
     return longest;
 }
@@ -518,7 +517,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
 
     /* Main Loop */
     while (ip <= mflimit) {
-        ml = LZ4HC_InsertAndFindBestMatch (ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis, dict);
+        ml = LZ4HC_InsertAndFindBestMatch(ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis, dict);
         if (ml<MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
@@ -768,29 +767,31 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
 
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock);
 
-static int LZ4HC_compress_generic_noDictCtx (
-    LZ4HC_CCtx_internal* const ctx,
-    const char* const src,
-    char* const dst,
-    int* const srcSizePtr,
-    int const dstCapacity,
-    int cLevel,
-    limitedOutput_directive limit
-    )
+static int
+LZ4HC_compress_generic_noDictCtx (
+        LZ4HC_CCtx_internal* const ctx,
+        const char* const src,
+        char* const dst,
+        int* const srcSizePtr,
+        int const dstCapacity,
+        int cLevel,
+        limitedOutput_directive limit
+        )
 {
     assert(ctx->dictCtx == NULL);
     return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, noDictCtx);
 }
 
-static int LZ4HC_compress_generic_dictCtx (
-    LZ4HC_CCtx_internal* const ctx,
-    const char* const src,
-    char* const dst,
-    int* const srcSizePtr,
-    int const dstCapacity,
-    int cLevel,
-    limitedOutput_directive limit
-    )
+static int
+LZ4HC_compress_generic_dictCtx (
+        LZ4HC_CCtx_internal* const ctx,
+        const char* const src,
+        char* const dst,
+        int* const srcSizePtr,
+        int const dstCapacity,
+        int cLevel,
+        limitedOutput_directive limit
+        )
 {
     const size_t position = ctx->end - ctx->base - ctx->lowLimit;
     assert(ctx->dictCtx != NULL);
@@ -807,15 +808,16 @@ static int LZ4HC_compress_generic_dictCtx (
     }
 }
 
-static int LZ4HC_compress_generic (
-    LZ4HC_CCtx_internal* const ctx,
-    const char* const src,
-    char* const dst,
-    int* const srcSizePtr,
-    int const dstCapacity,
-    int cLevel,
-    limitedOutput_directive limit
-    )
+static int
+LZ4HC_compress_generic (
+        LZ4HC_CCtx_internal* const ctx,
+        const char* const src,
+        char* const dst,
+        int* const srcSizePtr,
+        int const dstCapacity,
+        int cLevel,
+        limitedOutput_directive limit
+        )
 {
     if (ctx->dictCtx == NULL) {
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
@@ -842,7 +844,7 @@ int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* ds
 int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
     if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
-    LZ4_resetStreamHC ((LZ4_streamHC_t*)state, compressionLevel);
+    LZ4_initStreamHC (state, compressionLevel);   /* full initialization, as there is no guarantee on state's content (could be freshly malloc'ed) */
     return LZ4_compress_HC_extStateHC_fastReset(state, src, dst, srcSize, dstCapacity, compressionLevel);
 }
 
@@ -861,12 +863,10 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
     return cSize;
 }
 
-/* LZ4_compress_HC_destSize() :
- * only compatible with regular HC parser */
 int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
-    LZ4_resetStreamHC((LZ4_streamHC_t*)LZ4HC_Data, cLevel);
+    LZ4_initStreamHC(LZ4HC_Data, cLevel);   /* full initialization, as there is no guarantee on state's content (could be freshly malloc'ed) */
     LZ4HC_init(ctx, (const BYTE*) source);
     return LZ4HC_compress_generic(ctx, source, dest, sourceSizePtr, targetDestSize, cLevel, limitedDestSize);
 }
@@ -877,14 +877,16 @@ int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, i
 *  Streaming Functions
 **************************************/
 /* allocation */
-LZ4_streamHC_t* LZ4_createStreamHC(void) {
+LZ4_streamHC_t* LZ4_createStreamHC(void)
+{
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
     if (LZ4_streamHCPtr==NULL) return NULL;
-    LZ4_resetStreamHC(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);
+    LZ4_initStreamHC(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);  /* full initialization, malloc'ed buffer can be full of garbage */
     return LZ4_streamHCPtr;
 }
 
-int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
+int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
+{
     DEBUGLOG(4, "LZ4_freeStreamHC(%p)", LZ4_streamHCPtr);
     if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
     free(LZ4_streamHCPtr);
@@ -893,9 +895,10 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr) {
 
 
 /* initialization */
-void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
+void LZ4_initStreamHC (void* state, int compressionLevel)
 {
-    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= sizeof(size_t) * LZ4_STREAMHCSIZE_SIZET);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
+    LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)state;
+    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     DEBUGLOG(4, "LZ4_resetStreamHC(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
@@ -905,11 +908,17 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
+/* just a stub */
+void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
+{
+    return LZ4_initStreamHC(LZ4_streamHCPtr, compressionLevel);
+}
+
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     DEBUGLOG(4, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (LZ4_streamHCPtr->internal_donotuse.dirty) {
-        LZ4_resetStreamHC(LZ4_streamHCPtr, compressionLevel);
+        LZ4_initStreamHC(LZ4_streamHCPtr, compressionLevel);
     } else {
         LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.base;
         LZ4_streamHCPtr->internal_donotuse.base = NULL;
@@ -938,7 +947,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    LZ4_resetStreamHC(LZ4_streamHCPtr, ctxPtr->compressionLevel);
+    LZ4_initStreamHC(LZ4_streamHCPtr, ctxPtr->compressionLevel);
     LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
@@ -1029,8 +1038,8 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     {   U32 const endIndex = (U32)(streamPtr->end - streamPtr->base);
         streamPtr->end = (const BYTE*)safeBuffer + dictSize;
         streamPtr->base = streamPtr->end - endIndex;
-        streamPtr->dictLimit = endIndex - dictSize;
-        streamPtr->lowLimit = endIndex - dictSize;
+        streamPtr->dictLimit = endIndex - (U32)dictSize;
+        streamPtr->lowLimit = endIndex - (U32)dictSize;
         if (streamPtr->nextToUpdate < streamPtr->dictLimit) streamPtr->nextToUpdate = streamPtr->dictLimit;
     }
     return dictSize;
@@ -1061,7 +1070,7 @@ int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
 {
     LZ4HC_CCtx_internal *ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
     if ((((size_t)state) & (sizeof(void*)-1)) != 0) return 1;   /* Error : pointer is not aligned for pointer (32 or 64 bits) */
-    LZ4_resetStreamHC((LZ4_streamHC_t*)state, ((LZ4_streamHC_t*)state)->internal_donotuse.compressionLevel);
+    LZ4_initStreamHC((LZ4_streamHC_t*)state, ((LZ4_streamHC_t*)state)->internal_donotuse.compressionLevel);
     LZ4HC_init(ctx, (const BYTE*)inputBuffer);
     return 0;
 }
@@ -1070,7 +1079,7 @@ void* LZ4_createHC (const char* inputBuffer)
 {
     LZ4_streamHC_t* hc4 = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
     if (hc4 == NULL) return NULL;   /* not enough memory */
-    LZ4_resetStreamHC(hc4, 0 /* compressionLevel */);
+    LZ4_initStreamHC(hc4, 0 /* compressionLevel */);
     LZ4HC_init (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
     return hc4;
 }
@@ -1102,7 +1111,7 @@ char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 
 
 /* ================================================
- * LZ4 Optimal parser (levels 10-12)
+ *  LZ4 Optimal parser (levels [LZ4HC_CLEVEL_OPT_MIN - LZ4HC_CLEVEL_MAX])
  * ===============================================*/
 typedef struct {
     int price;
@@ -1115,8 +1124,9 @@ typedef struct {
 LZ4_FORCE_INLINE int LZ4HC_literalsPrice(int const litlen)
 {
     int price = litlen;
+    assert(litlen >= 0);
     if (litlen >= (int)RUN_MASK)
-        price += 1 + (litlen-RUN_MASK)/255;
+        price += 1 + ((litlen-(int)RUN_MASK) / 255);
     return price;
 }
 
@@ -1125,11 +1135,13 @@ LZ4_FORCE_INLINE int LZ4HC_literalsPrice(int const litlen)
 LZ4_FORCE_INLINE int LZ4HC_sequencePrice(int litlen, int mlen)
 {
     int price = 1 + 2 ; /* token + 16-bit offset */
+    assert(litlen >= 0);
+    assert(mlen >= MINMATCH);
 
     price += LZ4HC_literalsPrice(litlen);
 
     if (mlen >= (int)(ML_MASK+MINMATCH))
-        price += 1 + (mlen-(ML_MASK+MINMATCH))/255;
+        price += 1 + ((mlen-(int)(ML_MASK+MINMATCH)) / 255);
 
     return price;
 }
