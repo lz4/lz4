@@ -911,7 +911,7 @@ void LZ4_initStreamHC (void* state, int compressionLevel)
 /* just a stub */
 void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
-    return LZ4_initStreamHC(LZ4_streamHCPtr, compressionLevel);
+    LZ4_initStreamHC(LZ4_streamHCPtr, compressionLevel);
 }
 
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
