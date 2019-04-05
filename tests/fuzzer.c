@@ -37,6 +37,7 @@
 *  Dependencies
 **************************************/
 #if defined(__unix__) && !defined(_AIX)   /* must be included before platform.h for MAP_ANONYMOUS */
+#  undef  _GNU_SOURCE     /* in case it's already defined */
 #  define _GNU_SOURCE     /* MAP_ANONYMOUS even in -std=c99 mode */
 #  include <sys/mman.h>   /* mmap */
 #endif
