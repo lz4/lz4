@@ -528,13 +528,16 @@ union LZ4_stream_u {
 
 /*! LZ4_initStream() :
  *  An LZ4_stream_t structure must be initialized at least once.
- *  While this is automatically done when invoking LZ4_createStream(),
- *  it's not when the structure is simply declared on stack (for example).
- *  Use this function to properly initialize a newly declared LZ4_stream_t.
- *  It can also accept any arbitrary buffer of sufficient size as input,
- *  and will return a pointer of proper type upon initialization.
- *  Note : initialization can fail if size < sizeof(LZ4_stream_t).
- *  In which case, the function will @return NULL.
+ *  This is automatically done when invoking LZ4_createStream(),
+ *  but it's not when the structure is simply declared on stack (for example).
+ *
+ *  Use LZ4_initStream() to properly initialize a newly declared LZ4_stream_t.
+ *  It can also initialize any arbitrary buffer of sufficient size,
+ *  and will @return a pointer of proper type upon initialization.
+ *
+ *  Note : initialization fails if size and alignment conditions are not respected.
+ *         In which case, the function will @return NULL.
+ *  Note2: An LZ4_stream_t structure guarantees correct alignment and size.
  */
 LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
 

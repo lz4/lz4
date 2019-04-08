@@ -1284,10 +1284,17 @@ LZ4_stream_t* LZ4_createStream(void)
     return lz4s;
 }
 
+static size_t LZ4_stream_t_alignment(void)
+{
+    struct { char c; LZ4_stream_t t; } t_a;
+    return sizeof(t_a) - sizeof(t_a.t);
+}
+
 LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
 {
     DEBUGLOG(5, "LZ4_initStream");
     if (size < sizeof(LZ4_stream_t)) return NULL;
+    if (((size_t)buffer) & (LZ4_stream_t_alignment() - 1)) return NULL;  /* alignment check */
     MEM_INIT(buffer, 0, sizeof(LZ4_stream_t));
     return (LZ4_stream_t*)buffer;
 }
