@@ -151,12 +151,18 @@ endif
 
 DD:=dd
 
+.PHONY: list
+list:
+	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
+.PHONY: test
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation
 
+.PHONY: test32
 test32: CFLAGS+=-m32
 test32: test
 
+.PHONY: test-amalgamation
 test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
 	cat $(LZ4DIR)/lz4.c > lz4_all.c
 	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
