@@ -327,7 +327,7 @@ test-lz4-dict: lz4 datagen
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
-	./datagen -g6GB   | $(LZ4) -v5BD  | $(LZ4) -qt
+	./datagen -g5GB   | $(LZ4) -v4BD  | $(LZ4) -qt
 	# test large file size [2-4] GB
 	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
 	@ls -ls tmphf1
