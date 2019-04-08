@@ -115,15 +115,15 @@ checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) core *.o *.test tmp* \
+	@$(RM) -rf core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
-				frameTest$(EXT)
-	@rm -fR $(TESTDIR)
+        frameTest$(EXT)
+	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
