@@ -1,6 +1,6 @@
   /*
       checkFrame - verify frame headers
-      Copyright (C) Yann Collet 2014-2016
+      Copyright (C) Yann Collet 2014-present
 
       GPL v2 License
 
@@ -159,8 +159,12 @@ int frameCheck(cRess_t ress, FILE* const srcFile, unsigned bsid, size_t blockSiz
                 curblocksize = 0;
                 remaining = readSize - pos;
                 nextToLoad = LZ4F_getFrameInfo(ress.ctx, &frameInfo, (char*)(ress.srcBuffer)+pos, &remaining);
-                if (LZ4F_isError(nextToLoad)) EXM_THROW(22, "Error getting frame info: %s", LZ4F_getErrorName(nextToLoad)); /* XXX */
-                if (frameInfo.blockSizeID != bsid) EXM_THROW(23, "Block size ID %u != expected %u", frameInfo.blockSizeID, bsid);
+                if (LZ4F_isError(nextToLoad))
+                    EXM_THROW(22, "Error getting frame info: %s",
+                                LZ4F_getErrorName(nextToLoad));
+                if (frameInfo.blockSizeID != bsid)
+                    EXM_THROW(23, "Block size ID %u != expected %u",
+                                frameInfo.blockSizeID, bsid);
                 pos += remaining;
                 /* nextToLoad should be block header size */
                 remaining = nextToLoad;
@@ -189,7 +193,8 @@ int frameCheck(cRess_t ress, FILE* const srcFile, unsigned bsid, size_t blockSiz
                 /* detect small block due to end of frame; the final 4-byte frame checksum could be left in the buffer */
                 if ((curblocksize != 0) && (nextToLoad > 4)) {
                     if (curblocksize != blockSize)
-                        EXM_THROW(25, "Block size %zu != expected %zu, pos %zu\n", curblocksize, blockSize, pos);
+                        EXM_THROW(25, "Block size %u != expected %u, pos %u\n",
+                                    (unsigned)curblocksize, (unsigned)blockSize, (unsigned)pos);
                 }
                 curblocksize = 0;
             }
@@ -220,7 +225,7 @@ int FUZ_usage(const char* programName)
 int main(int argc, const char** argv)
 {
     int argNb;
-    int bsid=0;
+    unsigned bsid=0;
     size_t blockSize=0;
     const char* const programName = argv[0];
 
@@ -262,7 +267,7 @@ int main(int argc, const char** argv)
                     bsid=0;
                     while ((*argument>='0') && (*argument<='9')) {
                         bsid *= 10;
-                        bsid += *argument - '0';
+                        bsid += (unsigned)(*argument - '0');
                         argument++;
                     }
                     break;
@@ -272,7 +277,7 @@ int main(int argc, const char** argv)
                     blockSize=0;
                     while ((*argument>='0') && (*argument<='9')) {
                         blockSize *= 10;
-                        blockSize += *argument - '0';
+                        blockSize += (size_t)(*argument - '0');
                         argument++;
                     }
                     break;

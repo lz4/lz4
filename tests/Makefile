@@ -115,15 +115,15 @@ checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) core *.o *.test tmp* \
+	@$(RM) -rf core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
-				frameTest$(EXT)
-	@rm -fR $(TESTDIR)
+        frameTest$(EXT)
+	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
@@ -151,12 +151,18 @@ endif
 
 DD:=dd
 
+.PHONY: list
+list:
+	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
+.PHONY: test
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation
 
+.PHONY: test32
 test32: CFLAGS+=-m32
 test32: test
 
+.PHONY: test-amalgamation
 test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
 	cat $(LZ4DIR)/lz4.c > lz4_all.c
 	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
@@ -321,7 +327,7 @@ test-lz4-dict: lz4 datagen
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
-	./datagen -g6GB   | $(LZ4) -v5BD  | $(LZ4) -qt
+	./datagen -g5GB   | $(LZ4) -v4BD  | $(LZ4) -qt
 	# test large file size [2-4] GB
 	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
 	@ls -ls tmphf1
