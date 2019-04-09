@@ -265,7 +265,7 @@ union LZ4_streamHC_u {
  * Static allocation shall only be used in combination with static linking.
  */
 
-LZ4LIB_API void LZ4_initStreamHC (void* streamHCPtr, int compressionLevel);  /* v1.9.0+ */
+LZ4LIB_API LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size);
 
 
 /*-************************************
@@ -299,7 +299,7 @@ LZ4_DEPRECATED("use LZ4_freeStreamHC() instead") LZ4LIB_API   int   LZ4_freeHC (
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC2_continue               (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
 LZ4_DEPRECATED("use LZ4_compress_HC_continue() instead") LZ4LIB_API int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
 LZ4_DEPRECATED("use LZ4_createStreamHC() instead") LZ4LIB_API int   LZ4_sizeofStreamStateHC(void);
-LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStreamStateHC(void* state, char* inputBuffer);
+LZ4_DEPRECATED("use LZ4_initStreamHC() instead") LZ4LIB_API  int   LZ4_resetStreamStateHC(void* state, char* inputBuffer);
 
 
 /* LZ4_resetStreamHC() is now replaced by LZ4_initStreamHC().
@@ -310,7 +310,7 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStr
  * It is recommended to switch to LZ4_initStreamHC().
  * LZ4_resetStreamHC() will generate deprecation warnings in a future version.
  */
-LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
+//LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
 
 
 #if defined (__cplusplus)

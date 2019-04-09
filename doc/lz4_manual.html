@@ -159,19 +159,23 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 </b><p>  Use this to prepare an LZ4_stream_t for a new chain of dependent blocks
   (e.g., LZ4_compress_fast_continue()).
 
-  An LZ4_stream_t must be initialized once.
+  An LZ4_stream_t must be initialized once before usage.
   This is automatically done when created by LZ4_createStream().
   However, should the LZ4_stream_t be simply declared on stack (for example),
-  it's necessary to initialize first using LZ4_initStream().
+  it's necessary to initialize it first, using LZ4_initStream().
 
-  After that, start any new stream with LZ4_resetStream_fast().
+  After init, start any new stream with LZ4_resetStream_fast().
   A same LZ4_stream_t can be re-used multiple times consecutively
   and compress multiple streams,
   provided that it starts each new stream with LZ4_resetStream_fast().
 
   LZ4_resetStream_fast() is much faster than LZ4_initStream(),
   but is not compatible with memory regions containing garbage data.
-  For this reason, LZ4_stream_t must be initialized at least once,
+
+  Note: it's only useful to call LZ4_resetStream_fast()
+        in the context of streaming compression.
+        The *extState* functions perform their own resets.
+        Invoking LZ4_resetStream_fast() before is redundant, and even counterproductive.
  
 </p></pre><BR>
 
@@ -382,13 +386,16 @@ union LZ4_stream_u {
 
 <pre><b>LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
 </b><p>  An LZ4_stream_t structure must be initialized at least once.
-  While this is automatically done when invoking LZ4_createStream(),
-  it's not when the structure is simply declared on stack (for example).
-  Use this function to properly initialize a newly declared LZ4_stream_t.
-  It can also accept any arbitrary buffer of sufficient size as input,
-  and will return a pointer of proper type upon initialization.
-  Note : initialization can fail if size < sizeof(LZ4_stream_t).
-  In which case, the function will @return NULL.
+  This is automatically done when invoking LZ4_createStream(),
+  but it's not when the structure is simply declared on stack (for example).
+
+  Use LZ4_initStream() to properly initialize a newly declared LZ4_stream_t.
+  It can also initialize any arbitrary buffer of sufficient size,
+  and will @return a pointer of proper type upon initialization.
+
+  Note : initialization fails if size and alignment conditions are not respected.
+         In which case, the function will @return NULL.
+  Note2: An LZ4_stream_t structure guarantees correct alignment and size.
  
 </p></pre><BR>
 
@@ -468,7 +475,7 @@ int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize,
  
 </p></pre><BR>
 
-<pre><b>//LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
+<pre><b>void LZ4_resetStream (LZ4_stream_t* streamPtr);
 </b><p>  An LZ4_stream_t structure must be initialized at least once.
   This is done with LZ4_initStream(), or LZ4_resetStream().
   Consider switching to LZ4_initStream(),

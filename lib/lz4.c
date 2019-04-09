@@ -1299,6 +1299,7 @@ static size_t LZ4_stream_t_alignment(void)
 LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
 {
     DEBUGLOG(5, "LZ4_initStream");
+    if (buffer == NULL) return NULL;
     if (size < sizeof(LZ4_stream_t)) return NULL;
 #ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
                      it reports an aligment of 8-bytes,

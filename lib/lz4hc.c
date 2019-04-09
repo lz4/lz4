@@ -103,7 +103,7 @@ static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
 }
 
-static void LZ4HC_init (LZ4HC_CCtx_internal* hc4, const BYTE* start)
+static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     uptrval startingOffset = (uptrval)(hc4->end - hc4->base);
     if (startingOffset > 1 GB) {
@@ -239,7 +239,7 @@ LZ4HC_InsertAndGetWiderMatch (
     const BYTE* const dictBase = hc4->dictBase;
     int const lookBackLength = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
-    int matchChainPos = 0;
+    U32 matchChainPos = 0;
     U32 const pattern = LZ4_read32(ip);
     U32 matchIndex;
     repeat_state_e repeat = rep_untested;
@@ -300,7 +300,7 @@ LZ4HC_InsertAndGetWiderMatch (
                     U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + (U32)pos);
                     if (candidateDist > distanceToNextMatch) {
                         distanceToNextMatch = candidateDist;
-                        matchChainPos = pos;
+                        matchChainPos = (U32)pos;
                 }   }
                 if (distanceToNextMatch > 1) {
                     if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
@@ -793,7 +793,7 @@ LZ4HC_compress_generic_dictCtx (
         limitedOutput_directive limit
         )
 {
-    const size_t position = ctx->end - ctx->base - ctx->lowLimit;
+    const size_t position = (size_t)(ctx->end - ctx->base) - ctx->lowLimit;
     assert(ctx->dictCtx != NULL);
     if (position >= 64 KB) {
         ctx->dictCtx = NULL;
@@ -827,14 +827,31 @@ LZ4HC_compress_generic (
 }
 
 
-int LZ4_sizeofStateHC(void) { return sizeof(LZ4_streamHC_t); }
+int LZ4_sizeofStateHC(void) { return (int)sizeof(LZ4_streamHC_t); }
 
+#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
+                   * it reports an aligment of 8-bytes,
+                   * while actually aligning LZ4_streamHC_t on 4 bytes. */
+static size_t LZ4_streamHC_t_alignment(void)
+{
+    struct { char c; LZ4_streamHC_t t; } t_a;
+    return sizeof(t_a) - sizeof(t_a.t);
+}
+#endif
+
+/* state is presumed correctly initialized,
+ * in which case its size and alignment have already been validate */
 int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
+#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
+                   * it reports an aligment of 8-bytes,
+                   * while actually aligning LZ4_streamHC_t on 4 bytes. */
+    assert(((size_t)state & (LZ4_streamHC_t_alignment() - 1)) == 0);  /* check alignment */
+#endif
     if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
     LZ4_resetStreamHC_fast((LZ4_streamHC_t*)state, compressionLevel);
-    LZ4HC_init (ctx, (const BYTE*)src);
+    LZ4HC_init_internal (ctx, (const BYTE*)src);
     if (dstCapacity < LZ4_compressBound(srcSize))
         return LZ4HC_compress_generic (ctx, src, dst, &srcSize, dstCapacity, compressionLevel, limitedOutput);
     else
@@ -843,8 +860,8 @@ int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* ds
 
 int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
-    if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
-    LZ4_initStreamHC (state, compressionLevel);   /* full initialization, as there is no guarantee on state's content (could be freshly malloc'ed) */
+    LZ4_streamHC_t* const ctx = LZ4_initStreamHC(state, sizeof(*ctx));
+    if (ctx==NULL) return 0;   /* init failure */
     return LZ4_compress_HC_extStateHC_fastReset(state, src, dst, srcSize, dstCapacity, compressionLevel);
 }
 
@@ -863,12 +880,14 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
     return cSize;
 }
 
-int LZ4_compress_HC_destSize(void* LZ4HC_Data, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
+/* state is presumed sized correctly (>= sizeof(LZ4_streamHC_t)) */
+int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
 {
-    LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
-    LZ4_initStreamHC(LZ4HC_Data, cLevel);   /* full initialization, as there is no guarantee on state's content (could be freshly malloc'ed) */
-    LZ4HC_init(ctx, (const BYTE*) source);
-    return LZ4HC_compress_generic(ctx, source, dest, sourceSizePtr, targetDestSize, cLevel, limitedDestSize);
+    LZ4_streamHC_t* const ctx = LZ4_initStreamHC(state, sizeof(*ctx));
+    if (ctx==NULL) return 0;   /* init failure */
+    LZ4HC_init_internal(&ctx->internal_donotuse, (const BYTE*) source);
+    LZ4_setCompressionLevel(ctx, cLevel);
+    return LZ4HC_compress_generic(&ctx->internal_donotuse, source, dest, sourceSizePtr, targetDestSize, cLevel, limitedDestSize);
 }
 
 
@@ -881,7 +900,7 @@ LZ4_streamHC_t* LZ4_createStreamHC(void)
 {
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
     if (LZ4_streamHCPtr==NULL) return NULL;
-    LZ4_initStreamHC(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);  /* full initialization, malloc'ed buffer can be full of garbage */
+    LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));  /* full initialization, malloc'ed buffer can be full of garbage */
     return LZ4_streamHCPtr;
 }
 
@@ -894,37 +913,48 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 }
 
 
-/* initialization */
-void LZ4_initStreamHC (void* state, int compressionLevel)
+LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
 {
-    LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)state;
-    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);   /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
+    LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)buffer;
+    if (buffer == NULL) return NULL;
+    if (size < sizeof(LZ4_streamHC_t)) return NULL;
+#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
+                   * it reports an aligment of 8-bytes,
+                   * while actually aligning LZ4_streamHC_t on 4 bytes. */
+    if (((size_t)buffer) & (LZ4_streamHC_t_alignment() - 1)) return NULL;  /* alignment check */
+#endif
+    /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
+    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
     DEBUGLOG(4, "LZ4_resetStreamHC(%p, %d)", LZ4_streamHCPtr, compressionLevel);
+    /* end-base will trigger a clearTable on starting compression */
     LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
     LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
     LZ4_streamHCPtr->internal_donotuse.favorDecSpeed = 0;
     LZ4_streamHCPtr->internal_donotuse.dirty = 0;
-    LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
+    LZ4_setCompressionLevel(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);
+    return LZ4_streamHCPtr;
 }
 
 /* just a stub */
 void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
-    LZ4_initStreamHC(LZ4_streamHCPtr, compressionLevel);
+    LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+    LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     DEBUGLOG(4, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (LZ4_streamHCPtr->internal_donotuse.dirty) {
-        LZ4_initStreamHC(LZ4_streamHCPtr, compressionLevel);
+        LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
     } else {
+        /* preserve end - base : can trigger clearTable's threshold */
         LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.base;
         LZ4_streamHCPtr->internal_donotuse.base = NULL;
         LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
-        LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
     }
+    LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
@@ -939,16 +969,19 @@ void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor)
     LZ4_streamHCPtr->internal_donotuse.favorDecSpeed = (favor!=0);
 }
 
+/* LZ4_loadDictHC() :
+ * LZ4_streamHCPtr is presumed properly initialized */
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(4, "LZ4_loadDictHC(%p, %p, %d)", LZ4_streamHCPtr, dictionary, dictSize);
+    assert(LZ4_streamHCPtr != NULL);
     if (dictSize > 64 KB) {
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    LZ4_initStreamHC(LZ4_streamHCPtr, ctxPtr->compressionLevel);
-    LZ4HC_init (ctxPtr, (const BYTE*)dictionary);
+    LZ4_resetStreamHC_fast(LZ4_streamHCPtr, ctxPtr->compressionLevel);
+    LZ4HC_init_internal (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
     return dictSize;
@@ -982,8 +1015,9 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(4, "LZ4_compressHC_continue_generic(%p, %p, %d)", LZ4_streamHCPtr, src, *srcSizePtr);
+    assert(ctxPtr != NULL);
     /* auto-init if forgotten */
-    if (ctxPtr->base == NULL) LZ4HC_init (ctxPtr, (const BYTE*) src);
+    if (ctxPtr->base == NULL) LZ4HC_init_internal (ctxPtr, (const BYTE*) src);
 
     /* Check overflow */
     if ((size_t)(ctxPtr->end - ctxPtr->base) > 2 GB) {
@@ -1046,11 +1080,13 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
 }
 
 
-/***********************************
+/***************************************************
 *  Deprecated Functions
-***********************************/
+***************************************************/
+
 /* These functions currently generate deprecation warnings */
-/* Deprecated compression functions */
+
+/* Wrappers for deprecated compression functions */
 int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
 int LZ4_compressHC_limitedOutput(const char* src, char* dst, int srcSize, int maxDstSize) { return LZ4_compress_HC(src, dst, srcSize, maxDstSize, 0); }
 int LZ4_compressHC2(const char* src, char* dst, int srcSize, int cLevel) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), cLevel); }
@@ -1066,25 +1102,26 @@ int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* ctx, const char* src,
 /* Deprecated streaming functions */
 int LZ4_sizeofStreamStateHC(void) { return LZ4_STREAMHCSIZE; }
 
+/* state is presumed correctly sized, aka >= sizeof(LZ4_streamHC_t)
+ * @return : 0 on success, !=0 if error */
 int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
 {
-    LZ4HC_CCtx_internal *ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
-    if ((((size_t)state) & (sizeof(void*)-1)) != 0) return 1;   /* Error : pointer is not aligned for pointer (32 or 64 bits) */
-    LZ4_initStreamHC((LZ4_streamHC_t*)state, ((LZ4_streamHC_t*)state)->internal_donotuse.compressionLevel);
-    LZ4HC_init(ctx, (const BYTE*)inputBuffer);
+    LZ4_streamHC_t* const hc4 = LZ4_initStreamHC(state, sizeof(*hc4));
+    if (hc4 == NULL) return 1;   /* init failed */
+    LZ4HC_init_internal (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
     return 0;
 }
 
 void* LZ4_createHC (const char* inputBuffer)
 {
-    LZ4_streamHC_t* hc4 = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
+    LZ4_streamHC_t* const hc4 = LZ4_createStreamHC();
     if (hc4 == NULL) return NULL;   /* not enough memory */
-    LZ4_initStreamHC(hc4, 0 /* compressionLevel */);
-    LZ4HC_init (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
+    LZ4HC_init_internal (&hc4->internal_donotuse, (const BYTE*)inputBuffer);
     return hc4;
 }
 
-int LZ4_freeHC (void* LZ4HC_Data) {
+int LZ4_freeHC (void* LZ4HC_Data)
+{
     if (!LZ4HC_Data) return 0;  /* support free on NULL */
     FREEMEM(LZ4HC_Data);
     return 0;

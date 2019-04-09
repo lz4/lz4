@@ -630,7 +630,8 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
                 LZ4_initStream((LZ4_stream_t *) cctxPtr->lz4CtxPtr, sizeof (LZ4_stream_t));
             } else {
-                LZ4_initStreamHC((LZ4_streamHC_t *) cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel);
+                LZ4_initStreamHC((LZ4_streamHC_t *) cctxPtr->lz4CtxPtr, sizeof(LZ4_streamHC_t));
+                LZ4_setCompressionLevel((LZ4_streamHC_t *) cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel);
             }
             cctxPtr->lz4CtxState = ctxTypeID;
         }
