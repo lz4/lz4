@@ -736,10 +736,10 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
         { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
     };
 
-    DEBUGLOG(4, "LZ4HC_compress_generic(%p, %p, %d)", ctx, src, *srcSizePtr);
+    DEBUGLOG(4, "LZ4HC_compress_generic(ctx=%p, src=%p, srcSize=%d)", ctx, src, *srcSizePtr);
 
-    if (limit == limitedDestSize && dstCapacity < 1) return 0;         /* Impossible to store anything */
-    if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;          /* Unsupported input size (too large or negative) */
+    if (limit == limitedDestSize && dstCapacity < 1) return 0;   /* Impossible to store anything */
+    if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;    /* Unsupported input size (too large or negative) */
 
     ctx->end += *srcSizePtr;
     if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
@@ -756,7 +756,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
             assert(cParam.strat == lz4opt);
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
-                                cParam.nbSearches, cParam.targetLength, limit,
+                                (int)cParam.nbSearches, cParam.targetLength, limit,
                                 cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
                                 dict, favor);
         }
@@ -925,7 +925,7 @@ LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
 #endif
     /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
-    DEBUGLOG(4, "LZ4_resetStreamHC(%p, %d)", LZ4_streamHCPtr, compressionLevel);
+    DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", LZ4_streamHCPtr, (unsigned)size);
     /* end-base will trigger a clearTable on starting compression */
     LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
     LZ4_streamHCPtr->internal_donotuse.base = NULL;
@@ -959,6 +959,7 @@ void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
+    DEBUGLOG(5, "LZ4_setCompressionLevel(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (compressionLevel < 1) compressionLevel = LZ4HC_CLEVEL_DEFAULT;
     if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;
     LZ4_streamHCPtr->internal_donotuse.compressionLevel = (short)compressionLevel;
@@ -971,7 +972,8 @@ void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor)
 
 /* LZ4_loadDictHC() :
  * LZ4_streamHCPtr is presumed properly initialized */
-int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int dictSize)
+int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
+              const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(4, "LZ4_loadDictHC(%p, %p, %d)", LZ4_streamHCPtr, dictionary, dictSize);
@@ -980,7 +982,11 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, const char* dictionary, int
         dictionary += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    LZ4_resetStreamHC_fast(LZ4_streamHCPtr, ctxPtr->compressionLevel);
+    /* need a full initialization, there are bad side-effects when using resetFast() */
+    {   int const cLevel = ctxPtr->compressionLevel;
+        LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+        LZ4_setCompressionLevel(LZ4_streamHCPtr, cLevel);
+    }
     LZ4HC_init_internal (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
@@ -1014,7 +1020,8 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
                                             limitedOutput_directive limit)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
-    DEBUGLOG(4, "LZ4_compressHC_continue_generic(%p, %p, %d)", LZ4_streamHCPtr, src, *srcSizePtr);
+    DEBUGLOG(4, "LZ4_compressHC_continue_generic(ctx=%p, src=%p, srcSize=%d)",
+                LZ4_streamHCPtr, src, *srcSizePtr);
     assert(ctxPtr != NULL);
     /* auto-init if forgotten */
     if (ctxPtr->base == NULL) LZ4HC_init_internal (ctxPtr, (const BYTE*) src);
@@ -1027,7 +1034,8 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
     }
 
     /* Check if blocks follow each other */
-    if ((const BYTE*)src != ctxPtr->end) LZ4HC_setExternalDict(ctxPtr, (const BYTE*)src);
+    if ((const BYTE*)src != ctxPtr->end)
+        LZ4HC_setExternalDict(ctxPtr, (const BYTE*)src);
 
     /* Check overlapping input/dictionary space */
     {   const BYTE* sourceEnd = (const BYTE*) src + *srcSizePtr;
@@ -1237,7 +1245,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     BYTE* oend = op + dstCapacity;
 
     /* init */
-    DEBUGLOG(5, "LZ4HC_compress_optimal");
+    DEBUGLOG(5, "LZ4HC_compress_optimal(dst=%p, dstCapa=%u)", dst, (unsigned)dstCapacity);
     *srcSizePtr = 0;
     if (limit == limitedDestSize) oend -= LASTLITERALS;   /* Hack for support LZ4 format restriction */
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
