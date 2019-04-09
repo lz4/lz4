@@ -310,7 +310,7 @@ LZ4_DEPRECATED("use LZ4_initStreamHC() instead") LZ4LIB_API  int   LZ4_resetStre
  * It is recommended to switch to LZ4_initStreamHC().
  * LZ4_resetStreamHC() will generate deprecation warnings in a future version.
  */
-//LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
+LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionLevel);
 
 
 #if defined (__cplusplus)
