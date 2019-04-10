@@ -211,7 +211,7 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 #define LZ4F_BLOCKUNCOMPRESSED_FLAG 0x80000000U
 #define LZ4F_BLOCKSIZEID_DEFAULT LZ4F_max64KB
 
-static const size_t minFHSize = 7;
+static const size_t minFHSize = LZ4F_HEADER_SIZE_MIN;   /*  7 */
 static const size_t maxFHSize = LZ4F_HEADER_SIZE_MAX;   /* 19 */
 static const size_t BHSize = 4;  /* block header : size, and compress flag */
 static const size_t BFSize = 4;  /* block footer : checksum (optional) */
@@ -280,8 +280,9 @@ size_t LZ4F_getBlockSize(unsigned blockSizeID)
     static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
 
     if (blockSizeID == 0) blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
-    if (blockSizeID < 4 || blockSizeID > 7) return err0r(LZ4F_ERROR_maxBlockSize_invalid);
-    blockSizeID -= 4;
+    if (blockSizeID < LZ4F_max64KB || blockSizeID > LZ4F_max4MB)
+        return err0r(LZ4F_ERROR_maxBlockSize_invalid);
+    blockSizeID -= LZ4F_max64KB;
     return blockSizes[blockSizeID];
 }
 
@@ -1094,31 +1095,6 @@ void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
 }
 
 
-/*! LZ4F_headerSize() :
- *   @return : size of frame header
- *             or an error code, which can be tested using LZ4F_isError()
- */
-static size_t LZ4F_headerSize(const void* src, size_t srcSize)
-{
-    /* minimal srcSize to determine header size */
-    if (srcSize < 5) return err0r(LZ4F_ERROR_frameHeader_incomplete);
-
-    /* special case : skippable frames */
-    if ((LZ4F_readLE32(src) & 0xFFFFFFF0U) == LZ4F_MAGIC_SKIPPABLE_START) return 8;
-
-    /* control magic number */
-    if (LZ4F_readLE32(src) != LZ4F_MAGICNUMBER)
-        return err0r(LZ4F_ERROR_frameType_unknown);
-
-    /* Frame Header Size */
-    {   BYTE const FLG = ((const BYTE*)src)[4];
-        U32 const contentSizeFlag = (FLG>>3) & _1BIT;
-        U32 const dictIDFlag = FLG & _1BIT;
-        return minFHSize + (contentSizeFlag*8) + (dictIDFlag*4);
-    }
-}
-
-
 /*! LZ4F_decodeHeader() :
  *  input   : `src` points at the **beginning of the frame**
  *  output  : set internal values of dctx, such as
@@ -1191,6 +1167,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     }
 
     /* check header */
+    assert(frameHeaderSize > 5);
     {   BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
         if (HC != srcPtr[frameHeaderSize-1])
             return err0r(LZ4F_ERROR_headerChecksum_invalid);
@@ -1214,6 +1191,34 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
 }
 
 
+/*! LZ4F_headerSize() :
+ * @return : size of frame header
+ *           or an error code, which can be tested using LZ4F_isError()
+ */
+size_t LZ4F_headerSize(const void* src, size_t srcSize)
+{
+    if (src == NULL) return err0r(LZ4F_ERROR_srcPtr_wrong);
+
+    /* minimal srcSize to determine header size */
+    if (srcSize < LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH)
+        return err0r(LZ4F_ERROR_frameHeader_incomplete);
+
+    /* special case : skippable frames */
+    if ((LZ4F_readLE32(src) & 0xFFFFFFF0U) == LZ4F_MAGIC_SKIPPABLE_START)
+        return 8;
+
+    /* control magic number */
+    if (LZ4F_readLE32(src) != LZ4F_MAGICNUMBER)
+        return err0r(LZ4F_ERROR_frameType_unknown);
+
+    /* Frame Header Size */
+    {   BYTE const FLG = ((const BYTE*)src)[4];
+        U32 const contentSizeFlag = (FLG>>3) & _1BIT;
+        U32 const dictIDFlag = FLG & _1BIT;
+        return minFHSize + (contentSizeFlag*8) + (dictIDFlag*4);
+    }
+}
+
 /*! LZ4F_getFrameInfo() :
  *  This function extracts frame parameters (max blockSize, frame checksum, etc.).
  *  Usage is optional. Objective is to provide relevant information for allocation purposes.
@@ -1229,10 +1234,12 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
  *  note 1 : in case of error, dctx is not modified. Decoding operations can resume from where they stopped.
  *  note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
  */
-LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx, LZ4F_frameInfo_t* frameInfoPtr,
-                                   const void* srcBuffer, size_t* srcSizePtr)
+LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
+                                   LZ4F_frameInfo_t* frameInfoPtr,
+                             const void* srcBuffer, size_t* srcSizePtr)
 {
-    if (dctx->dStage > dstage_storeFrameHeader) {  /* assumption :  dstage_* header enum at beginning of range */
+    LZ4F_STATIC_ASSERT(dstage_getFrameHeader < dstage_storeFrameHeader);
+    if (dctx->dStage > dstage_storeFrameHeader) {
         /* frameInfo already decoded */
         size_t o=0, i=0;
         *srcSizePtr = 0;
@@ -1245,7 +1252,6 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx, LZ4F_frameInfo_t* frameInfoP
             *srcSizePtr = 0;
             return err0r(LZ4F_ERROR_frameDecoding_alreadyStarted);
         } else {
-            size_t decodeResult;
             size_t const hSize = LZ4F_headerSize(srcBuffer, *srcSizePtr);
             if (LZ4F_isError(hSize)) { *srcSizePtr=0; return hSize; }
             if (*srcSizePtr < hSize) {
@@ -1253,16 +1259,16 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx, LZ4F_frameInfo_t* frameInfoP
                 return err0r(LZ4F_ERROR_frameHeader_incomplete);
             }
 
-            decodeResult = LZ4F_decodeHeader(dctx, srcBuffer, hSize);
-            if (LZ4F_isError(decodeResult)) {
-                *srcSizePtr = 0;
-            } else {
-                *srcSizePtr = decodeResult;
-                decodeResult = BHSize;   /* block header size */
-            }
-            *frameInfoPtr = dctx->frameInfo;
-            return decodeResult;
-    }   }
+            {   size_t decodeResult = LZ4F_decodeHeader(dctx, srcBuffer, hSize);
+                if (LZ4F_isError(decodeResult)) {
+                    *srcSizePtr = 0;
+                } else {
+                    *srcSizePtr = decodeResult;
+                    decodeResult = BHSize;   /* block header size */
+                }
+                *frameInfoPtr = dctx->frameInfo;
+                return decodeResult;
+    }   }   }
 }
 
 

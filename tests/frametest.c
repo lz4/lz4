@@ -211,9 +211,13 @@ int basicTests(U32 seed, double compressibility)
     CHECK ( LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION) );
 
     DISPLAYLEVEL(3, "LZ4F_getFrameInfo on null-content frame (#157) \n");
-    {   size_t avail_in = cSize;
-        LZ4F_frameInfo_t frame_info;
+    assert(cSize >= LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH);
+    {   LZ4F_frameInfo_t frame_info;
+        size_t const fhs = LZ4F_headerSize(compressedBuffer, LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH);
+        size_t avail_in = fhs;
+        CHECK( fhs );
         CHECK( LZ4F_getFrameInfo(dCtx, &frame_info, compressedBuffer, &avail_in) );
+        if (avail_in != fhs) goto _output_error;  /* must consume all, since header size is supposed to be exact */
     }
 
     DISPLAYLEVEL(3, "LZ4F_freeDecompressionContext \n");
@@ -306,7 +310,8 @@ int basicTests(U32 seed, double compressibility)
             }
 
             DISPLAYLEVEL(3, "LZ4F_getFrameInfo on enough input : ");
-            iSize = 15 - iSize;
+            iSize = LZ4F_headerSize(ip, LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH);
+            CHECK( iSize );
             CHECK( LZ4F_getFrameInfo(dCtx, &fi, ip, &iSize) );
             DISPLAYLEVEL(3, " correctly decoded \n");
         }
