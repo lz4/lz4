@@ -265,6 +265,10 @@ union LZ4_streamHC_u {
  * Static allocation shall only be used in combination with static linking.
  */
 
+/* LZ4_initStreamHC() : v1.9.0+
+ * Required before first use of a statically allocated LZ4_streamHC_t.
+ * Before v1.9.0 : use LZ4_resetStreamHC() instead
+ */
 LZ4LIB_API LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size);
 
 
@@ -351,7 +355,7 @@ LZ4LIB_STATIC_API void LZ4_setCompressionLevel(
 LZ4LIB_STATIC_API void LZ4_favorDecompressionSpeed(
     LZ4_streamHC_t* LZ4_streamHCPtr, int favor);
 
-/*! LZ4_resetStreamHC_fast() :
+/*! LZ4_resetStreamHC_fast() : v1.9.0+
  *  When an LZ4_streamHC_t is known to be in a internally coherent state,
  *  it can often be prepared for a new compression with almost no work, only
  *  sometimes falling back to the full, expensive reset that is always required

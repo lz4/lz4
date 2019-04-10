@@ -526,7 +526,7 @@ union LZ4_stream_u {
     LZ4_stream_t_internal internal_donotuse;
 } ;  /* previously typedef'd to LZ4_stream_t */
 
-/*! LZ4_initStream() :
+/*! LZ4_initStream() : v1.9.0+
  *  An LZ4_stream_t structure must be initialized at least once.
  *  This is automatically done when invoking LZ4_createStream(),
  *  but it's not when the structure is simply declared on stack (for example).
@@ -538,6 +538,7 @@ union LZ4_stream_u {
  *  Note : initialization fails if size and alignment conditions are not respected.
  *         In which case, the function will @return NULL.
  *  Note2: An LZ4_stream_t structure guarantees correct alignment and size.
+ *  Note3: Before v1.9.0, use LZ4_resetStream() instead
  */
 LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
 
