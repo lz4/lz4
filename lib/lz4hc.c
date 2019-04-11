@@ -132,7 +132,7 @@ LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
     while (idx < target) {
         U32 const h = LZ4HC_hashPtr(base+idx);
         size_t delta = idx - hashTable[h];
-        if (delta>MAX_DISTANCE) delta = MAX_DISTANCE;
+        if (delta>LZ4_DISTANCE_MAX) delta = LZ4_DISTANCE_MAX;
         DELTANEXTU16(chainTable, idx) = (U16)delta;
         hashTable[h] = idx;
         idx++;
@@ -235,7 +235,7 @@ LZ4HC_InsertAndGetWiderMatch (
     const U32 dictLimit = hc4->dictLimit;
     const BYTE* const lowPrefixPtr = base + dictLimit;
     const U32 ipIndex = (U32)(ip - base);
-    const U32 lowestMatchIndex = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - MAX_DISTANCE;
+    const U32 lowestMatchIndex = (hc4->lowLimit + 64 KB > ipIndex) ? hc4->lowLimit : ipIndex - LZ4_DISTANCE_MAX;
     const BYTE* const dictBase = hc4->dictBase;
     int const lookBackLength = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
@@ -325,7 +325,7 @@ LZ4HC_InsertAndGetWiderMatch (
                     const BYTE* const matchPtr = base + matchCandidateIdx;
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
                         size_t const forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
-                        const BYTE* const lowestMatchPtr = (lowPrefixPtr + MAX_DISTANCE >= ip) ? lowPrefixPtr : ip - MAX_DISTANCE;
+                        const BYTE* const lowestMatchPtr = (lowPrefixPtr + LZ4_DISTANCE_MAX >= ip) ? lowPrefixPtr : ip - LZ4_DISTANCE_MAX;
                         size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, lowestMatchPtr, pattern);
                         size_t const currentSegmentLength = backLength + forwardPatternLength;
 
@@ -338,7 +338,7 @@ LZ4HC_InsertAndGetWiderMatch (
                                 size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
                                 if ((size_t)longest < maxML) {
                                     assert(base + matchIndex < ip);
-                                    if (ip - (base+matchIndex) > MAX_DISTANCE) break;
+                                    if (ip - (base+matchIndex) > LZ4_DISTANCE_MAX) break;
                                     assert(maxML < 2 GB);
                                     longest = (int)maxML;
                                     *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
@@ -359,12 +359,12 @@ LZ4HC_InsertAndGetWiderMatch (
 
     if ( dict == usingDictCtxHc
       && nbAttempts
-      && ipIndex - lowestMatchIndex < MAX_DISTANCE) {
+      && ipIndex - lowestMatchIndex < LZ4_DISTANCE_MAX) {
         size_t const dictEndOffset = (size_t)(dictCtx->end - dictCtx->base);
         U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         assert(dictEndOffset <= 1 GB);
         matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
-        while (ipIndex - matchIndex <= MAX_DISTANCE && nbAttempts--) {
+        while (ipIndex - matchIndex <= LZ4_DISTANCE_MAX && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->base + dictMatchIndex;
 
             if (LZ4_read32(matchPtr) == pattern) {
@@ -453,7 +453,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     *op += length;
 
     /* Encode Offset */
-    assert( (*ip - match) <= MAX_DISTANCE );   /* note : consider providing offset as a value, rather than as a pointer difference */
+    assert( (*ip - match) <= LZ4_DISTANCE_MAX );   /* note : consider providing offset as a value, rather than as a pointer difference */
     LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
 
     /* Encode MatchLength */
@@ -1435,7 +1435,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                  if (ml == 1) { ip++; rPos++; continue; }  /* literal; note: can end up with several literals, in which case, skip them */
                  rPos += ml;
                  assert(ml >= MINMATCH);
-                 assert((offset >= 1) && (offset <= MAX_DISTANCE));
+                 assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
                  opSaved = op;
                  if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ip - offset, limit, oend) )   /* updates ip, op and anchor */
                      goto _dest_overflow;
