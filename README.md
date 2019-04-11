@@ -15,9 +15,11 @@ trading CPU time for improved compression ratio.
 All versions feature the same decompression speed.
 
 LZ4 is also compatible with [dictionary compression](https://github.com/facebook/zstd#the-case-for-small-data-compression),
-and can ingest any input file as dictionary,
-including those created by [Zstandard Dictionary Builder](https://github.com/facebook/zstd/blob/v1.3.5/programs/zstd.1.md#dictionary-builder).
-(note: only the final 64KB are used).
+both at [API](https://github.com/lz4/lz4/blob/v1.8.3/lib/lz4frame.h#L481) and [CLI](https://github.com/lz4/lz4/blob/v1.8.3/programs/lz4.1.md#operation-modifiers) levels.
+It can ingest any input file as dictionary, though only the final 64KB are used.
+This capability can be combined with the [Zstandard Dictionary Builder](https://github.com/facebook/zstd/blob/v1.3.5/programs/zstd.1.md#dictionary-builder),
+in order to drastically improve compression performance on small files.
+
 
 LZ4 library is provided as open-source software using BSD 2-Clause license.
 

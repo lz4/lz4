@@ -524,10 +524,28 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
 /**********************************
  *  Bulk processing dictionary API
  *********************************/
+
+/* A Dictionary is useful for the compression of small messages (KB range).
+ * It dramatically improves compression efficiency.
+ *
+ * LZ4 can ingest any input as dictionary, though only the last 64 KB are useful.
+ * Best results are generally achieved by using Zstandard's Dictionary Builder
+ * to generate a high-quality dictionary from a set of samples.
+ *
+ * Loading a dictionary has a cost, since it involves construction of tables.
+ * The Bulk processing dictionary API makes it possible to share this cost
+ * over an arbitrary number of compression jobs, even concurrently,
+ * markedly improving compression latency for these cases.
+ *
+ * The same dictionary will have to be used on the decompression side
+ * for decoding to be successful.
+ * To help identify the correct dictionary at decoding stage,
+ * the frame header allows optional embedding of a dictID field.
+ */
 typedef struct LZ4F_CDict_s LZ4F_CDict;
 
 /*! LZ4_createCDict() :
- *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
+ *  When compressing multiple messages / blocks using the same dictionary, it's recommended to load it just once.
  *  LZ4_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
  *  LZ4_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
  * `dictBuffer` can be released after LZ4_CDict creation, since its content is copied within CDict */
