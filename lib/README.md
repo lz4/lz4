@@ -52,6 +52,13 @@ The following build macro can be determined at compilation time :
   For example, with `gcc` : `-DLZ4_FAST_DEC_LOOP=1`,
   and with `make` : `CPPFLAGS+=-DLZ4_FAST_DEC_LOOP=1 make lz4`.
 
+- `LZ4_DISTANCE_MAX` : control the maximum offset that the compressor will allow.
+  Set to 65535 by default, which is the maximum value supported by lz4 format.
+  Reducing maximum distance will reduce opportunities for LZ4 to find matches,
+  hence will produce worse the compression ratio.
+  However, a smaller max distance may allow compatibility with specific decoders using limited memory budget.
+  This build macro only influences the compressed output of the compressor.
+
 - `LZ4_DISABLE_DEPRECATE_WARNINGS` : invoking a deprecated function will make the compiler generate a warning.
   This is meant to invite users to update their source code.
   Should this be a problem, it's generally to make the compiler ignore these warnings,

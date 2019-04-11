@@ -94,7 +94,7 @@ lz4.1: lz4.1.md $(LIBVER_SRC)
 man: lz4.1
 
 clean-man:
-	rm lz4.1
+	$(RM) lz4.1
 
 preview-man: clean-man man
 	man ./lz4.1
