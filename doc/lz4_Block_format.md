@@ -1,6 +1,6 @@
 LZ4 Block Format Description
 ============================
-Last revised: 2018-12-30.
+Last revised: 2019-03-30.
 Author : Yann Collet
 
 
@@ -109,18 +109,29 @@ End of block restrictions
 -----------------------
 There are specific rules required to terminate a block.
 
-1. The last sequence only contains literals. The block ends right after them.
-1. The last 5 bytes of input are always literals.
-   Therefore, the last sequence contains at least 5 bytes,
-   or all input bytes if input is smaller than 5 bytes
-   (empty input can be represented with a zero byte,
-   interpreted as a token without literal and without a match).
-2. The last match must start at least 12 bytes before the end of block.
+1. The last sequence contains only literals.
+   The block ends right after them.
+2. The last 5 bytes of input are always literals.
+   Therefore, the last sequence contains at least 5 bytes.
+   - Special : if input is smaller than 5 bytes,
+     there is only one sequence, it contains the whole input as literals.
+     Empty input can be represented with a zero byte,
+     interpreted as a final token without literal and without a match.
+3. The last match must start at least 12 bytes before the end of block.
    The last match is part of the penultimate sequence.
-   It is followed by the last sequence, which only contains literals.
-   Note that, as a consequence, blocks < 13 bytes cannot be compressed.
+   It is followed by the last sequence, which contains only literals.
+   - Note that, as a consequence,
+     an independent block < 13 bytes cannot be compressed,
+     because the match must copy "something",
+     so it needs at least one prior byte.
+   - When a block can reference data from another block,
+     it can start immediately with a match and no literal,
+     so a block of 12 bytes can be compressed.
 
-These rules are in place to ensure that a compatible decoder
+When a block does not respect these end conditions,
+a conformant decoder is allowed to reject the block as incorrect.
+
+These rules are in place to ensure that a conformant decoder
 can be designed for speed, issuing speculatively instructions,
 while never reading nor writing beyond provided I/O buffers.
 
