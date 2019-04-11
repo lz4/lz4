@@ -38,7 +38,9 @@ Arguments :
  -9     : High compression
  -d     : decompression (default for .lz4 extension)
  -z     : force compression
+ -D FILE: use FILE as dictionary
  -f     : overwrite output without prompting
+ -k     : preserve source files(s)  (default)
 --rm    : remove source file(s) after successful de/compression
  -h/-H  : display help/long help and exit
 
@@ -51,17 +53,20 @@ Advanced arguments :
  -m     : multiple input files (implies automatic output filenames)
  -r     : operate recursively on directories (sets also -m)
  -l     : compress using Legacy format (Linux kernel compression)
- -B#    : Block size [4-7] (default : 7)
+ -B#    : cut file into blocks of size # bytes [32+]
+                     or predefined block size [4-7] (default: 7)
  -BD    : Block dependency (improve compression ratio)
+ -BX    : enable block checksum (default:disabled)
 --no-frame-crc : disable stream checksum (default:enabled)
 --content-size : compressed frame includes original size (default:not present)
 --[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)
+--favor-decSpeed: compressed files decompress faster, but are less compressed
+--fast[=#]: switch to ultra fast compression level (default: 1)
+
 Benchmark arguments :
  -b#    : benchmark file(s), using # compression level (default : 1)
  -e#    : test all compression levels from -bX to # (default : 1)
- -i#    : minimum evaluation time in seconds (default : 3s)
- -B#    : cut file into independent blocks of size # bytes [32+]
-                      or predefined block size [4-7] (default: 7)
+ -i#    : minimum evaluation time in seconds (default : 3s)```
 ```
 
 #### License

@@ -263,10 +263,15 @@ LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
 LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
 
 /*! LZ4_loadDict() :
- *  Use this function to load a static dictionary into LZ4_stream_t.
- *  Any previous data will be forgotten, only 'dictionary' will remain in memory.
+ *  Use this function to reference a static dictionary into LZ4_stream_t.
+ *  The dictionary must remain available during compression.
+ *  LZ4_loadDict() triggers a reset, so any previous data will be forgotten.
+ *  The same dictionary will have to be loaded on decompression side for successful decoding.
+ *  Dictionary are useful for better compression of small data (KB range).
+ *  While LZ4 accept any input as dictionary,
+ *  results are generally better when using Zstandard's Dictionary Builder.
  *  Loading a size of 0 is allowed, and is the same as reset.
- * @return : dictionary size, in bytes (necessarily <= 64 KB)
+ * @return : loaded dictionary size, in bytes (necessarily <= 64 KB)
  */
 LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, int dictSize);
 
