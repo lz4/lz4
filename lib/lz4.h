@@ -51,19 +51,23 @@ extern "C" {
   multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
 
   The LZ4 compression library provides in-memory compression and decompression functions.
+  It gives full buffer control to user.
   Compression can be done in:
     - a single step (described as Simple Functions)
     - a single step, reusing a context (described in Advanced Functions)
     - unbounded multiple steps (described as Streaming compression)
 
-  lz4.h provides block compression functions. It gives full buffer control to user.
-  Decompressing an lz4-compressed block also requires metadata (such as compressed size).
-  Each application is free to encode such metadata in whichever way it wants.
+  lz4.h generates and decodes LZ4-compressed blocks (doc/lz4_Block_format.md).
+  Decompressing a block requires additional metadata, such as its compressed size.
+  Each application is free to encode and pass such metadata in whichever way it wants.
 
-  An additional format, called LZ4 frame specification (doc/lz4_Frame_format.md),
-  take care of encoding standard metadata alongside LZ4-compressed blocks.
-  Frame format is required for interoperability.
-  It is delivered through a companion API, declared in lz4frame.h.
+  lz4.h only handle blocks, it can not generate Frames.
+
+  Blocks are different from Frames (doc/lz4_Frame_format.md).
+  Frames bundle both blocks and metadata in a specified manner.
+  This are required for compressed data to be self-contained and portable.
+  Frame format is delivered through a companion API, declared in lz4frame.h.
+  Note that the `lz4` CLI can only manage frames.
 */
 
 /*^***************************************************************

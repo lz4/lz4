@@ -16,13 +16,14 @@ They generate and decode data using the [LZ4 block format].
 For more compression ratio at the cost of compression speed,
 the High Compression variant called **lz4hc** is available.
 Add files **`lz4hc.c`** and **`lz4hc.h`**.
-This variant also depends on regular `lib/lz4.*` source files.
+This variant also compresses data using the [LZ4 block format],
+and depends on regular `lib/lz4.*` source files.
 
 
 #### Frame support, for interoperability
 
 In order to produce compressed data compatible with `lz4` command line utility,
-it's necessary to encode lz4-compressed blocks using the [official interoperable frame format].
+it's necessary to use the [official interoperable frame format].
 This format is generated and decoded automatically by the **lz4frame** library.
 Its public API is described in `lib/lz4frame.h`.
 In order to work properly, lz4frame needs all other modules present in `/lib`,
@@ -44,7 +45,7 @@ by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
 
 #### Build macros
 
-The following build macro can be determined at compilation time :
+The following build macro can be selected at compilation time :
 
 - `LZ4_FAST_DEC_LOOP` : this triggers the optimized decompression loop.
   This loops works great on x86/x64 cpus, and is automatically enabled on this platform.
@@ -61,7 +62,7 @@ The following build macro can be determined at compilation time :
 
 - `LZ4_DISABLE_DEPRECATE_WARNINGS` : invoking a deprecated function will make the compiler generate a warning.
   This is meant to invite users to update their source code.
-  Should this be a problem, it's generally to make the compiler ignore these warnings,
+  Should this be a problem, it's generally possible to make the compiler ignore these warnings,
   for example with `-Wno-deprecated-declarations` on `gcc`,
   or `_CRT_SECURE_NO_WARNINGS` for Visual Studio.
   Another method is to define `LZ4_DISABLE_DEPRECATE_WARNINGS`

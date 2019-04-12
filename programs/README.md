@@ -1,16 +1,24 @@
 Command Line Interface for LZ4 library
 ============================================
 
-Command Line Interface (CLI) can be created using the `make` command without any additional parameters.
-There are also multiple targets that create different variations of CLI:
+### Build
+The Command Line Interface (CLI) can be generated
+using the `make` command without any additional parameters.
+
+The `Makefile` script supports all [standard conventions](https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html),
+including standard targets (`all`, `install`, `clean`, etc.)
+and standard variables (`CC`, `CFLAGS`, `CPPFLAGS`, etc.).
+
+For advanced use cases, there are targets to different variations of the CLI:
 - `lz4` : default CLI, with a command line syntax close to gzip
 - `lz4c` : Same as `lz4` with additional support legacy lz4 commands (incompatible with gzip)
 - `lz4c32` : Same as `lz4c`, but forced to compile in 32-bits mode
 
+The CLI generates and decodes [LZ4-compressed frames](../doc/lz4_Frame_format.md).
+
 
 #### Aggregation of parameters
 CLI supports aggregation of parameters i.e. `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`.
-
 
 
 #### Benchmark in Command Line Interface

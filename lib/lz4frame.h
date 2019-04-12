@@ -32,11 +32,14 @@
    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-/* LZ4F is a stand-alone API to create LZ4-compressed frames
- * conformant with specification v1.6.1.
- * It also offers streaming capabilities.
+/* LZ4F is a stand-alone API able to create and decode LZ4 frames
+ * conformant with specification v1.6.1 in doc/lz4_Frame_format.md .
+ * Generated frames are compatible with `lz4` CLI.
+ *
+ * LZ4F also offers streaming capabilities.
+ *
  * lz4.h is not required when using lz4frame.h,
- * except to get constant such as LZ4_VERSION_NUMBER.
+ * except to extract common constant such as LZ4_VERSION_NUMBER.
  * */
 
 #ifndef LZ4F_H_09782039843
@@ -195,7 +198,7 @@ typedef struct {
 *  Simple compression function
 ***********************************/
 
-LZ4FLIB_API int LZ4F_compressionLevel_max(void);
+LZ4FLIB_API int LZ4F_compressionLevel_max(void);   /* v1.8.0+ */
 
 /*! LZ4F_compressFrameBound() :
  *  Returns the maximum possible compressed size with LZ4F_compressFrame() given srcSize and preferences.
