@@ -57,13 +57,16 @@ typedef struct LZ4IO_prefs_s LZ4IO_prefs_t;
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void);
 void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs);
 
+
 /* ************************************************** */
 /* ****************** Functions ********************* */
 /* ************************************************** */
 
+/* if output_filename == stdoutmark, writes to stdout */
 int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename, int compressionlevel);
 int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename);
 
+/* if suffix == stdoutmark, writes to stdout */
 int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionlevel);
 int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix);
 

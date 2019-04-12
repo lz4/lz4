@@ -232,11 +232,20 @@ test-lz4-multiple: lz4 datagen
 	@./datagen -s2 -g100K > tmp-tlm2 2> $(VOID)
 	@./datagen -s3 -g1M   > tmp-tlm3 2> $(VOID)
 	$(LZ4) -f -m tmp-tlm*
-	ls -ls tmp-tlm*
+	test -f tmp-tlm1.lz4
+	test -f tmp-tlm2.lz4
+	test -f tmp-tlm3.lz4
 	@$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
 	$(LZ4) -df -m tmp-tlm*.lz4
-	ls -ls tmp-tlm*
-	$(LZ4) -f -m tmp-tlm1 notHere tmp-tlm2; echo $$?
+	test -f tmp-tlm1
+	test -f tmp-tlm2
+	test -f tmp-tlm3
+	cat tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
+	$(RM) *.lz4
+	$(LZ4) -f -m tmp-tlm* -c > tmp-tlm-concat2
+	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
+	sdiff tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	! $(LZ4) -f -m tmp-tlm1 notHere tmp-tlm2  # must fail : notHere not present
 	@$(RM) tmp-tlm*
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
