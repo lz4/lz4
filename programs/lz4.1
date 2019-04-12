@@ -159,8 +159,12 @@ Block size [4\-7](default : 7)
 \fB\-B4\fR= 64KB ; \fB\-B5\fR= 256KB ; \fB\-B6\fR= 1MB ; \fB\-B7\fR= 4MB
 .
 .TP
+\fB\-BI\fR
+Produce independent blocks (default)
+.
+.TP
 \fB\-BD\fR
-Block Dependency (improves compression ratio on small blocks)
+Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 .
 .TP
 \fB\-\-[no\-]frame\-crc\fR
