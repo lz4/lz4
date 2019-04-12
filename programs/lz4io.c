@@ -766,6 +766,12 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
+        if (!strcmp(suffix, stdoutmark)) {
+            missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+                                    inFileNamesTable[i], stdoutmark,
+                                    compressionLevel);
+            continue;
+        }
         if (ofnSize <= ifnSize+suffixSize+1) {
             free(dstFileName);
             ofnSize = ifnSize + 20;
@@ -778,9 +784,8 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
         strcat(dstFileName, suffix);
 
         missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
-            inFileNamesTable[i],
-            !strcmp(suffix,stdoutmark) ? stdoutmark : dstFileName,
-            compressionLevel);
+                                inFileNamesTable[i], dstFileName,
+                                compressionLevel);
     }
 
     /* Close & Free */
