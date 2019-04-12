@@ -136,7 +136,8 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
     DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
     DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
-    DISPLAY( " -BD    : Block dependency (improve compression ratio) \n");
+    DISPLAY( " -BI    : Block Independence (default) \n");
+    DISPLAY( " -BD    : Block dependency (improves compression ratio) \n");
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
@@ -250,16 +251,16 @@ static int exeNameMatch(const char* exeName, const char* test)
 }
 
 /*! readU32FromChar() :
-    @return : unsigned integer value read from input in `char` format
-    allows and interprets K, KB, KiB, M, MB and MiB suffix.
-    Will also modify `*stringPtr`, advancing it to position where it stopped reading.
-    Note : function result can overflow if digit string > MAX_UINT */
+ * @return : unsigned integer value read from input in `char` format
+ *  allows and interprets K, KB, KiB, M, MB and MiB suffix.
+ *  Will also modify `*stringPtr`, advancing it to position where it stopped reading.
+ *  Note : function result can overflow if digit string > MAX_UINT */
 static unsigned readU32FromChar(const char** stringPtr)
 {
     unsigned result = 0;
     while ((**stringPtr >='0') && (**stringPtr <='9')) {
         result *= 10;
-        result += **stringPtr - '0';
+        result += (unsigned)(**stringPtr - '0');
         (*stringPtr)++ ;
     }
     if ((**stringPtr=='K') || (**stringPtr=='M')) {
@@ -277,7 +278,7 @@ static unsigned readU32FromChar(const char** stringPtr)
  *  If yes, @return 1 and advances *stringPtr to the position which immediately follows longCommand.
  * @return 0 and doesn't modify *stringPtr otherwise.
  */
-static unsigned longCommandWArg(const char** stringPtr, const char* longCommand)
+static int longCommandWArg(const char** stringPtr, const char* longCommand)
 {
     size_t const comSize = strlen(longCommand);
     int const result = !strncmp(*stringPtr, longCommand, comSize);
@@ -316,7 +317,7 @@ int main(int argc, const char** argv)
     const char* output_filename= NULL;
     const char* dictionary_filename = NULL;
     char* dynNameSpace = NULL;
-    const char** inFileNames = (const char**) calloc(argc, sizeof(char*));
+    const char** inFileNames = (const char**)calloc((size_t)argc, sizeof(char*));
     unsigned ifnIdx=0;
     LZ4IO_prefs_t* const prefs = LZ4IO_defaultPreferences();
     const char nullOutput[] = NULL_OUTPUT;
@@ -425,7 +426,7 @@ int main(int argc, const char** argv)
                 }
 
                 if ((*argument>='0') && (*argument<='9')) {
-                    cLevel = readU32FromChar(&argument);
+                    cLevel = (int)readU32FromChar(&argument);
                     argument--;
                     continue;
                 }
@@ -440,7 +441,7 @@ int main(int argc, const char** argv)
 
                 case 'e':
                     argument++;
-                    cLevelLast = readU32FromChar(&argument);
+                    cLevelLast = (int)readU32FromChar(&argument);
                     argument--;
                     break;
 
@@ -498,6 +499,7 @@ int main(int argc, const char** argv)
                         switch(argument[1])
                         {
                         case 'D': LZ4IO_setBlockMode(prefs, LZ4IO_blockLinked); argument++; break;
+                        case 'I': LZ4IO_setBlockMode(prefs, LZ4IO_blockIndependent); argument++; break;
                         case 'X': LZ4IO_setBlockChecksumMode(prefs, 1); argument ++; break;   /* disabled by default */
                         default :
                             if (argument[1] < '0' || argument[1] > '9') {
@@ -696,7 +698,7 @@ int main(int argc, const char** argv)
     }
 
     /* IO Stream/File */
-    LZ4IO_setNotificationLevel(displayLevel);
+    LZ4IO_setNotificationLevel((int)displayLevel);
     if (ifnIdx == 0) multiple_inputs = 0;
     if (mode == om_decompress) {
         if (multiple_inputs)

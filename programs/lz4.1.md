@@ -172,8 +172,11 @@ only the latest one will be applied.
   Block size \[4-7\](default : 7)<br/>
   `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB
 
+* `-BI`:
+  Produce independent blocks (default)
+
 * `-BD`:
-  Block Dependency (improves compression ratio on small blocks)
+  Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)

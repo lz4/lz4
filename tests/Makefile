@@ -248,7 +248,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
 	$(LZ4) --no-frame-crc < tmp-tlb-dg20k | $(LZ4) -d > tmp-tlb-dec
 	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
-	./datagen           | $(LZ4)        | $(LZ4) -t
+	./datagen           | $(LZ4) -BI    | $(LZ4) -t
 	./datagen -g6M -P99 | $(LZ4) -9BD   | $(LZ4) -t
 	./datagen -g17M     | $(LZ4) -9v    | $(LZ4) -qt
 	./datagen -g33M     | $(LZ4) --no-frame-crc | $(LZ4) -t
