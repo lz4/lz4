@@ -956,7 +956,7 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
                              compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
                              cctxPtr->cdict,
                              cctxPtr->prefs.frameInfo.blockChecksumFlag);
-    assert(((void)"flush overflows dstBuffer!", (size_t)(dstPtr - dstStart) < dstCapacity));
+    assert(((void)"flush overflows dstBuffer!", (size_t)(dstPtr - dstStart) <= dstCapacity));
 
     if (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked)
         cctxPtr->tmpIn += cctxPtr->tmpInSize;
