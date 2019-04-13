@@ -389,7 +389,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
       /* Allocation */
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)g_chunkSize)+1) * sizeof(struct chunkParameters));
       orig_buff = (char*) malloc(benchedSize);
-      nbChunks = (int) ((benchedSize + (g_chunkSize-1)) / g_chunkSize);
+      nbChunks = (int) ((benchedSize + (size_t)g_chunkSize - 1) / (size_t)g_chunkSize);
       maxCompressedChunkSize = LZ4_compressBound(g_chunkSize);
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
       compressed_buff = (char*)malloc((size_t)compressedBuffSize);

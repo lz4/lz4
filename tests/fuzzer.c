@@ -145,10 +145,10 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
         /* Select : Literal (noise) or copy (within 64K) */
         if (FUZ_RAND15BITS < P32) {
             /* Copy (within 64K) */
-            size_t const length = FUZ_RANDLENGTH + 4;
+            size_t const length = (size_t)FUZ_RANDLENGTH + 4;
             size_t const d = MIN(pos+length, bufferSize);
             size_t match;
-            size_t offset = FUZ_RAND15BITS + 1;
+            size_t offset = (size_t)FUZ_RAND15BITS + 1;
             while (offset > pos) offset >>= 1;
             match = pos - offset;
             while (pos < d) BBuffer[pos++] = BBuffer[match++];
@@ -667,7 +667,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Compress using External dictionary */
         FUZ_DISPLAYTEST("test LZ4_compress_fast_continue(), with non-contiguous dictionary");
-        dict -= (FUZ_rand(&randState) & 0xF) + 1;   /* create space, so now dictionary is an ExtDict */
+        dict -= (size_t)(FUZ_rand(&randState) & 0xF) + 1;   /* create space, so now dictionary is an ExtDict */
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_loadDict(&LZ4dict, dict, dictSize);
         blockContinueCompressedSize = LZ4_compress_fast_continue(&LZ4dict, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
@@ -1145,7 +1145,7 @@ static void FUZ_unitTests(int compressionLevel)
             result1 = LZ4_compress_HC_continue(&sHC, testInput + segSize, testCompressed, segSize, segSize -1);
             FUZ_CHECKTEST(result1==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result1);
             FUZ_CHECKTEST(sHC.internal_donotuse.dirty, "Context should be clean");
-            result2 = LZ4_compress_HC_continue(&sHC, testInput + 2*segSize, testCompressed+result1, segSize, segSize-1);
+            result2 = LZ4_compress_HC_continue(&sHC, testInput + 2*(size_t)segSize, testCompressed+result1, segSize, segSize-1);
             FUZ_CHECKTEST(result2==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result2);
             FUZ_CHECKTEST(sHC.internal_donotuse.dirty, "Context should be clean");
 
@@ -1178,7 +1178,7 @@ static void FUZ_unitTests(int compressionLevel)
             int dictSize = (FUZ_rand(&randState) & 8191);
             char* dst = testVerify;
 
-            size_t segStart = dictSize + 7;
+            size_t segStart = (size_t)dictSize + 7;
             int segSize = (FUZ_rand(&randState) & 8191);
             int segNb = 1;
 
@@ -1203,13 +1203,14 @@ static void FUZ_unitTests(int compressionLevel)
                     FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_usingDict() part %i corruption", segNb);
                 }
 
+                assert(segSize >= 0);
                 dict = dst;
                 dictSize = segSize;
 
-                dst += segSize + 1;
+                dst += (size_t)segSize + 1;
                 segNb ++;
 
-                segStart += segSize + (FUZ_rand(&randState) & 0xF) + 1;
+                segStart += (size_t)segSize + (FUZ_rand(&randState) & 0xF) + 1;
                 segSize = (FUZ_rand(&randState) & 8191);
             }
         }
@@ -1288,7 +1289,7 @@ static void FUZ_unitTests(int compressionLevel)
             int dNext = 0;
             int compressedSize;
 
-            assert((size_t)(dBufferSize + 1 + dBufferSize) < testVerifySize);   /* space used by ringBufferSafe and ringBufferFast */
+            assert((size_t)dBufferSize * 2 + 1 < testVerifySize);   /* space used by ringBufferSafe and ringBufferFast */
             XXH64_reset(&xxhOrig, 0);
             XXH64_reset(&xxhNewSafe, 0);
             XXH64_reset(&xxhNewFast, 0);
@@ -1323,7 +1324,8 @@ static void FUZ_unitTests(int compressionLevel)
 
             /* prepare second message */
             dNext += messageSize;
-            totalMessageSize += messageSize;
+            assert(messageSize >= 0);
+            totalMessageSize += (unsigned)messageSize;
             messageSize = maxMessageSize;
             iNext = BSIZE1+1;
             assert(BSIZE1 >= 65535);

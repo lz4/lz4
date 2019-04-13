@@ -194,10 +194,10 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 /*-************************************
 *  Constants
 **************************************/
-#ifndef LZ4_SRC_INCLUDED
-#define KB *(1<<10)
-#define MB *(1<<20)
-#define GB *(1<<30)
+#ifndef LZ4_SRC_INCLUDED   /* avoid double definition */
+#  define KB *(1<<10)
+#  define MB *(1<<20)
+#  define GB *(1<<30)
 #endif
 
 #define _1BIT  0x01
@@ -644,8 +644,8 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     cctxPtr->maxBlockSize = LZ4F_getBlockSize(cctxPtr->prefs.frameInfo.blockSizeID);
 
     {   size_t const requiredBuffSize = preferencesPtr->autoFlush ?
-                (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) * 64 KB :  /* only needs windows size */
-                cctxPtr->maxBlockSize + ((cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) * 128 KB);
+                ((cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 64 KB : 0) :  /* only needs past data up to window size */
+                cctxPtr->maxBlockSize + ((cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 128 KB : 0);
 
         if (cctxPtr->maxBufferSize < requiredBuffSize) {
             cctxPtr->maxBufferSize = 0;
@@ -1146,7 +1146,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     }
 
     /* Frame Header Size */
-    frameHeaderSize = minFHSize + (contentSizeFlag*8) + (dictIDFlag*4);
+    frameHeaderSize = minFHSize + (contentSizeFlag?8:0) + (dictIDFlag?4:0);
 
     if (srcSize < frameHeaderSize) {
         /* not enough input to fully decode frame header */
@@ -1215,7 +1215,7 @@ size_t LZ4F_headerSize(const void* src, size_t srcSize)
     {   BYTE const FLG = ((const BYTE*)src)[4];
         U32 const contentSizeFlag = (FLG>>3) & _1BIT;
         U32 const dictIDFlag = FLG & _1BIT;
-        return minFHSize + (contentSizeFlag*8) + (dictIDFlag*4);
+        return minFHSize + (contentSizeFlag?8:0) + (dictIDFlag?4:0);
     }
 }
 
@@ -1421,11 +1421,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             if (dctx->frameInfo.contentChecksumFlag) (void)XXH32_reset(&(dctx->xxh), 0);
             /* internal buffers allocation */
             {   size_t const bufferNeeded = dctx->maxBlockSize
-                    + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) * 128 KB);
+                    + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
                 if (bufferNeeded > dctx->maxBufferSize) {   /* tmp buffers too small */
                     dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
                     FREEMEM(dctx->tmpIn);
-                    dctx->tmpIn = (BYTE*)ALLOC(dctx->maxBlockSize + 4 /* block checksum */);
+                    dctx->tmpIn = (BYTE*)ALLOC(dctx->maxBlockSize + BFSize /* block checksum */);
                     if (dctx->tmpIn == NULL)
                         return err0r(LZ4F_ERROR_allocation_failed);
                     FREEMEM(dctx->tmpOutBuffer);
@@ -1526,7 +1526,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
                 dctx->tmpInTarget -= sizeToCopy;  /* need to copy more */
                 nextSrcSizeHint = dctx->tmpInTarget +
-                                + dctx->frameInfo.blockChecksumFlag * 4   /* size for block checksum */
+                                +(dctx->frameInfo.blockChecksumFlag ? BFSize : 0)
                                 + BHSize /* next header size */;
                 doAnotherStage = 0;
                 break;
@@ -1578,7 +1578,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 srcPtr += sizeToCopy;
                 if (dctx->tmpInSize < dctx->tmpInTarget) { /* need more input */
                     nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)
-                                    + dctx->frameInfo.blockChecksumFlag * 4   /* size for block checksum */
+                                    + (dctx->frameInfo.blockChecksumFlag ? BFSize : 0)
                                     + BHSize /* next header size */;
                     doAnotherStage = 0;
                     break;
