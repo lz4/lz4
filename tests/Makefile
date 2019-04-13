@@ -222,7 +222,7 @@ test-lz4-frame-concatenation: lz4 datagen
 	@$(LZ4) -zq tmp-lfc-nonempty > tmp-lfc-nonempty.lz4
 	cat tmp-lfc-nonempty.lz4 tmp-lfc-empty.lz4 tmp-lfc-nonempty.lz4 > tmp-lfc-concat.lz4
 	$(LZ4) -d tmp-lfc-concat.lz4 > tmp-lfc-result
-	sdiff tmp-lfc-src tmp-lfc-result
+	cmp tmp-lfc-src tmp-lfc-result
 	@$(RM) tmp-lfc-*
 	@echo frame concatenation test completed
 
@@ -230,13 +230,36 @@ test-lz4-multiple: lz4 datagen
 	@echo "\n ---- test multiple files ----"
 	@./datagen -s1        > tmp-tlm1 2> $(VOID)
 	@./datagen -s2 -g100K > tmp-tlm2 2> $(VOID)
-	@./datagen -s3 -g1M   > tmp-tlm3 2> $(VOID)
+	@./datagen -s3 -g200K > tmp-tlm3 2> $(VOID)
+	# compress multiple files : one .lz4 per source file
 	$(LZ4) -f -m tmp-tlm*
-	ls -ls tmp-tlm*
-	@$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
-	$(LZ4) -df -m tmp-tlm*.lz4
-	ls -ls tmp-tlm*
-	$(LZ4) -f -m tmp-tlm1 notHere tmp-tlm2; echo $$?
+	test -f tmp-tlm1.lz4
+	test -f tmp-tlm2.lz4
+	test -f tmp-tlm3.lz4
+	# decompress multiple files : one output file per .lz4
+	mv tmp-tlm1 tmp-tlm1-orig
+	mv tmp-tlm2 tmp-tlm2-orig
+	mv tmp-tlm3 tmp-tlm3-orig
+	$(LZ4) -d -f -m tmp-tlm*.lz4
+	cmp tmp-tlm1 tmp-tlm1-orig   # must be identical
+	cmp tmp-tlm2 tmp-tlm2-orig
+	cmp tmp-tlm3 tmp-tlm3-orig
+	# compress multiple files into stdout
+	cat tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
+	$(RM) *.lz4
+	$(LZ4) -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
+	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
+	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	# decompress multiple files into stdout
+	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
+	$(LZ4) -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
+	cat tmp-tlm1 tmp-tlm2 tmp-tlm3 > tmp-tlm-concat1   # create concatenated reference
+	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
+	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
+	test ! -f tmp-tlm1  # must not create file artefact
+	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	# compress multiple files, one of which is absent (must fail)
+	! $(LZ4) -f -m tmp-tlm-concat1 notHere tmp-tlm-concat2  # must fail : notHere not present
 	@$(RM) tmp-tlm*
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat

@@ -33,3 +33,6 @@ bin/
 # Windows / Msys
 nul
 ld.exe*
+
+# test files
+*.lz4

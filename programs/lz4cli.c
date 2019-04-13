@@ -711,7 +711,7 @@ int main(int argc, const char** argv)
             LZ4IO_compressFilename_Legacy(prefs, input_filename, output_filename, cLevel);
         } else {
             if (multiple_inputs)
-                operationResult = LZ4IO_compressMultipleFilenames(prefs, inFileNames, ifnIdx, LZ4_EXTENSION, cLevel);
+                operationResult = LZ4IO_compressMultipleFilenames(prefs, inFileNames, ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION, cLevel);
             else
                 operationResult = DEFAULT_COMPRESSOR(prefs, input_filename, output_filename, cLevel);
         }

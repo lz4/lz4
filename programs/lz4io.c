@@ -121,8 +121,8 @@ struct LZ4IO_prefs_s {
   int contentSizeFlag;
   int useDictionary;
   unsigned favorDecSpeed;
-  char const* dictionaryFilename;
-  U32 removeSrcFile;
+  const char* dictionaryFilename;
+  int removeSrcFile;
 };
 
 /**************************************
@@ -323,11 +323,12 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 }
 
 /** FIO_openDstFile() :
- * condition : `dstFileName` must be non-NULL.
+ *  condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
 static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileName)
 {
     FILE* f;
+    assert(dstFileName != NULL);
 
     if (!strcmp (dstFileName, stdoutmark)) {
         DISPLAYLEVEL(4,"Using stdout for output\n");
@@ -595,7 +596,10 @@ static void LZ4IO_freeCResources(cRess_t ress)
  * result : 0 : compression completed correctly
  *          1 : missing or pb opening srcFileName
  */
-static int LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress, const char* srcFileName, const char* dstFileName, int compressionLevel)
+static int
+LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
+                               const char* srcFileName, const char* dstFileName,
+                               int compressionLevel)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -691,9 +695,9 @@ static int LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t
         compressedfilesize += headerSize;
     }
 
-    /* Release files */
+    /* Release file handlers */
     fclose (srcFile);
-    fclose (dstFile);
+    if (strcmp(dstFileName,stdoutmark)) fclose (dstFile);   /* do not close stdout */
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
@@ -744,7 +748,10 @@ int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, 
 
 
 #define FNSPACE 30
-int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix, int compressionLevel)
+int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
+                              const char** inFileNamesTable, int ifntSize,
+                              const char* suffix,
+                              int compressionLevel)
 {
     int i;
     int missed_files = 0;
@@ -759,11 +766,26 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inF
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
-        if (ofnSize <= ifnSize+suffixSize+1) { free(dstFileName); ofnSize = ifnSize + 20; dstFileName = (char*)malloc(ofnSize); if (dstFileName==NULL) { LZ4IO_freeCResources(ress); return ifntSize; } }
+        if (!strcmp(suffix, stdoutmark)) {
+            missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+                                    inFileNamesTable[i], stdoutmark,
+                                    compressionLevel);
+            continue;
+        }
+        if (ofnSize <= ifnSize+suffixSize+1) {
+            free(dstFileName);
+            ofnSize = ifnSize + 20;
+            dstFileName = (char*)malloc(ofnSize);
+            if (dstFileName==NULL) {
+                LZ4IO_freeCResources(ress);
+                return ifntSize;
+        }   }
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_extRess(prefs, ress, inFileNamesTable[i], dstFileName, compressionLevel);
+        missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+                                inFileNamesTable[i], dstFileName,
+                                compressionLevel);
     }
 
     /* Close & Free */
@@ -778,13 +800,14 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inF
 /* ********************** LZ4 file-stream Decompression **************** */
 /* ********************************************************************* */
 
+/* It's presumed that s points to a memory space of size >= 4 */
 static unsigned LZ4IO_readLE32 (const void* s)
 {
     const unsigned char* const srcPtr = (const unsigned char*)s;
     unsigned value32 = srcPtr[0];
-    value32 += (srcPtr[1]<<8);
-    value32 += (srcPtr[2]<<16);
-    value32 += ((unsigned)srcPtr[3])<<24;
+    value32 += (unsigned)srcPtr[1] <<  8;
+    value32 += (unsigned)srcPtr[2] << 16;
+    value32 += (unsigned)srcPtr[3] << 24;
     return value32;
 }
 
