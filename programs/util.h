@@ -571,7 +571,11 @@ UTIL_createFileList(const char** inputNames, unsigned inputNamesNb, char** alloc
         pos += strlen(fileTable[i]) + 1;
     }
 
-    if (pos > bufSize) { free(buf); free((void*)fileTable); return NULL; }   /* can this happen ? */
+    if (pos > bufSize) {
+        free(buf);
+        free((void*)fileTable);
+        return NULL;
+    }   /* can this happen ? */
 
     *allocatedBuffer = buf;
     *allocatedNamesNb = nbFiles;
