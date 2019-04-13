@@ -458,7 +458,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
-    length = (size_t)(matchLength - MINMATCH);
+    length = (size_t)matchLength - MINMATCH;
     if ((limit) && (*op + (length / 255) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
     if (length >= ML_MASK) {
         *token += ML_MASK;
@@ -979,7 +979,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
     DEBUGLOG(4, "LZ4_loadDictHC(%p, %p, %d)", LZ4_streamHCPtr, dictionary, dictSize);
     assert(LZ4_streamHCPtr != NULL);
     if (dictSize > 64 KB) {
-        dictionary += dictSize - 64 KB;
+        dictionary += (size_t)dictSize - 64 KB;
         dictSize = 64 KB;
     }
     /* need a full initialization, there are bad side-effects when using resetFast() */
