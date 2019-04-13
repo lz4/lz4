@@ -45,6 +45,7 @@ extern "C" {
 #  include <utime.h>      /* utime */
 #endif
 #include <time.h>         /* time */
+#include <limits.h>       /* INT_MAX */
 #include <errno.h>
 
 
@@ -445,7 +446,8 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
     } while (FindNextFileA(hFile, &cFile));
 
     FindClose(hFile);
-    return nbFiles;
+    assert(nbFiles < INT_MAX);
+    return (int)nbFiles;
 }
 
 #elif defined(__linux__) || (PLATFORM_POSIX_VERSION >= 200112L)  /* opendir, readdir require POSIX.1-2001 */
