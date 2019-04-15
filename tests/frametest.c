@@ -787,7 +787,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     unsigned testNb = 0;
     size_t const srcDataLength = 9 MB;  /* needs to be > 2x4MB to test large blocks */
     void* srcBuffer = NULL;
-    size_t const compressedBufferSize = LZ4F_compressFrameBound(srcDataLength, NULL);
+    size_t const compressedBufferSize = LZ4F_compressFrameBound(srcDataLength, NULL) + 64 KB;  /* needs some margin for some rare exceptional cases involving multiple flushes */
     void* compressedBuffer = NULL;
     void* decodedBuffer = NULL;
     U32 coreRand = seed;
@@ -801,10 +801,10 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                             DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
 
     /* Create buffers */
-    result = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
-    CHECK(LZ4F_isError(result), "Allocation failed (error %i)", (int)result);
-    result = LZ4F_createCompressionContext(&cCtx, LZ4F_VERSION);
-    CHECK(LZ4F_isError(result), "Allocation failed (error %i)", (int)result);
+    {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
+        CHECK(LZ4F_isError(creationStatus), "Allocation failed (error %i)", (int)creationStatus); }
+    {   size_t const creationStatus = LZ4F_createCompressionContext(&cCtx, LZ4F_VERSION);
+        CHECK(LZ4F_isError(creationStatus), "Allocation failed (error %i)", (int)creationStatus); }
     srcBuffer = malloc(srcDataLength);
     CHECK(srcBuffer==NULL, "srcBuffer Allocation failed");
     compressedBuffer = malloc(compressedBufferSize);
@@ -859,7 +859,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             unsigned const maxBits = FUZ_highbit((U32)srcSize);
             LZ4F_compressOptions_t cOptions;
             memset(&cOptions, 0, sizeof(cOptions));
-            result = LZ4F_compressBegin(cCtx, op, oend-op, prefsPtr);
+            result = LZ4F_compressBegin(cCtx, op, (size_t)(oend-op), prefsPtr);
             CHECK(LZ4F_isError(result), "Compression header failed (error %i)", (int)result);
             op += result;
             while (ip < iend) {
@@ -878,9 +878,10 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
                 {   unsigned const forceFlush = neverFlush ? 0 : ((FUZ_rand(&randState) & 3) == 1);
                     if (forceFlush) {
-                        result = LZ4F_flush(cCtx, op, oend-op, &cOptions);
-                        CHECK(LZ4F_isError(result), "Compression failed (error %i)", (int)result);
-                        op += result;
+                        size_t const flushSize = LZ4F_flush(cCtx, op, (size_t)(oend-op), &cOptions);
+                        DISPLAYLEVEL(6,"flushing %u bytes \n", (unsigned)flushSize);
+                        CHECK(LZ4F_isError(flushSize), "Compression failed (error %i)", (int)flushSize);
+                        op += flushSize;
                 }   }
             }
             CHECK(op>=oend, "LZ4F_compressFrameBound overflow");
@@ -889,6 +890,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t const dstEndTooSmallSize = (FUZ_rand(&randState) % dstEndSafeSize) + 1;
                 size_t const dstEndSize = tooSmallDstEnd ? dstEndTooSmallSize : dstEndSafeSize;
                 BYTE const canaryByte = (BYTE)(FUZ_rand(&randState) & 255);
+                DISPLAYLEVEL(7,"canaryByte at pos %u / %u \n",
+                            (unsigned)((size_t)(op - (BYTE*)compressedBuffer) + dstEndSize),
+                            (unsigned)compressedBufferSize);
                 op[dstEndSize] = canaryByte;
                 result = LZ4F_compressEnd(cCtx, op, dstEndSize, &cOptions);
                 CHECK(op[dstEndSize] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
@@ -897,7 +901,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                     CHECK(1, "Compression completion failed (error %i : %s)", (int)result, LZ4F_getErrorName(result));
             }   }
             op += result;
-            cSize = op-(BYTE*)compressedBuffer;
+            cSize = (size_t)(op - (BYTE*)compressedBuffer);
             DISPLAYLEVEL(5, "\nCompressed %u bytes into %u \n", (U32)srcSize, (U32)cSize);
         }
 
