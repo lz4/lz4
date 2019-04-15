@@ -32,14 +32,6 @@
     - LZ4 source repository : https://github.com/lz4/lz4
 */
 
-/*
- * LZ4_SRC_INCLUDED:
- * Amalgamation flag, whether lz4.c is included
- */
-#ifndef LZ4_SRC_INCLUDED
-#  define LZ4_SRC_INCLUDED 1
-#endif
-
 /*-************************************
 *  Tuning parameters
 **************************************/
@@ -98,6 +90,14 @@
 /*-************************************
 *  Dependency
 **************************************/
+/*
+ * LZ4_SRC_INCLUDED:
+ * Amalgamation flag, whether lz4.c is included
+ */
+#ifndef LZ4_SRC_INCLUDED
+#  define LZ4_SRC_INCLUDED 1
+#endif
+
 #define LZ4_STATIC_LINKING_ONLY
 #define LZ4_DISABLE_DEPRECATE_WARNINGS /* due to LZ4_decompress_safe_withPrefix64k */
 #include "lz4.h"
@@ -177,7 +177,7 @@
 
 
 /*-************************************
-*  Basic Types
+*  Types
 **************************************/
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
@@ -201,6 +201,12 @@
 #else
   typedef size_t reg_t;   /* 32-bits in x32 mode */
 #endif
+
+typedef enum {
+    notLimited = 0,
+    limitedOutput = 1,
+    fillOutput = 2,
+} limitedOutput_directive;
 
 
 /*-************************************
@@ -549,13 +555,6 @@ static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression ru
 /*-************************************
 *  Local Structures and types
 **************************************/
-typedef enum {
-    noLimit = 0,
-    notLimited = 1,
-    limitedOutput = 2,
-    fillOutput = 3,
-    limitedDestSize = 4
-} limitedOutput_directive;
 typedef enum { clearedTable = 0, byPtr, byU32, byU16 } tableType_t;
 
 /**
