@@ -920,7 +920,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             unsigned const maxBits = MAX(3, suggestedBits);
             unsigned const nonContiguousDst = FUZ_rand(&randState) % 3;   /* 0 : contiguous; 1 : non-contiguous; 2 : dst overwritten */
             size_t totalOut = 0;
-            size_t decSize;
+            size_t decSize = 0;
             XXH64_state_t xxh64;
             XXH64_reset(&xxh64, 1);
             assert(ip < iend);
