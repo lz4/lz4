@@ -32,14 +32,6 @@
     - LZ4 source repository : https://github.com/lz4/lz4
 */
 
-/*
- * LZ4_SRC_INCLUDED:
- * Amalgamation flag, whether lz4.c is included
- */
-#ifndef LZ4_SRC_INCLUDED
-#  define LZ4_SRC_INCLUDED 1
-#endif
-
 /*-************************************
 *  Tuning parameters
 **************************************/
@@ -98,6 +90,14 @@
 /*-************************************
 *  Dependency
 **************************************/
+/*
+ * LZ4_SRC_INCLUDED:
+ * Amalgamation flag, whether lz4.c is included
+ */
+#ifndef LZ4_SRC_INCLUDED
+#  define LZ4_SRC_INCLUDED 1
+#endif
+
 #define LZ4_STATIC_LINKING_ONLY
 #define LZ4_DISABLE_DEPRECATE_WARNINGS /* due to LZ4_decompress_safe_withPrefix64k */
 #include "lz4.h"
@@ -177,7 +177,7 @@
 
 
 /*-************************************
-*  Basic Types
+*  Types
 **************************************/
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
@@ -201,6 +201,12 @@
 #else
   typedef size_t reg_t;   /* 32-bits in x32 mode */
 #endif
+
+typedef enum {
+    notLimited = 0,
+    limitedOutput = 1,
+    fillOutput = 2
+} limitedOutput_directive;
 
 
 /*-************************************
@@ -549,13 +555,6 @@ static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression ru
 /*-************************************
 *  Local Structures and types
 **************************************/
-typedef enum {
-    noLimit = 0,
-    notLimited = 1,
-    limitedOutput = 2,
-    fillOutput = 3,
-    limitedDestSize = 4
-} limitedOutput_directive;
 typedef enum { clearedTable = 0, byPtr, byU32, byU16 } tableType_t;
 
 /**
@@ -761,9 +760,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                  const char* const source,
                  char* const dest,
                  const int inputSize,
-                 int *inputConsumed, /* only written when outputLimited == fillOutput */
+                 int *inputConsumed, /* only written when outputDirective == fillOutput */
                  const int maxOutputSize,
-                 const limitedOutput_directive outputLimited,
+                 const limitedOutput_directive outputDirective,
                  const tableType_t tableType,
                  const dict_directive dictDirective,
                  const dictIssue_directive dictIssue,
@@ -806,7 +805,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, tableType=%u", inputSize, tableType);
     /* If init conditions are not met, we don't have to mark stream
      * as having dirty context, since no action was taken yet */
-    if (outputLimited == fillOutput && maxOutputSize < 1) return 0;   /* Impossible to store anything */
+    if (outputDirective == fillOutput && maxOutputSize < 1) return 0;   /* Impossible to store anything */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;           /* Unsupported inputSize, too large (or negative) */
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
@@ -923,11 +922,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         /* Encode Literals */
         {   unsigned const litLength = (unsigned)(ip - anchor);
             token = op++;
-            if ((outputLimited == limitedOutput) &&  /* Check output buffer overflow */
-                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
-                goto _failure;
+            if ((outputDirective == limitedOutput) &&  /* Check output buffer overflow */
+                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)) )
+                return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
 
-            if ((outputLimited == fillOutput) &&
+            if ((outputDirective == fillOutput) &&
                 (unlikely(op + (litLength+240)/255 /* litlen */ + litLength /* literals */ + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit))) {
                 op--;
                 goto _last_literals;
@@ -956,7 +955,7 @@ _next_match:
          * - token and *token : position to write 4-bits for match length; higher 4-bits for literal length supposed already written
          */
 
-        if ((outputLimited == fillOutput) &&
+        if ((outputDirective == fillOutput) &&
             (op + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit)) {
             /* the match was too close to the end, rewind and go to last literals */
             op = token;
@@ -996,15 +995,16 @@ _next_match:
                 DEBUGLOG(6, "             with matchLength=%u", matchCode+MINMATCH);
             }
 
-            if ((outputLimited) &&    /* Check output buffer overflow */
+            if ((outputDirective) &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) ) {
-                if (outputLimited == limitedOutput)
-                    goto _failure;
-                if (outputLimited == fillOutput) {
+                if (outputDirective == fillOutput) {
                     /* Match description too long : reduce it */
                     U32 newMatchCode = 15 /* in token */ - 1 /* to avoid needing a zero byte */ + ((U32)(olimit - op) - 2 - 1 - LASTLITERALS) * 255;
                     ip -= matchCode - newMatchCode;
                     matchCode = newMatchCode;
+                } else {
+                    assert(outputDirective == limitedOutput);
+                    return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
                 }
             }
             if (matchCode >= ML_MASK) {
@@ -1089,16 +1089,17 @@ _next_match:
 _last_literals:
     /* Encode Last Literals */
     {   size_t lastRun = (size_t)(iend - anchor);
-        if ( (outputLimited) &&  /* Check output buffer overflow */
+        if ( (outputDirective) &&  /* Check output buffer overflow */
             (op + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > olimit)) {
-            if (outputLimited == fillOutput) {
+            if (outputDirective == fillOutput) {
                 /* adapt lastRun to fill 'dst' */
                 assert(olimit >= op);
                 lastRun  = (size_t)(olimit-op) - 1;
                 lastRun -= (lastRun+240)/255;
+            } else {
+                assert(outputDirective == limitedOutput);
+                return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
             }
-            if (outputLimited == limitedOutput)
-                goto _failure;
         }
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
@@ -1113,18 +1114,13 @@ _last_literals:
         op += lastRun;
     }
 
-    if (outputLimited == fillOutput) {
+    if (outputDirective == fillOutput) {
         *inputConsumed = (int) (((const char*)ip)-source);
     }
     DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, (int)(((char*)op) - dest));
     result = (int)(((char*)op) - dest);
     assert(result > 0);
     return result;
-
-_failure:
-    /* Mark stream as having dirty context, so, it has to be fully reset */
-    cctx->dirty = 1;
-    return 0;
 }
 
 
@@ -1422,7 +1418,10 @@ static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, int nextSize)
 }
 
 
-int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
+int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
+                                const char* source, char* dest,
+                                int inputSize, int maxOutputSize,
+                                int acceleration)
 {
     const tableType_t tableType = byU32;
     LZ4_stream_t_internal* streamPtr = &LZ4_stream->internal_donotuse;

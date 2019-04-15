@@ -63,13 +63,6 @@
 
 /*===   Enums   ===*/
 typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
-#ifndef LZ4_SRC_INCLUDED
-typedef enum {
-    noLimit = 0,
-    limitedOutput = 1,
-    limitedDestSize = 2
-} limitedOutput_directive;
-#endif
 
 
 #define LZ4_COMMONDEFS_ONLY
@@ -512,7 +505,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
 
     /* init */
     *srcSizePtr = 0;
-    if (limit == limitedDestSize) oend -= LASTLITERALS;                  /* Hack for support LZ4 format restriction */
+    if (limit == fillOutput) oend -= LASTLITERALS;                  /* Hack for support LZ4 format restriction */
     if (inputSize < LZ4_minLength) goto _last_literals;                  /* Input too small, no compression (all literals) */
 
     /* Main Loop */
@@ -659,7 +652,7 @@ _last_literals:
     {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
         size_t litLength = (lastRunSize + 255 - RUN_MASK) / 255;
         size_t const totalSize = 1 + litLength + lastRunSize;
-        if (limit == limitedDestSize) oend += LASTLITERALS;  /* restore correct value */
+        if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
         if (limit && (op + totalSize > oend)) {
             if (limit == limitedOutput) return 0;  /* Check output limit */
             /* adapt lastRunSize to fill 'dest' */
@@ -686,7 +679,7 @@ _last_literals:
     return (int) (((char*)op)-dest);
 
 _dest_overflow:
-    if (limit == limitedDestSize) {
+    if (limit == fillOutput) {
         op = optr;  /* restore correct out pointer */
         goto _last_literals;
     }
@@ -738,7 +731,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
 
     DEBUGLOG(4, "LZ4HC_compress_generic(ctx=%p, src=%p, srcSize=%d)", ctx, src, *srcSizePtr);
 
-    if (limit == limitedDestSize && dstCapacity < 1) return 0;   /* Impossible to store anything */
+    if (limit == fillOutput && dstCapacity < 1) return 0;   /* Impossible to store anything */
     if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;    /* Unsupported input size (too large or negative) */
 
     ctx->end += *srcSizePtr;
@@ -855,7 +848,7 @@ int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* ds
     if (dstCapacity < LZ4_compressBound(srcSize))
         return LZ4HC_compress_generic (ctx, src, dst, &srcSize, dstCapacity, compressionLevel, limitedOutput);
     else
-        return LZ4HC_compress_generic (ctx, src, dst, &srcSize, dstCapacity, compressionLevel, noLimit);
+        return LZ4HC_compress_generic (ctx, src, dst, &srcSize, dstCapacity, compressionLevel, notLimited);
 }
 
 int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
@@ -887,7 +880,7 @@ int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* s
     if (ctx==NULL) return 0;   /* init failure */
     LZ4HC_init_internal(&ctx->internal_donotuse, (const BYTE*) source);
     LZ4_setCompressionLevel(ctx, cLevel);
-    return LZ4HC_compress_generic(&ctx->internal_donotuse, source, dest, sourceSizePtr, targetDestSize, cLevel, limitedDestSize);
+    return LZ4HC_compress_generic(&ctx->internal_donotuse, source, dest, sourceSizePtr, targetDestSize, cLevel, fillOutput);
 }
 
 
@@ -1056,12 +1049,12 @@ int LZ4_compress_HC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, 
     if (dstCapacity < LZ4_compressBound(srcSize))
         return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, &srcSize, dstCapacity, limitedOutput);
     else
-        return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, &srcSize, dstCapacity, noLimit);
+        return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, &srcSize, dstCapacity, notLimited);
 }
 
 int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, char* dst, int* srcSizePtr, int targetDestSize)
 {
-    return LZ4_compressHC_continue_generic(LZ4_streamHCPtr, src, dst, srcSizePtr, targetDestSize, limitedDestSize);
+    return LZ4_compressHC_continue_generic(LZ4_streamHCPtr, src, dst, srcSizePtr, targetDestSize, fillOutput);
 }
 
 
@@ -1137,7 +1130,7 @@ int LZ4_freeHC (void* LZ4HC_Data)
 
 int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int cLevel)
 {
-    return LZ4HC_compress_generic (&((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse, src, dst, &srcSize, 0, cLevel, noLimit);
+    return LZ4HC_compress_generic (&((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse, src, dst, &srcSize, 0, cLevel, notLimited);
 }
 
 int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int dstCapacity, int cLevel)
@@ -1247,7 +1240,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal(dst=%p, dstCapa=%u)", dst, (unsigned)dstCapacity);
     *srcSizePtr = 0;
-    if (limit == limitedDestSize) oend -= LASTLITERALS;   /* Hack for support LZ4 format restriction */
+    if (limit == fillOutput) oend -= LASTLITERALS;   /* Hack for support LZ4 format restriction */
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
 
     /* Main Loop */
@@ -1447,7 +1440,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
      {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
          size_t litLength = (lastRunSize + 255 - RUN_MASK) / 255;
          size_t const totalSize = 1 + litLength + lastRunSize;
-         if (limit == limitedDestSize) oend += LASTLITERALS;  /* restore correct value */
+         if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
          if (limit && (op + totalSize > oend)) {
              if (limit == limitedOutput) return 0;  /* Check output limit */
              /* adapt lastRunSize to fill 'dst' */
@@ -1474,7 +1467,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
      return (int) ((char*)op-dst);
 
  _dest_overflow:
-     if (limit == limitedDestSize) {
+     if (limit == fillOutput) {
          op = opSaved;  /* restore correct out pointer */
          goto _last_literals;
      }
