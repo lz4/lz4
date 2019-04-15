@@ -924,8 +924,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         {   unsigned const litLength = (unsigned)(ip - anchor);
             token = op++;
             if ((outputLimited == limitedOutput) &&  /* Check output buffer overflow */
-                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)))
-                goto _failure;
+                (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)) )
+                return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
 
             if ((outputLimited == fillOutput) &&
                 (unlikely(op + (litLength+240)/255 /* litlen */ + litLength /* literals */ + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit))) {
@@ -998,14 +998,14 @@ _next_match:
 
             if ((outputLimited) &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) ) {
-                if (outputLimited == limitedOutput)
-                    goto _failure;
                 if (outputLimited == fillOutput) {
                     /* Match description too long : reduce it */
                     U32 newMatchCode = 15 /* in token */ - 1 /* to avoid needing a zero byte */ + ((U32)(olimit - op) - 2 - 1 - LASTLITERALS) * 255;
                     ip -= matchCode - newMatchCode;
                     matchCode = newMatchCode;
                 }
+                if (outputLimited == limitedOutput)
+                    return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
             }
             if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
@@ -1098,7 +1098,7 @@ _last_literals:
                 lastRun -= (lastRun+240)/255;
             }
             if (outputLimited == limitedOutput)
-                goto _failure;
+                return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
         }
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
@@ -1120,11 +1120,6 @@ _last_literals:
     result = (int)(((char*)op) - dest);
     assert(result > 0);
     return result;
-
-_failure:
-    /* Mark stream as having dirty context, so, it has to be fully reset */
-    cctx->dirty = 1;
-    return 0;
 }
 
 
@@ -1422,7 +1417,10 @@ static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, int nextSize)
 }
 
 
-int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
+int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
+                                const char* source, char* dest,
+                                int inputSize, int maxOutputSize,
+                                int acceleration)
 {
     const tableType_t tableType = byU32;
     LZ4_stream_t_internal* streamPtr = &LZ4_stream->internal_donotuse;
