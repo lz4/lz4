@@ -631,11 +631,11 @@ LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") LZ4LIB_API int LZ4
 LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
 
 /*! LZ4_decompress_fast() : **unsafe!**
- *  These functions used to be a bit faster than LZ4_decompress_safe(),
- *  but situation has changed in recent versions.
- *  Now, `LZ4_decompress_safe()` is as fast and sometimes even faster than `LZ4_decompress_fast()`.
- *  Moreover, LZ4_decompress_safe() is protected vs malformed input, while `LZ4_decompress_fast()` is not, making it a security liability.
+ *  These functions are generally slightly faster than LZ4_decompress_safe(),
+ *  though the difference is small (generally ~5%).
+ *  However, the real cost is a risk :  LZ4_decompress_safe() is protected vs malformed input, while `LZ4_decompress_fast()` is not, making it a security liability.
  *  As a consequence, LZ4_decompress_fast() is strongly discouraged, and deprecated.
+ *  These functions will generate a deprecation warning in the future.
  *
  *  Last LZ4_decompress_fast() specificity is that it can decompress a block without knowing its compressed size.
  *  Note that even that functionality could be achieved in a more secure manner if need be,
@@ -648,18 +648,19 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4
  *           The function expects to finish at block's end exactly.
  *           If the source stream is detected malformed, the function stops decoding and returns a negative result.
  *  note : LZ4_decompress_fast*() requires originalSize. Thanks to this information, it never writes past the output buffer.
- *         However, since it doesn't know its 'src' size, it may read an unknown amount of input, and overflow input buffer.
- *         Also, since match offsets are not validated, match reads from 'src' may underflow.
- *         These issues never happen if input data is correct.
+ *         However, since it doesn't know its 'src' size, it may read an unknown amount of input, past input buffer bounds.
+ *         Also, since match offsets are not validated, match reads from 'src' may underflow too.
+ *         These issues never happen if input (compressed) data is correct.
  *         But they may happen if input data is invalid (error or intentional tampering).
  *         As a consequence, use these functions in trusted environments with trusted data **only**.
  */
-LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead") LZ4LIB_API
-int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
-LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead") LZ4LIB_API
-int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
-LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_usingDict() instead") LZ4LIB_API
-int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
+
+/* LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead")  */
+LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
+/* LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead") */
+LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
+/* LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_usingDict() instead") */
+LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
 
 /*! LZ4_resetStream() :
  *  An LZ4_stream_t structure must be initialized at least once.
