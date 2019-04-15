@@ -205,7 +205,7 @@
 typedef enum {
     notLimited = 0,
     limitedOutput = 1,
-    fillOutput = 2,
+    fillOutput = 2
 } limitedOutput_directive;
 
 
