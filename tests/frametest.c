@@ -27,8 +27,8 @@
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4146)        /* disable: C4146: minus unsigned expression */
+#  pragma warning(disable : 4127)     /* disable: C4127: conditional expression is constant */
+#  pragma warning(disable : 4146)     /* disable: C4146: minus unsigned expression */
 #endif
 
 
@@ -55,7 +55,7 @@
 static void FUZ_writeLE32 (void* dstVoidPtr, U32 value32)
 {
     BYTE* dstPtr = (BYTE*)dstVoidPtr;
-    dstPtr[0] = (BYTE)value32;
+    dstPtr[0] = (BYTE) value32;
     dstPtr[1] = (BYTE)(value32 >> 8);
     dstPtr[2] = (BYTE)(value32 >> 16);
     dstPtr[3] = (BYTE)(value32 >> 24);
@@ -75,7 +75,6 @@ static const U32 nbTestsDefault = 256 KB;
 #define FUZ_COMPRESSIBILITY_DEFAULT 50
 static const U32 prime1 = 2654435761U;
 static const U32 prime2 = 2246822519U;
-
 
 
 /*-************************************
@@ -787,7 +786,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     unsigned testNb = 0;
     size_t const srcDataLength = 9 MB;  /* needs to be > 2x4MB to test large blocks */
     void* srcBuffer = NULL;
-    size_t const compressedBufferSize = LZ4F_compressFrameBound(srcDataLength, NULL) + 64 KB;  /* needs some margin for some rare exceptional cases involving multiple flushes */
+    size_t const compressedBufferSize = LZ4F_compressFrameBound(srcDataLength, NULL) + 4 MB;  /* needs some margin */
     void* compressedBuffer = NULL;
     void* decodedBuffer = NULL;
     U32 coreRand = seed;
