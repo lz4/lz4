@@ -893,6 +893,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 DISPLAYLEVEL(7,"canaryByte at pos %u / %u \n",
                             (unsigned)((size_t)(op - (BYTE*)compressedBuffer) + dstEndSize),
                             (unsigned)compressedBufferSize);
+                assert(op + dstEndSize < (BYTE*)compressedBuffer + compressedBufferSize);
                 op[dstEndSize] = canaryByte;
                 result = LZ4F_compressEnd(cCtx, op, dstEndSize, &cOptions);
                 CHECK(op[dstEndSize] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
