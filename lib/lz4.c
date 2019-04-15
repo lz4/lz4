@@ -760,9 +760,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                  const char* const source,
                  char* const dest,
                  const int inputSize,
-                 int *inputConsumed, /* only written when outputLimited == fillOutput */
+                 int *inputConsumed, /* only written when outputDirective == fillOutput */
                  const int maxOutputSize,
-                 const limitedOutput_directive outputLimited,
+                 const limitedOutput_directive outputDirective,
                  const tableType_t tableType,
                  const dict_directive dictDirective,
                  const dictIssue_directive dictIssue,
@@ -805,7 +805,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, tableType=%u", inputSize, tableType);
     /* If init conditions are not met, we don't have to mark stream
      * as having dirty context, since no action was taken yet */
-    if (outputLimited == fillOutput && maxOutputSize < 1) return 0;   /* Impossible to store anything */
+    if (outputDirective == fillOutput && maxOutputSize < 1) return 0;   /* Impossible to store anything */
     if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) return 0;           /* Unsupported inputSize, too large (or negative) */
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) return 0;  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
@@ -922,11 +922,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         /* Encode Literals */
         {   unsigned const litLength = (unsigned)(ip - anchor);
             token = op++;
-            if ((outputLimited == limitedOutput) &&  /* Check output buffer overflow */
+            if ((outputDirective == limitedOutput) &&  /* Check output buffer overflow */
                 (unlikely(op + litLength + (2 + 1 + LASTLITERALS) + (litLength/255) > olimit)) )
                 return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
 
-            if ((outputLimited == fillOutput) &&
+            if ((outputDirective == fillOutput) &&
                 (unlikely(op + (litLength+240)/255 /* litlen */ + litLength /* literals */ + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit))) {
                 op--;
                 goto _last_literals;
@@ -955,7 +955,7 @@ _next_match:
          * - token and *token : position to write 4-bits for match length; higher 4-bits for literal length supposed already written
          */
 
-        if ((outputLimited == fillOutput) &&
+        if ((outputDirective == fillOutput) &&
             (op + 2 /* offset */ + 1 /* token */ + MFLIMIT - MINMATCH /* min last literals so last match is <= end - MFLIMIT */ > olimit)) {
             /* the match was too close to the end, rewind and go to last literals */
             op = token;
@@ -995,16 +995,17 @@ _next_match:
                 DEBUGLOG(6, "             with matchLength=%u", matchCode+MINMATCH);
             }
 
-            if ((outputLimited) &&    /* Check output buffer overflow */
+            if ((outputDirective) &&    /* Check output buffer overflow */
                 (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) ) {
-                if (outputLimited == fillOutput) {
+                if (outputDirective == fillOutput) {
                     /* Match description too long : reduce it */
                     U32 newMatchCode = 15 /* in token */ - 1 /* to avoid needing a zero byte */ + ((U32)(olimit - op) - 2 - 1 - LASTLITERALS) * 255;
                     ip -= matchCode - newMatchCode;
                     matchCode = newMatchCode;
-                }
-                if (outputLimited == limitedOutput)
+                } else {
+                    assert(outputDirective == limitedOutput);
                     return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
+                }
             }
             if (matchCode >= ML_MASK) {
                 *token += ML_MASK;
@@ -1088,16 +1089,17 @@ _next_match:
 _last_literals:
     /* Encode Last Literals */
     {   size_t lastRun = (size_t)(iend - anchor);
-        if ( (outputLimited) &&  /* Check output buffer overflow */
+        if ( (outputDirective) &&  /* Check output buffer overflow */
             (op + lastRun + 1 + ((lastRun+255-RUN_MASK)/255) > olimit)) {
-            if (outputLimited == fillOutput) {
+            if (outputDirective == fillOutput) {
                 /* adapt lastRun to fill 'dst' */
                 assert(olimit >= op);
                 lastRun  = (size_t)(olimit-op) - 1;
                 lastRun -= (lastRun+240)/255;
-            }
-            if (outputLimited == limitedOutput)
+            } else {
+                assert(outputDirective == limitedOutput);
                 return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
+            }
         }
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
@@ -1112,7 +1114,7 @@ _last_literals:
         op += lastRun;
     }
 
-    if (outputLimited == fillOutput) {
+    if (outputDirective == fillOutput) {
         *inputConsumed = (int) (((const char*)ip)-source);
     }
     DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, (int)(((char*)op) - dest));
