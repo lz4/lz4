@@ -868,7 +868,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
 #endif
     int const cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    free(statePtr);
+    FREEMEM(statePtr);
 #endif
     return cSize;
 }
@@ -901,7 +901,7 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 {
     DEBUGLOG(4, "LZ4_freeStreamHC(%p)", LZ4_streamHCPtr);
     if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
-    free(LZ4_streamHCPtr);
+    FREEMEM(LZ4_streamHCPtr);
     return 0;
 }
 
