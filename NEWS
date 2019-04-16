@@ -8,7 +8,7 @@ build: source code can be amalgamated, by Bing Xu
 build: added meson build, by @lzutao
 build: new build macros : LZ4_DISTANCE_MAX, LZ4_FAST_DEC_LOOP
 install: MidnightBSD, by @laffer1
-install: Windows 10 msys2, by @vtorri
+install: msys2 on Windows 10, by @vtorri
 
 v1.8.3
 perf: minor decompression speed improvement (~+2%) with gcc
