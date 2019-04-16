@@ -1,5 +1,5 @@
 v1.9.0
-perf: large decompression speed improvement on x86/x64 (~+20%) by @djwatson
+perf: large decompression speed improvement on x86/x64 (up to +20%) by @djwatson
 api : changed : _destSize() compression variants are promoted to stable API
 api : new : LZ4_initStream(HC), replacing LZ4_resetStream(HC)
 api : changed : LZ4_resetStream(HC) as recommended reset function, for better performance on small data

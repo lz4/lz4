@@ -51,7 +51,7 @@ Benchmarks
 
 The benchmark uses [lzbench], from @inikep
 compiled with GCC v8.2.0 on Linux 64-bits (Ubuntu 4.18.0-17).
-The reference system uses a Core i7-9700K CPU @ 4.9GHz.
+The reference system uses a Core i7-9700K CPU @ 4.9GHz (w/ turbo boost).
 Benchmark evaluates the compression of reference [Silesia Corpus]
 in single-thread mode.
 
@@ -61,14 +61,14 @@ in single-thread mode.
 |  Compressor             | Ratio   | Compression | Decompression |
 |  ----------             | -----   | ----------- | ------------- |
 |  memcpy                 |  1.000  | 13700 MB/s  |  13700 MB/s   |
-|**LZ4 default (v1.9.0)** |**2.101**| **780 MB/s**| **4900 MB/s** |
+|**LZ4 default (v1.9.0)** |**2.101**| **780 MB/s**| **4970 MB/s** |
 |  LZO 2.09               |  2.108  |   670 MB/s  |    860 MB/s   |
 |  QuickLZ 1.5.0          |  2.238  |   575 MB/s  |    780 MB/s   |
 |  Snappy 1.1.4           |  2.091  |   565 MB/s  |   1950 MB/s   |
 | [Zstandard] 1.4.0 -1    |  2.883  |   515 MB/s  |   1380 MB/s   |
 |  LZF v3.6               |  2.073  |   415 MB/s  |    910 MB/s   |
 | [zlib] deflate 1.2.11 -1|  2.730  |   100 MB/s  |    415 MB/s   |
-|**LZ4 HC -9 (v1.8.2)**   |**2.721**|    39 MB/s  | **4850 MB/s** |
+|**LZ4 HC -9 (v1.8.2)**   |**2.721**|    41 MB/s  | **4900 MB/s** |
 | [zlib] deflate 1.2.11 -6|  3.099  |    36 MB/s  |    445 MB/s   |
 
 [zlib]: http://www.zlib.net/
