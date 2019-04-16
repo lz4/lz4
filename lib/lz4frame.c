@@ -72,15 +72,15 @@
  * by modifying below section.
  */
 #include <stdlib.h>   /* malloc, calloc, free */
-#define ALLOC(s)       malloc(s)
 #ifndef LZ4_SRC_INCLUDED   /* avoid redefinition when sources are coalesced */
-#  define ALLOC_AND_ZERO(s)  calloc(1,(s))
+#  define ALLOC(s)          malloc(s)
+#  define ALLOC_AND_ZERO(s) calloc(1,(s))
+#  define FREEMEM(p)        free(p)
 #endif
-#define FREEMEM(p)     free(p)
 
 #include <string.h>   /* memset, memcpy, memmove */
 #ifndef LZ4_SRC_INCLUDED  /* avoid redefinition when sources are coalesced */
-#  define MEM_INIT       memset
+#  define MEM_INIT(p,v,s)   memset((p),(v),(s))
 #endif
 
 
