@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "September 2018" "lz4 1.8.3" "User Commands"
+.TH "LZ4" "1" "April 2019" "lz4 1.9.0" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -118,6 +118,14 @@ Benchmark mode, using \fB#\fR compression level\.
 Compression level, with # being any value from 1 to 12\. Higher values trade compression speed for compression ratio\. Values above 12 are considered the same as 12\. Recommended values are 1 for fast compression (default), and 9 for high compression\. Speed/compression trade\-off will vary depending on data to compress\. Decompression speed remains fast at all settings\.
 .
 .TP
+\fB\-\-fast[=#]\fR
+Switch to ultra\-fast compression levels\. The higher the value, the faster the compression speed, at the cost of some compression ratio\. If \fB=#\fR is not present, it defaults to \fB1\fR\. This setting overrides compression level if one was set previously\. Similarly, if a compression level is set after \fB\-\-fast\fR, it overrides it\.
+.
+.TP
+\fB\-\-favor\-decSpeed\fR
+Generate compressed data optimized for decompression speed\. Compressed data will be larger as a consequence (typically by ~0\.5%), while decompression speed will be improved by 5\-20%, depending on use cases\. This option only works in combination with very high compression levels (>=10)\.
+.
+.TP
 \fB\-D dictionaryName\fR
 Compress, decompress or benchmark using dictionary \fIdictionaryName\fR\. Compression and decompression must use the same dictionary to be compatible\. Using a different dictionary during decompression will either abort due to decompression error, or generate a checksum error\.
 .
@@ -151,12 +159,12 @@ Block size [4\-7](default : 7)
 \fB\-B4\fR= 64KB ; \fB\-B5\fR= 256KB ; \fB\-B6\fR= 1MB ; \fB\-B7\fR= 4MB
 .
 .TP
-\fB\-BD\fR
-Block Dependency (improves compression ratio on small blocks)
+\fB\-BI\fR
+Produce independent blocks (default)
 .
 .TP
-\fB\-\-fast[=#]\fR
-switch to ultra\-fast compression levels\. If \fB=#\fR is not present, it defaults to \fB1\fR\. The higher the value, the faster the compression speed, at the cost of some compression ratio\. This setting overwrites compression level if one was set previously\. Similarly, if a compression level is set after \fB\-\-fast\fR, it overrides it\.
+\fB\-BD\fR
+Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 .
 .TP
 \fB\-\-[no\-]frame\-crc\fR

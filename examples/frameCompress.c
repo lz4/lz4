@@ -70,11 +70,12 @@ compress_file_internal(FILE* f_in, FILE* f_out,
     /* write frame header */
     {   size_t const headerSize = LZ4F_compressBegin(ctx, outBuff, outCapacity, &kPrefs);
         if (LZ4F_isError(headerSize)) {
-            printf("Failed to start compression: error %zu\n", headerSize);
+            printf("Failed to start compression: error %u \n", (unsigned)headerSize);
             return result;
         }
         count_out = headerSize;
-        printf("Buffer size is %zu bytes, header size %zu bytes\n", outCapacity, headerSize);
+        printf("Buffer size is %u bytes, header size %u bytes \n",
+                (unsigned)outCapacity, (unsigned)headerSize);
         safe_fwrite(outBuff, 1, headerSize, f_out);
     }
 
@@ -89,11 +90,11 @@ compress_file_internal(FILE* f_in, FILE* f_out,
                                                 inBuff, readSize,
                                                 NULL);
         if (LZ4F_isError(compressedSize)) {
-            printf("Compression failed: error %zu\n", compressedSize);
+            printf("Compression failed: error %u \n", (unsigned)compressedSize);
             return result;
         }
 
-        printf("Writing %zu bytes\n", compressedSize);
+        printf("Writing %u bytes\n", (unsigned)compressedSize);
         safe_fwrite(outBuff, 1, compressedSize, f_out);
         count_out += compressedSize;
     }
@@ -103,11 +104,11 @@ compress_file_internal(FILE* f_in, FILE* f_out,
                                                 outBuff, outCapacity,
                                                 NULL);
         if (LZ4F_isError(compressedSize)) {
-            printf("Failed to end compression: error %zu\n", compressedSize);
+            printf("Failed to end compression: error %u \n", (unsigned)compressedSize);
             return result;
         }
 
-        printf("Writing %zu bytes\n", compressedSize);
+        printf("Writing %u bytes \n", (unsigned)compressedSize);
         safe_fwrite(outBuff, 1, compressedSize, f_out);
         count_out += compressedSize;
     }
@@ -184,8 +185,8 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
     while (ret != 0) {
         /* Load more input */
         size_t readSize = firstChunk ? filled : fread(src, 1, srcCapacity, f_in); firstChunk=0;
-        const void* srcPtr = src + alreadyConsumed; alreadyConsumed=0;
-        const void* const srcEnd = srcPtr + readSize;
+        const void* srcPtr = (const char*)src + alreadyConsumed; alreadyConsumed=0;
+        const void* const srcEnd = (const char*)srcPtr + readSize;
         if (readSize == 0 || ferror(f_in)) {
             printf("Decompress: not enough input or error reading file\n");
             return 1;
@@ -198,7 +199,7 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
         while (srcPtr < srcEnd && ret != 0) {
             /* Any data within dst has been flushed at this stage */
             size_t dstSize = dstCapacity;
-            size_t srcSize = srcEnd - srcPtr;
+            size_t srcSize = (const char*)srcEnd - (const char*)srcPtr;
             ret = LZ4F_decompress(dctx, dst, &dstSize, srcPtr, &srcSize, /* LZ4F_decompressOptions_t */ NULL);
             if (LZ4F_isError(ret)) {
                 printf("Decompression error: %s\n", LZ4F_getErrorName(ret));
@@ -207,7 +208,7 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
             /* Flush output */
             if (dstSize != 0) safe_fwrite(dst, 1, dstSize, f_out);
             /* Update input */
-            srcPtr += srcSize;
+            srcPtr = (const char*)srcPtr + srcSize;
         }
 
         assert(srcPtr <= srcEnd);

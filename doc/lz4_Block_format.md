@@ -1,6 +1,6 @@
 LZ4 Block Format Description
 ============================
-Last revised: 2018-04-25.
+Last revised: 2019-03-30.
 Author : Yann Collet
 
 
@@ -10,7 +10,8 @@ using any programming language.
 
 LZ4 is an LZ77-type compressor with a fixed, byte-oriented encoding.
 There is no entropy encoder back-end nor framing layer.
-The latter is assumed to be handled by other parts of the system (see [LZ4 Frame format]).
+The latter is assumed to be handled by other parts of the system
+(see [LZ4 Frame format]).
 This design is assumed to favor simplicity and speed.
 It helps later on for optimizations, compactness, and features.
 
@@ -104,45 +105,52 @@ A common case is an offset of 1,
 meaning the last byte is repeated `matchlength` times.
 
 
-Parsing restrictions
+End of block restrictions
 -----------------------
-There are specific parsing rules to respect in order to remain compatible
-with assumptions made by the decoder :
+There are specific rules required to terminate a block.
 
-1. The last 5 bytes are always literals.  In other words, the last five bytes
-   from the uncompressed input (or all bytes, if the input has less than five
-   bytes) must be encoded as literals on behalf of the last sequence.
-   The last sequence is incomplete, and stops right after the literals.
-2. The last match must start at least 12 bytes before end of block.
-   The last match is part of the penultimate sequence,
-   since the last sequence stops right after literals.
-   Note that, as a consequence, blocks < 13 bytes cannot be compressed.
+1. The last sequence contains only literals.
+   The block ends right after them.
+2. The last 5 bytes of input are always literals.
+   Therefore, the last sequence contains at least 5 bytes.
+   - Special : if input is smaller than 5 bytes,
+     there is only one sequence, it contains the whole input as literals.
+     Empty input can be represented with a zero byte,
+     interpreted as a final token without literal and without a match.
+3. The last match must start at least 12 bytes before the end of block.
+   The last match is part of the penultimate sequence.
+   It is followed by the last sequence, which contains only literals.
+   - Note that, as a consequence,
+     an independent block < 13 bytes cannot be compressed,
+     because the match must copy "something",
+     so it needs at least one prior byte.
+   - When a block can reference data from another block,
+     it can start immediately with a match and no literal,
+     so a block of 12 bytes can be compressed.
 
-These rules are in place to ensure that the decoder
-can speculatively execute copy instructions
-without ever reading nor writing beyond provided I/O buffers.
+When a block does not respect these end conditions,
+a conformant decoder is allowed to reject the block as incorrect.
 
-1. To copy literals from a non-last sequence, an 8-byte copy instruction
-   can always be safely issued (without reading past the input),
-   because literals are followed by a 2-byte offset,
-   and last sequence is at least 1+5 bytes long.
-2. Similarly, a match operation can speculatively copy up to 12 bytes
-   while remaining within output buffer boundaries.
-
-Empty inputs can be represented with a zero byte,
-interpreted as a token without literals and without a match.
+These rules are in place to ensure that a conformant decoder
+can be designed for speed, issuing speculatively instructions,
+while never reading nor writing beyond provided I/O buffers.
 
 
 Additional notes
 -----------------------
-There is no assumption nor limits to the way the compressor
+If the decoder will decompress data from an external source,
+it is recommended to ensure that the decoder will not be vulnerable to
+buffer overflow manipulations.
+Always ensure that read and write operations
+remain within the limits of provided buffers.
+Test the decoder with fuzzers
+to ensure it's resilient to improbable combinations.
+
+The format makes no assumption nor limits to the way the compressor
 searches and selects matches within the source data block.
-It could be a fast scan, a multi-probe, a full search using BST,
-standard hash chains or MMC, well whatever.
-
-Advanced parsing strategies can also be implemented, such as lazy match,
-or full optimal parsing.
-
-All these trade-off offer distinctive speed/memory/compression advantages.
-Whatever the method used by the compressor, its result will be decodable
-by any LZ4 decoder if it follows the format specification described above.
+Multiple techniques can be considered,
+featuring distinct time / performance trade offs.
+As long as the format is respected,
+the result will be compatible and decodable by any compliant decoder.
+An upper compression limit can be reached,
+using a technique called "full optimal parsing", at high cpu cost.

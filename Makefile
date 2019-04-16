@@ -50,10 +50,10 @@ endif
 default: lib-release lz4-release
 
 .PHONY: all
-all: allmost manuals
+all: allmost examples manuals build_tests
 
 .PHONY: allmost
-allmost: lib lz4 examples
+allmost: lib lz4
 
 .PHONY: lib lib-release liblz4.a
 lib: liblz4.a
@@ -75,6 +75,10 @@ examples: liblz4.a
 manuals:
 	@$(MAKE) -C contrib/gen_manual $@
 
+.PHONY: build_tests
+build_tests:
+	@$(MAKE) -C $(TESTDIR) all
+
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
@@ -89,7 +93,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD))
+ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW32_NT-6.1 MINGW64_NT-6.1 MINGW32_NT-10.0 MINGW64_NT-10.0))
 HOST_OS = POSIX
 
 .PHONY: install uninstall
@@ -148,8 +152,13 @@ usan: clean
 usan32: clean
 	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
+.PHONY: staticAnalyze
 staticAnalyze: clean
 	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
+
+.PHONY: cppcheck
+cppcheck:
+	cppcheck . --force --enable=warning,portability,performance,style --error-exitcode=1 > /dev/null
 
 platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
@@ -181,10 +190,10 @@ ctocpptest: clean
 	CC=$(TESTCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
 c_standards: clean
-	CFLAGS="-std=c90   -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=gnu90 -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=c99   -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=gnu99 -Werror" $(MAKE) clean allmost
-	CFLAGS="-std=c11   -Werror" $(MAKE) clean allmost
+	$(MAKE) clean; CFLAGS="-std=c90   -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=c99   -Werror -pedantic" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=gnu99 -Werror -pedantic" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=c11   -Werror" $(MAKE) all
 
 endif

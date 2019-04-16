@@ -1,7 +1,20 @@
+v1.9.0
+perf: large decompression speed improvement on x86/x64 (~+20%) by @djwatson
+api : changed : _destSize() compression variants are promoted to stable API
+api : new : LZ4_initStream(HC), replacing LZ4_resetStream(HC)
+api : changed : LZ4_resetStream(HC) as recommended reset function, for better performance on small data
+cli : support custom block sizes, by @blezsan
+build: source code can be amalgamated, by Bing Xu
+build: added meson build, by @lzutao
+build: new build macros : LZ4_DISTANCE_MAX, LZ4_FAST_DEC_LOOP
+install: MidnightBSD, by @laffer1
+install: Windows 10 msys2, by @vtorri
+
 v1.8.3
 perf: minor decompression speed improvement (~+2%) with gcc
 fix : corruption in v1.8.2 at level 9 for files > 64KB under rare conditions (#560)
 cli : new command --fast, by @jennifermliu
+cli : fixed elapsed time, and added cpu load indicator (on -vv) (#555)
 api : LZ4_decompress_safe_partial() now decodes exactly the nb of bytes requested (feature request #566)
 build : added Haiku target, by @fbrosson, and MidnightBSD, by @laffer1
 doc : updated documentation regarding dictionary compression

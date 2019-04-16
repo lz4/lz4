@@ -126,11 +126,17 @@ only the latest one will be applied.
   Decompression speed remains fast at all settings.
 
 * `--fast[=#]`:
-  switch to ultra-fast compression levels.
+  Switch to ultra-fast compression levels.
   The higher the value, the faster the compression speed, at the cost of some compression ratio.
   If `=#` is not present, it defaults to `1`.
   This setting overrides compression level if one was set previously.
   Similarly, if a compression level is set after `--fast`, it overrides it.
+
+* `--favor-decSpeed`:
+  Generate compressed data optimized for decompression speed.
+  Compressed data will be larger as a consequence (typically by ~0.5%),
+  while decompression speed will be improved by 5-20%, depending on use cases.
+  This option only works in combination with very high compression levels (>=10).
 
 * `-D dictionaryName`:
   Compress, decompress or benchmark using dictionary _dictionaryName_.
@@ -166,8 +172,11 @@ only the latest one will be applied.
   Block size \[4-7\](default : 7)<br/>
   `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB
 
+* `-BI`:
+  Produce independent blocks (default)
+
 * `-BD`:
-  Block Dependency (improves compression ratio on small blocks)
+  Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)

@@ -44,7 +44,7 @@ void test_compress(FILE* outFp, FILE* inpFp)
     char inpBuf[2][BLOCK_BYTES];
     int  inpBufIndex = 0;
 
-    LZ4_resetStream(lz4Stream);
+    LZ4_initStream(lz4Stream, sizeof (*lz4Stream));
 
     for(;;) {
         char* const inpPtr = inpBuf[inpBufIndex];

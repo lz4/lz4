@@ -63,7 +63,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame
 
 all32: CFLAGS+=-m32
 all32: all
@@ -109,17 +109,21 @@ roundTripTest : lz4.o lz4hc.o xxhash.o roundTripTest.c
 datagen : $(PRGDIR)/datagen.c datagencli.c
 	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
+checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) core *.o *.test tmp* \
+	@$(RM) -rf core *.o *.test tmp* \
         fullbench-dll$(EXT) fullbench-lib$(EXT) \
         fullbench$(EXT) fullbench32$(EXT) \
         fuzzer$(EXT) fuzzer32$(EXT) \
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
-        datagen$(EXT) checkTag$(EXT)
-	@rm -fR $(TESTDIR)
+        datagen$(EXT) checkTag$(EXT) \
+        frameTest$(EXT)
+	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
@@ -147,11 +151,24 @@ endif
 
 DD:=dd
 
+.PHONY: list
+list:
+	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install
+.PHONY: test
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation
 
+.PHONY: test32
 test32: CFLAGS+=-m32
 test32: test
+
+.PHONY: test-amalgamation
+test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
+	cat $(LZ4DIR)/lz4.c > lz4_all.c
+	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
+	cat $(LZ4DIR)/lz4frame.c >> lz4_all.c
+	$(CC) -I$(LZ4DIR) -c lz4_all.c
+	$(RM) lz4_all.c
 
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
@@ -205,7 +222,7 @@ test-lz4-frame-concatenation: lz4 datagen
 	@$(LZ4) -zq tmp-lfc-nonempty > tmp-lfc-nonempty.lz4
 	cat tmp-lfc-nonempty.lz4 tmp-lfc-empty.lz4 tmp-lfc-nonempty.lz4 > tmp-lfc-concat.lz4
 	$(LZ4) -d tmp-lfc-concat.lz4 > tmp-lfc-result
-	sdiff tmp-lfc-src tmp-lfc-result
+	cmp tmp-lfc-src tmp-lfc-result
 	@$(RM) tmp-lfc-*
 	@echo frame concatenation test completed
 
@@ -213,13 +230,36 @@ test-lz4-multiple: lz4 datagen
 	@echo "\n ---- test multiple files ----"
 	@./datagen -s1        > tmp-tlm1 2> $(VOID)
 	@./datagen -s2 -g100K > tmp-tlm2 2> $(VOID)
-	@./datagen -s3 -g1M   > tmp-tlm3 2> $(VOID)
+	@./datagen -s3 -g200K > tmp-tlm3 2> $(VOID)
+	# compress multiple files : one .lz4 per source file
 	$(LZ4) -f -m tmp-tlm*
-	ls -ls tmp-tlm*
-	@$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
-	$(LZ4) -df -m tmp-tlm*.lz4
-	ls -ls tmp-tlm*
-	$(LZ4) -f -m tmp-tlm1 notHere tmp-tlm2; echo $$?
+	test -f tmp-tlm1.lz4
+	test -f tmp-tlm2.lz4
+	test -f tmp-tlm3.lz4
+	# decompress multiple files : one output file per .lz4
+	mv tmp-tlm1 tmp-tlm1-orig
+	mv tmp-tlm2 tmp-tlm2-orig
+	mv tmp-tlm3 tmp-tlm3-orig
+	$(LZ4) -d -f -m tmp-tlm*.lz4
+	cmp tmp-tlm1 tmp-tlm1-orig   # must be identical
+	cmp tmp-tlm2 tmp-tlm2-orig
+	cmp tmp-tlm3 tmp-tlm3-orig
+	# compress multiple files into stdout
+	cat tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
+	$(RM) *.lz4
+	$(LZ4) -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
+	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
+	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	# decompress multiple files into stdout
+	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
+	$(LZ4) -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
+	cat tmp-tlm1 tmp-tlm2 tmp-tlm3 > tmp-tlm-concat1   # create concatenated reference
+	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
+	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
+	test ! -f tmp-tlm1  # must not create file artefact
+	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	# compress multiple files, one of which is absent (must fail)
+	! $(LZ4) -f -m tmp-tlm-concat1 notHere tmp-tlm-concat2  # must fail : notHere not present
 	@$(RM) tmp-tlm*
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
@@ -231,7 +271,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
 	$(LZ4) --no-frame-crc < tmp-tlb-dg20k | $(LZ4) -d > tmp-tlb-dec
 	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
-	./datagen           | $(LZ4)        | $(LZ4) -t
+	./datagen           | $(LZ4) -BI    | $(LZ4) -t
 	./datagen -g6M -P99 | $(LZ4) -9BD   | $(LZ4) -t
 	./datagen -g17M     | $(LZ4) -9v    | $(LZ4) -qt
 	./datagen -g33M     | $(LZ4) --no-frame-crc | $(LZ4) -t
@@ -273,6 +313,11 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell ./datagen -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
 	! $(LZ4) -c --fast=0 tmp-tlb-dg20K # lz4 should fail when fast=0
 	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
+	# Test for #596
+	@echo "TEST" > tmp-tlb-test
+	$(LZ4) tmp-tlb-test
+	$(LZ4) tmp-tlb-test.lz4 tmp-tlb-test2
+	$(DIFF) -q tmp-tlb-test tmp-tlb-test2
 	@$(RM) tmp-tlb*
 
 
@@ -305,7 +350,7 @@ test-lz4-dict: lz4 datagen
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
 	./datagen -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
-	./datagen -g6GB   | $(LZ4) -v5BD  | $(LZ4) -qt
+	./datagen -g5GB   | $(LZ4) -v4BD  | $(LZ4) -qt
 	# test large file size [2-4] GB
 	@./datagen -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
 	@ls -ls tmphf1
@@ -321,8 +366,11 @@ test-lz4-testmode: lz4 datagen
 	! ./datagen | $(LZ4) -t
 	! ./datagen | $(LZ4) -tf
 	@echo "\n ---- pass-through mode ----"
-	! ./datagen | $(LZ4) -d  > $(VOID)
-	./datagen | $(LZ4) -df > $(VOID)
+	@echo "Why hello there " > tmp-tlt2.lz4
+	! $(LZ4) -f tmp-tlt2.lz4 > $(VOID)
+	! ./datagen | $(LZ4) -dc  > $(VOID)
+	! ./datagen | $(LZ4) -df > $(VOID)
+	./datagen | $(LZ4) -dcf > $(VOID)
 	@echo "Hello World !" > tmp-tlt1
 	$(LZ4) -dcf tmp-tlt1
 	@echo "from underground..." > tmp-tlt2
@@ -331,7 +379,7 @@ test-lz4-testmode: lz4 datagen
 	! $(LZ4)     file-does-not-exist
 	! $(LZ4) -f  file-does-not-exist
 	! $(LZ4) -fm file1-dne file2-dne
-	@$(RM) tmp-tlt
+	@$(RM) tmp-tlt tmp-tlt1 tmp-tlt2 tmp-tlt2.lz4
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
