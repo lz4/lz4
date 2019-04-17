@@ -487,7 +487,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Decompression tests */
 
         /* Test decompress_fast() with input buffer size exactly correct => must not read out of bound */
-        {   char* const cBuffer_exact = malloc((size_t)compressedSize);
+        {   char* const cBuffer_exact = (char*)malloc((size_t)compressedSize);
             assert(cBuffer_exact != NULL);
             memcpy(cBuffer_exact, compressedBuffer, compressedSize);
 
