@@ -135,6 +135,9 @@
 #  endif  /* _MSC_VER */
 #endif /* LZ4_FORCE_INLINE */
 
+#undef LZ4_FORCE_INLINE
+#define LZ4_FORCE_INLINE static /* disable */
+
 /* LZ4_FORCE_O2_GCC_PPC64LE and LZ4_FORCE_O2_INLINE_GCC_PPC64LE
  * Gcc on ppc64le generates an unrolled SIMDized loop for LZ4_wildCopy,
  * together with a simple 8-byte copy loop as a fall-back path.
@@ -1671,7 +1674,10 @@ LZ4_decompress_generic(
                     {
                         goto safe_literal_copy;
                     }
-                LZ4_wildCopy32(op, ip, cpy);
+                if (endOnInput)
+                    LZ4_wildCopy32(op, ip, cpy);
+                else
+                    LZ4_wildCopy(op, ip, cpy);  /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time : it doesn't know input length, and only relies on end-of-block properties */
                 ip += length; op = cpy;
             } else {
                 cpy = op+length;
@@ -1681,7 +1687,12 @@ LZ4_decompress_generic(
                         goto safe_literal_copy;
                     }
                 /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
-                memcpy(op, ip, 16);
+                if (endOnInput)
+                    memcpy(op, ip, 16);
+                else {  /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time : it doesn't know input length, and only relies on end-of-block properties */
+                    memcpy(op, ip, 8);
+                    if (length > 8) memcpy(op+8, ip+8, 8);
+                }
                 ip += length; op = cpy;
             }
 
