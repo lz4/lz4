@@ -50,6 +50,10 @@
 #include <assert.h>
 #include <limits.h>     /* INT_MAX */
 
+#if defined(_AIX)
+#  include <sys/mman.h>   /* mmap */
+#endif
+
 #define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
 #define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
