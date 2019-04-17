@@ -481,31 +481,39 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Test compression */
         FUZ_DISPLAYTEST("test LZ4_compress_default()");
         ret = LZ4_compress_default(block, compressedBuffer, blockSize, (int)compressedBufferSize);
-        FUZ_CHECKTEST(ret==0, "LZ4_compress_default() failed");
+        FUZ_CHECKTEST(ret<=0, "LZ4_compress_default() failed");
         compressedSize = ret;
 
         /* Decompression tests */
 
-        /* Test decoding with output size exactly correct => must work */
-        FUZ_DISPLAYTEST("LZ4_decompress_fast() with exact output buffer");
-        ret = LZ4_decompress_fast(compressedBuffer, decodedBuffer, blockSize);
-        FUZ_CHECKTEST(ret<0, "LZ4_decompress_fast failed despite correct space");
-        FUZ_CHECKTEST(ret!=compressedSize, "LZ4_decompress_fast failed : did not fully read compressed data");
-        {   U32 const crcCheck = XXH32(decodedBuffer, blockSize, 0);
-            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast corrupted decoded data");
+        /* Test decompress_fast() with input buffer size exactly correct => must not read out of bound */
+        {   char* const cBuffer_exact = malloc((size_t)compressedSize);
+            assert(cBuffer_exact != NULL);
+            memcpy(cBuffer_exact, compressedBuffer, compressedSize);
+
+            /* Test decoding with output size exactly correct => must work */
+            FUZ_DISPLAYTEST("LZ4_decompress_fast() with exact output buffer");
+            ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize);
+            FUZ_CHECKTEST(ret<0, "LZ4_decompress_fast failed despite correct space");
+            FUZ_CHECKTEST(ret!=compressedSize, "LZ4_decompress_fast failed : did not fully read compressed data");
+            {   U32 const crcCheck = XXH32(decodedBuffer, (size_t)blockSize, 0);
+                FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast corrupted decoded data");
+            }
+
+            /* Test decoding with one byte missing => must fail */
+            FUZ_DISPLAYTEST("LZ4_decompress_fast() with output buffer 1-byte too short");
+            decodedBuffer[blockSize-1] = 0;
+            ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize-1);
+            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too small");
+            FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_fast overrun specified output buffer");
+
+            /* Test decoding with one byte too much => must fail */
+            FUZ_DISPLAYTEST();
+            ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize+1);
+            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
+
+            free(cBuffer_exact);
         }
-
-        /* Test decoding with one byte missing => must fail */
-        FUZ_DISPLAYTEST("LZ4_decompress_fast() with output buffer 1-byte too short");
-        decodedBuffer[blockSize-1] = 0;
-        ret = LZ4_decompress_fast(compressedBuffer, decodedBuffer, blockSize-1);
-        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too small");
-        FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_fast overrun specified output buffer");
-
-        /* Test decoding with one byte too much => must fail */
-        FUZ_DISPLAYTEST();
-        ret = LZ4_decompress_fast(compressedBuffer, decodedBuffer, blockSize+1);
-        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
 
         /* Test decoding with empty input */
         FUZ_DISPLAYTEST("LZ4_decompress_safe() with empty input");
