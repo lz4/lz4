@@ -135,9 +135,6 @@
 #  endif  /* _MSC_VER */
 #endif /* LZ4_FORCE_INLINE */
 
-#undef LZ4_FORCE_INLINE
-#define LZ4_FORCE_INLINE static /* disable */
-
 /* LZ4_FORCE_O2_GCC_PPC64LE and LZ4_FORCE_O2_INLINE_GCC_PPC64LE
  * Gcc on ppc64le generates an unrolled SIMDized loop for LZ4_wildCopy,
  * together with a simple 8-byte copy loop as a fall-back path.
