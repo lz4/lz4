@@ -1671,7 +1671,10 @@ LZ4_decompress_generic(
                     {
                         goto safe_literal_copy;
                     }
-                LZ4_wildCopy32(op, ip, cpy);
+                if (endOnInput)
+                    LZ4_wildCopy32(op, ip, cpy);
+                else
+                    LZ4_wildCopy(op, ip, cpy);  /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time : it doesn't know input length, and only relies on end-of-block properties */
                 ip += length; op = cpy;
             } else {
                 cpy = op+length;
@@ -1681,7 +1684,12 @@ LZ4_decompress_generic(
                         goto safe_literal_copy;
                     }
                 /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
-                memcpy(op, ip, 16);
+                if (endOnInput)
+                    memcpy(op, ip, 16);
+                else {  /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time : it doesn't know input length, and only relies on end-of-block properties */
+                    memcpy(op, ip, 8);
+                    if (length > 8) memcpy(op+8, ip+8, 8);
+                }
                 ip += length; op = cpy;
             }
 
