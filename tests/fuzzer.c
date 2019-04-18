@@ -331,7 +331,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         if (cond) {                                            \
             printf("Test %u : ", testNb); printf(__VA_ARGS__); \
             printf(" (seed %u, cycle %u) \n", seed, cycleNb);  \
-            goto _output_error;                                \
+            exit(1);                                           \
         }
 
 #   define FUZ_DISPLAYTEST(...) {                 \
@@ -347,7 +347,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     /* init */
     if(!CNBuffer || !compressedBuffer || !decodedBuffer) {
         DISPLAY("Not enough memory to start fuzzer tests");
-        goto _output_error;
+        exit(1);
     }
     if ( LZ4_initStream(&LZ4dict, sizeof(LZ4dict)) == NULL) abort();
     if ( LZ4_initStreamHC(&LZ4dictHC, sizeof(LZ4dictHC)) == NULL) abort();
@@ -505,7 +505,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             decodedBuffer[blockSize-1] = 0;
             ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize-1);
             FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too small");
-            FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_fast overrun specified output buffer");
+            FUZ_CHECKTEST(decodedBuffer[blockSize-1]!=0, "LZ4_decompress_fast overrun specified output buffer");
 
             /* Test decoding with one byte too much => must fail */
             FUZ_DISPLAYTEST();
@@ -960,20 +960,13 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     printf("ratio with dict: %0.3f%%\n", (double)ccbytes/bytes*100);
 
     /* release memory */
-    {
-_exit:
-        free(CNBuffer);
-        free(compressedBuffer);
-        free(decodedBuffer);
-        FUZ_freeLowAddr(lowAddrBuffer, labSize);
-        free(stateLZ4);
-        free(stateLZ4HC);
-        return result;
-
-_output_error:
-        result = 1;
-        goto _exit;
-    }
+    free(CNBuffer);
+    free(compressedBuffer);
+    free(decodedBuffer);
+    FUZ_freeLowAddr(lowAddrBuffer, labSize);
+    free(stateLZ4);
+    free(stateLZ4HC);
+    return result;
 }
 
 
@@ -1388,8 +1381,6 @@ static void FUZ_unitTests(int compressionLevel)
 
     printf("All unit tests completed successfully compressionLevel=%d \n", compressionLevel);
     return;
-_output_error:
-    exit(1);
 }
 
 
