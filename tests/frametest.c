@@ -167,7 +167,7 @@ static unsigned FUZ_highbit(U32 v32)
 /*-*******************************************************
 *  Tests
 *********************************************************/
-#define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s\n", LZ4F_getErrorName(v)); goto _output_error; }
+#define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s \n", LZ4F_getErrorName(v)); goto _output_error; }
 #define CHECK(f)   { LZ4F_errorCode_t const CHECK_V(err_ , f); }
 
 int basicTests(U32 seed, double compressibility)
@@ -795,8 +795,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     clock_t const startClock = clock();
     clock_t const clockDuration = duration_s * CLOCKS_PER_SEC;
 #   undef CHECK
-#   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                            DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
+#   define EXIT_MSG(...) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                           DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
+#   define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
 
     /* Create buffers */
     {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
@@ -950,9 +951,10 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             CHECK(decSize != 0, "Frame decompression failed (error %i)", (int)decSize);
             if (totalOut) {  /* otherwise, it's a skippable frame */
                 U64 const crcDecoded = XXH64_digest(&xxh64);
-                if (crcDecoded != crcOrig) locateBuffDiff(srcStart, decodedBuffer, srcSize, nonContiguousDst);
-                CHECK(crcDecoded != crcOrig, "Decompression corruption");
-            }
+                if (crcDecoded != crcOrig) {
+                    locateBuffDiff(srcStart, decodedBuffer, srcSize, nonContiguousDst);
+                    EXIT_MSG("Decompression corruption");
+            }   }
         }
     }
 

@@ -105,7 +105,7 @@ typedef struct {
     LZ4F_decompressionContext_t ctx;
 } cRess_t;
 
-static int createCResources(cRess_t *ress)
+static int createCResources(cRess_t* ress)
 {
     ress->srcBufferSize = 4 MB;
     ress->srcBuffer = malloc(ress->srcBufferSize);
