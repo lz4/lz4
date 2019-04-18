@@ -162,13 +162,13 @@ static LZ4_stream_t LZ4_stream;
 static void local_LZ4_resetDictT(void)
 {
     void* const r = LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
-    assert(r != NULL);
+    assert(r != NULL); (void)r;
 }
 
 static void local_LZ4_createStream(void)
 {
     void* const r = LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
-    assert(r != NULL);
+    assert(r != NULL); (void)r;
 }
 
 static int local_LZ4_saveDict(const char* in, char* out, int inSize)

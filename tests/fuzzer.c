@@ -490,6 +490,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Test decompress_fast() with input buffer size exactly correct => must not read out of bound */
         {   char* const cBuffer_exact = (char*)malloc((size_t)compressedSize);
             assert(cBuffer_exact != NULL);
+            assert(compressedSize <= compressedBufferSize);
             memcpy(cBuffer_exact, compressedBuffer, compressedSize);
 
             /* Test decoding with output size exactly correct => must work */
@@ -1302,9 +1303,8 @@ static void FUZ_unitTests(int compressionLevel)
             int iNext = 0;
             int dNext = 0;
             int compressedSize;
-            size_t const testVerifySize = testInputSize;
 
-            assert((size_t)dBufferSize * 2 + 1 < testVerifySize);   /* space used by ringBufferSafe and ringBufferFast */
+            assert((size_t)dBufferSize * 2 + 1 < testInputSize);   /* space used by ringBufferSafe and ringBufferFast */
             XXH64_reset(&xxhOrig, 0);
             XXH64_reset(&xxhNewSafe, 0);
             XXH64_reset(&xxhNewFast, 0);

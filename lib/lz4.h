@@ -638,9 +638,11 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4
  *  On top of that `LZ4_decompress_fast()` is not protected vs malformed or malicious inputs, making it a security liability.
  *  As a consequence, LZ4_decompress_fast() is strongly discouraged, and deprecated.
  *
- *  Only LZ4_decompress_fast() specificity is that it can decompress a block without knowing its compressed size.
- *  Even that functionality could be achieved in a more secure manner if need be,
- *  though it would require new prototypes, and adaptation of the implementation to this new use case.
+ *  The last remaining LZ4_decompress_fast() specificity is that
+ *  it can decompress a block without knowing its compressed size.
+ *  Such functionality could be achieved in a more secure manner,
+ *  by also providing the maximum size of input buffer,
+ *  but it would require new prototypes, and adaptation of the implementation to this new use case.
  *
  *  Parameters:
  *  originalSize : is the uncompressed size to regenerate.
