@@ -881,39 +881,39 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Compress HC using external dictionary stream */
         FUZ_DISPLAYTEST();
-        {
-            LZ4_streamHC_t LZ4_streamHC;
-            LZ4_initStreamHC(&LZ4_streamHC, sizeof(LZ4_streamHC));
+        {   LZ4_streamHC_t* LZ4_streamHC = LZ4_createStreamHC();
 
             LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
-            LZ4_attach_HC_dictionary(&LZ4_streamHC, LZ4dictHC);
-            LZ4_setCompressionLevel (&LZ4_streamHC, compressionLevel);
-            blockContinueCompressedSize = LZ4_compress_HC_continue(&LZ4_streamHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
+            LZ4_attach_HC_dictionary(LZ4_streamHC, LZ4dictHC);
+            LZ4_setCompressionLevel (LZ4_streamHC, compressionLevel);
+            blockContinueCompressedSize = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue with ExtDictCtx failed");
-            FUZ_CHECKTEST(LZ4_streamHC.internal_donotuse.dirty, "Context should be clean");
+            FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
 
             FUZ_DISPLAYTEST();
-            LZ4_resetStreamHC_fast (&LZ4_streamHC, compressionLevel);
-            LZ4_attach_HC_dictionary(&LZ4_streamHC, LZ4dictHC);
-            ret = LZ4_compress_HC_continue(&LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize-1);
+            LZ4_resetStreamHC_fast (LZ4_streamHC, compressionLevel);
+            LZ4_attach_HC_dictionary(LZ4_streamHC, LZ4dictHC);
+            ret = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize-1);
             FUZ_CHECKTEST(ret>0, "LZ4_compress_HC_continue using ExtDictCtx should fail : one missing byte for output buffer (%i != %i)", ret, blockContinueCompressedSize);
             /* note : context is no longer dirty after a failed compressed block */
 
             FUZ_DISPLAYTEST();
-            LZ4_resetStreamHC_fast (&LZ4_streamHC, compressionLevel);
-            LZ4_attach_HC_dictionary(&LZ4_streamHC, LZ4dictHC);
-            ret = LZ4_compress_HC_continue(&LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
+            LZ4_resetStreamHC_fast (LZ4_streamHC, compressionLevel);
+            LZ4_attach_HC_dictionary(LZ4_streamHC, LZ4dictHC);
+            ret = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue using ExtDictCtx size is different (%i != %i)", ret, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_HC_continue using ExtDictCtx should work : enough size available within output buffer");
-            FUZ_CHECKTEST(LZ4_streamHC.internal_donotuse.dirty, "Context should be clean");
+            FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
 
             FUZ_DISPLAYTEST();
-            LZ4_resetStreamHC_fast (&LZ4_streamHC, compressionLevel);
-            LZ4_attach_HC_dictionary(&LZ4_streamHC, LZ4dictHC);
-            ret = LZ4_compress_HC_continue(&LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
+            LZ4_resetStreamHC_fast (LZ4_streamHC, compressionLevel);
+            LZ4_attach_HC_dictionary(LZ4_streamHC, LZ4dictHC);
+            ret = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue using ExtDictCtx and fast reset size is different (%i != %i)", ret, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_HC_continue using ExtDictCtx and fast reset should work : enough size available within output buffer");
-            FUZ_CHECKTEST(LZ4_streamHC.internal_donotuse.dirty, "Context should be clean");
+            FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
+
+            LZ4_freeStreamHC(LZ4_streamHC);
         }
 
         FUZ_DISPLAYTEST();
