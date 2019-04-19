@@ -494,9 +494,10 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
             /* Test decoding with output size exactly correct => must work */
             FUZ_DISPLAYTEST("LZ4_decompress_fast() with exact output buffer");
-            ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize);
-            FUZ_CHECKTEST(ret<0, "LZ4_decompress_fast failed despite correct space");
-            FUZ_CHECKTEST(ret!=compressedSize, "LZ4_decompress_fast failed : did not fully read compressed data");
+            {   int const r = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize);
+                FUZ_CHECKTEST(r<0, "LZ4_decompress_fast failed despite correct space");
+                FUZ_CHECKTEST(r!=compressedSize, "LZ4_decompress_fast failed : did not fully read compressed data");
+            }
             {   U32 const crcCheck = XXH32(decodedBuffer, (size_t)blockSize, 0);
                 FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_fast corrupted decoded data");
             }
@@ -504,92 +505,75 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             /* Test decoding with one byte missing => must fail */
             FUZ_DISPLAYTEST("LZ4_decompress_fast() with output buffer 1-byte too short");
             decodedBuffer[blockSize-1] = 0;
-            ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize-1);
-            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too small");
+            {   int const r = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize-1);
+                FUZ_CHECKTEST(r>=0, "LZ4_decompress_fast should have failed, due to Output Size being too small");
+            }
             FUZ_CHECKTEST(decodedBuffer[blockSize-1]!=0, "LZ4_decompress_fast overrun specified output buffer");
 
             /* Test decoding with one byte too much => must fail */
             FUZ_DISPLAYTEST();
-            ret = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize+1);
-            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
+            {   int const r = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, blockSize+1);
+                FUZ_CHECKTEST(r>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
+            }
+
+            /* Test decoding with output size exactly what's necessary => must work */
+            FUZ_DISPLAYTEST();
+            decodedBuffer[blockSize] = 0;
+            {   int const r = LZ4_decompress_safe(cBuffer_exact, decodedBuffer, compressedSize, blockSize);
+                FUZ_CHECKTEST(r<0, "LZ4_decompress_safe failed despite sufficient space");
+                FUZ_CHECKTEST(r!=blockSize, "LZ4_decompress_safe did not regenerate original data");
+            }
+            FUZ_CHECKTEST(decodedBuffer[blockSize], "LZ4_decompress_safe overrun specified output buffer size");
+            {   U32 const crcCheck = XXH32(decodedBuffer, blockSize, 0);
+                FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe corrupted decoded data");
+            }
+
+            /* Test decoding with more than enough output size => must work */
+            FUZ_DISPLAYTEST();
+            decodedBuffer[blockSize] = 0;
+            decodedBuffer[blockSize+1] = 0;
+            {   int const r = LZ4_decompress_safe(cBuffer_exact, decodedBuffer, compressedSize, blockSize+1);
+                FUZ_CHECKTEST(r<0, "LZ4_decompress_safe failed despite amply sufficient space");
+                FUZ_CHECKTEST(r!=blockSize, "LZ4_decompress_safe did not regenerate original data");
+            }
+            FUZ_CHECKTEST(decodedBuffer[blockSize+1], "LZ4_decompress_safe overrun specified output buffer size");
+            {   U32 const crcCheck = XXH32(decodedBuffer, (size_t)blockSize, 0);
+                FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe corrupted decoded data");
+            }
+
+            /* Test decoding with output size being one byte too short => must fail */
+            FUZ_DISPLAYTEST();
+            decodedBuffer[blockSize-1] = 0;
+            {   int const r = LZ4_decompress_safe(cBuffer_exact, decodedBuffer, compressedSize, blockSize-1);
+                FUZ_CHECKTEST(r>=0, "LZ4_decompress_safe should have failed, due to Output Size being one byte too short");
+            }
+            FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_safe overrun specified output buffer size");
+
+            /* Test decoding with output size being 10 bytes too short => must fail */
+            FUZ_DISPLAYTEST();
+            if (blockSize>10) {
+                decodedBuffer[blockSize-10] = 0;
+                {   int const r = LZ4_decompress_safe(cBuffer_exact, decodedBuffer, compressedSize, blockSize-10);
+                    FUZ_CHECKTEST(r>=0, "LZ4_decompress_safe should have failed, due to Output Size being 10 bytes too short");
+                }
+                FUZ_CHECKTEST(decodedBuffer[blockSize-10], "LZ4_decompress_safe overrun specified output buffer size");
+            }
 
             free(cBuffer_exact);
         }
 
-        /* Test decoding with empty input */
-        FUZ_DISPLAYTEST("LZ4_decompress_safe() with empty input");
-        LZ4_decompress_safe(compressedBuffer, decodedBuffer, 0, blockSize);
-
-        /* Test decoding with a one byte input */
-        FUZ_DISPLAYTEST("LZ4_decompress_safe() with one byte input");
-        {   char const tmp = (char)0xFF;
-            LZ4_decompress_safe(&tmp, decodedBuffer, 1, blockSize);
+        /* Test decoding with input size being one byte too short => must fail */
+        FUZ_DISPLAYTEST();
+        {   int const r = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize-1, blockSize);
+            FUZ_CHECKTEST(r>=0, "LZ4_decompress_safe should have failed, due to input size being one byte too short (blockSize=%i, ret=%i, compressedSize=%i)", blockSize, ret, compressedSize);
         }
 
-        /* Test decoding shortcut edge case */
-        FUZ_DISPLAYTEST("LZ4_decompress_safe() with shortcut edge case");
-        {   char tmp[17];
-            /* 14 bytes of literals, followed by a 14 byte match.
-             * Should not read beyond the end of the buffer.
-             * See https://github.com/lz4/lz4/issues/508. */
-            *tmp = (char)0xEE;
-            memset(tmp + 1, 0, 14);
-            tmp[15] = 14;
-            tmp[16] = 0;
-            ret = LZ4_decompress_safe(tmp, decodedBuffer, sizeof(tmp), blockSize);
-            FUZ_CHECKTEST(ret >= 0, "LZ4_decompress_safe() should fail");
-        }
-
-
-        /* Test decoding with output size exactly what's necessary => must work */
+        /* Test decoding with input size being one byte too large => must fail */
         FUZ_DISPLAYTEST();
         decodedBuffer[blockSize] = 0;
-        ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize);
-        FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe failed despite sufficient space");
-        FUZ_CHECKTEST(ret!=blockSize, "LZ4_decompress_safe did not regenerate original data");
-        FUZ_CHECKTEST(decodedBuffer[blockSize], "LZ4_decompress_safe overrun specified output buffer size");
-        {   U32 const crcCheck = XXH32(decodedBuffer, blockSize, 0);
-            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe corrupted decoded data");
+        {   int const r = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize+1, blockSize);
+            FUZ_CHECKTEST(r>=0, "LZ4_decompress_safe should have failed, due to input size being too large");
         }
-
-        // Test decoding with more than enough output size => must work
-        FUZ_DISPLAYTEST();
-        decodedBuffer[blockSize] = 0;
-        decodedBuffer[blockSize+1] = 0;
-        ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize+1);
-        FUZ_CHECKTEST(ret<0, "LZ4_decompress_safe failed despite amply sufficient space");
-        FUZ_CHECKTEST(ret!=blockSize, "LZ4_decompress_safe did not regenerate original data");
-        FUZ_CHECKTEST(decodedBuffer[blockSize+1], "LZ4_decompress_safe overrun specified output buffer size");
-        {   U32 const crcCheck = XXH32(decodedBuffer, (size_t)blockSize, 0);
-            FUZ_CHECKTEST(crcCheck!=crcOrig, "LZ4_decompress_safe corrupted decoded data");
-        }
-
-        // Test decoding with output size being one byte too short => must fail
-        FUZ_DISPLAYTEST();
-        decodedBuffer[blockSize-1] = 0;
-        ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize-1);
-        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to Output Size being one byte too short");
-        FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_safe overrun specified output buffer size");
-
-        // Test decoding with output size being 10 bytes too short => must fail
-        FUZ_DISPLAYTEST();
-        if (blockSize>10) {
-            decodedBuffer[blockSize-10] = 0;
-            ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize-10);
-            FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to Output Size being 10 bytes too short");
-            FUZ_CHECKTEST(decodedBuffer[blockSize-10], "LZ4_decompress_safe overrun specified output buffer size");
-        }
-
-        // Test decoding with input size being one byte too short => must fail
-        FUZ_DISPLAYTEST();
-        ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize-1, blockSize);
-        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to input size being one byte too short (blockSize=%i, ret=%i, compressedSize=%i)", blockSize, ret, compressedSize);
-
-        // Test decoding with input size being one byte too large => must fail
-        FUZ_DISPLAYTEST();
-        decodedBuffer[blockSize] = 0;
-        ret = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize+1, blockSize);
-        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe should have failed, due to input size being too large");
         FUZ_CHECKTEST(decodedBuffer[blockSize], "LZ4_decompress_safe overrun specified output buffer size");
 
         /* Test partial decoding => must work */
@@ -881,7 +865,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Compress HC using external dictionary stream */
         FUZ_DISPLAYTEST();
-        {   LZ4_streamHC_t* LZ4_streamHC = LZ4_createStreamHC();
+        {   LZ4_streamHC_t* const LZ4_streamHC = LZ4_createStreamHC();
 
             LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
             LZ4_attach_HC_dictionary(LZ4_streamHC, LZ4dictHC);
@@ -1004,6 +988,30 @@ static void FUZ_unitTests(int compressionLevel)
 
     /* 32-bits address space overflow test */
     FUZ_AddressOverflow();
+
+    /* Test decoding with empty input */
+    DISPLAYLEVEL(3, "LZ4_decompress_safe() with empty input");
+    LZ4_decompress_safe(testCompressed, testVerify, 0, testInputSize);
+
+    /* Test decoding with a one byte input */
+    DISPLAYLEVEL(3, "LZ4_decompress_safe() with one byte input");
+    {   char const tmp = (char)0xFF;
+        LZ4_decompress_safe(&tmp, testVerify, 1, testInputSize);
+    }
+
+    /* Test decoding shortcut edge case */
+    DISPLAYLEVEL(3, "LZ4_decompress_safe() with shortcut edge case");
+    {   char tmp[17];
+        /* 14 bytes of literals, followed by a 14 byte match.
+         * Should not read beyond the end of the buffer.
+         * See https://github.com/lz4/lz4/issues/508. */
+        *tmp = (char)0xEE;
+        memset(tmp + 1, 0, 14);
+        tmp[15] = 14;
+        tmp[16] = 0;
+        {   int const r = LZ4_decompress_safe(tmp, testVerify, sizeof(tmp), testInputSize);
+            FUZ_CHECKTEST(r >= 0, "LZ4_decompress_safe() should fail");
+    }   }
 
     /* LZ4 streaming tests */
     {   LZ4_stream_t  streamingState;

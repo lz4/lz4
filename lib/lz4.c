@@ -136,7 +136,7 @@
 #endif /* LZ4_FORCE_INLINE */
 
 /* LZ4_FORCE_O2_GCC_PPC64LE and LZ4_FORCE_O2_INLINE_GCC_PPC64LE
- * Gcc on ppc64le generates an unrolled SIMDized loop for LZ4_wildCopy,
+ * gcc on ppc64le generates an unrolled SIMDized loop for LZ4_wildCopy8,
  * together with a simple 8-byte copy loop as a fall-back path.
  * However, this optimization hurts the decompression speed by >30%,
  * because the execution does not go to the optimized loop
@@ -144,10 +144,10 @@
  * before going to the fall-back path become useless overhead.
  * This optimization happens only with the -O3 flag, and -O2 generates
  * a simple 8-byte copy loop.
- * With gcc on ppc64le, all of the LZ4_decompress_* and LZ4_wildCopy
+ * With gcc on ppc64le, all of the LZ4_decompress_* and LZ4_wildCopy8
  * functions are annotated with __attribute__((optimize("O2"))),
- * and also LZ4_wildCopy is forcibly inlined, so that the O2 attribute
- * of LZ4_wildCopy does not affect the compression speed.
+ * and also LZ4_wildCopy8 is forcibly inlined, so that the O2 attribute
+ * of LZ4_wildCopy8 does not affect the compression speed.
  */
 #if defined(__PPC64__) && defined(__LITTLE_ENDIAN__) && defined(__GNUC__) && !defined(__clang__)
 #  define LZ4_FORCE_O2_GCC_PPC64LE __attribute__((optimize("O2")))
@@ -301,7 +301,7 @@ static void LZ4_writeLE16(void* memPtr, U16 value)
 
 /* customized variant of memcpy, which can overwrite up to 8 bytes beyond dstEnd */
 LZ4_FORCE_O2_INLINE_GCC_PPC64LE
-void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
+void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
@@ -342,7 +342,7 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
         srcPtr += 8;
     }
 
-    LZ4_wildCopy(dstPtr, srcPtr, dstEnd);
+    LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
 }
 
 /* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd
@@ -946,7 +946,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
             else *token = (BYTE)(litLength<<ML_BITS);
 
             /* Copy Literals */
-            LZ4_wildCopy(op, anchor, op+litLength);
+            LZ4_wildCopy8(op, anchor, op+litLength);
             op+=litLength;
             DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i",
                         (int)(anchor-(const BYTE*)source), litLength, (int)(ip-(const BYTE*)source));
@@ -1642,14 +1642,16 @@ LZ4_decompress_generic(
 
 	/* Currently the fast loop shows a regression on qualcomm arm chips. */
 #if LZ4_FAST_DEC_LOOP
-        if ((oend - op) < FASTLOOP_SAFE_DISTANCE)
+        if ((oend - op) < FASTLOOP_SAFE_DISTANCE) {
+            DEBUGLOG(6, "skip fast decode loop");
             goto safe_decode;
+        }
 
         /* Fast loop : decode sequences as long as output < iend-FASTLOOP_SAFE_DISTANCE */
         while (1) {
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
             assert(oend - op >= FASTLOOP_SAFE_DISTANCE);
-
+            if (endOnInput) assert(ip < iend);
             token = *ip++;
             length = token >> ML_BITS;  /* literal length */
 
@@ -1666,27 +1668,26 @@ LZ4_decompress_generic(
                 /* copy literals */
                 cpy = op+length;
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
-                if ( ((endOnInput) && ((cpy>oend-FASTLOOP_SAFE_DISTANCE) || (ip+length>iend-(2+1+LASTLITERALS))) )
-                     || ((!endOnInput) && (cpy>oend-FASTLOOP_SAFE_DISTANCE)) )
-                    {
-                        goto safe_literal_copy;
-                    }
-                if (endOnInput)
+                if (endOnInput) {  /* LZ4_decompress_safe() */
+                    if ((cpy>oend-32) || (ip+length>iend-32)) goto safe_literal_copy;
                     LZ4_wildCopy32(op, ip, cpy);
-                else
-                    LZ4_wildCopy(op, ip, cpy);  /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time : it doesn't know input length, and only relies on end-of-block properties */
+                } else {   /* LZ4_decompress_fast() */
+                    if (cpy>oend-8) goto safe_literal_copy;
+                    LZ4_wildCopy8(op, ip, cpy); /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time :
+                                                 * it doesn't know input length, and only relies on end-of-block properties */
+                }
                 ip += length; op = cpy;
             } else {
                 cpy = op+length;
-                /* We don't need to check oend, since we check it once for each loop below */
-                if ( ((endOnInput) && (ip+16>iend-(2+1+LASTLITERALS))))
-                    {
-                        goto safe_literal_copy;
-                    }
-                /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
-                if (endOnInput)
+                if (endOnInput) {  /* LZ4_decompress_safe() */
+                    DEBUGLOG(7, "copy %u bytes in a 16-bytes stripe", (unsigned)length);
+                    /* We don't need to check oend, since we check it once for each loop below */
+                    if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) goto safe_literal_copy;
+                    /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
                     memcpy(op, ip, 16);
-                else {  /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time : it doesn't know input length, and only relies on end-of-block properties */
+                } else {  /* LZ4_decompress_fast() */
+                    /* LZ4_decompress_fast() cannot copy more than 8 bytes at a time :
+                     * it doesn't know input length, and relies on end-of-block properties */
                     memcpy(op, ip, 8);
                     if (length > 8) memcpy(op+8, ip+8, 8);
                 }
@@ -1852,7 +1853,7 @@ LZ4_decompress_generic(
                 }
 
             } else {
-                LZ4_wildCopy(op, ip, cpy);   /* may overwrite up to WILDCOPYLENGTH beyond cpy */
+                LZ4_wildCopy8(op, ip, cpy);   /* may overwrite up to WILDCOPYLENGTH beyond cpy */
                 ip += length; op = cpy;
             }
 
@@ -1947,14 +1948,14 @@ LZ4_decompress_generic(
                 BYTE* const oCopyLimit = oend - (WILDCOPYLENGTH-1);
                 if (cpy > oend-LASTLITERALS) goto _output_error;    /* Error : last LASTLITERALS bytes must be literals (uncompressed) */
                 if (op < oCopyLimit) {
-                    LZ4_wildCopy(op, match, oCopyLimit);
+                    LZ4_wildCopy8(op, match, oCopyLimit);
                     match += oCopyLimit - op;
                     op = oCopyLimit;
                 }
                 while (op < cpy) *op++ = *match++;
             } else {
                 memcpy(op, match, 8);
-                if (length > 16) LZ4_wildCopy(op+8, match+8, cpy);
+                if (length > 16) LZ4_wildCopy8(op+8, match+8, cpy);
             }
             op = cpy;   /* wildcopy correction */
         }

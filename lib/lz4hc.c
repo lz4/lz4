@@ -442,7 +442,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     }
 
     /* Copy Literals */
-    LZ4_wildCopy(*op, *anchor, (*op) + length);
+    LZ4_wildCopy8(*op, *anchor, (*op) + length);
     *op += length;
 
     /* Encode Offset */
