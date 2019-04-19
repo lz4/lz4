@@ -1,3 +1,8 @@
+v1.9.1
+fix : decompression functions were reading beyond input size (introduced in v1.9.0, reported by @ppodolsky and @danlark1)
+api : fix : lz4frame initializers compatibility with c++, reported by @degski
+build: AIX, by Norman Green
+
 v1.9.0
 perf: large decompression speed improvement on x86/x64 (up to +20%) by @djwatson
 api : changed : _destSize() compression variants are promoted to stable API
