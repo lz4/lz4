@@ -667,8 +667,8 @@ int basicTests(U32 seed, double compressibility)
       for (blockSizeID = 4; blockSizeID < 8; ++blockSizeID) {
         result = LZ4F_getBlockSize(blockSizeID);
         CHECK(result);
-        DISPLAYLEVEL(3, "Returned block size of %zu bytes for blockID %u \n",
-                         result, blockSizeID);
+        DISPLAYLEVEL(3, "Returned block size of %u bytes for blockID %u \n",
+                         (unsigned)result, blockSizeID);
       }
 
       /* Test an invalid input that's too large */
@@ -770,7 +770,8 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, un
     const BYTE* b2=(const BYTE*)buff2;
     DISPLAY("locateBuffDiff: looking for error position \n");
     if (nonContiguous) {
-        DISPLAY("mode %u: non-contiguous output (%zu bytes), cannot search \n", nonContiguous, size);
+        DISPLAY("mode %u: non-contiguous output (%u bytes), cannot search \n",
+                nonContiguous, (unsigned)size);
         return;
     }
     while (p < size && b1[p]==b2[p]) p++;
