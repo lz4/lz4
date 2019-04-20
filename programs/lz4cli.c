@@ -714,9 +714,9 @@ int main(int argc, const char** argv)
             inFileNames[ifnIdx++] = input_filename;
         }
         DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n","BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
-        for(i=0; i<ifnIdx; i++){
+        for(unsigned int j=0; j<ifnIdx; j++){
             /* Get file info */
-            if (!LZ4IO_getCompressedFileInfo(inFileNames[i], &cfinfo)){
+            if (!LZ4IO_getCompressedFileInfo(inFileNames[j], &cfinfo)){
                 DISPLAYLEVEL(1, "Failed to get frame info.\n");
                 if (!multiple_inputs){
                     return 1;
