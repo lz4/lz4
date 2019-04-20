@@ -40,6 +40,7 @@
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
+#include "lz4frame.h"
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 #include "lz4hc.h"    /* LZ4HC_CLEVEL_MAX */
 #include "lz4.h"      /* LZ4_VERSION_STRING */
@@ -141,6 +142,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
+    DISPLAY( "--list  : list information about .lz4 files. Only useful if compressed with --content-size flag.\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
@@ -286,7 +288,7 @@ static int longCommandWArg(const char** stringPtr, const char* longCommand)
     return result;
 }
 
-typedef enum { om_auto, om_compress, om_decompress, om_test, om_bench } operationMode_e;
+typedef enum { om_auto, om_compress, om_decompress, om_test, om_bench, om_list } operationMode_e;
 
 /** determineOpMode() :
  *  auto-determine operation mode, based on input filename extension
@@ -383,6 +385,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); continue; }
                 if (!strcmp(argument,  "--content-size")) { LZ4IO_setContentSize(prefs, 1); continue; }
                 if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(prefs, 0); continue; }
+                if (!strcmp(argument,  "--list")) { mode = om_list; continue; }
                 if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(prefs, 2); continue; }
                 if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(prefs, 0); continue; }
                 if (!strcmp(argument,  "--favor-decSpeed")) { LZ4IO_favorDecSpeed(prefs, 1); continue; }
@@ -705,7 +708,34 @@ int main(int argc, const char** argv)
             operationResult = LZ4IO_decompressMultipleFilenames(prefs, inFileNames, ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION);
         else
             operationResult = DEFAULT_DECOMPRESSOR(prefs, input_filename, output_filename);
-    } else {   /* compression is default action */
+    } else if (mode == om_list){
+        LZ4F_compFileInfo_t cfinfo;
+        if(!multiple_inputs){
+            inFileNames[ifnIdx++] = input_filename;
+        }
+        DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n","BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
+        for(i=0; i<ifnIdx; i++){
+            /* Get file info */
+            if (!LZ4IO_getCompressedFileInfo(inFileNames[i], &cfinfo)){
+                DISPLAYLEVEL(1, "Failed to get frame info.\n");
+                if (!multiple_inputs){
+                    return 1;
+                }
+                continue;
+            }
+            if(cfinfo.frameInfo.contentSize){
+                double ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
+                DISPLAY("%-16d\t%-20llu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
+            }
+            else{
+                DISPLAY("%-16d\t%-20llu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
+            }
+            free(cfinfo.fileName);
+        }
+        free(inFileNames);
+        return 0;
+    } else {
+       /* compression is default action */
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
             LZ4IO_compressFilename_Legacy(prefs, input_filename, output_filename, cLevel);

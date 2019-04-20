@@ -53,11 +53,11 @@
 #include <time.h>      /* clock */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
-#include "lz4io.h"
 #include "lz4.h"       /* still required for legacy format */
 #include "lz4hc.h"     /* still required for legacy format */
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
+#include "lz4io.h"
 
 
 /*****************************
@@ -1264,4 +1264,42 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** i
     LZ4IO_freeDResources(ress);
     free(outFileName);
     return missingFiles + skippedFiles;
+}
+
+size_t LZ4IO_getCompressedFileInfo(const char* input_filename, LZ4F_compFileInfo_t* cfinfo){
+    /* Get file size */
+    stat_t statbuf;
+    if (!UTIL_getFileStat(input_filename, &statbuf)){
+      EXM_THROW(60, "Can't stat file : %s", input_filename);
+    }
+    cfinfo->fileSize = statbuf.st_size;
+    /* Get basename without extension */
+    const char *b = strrchr(input_filename, '/');
+    if (b && b != input_filename){
+      b++;
+    } else{
+      b=input_filename;
+    }
+    const char *e = strrchr(b, '.');
+    cfinfo->fileName = malloc( (e-b+1) * sizeof(char));
+    strncpy(cfinfo->fileName, b, (e-b));
+    cfinfo->fileName[e-b] = '\0';
+    /* init */
+    dRess_t ress;
+    LZ4F_errorCode_t const errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
+    if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+    FILE* const finput = LZ4IO_openSrcFile(input_filename);
+    if (finput==NULL) return 1;
+    /* Allocate Memory */
+    ress.srcBuffer = malloc(LZ4IO_dBufferSize);
+    size_t readSize = LZ4F_HEADER_SIZE_MAX;
+    if (!fread(ress.srcBuffer, readSize, 1, finput)){
+      EXM_THROW(30, "Error reading %s ", input_filename);
+    }
+    cfinfo->frameInfo = (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO;
+    LZ4F_getFrameInfo(ress.dCtx, &cfinfo->frameInfo, ress.srcBuffer, &readSize);
+    /* Close input/free resources */
+    fclose(finput);
+    free(ress.srcBuffer);
+    return readSize;
 }
