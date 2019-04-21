@@ -144,6 +144,8 @@ ifneq (,$(filter $(shell uname), Darwin ))
 MD5:=md5 -r
 endif
 
+# note : we should probably settle on a single compare utility
+CMP:=cmp
 DIFF:=diff
 ifneq (,$(filter $(shell uname),SunOS))
 DIFF:=gdiff
@@ -222,7 +224,7 @@ test-lz4-frame-concatenation: lz4 datagen
 	$(LZ4) -zq tmp-lfc-nonempty -c > tmp-lfc-nonempty.lz4
 	cat tmp-lfc-nonempty.lz4 tmp-lfc-empty.lz4 tmp-lfc-nonempty.lz4 > tmp-lfc-concat.lz4
 	$(LZ4) -d tmp-lfc-concat.lz4 -c > tmp-lfc-result
-	cmp tmp-lfc-src tmp-lfc-result
+	$(CMP) tmp-lfc-src tmp-lfc-result
 	@$(RM) tmp-lfc-*
 	@echo frame concatenation test completed
 
@@ -241,15 +243,15 @@ test-lz4-multiple: lz4 datagen
 	mv tmp-tlm2 tmp-tlm2-orig
 	mv tmp-tlm3 tmp-tlm3-orig
 	$(LZ4) -d -f -m tmp-tlm*.lz4
-	cmp tmp-tlm1 tmp-tlm1-orig   # must be identical
-	cmp tmp-tlm2 tmp-tlm2-orig
-	cmp tmp-tlm3 tmp-tlm3-orig
+	$(CMP) tmp-tlm1 tmp-tlm1-orig   # must be identical
+	$(CMP) tmp-tlm2 tmp-tlm2-orig
+	$(CMP) tmp-tlm3 tmp-tlm3-orig
 	# compress multiple files into stdout
 	cat tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
 	$(RM) *.lz4
 	$(LZ4) -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
 	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
-	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
 	# decompress multiple files into stdout
 	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
 	$(LZ4) -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
@@ -257,7 +259,7 @@ test-lz4-multiple: lz4 datagen
 	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
 	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
 	test ! -f tmp-tlm1  # must not create file artefact
-	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
 	# compress multiple files, one of which is absent (must fail)
 	! $(LZ4) -f -m tmp-tlm-concat1 notHere tmp-tlm-concat2  # must fail : notHere not present
 	@$(RM) tmp-tlm*
