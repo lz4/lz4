@@ -142,7 +142,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
-    DISPLAY( "--list  : list information about .lz4 files. Only useful if compressed with --content-size flag.\n");
+    DISPLAY( "--list  : lists information about .lz4 files. Useful if compressed with --content-size flag.\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
@@ -709,31 +709,11 @@ int main(int argc, const char** argv)
         else
             operationResult = DEFAULT_DECOMPRESSOR(prefs, input_filename, output_filename);
     } else if (mode == om_list){
-        LZ4F_compFileInfo_t cfinfo;
         if(!multiple_inputs){
             inFileNames[ifnIdx++] = input_filename;
         }
-        DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n","BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
-        for(unsigned int j=0; j<ifnIdx; j++){
-            /* Get file info */
-            if (!LZ4IO_getCompressedFileInfo(inFileNames[j], &cfinfo)){
-                DISPLAYLEVEL(1, "Failed to get frame info.\n");
-                if (!multiple_inputs){
-                    return 1;
-                }
-                continue;
-            }
-            if(cfinfo.frameInfo.contentSize){
-                double ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
-                DISPLAY("%-16d\t%-20llu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
-            }
-            else{
-                DISPLAY("%-16d\t%-20llu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
-            }
-            free(cfinfo.fileName);
-        }
-        free(inFileNames);
-        return 0;
+        operationResult = LZ4IO_getCompressedFilesInfo(inFileNames, ifnIdx);
+        inFileNames=NULL;
     } else {
        /* compression is default action */
         if (legacy_format) {

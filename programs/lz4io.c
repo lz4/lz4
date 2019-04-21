@@ -1266,40 +1266,86 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** i
     return missingFiles + skippedFiles;
 }
 
-size_t LZ4IO_getCompressedFileInfo(const char* input_filename, LZ4F_compFileInfo_t* cfinfo){
-    /* Get file size */
-    stat_t statbuf;
-    if (!UTIL_getFileStat(input_filename, &statbuf)){
-      EXM_THROW(60, "Can't stat file : %s", input_filename);
+int LZ4IO_getCompressedFilesInfo(const char** inFileNames, const size_t ifnIdx){
+  size_t idx;
+  int op_result=0;
+  LZ4F_compFileInfo_t cfinfo = (LZ4F_compFileInfo_t) LZ4F_INIT_FILEINFO;
+  DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n","BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
+  for(idx=0; idx<ifnIdx; idx++){
+    /* Get file info */
+    op_result&=LZ4IO_getCompressedFileInfo(inFileNames[idx], &cfinfo);
+    if (op_result != 0){
+        DISPLAYLEVEL(1, "Failed to get frame info for file %s\n", inFileNames[idx]);
+        if (ifnIdx < 2){
+            return 1;
+        }
+        continue;
     }
-    cfinfo->fileSize = statbuf.st_size;
-    /* Get basename without extension */
-    const char *b = strrchr(input_filename, '/');
-    if (b && b != input_filename){
-      b++;
-    } else{
-      b=input_filename;
+    if(cfinfo.frameInfo.contentSize){
+        DISPLAY("%-16d\t%-20llu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, cfinfo.ratio, cfinfo.fileName);
     }
-    const char *e = strrchr(b, '.');
-    cfinfo->fileName = malloc( (e-b+1) * sizeof(char));
-    strncpy(cfinfo->fileName, b, (e-b));
-    cfinfo->fileName[e-b] = '\0';
-    /* init */
-    dRess_t ress;
-    LZ4F_errorCode_t const errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
-    if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
-    FILE* const finput = LZ4IO_openSrcFile(input_filename);
-    if (finput==NULL) return 1;
-    /* Allocate Memory */
-    ress.srcBuffer = malloc(LZ4IO_dBufferSize);
-    size_t readSize = LZ4F_HEADER_SIZE_MAX;
-    if (!fread(ress.srcBuffer, readSize, 1, finput)){
-      EXM_THROW(30, "Error reading %s ", input_filename);
+    else{
+        DISPLAY("%-16d\t%-20llu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
     }
-    cfinfo->frameInfo = (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO;
-    LZ4F_getFrameInfo(ress.dCtx, &cfinfo->frameInfo, ress.srcBuffer, &readSize);
-    /* Close input/free resources */
-    fclose(finput);
-    free(ress.srcBuffer);
-    return readSize;
+  }
+  return op_result;
+}
+
+int LZ4IO_getCompressedFileInfo(const char* input_filename, LZ4F_compFileInfo_t* cfinfo){
+  const char *b, 
+             *e;
+  char *t;
+  stat_t statbuf;
+  size_t readSize = LZ4F_HEADER_SIZE_MAX;
+  LZ4F_errorCode_t errorCode;
+  dRess_t ress;
+  /* Open file */
+  FILE* const finput = LZ4IO_openSrcFile(input_filename);
+  if (finput==NULL) return 0;
+  *cfinfo = (LZ4F_compFileInfo_t) LZ4F_INIT_FILEINFO;
+  /* Get file size */
+  if (!UTIL_getFileStat(input_filename, &statbuf)){
+    EXM_THROW(60, "Can't stat file : %s", input_filename);
+  }
+  cfinfo->fileSize = statbuf.st_size;
+
+  /* Get basename without extension */
+  b = strrchr(input_filename, '/');
+  if (!b){
+    b = strrchr(input_filename, '\\');
+  }
+  if (b && b != input_filename){
+    b++;
+  } else{
+    b=input_filename;
+  }
+  e = strrchr(b, '.');
+  /* Allocate Memory */
+  t = malloc( (e-b+1) * sizeof(char));
+  ress.srcBuffer = malloc(LZ4IO_dBufferSize);
+  if (!t || !ress.srcBuffer)
+    EXM_THROW(21, "Allocation error : not enough memory");
+  strncpy(t, b, (e-b));
+  t[e-b] = '\0';
+  cfinfo->fileName = t;
+
+  /* init */
+  errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
+  if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+
+  if (!fread(ress.srcBuffer, readSize, 1, finput)){
+    EXM_THROW(30, "Error reading %s ", input_filename);
+  }
+  // cfinfo->frameInfo = (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO;
+  LZ4F_getFrameInfo(ress.dCtx, &cfinfo->frameInfo, ress.srcBuffer, &readSize);
+  if(cfinfo->frameInfo.contentSize){
+    cfinfo->ratio = (double)cfinfo->fileSize / cfinfo->frameInfo.contentSize;
+  } else {
+    cfinfo->ratio = -1;
+  }
+
+  /* Close input/free resources */
+  fclose(finput);
+  free(ress.srcBuffer);
+  return 0;
 }

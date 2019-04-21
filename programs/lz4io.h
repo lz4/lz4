@@ -56,11 +56,12 @@ typedef struct LZ4IO_prefs_s LZ4IO_prefs_t;
 
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
-  char* fileName;
+  const char* fileName;
   unsigned long long fileSize;
-  double compressionRatio;
+  double ratio;
 } LZ4F_compFileInfo_t;
 
+#define LZ4F_INIT_FILEINFO   { (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO, NULL, 0ULL, -1.f }
 
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void);
 void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs);
@@ -124,8 +125,9 @@ int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable);
 /* Default setting : 0 == no content size present in frame header */
 int LZ4IO_setContentSize(LZ4IO_prefs_t* const prefs, int enable);
 
-/*  */
-size_t LZ4IO_getCompressedFileInfo(const char* input_filename, LZ4F_compFileInfo_t* cfinfo);
+int LZ4IO_getCompressedFilesInfo(const char** inFileNames,const size_t ifnIdx);
+
+int LZ4IO_getCompressedFileInfo(const char* input_filename, LZ4F_compFileInfo_t* cfinfo);
 
 /* Default setting : 0 == src file preserved */
 void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* const prefs, unsigned flag);
