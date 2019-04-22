@@ -1222,7 +1222,6 @@ static int LZ4IO_getCompressedFileInfo(const char* input_filename,  LZ4F_compFil
   size_t readSize = LZ4F_HEADER_SIZE_MAX;
   LZ4F_errorCode_t errorCode;
   dRess_t ress;
-  // LZ4F_compFileInfo_t cfinfo = (LZ4F_compFileInfo_t) LZ4F_INIT_FILEINFO;
   /* Open file */
   FILE* const finput = LZ4IO_openSrcFile(input_filename);
   if (finput==NULL) return 1;
@@ -1247,7 +1246,7 @@ static int LZ4IO_getCompressedFileInfo(const char* input_filename,  LZ4F_compFil
   e = strrchr(b, '.');
 
   /* Allocate Memory */
-  t = malloc( (e-b+1) * sizeof(char));
+  t = (char*)malloc( (e-b+1) * sizeof(char));
   ress.srcBuffer = malloc(LZ4IO_dBufferSize);
   if (!t || !ress.srcBuffer)
     EXM_THROW(21, "Allocation error : not enough memory");
@@ -1332,6 +1331,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, const size_t ifnI
   DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n","BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
   for(idx=0; idx<ifnIdx; idx++){
     /* Get file info */
+    cfinfo = (LZ4F_compFileInfo_t) LZ4F_INIT_FILEINFO;
     op_result=LZ4IO_getCompressedFileInfo(inFileNames[idx], &cfinfo);
     if (op_result != 0){
         DISPLAYLEVEL(1, "Failed to get frame info for file %s\n", inFileNames[idx]);
