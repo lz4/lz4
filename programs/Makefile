@@ -56,48 +56,7 @@ LZ4_VERSION=$(LIBVER)
 MD2ROFF   = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
-TARGET_OS ?= $(shell uname)
-ifeq ($(TARGET_OS),)
-  TARGET_OS ?= $(OS)
-endif
-
-# Define *.exe as extension for Windows systems
-ifneq (,$(filter Windows%,$(TARGET_OS)))
-EXT  :=.exe
-else
-ifneq (,$(filter MINGW%,$(TARGET_OS)))
-EXT  :=.exe
-else
-ifneq (,$(filter MSYS%,$(TARGET_OS)))
-EXT  :=.exe
-else
-ifneq (,$(filter CYGWIN%,$(TARGET_OS)))
-EXT  :=.exe
-else
-EXT  :=
-endif
-endif
-endif
-endif
-
-#determine if dev/nul based on host environment
-ifneq (,$(filter MINGW%,$(shell uname)))
-VOID := /dev/null
-else
-ifneq (,$(filter MSYS%,$(shell uname)))
-VOID := /dev/null
-else
-ifneq (,$(filter CYGWIN%,$(shell uname)))
-VOID := /dev/null
-else
-ifneq (,$(filter Windows%,$(OS)))
-VOID := nul
-else
-VOID  := /dev/null
-endif
-endif
-endif
-endif
+include ../Makefile.inc
 
 default: lz4-release
 
