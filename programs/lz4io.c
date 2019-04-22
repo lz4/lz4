@@ -1304,7 +1304,6 @@ typedef enum { LZ4IO_LZ4F_OK, LZ4IO_format_not_known, LZ4IO_not_a_file } LZ4IO_i
  *   + combine results from multiple frames, give total
  * - Optional :
  *  + report nb of blocks, hence max. possible decompressed size (when not reported in header)
- *  + report block type (B4D, B7I, etc.)
  */
 static LZ4IO_infoResult
 LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filename)
@@ -1355,13 +1354,26 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
     return result;
 }
 
+
+/* buffer : must be a valid memory area of at least 4 bytes */
+const char* LZ4IO_blockTypeID(int sizeID, int blockMode, char* buffer)
+{
+    buffer[0] = 'B';
+    assert(sizeID >= 4); assert(sizeID <=7);
+    buffer[1] = (char)(sizeID + '0');
+    buffer[2] = (blockMode == LZ4F_blockIndependent) ? 'I' : 'D';
+    buffer[3] = 0;
+    return buffer;
+}
+
+
 int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
 {
     int result = 0;
     size_t idx;
 
-    DISPLAY("%20s %20s %10s %7s  %s\n",
-        "Compressed", "Uncompressed", "Ratio", "Check", "Filename");
+    DISPLAY("%5s %20s %20s %10s %7s  %s\n",
+        "Block", "Compressed", "Uncompressed", "Ratio", "Check", "Filename");
 
     for (idx=0; idx<ifnIdx; idx++) {
         /* Get file info */
@@ -1378,14 +1390,18 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
             continue;
         }
         if (cfinfo.frameInfo.contentSize) {
+            char buffer[5];
             double const ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
-            DISPLAY("%20llu %20llu %8.4f %7s  %s \n",
+            DISPLAY("%5s %20llu %20llu %8.4f %7s  %s \n",
+                    LZ4IO_blockTypeID(cfinfo.frameInfo.blockSizeID, cfinfo.frameInfo.blockMode, buffer),
                     cfinfo.fileSize,
                     cfinfo.frameInfo.contentSize, ratio,
                     cfinfo.frameInfo.contentChecksumFlag ? "XXH32" : "-",
                     cfinfo.fileName);
         } else {
-            DISPLAY("%20llu %20s %10s %7s  %s \n",
+            char buffer[5];
+            DISPLAY("%5s %20llu %20s %10s %7s  %s \n",
+                    LZ4IO_blockTypeID(cfinfo.frameInfo.blockSizeID, cfinfo.frameInfo.blockMode, buffer),
                     cfinfo.fileSize,
                     "-", "-",
                     cfinfo.frameInfo.contentChecksumFlag ? "XXH32" : "-",

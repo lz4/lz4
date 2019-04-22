@@ -114,9 +114,8 @@ only the latest one will be applied.
   Benchmark mode, using `#` compression level.
 
 * `--list`:
-  List mode.
-  Lists information about .lz4 files. 
-  Useful if compressed with --content-size flag.
+  List information about .lz4 files.
+  note : current implementation is limited to single-frame .lz4 files.
 
 ### Operation modifiers
 
