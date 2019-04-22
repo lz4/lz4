@@ -196,10 +196,10 @@ typedef struct {
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   const char* fileName;
-  unsigned long fileSize;
+  unsigned long long fileSize;
 } LZ4F_compFileInfo_t;
 
-#define LZ4F_INIT_FILEINFO   { (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO, NULL, 0UL }
+#define LZ4F_INIT_FILEINFO   { (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO, NULL, 0ULL }
 
 /*-*********************************
 *  Simple compression function

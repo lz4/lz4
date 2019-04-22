@@ -1340,10 +1340,10 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, const size_t ifnI
     }
     if(cfinfo.frameInfo.contentSize){
         ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
-        DISPLAY("%-16d\t%-20lu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
+        DISPLAY("%-16d\t%-20llu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
     }
     else{
-        DISPLAY("%-16d\t%-20lu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
+        DISPLAY("%-16d\t%-20llu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
     }
   }
   return op_result;
