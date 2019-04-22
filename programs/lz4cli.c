@@ -655,8 +655,9 @@ int main(int argc, const char** argv)
 
         if (!IS_CONSOLE(stdout)) {
             /* Default to stdout whenever stdout is not the console.
-             * Note : this policy is likely to change in the future, don't rely on it !
-             * prefer using an explicit `-c` flag */
+             * Note : this policy may change in the future, therefore don't rely on it !
+             * To ensure `stdout` is explicitly selected, use `-c` command flag.
+             * Conversely, to ensure output will not become `stdout`, use `-m` command flag */
             DISPLAYLEVEL(1, "Warning : using stdout as default output. Do not rely on this behavior: use explicit `-c` instead ! \n");
             output_filename=stdoutmark;
             break;

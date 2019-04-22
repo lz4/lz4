@@ -317,7 +317,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
 	# Test for #596
 	@echo "TEST" > tmp-tlb-test
-	$(LZ4) tmp-tlb-test
+	$(LZ4) -m tmp-tlb-test
 	$(LZ4) tmp-tlb-test.lz4 tmp-tlb-test2
 	$(DIFF) -q tmp-tlb-test tmp-tlb-test2
 	@$(RM) tmp-tlb*
