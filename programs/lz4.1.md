@@ -31,29 +31,29 @@ The native file format is the `.lz4` format.
 `lz4` supports a command line syntax similar _but not identical_ to `gzip(1)`.
 Differences are :
 
-  * `lz4` preserves original files
   * `lz4` compresses a single file by default (see `-m` for multiple files)
   * `lz4 file1 file2` means : compress file1 _into_ file2
   * `lz4 file.lz4` will default to decompression (use `-z` to force compression)
+  * `lz4` preserves original files
   * `lz4` shows real-time notification statistics
      during compression or decompression of a single file
      (use `-q` to silence them)
-  * If no destination name is provided, result is sent to `stdout`
-    _except if stdout is the console_.
-  * If no destination name is provided, __and__ if `stdout` is the console,
-    `file` is compressed into `file.lz4`.
-  * As a consequence of previous rules, note the following example :
-    `lz4 file | consumer` sends compressed data to `consumer` through `stdout`,
-    hence it does _not_ create `file.lz4`.
-  * Another consequence of those rules is that to run `lz4` under `nohup`,
-    you should provide a destination file: `nohup lz4 file file.lz4`,
-    because `nohup` writes the specified command's output to a file.
+  * When no destination is specified, result is sent on implicit output,
+    which depends on `stdout` status.
+    When `stdout` _is Not the console_, it becomes the implicit output.
+    Otherwise, if `stdout` is the console, the implicit output is `filename.lz4`.
+  * It is considered bad practice to rely on implicit output in scripts.
+    because the script's environment may change.
+    Always use explicit output in scripts.
+    `-c` ensures that output will be `stdout`.
+    Conversely, providing a destination name, or using `-m`
+    ensures that the output will be either the specified name, or `filename.lz4` respectively.
 
 Default behaviors can be modified by opt-in commands, detailed below.
 
   * `lz4 -m` makes it possible to provide multiple input filenames,
     which will be compressed into files using suffix `.lz4`.
-    Progress notifications are also disabled by default (use `-v` to enable them).
+    Progress notifications become disabled by default (use `-v` to enable them).
     This mode has a behavior which more closely mimics `gzip` command line,
     with the main remaining difference being that source files are preserved by default.
   * Similarly, `lz4 -m -d` can decompress multiple `*.lz4` files.
@@ -81,8 +81,7 @@ In some cases, some options can be expressed using short command `-x`
 or long command `--long-word`.
 Short commands can be concatenated together.
 For example, `-d -c` is equivalent to `-dc`.
-Long commands cannot be concatenated.
-They must be clearly separated by a space.
+Long commands cannot be concatenated. They must be clearly separated by a space.
 
 ### Multiple commands
 
