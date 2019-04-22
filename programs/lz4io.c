@@ -1218,6 +1218,7 @@ static int LZ4IO_getCompressedFileInfo(const char* input_filename,  LZ4F_compFil
   const char *b, 
              *e;
   char *t;
+  stat_t statbuf;
   size_t readSize = LZ4F_HEADER_SIZE_MAX;
   LZ4F_errorCode_t errorCode;
   dRess_t ress;
@@ -1227,9 +1228,11 @@ static int LZ4IO_getCompressedFileInfo(const char* input_filename,  LZ4F_compFil
   if (finput==NULL) return 1;
   
   /* Get file size */
-  if (!UTIL_getFileStat(input_filename, &cfinfo->fileStat)){
+  if (!UTIL_getFileStat(input_filename, &statbuf)){
     EXM_THROW(60, "Can't stat file : %s", input_filename);
   }
+
+  cfinfo->fileSize = statbuf.st_size;
 
   /* Get basename without extension */
   b = strrchr(input_filename, '/');
@@ -1336,11 +1339,11 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, const size_t ifnI
         break;
     }
     if(cfinfo.frameInfo.contentSize){
-        ratio = (double)cfinfo.fileStat.st_size / cfinfo.frameInfo.contentSize;
-        DISPLAY("%-16d\t%-20lu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileStat.st_size,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
+        ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
+        DISPLAY("%-16d\t%-20lu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
     }
     else{
-        DISPLAY("%-16d\t%-20lu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileStat.st_size, "-", "-", cfinfo.fileName);
+        DISPLAY("%-16d\t%-20lu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
     }
   }
   return op_result;

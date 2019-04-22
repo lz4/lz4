@@ -693,7 +693,7 @@ int main(int argc, const char** argv)
         break;
     }
 
-    if (multiple_inputs==0) assert(output_filename);
+    if (multiple_inputs==0 && mode != om_list) assert(output_filename);
     /* when multiple_inputs==1, output_filename may simply be useless,
      * however, output_filename must be !NULL for next strcmp() tests */
     if (!output_filename) output_filename = "*\\dummy^!//";
@@ -721,7 +721,14 @@ int main(int argc, const char** argv)
             operationResult = LZ4IO_decompressMultipleFilenames(prefs, inFileNames, (int)ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION);
         } else {
             operationResult = DEFAULT_DECOMPRESSOR(prefs, input_filename, output_filename);
-
+        }
+    } else if (mode == om_list){
+        if(!multiple_inputs){
+            inFileNames[ifnIdx++] = input_filename;
+        }
+        operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
+        inFileNames=NULL;
+    } else {   /* compression is default action */
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
             LZ4IO_compressFilename_Legacy(prefs, input_filename, output_filename, cLevel);
