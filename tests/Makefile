@@ -43,15 +43,8 @@ CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 CPPFLAGS+= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
+include ../Makefile.inc
 
-# Define *.exe as extension for Windows systems
-ifneq (,$(filter Windows%,$(OS)))
-EXT  =.exe
-VOID = nul
-else
-EXT  =
-VOID = /dev/null
-endif
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
 
@@ -59,7 +52,6 @@ LZ4 := $(PRGDIR)/lz4$(EXT)
 TEST_FILES   := COPYING
 FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
-
 
 default: all
 
@@ -95,7 +87,7 @@ fullbench-lib: fullbench.c $(LZ4DIR)/liblz4.a
 
 fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
 	$(MAKE) -C $(LZ4DIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/liblz4.dll
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/$(LIBLZ4).dll
 
 fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
@@ -137,7 +129,7 @@ checkTag: checkTag.c $(LZ4DIR)/lz4.h
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD))
+ifeq ($(POSIX_ENV),Yes)
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))
