@@ -1230,7 +1230,9 @@ int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filen
 }
 
 
-int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix)
+int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
+                                const char** inFileNamesTable, int ifntSize,
+                                const char* suffix)
 {
     int i;
     int skippedFiles = 0;
@@ -1250,7 +1252,12 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** i
             missingFiles += LZ4IO_decompressSrcFile(prefs, ress, inFileNamesTable[i], stdoutmark);
             continue;
         }
-        if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); if (outFileName==NULL) return ifntSize; }
+        if (ofnSize <= ifnSize-suffixSize+1) {
+            free(outFileName);
+            ofnSize = ifnSize + 20;
+            outFileName = (char*)malloc(ofnSize);
+            if (outFileName==NULL) return ifntSize;
+        }
         if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
@@ -1279,6 +1286,13 @@ typedef struct {
 
 #define LZ4IO_INIT_CFILEINFO   { LZ4F_INIT_FRAMEINFO, NULL, 0ULL }
 
+#define CHECK_Z_THROW(f)  {           \
+    LZ4F_errorCode_t const ec = (f);  \
+    if (LZ4F_isError(ec))             \
+        EXM_THROW(1, "LZ4F error : %s", LZ4F_getErrorName(ec)); \
+}
+
+typedef enum { LZ4IO_LZ4F_OK, LZ4IO_format_not_known, LZ4IO_not_a_file } LZ4IO_infoResult;
 
 /* This function is limited,
  * it only works fine for a file consisting of a single valid frame.
@@ -1286,17 +1300,18 @@ typedef struct {
  * It will not look at content beyond first frame header.
  *
  * Things to improve :
- * - continue execution after an error, just report an error code, keep all memory clean
  * - check the entire file for additional content after first frame
  *   + combine results from multiple frames, give total
  * - Optional :
  *  + report nb of blocks, hence max. possible decompressed size (when not reported in header)
  *  + report block type (B4D, B7I, etc.)
  */
-static int
+static LZ4IO_infoResult
 LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filename)
 {
-    /* Get file size */
+    LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
+
+    if (!UTIL_isRegFile(input_filename)) return LZ4IO_not_a_file;
     cfinfo->fileSize = UTIL_getFileSize(input_filename);  /* returns 0 if cannot read information */
 
     /* Get filename without path prefix */
@@ -1313,67 +1328,69 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
     }
 
     /* Read file and extract header */
-    {   size_t readSize = LZ4F_HEADER_SIZE_MAX;
-        void* buffer = malloc(readSize);
-        LZ4F_dctx* dctx;
+    {   size_t const hSize = LZ4F_HEADER_SIZE_MAX;
+        size_t readSize=0;
+        void* const buffer = malloc(hSize);
 
         if (!buffer) EXM_THROW(21, "Allocation error : not enough memory");
-        {   LZ4F_errorCode_t const errorCode =
-                LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
-            if (LZ4F_isError(errorCode))
-                EXM_THROW(60, "Can't create LZ4F context : %s",
-                            LZ4F_getErrorName(errorCode));
-        }
-
         {   FILE* const finput = LZ4IO_openSrcFile(input_filename);
-            if (finput==NULL) return 1;
-            if (!fread(buffer, readSize, 1, finput)) {
-                EXM_THROW(30, "Error reading %s ", input_filename);
-            }
-            fclose(finput);
-        }
+            if (finput) {
+                readSize = fread(buffer, 1, hSize, finput);
+                fclose(finput);
+        }   }
 
-        {   LZ4F_errorCode_t const errorCode =
-                LZ4F_getFrameInfo(dctx, &cfinfo->frameInfo, buffer, &readSize);
-            if (LZ4F_isError(errorCode))
-                EXM_THROW(60, "Cannot interpret LZ4 frame : %s",
-                            LZ4F_getErrorName(errorCode));
+        if (readSize > 0) {
+            LZ4F_dctx* dctx;
+            CHECK_Z_THROW(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
+            if (!LZ4F_isError(LZ4F_getFrameInfo(dctx, &cfinfo->frameInfo, buffer, &readSize))) {
+                result = LZ4IO_LZ4F_OK;
+            }
+            LZ4F_freeDecompressionContext(dctx);
         }
 
         /* clean */
         free(buffer);
-        LZ4F_freeDecompressionContext(dctx);
     }
 
-    return 0;
+    return result;
 }
 
-int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, const size_t ifnIdx)
+int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
 {
+    int result = 0;
     size_t idx;
 
-    DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n",
-        "BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
+    DISPLAY("%20s %20s %10s %7s  %s\n",
+        "Compressed", "Uncompressed", "Ratio", "Check", "Filename");
 
     for (idx=0; idx<ifnIdx; idx++) {
         /* Get file info */
         LZ4IO_cFileInfo_t cfinfo = LZ4IO_INIT_CFILEINFO;
-        int const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx]);
-        if (op_result != 0) {
-            DISPLAYLEVEL(1, "Failed to get frame info for file %s\n", inFileNames[idx]);
-            /* Don't bother processing any more file */
-            return 1;
+        LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx]);
+        if (op_result != LZ4IO_LZ4F_OK) {
+            if (op_result == LZ4IO_not_a_file) {
+                DISPLAYLEVEL(1, "lz4: %s is not a regular file \n", inFileNames[idx]);
+            } else {
+                assert(op_result == LZ4IO_format_not_known);
+                DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
+            }
+            result = 1;
+            continue;
         }
         if (cfinfo.frameInfo.contentSize) {
             double const ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
-            DISPLAY("%-16d\t%-20llu\t%-20llu\t%-8.4f\t%s\n",
-                    cfinfo.frameInfo.blockChecksumFlag, cfinfo.fileSize,
-                    cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
+            DISPLAY("%20llu %20llu %8.4f %7s  %s \n",
+                    cfinfo.fileSize,
+                    cfinfo.frameInfo.contentSize, ratio,
+                    cfinfo.frameInfo.contentChecksumFlag ? "XXH32" : "-",
+                    cfinfo.fileName);
         } else {
-            DISPLAY("%-16d\t%-20llu\t%-20s\t%-10s\t%s\n",
-                    cfinfo.frameInfo.blockChecksumFlag, cfinfo.fileSize,
-                    "-", "-", cfinfo.fileName);
+            DISPLAY("%20llu %20s %10s %7s  %s \n",
+                    cfinfo.fileSize,
+                    "-", "-",
+                    cfinfo.frameInfo.contentChecksumFlag ? "XXH32" : "-",
+                    cfinfo.fileName);
         }
     }
-    return 0;
+    return result;
 }
