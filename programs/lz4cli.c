@@ -40,7 +40,6 @@
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
-#include "lz4frame.h"
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 #include "lz4hc.h"    /* LZ4HC_CLEVEL_MAX */
 #include "lz4.h"      /* LZ4_VERSION_STRING */
@@ -712,7 +711,7 @@ int main(int argc, const char** argv)
         if(!multiple_inputs){
             inFileNames[ifnIdx++] = input_filename;
         }
-        operationResult = LZ4IO_getCompressedFilesInfo(inFileNames, ifnIdx);
+        operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
         inFileNames=NULL;
     } else {
        /* compression is default action */
