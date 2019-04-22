@@ -1286,11 +1286,6 @@ typedef struct {
 
 #define LZ4IO_INIT_CFILEINFO   { LZ4F_INIT_FRAMEINFO, NULL, 0ULL }
 
-#define CHECK_Z_THROW(f)  {           \
-    LZ4F_errorCode_t const ec = (f);  \
-    if (LZ4F_isError(ec))             \
-        EXM_THROW(1, "LZ4F error : %s", LZ4F_getErrorName(ec)); \
-}
 
 typedef enum { LZ4IO_LZ4F_OK, LZ4IO_format_not_known, LZ4IO_not_a_file } LZ4IO_infoResult;
 
@@ -1341,10 +1336,10 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
 
         if (readSize > 0) {
             LZ4F_dctx* dctx;
-            CHECK_Z_THROW(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
-            if (!LZ4F_isError(LZ4F_getFrameInfo(dctx, &cfinfo->frameInfo, buffer, &readSize))) {
-                result = LZ4IO_LZ4F_OK;
-            }
+            if (!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION))) {
+                if (!LZ4F_isError(LZ4F_getFrameInfo(dctx, &cfinfo->frameInfo, buffer, &readSize))) {
+                    result = LZ4IO_LZ4F_OK;
+            }   }
             LZ4F_freeDecompressionContext(dctx);
         }
 
