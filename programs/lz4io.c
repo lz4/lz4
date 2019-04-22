@@ -53,11 +53,11 @@
 #include <time.h>      /* clock */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
-#include "lz4io.h"
 #include "lz4.h"       /* still required for legacy format */
 #include "lz4hc.h"     /* still required for legacy format */
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
+#include "lz4io.h"
 
 
 /*****************************
@@ -1214,6 +1214,62 @@ static int LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs, dRess_t ress, con
 }
 
 
+static int LZ4IO_getCompressedFileInfo(const char* input_filename,  LZ4F_compFileInfo_t* cfinfo){
+  const char *b, 
+             *e;
+  char *t;
+  stat_t statbuf;
+  size_t readSize = LZ4F_HEADER_SIZE_MAX;
+  LZ4F_errorCode_t errorCode;
+  dRess_t ress;
+  /* Open file */
+  FILE* const finput = LZ4IO_openSrcFile(input_filename);
+  if (finput==NULL) return 1;
+  
+  /* Get file size */
+  if (!UTIL_getFileStat(input_filename, &statbuf)){
+    EXM_THROW(60, "Can't stat file : %s", input_filename);
+  }
+
+  cfinfo->fileSize = statbuf.st_size;
+
+  /* Get basename without extension */
+  b = strrchr(input_filename, '/');
+  if (!b){
+    b = strrchr(input_filename, '\\');
+  }
+  if (b && b != input_filename){
+    b++;
+  } else{
+    b=input_filename;
+  }
+  e = strrchr(b, '.');
+
+  /* Allocate Memory */
+  t = (char*)malloc( (e-b+1) * sizeof(char));
+  ress.srcBuffer = malloc(LZ4IO_dBufferSize);
+  if (!t || !ress.srcBuffer)
+    EXM_THROW(21, "Allocation error : not enough memory");
+  strncpy(t, b, (e-b));
+  t[e-b] = '\0';
+  cfinfo->fileName = t;
+
+  /* init */
+  errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
+  if (LZ4F_isError(errorCode)) EXM_THROW(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+
+  if (!fread(ress.srcBuffer, readSize, 1, finput)){
+    EXM_THROW(30, "Error reading %s ", input_filename);
+  }
+  LZ4F_getFrameInfo(ress.dCtx, &cfinfo->frameInfo, ress.srcBuffer, &readSize);
+
+  /* Close input/free resources */
+  fclose(finput);
+  free(ress.srcBuffer);
+  return 0;
+}
+
+
 int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
@@ -1264,4 +1320,31 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** i
     LZ4IO_freeDResources(ress);
     free(outFileName);
     return missingFiles + skippedFiles;
+}
+
+
+int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, const size_t ifnIdx){
+  size_t idx;
+  int op_result=0;
+  double ratio;
+  LZ4F_compFileInfo_t cfinfo;
+  DISPLAY("%16s\t%-20s\t%-20s\t%-10s\t%s\n","BlockChecksumFlag","Compressed", "Uncompressed", "Ratio", "Filename");
+  for(idx=0; idx<ifnIdx; idx++){
+    /* Get file info */
+    cfinfo = (LZ4F_compFileInfo_t) LZ4F_INIT_FILEINFO;
+    op_result=LZ4IO_getCompressedFileInfo(inFileNames[idx], &cfinfo);
+    if (op_result != 0){
+        DISPLAYLEVEL(1, "Failed to get frame info for file %s\n", inFileNames[idx]);
+        /* Don't bother trying to process any other file */
+        break;
+    }
+    if(cfinfo.frameInfo.contentSize){
+        ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
+        DISPLAY("%-16d\t%-20llu\t%-20llu\t%-8.4f\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize,cfinfo.frameInfo.contentSize, ratio, cfinfo.fileName);
+    }
+    else{
+        DISPLAY("%-16d\t%-20llu\t%-20s\t%-10s\t%s\n",cfinfo.frameInfo.blockChecksumFlag,cfinfo.fileSize, "-", "-", cfinfo.fileName);
+    }
+  }
+  return op_result;
 }

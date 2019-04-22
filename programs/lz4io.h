@@ -116,6 +116,8 @@ int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable);
 /* Default setting : 0 == no content size present in frame header */
 int LZ4IO_setContentSize(LZ4IO_prefs_t* const prefs, int enable);
 
+int LZ4IO_displayCompressedFilesInfo(const char** inFileNames,const size_t ifnIdx);
+
 /* Default setting : 0 == src file preserved */
 void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* const prefs, unsigned flag);
 
