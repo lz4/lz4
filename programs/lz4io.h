@@ -52,8 +52,6 @@ static const char nulmark[] = "/dev/null";
 /* ****************** Type Definitions ************** */
 /* ************************************************** */
 
-typedef struct LZ4IO_prefs_s LZ4IO_prefs_t;
-
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   const char* fileName;
@@ -61,6 +59,8 @@ typedef struct {
 } LZ4F_compFileInfo_t;
 
 #define LZ4F_INIT_FILEINFO   { (LZ4F_frameInfo_t) LZ4F_INIT_FRAMEINFO, NULL, stat_t() }
+
+typedef struct LZ4IO_prefs_s LZ4IO_prefs_t;
 
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void);
 void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs);
