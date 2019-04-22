@@ -1295,9 +1295,9 @@ typedef struct {
 typedef enum { LZ4IO_LZ4F_OK, LZ4IO_format_not_known, LZ4IO_not_a_file } LZ4IO_infoResult;
 
 /* This function is limited,
- * it only works fine for a file consisting of a single valid frame.
- * It will / may stop program execution if a single filename is wrong.
+ * it only works fine for a file consisting of a single valid frame using LZ4 Frame specification.
  * It will not look at content beyond first frame header.
+ * It's also unable to parse legacy frames, nor skippable ones.
  *
  * Things to improve :
  * - check the entire file for additional content after first frame
@@ -1311,7 +1311,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
     LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
 
     if (!UTIL_isRegFile(input_filename)) return LZ4IO_not_a_file;
-    cfinfo->fileSize = UTIL_getFileSize(input_filename);  /* returns 0 if cannot read information */
+    cfinfo->fileSize = UTIL_getFileSize(input_filename);
 
     /* Get filename without path prefix */
     {   const char* b = strrchr(input_filename, '/');
@@ -1329,9 +1329,10 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
     /* Read file and extract header */
     {   size_t const hSize = LZ4F_HEADER_SIZE_MAX;
         size_t readSize=0;
-        void* const buffer = malloc(hSize);
 
+        void* const buffer = malloc(hSize);
         if (!buffer) EXM_THROW(21, "Allocation error : not enough memory");
+
         {   FILE* const finput = LZ4IO_openSrcFile(input_filename);
             if (finput) {
                 readSize = fread(buffer, 1, hSize, finput);
