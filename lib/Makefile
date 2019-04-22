@@ -45,10 +45,6 @@ LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 BUILD_SHARED:=yes
 BUILD_STATIC:=yes
 
-TARGET_OS ?= $(shell uname)
-ifeq ($(TARGET_OS),)
-  TARGET_OS ?= $(OS)
-endif
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 CFLAGS  ?= -O3
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
@@ -74,27 +70,7 @@ else
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
 
-WINBASED = yes
-ifneq (,$(filter Windows%,$(TARGET_OS)))
-LIBLZ4 = liblz4-$(LIBVER_MAJOR)
-LIBLZ4_EXP = liblz4.lib
-else
-LIBLZ4_EXP = liblz4.dll.a
-ifneq (,$(filter MINGW%,$(TARGET_OS)))
-LIBLZ4 = liblz4
-else
-ifneq (,$(filter MSYS%,$(TARGET_OS)))
-LIBLZ4 = msys-lz4-$(LIBVER_MAJOR)
-else
-ifneq (,$(filter CYGWIN%,$(TARGET_OS)))
-LIBLZ4 = cyglz4-$(LIBVER_MAJOR)
-else
-LIBLZ4 = liblz4.$(SHARED_EXT_VER)
-WINBASED = no
-endif
-endif
-endif
-endif
+include ../Makefile.inc
 
 .PHONY: default
 default: lib-release
@@ -147,7 +123,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW32_NT% MINGW64_NT% MSYS% CYGWIN_NT%,$(shell uname)))
+ifeq ($(POSIX_ENV),yes)
 
 .PHONY: listL120
 listL120:  # extract lines >= 120 characters in *.{c,h}, by Takayuki Matsuoka (note : $$, for Makefile compatibility)
