@@ -129,7 +129,7 @@ checkTag: checkTag.c $(LZ4DIR)/lz4.h
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifeq ($(POSIX_ENV),yes)
+ifeq ($(POSIX_ENV),Yes)
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))

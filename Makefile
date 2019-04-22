@@ -84,7 +84,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifeq ($(POSIX_ENV),yes)
+ifeq ($(POSIX_ENV),Yes)
 HOST_OS = POSIX
 
 .PHONY: install uninstall

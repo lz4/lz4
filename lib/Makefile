@@ -123,7 +123,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifeq ($(POSIX_ENV),yes)
+ifeq ($(POSIX_ENV),Yes)
 
 .PHONY: listL120
 listL120:  # extract lines >= 120 characters in *.{c,h}, by Takayuki Matsuoka (note : $$, for Makefile compatibility)

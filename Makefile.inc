@@ -52,7 +52,7 @@ VOID  := /dev/null
   endif
 endif
 
-ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW32% MINGW64% CYGWIN% MSYS%,$(shell uname)))
+ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS%,$(shell uname)))
 POSIX_ENV = Yes
 else
 POSIX_ENV = No
