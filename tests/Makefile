@@ -114,7 +114,7 @@ clean:
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
-        frameTest$(EXT)
+        frameTest$(EXT) lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
@@ -156,11 +156,13 @@ test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install 
 test32: CFLAGS+=-m32
 test32: test
 
-.PHONY: test-amalgamation
-test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
-	cat $^ > lz4_all.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c lz4_all.c
-	$(RM) lz4_all.c
+test-amalgamation: lz4_all.o
+
+lz4_all.o: lz4_all.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $^ -o $@
+
+lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
+	cat $^ > $@
 
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
