@@ -1,3 +1,9 @@
+ifeq ($(V), 1)
+Q =
+else
+Q = @
+endif
+
 TARGET_OS ?= $(shell uname)
 ifeq ($(TARGET_OS),)
   TARGET_OS ?= $(OS)
@@ -31,24 +37,17 @@ endif
 
 ifeq ($(WINBASED),yes)
 EXT        = .exe
+WINDRES    = windres
 endif
 
 #determine if dev/nul based on host environment
-ifneq (,$(filter MINGW%,$(shell uname)))
+ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
 VOID := /dev/null
 else
-  ifneq (,$(filter MSYS%,$(shell uname)))
-VOID := /dev/null
-  else
-    ifneq (,$(filter CYGWIN%,$(shell uname)))
-VOID := /dev/null
-    else
-      ifneq (,$(filter Windows%,$(OS)))
+  ifneq (,$(filter Windows%,$(OS)))
 VOID := nul
-      else
+  else
 VOID  := /dev/null
-      endif
-    endif
   endif
 endif
 
@@ -57,3 +56,32 @@ POSIX_ENV = Yes
 else
 POSIX_ENV = No
 endif
+
+# Avoid symlinks when targetting Windows or building on a Windows host
+ifeq ($(WINBASED),yes)
+LN_S  = cp -p
+LN_SF = cp -p
+else
+  ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
+LN_S  = cp -p
+LN_SF = cp -p
+  else
+    ifneq (,$(filter Windows%,$(OS)))
+LN_S  = cp -p
+LN_SF = cp -p
+    else
+LN_S   = ln -s
+LN_SF  = ln -sf
+    endif
+  endif
+endif
+
+ifneq (,$(filter $(shell uname),SunOS))
+INSTALL ?= ginstall
+else
+INSTALL ?= install
+endif
+
+INSTALL_PROGRAM ?= $(INSTALL) -m 755
+INSTALL_DATA    ?= $(INSTALL) -m 644
+INSTALL_DIR     ?= $(INSTALL) -d -m 755
