@@ -55,10 +55,11 @@ FLAGS    = $(CPPFLAGS) $(CFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))
 
+include ../Makefile.inc
 
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
-ifeq ($(OS), Darwin)
+ifeq ($(TARGET_OS), Darwin)
 	SHARED_EXT = dylib
 	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
 	SHARED_EXT_VER = $(LIBVER).$(SHARED_EXT)
@@ -69,8 +70,6 @@ else
 	SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
 	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 endif
-
-include ../Makefile.inc
 
 .PHONY: default
 default: lib-release
