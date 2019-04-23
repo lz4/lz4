@@ -209,7 +209,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 blockTable[nbBlocks].cPtr = cPtr;
                 blockTable[nbBlocks].resPtr = resPtr;
                 blockTable[nbBlocks].srcSize = thisBlockSize;
-                blockTable[nbBlocks].cRoom = LZ4_compressBound((int)thisBlockSize);
+                blockTable[nbBlocks].cRoom = (size_t)LZ4_compressBound((int)thisBlockSize);
                 srcPtr += thisBlockSize;
                 cPtr += blockTable[nbBlocks].cRoom;
                 resPtr += thisBlockSize;
@@ -257,8 +257,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 for (nbLoops=0; nbLoops < nbCompressionLoops; nbLoops++) {
                     U32 blockNb;
                     for (blockNb=0; blockNb<nbBlocks; blockNb++) {
-                        size_t const rSize = compP.compressionFunction(blockTable[blockNb].srcPtr, blockTable[blockNb].cPtr, (int)blockTable[blockNb].srcSize, (int)blockTable[blockNb].cRoom, cLevel);
-                        if (LZ4_isError(rSize)) EXM_THROW(1, "LZ4_compress() failed");
+                        size_t const rSize = (size_t)compP.compressionFunction(blockTable[blockNb].srcPtr, blockTable[blockNb].cPtr, (int)blockTable[blockNb].srcSize, (int)blockTable[blockNb].cRoom, cLevel);
+                        if (LZ4_isError(rSize)) EXM_THROW(1, "LZ4 compression failed");
                         blockTable[blockNb].cSize = rSize;
                 }   }
                 {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
@@ -298,12 +298,12 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
                     U32 blockNb;
                     for (blockNb=0; blockNb<nbBlocks; blockNb++) {
-                        size_t const regenSize = LZ4_decompress_safe(blockTable[blockNb].cPtr, blockTable[blockNb].resPtr, (int)blockTable[blockNb].cSize, (int)blockTable[blockNb].srcSize);
-                        if (LZ4_isError(regenSize)) {
+                        int const regenSize = LZ4_decompress_safe(blockTable[blockNb].cPtr, blockTable[blockNb].resPtr, (int)blockTable[blockNb].cSize, (int)blockTable[blockNb].srcSize);
+                        if (regenSize < 0) {
                             DISPLAY("LZ4_decompress_safe() failed on block %u \n", blockNb);
                             break;
                         }
-                        blockTable[blockNb].resSize = regenSize;
+                        blockTable[blockNb].resSize = (size_t)regenSize;
                 }   }
                 {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
                     if (clockSpan > 0) {

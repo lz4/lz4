@@ -97,7 +97,7 @@ extern "C" {
 /*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    9    /* for new (non-breaking) interface capabilities */
-#define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
+#define LZ4_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 
@@ -631,15 +631,18 @@ LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") LZ4LIB_API int LZ4
 LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
 
 /*! LZ4_decompress_fast() : **unsafe!**
- *  These functions are generally slightly faster than LZ4_decompress_safe(),
- *  though the difference is small (generally ~5%).
- *  However, the real cost is a risk :  LZ4_decompress_safe() is protected vs malformed input, while `LZ4_decompress_fast()` is not, making it a security liability.
+ *  These functions used to be faster than LZ4_decompress_safe(),
+ *  but it has changed, and they are now slower than LZ4_decompress_safe().
+ *  This is because LZ4_decompress_fast() doesn't know the input size,
+ *  and therefore must progress more cautiously in the input buffer to not read beyond the end of block.
+ *  On top of that `LZ4_decompress_fast()` is not protected vs malformed or malicious inputs, making it a security liability.
  *  As a consequence, LZ4_decompress_fast() is strongly discouraged, and deprecated.
- *  These functions will generate a deprecation warning in the future.
  *
- *  Last LZ4_decompress_fast() specificity is that it can decompress a block without knowing its compressed size.
- *  Note that even that functionality could be achieved in a more secure manner if need be,
- *  though it would require new prototypes, and adaptation of the implementation to this new use case.
+ *  The last remaining LZ4_decompress_fast() specificity is that
+ *  it can decompress a block without knowing its compressed size.
+ *  Such functionality could be achieved in a more secure manner,
+ *  by also providing the maximum size of input buffer,
+ *  but it would require new prototypes, and adaptation of the implementation to this new use case.
  *
  *  Parameters:
  *  originalSize : is the uncompressed size to regenerate.
@@ -655,11 +658,11 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4
  *         As a consequence, use these functions in trusted environments with trusted data **only**.
  */
 
-/* LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead")  */
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead")
 LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
-/* LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead") */
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead")
 LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
-/* LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_usingDict() instead") */
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_usingDict() instead")
 LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
 
 /*! LZ4_resetStream() :

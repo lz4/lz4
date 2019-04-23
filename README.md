@@ -68,7 +68,7 @@ in single-thread mode.
 | [Zstandard] 1.4.0 -1    |  2.883  |   515 MB/s  |   1380 MB/s   |
 |  LZF v3.6               |  2.073  |   415 MB/s  |    910 MB/s   |
 | [zlib] deflate 1.2.11 -1|  2.730  |   100 MB/s  |    415 MB/s   |
-|**LZ4 HC -9 (v1.8.2)**   |**2.721**|    41 MB/s  | **4900 MB/s** |
+|**LZ4 HC -9 (v1.9.0)**   |**2.721**|    41 MB/s  | **4900 MB/s** |
 | [zlib] deflate 1.2.11 -6|  3.099  |    36 MB/s  |    445 MB/s   |
 
 [zlib]: http://www.zlib.net/

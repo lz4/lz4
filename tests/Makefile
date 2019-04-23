@@ -43,15 +43,8 @@ CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 CPPFLAGS+= -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
+include ../Makefile.inc
 
-# Define *.exe as extension for Windows systems
-ifneq (,$(filter Windows%,$(OS)))
-EXT  =.exe
-VOID = nul
-else
-EXT  =
-VOID = /dev/null
-endif
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
 
@@ -59,7 +52,6 @@ LZ4 := $(PRGDIR)/lz4$(EXT)
 TEST_FILES   := COPYING
 FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
-
 
 default: all
 
@@ -75,7 +67,7 @@ lib liblz4.pc:
 	$(MAKE) -C $(LZ4DIR) $@ CFLAGS="$(CFLAGS)"
 
 lz4c unlz4 lz4cat: lz4
-	ln -sf $(LZ4) $(PRGDIR)/$@
+	$(LN_SF) $(LZ4) $(PRGDIR)/$@
 
 lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
@@ -95,7 +87,7 @@ fullbench-lib: fullbench.c $(LZ4DIR)/liblz4.a
 
 fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
 	$(MAKE) -C $(LZ4DIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/liblz4.dll
+	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/$(LIBLZ4).dll
 
 fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
@@ -137,13 +129,15 @@ checkTag: checkTag.c $(LZ4DIR)/lz4.h
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD))
+ifeq ($(POSIX_ENV),Yes)
 
 MD5:=md5sum
 ifneq (,$(filter $(shell uname), Darwin ))
 MD5:=md5 -r
 endif
 
+# note : we should probably settle on a single compare utility
+CMP:=cmp
 DIFF:=diff
 ifneq (,$(filter $(shell uname),SunOS))
 DIFF:=gdiff
@@ -176,15 +170,15 @@ test-install: lz4 lib liblz4.pc
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
 	./datagen -g5M  -P100 > tmplsdg5M
-	$(LZ4) -B4D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB4
+	$(LZ4) -B4D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB4
 	$(DIFF) -s tmplsdg5M tmplscB4
-	$(LZ4) -B5D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB5
+	$(LZ4) -B5D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB5
 	$(DIFF) -s tmplsdg5M tmplscB5
-	$(LZ4) -B6D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB6
+	$(LZ4) -B6D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB6
 	$(DIFF) -s tmplsdg5M tmplscB6
-	$(LZ4) -B7D tmplsdg5M | $(LZ4) -dv --sparse > tmplscB7
+	$(LZ4) -B7D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB7
 	$(DIFF) -s tmplsdg5M tmplscB7
-	$(LZ4) tmplsdg5M | $(LZ4) -dv --no-sparse > tmplsnosparse
+	$(LZ4) tmplsdg5M -c | $(LZ4) -dv --no-sparse > tmplsnosparse
 	$(DIFF) -s tmplsdg5M tmplsnosparse
 	ls -ls tmpls*
 	./datagen -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > tmplsodd   # Odd size file (to generate non-full last block)
@@ -200,7 +194,7 @@ test-lz4-sparse: lz4 datagen
 	cat tmplsdg1M tmplsdg1M > tmpls2M
 	$(LZ4) -B5 -v tmplsdg1M tmplsc
 	$(LZ4) -d -v tmplsc tmplsr
-	$(LZ4) -d -v tmplsc >> tmplsr
+	$(LZ4) -d -v tmplsc -c >> tmplsr
 	ls -ls tmp*
 	$(DIFF) tmpls2M tmplsr
 	@$(RM) tmpls*
@@ -208,8 +202,8 @@ test-lz4-sparse: lz4 datagen
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
 	./datagen -g15M > tmplc1
-	$(LZ4) -v tmplc1 | $(LZ4) -t
-	$(LZ4) -v --content-size tmplc1 | $(LZ4) -d > tmplc2
+	$(LZ4) -v tmplc1 -c | $(LZ4) -t
+	$(LZ4) -v --content-size tmplc1 -c | $(LZ4) -d > tmplc2
 	$(DIFF) -s tmplc1 tmplc2
 	@$(RM) tmplc*
 
@@ -218,11 +212,11 @@ test-lz4-frame-concatenation: lz4 datagen
 	@echo -n > tmp-lfc-empty
 	@echo hi > tmp-lfc-nonempty
 	cat tmp-lfc-nonempty tmp-lfc-empty tmp-lfc-nonempty > tmp-lfc-src
-	@$(LZ4) -zq tmp-lfc-empty > tmp-lfc-empty.lz4
-	@$(LZ4) -zq tmp-lfc-nonempty > tmp-lfc-nonempty.lz4
+	$(LZ4) -zq tmp-lfc-empty -c > tmp-lfc-empty.lz4
+	$(LZ4) -zq tmp-lfc-nonempty -c > tmp-lfc-nonempty.lz4
 	cat tmp-lfc-nonempty.lz4 tmp-lfc-empty.lz4 tmp-lfc-nonempty.lz4 > tmp-lfc-concat.lz4
-	$(LZ4) -d tmp-lfc-concat.lz4 > tmp-lfc-result
-	cmp tmp-lfc-src tmp-lfc-result
+	$(LZ4) -d tmp-lfc-concat.lz4 -c > tmp-lfc-result
+	$(CMP) tmp-lfc-src tmp-lfc-result
 	@$(RM) tmp-lfc-*
 	@echo frame concatenation test completed
 
@@ -241,15 +235,15 @@ test-lz4-multiple: lz4 datagen
 	mv tmp-tlm2 tmp-tlm2-orig
 	mv tmp-tlm3 tmp-tlm3-orig
 	$(LZ4) -d -f -m tmp-tlm*.lz4
-	cmp tmp-tlm1 tmp-tlm1-orig   # must be identical
-	cmp tmp-tlm2 tmp-tlm2-orig
-	cmp tmp-tlm3 tmp-tlm3-orig
+	$(CMP) tmp-tlm1 tmp-tlm1-orig   # must be identical
+	$(CMP) tmp-tlm2 tmp-tlm2-orig
+	$(CMP) tmp-tlm3 tmp-tlm3-orig
 	# compress multiple files into stdout
 	cat tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
 	$(RM) *.lz4
 	$(LZ4) -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
 	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
-	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
 	# decompress multiple files into stdout
 	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
 	$(LZ4) -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
@@ -257,7 +251,7 @@ test-lz4-multiple: lz4 datagen
 	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
 	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
 	test ! -f tmp-tlm1  # must not create file artefact
-	cmp tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
 	# compress multiple files, one of which is absent (must fail)
 	! $(LZ4) -f -m tmp-tlm-concat1 notHere tmp-tlm-concat2  # must fail : notHere not present
 	@$(RM) tmp-tlm*
@@ -303,6 +297,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	test ! -f ./-z
 	$(DIFF) -q tmp-tlb-hw tmp-tlb4
 	$(LZ4) -f tmp-tlb-hw
+	$(LZ4) --list tmp-tlb-hw.lz4           # test --list on valid single-frame file
 	cat tmp-tlb-hw >> tmp-tlb-hw.lz4
 	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
@@ -315,7 +310,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
 	# Test for #596
 	@echo "TEST" > tmp-tlb-test
-	$(LZ4) tmp-tlb-test
+	$(LZ4) -m tmp-tlb-test
 	$(LZ4) tmp-tlb-test.lz4 tmp-tlb-test2
 	$(DIFF) -q tmp-tlb-test tmp-tlb-test2
 	@$(RM) tmp-tlb*
@@ -341,8 +336,8 @@ test-lz4-dict: lz4 datagen
 	for l in 0 1 4 128 32767 32768 32769 65535 65536 65537 98303 98304 98305 131071 131072 131073; do \
 		./datagen -g$$l > tmp-dict-$$l; \
 		$(DD) if=tmp-dict-$$l of=tmp-dict-$$l-tail bs=1 count=65536 skip=$$((l > 65536 ? l - 65536 : 0)); \
-		< tmp-dict-$$l      $(LZ4) -D stdin tmp-dict-data-128KB | $(LZ4) -dD tmp-dict-$$l-tail | $(DIFF) - tmp-dict-data-128KB; \
-		< tmp-dict-$$l-tail $(LZ4) -D stdin tmp-dict-data-128KB | $(LZ4) -dD tmp-dict-$$l      | $(DIFF) - tmp-dict-data-128KB; \
+		< tmp-dict-$$l      $(LZ4) -D stdin tmp-dict-data-128KB -c | $(LZ4) -dD tmp-dict-$$l-tail | $(DIFF) - tmp-dict-data-128KB; \
+		< tmp-dict-$$l-tail $(LZ4) -D stdin tmp-dict-data-128KB -c | $(LZ4) -dD tmp-dict-$$l      | $(DIFF) - tmp-dict-data-128KB; \
 	done
 
 	@$(RM) tmp-dict*

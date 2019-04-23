@@ -442,7 +442,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     }
 
     /* Copy Literals */
-    LZ4_wildCopy(*op, *anchor, (*op) + length);
+    LZ4_wildCopy8(*op, *anchor, (*op) + length);
     *op += length;
 
     /* Encode Offset */
@@ -1396,6 +1396,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
              }   }
          }  /* for (cur = 1; cur <= last_match_pos; cur++) */
 
+         assert(last_match_pos < LZ4_OPT_NUM + TRAILING_LITERALS);
          best_mlen = opt[last_match_pos].mlen;
          best_off = opt[last_match_pos].off;
          cur = last_match_pos - best_mlen;

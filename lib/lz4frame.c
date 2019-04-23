@@ -325,8 +325,7 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
                                     const LZ4F_preferences_t* preferencesPtr,
                                           size_t alreadyBuffered)
 {
-    LZ4F_preferences_t prefsNull;
-    MEM_INIT(&prefsNull, 0, sizeof(prefsNull));
+    LZ4F_preferences_t prefsNull = LZ4F_INIT_PREFERENCES;
     prefsNull.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;   /* worst case */
     {   const LZ4F_preferences_t* const prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
         U32 const flush = prefsPtr->autoFlush | (srcSize==0);
@@ -1065,7 +1064,10 @@ struct LZ4F_dctx_s {
 LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** LZ4F_decompressionContextPtr, unsigned versionNumber)
 {
     LZ4F_dctx* const dctx = (LZ4F_dctx*)ALLOC_AND_ZERO(sizeof(LZ4F_dctx));
-    if (dctx==NULL) return err0r(LZ4F_ERROR_GENERIC);
+    if (dctx == NULL) {  /* failed allocation */
+        *LZ4F_decompressionContextPtr = NULL;
+        return err0r(LZ4F_ERROR_allocation_failed);
+    }
 
     dctx->version = versionNumber;
     *LZ4F_decompressionContextPtr = dctx;

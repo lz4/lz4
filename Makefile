@@ -35,16 +35,7 @@ PRGDIR  = programs
 TESTDIR = tests
 EXDIR   = examples
 
-
-# Define nul output
-ifneq (,$(filter Windows%,$(OS)))
-EXT  = .exe
-VOID = nul
-else
-EXT  =
-VOID = /dev/null
-endif
-
+include Makefile.inc
 
 .PHONY: default
 default: lib-release lz4-release
@@ -93,7 +84,7 @@ clean:
 #-----------------------------------------------------------------------------
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
-ifneq (,$(filter $(shell uname),Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW32_NT-6.1 MINGW64_NT-6.1 MINGW32_NT-10.0 MINGW64_NT-10.0))
+ifeq ($(POSIX_ENV),Yes)
 HOST_OS = POSIX
 
 .PHONY: install uninstall
@@ -176,6 +167,14 @@ gpptest gpptest32: CC = "$(CXX) -Wno-deprecated"
 gpptest gpptest32: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
 gpptest32: CFLAGS += -m32
 gpptest gpptest32: clean
+	$(CXX) -v
+	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
+	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
+	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
+
+cxx17build : CC = "$(CXX) -Wno-deprecated"
+cxx17build : CFLAGS = -std=c++17 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror -pedantic
+cxx17build : clean
 	$(CXX) -v
 	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"

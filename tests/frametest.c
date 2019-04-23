@@ -167,7 +167,7 @@ static unsigned FUZ_highbit(U32 v32)
 /*-*******************************************************
 *  Tests
 *********************************************************/
-#define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s\n", LZ4F_getErrorName(v)); goto _output_error; }
+#define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s \n", LZ4F_getErrorName(v)); goto _output_error; }
 #define CHECK(f)   { LZ4F_errorCode_t const CHECK_V(err_ , f); }
 
 int basicTests(U32 seed, double compressibility)
@@ -667,8 +667,8 @@ int basicTests(U32 seed, double compressibility)
       for (blockSizeID = 4; blockSizeID < 8; ++blockSizeID) {
         result = LZ4F_getBlockSize(blockSizeID);
         CHECK(result);
-        DISPLAYLEVEL(3, "Returned block size of %zu bytes for blockID %u \n",
-                         result, blockSizeID);
+        DISPLAYLEVEL(3, "Returned block size of %u bytes for blockID %u \n",
+                         (unsigned)result, blockSizeID);
       }
 
       /* Test an invalid input that's too large */
@@ -770,7 +770,8 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, un
     const BYTE* b2=(const BYTE*)buff2;
     DISPLAY("locateBuffDiff: looking for error position \n");
     if (nonContiguous) {
-        DISPLAY("mode %u: non-contiguous output (%zu bytes), cannot search \n", nonContiguous, size);
+        DISPLAY("mode %u: non-contiguous output (%u bytes), cannot search \n",
+                nonContiguous, (unsigned)size);
         return;
     }
     while (p < size && b1[p]==b2[p]) p++;
@@ -795,8 +796,9 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     clock_t const startClock = clock();
     clock_t const clockDuration = duration_s * CLOCKS_PER_SEC;
 #   undef CHECK
-#   define CHECK(cond, ...) if (cond) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                            DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
+#   define EXIT_MSG(...) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                           DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); goto _output_error; }
+#   define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
 
     /* Create buffers */
     {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
@@ -950,9 +952,10 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             CHECK(decSize != 0, "Frame decompression failed (error %i)", (int)decSize);
             if (totalOut) {  /* otherwise, it's a skippable frame */
                 U64 const crcDecoded = XXH64_digest(&xxh64);
-                if (crcDecoded != crcOrig) locateBuffDiff(srcStart, decodedBuffer, srcSize, nonContiguousDst);
-                CHECK(crcDecoded != crcOrig, "Decompression corruption");
-            }
+                if (crcDecoded != crcOrig) {
+                    locateBuffDiff(srcStart, decodedBuffer, srcSize, nonContiguousDst);
+                    EXIT_MSG("Decompression corruption");
+            }   }
         }
     }
 
