@@ -67,7 +67,7 @@ lib liblz4.pc:
 	$(MAKE) -C $(LZ4DIR) $@ CFLAGS="$(CFLAGS)"
 
 lz4c unlz4 lz4cat: lz4
-	ln -sf $(LZ4) $(PRGDIR)/$@
+	$(LN_SF) $(LZ4) $(PRGDIR)/$@
 
 lz4c32:   # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
