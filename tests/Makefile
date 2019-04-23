@@ -157,7 +157,7 @@ test32: CFLAGS+=-m32
 test32: test
 
 .PHONY: test-amalgamation
-test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
+test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
 	cat $(LZ4DIR)/lz4.c > lz4_all.c
 	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
 	cat $(LZ4DIR)/lz4frame.c >> lz4_all.c
