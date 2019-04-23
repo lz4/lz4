@@ -297,6 +297,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	test ! -f ./-z
 	$(DIFF) -q tmp-tlb-hw tmp-tlb4
 	$(LZ4) -f tmp-tlb-hw
+	$(LZ4) --list tmp-tlb-hw.lz4           # test --list on valid single-frame file
 	cat tmp-tlb-hw >> tmp-tlb-hw.lz4
 	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum

@@ -124,4 +124,9 @@ void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* const prefs, unsigned flag);
 void LZ4IO_favorDecSpeed(LZ4IO_prefs_t* const prefs, int favor);
 
 
+/* implement --list
+ * @return 0 on success, 1 on error */
+int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx);
+
+
 #endif  /* LZ4IO_H_237902873 */

@@ -53,11 +53,11 @@
 #include <time.h>      /* clock */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
-#include "lz4io.h"
 #include "lz4.h"       /* still required for legacy format */
 #include "lz4hc.h"     /* still required for legacy format */
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
+#include "lz4io.h"
 
 
 /*****************************
@@ -1230,7 +1230,9 @@ int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filen
 }
 
 
-int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** inFileNamesTable, int ifntSize, const char* suffix)
+int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
+                                const char** inFileNamesTable, int ifntSize,
+                                const char* suffix)
 {
     int i;
     int skippedFiles = 0;
@@ -1250,7 +1252,12 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** i
             missingFiles += LZ4IO_decompressSrcFile(prefs, ress, inFileNamesTable[i], stdoutmark);
             continue;
         }
-        if (ofnSize <= ifnSize-suffixSize+1) { free(outFileName); ofnSize = ifnSize + 20; outFileName = (char*)malloc(ofnSize); if (outFileName==NULL) return ifntSize; }
+        if (ofnSize <= ifnSize-suffixSize+1) {
+            free(outFileName);
+            ofnSize = ifnSize + 20;
+            outFileName = (char*)malloc(ofnSize);
+            if (outFileName==NULL) return ifntSize;
+        }
         if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
@@ -1264,4 +1271,138 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs, const char** i
     LZ4IO_freeDResources(ress);
     free(outFileName);
     return missingFiles + skippedFiles;
+}
+
+
+/* ********************************************************************* */
+/* **********************   LZ4 --list command   *********************** */
+/* ********************************************************************* */
+
+typedef struct {
+  LZ4F_frameInfo_t frameInfo;
+  const char* fileName;
+  unsigned long long fileSize;
+} LZ4IO_cFileInfo_t;
+
+#define LZ4IO_INIT_CFILEINFO   { LZ4F_INIT_FRAMEINFO, NULL, 0ULL }
+
+
+typedef enum { LZ4IO_LZ4F_OK, LZ4IO_format_not_known, LZ4IO_not_a_file } LZ4IO_infoResult;
+
+/* This function is limited,
+ * it only works fine for a file consisting of a single valid frame using LZ4 Frame specification.
+ * It will not look at content beyond first frame header.
+ * It's also unable to parse legacy frames, nor skippable ones.
+ *
+ * Things to improve :
+ * - check the entire file for additional content after first frame
+ *   + combine results from multiple frames, give total
+ * - Optional :
+ *  + report nb of blocks, hence max. possible decompressed size (when not reported in header)
+ */
+static LZ4IO_infoResult
+LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filename)
+{
+    LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
+
+    if (!UTIL_isRegFile(input_filename)) return LZ4IO_not_a_file;
+    cfinfo->fileSize = UTIL_getFileSize(input_filename);
+
+    /* Get filename without path prefix */
+    {   const char* b = strrchr(input_filename, '/');
+        if (!b) {
+            b = strrchr(input_filename, '\\');
+        }
+        if (b && b != input_filename) {
+            b++;
+        } else {
+            b = input_filename;
+        }
+        cfinfo->fileName = b;
+    }
+
+    /* Read file and extract header */
+    {   size_t const hSize = LZ4F_HEADER_SIZE_MAX;
+        size_t readSize=0;
+
+        void* const buffer = malloc(hSize);
+        if (!buffer) EXM_THROW(21, "Allocation error : not enough memory");
+
+        {   FILE* const finput = LZ4IO_openSrcFile(input_filename);
+            if (finput) {
+                readSize = fread(buffer, 1, hSize, finput);
+                fclose(finput);
+        }   }
+
+        if (readSize > 0) {
+            LZ4F_dctx* dctx;
+            if (!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION))) {
+                if (!LZ4F_isError(LZ4F_getFrameInfo(dctx, &cfinfo->frameInfo, buffer, &readSize))) {
+                    result = LZ4IO_LZ4F_OK;
+            }   }
+            LZ4F_freeDecompressionContext(dctx);
+        }
+
+        /* clean */
+        free(buffer);
+    }
+
+    return result;
+}
+
+
+/* buffer : must be a valid memory area of at least 4 bytes */
+const char* LZ4IO_blockTypeID(int sizeID, int blockMode, char* buffer)
+{
+    buffer[0] = 'B';
+    assert(sizeID >= 4); assert(sizeID <=7);
+    buffer[1] = (char)(sizeID + '0');
+    buffer[2] = (blockMode == LZ4F_blockIndependent) ? 'I' : 'D';
+    buffer[3] = 0;
+    return buffer;
+}
+
+
+int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
+{
+    int result = 0;
+    size_t idx;
+
+    DISPLAY("%5s %20s %20s %10s %7s  %s\n",
+        "Block", "Compressed", "Uncompressed", "Ratio", "Check", "Filename");
+
+    for (idx=0; idx<ifnIdx; idx++) {
+        /* Get file info */
+        LZ4IO_cFileInfo_t cfinfo = LZ4IO_INIT_CFILEINFO;
+        LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx]);
+        if (op_result != LZ4IO_LZ4F_OK) {
+            if (op_result == LZ4IO_not_a_file) {
+                DISPLAYLEVEL(1, "lz4: %s is not a regular file \n", inFileNames[idx]);
+            } else {
+                assert(op_result == LZ4IO_format_not_known);
+                DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
+            }
+            result = 1;
+            continue;
+        }
+        if (cfinfo.frameInfo.contentSize) {
+            char buffer[5];
+            double const ratio = (double)cfinfo.fileSize / cfinfo.frameInfo.contentSize;
+            DISPLAY("%5s %20llu %20llu %8.4f %7s  %s \n",
+                    LZ4IO_blockTypeID(cfinfo.frameInfo.blockSizeID, cfinfo.frameInfo.blockMode, buffer),
+                    cfinfo.fileSize,
+                    cfinfo.frameInfo.contentSize, ratio,
+                    cfinfo.frameInfo.contentChecksumFlag ? "XXH32" : "-",
+                    cfinfo.fileName);
+        } else {
+            char buffer[5];
+            DISPLAY("%5s %20llu %20s %10s %7s  %s \n",
+                    LZ4IO_blockTypeID(cfinfo.frameInfo.blockSizeID, cfinfo.frameInfo.blockMode, buffer),
+                    cfinfo.fileSize,
+                    "-", "-",
+                    cfinfo.frameInfo.contentChecksumFlag ? "XXH32" : "-",
+                    cfinfo.fileName);
+        }
+    }
+    return result;
 }
