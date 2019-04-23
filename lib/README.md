@@ -74,9 +74,7 @@ The following build macro can be selected at compilation time :
 lz4 source code can be amalgamated into a single file.
 One can combine all source code into `lz4_all.c` by using following command:
 ```
-cat lz4.c > lz4_all.c
-cat lz4hc.c >> lz4_all.c
-cat lz4frame.c >> lz4_all.c
+cat lz4.c lz4hc.c lz4frame.c > lz4_all.c
 ```
 (`cat` file order is important) then compile `lz4_all.c`.
 All `*.h` files present in `/lib` remain necessary to compile `lz4_all.c`.
