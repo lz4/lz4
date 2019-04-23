@@ -159,7 +159,7 @@ test32: test
 .PHONY: test-amalgamation
 test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
 	cat $^ > lz4_all.c
-	$(CC) -I$(LZ4DIR) -c lz4_all.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c lz4_all.c
 	$(RM) lz4_all.c
 
 test-install: lz4 lib liblz4.pc
