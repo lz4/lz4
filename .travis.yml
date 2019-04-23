@@ -8,8 +8,11 @@ matrix:
       os: osx
       compiler: clang
       script:
+        - make   # test library build
+        - make clean
         - make -C tests test-lz4 MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee # test scenario where `stdout` is not the console
-        - CFLAGS=-m32 make -C tests clean test-lz4-contentSize
+        - make clean
+        - CFLAGS=-m32 make -C tests test-lz4-contentSize
 
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - name: (Precise) benchmark test
