@@ -11,7 +11,9 @@ project('lz4', ['c'],
   license: ['BSD', 'GPLv2'],
   default_options : ['c_std=c99',
     'buildtype=release'],
-  version: '1.8.3',
+  # Fall-back version in case of extracting version number from
+  # `lz4.h` failed.
+  version: '1.9.1',
   meson_version: '>=0.47.0')
 
 cc = meson.get_compiler('c')
