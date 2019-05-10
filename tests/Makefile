@@ -55,7 +55,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame listTest
 
 all32: CFLAGS+=-m32
 all32: all
@@ -122,9 +122,12 @@ clean:
 versionsTest:
 	$(PYTHON) test-lz4-versions.py
 
+.PHONY: listTest
+listTest: lz4
+	QEMU_SYS=$(QEMU_SYS) $(PYTHON) test-lz4-list.py
+
 checkTag: checkTag.c $(LZ4DIR)/lz4.h
 	$(CC) $(FLAGS) $< -o $@$(EXT)
-
 
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets

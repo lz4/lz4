@@ -213,8 +213,8 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 
 static const size_t minFHSize = LZ4F_HEADER_SIZE_MIN;   /*  7 */
 static const size_t maxFHSize = LZ4F_HEADER_SIZE_MAX;   /* 19 */
-static const size_t BHSize = 4;  /* block header : size, and compress flag */
-static const size_t BFSize = 4;  /* block footer : checksum (optional) */
+static const size_t BHSize = LZ4F_BLOCK_HEADER_SIZE;  /* block header : size, and compress flag */
+static const size_t BFSize = LZ4F_BLOCK_CHECKSUM_SIZE;  /* block footer : checksum (optional) */
 
 
 /*-************************************

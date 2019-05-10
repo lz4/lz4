@@ -253,6 +253,15 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 #define LZ4F_HEADER_SIZE_MIN  7   /* LZ4 Frame header size can vary, depending on selected paramaters */
 #define LZ4F_HEADER_SIZE_MAX 19
 
+/* Size in bytes of a block header in little-endian format. Highest bit indicates if block data is uncompressed */
+#define LZ4F_BLOCK_HEADER_SIZE 4
+
+/* Size in bytes of a block checksum footer in little-endian format. */
+#define LZ4F_BLOCK_CHECKSUM_SIZE 4
+
+/* Size in bytes of the content checksum. */
+#define LZ4F_CONTENT_CHECKSUM_SIZE 4
+
 /*! LZ4F_compressBegin() :
  *  will write the frame header into dstBuffer.
  *  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
