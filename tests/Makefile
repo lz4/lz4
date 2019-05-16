@@ -466,6 +466,8 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg7M
 	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg7M ftmdg16K2
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg7M $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m ftm*.lz4
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m -v ftm*.lz4
 	$(RM) ftm*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
