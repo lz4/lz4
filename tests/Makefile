@@ -55,7 +55,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame listTest
 
 all32: CFLAGS+=-m32
 all32: all
@@ -122,9 +122,12 @@ clean:
 versionsTest:
 	$(PYTHON) test-lz4-versions.py
 
+.PHONY: listTest
+listTest: lz4
+	QEMU_SYS=$(QEMU_SYS) $(PYTHON) test-lz4-list.py
+
 checkTag: checkTag.c $(LZ4DIR)/lz4.h
 	$(CC) $(FLAGS) $< -o $@$(EXT)
-
 
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
@@ -463,6 +466,8 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg7M
 	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg7M ftmdg16K2
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg7M $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m ftm*.lz4
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m -v ftm*.lz4
 	$(RM) ftm*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256

@@ -57,6 +57,8 @@ typedef struct LZ4IO_prefs_s LZ4IO_prefs_t;
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void);
 void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs);
 
+/* Size in bytes of a legacy block header in little-endian format */
+#define LZIO_LEGACY_BLOCK_HEADER_SIZE 4
 
 /* ************************************************** */
 /* ****************** Functions ********************* */

@@ -141,7 +141,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
     DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
-    DISPLAY( "--list  : lists information about .lz4 files. Useful if compressed with --content-size flag.\n");
+    DISPLAY( "--list FILE : lists information about .lz4 files (useful for files compressed with --content-size flag)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
@@ -654,7 +654,6 @@ int main(int argc, const char** argv)
 
     /* No output filename ==> try to select one automatically (when possible) */
     while ((!output_filename) && (multiple_inputs==0)) {
-
         if (!IS_CONSOLE(stdout)) {
             /* Default to stdout whenever stdout is not the console.
              * Note : this policy may change in the future, therefore don't rely on it !
@@ -693,7 +692,19 @@ int main(int argc, const char** argv)
         break;
     }
 
-    if (multiple_inputs==0 && mode != om_list) assert(output_filename);
+    if (mode == om_list){
+        /* Exit if trying to read from stdin as this isn't supported in this mode */
+        if(!strcmp(input_filename, stdinmark)){
+            DISPLAYLEVEL(1, "refusing to read from standard input in --list mode\n");
+            exit(1);
+        }
+        if(!multiple_inputs){
+            inFileNames[ifnIdx++] = input_filename;
+        }
+    }
+    else{
+        if (multiple_inputs==0) assert(output_filename);
+    }
     /* when multiple_inputs==1, output_filename may simply be useless,
      * however, output_filename must be !NULL for next strcmp() tests */
     if (!output_filename) output_filename = "*\\dummy^!//";
@@ -723,11 +734,7 @@ int main(int argc, const char** argv)
             operationResult = DEFAULT_DECOMPRESSOR(prefs, input_filename, output_filename);
         }
     } else if (mode == om_list){
-        if(!multiple_inputs){
-            inFileNames[ifnIdx++] = input_filename;
-        }
         operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
-        inFileNames=NULL;
     } else {   /* compression is default action */
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
