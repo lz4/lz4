@@ -125,11 +125,14 @@ test:
 	$(MAKE) -C $(TESTDIR) $@
 	$(MAKE) -C $(EXDIR) $@
 
+clangtest: CFLAGS ?= -O3
+clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
+clangtest: CC = clang
 clangtest: clean
-	clang -v
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  all CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) all CC=clang
+	$(CC) -v
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all CC=$(CC)
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all CC=$(CC)
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all CC=$(CC)
 
 clangtest-native: clean
 	clang -v

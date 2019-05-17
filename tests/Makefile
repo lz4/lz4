@@ -55,7 +55,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame listTest
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame
 
 all32: CFLAGS+=-m32
 all32: all
@@ -153,7 +153,7 @@ list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest
 
 .PHONY: test32
 test32: CFLAGS+=-m32
