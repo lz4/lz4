@@ -315,12 +315,7 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
 
 #ifndef LZ4_FAST_DEC_LOOP
-#  if defined(__i386__) || defined(__x86_64__)
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && !defined(__clang__)
-     /* On aarch64, we disable this optimization for clang because on certain
-      * mobile chipsets and clang, it reduces performance. For more information
-      * refer to https://github.com/lz4/lz4/pull/707. */
+#  if defined(__i386__) || defined(__x86_64__) || defined(__aarch64__)
 #    define LZ4_FAST_DEC_LOOP 1
 #  else
 #    define LZ4_FAST_DEC_LOOP 0
@@ -359,7 +354,6 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
-
     do { memcpy(d,s,16); memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 }
 
@@ -369,7 +363,15 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
     BYTE v[8];
     switch(offset) {
     case 1:
+#if defined(__aarch64__)
+        v[0] = srcPtr[0];
+        v[1] = srcPtr[0];
+        v[2] = srcPtr[0];
+        v[3] = srcPtr[0];
+        memcpy(v+4, v, 4);
+#else
         memset(v, *srcPtr, 8);
+#endif
         goto copy_loop;
     case 2:
         memcpy(v, srcPtr, 2);
@@ -1708,10 +1710,9 @@ LZ4_decompress_generic(
             /* get matchlength */
             length = token & ML_MASK;
 
-            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
-
             if (length == ML_MASK) {
               variable_length_error error = ok;
+              if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
               length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
               if (error != ok) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
@@ -1727,7 +1728,16 @@ LZ4_decompress_generic(
 
                 /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
                 if (!(dict == usingExtDict) || (match >= lowPrefix)) {
+#if defined(__aarch64__)
+                    if (offset >= 16) {
+                        memcpy(op, match, 16);
+                        memcpy(op+16, match+16, 2);
+                        op += length;
+                        continue;
+                     } else if (offset >= 8) {
+#else
                     if (offset >= 8) {
+#endif
                         memcpy(op, match, 8);
                         memcpy(op+8, match+8, 8);
                         memcpy(op+16, match+16, 2);
@@ -1735,6 +1745,7 @@ LZ4_decompress_generic(
                         continue;
             }   }   }
 
+            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
