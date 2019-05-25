@@ -376,6 +376,7 @@ test-lz4-testmode: lz4 datagen
 	@echo "\n ---- non-existing source ----"
 	! $(LZ4)     file-does-not-exist
 	! $(LZ4) -f  file-does-not-exist
+	! $(LZ4) -t  file-does-not-exist
 	! $(LZ4) -fm file1-dne file2-dne
 	@$(RM) tmp-tlt tmp-tlt1 tmp-tlt2 tmp-tlt2.lz4
 

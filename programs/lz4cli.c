@@ -648,9 +648,16 @@ int main(int argc, const char** argv)
         DISPLAYLEVEL(1, "refusing to read from a console\n");
         exit(1);
     }
-    /* if input==stdin and no output defined, stdout becomes default output */
-    if (!strcmp(input_filename, stdinmark) && !output_filename)
-        output_filename = stdoutmark;
+    if (!strcmp(input_filename, stdinmark)) {
+        /* if input==stdin and no output defined, stdout becomes default output */
+        if (!output_filename) output_filename = stdoutmark;
+    }
+    else{
+        if (!recursive && !UTIL_isRegFile(input_filename)) {
+            DISPLAYLEVEL(1, "%s: is not a regular file \n", input_filename);
+            exit(1);
+        }
+    }
 
     /* No output filename ==> try to select one automatically (when possible) */
     while ((!output_filename) && (multiple_inputs==0)) {
