@@ -1031,7 +1031,7 @@ static void FUZ_unitTests(int compressionLevel)
         assert(cSize <= (int)maxCSize);
         /* decompress and verify */
         {   int const dSize = LZ4_decompress_safe(testCompressed, testVerify, cSize, testInputSize);
-            assert(dSize == sampleSize);   /* correct size */
+            assert(dSize == (int)sampleSize);   /* correct size */
             {   XXH32_hash_t const crcCheck = XXH32(testVerify, (size_t)dSize, 0);
                 assert(crcCheck == crcOrig);
     }   }   }
