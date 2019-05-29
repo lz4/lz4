@@ -388,6 +388,8 @@ LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecod
  */
 LZ4LIB_API int LZ4_decompress_safe_usingDict (const char* src, char* dst, int srcSize, int dstCapcity, const char* dictStart, int dictSize);
 
+#endif /* LZ4_H_2983827168210 */
+
 
 /*^*************************************
  * !!!!!!   STATIC LINKING ONLY   !!!!!!
@@ -413,13 +415,16 @@ LZ4LIB_API int LZ4_decompress_safe_usingDict (const char* src, char* dst, int sr
  * define LZ4_PUBLISH_STATIC_FUNCTIONS when building the LZ4 library.
  ******************************************************************************/
 
+#ifdef LZ4_STATIC_LINKING_ONLY
+
+#ifndef LZ4_STATIC_3504398509
+#define LZ4_STATIC_3504398509
+
 #ifdef LZ4_PUBLISH_STATIC_FUNCTIONS
 #define LZ4LIB_STATIC_API LZ4LIB_API
 #else
 #define LZ4LIB_STATIC_API
 #endif
-
-#ifdef LZ4_STATIC_LINKING_ONLY
 
 
 /*! LZ4_compress_fast_extState_fastReset() :
@@ -503,10 +508,13 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
 #define LZ4_COMPRESS_INPLACE_MARGIN (LZ4_DISTANCE_MAX + 32)
 #define LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)   ( (maxCompressedSize) + LZ4_COMPRESS_INPLACE_MARGIN)  /**< maxCompressedSize is generally LZ4_COMPRESSBOUND(inputSize), but can be set to any lower value, with the risk that compression can fail (return code 0(zero)) */
 
-
+#endif   /* LZ4_STATIC_3504398509 */
 #endif   /* LZ4_STATIC_LINKING_ONLY */
 
 
+
+#ifndef LZ4_H_98237428734687
+#define LZ4_H_98237428734687
 
 /*-************************************************************
  *  PRIVATE DEFINITIONS
@@ -718,7 +726,7 @@ LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int or
 LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
 
 
-#endif /* LZ4_H_2983827168210 */
+#endif /* LZ4_H_98237428734687 */
 
 
 #if defined (__cplusplus)
