@@ -965,7 +965,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 }
 
 
-#define testInputSize (192 KB)
+#define testInputSize (196 KB)
 #define testCompressedSize (130 KB)
 #define ringBufferSize (8 KB)
 
@@ -1175,12 +1175,12 @@ static void FUZ_unitTests(int compressionLevel)
         {   U64 const crc64 = XXH64(testInput + 64 KB, testCompressedSize, 0);
             LZ4_resetStreamHC_fast(&sHC, compressionLevel);
             LZ4_loadDictHC(&sHC, testInput, 64 KB);
-            result = LZ4_compress_HC_continue(&sHC, testInput + 64 KB, testCompressed, testCompressedSize, testCompressedSize-1);
-            FUZ_CHECKTEST(result==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : result = %i", result);
-            FUZ_CHECKTEST(sHC.internal_donotuse.dirty, "Context should be clean");
-
-            result = LZ4_decompress_safe_usingDict(testCompressed, testVerify, result, testCompressedSize, testInput, 64 KB);
-            FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() simple dictionary decompression test failed");
+            {   int const cSize = LZ4_compress_HC_continue(&sHC, testInput + 64 KB, testCompressed, testCompressedSize, testCompressedSize-1);
+                FUZ_CHECKTEST(cSize==0, "LZ4_compressHC_limitedOutput_continue() dictionary compression failed : @return = %i", cSize);
+                FUZ_CHECKTEST(sHC.internal_donotuse.dirty, "Context should be clean");
+                {   int const dSize = LZ4_decompress_safe_usingDict(testCompressed, testVerify, cSize, testCompressedSize, testInput, 64 KB);
+                    FUZ_CHECKTEST(dSize!=(int)testCompressedSize, "LZ4_decompress_safe() simple dictionary decompression test failed");
+            }   }
             {   U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
                 FUZ_CHECKTEST(crc64!=crcNew, "LZ4_decompress_safe() simple dictionary decompression test : corruption");
         }   }
@@ -1189,7 +1189,8 @@ static void FUZ_unitTests(int compressionLevel)
         /* multiple HC compression test with dictionary */
         {   int result1, result2;
             int segSize = testCompressedSize / 2;
-            U64 const crc64 = XXH64(testInput + segSize, testCompressedSize, 0);
+            XXH64_hash_t const crc64 = ( (void)assert((unsigned)segSize + testCompressedSize < testInputSize) ,
+                                        XXH64(testInput + segSize, testCompressedSize, 0) );
             LZ4_resetStreamHC_fast(&sHC, compressionLevel);
             LZ4_loadDictHC(&sHC, testInput, segSize);
             result1 = LZ4_compress_HC_continue(&sHC, testInput + segSize, testCompressed, segSize, segSize -1);
@@ -1203,7 +1204,7 @@ static void FUZ_unitTests(int compressionLevel)
             FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 1 failed");
             result = LZ4_decompress_safe_usingDict(testCompressed+result1, testVerify+segSize, result2, segSize, testInput, 2*segSize);
             FUZ_CHECKTEST(result!=segSize, "LZ4_decompress_safe() dictionary decompression part 2 failed");
-            {   U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+            {   XXH64_hash_t const crcNew = XXH64(testVerify, testCompressedSize, 0);
                 FUZ_CHECKTEST(crc64!=crcNew, "LZ4_decompress_safe() dictionary decompression corruption");
         }   }
 
