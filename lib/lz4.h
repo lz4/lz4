@@ -65,9 +65,9 @@ extern "C" {
 
   Blocks are different from Frames (doc/lz4_Frame_format.md).
   Frames bundle both blocks and metadata in a specified manner.
-  This are required for compressed data to be self-contained and portable.
+  Embedding metadata is required for compressed data to be self-contained and portable.
   Frame format is delivered through a companion API, declared in lz4frame.h.
-  Note that the `lz4` CLI can only manage frames.
+  The `lz4` CLI can only manage frames.
 */
 
 /*^***************************************************************
@@ -462,7 +462,50 @@ LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const c
  */
 LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream);
 
+
+/*! In-place compression and decompression
+ *
+ * It's possible to have input and output sharing the same buffer,
+ * for highly contrained memory environments.
+ * In both cases, it requires input to lay at the end of the buffer,
+ * and buffer must have some margin, hence be larger than final size.
+ *
+ * This technique is more useful for decompression,
+ * since decompressed size is typically larger,
+ * and margin is mostly required to avoid stripe overflow, so it's short.
+ *
+ * For compression though, margin must be able to cope with both
+ * history preservation, requiring input data to remain unmodified up to LZ4_DISTANCE_MAX,
+ * and data expansion, which can happen when input is not compressible.
+ * As a consequence, buffer size requirements are much higher than average compressed size,
+ * hence memory savings are limited.
+ *
+ * There are ways to limit this cost for compression :
+ * - Reduce history size, by modifying LZ4_DISTANCE_MAX.
+ *   Lower values will also reduce compression ratio, except when input_size < LZ4_DISTANCE_MAX,
+ *   so it's a reasonable trick when inputs are known to be small.
+ * - Require the compressor to deliver a "maximum compressed size".
+ *   When this size is < LZ4_COMPRESSBOUND(inputSize), then compression can fail,
+ *   in which case, the return code will be 0 (zero).
+ *   The caller must be ready for these cases to happen,
+ *   and typically design a backup scheme to send data uncompressed.
+ * The combination of both techniques can significantly reduce
+ * the amount of margin required for in-place compression.
+ */
+
+#define LZ4_DECOMPRESS_INPLACE_MARGIN 32
+#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ( (decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN)  /**< note: presumes that compressedSize < decompressedSize */
+
+#ifndef LZ4_DISTANCE_MAX   /* history window size; can be user-defined at compile time */
+#  define LZ4_DISTANCE_MAX 65535   /* set to maximum value by default */
 #endif
+
+#define LZ4_COMPRESS_INPLACE_MARGIN (LZ4_DISTANCE_MAX + 32)
+#define LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)   ( (maxCompressedSize) + LZ4_COMPRESS_INPLACE_MARGIN)  /**< maxCompressedSize is generally LZ4_COMPRESSBOUND(inputSize), but can be set to any lower value, with the risk that compression can fail (return code 0(zero)) */
+
+
+#endif   /* LZ4_STATIC_LINKING_ONLY */
+
 
 
 /*-************************************************************
@@ -565,6 +608,7 @@ union LZ4_streamDecode_u {
     unsigned long long table[LZ4_STREAMDECODESIZE_U64];
     LZ4_streamDecode_t_internal internal_donotuse;
 } ;   /* previously typedef'd to LZ4_streamDecode_t */
+
 
 
 /*-************************************

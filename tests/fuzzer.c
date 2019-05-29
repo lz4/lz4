@@ -1017,8 +1017,7 @@ static void FUZ_unitTests(int compressionLevel)
     DISPLAYLEVEL(3, "in-place compression using LZ4_compress_default() :");
     {   size_t const sampleSize = 65 KB;
         size_t const maxCSize = LZ4_COMPRESSBOUND(sampleSize);
-        size_t const margin = 64 KB;
-        size_t const outSize = maxCSize + margin;
+        size_t const outSize = LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCSize);
         size_t const startIndex = outSize - sampleSize;
         char*  const startInput = testCompressed + startIndex;
         XXH32_hash_t const crcOrig = XXH32(testInput, sampleSize, 0);
