@@ -462,7 +462,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
             _BitScanForward64( &r, (U64)val );
             return (int)(r>>3);
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
-            return (__builtin_ctzll((U64)val) >> 3);
+            return (unsigned)__builtin_ctzll((U64)val) >> 3;
 #       else
             static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2,
                                                      0, 3, 1, 3, 1, 4, 2, 7,
@@ -480,7 +480,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
             _BitScanForward( &r, (U32)val );
             return (int)(r>>3);
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
-            return (__builtin_ctz((U32)val) >> 3);
+            return (unsigned)__builtin_ctz((U32)val) >> 3;
 #       else
             static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0,
                                                      3, 2, 2, 1, 3, 2, 0, 1,
@@ -496,7 +496,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
             _BitScanReverse64( &r, val );
             return (unsigned)(r>>3);
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
-            return (__builtin_clzll((U64)val) >> 3);
+            return (unsigned)__builtin_clzll((U64)val) >> 3;
 #       else
             static const U32 by32 = sizeof(val)*4;  /* 32 on 64 bits (goal), 16 on 32 bits.
                 Just to avoid some static analyzer complaining about shift by 32 on 32-bits target.
@@ -513,7 +513,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
             _BitScanReverse( &r, (unsigned long)val );
             return (unsigned)(r>>3);
 #       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
-            return (__builtin_clz((U32)val) >> 3);
+            return (unsigned)__builtin_clz((U32)val) >> 3;
 #       else
             unsigned r;
             if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }

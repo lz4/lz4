@@ -1015,10 +1015,10 @@ static void FUZ_unitTests(int compressionLevel)
 
     /* in-place compression test */
     DISPLAYLEVEL(3, "in-place compression using LZ4_compress_default() :");
-    {   size_t const sampleSize = 65 KB;
-        size_t const maxCSize = LZ4_COMPRESSBOUND(sampleSize);
-        size_t const outSize = LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCSize);
-        size_t const startIndex = outSize - sampleSize;
+    {   int const sampleSize = 65 KB;
+        int const maxCSize = LZ4_COMPRESSBOUND(sampleSize);
+        int const outSize = LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCSize);
+        int const startIndex = outSize - sampleSize;
         char*  const startInput = testCompressed + startIndex;
         XXH32_hash_t const crcOrig = XXH32(testInput, sampleSize, 0);
         int cSize;
@@ -1028,7 +1028,7 @@ static void FUZ_unitTests(int compressionLevel)
         cSize = LZ4_compress_default(startInput, testCompressed, sampleSize, maxCSize);
         assert(cSize != 0);  /* ensure compression is successful */
         assert(maxCSize < INT_MAX);
-        assert(cSize <= (int)maxCSize);
+        assert(cSize <= maxCSize);
         /* decompress and verify */
         {   int const dSize = LZ4_decompress_safe(testCompressed, testVerify, cSize, testInputSize);
             assert(dSize == (int)sampleSize);   /* correct size */

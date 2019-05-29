@@ -49,7 +49,7 @@ allmost: lib lz4
 .PHONY: lib lib-release liblz4.a
 lib: liblz4.a
 lib lib-release liblz4.a:
-	@$(MAKE) -C $(LZ4DIR) $@
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
 lz4 : liblz4.a
