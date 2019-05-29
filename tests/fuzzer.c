@@ -1022,7 +1022,7 @@ static void FUZ_unitTests(int compressionLevel)
         char*  const startInput = testCompressed + startIndex;
         XXH32_hash_t const crcOrig = XXH32(testInput, sampleSize, 0);
         int cSize;
-        assert(outSize < testCompressedSize);
+        assert(outSize < (int)testCompressedSize);
         memcpy(startInput, testInput, sampleSize);  /* copy at end of buffer */
         /* compress in-place */
         cSize = LZ4_compress_default(startInput, testCompressed, sampleSize, maxCSize);
