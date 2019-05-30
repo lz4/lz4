@@ -518,8 +518,8 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
  * so there are ways to reduce memory requirements by playing with them.
  */
 
-#define LZ4_DECOMPRESS_INPLACE_MARGIN 32
-#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ( (decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN)  /**< note: presumes that compressedSize < decompressedSize */
+#define LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize)  (((decompressedSize) >> 8) + 32)
+#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ( (decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize))  /**< note: presumes that compressedSize < decompressedSize */
 
 #ifndef LZ4_DISTANCE_MAX   /* history window size; can be user-defined at compile time */
 #  define LZ4_DISTANCE_MAX 65535   /* set to maximum value by default */
