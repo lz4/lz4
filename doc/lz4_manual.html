@@ -407,7 +407,7 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  
 </p></pre><BR>
 
-<pre><b>#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ( (decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN)  </b>/**< note: presumes that compressedSize < decompressedSize */<b>
+<pre><b>#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ( (decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize))  </b>/**< note: presumes that compressedSize < decompressedSize */<b>
 </b></pre><BR>
 <pre><b>#define LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)   ( (maxCompressedSize) + LZ4_COMPRESS_INPLACE_MARGIN)  </b>/**< maxCompressedSize is generally LZ4_COMPRESSBOUND(inputSize), but can be set to any lower value, with the risk that compression can fail (return code 0(zero)) */<b>
 </b></pre><BR>
