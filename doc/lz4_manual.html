@@ -361,21 +361,35 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  It's possible to have input and output sharing the same buffer,
  for highly contrained memory environments.
  In both cases, it requires input to lay at the end of the buffer,
- and buffer must have some margin, hence be larger than final size.
+ and decompression to start at beginning of the buffer.
+ Buffer size must feature some margin, hence be larger than final size.
+
+ |<------------------------buffer----------------------------------->|
+                             |<------------compressed data---------->|
+ |<-----------decompressed size------------------>|
+                                                  |<-----margin----->|
 
  This technique is more useful for decompression,
  since decompressed size is typically larger,
  and margin is mostly required to avoid stripe overflow, so it's short.
 
- For compression though, margin must be able to cope with both
+ In-place decompression will work inside any buffer
+ which size is >= LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize).
+ This presumes that decompressedSize > compressedSize.
+ Otherwise, it means compression actually expanded data,
+ which can happen when data is not compressible (already compressed, or encrypted),
+ and it would be more efficient to store such data with a flag indicating it's not compressed.
+
+ For compression, margin is larger, as it must be able to cope with both
  history preservation, requiring input data to remain unmodified up to LZ4_DISTANCE_MAX,
  and data expansion, which can happen when input is not compressible.
- As a consequence, buffer size requirements are much higher than average compressed size,
- hence memory savings are limited.
+ As a consequence, buffer size requirements are much higher,
+ and memory savings offered by in-place compression are more limited.
 
  There are ways to limit this cost for compression :
  - Reduce history size, by modifying LZ4_DISTANCE_MAX.
-   Lower values will also reduce compression ratio, except when input_size < LZ4_DISTANCE_MAX,
+   Note that it is a compile-time constant, so all future compression will apply this parameter.
+   Lower values will reduce compression ratio, except when input_size < LZ4_DISTANCE_MAX,
    so it's a reasonable trick when inputs are known to be small.
  - Require the compressor to deliver a "maximum compressed size".
    When this size is < LZ4_COMPRESSBOUND(inputSize), then compression can fail,
@@ -384,6 +398,12 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
    and typically design a backup scheme to send data uncompressed.
  The combination of both techniques can significantly reduce
  the amount of margin required for in-place compression.
+
+ In-place compression can work in any buffer
+ which size is >= LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)
+ with maxCompressedSize == LZ4_COMPRESSBOUND(srcSize) for guaranteed compression success.
+ This macro depends on both maxCompressedSize and LZ4_DISTANCE_MAX,
+ so there are ways to reduce memory requirements by playing with them.
  
 </p></pre><BR>
 
