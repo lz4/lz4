@@ -336,6 +336,9 @@ LZ4LIB_API void LZ4_resetStreamHC (LZ4_streamHC_t* streamHCPtr, int compressionL
 #ifndef LZ4_HC_SLO_098092834
 #define LZ4_HC_SLO_098092834
 
+#define LZ4_STATIC_LINKING_ONLY   /* LZ4LIB_STATIC_API */
+#include "lz4.h"
+
 #if defined (__cplusplus)
 extern "C" {
 #endif
