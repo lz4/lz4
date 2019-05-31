@@ -1494,7 +1494,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 /* next block is a compressed block */
                 dctx->tmpInTarget = nextCBlockSize + crcSize;
                 dctx->dStage = dstage_getCBlock;
-                if (dstPtr==dstEnd) {
+                if (dstPtr==dstEnd || srcPtr==srcEnd) {
                     nextSrcSizeHint = BHSize + nextCBlockSize + crcSize;
                     doAnotherStage = 0;
                 }
