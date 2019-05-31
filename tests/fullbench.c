@@ -571,9 +571,15 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 
           nbChunks = (int) (((int)benchedSize + (g_chunkSize-1))/ g_chunkSize);
           for (i=0; i<nbChunks; i++) {
-              chunkP[i].id = i;
+              chunkP[i].id = (U32)i;
               chunkP[i].origBuffer = in; in += g_chunkSize;
-              if ((int)remaining > g_chunkSize) { chunkP[i].origSize = g_chunkSize; remaining -= g_chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
+              if ((int)remaining > g_chunkSize) {
+                  chunkP[i].origSize = g_chunkSize;
+                  remaining -= (size_t)g_chunkSize;
+              } else {
+                  chunkP[i].origSize = (int)remaining;
+                  remaining = 0;
+              }
               chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
               chunkP[i].compressedSize = 0;
           }
@@ -586,8 +592,8 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 
         /* Decompression Algorithms */
         for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && g_decompressionTest; dAlgNb++) {
-            const char* dName;
-            int (*decompressionFunction)(const char*, char*, int, int);
+            const char* dName = NULL;
+            int (*decompressionFunction)(const char*, char*, int, int) = NULL;
             double bestTime = 100000000.;
             int checkResult = 1;
 
@@ -609,6 +615,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 11:
                 if (dAlgNb == 10) { decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress"; }  /* can be skipped */
                 if (dAlgNb == 11) { decompressionFunction = local_LZ4F_decompress_followHint; dName = "LZ4F_decompress_followHint"; }  /* can be skipped */
+                /* prepare compressed data using frame format */
                 {   size_t const fcsize = LZ4F_compressFrame(compressed_buff, (size_t)compressedBuffSize, orig_buff, benchedSize, NULL);
                     assert(!LZ4F_isError(fcsize));
                     chunkP[0].origSize = (int)benchedSize;
@@ -619,6 +626,9 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             default :
                 continue;   /* skip if unknown ID */
             }
+
+            assert(decompressionFunction != NULL);
+            assert(dName != NULL);
 
             { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
 
