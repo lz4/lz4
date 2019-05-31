@@ -476,23 +476,23 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
  * and decompression to start at beginning of the buffer.
  * Buffer size must feature some margin, hence be larger than final size.
  *
- * |<------------------------buffer----------------------------------->|
- *                             |<------------compressed data---------->|
+ * |<------------------------buffer--------------------------------->|
+ *                             |<-----------compressed data--------->|
  * |<-----------decompressed size------------------>|
- *                                                  |<-----margin----->|
+ *                                                  |<----margin---->|
  *
  * This technique is more useful for decompression,
  * since decompressed size is typically larger,
- * and margin is mostly required to avoid stripe overflow, so it's short.
+ * and margin is short.
  *
  * In-place decompression will work inside any buffer
  * which size is >= LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize).
  * This presumes that decompressedSize > compressedSize.
  * Otherwise, it means compression actually expanded data,
- * which can happen when data is not compressible (already compressed, or encrypted),
  * and it would be more efficient to store such data with a flag indicating it's not compressed.
+ * This can happen when data is not compressible (already compressed, or encrypted).
  *
- * For compression, margin is larger, as it must be able to cope with both
+ * For in-place compression, margin is larger, as it must be able to cope with both
  * history preservation, requiring input data to remain unmodified up to LZ4_DISTANCE_MAX,
  * and data expansion, which can happen when input is not compressible.
  * As a consequence, buffer size requirements are much higher,
@@ -500,10 +500,11 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
  *
  * There are ways to limit this cost for compression :
  * - Reduce history size, by modifying LZ4_DISTANCE_MAX.
- *   Note that it is a compile-time constant, so all future compression will apply this parameter.
+ *   Note that it is a compile-time constant, so all compressions will apply this limit.
  *   Lower values will reduce compression ratio, except when input_size < LZ4_DISTANCE_MAX,
  *   so it's a reasonable trick when inputs are known to be small.
  * - Require the compressor to deliver a "maximum compressed size".
+ *   This is the `dstCapacity` parameter in `LZ4_compress*()`.
  *   When this size is < LZ4_COMPRESSBOUND(inputSize), then compression can fail,
  *   in which case, the return code will be 0 (zero).
  *   The caller must be ready for these cases to happen,
@@ -512,21 +513,21 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
  * the amount of margin required for in-place compression.
  *
  * In-place compression can work in any buffer
- * which size is >= LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)
+ * which size is >= (maxCompressedSize)
  * with maxCompressedSize == LZ4_COMPRESSBOUND(srcSize) for guaranteed compression success.
- * This macro depends on both maxCompressedSize and LZ4_DISTANCE_MAX,
- * so there are ways to reduce memory requirements by playing with them.
+ * LZ4_COMPRESS_INPLACE_BUFFER_SIZE() depends on both maxCompressedSize and LZ4_DISTANCE_MAX,
+ * so it's possible to reduce memory requirements by playing with them.
  */
 
-#define LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize)  (((decompressedSize) >> 8) + 32)
-#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ( (decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize))  /**< note: presumes that compressedSize < decompressedSize */
+#define LZ4_DECOMPRESS_INPLACE_MARGIN(compressedSize)          (((compressedSize) >> 8) + 32)
+#define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ((decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize))  /**< note: presumes that compressedSize < decompressedSize. note2: margin is overestimated a bit, since it could use compressedSize instead */
 
 #ifndef LZ4_DISTANCE_MAX   /* history window size; can be user-defined at compile time */
 #  define LZ4_DISTANCE_MAX 65535   /* set to maximum value by default */
 #endif
 
-#define LZ4_COMPRESS_INPLACE_MARGIN (LZ4_DISTANCE_MAX + 32)
-#define LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)   ( (maxCompressedSize) + LZ4_COMPRESS_INPLACE_MARGIN)  /**< maxCompressedSize is generally LZ4_COMPRESSBOUND(inputSize), but can be set to any lower value, with the risk that compression can fail (return code 0(zero)) */
+#define LZ4_COMPRESS_INPLACE_MARGIN                           (LZ4_DISTANCE_MAX + 32)   /* LZ4_DISTANCE_MAX can be safely replaced by srcSize when it's smaller */
+#define LZ4_COMPRESS_INPLACE_BUFFER_SIZE(maxCompressedSize)   ((maxCompressedSize) + LZ4_COMPRESS_INPLACE_MARGIN)  /**< maxCompressedSize is generally LZ4_COMPRESSBOUND(inputSize), but can be set to any lower value, with the risk that compression can fail (return code 0(zero)) */
 
 #endif   /* LZ4_STATIC_3504398509 */
 #endif   /* LZ4_STATIC_LINKING_ONLY */
