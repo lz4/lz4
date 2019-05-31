@@ -120,6 +120,7 @@
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #endif  /* _MSC_VER */
 
+#define LZ4_FORCE_INLINE static
 #ifndef LZ4_FORCE_INLINE
 #  ifdef _MSC_VER    /* Visual Studio */
 #    define LZ4_FORCE_INLINE static __forceinline
@@ -707,18 +708,19 @@ static const BYTE* LZ4_getPositionOnHash(U32 h, const void* tableBase, tableType
     { const U16* const hashTable = (const U16*) tableBase; return hashTable[h] + srcBase; }   /* default, to ensure a return */
 }
 
-LZ4_FORCE_INLINE const BYTE* LZ4_getPosition(const BYTE* p,
-                                             const void* tableBase, tableType_t tableType,
-                                             const BYTE* srcBase)
+LZ4_FORCE_INLINE const BYTE*
+LZ4_getPosition(const BYTE* p,
+                const void* tableBase, tableType_t tableType,
+                const BYTE* srcBase)
 {
     U32 const h = LZ4_hashPosition(p, tableType);
     return LZ4_getPositionOnHash(h, tableBase, tableType, srcBase);
 }
 
-LZ4_FORCE_INLINE void LZ4_prepareTable(
-        LZ4_stream_t_internal* const cctx,
-        const int inputSize,
-        const tableType_t tableType) {
+LZ4_FORCE_INLINE void
+LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
+           const int inputSize,
+           const tableType_t tableType) {
     /* If compression failed during the previous step, then the context
      * is marked as dirty, therefore, it has to be fully reset.
      */
@@ -733,9 +735,10 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(
      * out if it's safe to leave as is or whether it needs to be reset.
      */
     if (cctx->tableType != clearedTable) {
+        assert(inputSize >= 0);
         if (cctx->tableType != tableType
-          || (tableType == byU16 && cctx->currentOffset + inputSize >= 0xFFFFU)
-          || (tableType == byU32 && cctx->currentOffset > 1 GB)
+          || ((tableType == byU16) && cctx->currentOffset + (unsigned)inputSize >= 0xFFFFU)
+          || ((tableType == byU32) && cctx->currentOffset > 1 GB)
           || tableType == byPtr
           || inputSize >= 4 KB)
         {
@@ -1850,7 +1853,7 @@ LZ4_decompress_generic(
                     if ((!endOnInput) && (cpy != oend)) { goto _output_error; }   /* Error : block decoding must stop exactly there */
                     if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) { goto _output_error; } /* Error : input must be consumed */
                 }
-                memcpy(op, ip, length);
+                memmove(op, ip, length);  /* supports overlapping memory regions, which only matters for in-place decompression scenarios */
                 ip += length;
                 op += length;
                 if (!partialDecoding || (cpy == oend)) {
