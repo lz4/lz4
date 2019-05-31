@@ -343,9 +343,42 @@ static int local_LZ4F_decompress(const char* in, char* out, int inSize, int outS
     assert(inSize >= 0);
     assert(outSize >= 0);
     result = LZ4F_decompress(g_dCtx, out, &dstSize, in, &srcSize, NULL);
-    if (result!=0) { DISPLAY("Error decompressing frame : unfinished frame\n"); exit(8); }
-    if (srcSize != (size_t)inSize) { DISPLAY("Error decompressing frame : read size incorrect\n"); exit(9); }
+    if (result!=0) { DISPLAY("Error decompressing frame : unfinished frame \n"); exit(8); }
+    if (srcSize != (size_t)inSize) { DISPLAY("Error decompressing frame : read size incorrect \n"); exit(9); }
     return (int)dstSize;
+}
+
+static int local_LZ4F_decompress_followHint(const char* src, char* dst, int srcSize, int dstSize)
+{
+    size_t totalInSize = (size_t)srcSize;
+    size_t maxOutSize = (size_t)dstSize;
+
+    size_t inPos = 0;
+    size_t inSize = 0;
+    size_t outPos = 0;
+    size_t outRemaining = maxOutSize - outPos;
+
+    for (;;) {
+        size_t const sizeHint = LZ4F_decompress(g_dCtx, dst+outPos, &outRemaining, src+inPos, &inSize, NULL);
+        assert(!LZ4F_isError(sizeHint));
+
+        inPos += inSize;
+        inSize = sizeHint;
+
+        outPos += outRemaining;
+        outRemaining = maxOutSize - outPos;
+
+        if (!sizeHint) break;
+    }
+
+    /* frame completed */
+    if (inPos != totalInSize) {
+        DISPLAY("Error decompressing frame : must read (%u) full frame (%u) \n",
+                (unsigned)inPos, (unsigned)totalInSize);
+        exit(10);
+    }
+    return (int)outPos;
+
 }
 
 
@@ -446,7 +479,14 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 for (i=0; i<nbChunks; i++) {
                     chunkP[i].id = (U32)i;
                     chunkP[i].origBuffer = in; in += g_chunkSize;
-                    if ((int)remaining > g_chunkSize) { chunkP[i].origSize = g_chunkSize; remaining -= g_chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
+                    assert(g_chunkSize > 0);
+                    if (remaining > (size_t)g_chunkSize) {
+                        chunkP[i].origSize = g_chunkSize;
+                        remaining -= (size_t)g_chunkSize;
+                    } else {
+                        chunkP[i].origSize = (int)remaining;
+                        remaining = 0;
+                    }
                     chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
                     chunkP[i].compressedSize = 0;
                 }
@@ -531,9 +571,15 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 
           nbChunks = (int) (((int)benchedSize + (g_chunkSize-1))/ g_chunkSize);
           for (i=0; i<nbChunks; i++) {
-              chunkP[i].id = i;
+              chunkP[i].id = (U32)i;
               chunkP[i].origBuffer = in; in += g_chunkSize;
-              if ((int)remaining > g_chunkSize) { chunkP[i].origSize = g_chunkSize; remaining -= g_chunkSize; } else { chunkP[i].origSize = (int)remaining; remaining = 0; }
+              if ((int)remaining > g_chunkSize) {
+                  chunkP[i].origSize = g_chunkSize;
+                  remaining -= (size_t)g_chunkSize;
+              } else {
+                  chunkP[i].origSize = (int)remaining;
+                  remaining = 0;
+              }
               chunkP[i].compressedBuffer = out; out += maxCompressedChunkSize;
               chunkP[i].compressedSize = 0;
           }
@@ -546,8 +592,8 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 
         /* Decompression Algorithms */
         for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && g_decompressionTest; dAlgNb++) {
-            const char* dName;
-            int (*decompressionFunction)(const char*, char*, int, int);
+            const char* dName = NULL;
+            int (*decompressionFunction)(const char*, char*, int, int) = NULL;
             double bestTime = 100000000.;
             int checkResult = 1;
 
@@ -565,23 +611,24 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 #ifndef LZ4_DLL_IMPORT
             case 8: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
 #endif
-            case 9: decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress";
-                {   size_t const errorCode = LZ4F_compressFrame(compressed_buff, compressedBuffSize, orig_buff, benchedSize, NULL);
-                    if (LZ4F_isError(errorCode)) {
-                        DISPLAY("Error while preparing compressed frame\n");
-                        free(orig_buff);
-                        free(compressed_buff);
-                        free(chunkP);
-                        return 1;
-                    }
+            case 10:
+            case 11:
+                if (dAlgNb == 10) { decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress"; }  /* can be skipped */
+                if (dAlgNb == 11) { decompressionFunction = local_LZ4F_decompress_followHint; dName = "LZ4F_decompress_followHint"; }  /* can be skipped */
+                /* prepare compressed data using frame format */
+                {   size_t const fcsize = LZ4F_compressFrame(compressed_buff, (size_t)compressedBuffSize, orig_buff, benchedSize, NULL);
+                    assert(!LZ4F_isError(fcsize));
                     chunkP[0].origSize = (int)benchedSize;
-                    chunkP[0].compressedSize = (int)errorCode;
+                    chunkP[0].compressedSize = (int)fcsize;
                     nbChunks = 1;
                     break;
                 }
             default :
                 continue;   /* skip if unknown ID */
             }
+
+            assert(decompressionFunction != NULL);
+            assert(dName != NULL);
 
             { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
 
