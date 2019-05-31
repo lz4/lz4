@@ -1708,10 +1708,9 @@ LZ4_decompress_generic(
             /* get matchlength */
             length = token & ML_MASK;
 
-            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
-
             if (length == ML_MASK) {
               variable_length_error error = ok;
+              if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
               length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
               if (error != ok) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
@@ -1735,6 +1734,7 @@ LZ4_decompress_generic(
                         continue;
             }   }   }
 
+            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
