@@ -28,7 +28,7 @@ jobs:
     # https://circleci.com/docs/2.0/circleci-images/
     docker:
     - image: fbopensource/zstd-circleci-primary:0.0.1 # circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-      command: /sbin/init
+    #   command: /sbin/init
     steps:
     # Machine Setup
     #   If you break your build into multiple jobs with workflows, you will probably want to do the parts of this that are relevant in each
