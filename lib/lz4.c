@@ -120,7 +120,6 @@
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
 #endif  /* _MSC_VER */
 
-#define LZ4_FORCE_INLINE static
 #ifndef LZ4_FORCE_INLINE
 #  ifdef _MSC_VER    /* Visual Studio */
 #    define LZ4_FORCE_INLINE static __forceinline
