@@ -27,7 +27,7 @@ jobs:
     # To see the list of pre-built images that CircleCI provides for most common languages see
     # https://circleci.com/docs/2.0/circleci-images/
     docker:
-    - image: fbopensource/zstd-circleci-primary:0.0.1 # circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37 
+    - image: ephiepark/lz4-circleci-primary:0.0.1 # circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37 
     #   command: /sbin/init
     steps:
     # Machine Setup
