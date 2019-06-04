@@ -27,7 +27,7 @@ jobs:
     # To see the list of pre-built images that CircleCI provides for most common languages see
     # https://circleci.com/docs/2.0/circleci-images/
     docker:
-    - image: fbopensource/zstd-circleci-primary:0.0.1 # circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
+    - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37 # fbopensource/zstd-circleci-primary:0.0.1 
     #   command: /sbin/init
     steps:
     # Machine Setup
@@ -41,33 +41,33 @@ jobs:
     # Dependencies
     #   This would typically go in either a build or a build-and-test job when using workflows
     # Restore the dependency cache
-    - restore_cache:
-        keys:
-        # This branch if available
-        - v1-dep-{{ .Branch }}-
-        # Default branch if not
-        - v1-dep-dev-
-        # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
-        - v1-dep-
+    # - restore_cache:
+    #     keys:
+    #     # This branch if available
+    #     - v1-dep-{{ .Branch }}-
+    #     # Default branch if not
+    #     - v1-dep-dev-
+    #     # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
+    #     - v1-dep-
     # This is based on your 1.0 configuration file or project settings
     # - run: sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; sudo apt-get -y -qq update
     # - run: sudo apt-get -y install qemu-system-ppc qemu-user-static gcc-powerpc-linux-gnu
     # - run: sudo apt-get -y install qemu-system-arm gcc-arm-linux-gnueabi libc6-dev-armel-cross gcc-aarch64-linux-gnu libc6-dev-arm64-cross
     # - run: sudo apt-get -y install libc6-dev-i386 clang gcc-5 gcc-5-multilib gcc-6 valgrind
     # Save dependency cache
-    - save_cache:
-        key: v1-dep-{{ .Branch }}-{{ epoch }}
-        paths:
-        # This is a broad list of cache paths to include many possible development environments
-        # You can probably delete some of these entries
-        - vendor/bundle
-        - ~/virtualenvs
-        - ~/.m2
-        - ~/.ivy2
-        - ~/.bundle
-        - ~/.go_workspace
-        - ~/.gradle
-        - ~/.cache/bower
+    # - save_cache:
+    #     key: v1-dep-{{ .Branch }}-{{ epoch }}
+    #     paths:
+    #     # This is a broad list of cache paths to include many possible development environments
+    #     # You can probably delete some of these entries
+    #     - vendor/bundle
+    #     - ~/virtualenvs
+    #     - ~/.m2
+    #     - ~/.ivy2
+    #     - ~/.bundle
+    #     - ~/.go_workspace
+    #     - ~/.gradle
+    #     - ~/.cache/bower
     # Test
     #   This would typically be a build job when using workflows, possibly combined with build
     # This is based on your 1.0 configuration file or project settings
