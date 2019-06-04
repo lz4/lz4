@@ -1725,14 +1725,13 @@ LZ4_decompress_generic(
                 }
 
                 /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
-                if (!(dict == usingExtDict) || (match >= lowPrefix)) {
-                    if (offset >= 8) {
+                if ((offset >= 8) && (!(dict == usingExtDict) || (match >= lowPrefix))) {
                         memcpy(op, match, 8);
                         memcpy(op+8, match+8, 8);
                         memcpy(op+16, match+16, 2);
                         op += length;
                         continue;
-            }   }   }
+            }   }
 
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
