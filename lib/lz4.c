@@ -1664,7 +1664,7 @@ LZ4_decompress_generic(
             assert(!endOnInput || ip <= iend); /* ip < iend before the increment */
 
             /* decode literal length */
-            if (length == RUN_MASK) {
+            if (unlikely(length == RUN_MASK)) {
                 variable_length_error error = ok;
                 length += read_variable_length(&ip, iend-RUN_MASK, endOnInput, endOnInput, &error);
                 if (error == initial_error) { goto _output_error; }
@@ -1688,7 +1688,7 @@ LZ4_decompress_generic(
                 if (endOnInput) {  /* LZ4_decompress_safe() */
                     DEBUGLOG(7, "copy %u bytes in a 16-bytes stripe", (unsigned)length);
                     /* We don't need to check oend, since we check it once for each loop below */
-                    if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { goto safe_literal_copy; }
+                    if (unlikely(ip > iend-(16 + 1/*max lit + offset + nextToken*/))) { goto safe_literal_copy; }
                     /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
                     memcpy(op, ip, 16);
                 } else {  /* LZ4_decompress_fast() */
@@ -1707,7 +1707,7 @@ LZ4_decompress_generic(
             /* get matchlength */
             length = token & ML_MASK;
 
-            if (length == ML_MASK) {
+            if (unlikely(length == ML_MASK)) {
               variable_length_error error = ok;
               if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
               length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
