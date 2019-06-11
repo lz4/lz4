@@ -1717,6 +1717,7 @@ LZ4_decompress_generic(
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
                     goto safe_match_copy;
                 }
+                goto skip_dup_check;
             } else {
                 length += MINMATCH;
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
@@ -1743,6 +1744,7 @@ LZ4_decompress_generic(
             }   }   }
 
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
+skip_dup_check:
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
