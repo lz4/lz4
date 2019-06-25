@@ -194,5 +194,11 @@ matrix:
         - pushd build
         - DESTDIR=./staging ninja install
         - tree ./staging
+
+    # oss-fuzz compilation test
+    - name: Compile OSS-Fuzz targets
+      script:
+        - ./ossfuzz/travisoss.sh
+
   allow_failures:
     - env: ALLOW_FAILURES=true

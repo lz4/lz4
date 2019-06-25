@@ -34,6 +34,7 @@ LZ4DIR  = lib
 PRGDIR  = programs
 TESTDIR = tests
 EXDIR   = examples
+FUZZDIR = ossfuzz
 
 include Makefile.inc
 
