@@ -21,7 +21,8 @@
 #  - LZ4 homepage : http://www.lz4.org
 #  - LZ4 source repository : https://github.com/lz4/lz4
 # ##########################################################################
-# lz4_fuzzer : OSS Fuzz test tool
+# compress_fuzzer : OSS Fuzz test tool
+# decompress_fuzzer : OSS Fuzz test tool
 # ##########################################################################
 
 LZ4DIR  := ../lib
@@ -44,8 +45,8 @@ $(LZ4DIR)/liblz4.a:
 %.o: %.cc
 	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $< -o $@
 
-.PHONY: compress_fuzzer
-compress_fuzzer: compress_fuzzer.o $(LZ4DIR)/liblz4.a
+# Generic rule for generating fuzzers
+%_fuzzer: %_fuzzer.o $(LZ4DIR)/liblz4.a
 	# Compile the standalone code just in case. The OSS-Fuzz code might
 	# override the LIB_FUZZING_ENGINE value to "-fsanitize=fuzzer"
 	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) standaloneengine.cc -o standaloneengine.o
