@@ -30,9 +30,9 @@ LIB_FUZZING_ENGINE ?= standaloneengine.o
 DEBUGLEVEL?= 1
 DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
 
-CFLAGS  += -I$(LZ4DIR) $(DEBUGFLAGS) $(MOREFLAGS)
-CPPFLAGS+= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
-FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+CFLAGS   += -I$(LZ4DIR) $(DEBUGFLAGS) $(MOREFLAGS)
+CXXFLAGS += -I$(LZ4DIR) $(DEBUGFLAGS) $(MOREFLAGS)
+CPPFLAGS += -DXXH_NAMESPACE=LZ4_
 
 include ../Makefile.inc
 
@@ -42,13 +42,13 @@ $(LZ4DIR)/liblz4.a:
 	$(MAKE) -C $(LZ4DIR) CFLAGS="$(CFLAGS)" liblz4.a
 
 %.o: %.cc
-	$(CXX) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $< -o $@
 
 .PHONY: compress_fuzzer
 compress_fuzzer: compress_fuzzer.o $(LZ4DIR)/liblz4.a
 	# Compile the standalone code just in case. The OSS-Fuzz code might
 	# override the LIB_FUZZING_ENGINE value to "-fsanitize=fuzzer"
-	$(CXX) -c $(CFLAGS) $(CPPFLAGS) standaloneengine.cc -o standaloneengine.o
+	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) standaloneengine.cc -o standaloneengine.o
 
 	# Now compile the actual fuzzer.
-	$(CXX) $(FLAGS) $(LIB_FUZZING_ENGINE) $^ -o $@$(EXT)
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) $(LIB_FUZZING_ENGINE) $^ -o $@$(EXT)

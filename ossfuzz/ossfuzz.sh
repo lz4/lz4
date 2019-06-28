@@ -6,14 +6,11 @@
 # Save off the current folder as the build root.
 export BUILD_ROOT=$PWD
 
-# lz4 uses CPPFLAGS rather than CXX flags.
-export CPPFLAGS="${CXXFLAGS}"
-
 echo "CC: $CC"
 echo "CXX: $CXX"
 echo "LIB_FUZZING_ENGINE: $LIB_FUZZING_ENGINE"
 echo "CFLAGS: $CFLAGS"
-echo "CPPFLAGS: $CPPFLAGS"
+echo "CXXFLAGS: $CXXFLAGS"
 echo "OUT: $OUT"
 
 export MAKEFLAGS+="-j$(nproc)"
