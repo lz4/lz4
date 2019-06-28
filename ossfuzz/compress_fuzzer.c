@@ -5,7 +5,7 @@
 
 #define CHECK(COND)   if (!(COND)) { abort(); }
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
   size_t const compressed_dest_size = LZ4_compressBound(size);
   char *const dest_buffer = (char *)malloc(compressed_dest_size);

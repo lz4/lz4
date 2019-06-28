@@ -42,14 +42,20 @@ include ../Makefile.inc
 $(LZ4DIR)/liblz4.a:
 	$(MAKE) -C $(LZ4DIR) CFLAGS="$(CFLAGS)" liblz4.a
 
-%.o: %.cc
-	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $< -o $@
+%.o: %.c
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 # Generic rule for generating fuzzers
 %_fuzzer: %_fuzzer.o $(LZ4DIR)/liblz4.a
 	# Compile the standalone code just in case. The OSS-Fuzz code might
 	# override the LIB_FUZZING_ENGINE value to "-fsanitize=fuzzer"
-	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) standaloneengine.cc -o standaloneengine.o
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) standaloneengine.c -o standaloneengine.o
 
 	# Now compile the actual fuzzer.
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) $(LIB_FUZZING_ENGINE) $^ -o $@$(EXT)
+
+%_fuzzer_clean:
+	$(RM) $*_fuzzer $*_fuzzer.o standaloneengine.o
+
+.PHONY: clean
+clean: compress_fuzzer_clean decompress_fuzzer_clean
