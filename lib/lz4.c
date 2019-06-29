@@ -1703,6 +1703,7 @@ LZ4_decompress_generic(
             /* get offset */
             offset = LZ4_readLE16(ip); ip+=2;
             match = op - offset;
+            assert(match <= op);
 
             /* get matchlength */
             length = token & ML_MASK;
@@ -1724,8 +1725,12 @@ LZ4_decompress_generic(
                 }
 
                 /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
-                if (!(dict == usingExtDict) || (match >= lowPrefix)) {
+                if ((dict == withPrefix64k) || (match >= lowPrefix)) {
                     if (offset >= 8) {
+                        assert(match >= lowPrefix);
+                        assert(match <= op);
+                        assert(op + 18 <= oend);
+
                         memcpy(op, match, 8);
                         memcpy(op+8, match+8, 8);
                         memcpy(op+16, match+16, 2);
@@ -1873,7 +1878,6 @@ LZ4_decompress_generic(
             length = token & ML_MASK;
 
     _copy_match:
-            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
             if (!partialDecoding) {
                 assert(oend > op);
                 assert(oend - op >= 4);
@@ -1891,6 +1895,7 @@ LZ4_decompress_generic(
 #if LZ4_FAST_DEC_LOOP
         safe_match_copy:
 #endif
+            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
@@ -1918,6 +1923,7 @@ LZ4_decompress_generic(
                 }   }
                 continue;
             }
+            assert(match >= lowPrefix);
 
             /* copy match within block */
             cpy = op + length;
