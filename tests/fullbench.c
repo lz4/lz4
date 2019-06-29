@@ -541,9 +541,10 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                     if (initFunction!=NULL) initFunction();
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
-                        if (chunkP[chunkNb].compressedSize==0)
-                            DISPLAY("ERROR ! %s() = 0 !! \n", compressorName), exit(1);
-                    }
+                        if (chunkP[chunkNb].compressedSize==0) {
+                            DISPLAY("ERROR ! %s() = 0 !! \n", compressorName);
+                            exit(1);
+                    }   }
                     nb_loops++;
                 }
                 clockTime = BMK_GetClockSpan(clockTime);
@@ -551,7 +552,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 nb_loops += !nb_loops;   /* avoid division by zero */
                 averageTime = ((double)clockTime) / nb_loops / CLOCKS_PER_SEC;
                 if (averageTime < bestTime) bestTime = averageTime;
-                cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += chunkP[chunkNb].compressedSize;
+                cSize=0; for (chunkNb=0; chunkNb<nbChunks; chunkNb++) cSize += (size_t)chunkP[chunkNb].compressedSize;
                 ratio = (double)cSize/(double)benchedSize*100.;
                 PROGRESS("%2i-%-34.34s :%10i ->%9i (%5.2f%%),%7.1f MB/s\r", loopNb, compressorName, (int)benchedSize, (int)cSize, ratio, (double)benchedSize / bestTime / 1000000);
             }
@@ -586,9 +587,10 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
         }
         for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
             chunkP[chunkNb].compressedSize = LZ4_compress_default(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize, maxCompressedChunkSize);
-            if (chunkP[chunkNb].compressedSize==0)
-                DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress"), exit(1);
-        }
+            if (chunkP[chunkNb].compressedSize==0) {
+                DISPLAY("ERROR ! %s() = 0 !! \n", "LZ4_compress");
+                exit(1);
+        }   }
 
         /* Decompression Algorithms */
         for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && g_decompressionTest; dAlgNb++) {

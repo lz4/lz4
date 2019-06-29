@@ -126,7 +126,7 @@ static U32 FUZ_highbit32(U32 v32)
 {
     unsigned nbBits = 0;
     if (v32==0) return 0;
-    while (v32) v32 >>= 1, nbBits++;
+    while (v32) { v32 >>= 1; nbBits++; }
     return nbBits;
 }
 
@@ -766,8 +766,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             if (blockSize > missingBytes) {
                 decodedBuffer[blockSize-missingBytes] = 0;
                 ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize-missingBytes, dict, dictSize);
-                FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : output buffer too small (-%u byte)", missingBytes);
-                FUZ_CHECKTEST(decodedBuffer[blockSize-missingBytes], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-%u byte) (blockSize=%i)", missingBytes, blockSize);
+                FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : output buffer too small (-%i byte)", missingBytes);
+                FUZ_CHECKTEST(decodedBuffer[blockSize-missingBytes], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-%i byte) (blockSize=%i)", missingBytes, blockSize);
         }   }
 
         /* Compress using external dictionary stream */
