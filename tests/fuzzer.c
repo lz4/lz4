@@ -563,6 +563,42 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 FUZ_CHECKTEST(decodedBuffer[blockSize-10], "LZ4_decompress_safe overrun specified output buffer size");
             }
 
+            /* noisy src decompression test */
+
+            /* insert noise into src */
+            {   U32 const maxNbBits = FUZ_highbit32((U32)compressedSize);
+                size_t pos = 0;
+                for (;;) {
+                    /* keep some original src */
+                    {   U32 const nbBits = FUZ_rand(&randState) % maxNbBits;
+                        size_t const mask = (1<<nbBits) - 1;
+                        size_t const skipLength = FUZ_rand(&randState) & mask;
+                        pos += skipLength;
+                    }
+                    if (pos >= (size_t)compressedSize) break;
+                    /* add noise */
+                    {   U32 const nbBitsCodes = FUZ_rand(&randState) % maxNbBits;
+                        U32 const nbBits = nbBitsCodes ? nbBitsCodes-1 : 0;
+                        size_t const mask = (1<<nbBits) - 1;
+                        size_t const rNoiseLength = (FUZ_rand(&randState) & mask) + 1;
+                        size_t const noiseLength = MIN(rNoiseLength, (size_t)compressedSize-pos);
+                        size_t const noiseStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - noiseLength);
+                        memcpy(cBuffer_exact + pos, (const char*)CNBuffer + noiseStart, noiseLength);
+                        pos += noiseLength;
+            }   }   }
+
+            /* decompress noisy source */
+            FUZ_DISPLAYTEST("decompress noisy source ");
+            {   U32 const endMark = 0xA9B1C3D6;
+                memcpy(decodedBuffer+blockSize, &endMark, sizeof(endMark));
+                {   int const decompressResult = LZ4_decompress_safe(cBuffer_exact, decodedBuffer, compressedSize, blockSize);
+                    /* result *may* be an unlikely success, but even then, it must strictly respect dst buffer boundaries */
+                    FUZ_CHECKTEST(decompressResult > blockSize, "LZ4_decompress_safe on noisy src : result is too large : %u > %u (dst buffer)", (unsigned)decompressResult, (unsigned)blockSize);
+                }
+                {   U32 endCheck; memcpy(&endCheck, decodedBuffer+blockSize, sizeof(endCheck));
+                    FUZ_CHECKTEST(endMark!=endCheck, "LZ4_decompress_safe on noisy src : dst buffer overflow");
+            }   }   /* noisy src decompression test */
+
             free(cBuffer_exact);
         }
 
@@ -590,42 +626,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_CHECKTEST(decResult != targetSize, "LZ4_decompress_safe_partial did not regenerated required amount of data (%i < %i <= %i)", decResult, targetSize, blockSize);
             FUZ_CHECKTEST(decodedBuffer[targetSize] != sentinel, "LZ4_decompress_safe_partial overwrite beyond requested size (though %i <= %i <= %i)", decResult, targetSize, blockSize);
         }
-
-        /* noisy src decompression test */
-        {
-            /* insert noise into src */
-            {   U32 const maxNbBits = FUZ_highbit32((U32)compressedSize);
-                size_t pos = 0;
-                for (;;) {
-                    /* keep some original src */
-                    {   U32 const nbBits = FUZ_rand(&randState) % maxNbBits;
-                        size_t const mask = (1<<nbBits) - 1;
-                        size_t const skipLength = FUZ_rand(&randState) & mask;
-                        pos += skipLength;
-                    }
-                    if (pos >= (size_t)compressedSize) break;
-                    /* add noise */
-                    {   U32 const nbBitsCodes = FUZ_rand(&randState) % maxNbBits;
-                        U32 const nbBits = nbBitsCodes ? nbBitsCodes-1 : 0;
-                        size_t const mask = (1<<nbBits) - 1;
-                        size_t const rNoiseLength = (FUZ_rand(&randState) & mask) + 1;
-                        size_t const noiseLength = MIN(rNoiseLength, (size_t)compressedSize-pos);
-                        size_t const noiseStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - noiseLength);
-                        memcpy(compressedBuffer + pos, (const char*)CNBuffer + noiseStart, noiseLength);
-                        pos += noiseLength;
-            }   }   }
-
-            /* decompress noisy source */
-            FUZ_DISPLAYTEST("decompress noisy source \n");
-            {   U32 const endMark = 0xA9B1C3D6;
-                memcpy(decodedBuffer+blockSize, &endMark, sizeof(endMark));
-                {   int const decompressResult = LZ4_decompress_safe(compressedBuffer, decodedBuffer, compressedSize, blockSize);
-                    /* result *may* be an unlikely success, but even then, it must strictly respect dst buffer boundaries */
-                    FUZ_CHECKTEST(decompressResult > blockSize, "LZ4_decompress_safe on noisy src : result is too large : %u > %u (dst buffer)", (unsigned)decompressResult, (unsigned)blockSize);
-                }
-                {   U32 endCheck; memcpy(&endCheck, decodedBuffer+blockSize, sizeof(endCheck));
-                    FUZ_CHECKTEST(endMark!=endCheck, "LZ4_decompress_safe on noisy src : dst buffer overflow");
-        }   }   }   /* noisy src decompression test */
 
         /* Test Compression with limited output size */
 
@@ -713,7 +713,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         blockContinueCompressedSize = LZ4_compress_fast_continue(&LZ4dictBody, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_fast_continue failed");
 
-        FUZ_DISPLAYTEST("test LZ4_compress_fast_continue() with dictionary but with an output buffer too short by one byte");
+        FUZ_DISPLAYTEST("LZ4_compress_fast_continue() with dictionary and output buffer too short by one byte");
         LZ4_loadDict(&LZ4dictBody, dict, dictSize);
         ret = LZ4_compress_fast_continue(&LZ4dictBody, block, compressedBuffer, blockSize, blockContinueCompressedSize-1, 1);
         FUZ_CHECKTEST(ret>0, "LZ4_compress_fast_continue using ExtDict should fail : one missing byte for output buffer : %i written, %i buffer", ret, blockContinueCompressedSize);
