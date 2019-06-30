@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 enum {
     MESSAGE_MAX_BYTES   = 1024,
@@ -39,7 +40,8 @@ size_t write_int32(FILE* fp, int32_t i) {
 }
 
 size_t write_bin(FILE* fp, const void* array, int arrayBytes) {
-    return fwrite(array, 1, arrayBytes, fp);
+    assert(arrayBytes >= 0);
+    return fwrite(array, 1, (size_t)arrayBytes, fp);
 }
 
 size_t read_int32(FILE* fp, int32_t* i) {
@@ -47,7 +49,8 @@ size_t read_int32(FILE* fp, int32_t* i) {
 }
 
 size_t read_bin(FILE* fp, void* array, int arrayBytes) {
-    return fread(array, 1, arrayBytes, fp);
+    assert(arrayBytes >= 0);
+    return fread(array, 1, (size_t)arrayBytes, fp);
 }
 
 
@@ -174,7 +177,7 @@ int main(int argc, const char** argv)
         return 0;
     }
 
-    if (!strcmp(argv[1], "-p")) pause = 1, fileID = 2;
+    if (!strcmp(argv[1], "-p")) { pause = 1; fileID = 2; }
 
     snprintf(inpFilename, 256, "%s", argv[fileID]);
     snprintf(lz4Filename, 256, "%s.lz4s-%d", argv[fileID], 9);
