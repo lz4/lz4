@@ -1236,7 +1236,7 @@ int main(int argc, const char** argv)
     DISPLAY("Seed = %u\n", seed);
     if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) DISPLAY("Compressibility : %i%%\n", proba);
 
-    if (nbTests<=0) nbTests=1;
+    nbTests += (nbTests==0);  /* avoid zero */
 
     if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
     if (result) return 1;
