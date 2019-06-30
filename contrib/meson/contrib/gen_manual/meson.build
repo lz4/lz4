@@ -22,6 +22,7 @@ gen_manual = executable('gen_manual',
   join_paths(lz4_root_dir, 'contrib/gen_manual/gen_manual.cpp'),
   cpp_args: gen_manual_cppflags,
   include_directories: gen_manual_includes,
+  native: true,
   install: false)
 
 # Update lz4 manual
