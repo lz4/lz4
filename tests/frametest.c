@@ -766,18 +766,20 @@ typedef enum { o_contiguous, o_noncontiguous, o_overwrite } o_scenario_e;
 
 static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, o_scenario_e o_scenario)
 {
-    size_t p=0;
-    const BYTE* b1=(const BYTE*)buff1;
-    const BYTE* b2=(const BYTE*)buff2;
-    DISPLAY("locateBuffDiff: looking for error position \n");
-    if (o_scenario != o_contiguous) {
-        DISPLAY("mode %i: non-contiguous output (%u bytes), cannot search \n",
-                (int)o_scenario, (unsigned)size);
-        return;
-    }
-    while (p < size && b1[p]==b2[p]) p++;
-    if (p != size) {
-        DISPLAY("Error at pos %i/%i : %02X != %02X \n", (int)p, (int)size, b1[p], b2[p]);
+    if (displayLevel >= 5) {
+        size_t p=0;
+        const BYTE* b1=(const BYTE*)buff1;
+        const BYTE* b2=(const BYTE*)buff2;
+        DISPLAY("locateBuffDiff: looking for error position \n");
+        if (o_scenario != o_contiguous) {
+            DISPLAY("mode %i: non-contiguous output (%u bytes), cannot search \n",
+                    (int)o_scenario, (unsigned)size);
+            return;
+        }
+        while (p < size && b1[p]==b2[p]) p++;
+        if (p != size) {
+            DISPLAY("Error at pos %i/%i : %02X != %02X \n", (int)p, (int)size, b1[p], b2[p]);
+        }
     }
 }
 
@@ -825,6 +827,8 @@ size_t test_lz4f_decompression_wBuffers(
         if (o_scenario == o_overwrite) dOptions.stableDst = 0;  /* overwrite mode */
         if (op + oSizeMax < oend) op[oSizeMax] = mark;
 
+        DISPLAYLEVEL(7, "dstCapacity=%u,  presentedInput=%u \n", (unsigned)oSize, (unsigned)iSize);
+
         /* read data from byte-exact buffer to catch out-of-bound reads */
         {   void* const iBuffer = malloc(iSizeMax);
             assert(iBuffer != NULL);
@@ -832,6 +836,7 @@ size_t test_lz4f_decompression_wBuffers(
             moreToFlush = LZ4F_decompress(dCtx, op, &oSize, iBuffer, &iSize, &dOptions);
             free(iBuffer);
         }
+        DISPLAYLEVEL(7, "oSize=%u,  readSize=%u \n", (unsigned)oSize, (unsigned)iSize);
 
         if (op + oSizeMax < oend) {
             CHECK(op[oSizeMax] != mark, "op[oSizeMax] = %02X != %02X : "
@@ -846,8 +851,14 @@ size_t test_lz4f_decompression_wBuffers(
         totalOut += oSize;
         op += oSize;
         ip += iSize;
-        op += (o_scenario == o_noncontiguous);  /* create a gap between consecutive output */
+        if (o_scenario == o_noncontiguous) {
+            if (op == oend) return LZ4F_ERROR_GENERIC;  /* can theoretically happen with bogus data */
+            op++; /* create a gap between consecutive output */
+        }
         if (o_scenario==o_overwrite) op = (BYTE*)dst;   /* overwrite destination */
+        if ( (op == oend) /* no more room for output; can happen with bogus input */
+          && (iSize == 0)) /* no input consumed */
+            break;
     }
     if (moreToFlush != 0) return LZ4F_ERROR_decompressionFailed;
     if (totalOut) {  /* otherwise, it's a skippable frame */
@@ -870,7 +881,7 @@ size_t test_lz4f_decompression(const void* cSrc, size_t cSize,
     o_scenario_e const o_scenario = (o_scenario_e)(FUZ_rand(randState) % 3);   /* 0 : contiguous; 1 : non-contiguous; 2 : dst overwritten */
     /* tighten dst buffer conditions */
     size_t const dstCapacity = (o_scenario == o_noncontiguous) ?
-                               (decompressedSize * 2) + 64 :
+                               (decompressedSize * 2) + 128 :
                                decompressedSize;
     size_t result;
     void* const dstBuffer = malloc(dstCapacity);
@@ -1023,7 +1034,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
 
         /* multi-segments decompression */
-        printf("normal decompression \n");
+        DISPLAYLEVEL(6, "normal decompression \n");
         {   size_t result = test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtx, seed, testNb);
             CHECK (LZ4F_isError(result), "multi-segment decompression failed (error %i => %s)",
                                         (int)result, LZ4F_getErrorName(result));
@@ -1053,7 +1064,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         }   }   }
 
         /* test decompression on noisy src */
-        printf("noisy decompression \n");
+        DISPLAYLEVEL(6, "noisy decompression \n");
         test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtxNoise, seed, testNb);
         /* note : we don't analyze result here : it probably failed, which is expected.
          * We just check for potential out-of-bound reads and writes. */
