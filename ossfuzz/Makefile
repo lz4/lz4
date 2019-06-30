@@ -35,8 +35,6 @@ LZ4_CFLAGS  = $(CFLAGS) $(DEBUGFLAGS) $(MOREFLAGS)
 LZ4_CXXFLAGS = $(CXXFLAGS) $(DEBUGFLAGS) $(MOREFLAGS)
 LZ4_CPPFLAGS = $(CPPFLAGS) -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 
-include ../Makefile.inc
-
 # Include a rule to build the static library if calling this target
 # directly.
 $(LZ4DIR)/liblz4.a:
