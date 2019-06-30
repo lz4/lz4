@@ -1528,8 +1528,8 @@ int main(int argc, const char** argv)
     U32 seed = 0;
     int seedset = 0;
     int argNb;
-    int nbTests = NB_ATTEMPTS;
-    int testNb = 0;
+    unsigned nbTests = NB_ATTEMPTS;
+    unsigned testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
     int use_pause = 0;
     const char* programName = argv[0];
@@ -1567,7 +1567,7 @@ int main(int argc, const char** argv)
                     nbTests = 0; duration = 0;
                     while ((*argument>='0') && (*argument<='9')) {
                         nbTests *= 10;
-                        nbTests += *argument - '0';
+                        nbTests += (unsigned)(*argument - '0');
                         argument++;
                     }
                     break;
@@ -1590,7 +1590,7 @@ int main(int argc, const char** argv)
                             case '6':
                             case '7':
                             case '8':
-                            case '9': duration *= 10; duration += *argument++ - '0'; continue;
+                            case '9': duration *= 10; duration += (U32)(*argument++ - '0'); continue;
                         }
                         break;
                     }
@@ -1601,7 +1601,7 @@ int main(int argc, const char** argv)
                     seed=0; seedset=1;
                     while ((*argument>='0') && (*argument<='9')) {
                         seed *= 10;
-                        seed += *argument - '0';
+                        seed += (U32)(*argument - '0');
                         argument++;
                     }
                     break;
@@ -1611,7 +1611,7 @@ int main(int argc, const char** argv)
                     testNb=0;
                     while ((*argument>='0') && (*argument<='9')) {
                         testNb *= 10;
-                        testNb += *argument - '0';
+                        testNb += (unsigned)(*argument - '0');
                         argument++;
                     }
                     break;
