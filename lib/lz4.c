@@ -1782,17 +1782,50 @@ LZ4_decompress_generic(
 
                 /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
                 if ((dict == withPrefix64k) || (match >= lowPrefix)) {
-                    if (offset >= 8) {
-                        assert(match >= lowPrefix);
-                        assert(match <= op);
-                        assert(op + 18 <= oend);
-
+                    assert(match >= lowPrefix);
+                    assert(match <= op);
+                    assert(op + 18 <= oend);
+#if defined(__i386__) || defined(__x86_64__)
+/**
+ * Sperate offset to 3 parts for best performance.
+ * Note that there might be negative impact on branch prediction.
+ * Not only offset >=8 but also offset[0,8) will be handled as well.
+ */
+                    if (likely(offset >= 16)) {
+                        memcpy(op, match, 16);
+                        memcpy(op+16, match+16, 2);
+                        op += length;
+                        continue;
+                    } else if (offset >= 8) {
                         memcpy(op, match, 8);
                         memcpy(op+8, match+8, 8);
                         memcpy(op+16, match+16, 2);
                         op += length;
                         continue;
-            }   }   }
+                    } else {
+                        cpy = op + length;
+                        op[0] = match[0];
+                        op[1] = match[1];
+                        op[2] = match[2];
+                        op[3] = match[3];
+                        match += inc32table[offset];
+                        memcpy(op+4, match, 4);
+                        match -= dec64table[offset];
+                        op += 8;
+                        do { memcpy(op,match,8); op+=8; match+=8; } while (op<cpy);
+                        op = cpy;
+                        continue;
+                    }
+#else /* ARM64 */
+                    if (offset >= 8) {
+                        memcpy(op, match, 8);
+                        memcpy(op+8, match+8, 8);
+                        memcpy(op+16, match+16, 2);
+                        op += length;
+                        continue;
+                    }
+#endif
+            }   }
 
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
