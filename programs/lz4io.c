@@ -219,8 +219,8 @@ size_t LZ4IO_setBlockSizeID(LZ4IO_prefs_t* const prefs, unsigned bsid)
     static const unsigned minBlockSizeID = 4;
     static const unsigned maxBlockSizeID = 7;
     if ((bsid < minBlockSizeID) || (bsid > maxBlockSizeID)) return 0;
-    prefs->blockSizeId = bsid;
-    prefs->blockSize = blockSizeTable[prefs->blockSizeId-minBlockSizeID];
+    prefs->blockSizeId = (int)bsid;
+    prefs->blockSize = blockSizeTable[(unsigned)prefs->blockSizeId-minBlockSizeID];
     return prefs->blockSize;
 }
 
@@ -237,7 +237,7 @@ size_t LZ4IO_setBlockSize(LZ4IO_prefs_t* const prefs, size_t blockSize)
     while (blockSize >>= 2)
         bsid++;
     if (bsid < 7) bsid = 7;
-    prefs->blockSizeId = bsid-3;
+    prefs->blockSizeId = (int)(bsid-3);
     return prefs->blockSize;
 }
 
@@ -417,7 +417,7 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_
 
     /* Allocate Memory */
     in_buff = (char*)malloc(LEGACY_BLOCKSIZE);
-    out_buff = (char*)malloc(outBuffSize + 4);
+    out_buff = (char*)malloc((size_t)outBuffSize + 4);
     if (!in_buff || !out_buff)
         EXM_THROW(21, "Allocation error : not enough memory");
 
@@ -898,7 +898,7 @@ static unsigned long long LZ4IO_decodeLegacyStream(LZ4IO_prefs_t* const prefs, F
     unsigned storedSkips = 0;
 
     /* Allocate Memory */
-    char* const in_buff  = (char*)malloc(LZ4_compressBound(LEGACY_BLOCKSIZE));
+    char* const in_buff  = (char*)malloc((size_t)LZ4_compressBound(LEGACY_BLOCKSIZE));
     char* const out_buff = (char*)malloc(LEGACY_BLOCKSIZE);
     if (!in_buff || !out_buff) EXM_THROW(51, "Allocation error : not enough memory");
 
@@ -922,11 +922,11 @@ static unsigned long long LZ4IO_decodeLegacyStream(LZ4IO_prefs_t* const prefs, F
           if (sizeCheck!=blockSize) EXM_THROW(52, "Read error : cannot access compressed block !"); }
 
         /* Decode Block */
-        {   int const decodeSize = LZ4_decompress_safe(in_buff, out_buff, blockSize, LEGACY_BLOCKSIZE);
+        {   int const decodeSize = LZ4_decompress_safe(in_buff, out_buff, (int)blockSize, LEGACY_BLOCKSIZE);
             if (decodeSize < 0) EXM_THROW(53, "Decoding Failed ! Corrupted input detected !");
-            streamSize += decodeSize;
+            streamSize += (unsigned long long)decodeSize;
             /* Write Block */
-            storedSkips = LZ4IO_fwriteSparse(prefs, foutput, out_buff, decodeSize, storedSkips); /* success or die */
+            storedSkips = LZ4IO_fwriteSparse(prefs, foutput, out_buff, (size_t)decodeSize, storedSkips); /* success or die */
     }   }
     if (ferror(finput)) EXM_THROW(54, "Read error : ferror");
 
