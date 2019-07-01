@@ -1710,7 +1710,6 @@ LZ4_decompress_generic(
 
             if (length == ML_MASK) {
               variable_length_error error = ok;
-              if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
               length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
               if (error != ok) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
@@ -1726,7 +1725,16 @@ LZ4_decompress_generic(
 
                 /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
                 if ((dict == withPrefix64k) || (match >= lowPrefix)) {
-                    if (offset >= 8) {
+                    if (offset >= 16) {
+                        assert(match >= lowPrefix);
+                        assert(match <= op);
+                        assert(op + 18 <= oend);
+
+                        memcpy(op, match, 16);
+                        memcpy(op+16, match+16, 2);
+                        op += length;
+                        continue;
+                     } else if (offset >= 8) {
                         assert(match >= lowPrefix);
                         assert(match <= op);
                         assert(op + 18 <= oend);
