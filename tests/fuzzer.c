@@ -861,7 +861,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST("LZ4_decompress_safe_usingDict with a too small output buffer");
         {   U32 const missingBytes = (FUZ_rand(&randState) & 0xF) + 2;
             if ((U32)blockSize > missingBytes) {
-                decodedBuffer[blockSize-missingBytes] = 0;
+                decodedBuffer[(U32)blockSize-missingBytes] = 0;
                 ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize-missingBytes, dict, dictSize);
                 FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : output buffer too small (-%u byte)", missingBytes);
                 FUZ_CHECKTEST(decodedBuffer[blockSize-missingBytes], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-%u byte) (blockSize=%i)", missingBytes, blockSize);
@@ -1528,8 +1528,8 @@ int main(int argc, const char** argv)
     U32 seed = 0;
     int seedset = 0;
     int argNb;
-    int nbTests = NB_ATTEMPTS;
-    int testNb = 0;
+    unsigned nbTests = NB_ATTEMPTS;
+    unsigned testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
     int use_pause = 0;
     const char* programName = argv[0];
@@ -1567,7 +1567,7 @@ int main(int argc, const char** argv)
                     nbTests = 0; duration = 0;
                     while ((*argument>='0') && (*argument<='9')) {
                         nbTests *= 10;
-                        nbTests += *argument - '0';
+                        nbTests += (unsigned)(*argument - '0');
                         argument++;
                     }
                     break;
@@ -1590,7 +1590,7 @@ int main(int argc, const char** argv)
                             case '6':
                             case '7':
                             case '8':
-                            case '9': duration *= 10; duration += *argument++ - '0'; continue;
+                            case '9': duration *= 10; duration += (U32)(*argument++ - '0'); continue;
                         }
                         break;
                     }
@@ -1601,7 +1601,7 @@ int main(int argc, const char** argv)
                     seed=0; seedset=1;
                     while ((*argument>='0') && (*argument<='9')) {
                         seed *= 10;
-                        seed += *argument - '0';
+                        seed += (U32)(*argument - '0');
                         argument++;
                     }
                     break;
@@ -1611,7 +1611,7 @@ int main(int argc, const char** argv)
                     testNb=0;
                     while ((*argument>='0') && (*argument<='9')) {
                         testNb *= 10;
-                        testNb += *argument - '0';
+                        testNb += (unsigned)(*argument - '0');
                         argument++;
                     }
                     break;
@@ -1646,7 +1646,7 @@ int main(int argc, const char** argv)
 
     if ((seedset==0) && (testNb==0)) { FUZ_unitTests(LZ4HC_CLEVEL_DEFAULT); FUZ_unitTests(LZ4HC_CLEVEL_OPT_MIN); }
 
-    if (nbTests<=0) nbTests=1;
+    nbTests += (nbTests==0);  /* avoid zero */
 
     {   int const result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
         if (use_pause) {
