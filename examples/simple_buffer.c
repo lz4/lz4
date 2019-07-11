@@ -38,7 +38,7 @@ int main(void) {
 
   /* Compression */
   // We'll store some text into a variable pointed to by *src to be compressed later.
-  const char* const src = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
+  const char* const src = "Lorem ipsum dolor sit amet, hhhhhhhhhhhhhhhhhhhhhhh";
   // The compression function needs to know how many bytes exist.  Since we're using a string, we can use strlen() + 1 (for \0).
   const int src_size = (int)(strlen(src) + 1);
   // LZ4 provides a function that will tell you the maximum size of compressed output based on input data via LZ4_compressBound().
