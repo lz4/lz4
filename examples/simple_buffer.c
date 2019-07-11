@@ -55,7 +55,8 @@ int main(void) {
   if (compressed_data_size <= 0)
     run_screaming("A 0 or negative result from LZ4_compress_default() indicates a failure trying to compress the data. ", 1);
   if (compressed_data_size > 0)
-    printf("We successfully compressed some data!\n");
+    printf("We successfully compressed some data! Ratio: %.2f\n",
+        (float) compressed_data_size/src_size);
   // Not only does a positive return_value mean success, the value returned == the number of bytes required.
   // You can use this to realloc() *compress_data to free up memory, if desired.  We'll do so just to demonstrate the concept.
   compressed_data = (char *)realloc(compressed_data, (size_t)compressed_data_size);
