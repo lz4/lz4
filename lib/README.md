@@ -56,8 +56,8 @@ The following build macro can be selected at compilation time :
 - `LZ4_DISTANCE_MAX` : control the maximum offset that the compressor will allow.
   Set to 65535 by default, which is the maximum value supported by lz4 format.
   Reducing maximum distance will reduce opportunities for LZ4 to find matches,
-  hence will produce worse the compression ratio.
-  However, a smaller max distance may allow compatibility with specific decoders using limited memory budget.
+  hence will produce a worse compression ratio.
+  However, a smaller max distance can allow compatibility with specific decoders using limited memory budget.
   This build macro only influences the compressed output of the compressor.
 
 - `LZ4_DISABLE_DEPRECATE_WARNINGS` : invoking a deprecated function will make the compiler generate a warning.

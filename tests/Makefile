@@ -448,7 +448,7 @@ test-fuzzer32: CFLAGS += -m32
 test-fuzzer32: test-fuzzer
 
 test-frametest: frametest
-	./frametest $(FUZZER_TIME)
+	./frametest -v $(FUZZER_TIME)
 
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
