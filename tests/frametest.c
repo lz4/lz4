@@ -46,6 +46,7 @@
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4frame.h"
+#define LZ4_STATIC_LINKING_ONLY  /* LZ4_DISTANCE_MAX */
 #include "lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
@@ -540,7 +541,7 @@ int basicTests(U32 seed, double compressibility)
                                               cdict, NULL) );
         DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
                         (unsigned)dictSize, (unsigned)cSizeWithDict);
-        if (cSizeWithDict >= cSizeNoDict) goto _output_error;  /* must be more efficient */
+        if ((LZ4_DISTANCE_MAX > dictSize) && (cSizeWithDict >= cSizeNoDict)) goto _output_error;  /* must be more efficient */
         crcOrig = XXH64(CNBuffer, dictSize, 0);
 
         DISPLAYLEVEL(3, "LZ4F_decompress_usingDict : ");
