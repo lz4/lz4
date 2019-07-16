@@ -1647,7 +1647,11 @@ LZ4_decompress_generic(
 
         /* Special cases */
         assert(lowPrefix <= op);
-        if ((endOnInput) && (unlikely(outputSize==0))) { return ((srcSize==1) && (*ip==0)) ? 0 : -1; } /* Empty output buffer */
+        if ((endOnInput) && (unlikely(outputSize==0))) {
+            /* Empty output buffer */
+            if (partialDecoding) return 0;
+            return ((srcSize==1) && (*ip==0)) ? 0 : -1;
+        }
         if ((!endOnInput) && (unlikely(outputSize==0))) { return (*ip==0 ? 1 : -1); }
         if ((endOnInput) && unlikely(srcSize==0)) { return -1; }
 
@@ -1855,21 +1859,50 @@ LZ4_decompress_generic(
             if ( ((endOnInput) && ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) )
               || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)) )
             {
+                /* We've either hit the input parsing restriction or the output parsing restriction.
+                 * If we've hit the input parsing condition then this must be the last sequence.
+                 * If we've hit the output parsing condition then we are either using partialDecoding
+                 * or we've hit the output parsing condition.
+                 */
                 if (partialDecoding) {
-                    if (cpy > oend) { cpy = oend; assert(op<=oend); length = (size_t)(oend-op); }  /* Partial decoding : stop in the middle of literal segment */
-                    if ((endOnInput) && (ip+length > iend)) { goto _output_error; } /* Error : read attempt beyond end of input buffer */
+                    /* Since we are partial decoding we may be in this block because of the output parsing
+                     * restriction, which is not valid since the output buffer is allowed to be undersized.
+                     */
+                    assert(endOnInput);
+                    /* If we're in this block because of the input parsing condition, then we must be on the
+                     * last sequence (or invalid), so we must check that we exactly consume the input.
+                     */
+                    if ((ip+length>iend-(2+1+LASTLITERALS)) && (ip+length != iend)) { goto _output_error; }
+                    assert(ip+length <= iend);
+                    /* We are finishing in the middle of a literals segment.
+                     * Break after the copy.
+                     */
+                    if (cpy > oend) {
+                        cpy = oend;
+                        assert(op<=oend);
+                        length = (size_t)(oend-op);
+                    }
+                    assert(ip+length <= iend);
                 } else {
-                    if ((!endOnInput) && (cpy != oend)) { goto _output_error; }   /* Error : block decoding must stop exactly there */
-                    if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) { goto _output_error; } /* Error : input must be consumed */
+                    /* We must be on the last sequence because of the parsing limitations so check
+                     * that we exactly regenerate the original size (must be exact when !endOnInput).
+                     */
+                    if ((!endOnInput) && (cpy != oend)) { goto _output_error; }
+                     /* We must be on the last sequence (or invalid) because of the parsing limitations
+                      * so check that we exactly consume the input and don't overrun the output buffer.
+                      */
+                    if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) { goto _output_error; }
                 }
                 memmove(op, ip, length);  /* supports overlapping memory regions, which only matters for in-place decompression scenarios */
                 ip += length;
                 op += length;
-                if (!partialDecoding || (cpy == oend)) {
-                    /* Necessarily EOF, due to parsing restrictions */
+                /* Necessarily EOF when !partialDecoding. When partialDecoding
+                 * it is EOF if we've either filled the output buffer or hit
+                 * the input parsing restriction.
+                 */
+                if (!partialDecoding || (cpy == oend) || (ip == iend)) {
                     break;
                 }
-
             } else {
                 LZ4_wildCopy8(op, ip, cpy);   /* may overwrite up to WILDCOPYLENGTH beyond cpy */
                 ip += length; op = cpy;
