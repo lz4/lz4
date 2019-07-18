@@ -39,7 +39,9 @@ FUZZERS := \
 	compress_fuzzer \
 	decompress_fuzzer \
 	round_trip_fuzzer \
-	round_trip_stream_fuzzer
+	round_trip_stream_fuzzer \
+	compress_hc_fuzzer \
+	round_trip_hc_fuzzer
 
 all: $(FUZZERS)
 
