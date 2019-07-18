@@ -1042,7 +1042,7 @@ _next_match:
                          */
                         const BYTE* ptr;
                         DEBUGLOG(5, "Clearing %u positions", (U32)(filledIp - ip));
-                        for (ptr = ip + 1; ptr <= filledIp; ++ptr) {
+                        for (ptr = ip; ptr <= filledIp; ++ptr) {
                             U32 const h = LZ4_hashPosition(ptr, tableType);
                             LZ4_clearHash(h, cctx->hashTable, tableType);
                         }
