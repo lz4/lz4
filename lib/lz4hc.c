@@ -998,11 +998,6 @@ static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBl
     if (ctxPtr->end >= ctxPtr->base + ctxPtr->dictLimit + 4)
         LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
-    /* cannot reference an extDict and a dictCtx at the same time */
-    if (ctxPtr->dictCtx != NULL) {
-        ctxPtr->dictCtx = NULL;
-    }
-
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
     ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
@@ -1010,6 +1005,9 @@ static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBl
     ctxPtr->base = newBlock - ctxPtr->dictLimit;
     ctxPtr->end  = newBlock;
     ctxPtr->nextToUpdate = ctxPtr->dictLimit;   /* match referencing will resume from there */
+
+    /* cannot reference an extDict and a dictCtx at the same time */
+    ctxPtr->dictCtx = NULL;
 }
 
 static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
