@@ -8,10 +8,7 @@ git clone https://github.com/google/oss-fuzz.git /tmp/ossfuzz
 if [[ ! -d /tmp/ossfuzz/projects/lz4 ]]
 then
     echo "Could not find the lz4 project in ossfuzz"
-
-    # Exit with a success code while the lz4 project is not expected to exist
-    # on oss-fuzz.
-    exit 0
+    exit 1
 fi
 
 # Modify the oss-fuzz Dockerfile so that we're checking out the current branch on travis.

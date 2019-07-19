@@ -33,7 +33,21 @@ DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
 
 LZ4_CFLAGS  = $(CFLAGS) $(DEBUGFLAGS) $(MOREFLAGS)
 LZ4_CXXFLAGS = $(CXXFLAGS) $(DEBUGFLAGS) $(MOREFLAGS)
-LZ4_CPPFLAGS = $(CPPFLAGS) -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
+LZ4_CPPFLAGS = $(CPPFLAGS) -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ \
+               -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+
+FUZZERS := \
+	compress_fuzzer \
+	decompress_fuzzer \
+	round_trip_fuzzer \
+	round_trip_stream_fuzzer \
+	compress_hc_fuzzer \
+	round_trip_hc_fuzzer \
+	compress_frame_fuzzer \
+	round_trip_frame_fuzzer \
+	decompress_frame_fuzzer
+
+all: $(FUZZERS)
 
 # Include a rule to build the static library if calling this target
 # directly.
@@ -44,7 +58,7 @@ $(LZ4DIR)/liblz4.a:
 	$(CC) -c $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) $< -o $@
 
 # Generic rule for generating fuzzers
-%_fuzzer: %_fuzzer.o $(LZ4DIR)/liblz4.a
+%_fuzzer: %_fuzzer.o lz4_helpers.o $(LZ4DIR)/liblz4.a
 	# Compile the standalone code just in case. The OSS-Fuzz code might
 	# override the LIB_FUZZING_ENGINE value to "-fsanitize=fuzzer"
 	$(CC) -c $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) standaloneengine.c -o standaloneengine.o

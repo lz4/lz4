@@ -16,8 +16,8 @@ echo "OUT: $OUT"
 export MAKEFLAGS+="-j$(nproc)"
 
 pushd ossfuzz
-make V=1 compress_fuzzer decompress_fuzzer
+make V=1 all
 popd
 
 # Copy the fuzzers to the target directory.
-cp -v ossfuzz/compress_fuzzer ossfuzz/decompress_fuzzer $OUT/
+cp -v ossfuzz/*_fuzzer $OUT/

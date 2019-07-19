@@ -1429,7 +1429,7 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
      */
     LZ4_resetStream_fast(workingStream);
 
-    if (dictionaryStream != NULL) {
+    if (dictionaryStream != NULL && dictionaryStream->internal_donotuse.dictSize > 0) {
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
          * entry can take that indicate a miss. In that case, we need

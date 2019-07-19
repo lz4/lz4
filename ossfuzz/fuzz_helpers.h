@@ -24,8 +24,13 @@
 extern "C" {
 #endif
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define LZ4_COMMONDEFS_ONLY
+#ifndef LZ4_SRC_INCLUDED
+#include "lz4.c"   /* LZ4_count, constants, mem */
+#endif
+
+#define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
+#define MAX(a,b)   ( (a) > (b) ? (a) : (b) )
 
 #define FUZZ_QUOTE_IMPL(str) #str
 #define FUZZ_QUOTE(str) FUZZ_QUOTE_IMPL(str)
