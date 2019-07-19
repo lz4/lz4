@@ -1564,6 +1564,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                     if (readCRC != calcCRC)
                         return err0r(LZ4F_ERROR_blockChecksum_invalid);
+#else
+                    (void)readCRC;
+                    (void)calcCRC;
 #endif
             }   }
             dctx->dStage = dstage_getBlockHeader;  /* new block */
@@ -1606,6 +1609,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                     if (readBlockCrc != calcBlockCrc)
                         return err0r(LZ4F_ERROR_blockChecksum_invalid);
+#else
+                    (void)readBlockCrc;
+                    (void)calcBlockCrc;
 #endif
             }   }
 
@@ -1737,6 +1743,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                 if (readCRC != resultCRC)
                     return err0r(LZ4F_ERROR_contentChecksum_invalid);
+#else
+                (void)readCRC;
+                (void)resultCRC;
 #endif
                 nextSrcSizeHint = 0;
                 LZ4F_resetDecompressionContext(dctx);
