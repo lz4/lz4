@@ -135,6 +135,9 @@ only the latest one will be applied.
   This setting overrides compression level if one was set previously.
   Similarly, if a compression level is set after `--fast`, it overrides it.
 
+* `--best`:
+  Set highest compression level. Same as -12.
+
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.
   Compressed data will be larger as a consequence (typically by ~0.5%),

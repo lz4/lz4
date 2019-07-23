@@ -146,6 +146,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
+    DISPLAY( "--best  : same as -%d\n", LZ4HC_CLEVEL_MAX);
     DISPLAY( "Benchmark arguments : \n");
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
     DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
@@ -414,6 +415,9 @@ int main(int argc, const char** argv)
                         }
                         continue;
                     }
+
+                /* For gzip(1) compatibility */
+                if (!strcmp(argument,  "--best")) { cLevel=LZ4HC_CLEVEL_MAX; continue; }
             }
 
             while (argument[1]!=0) {
