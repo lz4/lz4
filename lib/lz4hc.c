@@ -151,6 +151,19 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
     return back;
 }
 
+#if defined(_MSC_VER)
+#  define LZ4HC_rotl32(x,r) _rotl(x,r)
+#else
+#  define LZ4HC_rotl32(x,r) ((x << r) | (x >> (32 - r)))
+#endif
+
+
+static U32 LZ4HC_rotatePattern(size_t const length, U32 const pattern)
+{
+    size_t const bitsToRotate = (length & (sizeof(pattern) - 1)) << 3;
+    return LZ4HC_rotl32(pattern, (int)bitsToRotate);
+}
+
 /* LZ4HC_countPattern() :
  * pattern32 must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!) */
 static unsigned
@@ -313,34 +326,41 @@ LZ4HC_InsertAndGetWiderMatch (
                     } else {
                         repeat = rep_not;
                 }   }
-                if ( (repeat == rep_confirmed)
-                  && (matchCandidateIdx >= dictLimit) ) {   /* same segment only */
-                    const BYTE* const matchPtr = base + matchCandidateIdx;
+                if ( (repeat == rep_confirmed) && (matchCandidateIdx >= lowestMatchIndex) ) {
+                    const int extDict = matchCandidateIdx < dictLimit;
+                    const BYTE* const matchPtr = (extDict ? dictBase : base) + matchCandidateIdx;
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
-                        size_t const forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
-                        const BYTE* const lowestMatchPtr = (lowPrefixPtr + LZ4_DISTANCE_MAX >= ip) ? lowPrefixPtr : ip - LZ4_DISTANCE_MAX;
-                        size_t const backLength = LZ4HC_reverseCountPattern(matchPtr, lowestMatchPtr, pattern);
-                        size_t const currentSegmentLength = backLength + forwardPatternLength;
+                        const BYTE* const dictStart = dictBase + hc4->lowLimit;
+                        const BYTE* const iLimit = extDict ? dictBase + dictLimit : iHighLimit;
+                        size_t forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iLimit, pattern) + sizeof(pattern);
+                        if (extDict && ip + forwardPatternLength == iLimit) {
+                            U32 const rotatedPattern = LZ4HC_rotatePattern(forwardPatternLength, pattern);
+                            forwardPatternLength += LZ4HC_countPattern(lowPrefixPtr, iHighLimit, rotatedPattern);
+                        }
+                        {   const BYTE* const lowestMatchPtr = extDict ? dictStart : lowPrefixPtr;
+                            size_t const backLengthRaw = LZ4HC_reverseCountPattern(matchPtr, lowestMatchPtr, pattern);
+                            size_t const backLength = matchCandidateIdx - MAX(matchCandidateIdx - (U32)backLengthRaw, lowestMatchIndex);
+                            size_t const currentSegmentLength = backLength + forwardPatternLength;
 
-                        if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
-                          && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
-                            matchIndex = matchCandidateIdx + (U32)forwardPatternLength - (U32)srcPatternLength;  /* best position, full pattern, might be followed by more match */
-                        } else {
-                            matchIndex = matchCandidateIdx - (U32)backLength;   /* farthest position in current segment, will find a match of length currentSegmentLength + maybe some back */
-                            if (lookBackLength==0) {  /* no back possible */
-                                size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
-                                if ((size_t)longest < maxML) {
-                                    assert(base + matchIndex < ip);
-                                    if (ip - (base+matchIndex) > LZ4_DISTANCE_MAX) break;
-                                    assert(maxML < 2 GB);
-                                    longest = (int)maxML;
-                                    *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
-                                    *startpos = ip;
-                                }
-                                {   U32 const distToNextPattern = DELTANEXTU16(chainTable, matchIndex);
-                                    if (distToNextPattern > matchIndex) break;  /* avoid overflow */
-                                    matchIndex -= distToNextPattern;
-                        }   }   }
+                            if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
+                              && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
+                                matchIndex = matchCandidateIdx + (U32)forwardPatternLength - (U32)srcPatternLength;  /* best position, full pattern, might be followed by more match */
+                            } else {
+                                matchIndex = matchCandidateIdx - (U32)backLength;   /* farthest position in current segment, will find a match of length currentSegmentLength + maybe some back */
+                                if (lookBackLength==0) {  /* no back possible */
+                                    size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
+                                    if ((size_t)longest < maxML) {
+                                        assert(base + matchIndex < ip);
+                                        if (ip - (base+matchIndex) > LZ4_DISTANCE_MAX) break;
+                                        assert(maxML < 2 GB);
+                                        longest = (int)maxML;
+                                        *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
+                                        *startpos = ip;
+                                    }
+                                    {   U32 const distToNextPattern = DELTANEXTU16(chainTable, matchIndex);
+                                        if (distToNextPattern > matchIndex) break;  /* avoid overflow */
+                                        matchIndex -= distToNextPattern;
+                        }   }   }   }
                         continue;
                 }   }
         }   }   /* PA optimization */
