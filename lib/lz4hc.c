@@ -335,7 +335,7 @@ LZ4HC_InsertAndGetWiderMatch (
                         const BYTE* const dictStart = dictBase + hc4->lowLimit;
                         const BYTE* const iLimit = extDict ? dictBase + dictLimit : iHighLimit;
                         size_t forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iLimit, pattern) + sizeof(pattern);
-                        if (extDict && ip + forwardPatternLength == iLimit) {
+                        if (extDict && matchPtr + forwardPatternLength == iLimit) {
                             U32 const rotatedPattern = LZ4HC_rotatePattern(forwardPatternLength, pattern);
                             forwardPatternLength += LZ4HC_countPattern(lowPrefixPtr, iHighLimit, rotatedPattern);
                         }
