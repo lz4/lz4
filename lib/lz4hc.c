@@ -158,9 +158,11 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
 #endif
 
 
-static U32 LZ4HC_rotatePattern(size_t const length, U32 const pattern)
+static U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
 {
-    size_t const bitsToRotate = (length & (sizeof(pattern) - 1)) << 3;
+    size_t const bitsToRotate = (rotate & (sizeof(pattern) - 1)) << 3;
+    if (bitsToRotate == 0)
+        return pattern;
     return LZ4HC_rotl32(pattern, (int)bitsToRotate);
 }
 
@@ -338,9 +340,15 @@ LZ4HC_InsertAndGetWiderMatch (
                             forwardPatternLength += LZ4HC_countPattern(lowPrefixPtr, iHighLimit, rotatedPattern);
                         }
                         {   const BYTE* const lowestMatchPtr = extDict ? dictStart : lowPrefixPtr;
-                            size_t const backLengthRaw = LZ4HC_reverseCountPattern(matchPtr, lowestMatchPtr, pattern);
-                            size_t const backLength = matchCandidateIdx - MAX(matchCandidateIdx - (U32)backLengthRaw, lowestMatchIndex);
-                            size_t const currentSegmentLength = backLength + forwardPatternLength;
+                            size_t backLength = LZ4HC_reverseCountPattern(matchPtr, lowestMatchPtr, pattern);
+                            size_t currentSegmentLength;
+                            if (!extDict && matchPtr - backLength == lowPrefixPtr && hc4->lowLimit < dictLimit) {
+                                U32 const rotatedPattern = LZ4HC_rotatePattern((U32)(-(int)backLength), pattern);
+                                backLength += LZ4HC_reverseCountPattern(dictBase + dictLimit, dictStart, rotatedPattern);
+                            }
+                            /* Limit backLength not go further than lowestMatchIndex */
+                            backLength = matchCandidateIdx - MAX(matchCandidateIdx - (U32)backLength, lowestMatchIndex);
+                            currentSegmentLength = backLength + forwardPatternLength;
 
                             if ( (currentSegmentLength >= srcPatternLength)   /* current pattern segment large enough to contain full srcPatternLength */
                               && (forwardPatternLength <= srcPatternLength) ) { /* haven't reached this position yet */
