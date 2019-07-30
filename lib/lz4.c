@@ -1326,7 +1326,13 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 
 LZ4_stream_t* LZ4_createStream(void)
 {
+#if (LZ4_HEAPMODE)
     LZ4_stream_t* const lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
+#else
+    static LZ4_stream_t lz4sBody;
+    LZ4_stream_t* lz4s = &lz4sBody;
+#endif
+
     LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
     DEBUGLOG(4, "LZ4_createStream %p", lz4s);
     if (lz4s == NULL) return NULL;
@@ -1374,7 +1380,10 @@ int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     if (!LZ4_stream) return 0;   /* support free on NULL */
     DEBUGLOG(5, "LZ4_freeStream %p", LZ4_stream);
+#if (LZ4_HEAPMODE)
     FREEMEM(LZ4_stream);
+#endif
+
     return (0);
 }
 
@@ -2155,7 +2164,14 @@ int LZ4_decompress_fast_doubleDict(const char* source, char* dest, int originalS
 
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
+#if (LZ4_HEAPMODE)
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOC_AND_ZERO(sizeof(LZ4_streamDecode_t));
+    if (lz4s == NULL) return NULL;
+#else
+    static LZ4_streamDecode_t lz4sBody;
+    LZ4_streamDecode_t* const lz4s = &lz4sBody;
+#endif
+
     LZ4_STATIC_ASSERT(LZ4_STREAMDECODESIZE >= sizeof(LZ4_streamDecode_t_internal));    /* A compilation error here means LZ4_STREAMDECODESIZE is not large enough */
     return lz4s;
 }
@@ -2163,7 +2179,9 @@ LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
     if (LZ4_stream == NULL) { return 0; }  /* support free on NULL */
+#if (LZ4_HEAPMODE)
     FREEMEM(LZ4_stream);
+#endif
     return 0;
 }
 
