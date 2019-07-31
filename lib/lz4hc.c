@@ -312,20 +312,26 @@ LZ4HC_InsertAndGetWiderMatch (
         if (chainSwap && matchLength==longest) {    /* better match => select a better chain */
             assert(lookBackLength==0);   /* search forward only */
             if (matchIndex + (U32)longest <= ipIndex) {
+                int const kTrigger = 4;
                 U32 distanceToNextMatch = 1;
+                int const end = longest - MINMATCH + 1;
+                int step = 1;
+                int accel = 1 << kTrigger;
                 int pos;
-                for (pos = matchChainPos; pos <= longest - MINMATCH; ++pos) {
+                for (pos = 0; pos < end; pos += step) {
                     U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + (U32)pos);
+                    step = (accel++ >> kTrigger);
                     if (candidateDist > distanceToNextMatch) {
                         distanceToNextMatch = candidateDist;
                         matchChainPos = (U32)pos;
-                }   }
+                        accel = 1 << kTrigger;
+                    }
+                }
                 if (distanceToNextMatch > 1) {
                     if (distanceToNextMatch > matchIndex) break;   /* avoid overflow */
                     matchIndex -= distanceToNextMatch;
                     continue;
-                }
-        }   }
+        }   }   }
 
         {   U32 const distNextMatch = DELTANEXTU16(chainTable, matchIndex);
             if (patternAnalysis && distNextMatch==1 && matchChainPos==0) {
