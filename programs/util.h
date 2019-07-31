@@ -37,12 +37,17 @@ extern "C" {
 #include <assert.h>
 #include <sys/types.h>    /* stat, utime */
 #include <sys/stat.h>     /* stat */
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #  include <sys/utime.h>  /* utime */
 #  include <io.h>         /* _chmod */
 #else
 #  include <unistd.h>     /* chown, stat */
+# if PLATFORM_POSIX_VERSION < 200809L
 #  include <utime.h>      /* utime */
+# else
+#  include <fcntl.h>      /* AT_FDCWD */
+#  include <sys/stat.h>   /* for utimensat */
+# endif
 #endif
 #include <time.h>         /* time */
 #include <limits.h>       /* INT_MAX */
@@ -287,14 +292,23 @@ UTIL_STATIC int UTIL_isRegFile(const char* infilename);
 UTIL_STATIC int UTIL_setFileStat(const char *filename, stat_t *statbuf)
 {
     int res = 0;
-    struct utimbuf timebuf;
 
     if (!UTIL_isRegFile(filename))
         return -1;
 
-    timebuf.actime = time(NULL);
-    timebuf.modtime = statbuf->st_mtime;
-    res += utime(filename, &timebuf);  /* set access and modification times */
+    {
+#if defined(_WIN32) || (PLATFORM_POSIX_VERSION < 200809L)
+        struct utimbuf timebuf;
+        timebuf.actime = time(NULL);
+        timebuf.modtime = statbuf->st_mtime;
+        res += utime(filename, &timebuf);  /* set access and modification times */
+#else
+        struct timespec timebuf[2] = {};
+        timebuf[0].tv_nsec = UTIME_NOW;
+        timebuf[1].tv_sec = statbuf->st_mtime;
+        res += utimensat(AT_FDCWD, filename, timebuf, 0);  /* set access and modification times */
+#endif
+    }
 
 #if !defined(_WIN32)
     res += chown(filename, statbuf->st_uid, statbuf->st_gid);  /* Copy ownership */
