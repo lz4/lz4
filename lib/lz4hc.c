@@ -314,7 +314,7 @@ LZ4HC_InsertAndGetWiderMatch (
             if (matchIndex + (U32)longest <= ipIndex) {
                 U32 distanceToNextMatch = 1;
                 int pos;
-                for (pos = 0; pos <= longest - MINMATCH; ++pos) {
+                for (pos = matchChainPos; pos <= longest - MINMATCH; ++pos) {
                     U32 const candidateDist = DELTANEXTU16(chainTable, matchIndex + (U32)pos);
                     if (candidateDist > distanceToNextMatch) {
                         distanceToNextMatch = candidateDist;
