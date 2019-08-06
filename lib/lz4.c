@@ -1429,9 +1429,12 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream) {
-    DEBUGLOG(4, "LZ4_attach_dictionary (%p, %p, size %d)",
-        workingStream, dictionaryStream, dictionaryStream != NULL ?
-        dictionaryStream->internal_donotuse.dictSize : 0);
+    const LZ4_stream_t_internal* dictCtx = dictionaryStream == NULL ? NULL :
+        &(dictionaryStream->internal_donotuse);
+
+    DEBUGLOG(4, "LZ4_attach_dictionary (%p, %p, size %u)",
+             workingStream, dictionaryStream,
+             dictCtx != NULL ? dictCtx->dictSize : 0);
 
     /* Calling LZ4_resetStream_fast() here makes sure that changes will not be
      * erased by subsequent calls to LZ4_resetStream_fast() in case stream was
@@ -1439,20 +1442,23 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
      */
     LZ4_resetStream_fast(workingStream);
 
-    /* If the current offset is zero, we will never look in the
-     * external dictionary context, since there is no value a table
-     * entry can take that indicate a miss. In that case, we need
-     * to bump the offset to something non-zero.
-     */
-    if (workingStream->internal_donotuse.currentOffset == 0) {
-        workingStream->internal_donotuse.currentOffset = 64 KB;
-    }
+    if (dictCtx != NULL) {
+        /* If the current offset is zero, we will never look in the
+         * external dictionary context, since there is no value a table
+         * entry can take that indicate a miss. In that case, we need
+         * to bump the offset to something non-zero.
+         */
+        if (workingStream->internal_donotuse.currentOffset == 0) {
+            workingStream->internal_donotuse.currentOffset = 64 KB;
+        }
 
-    if (dictionaryStream != NULL && dictionaryStream->internal_donotuse.dictSize > 0) {
-        workingStream->internal_donotuse.dictCtx = &(dictionaryStream->internal_donotuse);
-    } else {
-        workingStream->internal_donotuse.dictCtx = NULL;
+        /* Don't actually attach an empty dictionary.
+         */
+        if (dictCtx->dictSize == 0) {
+            dictCtx = NULL;
+        }
     }
+    workingStream->internal_donotuse.dictCtx = dictCtx;
 }
 
 
