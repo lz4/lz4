@@ -1429,6 +1429,10 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream) {
+    DEBUGLOG(4, "LZ4_attach_dictionary (%p, %p, size %d)",
+        workingStream, dictionaryStream, dictionaryStream != NULL ?
+        dictionaryStream->internal_donotuse.dictSize : 0);
+
     /* Calling LZ4_resetStream_fast() here makes sure that changes will not be
      * erased by subsequent calls to LZ4_resetStream_fast() in case stream was
      * marked as having dirty context, e.g. requiring full reset.
