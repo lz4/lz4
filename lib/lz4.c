@@ -1408,17 +1408,17 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
      * there are only valid offsets in the window, which allows an optimization
      * in LZ4_compress_fast_continue() where it uses noDictIssue even when the
      * dictionary isn't a full 64k. */
-
-    if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
-    base = dictEnd - 64 KB - dict->currentOffset;
-    dict->dictionary = p;
-    dict->dictSize = (U32)(dictEnd - p);
     dict->currentOffset += 64 KB;
-    dict->tableType = tableType;
 
     if (dictSize < (int)HASH_UNIT) {
         return 0;
     }
+
+    if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
+    base = dictEnd - dict->currentOffset;
+    dict->dictionary = p;
+    dict->dictSize = (U32)(dictEnd - p);
+    dict->tableType = tableType;
 
     while (p <= dictEnd-HASH_UNIT) {
         LZ4_putPosition(p, dict->hashTable, tableType, base);
@@ -1435,15 +1435,16 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
      */
     LZ4_resetStream_fast(workingStream);
 
+    /* If the current offset is zero, we will never look in the
+     * external dictionary context, since there is no value a table
+     * entry can take that indicate a miss. In that case, we need
+     * to bump the offset to something non-zero.
+     */
+    if (workingStream->internal_donotuse.currentOffset == 0) {
+        workingStream->internal_donotuse.currentOffset = 64 KB;
+    }
+
     if (dictionaryStream != NULL && dictionaryStream->internal_donotuse.dictSize > 0) {
-        /* If the current offset is zero, we will never look in the
-         * external dictionary context, since there is no value a table
-         * entry can take that indicate a miss. In that case, we need
-         * to bump the offset to something non-zero.
-         */
-        if (workingStream->internal_donotuse.currentOffset == 0) {
-            workingStream->internal_donotuse.currentOffset = 64 KB;
-        }
         workingStream->internal_donotuse.dictCtx = &(dictionaryStream->internal_donotuse);
     } else {
         workingStream->internal_donotuse.dictCtx = NULL;
