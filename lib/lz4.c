@@ -184,6 +184,60 @@
 
 
 /*-************************************
+*  Common Constants
+**************************************/
+#define MINMATCH 4
+
+#define WILDCOPYLENGTH 8
+#define LASTLITERALS   5   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
+#define MFLIMIT       12   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
+#define MATCH_SAFEGUARD_DISTANCE  ((2*WILDCOPYLENGTH) - MINMATCH)   /* ensure it's possible to write 2 x wildcopyLength without overflowing output buffer */
+#define FASTLOOP_SAFE_DISTANCE 64
+static const int LZ4_minLength = (MFLIMIT+1);
+
+#define KB *(1 <<10)
+#define MB *(1 <<20)
+#define GB *(1U<<30)
+
+#define LZ4_DISTANCE_ABSOLUTE_MAX 65535
+#if (LZ4_DISTANCE_MAX > LZ4_DISTANCE_ABSOLUTE_MAX)   /* max supported by LZ4 format */
+#  error "LZ4_DISTANCE_MAX is too big : must be <= 65535"
+#endif
+
+#define ML_BITS  4
+#define ML_MASK  ((1U<<ML_BITS)-1)
+#define RUN_BITS (8-ML_BITS)
+#define RUN_MASK ((1U<<RUN_BITS)-1)
+
+
+/*-************************************
+*  Error detection
+**************************************/
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
+#  include <assert.h>
+#else
+#  ifndef assert
+#    define assert(condition) ((void)0)
+#  endif
+#endif
+
+#define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
+
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
+#  include <stdio.h>
+static int g_debuglog_enable = 1;
+#  define DEBUGLOG(l, ...) {                                  \
+                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
+                    fprintf(stderr, __FILE__ ": ");           \
+                    fprintf(stderr, __VA_ARGS__);             \
+                    fprintf(stderr, " \n");                   \
+            }   }
+#else
+#  define DEBUGLOG(l, ...)      {}    /* disabled */
+#endif
+
+
+/*-************************************
 *  Types
 **************************************/
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
@@ -364,29 +418,35 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { memcpy(d,s,16); memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 }
 
+/* LZ4_memcpy_using_offset()  presumes :
+ * - dstEnd >= dstPtr + MINMATCH
+ * - there is at least 8 bytes available to write after dstEnd */
 LZ4_FORCE_O2_INLINE_GCC_PPC64LE void
 LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
 {
     BYTE v[8];
+
+    assert(dstEnd >= dstPtr + MINMATCH);
+    LZ4_write32(dstPtr, 0);   /* silence an msan warning when offset==0 */
+
     switch(offset) {
     case 1:
         memset(v, *srcPtr, 8);
-        goto copy_loop;
+        break;
     case 2:
         memcpy(v, srcPtr, 2);
         memcpy(&v[2], srcPtr, 2);
         memcpy(&v[4], &v[0], 4);
-        goto copy_loop;
+        break;
     case 4:
         memcpy(v, srcPtr, 4);
         memcpy(&v[4], srcPtr, 4);
-        goto copy_loop;
+        break;
     default:
         LZ4_memcpy_using_offset_base(dstPtr, srcPtr, dstEnd, offset);
         return;
     }
 
- copy_loop:
     memcpy(dstPtr, v, 8);
     dstPtr += 8;
     while (dstPtr < dstEnd) {
@@ -394,60 +454,6 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
         dstPtr += 8;
     }
 }
-#endif
-
-
-/*-************************************
-*  Common Constants
-**************************************/
-#define MINMATCH 4
-
-#define WILDCOPYLENGTH 8
-#define LASTLITERALS   5   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
-#define MFLIMIT       12   /* see ../doc/lz4_Block_format.md#parsing-restrictions */
-#define MATCH_SAFEGUARD_DISTANCE  ((2*WILDCOPYLENGTH) - MINMATCH)   /* ensure it's possible to write 2 x wildcopyLength without overflowing output buffer */
-#define FASTLOOP_SAFE_DISTANCE 64
-static const int LZ4_minLength = (MFLIMIT+1);
-
-#define KB *(1 <<10)
-#define MB *(1 <<20)
-#define GB *(1U<<30)
-
-#define LZ4_DISTANCE_ABSOLUTE_MAX 65535
-#if (LZ4_DISTANCE_MAX > LZ4_DISTANCE_ABSOLUTE_MAX)   /* max supported by LZ4 format */
-#  error "LZ4_DISTANCE_MAX is too big : must be <= 65535"
-#endif
-
-#define ML_BITS  4
-#define ML_MASK  ((1U<<ML_BITS)-1)
-#define RUN_BITS (8-ML_BITS)
-#define RUN_MASK ((1U<<RUN_BITS)-1)
-
-
-/*-************************************
-*  Error detection
-**************************************/
-#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
-#  include <assert.h>
-#else
-#  ifndef assert
-#    define assert(condition) ((void)0)
-#  endif
-#endif
-
-#define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
-
-#if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
-#  include <stdio.h>
-static int g_debuglog_enable = 1;
-#  define DEBUGLOG(l, ...) {                                  \
-                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
-                    fprintf(stderr, __FILE__ ": ");           \
-                    fprintf(stderr, __VA_ARGS__);             \
-                    fprintf(stderr, " \n");                   \
-            }   }
-#else
-#  define DEBUGLOG(l, ...)      {}    /* disabled */
 #endif
 
 
@@ -1946,12 +1952,6 @@ LZ4_decompress_generic(
             length = token & ML_MASK;
 
     _copy_match:
-            if (!partialDecoding) {
-                assert(oend > op);
-                assert(oend - op >= 4);
-                LZ4_write32(op, 0);   /* silence an msan warning when offset==0; costs <1%; */
-            }   /* note : when partialDecoding, there is no guarantee that at least 4 bytes remain available in output buffer */
-
             if (length == ML_MASK) {
               variable_length_error error = ok;
               length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
@@ -2013,6 +2013,7 @@ LZ4_decompress_generic(
             }
 
             if (unlikely(offset<8)) {
+                LZ4_write32(op, 0);   /* silence msan warning when offset==0 */
                 op[0] = match[0];
                 op[1] = match[1];
                 op[2] = match[2];
