@@ -1408,17 +1408,17 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
      * there are only valid offsets in the window, which allows an optimization
      * in LZ4_compress_fast_continue() where it uses noDictIssue even when the
      * dictionary isn't a full 64k. */
-
-    if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
-    base = dictEnd - 64 KB - dict->currentOffset;
-    dict->dictionary = p;
-    dict->dictSize = (U32)(dictEnd - p);
     dict->currentOffset += 64 KB;
-    dict->tableType = tableType;
 
     if (dictSize < (int)HASH_UNIT) {
         return 0;
     }
+
+    if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
+    base = dictEnd - dict->currentOffset;
+    dict->dictionary = p;
+    dict->dictSize = (U32)(dictEnd - p);
+    dict->tableType = tableType;
 
     while (p <= dictEnd-HASH_UNIT) {
         LZ4_putPosition(p, dict->hashTable, tableType, base);
@@ -1429,13 +1429,20 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream) {
+    const LZ4_stream_t_internal* dictCtx = dictionaryStream == NULL ? NULL :
+        &(dictionaryStream->internal_donotuse);
+
+    DEBUGLOG(4, "LZ4_attach_dictionary (%p, %p, size %u)",
+             workingStream, dictionaryStream,
+             dictCtx != NULL ? dictCtx->dictSize : 0);
+
     /* Calling LZ4_resetStream_fast() here makes sure that changes will not be
      * erased by subsequent calls to LZ4_resetStream_fast() in case stream was
      * marked as having dirty context, e.g. requiring full reset.
      */
     LZ4_resetStream_fast(workingStream);
 
-    if (dictionaryStream != NULL && dictionaryStream->internal_donotuse.dictSize > 0) {
+    if (dictCtx != NULL) {
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
          * entry can take that indicate a miss. In that case, we need
@@ -1444,10 +1451,14 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
         if (workingStream->internal_donotuse.currentOffset == 0) {
             workingStream->internal_donotuse.currentOffset = 64 KB;
         }
-        workingStream->internal_donotuse.dictCtx = &(dictionaryStream->internal_donotuse);
-    } else {
-        workingStream->internal_donotuse.dictCtx = NULL;
+
+        /* Don't actually attach an empty dictionary.
+         */
+        if (dictCtx->dictSize == 0) {
+            dictCtx = NULL;
+        }
     }
+    workingStream->internal_donotuse.dictCtx = dictCtx;
 }
 
 
