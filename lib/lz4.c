@@ -1040,7 +1040,7 @@ _next_match:
                     ip -= matchCode - newMatchCode;
                     assert(newMatchCode < matchCode);
                     matchCode = newMatchCode;
-                    if (unlikely(ip < filledIp)) {
+                    if (unlikely(ip <= filledIp)) {
                         /* We have already filled up to filledIp so if ip ends up less than filledIp
                          * we have positions in the hash table beyond the current position. This is
                          * a problem if we reuse the hash table. So we have to remove these positions
