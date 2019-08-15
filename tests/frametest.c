@@ -1059,7 +1059,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                     size_t const mask = (1<<nbBits) - 1;
                     size_t const rNoiseLength = (FUZ_rand(&randState) & mask) + 1;
                     size_t const noiseLength = MIN(rNoiseLength, cSize-pos);
-                    size_t const noiseStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - noiseLength);
+                    size_t const noiseStart = FUZ_rand(&randState) % (CNBufferLength - noiseLength);
                     memcpy((BYTE*)compressedBuffer + pos, (const char*)CNBuffer + noiseStart, noiseLength);
                     pos += noiseLength;
         }   }   }
