@@ -9,13 +9,12 @@
 #include <string.h>
 
 #include "fuzz_helpers.h"
+#include "fuzz_data_producer.h"
 #include "lz4.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
-
-    uint32_t seed = FUZZ_seed(&data, &size);
-    size_t const dstCapacity = FUZZ_rand32(&seed, 0, 4 * size);
+    size_t const dstCapacity = FUZZ_produceUint32Range(data, size, 0, 4 * size);
     size_t const smallDictSize = size + 1;
     size_t const largeDictSize = 64 * 1024 - 1;
     size_t const dictSize = MAX(smallDictSize, largeDictSize);
