@@ -58,7 +58,7 @@ $(LZ4DIR)/liblz4.a:
 	$(CC) -c $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) $< -o $@
 
 # Generic rule for generating fuzzers
-%_fuzzer: %_fuzzer.o lz4_helpers.o $(LZ4DIR)/liblz4.a
+%_fuzzer: %_fuzzer.o lz4_helpers.o fuzz_data_producer.o $(LZ4DIR)/liblz4.a
 	# Compile the standalone code just in case. The OSS-Fuzz code might
 	# override the LIB_FUZZING_ENGINE value to "-fsanitize=fuzzer"
 	$(CC) -c $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) standaloneengine.c -o standaloneengine.o
