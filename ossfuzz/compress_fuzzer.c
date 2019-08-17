@@ -22,7 +22,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     char* const rt = (char*)malloc(size);
 
     /* Restrict to remaining data from producer */
-    size = producer->size;
+    size = FUZZ_dataProducer_remainingBytes(producer);
 
     FUZZ_ASSERT(dst);
     FUZZ_ASSERT(rt);

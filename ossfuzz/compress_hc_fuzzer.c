@@ -25,7 +25,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
       producer, LZ4HC_CLEVEL_MIN, LZ4HC_CLEVEL_MAX);
 
     /* Restrict to remaining data from producer */
-    size = producer->size;
+    size = FUZZ_dataProducer_remainingBytes(producer);
 
     FUZZ_ASSERT(dst);
     FUZZ_ASSERT(rt);

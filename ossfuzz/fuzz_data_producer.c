@@ -1,7 +1,15 @@
 #include "fuzz_data_producer.h"
 
+struct FUZZ_dataProducer_s{
+  const uint8_t *data;
+  size_t size;
+};
+
 FUZZ_dataProducer_t *FUZZ_dataProducer_create(const uint8_t *data, size_t size) {
   FUZZ_dataProducer_t *producer = malloc(sizeof(FUZZ_dataProducer_t));
+
+  FUZZ_ASSERT(producer != NULL);
+
   producer->data = data;
   producer->size = size;
   return producer;
@@ -29,4 +37,8 @@ uint32_t FUZZ_dataProducer_uint32(FUZZ_dataProducer_t *producer, uint32_t min,
   }
 
   return min + result % (range + 1);
+}
+
+size_t FUZZ_dataProducer_remainingBytes(FUZZ_dataProducer_t *producer){
+  return producer->size;
 }

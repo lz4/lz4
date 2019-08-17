@@ -43,7 +43,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
 
     /* Restrict to remaining data from producer */
-    size = producer->size;
+    size = FUZZ_dataProducer_remainingBytes(producer);
 
     FUZZ_ASSERT(dctx);
     FUZZ_ASSERT(dst);
