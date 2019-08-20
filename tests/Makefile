@@ -114,7 +114,7 @@ clean:
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
-        frameTest$(EXT)
+        frameTest$(EXT) lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
@@ -122,9 +122,12 @@ clean:
 versionsTest:
 	$(PYTHON) test-lz4-versions.py
 
+.PHONY: listTest
+listTest: lz4
+	QEMU_SYS=$(QEMU_SYS) $(PYTHON) test-lz4-list.py
+
 checkTag: checkTag.c $(LZ4DIR)/lz4.h
 	$(CC) $(FLAGS) $< -o $@$(EXT)
-
 
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
@@ -150,19 +153,19 @@ list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest
 
 .PHONY: test32
 test32: CFLAGS+=-m32
 test32: test
 
-.PHONY: test-amalgamation
-test-amalgamation: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c
-	cat $(LZ4DIR)/lz4.c > lz4_all.c
-	cat $(LZ4DIR)/lz4hc.c >> lz4_all.c
-	cat $(LZ4DIR)/lz4frame.c >> lz4_all.c
-	$(CC) -I$(LZ4DIR) -c lz4_all.c
-	$(RM) lz4_all.c
+test-amalgamation: lz4_all.o
+
+lz4_all.o: lz4_all.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $^ -o $@
+
+lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
+	cat $^ > $@
 
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
@@ -373,6 +376,7 @@ test-lz4-testmode: lz4 datagen
 	@echo "\n ---- non-existing source ----"
 	! $(LZ4)     file-does-not-exist
 	! $(LZ4) -f  file-does-not-exist
+	! $(LZ4) -t  file-does-not-exist
 	! $(LZ4) -fm file1-dne file2-dne
 	@$(RM) tmp-tlt tmp-tlt1 tmp-tlt2 tmp-tlt2.lz4
 
@@ -444,7 +448,7 @@ test-fuzzer32: CFLAGS += -m32
 test-fuzzer32: test-fuzzer
 
 test-frametest: frametest
-	./frametest $(FUZZER_TIME)
+	./frametest -v $(FUZZER_TIME)
 
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
@@ -463,6 +467,8 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg7M
 	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg7M ftmdg16K2
 	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg7M $(VOID)
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m ftm*.lz4
+	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m -v ftm*.lz4
 	$(RM) ftm*
 	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
 	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256

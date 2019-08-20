@@ -14,11 +14,11 @@ option('debug_level', type: 'integer', min: 0, max: 7, value: 1,
 option('backtrace', type: 'boolean', value: false,
   description: 'Display a stack backtrace when execution generates a runtime exception')
 
-option('build_programs', type: 'boolean', value: false,
+option('bin_programs', type: 'boolean', value: false,
   description: 'Enable programs build')
-option('build_tests', type: 'boolean', value: false,
+option('bin_tests', type: 'boolean', value: false,
   description: 'Enable tests build')
-option('build_contrib', type: 'boolean', value: false,
+option('bin_contrib', type: 'boolean', value: false,
   description: 'Enable contrib build')
-option('build_examples', type: 'boolean', value: false,
+option('bin_examples', type: 'boolean', value: false,
   description: 'Enable examples build')

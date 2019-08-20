@@ -213,8 +213,8 @@ static void LZ4F_writeLE64 (void* dst, U64 value64)
 
 static const size_t minFHSize = LZ4F_HEADER_SIZE_MIN;   /*  7 */
 static const size_t maxFHSize = LZ4F_HEADER_SIZE_MAX;   /* 19 */
-static const size_t BHSize = 4;  /* block header : size, and compress flag */
-static const size_t BFSize = 4;  /* block footer : checksum (optional) */
+static const size_t BHSize = LZ4F_BLOCK_HEADER_SIZE;  /* block header : size, and compress flag */
+static const size_t BFSize = LZ4F_BLOCK_CHECKSUM_SIZE;  /* block footer : checksum (optional) */
 
 
 /*-************************************
@@ -327,6 +327,7 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
 {
     LZ4F_preferences_t prefsNull = LZ4F_INIT_PREFERENCES;
     prefsNull.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;   /* worst case */
+    prefsNull.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;   /* worst case */
     {   const LZ4F_preferences_t* const prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
         U32 const flush = prefsPtr->autoFlush | (srcSize==0);
         LZ4F_blockSizeID_t const blockID = prefsPtr->frameInfo.blockSizeID;
@@ -1130,8 +1131,10 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     }
 
     /* control magic number */
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     if (LZ4F_readLE32(srcPtr) != LZ4F_MAGICNUMBER)
         return err0r(LZ4F_ERROR_frameType_unknown);
+#endif
     dctx->frameInfo.frameType = LZ4F_frame;
 
     /* Flags */
@@ -1170,10 +1173,12 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
 
     /* check header */
     assert(frameHeaderSize > 5);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     {   BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
         if (HC != srcPtr[frameHeaderSize-1])
             return err0r(LZ4F_ERROR_headerChecksum_invalid);
     }
+#endif
 
     /* save */
     dctx->frameInfo.blockMode = (LZ4F_blockMode_t)blockMode;
@@ -1210,8 +1215,10 @@ size_t LZ4F_headerSize(const void* src, size_t srcSize)
         return 8;
 
     /* control magic number */
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     if (LZ4F_readLE32(src) != LZ4F_MAGICNUMBER)
         return err0r(LZ4F_ERROR_frameType_unknown);
+#endif
 
     /* Frame Header Size */
     {   BYTE const FLG = ((const BYTE*)src)[4];
@@ -1493,7 +1500,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 /* next block is a compressed block */
                 dctx->tmpInTarget = nextCBlockSize + crcSize;
                 dctx->dStage = dstage_getCBlock;
-                if (dstPtr==dstEnd) {
+                if (dstPtr==dstEnd || srcPtr==srcEnd) {
                     nextSrcSizeHint = BHSize + nextCBlockSize + crcSize;
                     doAnotherStage = 0;
                 }
@@ -1554,8 +1561,13 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
                 {   U32 const readCRC = LZ4F_readLE32(crcSrc);
                     U32 const calcCRC = XXH32_digest(&dctx->blockChecksum);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                     if (readCRC != calcCRC)
                         return err0r(LZ4F_ERROR_blockChecksum_invalid);
+#else
+                    (void)readCRC;
+                    (void)calcCRC;
+#endif
             }   }
             dctx->dStage = dstage_getBlockHeader;  /* new block */
             break;
@@ -1594,8 +1606,13 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
                 {   U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
                     U32 const calcBlockCrc = XXH32(selectedIn, dctx->tmpInTarget, 0);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                     if (readBlockCrc != calcBlockCrc)
                         return err0r(LZ4F_ERROR_blockChecksum_invalid);
+#else
+                    (void)readBlockCrc;
+                    (void)calcBlockCrc;
+#endif
             }   }
 
             if ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize) {
@@ -1723,8 +1740,13 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
         /* case dstage_checkSuffix: */   /* no direct entry, avoid initialization risks */
             {   U32 const readCRC = LZ4F_readLE32(selectedIn);
                 U32 const resultCRC = XXH32_digest(&(dctx->xxh));
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                 if (readCRC != resultCRC)
                     return err0r(LZ4F_ERROR_contentChecksum_invalid);
+#else
+                (void)readCRC;
+                (void)resultCRC;
+#endif
                 nextSrcSizeHint = 0;
                 LZ4F_resetDecompressionContext(dctx);
                 doAnotherStage = 0;

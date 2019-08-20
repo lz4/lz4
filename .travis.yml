@@ -8,8 +8,11 @@ matrix:
       os: osx
       compiler: clang
       script:
+        - make   # test library build
+        - make clean
         - make -C tests test-lz4 MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee # test scenario where `stdout` is not the console
-        - CFLAGS=-m32 make -C tests clean test-lz4-contentSize
+        - make clean
+        - CFLAGS=-m32 make -C tests test-lz4-contentSize
 
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - name: (Precise) benchmark test
@@ -23,6 +26,16 @@ matrix:
         - sudo sysctl -w vm.mmap_min_addr=4096
       script:
         - make -C tests test-frametest test-fuzzer
+
+    - name: ASAN tests with fuzzer and frametest
+      install:
+        - sudo sysctl -w vm.mmap_min_addr=4096
+      script:
+        - CC=clang MOREFLAGS=-fsanitize=address make -C tests test-frametest test-fuzzer
+
+    - name: Custom LZ4_DISTANCE_MAX
+      script:
+        - MOREFLAGS=-DLZ4_DISTANCE_MAX=8000 make check
 
     - name: (Precise) g++ and clang CMake test
       dist: precise
@@ -169,27 +182,39 @@ matrix:
         - tests/checkTag "$TRAVIS_BRANCH"
 
     - name: (Xenial) Meson + clang build
-      env: ALLOW_FAILURES=true
+      #env: ALLOW_FAILURES=true
       dist: xenial
       language: cpp
       compiler: clang
       install:
         - sudo apt-get install -qq python3 tree
-        - curl -o ~/ninja.zip -L 'https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip'
-            && unzip ~/ninja.zip -d ~/.local/bin
-        - curl -o ~/get-pip.py 'https://bootstrap.pypa.io/get-pip.py'
-            && python3 ~/get-pip.py --user
-            && pip3 install --user meson
+        - |
+          travis_retry curl -o ~/ninja.zip -L 'https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip' &&
+          unzip ~/ninja.zip -d ~/.local/bin
+        - |
+          travis_retry curl -o ~/get-pip.py 'https://bootstrap.pypa.io/get-pip.py' &&
+          python3 ~/get-pip.py --user &&
+          pip3 install --user meson
       script:
-        - meson setup
-            --buildtype=debug
-            -Db_lundef=false
-            -Dauto_features=enabled
-            -Ddefault_library=both
-            -Dbuild_{programs,contrib,tests,examples}=true
+        - |
+          meson setup \
+            --buildtype=debug \
+            -Db_lundef=false \
+            -Dauto_features=enabled \
+            -Ddefault_library=both \
+            -Dbin_programs=true \
+            -Dbin_contrib=true \
+            -Dbin_tests=true \
+            -Dbin_examples=true \
             contrib/meson build
-        - cd build
+        - pushd build
         - DESTDIR=./staging ninja install
         - tree ./staging
+
+    # oss-fuzz compilation test
+    - name: Compile OSS-Fuzz targets
+      script:
+        - ./ossfuzz/travisoss.sh
+
   allow_failures:
     - env: ALLOW_FAILURES=true

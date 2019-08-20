@@ -11,7 +11,7 @@ project('lz4', ['c'],
   license: ['BSD', 'GPLv2'],
   default_options : ['c_std=c99',
     'buildtype=release'],
-  version: '1.8.3',
+  version: 'DUMMY',
   meson_version: '>=0.47.0')
 
 cc = meson.get_compiler('c')
@@ -38,13 +38,10 @@ lz4_h_file = join_paths(meson.current_source_dir(), '../../lib/lz4.h')
 GetLz4LibraryVersion_py = files('GetLz4LibraryVersion.py')
 r = run_command(python3, GetLz4LibraryVersion_py, lz4_h_file)
 if r.returncode() == 0
-  output = r.stdout().strip()
-  if output.version_compare('>@0@'.format(lz4_version))
-    lz4_version = output
-    message('Project version is now: @0@'.format(lz4_version))
-  endif
+  lz4_version = r.stdout().strip()
+  message('Project version is now: @0@'.format(lz4_version))
 else
-  warning('Cannot find project version in @0@'.format(lz4_h_file))
+  error('Cannot find project version in @0@'.format(lz4_h_file))
 endif
 
 lz4_libversion = lz4_version
@@ -72,17 +69,17 @@ use_debug = get_option('debug')
 debug_level = get_option('debug_level')
 use_backtrace = get_option('backtrace')
 
-build_programs = get_option('build_programs')
-build_contrib = get_option('build_contrib')
-build_tests = get_option('build_tests')
-build_examples = get_option('build_examples')
+bin_programs = get_option('bin_programs')
+bin_contrib = get_option('bin_contrib')
+bin_tests = get_option('bin_tests')
+bin_examples = get_option('bin_examples')
 #feature_multi_thread = get_option('multi_thread')
 
 # =============================================================================
 # Dependencies
 # =============================================================================
 
-#libm_dep = cc.find_library('m', required: build_tests)
+#libm_dep = cc.find_library('m', required: bin_tests)
 #thread_dep = dependency('threads', required: feature_multi_thread)
 #use_multi_thread = thread_dep.found()
 
@@ -111,18 +108,18 @@ endif
 
 subdir('lib')
 
-if build_programs
+if bin_programs
   subdir('programs')
 endif
 
-if build_tests
+if bin_tests
   subdir('tests')
 endif
 
-if build_contrib
+if bin_contrib
   subdir('contrib')
 endif
 
-if build_examples
+if bin_examples
   subdir('examples')
 endif

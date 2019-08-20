@@ -34,6 +34,7 @@ LZ4DIR  = lib
 PRGDIR  = programs
 TESTDIR = tests
 EXDIR   = examples
+FUZZDIR = ossfuzz
 
 include Makefile.inc
 
@@ -76,6 +77,7 @@ clean:
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
 	@$(MAKE) -C $(EXDIR) $@ > $(VOID)
+	@$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
 	@$(MAKE) -C contrib/gen_manual $@ > $(VOID)
 	@$(RM) lz4$(EXT)
 	@echo Cleaning completed
@@ -125,11 +127,14 @@ test:
 	$(MAKE) -C $(TESTDIR) $@
 	$(MAKE) -C $(EXDIR) $@
 
+clangtest: CFLAGS ?= -O3
+clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
+clangtest: CC = clang
 clangtest: clean
-	clang -v
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  all CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) all CC=clang
+	$(CC) -v
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all CC=$(CC)
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all CC=$(CC)
+	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all CC=$(CC)
 
 clangtest-native: clean
 	clang -v

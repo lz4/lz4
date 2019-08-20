@@ -10,6 +10,9 @@ version: 2
 jobs:
   build:
     working_directory: ~/lz4/lz4
+    # Parallelism is broken in this file : it just plays the same tests twice.
+    # The script will have to be modified to support parallelism properly
+    # In the meantime, set it to 1.
     parallelism: 1
     shell: /bin/bash --login
     # CircleCI 2.0 does not support environment variables that refer to each other the same way as 1.0 did.
@@ -27,8 +30,7 @@ jobs:
     # To see the list of pre-built images that CircleCI provides for most common languages see
     # https://circleci.com/docs/2.0/circleci-images/
     docker:
-    - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-      command: /sbin/init
+    - image: fbopensource/lz4-circleci-primary:0.0.4
     steps:
     # Machine Setup
     #   If you break your build into multiple jobs with workflows, you will probably want to do the parts of this that are relevant in each
@@ -38,60 +40,25 @@ jobs:
     # In many cases you can simplify this from what is generated here.
     # 'See docs on artifact collection here https://circleci.com/docs/2.0/artifacts/'
     - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
-    # Dependencies
-    #   This would typically go in either a build or a build-and-test job when using workflows
-    # Restore the dependency cache
-    - restore_cache:
-        keys:
-        # This branch if available
-        - v1-dep-{{ .Branch }}-
-        # Default branch if not
-        - v1-dep-dev-
-        # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
-        - v1-dep-
-    # This is based on your 1.0 configuration file or project settings
-    - run: sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; sudo apt-get -y -qq update
-    - run: sudo apt-get -y install qemu-system-ppc qemu-user-static gcc-powerpc-linux-gnu
-    - run: sudo apt-get -y install qemu-system-arm gcc-arm-linux-gnueabi libc6-dev-armel-cross gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-    - run: sudo apt-get -y install libc6-dev-i386 clang gcc-5 gcc-5-multilib gcc-6 valgrind
-    # Save dependency cache
-    - save_cache:
-        key: v1-dep-{{ .Branch }}-{{ epoch }}
-        paths:
-        # This is a broad list of cache paths to include many possible development environments
-        # You can probably delete some of these entries
-        - vendor/bundle
-        - ~/virtualenvs
-        - ~/.m2
-        - ~/.ivy2
-        - ~/.bundle
-        - ~/.go_workspace
-        - ~/.gradle
-        - ~/.cache/bower
     # Test
     #   This would typically be a build job when using workflows, possibly combined with build
     # This is based on your 1.0 configuration file or project settings
-    - run: clang -v; make clangtest && make clean
+    - run: CFLAGS= make clangtest && make clean
     - run: g++ -v; make gpptest     && make clean
-    - run: gcc -v; make c_standards && make clean
     - run: gcc -v; g++ -v; make ctocpptest && make clean
     - run: gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -Werror" make check && make clean
     - run: gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -m32 -Werror" CPPFLAGS=-I/usr/include/x86_64-linux-gnu make check && make clean
-    - run: gcc-6 -v; CC=gcc-6 make c_standards && make clean
     - run: gcc-6 -v; CC=gcc-6 MOREFLAGS="-O2 -Werror" make check  && make clean
     - run: make cmake               && make clean
     - run: make -C tests test-lz4
     - run: make -C tests test-lz4c
     - run: make -C tests test-frametest
-    - run: make -C tests test-fullbench
     - run: make -C tests test-fuzzer && make clean
     - run: make -C lib all          && make clean
     - run: pyenv global 3.4.4; make versionsTest MOREFLAGS=-I/usr/include/x86_64-linux-gnu && make clean
     - run: make travis-install      && make clean
     - run: gcc -v; CFLAGS="-O2 -m32 -Werror" CPPFLAGS=-I/usr/include/x86_64-linux-gnu make check && make clean
-    - run: make usan                && make clean
     - run: clang -v; make staticAnalyze && make clean
-    - run: make -C tests test-mem && make clean
     - run: make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc-static                  && make clean
     - run: make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static MOREFLAGS=-m64 && make clean
     - run: make platformTest CC=arm-linux-gnueabi-gcc QEMU_SYS=qemu-arm-static                  && make clean
