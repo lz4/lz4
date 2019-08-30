@@ -4,6 +4,8 @@
 #include <stdlib.h>
 
 #include "fuzz_helpers.h"
+#include "lz4frame.h"
+#include "lz4hc.h"
 
 /* Struct used for maintaining the state of the data */
 typedef struct FUZZ_dataProducer_s FUZZ_dataProducer_t;
@@ -17,6 +19,12 @@ void FUZZ_dataProducer_free(FUZZ_dataProducer_t *producer);
 /* Returns value between [min, max] */
 uint32_t FUZZ_dataProducer_uint32(FUZZ_dataProducer_t *producer, uint32_t min,
                                   uint32_t max);
+
+/* Returns lz4 preferences */
+LZ4F_preferences_t FUZZ_dataProducer_preferences(FUZZ_dataProducer_t* producer);
+
+/* Returns lz4 frame info */
+LZ4F_frameInfo_t FUZZ_dataProducer_frameInfo(FUZZ_dataProducer_t* producer);
 
 /* Returns the size of the remaining bytes of data in the producer */
 size_t FUZZ_dataProducer_remainingBytes(FUZZ_dataProducer_t *producer);
