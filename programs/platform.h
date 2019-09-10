@@ -86,7 +86,7 @@ extern "C" {
 #  else
 #    if defined(__linux__) || defined(__linux)
 #      ifndef _POSIX_C_SOURCE
-#        define _POSIX_C_SOURCE 200112L  /* use feature test macro */
+#        define _POSIX_C_SOURCE 200809L  /* use feature test macro */
 #      endif
 #    endif
 #    include <unistd.h>  /* declares _POSIX_VERSION */
