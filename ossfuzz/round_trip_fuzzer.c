@@ -23,9 +23,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     FUZZ_ASSERT(dst);
     FUZZ_ASSERT(rt);
 
-    /* Restrict to remaining data from producer */
-    size = FUZZ_dataProducer_remainingBytes(producer);
-
     /* Compression must succeed and round trip correctly. */
     int const dstSize = LZ4_compress_default((const char*)data, dst,
                                              size, dstCapacity);
