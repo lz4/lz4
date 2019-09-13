@@ -31,11 +31,15 @@ static void decompress(LZ4F_dctx* dctx, void* dst, size_t dstCapacity,
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
     FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
-    size_t const dstCapacity = FUZZ_dataProducer_uint32(
-      producer, 0, 4 * size);
+    size_t const dstCapacitySeed = FUZZ_dataProducer_uint32_seed(producer,
+        0, 4 * size);
     size_t const largeDictSize = 64 * 1024;
+    size_t const dictSizeSeed = FUZZ_dataProducer_uint32_seed(producer,
+        0, largeDictSize);
+    size_t const dstCapacity = FUZZ_dataProducer_uint32(
+      dstCapacitySeed, 0, 4 * FUZZ_dataProducer_remainingBytes(producer));
     size_t const dictSize = FUZZ_dataProducer_uint32(
-      producer, 0, largeDictSize);
+      dictSizeSeed, 0, largeDictSize);
     char* const dst = (char*)malloc(dstCapacity);
     char* const dict = (char*)malloc(dictSize);
     LZ4F_decompressOptions_t opts;

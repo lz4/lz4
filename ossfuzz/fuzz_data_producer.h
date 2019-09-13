@@ -16,8 +16,15 @@ FUZZ_dataProducer_t *FUZZ_dataProducer_create(const uint8_t *data, size_t size);
 /* Frees the data producer */
 void FUZZ_dataProducer_free(FUZZ_dataProducer_t *producer);
 
+/* Returns a seed value for the function after this one to consume */
+uint32_t FUZZ_dataProducer_uint32_seed(FUZZ_dataProducer_t *producer, uint32_t min,
+                                  uint32_t max);
+
 /* Returns value between [min, max] */
-uint32_t FUZZ_dataProducer_uint32(FUZZ_dataProducer_t *producer, uint32_t min,
+uint32_t FUZZ_dataProducer_uint32(uint32_t seed, uint32_t min, uint32_t max);
+
+/* Combination of above two functions for non adaptive use cases. ie where size is not involved */
+uint32_t FUZZ_dataProducer_uint32NonAdaptive(FUZZ_dataProducer_t *producer, uint32_t min,
                                   uint32_t max);
 
 /* Returns lz4 preferences */
