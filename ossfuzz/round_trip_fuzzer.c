@@ -15,11 +15,10 @@
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
     FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
-    size_t const partialCapacitySeed = FUZZ_dataProducer_uint32(producer, 0, size);
-
+    size_t const partialCapacitySeed = FUZZ_dataProducer_retrieve32(producer);
     size = FUZZ_dataProducer_remainingBytes(producer);
-    size_t const partialCapacity = FUZZ_getRange_from_uint32(partialCapacitySeed,
-        0, size);
+
+    size_t const partialCapacity = FUZZ_getRange_from_uint32(partialCapacitySeed, 0, size);
     size_t const dstCapacity = LZ4_compressBound(size);
 
     char* const dst = (char*)malloc(dstCapacity);

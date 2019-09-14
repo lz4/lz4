@@ -17,22 +17,18 @@ FUZZ_dataProducer_t *FUZZ_dataProducer_create(const uint8_t *data, size_t size) 
 
 void FUZZ_dataProducer_free(FUZZ_dataProducer_t *producer) { free(producer); }
 
-uint32_t FUZZ_dataProducer_uint32(FUZZ_dataProducer_t *producer, uint32_t min,
-                                  uint32_t max) {
-  FUZZ_ASSERT(min <= max);
-
-  uint32_t range = max - min;
-  uint32_t rolling = range;
-  uint32_t result = 0;
-
-  while (rolling > 0 && producer->size > 0) {
-    uint8_t next = *(producer->data + producer->size - 1);
-    producer->size -= 1;
-    result = (result << 8) | next;
-    rolling >>= 8;
-  }
-
-  return result;
+uint32_t FUZZ_dataProducer_retrieve32(FUZZ_dataProducer_t *producer) {
+    const uint8_t* data = producer->data;
+    const size_t size = producer->size;
+    if (size == 0) {
+        return 0;
+    } else if (size < 4) {
+        producer->size -= 1;
+        return (uint32_t)data[size - 1];
+    } else {
+        producer->size -= 4;
+        return *(data + size - 4);
+    }
 }
 
 uint32_t FUZZ_getRange_from_uint32(uint32_t seed, uint32_t min, uint32_t max)
@@ -47,7 +43,7 @@ uint32_t FUZZ_getRange_from_uint32(uint32_t seed, uint32_t min, uint32_t max)
 uint32_t FUZZ_dataProducer_range32(FUZZ_dataProducer_t* producer,
     uint32_t min, uint32_t max)
 {
-    size_t const seed = FUZZ_dataProducer_uint32(producer, min, max);
+    size_t const seed = FUZZ_dataProducer_retrieve32(producer);
     return FUZZ_getRange_from_uint32(seed, min, max);
 }
 
