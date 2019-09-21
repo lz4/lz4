@@ -249,6 +249,10 @@ static int g_debuglog_enable = 1;
   typedef uint64_t U64;
   typedef uintptr_t uptrval;
 #else
+# include <limits.h>
+# if UINT_MAX != 4294967295UL
+#   error "LZ4 code (when not C++ or C99) assumes that sizeof(int) == 4"
+# endif
   typedef unsigned char       BYTE;
   typedef unsigned short      U16;
   typedef unsigned int        U32;
@@ -1625,8 +1629,8 @@ typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_err
 LZ4_FORCE_INLINE unsigned
 read_variable_length(const BYTE**ip, const BYTE* lencheck, int loop_check, int initial_check, variable_length_error* error)
 {
-  unsigned length = 0;
-  unsigned s;
+  U32 length = 0;
+  U32 s;
   if (initial_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
     *error = initial_error;
     return length;
