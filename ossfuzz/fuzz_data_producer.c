@@ -20,6 +20,7 @@ void FUZZ_dataProducer_free(FUZZ_dataProducer_t *producer) { free(producer); }
 uint32_t FUZZ_dataProducer_retrieve32(FUZZ_dataProducer_t *producer) {
     const uint8_t* data = producer->data;
     const size_t size = producer->size;
+    FUZZ_ASSERT(size >= 0);
     if (size == 0) {
         return 0;
     } else if (size < 4) {
