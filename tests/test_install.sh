@@ -1,7 +1,14 @@
 #/usr/bin/env sh
 set -e
 
-make="$(MAKE) -C $lz4_root"
+
+make="make -C $lz4_root"
+if [ "$unamestr" = 'Linux' ]; then
+  make="make -C $lz4_root"
+elif [ "$unamestr" = 'FreeBSD' ]; then
+  make="gmake -C $lz4_root"
+fi
+
 for cmd in install uninstall; do
   for upper in DUMMY PREFIX EXEC_PREFIX LIBDIR INCLUDEDIR PKGCONFIGDIR BINDIR MANDIR MAN1DIR ; do
     lower=$(echo $upper | tr '[:upper:]' '[:lower:]')
