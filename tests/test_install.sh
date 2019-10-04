@@ -1,7 +1,7 @@
 #/usr/bin/env sh
 set -e
 
-make="make -C $lz4_root"
+make="gmake -C $lz4_root"
 for cmd in install uninstall; do
   for upper in DUMMY PREFIX EXEC_PREFIX LIBDIR INCLUDEDIR PKGCONFIGDIR BINDIR MANDIR MAN1DIR ; do
     lower=$(echo $upper | tr '[:upper:]' '[:lower:]')
