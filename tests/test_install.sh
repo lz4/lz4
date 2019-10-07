@@ -3,6 +3,7 @@ set -e
 
 
 make="make -C $lz4_root"
+unamestr=$(uname)
 if [ "$unamestr" = 'Linux' ]; then
   make="make -C $lz4_root"
 elif [ "$unamestr" = 'FreeBSD' ]; then
