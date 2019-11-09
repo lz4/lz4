@@ -69,8 +69,8 @@
         <h1>LZ4</h1>
         <iframe src="https://ghbtns.com/github-btn.html?user=lz4&repo=lz4&type=star&count=true&size=large&v=2" frameborder="0" scrolling="0" width="160px" height="30px"></iframe>
         <p>
-        LZ4 is lossless compression algorithm, providing compression speed at 400 MB/s per core (0.16 Bytes/cycle).
-        It features an extremely fast decoder, with speed in multiple GB/s per core (0.71 Bytes/cycle).
+        LZ4 is lossless compression algorithm, providing compression speed > 500 MB/s per core (>0.15 Bytes/cycle).
+        It features an extremely fast decoder, with speed in multiple GB/s per core (~1 Byte/cycle).
         A high compression derivative, called LZ4_HC, is available, trading customizable CPU time for compression ratio.
         LZ4 library is provided as open source software using a BSD license.
       </div>
@@ -204,7 +204,9 @@ Here are a few compatible alternatives to lz4 command line utility :
 |__C++11 multi-threads__ | Takayuki Matsuoka   |https://github.com/t-mat/lz4mt |
 |__LZ4X__                | Ilya Muravyov       |https://github.com/encode84/lz4x |
 |__smalLZ4__             | Stephan Brumme      |http://create.stephan-brumme.com/smallz4/ |
+|__briefLZ4__            | Jørgen Ibsen        |https://github.com/jibsen/blz4 |
 |__7Zip with LZ4__       | Tino Reichardt      |https://github.com/mcmilk/7-Zip-zstd |
+|__lz4ultra__            | Emmanuel Marty      |https://github.com/emmanuel-marty/lz4ultra |
 
 
 <br/>
@@ -234,7 +236,7 @@ They are not interoperable with LZ4 command line utility.
 |__OCaml__            | Peter Zotov         | https://github.com/whitequark/ocaml-lz4
 |__Rust__             | Alex Crichton       | http://alexcrichton.com/rust-compress/compress/lz4/index.html
 |__WASM__             | Raymond Hill        | https://github.com/gorhill/lz4-wasm
-|__ARM Cortex assembly__ decoder | Jens Bauer | http://community.arm.com/docs/DOC-10570
+|__ARM Cortex assembly__ decoder | Jens Bauer | https://community.arm.com/developer/ip-products/processors/b/processors-ip-blog/posts/lz4-decompression-routine-for-cortex-m0-and-later
 |__8088 assembly__ decoder | Jim Leonard     | http://www.oldskool.org/pc/lz4_8088
 |__6502 & 65C02 assembly__ decoder | Peter Ferrie | http://pferrie.host22.com/misc/appleii.htm
 |__65c816 assembly__ decoder | Olivier Zardini | http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
@@ -305,7 +307,7 @@ They are not interoperable with LZ4 command line utility.
 <li><a href="https://olegdb.org/"				><img src="images/logo50/olegdb.png"	/><span> OlegDB</span></a></li>
 <li><a href="https://gemtalksystems.com/products/gs64/"		><img src="images/logo50/gemstone.png"	/><span> GemStone</span></a></li>
 <li><a href="https://www.percona.com/blog/2016/08/11/percona-server-mongodb-3-2-8-2-0-now-available/"> <img src="images/logo50/percona.png"	/><span> Percona</span></a></li>
-<li><a href="https://github.com/zilder/pg_lz4"		><img src="images/logo50/postgresql.png" /><span> PostgreSQL</span></a></li>
+<li><a href="https://github.com/adjust/pg_cryogen"		><img src="images/logo50/postgresql.png" /><span> PostgreSQL</span></a></li>
   </ul>
 </div>
 
