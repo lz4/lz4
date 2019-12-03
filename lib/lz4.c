@@ -225,15 +225,15 @@ static const int LZ4_minLength = (MFLIMIT+1);
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)
 #  include <stdio.h>
-static int g_debuglog_enable = 1;
-#  define DEBUGLOG(l, ...) {                                  \
-                if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
-                    fprintf(stderr, __FILE__ ": ");           \
-                    fprintf(stderr, __VA_ARGS__);             \
-                    fprintf(stderr, " \n");                   \
-            }   }
+   static int g_debuglog_enable = 1;
+#  define DEBUGLOG(l, ...) {                          \
+        if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
+            fprintf(stderr, __FILE__ ": ");           \
+            fprintf(stderr, __VA_ARGS__);             \
+            fprintf(stderr, " \n");                   \
+    }   }
 #else
-#  define DEBUGLOG(l, ...)      {}    /* disabled */
+#  define DEBUGLOG(l, ...) {}    /* disabled */
 #endif
 
 

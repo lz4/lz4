@@ -389,8 +389,8 @@ LZ4HC_InsertAndGetWiderMatch (
                                     if (lookBackLength==0) {  /* no back possible */
                                         size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
                                         if ((size_t)longest < maxML) {
-                                            assert(base + matchIndex < ip);
-                                            if (ip - (base+matchIndex) > LZ4_DISTANCE_MAX) break;
+                                            assert(base + matchIndex != ip);
+                                            if ((size_t)(ip - base) - matchIndex > LZ4_DISTANCE_MAX) break;
                                             assert(maxML < 2 GB);
                                             longest = (int)maxML;
                                             *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
@@ -1028,7 +1028,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
               const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
-    DEBUGLOG(4, "LZ4_loadDictHC(%p, %p, %d)", LZ4_streamHCPtr, dictionary, dictSize);
+    DEBUGLOG(4, "LZ4_loadDictHC(ctx:%p, dict:%p, dictSize:%d)", LZ4_streamHCPtr, dictionary, dictSize);
     assert(LZ4_streamHCPtr != NULL);
     if (dictSize > 64 KB) {
         dictionary += (size_t)dictSize - 64 KB;
