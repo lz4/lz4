@@ -24,8 +24,8 @@
 */
 
 
-// S_ISREG & gettimeofday() are not supported by MSVC
 #if defined(_MSC_VER) || defined(_WIN32)
+   /* S_ISREG & gettimeofday() are not supported by MSVC */
 #  define BMK_LEGACY_TIMER 1
 #endif
 
@@ -134,7 +134,7 @@ static clock_t BMK_GetClockSpan( clock_t clockStart )
 static size_t BMK_findMaxMem(U64 requiredMem)
 {
     size_t step = 64 MB;
-    BYTE* testmem=NULL;
+    BYTE* testmem = NULL;
 
     requiredMem = (((requiredMem >> 26) + 1) << 26);
     requiredMem += 2*step;
@@ -292,9 +292,14 @@ static int local_LZ4_decompress_fast_usingExtDict(const char* in, char* out, int
     return outSize;
 }
 
+static int local_LZ4_decompress_safe_withPrefix64k(const char* in, char* out, int inSize, int outSize)
+{
+    LZ4_decompress_safe_withPrefix64k(in, out, inSize, outSize);
+    return outSize;
+}
+
 static int local_LZ4_decompress_safe_usingDict(const char* in, char* out, int inSize, int outSize)
 {
-    (void)inSize;
     LZ4_decompress_safe_usingDict(in, out, inSize, outSize, out - 65536, 65536);
     return outSize;
 }
@@ -608,6 +613,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 2: decompressionFunction = local_LZ4_decompress_fast_usingDict_prefix; dName = "LZ4_decompress_fast_usingDict(prefix)"; break;
             case 3: decompressionFunction = local_LZ4_decompress_fast_usingExtDict; dName = "LZ4_decompress_fast_using(Ext)Dict"; break;
             case 4: decompressionFunction = LZ4_decompress_safe; dName = "LZ4_decompress_safe"; break;
+            case 5: decompressionFunction = local_LZ4_decompress_safe_withPrefix64k; dName = "LZ4_decompress_safe_withPrefix64k"; break;
             case 6: decompressionFunction = local_LZ4_decompress_safe_usingDict; dName = "LZ4_decompress_safe_usingDict"; break;
             case 7: decompressionFunction = local_LZ4_decompress_safe_partial; dName = "LZ4_decompress_safe_partial"; checkResult = 0; break;
 #ifndef LZ4_DLL_IMPORT
