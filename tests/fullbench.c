@@ -386,6 +386,39 @@ static int local_LZ4F_decompress_followHint(const char* src, char* dst, int srcS
 
 }
 
+/* always provide input by block of 64 KB */
+static int local_LZ4F_decompress_noHint(const char* src, char* dst, int srcSize, int dstSize)
+{
+    size_t totalInSize = (size_t)srcSize;
+    size_t maxOutSize = (size_t)dstSize;
+
+    size_t inPos = 0;
+    size_t inSize = 64 KB;
+    size_t outPos = 0;
+    size_t outRemaining = maxOutSize - outPos;
+
+    for (;;) {
+        size_t const sizeHint = LZ4F_decompress(g_dCtx, dst+outPos, &outRemaining, src+inPos, &inSize, NULL);
+        assert(!LZ4F_isError(sizeHint));
+
+        inPos += inSize;
+        inSize = (inPos + 64 KB <= totalInSize) ? 64 KB : totalInSize - inPos;
+
+        outPos += outRemaining;
+        outRemaining = maxOutSize - outPos;
+
+        if (!sizeHint) break;
+    }
+
+    /* frame completed */
+    if (inPos != totalInSize) {
+        DISPLAY("Error decompressing frame : must read (%u) full frame (%u) \n",
+                (unsigned)inPos, (unsigned)totalInSize);
+        exit(10);
+    }
+    return (int)outPos;
+
+}
 
 #define NB_COMPRESSION_ALGORITHMS 100
 #define NB_DECOMPRESSION_ALGORITHMS 100
@@ -621,8 +654,10 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 #endif
             case 10:
             case 11:
+            case 12:
                 if (dAlgNb == 10) { decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress"; }  /* can be skipped */
                 if (dAlgNb == 11) { decompressionFunction = local_LZ4F_decompress_followHint; dName = "LZ4F_decompress_followHint"; }  /* can be skipped */
+                if (dAlgNb == 12) { decompressionFunction = local_LZ4F_decompress_noHint; dName = "LZ4F_decompress_noHint"; }  /* can be skipped */
                 /* prepare compressed data using frame format */
                 {   size_t const fcsize = LZ4F_compressFrame(compressed_buff, (size_t)compressedBuffSize, orig_buff, benchedSize, NULL);
                     assert(!LZ4F_isError(fcsize));
