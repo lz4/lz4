@@ -658,9 +658,14 @@ int main(int argc, const char** argv)
         if (!output_filename) output_filename = stdoutmark;
     }
     else{
-        if (!recursive && !UTIL_isRegFile(input_filename)) {
-            DISPLAYLEVEL(1, "%s: is not a regular file \n", input_filename);
-            exit(1);
+#ifdef UTIL_HAS_CREATEFILELIST
+        if (!recursive)
+#endif
+        {
+            if (!UTIL_isRegFile(input_filename)) {
+                DISPLAYLEVEL(1, "%s: is not a regular file \n", input_filename);
+                exit(1);
+            }
         }
     }
 
