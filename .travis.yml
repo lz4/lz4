@@ -274,20 +274,5 @@ matrix:
       script:
         - ./ossfuzz/travisoss.sh
 
-    - name: Compile OSS-Fuzz targets (arm64)
-      arch: arm64
-      script:
-        - ./ossfuzz/travisoss.sh
-
-    - name: Compile OSS-Fuzz targets (ppc64le)
-      arch: ppc64le
-      script:
-        - ./ossfuzz/travisoss.sh
-
-    - name: Compile OSS-Fuzz targets (s390x)
-      arch: s390x
-      script:
-        - ./ossfuzz/travisoss.sh
-
   allow_failures:
     - env: ALLOW_FAILURES=true
