@@ -48,13 +48,6 @@ matrix:
       script:
         - CC=clang MOREFLAGS=-fsanitize=address make -C tests test-frametest test-fuzzer
 
-    - name: ASAN tests with fuzzer and frametest (s390x)
-      arch: s390x
-      install:
-        - sudo sysctl -w vm.mmap_min_addr=4096
-      script:
-        - CC=clang MOREFLAGS=-fsanitize=address make -C tests test-frametest test-fuzzer
-
     - name: Custom LZ4_DISTANCE_MAX (amd64)
       arch: amd64
       script:
