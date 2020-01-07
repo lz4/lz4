@@ -34,13 +34,6 @@ matrix:
       script:
         - CC=clang MOREFLAGS=-fsanitize=address make -C tests test-frametest test-fuzzer
 
-    - name: ASAN tests with fuzzer and frametest (arm64)
-      arch: arm64
-      install:
-        - sudo sysctl -w vm.mmap_min_addr=4096
-      script:
-        - CC=clang MOREFLAGS=-fsanitize=address make -C tests test-frametest test-fuzzer
-
     - name: ASAN tests with fuzzer and frametest (ppc64le)
       arch: ppc64le
       install:
