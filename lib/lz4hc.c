@@ -495,11 +495,11 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 
     /* Encode Literal length */
     litLength = (size_t)(*ip - *anchor);
-    if ((outputDirective) && ((*op + (litLength / 255) + litLength + (L_PREFIX_SIZE + LASTLITERALS)) > olimit)) return 1;   /* Check output limit */
+    if (outputDirective && (*op + (litLength / 255) + litLength + (L_PREFIX_SIZE + LASTLITERALS)) > olimit) return 1;   /* Check output limit */
     if (litLength >= RUN_MASK) {
         size_t len = litLength - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
-        for(; len >= 255 ; len -= 255) *(*op)++ = 255;
+        for( ; len >= 255 ; len -= 255) *(*op)++ = 255;
         *(*op)++ = (BYTE)len;
     } else {
         *token = (BYTE)(litLength << ML_BITS);
@@ -510,17 +510,17 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     *op += litLength;
 
     /* Encode Offset */
-    assert( (*ip - match) <= LZ4_DISTANCE_MAX );   /* note : consider providing offset as a value, rather than as a pointer difference */
-    LZ4_writeLE16(*op, (U16)(*ip-match)); *op += L_OFFSET_SIZE;
+    assert(*ip - match <= LZ4_DISTANCE_MAX);   /* note : consider providing offset as a value, rather than as a pointer difference */
+    LZ4_writeLE16(*op, (U16)(*ip - match)); *op += L_OFFSET_SIZE;
 
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
     litLength = (size_t)matchLength - MINMATCH;
-    if ((outputDirective) && (*op + (litLength / 255) + (L_TOKEN_SIZE + LASTLITERALS) > olimit)) return 1;   /* Check output limit */
+    if (outputDirective && (*op + (litLength / 255) + L_TOKEN_SIZE + LASTLITERALS) > olimit) return 1;   /* Check output limit */
     if (litLength >= ML_MASK) {
         *token += ML_MASK;
         litLength -= ML_MASK;
-        for(; litLength >= 510 ; litLength -= 510) { *(*op)++ = 255; *(*op)++ = 255; }
+        for( ; litLength >= 510 ; litLength -= 510) { *(*op)++ = 255; *(*op)++ = 255; }
         if (litLength >= 255) { litLength -= 255; *(*op)++ = 255; }
         *(*op)++ = (BYTE)litLength;
     } else {
@@ -581,7 +581,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
         start0 = ip; ref0 = ref; ml0 = ml;
 
 _Search2:
-        if (ip+ml <= mflimit) {
+        if (ip + ml <= mflimit) {
             ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
                             ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
                             maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
@@ -598,13 +598,14 @@ _Search2:
         if (start0 < ip) {   /* first match was skipped at least once */
             if (start2 < ip + ml0) {  /* squeezing ML1 between ML0(original ML1) and ML2 */
                 ip = start0; ref = ref0; ml = ml0;  /* restore initial ML1 */
-        }   }
+            }
+        }
 
         /* Here, start0==ip */
-        if ((start2 - ip) < 3) {  /* First Match too small : removed */
+        if (start2 - ip < 3) {  /* First Match too small : removed */
             ml = ml2;
             ip = start2;
-            ref =ref2;
+            ref = ref2;
             goto _Search2;
         }
 
@@ -612,11 +613,11 @@ _Search3:
         /* At this stage, we have :
         *  ml2 > ml1, and
         *  ip1+3 <= ip2 (usually < ip1+ml1) */
-        if ((start2 - ip) < OPTIMAL_ML) {
+        if (start2 - ip < OPTIMAL_ML) {
             int correction;
             int new_ml = ml;
             if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-            if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
+            if (ip + new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
             correction = new_ml - (int)(start2 - ip);
             if (correction > 0) {
                 start2 += correction;
@@ -636,7 +637,7 @@ _Search3:
 
         if (ml3 == ml2) {  /* No better match => encode ML1 and ML2 */
             /* ip & ref are known; Now for ml */
-            if (start2 < ip+ml)  ml = (int)(start2 - ip);
+            if (start2 < ip + ml)  ml = (int)(start2 - ip);
             /* Now, encode 2 sequences */
             optr = op;
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, outputDirective, olimit)) goto _dest_overflow;
@@ -646,10 +647,10 @@ _Search3:
             continue;
         }
 
-        if (start3 < ip+ml+3) {  /* Not enough space for match 2 : remove it */
-            if (start3 >= (ip+ml)) {  /* can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1 */
-                if (start2 < ip+ml) {
-                    int correction = (int)(ip+ml - start2);
+        if (start3 < ip + ml + 3) {  /* Not enough space for match 2 : remove it */
+            if (start3 >= ip + ml) {  /* can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1 */
+                if (start2 < ip + ml) {
+                    int correction = (int)(ip + ml - start2);
                     start2 += correction;
                     ref2 += correction;
                     ml2 -= correction;
@@ -683,7 +684,7 @@ _Search3:
         * let's write the first one ML1.
         * ip & ref are known; Now decide ml.
         */
-        if (start2 < ip+ml) {
+        if (start2 < ip + ml) {
             if ((start2 - ip) < OPTIMAL_ML) {
                 int correction;
                 if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
@@ -740,7 +741,7 @@ _last_literals:
 
     /* End */
     *srcSizePtr = (int) (((const char*)ip) - source);
-    return (int) (((char*)op)-dest);
+    return (int) (((char*)op) - dest);
 
 _dest_overflow:
     if (outputDirective == fillOutput) {
