@@ -74,6 +74,9 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
 #define LZ4_OPT_NUM   (1<<12)
 
+#define L_OFFSET_SIZE  2   /* literals offset size (U16) */
+#define L_TOKEN_SIZE   1   /* token size (BYTE) */
+#define L_PREFIX_SIZE  (L_OFFSET_SIZE + L_TOKEN_SIZE)
 
 /*===   Macros   ===*/
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
@@ -83,6 +86,8 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 #define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
 /* Make fields passed to, and updated by LZ4HC_encodeSequence explicit */
 #define UPDATABLE(ip, op, anchor) &ip, &op, &anchor
+/* Calculate size of literals */
+#define LIT_SIZE(length)  (((length) + 255 - RUN_MASK) / 255)
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
@@ -490,7 +495,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 
     /* Encode Literal length */
     litLength = (size_t)(*ip - *anchor);
-    if ((outputDirective) && ((*op + (litLength / 255) + litLength + (2 + 1 + LASTLITERALS)) > olimit)) return 1;   /* Check output limit */
+    if ((outputDirective) && ((*op + (litLength / 255) + litLength + (L_PREFIX_SIZE + LASTLITERALS)) > olimit)) return 1;   /* Check output limit */
     if (litLength >= RUN_MASK) {
         size_t len = litLength - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
@@ -506,12 +511,12 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 
     /* Encode Offset */
     assert( (*ip - match) <= LZ4_DISTANCE_MAX );   /* note : consider providing offset as a value, rather than as a pointer difference */
-    LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
+    LZ4_writeLE16(*op, (U16)(*ip-match)); *op += L_OFFSET_SIZE;
 
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
     litLength = (size_t)matchLength - MINMATCH;
-    if ((outputDirective) && (*op + (litLength / 255) + (1 + LASTLITERALS) > olimit)) return 1;   /* Check output limit */
+    if ((outputDirective) && (*op + (litLength / 255) + (L_TOKEN_SIZE + LASTLITERALS) > olimit)) return 1;   /* Check output limit */
     if (litLength >= ML_MASK) {
         *token += ML_MASK;
         litLength -= ML_MASK;
@@ -709,14 +714,14 @@ _Search3:
 _last_literals:
     /* Encode Last Literals */
     {   size_t lastRun = (size_t)(iend - anchor);  /* literals */
-        size_t litSize = (lastRun + 255 - RUN_MASK) / 255;
+        size_t litSize = LIT_SIZE(lastRun);
         size_t const totalSize = 1 + litSize + lastRun;
         if (outputDirective == fillOutput) olimit += LASTLITERALS;  /* restore correct value */
         if (outputDirective && (op + totalSize > olimit)) {
             if (outputDirective == limitedOutput) return 0;  /* Check output limit */
             /* adapt lastRunSize to fill 'dest' */
             lastRun = (size_t)(olimit - op) - 1;
-            litSize = (lastRun + 255 - RUN_MASK) / 255;
+            litSize = LIT_SIZE(lastRun);
             lastRun -= litSize;
         }
         ip = anchor + lastRun;
