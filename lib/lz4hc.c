@@ -575,7 +575,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     /* Main Loop */
     while (ip <= mflimit) {
         ml = LZ4HC_InsertAndFindBestMatch(ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis, dict);
-        if (ml<MINMATCH) { ip++; continue; }
+        if (ml < MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
         start0 = ip; ref0 = ref; ml0 = ml;
@@ -615,10 +615,12 @@ _Search3:
         *  ip1+3 <= ip2 (usually < ip1+ml1) */
         if (start2 - ip < OPTIMAL_ML) {
             int correction;
+            int const mLen = (int)(start2 - ip);
+            int const max_ml = mLen + ml2 - MINMATCH;
             int new_ml = ml;
             if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-            if (ip + new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
-            correction = new_ml - (int)(start2 - ip);
+            if (new_ml > max_ml) new_ml = max_ml;
+            correction = new_ml - mLen;
             if (correction > 0) {
                 start2 += correction;
                 ref2 += correction;
@@ -650,7 +652,7 @@ _Search3:
         if (start3 < ip + ml + 3) {  /* Not enough space for match 2 : remove it */
             if (start3 >= ip + ml) {  /* can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1 */
                 if (start2 < ip + ml) {
-                    int correction = (int)(ip + ml - start2);
+                    int const correction = (int)(ip + ml - start2);
                     start2 += correction;
                     ref2 += correction;
                     ml2 -= correction;
@@ -685,18 +687,20 @@ _Search3:
         * ip & ref are known; Now decide ml.
         */
         if (start2 < ip + ml) {
-            if ((start2 - ip) < OPTIMAL_ML) {
+            int const mLen = (int)(start2 - ip);
+            if (mLen < OPTIMAL_ML) {
                 int correction;
+                int const max_ml = mLen + ml2 - MINMATCH;
                 if (ml > OPTIMAL_ML) ml = OPTIMAL_ML;
-                if (ip + ml > start2 + ml2 - MINMATCH) ml = (int)(start2 - ip) + ml2 - MINMATCH;
-                correction = ml - (int)(start2 - ip);
+                if (ml > max_ml) ml = max_ml;
+                correction = ml - mLen;
                 if (correction > 0) {
                     start2 += correction;
                     ref2 += correction;
                     ml2 -= correction;
                 }
             } else {
-                ml = (int)(start2 - ip);
+                ml = mLen;
             }
         }
         optr = op;
