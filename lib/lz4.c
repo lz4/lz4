@@ -632,7 +632,7 @@ int LZ4_decompress_safe_forceExtDict(const char* source, char* dest,
 /*-******************************
 *  Compression functions
 ********************************/
-static U32 LZ4_hash4(U32 sequence, tableType_t const tableType)
+LZ4_FORCE_INLINE U32 LZ4_hash4(U32 sequence, tableType_t const tableType)
 {
     if (tableType == byU16)
         return ((sequence * 2654435761U) >> ((MINMATCH*8)-(LZ4_HASHLOG+1)));
@@ -640,7 +640,7 @@ static U32 LZ4_hash4(U32 sequence, tableType_t const tableType)
         return ((sequence * 2654435761U) >> ((MINMATCH*8)-LZ4_HASHLOG));
 }
 
-static U32 LZ4_hash5(U64 sequence, tableType_t const tableType)
+LZ4_FORCE_INLINE U32 LZ4_hash5(U64 sequence, tableType_t const tableType)
 {
     const U32 hashLog = (tableType == byU16) ? LZ4_HASHLOG+1 : LZ4_HASHLOG;
     if (LZ4_isLittleEndian()) {
@@ -658,7 +658,7 @@ LZ4_FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tab
     return LZ4_hash4(LZ4_read32(p), tableType);
 }
 
-static void LZ4_clearHash(U32 h, void* tableBase, tableType_t const tableType)
+LZ4_FORCE_INLINE void LZ4_clearHash(U32 h, void* tableBase, tableType_t const tableType)
 {
     switch (tableType)
     {
@@ -670,7 +670,7 @@ static void LZ4_clearHash(U32 h, void* tableBase, tableType_t const tableType)
     }
 }
 
-static void LZ4_putIndexOnHash(U32 idx, U32 h, void* tableBase, tableType_t const tableType)
+LZ4_FORCE_INLINE void LZ4_putIndexOnHash(U32 idx, U32 h, void* tableBase, tableType_t const tableType)
 {
     switch (tableType)
     {
@@ -682,7 +682,7 @@ static void LZ4_putIndexOnHash(U32 idx, U32 h, void* tableBase, tableType_t cons
     }
 }
 
-static void LZ4_putPositionOnHash(const BYTE* p, U32 h,
+LZ4_FORCE_INLINE void LZ4_putPositionOnHash(const BYTE* p, U32 h,
                                   void* tableBase, tableType_t const tableType,
                             const BYTE* srcBase)
 {
@@ -707,7 +707,7 @@ LZ4_FORCE_INLINE void LZ4_putPosition(const BYTE* p, void* tableBase, tableType_
  * Assumption 1 : only valid if tableType == byU32 or byU16.
  * Assumption 2 : h is presumed valid (within limits of hash table)
  */
-static U32 LZ4_getIndexOnHash(U32 h, const void* tableBase, tableType_t tableType)
+LZ4_FORCE_INLINE U32 LZ4_getIndexOnHash(U32 h, const void* tableBase, tableType_t tableType)
 {
     LZ4_STATIC_ASSERT(LZ4_MEMORY_USAGE > 2);
     if (tableType == byU32) {
