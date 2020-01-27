@@ -87,7 +87,8 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 /* Make fields passed to, and updated by LZ4HC_encodeSequence explicit */
 #define UPDATABLE(ip, op, anchor) &ip, &op, &anchor
 /* Calculate size of literals */
-#define LIT_SIZE(length)  (((length) + 255 - RUN_MASK) / 255)
+#define LIT_RUN_SIZE(length)  (((length) + 255 - RUN_MASK) / 255)
+#define LIT_ML_SIZE(length)   (((length) + 255 - ML_MASK)  / 255)
 
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
@@ -730,13 +731,13 @@ _Search3:
 _last_literals:
     /* Encode Last Literals */
     {   size_t lastRun = (size_t)(iend - anchor);  /* literals */
-        size_t litSize = LIT_SIZE(lastRun);
+        size_t litSize = LIT_RUN_SIZE(lastRun);
         size_t const totalSize = 1 + litSize + lastRun;
         if (outputDirective && (op + totalSize > olimit)) {
             if (outputDirective == limitedOutput) return 0;  /* Check output limit */
             /* adapt lastRunSize to fill 'dest' */
             lastRun = (size_t)(olimit - op) - 1;
-            litSize = LIT_SIZE(lastRun);
+            litSize = LIT_RUN_SIZE(lastRun);
             lastRun -= litSize;
         }
         ip = anchor + lastRun;
