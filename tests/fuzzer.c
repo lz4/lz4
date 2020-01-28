@@ -1505,6 +1505,20 @@ static void FUZ_unitTests(int compressionLevel)
  * CLI
  * ======================================= */
 
+static U32 FUZ_atoi(const char** argument)
+{
+    U32 x = 0;
+    const char* a = *argument;
+    while ((*a >= '0') && (*a <= '9')) {
+        x *= 10;
+        x += (U32)(*a - '0');
+        a++;
+    }
+    *argument = a;
+    return x;
+}
+
+
 static int FUZ_usage(const char* programName)
 {
     DISPLAY( "Usage :\n");
@@ -1564,12 +1578,8 @@ int main(int argc, const char** argv)
 
                 case 'i':
                     argument++;
-                    nbTests = 0; duration = 0;
-                    while ((*argument>='0') && (*argument<='9')) {
-                        nbTests *= 10;
-                        nbTests += (unsigned)(*argument - '0');
-                        argument++;
-                    }
+                    duration = 0;
+                    nbTests = FUZ_atoi(&argument);
                     break;
 
                 case 'T':
@@ -1598,36 +1608,23 @@ int main(int argc, const char** argv)
 
                 case 's':
                     argument++;
-                    seed=0; seedset=1;
-                    while ((*argument>='0') && (*argument<='9')) {
-                        seed *= 10;
-                        seed += (U32)(*argument - '0');
-                        argument++;
-                    }
+                    seedset = 1;
+                    seed = FUZ_atoi(&argument);
                     break;
 
                 case 't':   /* select starting test nb */
                     argument++;
-                    testNb=0;
-                    while ((*argument>='0') && (*argument<='9')) {
-                        testNb *= 10;
-                        testNb += (unsigned)(*argument - '0');
-                        argument++;
-                    }
+                    testNb = FUZ_atoi(&argument);
                     break;
 
                 case 'P':  /* change probability */
                     argument++;
-                    proba=0;
-                    while ((*argument>='0') && (*argument<='9')) {
-                        proba *= 10;
-                        proba += *argument - '0';
-                        argument++;
-                    }
+                    proba = FUZ_atoi(&argument);
                     if (proba<0) proba=0;
                     if (proba>100) proba=100;
                     break;
-                default: ;
+
+                default: /* nothing */;
                 }
             }
         }
