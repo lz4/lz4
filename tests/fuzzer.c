@@ -384,7 +384,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         int const compressionLevel = FUZ_rand(&randState) % (g_max_clevel + 1);
         const char* block = ((char*)CNBuffer) + blockStart;
         const char* dict = block - dictSize;
-        int compressedSize, HCcompressedSize;
+        int compressedSize;
+        int HCcompressedSize = 0;
         int blockContinueCompressedSize;
         U32 const crcOrig = XXH32(block, (size_t)blockSize, 0);
         int ret;
