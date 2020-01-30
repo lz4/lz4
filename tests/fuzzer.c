@@ -1617,6 +1617,7 @@ static int FUZ_usage(const char* programName)
     DISPLAY( " -t#    : Select starting test number (default:0)\n");
     DISPLAY( " -P#    : Select compressibility in %% (default:%i%%)\n", FUZ_COMPRESSIBILITY_DEFAULT);
     DISPLAY( " -c#    : Select max compression level (default:%i)\n", FUZ_MAX_COMPRESSION_LEVEL);
+    DISPLAY( " -u     : Forced run unit tests\n");
     DISPLAY( " -v     : verbose\n");
     DISPLAY( " -p     : pause at the end\n");
     DISPLAY( " -h     : display help and exit\n");
@@ -1635,6 +1636,7 @@ int main(int argc, const char** argv)
     int use_pause = 0;
     const char* programName = argv[0];
     U32 duration = 0;
+    int forced_unit_test = 0;
 
     /* Check command line */
     for(argNb=1; argNb<argc; argNb++) {
@@ -1648,30 +1650,27 @@ int main(int argc, const char** argv)
             argument++;
 
             while (*argument!=0) {
-                switch(*argument)
+                char const arg = *argument++;
+                switch(arg)
                 {
                 case 'h':   /* display help */
                     return FUZ_usage(programName);
 
                 case 'v':   /* verbose mode */
                     g_displayLevel++;
-                    argument++;
                     break;
 
                 case 'p':   /* pause at the end */
                     use_pause=1;
-                    argument++;
                     break;
 
                 case 'i':
-                    argument++;
                     duration = 0;
                     nbTests = FUZ_atoi(&argument);
                     break;
 
                 case 'T':
-                    argument++;
-                    nbTests = 0; duration = 0;
+                    nbTests = 1; duration = 0;
                     for (;;) {
                         switch(*argument)
                         {
@@ -1694,27 +1693,27 @@ int main(int argc, const char** argv)
                     break;
 
                 case 's':
-                    argument++;
                     seedset = 1;
                     seed = FUZ_atoi(&argument);
                     break;
 
                 case 't':   /* select starting test nb */
-                    argument++;
                     testNb = FUZ_atoi(&argument);
                     break;
 
                 case 'P':  /* change probability */
-                    argument++;
                     proba = FUZ_atoi(&argument);
                     if (proba<0) proba=0;
                     if (proba>100) proba=100;
                     break;
 
                 case 'c':  /* change max compression level */
-                    argument++;
                     g_max_clevel = FUZ_atoi(&argument);
                     if (g_max_clevel > LZ4HC_CLEVEL_MAX) g_max_clevel = LZ4HC_CLEVEL_MAX;
+                    break;
+
+                case 'u':
+                    forced_unit_test = 1;
                     break;
 
                 default: /* nothing */;
@@ -1732,9 +1731,9 @@ int main(int argc, const char** argv)
     }
     printf("Seed = %u\n", seed);
 
-    if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
+    if (nbTests && proba != FUZ_COMPRESSIBILITY_DEFAULT) printf("Compressibility : %i%%\n", proba);
 
-    if ((seedset==0) && (testNb==0)) {
+    if ( ((seedset==0) && (testNb==0)) || forced_unit_test ) {
         if (g_max_clevel < LZ4HC_CLEVEL_MIN) {
             /* unit tests only for LZ4_compress_generic */
             FUZ_unitTests(g_max_clevel);
@@ -1749,13 +1748,14 @@ int main(int argc, const char** argv)
         }
     }
 
-    nbTests += (nbTests==0);  /* avoid zero */
-
-    {   int const result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
+    if (nbTests) {
+        int const result = FUZ_test(seed, nbTests, testNb, ((double)proba) / 100, duration);
         if (use_pause) {
             DISPLAY("press enter ... \n");
             (void)getchar();
         }
         return result;
     }
+
+    return 0;  /* OK */
 }
