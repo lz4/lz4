@@ -85,7 +85,7 @@ test('test-fullbench',
   timeout: 420) # Should enough when running on HDD
 test('test-fuzzer',
   fuzzer,
-  args: [FUZZER_TIME],
+  args: ['-u', FUZZER_TIME],
   timeout: 100)
 test('test-frametest',
   frametest,

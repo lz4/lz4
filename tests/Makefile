@@ -442,7 +442,7 @@ test-fullbench32: CFLAGS += -m32
 test-fullbench32: test-fullbench
 
 test-fuzzer: fuzzer
-	./fuzzer $(FUZZER_TIME)
+	./fuzzer -u $(FUZZER_TIME)
 
 test-fuzzer32: CFLAGS += -m32
 test-fuzzer32: test-fuzzer
