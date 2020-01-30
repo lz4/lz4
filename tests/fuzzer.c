@@ -1508,6 +1508,72 @@ static void FUZ_unitTests(int compressionLevel)
                 if (dNext + maxMessageSize > dBufferSize) dNext = 0;
             }
         }
+
+        /* encode congenerical sequence test for HC compressors */
+        {
+            int const src_buf_size = 3 MB;
+            int const dst_buf_size = 6 KB;
+            int const payload = 0;
+            int const dst_step = 43;
+            int const dst_min_len = 33 + (FUZ_rand(&randState) % dst_step);
+            int const dst_max_len = 5000;
+            int slen, dlen;
+            char* sbuf1 = (char*)malloc(src_buf_size + 1);
+            char* sbuf2 = (char*)malloc(src_buf_size + 1);
+            char* dbuf1 = (char*)malloc(dst_buf_size + 1);
+            char* dbuf2 = (char*)malloc(dst_buf_size + 1);
+
+            assert(dst_buf_size > dst_max_len);
+            if (!sbuf1 || !sbuf2 || !dbuf1 || !dbuf2) {
+                EXIT_MSG("not enough memory for FUZ_unitTests (destSize)");
+            }
+            for (dlen = dst_min_len; dlen <= dst_max_len; dlen += dst_step) {
+                int src_len = (dlen - 10)*255 + 24;
+                if (src_len + 10 >= src_buf_size) break;   /* END of check */
+                for (slen = src_len - 3; slen <= src_len + 3; slen++) {
+                    int srcsz1, srcsz2;
+                    int dsz1, dsz2;
+                    int res1, res2;
+                    char const endchk = 0x88;
+
+                    srcsz1 = slen;
+                    memset(sbuf1, payload, slen);
+                    memset(dbuf1, 0, dlen);
+                    dbuf1[dlen] = endchk;
+                    dsz1 = LZ4_compress_destSize(sbuf1, dbuf1, &srcsz1, dlen);
+                    FUZ_CHECKTEST(dbuf1[dlen] != endchk, "LZ4_compress_destSize() overwrite dst buffer !");
+                    FUZ_CHECKTEST(dsz1 <= 0,             "LZ4_compress_destSize() compression failed");
+                    FUZ_CHECKTEST(dsz1 > dlen,           "LZ4_compress_destSize() result larger than dst buffer !");
+                    FUZ_CHECKTEST(srcsz1 > slen,         "LZ4_compress_destSize() read more than src buffer !");
+
+                    res1 = LZ4_decompress_safe(dbuf1, sbuf1, dsz1, src_buf_size);
+                    FUZ_CHECKTEST(res1 != srcsz1,        "LZ4_compress_destSize() decompression failed!");
+
+                    srcsz2 = slen;
+                    memset(sbuf2, payload, slen);
+                    memset(dbuf2, 0, dlen);
+                    dbuf2[dlen] = endchk;
+                    LZ4_resetStreamHC(&sHC, compressionLevel);
+                    dsz2 = LZ4_compress_HC_destSize(&sHC, sbuf2, dbuf2, &srcsz2, dlen, compressionLevel);
+                    FUZ_CHECKTEST(dbuf2[dlen] != endchk,      "LZ4_compress_HC_destSize() overwrite dst buffer !");
+                    FUZ_CHECKTEST(dsz2 <= 0,                  "LZ4_compress_HC_destSize() compression failed");
+                    FUZ_CHECKTEST(dsz2 > dlen,                "LZ4_compress_HC_destSize() result larger than dst buffer !");
+                    FUZ_CHECKTEST(srcsz2 > slen,              "LZ4_compress_HC_destSize() read more than src buffer !");
+                    FUZ_CHECKTEST(dsz2 != dsz1,               "LZ4_compress_HC_destSize() return incorrect result !");
+                    FUZ_CHECKTEST(srcsz2 != srcsz1,           "LZ4_compress_HC_destSize() return incorrect src buffer size !");
+                    FUZ_CHECKTEST(memcmp(dbuf2, dbuf1, dsz2), "LZ4_compress_HC_destSize() return incorrect data into dst buffer !");
+
+                    res2 = LZ4_decompress_safe(dbuf2, sbuf1, dsz2, src_buf_size);
+                    FUZ_CHECKTEST(res2 != srcsz1,             "LZ4_compress_HC_destSize() decompression failed!");
+
+                    FUZ_CHECKTEST(memcmp(sbuf1, sbuf2, res2), "LZ4_compress_HC_destSize() decompression corruption!");
+                }
+            }
+            free(sbuf1);
+            free(sbuf2);
+            free(dbuf1);
+            free(dbuf2);
+        }
     }
 
     /* clean up */
