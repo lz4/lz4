@@ -1287,8 +1287,13 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                                     const dictCtx_directive dict,
                                     const HCfavor_e favorDecSpeed)
 {
+    int retval = 0;
 #define TRAILING_LITERALS 3
+#ifdef LZ4HC_HEAPMODE
+    LZ4HC_optimal_t* opt = (LZ4HC_optimal_t*)malloc(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
+#else
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which is a bit large for stack... */
+#endif
 
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
@@ -1505,7 +1510,10 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
          size_t const totalSize = 1 + litLength + lastRunSize;
          if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
          if (limit && (op + totalSize > oend)) {
-             if (limit == limitedOutput) return 0;  /* Check output limit */
+             if (limit == limitedOutput) { /* Check output limit */
+                retval = 0;
+                goto _return_label;
+             }
              /* adapt lastRunSize to fill 'dst' */
              lastRunSize  = (size_t)(oend - op) - 1;
              litLength = (lastRunSize + 255 - RUN_MASK) / 255;
@@ -1527,12 +1535,17 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 
      /* End */
      *srcSizePtr = (int) (((const char*)ip) - source);
-     return (int) ((char*)op-dst);
+     retval = (int) ((char*)op-dst);
+     goto _return_label;
 
  _dest_overflow:
      if (limit == fillOutput) {
          op = opSaved;  /* restore correct out pointer */
          goto _last_literals;
      }
-     return 0;
+ _return_label:
+#ifdef LZ4HC_HEAPMODE
+     free(opt);
+#endif
+     return retval;
  }
