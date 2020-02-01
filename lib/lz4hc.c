@@ -1337,19 +1337,20 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 #define TRAILING_LITERALS 3
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which is a bit large for stack... */
 
+    const int inputSize = *srcSizePtr;
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
-    const BYTE* const iend = ip + *srcSizePtr;
+    const BYTE* const iend = ip + inputSize;
     const BYTE* const mflimit = iend - MFLIMIT;
     const BYTE* const matchlimit = iend - LASTLITERALS;
     BYTE* op = (BYTE*) dst;
-    BYTE* opSaved = (BYTE*) dst;
     BYTE* olimit = op + dstCapacity;
+    int   esr;
 
     /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal(dst=%p, dstCapa=%u)", dst, (unsigned)dstCapacity);
     *srcSizePtr = 0;
-    if (outputDirective == fillOutput) olimit -= LASTLITERALS;   /* Hack for support LZ4 format restriction */
+    if (inputSize < LZ4_minLength) goto _last_literals;     /* Input too small, no compression (all literals) */
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
 
     /* Main Loop */
@@ -1366,9 +1367,8 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
              /* good enough solution : immediate encoding */
              int const firstML = firstMatch.len;
              const BYTE* const matchPos = ip - firstMatch.off;
-             opSaved = op;
-             if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), firstML, matchPos, outputDirective, olimit) )   /* updates ip, op and anchor */
-                 goto _dest_overflow;
+             esr = LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), firstML, matchPos, outputDirective, olimit);   /* updates ip, op and anchor */
+             if (esr) goto _dest_overflow;
              continue;
          }
 
@@ -1539,46 +1539,43 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                  rPos += ml;
                  assert(ml >= MINMATCH);
                  assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
-                 opSaved = op;
-                 if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ip - offset, outputDirective, olimit) )   /* updates ip, op and anchor */
-                     goto _dest_overflow;
+                 esr = LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ip - offset, outputDirective, olimit);   /* updates ip, op and anchor */
+                 if (esr) goto _dest_overflow;
          }   }
      }  /* while (ip <= mflimit) */
 
  _last_literals:
      /* Encode Last Literals */
-     {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
-         size_t litLength = (lastRunSize + 255 - RUN_MASK) / 255;
-         size_t const totalSize = 1 + litLength + lastRunSize;
-         if (outputDirective == fillOutput) olimit += LASTLITERALS;  /* restore correct value */
+     {   size_t lastRun = (size_t)(iend - anchor);  /* literals */
+         size_t litSize = LIT_RUN_SIZE(lastRun);
+         size_t const totalSize = 1 + litSize + lastRun;
          if (outputDirective && (op + totalSize > olimit)) {
              if (outputDirective == limitedOutput) return 0;  /* Check output limit */
-             /* adapt lastRunSize to fill 'dst' */
-             lastRunSize  = (size_t)(olimit - op) - 1;
-             litLength = (lastRunSize + 255 - RUN_MASK) / 255;
-             lastRunSize -= litLength;
+             /* adapt lastRun to fill 'dst' */
+             lastRun  = (size_t)(olimit - op) - 1;
+             litSize = LIT_RUN_SIZE(lastRun);
+             lastRun -= litSize;
          }
-         ip = anchor + lastRunSize;
+         ip = anchor + lastRun;
 
-         if (lastRunSize >= RUN_MASK) {
-             size_t accumulator = lastRunSize - RUN_MASK;
+         if (lastRun >= RUN_MASK) {
+             size_t accumulator = lastRun - RUN_MASK;
              *op++ = (RUN_MASK << ML_BITS);
              for(; accumulator >= 255 ; accumulator -= 255) *op++ = 255;
              *op++ = (BYTE) accumulator;
          } else {
-             *op++ = (BYTE)(lastRunSize << ML_BITS);
+             *op++ = (BYTE)(lastRun << ML_BITS);
          }
-         memcpy(op, anchor, lastRunSize);
-         op += lastRunSize;
+         memcpy(op, anchor, lastRun);
+         op += lastRun;
      }
 
      /* End */
      *srcSizePtr = (int) (((const char*)ip) - source);
-     return (int) ((char*)op-dst);
+     return (int) ((char*)op - dst);
 
  _dest_overflow:
-     if (outputDirective == fillOutput) {
-         op = opSaved;  /* restore correct out pointer */
+     if (outputDirective == fillOutput && esr > 0) {
          goto _last_literals;
      }
      return 0;
