@@ -479,6 +479,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 #define op      (*_op)
 #define anchor  (*_anchor)
 
+    int rc = 0;
     size_t litLength;
     BYTE* const token = op++;
 
@@ -499,11 +500,24 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     totalCost += cost;
 #endif
 
-    /* Encode Literal length */
     litLength = (size_t)(ip - anchor);
-    if (outputDirective && (op + (litLength / 255) + litLength + (L_PREFIX_SIZE + LASTLITERALS)) > olimit) {
-        return (outputDirective == fillOutput) ? 1 : -1;
+
+    if (outputDirective == limitedOutput) {
+        /* Check output buffer overflow */
+        if (op + litLength + L_PREFIX_SIZE + LASTLITERALS + (litLength / 255) > olimit) {
+            return -1;   /* cannot compress within `dest` budget */
+        }
+    } else
+    if (outputDirective == fillOutput) {
+        size_t const litSize = LIT_RUN_SIZE(litLength);
+        /* min last literals so last match is <= end - MFLIMIT */
+        if (op + litSize + litLength + L_PREFIX_SIZE + MFLIMIT - MINMATCH > olimit) {
+            op = token;  /* restore op */
+            return 1;    /* Required process last literals */
+        }
     }
+
+    /* Encode Literal length */
     if (litLength >= RUN_MASK) {
         size_t len = litLength - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
@@ -524,8 +538,19 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
     litLength = (size_t)matchLength - MINMATCH;
-    if (outputDirective && (op + (litLength / 255) + L_TOKEN_SIZE + LASTLITERALS) > olimit) {
-        return (outputDirective == fillOutput) ? 1 : -1;
+
+    if (outputDirective) {
+        const BYTE* xp = op + L_TOKEN_SIZE + LASTLITERALS;
+        if (xp > olimit) {
+            op = token;  /* restore op */
+            return 1;    /* Required process last literals. */
+        }
+        if (xp + LIT_ML_SIZE(litLength) > olimit) {
+            litLength = ((size_t)(olimit - xp)) * 255 + ML_MASK - 1;
+            ip += litLength + 4;   /* this 4 is magic number !!! Fix me, plz !!! */
+            anchor = ip;
+            rc = 2;      /* ip, op, anchor was changed. Required process last literals. */
+        }
     }
     if (litLength >= ML_MASK) {
         *token += ML_MASK;
@@ -536,6 +561,8 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     } else {
         *token += (BYTE)(litLength);
     }
+
+    if (rc) return rc;
 
     /* Prepare next loop */
     ip += matchLength;
