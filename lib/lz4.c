@@ -240,18 +240,56 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Types
 **************************************/
-#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
+#if defined(__VMS)
+# /* nothing */
+#elif defined(_MSC_VER)
+# if (_MSC_VER >= 1600) /* MSVC 2010 */
+#  define LZ4_HAVE_STDINT_H
+# endif
+#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */
+# define LZ4_HAVE_STDINT_H
+#elif defined(__cplusplus)
+# define LZ4_HAVE_STDINT_H
+#else
+# /* nothing */
+#endif
+
+#include <limits.h>
+
+#if defined(LZ4_HAVE_STDINT_H)
 # include <stdint.h>
+# define LZ4_STDINT_H_INCLUDED
+#else
+# if defined(INT_LEAST32_MAX) && defined(INT8_MAX) && defined(INT32_MAX) && defined(INTPTR_MAX)
+#  define LZ4_STDINT_H_INCLUDED   /* stdint.h already included */
+# endif
+#endif
+
+#if defined(SIZE_MAX)
+# define LZ4_SIZE_MAX  SIZE_MAX
+#else
+# if defined(__WORDSIZE) && (__WORDSIZE == 64)
+#  define LZ4_SIZE_MAX  18446744073709551615ULL
+# endif
+# if defined(__WORDSIZE) && (__WORDSIZE == 32)
+#  define LZ4_SIZE_MAX  4294967295UL
+# endif
+#endif
+
+#ifdef LZ4_STDINT_H_INCLUDED
   typedef  uint8_t BYTE;
   typedef uint16_t U16;
   typedef uint32_t U32;
   typedef  int32_t S32;
   typedef uint64_t U64;
   typedef uintptr_t uptrval;
+  typedef  intptr_t sptrval;
 #else
-# include <limits.h>
 # if UINT_MAX != 4294967295UL
 #   error "LZ4 code (when not C++ or C99) assumes that sizeof(int) == 4"
+# endif
+# if !defined(LZ4_SIZE_MAX)
+#   error "LZ4 code (when not C++ or C99) assumes that macro constant SIZE_MAX has been defined"
 # endif
   typedef unsigned char       BYTE;
   typedef unsigned short      U16;
@@ -259,6 +297,13 @@ static const int LZ4_minLength = (MFLIMIT+1);
   typedef   signed int        S32;
   typedef unsigned long long  U64;
   typedef size_t              uptrval;   /* generally true, except OpenVMS-64 */
+# if defined(ULLONG_MAX) && (LZ4_SIZE_MAX == ULLONG_MAX)
+  typedef   signed long long  sptrval;
+# elif defined(ULONG_MAX) && (LZ4_SIZE_MAX == ULONG_MAX)
+  typedef   signed long       sptrval;
+# else
+#   error "Can't determine limit for size_t"
+# endif
 #endif
 
 #if defined(__x86_64__)
