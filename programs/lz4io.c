@@ -90,6 +90,7 @@
 *  Macros
 **************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
+#define DISPLAYOUT(...)      fprintf(stdout, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
 
@@ -1561,7 +1562,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
     int result = 0;
     size_t idx = 0;
     if (g_displayLevel < 3) {
-        DISPLAY("%10s %14s %5s %11s %13s %9s   %s\n",
+        DISPLAYOUT("%10s %14s %5s %11s %13s %9s   %s\n",
                 "Frames", "Type", "Block", "Compressed", "Uncompressed", "Ratio", "Filename");
     }
     for (; idx < ifnIdx; idx++) {
@@ -1586,7 +1587,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         if (g_displayLevel < 3) {
             /* Display Summary */
             {   char buffers[3][10];
-                DISPLAY("%10llu %14s %5s %11s %13s ",
+                DISPLAYOUT("%10llu %14s %5s %11s %13s ",
                         cfinfo.frameCount,
                         cfinfo.eqFrameTypes ? LZ4IO_frameTypeNames[cfinfo.frameSummary.frameType] : "-" ,
                         cfinfo.eqBlockTypes ? LZ4IO_blockTypeID(cfinfo.frameSummary.lz4FrameInfo.blockSizeID,
@@ -1595,9 +1596,9 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
                         cfinfo.allContentSize ? LZ4IO_toHuman((long double)cfinfo.frameSummary.lz4FrameInfo.contentSize, buffers[2]) : "-");
                 if (cfinfo.allContentSize) {
                     double const ratio = (double)cfinfo.fileSize / cfinfo.frameSummary.lz4FrameInfo.contentSize * 100;
-                    DISPLAY("%9.2f%%  %s \n", ratio, cfinfo.fileName);
+                    DISPLAYOUT("%9.2f%%  %s \n", ratio, cfinfo.fileName);
                 } else {
-                    DISPLAY("%9s   %s\n",
+                    DISPLAYOUT("%9s   %s\n",
                             "-",
                             cfinfo.fileName);
                 }
