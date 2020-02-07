@@ -670,7 +670,7 @@ int main(int argc, const char** argv)
 
     /* No output filename ==> try to select one automatically (when possible) */
     while ((!output_filename) && (multiple_inputs==0)) {
-        if (!IS_CONSOLE(stdout)) {
+        if (!IS_CONSOLE(stdout) && mode != om_list) {
             /* Default to stdout whenever stdout is not the console.
              * Note : this policy may change in the future, therefore don't rely on it !
              * To ensure `stdout` is explicitly selected, use `-c` command flag.
