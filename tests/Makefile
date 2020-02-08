@@ -259,6 +259,44 @@ test-lz4-multiple: lz4 datagen
 	! $(LZ4) -f -m tmp-tlm-concat1 notHere tmp-tlm-concat2  # must fail : notHere not present
 	@$(RM) tmp-tlm*
 
+test-lz4-multiple-legacy: lz4 datagen
+	@echo "\n ---- test multiple files (Legacy format) ----"
+	@./datagen -s1        > tmp-tlm1 2> $(VOID)
+	@./datagen -s2 -g100K > tmp-tlm2 2> $(VOID)
+	@./datagen -s3 -g200K > tmp-tlm3 2> $(VOID)
+	# compress multiple files using legacy format: one .lz4 per source file
+	$(LZ4) -f -l -m tmp-tlm*
+	test -f tmp-tlm1.lz4
+	test -f tmp-tlm2.lz4
+	test -f tmp-tlm3.lz4
+	# decompress multiple files compressed using legacy format: one output file per .lz4
+	mv tmp-tlm1 tmp-tlm1-orig
+	mv tmp-tlm2 tmp-tlm2-orig
+	mv tmp-tlm3 tmp-tlm3-orig
+	$(LZ4) -d -f -m tmp-tlm*.lz4
+	$(LZ4) -l -d -f -m tmp-tlm*.lz4 # -l mustn't impact -d option
+	$(CMP) tmp-tlm1 tmp-tlm1-orig   # must be identical
+	$(CMP) tmp-tlm2 tmp-tlm2-orig
+	$(CMP) tmp-tlm3 tmp-tlm3-orig
+	# compress multiple files into stdout using legacy format
+	cat tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
+	$(RM) *.lz4
+	$(LZ4) -l -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
+	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
+	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	# # # decompress multiple files into stdout using legacy format
+	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
+	$(LZ4) -l -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
+	cat tmp-tlm1 tmp-tlm2 tmp-tlm3 > tmp-tlm-concat1   # create concatenated reference
+	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
+	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
+	$(LZ4) -d -l -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2 # -l mustn't impact option -d
+	test ! -f tmp-tlm1  # must not create file artefact
+	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	# # # compress multiple files, one of which is absent (must fail)
+	! $(LZ4) -f -l -m tmp-tlm-concat1 notHere-legacy tmp-tlm-concat2  # must fail : notHere-legacy not present
+	@$(RM) tmp-tlm*
+
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./datagen -g0       | $(LZ4) -v     | $(LZ4) -t
@@ -393,7 +431,7 @@ test-lz4-opt-parser: lz4 datagen
 	./datagen -g16M -P90  | $(LZ4) -11B5    | $(LZ4) -t
 	./datagen -g32M -P10  | $(LZ4) -11B5D   | $(LZ4) -t
 
-test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple \
+test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-multiple-legacy \
                       test-lz4-frame-concatenation test-lz4-testmode \
                       test-lz4-contentSize test-lz4-dict
 	@$(RM) tmp*

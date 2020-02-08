@@ -470,9 +470,57 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_
     free(in_buff);
     free(out_buff);
     fclose(finput);
-    fclose(foutput);
+    if (strcmp(output_filename,stdoutmark)) fclose(foutput);   /* do not close stdout */
 
     return 0;
+}
+
+#define FNSPACE 30
+/* LZ4IO_compressMultipleFilenames_Legacy :
+ * This function is intentionally "hidden" (not published in .h)
+ * It generates multiple compressed streams using the old 'legacy' format */
+int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
+                            const char** inFileNamesTable, int ifntSize,
+                            const char* suffix,
+                            int compressionLevel)
+{
+    int i;
+    int missed_files = 0;
+    char* dstFileName = (char*)malloc(FNSPACE);
+    size_t ofnSize = FNSPACE;
+    const size_t suffixSize = strlen(suffix);
+
+    if (dstFileName == NULL) return ifntSize;   /* not enough memory */
+
+    /* loop on each file */
+    for (i=0; i<ifntSize; i++) {
+        size_t const ifnSize = strlen(inFileNamesTable[i]);
+        if (!strcmp(suffix, stdoutmark)) {
+            missed_files += LZ4IO_compressFilename_Legacy(prefs,
+                                    inFileNamesTable[i], stdoutmark,
+                                    compressionLevel);
+            continue;
+        }
+
+        if (ofnSize <= ifnSize+suffixSize+1) {
+            free(dstFileName);
+            ofnSize = ifnSize + 20;
+            dstFileName = (char*)malloc(ofnSize);
+            if (dstFileName==NULL) {
+                return ifntSize;
+        }   }
+        strcpy(dstFileName, inFileNamesTable[i]);
+        strcat(dstFileName, suffix);
+
+        missed_files += LZ4IO_compressFilename_Legacy(prefs,
+                                inFileNamesTable[i], dstFileName,
+                                compressionLevel);
+    }
+
+    /* Close & Free */
+    free(dstFileName);
+
+    return missed_files;
 }
 
 
@@ -749,7 +797,6 @@ int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, 
 }
 
 
-#define FNSPACE 30
 int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
                               const char** inFileNamesTable, int ifntSize,
                               const char* suffix,

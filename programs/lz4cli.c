@@ -94,7 +94,10 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 #define DEFAULT_COMPRESSOR   LZ4IO_compressFilename
 #define DEFAULT_DECOMPRESSOR LZ4IO_decompressFilename
 int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename, int compressionlevel);   /* hidden function */
-
+int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
+                            const char** inFileNamesTable, int ifntSize,
+                            const char* suffix,
+                            int compressionLevel);
 
 /*-***************************
 *  Functions
@@ -754,7 +757,11 @@ int main(int argc, const char** argv)
     } else {   /* compression is default action */
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
-            LZ4IO_compressFilename_Legacy(prefs, input_filename, output_filename, cLevel);
+            if(multiple_inputs){
+                LZ4IO_compressMultipleFilenames_Legacy(prefs, inFileNames, (int)ifnIdx, !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION, cLevel);
+            } else {
+                LZ4IO_compressFilename_Legacy(prefs, input_filename, output_filename, cLevel);
+            }
         } else {
             if (multiple_inputs) {
                 assert(ifnIdx <= INT_MAX);
