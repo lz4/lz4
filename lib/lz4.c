@@ -429,22 +429,42 @@ LZ4_FORCE_O2_INLINE_GCC_PPC64LE void
 LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
 {
     BYTE v[8];
+    U16 u16;
+    U32 u32;
+    U64 u64;
 
     assert(dstEnd >= dstPtr + MINMATCH);
     LZ4_write32(dstPtr, 0);   /* silence an msan warning when offset==0 */
 
     switch(offset) {
     case 1:
-        memset(v, *srcPtr, 8);
+        if(sizeof(void*) == 8) {
+            u64 = *srcPtr * 0x0101010101010101;
+            memcpy(v, &u64, 8);
+        } else {
+            memset(v, *srcPtr, 8);
+        }
         break;
     case 2:
-        memcpy(v, srcPtr, 2);
-        memcpy(&v[2], srcPtr, 2);
-        memcpy(&v[4], &v[0], 4);
+        if(sizeof(void*) == 8) {
+            memcpy(&u16, srcPtr, 2);
+            u64 = u16 * 0x0001000100010001;
+            memcpy(v, &u64, 8);
+        } else {
+            memcpy(v, srcPtr, 2);
+            memcpy(&v[2], srcPtr, 2);
+            memcpy(&v[4], &v[0], 4);
+        }
         break;
     case 4:
-        memcpy(v, srcPtr, 4);
-        memcpy(&v[4], srcPtr, 4);
+        if(sizeof(void*) == 8) {
+            memcpy(&u32, srcPtr, 4);
+            u64 = u32 | (((U64)u32) << 32);
+            memcpy(v, &u64, 8);
+        } else {
+            memcpy(v, srcPtr, 4);
+            memcpy(&v[4], srcPtr, 4);
+        }
         break;
     default:
         LZ4_memcpy_using_offset_base(dstPtr, srcPtr, dstEnd, offset);
