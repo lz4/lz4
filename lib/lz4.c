@@ -438,7 +438,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
 
     switch(offset) {
     case 1:
-        if(sizeof(void*) == 8) {
+        if(sizeof(reg_t) == 8) {
             u64 = *srcPtr * 0x0101010101010101;
             memcpy(v, &u64, 8);
         } else {
@@ -446,7 +446,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
         }
         break;
     case 2:
-        if(sizeof(void*) == 8) {
+        if(sizeof(reg_t) == 8) {
             memcpy(&u16, srcPtr, 2);
             u64 = u16 * 0x0001000100010001;
             memcpy(v, &u64, 8);
@@ -457,7 +457,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
         }
         break;
     case 4:
-        if(sizeof(void*) == 8) {
+        if(sizeof(reg_t) == 8) {
             memcpy(&u32, srcPtr, 4);
             u64 = u32 | (((U64)u32) << 32);
             memcpy(v, &u64, 8);
