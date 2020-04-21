@@ -168,13 +168,17 @@ foreach (flag
   unset(flag_to_test)
 endforeach (flag)
 
+option(LZ4_INSTALL_BINARIES "Install binaries as well as libraries and headers (if applicable)" ON)
+
 if(NOT LZ4_BUNDLED_MODE)
   include(GNUInstallDirs)
   set(TARGETS_EXPORT_NAME "${PROJECT_NAME}Targets")
 
-  install(TARGETS ${LZ4_PROGRAMS_BUILT}
-    BUNDLE	DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  if(LZ4_INSTALL_BINARIES)
+    install(TARGETS ${LZ4_PROGRAMS_BUILT}
+      BUNDLE	DESTINATION "${CMAKE_INSTALL_BINDIR}"
+      RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  endif(LZ4_INSTALL_BINARIES)
   install(TARGETS ${LZ4_LIBRARIES_BUILT}
     EXPORT "${TARGETS_EXPORT_NAME}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -186,8 +190,10 @@ if(NOT LZ4_BUNDLED_MODE)
     "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-  install(FILES "${LZ4_PROG_SOURCE_DIR}/lz4.1"
-    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+  if(LZ4_INSTALL_BINARIES)
+    install(FILES "${LZ4_PROG_SOURCE_DIR}/lz4.1"
+      DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+  endif(LZ4_INSTALL_BINARIES)
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
   install(FILES
@@ -199,7 +205,7 @@ if(NOT LZ4_BUNDLED_MODE)
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
   # install lz4cat and unlz4 symlinks on *nix
-  if(UNIX)
+  if(UNIX AND LZ4_INSTALL_BINARIES)
     install(CODE "
       foreach(f lz4cat unlz4)
         set(dest \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_BINDIR}/\${f}\")
@@ -215,7 +221,7 @@ if(NOT LZ4_BUNDLED_MODE)
       install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${f}.1"
         DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
     endforeach()
-  endif(UNIX)
+  endif(UNIX AND LZ4_INSTALL_BINARIES)
 endif(NOT LZ4_BUNDLED_MODE)
 
 # pkg-config
