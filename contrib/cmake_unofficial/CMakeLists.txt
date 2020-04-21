@@ -170,14 +170,17 @@ endforeach (flag)
 
 if(NOT LZ4_BUNDLED_MODE)
   include(GNUInstallDirs)
+  set(TARGETS_EXPORT_NAME "${PROJECT_NAME}Targets")
 
   install(TARGETS ${LZ4_PROGRAMS_BUILT}
     BUNDLE	DESTINATION "${CMAKE_INSTALL_BINDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
   install(TARGETS ${LZ4_LIBRARIES_BUILT}
+    EXPORT "${TARGETS_EXPORT_NAME}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
   install(FILES
     "${LZ4_LIB_SOURCE_DIR}/lz4.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
@@ -187,6 +190,13 @@ if(NOT LZ4_BUNDLED_MODE)
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
+  install(EXPORT "${TARGETS_EXPORT_NAME}"
+    NAMESPACE "${PROJECT_NAME}::"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
   # install lz4cat and unlz4 symlinks on *nix
   if(UNIX)
@@ -226,3 +236,16 @@ endif()
 # for liblz4.pc substitution
 set(VERSION ${LZ4_VERSION_STRING})
 configure_file(${LZ4_LIB_SOURCE_DIR}/liblz4.pc.in liblz4.pc @ONLY)
+
+# cmake package
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+  "Config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+)
