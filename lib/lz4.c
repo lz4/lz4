@@ -1923,7 +1923,7 @@ LZ4_decompress_generic(
                     /* If we're in this block because of the input parsing condition, then we must be on the
                      * last sequence (or invalid), so we must check that we exactly consume the input.
                      */
-                    if ((ip+length>iend-(2+1+LASTLITERALS)) && (ip+length != iend)) { goto _output_error; }
+                    if (ip+length > iend) { goto _output_error; }
                     assert(ip+length <= iend);
                     /* We are finishing in the middle of a literals segment.
                      * Break after the copy.
