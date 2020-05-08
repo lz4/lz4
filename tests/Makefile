@@ -55,7 +55,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
 
 all32: CFLAGS+=-m32
 all32: all
@@ -104,6 +104,9 @@ datagen : $(PRGDIR)/datagen.c datagencli.c
 checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+decompress-partial: lz4.o decompress-partial.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
@@ -114,7 +117,8 @@ clean:
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
-        frameTest$(EXT) lz4_all.c
+        frameTest$(EXT) decompress-partial$(EXT) \
+		lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
@@ -153,7 +157,7 @@ list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest test-decompress-partial
 
 .PHONY: test32
 test32: CFLAGS+=-m32
@@ -513,5 +517,8 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
+
+test-decompress-partial : decompress-partial 
+	./decompress-partial
 
 endif
