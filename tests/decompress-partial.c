@@ -26,7 +26,7 @@ const char source[] =
 
 #define BUFFER_SIZE 2048
 
-int main()
+int main(void)
 {
   int srcLen = strlen(source);
   char cmpBuffer[BUFFER_SIZE];
@@ -38,8 +38,11 @@ int main()
   for (int i = cmpSize; i < cmpSize + 10; ++i) {
     result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
     if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
+      printf("test decompress-partial error \n");
       return -1;
     }
   }
+  
+  printf("test decompress-partial OK \n");
   return 0;
 }
