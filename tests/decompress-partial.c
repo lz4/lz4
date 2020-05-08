@@ -31,13 +31,13 @@ int main(void)
   int srcLen = (int)strlen(source);
   char cmpBuffer[BUFFER_SIZE];
   char outBuffer[BUFFER_SIZE];
-  int cmpSize, result;
+  int cmpSize;
   int i;
   
   cmpSize = LZ4_compress_default(source, cmpBuffer, srcLen, BUFFER_SIZE);
 
   for (i = cmpSize; i < cmpSize + 10; ++i) {
-    result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
+    int result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
     if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
       printf("test decompress-partial error \n");
       return -1;
