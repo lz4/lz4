@@ -519,7 +519,7 @@ test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
 
 test-decompress-partial : decompress-partial
-    @echo "\n ---- test decompress-partial ----"
+	@echo "\n ---- test decompress-partial ----"
 	./decompress-partial$(EXT)
 
 endif
