@@ -37,7 +37,7 @@ int main(void)
   cmpSize = LZ4_compress_default(source, cmpBuffer, srcLen, BUFFER_SIZE);
 
   for (i = cmpSize; i < cmpSize + 10; ++i) {
-    result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
+    result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, (int)srcLen, BUFFER_SIZE);
     if ((result < 0) || ((unsigned int)result != srcLen) || memcmp(source, outBuffer, srcLen)) {
       printf("test decompress-partial error \n");
       return -1;
