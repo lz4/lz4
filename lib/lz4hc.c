@@ -886,8 +886,8 @@ int LZ4_sizeofStateHC(void) { return (int)sizeof(LZ4_streamHC_t); }
                    * while actually aligning LZ4_streamHC_t on 4 bytes. */
 static size_t LZ4_streamHC_t_alignment(void)
 {
-    struct { char c; LZ4_streamHC_t t; } t_a;
-    return sizeof(t_a) - sizeof(t_a.t);
+    typedef struct { char c; LZ4_streamHC_t t; } t_a;
+    return sizeof(t_a) - sizeof(LZ4_streamHC_t);
 }
 #endif
 
