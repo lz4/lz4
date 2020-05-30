@@ -6,7 +6,7 @@ make="make -C $lz4_root"
 unamestr=$(uname)
 if [ "$unamestr" = 'Linux' ]; then
   make="make -C $lz4_root"
-elif [ "$unamestr" = 'FreeBSD' ]; then
+elif [ "$unamestr" = 'FreeBSD' -o "$unamestr" = 'OpenBSD' ]; then
   make="gmake -C $lz4_root"
 fi
 
