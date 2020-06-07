@@ -1862,7 +1862,7 @@ LZ4_decompress_generic(
              */
             if ( (endOnInput ? length != RUN_MASK : length <= 8)
                 /* strictly "less than" on input, to re-enter the loop with at least one byte */
-              && likely((endOnInput ? ip < shortiend : 1) & (op <= shortoend)) ) {
+              && likely((endOnInput ? ip < shortiend : 1) && (op <= shortoend)) ) {
                 /* Copy the literals */
                 memcpy(op, ip, endOnInput ? 16 : 8);
                 op += length; ip += length;
