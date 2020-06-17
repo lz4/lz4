@@ -1267,7 +1267,7 @@ LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
     int matchLength = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &matchPtr, &ip, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
     if (matchLength <= minLen) return match;
     if (favorDecSpeed) {
-        if ((matchLength>18) & (matchLength<=36)) matchLength=18;   /* favor shortcut */
+        if ((matchLength>18) && (matchLength<=36)) matchLength=18;   /* favor shortcut */
     }
     match.len = matchLength;
     match.off = (int)(ip-matchPtr);
