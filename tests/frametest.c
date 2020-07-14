@@ -200,6 +200,24 @@ int basicTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, " %u \n", (U32)cBound);
     }
 
+    /* LZ4F_compressBound() : special case : automatic flushing enabled */
+    DISPLAYLEVEL(3, "LZ4F_compressBound(1 KB, autoFlush=1) = ");
+    {   size_t cBound;
+        LZ4F_preferences_t autoFlushPrefs;
+        memset(&autoFlushPrefs, 0, sizeof(autoFlushPrefs));
+        autoFlushPrefs.autoFlush = 1;
+        cBound = LZ4F_compressBound(1 KB, &autoFlushPrefs);
+        if (cBound > 64 KB) goto _output_error;
+        DISPLAYLEVEL(3, " %u \n", (U32)cBound);
+    }
+
+    /* LZ4F_compressBound() : special case : automatic flushing disabled */
+    DISPLAYLEVEL(3, "LZ4F_compressBound(1 KB, autoFlush=0) = ");
+    {   size_t const cBound = LZ4F_compressBound(1 KB, &prefs);
+        if (cBound < 64 KB) goto _output_error;
+        DISPLAYLEVEL(3, " %u \n", (U32)cBound);
+    }
+
     /* Special case : null-content frame */
     testSize = 0;
     DISPLAYLEVEL(3, "LZ4F_compressFrame, compress null content : ");
