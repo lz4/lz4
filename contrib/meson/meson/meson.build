@@ -9,7 +9,6 @@
 
 cc = meson.get_compiler('c')
 pkgconfig = import('pkgconfig')
-python3 = import('python').find_installation()
 c_std = get_option('c_std')
 default_library = get_option('default_library')
 
@@ -28,8 +27,8 @@ compiler_msvc = 'msvc'
 lz4_version = meson.project_version()
 
 lz4_h_file = join_paths(meson.current_source_dir(), '../../../lib/lz4.h')
-GetLz4LibraryVersion_py = files('GetLz4LibraryVersion.py')
-r = run_command(python3, GetLz4LibraryVersion_py, lz4_h_file)
+GetLz4LibraryVersion_py = find_program('GetLz4LibraryVersion.py', native : true)
+r = run_command(GetLz4LibraryVersion_py, lz4_h_file)
 if r.returncode() == 0
   lz4_version = r.stdout().strip()
   message('Project version is now: @0@'.format(lz4_version))
