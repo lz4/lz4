@@ -609,7 +609,7 @@ typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
 int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 const char* LZ4_versionString(void) { return LZ4_VERSION_STRING; }
 int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
-int LZ4_sizeofState() { return LZ4_STREAMSIZE; }
+int LZ4_sizeofState(void) { return LZ4_STREAMSIZE; }
 
 
 /*-************************************
@@ -2378,7 +2378,7 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 /* Obsolete Streaming functions */
 
-int LZ4_sizeofStreamState() { return LZ4_STREAMSIZE; }
+int LZ4_sizeofStreamState(void) { return LZ4_STREAMSIZE; }
 
 int LZ4_resetStreamState(void* state, char* inputBuffer)
 {
