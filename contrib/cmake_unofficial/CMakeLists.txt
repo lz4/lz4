@@ -106,6 +106,12 @@ if(BUILD_SHARED_LIBS)
     OUTPUT_NAME lz4
     SOVERSION "${LZ4_VERSION_MAJOR}"
     VERSION "${LZ4_VERSION_STRING}")
+  if(MSVC)
+    target_compile_definitions(lz4_shared PRIVATE
+      LZ4_DLL_EXPORT=1
+      XXH_EXPORT=1
+      LZ4F_PUBLISH_STATIC_FUNCTIONS=1)
+  endif()
   list(APPEND LZ4_LIBRARIES_BUILT lz4_shared)
 endif()
 if(BUILD_STATIC_LIBS)
