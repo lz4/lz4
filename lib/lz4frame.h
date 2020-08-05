@@ -376,7 +376,7 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
  *  note : Frame header size is variable, but is guaranteed to be
  *         >= LZ4F_HEADER_SIZE_MIN bytes, and <= LZ4F_HEADER_SIZE_MAX bytes.
  */
-size_t LZ4F_headerSize(const void* src, size_t srcSize);
+LZ4FLIB_API size_t LZ4F_headerSize(const void* src, size_t srcSize);
 
 /*! LZ4F_getFrameInfo() :
  *  This function extracts frame parameters (max blockSize, dictID, etc.).
