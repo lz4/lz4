@@ -66,7 +66,7 @@ extern "C" {
  *****************************************************************/
 /*  LZ4_DLL_EXPORT :
  *  Enable exporting of functions when building a Windows DLL
- *  LZ4LIB_VISIBILITY :
+ *  LZ4FLIB_VISIBILITY :
  *  Control library symbols visibility.
  */
 #ifndef LZ4FLIB_VISIBILITY
