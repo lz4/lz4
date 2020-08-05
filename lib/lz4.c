@@ -1455,12 +1455,6 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
              workingStream, dictionaryStream,
              dictCtx != NULL ? dictCtx->dictSize : 0);
 
-    /* Calling LZ4_resetStream_fast() here makes sure that changes will not be
-     * erased by subsequent calls to LZ4_resetStream_fast() in case stream was
-     * marked as having dirty context, e.g. requiring full reset.
-     */
-    LZ4_resetStream_fast(workingStream);
-
     if (dictCtx != NULL) {
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
