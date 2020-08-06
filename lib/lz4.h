@@ -564,8 +564,7 @@ typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
 struct LZ4_stream_t_internal {
     uint32_t hashTable[LZ4_HASH_SIZE_U32];
     uint32_t currentOffset;
-    uint16_t dirty;
-    uint16_t tableType;
+    uint32_t tableType;
     const uint8_t* dictionary;
     const LZ4_stream_t_internal* dictCtx;
     uint32_t dictSize;
@@ -584,8 +583,7 @@ typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
 struct LZ4_stream_t_internal {
     unsigned int hashTable[LZ4_HASH_SIZE_U32];
     unsigned int currentOffset;
-    unsigned short dirty;
-    unsigned short tableType;
+    unsigned int tableType;
     const unsigned char* dictionary;
     const LZ4_stream_t_internal* dictCtx;
     unsigned int dictSize;

@@ -758,15 +758,6 @@ LZ4_FORCE_INLINE void
 LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
            const int inputSize,
            const tableType_t tableType) {
-    /* If compression failed during the previous step, then the context
-     * is marked as dirty, therefore, it has to be fully reset.
-     */
-    if (cctx->dirty) {
-        DEBUGLOG(5, "LZ4_prepareTable: Full reset for %p", cctx);
-        MEM_INIT(cctx, 0, sizeof(LZ4_stream_t_internal));
-        return;
-    }
-
     /* If the table hasn't been used, it's guaranteed to be zeroed out, and is
      * therefore safe to use no matter what mode we're in. Otherwise, we figure
      * out if it's safe to leave as is or whether it needs to be reset.
@@ -1506,7 +1497,6 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
 
-    if (streamPtr->dirty) { return 0; } /* Uninitialized structure detected */
     LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
     if (acceleration < 1) acceleration = ACCELERATION_DEFAULT;
 
