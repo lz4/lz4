@@ -69,6 +69,17 @@ include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON "NOT LZ4_BUNDLED_MODE" OFF)
 CMAKE_DEPENDENT_OPTION(BUILD_STATIC_LIBS "Build static libraries" OFF "BUILD_SHARED_LIBS" ON)
 
+# When the Visual Studio compiler compiles, only static library links are supported.
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+	message(STATUS "2 ----- MSVC: SHARED=OFF  STATIC=ON")
+	set(BUILD_SHARED_LIBS OFF)
+	set(BUILD_STATIC_LIBS ON)
+elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+	message(STATUS "2 ----- GNU: SHARED=ON  STATIC=OFF")
+	set(BUILD_SHARED_LIBS ON)
+	set(BUILD_STATIC_LIBS OFF)
+endif()
+
 if(NOT BUILD_SHARED_LIBS AND NOT BUILD_STATIC_LIBS)
   message(FATAL_ERROR "Both BUILD_SHARED_LIBS and BUILD_STATIC_LIBS have been disabled")
 endif()
