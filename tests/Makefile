@@ -152,6 +152,9 @@ DD:=dd
 list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
+.PHONY: check
+check: test-lz4-essentials
+
 .PHONY: test
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest
 
@@ -349,6 +352,8 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	test "$(shell ./datagen -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell ./datagen -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
 	! $(LZ4) -c --fast=0 tmp-tlb-dg20K # lz4 should fail when fast=0
 	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
+	# High --fast values can result in out-of-bound dereferences #876
+	./datagen -g1M | $(LZ4) -c --fast=999999999 > /dev/null
 	# Test for #596
 	@echo "TEST" > tmp-tlb-test
 	$(LZ4) -m tmp-tlb-test
