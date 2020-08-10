@@ -762,9 +762,9 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
      * therefore safe to use no matter what mode we're in. Otherwise, we figure
      * out if it's safe to leave as is or whether it needs to be reset.
      */
-    if (cctx->tableType != clearedTable) {
+    if ((tableType_t)cctx->tableType != clearedTable) {
         assert(inputSize >= 0);
-        if (cctx->tableType != tableType
+        if ((tableType_t)cctx->tableType != tableType
           || ((tableType == byU16) && cctx->currentOffset + (unsigned)inputSize >= 0xFFFFU)
           || ((tableType == byU32) && cctx->currentOffset > 1 GB)
           || tableType == byPtr
@@ -773,7 +773,7 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
             DEBUGLOG(4, "LZ4_prepareTable: Resetting table in %p", cctx);
             MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
             cctx->currentOffset = 0;
-            cctx->tableType = clearedTable;
+            cctx->tableType = (U32)clearedTable;
         } else {
             DEBUGLOG(4, "LZ4_prepareTable: Re-use hash table (no reset)");
         }
@@ -864,7 +864,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
         cctx->dictSize += (U32)inputSize;
     }
     cctx->currentOffset += (U32)inputSize;
-    cctx->tableType = (U16)tableType;
+    cctx->tableType = (U32)tableType;
 
     if (inputSize<LZ4_minLength) goto _last_literals;        /* Input too small, no compression (all literals) */
 
@@ -1428,7 +1428,7 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
     base = dictEnd - dict->currentOffset;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
-    dict->tableType = tableType;
+    dict->tableType = (U32)tableType;
 
     while (p <= dictEnd-HASH_UNIT) {
         LZ4_putPosition(p, dict->hashTable, tableType, base);
