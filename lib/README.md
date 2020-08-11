@@ -35,12 +35,13 @@ So it's necessary to include all `*.c` and `*.h` files present in `/lib`.
 
 Definitions which are not guaranteed to remain stable in future versions,
 are protected behind macros, such as `LZ4_STATIC_LINKING_ONLY`.
-As the name implies, these definitions can only be invoked
+As the name strongly implies, these definitions should only be invoked
 in the context of static linking ***only***.
 Otherwise, dependent application may fail on API or ABI break in the future.
-The associated symbols are also not present in dynamic library by default.
+The associated symbols are also not exposed by the dynamic library by default.
 Should they be nonetheless needed, it's possible to force their publication
-by using build macro `LZ4_PUBLISH_STATIC_FUNCTIONS`.
+by using build macros `LZ4_PUBLISH_STATIC_FUNCTIONS`
+and `LZ4F_PUBLISH_STATIC_FUNCTIONS`.
 
 
 #### Build macros
