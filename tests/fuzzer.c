@@ -620,11 +620,16 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST("test LZ4_decompress_safe_partial");
         {   size_t const missingBytes = FUZ_rand(&randState) % (unsigned)blockSize;
             int const targetSize = (int)((size_t)blockSize - missingBytes);
+            size_t const extraneousInBytes = FUZ_rand(&randState) % 2;
+            int const inCSize = (int)((size_t)compressedSize + extraneousInBytes);
             char const sentinel = decodedBuffer[targetSize] = block[targetSize] ^ 0x5A;
-            int const decResult = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, compressedSize, targetSize, blockSize);
+            //DISPLAY("compressedSize=%i, inCSize=%i \n", compressedSize, inCSize);
+            //DISPLAY("decompressedSize=%i, targetDstSize=%i \n", blockSize, targetSize);
+            int const decResult = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, inCSize, targetSize, blockSize);
             FUZ_CHECKTEST(decResult<0, "LZ4_decompress_safe_partial failed despite valid input data (error:%i)", decResult);
             FUZ_CHECKTEST(decResult != targetSize, "LZ4_decompress_safe_partial did not regenerated required amount of data (%i < %i <= %i)", decResult, targetSize, blockSize);
             FUZ_CHECKTEST(decodedBuffer[targetSize] != sentinel, "LZ4_decompress_safe_partial overwrite beyond requested size (though %i <= %i <= %i)", decResult, targetSize, blockSize);
+            FUZ_CHECKTEST(memcmp(block, decodedBuffer, (size_t)targetSize), "LZ4_decompress_safe_partial: corruption detected in regenerated data");
         }
 
         /* Test Compression with limited output size */
@@ -856,9 +861,9 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(decodedBuffer[blockSize-1], "LZ4_decompress_safe_usingDict overrun specified output buffer size");
 
         FUZ_DISPLAYTEST("LZ4_decompress_safe_usingDict with a too small output buffer");
-        {   U32 const missingBytes = (FUZ_rand(&randState) & 0xF) + 2;
-            if ((U32)blockSize > missingBytes) {
-                decodedBuffer[(U32)blockSize-missingBytes] = 0;
+        {   int const missingBytes = (FUZ_rand(&randState) & 0xF) + 2;
+            if (blockSize > missingBytes) {
+                decodedBuffer[blockSize-missingBytes] = 0;
                 ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize-missingBytes, dict, dictSize);
                 FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed : output buffer too small (-%u byte)", missingBytes);
                 FUZ_CHECKTEST(decodedBuffer[blockSize-missingBytes], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-%u byte) (blockSize=%i)", missingBytes, blockSize);
@@ -948,7 +953,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Compress HC continue destSize */
         FUZ_DISPLAYTEST();
-        {   int const availableSpace = (int)(FUZ_rand(&randState) % blockSize) + 5;
+        {   int const availableSpace = (int)(FUZ_rand(&randState) % (U32)blockSize) + 5;
             int consumedSize = blockSize;
             FUZ_DISPLAYTEST();
             LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
@@ -974,10 +979,14 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* ***** End of tests *** */
         /* Fill stats */
-        bytes += blockSize;
-        cbytes += compressedSize;
-        hcbytes += HCcompressedSize;
-        ccbytes += blockContinueCompressedSize;
+        assert(blockSize >= 0);
+        bytes += (unsigned)blockSize;
+        assert(compressedSize >= 0);
+        cbytes += (unsigned)compressedSize;
+        assert(HCcompressedSize >= 0);
+        hcbytes += (unsigned)HCcompressedSize;
+        assert(blockContinueCompressedSize >= 0);
+        ccbytes += (unsigned)blockContinueCompressedSize;
     }
 
     if (nbCycles<=1) nbCycles = cycleNb;   /* end by time */
