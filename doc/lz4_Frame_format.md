@@ -85,8 +85,8 @@ That’s where compressed data is stored.
 
 __EndMark__
 
-The flow of blocks ends when the last data block is announced with
-an invalid size of “0”, expressed as a 32-bits value (exactly `0x00000000`).
+The flow of blocks ends when the last data block is followed by
+the 32-bit value `0x00000000`.
 
 __Content Checksum__
 
@@ -260,9 +260,9 @@ __Block Size__
 
 This field uses 4-bytes, format is little-endian.
 
-If highest bit is set (`1`), the block is uncompressed.
+If the highest bit is set (`1`), the block is uncompressed.
 
-If highest bit is not set (`0`), the block is LZ4-compressed,
+If the highest bit is not set (`0`), the block is LZ4-compressed,
 using the [LZ4 block format specification](https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md).
 
 All other bits give the size, in bytes, of the data section.
