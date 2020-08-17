@@ -538,8 +538,8 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
                 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
             };
             const U64 mask = 0x0101010101010101ULL;
-            val = (((val >> 8) - mask) | val) & mask;
-            return ctz7_tab[((U64)(val * 0x0080402010080402ULL)) >> 57];
+            U64 t = (((val >> 8) - mask) | val) & mask;
+            return ctz7_tab[(t * 0x0080402010080402ULL) >> 57];
 #       endif
         } else /* 32 bits */ {
 #       if (defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 3) || \
