@@ -47,6 +47,7 @@ FUZZERS := \
 	round_trip_frame_fuzzer \
 	decompress_frame_fuzzer
 
+.PHONY: all
 all: $(FUZZERS)
 
 # Include a rule to build the static library if calling this target
@@ -70,5 +71,8 @@ $(LZ4DIR)/liblz4.a:
 	$(RM) $*_fuzzer $*_fuzzer.o standaloneengine.o
 
 .PHONY: clean
-clean: compress_fuzzer_clean decompress_fuzzer_clean
+clean: compress_fuzzer_clean decompress_fuzzer_clean \
+	compress_frame_fuzzer_clean compress_hc_fuzzer_clean \
+	decompress_frame_fuzzer_clean round_trip_frame_fuzzer_clean \
+	round_trip_fuzzer_clean round_trip_hc_fuzzer_clean round_trip_stream_fuzzer_clean
 	$(MAKE) -C $(LZ4DIR) clean
