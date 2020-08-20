@@ -98,7 +98,7 @@ travis-install:
 	$(MAKE) -j1 install DESTDIR=~/install_test_dir
 
 cmake:
-	@cd contrib/cmake_unofficial; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
+	@cd build/cmake; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
 
 endif
 
