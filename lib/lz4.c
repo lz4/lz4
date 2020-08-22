@@ -1288,22 +1288,6 @@ int LZ4_compress_default(const char* src, char* dst, int srcSize, int maxOutputS
 }
 
 
-/* hidden debug function */
-/* strangely enough, gcc generates faster code when this function is uncommented, even if unused */
-int LZ4_compress_fast_force(const char* src, char* dst, int srcSize, int dstCapacity, int acceleration)
-{
-    LZ4_stream_t ctx;
-    LZ4_initStream(&ctx, sizeof(ctx));
-
-    if (srcSize < LZ4_64Klimit) {
-        return LZ4_compress_generic(&ctx.internal_donotuse, src, dst, srcSize, NULL, dstCapacity, limitedOutput, byU16,    noDict, noDictIssue, acceleration);
-    } else {
-        tableType_t const addrMode = (sizeof(void*) > 4) ? byU32 : byPtr;
-        return LZ4_compress_generic(&ctx.internal_donotuse, src, dst, srcSize, NULL, dstCapacity, limitedOutput, addrMode, noDict, noDictIssue, acceleration);
-    }
-}
-
-
 /* Note!: This function leaves the stream in an unclean/broken state!
  * It is not safe to subsequently use the same state with a _fastReset() or
  * _continue() call without resetting it. */
