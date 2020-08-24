@@ -33,7 +33,7 @@ extern "C" {
 #include <stddef.h>       /* size_t, ptrdiff_t */
 #include <stdlib.h>       /* malloc */
 #include <string.h>       /* strlen, strncpy */
-#include <stdio.h>        /* fprintf */
+#include <stdio.h>        /* fprintf, fileno */
 #include <assert.h>
 #include <sys/types.h>    /* stat, utime */
 #include <sys/stat.h>     /* stat */
@@ -354,6 +354,31 @@ UTIL_STATIC U32 UTIL_isDirectory(const char* infilename)
     if (!r && S_ISDIR(statbuf.st_mode)) return 1;
 #endif
     return 0;
+}
+
+
+UTIL_STATIC U64 UTIL_getOpenFileSize(FILE* file)
+{
+    int r;
+    int fd = fileno(file);
+    if (fd < 0) {
+        perror("fileno");
+        exit(1);
+    }
+#if defined(_MSC_VER)
+    struct __stat64 statbuf;
+    r = _fstat64(fd, &statbuf);
+    if (r || !(statbuf.st_mode & S_IFREG)) return 0;   /* No good... */
+#elif defined(__MINGW32__) && defined (__MSVCRT__)
+    struct _stati64 statbuf;
+    r = _fstati64(fd, &statbuf);
+    if (r || !(statbuf.st_mode & S_IFREG)) return 0;   /* No good... */
+#else
+    struct stat statbuf;
+    r = fstat(fd, &statbuf);
+    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
+#endif
+    return (U64)statbuf.st_size;
 }
 
 
