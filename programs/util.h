@@ -143,6 +143,15 @@ extern "C" {
 #endif
 
 
+/*-****************************************
+*  fileno() function
+******************************************/
+#if defined(_MSC_VER)
+#  define UTIL_fileno _fileno
+#else
+#  define UTIL_fileno fileno
+#endif
+
 /* *************************************
 *  Constants
 ***************************************/
@@ -384,7 +393,7 @@ UTIL_STATIC U64 UTIL_getOpenFileSize(FILE* file)
     int fd;
     struct UTIL_TYPE_stat statbuf;
 
-    fd = fileno(file);
+    fd = UTIL_fileno(file);
     if (fd < 0) {
         perror("fileno");
         exit(1);
