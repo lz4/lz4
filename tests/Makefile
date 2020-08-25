@@ -212,7 +212,16 @@ test-lz4-contentSize: lz4 datagen
 	$(DATAGEN) -g15M > tmplc1
 	$(LZ4) -v tmplc1 -c | $(LZ4) -t
 	$(LZ4) -v --content-size tmplc1 -c | $(LZ4) -d > tmplc2
-	$(DIFF) -s tmplc1 tmplc2
+	$(DIFF) tmplc1 tmplc2
+	$(LZ4) -f tmplc1
+	$(LZ4) --content-size tmplc1 -c > tmplc2.lz4
+	! $(DIFF) tmplc1.lz4 tmplc2.lz4  # must differ, due to content size
+	$(LZ4) --content-size < tmplc1 > tmplc3.lz4
+	$(DIFF) tmplc2.lz4 tmplc3.lz4  # both must contain content size
+	$(CAT) tmplc1 | $(LZ4) > tmplc4.lz4
+	$(DIFF) tmplc1.lz4 tmplc4.lz4  # both don't have content size
+	$(CAT) tmplc1 | $(LZ4) --content-size > tmplc5.lz4 # can't determine content size
+	$(DIFF) tmplc1.lz4 tmplc5.lz4  # both don't have content size
 	@$(RM) tmplc*
 
 test-lz4-frame-concatenation: lz4 datagen
