@@ -122,6 +122,27 @@ extern "C" {
 #endif
 
 
+/*-****************************************
+*  stat() functions
+******************************************/
+#if defined(_MSC_VER)
+#  define UTIL_TYPE_stat __stat64
+#  define UTIL_stat _stat64
+#  define UTIL_fstat _fstat64
+#  define UTIL_STAT_MODE_ISREG(st_mode) ((st_mode) & S_IFREG)
+#elif   defined(__MINGW32__) && defined (__MSVCRT__)
+#  define UTIL_TYPE_stat _stati64
+#  define UTIL_stat _stati64
+#  define UTIL_fstat _fstati64
+#  define UTIL_STAT_MODE_ISREG(st_mode) ((st_mode) & S_IFREG)
+#else
+#  define UTIL_TYPE_stat stat
+#  define UTIL_stat stat
+#  define UTIL_fstat fstat
+#  define UTIL_STAT_MODE_ISREG(st_mode) (S_ISREG(st_mode))
+#endif
+
+
 /* *************************************
 *  Constants
 ***************************************/
@@ -360,24 +381,16 @@ UTIL_STATIC U32 UTIL_isDirectory(const char* infilename)
 UTIL_STATIC U64 UTIL_getOpenFileSize(FILE* file)
 {
     int r;
-    int fd = fileno(file);
+    int fd;
+    struct UTIL_TYPE_stat statbuf;
+
+    fd = fileno(file);
     if (fd < 0) {
         perror("fileno");
         exit(1);
     }
-#if defined(_MSC_VER)
-    struct __stat64 statbuf;
-    r = _fstat64(fd, &statbuf);
-    if (r || !(statbuf.st_mode & S_IFREG)) return 0;   /* No good... */
-#elif defined(__MINGW32__) && defined (__MSVCRT__)
-    struct _stati64 statbuf;
-    r = _fstati64(fd, &statbuf);
-    if (r || !(statbuf.st_mode & S_IFREG)) return 0;   /* No good... */
-#else
-    struct stat statbuf;
-    r = fstat(fd, &statbuf);
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
-#endif
+    r = UTIL_fstat(fd, &statbuf);
+    if (r || !UTIL_STAT_MODE_ISREG(statbuf.st_mode)) return 0;   /* No good... */
     return (U64)statbuf.st_size;
 }
 
@@ -385,19 +398,10 @@ UTIL_STATIC U64 UTIL_getOpenFileSize(FILE* file)
 UTIL_STATIC U64 UTIL_getFileSize(const char* infilename)
 {
     int r;
-#if defined(_MSC_VER)
-    struct __stat64 statbuf;
-    r = _stat64(infilename, &statbuf);
-    if (r || !(statbuf.st_mode & S_IFREG)) return 0;   /* No good... */
-#elif defined(__MINGW32__) && defined (__MSVCRT__)
-    struct _stati64 statbuf;
-    r = _stati64(infilename, &statbuf);
-    if (r || !(statbuf.st_mode & S_IFREG)) return 0;   /* No good... */
-#else
-    struct stat statbuf;
-    r = stat(infilename, &statbuf);
-    if (r || !S_ISREG(statbuf.st_mode)) return 0;   /* No good... */
-#endif
+    struct UTIL_TYPE_stat statbuf;
+
+    r = UTIL_stat(infilename, &statbuf);
+    if (r || !UTIL_STAT_MODE_ISREG(statbuf.st_mode)) return 0;   /* No good... */
     return (U64)statbuf.st_size;
 }
 
