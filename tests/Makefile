@@ -213,7 +213,7 @@ test-lz4-contentSize: lz4 datagen
 	$(LZ4) -v tmplc1 -c | $(LZ4) -t
 	$(LZ4) -v --content-size tmplc1 -c | $(LZ4) -d > tmplc2
 	$(DIFF) tmplc1 tmplc2
-	$(LZ4) -f tmplc1
+	$(LZ4) -f tmplc1 -c > tmplc1.lz4
 	$(LZ4) --content-size tmplc1 -c > tmplc2.lz4
 	! $(DIFF) tmplc1.lz4 tmplc2.lz4  # must differ, due to content size
 	$(LZ4) --content-size < tmplc1 > tmplc3.lz4
