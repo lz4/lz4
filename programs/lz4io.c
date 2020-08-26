@@ -680,7 +680,7 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
     prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
     prefs.favorDecSpeed = io_prefs->favorDecSpeed;
     if (io_prefs->contentSizeFlag) {
-      U64 const fileSize = UTIL_getFileSize(srcFileName);
+      U64 const fileSize = UTIL_getOpenFileSize(srcFile);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
@@ -1472,7 +1472,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
     LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
     unsigned char buffer[LZ4F_HEADER_SIZE_MAX];
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
-    cfinfo->fileSize = UTIL_getFileSize(input_filename);
+    cfinfo->fileSize = (finput == NULL) ? 0 : UTIL_getOpenFileSize(finput);
 
     while (!feof(finput)) {
         LZ4IO_frameInfo_t frameInfo = LZ4IO_INIT_FRAMEINFO;
