@@ -88,6 +88,7 @@
  * Define this parameter if your target system or compiler does not support hardware bit count
  */
 #if defined(_MSC_VER) && defined(_WIN32_WCE)   /* Visual Studio for WinCE doesn't support Hardware bit count */
+#  undef  LZ4_FORCE_SW_BITCOUNT  /* avoid double def */
 #  define LZ4_FORCE_SW_BITCOUNT
 #endif
 
@@ -527,6 +528,9 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
                                         !defined(LZ4_FORCE_SW_BITCOUNT)
             return (unsigned)__builtin_clzll((U64)val) >> 3;
 #       else
+#if 1
+            /* this method is probably faster,
+             * but adds a 128 bytes lookup table */
             static const unsigned char ctz7_tab[128] = {
                 7, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
                 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
@@ -537,9 +541,22 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
                 5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
                 4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
             };
-            const U64 mask = 0x0101010101010101ULL;
-            U64 t = (((val >> 8) - mask) | val) & mask;
+            U64 const mask = 0x0101010101010101ULL;
+            U64 const t = (((val >> 8) - mask) | val) & mask;
             return ctz7_tab[(t * 0x0080402010080402ULL) >> 57];
+#else
+            /* this method doesn't consume memory space like the previous one,
+             * but it contains several branches,
+             * that may end up slowing execution */
+            static const U32 by32 = sizeof(val)*4;  /* 32 on 64 bits (goal), 16 on 32 bits.
+            Just to avoid some static analyzer complaining about shift by 32 on 32-bits target.
+            Note that this code path is never triggered in 32-bits mode. */
+            unsigned r;
+            if (!(val>>by32)) { r=4; } else { r=0; val>>=by32; }
+            if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
+            r += (!val);
+            return r;
+#endif
 #       endif
         } else /* 32 bits */ {
 #       if (defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 3) || \
