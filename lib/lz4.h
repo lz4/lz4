@@ -221,25 +221,35 @@ LZ4LIB_API int LZ4_compress_destSize (const char* src, char* dst, int* srcSizePt
  *  Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
  *  into destination buffer 'dst' of size 'dstCapacity'.
  *  Up to 'targetOutputSize' bytes will be decoded.
- *  The function stops decoding on reaching this objective,
- *  which can boost performance when only the beginning of a block is required.
+ *  The function stops decoding on reaching this objective.
+ *  This can be useful to boost performance
+ *  whenever only the beginning of a block is required.
  *
- * @return : the number of bytes decoded in `dst` (necessarily <= dstCapacity)
+ * @return : the number of bytes decoded in `dst` (necessarily <= targetOutputSize)
  *           If source stream is detected malformed, function returns a negative result.
  *
- *  Note : @return can be < targetOutputSize, if compressed block contains less data.
+ *  Note 1 : @return can be < targetOutputSize, if compressed block contains less data.
  *
- *  Note 2 : this function features 2 parameters, targetOutputSize and dstCapacity,
- *           and expects targetOutputSize <= dstCapacity.
- *           It effectively stops decoding on reaching targetOutputSize,
+ *  Note 2 : targetOutputSize must be <= dstCapacity
+ *
+ *  Note 3 : this function effectively stops decoding on reaching targetOutputSize,
  *           so dstCapacity is kind of redundant.
- *           This is because in a previous version of this function,
- *           decoding operation would not "break" a sequence in the middle.
- *           As a consequence, there was no guarantee that decoding would stop at exactly targetOutputSize,
+ *           This is because in older versions of this function,
+ *           decoding operation would still write complete sequences.
+ *           Therefore, there was no guarantee that it would stop writing at exactly targetOutputSize,
  *           it could write more bytes, though only up to dstCapacity.
  *           Some "margin" used to be required for this operation to work properly.
- *           This is no longer necessary.
- *           The function nonetheless keeps its signature, in an effort to not break API.
+ *           Thankfully, this is no longer necessary.
+ *           The function nonetheless keeps the same signature, in an effort to preserve API compatibility.
+ *
+ *  Note 4 : If srcSize is the exact size of the block,
+ *           then targetOutputSize can be any value,
+ *           including larger than the block's decompressed size.
+ *           The function will, at most, generate block's decompressed size.
+ *
+ *  Note 5 : If srcSize is _larger_ than block's compressed size,
+ *           then targetOutputSize **MUST** be <= block's decompressed size.
+ *           Otherwise, *silent corruption will occur*.
  */
 LZ4LIB_API int LZ4_decompress_safe_partial (const char* src, char* dst, int srcSize, int targetOutputSize, int dstCapacity);
 

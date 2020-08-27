@@ -618,13 +618,13 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 
         /* Test partial decoding => must work */
         FUZ_DISPLAYTEST("test LZ4_decompress_safe_partial");
-        {   size_t const missingBytes = FUZ_rand(&randState) % (unsigned)blockSize;
-            int const targetSize = (int)((size_t)blockSize - missingBytes);
+        {   size_t const missingOutBytes = FUZ_rand(&randState) % (unsigned)blockSize;
+            int const targetSize = (int)((size_t)blockSize - missingOutBytes);
             size_t const extraneousInBytes = FUZ_rand(&randState) % 2;
             int const inCSize = (int)((size_t)compressedSize + extraneousInBytes);
             char const sentinel = decodedBuffer[targetSize] = block[targetSize] ^ 0x5A;
-            //DISPLAY("compressedSize=%i, inCSize=%i \n", compressedSize, inCSize);
-            //DISPLAY("decompressedSize=%i, targetDstSize=%i \n", blockSize, targetSize);
+            DISPLAYLEVEL(6,"compressedSize=%i, inCSize=%i \n", compressedSize, inCSize);
+            DISPLAYLEVEL(6,"decompressedSize=%i, targetDstSize=%i \n", blockSize, targetSize);
             int const decResult = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, inCSize, targetSize, blockSize);
             FUZ_CHECKTEST(decResult<0, "LZ4_decompress_safe_partial failed despite valid input data (error:%i)", decResult);
             FUZ_CHECKTEST(decResult != targetSize, "LZ4_decompress_safe_partial did not regenerated required amount of data (%i < %i <= %i)", decResult, targetSize, blockSize);
