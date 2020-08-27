@@ -55,7 +55,7 @@ NB_LOOPS     ?= -i1
 
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
 
 all32: CFLAGS+=-m32
 all32: all
@@ -104,6 +104,9 @@ datagen : $(PRGDIR)/datagen.c datagencli.c
 checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+decompress-partial: lz4.o decompress-partial.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
@@ -114,7 +117,8 @@ clean:
         frametest$(EXT) frametest32$(EXT) \
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
-        frameTest$(EXT) lz4_all.c
+        frameTest$(EXT) decompress-partial$(EXT) \
+		lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
@@ -158,7 +162,7 @@ list:
 check: test-lz4-essentials
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest test-decompress-partial
 
 .PHONY: test32
 test32: CFLAGS+=-m32
@@ -401,8 +405,8 @@ test-lz4-dict: lz4 datagen
 
 test-lz4-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
-	$(DATAGEN) -g6GB   | $(LZ4) -vB5D  | $(LZ4) -qt
-	$(DATAGEN) -g5GB   | $(LZ4) -v4BD  | $(LZ4) -qt
+	./datagen -g6GB    | $(LZ4) -vB5D  | $(LZ4) -qt
+	./datagen -g4500MB | $(LZ4) -v3BD | $(LZ4) -qt
 	# test large file size [2-4] GB
 	@$(DATAGEN) -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
 	@ls -ls tmphf1
@@ -529,5 +533,9 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
+
+test-decompress-partial : decompress-partial
+	@echo "\n ---- test decompress-partial ----"
+	./decompress-partial$(EXT)
 
 endif

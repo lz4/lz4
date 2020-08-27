@@ -1813,7 +1813,8 @@ LZ4_decompress_generic(
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
                     if (partialDecoding) {
-                        length = MIN(length, (size_t)(oend-op));  /* reach end of buffer */
+                        DEBUGLOG(7, "partialDecoding: dictionary match, close to dstEnd");
+                        length = MIN(length, (size_t)(oend-op));
                     } else {
                         goto _output_error;  /* end-of-block condition violated */
                 }   }
@@ -1921,29 +1922,34 @@ LZ4_decompress_generic(
               || ((!endOnInput) && (cpy>oend-WILDCOPYLENGTH)) )
             {
                 /* We've either hit the input parsing restriction or the output parsing restriction.
-                 * If we've hit the input parsing condition then this must be the last sequence.
-                 * If we've hit the output parsing condition then we are either using partialDecoding
-                 * or we've hit the output parsing condition.
+                 * In the normal scenario, decoding a full block, it must be the last sequence,
+                 * otherwise it's an error (invalid input or dimensions).
+                 * In partialDecoding scenario, it's necessary to ensure there is no buffer overflow.
                  */
                 if (partialDecoding) {
                     /* Since we are partial decoding we may be in this block because of the output parsing
                      * restriction, which is not valid since the output buffer is allowed to be undersized.
                      */
                     assert(endOnInput);
-                    /* If we're in this block because of the input parsing condition, then we must be on the
-                     * last sequence (or invalid), so we must check that we exactly consume the input.
+                    DEBUGLOG(7, "partialDecoding: copying literals, close to input or output end")
+                    DEBUGLOG(7, "partialDecoding: literal length = %u", (unsigned)length);
+                    DEBUGLOG(7, "partialDecoding: remaining space in dstBuffer : %i", (int)(oend - op));
+                    DEBUGLOG(7, "partialDecoding: remaining space in srcBuffer : %i", (int)(iend - ip));
+                    /* Finishing in the middle of a literals segment,
+                     * due to lack of input.
                      */
-                    if ((ip+length>iend-(2+1+LASTLITERALS)) && (ip+length != iend)) { goto _output_error; }
-                    assert(ip+length <= iend);
-                    /* We are finishing in the middle of a literals segment.
-                     * Break after the copy.
+                    if (ip+length > iend) {
+                        length = (size_t)(iend-ip);
+                        cpy = op + length;
+                    }
+                    /* Finishing in the middle of a literals segment,
+                     * due to lack of output space.
                      */
                     if (cpy > oend) {
                         cpy = oend;
                         assert(op<=oend);
                         length = (size_t)(oend-op);
                     }
-                    assert(ip+length <= iend);
                 } else {
                     /* We must be on the last sequence because of the parsing limitations so check
                      * that we exactly regenerate the original size (must be exact when !endOnInput).
@@ -1954,14 +1960,15 @@ LZ4_decompress_generic(
                       */
                     if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) { goto _output_error; }
                 }
-                memmove(op, ip, length);  /* supports overlapping memory regions, which only matters for in-place decompression scenarios */
+                memmove(op, ip, length);  /* supports overlapping memory regions; only matters for in-place decompression scenarios */
                 ip += length;
                 op += length;
-                /* Necessarily EOF when !partialDecoding. When partialDecoding
-                 * it is EOF if we've either filled the output buffer or hit
-                 * the input parsing restriction.
+                /* Necessarily EOF when !partialDecoding.
+                 * When partialDecoding, it is EOF if we've either
+                 * filled the output buffer or
+                 * can't proceed with reading an offset for following match.
                  */
-                if (!partialDecoding || (cpy == oend) || (ip == iend)) {
+                if (!partialDecoding || (cpy == oend) || (ip >= (iend-2))) {
                     break;
                 }
             } else {
