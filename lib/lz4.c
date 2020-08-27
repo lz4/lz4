@@ -88,6 +88,7 @@
  * Define this parameter if your target system or compiler does not support hardware bit count
  */
 #if defined(_MSC_VER) && defined(_WIN32_WCE)   /* Visual Studio for WinCE doesn't support Hardware bit count */
+#  undef  LZ4_FORCE_SW_BITCOUNT  /* avoid double def */
 #  define LZ4_FORCE_SW_BITCOUNT
 #endif
 
@@ -487,74 +488,91 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
 **************************************/
 static unsigned LZ4_NbCommonBytes (reg_t val)
 {
+    assert(val != 0);
     if (LZ4_isLittleEndian()) {
-        if (sizeof(val)==8) {
-#       if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
+        if (sizeof(val) == 8) {
+#       if defined(_MSC_VER) && (_MSC_VER >= 1800) && defined(_M_AMD64) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            /* x64 CPUS without BMI support interpret `TZCNT` as `REP BSF` */
+            return (unsigned)_tzcnt_u64(val) >> 3;
+#       elif defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r = 0;
-            _BitScanForward64( &r, (U64)val );
-            return (int)(r>>3);
-#       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            _BitScanForward64(&r, (U64)val);
+            return (unsigned)r >> 3;
+#       elif (defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 3) || \
+                            ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 4))))) && \
+                                        !defined(LZ4_FORCE_SW_BITCOUNT)
             return (unsigned)__builtin_ctzll((U64)val) >> 3;
 #       else
-            static const int DeBruijnBytePos[64] = { 0, 0, 0, 0, 0, 1, 1, 2,
-                                                     0, 3, 1, 3, 1, 4, 2, 7,
-                                                     0, 2, 3, 6, 1, 5, 3, 5,
-                                                     1, 3, 4, 4, 2, 5, 6, 7,
-                                                     7, 0, 1, 2, 3, 3, 4, 6,
-                                                     2, 6, 5, 5, 3, 4, 5, 6,
-                                                     7, 1, 2, 4, 6, 4, 4, 5,
-                                                     7, 2, 6, 5, 7, 6, 7, 7 };
-            return DeBruijnBytePos[((U64)((val & -(long long)val) * 0x0218A392CDABBD3FULL)) >> 58];
+            const U64 m = 0x0101010101010101ULL;
+            val ^= val - 1;
+            return (unsigned)(((U64)((val & (m - 1)) * m)) >> 56);
 #       endif
         } else /* 32 bits */ {
 #       if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r;
-            _BitScanForward( &r, (U32)val );
-            return (int)(r>>3);
-#       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
+            _BitScanForward(&r, (U32)val);
+            return (unsigned)r >> 3;
+#       elif (defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 3) || \
+                            ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 4))))) && \
+                                        !defined(LZ4_FORCE_SW_BITCOUNT)
             return (unsigned)__builtin_ctz((U32)val) >> 3;
 #       else
-            static const int DeBruijnBytePos[32] = { 0, 0, 3, 0, 3, 1, 3, 0,
-                                                     3, 2, 2, 1, 3, 2, 0, 1,
-                                                     3, 3, 1, 2, 2, 2, 2, 0,
-                                                     3, 1, 2, 0, 1, 0, 1, 1 };
-            return DeBruijnBytePos[((U32)((val & -(S32)val) * 0x077CB531U)) >> 27];
+            const U32 m = 0x01010101;
+            return (unsigned)((((val - 1) ^ val) & (m - 1)) * m) >> 24;
 #       endif
         }
     } else   /* Big Endian CPU */ {
-        if (sizeof(val)==8) {   /* 64-bits */
-#       if defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
-            unsigned long r = 0;
-            _BitScanReverse64( &r, val );
-            return (unsigned)(r>>3);
-#       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
+        if (sizeof(val)==8) {
+#       if (defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 3) || \
+                            ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 4))))) && \
+                                        !defined(LZ4_FORCE_SW_BITCOUNT)
             return (unsigned)__builtin_clzll((U64)val) >> 3;
 #       else
+#if 1
+            /* this method is probably faster,
+             * but adds a 128 bytes lookup table */
+            static const unsigned char ctz7_tab[128] = {
+                7, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                6, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+                4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+            };
+            U64 const mask = 0x0101010101010101ULL;
+            U64 const t = (((val >> 8) - mask) | val) & mask;
+            return ctz7_tab[(t * 0x0080402010080402ULL) >> 57];
+#else
+            /* this method doesn't consume memory space like the previous one,
+             * but it contains several branches,
+             * that may end up slowing execution */
             static const U32 by32 = sizeof(val)*4;  /* 32 on 64 bits (goal), 16 on 32 bits.
-                Just to avoid some static analyzer complaining about shift by 32 on 32-bits target.
-                Note that this code path is never triggered in 32-bits mode. */
+            Just to avoid some static analyzer complaining about shift by 32 on 32-bits target.
+            Note that this code path is never triggered in 32-bits mode. */
             unsigned r;
             if (!(val>>by32)) { r=4; } else { r=0; val>>=by32; }
             if (!(val>>16)) { r+=2; val>>=8; } else { val>>=24; }
             r += (!val);
             return r;
+#endif
 #       endif
         } else /* 32 bits */ {
-#       if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
-            unsigned long r = 0;
-            _BitScanReverse( &r, (unsigned long)val );
-            return (unsigned)(r>>3);
-#       elif (defined(__clang__) || (defined(__GNUC__) && (__GNUC__>=3))) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       if (defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 3) || \
+                            ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 4))))) && \
+                                        !defined(LZ4_FORCE_SW_BITCOUNT)
             return (unsigned)__builtin_clz((U32)val) >> 3;
 #       else
-            unsigned r;
-            if (!(val>>16)) { r=2; val>>=8; } else { r=0; val>>=24; }
-            r += (!val);
-            return r;
+            val >>= 8;
+            val = ((((val + 0x00FFFF00) | 0x00FFFFFF) + val) |
+              (val + 0x00FF0000)) >> 24;
+            return (unsigned)val ^ 3;
 #       endif
         }
     }
 }
+
 
 #define STEPSIZE sizeof(reg_t)
 LZ4_FORCE_INLINE
@@ -1285,22 +1303,6 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
 int LZ4_compress_default(const char* src, char* dst, int srcSize, int maxOutputSize)
 {
     return LZ4_compress_fast(src, dst, srcSize, maxOutputSize, 1);
-}
-
-
-/* hidden debug function */
-/* strangely enough, gcc generates faster code when this function is uncommented, even if unused */
-int LZ4_compress_fast_force(const char* src, char* dst, int srcSize, int dstCapacity, int acceleration)
-{
-    LZ4_stream_t ctx;
-    LZ4_initStream(&ctx, sizeof(ctx));
-
-    if (srcSize < LZ4_64Klimit) {
-        return LZ4_compress_generic(&ctx.internal_donotuse, src, dst, srcSize, NULL, dstCapacity, limitedOutput, byU16,    noDict, noDictIssue, acceleration);
-    } else {
-        tableType_t const addrMode = (sizeof(void*) > 4) ? byU32 : byPtr;
-        return LZ4_compress_generic(&ctx.internal_donotuse, src, dst, srcSize, NULL, dstCapacity, limitedOutput, addrMode, noDict, noDictIssue, acceleration);
-    }
 }
 
 

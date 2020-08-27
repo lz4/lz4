@@ -1,5 +1,7 @@
 v1.9.3
 perf: faster speed on Visual Studio, by @wolfpld
+build: contrib/cmake_unofficial/ moved to build/cmake/
+build: visual/* moved to build/
 
 
 v1.9.2
