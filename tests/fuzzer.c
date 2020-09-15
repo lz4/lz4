@@ -1059,8 +1059,11 @@ static void FUZ_unitTests(int compressionLevel)
     /* useful to trigger undefined sanitizer */
     DISPLAYLEVEL(3, "LZ4_compress_default() with NULL input \n");
     {	int const maxCSize = LZ4_compressBound(0);
-	int const cSize = LZ4_compress_default(NULL, testCompressed, 0, maxCSize);
-	FUZ_CHECKTEST(cSize==1 && testCompressed[0]==0, "compressed empty is byte 0");
+        int const cSize = LZ4_compress_default(NULL, testCompressed, 0, maxCSize);
+        FUZ_CHECKTEST(!(cSize==1 && testCompressed[0]==0),
+                    "compressing empty should give byte 0"
+                    " (maxCSize == %u) (cSize == %u)",
+                    (unsigned)maxCSize, (unsigned)cSize);
     }
 
     /* in-place compression test */
