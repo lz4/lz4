@@ -1055,6 +1055,14 @@ static void FUZ_unitTests(int compressionLevel)
             FUZ_CHECKTEST(r >= 0, "LZ4_decompress_safe() should fail");
     }   }
 
+
+    /* useful to trigger undefined sanitizer */
+    DISPLAYLEVEL(3, "LZ4_compress_default() with NULL input \n");
+    {	int const maxCSize = LZ4_compressBound(0);
+	int const cSize = LZ4_compress_default(NULL, testCompressed, 0, maxCSize);
+	FUZ_CHECKTEST(cSize==1 && testCompressed[0]==0, "compressed empty is byte 0");
+    }
+
     /* in-place compression test */
     DISPLAYLEVEL(3, "in-place compression using LZ4_compress_default() :");
     {   int const sampleSize = 65 KB;
