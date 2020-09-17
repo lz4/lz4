@@ -35,7 +35,7 @@ PYTHON  ?= python3
 
 DEBUGLEVEL?= 1
 DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
-CFLAGS  ?= -O3 # can select custom optimization flags. For example : CFLAGS=-O2 make
+CFLAGS  ?= -O3 # can select custom optimization flags. Example : CFLAGS=-O2 make
 CFLAGS  += -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
            -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
            -Wpointer-arith -Wstrict-aliasing=1
