@@ -143,7 +143,7 @@ clangtest-native: clean
 	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) native CC=clang
 
 usan: clean
-	CC=clang CFLAGS="-O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
+	CC=clang CFLAGS="-O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined -fsanitize-recover=pointer-overflow" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
 usan32: clean
 	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
