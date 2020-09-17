@@ -819,8 +819,13 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
 }
 
 /** LZ4_compress_generic() :
-    inlined, to ensure branches are decided at compilation time */
-LZ4_FORCE_INLINE int LZ4_compress_generic(
+ *  inlined, to ensure branches are decided at compilation time.
+ *  Presumed already validated at this stage:
+ *  - source != NULL
+ *  - inputSize > 0
+ *  - outputDirective == notLimited || maxOutputSize > 0
+ */
+LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                  LZ4_stream_t_internal* const cctx,
                  const char* const source,
                  char* const dest,
@@ -867,11 +872,10 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     U32 offset = 0;
     U32 forwardH;
 
-    DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, tableType=%u", inputSize, tableType);
+    DEBUGLOG(5, "LZ4_compress_generic_validated: srcSize=%i, tableType=%u", inputSize, tableType);
+    assert(ip != NULL);
     /* If init conditions are not met, we don't have to mark stream
      * as having dirty context, since no action was taken yet */
-    if (outputDirective == fillOutput && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) { return 0; }           /* Unsupported inputSize, too large (or negative) */
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) { return 0; }  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
@@ -1204,10 +1208,53 @@ _last_literals:
     if (outputDirective == fillOutput) {
         *inputConsumed = (int) (((const char*)ip)-source);
     }
-    DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, (int)(((char*)op) - dest));
     result = (int)(((char*)op) - dest);
     assert(result > 0);
+    DEBUGLOG(5, "LZ4_compress_generic: compressed %i bytes into %i bytes", inputSize, result);
     return result;
+}
+
+/** LZ4_compress_generic() :
+ *  inlined, to ensure branches are decided at compilation time;
+ *  takes care of input == (NULL, 0) and outputSize == 0
+ *  and forward the rest to LZ4_compress_generic_validated */
+LZ4_FORCE_INLINE int LZ4_compress_generic(
+                 LZ4_stream_t_internal* const cctx,
+                 const char* const source,
+                 char* const dest,
+                 const int inputSize,
+                 int *inputConsumed, /* only written when outputDirective == fillOutput */
+                 const int maxOutputSize,
+                 const limitedOutput_directive outputDirective,
+                 const tableType_t tableType,
+                 const dict_directive dictDirective,
+                 const dictIssue_directive dictIssue,
+                 const int acceleration)
+{
+    DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, maxOutputSize=%i",
+            inputSize, maxOutputSize);
+
+    /* If init conditions are not met, we don't have to mark stream
+     * as having dirty context, since no action was taken yet */
+    if (outputDirective != notLimited && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
+    assert(dest != NULL);
+
+    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) { return 0; }  /* Unsupported inputSize, too large (or negative) */
+    if (inputSize == 0) {   /* source == NULL supported if inputSize == 0 */
+        assert(outputDirective == notLimited || maxOutputSize >= 1);
+        dest[0] = 0;
+        if (outputDirective == fillOutput) {
+            assert (inputConsumed != NULL);
+            *inputConsumed = 0;
+        }
+        return 1;
+    }
+    assert(source != NULL);
+
+    return LZ4_compress_generic_validated(cctx, source, dest, inputSize,
+                inputConsumed, /* only written when outputDirective == fillOutput */
+                maxOutputSize, outputDirective,
+                tableType, dictDirective, dictIssue, acceleration);
 }
 
 
