@@ -823,7 +823,6 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
  *  Presumed already validated at this stage:
  *  - source != NULL
  *  - inputSize > 0
- *  - outputDirective == notLimited || maxOutputSize > 0
  */
 LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                  LZ4_stream_t_internal* const cctx,
@@ -876,6 +875,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     assert(ip != NULL);
     /* If init conditions are not met, we don't have to mark stream
      * as having dirty context, since no action was taken yet */
+    if (outputDirective == fillOutput && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
     if ((tableType == byU16) && (inputSize>=LZ4_64Klimit)) { return 0; }  /* Size too large (not within 64K limit) */
     if (tableType==byPtr) assert(dictDirective==noDict);      /* only supported use case with byPtr */
     assert(acceleration >= 1);
@@ -1216,44 +1216,41 @@ _last_literals:
 
 /** LZ4_compress_generic() :
  *  inlined, to ensure branches are decided at compilation time;
- *  takes care of input == (NULL, 0) and outputSize == 0
+ *  takes care of src == (NULL, 0)
  *  and forward the rest to LZ4_compress_generic_validated */
 LZ4_FORCE_INLINE int LZ4_compress_generic(
                  LZ4_stream_t_internal* const cctx,
-                 const char* const source,
-                 char* const dest,
-                 const int inputSize,
+                 const char* const src,
+                 char* const dst,
+                 const int srcSize,
                  int *inputConsumed, /* only written when outputDirective == fillOutput */
-                 const int maxOutputSize,
+                 const int dstCapacity,
                  const limitedOutput_directive outputDirective,
                  const tableType_t tableType,
                  const dict_directive dictDirective,
                  const dictIssue_directive dictIssue,
                  const int acceleration)
 {
-    DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, maxOutputSize=%i",
-            inputSize, maxOutputSize);
+    DEBUGLOG(5, "LZ4_compress_generic: srcSize=%i, dstCapacity=%i",
+                srcSize, dstCapacity);
 
-    /* If init conditions are not met, we don't have to mark stream
-     * as having dirty context, since no action was taken yet */
-    if (outputDirective != notLimited && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
-    assert(dest != NULL);
-
-    if ((U32)inputSize > (U32)LZ4_MAX_INPUT_SIZE) { return 0; }  /* Unsupported inputSize, too large (or negative) */
-    if (inputSize == 0) {   /* source == NULL supported if inputSize == 0 */
-        assert(outputDirective == notLimited || maxOutputSize >= 1);
-        dest[0] = 0;
+    if ((U32)srcSize > (U32)LZ4_MAX_INPUT_SIZE) { return 0; }  /* Unsupported srcSize, too large (or negative) */
+    if (srcSize == 0) {   /* src == NULL supported if srcSize == 0 */
+        DEBUGLOG(5, "Generating an empty block");
+        assert(outputDirective == notLimited || dstCapacity >= 1);
+        assert(dst != NULL);
+        dst[0] = 0;
         if (outputDirective == fillOutput) {
             assert (inputConsumed != NULL);
             *inputConsumed = 0;
         }
         return 1;
     }
-    assert(source != NULL);
+    assert(src != NULL);
 
-    return LZ4_compress_generic_validated(cctx, source, dest, inputSize,
-                inputConsumed, /* only written when outputDirective == fillOutput */
-                maxOutputSize, outputDirective,
+    return LZ4_compress_generic_validated(cctx, src, dst, srcSize,
+                inputConsumed, /* only written into if outputDirective == fillOutput */
+                dstCapacity, outputDirective,
                 tableType, dictDirective, dictIssue, acceleration);
 }
 
@@ -2124,6 +2121,7 @@ LZ4_decompress_generic(
 
         /* end of decoding */
         if (endOnInput) {
+            DEBUGLOG(5, "decoded %i bytes", (int) (((char*)op)-dst));
            return (int) (((char*)op)-dst);     /* Nb of output bytes decoded */
        } else {
            return (int) (((const char*)ip)-src);   /* Nb of input bytes read */

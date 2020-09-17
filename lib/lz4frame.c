@@ -750,6 +750,7 @@ static size_t LZ4F_makeBlock(void* dst,
                                       (int)(srcSize), (int)(srcSize-1),
                                       level, cdict);
     if (cSize == 0) {  /* compression failed */
+        DEBUGLOG(5, "LZ4F_makeBlock: compression failed, creating a raw block (size %u)", (U32)srcSize);
         cSize = (U32)srcSize;
         LZ4F_writeLE32(cSizePtr, cSize | LZ4F_BLOCKUNCOMPRESSED_FLAG);
         memcpy(cSizePtr+BHSize, src, srcSize);
@@ -1487,15 +1488,17 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 size_t const nextCBlockSize = blockHeader & 0x7FFFFFFFU;
                 size_t const crcSize = dctx->frameInfo.blockChecksumFlag * BFSize;
                 if (blockHeader==0) {  /* frameEnd signal, no more block */
+                    DEBUGLOG(5, "end of frame");
                     dctx->dStage = dstage_getSuffix;
                     break;
                 }
                 if (nextCBlockSize > dctx->maxBlockSize) {
                     return err0r(LZ4F_ERROR_maxBlockSize_invalid);
                 }
-                if (LZ4F_readLE32(selectedIn) & LZ4F_BLOCKUNCOMPRESSED_FLAG) {
+                if (blockHeader & LZ4F_BLOCKUNCOMPRESSED_FLAG) {
                     /* next block is uncompressed */
                     dctx->tmpInTarget = nextCBlockSize;
+                    DEBUGLOG(5, "next block is uncompressed (size %u)", (U32)nextCBlockSize);
                     if (dctx->frameInfo.blockChecksumFlag) {
                         (void)XXH32_reset(&dctx->blockChecksum, 0);
                     }
