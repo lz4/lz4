@@ -785,7 +785,7 @@ typedef enum { o_contiguous, o_noncontiguous, o_overwrite } o_scenario_e;
 
 static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, o_scenario_e o_scenario)
 {
-    if (displayLevel >= 5) {
+    if (displayLevel >= 2) {
         size_t p=0;
         const BYTE* b1=(const BYTE*)buff1;
         const BYTE* b2=(const BYTE*)buff2;
@@ -862,8 +862,10 @@ size_t test_lz4f_decompression_wBuffers(
                     "Decompression overwrites beyond assigned dst size",
                     op[oSizeMax], mark);
         }
-        if (LZ4F_getErrorCode(moreToFlush) == LZ4F_ERROR_contentChecksum_invalid)
+        if (LZ4F_getErrorCode(moreToFlush) == LZ4F_ERROR_contentChecksum_invalid) {
+            DISPLAYLEVEL(2, "checksum error detected \n");
             locateBuffDiff(srcRef, dst, decompressedSize, o_scenario);
+        }
         if (LZ4F_isError(moreToFlush)) return moreToFlush;
 
         XXH64_update(&xxh64, op, oSize);
