@@ -481,7 +481,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = *anchor;  /* only works for single segment */
     /* g_debuglog_enable = (pos >= 2228) & (pos <= 2262); */
-    DEBUGLOG(6, "pos:%7u -- literals:%3u, match:%4i, offset:%5u, cost:%3u + %u",
+    DEBUGLOG(6, "pos:%7u -- literals:%4u, match:%4i, offset:%5u, cost:%4u + %5u",
                 pos,
                 (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
                 cost, totalCost);
@@ -726,7 +726,7 @@ _last_literals:
             lastRunSize -= llAdd;
         }
         DEBUGLOG(6, "Final literal run : %i literals", (int)lastRunSize);
-        ip = ip + lastRunSize;  /* can be != iend if limit==fillOutput */
+        ip = anchor + lastRunSize;  /* can be != iend if limit==fillOutput */
 
         if (lastRunSize >= RUN_MASK) {
             size_t accumulator = lastRunSize - RUN_MASK;
@@ -751,6 +751,7 @@ _dest_overflow:
         size_t const ll_addbytes = (ll + 240) / 255;
         size_t const ll_totalCost = 1 + ll_addbytes + ll;
         BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
+        DEBUGLOG(6, "Last sequence overflowing");
         op = optr;  /* restore correct out pointer */
         if (op + ll_totalCost <= maxLitPos) {
             /* ll validated; now how many matches ? */

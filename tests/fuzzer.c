@@ -447,7 +447,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 decodedBuffer[srcSize] = canary;
                 {   int const dSize = LZ4_decompress_safe(compressedBuffer, decodedBuffer, cSize, srcSize);
                     FUZ_CHECKTEST(dSize<0, "LZ4_decompress_safe() failed on data compressed by LZ4_compressHC_destSize");
-                    FUZ_CHECKTEST(dSize!=srcSize, "LZ4_decompress_safe() failed : did not fully decompressed data");
+                    FUZ_CHECKTEST(dSize!=srcSize, "LZ4_decompress_safe() failed : decompressed %i bytes, was supposed to decompress %i bytes", dSize, srcSize);
                 }
                 FUZ_CHECKTEST(decodedBuffer[srcSize] != canary, "LZ4_decompress_safe() overwrite dst buffer !");
                 {   U32 const crcDec = XXH32(decodedBuffer, (size_t)srcSize, 0);
