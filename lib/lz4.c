@@ -247,6 +247,7 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Types
 **************************************/
+#include <limits.h>
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
   typedef  uint8_t BYTE;
@@ -256,7 +257,6 @@ static const int LZ4_minLength = (MFLIMIT+1);
   typedef uint64_t U64;
   typedef uintptr_t uptrval;
 #else
-# include <limits.h>
 # if UINT_MAX != 4294967295UL
 #   error "LZ4 code (when not C++ or C99) assumes that sizeof(int) == 4"
 # endif
@@ -1185,13 +1185,14 @@ _last_literals:
             if (outputDirective == fillOutput) {
                 /* adapt lastRun to fill 'dst' */
                 assert(olimit >= op);
-                lastRun  = (size_t)(olimit-op) - 1;
-                lastRun -= (lastRun+240)/255;
+                lastRun  = (size_t)(olimit-op) - 1/*token*/;
+                lastRun -= (lastRun + 256 - RUN_MASK) / 256;  /*additional length tokens*/
             } else {
                 assert(outputDirective == limitedOutput);
                 return 0;   /* cannot compress within `dst` budget. Stored indexes in hash table are nonetheless fine */
             }
         }
+        DEBUGLOG(6, "Final literal run : %i literals", (int)lastRun);
         if (lastRun >= RUN_MASK) {
             size_t accumulator = lastRun - RUN_MASK;
             *op++ = RUN_MASK << ML_BITS;
@@ -1824,10 +1825,10 @@ LZ4_decompress_generic(
             length = token & ML_MASK;
 
             if (length == ML_MASK) {
-              variable_length_error error = ok;
-              if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
-              length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
-              if (error != ok) { goto _output_error; }
+                variable_length_error error = ok;
+                if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
+                length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
+                if (error != ok) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
                 length += MINMATCH;
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
@@ -1853,7 +1854,7 @@ LZ4_decompress_generic(
                         continue;
             }   }   }
 
-            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
+            if (checkOffset && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
@@ -2003,7 +2004,12 @@ LZ4_decompress_generic(
                      /* We must be on the last sequence (or invalid) because of the parsing limitations
                       * so check that we exactly consume the input and don't overrun the output buffer.
                       */
-                    if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) { goto _output_error; }
+                    if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) {
+                        DEBUGLOG(6, "should have been last run of literals")
+                        DEBUGLOG(6, "ip(%p) + length(%i) = %p != iend (%p)", ip, (int)length, ip+length, iend);
+                        DEBUGLOG(6, "or cpy(%p) > oend(%p)", cpy, oend);
+                        goto _output_error;
+                    }
                 }
                 memmove(op, ip, length);  /* supports overlapping memory regions; only matters for in-place decompression scenarios */
                 ip += length;
