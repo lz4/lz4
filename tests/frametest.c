@@ -815,7 +815,8 @@ size_t test_lz4f_decompression_wBuffers(
                 U64 crcOrig,
                 U32* const randState,
                 LZ4F_dctx* const dCtx,
-                U32 seed, U32 testNb)
+                U32 seed, U32 testNb,
+                int findErrorPos)
 {
     const BYTE* ip = (const BYTE*)cSrc;
     const BYTE* const iend = ip + cSize;
@@ -863,8 +864,8 @@ size_t test_lz4f_decompression_wBuffers(
                     op[oSizeMax], mark);
         }
         if (LZ4F_getErrorCode(moreToFlush) == LZ4F_ERROR_contentChecksum_invalid) {
-            DISPLAYLEVEL(2, "checksum error detected \n");
-            locateBuffDiff(srcRef, dst, decompressedSize, o_scenario);
+            if (findErrorPos) DISPLAYLEVEL(2, "checksum error detected \n");
+            if (findErrorPos) locateBuffDiff(srcRef, dst, decompressedSize, o_scenario);
         }
         if (LZ4F_isError(moreToFlush)) return moreToFlush;
 
@@ -885,7 +886,7 @@ size_t test_lz4f_decompression_wBuffers(
     if (totalOut) {  /* otherwise, it's a skippable frame */
         U64 const crcDecoded = XXH64_digest(&xxh64);
         if (crcDecoded != crcOrig) {
-            locateBuffDiff(srcRef, dst, decompressedSize, o_scenario);
+            if (findErrorPos) locateBuffDiff(srcRef, dst, decompressedSize, o_scenario);
             return LZ4F_ERROR_contentChecksum_invalid;
     }   }
     return 0;
@@ -897,7 +898,8 @@ size_t test_lz4f_decompression(const void* cSrc, size_t cSize,
                                U64 crcOrig,
                                U32* const randState,
                                LZ4F_dctx* const dCtx,
-                               U32 seed, U32 testNb)
+                               U32 seed, U32 testNb,
+                               int findErrorPos)
 {
     o_scenario_e const o_scenario = (o_scenario_e)(FUZ_rand(randState) % 3);   /* 0 : contiguous; 1 : non-contiguous; 2 : dst overwritten */
     /* tighten dst buffer conditions */
@@ -914,7 +916,7 @@ size_t test_lz4f_decompression(const void* cSrc, size_t cSize,
                                      crcOrig,
                                      randState,
                                      dCtx,
-                                     seed, testNb);
+                                     seed, testNb, findErrorPos);
 
     free(dstBuffer);
     return result;
@@ -1068,7 +1070,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
         /* multi-segments decompression */
         DISPLAYLEVEL(6, "normal decompression \n");
-        {   size_t result = test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtx, seed, testNb);
+        {   size_t result = test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtx, seed, testNb, 1 /*findError*/ );
             CHECK (LZ4F_isError(result), "multi-segment decompression failed (error %i => %s)",
                                         (int)result, LZ4F_getErrorName(result));
         }
@@ -1098,7 +1100,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
         /* test decompression on noisy src */
         DISPLAYLEVEL(6, "noisy decompression \n");
-        test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtxNoise, seed, testNb);
+        test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtxNoise, seed, testNb, 0 /*don't search error Pos*/ );
         /* note : we don't analyze result here : it probably failed, which is expected.
          * The sole purpose is to catch potential out-of-bound reads and writes. */
         LZ4F_resetDecompressionContext(dCtxNoise);  /* context must be reset after an error */
