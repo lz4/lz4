@@ -446,10 +446,10 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 FUZ_DISPLAYTEST();
                 decodedBuffer[srcSize] = canary;
                 {   int const dSize = LZ4_decompress_safe(compressedBuffer, decodedBuffer, cSize, srcSize);
-                    FUZ_CHECKTEST(dSize<0, "LZ4_decompress_safe() failed on data compressed by LZ4_compressHC_destSize");
-                    FUZ_CHECKTEST(dSize!=srcSize, "LZ4_decompress_safe() failed : decompressed %i bytes, was supposed to decompress %i bytes", dSize, srcSize);
+                    FUZ_CHECKTEST(dSize<0, "LZ4_decompress_safe failed (%i) on data compressed by LZ4_compressHC_destSize", dSize);
+                    FUZ_CHECKTEST(dSize!=srcSize, "LZ4_decompress_safe failed : decompressed %i bytes, was supposed to decompress %i bytes", dSize, srcSize);
                 }
-                FUZ_CHECKTEST(decodedBuffer[srcSize] != canary, "LZ4_decompress_safe() overwrite dst buffer !");
+                FUZ_CHECKTEST(decodedBuffer[srcSize] != canary, "LZ4_decompress_safe overwrite dst buffer !");
                 {   U32 const crcDec = XXH32(decodedBuffer, (size_t)srcSize, 0);
                     FUZ_CHECKTEST(crcDec!=crcBase, "LZ4_decompress_safe() corrupted decoded data");
             }   }
@@ -931,7 +931,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             LZ4_resetStreamHC_fast (LZ4_streamHC, compressionLevel);
             LZ4_attach_HC_dictionary(LZ4_streamHC, LZ4dictHC);
             ret = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
-            FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue using ExtDictCtx and fast reset size is different (%i != %i)", ret, blockContinueCompressedSize);
+            FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue using ExtDictCtx and fast reset size is different (%i != %i)",
+                        ret, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_HC_continue using ExtDictCtx and fast reset should work : enough size available within output buffer");
             FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
 
@@ -957,7 +958,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
             LZ4_setCompressionLevel(LZ4dictHC, compressionLevel);
             blockContinueCompressedSize = LZ4_compress_HC_continue_destSize(LZ4dictHC, block, compressedBuffer, &consumedSize, availableSpace);
-            DISPLAYLEVEL(5, " LZ4_compress_HC_continue_destSize : compressed %6i/%6i into %6i/%6i at cLevel=%i\n", consumedSize, blockSize, blockContinueCompressedSize, availableSpace, compressionLevel);
+            DISPLAYLEVEL(5, " LZ4_compress_HC_continue_destSize : compressed %6i/%6i into %6i/%6i at cLevel=%i \n",
+                        consumedSize, blockSize, blockContinueCompressedSize, availableSpace, compressionLevel);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue_destSize failed");
             FUZ_CHECKTEST(blockContinueCompressedSize > availableSpace, "LZ4_compress_HC_continue_destSize write overflow");
             FUZ_CHECKTEST(consumedSize > blockSize, "LZ4_compress_HC_continue_destSize read overflow");
@@ -965,7 +967,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_DISPLAYTEST();
             decodedBuffer[consumedSize] = 0;
             ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, consumedSize, dict, dictSize);
-            FUZ_CHECKTEST(ret!=consumedSize, "LZ4_decompress_safe_usingDict did not regenerate original data");
+            FUZ_CHECKTEST(ret != consumedSize, "LZ4_decompress_safe_usingDict regenerated %i bytes (%i expected)", ret, consumedSize);
             FUZ_CHECKTEST(decodedBuffer[consumedSize], "LZ4_decompress_safe_usingDict overrun specified output buffer size")
             {   U32 const crcSrc = XXH32(block, (size_t)consumedSize, 0);
                 U32 const crcDst = XXH32(decodedBuffer, (size_t)consumedSize, 0);

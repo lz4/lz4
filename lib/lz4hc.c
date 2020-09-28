@@ -492,7 +492,11 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     length = (size_t)(*ip - *anchor);
     LZ4_STATIC_ASSERT(notLimited == 0);
     /* Check output limit */
-    if (limit && ((*op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) return 1;
+    if (limit && ((*op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) {
+        DEBUGLOG(6, "Not enough room to write %i literals (%i bytes remaining)",
+                (int)length, (int)(oend-*op));
+        return 1;
+    }
     if (length >= RUN_MASK) {
         size_t len = length - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
@@ -513,7 +517,10 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
     length = (size_t)matchLength - MINMATCH;
-    if (limit && (*op + (length / 255) + (1 + LASTLITERALS) > oend)) return 1;   /* Check output limit */
+    if (limit && (*op + (length / 255) + (1 + LASTLITERALS) > oend)) {
+        DEBUGLOG(6, "Not enough room to write match length");
+        return 1;   /* Check output limit */
+    }
     if (length >= ML_MASK) {
         *token += ML_MASK;
         length -= ML_MASK;
@@ -721,7 +728,7 @@ _last_literals:
         if (limit && (op + totalSize > oend)) {
             if (limit == limitedOutput) return 0;
             /* adapt lastRunSize to fill 'dest' */
-            lastRunSize  = (size_t)(oend - op) - 1;
+            lastRunSize  = (size_t)(oend - op) - 1 /*token*/;
             llAdd = (lastRunSize + 256 - RUN_MASK) / 256;
             lastRunSize -= llAdd;
         }
@@ -754,13 +761,14 @@ _dest_overflow:
         DEBUGLOG(6, "Last sequence overflowing");
         op = optr;  /* restore correct out pointer */
         if (op + ll_totalCost <= maxLitPos) {
-            /* ll validated; now how many matches ? */
+            /* ll validated; now adjust match length */
             size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
             size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
             assert(maxMlSize < INT_MAX); assert(ml >= 0);
             if ((size_t)ml > maxMlSize) ml = (int)maxMlSize;
-            LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, notLimited, oend);
-        }
+            if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + ml >= MFLIMIT) {
+                LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, notLimited, oend);
+        }   }
         goto _last_literals;
     }
     /* compression failed */
@@ -1539,8 +1547,8 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
 _last_literals:
      /* Encode Last Literals */
      {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
-         size_t litLength = (lastRunSize + 255 - RUN_MASK) / 255;
-         size_t const totalSize = 1 + litLength + lastRunSize;
+         size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
+         size_t const totalSize = 1 + llAdd + lastRunSize;
          if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
          if (limit && (op + totalSize > oend)) {
              if (limit == limitedOutput) { /* Check output limit */
@@ -1548,11 +1556,12 @@ _last_literals:
                 goto _return_label;
              }
              /* adapt lastRunSize to fill 'dst' */
-             lastRunSize  = (size_t)(oend - op) - 1;
-             litLength = (lastRunSize + 255 - RUN_MASK) / 255;
-             lastRunSize -= litLength;
+             lastRunSize  = (size_t)(oend - op) - 1 /*token*/;
+             llAdd = (lastRunSize + 256 - RUN_MASK) / 256;
+             lastRunSize -= llAdd;
          }
-         ip = anchor + lastRunSize;
+         DEBUGLOG(6, "Final literal run : %i literals", (int)lastRunSize);
+         ip = anchor + lastRunSize; /* can be != iend if limit==fillOutput */
 
          if (lastRunSize >= RUN_MASK) {
              size_t accumulator = lastRunSize - RUN_MASK;
@@ -1578,15 +1587,20 @@ if (limit == fillOutput) {
      size_t const ll_addbytes = (ll + 240) / 255;
      size_t const ll_totalCost = 1 + ll_addbytes + ll;
      BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
+     DEBUGLOG(6, "Last sequence overflowing (only %i bytes remaining)", (int)(oend-1-opSaved));
      op = opSaved;  /* restore correct out pointer */
      if (op + ll_totalCost <= maxLitPos) {
-         /* ll validated; now how many matches ? */
+         /* ll validated; now adjust match length */
          size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
          size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
          assert(maxMlSize < INT_MAX); assert(ovml >= 0);
          if ((size_t)ovml > maxMlSize) ovml = (int)maxMlSize;
-         LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, ovref, notLimited, oend);
-     }
+         if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + ovml >= MFLIMIT) {
+             DEBUGLOG(6, "Space to end : %i + ml (%i)", (int)((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1), ovml);
+             DEBUGLOG(6, "Before : ip = %p, anchor = %p", ip, anchor);
+             LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, ovref, notLimited, oend);
+             DEBUGLOG(6, "After : ip = %p, anchor = %p", ip, anchor);
+     }   }
      goto _last_literals;
 }
 _return_label:

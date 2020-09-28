@@ -1824,10 +1824,10 @@ LZ4_decompress_generic(
             length = token & ML_MASK;
 
             if (length == ML_MASK) {
-              variable_length_error error = ok;
-              if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
-              length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
-              if (error != ok) { goto _output_error; }
+                variable_length_error error = ok;
+                if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
+                length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
+                if (error != ok) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
                 length += MINMATCH;
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
@@ -1853,7 +1853,7 @@ LZ4_decompress_generic(
                         continue;
             }   }   }
 
-            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
+            if (checkOffset && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 if (unlikely(op+length > oend-LASTLITERALS)) {
@@ -2003,7 +2003,12 @@ LZ4_decompress_generic(
                      /* We must be on the last sequence (or invalid) because of the parsing limitations
                       * so check that we exactly consume the input and don't overrun the output buffer.
                       */
-                    if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) { goto _output_error; }
+                    if ((endOnInput) && ((ip+length != iend) || (cpy > oend))) {
+                        DEBUGLOG(6, "should have been last run of literals")
+                        DEBUGLOG(6, "ip(%p) + length(%i) = %p != iend (%p)", ip, (int)length, ip+length, iend);
+                        DEBUGLOG(6, "or cpy(%p) > oend(%p)", cpy, oend);
+                        goto _output_error;
+                    }
                 }
                 memmove(op, ip, length);  /* supports overlapping memory regions; only matters for in-place decompression scenarios */
                 ip += length;
