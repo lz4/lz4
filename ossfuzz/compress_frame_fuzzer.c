@@ -28,8 +28,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     char* const dst = (char*)malloc(dstCapacity);
     char* const rt = (char*)malloc(size);
 
-    FUZZ_ASSERT(dst);
-    FUZZ_ASSERT(rt);
+    FUZZ_ASSERT(dst!=NULL);
+    FUZZ_ASSERT(rt!=NULL);
 
     /* If compression succeeds it must round trip correctly. */
     size_t const dstSize =

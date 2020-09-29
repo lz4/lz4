@@ -1291,7 +1291,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
     size_t const suffixSize = strlen(suffix);
     dRess_t ress = LZ4IO_createDResources(prefs);
 
-    if (outFileName==NULL) return ifntSize;   /* not enough memory */
+    if (outFileName==NULL) EXM_THROW(70, "Memory allocation error");
     ress.dstFile = LZ4IO_openDstFile(prefs, stdoutmark);
 
     for (i=0; i<ifntSize; i++) {
@@ -1305,7 +1305,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
             free(outFileName);
             ofnSize = ifnSize + 20;
             outFileName = (char*)malloc(ofnSize);
-            if (outFileName==NULL) return ifntSize;
+            if (outFileName==NULL) EXM_THROW(71, "Memory allocation error");
         }
         if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
@@ -1458,7 +1458,7 @@ static const char* LZ4IO_baseName(const char* input_filename) {
     const char* b = strrchr(input_filename, '/');
     if (!b) b = strrchr(input_filename, '\\');
     if (!b) return input_filename;
-    return b ? b + 1 : b;
+    return b + 1;
 }
 
 /* Report frame/s information in verbose mode.
@@ -1472,7 +1472,9 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
     LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
     unsigned char buffer[LZ4F_HEADER_SIZE_MAX];
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
-    cfinfo->fileSize = (finput == NULL) ? 0 : UTIL_getOpenFileSize(finput);
+
+    if (finput == NULL) return LZ4IO_not_a_file;
+    cfinfo->fileSize = UTIL_getOpenFileSize(finput);
 
     while (!feof(finput)) {
         LZ4IO_frameInfo_t frameInfo = LZ4IO_INIT_FRAMEINFO;
@@ -1560,8 +1562,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                                  totalBlocksSize + 4,
                                  "-", "-");
                     result = LZ4IO_LZ4F_OK;
-                }
-            }
+            }   }
             break;
         case LZ4IO_SKIPPABLE0:
             frameInfo.frameType = skippableFrame;
@@ -1628,8 +1629,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
                 assert(op_result == LZ4IO_format_not_known);
                 DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
                 return 0;
-            }
-        }
+        }   }
         DISPLAYLEVEL(3, "\n");
         if (g_displayLevel < 3) {
             /* Display Summary */
@@ -1648,10 +1648,8 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
                     DISPLAYOUT("%9s   %s\n",
                             "-",
                             cfinfo.fileName);
-                }
-            }
-        }
-    }
+        }   }   }  /* if (g_displayLevel < 3) */
+    }  /* for (; idx < ifnIdx; idx++) */
 
     return result;
 }

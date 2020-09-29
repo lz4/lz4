@@ -981,10 +981,10 @@ int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* s
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void)
 {
-    LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
-    if (LZ4_streamHCPtr==NULL) return NULL;
-    LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));  /* full initialization, malloc'ed buffer can be full of garbage */
-    return LZ4_streamHCPtr;
+    LZ4_streamHC_t* state = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
+    if (state==NULL) return NULL;
+    state = LZ4_initStreamHC(state, sizeof(*state));  /* full initialization, malloc'ed buffer can be full of garbage */
+    return state;
 }
 
 int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
@@ -1347,7 +1347,6 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
 
     /* Main Loop */
-    assert(ip - anchor < LZ4_MAX_INPUT_SIZE);
     while (ip <= mflimit) {
          int const llen = (int)(ip - anchor);
          int best_mlen, best_off;

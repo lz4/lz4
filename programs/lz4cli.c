@@ -395,7 +395,7 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--favor-decSpeed")) { LZ4IO_favorDecSpeed(prefs, 1); continue; }
                 if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
                 if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
-                if (!strcmp(argument,  "--version")) { DISPLAYOUT(WELCOME_MESSAGE); return 0; }
+                if (!strcmp(argument,  "--version")) { DISPLAYOUT(WELCOME_MESSAGE); goto _cleanup; }
                 if (!strcmp(argument,  "--help")) { usage_advanced(exeName); goto _cleanup; }
                 if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(prefs, 0); continue; }   /* keep source file (default) */
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(prefs, 1); continue; }

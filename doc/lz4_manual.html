@@ -117,7 +117,8 @@
     The larger the acceleration value, the faster the algorithm, but also the lesser the compression.
     It's a trade-off. It can be fine tuned, with each successive value providing roughly +~3% to speed.
     An acceleration value of "1" is the same as regular LZ4_compress_default()
-    Values <= 0 will be replaced by ACCELERATION_DEFAULT (currently == 1, see lz4.c).
+    Values <= 0 will be replaced by LZ4_ACCELERATION_DEFAULT (currently == 1, see lz4.c).
+    Values > LZ4_ACCELERATION_MAX will be replaced by LZ4_ACCELERATION_MAX (currently == 65537, see lz4.c).
 </p></pre><BR>
 
 <pre><b>int LZ4_sizeofState(void);
@@ -140,31 +141,53 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
                New value is necessarily <= input value.
  @return : Nb bytes written into 'dst' (necessarily <= targetDestSize)
            or 0 if compression fails.
+
+ Note : from v1.8.2 to v1.9.1, this function had a bug (fixed un v1.9.2+):
+        the produced compressed content could, in specific circumstances,
+        require to be decompressed into a destination buffer larger
+        by at least 1 byte than the content to decompress.
+        If an application uses `LZ4_compress_destSize()`,
+        it's highly recommended to update liblz4 to v1.9.2 or better.
+        If this can't be done or ensured,
+        the receiving decompression function should provide
+        a dstCapacity which is > decompressedSize, by at least 1 byte.
+        See https://github.com/lz4/lz4/issues/859 for details
+ 
 </p></pre><BR>
 
 <pre><b>int LZ4_decompress_safe_partial (const char* src, char* dst, int srcSize, int targetOutputSize, int dstCapacity);
 </b><p>  Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
   into destination buffer 'dst' of size 'dstCapacity'.
   Up to 'targetOutputSize' bytes will be decoded.
-  The function stops decoding on reaching this objective,
-  which can boost performance when only the beginning of a block is required.
+  The function stops decoding on reaching this objective.
+  This can be useful to boost performance
+  whenever only the beginning of a block is required.
 
- @return : the number of bytes decoded in `dst` (necessarily <= dstCapacity)
+ @return : the number of bytes decoded in `dst` (necessarily <= targetOutputSize)
            If source stream is detected malformed, function returns a negative result.
 
-  Note : @return can be < targetOutputSize, if compressed block contains less data.
+  Note 1 : @return can be < targetOutputSize, if compressed block contains less data.
 
-  Note 2 : this function features 2 parameters, targetOutputSize and dstCapacity,
-           and expects targetOutputSize <= dstCapacity.
-           It effectively stops decoding on reaching targetOutputSize,
+  Note 2 : targetOutputSize must be <= dstCapacity
+
+  Note 3 : this function effectively stops decoding on reaching targetOutputSize,
            so dstCapacity is kind of redundant.
-           This is because in a previous version of this function,
-           decoding operation would not "break" a sequence in the middle.
-           As a consequence, there was no guarantee that decoding would stop at exactly targetOutputSize,
+           This is because in older versions of this function,
+           decoding operation would still write complete sequences.
+           Therefore, there was no guarantee that it would stop writing at exactly targetOutputSize,
            it could write more bytes, though only up to dstCapacity.
            Some "margin" used to be required for this operation to work properly.
-           This is no longer necessary.
-           The function nonetheless keeps its signature, in an effort to not break API.
+           Thankfully, this is no longer necessary.
+           The function nonetheless keeps the same signature, in an effort to preserve API compatibility.
+
+  Note 4 : If srcSize is the exact size of the block,
+           then targetOutputSize can be any value,
+           including larger than the block's decompressed size.
+           The function will, at most, generate block's decompressed size.
+
+  Note 5 : If srcSize is _larger_ than block's compressed size,
+           then targetOutputSize **MUST** be <= block's decompressed size.
+           Otherwise, *silent corruption will occur*.
  
 </p></pre><BR>
 
@@ -494,18 +517,17 @@ union LZ4_streamDecode_u {
 <pre><b>#ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DEPRECATED(message)   </b>/* disable deprecation warnings */<b>
 #else
-#  define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #  if defined (__cplusplus) && (__cplusplus >= 201402) </b>/* C++14 or greater */<b>
 #    define LZ4_DEPRECATED(message) [[deprecated(message)]]
-#  elif (LZ4_GCC_VERSION >= 405) || defined(__clang__)
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif (LZ4_GCC_VERSION >= 301)
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
 #    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
+#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 45))
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
+#  elif defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 31)
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
 #  else
-#    pragma message("WARNING: You need to implement LZ4_DEPRECATED for this compiler")
-#    define LZ4_DEPRECATED(message)
+#    pragma message("WARNING: LZ4_DEPRECATED needs custom implementation for this compiler")
+#    define LZ4_DEPRECATED(message)   </b>/* disabled */<b>
 #  endif
 #endif </b>/* LZ4_DISABLE_DEPRECATE_WARNINGS */<b>
 </b><p>
