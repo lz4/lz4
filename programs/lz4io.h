@@ -39,13 +39,13 @@
 /* ************************************************** */
 /* Special input/output values                        */
 /* ************************************************** */
+#define stdinmark  "stdin"
+#define stdoutmark "stdout"
 #define NULL_OUTPUT "null"
-static const char stdinmark[]  = "stdin";
-static const char stdoutmark[] = "stdout";
 #ifdef _WIN32
-static const char nulmark[] = "nul";
+#define nulmark "nul"
 #else
-static const char nulmark[] = "/dev/null";
+#define nulmark "/dev/null"
 #endif
 
 /* ************************************************** */

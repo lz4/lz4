@@ -301,6 +301,7 @@ int main(int argc, const char** argv)
                 freeCResources(ress);
                 EXM_THROW(1, "%s: %s \n", argument, strerror(errno));
             }
+            assert (srcFile != NULL);
             err = frameCheck(ress, srcFile, bsid, blockSize);
             freeCResources(ress);
             fclose(srcFile);

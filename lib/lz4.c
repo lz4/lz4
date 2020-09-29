@@ -1683,25 +1683,27 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  */
 typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
 LZ4_FORCE_INLINE unsigned
-read_variable_length(const BYTE**ip, const BYTE* lencheck, int loop_check, int initial_check, variable_length_error* error)
+read_variable_length(const BYTE**ip, const BYTE* lencheck,
+                     endCondition_directive loop_check, endCondition_directive initial_check,
+                     variable_length_error* error)
 {
-  U32 length = 0;
-  U32 s;
-  if (initial_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
-    *error = initial_error;
-    return length;
-  }
-  do {
-    s = **ip;
-    (*ip)++;
-    length += s;
-    if (loop_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
-      *error = loop_error;
-      return length;
+    U32 length = 0;
+    U32 s;
+    if (initial_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
+        *error = initial_error;
+        return length;
     }
-  } while (s==255);
+    do {
+        s = **ip;
+        (*ip)++;
+        length += s;
+        if (loop_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
+            *error = loop_error;
+            return length;
+        }
+    } while (s==255);
 
-  return length;
+    return length;
 }
 
 /*! LZ4_decompress_generic() :

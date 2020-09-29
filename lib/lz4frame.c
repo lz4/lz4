@@ -533,7 +533,7 @@ void LZ4F_freeCDict(LZ4F_CDict* cdict)
  *  If the result LZ4F_errorCode_t is not OK_NoError, there was an error during context creation.
  *  Object can release its memory using LZ4F_freeCompressionContext();
  */
-LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_compressionContextPtr, unsigned version)
+LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** LZ4F_compressionContextPtr, unsigned version)
 {
     LZ4F_cctx_t* const cctxPtr = (LZ4F_cctx_t*)ALLOC_AND_ZERO(sizeof(LZ4F_cctx_t));
     if (cctxPtr==NULL) return err0r(LZ4F_ERROR_allocation_failed);
@@ -541,20 +541,18 @@ LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_compressionContext_t* LZ4F_c
     cctxPtr->version = version;
     cctxPtr->cStage = 0;   /* Next stage : init stream */
 
-    *LZ4F_compressionContextPtr = (LZ4F_compressionContext_t)cctxPtr;
+    *LZ4F_compressionContextPtr = cctxPtr;
 
     return LZ4F_OK_NoError;
 }
 
 
-LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_compressionContext_t LZ4F_compressionContext)
+LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctxPtr)
 {
-    LZ4F_cctx_t* const cctxPtr = (LZ4F_cctx_t*)LZ4F_compressionContext;
-
     if (cctxPtr != NULL) {  /* support free on NULL */
-       FREEMEM(cctxPtr->lz4CtxPtr);  /* works because LZ4_streamHC_t and LZ4_stream_t are simple POD types */
+       FREEMEM(cctxPtr->lz4CtxPtr);  /* note: LZ4_streamHC_t and LZ4_stream_t are simple POD types */
        FREEMEM(cctxPtr->tmpBuff);
-       FREEMEM(LZ4F_compressionContext);
+       FREEMEM(cctxPtr);
     }
 
     return LZ4F_OK_NoError;
@@ -1291,8 +1289,10 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
                       const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
                       unsigned withinTmp)
 {
-    if (dctx->dictSize==0)
+    if (dctx->dictSize==0) {
+        assert(dstPtr != NULL);
         dctx->dict = (const BYTE*)dstPtr;   /* priority to dictionary continuity */
+    }
 
     if (dctx->dict + dctx->dictSize == dstPtr) {  /* dictionary continuity, directly within dstBuffer */
         dctx->dictSize += dstSize;
@@ -1382,13 +1382,14 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     const BYTE* const srcEnd = srcStart + *srcSizePtr;
     const BYTE* srcPtr = srcStart;
     BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* const dstEnd = dstStart + *dstSizePtr;
+    BYTE* const dstEnd = dstStart ? dstStart + *dstSizePtr : NULL;
     BYTE* dstPtr = dstStart;
     const BYTE* selectedIn = NULL;
     unsigned doAnotherStage = 1;
     size_t nextSrcSizeHint = 1;
 
 
+    if (dstBuffer == NULL) assert(*dstSizePtr == 0);
     MEM_INIT(&optionsNull, 0, sizeof(optionsNull));
     if (decompressOptionsPtr==NULL) decompressOptionsPtr = &optionsNull;
     *srcSizePtr = 0;
@@ -1590,7 +1591,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             selectedIn = srcPtr;
             srcPtr += dctx->tmpInTarget;
 
-            if (0)  /* jump over next block */
+            if (0)  /* always jump over next block */
         case dstage_storeCBlock:
             {   size_t const wantedData = dctx->tmpInTarget - dctx->tmpInSize;
                 size_t const inputLeft = (size_t)(srcEnd-srcPtr);
