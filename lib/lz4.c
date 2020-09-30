@@ -1684,7 +1684,7 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
 typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
 LZ4_FORCE_INLINE unsigned
 read_variable_length(const BYTE**ip, const BYTE* lencheck,
-                     endCondition_directive loop_check, endCondition_directive initial_check,
+                     int loop_check, int initial_check,
                      variable_length_error* error)
 {
     U32 length = 0;
@@ -1784,7 +1784,7 @@ LZ4_decompress_generic(
             /* decode literal length */
             if (length == RUN_MASK) {
                 variable_length_error error = ok;
-                length += read_variable_length(&ip, iend-RUN_MASK, endOnInput, endOnInput, &error);
+                length += read_variable_length(&ip, iend-RUN_MASK, (int)endOnInput, (int)endOnInput, &error);
                 if (error == initial_error) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if ((safeDecode) && unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
@@ -1829,7 +1829,7 @@ LZ4_decompress_generic(
             if (length == ML_MASK) {
                 variable_length_error error = ok;
                 if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
-                length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
+                length += read_variable_length(&ip, iend - LASTLITERALS + 1, (int)endOnInput, 0, &error);
                 if (error != ok) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
                 length += MINMATCH;
@@ -1954,7 +1954,7 @@ LZ4_decompress_generic(
             /* decode literal length */
             if (length == RUN_MASK) {
                 variable_length_error error = ok;
-                length += read_variable_length(&ip, iend-RUN_MASK, endOnInput, endOnInput, &error);
+                length += read_variable_length(&ip, iend-RUN_MASK, (int)endOnInput, (int)endOnInput, &error);
                 if (error == initial_error) { goto _output_error; }
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if ((safeDecode) && unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
@@ -2039,7 +2039,7 @@ LZ4_decompress_generic(
     _copy_match:
             if (length == ML_MASK) {
               variable_length_error error = ok;
-              length += read_variable_length(&ip, iend - LASTLITERALS + 1, endOnInput, 0, &error);
+              length += read_variable_length(&ip, iend - LASTLITERALS + 1, (int)endOnInput, 0, &error);
               if (error != ok) goto _output_error;
                 if ((safeDecode) && unlikely((uptrval)(op)+length<(uptrval)op)) goto _output_error;   /* overflow detection */
             }
