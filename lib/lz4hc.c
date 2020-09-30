@@ -270,7 +270,7 @@ LZ4HC_InsertAndGetWiderMatch (
     DEBUGLOG(7, "First match at index %u / %u (lowestMatchIndex)",
                 matchIndex, lowestMatchIndex);
 
-    while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) {
+    while ((matchIndex>=lowestMatchIndex) && (nbAttempts>0)) {
         int matchLength=0;
         nbAttempts--;
         assert(matchIndex < ipIndex);
@@ -410,7 +410,7 @@ LZ4HC_InsertAndGetWiderMatch (
     }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
     if ( dict == usingDictCtxHc
-      && nbAttempts
+      && nbAttempts > 0
       && ipIndex - lowestMatchIndex < LZ4_DISTANCE_MAX) {
         size_t const dictEndOffset = (size_t)(dictCtx->end - dictCtx->base);
         U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
@@ -544,7 +544,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     char* const dest,
     int* srcSizePtr,
     int const maxOutputSize,
-    unsigned maxNbAttempts,
+    int maxNbAttempts,
     const limitedOutput_directive limit,
     const dictCtx_directive dict
     )
@@ -799,7 +799,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
     typedef enum { lz4hc, lz4opt } lz4hc_strat_e;
     typedef struct {
         lz4hc_strat_e strat;
-        U32 nbSearches;
+        int nbSearches;
         U32 targetLength;
     } cParams_t;
     static const cParams_t clTable[LZ4HC_CLEVEL_MAX+1] = {
@@ -839,7 +839,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
             assert(cParam.strat == lz4opt);
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
-                                (int)cParam.nbSearches, cParam.targetLength, limit,
+                                cParam.nbSearches, cParam.targetLength, limit,
                                 cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
                                 dict, favor);
         }
