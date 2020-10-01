@@ -399,25 +399,25 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
       char* compressed_buff=NULL;
       const char* const inFileName = fileNamesTable[fileIdx++];
       FILE* const inFile = fopen( inFileName, "rb" );
-      U64   inFileSize;
-      size_t benchedSize;
+      U64 const inFileSize = UTIL_getFileSize(inFileName);
+      size_t benchedSize = BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
       int nbChunks;
       int maxCompressedChunkSize;
       size_t readSize;
       int compressedBuffSize;
       U32 crcOriginal;
 
-      /* Check file existence */
-      if (inFile==NULL) { DISPLAY( "Pb opening %s\n", inFileName); return 11; }
+      /* Check infile pre-requisites */
+      if (inFile==NULL) { DISPLAY("Pb opening %s \n", inFileName); return 11; }
+      if (inFileSize==0) { DISPLAY("file is empty \n"); fclose(inFile); return 11; }
+      if (benchedSize==0) { DISPLAY("not enough memory \n"); fclose(inFile); return 11; }
 
       /* Memory size adjustments */
-      inFileSize = UTIL_getFileSize(inFileName);
-      if (inFileSize==0) { DISPLAY( "file is empty\n"); fclose(inFile); return 11; }
-      benchedSize = BMK_findMaxMem(inFileSize*2) / 2;   /* because 2 buffers */
-      if (benchedSize==0) { DISPLAY( "not enough memory\n"); fclose(inFile); return 11; }
       if ((U64)benchedSize > inFileSize) benchedSize = (size_t)inFileSize;
-      if (benchedSize < inFileSize)
-          DISPLAY("Not enough memory for '%s' full size; testing %i MB only...\n", inFileName, (int)(benchedSize>>20));
+      if (benchedSize < inFileSize) {
+          DISPLAY("Not enough memory for '%s' full size; testing %i MB only... \n",
+                inFileName, (int)(benchedSize>>20));
+      }
 
       /* Allocation */
       chunkP = (struct chunkParameters*) malloc(((benchedSize / (size_t)g_chunkSize)+1) * sizeof(struct chunkParameters));
@@ -427,7 +427,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
       compressedBuffSize = nbChunks * maxCompressedChunkSize;
       compressed_buff = (char*)malloc((size_t)compressedBuffSize);
       if(!chunkP || !orig_buff || !compressed_buff) {
-          DISPLAY("\nError: not enough memory!\n");
+          DISPLAY("\nError: not enough memory! \n");
           fclose(inFile);
           free(orig_buff);
           free(compressed_buff);
@@ -475,7 +475,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 size_t remaining = benchedSize;
                 char* in = orig_buff;
                 char* out = compressed_buff;
-                nbChunks = (int) (((int)benchedSize + (g_chunkSize-1))/ g_chunkSize);
+                assert(nbChunks >= 1);
                 for (i=0; i<nbChunks; i++) {
                     chunkP[i].id = (U32)i;
                     chunkP[i].origBuffer = in; in += g_chunkSize;
