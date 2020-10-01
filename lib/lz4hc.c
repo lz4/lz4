@@ -981,9 +981,11 @@ int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* s
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void)
 {
-    LZ4_streamHC_t* state = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
-    if (state==NULL) return NULL;
-    state = LZ4_initStreamHC(state, sizeof(*state));  /* full initialization, malloc'ed buffer can be full of garbage */
+    LZ4_streamHC_t* const state = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
+    if (LZ4_initStreamHC(state, sizeof(*state)) == NULL) {
+        free(state);
+        return NULL;
+    }
     return state;
 }
 
