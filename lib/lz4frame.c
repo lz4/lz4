@@ -1284,18 +1284,20 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
 
 
 /* LZ4F_updateDict() :
- * only used for LZ4F_blockLinked mode */
+ * only used for LZ4F_blockLinked mode
+ * Condition : dstPtr != NULL
+ */
 static void LZ4F_updateDict(LZ4F_dctx* dctx,
                       const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
                       unsigned withinTmp)
 {
-    /* hint to static analyzer : dstPtr can't be NULL at this stage */
-    assert(dstPtr != NULL); if (dstPtr==NULL) return;
+    assert(dstPtr != NULL);
     if (dctx->dictSize==0) {
-        dctx->dict = (const BYTE*)dstPtr;   /* priority to dictionary continuity */
+        dctx->dict = (const BYTE*)dstPtr;   /* priority to prefix mode */
     }
+    assert(dctx->dict != NULL);
 
-    if (dctx->dict + dctx->dictSize == dstPtr) {  /* dictionary continuity, directly within dstBuffer */
+    if (dctx->dict + dctx->dictSize == dstPtr) {  /* prefix mode, everything within dstBuffer */
         dctx->dictSize += dstSize;
         return;
     }
@@ -1309,7 +1311,8 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
 
     assert(dstSize < 64 KB);   /* if dstSize >= 64 KB, dictionary would be set into dstBuffer directly */
 
-    /* dstBuffer does not contain whole useful history (64 KB), so it must be saved within tmpOut */
+    /* dstBuffer does not contain whole useful history (64 KB), so it must be saved within tmpOutBuffer */
+    assert(dctx->tmpOutBuffer != NULL);
 
     if (withinTmp && (dctx->dict == dctx->tmpOutBuffer)) {   /* continue history within tmpOutBuffer */
         /* withinTmp expectation : content of [dstPtr,dstSize] is same as [dict+dictSize,dstSize], so we just extend it */

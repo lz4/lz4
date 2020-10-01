@@ -153,7 +153,7 @@ usan32: clean
 
 .PHONY: staticAnalyze
 staticAnalyze: clean
-	CFLAGS=-g scan-build --status-bugs -v $(MAKE) all
+	CPPFLAGS=-DLZ4_DEBUG=1 CFLAGS=-g scan-build --status-bugs -v --force-analyze-debug-code $(MAKE) all V=1 DEBUGLEVEL=1
 
 .PHONY: cppcheck
 cppcheck:
