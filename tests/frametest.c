@@ -1037,7 +1037,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                             op += 4;
                             if ((prefsPtr!= NULL) && prefsPtr->frameInfo.blockChecksumFlag) {
                                 U32 const bc32 = XXH32(op, 0, 0);
-                                op[0] = (BYTE)bc32; /* little endian format */
+                                op[0] = (BYTE)bc32;  /* little endian format */
                                 op[1] = (BYTE)(bc32>>8);
                                 op[2] = (BYTE)(bc32>>16);
                                 op[3] = (BYTE)(bc32>>24);
