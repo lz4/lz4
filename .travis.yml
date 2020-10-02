@@ -47,18 +47,15 @@ matrix:
         - make clean travis-install
         - make clean clangtest
 
-
-    # 14.04 LTS Server Edition 64 bit
-    - name: (Trusty) i386 gcc test
-      dist: trusty
+    - name: x32 compatibility test
       addons:
         apt:
           packages:
-            - libc6-dev-i386
             - gcc-multilib
       script:
         - make -C tests test MOREFLAGS=-mx32
 
+    # 14.04 LTS Server Edition 64 bit
     # presume clang >= v3.9.0
     - name: (Trusty) USan test
       dist: trusty
