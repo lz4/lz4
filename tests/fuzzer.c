@@ -1208,6 +1208,7 @@ static void FUZ_unitTests(int compressionLevel)
             char           c2;
             LZ4_streamHC_t hc3;
         } shc;
+        (void)shc.c1; (void)shc.c2;  /* tell cppcheck these variables are unused */
         DISPLAYLEVEL(3, "hc1(%p) hc2(%p) hc3(%p) size(0x%x): ",
                     &(shc.hc1), &(shc.hc2), &(shc.hc3), (unsigned)sizeof(LZ4_streamHC_t));
         FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc1), sizeof(shc.hc1)) == NULL, "hc1 (%p) failed init", &(shc.hc1) );
