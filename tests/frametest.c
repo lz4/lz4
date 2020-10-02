@@ -839,26 +839,29 @@ size_t test_lz4f_decompression_wBuffers(
         size_t iSize = iSizeMax;
         size_t const oSizeCand = (FUZ_rand(randState) & ((1<<nbBitsO)-1)) + 2;
         size_t const oSizeMax = MIN(oSizeCand, (size_t)(oend-op));
+        int const sentinelTest = (op + oSizeMax < oend);
         size_t oSize = oSizeMax;
         BYTE const mark = (BYTE)(FUZ_rand(randState) & 255);
         LZ4F_decompressOptions_t dOptions;
         memset(&dOptions, 0, sizeof(dOptions));
         dOptions.stableDst = FUZ_rand(randState) & 1;
         if (o_scenario == o_overwrite) dOptions.stableDst = 0;  /* overwrite mode */
-        if (op + oSizeMax < oend) op[oSizeMax] = mark;
+        if (sentinelTest) op[oSizeMax] = mark;
 
         DISPLAYLEVEL(7, "dstCapacity=%u,  presentedInput=%u \n", (unsigned)oSize, (unsigned)iSize);
 
         /* read data from byte-exact buffer to catch out-of-bound reads */
         {   void* const iBuffer = malloc(iSizeMax);
+            void* const tmpop = (FUZ_rand(randState) & (oSize == 0)) ? NULL : op;
+            const void* const tmpip = (FUZ_rand(randState) & (iSize == 0)) ? NULL : iBuffer;
             assert(iBuffer != NULL);
             memcpy(iBuffer, ip, iSizeMax);
-            moreToFlush = LZ4F_decompress(dCtx, op, &oSize, iBuffer, &iSize, &dOptions);
+            moreToFlush = LZ4F_decompress(dCtx, tmpop, &oSize, tmpip, &iSize, &dOptions);
             free(iBuffer);
         }
         DISPLAYLEVEL(7, "oSize=%u,  readSize=%u \n", (unsigned)oSize, (unsigned)iSize);
 
-        if (op + oSizeMax < oend) {
+        if (sentinelTest) {
             CHECK(op[oSizeMax] != mark, "op[oSizeMax] = %02X != %02X : "
                     "Decompression overwrites beyond assigned dst size",
                     op[oSizeMax], mark);
@@ -1035,7 +1038,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                             op += 4;
                             if ((prefsPtr!= NULL) && prefsPtr->frameInfo.blockChecksumFlag) {
                                 U32 const bc32 = XXH32(op, 0, 0);
-                                op[0] = (BYTE)bc32; /* little endian format */
+                                op[0] = (BYTE)bc32;  /* little endian format */
                                 op[1] = (BYTE)(bc32>>8);
                                 op[2] = (BYTE)(bc32>>16);
                                 op[3] = (BYTE)(bc32>>24);

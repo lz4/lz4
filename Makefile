@@ -151,9 +151,11 @@ usan: clean
 usan32: clean
 	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
+SCANBUILD ?= scan-build
+SCANBUILD_FLAGS += --status-bugs -v --force-analyze-debug-code
 .PHONY: staticAnalyze
 staticAnalyze: clean
-	CPPFLAGS=-DLZ4_DEBUG=1 CFLAGS=-g scan-build --status-bugs -v --force-analyze-debug-code $(MAKE) all V=1 DEBUGLEVEL=1
+	CPPFLAGS=-DLZ4_DEBUG=1 CFLAGS=-g $(SCANBUILD) $(SCANBUILD_FLAGS) $(MAKE) all V=1 DEBUGLEVEL=1
 
 .PHONY: cppcheck
 cppcheck:
