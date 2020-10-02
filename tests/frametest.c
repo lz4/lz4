@@ -839,13 +839,14 @@ size_t test_lz4f_decompression_wBuffers(
         size_t iSize = iSizeMax;
         size_t const oSizeCand = (FUZ_rand(randState) & ((1<<nbBitsO)-1)) + 2;
         size_t const oSizeMax = MIN(oSizeCand, (size_t)(oend-op));
+        int const sentinelTest = (op + oSizeMax < oend);
         size_t oSize = oSizeMax;
         BYTE const mark = (BYTE)(FUZ_rand(randState) & 255);
         LZ4F_decompressOptions_t dOptions;
         memset(&dOptions, 0, sizeof(dOptions));
         dOptions.stableDst = FUZ_rand(randState) & 1;
         if (o_scenario == o_overwrite) dOptions.stableDst = 0;  /* overwrite mode */
-        if (op + oSizeMax < oend) op[oSizeMax] = mark;
+        if (sentinelTest) op[oSizeMax] = mark;
 
         DISPLAYLEVEL(7, "dstCapacity=%u,  presentedInput=%u \n", (unsigned)oSize, (unsigned)iSize);
 
@@ -860,7 +861,7 @@ size_t test_lz4f_decompression_wBuffers(
         }
         DISPLAYLEVEL(7, "oSize=%u,  readSize=%u \n", (unsigned)oSize, (unsigned)iSize);
 
-        if (op + oSizeMax < oend) {
+        if (sentinelTest) {
             CHECK(op[oSizeMax] != mark, "op[oSizeMax] = %02X != %02X : "
                     "Decompression overwrites beyond assigned dst size",
                     op[oSizeMax], mark);
