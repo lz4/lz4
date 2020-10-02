@@ -1200,6 +1200,25 @@ static void FUZ_unitTests(int compressionLevel)
         }
     }
 
+    DISPLAYLEVEL(3, "LZ4_initStreamHC with multiple valid alignments : ");
+    {   struct {
+            LZ4_streamHC_t hc1;
+            char           c1;
+            LZ4_streamHC_t hc2;
+            char           c2;
+            LZ4_streamHC_t hc3;
+        } shc;
+        DISPLAYLEVEL(3, "hc1(%p) hc2(%p) hc3(%p) size(0x%x): ",
+                    &(shc.hc1), &(shc.hc2), &(shc.hc3), (unsigned)sizeof(LZ4_streamHC_t));
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc1), sizeof(shc.hc1)) == NULL, "hc1 (%p) failed init", &(shc.hc1) );
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc2), sizeof(shc.hc2)) == NULL, "hc2 (%p) failed init", &(shc.hc2)  );
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc3), sizeof(shc.hc3)) == NULL, "hc3 (%p) failed init", &(shc.hc3)  );
+        FUZ_CHECKTEST( LZ4_initStreamHC((char*)&(shc.hc1) + 1, sizeof(shc.hc1)) != NULL,
+                        "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc.hc1) + 1 );
+        /* no need to release anything : LZ4_streamHC_t is a simple POD type */
+    }
+    DISPLAYLEVEL(3, "OK \n");
+
     /* LZ4 HC streaming tests */
     {   LZ4_streamHC_t sHC;   /* statically allocated */
         int result;
@@ -1211,7 +1230,7 @@ static void FUZ_unitTests(int compressionLevel)
             FUZ_CHECKTEST(sp==NULL, "LZ4_createStreamHC() allocation failed");
             LZ4_freeStreamHC(sp);
         }
-        DISPLAYLEVEL(3, " OK \n");
+        DISPLAYLEVEL(3, "OK \n");
 
         /* simple HC compression test */
         DISPLAYLEVEL(3, "Simple HC round-trip : ");
@@ -1226,7 +1245,7 @@ static void FUZ_unitTests(int compressionLevel)
             {   U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
                 FUZ_CHECKTEST(crc64!=crcNew, "LZ4_decompress_safe() decompression corruption");
         }   }
-        DISPLAYLEVEL(3, " OK \n");
+        DISPLAYLEVEL(3, "OK \n");
 
         /* long sequence test */
         DISPLAYLEVEL(3, "Long sequence HC_destSize test : ");
