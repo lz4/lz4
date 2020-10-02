@@ -851,9 +851,11 @@ size_t test_lz4f_decompression_wBuffers(
 
         /* read data from byte-exact buffer to catch out-of-bound reads */
         {   void* const iBuffer = malloc(iSizeMax);
+            void* const tmpop = (FUZ_rand(randState) & (oSize == 0)) ? NULL : op;
+            const void* const tmpip = (FUZ_rand(randState) & (iSize == 0)) ? NULL : iBuffer;
             assert(iBuffer != NULL);
             memcpy(iBuffer, ip, iSizeMax);
-            moreToFlush = LZ4F_decompress(dCtx, op, &oSize, iBuffer, &iSize, &dOptions);
+            moreToFlush = LZ4F_decompress(dCtx, tmpop, &oSize, tmpip, &iSize, &dOptions);
             free(iBuffer);
         }
         DISPLAYLEVEL(7, "oSize=%u,  readSize=%u \n", (unsigned)oSize, (unsigned)iSize);
