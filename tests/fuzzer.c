@@ -1201,22 +1201,24 @@ static void FUZ_unitTests(int compressionLevel)
     }
 
     DISPLAYLEVEL(3, "LZ4_initStreamHC with multiple valid alignments : ");
-    {   struct {
+    {   typedef struct {
             LZ4_streamHC_t hc1;
             char           c1;
             LZ4_streamHC_t hc2;
             char           c2;
             LZ4_streamHC_t hc3;
-        } shc;
-        (void)shc.c1; (void)shc.c2;  /* tell cppcheck these variables are unused */
+        } shct;
+        shct* const shc = malloc(sizeof(*shc));
+        assert(shc != NULL);
+        memset(shc, 0, sizeof(*shc));
         DISPLAYLEVEL(3, "hc1(%p) hc2(%p) hc3(%p) size(0x%x): ",
-                    &(shc.hc1), &(shc.hc2), &(shc.hc3), (unsigned)sizeof(LZ4_streamHC_t));
-        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc1), sizeof(shc.hc1)) == NULL, "hc1 (%p) failed init", &(shc.hc1) );
-        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc2), sizeof(shc.hc2)) == NULL, "hc2 (%p) failed init", &(shc.hc2)  );
-        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc.hc3), sizeof(shc.hc3)) == NULL, "hc3 (%p) failed init", &(shc.hc3)  );
-        FUZ_CHECKTEST( LZ4_initStreamHC((char*)&(shc.hc1) + 1, sizeof(shc.hc1)) != NULL,
-                        "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc.hc1) + 1 );
-        /* no need to release anything : LZ4_streamHC_t is a simple POD type */
+                    &(shc->hc1), &(shc->hc2), &(shc->hc3), (unsigned)sizeof(LZ4_streamHC_t));
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc1), sizeof(shc->hc1)) == NULL, "hc1 (%p) failed init", &(shc->hc1) );
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc2), sizeof(shc->hc2)) == NULL, "hc2 (%p) failed init", &(shc->hc2)  );
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc3), sizeof(shc->hc3)) == NULL, "hc3 (%p) failed init", &(shc->hc3)  );
+        FUZ_CHECKTEST( LZ4_initStreamHC((char*)&(shc->hc1) + 1, sizeof(shc->hc1)) != NULL,
+                        "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc->hc1) + 1 );
+        free(shc);
     }
     DISPLAYLEVEL(3, "OK \n");
 
