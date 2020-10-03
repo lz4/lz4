@@ -460,83 +460,90 @@ int LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index tabl
  * @return : 0 if ok,
  *           1 if buffer issue detected */
 LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
-    const BYTE** ip,
-    BYTE** op,
-    const BYTE** anchor,
+    const BYTE** _ip,
+    BYTE** _op,
+    const BYTE** _anchor,
     int matchLength,
     const BYTE* const match,
     limitedOutput_directive limit,
     BYTE* oend)
 {
+#define ip      (*_ip)
+#define op      (*_op)
+#define anchor  (*_anchor)
+
     size_t length;
-    BYTE* const token = (*op)++;
+    BYTE* const token = op++;
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 6)
     static const BYTE* start = NULL;
     static U32 totalCost = 0;
-    U32 const pos = (start==NULL) ? 0 : (U32)(*anchor - start);
-    U32 const ll = (U32)(*ip - *anchor);
+    U32 const pos = (start==NULL) ? 0 : (U32)(anchor - start);
+    U32 const ll = (U32)(ip - anchor);
     U32 const llAdd = (ll>=15) ? ((ll-15) / 255) + 1 : 0;
     U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
-    if (start==NULL) start = *anchor;  /* only works for single segment */
+    if (start==NULL) start = anchor;  /* only works for single segment */
     /* g_debuglog_enable = (pos >= 2228) & (pos <= 2262); */
     DEBUGLOG(6, "pos:%7u -- literals:%4u, match:%4i, offset:%5u, cost:%4u + %5u",
                 pos,
-                (U32)(*ip - *anchor), matchLength, (U32)(*ip-match),
+                (U32)(ip - anchor), matchLength, (U32)(ip-match),
                 cost, totalCost);
     totalCost += cost;
 #endif
 
     /* Encode Literal length */
-    length = (size_t)(*ip - *anchor);
+    length = (size_t)(ip - anchor);
     LZ4_STATIC_ASSERT(notLimited == 0);
     /* Check output limit */
-    if (limit && ((*op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) {
+    if (limit && ((op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) {
         DEBUGLOG(6, "Not enough room to write %i literals (%i bytes remaining)",
-                (int)length, (int)(oend-*op));
+                (int)length, (int)(oend - op));
         return 1;
     }
     if (length >= RUN_MASK) {
         size_t len = length - RUN_MASK;
         *token = (RUN_MASK << ML_BITS);
-        for(; len >= 255 ; len -= 255) *(*op)++ = 255;
-        *(*op)++ = (BYTE)len;
+        for(; len >= 255 ; len -= 255) *op++ = 255;
+        *op++ = (BYTE)len;
     } else {
         *token = (BYTE)(length << ML_BITS);
     }
 
     /* Copy Literals */
-    LZ4_wildCopy8(*op, *anchor, (*op) + length);
-    *op += length;
+    LZ4_wildCopy8(op, anchor, op + length);
+    op += length;
 
     /* Encode Offset */
-    assert( (*ip - match) <= LZ4_DISTANCE_MAX );   /* note : consider providing offset as a value, rather than as a pointer difference */
-    LZ4_writeLE16(*op, (U16)(*ip-match)); *op += 2;
+    assert( (ip - match) <= LZ4_DISTANCE_MAX );   /* note : consider providing offset as a value, rather than as a pointer difference */
+    LZ4_writeLE16(op, (U16)(ip - match)); op += 2;
 
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
     length = (size_t)matchLength - MINMATCH;
-    if (limit && (*op + (length / 255) + (1 + LASTLITERALS) > oend)) {
+    if (limit && (op + (length / 255) + (1 + LASTLITERALS) > oend)) {
         DEBUGLOG(6, "Not enough room to write match length");
         return 1;   /* Check output limit */
     }
     if (length >= ML_MASK) {
         *token += ML_MASK;
         length -= ML_MASK;
-        for(; length >= 510 ; length -= 510) { *(*op)++ = 255; *(*op)++ = 255; }
-        if (length >= 255) { length -= 255; *(*op)++ = 255; }
-        *(*op)++ = (BYTE)length;
+        for(; length >= 510 ; length -= 510) { *op++ = 255; *op++ = 255; }
+        if (length >= 255) { length -= 255; *op++ = 255; }
+        *op++ = (BYTE)length;
     } else {
         *token += (BYTE)(length);
     }
 
     /* Prepare next loop */
-    *ip += matchLength;
-    *anchor = *ip;
+    ip += matchLength;
+    anchor = ip;
 
     return 0;
 }
+#undef ip
+#undef op
+#undef anchor
 
 LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
