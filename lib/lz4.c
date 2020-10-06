@@ -162,7 +162,7 @@
 #  define LZ4_FORCE_O2_INLINE_GCC_PPC64LE __attribute__((optimize("O2"))) LZ4_FORCE_INLINE
 #else
 #  define LZ4_FORCE_O2_GCC_PPC64LE
-#  define LZ4_FORCE_O2_INLINE_GCC_PPC64LE static
+#  define LZ4_FORCE_O2_INLINE_GCC_PPC64LE  LZ4_FORCE_INLINE
 #endif
 
 #if (defined(__GNUC__) && (__GNUC__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
