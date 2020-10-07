@@ -299,7 +299,7 @@ typedef enum {
 #define LZ4_memcpy(dst, src, size) memcpy(dst, src, size)
 #endif
 
-static unsigned LZ4_isLittleEndian(void)
+LZ4_FORCE_INLINE unsigned LZ4_isLittleEndian(void)
 {
     const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
     return one.c[0];
@@ -309,12 +309,12 @@ static unsigned LZ4_isLittleEndian(void)
 #if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
 /* lie to the compiler about data alignment; use with caution */
 
-static U16 LZ4_read16(const void* memPtr) { return *(const U16*) memPtr; }
-static U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
-static reg_t LZ4_read_ARCH(const void* memPtr) { return *(const reg_t*) memPtr; }
+LZ4_FORCE_INLINE U16 LZ4_read16(const void* memPtr) { return *(const U16*) memPtr; }
+LZ4_FORCE_INLINE U32 LZ4_read32(const void* memPtr) { return *(const U32*) memPtr; }
+LZ4_FORCE_INLINE reg_t LZ4_read_ARCH(const void* memPtr) { return *(const reg_t*) memPtr; }
 
-static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
-static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
+LZ4_FORCE_INLINE void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
+LZ4_FORCE_INLINE void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
 
 #elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
 
@@ -322,36 +322,36 @@ static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
 /* currently only defined for gcc and icc */
 typedef union { U16 u16; U32 u32; reg_t uArch; } __attribute__((packed)) unalign;
 
-static U16 LZ4_read16(const void* ptr) { return ((const unalign*)ptr)->u16; }
-static U32 LZ4_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
-static reg_t LZ4_read_ARCH(const void* ptr) { return ((const unalign*)ptr)->uArch; }
+LZ4_FORCE_INLINE U16 LZ4_read16(const void* ptr) { return ((const unalign*)ptr)->u16; }
+LZ4_FORCE_INLINE U32 LZ4_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
+LZ4_FORCE_INLINE reg_t LZ4_read_ARCH(const void* ptr) { return ((const unalign*)ptr)->uArch; }
 
-static void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
-static void LZ4_write32(void* memPtr, U32 value) { ((unalign*)memPtr)->u32 = value; }
+LZ4_FORCE_INLINE void LZ4_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
+LZ4_FORCE_INLINE void LZ4_write32(void* memPtr, U32 value) { ((unalign*)memPtr)->u32 = value; }
 
 #else  /* safe and portable access using memcpy() */
 
-static U16 LZ4_read16(const void* memPtr)
+LZ4_FORCE_INLINE U16 LZ4_read16(const void* memPtr)
 {
     U16 val; LZ4_memcpy(&val, memPtr, sizeof(val)); return val;
 }
 
-static U32 LZ4_read32(const void* memPtr)
+LZ4_FORCE_INLINE U32 LZ4_read32(const void* memPtr)
 {
     U32 val; LZ4_memcpy(&val, memPtr, sizeof(val)); return val;
 }
 
-static reg_t LZ4_read_ARCH(const void* memPtr)
+LZ4_FORCE_INLINE reg_t LZ4_read_ARCH(const void* memPtr)
 {
     reg_t val; LZ4_memcpy(&val, memPtr, sizeof(val)); return val;
 }
 
-static void LZ4_write16(void* memPtr, U16 value)
+LZ4_FORCE_INLINE void LZ4_write16(void* memPtr, U16 value)
 {
     LZ4_memcpy(memPtr, &value, sizeof(value));
 }
 
-static void LZ4_write32(void* memPtr, U32 value)
+LZ4_FORCE_INLINE void LZ4_write32(void* memPtr, U32 value)
 {
     LZ4_memcpy(memPtr, &value, sizeof(value));
 }
@@ -359,7 +359,7 @@ static void LZ4_write32(void* memPtr, U32 value)
 #endif /* LZ4_FORCE_MEMORY_ACCESS */
 
 
-static U16 LZ4_readLE16(const void* memPtr)
+LZ4_FORCE_INLINE U16 LZ4_readLE16(const void* memPtr)
 {
     if (LZ4_isLittleEndian()) {
         return LZ4_read16(memPtr);
@@ -369,7 +369,7 @@ static U16 LZ4_readLE16(const void* memPtr)
     }
 }
 
-static void LZ4_writeLE16(void* memPtr, U16 value)
+LZ4_FORCE_INLINE void LZ4_writeLE16(void* memPtr, U16 value)
 {
     if (LZ4_isLittleEndian()) {
         LZ4_write16(memPtr, value);

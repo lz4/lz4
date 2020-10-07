@@ -158,7 +158,7 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
 #endif
 
 
-static U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
+LZ4_FORCE_INLINE U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
 {
     size_t const bitsToRotate = (rotate & (sizeof(pattern) - 1)) << 3;
     if (bitsToRotate == 0)
@@ -223,7 +223,7 @@ LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
  * 4 byte MINMATCH would overflow.
  * @returns true if the match index is okay.
  */
-static int LZ4HC_protectDictEnd(U32 const dictLimit, U32 const matchIndex)
+LZ4_FORCE_INLINE int LZ4HC_protectDictEnd(U32 const dictLimit, U32 const matchIndex)
 {
     return ((U32)((dictLimit - 1) - matchIndex) >= 3);
 }
