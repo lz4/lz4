@@ -33,12 +33,13 @@
 #define LZ4IOMT_H_967887017
 
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar, FILE */
-#define LZ4F_STATIC_LINKING_ONLY
-#include "lz4frame.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define LZ4F_STATIC_LINKING_ONLY
+#include "lz4frame.h"
 
 typedef struct {
     void*  srcBuffer;
