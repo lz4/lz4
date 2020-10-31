@@ -1208,7 +1208,7 @@ static void FUZ_unitTests(int compressionLevel)
             char           c2;
             LZ4_streamHC_t hc3;
         } shct;
-        shct* const shc = malloc(sizeof(*shc));
+        shct* const shc = (shct*)malloc(sizeof(*shc));
         assert(shc != NULL);
         memset(shc, 0, sizeof(*shc));
         DISPLAYLEVEL(3, "hc1(%p) hc2(%p) hc3(%p) size(0x%x): ",
