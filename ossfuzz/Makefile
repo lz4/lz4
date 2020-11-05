@@ -26,7 +26,7 @@
 # ##########################################################################
 
 LZ4DIR  := ../lib
-LIB_FUZZING_ENGINE ?= standaloneengine.o
+LIB_FUZZING_ENGINE ?=
 
 DEBUGLEVEL?= 1
 DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
@@ -59,12 +59,12 @@ $(LZ4DIR)/liblz4.a:
 	$(CC) -c $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) $< -o $@
 
 # Generic rule for generating fuzzers
-%_fuzzer: %_fuzzer.o lz4_helpers.o fuzz_data_producer.o $(LZ4DIR)/liblz4.a
-	# Compile the standalone code just in case. The OSS-Fuzz code might
-	# override the LIB_FUZZING_ENGINE value to "-fsanitize=fuzzer"
-	$(CC) -c $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) standaloneengine.c -o standaloneengine.o
-
-	# Now compile the actual fuzzer.
+ifeq ($(LIB_FUZZING_ENGINE),)
+  LIB_FUZZING_DEPS := standaloneengine.o
+else
+  LIB_FUZZING_DEPS :=
+endif
+%_fuzzer: %_fuzzer.o lz4_helpers.o fuzz_data_producer.o $(LZ4DIR)/liblz4.a $(LIB_FUZZING_DEPS)
 	$(CXX) $(LZ4_CXXFLAGS) $(LZ4_CPPFLAGS) $(LDFLAGS) $(LIB_FUZZING_ENGINE) $^ -o $@$(EXT)
 
 %_fuzzer_clean:
