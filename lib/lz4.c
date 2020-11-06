@@ -178,6 +178,20 @@
 #define unlikely(expr)   expect((expr) != 0, 0)
 #endif
 
+/* for some reason, Visual Studio can fail the aligment test on 32-bit x86 :
+ * it sometimes report an aligment of 8-bytes (at least in some configurations),
+ * while only providing a `malloc()` memory area aligned on 4-bytes,
+ * which is inconsistent with malloc() contract.
+ * The source of the issue is still unclear.
+ * Mitigation : made the alignment test optional */
+#ifndef LZ4_ALIGN_TEST  /* can be externally provided */
+#  if (defined(_MSC_VER) && !defined(_M_X64))
+#    define LZ4_ALIGN_TEST 0  /* disable on win32+visual */
+#  else
+#    define LZ4_ALIGN_TEST 1
+#  endif
+#endif
+
 
 /*-************************************
 *  Memory routines
@@ -242,6 +256,11 @@ static const int LZ4_minLength = (MFLIMIT+1);
 #else
 #  define DEBUGLOG(l, ...) {}    /* disabled */
 #endif
+
+static int LZ4_isAligned(const void* ptr, size_t alignment)
+{
+    return ((size_t)ptr & (alignment -1)) == 0;
+}
 
 
 /*-************************************
@@ -1406,26 +1425,22 @@ LZ4_stream_t* LZ4_createStream(void)
     return lz4s;
 }
 
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                     it reports an aligment of 8-bytes,
-                     while actually aligning LZ4_stream_t on 4 bytes. */
 static size_t LZ4_stream_t_alignment(void)
 {
+#if LZ4_ALIGN_TEST
     typedef struct { char c; LZ4_stream_t t; } t_a;
     return sizeof(t_a) - sizeof(LZ4_stream_t);
-}
+#else
+    return 1;  /* effectively disabled */
 #endif
+}
 
 LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
 {
     DEBUGLOG(5, "LZ4_initStream");
     if (buffer == NULL) { return NULL; }
     if (size < sizeof(LZ4_stream_t)) { return NULL; }
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                     it reports an aligment of 8-bytes,
-                     while actually aligning LZ4_stream_t on 4 bytes. */
-    if (((size_t)buffer) & (LZ4_stream_t_alignment() - 1)) { return NULL; } /* alignment check */
-#endif
+    if (!LZ4_isAligned(buffer, LZ4_stream_t_alignment())) return NULL;
     MEM_INIT(buffer, 0, sizeof(LZ4_stream_t));
     return (LZ4_stream_t*)buffer;
 }

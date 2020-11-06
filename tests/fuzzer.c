@@ -1125,27 +1125,47 @@ static void FUZ_unitTests(int compressionLevel)
     }   }   }   }   }
     DISPLAYLEVEL(3, " OK \n");
 
-    /* LZ4 streaming tests */
-    {   LZ4_stream_t  streamingState;
-        U64 crcOrig;
-        int result;
+    DISPLAYLEVEL(3, "LZ4_initStream with multiple valid alignments : ");
+    {   typedef struct {
+            LZ4_stream_t state1;
+            LZ4_stream_t state2;
+            char              c;
+            LZ4_stream_t state3;
+        } shct;
+        shct* const shc = (shct*)malloc(sizeof(*shc));
+        assert(shc != NULL);
+        memset(shc, 0, sizeof(*shc));
+        DISPLAYLEVEL(3, "state1(%p) state2(%p) state3(%p) size(0x%x): ",
+                    &(shc->state1), &(shc->state2), &(shc->state3), (unsigned)sizeof(LZ4_stream_t));
+        FUZ_CHECKTEST( LZ4_initStream(&(shc->state1), sizeof(shc->state1)) == NULL, "state1 (%p) failed init", &(shc->state1) );
+        FUZ_CHECKTEST( LZ4_initStream(&(shc->state2), sizeof(shc->state2)) == NULL, "state2 (%p) failed init", &(shc->state2)  );
+        FUZ_CHECKTEST( LZ4_initStream(&(shc->state3), sizeof(shc->state3)) == NULL, "state3 (%p) failed init", &(shc->state3)  );
+        FUZ_CHECKTEST( LZ4_initStream((char*)&(shc->state1) + 1, sizeof(shc->state1)) != NULL,
+                        "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc->state1) + 1 );
+        free(shc);
+    }
+    DISPLAYLEVEL(3, "all inits OK \n");
 
-        /* Allocation test */
-        {   LZ4_stream_t* const statePtr = LZ4_createStream();
-            FUZ_CHECKTEST(statePtr==NULL, "LZ4_createStream() allocation failed");
-            LZ4_freeStream(statePtr);
-        }
+    /* Allocation test */
+    {   LZ4_stream_t* const statePtr = LZ4_createStream();
+        FUZ_CHECKTEST(statePtr==NULL, "LZ4_createStream() allocation failed");
+        LZ4_freeStream(statePtr);
+    }
+
+    /* LZ4 streaming tests */
+    {   LZ4_stream_t streamingState;
 
         /* simple compression test */
-        crcOrig = XXH64(testInput, testCompressedSize, 0);
-        LZ4_initStream(&streamingState, sizeof(streamingState));
-        result = LZ4_compress_fast_continue(&streamingState, testInput, testCompressed, testCompressedSize, testCompressedSize-1, 1);
-        FUZ_CHECKTEST(result==0, "LZ4_compress_fast_continue() compression failed!");
-
-        result = LZ4_decompress_safe(testCompressed, testVerify, result, testCompressedSize);
-        FUZ_CHECKTEST(result!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
-        { U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
-          FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption"); }
+        {   U64 const crcOrig = XXH64(testInput, testCompressedSize, 0);
+            LZ4_initStream(&streamingState, sizeof(streamingState));
+            { int const cs = LZ4_compress_fast_continue(&streamingState, testInput, testCompressed, testCompressedSize, testCompressedSize-1, 1);
+                FUZ_CHECKTEST(cs==0, "LZ4_compress_fast_continue() compression failed!");
+                {   int const r = LZ4_decompress_safe(testCompressed, testVerify, cs, testCompressedSize);
+                    FUZ_CHECKTEST(r!=(int)testCompressedSize, "LZ4_decompress_safe() decompression failed");
+            }   }
+            {   U64 const crcNew = XXH64(testVerify, testCompressedSize, 0);
+                FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
+        }   }
 
         /* ring buffer test */
         {   XXH64_state_t xxhOrig;
@@ -1167,7 +1187,7 @@ static void FUZ_unitTests(int compressionLevel)
             LZ4_setStreamDecode(&decodeStateFast, NULL, 0);
 
             while (iNext + messageSize < testCompressedSize) {
-                int compressedSize;
+                int compressedSize; U64 crcOrig;
                 XXH64_update(&xxhOrig, testInput + iNext, messageSize);
                 crcOrig = XXH64_digest(&xxhOrig);
 
@@ -1175,15 +1195,15 @@ static void FUZ_unitTests(int compressionLevel)
                 compressedSize = LZ4_compress_fast_continue(&streamingState, ringBuffer + rNext, testCompressed, (int)messageSize, testCompressedSize-ringBufferSize, 1);
                 FUZ_CHECKTEST(compressedSize==0, "LZ4_compress_fast_continue() compression failed");
 
-                result = LZ4_decompress_safe_continue(&decodeStateSafe, testCompressed, testVerify + dNext, compressedSize, (int)messageSize);
-                FUZ_CHECKTEST(result!=(int)messageSize, "ringBuffer : LZ4_decompress_safe_continue() test failed");
+                { int const r = LZ4_decompress_safe_continue(&decodeStateSafe, testCompressed, testVerify + dNext, compressedSize, (int)messageSize);
+                  FUZ_CHECKTEST(r!=(int)messageSize, "ringBuffer : LZ4_decompress_safe_continue() test failed"); }
 
                 XXH64_update(&xxhNewSafe, testVerify + dNext, messageSize);
                 { U64 const crcNew = XXH64_digest(&xxhNewSafe);
                   FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe_continue() decompression corruption"); }
 
-                result = LZ4_decompress_fast_continue(&decodeStateFast, testCompressed, testVerify + dNext, (int)messageSize);
-                FUZ_CHECKTEST(result!=compressedSize, "ringBuffer : LZ4_decompress_fast_continue() test failed");
+                { int const r = LZ4_decompress_fast_continue(&decodeStateFast, testCompressed, testVerify + dNext, (int)messageSize);
+                  FUZ_CHECKTEST(r!=compressedSize, "ringBuffer : LZ4_decompress_fast_continue() test failed"); }
 
                 XXH64_update(&xxhNewFast, testVerify + dNext, messageSize);
                 { U64 const crcNew = XXH64_digest(&xxhNewFast);
@@ -1196,16 +1216,14 @@ static void FUZ_unitTests(int compressionLevel)
                 messageSize = (FUZ_rand(&randState) & maxMessageSizeMask) + 1;
                 if (rNext + messageSize > ringBufferSize) rNext = 0;
                 if (dNext + messageSize > dBufferSize) dNext = 0;
-            }
-        }
+        }   }
     }
 
     DISPLAYLEVEL(3, "LZ4_initStreamHC with multiple valid alignments : ");
     {   typedef struct {
             LZ4_streamHC_t hc1;
-            char           c1;
             LZ4_streamHC_t hc2;
-            char           c2;
+            char             c;
             LZ4_streamHC_t hc3;
         } shct;
         shct* const shc = (shct*)malloc(sizeof(*shc));
@@ -1220,7 +1238,7 @@ static void FUZ_unitTests(int compressionLevel)
                         "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc->hc1) + 1 );
         free(shc);
     }
-    DISPLAYLEVEL(3, "OK \n");
+    DISPLAYLEVEL(3, "all inits OK \n");
 
     /* LZ4 HC streaming tests */
     {   LZ4_streamHC_t sHC;   /* statically allocated */

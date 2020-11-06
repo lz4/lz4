@@ -75,15 +75,6 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
 #define LZ4_OPT_NUM   (1<<12)
 
-/* for some reason, Visual Studio fails the aligment test on 32-bit x86 :
- * it reports an aligment of 8-bytes,
- * while LZ4_streamHC_t only requires alignment of 4-bytes
- * resulting in initialization error when allocating state with malloc() */
-#if (defined(_MSC_VER) && !defined(_M_X64))
-#  define LZ4_ALIGN_TEST 0
-#else
-#  define LZ4_ALIGN_TEST 1
-#endif
 
 /*===   Macros   ===*/
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
@@ -921,23 +912,22 @@ LZ4HC_compress_generic (
 
 int LZ4_sizeofStateHC(void) { return (int)sizeof(LZ4_streamHC_t); }
 
-#if LZ4_ALIGN_TEST
 static size_t LZ4_streamHC_t_alignment(void)
 {
+#if LZ4_ALIGN_TEST
     typedef struct { char c; LZ4_streamHC_t t; } t_a;
     return sizeof(t_a) - sizeof(LZ4_streamHC_t);
-}
+#else
+    return 1;  /* effectively disabled */
 #endif
+}
 
 /* state is presumed correctly initialized,
  * in which case its size and alignment have already been validate */
 int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
-#if LZ4_ALIGN_TEST
-    assert(((size_t)state & (LZ4_streamHC_t_alignment() - 1)) == 0);  /* check alignment */
-#endif
-    if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
+    if (!LZ4_isAligned(state, LZ4_streamHC_t_alignment())) return 0;
     LZ4_resetStreamHC_fast((LZ4_streamHC_t*)state, compressionLevel);
     LZ4HC_init_internal (ctx, (const BYTE*)src);
     if (dstCapacity < LZ4_compressBound(srcSize))
@@ -1008,9 +998,7 @@ LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)buffer;
     if (buffer == NULL) return NULL;
     if (size < sizeof(LZ4_streamHC_t)) return NULL;
-#if LZ4_ALIGN_TEST
-    if (((size_t)buffer) & (LZ4_streamHC_t_alignment() - 1)) return NULL;  /* alignment check */
-#endif
+    if (!LZ4_isAligned(buffer, LZ4_streamHC_t_alignment())) return NULL;
     /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
     DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", LZ4_streamHCPtr, (unsigned)size);
