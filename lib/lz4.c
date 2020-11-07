@@ -178,6 +178,12 @@
 #define unlikely(expr)   expect((expr) != 0, 0)
 #endif
 
+/* Should the alignment test prove unreliable, for some reason,
+ * it can be disabled by setting LZ4_ALIGN_TEST to 0 */
+#ifndef LZ4_ALIGN_TEST  /* can be externally provided */
+# define LZ4_ALIGN_TEST 1
+#endif
+
 
 /*-************************************
 *  Memory routines
@@ -242,6 +248,11 @@ static const int LZ4_minLength = (MFLIMIT+1);
 #else
 #  define DEBUGLOG(l, ...) {}    /* disabled */
 #endif
+
+static int LZ4_isAligned(const void* ptr, size_t alignment)
+{
+    return ((size_t)ptr & (alignment -1)) == 0;
+}
 
 
 /*-************************************
@@ -457,7 +468,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
 
     switch(offset) {
     case 1:
-        memset(v, *srcPtr, 8);
+        MEM_INIT(v, *srcPtr, 8);
         break;
     case 2:
         LZ4_memcpy(v, srcPtr, 2);
@@ -1406,27 +1417,23 @@ LZ4_stream_t* LZ4_createStream(void)
     return lz4s;
 }
 
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                     it reports an aligment of 8-bytes,
-                     while actually aligning LZ4_stream_t on 4 bytes. */
 static size_t LZ4_stream_t_alignment(void)
 {
+#if LZ4_ALIGN_TEST
     typedef struct { char c; LZ4_stream_t t; } t_a;
     return sizeof(t_a) - sizeof(LZ4_stream_t);
-}
+#else
+    return 1;  /* effectively disabled */
 #endif
+}
 
 LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
 {
     DEBUGLOG(5, "LZ4_initStream");
     if (buffer == NULL) { return NULL; }
     if (size < sizeof(LZ4_stream_t)) { return NULL; }
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                     it reports an aligment of 8-bytes,
-                     while actually aligning LZ4_stream_t on 4 bytes. */
-    if (((size_t)buffer) & (LZ4_stream_t_alignment() - 1)) { return NULL; } /* alignment check */
-#endif
-    MEM_INIT(buffer, 0, sizeof(LZ4_stream_t));
+    if (!LZ4_isAligned(buffer, LZ4_stream_t_alignment())) return NULL;
+    MEM_INIT(buffer, 0, sizeof(LZ4_stream_t_internal));
     return (LZ4_stream_t*)buffer;
 }
 
@@ -1435,7 +1442,7 @@ LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     DEBUGLOG(5, "LZ4_resetStream (ctx:%p)", LZ4_stream);
-    MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
+    MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t_internal));
 }
 
 void LZ4_resetStream_fast(LZ4_stream_t* ctx) {

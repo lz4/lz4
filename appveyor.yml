@@ -47,10 +47,14 @@ build_script:
       make -v &&
       echo ----- &&
       if not [%PLATFORM%]==[clang] (
-        make -C programs lz4 && make -C tests fullbench && make -C lib lib
+        make -C programs lz4 &&
+        make -C tests fullbench &&
+        make -C tests fuzzer &&
+        make -C lib lib
       ) ELSE (
         make -C programs lz4 CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
         make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+        make -C tests fuzzer CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
         make -C lib lib CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
       )
     )
@@ -77,7 +81,7 @@ build_script:
       7z.exe a bin\lz4_x86.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
       appveyor PushArtifact bin\lz4_x86.zip
     )
-  - if [%COMPILER%]==[gcc] (COPY tests\fullbench.exe programs\)
+  - if [%COMPILER%]==[gcc] (COPY tests\*.exe programs\)
   - if [%COMPILER%]==[visual] (
       ECHO *** &&
       ECHO *** Building Visual Studio 2010 %PLATFORM%\%CONFIGURATION% &&
@@ -110,7 +114,9 @@ test_script:
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
       echo ------- lz4 tested ------- &&
-      fullbench.exe -i1 fullbench.exe
+      fullbench.exe -i1 fullbench.exe &&
+      echo trying to launch fuzzer.exe &&
+      fuzzer.exe -v -T30s
     )
 
 artifacts:

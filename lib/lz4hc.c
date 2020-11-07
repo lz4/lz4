@@ -53,7 +53,7 @@
 #include "lz4hc.h"
 
 
-/*===   Common LZ4 definitions   ===*/
+/*===   Common definitions   ===*/
 #if defined(__GNUC__)
 #  pragma GCC diagnostic ignored "-Wunused-function"
 #endif
@@ -61,14 +61,15 @@
 #  pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
-/*===   Enums   ===*/
-typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
-
-
 #define LZ4_COMMONDEFS_ONLY
 #ifndef LZ4_SRC_INCLUDED
 #include "lz4.c"   /* LZ4_count, constants, mem */
 #endif
+
+
+/*===   Enums   ===*/
+typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
+
 
 /*===   Constants   ===*/
 #define OPTIMAL_ML (int)((ML_MASK-1)+MINMATCH)
@@ -161,8 +162,7 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
 LZ4_FORCE_INLINE U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
 {
     size_t const bitsToRotate = (rotate & (sizeof(pattern) - 1)) << 3;
-    if (bitsToRotate == 0)
-        return pattern;
+    if (bitsToRotate == 0) return pattern;
     return LZ4HC_rotl32(pattern, (int)bitsToRotate);
 }
 
@@ -919,27 +919,22 @@ LZ4HC_compress_generic (
 
 int LZ4_sizeofStateHC(void) { return (int)sizeof(LZ4_streamHC_t); }
 
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                   * it reports an aligment of 8-bytes,
-                   * while actually aligning LZ4_streamHC_t on 4 bytes. */
 static size_t LZ4_streamHC_t_alignment(void)
 {
+#if LZ4_ALIGN_TEST
     typedef struct { char c; LZ4_streamHC_t t; } t_a;
     return sizeof(t_a) - sizeof(LZ4_streamHC_t);
-}
+#else
+    return 1;  /* effectively disabled */
 #endif
+}
 
 /* state is presumed correctly initialized,
  * in which case its size and alignment have already been validate */
 int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
     LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                   * it reports an aligment of 8-bytes,
-                   * while actually aligning LZ4_streamHC_t on 4 bytes. */
-    assert(((size_t)state & (LZ4_streamHC_t_alignment() - 1)) == 0);  /* check alignment */
-#endif
-    if (((size_t)(state)&(sizeof(void*)-1)) != 0) return 0;   /* Error : state is not aligned for pointers (32 or 64 bits) */
+    if (!LZ4_isAligned(state, LZ4_streamHC_t_alignment())) return 0;
     LZ4_resetStreamHC_fast((LZ4_streamHC_t*)state, compressionLevel);
     LZ4HC_init_internal (ctx, (const BYTE*)src);
     if (dstCapacity < LZ4_compressBound(srcSize))
@@ -1010,11 +1005,7 @@ LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)buffer;
     if (buffer == NULL) return NULL;
     if (size < sizeof(LZ4_streamHC_t)) return NULL;
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                   * it reports an aligment of 8-bytes,
-                   * while actually aligning LZ4_streamHC_t on 4 bytes. */
-    if (((size_t)buffer) & (LZ4_streamHC_t_alignment() - 1)) return NULL;  /* alignment check */
-#endif
+    if (!LZ4_isAligned(buffer, LZ4_streamHC_t_alignment())) return NULL;
     /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
     DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", LZ4_streamHCPtr, (unsigned)size);
