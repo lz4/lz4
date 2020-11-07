@@ -1405,6 +1405,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     if (decompressOptionsPtr==NULL) decompressOptionsPtr = &optionsNull;
     *srcSizePtr = 0;
     *dstSizePtr = 0;
+    assert(dctx != NULL);
 
     /* behaves as a state machine */
 

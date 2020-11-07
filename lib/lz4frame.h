@@ -431,8 +431,10 @@ LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
                                      const void* srcBuffer, size_t* srcSizePtr);
 
 /*! LZ4F_decompress() :
- *  Call this function repetitively to regenerate compressed data from `srcBuffer`.
- *  The function will read up to *srcSizePtr bytes from srcBuffer,
+ *  Call this function repetitively to regenerate data compressed in `srcBuffer`.
+ *
+ *  The function requires a valid dctx state.
+ *  It will read up to *srcSizePtr bytes from srcBuffer,
  *  and decompress data into dstBuffer, of capacity *dstSizePtr.
  *
  *  The nb of bytes consumed from srcBuffer will be written into *srcSizePtr (necessarily <= original value).

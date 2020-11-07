@@ -49,7 +49,7 @@ and `LZ4F_PUBLISH_STATIC_FUNCTIONS`.
 The following build macro can be selected to adjust source code behavior at compilation time :
 
 - `LZ4_FAST_DEC_LOOP` : this triggers a speed optimized decompression loop, more powerful on modern cpus.
-  This loop works great on x86, x64 and aarch64 cpus, and is automatically enabled for them.
+  This loop works great on `x86`, `x64` and `aarch64` cpus, and is automatically enabled for them.
   It's also possible to enable or disable it manually, by passing `LZ4_FAST_DEC_LOOP=1` or `0` to the preprocessor.
   For example, with `gcc` : `-DLZ4_FAST_DEC_LOOP=1`,
   and with `make` : `CPPFLAGS+=-DLZ4_FAST_DEC_LOOP=1 make lz4`.
@@ -66,8 +66,8 @@ The following build macro can be selected to adjust source code behavior at comp
   Should this be a problem, it's generally possible to make the compiler ignore these warnings,
   for example with `-Wno-deprecated-declarations` on `gcc`,
   or `_CRT_SECURE_NO_WARNINGS` for Visual Studio.
-  Another project-specific method is to define `LZ4_DISABLE_DEPRECATE_WARNINGS`
-  before including the LZ4 header files.
+  This build macro offers another project-specific method
+  by defining `LZ4_DISABLE_DEPRECATE_WARNINGS` before including the LZ4 header files.
 
 - `LZ4_FORCE_SW_BITCOUNT` : by default, the compression algorithm tries to determine lengths
   by using bitcount instructions, generally implemented as fast single instructions in many cpus.
@@ -78,8 +78,8 @@ The following build macro can be selected to adjust source code behavior at comp
   but it can be legitimately considered for less common platforms.
 
 - `LZ4_ALIGN_TEST` : alignment test ensures that the memory area
-  passed as argument to become a compression state is suitable aligned.
-  This test can be disabled, if it proves flaky, by setting this value to 0.
+  passed as argument to become a compression state is suitably aligned.
+  This test can be disabled if it proves flaky, by setting this value to 0.
 
 
 #### Amalgamation
