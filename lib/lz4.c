@@ -424,7 +424,9 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 LZ4_FORCE_INLINE void
 LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
 {
+    assert(srcPtr + offset == dstPtr);
     if (offset < 8) {
+        LZ4_write32(dstPtr, 0);   /* silence an msan warning when offset==0 */
         dstPtr[0] = srcPtr[0];
         dstPtr[1] = srcPtr[1];
         dstPtr[2] = srcPtr[2];
@@ -464,7 +466,6 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
     BYTE v[8];
 
     assert(dstEnd >= dstPtr + MINMATCH);
-    LZ4_write32(dstPtr, 0);   /* silence an msan warning when offset==0 */
 
     switch(offset) {
     case 1:
@@ -473,7 +474,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
     case 2:
         LZ4_memcpy(v, srcPtr, 2);
         LZ4_memcpy(&v[2], srcPtr, 2);
-        LZ4_memcpy(&v[4], &v[0], 4);
+        LZ4_memcpy(&v[4], v, 4);
         break;
     case 4:
         LZ4_memcpy(v, srcPtr, 4);
