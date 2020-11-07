@@ -220,8 +220,8 @@ struct LZ4HC_CCtx_internal
 /* Do not use these definitions directly !
  * Declare or allocate an LZ4_streamHC_t instead.
  */
-#define LZ4_STREAMHCSIZE_VOIDP ((sizeof(LZ4HC_CCtx_internal) + sizeof(void*)-1) / sizeof(void*))
-#define LZ4_STREAMHCSIZE       (LZ4_STREAMHCSIZE_VOIDP * sizeof(void*))
+#define LZ4_STREAMHCSIZE       262200  /* static size, for inter-version compatibility */
+#define LZ4_STREAMHCSIZE_VOIDP (LZ4_STREAMHCSIZE / sizeof(void*))
 union LZ4_streamHC_u {
     void* table[LZ4_STREAMHCSIZE_VOIDP];
     LZ4HC_CCtx_internal internal_donotuse;
