@@ -573,68 +573,60 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
  **************************************************************
  * Do not use these definitions directly.
  * They are only exposed to allow static allocation of `LZ4_stream_t` and `LZ4_streamDecode_t`.
- * Accessing members will expose code to API and/or ABI break in future versions of the library.
+ * Accessing members will expose user code to API and/or ABI break in future versions of the library.
  **************************************************************/
 #define LZ4_HASHLOG   (LZ4_MEMORY_USAGE-2)
 #define LZ4_HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
 #define LZ4_HASH_SIZE_U32 (1 << LZ4_HASHLOG)       /* required as macro for static allocation */
 
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
-#include <stdint.h>
-
-typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
-struct LZ4_stream_t_internal {
-    uint32_t hashTable[LZ4_HASH_SIZE_U32];
-    uint32_t currentOffset;
-    uint32_t tableType;
-    const uint8_t* dictionary;
-    const LZ4_stream_t_internal* dictCtx;
-    uint32_t dictSize;
-};
-
-typedef struct {
-    const uint8_t* externalDict;
-    size_t extDictSize;
-    const uint8_t* prefixEnd;
-    size_t prefixSize;
-} LZ4_streamDecode_t_internal;
-
+# include <stdint.h>
+  typedef  int8_t  LZ4_i8;
+  typedef uint8_t  LZ4_byte;
+  typedef uint16_t LZ4_u16;
+  typedef uint32_t LZ4_u32;
 #else
-
-typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
-struct LZ4_stream_t_internal {
-    unsigned int hashTable[LZ4_HASH_SIZE_U32];
-    unsigned int currentOffset;
-    unsigned int tableType;
-    const unsigned char* dictionary;
-    const LZ4_stream_t_internal* dictCtx;
-    unsigned int dictSize;
-};
-
-typedef struct {
-    const unsigned char* externalDict;
-    const unsigned char* prefixEnd;
-    size_t extDictSize;
-    size_t prefixSize;
-} LZ4_streamDecode_t_internal;
-
+  typedef   signed char  LZ4_i8;
+  typedef unsigned char  LZ4_byte;
+  typedef unsigned short LZ4_u16;
+  typedef unsigned int   LZ4_u32;
 #endif
 
+typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
+struct LZ4_stream_t_internal {
+    LZ4_u32 hashTable[LZ4_HASH_SIZE_U32];
+    LZ4_u32 currentOffset;
+    LZ4_u32 tableType;
+    const LZ4_byte* dictionary;
+    const LZ4_stream_t_internal* dictCtx;
+    LZ4_u32 dictSize;
+};
+
+typedef struct {
+    const LZ4_byte* externalDict;
+    size_t extDictSize;
+    const LZ4_byte* prefixEnd;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+
+
 /*! LZ4_stream_t :
- *  information structure to track an LZ4 stream.
+ *  Do not use below internal definitions directly !
+ *  Declare or allocate an LZ4_stream_t instead.
  *  LZ4_stream_t can also be created using LZ4_createStream(), which is recommended.
  *  The structure definition can be convenient for static allocation
  *  (on stack, or as part of larger structure).
  *  Init this structure with LZ4_initStream() before first use.
  *  note : only use this definition in association with static linking !
- *    this definition is not API/ABI safe, and may change in a future version.
+ *    this definition is not API/ABI safe, and may change in future versions.
  */
-#define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4 + ((sizeof(void*)==16) ? 4 : 0) /*AS-400*/ )
-#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))
+#define LZ4_STREAMSIZE_VOIDP ((sizeof(LZ4_stream_t_internal) + sizeof(void*)-1) / sizeof(void*))
+#define LZ4_STREAMSIZE       (LZ4_STREAMSIZE_VOIDP * sizeof(void*))
 union LZ4_stream_u {
-    unsigned long long table[LZ4_STREAMSIZE_U64];
+    void* table[LZ4_STREAMSIZE_VOIDP];
     LZ4_stream_t_internal internal_donotuse;
-} ;  /* previously typedef'd to LZ4_stream_t */
+}; /* previously typedef'd to LZ4_stream_t */
+
 
 /*! LZ4_initStream() : v1.9.0+
  *  An LZ4_stream_t structure must be initialized at least once.
