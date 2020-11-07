@@ -178,18 +178,10 @@
 #define unlikely(expr)   expect((expr) != 0, 0)
 #endif
 
-/* for some reason, Visual Studio can fail the aligment test on 32-bit x86 :
- * it sometimes report an aligment of 8-bytes (at least in some configurations),
- * while only providing a `malloc()` memory area aligned on 4-bytes,
- * which is inconsistent with malloc() contract.
- * The source of the issue is still unclear.
- * Mitigation : made the alignment test optional */
+/* Should the alignment test prove unreliable, for some reason,
+ * it can be disabled by setting LZ4_ALIGN_TEST to 0 */
 #ifndef LZ4_ALIGN_TEST  /* can be externally provided */
-#  if (defined(_MSC_VER) && !defined(_M_X64))
-#    define LZ4_ALIGN_TEST 0  /* disable on win32+visual */
-#  else
-#    define LZ4_ALIGN_TEST 1
-#  endif
+# define LZ4_ALIGN_TEST 1
 #endif
 
 
@@ -476,7 +468,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
 
     switch(offset) {
     case 1:
-        memset(v, *srcPtr, 8);
+        MEM_INIT(v, *srcPtr, 8);
         break;
     case 2:
         LZ4_memcpy(v, srcPtr, 2);
@@ -1441,7 +1433,7 @@ LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
     if (buffer == NULL) { return NULL; }
     if (size < sizeof(LZ4_stream_t)) { return NULL; }
     if (!LZ4_isAligned(buffer, LZ4_stream_t_alignment())) return NULL;
-    MEM_INIT(buffer, 0, sizeof(LZ4_stream_t));
+    MEM_INIT(buffer, 0, sizeof(LZ4_stream_t_internal));
     return (LZ4_stream_t*)buffer;
 }
 
@@ -1450,7 +1442,7 @@ LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
 void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 {
     DEBUGLOG(5, "LZ4_resetStream (ctx:%p)", LZ4_stream);
-    MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t));
+    MEM_INIT(LZ4_stream, 0, sizeof(LZ4_stream_t_internal));
 }
 
 void LZ4_resetStream_fast(LZ4_stream_t* ctx) {

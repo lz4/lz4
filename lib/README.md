@@ -77,8 +77,9 @@ The following build macro can be selected to adjust source code behavior at comp
   In most cases, it's not expected to be necessary,
   but it can be legitimately considered for less common platforms.
 
-- `LZ4_ALIGN_TEST` : disable state alignment test when set to 0.
-  Is generally enabled by default, except on win32+visual.
+- `LZ4_ALIGN_TEST` : alignment test ensures that the memory area
+  passed as argument to become a compression state is suitable aligned.
+  This test can be disabled, if it proves flaky, by setting this value to 0.
 
 
 #### Amalgamation

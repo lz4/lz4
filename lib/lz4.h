@@ -618,7 +618,7 @@ typedef struct {
  *  (on stack, or as part of larger structure).
  *  Init this structure with LZ4_initStream() before first use.
  *  note : only use this definition in association with static linking !
- *    this definition is not API/ABI safe, and may change in future versions.
+ *  this definition is not API/ABI safe, and may change in future versions.
  */
 #define LZ4_STREAMSIZE_VOIDP ((sizeof(LZ4_stream_t_internal) + sizeof(void*)-1) / sizeof(void*))
 #define LZ4_STREAMSIZE       (LZ4_STREAMSIZE_VOIDP * sizeof(void*))
