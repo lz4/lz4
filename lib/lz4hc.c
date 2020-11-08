@@ -1003,18 +1003,16 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
 {
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)buffer;
+    LZ4HC_CCtx_internal* const hcstate = &(LZ4_streamHCPtr->internal_donotuse);
+    /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
+    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
+    DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", buffer, (unsigned)size);
+    /* check conditions */
     if (buffer == NULL) return NULL;
     if (size < sizeof(LZ4_streamHC_t)) return NULL;
     if (!LZ4_isAligned(buffer, LZ4_streamHC_t_alignment())) return NULL;
-    /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
-    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
-    DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", LZ4_streamHCPtr, (unsigned)size);
-    /* end-base will trigger a clearTable on starting compression */
-    LZ4_streamHCPtr->internal_donotuse.end = (const BYTE *)(ptrdiff_t)-1;
-    LZ4_streamHCPtr->internal_donotuse.base = NULL;
-    LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
-    LZ4_streamHCPtr->internal_donotuse.favorDecSpeed = 0;
-    LZ4_streamHCPtr->internal_donotuse.dirty = 0;
+    /* init */
+    MEM_INIT(hcstate, 0, sizeof(*hcstate));
     LZ4_setCompressionLevel(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);
     return LZ4_streamHCPtr;
 }
@@ -1100,10 +1098,11 @@ static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBl
     ctxPtr->dictCtx = NULL;
 }
 
-static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
-                                            const char* src, char* dst,
-                                            int* srcSizePtr, int dstCapacity,
-                                            limitedOutput_directive limit)
+static int
+LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
+                                 const char* src, char* dst,
+                                 int* srcSizePtr, int dstCapacity,
+                                 limitedOutput_directive limit)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(5, "LZ4_compressHC_continue_generic(ctx=%p, src=%p, srcSize=%d, limit=%d)",
@@ -1131,8 +1130,7 @@ static int LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
             ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictBase);
             if (ctxPtr->dictLimit - ctxPtr->lowLimit < 4) ctxPtr->lowLimit = ctxPtr->dictLimit;
-        }
-    }
+    }   }
 
     return LZ4HC_compress_generic (ctxPtr, src, dst, srcSizePtr, dstCapacity, ctxPtr->compressionLevel, limit);
 }
@@ -1152,13 +1150,17 @@ int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const ch
 
 
 
-/* dictionary saving */
-
+/* LZ4_saveDictHC :
+ * save history content
+ * into a user-provided buffer
+ * which is then used to continue compression
+ */
 int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictSize)
 {
     LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
     int const prefixSize = (int)(streamPtr->end - (streamPtr->base + streamPtr->dictLimit));
-    DEBUGLOG(4, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
+    DEBUGLOG(5, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
+    assert(prefixSize >= 0);
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 4) dictSize = 0;
     if (dictSize > prefixSize) dictSize = prefixSize;
