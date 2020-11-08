@@ -299,8 +299,10 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
                                    void* dstBuffer, size_t* dstSizePtr,
                                    const void* srcBuffer, size_t* srcSizePtr,
                                    const LZ4F_decompressOptions_t* dOptPtr);
-</b><p>  Call this function repetitively to regenerate compressed data from `srcBuffer`.
-  The function will read up to *srcSizePtr bytes from srcBuffer,
+</b><p>  Call this function repetitively to regenerate data compressed in `srcBuffer`.
+
+  The function requires a valid dctx state.
+  It will read up to *srcSizePtr bytes from srcBuffer,
   and decompress data into dstBuffer, of capacity *dstSizePtr.
 
   The nb of bytes consumed from srcBuffer will be written into *srcSizePtr (necessarily <= original value).

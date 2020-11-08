@@ -569,7 +569,7 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
 #define LZ4_H_98237428734687
 
 /*-************************************************************
- *  PRIVATE DEFINITIONS
+ *  Private Definitions
  **************************************************************
  * Do not use these definitions directly.
  * They are only exposed to allow static allocation of `LZ4_stream_t` and `LZ4_streamDecode_t`.
@@ -693,7 +693,7 @@ union LZ4_streamDecode_u {
 #  endif
 #endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */
 
-/* Obsolete compression functions */
+/*! Obsolete compression functions (since v1.7.3) */
 LZ4_DEPRECATED("use LZ4_compress_default() instead")       LZ4LIB_API int LZ4_compress               (const char* src, char* dest, int srcSize);
 LZ4_DEPRECATED("use LZ4_compress_default() instead")       LZ4LIB_API int LZ4_compress_limitedOutput (const char* src, char* dest, int srcSize, int maxOutputSize);
 LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead") LZ4LIB_API int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
@@ -701,11 +701,12 @@ LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead") LZ4LIB_API int LZ4_co
 LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_compress_continue                (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
 LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
-/* Obsolete decompression functions */
+/*! Obsolete decompression functions (since v1.8.0) */
 LZ4_DEPRECATED("use LZ4_decompress_fast() instead") LZ4LIB_API int LZ4_uncompress (const char* source, char* dest, int outputSize);
 LZ4_DEPRECATED("use LZ4_decompress_safe() instead") LZ4LIB_API int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
-/* Obsolete streaming functions; degraded functionality; do not use!
+/* Obsolete streaming functions (since v1.7.0)
+ * degraded functionality; do not use!
  *
  * In order to perform streaming compression, these functions depended on data
  * that is no longer tracked in the state. They have been preserved as well as
@@ -719,23 +720,22 @@ LZ4_DEPRECATED("Use LZ4_createStream() instead") LZ4LIB_API int   LZ4_sizeofStre
 LZ4_DEPRECATED("Use LZ4_resetStream() instead")  LZ4LIB_API int   LZ4_resetStreamState(void* state, char* inputBuffer);
 LZ4_DEPRECATED("Use LZ4_saveDict() instead")     LZ4LIB_API char* LZ4_slideInputBuffer (void* state);
 
-/* Obsolete streaming decoding functions */
+/*! Obsolete streaming decoding functions (since v1.7.0) */
 LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") LZ4LIB_API int LZ4_decompress_safe_withPrefix64k (const char* src, char* dst, int compressedSize, int maxDstSize);
 LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
 
-/*! LZ4_decompress_fast() : **unsafe!**
+/*! Obsolete LZ4_decompress_fast variants (since v1.9.0) :
  *  These functions used to be faster than LZ4_decompress_safe(),
- *  but it has changed, and they are now slower than LZ4_decompress_safe().
+ *  but this is no longer the case. They are now slower.
  *  This is because LZ4_decompress_fast() doesn't know the input size,
- *  and therefore must progress more cautiously in the input buffer to not read beyond the end of block.
+ *  and therefore must progress more cautiously into the input buffer to not read beyond the end of block.
  *  On top of that `LZ4_decompress_fast()` is not protected vs malformed or malicious inputs, making it a security liability.
  *  As a consequence, LZ4_decompress_fast() is strongly discouraged, and deprecated.
  *
  *  The last remaining LZ4_decompress_fast() specificity is that
  *  it can decompress a block without knowing its compressed size.
- *  Such functionality could be achieved in a more secure manner,
- *  by also providing the maximum size of input buffer,
- *  but it would require new prototypes, and adaptation of the implementation to this new use case.
+ *  Such functionality can be achieved in a more secure manner
+ *  by employing LZ4_decompress_safe_partial().
  *
  *  Parameters:
  *  originalSize : is the uncompressed size to regenerate.
@@ -750,7 +750,6 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4
  *         But they may happen if input data is invalid (error or intentional tampering).
  *         As a consequence, use these functions in trusted environments with trusted data **only**.
  */
-
 LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead")
 LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
 LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead")
