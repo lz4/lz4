@@ -1003,7 +1003,6 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
 {
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)buffer;
-    LZ4HC_CCtx_internal* const hcstate = &(LZ4_streamHCPtr->internal_donotuse);
     /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
     LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
     DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", buffer, (unsigned)size);
@@ -1012,7 +1011,8 @@ LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
     if (size < sizeof(LZ4_streamHC_t)) return NULL;
     if (!LZ4_isAligned(buffer, LZ4_streamHC_t_alignment())) return NULL;
     /* init */
-    MEM_INIT(hcstate, 0, sizeof(*hcstate));
+    { LZ4HC_CCtx_internal* const hcstate = &(LZ4_streamHCPtr->internal_donotuse);
+      MEM_INIT(hcstate, 0, sizeof(*hcstate)); }
     LZ4_setCompressionLevel(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);
     return LZ4_streamHCPtr;
 }
