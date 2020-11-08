@@ -789,7 +789,7 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     int const nbSearches, size_t sufficient_len,
     const limitedOutput_directive limit, int const fullUpdate,
     const dictCtx_directive dict,
-    HCfavor_e favorDecSpeed);
+    const HCfavor_e favorDecSpeed);
 
 
 LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
