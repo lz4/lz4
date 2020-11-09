@@ -37,7 +37,7 @@ matrix:
         - make clean
         - make -C programs lz4-wlib
         - make clean
-        - make fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
+        - make -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
 
     - name: (Precise) g++ and clang CMake test
       dist: precise
