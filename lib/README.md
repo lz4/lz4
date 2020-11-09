@@ -69,6 +69,10 @@ The following build macro can be selected to adjust source code behavior at comp
   This build macro offers another project-specific method
   by defining `LZ4_DISABLE_DEPRECATE_WARNINGS` before including the LZ4 header files.
 
+- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to <stdlib>'s `malloc`, `calloc` and `free`
+  by user-defined functions, which must be called `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
+  User functions must be available at link time.
+
 - `LZ4_FORCE_SW_BITCOUNT` : by default, the compression algorithm tries to determine lengths
   by using bitcount instructions, generally implemented as fast single instructions in many cpus.
   In case the target cpus doesn't support it, or compiler intrinsic doesn't work, or feature bad performance,

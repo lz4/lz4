@@ -53,6 +53,7 @@ TEST_FILES   := COPYING
 FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
 
+.PHONY: default
 default: all
 
 all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
@@ -89,6 +90,10 @@ fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
 	$(MAKE) -C $(LZ4DIR) liblz4
 	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/$(LIBLZ4).dll
 
+# test LZ4_USER_MEMORY_FUNCTIONS
+fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
+fullbench-wmalloc: fullbench
+
 fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
@@ -107,6 +112,7 @@ checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 decompress-partial: lz4.o decompress-partial.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+.PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
@@ -169,9 +175,6 @@ test32: CFLAGS+=-m32
 test32: test
 
 test-amalgamation: lz4_all.o
-
-lz4_all.o: lz4_all.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $^ -o $@
 
 lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
 	$(CAT) $^ > $@

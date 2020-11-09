@@ -188,10 +188,23 @@
 /*-************************************
 *  Memory routines
 **************************************/
-#include <stdlib.h>   /* malloc, calloc, free */
-#define ALLOC(s)          malloc(s)
-#define ALLOC_AND_ZERO(s) calloc(1,s)
-#define FREEMEM(p)        free(p)
+#ifdef LZ4_USER_MEMORY_FUNCTIONS
+/* memory management functions can be customized by user project.
+ * Below functions must exist somewhere in the Project
+ * and be available at link time */
+void* LZ4_malloc(size_t s);
+void* LZ4_calloc(size_t s);
+void  LZ4_free(void* p);
+# define ALLOC(s)          LZ4_malloc(s)
+# define ALLOC_AND_ZERO(s) LZ4_calloc(s)
+# define FREEMEM(p)        LZ4_free(p)
+#else
+# include <stdlib.h>   /* malloc, calloc, free */
+# define ALLOC(s)          malloc(s)
+# define ALLOC_AND_ZERO(s) calloc(1,s)
+# define FREEMEM(p)        free(p)
+#endif
+
 #include <string.h>   /* memset, memcpy */
 #define MEM_INIT(p,v,s)   memset((p),(v),(s))
 
