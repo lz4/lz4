@@ -160,7 +160,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 *********************************************************/
 void* LZ4_malloc(size_t s) { return malloc(s); }
 void* LZ4_calloc(size_t s) { return calloc(1,s); }
-void  LZ4_free(void* p) { return free(p); }
+void  LZ4_free(void* p) { free(p); }
 
 
 /*********************************************************
