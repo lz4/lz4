@@ -159,7 +159,7 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 *  Memory management, to test LZ4_USER_MEMORY_FUNCTIONS
 *********************************************************/
 void* LZ4_malloc(size_t s) { return malloc(s); }
-void* LZ4_calloc(size_t s) { return calloc(1,s); }
+void* LZ4_calloc(size_t n, size_t s) { (void)n; return calloc(1,s); }
 void  LZ4_free(void* p) { free(p); }
 
 
