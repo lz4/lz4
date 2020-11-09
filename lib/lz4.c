@@ -1619,7 +1619,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
                  * cost to copy the dictionary's tables into the active context,
                  * so that the compression loop is only looking into one table.
                  */
-                LZ4_memcpy(streamPtr, streamPtr->dictCtx, sizeof(LZ4_stream_t));
+                LZ4_memcpy(streamPtr, streamPtr->dictCtx, sizeof(*streamPtr));
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, tableType, usingExtDict, noDictIssue, acceleration);
             } else {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, tableType, usingDictCtx, noDictIssue, acceleration);
@@ -1675,7 +1675,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
     if ((U32)dictSize > dict->dictSize) { dictSize = (int)dict->dictSize; }
 
     if (safeBuffer == NULL) assert(dictSize == 0);
-    if (safeBuffer != NULL)
+    if (dictSize > 0)
         memmove(safeBuffer, previousDictEnd - dictSize, dictSize);
 
     dict->dictionary = (const BYTE*)safeBuffer;
