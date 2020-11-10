@@ -71,8 +71,8 @@
  * towards another library or solution of their choice
  * by modifying below section.
  */
-#include <stdlib.h>   /* malloc, calloc, free */
 #ifndef LZ4_SRC_INCLUDED   /* avoid redefinition when sources are coalesced */
+#  include <stdlib.h>   /* malloc, calloc, free */
 #  define ALLOC(s)          malloc(s)
 #  define ALLOC_AND_ZERO(s) calloc(1,(s))
 #  define FREEMEM(p)        free(p)
