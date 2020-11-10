@@ -1,8 +1,24 @@
 v1.9.3
-perf: faster speed on Visual Studio, by @wolfpld
+perf: highly improved speed in kernel space, by @terrelln
+perf: faster speed with Visual Studio, thanks to @wolfpld and @remittor
+perf: improved dictionary compression speed, by @felixhandte
+perf: fixed LZ4_compress_HC_destSize() ratio, detected by @hsiangkao
+perf: reduced stack usage in high compression mode, by @Yanpas
+api : LZ4_decompress_safe_partial() supports unknown compressed size, requested by @jfkthame
+api : improved LZ4F_compressBound() with automatic flushing, by Christopher Harvie
+api : can (de)compress to/from NULL without UBs
+api : fix alignment test on 32-bit systems (state initialization)
+api : fix LZ4_saveDictHC() in corner case scenario, detected by @IgorKorkin
+cli : --list command, compressed file content statistics, by Filipe Calasans
+cli : benchmark mode supports dictionary, by @rkoradi
+cli : fix --fast with large argument, detected by @picoHz
+build: link to user-defined memory functions with LZ4_USER_MEMORY_FUNCTIONS, suggested by Yuriy Levchenko
 build: contrib/cmake_unofficial/ moved to build/cmake/
 build: visual/* moved to build/
-
+build: updated meson script, by @neheb
+build: tinycc support, by Anton Kochkov
+install: Haiku support, by Jerome Duval
+doc : updated LZ4 frame format, clarify EndMark
 
 v1.9.2
 fix : out-of-bound read in exceptional circumstances when using decompress_partial(), by @terrelln
