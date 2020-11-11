@@ -93,7 +93,7 @@ static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)
 **************************************/
 static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 {
-    MEM_INIT((void*)hc4->hashTable, 0, sizeof(hc4->hashTable));
+    MEM_INIT(hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
 }
 
@@ -983,11 +983,10 @@ int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* s
 /* allocation */
 LZ4_streamHC_t* LZ4_createStreamHC(void)
 {
-    LZ4_streamHC_t* const state = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
-    if (LZ4_initStreamHC(state, sizeof(*state)) == NULL) {
-        free(state);
-        return NULL;
-    }
+    LZ4_streamHC_t* const state =
+        (LZ4_streamHC_t*)ALLOC_AND_ZERO(sizeof(LZ4_streamHC_t));
+    if (state == NULL) return NULL;
+    LZ4_setCompressionLevel(state, LZ4HC_CLEVEL_DEFAULT);
     return state;
 }
 
@@ -1326,7 +1325,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     int retval = 0;
 #define TRAILING_LITERALS 3
 #ifdef LZ4HC_HEAPMODE
-    LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)malloc(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
+    LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
 #else
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which is a bit large for stack... */
 #endif
@@ -1609,7 +1608,7 @@ if (limit == fillOutput) {
 }
 _return_label:
 #ifdef LZ4HC_HEAPMODE
-     free(opt);
+     FREEMEM(opt);
 #endif
      return retval;
 }

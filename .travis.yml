@@ -31,11 +31,15 @@ matrix:
       script:
         - CC=clang MOREFLAGS=-fsanitize=address make -C tests test-frametest test-fuzzer
 
-    - name: Custom LZ4_DISTANCE_MAX ; Build lz4-wlib (CLI linked to dynamic library)
+    - name: Custom LZ4_DISTANCE_MAX ; lz4-wlib (CLI linked to dynamic library); LZ4_USER_MEMORY_FUNCTIONS
       script:
         - MOREFLAGS=-DLZ4_DISTANCE_MAX=8000 make check
         - make clean
         - make -C programs lz4-wlib
+        - make clean
+        - make -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
+        - make clean
+        - CC="c++ -Wno-deprecated" make -C tests fullbench-wmalloc  # stricter function signature check
 
     - name: (Precise) g++ and clang CMake test
       dist: precise
