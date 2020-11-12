@@ -1,22 +1,22 @@
 version: 1.0.{build}
 environment:
   matrix:
-  - COMPILER: "visual"
-    CONFIGURATION: "Debug"
-    PLATFORM: "x64"
-  - COMPILER: "visual"
-    CONFIGURATION: "Debug"
-    PLATFORM: "Win32"
-  - COMPILER: "visual"
-    CONFIGURATION: "Release"
-    PLATFORM: "x64"
-  - COMPILER: "visual"
-    CONFIGURATION: "Release"
-    PLATFORM: "Win32"
   - COMPILER: "gcc"
     PLATFORM: "mingw64"
   - COMPILER: "gcc"
     PLATFORM: "mingw32"
+  - COMPILER: "visual"
+    CONFIGURATION: "Debug"
+    PLATFORM: "x64"
+  - COMPILER: "visual"
+    CONFIGURATION: "Debug"
+    PLATFORM: "Win32"
+  - COMPILER: "visual"
+    CONFIGURATION: "Release"
+    PLATFORM: "x64"
+  - COMPILER: "visual"
+    CONFIGURATION: "Release"
+    PLATFORM: "Win32"
   - COMPILER: "gcc"
     PLATFORM: "clang"
 
@@ -50,7 +50,7 @@ build_script:
         make -C programs lz4 &&
         make -C tests fullbench &&
         make -C tests fuzzer &&
-        make -C lib lib
+        make -C lib lib V=1
       ) ELSE (
         make -C programs lz4 CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
         make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
@@ -67,18 +67,18 @@ build_script:
       COPY lib\lz4hc.h bin\include\ &&
       COPY lib\lz4frame.h bin\include\ &&
       COPY lib\liblz4.a bin\static\liblz4_static.lib &&
-      COPY lib\dll\liblz4.* bin\dll\ &&
+      COPY lib\dll\* bin\dll\ &&
       COPY lib\dll\example\Makefile bin\example\ &&
       COPY lib\dll\example\fullbench-dll.* bin\example\ &&
       COPY lib\dll\example\README.md bin\ &&
       COPY programs\lz4.exe bin\lz4.exe
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
-      7z.exe a bin\lz4_x64.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
+      7z.exe a -bb1 bin\lz4_x64.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
       appveyor PushArtifact bin\lz4_x64.zip
     )
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
-      7z.exe a bin\lz4_x86.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
+      7z.exe a -bb1 bin\lz4_x86.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
       appveyor PushArtifact bin\lz4_x86.zip
     )
   - if [%COMPILER%]==[gcc] (COPY tests\*.exe programs\)
