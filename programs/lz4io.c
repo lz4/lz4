@@ -111,20 +111,20 @@ static clock_t g_time = 0;
 **************************************/
 
 struct LZ4IO_prefs_s {
-  int passThrough;
-  int overwrite;
-  int testMode;
-  int blockSizeId;
-  size_t blockSize;
-  int blockChecksum;
-  int streamChecksum;
-  int blockIndependence;
-  int sparseFileSupport;
-  int contentSizeFlag;
-  int useDictionary;
-  unsigned favorDecSpeed;
-  const char* dictionaryFilename;
-  int removeSrcFile;
+    int passThrough;
+    int overwrite;
+    int testMode;
+    int blockSizeId;
+    size_t blockSize;
+    int blockChecksum;
+    int streamChecksum;
+    int blockIndependence;
+    int sparseFileSupport;
+    int contentSizeFlag;
+    int useDictionary;
+    unsigned favorDecSpeed;
+    const char* dictionaryFilename;
+    int removeSrcFile;
 };
 
 /**************************************
@@ -440,7 +440,8 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_
 
         /* Compress Block */
         outSize = compressionFunction(in_buff, out_buff+4, (int)inSize, outBuffSize, compressionlevel);
-        compressedfilesize += outSize+4;
+        assert(outSize >= 0);
+        compressedfilesize += (unsigned long long)outSize+4;
         DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ",
                 (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
@@ -448,7 +449,7 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_
         assert(outSize > 0);
         assert(outSize < outBuffSize);
         LZ4IO_writeLE32(out_buff, (unsigned)outSize);
-        {   size_t const writeSize = fwrite(out_buff, 1, outSize+4, foutput);
+        {   size_t const writeSize = fwrite(out_buff, 1, (size_t)outSize+4, foutput);
             if (writeSize != (size_t)(outSize+4))
                 EXM_THROW(24, "Write error : cannot write compressed block");
     }   }
@@ -919,7 +920,7 @@ static unsigned LZ4IO_fwriteSparse(LZ4IO_prefs_t* const prefs, FILE* file, const
             int const seekResult = UTIL_fseek(file, storedSkips, SEEK_CUR);
             if (seekResult) EXM_THROW(74, "Sparse skip error ; try --no-sparse");
             storedSkips = 0;
-            {   size_t const sizeCheck = fwrite(restPtr, 1, restEnd - restPtr, file);
+            {   size_t const sizeCheck = fwrite(restPtr, 1, (size_t)(restEnd - restPtr), file);
                 if (sizeCheck != (size_t)(restEnd - restPtr)) EXM_THROW(75, "Write error : cannot write decoded end of block");
         }   }
     }
@@ -1099,7 +1100,10 @@ static unsigned long long LZ4IO_decompressLZ4F(LZ4IO_prefs_t* const prefs, dRess
 
 #define PTSIZE  (64 KB)
 #define PTSIZET (PTSIZE / sizeof(size_t))
-static unsigned long long LZ4IO_passThrough(LZ4IO_prefs_t* const prefs, FILE* finput, FILE* foutput, unsigned char MNstore[MAGICNUMBER_SIZE])
+static unsigned long long
+LZ4IO_passThrough(LZ4IO_prefs_t* const prefs,
+                  FILE* finput, FILE* foutput,
+                  unsigned char MNstore[MAGICNUMBER_SIZE])
 {
 	size_t buffer[PTSIZET];
     size_t readBytes = 1;
@@ -1351,7 +1355,7 @@ typedef struct {
     unsigned short allContentSize;
 } LZ4IO_cFileInfo_t;
 
-#define LZ4IO_INIT_CFILEINFO   { NULL, 0ULL, 0, LZ4IO_INIT_FRAMEINFO, 1, 1, 1 }
+#define LZ4IO_INIT_CFILEINFO  { NULL, 0ULL, 0, LZ4IO_INIT_FRAMEINFO, 1, 1, 1 }
 
 typedef enum { LZ4IO_LZ4F_OK, LZ4IO_format_not_known, LZ4IO_not_a_file } LZ4IO_infoResult;
 
@@ -1363,9 +1367,11 @@ static const char * LZ4IO_frameTypeNames[] = {"LZ4Frame", "LegacyFrame", "Skippa
    returns 0 in case it can't succesfully skip block data.
    Assumes SEEK_CUR after frame header.
  */
-static unsigned long long LZ4IO_skipBlocksData(FILE* finput,
-        const LZ4F_blockChecksum_t blockChecksumFlag,
-        const LZ4F_contentChecksum_t contentChecksumFlag) {
+static unsigned long long
+LZ4IO_skipBlocksData(FILE* finput,
+               const LZ4F_blockChecksum_t blockChecksumFlag,
+               const LZ4F_contentChecksum_t contentChecksumFlag)
+{
     unsigned char blockInfo[LZ4F_BLOCK_HEADER_SIZE];
     unsigned long long totalBlocksSize = 0;
     for (;;) {
@@ -1374,8 +1380,7 @@ static unsigned long long LZ4IO_skipBlocksData(FILE* finput,
             return 0;
         }
         totalBlocksSize += LZ4F_BLOCK_HEADER_SIZE;
-        {
-            const unsigned long nextCBlockSize = LZ4IO_readLE32(&blockInfo) & 0x7FFFFFFFU;
+        {   const unsigned long nextCBlockSize = LZ4IO_readLE32(&blockInfo) & 0x7FFFFFFFU;
             const unsigned long nextBlock = nextCBlockSize + (blockChecksumFlag * LZ4F_BLOCK_CHECKSUM_SIZE);
             if (nextCBlockSize == 0) {
                 /* Reached EndMark */
@@ -1390,11 +1395,9 @@ static unsigned long long LZ4IO_skipBlocksData(FILE* finput,
             }
             totalBlocksSize += nextBlock;
             /* skip to the next block */
-            if (UTIL_fseek(finput, nextBlock, SEEK_CUR) != 0) {
-                return 0;
-            }
-        }
-    }
+            assert(nextBlock < LONG_MAX);
+            if (UTIL_fseek(finput, (long)nextBlock, SEEK_CUR) != 0) return 0;
+    }   }
     return totalBlocksSize;
 }
 
@@ -1405,7 +1408,8 @@ static unsigned long long LZ4IO_skipBlocksData(FILE* finput,
    This works as long as legacy block header size = magic number size.
    Assumes SEEK_CUR after frame header.
  */
-static unsigned long long LZ4IO_skipLegacyBlocksData(FILE* finput) {
+static unsigned long long LZ4IO_skipLegacyBlocksData(FILE* finput)
+{
     unsigned char blockInfo[LZIO_LEGACY_BLOCK_HEADER_SIZE];
     unsigned long long totalBlocksSize = 0;
     LZ4IO_STATIC_ASSERT(LZIO_LEGACY_BLOCK_HEADER_SIZE == MAGICNUMBER_SIZE);
@@ -1428,14 +1432,15 @@ static unsigned long long LZ4IO_skipLegacyBlocksData(FILE* finput) {
             /* skip to the next block */
             if (UTIL_fseek(finput, nextCBlockSize, SEEK_CUR) != 0) {
                 return 0;
-            }
-        }
-    }
+    }   }   }
     return totalBlocksSize;
 }
 
-/* buffer : must be a valid memory area of at least 4 bytes */
-const char* LZ4IO_blockTypeID(int sizeID, int blockMode, char* buffer) {
+/* LZ4IO_blockTypeID:
+ * return human-readable block type, following command line convention
+ * buffer : must be a valid memory area of at least 4 bytes */
+const char* LZ4IO_blockTypeID(LZ4F_blockSizeID_t sizeID, LZ4F_blockMode_t blockMode, char buffer[4])
+{
     buffer[0] = 'B';
     assert(sizeID >= 4); assert(sizeID <= 7);
     buffer[1] = (char)(sizeID + '0');
@@ -1445,7 +1450,8 @@ const char* LZ4IO_blockTypeID(int sizeID, int blockMode, char* buffer) {
 }
 
 /* buffer : must be valid memory area of at least 10 bytes */
-static const char* LZ4IO_toHuman(long double size, char *buf) {
+static const char* LZ4IO_toHuman(long double size, char *buf)
+{
     const char units[] = {"\0KMGTPEZY"};
     size_t i = 0;
     for (; size >= 1024; i++) size /= 1024;
@@ -1454,14 +1460,15 @@ static const char* LZ4IO_toHuman(long double size, char *buf) {
 }
 
 /* Get filename without path prefix */
-static const char* LZ4IO_baseName(const char* input_filename) {
+static const char* LZ4IO_baseName(const char* input_filename)
+{
     const char* b = strrchr(input_filename, '/');
     if (!b) b = strrchr(input_filename, '\\');
     if (!b) return input_filename;
     return b + 1;
 }
 
-/* Report frame/s information in verbose mode.
+/* Report frame/s information (--list) in verbose mode (-v).
  * Will populate file info with fileName and frameSummary where applicable.
  * - TODO :
  *  + report nb of blocks, hence max. possible decompressed size (when not reported in header)
@@ -1480,11 +1487,12 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
         LZ4IO_frameInfo_t frameInfo = LZ4IO_INIT_FRAMEINFO;
         unsigned magicNumber;
         /* Get MagicNumber */
-        size_t nbReadBytes = fread(buffer, 1, MAGICNUMBER_SIZE, finput);
-        if (nbReadBytes == 0) { break; } /* EOF */
-        result = LZ4IO_format_not_known;  /* default result (error) */
-        if (nbReadBytes != MAGICNUMBER_SIZE)
-            EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
+        {   size_t const nbReadBytes = fread(buffer, 1, MAGICNUMBER_SIZE, finput);
+            if (nbReadBytes == 0) { break; } /* EOF */
+            result = LZ4IO_format_not_known;  /* default result (error) */
+            if (nbReadBytes != MAGICNUMBER_SIZE) {
+                EXM_THROW(40, "Unrecognized header : Magic Number unreadable");
+        }   }
         magicNumber = LZ4IO_readLE32(buffer);   /* Little Endian format */
         if (LZ4IO_isSkippableMagicNumber(magicNumber))
             magicNumber = LZ4IO_SKIPPABLE0;   /* fold skippable magic numbers */
@@ -1497,56 +1505,49 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                 if (!readBytes || ferror(finput)) EXM_THROW(71, "Error reading %s", input_filename);
             }
             {   size_t hSize = LZ4F_headerSize(&buffer, LZ4F_HEADER_SIZE_MIN);
-                if (!LZ4F_isError(hSize)) {
-                    if (hSize > (LZ4F_HEADER_SIZE_MIN + MAGICNUMBER_SIZE)) {
-                        /* We've already read LZ4F_HEADER_SIZE_MIN so read any extra until hSize*/
-                        const size_t readBytes = fread(buffer + LZ4F_HEADER_SIZE_MIN, 1, hSize - LZ4F_HEADER_SIZE_MIN, finput);
-                        if (!readBytes || ferror(finput)) EXM_THROW(72, "Error reading %s", input_filename);
-                    }
-                    /* Create decompression context */
-                    {   LZ4F_dctx* dctx;
-                        unsigned isError = LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
-                        if (!isError) {
-                            isError = LZ4F_isError(LZ4F_getFrameInfo(dctx, &frameInfo.lz4FrameInfo, buffer, &hSize));
-                            LZ4F_freeDecompressionContext(dctx);
-                            if (!isError) {
-                                if ((cfinfo->frameSummary.lz4FrameInfo.blockSizeID != frameInfo.lz4FrameInfo.blockSizeID ||
-                                        cfinfo->frameSummary.lz4FrameInfo.blockMode != frameInfo.lz4FrameInfo.blockMode)
-                                        && cfinfo->frameCount != 0)
-                                    cfinfo->eqBlockTypes = 0;
-                                {   const unsigned long long totalBlocksSize = LZ4IO_skipBlocksData(finput,
-                                            frameInfo.lz4FrameInfo.blockChecksumFlag,
-                                            frameInfo.lz4FrameInfo.contentChecksumFlag);
-                                    if (totalBlocksSize) {
-                                        char bTypeBuffer[5];
-                                        LZ4IO_blockTypeID(frameInfo.lz4FrameInfo.blockSizeID, frameInfo.lz4FrameInfo.blockMode, bTypeBuffer);
-                                        DISPLAYLEVEL(3, "    %6llu %14s %5s %8s",
-                                                     cfinfo->frameCount + 1,
-                                                     LZ4IO_frameTypeNames[frameInfo.frameType],
-                                                     bTypeBuffer,
-                                                     frameInfo.lz4FrameInfo.contentChecksumFlag ? "XXH32" : "-");
-                                        if (frameInfo.lz4FrameInfo.contentSize) {
-                                            {   double const ratio = (double)(totalBlocksSize + hSize) / frameInfo.lz4FrameInfo.contentSize * 100;
-                                                DISPLAYLEVEL(3, " %20llu %20llu %9.2f%%\n",
-                                                             totalBlocksSize + hSize,
-                                                             frameInfo.lz4FrameInfo.contentSize,
-                                                             ratio);
-                                            }
-                                            /* Now we've consumed frameInfo we can use it to store the total contentSize */
-                                            frameInfo.lz4FrameInfo.contentSize += cfinfo->frameSummary.lz4FrameInfo.contentSize;
-                                        }
-                                        else {
-                                            DISPLAYLEVEL(3, " %20llu %20s %9s \n", totalBlocksSize + hSize, "-", "-");
-                                            cfinfo->allContentSize = 0;
-                                        }
-                                        result = LZ4IO_LZ4F_OK;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if (LZ4F_isError(hSize)) break;
+                if (hSize > (LZ4F_HEADER_SIZE_MIN + MAGICNUMBER_SIZE)) {
+                    /* We've already read LZ4F_HEADER_SIZE_MIN so read any extra until hSize*/
+                    const size_t readBytes = fread(buffer + LZ4F_HEADER_SIZE_MIN, 1, hSize - LZ4F_HEADER_SIZE_MIN, finput);
+                    if (!readBytes || ferror(finput)) EXM_THROW(72, "Error reading %s", input_filename);
                 }
-            }
+                /* Create decompression context */
+                {   LZ4F_dctx* dctx;
+                    if ( LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION)) ) break;
+                    {   unsigned const frameInfoError = LZ4F_isError(LZ4F_getFrameInfo(dctx, &frameInfo.lz4FrameInfo, buffer, &hSize));
+                        LZ4F_freeDecompressionContext(dctx);
+                        if (frameInfoError) break;
+                        if ((cfinfo->frameSummary.lz4FrameInfo.blockSizeID != frameInfo.lz4FrameInfo.blockSizeID ||
+                                cfinfo->frameSummary.lz4FrameInfo.blockMode != frameInfo.lz4FrameInfo.blockMode)
+                                && cfinfo->frameCount != 0)
+                            cfinfo->eqBlockTypes = 0;
+                        {   const unsigned long long totalBlocksSize = LZ4IO_skipBlocksData(finput,
+                                    frameInfo.lz4FrameInfo.blockChecksumFlag,
+                                    frameInfo.lz4FrameInfo.contentChecksumFlag);
+                            if (totalBlocksSize) {
+                                char bTypeBuffer[5];
+                                LZ4IO_blockTypeID(frameInfo.lz4FrameInfo.blockSizeID, frameInfo.lz4FrameInfo.blockMode, bTypeBuffer);
+                                DISPLAYLEVEL(3, "    %6llu %14s %5s %8s",
+                                             cfinfo->frameCount + 1,
+                                             LZ4IO_frameTypeNames[frameInfo.frameType],
+                                             bTypeBuffer,
+                                             frameInfo.lz4FrameInfo.contentChecksumFlag ? "XXH32" : "-");
+                                if (frameInfo.lz4FrameInfo.contentSize) {
+                                    {   double const ratio = (double)(totalBlocksSize + hSize) / frameInfo.lz4FrameInfo.contentSize * 100;
+                                        DISPLAYLEVEL(3, " %20llu %20llu %9.2f%%\n",
+                                                     totalBlocksSize + hSize,
+                                                     frameInfo.lz4FrameInfo.contentSize,
+                                                     ratio);
+                                    }
+                                    /* Now we've consumed frameInfo we can use it to store the total contentSize */
+                                    frameInfo.lz4FrameInfo.contentSize += cfinfo->frameSummary.lz4FrameInfo.contentSize;
+                                }
+                                else {
+                                    DISPLAYLEVEL(3, " %20llu %20s %9s \n", totalBlocksSize + hSize, "-", "-");
+                                    cfinfo->allContentSize = 0;
+                                }
+                                result = LZ4IO_LZ4F_OK;
+            }   }   }   }   }
             break;
         case LEGACY_MAGICNUMBER:
             frameInfo.frameType = legacyFrame;
@@ -1569,7 +1570,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
             if (cfinfo->frameSummary.frameType != skippableFrame && cfinfo->frameCount != 0) cfinfo->eqFrameTypes = 0;
             cfinfo->eqBlockTypes = 0;
             cfinfo->allContentSize = 0;
-            {   nbReadBytes = fread(buffer, 1, 4, finput);
+            {   size_t const nbReadBytes = fread(buffer, 1, 4, finput);
                 if (nbReadBytes != 4)
                     EXM_THROW(42, "Stream error : skippable size unreadable");
             }
@@ -1594,12 +1595,10 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
             }
         break;
         }
-        if (result != LZ4IO_LZ4F_OK) {
-            break;
-        }
+        if (result != LZ4IO_LZ4F_OK) break;
         cfinfo->frameSummary = frameInfo;
         cfinfo->frameCount++;
-    }
+    }  /* while (!feof(finput)) */
     fclose(finput);
     return result;
 }
