@@ -600,9 +600,7 @@ static LZ4F_CDict* LZ4IO_createCDict(LZ4IO_prefs_t* const prefs) {
     size_t dictionarySize;
     void* dictionaryBuffer;
     LZ4F_CDict* cdict;
-    if (!prefs->useDictionary) {
-        return NULL;
-    }
+    if (!prefs->useDictionary) return NULL;
     dictionaryBuffer = LZ4IO_createDict(prefs, &dictionarySize);
     if (!dictionaryBuffer) EXM_THROW(25, "Dictionary error : could not create dictionary");
     cdict = LZ4F_createCDict(dictionaryBuffer, dictionarySize);
@@ -654,7 +652,6 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
-    FILE* srcFile;
     FILE* dstFile;
     void* const srcBuffer = ress.srcBuffer;
     void* const dstBuffer = ress.dstBuffer;
@@ -665,12 +662,11 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
     LZ4F_preferences_t prefs;
 
     /* Init */
-    srcFile = LZ4IO_openSrcFile(srcFileName);
+    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
     if (srcFile == NULL) return 1;
     dstFile = LZ4IO_openDstFile(io_prefs, dstFileName);
     if (dstFile == NULL) { fclose(srcFile); return 1; }
     memset(&prefs, 0, sizeof(prefs));
-
 
     /* Set compression parameters */
     prefs.autoFlush = 1;
@@ -695,41 +691,41 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
     /* single-block file */
     if (readSize < blockSize) {
         /* Compress in single pass */
-        size_t cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
-        if (LZ4F_isError(cSize)) EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
+        size_t const cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress.cdict, &prefs);
+        if (LZ4F_isError(cSize))
+            EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(filesize+!filesize)*100);   /* avoid division by zero */
 
         /* Write Block */
-        {   size_t const sizeCheck = fwrite(dstBuffer, 1, cSize, dstFile);
-            if (sizeCheck!=cSize) EXM_THROW(32, "Write error : cannot write compressed block");
+        if (fwrite(dstBuffer, 1, cSize, dstFile) != cSize) {
+            EXM_THROW(32, "Write error : failed writing single-block compressed frame");
     }   }
 
     else
 
     /* multiple-blocks file */
     {
-        /* Write Archive Header */
-        size_t headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
+        /* Write Frame Header */
+        size_t const headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
         if (LZ4F_isError(headerSize)) EXM_THROW(33, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
-        { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-          if (sizeCheck!=headerSize) EXM_THROW(34, "Write error : cannot write header"); }
+        if (fwrite(dstBuffer, 1, headerSize, dstFile) != headerSize)
+            EXM_THROW(34, "Write error : cannot write header");
         compressedfilesize += headerSize;
 
-        /* Main Loop */
+        /* Main Loop - one block at a time */
         while (readSize>0) {
-            size_t outSize;
-
-            /* Compress Block */
-            outSize = LZ4F_compressUpdate(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, NULL);
-            if (LZ4F_isError(outSize)) EXM_THROW(35, "Compression failed : %s", LZ4F_getErrorName(outSize));
+            size_t const outSize = LZ4F_compressUpdate(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, NULL);
+            if (LZ4F_isError(outSize))
+                EXM_THROW(35, "Compression failed : %s", LZ4F_getErrorName(outSize));
             compressedfilesize += outSize;
-            DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ", (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
+            DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
+                        (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
 
             /* Write Block */
-            { size_t const sizeCheck = fwrite(dstBuffer, 1, outSize, dstFile);
-              if (sizeCheck!=outSize) EXM_THROW(36, "Write error : cannot write compressed block"); }
+            if (fwrite(dstBuffer, 1, outSize, dstFile) != outSize)
+                EXM_THROW(36, "Write error : cannot write compressed block");
 
             /* Read next block */
             readSize  = fread(srcBuffer, (size_t)1, (size_t)blockSize, srcFile);
@@ -737,18 +733,18 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
         }
         if (ferror(srcFile)) EXM_THROW(37, "Error reading %s ", srcFileName);
 
-        /* End of Stream mark */
-        headerSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
-        if (LZ4F_isError(headerSize)) EXM_THROW(38, "End of file generation failed : %s", LZ4F_getErrorName(headerSize));
-
-        { size_t const sizeCheck = fwrite(dstBuffer, 1, headerSize, dstFile);
-          if (sizeCheck!=headerSize) EXM_THROW(39, "Write error : cannot write end of stream"); }
-        compressedfilesize += headerSize;
-    }
+        /* End of Frame mark */
+        {   size_t const endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
+            if (LZ4F_isError(endSize))
+                EXM_THROW(38, "End of frame error : %s", LZ4F_getErrorName(endSize));
+            if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
+                EXM_THROW(39, "Write error : cannot write end of frame");
+            compressedfilesize += endSize;
+    }   }
 
     /* Release file handlers */
     fclose (srcFile);
-    if (strcmp(dstFileName,stdoutmark)) fclose (dstFile);   /* do not close stdout */
+    if (strcmp(dstFileName,stdoutmark)) fclose (dstFile);  /* do not close stdout */
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
