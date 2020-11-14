@@ -325,6 +325,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 }
 
 /** FIO_openDstFile() :
+ *  prefs is writable, because sparseFileSupport might be updated
  *  condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
 static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileName)
@@ -858,7 +859,11 @@ static unsigned LZ4IO_readLE32 (const void* s)
 }
 
 
-static unsigned LZ4IO_fwriteSparse(LZ4IO_prefs_t* const prefs, FILE* file, const void* buffer, size_t bufferSize, unsigned storedSkips)
+static unsigned
+LZ4IO_fwriteSparse(FILE* file,
+                   const void* buffer, size_t bufferSize,
+                   int sparseFileSupport,
+                   unsigned storedSkips)
 {
     const size_t sizeT = sizeof(size_t);
     const size_t maskT = sizeT -1 ;
@@ -868,7 +873,7 @@ static unsigned LZ4IO_fwriteSparse(LZ4IO_prefs_t* const prefs, FILE* file, const
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     const size_t segmentSizeT = (32 KB) / sizeT;
 
-    if (!prefs->sparseFileSupport) {  /* normal write */
+    if (!sparseFileSupport) {  /* normal write */
         size_t const sizeCheck = fwrite(buffer, 1, bufferSize, file);
         if (sizeCheck != bufferSize) EXM_THROW(70, "Write error : cannot write decoded block");
         return 0;
@@ -971,7 +976,7 @@ static unsigned long long LZ4IO_decodeLegacyStream(LZ4IO_prefs_t* const prefs, F
             if (decodeSize < 0) EXM_THROW(53, "Decoding Failed ! Corrupted input detected !");
             streamSize += (unsigned long long)decodeSize;
             /* Write Block */
-            storedSkips = LZ4IO_fwriteSparse(prefs, foutput, out_buff, (size_t)decodeSize, storedSkips); /* success or die */
+            storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, (size_t)decodeSize, prefs->sparseFileSupport, storedSkips); /* success or die */
     }   }
     if (ferror(finput)) EXM_THROW(54, "Read error : ferror");
 
@@ -1076,7 +1081,7 @@ static unsigned long long LZ4IO_decompressLZ4F(LZ4IO_prefs_t* const prefs, dRess
             /* Write Block */
             if (decodedBytes) {
                 if (!prefs->testMode)
-                    storedSkips = LZ4IO_fwriteSparse(prefs, dstFile, ress.dstBuffer, decodedBytes, storedSkips);
+                    storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, prefs->sparseFileSupport, storedSkips);
                 filesize += decodedBytes;
                 DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
             }
@@ -1112,7 +1117,7 @@ LZ4IO_passThrough(LZ4IO_prefs_t* const prefs,
     while (readBytes) {
         readBytes = fread(buffer, 1, PTSIZE, finput);
         total += readBytes;
-        storedSkips = LZ4IO_fwriteSparse(prefs, foutput, buffer, readBytes, storedSkips);
+        storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, prefs->sparseFileSupport, storedSkips);
     }
     if (ferror(finput)) EXM_THROW(51, "Read Error");
 
