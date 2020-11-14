@@ -533,7 +533,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
             return (unsigned)(((U64)((val & (m - 1)) * m)) >> 56);
 #       endif
         } else /* 32 bits */ {
-#       if defined(_MSC_VER) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       if defined(_MSC_VER) && (_MSC_VER >= 1400) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r;
             _BitScanForward(&r, (U32)val);
             return (unsigned)r >> 3;
