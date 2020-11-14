@@ -178,7 +178,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     return ret;
 }
 
-void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs)
+void LZ4IO_freePreferences(LZ4IO_prefs_t* prefs)
 {
     free(prefs);
 }
@@ -396,9 +396,8 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
-                                  const char* input_filename, const char* output_filename,
-                                  int compressionlevel)
+int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename,
+                                  int compressionlevel, const LZ4IO_prefs_t* prefs)
 {
     typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
@@ -483,10 +482,10 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
 /* LZ4IO_compressMultipleFilenames_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates multiple compressed streams using the old 'legacy' format */
-int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
+int LZ4IO_compressMultipleFilenames_Legacy(
                             const char** inFileNamesTable, int ifntSize,
                             const char* suffix,
-                            int compressionLevel)
+                            int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
     int i;
     int missed_files = 0;
@@ -500,9 +499,9 @@ int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (!strcmp(suffix, stdoutmark)) {
-            missed_files += LZ4IO_compressFilename_Legacy(prefs,
+            missed_files += LZ4IO_compressFilename_Legacy(
                                     inFileNamesTable[i], stdoutmark,
-                                    compressionLevel);
+                                    compressionLevel, prefs);
             continue;
         }
 
@@ -516,9 +515,9 @@ int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_Legacy(prefs,
+        missed_files += LZ4IO_compressFilename_Legacy(
                                 inFileNamesTable[i], dstFileName,
-                                compressionLevel);
+                                compressionLevel, prefs);
     }
 
     /* Close & Free */
@@ -610,7 +609,7 @@ static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* const prefs)
     return cdict;
 }
 
-static cRess_t LZ4IO_createCResources(LZ4IO_prefs_t* const prefs)
+static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* const prefs)
 {
     const size_t blockSize = prefs->blockSize;
     cRess_t ress;
@@ -644,14 +643,13 @@ static void LZ4IO_freeCResources(cRess_t ress)
 
 /*
  * LZ4IO_compressFilename_extRess()
- * io_prefs is mutable, as it may update sparseFileSupport
  * result : 0 : compression completed correctly
  *          1 : missing or pb opening srcFileName
  */
 static int
-LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
+LZ4IO_compressFilename_extRess(cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
-                               int compressionLevel)
+                               int compressionLevel, const LZ4IO_prefs_t* const io_prefs)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -773,13 +771,13 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
 }
 
 
-int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, const char* dstFileName, int compressionLevel)
+int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
     UTIL_time_t const timeStart = UTIL_getTime();
     clock_t const cpuStart = clock();
     cRess_t const ress = LZ4IO_createCResources(prefs);
 
-    int const result = LZ4IO_compressFilename_extRess(prefs, ress, srcFileName, dstFileName, compressionLevel);
+    int const result = LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel, prefs);
 
     /* Free resources */
     LZ4IO_freeCResources(ress);
@@ -797,10 +795,11 @@ int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, 
 }
 
 
-int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
+int LZ4IO_compressMultipleFilenames(
                               const char** inFileNamesTable, int ifntSize,
                               const char* suffix,
-                              int compressionLevel)
+                              int compressionLevel,
+                              const LZ4IO_prefs_t* prefs)
 {
     int i;
     int missed_files = 0;
@@ -816,9 +815,9 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (!strcmp(suffix, stdoutmark)) {
-            missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+            missed_files += LZ4IO_compressFilename_extRess(ress,
                                     inFileNamesTable[i], stdoutmark,
-                                    compressionLevel);
+                                    compressionLevel, prefs);
             continue;
         }
         if (ofnSize <= ifnSize+suffixSize+1) {
@@ -832,9 +831,9 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+        missed_files += LZ4IO_compressFilename_extRess(ress,
                                 inFileNamesTable[i], dstFileName,
-                                compressionLevel);
+                                compressionLevel, prefs);
     }
 
     /* Close & Free */
@@ -1260,9 +1259,9 @@ LZ4IO_decompressSrcFile(dRess_t ress,
 
 
 static int
-LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs,
-                        dRess_t ress,
-                        const char* input_filename, const char* output_filename)
+LZ4IO_decompressDstFile(dRess_t ress,
+                        const char* input_filename, const char* output_filename,
+                        const LZ4IO_prefs_t* const prefs)
 {
     stat_t statbuf;
     int stat_result = 0;
@@ -1290,12 +1289,12 @@ LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs,
 }
 
 
-int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename)
+int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename, const LZ4IO_prefs_t* prefs)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
     clock_t const start = clock();
 
-    int const missingFiles = LZ4IO_decompressDstFile(prefs, ress, input_filename, output_filename);
+    int const missingFiles = LZ4IO_decompressDstFile(ress, input_filename, output_filename, prefs);
 
     clock_t const end = clock();
     double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
@@ -1306,9 +1305,10 @@ int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filen
 }
 
 
-int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
-                                const char** inFileNamesTable, int ifntSize,
-                                const char* suffix)
+int LZ4IO_decompressMultipleFilenames(
+                            const char** inFileNamesTable, int ifntSize,
+                            const char* suffix,
+                            const LZ4IO_prefs_t* prefs)
 {
     int i;
     int skippedFiles = 0;
@@ -1341,7 +1341,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
         }
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
-        missingFiles += LZ4IO_decompressDstFile(prefs, ress, inFileNamesTable[i], outFileName);
+        missingFiles += LZ4IO_decompressDstFile(ress, inFileNamesTable[i], outFileName, prefs);
     }
 
     LZ4IO_freeDResources(ress);
