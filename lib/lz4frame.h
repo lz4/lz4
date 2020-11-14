@@ -108,7 +108,7 @@ LZ4FLIB_API const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /**< return 
 
 /*-************************************
  *  Frame compression types
- **************************************/
+ ************************************* */
 /* #define LZ4F_ENABLE_OBSOLETE_ENUMS   // uncomment to enable obsolete enums */
 #ifdef LZ4F_ENABLE_OBSOLETE_ENUMS
 #  define LZ4F_OBSOLETE_ENUM(x) , LZ4F_DEPRECATE(x) = LZ4F_##x
@@ -118,7 +118,8 @@ LZ4FLIB_API const char* LZ4F_getErrorName(LZ4F_errorCode_t code);   /**< return 
 
 /* The larger the block size, the (slightly) better the compression ratio,
  * though there are diminishing returns.
- * Larger blocks also increase memory usage on both compression and decompression sides. */
+ * Larger blocks also increase memory usage on both compression and decompression sides.
+ */
 typedef enum {
     LZ4F_default=0,
     LZ4F_max64KB=4,
