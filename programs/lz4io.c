@@ -1102,25 +1102,30 @@ LZ4IO_decompressLZ4F(dRess_t ress,
 }
 
 
+/* LZ4IO_passThrough:
+ * just output the same content as input, no decoding.
+ * This is a capability of zcat, and by extension lz4cat
+ * MNstore : contain the first MAGICNUMBER_SIZE bytes already read from finput
+ */
 #define PTSIZE  (64 KB)
 #define PTSIZET (PTSIZE / sizeof(size_t))
 static unsigned long long
-LZ4IO_passThrough(LZ4IO_prefs_t* const prefs,
-                  FILE* finput, FILE* foutput,
-                  unsigned char MNstore[MAGICNUMBER_SIZE])
+LZ4IO_passThrough(FILE* finput, FILE* foutput,
+                  unsigned char MNstore[MAGICNUMBER_SIZE],
+                  int sparseFileSupport)
 {
 	size_t buffer[PTSIZET];
     size_t readBytes = 1;
     unsigned long long total = MAGICNUMBER_SIZE;
     unsigned storedSkips = 0;
 
-    size_t const sizeCheck = fwrite(MNstore, 1, MAGICNUMBER_SIZE, foutput);
-    if (sizeCheck != MAGICNUMBER_SIZE) EXM_THROW(50, "Pass-through write error");
-
+    if (fwrite(MNstore, 1, MAGICNUMBER_SIZE, foutput) != MAGICNUMBER_SIZE) {
+        EXM_THROW(50, "Pass-through write error");
+    }
     while (readBytes) {
-        readBytes = fread(buffer, 1, PTSIZE, finput);
+        readBytes = fread(buffer, 1, sizeof(buffer), finput);
         total += readBytes;
-        storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, prefs->sparseFileSupport, storedSkips);
+        storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, sparseFileSupport, storedSkips);
     }
     if (ferror(finput)) EXM_THROW(51, "Read Error");
 
@@ -1198,7 +1203,7 @@ selectDecoder(LZ4IO_prefs_t* const prefs,
             /* Wrong magic number at the beginning of 1st stream */
             if (!prefs->testMode && prefs->overwrite && prefs->passThrough) {
                 nbFrames = 0;
-                return LZ4IO_passThrough(prefs, finput, foutput, MNstore);
+                return LZ4IO_passThrough(finput, foutput, MNstore, prefs->sparseFileSupport);
             }
             EXM_THROW(44,"Unrecognized header : file cannot be decoded");
         }
