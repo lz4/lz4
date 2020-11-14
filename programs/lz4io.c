@@ -159,28 +159,28 @@ struct LZ4IO_prefs_s {
 
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
 {
-  LZ4IO_prefs_t* const ret = (LZ4IO_prefs_t*)malloc(sizeof(LZ4IO_prefs_t));
-  if (!ret) EXM_THROW(21, "Allocation error : not enough memory");
-  ret->passThrough = 0;
-  ret->overwrite = 1;
-  ret->testMode = 0;
-  ret->blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
-  ret->blockSize = 0;
-  ret->blockChecksum = 0;
-  ret->streamChecksum = 1;
-  ret->blockIndependence = 1;
-  ret->sparseFileSupport = 1;
-  ret->contentSizeFlag = 0;
-  ret->useDictionary = 0;
-  ret->favorDecSpeed = 0;
-  ret->dictionaryFilename = NULL;
-  ret->removeSrcFile = 0;
-  return ret;
+    LZ4IO_prefs_t* const ret = (LZ4IO_prefs_t*)malloc(sizeof(*ret));
+    if (!ret) EXM_THROW(21, "Allocation error : not enough memory");
+    ret->passThrough = 0;
+    ret->overwrite = 1;
+    ret->testMode = 0;
+    ret->blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
+    ret->blockSize = 0;
+    ret->blockChecksum = 0;
+    ret->streamChecksum = 1;
+    ret->blockIndependence = 1;
+    ret->sparseFileSupport = 1;
+    ret->contentSizeFlag = 0;
+    ret->useDictionary = 0;
+    ret->favorDecSpeed = 0;
+    ret->dictionaryFilename = NULL;
+    ret->removeSrcFile = 0;
+    return ret;
 }
 
 void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs)
 {
-  free(prefs);
+    free(prefs);
 }
 
 
@@ -242,20 +242,21 @@ size_t LZ4IO_setBlockSize(LZ4IO_prefs_t* const prefs, size_t blockSize)
     return prefs->blockSize;
 }
 
+/* Default setting : 1 == independent blocks */
 int LZ4IO_setBlockMode(LZ4IO_prefs_t* const prefs, LZ4IO_blockMode_t blockMode)
 {
     prefs->blockIndependence = (blockMode == LZ4IO_blockIndependent);
     return prefs->blockIndependence;
 }
 
-/* Default setting : no block checksum */
+/* Default setting : 0 == no block checksum */
 int LZ4IO_setBlockChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->blockChecksum = (enable != 0);
     return prefs->blockChecksum;
 }
 
-/* Default setting : checksum enabled */
+/* Default setting : 1 == checksum enabled */
 int LZ4IO_setStreamChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->streamChecksum = (enable != 0);
@@ -269,10 +270,10 @@ int LZ4IO_setNotificationLevel(int level)
     return g_displayLevel;
 }
 
-/* Default setting : 0 (disabled) */
+/* Default setting : 1 (auto: enabled on file, disabled on stdout) */
 int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable)
 {
-    prefs->sparseFileSupport = 2*(enable!=0);
+    prefs->sparseFileSupport = 2*(enable!=0);  /* 2==force enable */
     return prefs->sparseFileSupport;
 }
 
@@ -328,7 +329,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
  *  prefs is writable, because sparseFileSupport might be updated.
  *  condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
-static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileName)
+static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 {
     FILE* f;
     assert(dstFileName != NULL);
@@ -338,7 +339,6 @@ static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileNa
         f = stdout;
         SET_BINARY_MODE(stdout);
         if (prefs->sparseFileSupport==1) {
-            prefs->sparseFileSupport = 0;
             DISPLAYLEVEL(4, "Sparse File Support automatically disabled on stdout ;"
                             " to force-enable it, add --sparse command \n");
         }
@@ -364,7 +364,9 @@ static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileNa
     }
 
     /* sparse file */
-    if (f && prefs->sparseFileSupport) { SET_SPARSE_FILE_MODE(f); }
+    {   int const sparseMode = (prefs->sparseFileSupport - (f==stdout)) > 0;
+        if (f && sparseMode) SET_SPARSE_FILE_MODE(f);
+    }
 
     return f;
 }
@@ -414,7 +416,7 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
     if (finput == NULL)
         EXM_THROW(20, "%s : open file error ", input_filename);
 
-    foutput = LZ4IO_openDstFile(prefs, output_filename);
+    foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput == NULL) {
         fclose(finput);
         EXM_THROW(20, "%s : open file error ", input_filename);
@@ -665,7 +667,7 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
     /* Init */
     FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
     if (srcFile == NULL) return 1;
-    dstFile = LZ4IO_openDstFile(io_prefs, dstFileName);
+    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
     if (dstFile == NULL) { fclose(srcFile); return 1; }
     memset(&prefs, 0, sizeof(prefs));
 
@@ -872,8 +874,9 @@ LZ4IO_fwriteSparse(FILE* file,
     size_t bufferSizeT = bufferSize / sizeT;
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     const size_t segmentSizeT = (32 KB) / sizeT;
+    int const sparseMode = (sparseFileSupport - (file==stdout)) > 0;
 
-    if (!sparseFileSupport) {  /* normal write */
+    if (!sparseMode) {  /* normal write */
         size_t const sizeCheck = fwrite(buffer, 1, bufferSize, file);
         if (sizeCheck != bufferSize) EXM_THROW(70, "Write error : cannot write decoded block");
         return 0;
@@ -1263,7 +1266,7 @@ LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs,
 {
     stat_t statbuf;
     int stat_result = 0;
-    FILE* const foutput = LZ4IO_openDstFile(prefs, output_filename);
+    FILE* const foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput==NULL) return 1;   /* failure */
 
     if ( strcmp(input_filename, stdinmark)
@@ -1316,7 +1319,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
     dRess_t ress = LZ4IO_createDResources(prefs);
 
     if (outFileName==NULL) EXM_THROW(70, "Memory allocation error");
-    ress.dstFile = LZ4IO_openDstFile(prefs, stdoutmark);
+    ress.dstFile = LZ4IO_openDstFile(stdoutmark, prefs);
 
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);

@@ -77,7 +77,7 @@ extern "C" {
 *  PLATFORM_POSIX_VERSION = -1 for non-Unix e.g. Windows
 *  PLATFORM_POSIX_VERSION = 0 for Unix-like non-POSIX
 *  PLATFORM_POSIX_VERSION >= 1 is equal to found _POSIX_VERSION
-***************************************************************/
+************************************************************** */
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) /* UNIX-like OS */ \
    || defined(__midipix__) || defined(__VMS))
 #  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux) /* POSIX.1–2001 (SUSv3) conformant */ \
@@ -105,7 +105,7 @@ extern "C" {
 
 /*-*********************************************
 *  Detect if isatty() and fileno() are available
-************************************************/
+*********************************************** */
 #if (defined(__linux__) && (PLATFORM_POSIX_VERSION >= 1)) || (PLATFORM_POSIX_VERSION >= 200112L) || defined(__DJGPP__)
 #  include <unistd.h>   /* isatty */
 #  define IS_CONSOLE(stdStream) isatty(fileno(stdStream))
@@ -128,7 +128,7 @@ static __inline int IS_CONSOLE(FILE* stdStream)
 
 /******************************
 *  OS-specific Includes
-******************************/
+***************************** */
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32)
 #  include <fcntl.h>   /* _O_BINARY */
 #  include <io.h>      /* _setmode, _fileno, _get_osfhandle */
