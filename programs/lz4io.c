@@ -272,7 +272,7 @@ int LZ4IO_setNotificationLevel(int level)
 /* Default setting : 0 (disabled) */
 int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable)
 {
-    prefs->sparseFileSupport = (enable!=0);
+    prefs->sparseFileSupport = 2*(enable!=0);
     return prefs->sparseFileSupport;
 }
 
