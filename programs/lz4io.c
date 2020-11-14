@@ -325,7 +325,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 }
 
 /** FIO_openDstFile() :
- *  prefs is writable, because sparseFileSupport might be updated
+ *  prefs is writable, because sparseFileSupport might be updated.
  *  condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
 static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileName)
@@ -334,18 +334,19 @@ static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileNa
     assert(dstFileName != NULL);
 
     if (!strcmp (dstFileName, stdoutmark)) {
-        DISPLAYLEVEL(4,"Using stdout for output\n");
+        DISPLAYLEVEL(4, "Using stdout for output \n");
         f = stdout;
         SET_BINARY_MODE(stdout);
         if (prefs->sparseFileSupport==1) {
             prefs->sparseFileSupport = 0;
-            DISPLAYLEVEL(4, "Sparse File Support is automatically disabled on stdout ; try --sparse \n");
+            DISPLAYLEVEL(4, "Sparse File Support automatically disabled on stdout ;"
+                            " to force-enable it, add --sparse command \n");
         }
     } else {
         if (!prefs->overwrite && strcmp (dstFileName, nulmark)) {  /* Check if destination file already exists */
-            f = fopen( dstFileName, "rb" );
-            if (f != NULL) {  /* dest exists, prompt for overwrite authorization */
-                fclose(f);
+            FILE* const testf = fopen( dstFileName, "rb" );
+            if (testf != NULL) {  /* dest exists, prompt for overwrite authorization */
+                fclose(testf);
                 if (g_displayLevel <= 1) {  /* No interaction possible */
                     DISPLAY("%s already exists; not overwritten  \n", dstFileName);
                     return NULL;
@@ -393,7 +394,9 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename, int compressionlevel)
+int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
+                                  const char* input_filename, const char* output_filename,
+                                  int compressionlevel)
 {
     typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
@@ -425,18 +428,16 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_
 
     /* Write Archive Header */
     LZ4IO_writeLE32(out_buff, LEGACY_MAGICNUMBER);
-    {   size_t const writeSize = fwrite(out_buff, 1, MAGICNUMBER_SIZE, foutput);
-        if (writeSize != MAGICNUMBER_SIZE)
-            EXM_THROW(22, "Write error : cannot write header");
-    }
+    if (fwrite(out_buff, 1, MAGICNUMBER_SIZE, foutput) != MAGICNUMBER_SIZE)
+        EXM_THROW(22, "Write error : cannot write header");
 
     /* Main Loop */
     while (1) {
         int outSize;
         /* Read Block */
         size_t const inSize = fread(in_buff, (size_t)1, (size_t)LEGACY_BLOCKSIZE, finput);
-        assert(inSize <= LEGACY_BLOCKSIZE);
         if (inSize == 0) break;
+        assert(inSize <= LEGACY_BLOCKSIZE);
         filesize += inSize;
 
         /* Compress Block */
@@ -450,9 +451,8 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs, const char* input_
         assert(outSize > 0);
         assert(outSize < outBuffSize);
         LZ4IO_writeLE32(out_buff, (unsigned)outSize);
-        {   size_t const writeSize = fwrite(out_buff, 1, (size_t)outSize+4, foutput);
-            if (writeSize != (size_t)(outSize+4))
-                EXM_THROW(24, "Write error : cannot write compressed block");
+        if (fwrite(out_buff, 1, (size_t)outSize+4, foutput) != (size_t)(outSize+4)) {
+            EXM_THROW(24, "Write error : cannot write compressed block");
     }   }
     if (ferror(finput)) EXM_THROW(25, "Error while reading %s ", input_filename);
 
@@ -539,21 +539,19 @@ typedef struct {
     LZ4F_CDict* cdict;
 } cRess_t;
 
-static void* LZ4IO_createDict(LZ4IO_prefs_t* const prefs, size_t *dictSize) {
+static void* LZ4IO_createDict(size_t* dictSize, const char* const dictFilename)
+{
     size_t readSize;
     size_t dictEnd = 0;
     size_t dictLen = 0;
     size_t dictStart;
     size_t circularBufSize = LZ4_MAX_DICT_SIZE;
-    char* circularBuf;
-    char* dictBuf;
-    const char* dictFilename = prefs->dictionaryFilename;
+    char*  circularBuf = (char*)malloc(circularBufSize);
+    char*  dictBuf;
     FILE* dictFile;
 
+    if (!circularBuf) EXM_THROW(25, "Allocation error : not enough memory for circular buffer");
     if (!dictFilename) EXM_THROW(25, "Dictionary error : no filename provided");
-
-    circularBuf = (char *) malloc(circularBufSize);
-    if (!circularBuf) EXM_THROW(25, "Allocation error : not enough memory");
 
     dictFile = LZ4IO_openSrcFile(dictFilename);
     if (!dictFile) EXM_THROW(25, "Dictionary error : could not open dictionary file");
@@ -584,7 +582,7 @@ static void* LZ4IO_createDict(LZ4IO_prefs_t* const prefs, size_t *dictSize) {
         circularBuf = NULL;
     } else {
         /* Otherwise, we will alloc a new buffer and copy our dict into that. */
-        dictBuf = (char *) malloc(dictLen ? dictLen : 1);
+        dictBuf = (char *)malloc(dictLen ? dictLen : 1);
         if (!dictBuf) EXM_THROW(25, "Allocation error : not enough memory");
 
         memcpy(dictBuf, circularBuf + dictStart, circularBufSize - dictStart);
@@ -602,7 +600,7 @@ static LZ4F_CDict* LZ4IO_createCDict(LZ4IO_prefs_t* const prefs) {
     void* dictionaryBuffer;
     LZ4F_CDict* cdict;
     if (!prefs->useDictionary) return NULL;
-    dictionaryBuffer = LZ4IO_createDict(prefs, &dictionarySize);
+    dictionaryBuffer = LZ4IO_createDict(&dictionarySize, prefs->dictionaryFilename);
     if (!dictionaryBuffer) EXM_THROW(25, "Dictionary error : could not create dictionary");
     cdict = LZ4F_createCDict(dictionaryBuffer, dictionarySize);
     free(dictionaryBuffer);
@@ -643,6 +641,7 @@ static void LZ4IO_freeCResources(cRess_t ress)
 
 /*
  * LZ4IO_compressFilename_extRess()
+ * io_prefs is mutable, as it may update sparseFileSupport
  * result : 0 : compression completed correctly
  *          1 : missing or pb opening srcFileName
  */
@@ -1002,14 +1001,15 @@ typedef struct {
     size_t dictBufferSize;
 } dRess_t;
 
-static void LZ4IO_loadDDict(LZ4IO_prefs_t* const prefs, dRess_t* ress) {
+static void LZ4IO_loadDDict(LZ4IO_prefs_t* const prefs, dRess_t* ress)
+{
     if (!prefs->useDictionary) {
         ress->dictBuffer = NULL;
         ress->dictBufferSize = 0;
         return;
     }
 
-    ress->dictBuffer = LZ4IO_createDict(prefs, &ress->dictBufferSize);
+    ress->dictBuffer = LZ4IO_createDict(&ress->dictBufferSize, prefs->dictionaryFilename);
     if (!ress->dictBuffer) EXM_THROW(25, "Dictionary error : could not create dictionary");
 }
 
@@ -1255,7 +1255,10 @@ LZ4IO_decompressSrcFile(dRess_t ress,
 }
 
 
-static int LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs, dRess_t ress, const char* input_filename, const char* output_filename)
+static int
+LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs,
+                        dRess_t ress,
+                        const char* input_filename, const char* output_filename)
 {
     stat_t statbuf;
     int stat_result = 0;

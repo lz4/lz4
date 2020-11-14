@@ -420,7 +420,7 @@ test-lz4-hugefile: lz4 datagen
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
-	$(LZ4) -bi1
+	$(LZ4) -bi0
 	@echo "\n ---- test mode ----"
 	! $(DATAGEN) | $(LZ4) -t
 	! $(DATAGEN) | $(LZ4) -tf
