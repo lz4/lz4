@@ -931,18 +931,18 @@ LZ4IO_fwriteSparse(FILE* file,
 
 static void LZ4IO_fwriteSparseEnd(FILE* file, unsigned storedSkips)
 {
-    if (storedSkips>0) {   /* implies g_sparseFileSupport>0 */
-        int const seekResult = UTIL_fseek(file, storedSkips-1, SEEK_CUR);
-        if (seekResult != 0) EXM_THROW(69, "Final skip error (sparse file)\n");
-        {   const char lastZeroByte[1] = { 0 };
-            size_t const sizeCheck = fwrite(lastZeroByte, 1, 1, file);
-            if (sizeCheck != 1) EXM_THROW(69, "Write error : cannot write last zero\n");
-    }   }
+    if (storedSkips>0) {   /* implies sparseFileSupport>0 */
+        const char lastZeroByte[1] = { 0 };
+        if (UTIL_fseek(file, storedSkips-1, SEEK_CUR) != 0)
+            EXM_THROW(69, "Final skip error (sparse file)\n");
+        if (fwrite(lastZeroByte, 1, 1, file) != 1)
+            EXM_THROW(69, "Write error : cannot write last zero\n");
+    }
 }
 
 
 static unsigned g_magicRead = 0;   /* out-parameter of LZ4IO_decodeLegacyStream() */
-static unsigned long long LZ4IO_decodeLegacyStream(LZ4IO_prefs_t* const prefs, FILE* finput, FILE* foutput)
+static unsigned long long LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
 {
     unsigned long long streamSize = 0;
     unsigned storedSkips = 0;
@@ -1173,7 +1173,7 @@ static unsigned long long selectDecoder(LZ4IO_prefs_t* const prefs, dRess_t ress
         return LZ4IO_decompressLZ4F(prefs, ress, finput, foutput);
     case LEGACY_MAGICNUMBER:
         DISPLAYLEVEL(4, "Detected : Legacy format \n");
-        return LZ4IO_decodeLegacyStream(prefs, finput, foutput);
+        return LZ4IO_decodeLegacyStream(finput, foutput, prefs);
     case LZ4IO_SKIPPABLE0:
         DISPLAYLEVEL(4, "Skipping detected skippable area \n");
         {   size_t const nbReadBytes = fread(MNstore, 1, 4, finput);
