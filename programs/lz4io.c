@@ -1153,9 +1153,9 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
 
 #define ENDOFSTREAM ((unsigned long long)-1)
 static unsigned long long
-selectDecoder(LZ4IO_prefs_t* const prefs,
-              dRess_t ress,
-              FILE* finput, FILE* foutput)
+selectDecoder(dRess_t ress,
+              FILE* finput, FILE* foutput,
+              const LZ4IO_prefs_t* const prefs)
 {
     unsigned char MNstore[MAGICNUMBER_SIZE];
     unsigned magicNumber;
@@ -1234,7 +1234,7 @@ LZ4IO_decompressSrcFile(LZ4IO_prefs_t* const prefs,
     /* Loop over multiple streams */
     for ( ; ; ) {  /* endless loop, see break condition */
         unsigned long long const decodedSize =
-                        selectDecoder(prefs, ress, finput, foutput);
+                        selectDecoder(ress, finput, foutput, prefs);
         if (decodedSize == ENDOFSTREAM) break;
         filesize += decodedSize;
     }
