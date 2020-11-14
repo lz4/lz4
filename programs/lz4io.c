@@ -1219,9 +1219,9 @@ selectDecoder(dRess_t ress,
 
 
 static int
-LZ4IO_decompressSrcFile(LZ4IO_prefs_t* const prefs,
-                        dRess_t ress,
-                        const char* input_filename, const char* output_filename)
+LZ4IO_decompressSrcFile(dRess_t ress,
+                        const char* input_filename, const char* output_filename,
+                        const LZ4IO_prefs_t* const prefs)
 {
     FILE* const foutput = ress.dstFile;
     unsigned long long filesize = 0;
@@ -1267,7 +1267,7 @@ static int LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs, dRess_t ress, con
         stat_result = 1;
 
     ress.dstFile = foutput;
-    LZ4IO_decompressSrcFile(prefs, ress, input_filename, output_filename);
+    LZ4IO_decompressSrcFile(ress, input_filename, output_filename, prefs);
 
     fclose(foutput);
 
@@ -1318,7 +1318,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
         if (!strcmp(suffix, stdoutmark)) {
-            missingFiles += LZ4IO_decompressSrcFile(prefs, ress, inFileNamesTable[i], stdoutmark);
+            missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], stdoutmark, prefs);
             continue;
         }
         if (ofnSize <= ifnSize-suffixSize+1) {
