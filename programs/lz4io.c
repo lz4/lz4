@@ -595,7 +595,8 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* const dictFilename)
     return dictBuf;
 }
 
-static LZ4F_CDict* LZ4IO_createCDict(LZ4IO_prefs_t* const prefs) {
+static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* const prefs)
+{
     size_t dictionarySize;
     void* dictionaryBuffer;
     LZ4F_CDict* cdict;
@@ -1001,7 +1002,7 @@ typedef struct {
     size_t dictBufferSize;
 } dRess_t;
 
-static void LZ4IO_loadDDict(LZ4IO_prefs_t* const prefs, dRess_t* ress)
+static void LZ4IO_loadDDict(dRess_t* ress, const LZ4IO_prefs_t* const prefs)
 {
     if (!prefs->useDictionary) {
         ress->dictBuffer = NULL;
@@ -1014,7 +1015,7 @@ static void LZ4IO_loadDDict(LZ4IO_prefs_t* const prefs, dRess_t* ress)
 }
 
 static const size_t LZ4IO_dBufferSize = 64 KB;
-static dRess_t LZ4IO_createDResources(LZ4IO_prefs_t* const prefs)
+static dRess_t LZ4IO_createDResources(const LZ4IO_prefs_t* const prefs)
 {
     dRess_t ress;
 
@@ -1029,7 +1030,7 @@ static dRess_t LZ4IO_createDResources(LZ4IO_prefs_t* const prefs)
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer) EXM_THROW(61, "Allocation error : not enough memory");
 
-    LZ4IO_loadDDict(prefs, &ress);
+    LZ4IO_loadDDict(&ress, prefs);
 
     ress.dstFile = NULL;
     return ress;
