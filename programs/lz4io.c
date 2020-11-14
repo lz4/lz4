@@ -365,7 +365,7 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* con
 
     /* sparse file */
     {   int const sparseMode = (prefs->sparseFileSupport - (f==stdout)) > 0;
-        if (f && sparseMode) SET_SPARSE_FILE_MODE(f);
+        if (f && sparseMode) { SET_SPARSE_FILE_MODE(f); }
     }
 
     return f;
