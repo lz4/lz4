@@ -1045,7 +1045,10 @@ static void LZ4IO_freeDResources(dRess_t ress)
 }
 
 
-static unsigned long long LZ4IO_decompressLZ4F(LZ4IO_prefs_t* const prefs, dRess_t ress, FILE* srcFile, FILE* dstFile)
+static unsigned long long
+LZ4IO_decompressLZ4F(dRess_t ress,
+                     FILE* const srcFile, FILE* const dstFile,
+                     const LZ4IO_prefs_t* const prefs)
 {
     unsigned long long filesize = 0;
     LZ4F_errorCode_t nextToLoad;
@@ -1144,7 +1147,10 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
 }
 
 #define ENDOFSTREAM ((unsigned long long)-1)
-static unsigned long long selectDecoder(LZ4IO_prefs_t* const prefs, dRess_t ress, FILE* finput, FILE* foutput)
+static unsigned long long
+selectDecoder(LZ4IO_prefs_t* const prefs,
+              dRess_t ress,
+              FILE* finput, FILE* foutput)
 {
     unsigned char MNstore[MAGICNUMBER_SIZE];
     unsigned magicNumber;
@@ -1170,7 +1176,7 @@ static unsigned long long selectDecoder(LZ4IO_prefs_t* const prefs, dRess_t ress
     switch(magicNumber)
     {
     case LZ4IO_MAGICNUMBER:
-        return LZ4IO_decompressLZ4F(prefs, ress, finput, foutput);
+        return LZ4IO_decompressLZ4F(ress, finput, foutput, prefs);
     case LEGACY_MAGICNUMBER:
         DISPLAYLEVEL(4, "Detected : Legacy format \n");
         return LZ4IO_decodeLegacyStream(finput, foutput, prefs);
@@ -1207,7 +1213,10 @@ static unsigned long long selectDecoder(LZ4IO_prefs_t* const prefs, dRess_t ress
 }
 
 
-static int LZ4IO_decompressSrcFile(LZ4IO_prefs_t* const prefs, dRess_t ress, const char* input_filename, const char* output_filename)
+static int
+LZ4IO_decompressSrcFile(LZ4IO_prefs_t* const prefs,
+                        dRess_t ress,
+                        const char* input_filename, const char* output_filename)
 {
     FILE* const foutput = ress.dstFile;
     unsigned long long filesize = 0;
@@ -1215,6 +1224,7 @@ static int LZ4IO_decompressSrcFile(LZ4IO_prefs_t* const prefs, dRess_t ress, con
     /* Init */
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     if (finput==NULL) return 1;
+    assert(foutput != NULL);
 
     /* Loop over multiple streams */
     for ( ; ; ) {  /* endless loop, see break condition */
