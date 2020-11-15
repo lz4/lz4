@@ -172,7 +172,8 @@ static unsigned
 LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 {
     const BYTE* const iStart = ip;
-    reg_t const pattern = (sizeof(pattern)==8) ? (reg_t)pattern32 + (((reg_t)pattern32) << 32) : pattern32;
+    reg_t const pattern = (sizeof(pattern)==8) ?
+        (reg_t)pattern32 + (((reg_t)pattern32) << (sizeof(pattern)*4)) : pattern32;
 
     while (likely(ip < iEnd-(sizeof(pattern)-1))) {
         reg_t const diff = LZ4_read_ARCH(ip) ^ pattern;
