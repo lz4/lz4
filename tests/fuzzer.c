@@ -1097,7 +1097,7 @@ static void FUZ_unitTests(int compressionLevel)
         {   int const dSize = LZ4_decompress_safe(testCompressed, testVerify, cSize, testInputSize);
             assert(dSize == sampleSize);   /* correct size */
             {   XXH32_hash_t const crcCheck = XXH32(testVerify, (size_t)dSize, 0);
-                assert(crcCheck == crcOrig);
+                FUZ_CHECKTEST(crcCheck != crcOrig, "LZ4_decompress_safe decompression corruption");
     }   }   }
     DISPLAYLEVEL(3, " OK \n");
 
@@ -1121,7 +1121,7 @@ static void FUZ_unitTests(int compressionLevel)
                 {   int const dSize = LZ4_decompress_safe(startInput, testVerify, cSize, sampleSize);
                     assert(dSize == sampleSize);   /* correct size */
                     {   XXH64_hash_t const crcCheck = XXH64(testVerify, (size_t)dSize, 0);
-                        assert(crcCheck == crcOrig);
+                        FUZ_CHECKTEST(crcCheck != crcOrig, "LZ4_decompress_safe decompression corruption");
     }   }   }   }   }
     DISPLAYLEVEL(3, " OK \n");
 
@@ -1173,12 +1173,12 @@ static void FUZ_unitTests(int compressionLevel)
             assert(ctx != NULL);  /* ensure init is successful */
 
             /* Check access violation with asan */
-            FUZ_CHECKTEST( LZ4_saveDict(&streamingState, NULL, 0) != 0,
+            FUZ_CHECKTEST( LZ4_saveDict(ctx, NULL, 0) != 0,
             "LZ4_saveDict() can't save anything into (NULL,0)");
 
             /* Check access violation with asan */
             {   char tmp_buffer[240] = { 0 };
-                FUZ_CHECKTEST( LZ4_saveDict(&streamingState, tmp_buffer, sizeof(tmp_buffer)) != 0,
+                FUZ_CHECKTEST( LZ4_saveDict(ctx, tmp_buffer, sizeof(tmp_buffer)) != 0,
                 "LZ4_saveDict() can't save anything since compression hasn't started");
         }   }
         DISPLAYLEVEL(3, "OK \n");
@@ -1290,12 +1290,12 @@ static void FUZ_unitTests(int compressionLevel)
             assert(ctx != NULL);  /* ensure init is successful */
 
             /* Check access violation with asan */
-            FUZ_CHECKTEST( LZ4_saveDictHC(&sHC, NULL, 0) != 0,
+            FUZ_CHECKTEST( LZ4_saveDictHC(ctx, NULL, 0) != 0,
             "LZ4_saveDictHC() can't save anything into (NULL,0)");
 
             /* Check access violation with asan */
             {   char tmp_buffer[240] = { 0 };
-                FUZ_CHECKTEST( LZ4_saveDictHC(&sHC, tmp_buffer, sizeof(tmp_buffer)) != 0,
+                FUZ_CHECKTEST( LZ4_saveDictHC(ctx, tmp_buffer, sizeof(tmp_buffer)) != 0,
                 "LZ4_saveDictHC() can't save anything since compression hasn't started");
         }   }
         DISPLAYLEVEL(3, "OK \n");
@@ -1596,7 +1596,7 @@ static void FUZ_unitTests(int compressionLevel)
 
     DISPLAYLEVEL(3, "LZ4_compress_HC_destSize : ");
     /* encode congenerical sequence test for HC compressors */
-    {   LZ4_streamHC_t sHC;   /* statically allocated */
+    {   LZ4_streamHC_t* const sHC = LZ4_createStreamHC();
         int const src_buf_size = 3 MB;
         int const dst_buf_size = 6 KB;
         int const payload = 0;
@@ -1609,6 +1609,7 @@ static void FUZ_unitTests(int compressionLevel)
         char* dbuf1 = (char*)malloc(dst_buf_size + 1);
         char* dbuf2 = (char*)malloc(dst_buf_size + 1);
 
+        assert(sHC != NULL);
         assert(dst_buf_size > dst_max_len);
         if (!sbuf1 || !sbuf2 || !dbuf1 || !dbuf2) {
             EXIT_MSG("not enough memory for FUZ_unitTests (destSize)");
@@ -1643,8 +1644,8 @@ static void FUZ_unitTests(int compressionLevel)
                 memset(sbuf2, payload, slen);
                 memset(dbuf2, 0, dlen);
                 dbuf2[dlen] = endchk;
-                LZ4_resetStreamHC(&sHC, compressionLevel);
-                dsz2 = LZ4_compress_HC_destSize(&sHC, sbuf2, dbuf2, &srcsz2, dlen, compressionLevel);
+                LZ4_resetStreamHC(sHC, compressionLevel);
+                dsz2 = LZ4_compress_HC_destSize(sHC, sbuf2, dbuf2, &srcsz2, dlen, compressionLevel);
                 DISPLAYLEVEL(5, "LZ4_compress_HC_destSize: %i bytes compressed into %i bytes, ", srcsz2, dsz2);
                 DISPLAYLEVEL(5, "last token : 0x%0X, ", dbuf2[dsz2 - 6]);
                 DISPLAYLEVEL(5, "last ML extra lenbyte : 0x%0X, \n", dbuf2[dsz2 - 7]);
@@ -1663,6 +1664,7 @@ static void FUZ_unitTests(int compressionLevel)
                 FUZ_CHECKTEST(memcmp(sbuf1, sbuf2, (size_t)res2), "LZ4_compress_HC_destSize() decompression corruption!");
             }
         }
+        LZ4_freeStreamHC(sHC);
         free(sbuf1);
         free(sbuf2);
         free(dbuf1);

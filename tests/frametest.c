@@ -27,8 +27,7 @@
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  pragma warning(disable : 4127)     /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4146)     /* disable: C4146: minus unsigned expression */
+#  pragma warning(disable : 26451)     /* disable: Arithmetic overflow */
 #endif
 
 
@@ -1061,7 +1060,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 CHECK(op[dstEndSize] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
                 if (LZ4F_isError(flushedSize)) {
                     if (tooSmallDstEnd) /* failure is allowed */ continue;
-                    CHECK(1, "Compression completion failed (error %i : %s)",
+                    CHECK(!tooSmallDstEnd, "Compression completion failed (error %i : %s)",
                             (int)flushedSize, LZ4F_getErrorName(flushedSize));
                 }
                 op += flushedSize;

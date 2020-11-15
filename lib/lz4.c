@@ -121,10 +121,9 @@
 /*-************************************
 *  Compiler Options
 **************************************/
-#ifdef _MSC_VER    /* Visual Studio */
-#  include <intrin.h>
-#  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)  /* Visual Studio 2005+ */
+#  include <intrin.h>               /* only present in VS2005+ */
+#  pragma warning(disable : 4127)   /* disable: C4127: conditional expression is constant */
 #endif  /* _MSC_VER */
 
 #ifndef LZ4_FORCE_INLINE
