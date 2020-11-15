@@ -263,7 +263,7 @@ This field uses 4-bytes, format is little-endian.
 If the highest bit is set (`1`), the block is uncompressed.
 
 If the highest bit is not set (`0`), the block is LZ4-compressed,
-using the [LZ4 block format specification](https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md).
+using the [LZ4 block format specification](https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md).
 
 All other bits give the size, in bytes, of the data section.
 The size does not include the block checksum if present.
@@ -284,7 +284,7 @@ __Data__
 Where the actual data to decode stands.
 It might be compressed or not, depending on previous field indications.
 
-When compressed, the data must respect the [LZ4 block format specification](https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md).
+When compressed, the data must respect the [LZ4 block format specification](https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md).
 
 Note that a block is not necessarily full.
 Uncompressed size of data can be any size __up to__ _Block_Maximum_Size_,

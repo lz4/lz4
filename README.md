@@ -26,25 +26,13 @@ LZ4 library is provided as open-source software using BSD 2-Clause license.
 
 |Branch      |Status   |
 |------------|---------|
-|master      | [![Build Status][travisMasterBadge]][travisLink] [![Build status][AppveyorMasterBadge]][AppveyorLink] [![coverity][coverBadge]][coverlink] |
 |dev         | [![Build Status][travisDevBadge]][travisLink]    [![Build status][AppveyorDevBadge]][AppveyorLink]                                         |
 
-[travisMasterBadge]: https://travis-ci.org/lz4/lz4.svg?branch=master "Continuous Integration test suite"
 [travisDevBadge]: https://travis-ci.org/lz4/lz4.svg?branch=dev "Continuous Integration test suite"
 [travisLink]: https://travis-ci.org/lz4/lz4
-[AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/github/lz4/lz4?branch=master&svg=true "Windows test suite"
 [AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/github/lz4/lz4?branch=dev&svg=true "Windows test suite"
 [AppveyorLink]: https://ci.appveyor.com/project/YannCollet/lz4-1lndh
-[coverBadge]: https://scan.coverity.com/projects/4735/badge.svg "Static code analysis of Master branch"
-[coverlink]: https://scan.coverity.com/projects/4735
 
-> **Branch Policy:**
-> - The "master" branch is considered stable, at all times.
-> - The "dev" branch is the one where all contributions must be merged
-    before being promoted to master.
->   + If you plan to propose a patch, please commit into the "dev" branch,
-      or its own feature branch.
-      Direct commit to "master" are not permitted.
 
 Benchmarks
 -------------------------
