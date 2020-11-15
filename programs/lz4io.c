@@ -159,28 +159,28 @@ struct LZ4IO_prefs_s {
 
 LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
 {
-  LZ4IO_prefs_t* const ret = (LZ4IO_prefs_t*)malloc(sizeof(LZ4IO_prefs_t));
-  if (!ret) EXM_THROW(21, "Allocation error : not enough memory");
-  ret->passThrough = 0;
-  ret->overwrite = 1;
-  ret->testMode = 0;
-  ret->blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
-  ret->blockSize = 0;
-  ret->blockChecksum = 0;
-  ret->streamChecksum = 1;
-  ret->blockIndependence = 1;
-  ret->sparseFileSupport = 1;
-  ret->contentSizeFlag = 0;
-  ret->useDictionary = 0;
-  ret->favorDecSpeed = 0;
-  ret->dictionaryFilename = NULL;
-  ret->removeSrcFile = 0;
-  return ret;
+    LZ4IO_prefs_t* const ret = (LZ4IO_prefs_t*)malloc(sizeof(*ret));
+    if (!ret) EXM_THROW(21, "Allocation error : not enough memory");
+    ret->passThrough = 0;
+    ret->overwrite = 1;
+    ret->testMode = 0;
+    ret->blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
+    ret->blockSize = 0;
+    ret->blockChecksum = 0;
+    ret->streamChecksum = 1;
+    ret->blockIndependence = 1;
+    ret->sparseFileSupport = 1;
+    ret->contentSizeFlag = 0;
+    ret->useDictionary = 0;
+    ret->favorDecSpeed = 0;
+    ret->dictionaryFilename = NULL;
+    ret->removeSrcFile = 0;
+    return ret;
 }
 
-void LZ4IO_freePreferences(LZ4IO_prefs_t* const prefs)
+void LZ4IO_freePreferences(LZ4IO_prefs_t* prefs)
 {
-  free(prefs);
+    free(prefs);
 }
 
 
@@ -242,20 +242,21 @@ size_t LZ4IO_setBlockSize(LZ4IO_prefs_t* const prefs, size_t blockSize)
     return prefs->blockSize;
 }
 
+/* Default setting : 1 == independent blocks */
 int LZ4IO_setBlockMode(LZ4IO_prefs_t* const prefs, LZ4IO_blockMode_t blockMode)
 {
     prefs->blockIndependence = (blockMode == LZ4IO_blockIndependent);
     return prefs->blockIndependence;
 }
 
-/* Default setting : no block checksum */
+/* Default setting : 0 == no block checksum */
 int LZ4IO_setBlockChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->blockChecksum = (enable != 0);
     return prefs->blockChecksum;
 }
 
-/* Default setting : checksum enabled */
+/* Default setting : 1 == checksum enabled */
 int LZ4IO_setStreamChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->streamChecksum = (enable != 0);
@@ -269,10 +270,10 @@ int LZ4IO_setNotificationLevel(int level)
     return g_displayLevel;
 }
 
-/* Default setting : 0 (disabled) */
+/* Default setting : 1 (auto: enabled on file, disabled on stdout) */
 int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable)
 {
-    prefs->sparseFileSupport = (enable!=0);
+    prefs->sparseFileSupport = 2*(enable!=0);  /* 2==force enable */
     return prefs->sparseFileSupport;
 }
 
@@ -328,7 +329,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
  *  prefs is writable, because sparseFileSupport might be updated.
  *  condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
-static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileName)
+static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 {
     FILE* f;
     assert(dstFileName != NULL);
@@ -338,7 +339,6 @@ static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileNa
         f = stdout;
         SET_BINARY_MODE(stdout);
         if (prefs->sparseFileSupport==1) {
-            prefs->sparseFileSupport = 0;
             DISPLAYLEVEL(4, "Sparse File Support automatically disabled on stdout ;"
                             " to force-enable it, add --sparse command \n");
         }
@@ -364,7 +364,9 @@ static FILE* LZ4IO_openDstFile(LZ4IO_prefs_t* const prefs, const char* dstFileNa
     }
 
     /* sparse file */
-    if (f && prefs->sparseFileSupport) { SET_SPARSE_FILE_MODE(f); }
+    {   int const sparseMode = (prefs->sparseFileSupport - (f==stdout)) > 0;
+        if (f && sparseMode) { SET_SPARSE_FILE_MODE(f); }
+    }
 
     return f;
 }
@@ -394,9 +396,8 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
-                                  const char* input_filename, const char* output_filename,
-                                  int compressionlevel)
+int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename,
+                                  int compressionlevel, const LZ4IO_prefs_t* prefs)
 {
     typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
@@ -414,7 +415,7 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
     if (finput == NULL)
         EXM_THROW(20, "%s : open file error ", input_filename);
 
-    foutput = LZ4IO_openDstFile(prefs, output_filename);
+    foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput == NULL) {
         fclose(finput);
         EXM_THROW(20, "%s : open file error ", input_filename);
@@ -481,10 +482,10 @@ int LZ4IO_compressFilename_Legacy(LZ4IO_prefs_t* const prefs,
 /* LZ4IO_compressMultipleFilenames_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates multiple compressed streams using the old 'legacy' format */
-int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
+int LZ4IO_compressMultipleFilenames_Legacy(
                             const char** inFileNamesTable, int ifntSize,
                             const char* suffix,
-                            int compressionLevel)
+                            int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
     int i;
     int missed_files = 0;
@@ -498,9 +499,9 @@ int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (!strcmp(suffix, stdoutmark)) {
-            missed_files += LZ4IO_compressFilename_Legacy(prefs,
+            missed_files += LZ4IO_compressFilename_Legacy(
                                     inFileNamesTable[i], stdoutmark,
-                                    compressionLevel);
+                                    compressionLevel, prefs);
             continue;
         }
 
@@ -514,9 +515,9 @@ int LZ4IO_compressMultipleFilenames_Legacy(LZ4IO_prefs_t* const prefs,
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_Legacy(prefs,
+        missed_files += LZ4IO_compressFilename_Legacy(
                                 inFileNamesTable[i], dstFileName,
-                                compressionLevel);
+                                compressionLevel, prefs);
     }
 
     /* Close & Free */
@@ -608,7 +609,7 @@ static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* const prefs)
     return cdict;
 }
 
-static cRess_t LZ4IO_createCResources(LZ4IO_prefs_t* const prefs)
+static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* const prefs)
 {
     const size_t blockSize = prefs->blockSize;
     cRess_t ress;
@@ -642,14 +643,13 @@ static void LZ4IO_freeCResources(cRess_t ress)
 
 /*
  * LZ4IO_compressFilename_extRess()
- * io_prefs is mutable, as it may update sparseFileSupport
  * result : 0 : compression completed correctly
  *          1 : missing or pb opening srcFileName
  */
 static int
-LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
+LZ4IO_compressFilename_extRess(cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
-                               int compressionLevel)
+                               int compressionLevel, const LZ4IO_prefs_t* const io_prefs)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -665,7 +665,7 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
     /* Init */
     FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
     if (srcFile == NULL) return 1;
-    dstFile = LZ4IO_openDstFile(io_prefs, dstFileName);
+    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
     if (dstFile == NULL) { fclose(srcFile); return 1; }
     memset(&prefs, 0, sizeof(prefs));
 
@@ -771,13 +771,13 @@ LZ4IO_compressFilename_extRess(LZ4IO_prefs_t* const io_prefs, cRess_t ress,
 }
 
 
-int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, const char* dstFileName, int compressionLevel)
+int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
     UTIL_time_t const timeStart = UTIL_getTime();
     clock_t const cpuStart = clock();
     cRess_t const ress = LZ4IO_createCResources(prefs);
 
-    int const result = LZ4IO_compressFilename_extRess(prefs, ress, srcFileName, dstFileName, compressionLevel);
+    int const result = LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel, prefs);
 
     /* Free resources */
     LZ4IO_freeCResources(ress);
@@ -795,10 +795,11 @@ int LZ4IO_compressFilename(LZ4IO_prefs_t* const prefs, const char* srcFileName, 
 }
 
 
-int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
+int LZ4IO_compressMultipleFilenames(
                               const char** inFileNamesTable, int ifntSize,
                               const char* suffix,
-                              int compressionLevel)
+                              int compressionLevel,
+                              const LZ4IO_prefs_t* prefs)
 {
     int i;
     int missed_files = 0;
@@ -814,9 +815,9 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (!strcmp(suffix, stdoutmark)) {
-            missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+            missed_files += LZ4IO_compressFilename_extRess(ress,
                                     inFileNamesTable[i], stdoutmark,
-                                    compressionLevel);
+                                    compressionLevel, prefs);
             continue;
         }
         if (ofnSize <= ifnSize+suffixSize+1) {
@@ -830,9 +831,9 @@ int LZ4IO_compressMultipleFilenames(LZ4IO_prefs_t* const prefs,
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_extRess(prefs, ress,
+        missed_files += LZ4IO_compressFilename_extRess(ress,
                                 inFileNamesTable[i], dstFileName,
-                                compressionLevel);
+                                compressionLevel, prefs);
     }
 
     /* Close & Free */
@@ -872,8 +873,9 @@ LZ4IO_fwriteSparse(FILE* file,
     size_t bufferSizeT = bufferSize / sizeT;
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     const size_t segmentSizeT = (32 KB) / sizeT;
+    int const sparseMode = (sparseFileSupport - (file==stdout)) > 0;
 
-    if (!sparseFileSupport) {  /* normal write */
+    if (!sparseMode) {  /* normal write */
         size_t const sizeCheck = fwrite(buffer, 1, bufferSize, file);
         if (sizeCheck != bufferSize) EXM_THROW(70, "Write error : cannot write decoded block");
         return 0;
@@ -1257,13 +1259,13 @@ LZ4IO_decompressSrcFile(dRess_t ress,
 
 
 static int
-LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs,
-                        dRess_t ress,
-                        const char* input_filename, const char* output_filename)
+LZ4IO_decompressDstFile(dRess_t ress,
+                        const char* input_filename, const char* output_filename,
+                        const LZ4IO_prefs_t* const prefs)
 {
     stat_t statbuf;
     int stat_result = 0;
-    FILE* const foutput = LZ4IO_openDstFile(prefs, output_filename);
+    FILE* const foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput==NULL) return 1;   /* failure */
 
     if ( strcmp(input_filename, stdinmark)
@@ -1287,12 +1289,12 @@ LZ4IO_decompressDstFile(LZ4IO_prefs_t* const prefs,
 }
 
 
-int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filename, const char* output_filename)
+int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename, const LZ4IO_prefs_t* prefs)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
     clock_t const start = clock();
 
-    int const missingFiles = LZ4IO_decompressDstFile(prefs, ress, input_filename, output_filename);
+    int const missingFiles = LZ4IO_decompressDstFile(ress, input_filename, output_filename, prefs);
 
     clock_t const end = clock();
     double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
@@ -1303,9 +1305,10 @@ int LZ4IO_decompressFilename(LZ4IO_prefs_t* const prefs, const char* input_filen
 }
 
 
-int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
-                                const char** inFileNamesTable, int ifntSize,
-                                const char* suffix)
+int LZ4IO_decompressMultipleFilenames(
+                            const char** inFileNamesTable, int ifntSize,
+                            const char* suffix,
+                            const LZ4IO_prefs_t* prefs)
 {
     int i;
     int skippedFiles = 0;
@@ -1316,7 +1319,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
     dRess_t ress = LZ4IO_createDResources(prefs);
 
     if (outFileName==NULL) EXM_THROW(70, "Memory allocation error");
-    ress.dstFile = LZ4IO_openDstFile(prefs, stdoutmark);
+    ress.dstFile = LZ4IO_openDstFile(stdoutmark, prefs);
 
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
@@ -1338,7 +1341,7 @@ int LZ4IO_decompressMultipleFilenames(LZ4IO_prefs_t* const prefs,
         }
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
-        missingFiles += LZ4IO_decompressDstFile(prefs, ress, inFileNamesTable[i], outFileName);
+        missingFiles += LZ4IO_decompressDstFile(ress, inFileNamesTable[i], outFileName, prefs);
     }
 
     LZ4IO_freeDResources(ress);
