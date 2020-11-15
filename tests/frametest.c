@@ -1060,7 +1060,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 CHECK(op[dstEndSize] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
                 if (LZ4F_isError(flushedSize)) {
                     if (tooSmallDstEnd) /* failure is allowed */ continue;
-                    CHECK(1, "Compression completion failed (error %i : %s)",
+                    CHECK(!tooSmallDstEnd, "Compression completion failed (error %i : %s)",
                             (int)flushedSize, LZ4F_getErrorName(flushedSize));
                 }
                 op += flushedSize;
