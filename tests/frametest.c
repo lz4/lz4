@@ -27,8 +27,7 @@
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  pragma warning(disable : 4127)     /* disable: C4127: conditional expression is constant */
-#  pragma warning(disable : 4146)     /* disable: C4146: minus unsigned expression */
+#  pragma warning(disable : 26451)     /* disable: Arithmetic overflow */
 #endif
 
 

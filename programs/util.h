@@ -594,15 +594,15 @@ UTIL_createFileList(const char** inputNames, unsigned inputNamesNb,
 
     for (i=0, pos=0, nbFiles=0; i<inputNamesNb; i++) {
         if (!UTIL_isDirectory(inputNames[i])) {
-            size_t const len = strlen(inputNames[i]);
+            size_t const len = strlen(inputNames[i]) + 1;  /* include nul char */
             if (pos + len >= bufSize) {
                 while (pos + len >= bufSize) bufSize += LIST_SIZE_INCREASE;
                 buf = (char*)UTIL_realloc(buf, bufSize);
                 if (!buf) return NULL;
             }
             assert(pos + len < bufSize);
-            strncpy(buf + pos, inputNames[i], bufSize - pos);
-            pos += len + 1;
+            memcpy(buf + pos, inputNames[i], len);
+            pos += len;
             nbFiles++;
         } else {
             char* bufend = buf + bufSize;
