@@ -9,7 +9,7 @@ api : improved LZ4F_compressBound() with automatic flushing, by Christopher Harv
 api : can (de)compress to/from NULL without UBs
 api : fix alignment test on 32-bit systems (state initialization)
 api : fix LZ4_saveDictHC() in corner case scenario, detected by @IgorKorkin
-cli : --list command, compressed file content statistics, by Filipe Calasans
+cli : `-l` legacy format is now compatible with `-m` multiple files, by Filipe Calasans
 cli : benchmark mode supports dictionary, by @rkoradi
 cli : fix --fast with large argument, detected by @picoHz
 build: link to user-defined memory functions with LZ4_USER_MEMORY_FUNCTIONS, suggested by Yuriy Levchenko
