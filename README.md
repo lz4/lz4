@@ -83,7 +83,7 @@ It is compatible with parallel builds (`-j#`).
 [redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
 [command redefinition]: https://www.gnu.org/prep/standards/html_node/Utilities-in-Makefiles.html
 
-Building LZ4 - Using vcpkg
+### Building LZ4 - Using vcpkg
 
 You can download and install LZ4 using the [vcpkg](https://github.com/Microsoft/vcpkg) dependency manager:
 
