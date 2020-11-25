@@ -36,7 +36,7 @@ BEGIN
             VALUE "FileDescription", "Extremely fast compression"
             VALUE "FileVersion", LZ4_VERSION_STRING
             VALUE "InternalName", "lz4.dll"
-            VALUE "LegalCopyright", "Copyright (C) 2013-2016, Yann Collet"
+            VALUE "LegalCopyright", "Copyright (C) 2013-2020, Yann Collet"
             VALUE "OriginalFilename", "lz4.dll"
             VALUE "ProductName", "LZ4"
             VALUE "ProductVersion", LZ4_VERSION_STRING

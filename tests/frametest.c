@@ -1,6 +1,6 @@
 /*
     frameTest - test tool for lz4frame
-    Copyright (C) Yann Collet 2014-2016
+    Copyright (C) Yann Collet 2014-2020
 
     GPL v2 License
 

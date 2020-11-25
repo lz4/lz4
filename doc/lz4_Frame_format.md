@@ -3,7 +3,7 @@ LZ4 Frame Format Description
 
 ### Notices
 
-Copyright (c) 2013-2015 Yann Collet
+Copyright (c) 2013-2020 Yann Collet
 
 Permission is granted to copy and distribute this document
 for any  purpose and without charge,

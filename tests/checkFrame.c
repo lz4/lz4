@@ -1,6 +1,6 @@
   /*
       checkFrame - verify frame headers
-      Copyright (C) Yann Collet 2014-present
+      Copyright (C) Yann Collet 2014-2020
 
       GPL v2 License
 

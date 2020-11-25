@@ -1,6 +1,6 @@
 /*
     datagen.h - compressible data generator header
-    Copyright (C) Yann Collet 2012-2016
+    Copyright (C) Yann Collet 2012-2020
 
     GPL v2 License
 

@@ -1,6 +1,6 @@
 # ################################################################
 # LZ4 library - Makefile
-# Copyright (C) Yann Collet 2011-2016
+# Copyright (C) Yann Collet 2011-2020
 # All rights reserved.
 #
 # This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets

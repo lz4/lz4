@@ -1,6 +1,6 @@
 /*
   LZ4cli - LZ4 Command Line Interface
-  Copyright (C) Yann Collet 2011-2016
+  Copyright (C) Yann Collet 2011-2020
 
   GPL v2 License
 

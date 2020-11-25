@@ -1,6 +1,6 @@
 /*
     platform.h - compiler and OS detection
-    Copyright (C) 2016-present, Przemyslaw Skibinski, Yann Collet
+    Copyright (C) 2016-2020, Przemyslaw Skibinski, Yann Collet
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

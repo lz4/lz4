@@ -1,6 +1,6 @@
 /*
     fuzzer.c - Fuzzer test tool for LZ4
-    Copyright (C) Yann Collet 2012-2017
+    Copyright (C) Yann Collet 2012-2020
 
     GPL v2 License
 
