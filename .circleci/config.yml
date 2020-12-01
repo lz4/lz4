@@ -44,7 +44,7 @@ jobs:
     #   This would typically be a build job when using workflows, possibly combined with build
     # This is based on your 1.0 configuration file or project settings
     - run: CFLAGS= make clangtest && make clean
-    - run: g++ -v; make gpptest     && make clean
+    - run: g++ -v; make cxxtest   && make clean
     - run: gcc -v; g++ -v; make ctocpptest && make clean
     - run: gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -Werror" make check && make clean
     - run: gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -m32 -Werror" CPPFLAGS=-I/usr/include/x86_64-linux-gnu make check && make clean

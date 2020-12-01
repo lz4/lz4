@@ -44,7 +44,7 @@ matrix:
     - name: (Precise) g++ and clang CMake test
       dist: precise
       script:
-        - make gpptest
+        - make cxxtest
         - make clean
         - make examples
         - make clean cmake
