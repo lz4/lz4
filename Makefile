@@ -36,10 +36,24 @@ TESTDIR = tests
 EXDIR   = examples
 FUZZDIR = ossfuzz
 
-include Makefile.inc
+#include Makefile.inc
+#determine if dev/nul based on host environment
+ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
+VOID := /dev/null
+else
+  ifneq (,$(filter Windows%,$(OS)))
+VOID := nul
+  else
+VOID  := /dev/null
+  endif
+endif
+
 
 .PHONY: default
 default: lib-release lz4-release
+
+# silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
+$(V)$(VERBOSE).SILENT:
 
 .PHONY: all
 all: allmost examples manuals build_tests
@@ -50,14 +64,14 @@ allmost: lib lz4
 .PHONY: lib lib-release liblz4.a
 lib: liblz4.a
 lib lib-release liblz4.a:
-	@$(MAKE) -C $(LZ4DIR) $@
+	$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
 lz4 : liblz4.a
 lz4-release : lib-release
 lz4 lz4-release :
-	@$(MAKE) -C $(PRGDIR) $@
-	@cp $(PRGDIR)/lz4$(EXT) .
+	$(MAKE) -C $(PRGDIR) $@
+	cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
 examples: liblz4.a
@@ -65,21 +79,21 @@ examples: liblz4.a
 
 .PHONY: manuals
 manuals:
-	@$(MAKE) -C contrib/gen_manual $@
+	$(MAKE) -C contrib/gen_manual $@
 
 .PHONY: build_tests
 build_tests:
-	@$(MAKE) -C $(TESTDIR) all
+	$(MAKE) -C $(TESTDIR) all
 
 .PHONY: clean
 clean:
-	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
-	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
-	@$(MAKE) -C $(EXDIR) $@ > $(VOID)
-	@$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
-	@$(MAKE) -C contrib/gen_manual $@ > $(VOID)
-	@$(RM) lz4$(EXT)
+	$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	$(MAKE) -C $(PRGDIR) $@ > $(VOID)
+	$(MAKE) -C $(TESTDIR) $@ > $(VOID)
+	$(MAKE) -C $(EXDIR) $@ > $(VOID)
+	$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
+	$(MAKE) -C contrib/gen_manual $@ > $(VOID)
+	$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
 
@@ -91,14 +105,14 @@ HOST_OS = POSIX
 
 .PHONY: install uninstall
 install uninstall:
-	@$(MAKE) -C $(LZ4DIR) $@
-	@$(MAKE) -C $(PRGDIR) $@
+	$(MAKE) -C $(LZ4DIR) $@
+	$(MAKE) -C $(PRGDIR) $@
 
 travis-install:
 	$(MAKE) -j1 install DESTDIR=~/install_test_dir
 
 cmake:
-	@cd build/cmake; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
+	cd build/cmake; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
 
 endif
 
@@ -116,7 +130,7 @@ ifneq (,$(filter $(HOST_OS),MSYS POSIX))
 
 .PHONY: list
 list:
-	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
+	$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 .PHONY: check
 check:
@@ -132,15 +146,15 @@ clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
 clangtest: CC = clang
 clangtest: clean
 	$(CC) -v
-	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all CC=$(CC)
-	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all CC=$(CC)
-	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all CC=$(CC)
+	CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all CC=$(CC)
+	CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all CC=$(CC)
+	CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all CC=$(CC)
 
 clangtest-native: clean
 	clang -v
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all    CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  native CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) native CC=clang
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all    CC=clang
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  native CC=clang
+	CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) native CC=clang
 
 usan: CC      = clang
 usan: CFLAGS  = -O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined -fsanitize-recover=pointer-overflow
@@ -163,7 +177,7 @@ cppcheck:
 
 platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
-	@$(CC) -v
+	$(CC) -v
 	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
 	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) all
 	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) all
