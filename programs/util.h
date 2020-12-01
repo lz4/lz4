@@ -333,7 +333,8 @@ UTIL_STATIC int UTIL_setFileStat(const char *filename, stat_t *statbuf)
         timebuf.modtime = statbuf->st_mtime;
         res += utime(filename, &timebuf);  /* set access and modification times */
 #else
-        struct timespec timebuf[2] = {};
+        struct timespec timebuf[2];
+        memset(timebuf, 0, sizeof(timebuf));
         timebuf[0].tv_nsec = UTIME_NOW;
         timebuf[1].tv_sec = statbuf->st_mtime;
         res += utimensat(AT_FDCWD, filename, timebuf, 0);  /* set access and modification times */
@@ -511,22 +512,23 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
 {
     DIR* dir;
     struct dirent * entry;
-    int dirLength, nbFiles = 0;
+    size_t dirLength;
+    int nbFiles = 0;
 
     if (!(dir = opendir(dirName))) {
         fprintf(stderr, "Cannot open directory '%s': %s\n", dirName, strerror(errno));
         return 0;
     }
 
-    dirLength = (int)strlen(dirName);
+    dirLength = strlen(dirName);
     errno = 0;
     while ((entry = readdir(dir)) != NULL) {
         char* path;
-        int fnameLength, pathLength;
+        size_t fnameLength, pathLength;
         if (strcmp (entry->d_name, "..") == 0 ||
             strcmp (entry->d_name, ".") == 0) continue;
-        fnameLength = (int)strlen(entry->d_name);
-        path = (char*) malloc(dirLength + fnameLength + 2);
+        fnameLength = strlen(entry->d_name);
+        path = (char*)malloc(dirLength + fnameLength + 2);
         if (!path) { closedir(dir); return 0; }
         memcpy(path, dirName, dirLength);
         path[dirLength] = '/';
@@ -539,7 +541,7 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
             if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
         } else {
             if (*bufStart + *pos + pathLength >= *bufEnd) {
-                ptrdiff_t newListSize = (*bufEnd - *bufStart) + LIST_SIZE_INCREASE;
+                size_t const newListSize = (size_t)(*bufEnd - *bufStart) + LIST_SIZE_INCREASE;
                 *bufStart = (char*)UTIL_realloc(*bufStart, newListSize);
                 *bufEnd = *bufStart + newListSize;
                 if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
