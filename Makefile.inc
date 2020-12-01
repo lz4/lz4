@@ -85,18 +85,14 @@ endif
 
 # Avoid symlinks when targetting Windows or building on a Windows host
 ifeq ($(WINBASED),yes)
-LN_S  = cp -p
 LN_SF = cp -p
 else
   ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
-LN_S  = cp -p
 LN_SF = cp -p
   else
     ifneq (,$(filter Windows%,$(OS)))
-LN_S  = cp -p
 LN_SF = cp -p
     else
-LN_S   = ln -s
 LN_SF  = ln -sf
     endif
   endif

@@ -167,9 +167,9 @@ install: lz4
 	@echo Installing binaries
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
 	$(INSTALL_PROGRAM) lz4$(EXT) $(DESTDIR)$(bindir)/lz4$(EXT)
-	$(LN_S) lz4$(EXT) $(DESTDIR)$(bindir)/lz4c$(EXT)
-	$(LN_S) lz4$(EXT) $(DESTDIR)$(bindir)/lz4cat$(EXT)
-	$(LN_S) lz4$(EXT) $(DESTDIR)$(bindir)/unlz4$(EXT)
+	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4c$(EXT)
+	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4cat$(EXT)
+	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/unlz4$(EXT)
 	@echo Installing man pages
 	$(INSTALL_DATA) lz4.1 $(DESTDIR)$(man1dir)/lz4.1
 	$(LN_SF) lz4.1 $(DESTDIR)$(man1dir)/lz4c.1
