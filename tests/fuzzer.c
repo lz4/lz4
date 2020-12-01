@@ -1136,12 +1136,12 @@ static void FUZ_unitTests(int compressionLevel)
         assert(shc != NULL);
         memset(shc, 0, sizeof(*shc));
         DISPLAYLEVEL(4, "state1(%p) state2(%p) state3(%p) LZ4_stream_t size(0x%x): ",
-                    &(shc->state1), &(shc->state2), &(shc->state3), (unsigned)sizeof(LZ4_stream_t));
-        FUZ_CHECKTEST( LZ4_initStream(&(shc->state1), sizeof(shc->state1)) == NULL, "state1 (%p) failed init", &(shc->state1) );
-        FUZ_CHECKTEST( LZ4_initStream(&(shc->state2), sizeof(shc->state2)) == NULL, "state2 (%p) failed init", &(shc->state2)  );
-        FUZ_CHECKTEST( LZ4_initStream(&(shc->state3), sizeof(shc->state3)) == NULL, "state3 (%p) failed init", &(shc->state3)  );
+                    (void*)&(shc->state1), (void*)&(shc->state2), (void*)&(shc->state3), (unsigned)sizeof(LZ4_stream_t));
+        FUZ_CHECKTEST( LZ4_initStream(&(shc->state1), sizeof(shc->state1)) == NULL, "state1 (%p) failed init", (void*)&(shc->state1) );
+        FUZ_CHECKTEST( LZ4_initStream(&(shc->state2), sizeof(shc->state2)) == NULL, "state2 (%p) failed init", (void*)&(shc->state2)  );
+        FUZ_CHECKTEST( LZ4_initStream(&(shc->state3), sizeof(shc->state3)) == NULL, "state3 (%p) failed init", (void*)&(shc->state3)  );
         FUZ_CHECKTEST( LZ4_initStream((char*)&(shc->state1) + 1, sizeof(shc->state1)) != NULL,
-                       "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc->state1) + 1 );
+                       "hc1+1 (%p) init must fail, due to bad alignment", (void*)((char*)&(shc->state1) + 1) );
         free(shc);
     }
     DISPLAYLEVEL(3, "all inits OK \n");
@@ -1246,12 +1246,13 @@ static void FUZ_unitTests(int compressionLevel)
         assert(shc != NULL);
         memset(shc, 0, sizeof(*shc));
         DISPLAYLEVEL(4, "hc1(%p) hc2(%p) hc3(%p) size(0x%x): ",
-                    &(shc->hc1), &(shc->hc2), &(shc->hc3), (unsigned)sizeof(LZ4_streamHC_t));
-        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc1), sizeof(shc->hc1)) == NULL, "hc1 (%p) failed init", &(shc->hc1) );
-        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc2), sizeof(shc->hc2)) == NULL, "hc2 (%p) failed init", &(shc->hc2)  );
-        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc3), sizeof(shc->hc3)) == NULL, "hc3 (%p) failed init", &(shc->hc3)  );
+                    (void*)&(shc->hc1), (void*)&(shc->hc2), (void*)&(shc->hc3),
+                    (unsigned)sizeof(LZ4_streamHC_t));
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc1), sizeof(shc->hc1)) == NULL, "hc1 (%p) failed init", (void*)&(shc->hc1) );
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc2), sizeof(shc->hc2)) == NULL, "hc2 (%p) failed init", (void*)&(shc->hc2)  );
+        FUZ_CHECKTEST( LZ4_initStreamHC(&(shc->hc3), sizeof(shc->hc3)) == NULL, "hc3 (%p) failed init", (void*)&(shc->hc3)  );
         FUZ_CHECKTEST( LZ4_initStreamHC((char*)&(shc->hc1) + 1, sizeof(shc->hc1)) != NULL,
-                        "hc1+1 (%p) init must fail, due to bad alignment", (char*)&(shc->hc1) + 1 );
+                        "hc1+1 (%p) init must fail, due to bad alignment", (void*)((char*)&(shc->hc1) + 1) );
         free(shc);
     }
     DISPLAYLEVEL(3, "all inits OK \n");

@@ -134,7 +134,8 @@ test:
 	$(MAKE) -C $(EXDIR) $@
 
 .PHONY: clangtest
-clangtest: CFLAGS ?= -O3  # strangely, this line has the hidden side effect of `unexport CFLAGS`
+clangtest: CFLAGS ?= -O3  # make's bug (http://savannah.gnu.org/bugs/?func=detailitem&item_id=59230)
+# this line has the hidden side effect of `unexport CFLAGS`
 export CFLAGS   # fix the side effect by issuing export command
 clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
 clangtest: CC = clang
@@ -189,7 +190,7 @@ versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@
 
 .PHONY: cxxtest cxx32test
-cxxtest cxx32test: CC = "$(CXX) -Wno-deprecated"
+cxxtest cxx32test: CC := "$(CXX) -Wno-deprecated"
 cxxtest cxx32test: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
 cxx32test: CFLAGS += -m32
 cxxtest cxx32test: clean
