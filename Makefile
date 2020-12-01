@@ -168,10 +168,8 @@ usan32: clean
 SCANBUILD ?= scan-build
 SCANBUILD_FLAGS += --status-bugs -v --force-analyze-debug-code
 .PHONY: staticAnalyze
-staticAnalyze: CPPFLAGS = -DLZ4_DEBUG=1
-staticAnalyze: CFLAGS   = -g
 staticAnalyze: clean
-	$(SCANBUILD) $(SCANBUILD_FLAGS) $(MAKE) all V=1 DEBUGLEVEL=1
+	CPPFLAGS=-DLZ4_DEBUG=1 CFLAGS=-g $(SCANBUILD) $(SCANBUILD_FLAGS) $(MAKE) all V=1 DEBUGLEVEL=1
 
 .PHONY: cppcheck
 cppcheck:
