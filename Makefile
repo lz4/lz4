@@ -1,6 +1,6 @@
 # ################################################################
 # LZ4 - Makefile
-# Copyright (C) Yann Collet 2011-present
+# Copyright (C) Yann Collet 2011-2020
 # All rights reserved.
 #
 # BSD license
@@ -38,8 +38,12 @@ FUZZDIR = ossfuzz
 
 include Makefile.inc
 
+
 .PHONY: default
 default: lib-release lz4-release
+
+# silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
+$(V)$(VERBOSE).SILENT:
 
 .PHONY: all
 all: allmost examples manuals build_tests
@@ -50,14 +54,14 @@ allmost: lib lz4
 .PHONY: lib lib-release liblz4.a
 lib: liblz4.a
 lib lib-release liblz4.a:
-	@$(MAKE) -C $(LZ4DIR) $@
+	$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
 lz4 : liblz4.a
 lz4-release : lib-release
 lz4 lz4-release :
-	@$(MAKE) -C $(PRGDIR) $@
-	@cp $(PRGDIR)/lz4$(EXT) .
+	$(MAKE) -C $(PRGDIR) $@
+	cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
 examples: liblz4.a
@@ -65,21 +69,21 @@ examples: liblz4.a
 
 .PHONY: manuals
 manuals:
-	@$(MAKE) -C contrib/gen_manual $@
+	$(MAKE) -C contrib/gen_manual $@
 
 .PHONY: build_tests
 build_tests:
-	@$(MAKE) -C $(TESTDIR) all
+	$(MAKE) -C $(TESTDIR) all
 
 .PHONY: clean
 clean:
-	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
-	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(MAKE) -C $(TESTDIR) $@ > $(VOID)
-	@$(MAKE) -C $(EXDIR) $@ > $(VOID)
-	@$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
-	@$(MAKE) -C contrib/gen_manual $@ > $(VOID)
-	@$(RM) lz4$(EXT)
+	$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	$(MAKE) -C $(PRGDIR) $@ > $(VOID)
+	$(MAKE) -C $(TESTDIR) $@ > $(VOID)
+	$(MAKE) -C $(EXDIR) $@ > $(VOID)
+	$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
+	$(MAKE) -C contrib/gen_manual $@ > $(VOID)
+	$(RM) lz4$(EXT)
 	@echo Cleaning completed
 
 
@@ -91,16 +95,18 @@ HOST_OS = POSIX
 
 .PHONY: install uninstall
 install uninstall:
-	@$(MAKE) -C $(LZ4DIR) $@
-	@$(MAKE) -C $(PRGDIR) $@
+	$(MAKE) -C $(LZ4DIR) $@
+	$(MAKE) -C $(PRGDIR) $@
 
+.PHONY: travis-install
 travis-install:
 	$(MAKE) -j1 install DESTDIR=~/install_test_dir
 
+.PHONY: cmake
 cmake:
-	@cd build/cmake; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
+	cd build/cmake; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
 
-endif
+endif   # POSIX_ENV
 
 
 ifneq (,$(filter MSYS%,$(shell uname)))
@@ -116,7 +122,7 @@ ifneq (,$(filter $(HOST_OS),MSYS POSIX))
 
 .PHONY: list
 list:
-	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
+	$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
 
 .PHONY: check
 check:
@@ -124,32 +130,41 @@ check:
 
 .PHONY: test
 test:
-	CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(MAKE) -C $(TESTDIR) $@
-	CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(MAKE) -C $(EXDIR) $@
+	$(MAKE) -C $(TESTDIR) $@
+	$(MAKE) -C $(EXDIR) $@
 
-clangtest: CFLAGS ?= -O3
+.PHONY: clangtest
+clangtest: CFLAGS ?= -O3  # make's bug (http://savannah.gnu.org/bugs/?func=detailitem&item_id=59230)
+# this line has the hidden side effect of `unexport CFLAGS`
+export CFLAGS   # fix the side effect by issuing export command
 clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
 clangtest: CC = clang
 clangtest: clean
 	$(CC) -v
-	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all CC=$(CC)
-	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all CC=$(CC)
-	@CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all CC=$(CC)
+	$(MAKE) -C $(LZ4DIR)  all CC=$(CC)
+	$(MAKE) -C $(PRGDIR)  all CC=$(CC)
+	$(MAKE) -C $(TESTDIR) all CC=$(CC)
 
+.PHONY: clangtest-native
+clangtest-native: CFLAGS = -O3 -Werror -Wconversion -Wno-sign-conversion
 clangtest-native: clean
 	clang -v
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(LZ4DIR)  all    CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(PRGDIR)  native CC=clang
-	@CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" $(MAKE) -C $(TESTDIR) native CC=clang
+	$(MAKE) -C $(LZ4DIR)  all    CC=clang
+	$(MAKE) -C $(PRGDIR)  native CC=clang
+	$(MAKE) -C $(TESTDIR) native CC=clang
 
+.PHONY: usan
 usan: CC      = clang
 usan: CFLAGS  = -O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined -fsanitize-recover=pointer-overflow
 usan: LDFLAGS = $(CFLAGS)
 usan: clean
-	CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
+	$(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
+.PHONY: usan32
+usan32: CFLAGS = -m32 -O3 -g -fsanitize=undefined
+usan32: LDFLAGS = $(CFLAGS)
 usan32: clean
-	CFLAGS="-m32 -O3 -g -fsanitize=undefined" $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
+	$(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
 SCANBUILD ?= scan-build
 SCANBUILD_FLAGS += --status-bugs -v --force-analyze-debug-code
@@ -161,9 +176,10 @@ staticAnalyze: clean
 cppcheck:
 	cppcheck . --force --enable=warning,portability,performance,style --error-exitcode=1 > /dev/null
 
+.PHONY: platformTest
 platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
-	@$(CC) -v
+	$(CC) -v
 	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
 	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) all
 	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) all
@@ -173,15 +189,17 @@ platformTest: clean
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@
 
-gpptest gpptest32: CC = "$(CXX) -Wno-deprecated"
-gpptest gpptest32: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
-gpptest32: CFLAGS += -m32
-gpptest gpptest32: clean
+.PHONY: cxxtest cxx32test
+cxxtest cxx32test: CC := "$(CXX) -Wno-deprecated"
+cxxtest cxx32test: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
+cxx32test: CFLAGS += -m32
+cxxtest cxx32test: clean
 	$(CXX) -v
 	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
 
+.PHONY: cxx17build
 cxx17build : CC = "$(CXX) -Wno-deprecated"
 cxx17build : CFLAGS = -std=c++17 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror -pedantic
 cxx17build : clean
@@ -190,14 +208,16 @@ cxx17build : clean
 	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
 
+.PHONY: ctocpptest
 ctocpptest: LIBCC="$(CC)"
 ctocpptest: TESTCC="$(CXX)"
-ctocpptest: CFLAGS=""
+ctocpptest: CFLAGS=
 ctocpptest: clean
 	CC=$(LIBCC)  $(MAKE) -C $(LZ4DIR)  CFLAGS="$(CFLAGS)" all
 	CC=$(LIBCC)  $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" lz4.o lz4hc.o lz4frame.o
 	CC=$(TESTCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
+.PHONY: c_standards
 c_standards: clean
 	$(MAKE) clean; CFLAGS="-std=c90   -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
 	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
@@ -205,4 +225,4 @@ c_standards: clean
 	$(MAKE) clean; CFLAGS="-std=gnu99 -Werror -pedantic" $(MAKE) all
 	$(MAKE) clean; CFLAGS="-std=c11   -Werror" $(MAKE) all
 
-endif
+endif   # MSYS POSIX
