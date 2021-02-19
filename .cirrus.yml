@@ -1,5 +1,5 @@
 freebsd_instance:
-  image_family: freebsd-12-1
+  image_family: freebsd-12-2
 
 task:
   script: pkg install -y gmake && gmake test
