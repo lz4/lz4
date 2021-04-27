@@ -134,9 +134,6 @@ test:
 	$(MAKE) -C $(EXDIR) $@
 
 .PHONY: clangtest
-clangtest: CFLAGS ?= -O3  # make's bug (http://savannah.gnu.org/bugs/?func=detailitem&item_id=59230)
-# this line has the hidden side effect of `unexport CFLAGS`
-export CFLAGS   # fix the side effect by issuing export command
 clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
 clangtest: CC = clang
 clangtest: clean
