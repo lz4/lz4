@@ -984,6 +984,7 @@ int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* s
 *  Streaming Functions
 **************************************/
 /* allocation */
+#if (LZ4HC_HEAPMODE)
 LZ4_streamHC_t* LZ4_createStreamHC(void)
 {
     LZ4_streamHC_t* const state =
@@ -1000,6 +1001,7 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
     FREEMEM(LZ4_streamHCPtr);
     return 0;
 }
+#endif
 
 
 LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
@@ -1217,6 +1219,7 @@ int LZ4_resetStreamStateHC(void* state, char* inputBuffer)
     return 0;
 }
 
+#if (LZ4HC_HEAPMODE)
 void* LZ4_createHC (const char* inputBuffer)
 {
     LZ4_streamHC_t* const hc4 = LZ4_createStreamHC();
@@ -1231,6 +1234,7 @@ int LZ4_freeHC (void* LZ4HC_Data)
     FREEMEM(LZ4HC_Data);
     return 0;
 }
+#endif // LZ4HC_HEAPMODE=1
 
 int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int cLevel)
 {
@@ -1331,7 +1335,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 {
     int retval = 0;
 #define TRAILING_LITERALS 3
-#ifdef LZ4HC_HEAPMODE
+#if (LZ4HC_HEAPMODE)
     LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
 #else
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which is a bit large for stack... */
@@ -1614,7 +1618,7 @@ if (limit == fillOutput) {
      goto _last_literals;
 }
 _return_label:
-#ifdef LZ4HC_HEAPMODE
+#if (LZ4HC_HEAPMODE)
      FREEMEM(opt);
 #endif
      return retval;

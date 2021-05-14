@@ -187,6 +187,7 @@
 /*-************************************
 *  Memory routines
 **************************************/
+#if (LZ4_HEAPMODE)
 #ifdef LZ4_USER_MEMORY_FUNCTIONS
 /* memory management functions can be customized by user project.
  * Below functions must exist somewhere in the Project
@@ -202,6 +203,7 @@ void  LZ4_free(void* p);
 # define ALLOC(s)          malloc(s)
 # define ALLOC_AND_ZERO(s) calloc(1,s)
 # define FREEMEM(p)        free(p)
+#endif
 #endif
 
 #include <string.h>   /* memset, memcpy */
@@ -1420,6 +1422,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 *  Streaming functions
 ********************************/
 
+#if (LZ4_HEAPMODE)
 LZ4_stream_t* LZ4_createStream(void)
 {
     LZ4_stream_t* const lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
@@ -1429,6 +1432,7 @@ LZ4_stream_t* LZ4_createStream(void)
     LZ4_initStream(lz4s, sizeof(*lz4s));
     return lz4s;
 }
+#endif
 
 static size_t LZ4_stream_t_alignment(void)
 {
@@ -1462,6 +1466,7 @@ void LZ4_resetStream_fast(LZ4_stream_t* ctx) {
     LZ4_prepareTable(&(ctx->internal_donotuse), 0, byU32);
 }
 
+#if (LZ4_HEAPMODE)
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     if (!LZ4_stream) return 0;   /* support free on NULL */
@@ -1469,6 +1474,7 @@ int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
     FREEMEM(LZ4_stream);
     return (0);
 }
+#endif
 
 
 #define HASH_UNIT sizeof(reg_t)
@@ -1786,7 +1792,7 @@ LZ4_decompress_generic(
         if ((!endOnInput) && (unlikely(outputSize==0))) { return (*ip==0 ? 1 : -1); }
         if ((endOnInput) && unlikely(srcSize==0)) { return -1; }
 
-	/* Currently the fast loop shows a regression on qualcomm arm chips. */
+  /* Currently the fast loop shows a regression on qualcomm arm chips. */
 #if LZ4_FAST_DEC_LOOP
         if ((oend - op) < FASTLOOP_SAFE_DISTANCE) {
             DEBUGLOG(6, "skip fast decode loop");
@@ -2262,6 +2268,7 @@ int LZ4_decompress_fast_doubleDict(const char* source, char* dest, int originalS
 
 /*===== streaming decompression functions =====*/
 
+#if (LZ4_HEAPMODE)
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOC_AND_ZERO(sizeof(LZ4_streamDecode_t));
@@ -2275,6 +2282,7 @@ int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
     FREEMEM(LZ4_stream);
     return 0;
 }
+#endif
 
 /*! LZ4_setStreamDecode() :
  *  Use this function to instruct where to find the dictionary.
@@ -2480,11 +2488,13 @@ int LZ4_resetStreamState(void* state, char* inputBuffer)
     return 0;
 }
 
+#if (LZ4_HEAPMODE)
 void* LZ4_create (char* inputBuffer)
 {
     (void)inputBuffer;
     return LZ4_createStream();
 }
+#endif
 
 char* LZ4_slideInputBuffer (void* state)
 {
