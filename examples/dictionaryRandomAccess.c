@@ -97,7 +97,7 @@ void test_compress(FILE* outFp, FILE* inpFp, void *dict, int dictSize)
         while (ptr != offsetsEnd) {
             write_int(outFp, *ptr++);
         }
-        write_int(outFp, offsetsEnd - offsets);
+        write_int(outFp, (int) (offsetsEnd - offsets));
     }
 }
 
