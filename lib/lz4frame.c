@@ -134,12 +134,14 @@ static int g_debuglog_enable = 1;
   typedef uint32_t U32;
   typedef  int32_t S32;
   typedef uint64_t U64;
+  typedef uintptr_t uptrval;
 #else
   typedef unsigned char       BYTE;
   typedef unsigned short      U16;
   typedef unsigned int        U32;
   typedef   signed int        S32;
   typedef unsigned long long  U64;
+  typedef size_t              uptrval;   /* generally true, except OpenVMS-64 */
 #endif
 
 
@@ -904,7 +906,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
     }
 
     /* keep tmpIn within limits */
-    if ((cctxPtr->tmpIn + blockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize)   /* necessarily LZ4F_blockLinked && lastBlockCompressed==fromTmpBuffer */
+    if (((uptrval) cctxPtr->tmpIn + blockSize) > ((uptrval) cctxPtr->tmpBuff + cctxPtr->maxBufferSize)   /* necessarily LZ4F_blockLinked && lastBlockCompressed==fromTmpBuffer */
         && !(cctxPtr->prefs.autoFlush))
     {
         int const realDictSize = LZ4F_localSaveDict(cctxPtr);
@@ -1554,7 +1556,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }   }
 
                 srcPtr += sizeToCopy;
-                dstPtr += sizeToCopy;
+                dstPtr = (BYTE*) ((uptrval) dstPtr + sizeToCopy);
                 if (sizeToCopy == dctx->tmpInTarget) {   /* all done */
                     if (dctx->frameInfo.blockChecksumFlag) {
                         dctx->tmpInSize = 0;

@@ -106,9 +106,9 @@ static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
     }
     startingOffset += 64 KB;
     hc4->nextToUpdate = (U32) startingOffset;
-    hc4->base = start - startingOffset;
+    hc4->base = (const LZ4_byte*) ((uptrval) start - startingOffset);
     hc4->end = start;
-    hc4->dictBase = start - startingOffset;
+    hc4->dictBase = (const LZ4_byte*) ((uptrval) start - startingOffset);
     hc4->dictLimit = (U32) startingOffset;
     hc4->lowLimit = (U32) startingOffset;
 }
@@ -124,7 +124,7 @@ LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
     U32 idx = hc4->nextToUpdate;
 
     while (idx < target) {
-        U32 const h = LZ4HC_hashPtr(base+idx);
+        U32 const h = LZ4HC_hashPtr((const void*) ((uptrval) base + idx));
         size_t delta = idx - hashTable[h];
         if (delta>LZ4_DISTANCE_MAX) delta = LZ4_DISTANCE_MAX;
         DELTANEXTU16(chainTable, idx) = (U16)delta;
@@ -252,7 +252,7 @@ LZ4HC_InsertAndGetWiderMatch (
     const LZ4HC_CCtx_internal * const dictCtx = hc4->dictCtx;
     const BYTE* const base = hc4->base;
     const U32 dictLimit = hc4->dictLimit;
-    const BYTE* const lowPrefixPtr = base + dictLimit;
+    const BYTE* const lowPrefixPtr = (const BYTE*) ((uptrval)base + dictLimit);
     const U32 ipIndex = (U32)(ip - base);
     const U32 lowestMatchIndex = (hc4->lowLimit + (LZ4_DISTANCE_MAX + 1) > ipIndex) ? hc4->lowLimit : ipIndex - LZ4_DISTANCE_MAX;
     const BYTE* const dictBase = hc4->dictBase;
@@ -278,7 +278,7 @@ LZ4HC_InsertAndGetWiderMatch (
         if (favorDecSpeed && (ipIndex - matchIndex < 8)) {
             /* do nothing */
         } else if (matchIndex >= dictLimit) {   /* within current Prefix */
-            const BYTE* const matchPtr = base + matchIndex;
+            const BYTE* const matchPtr = (const BYTE*) ((uptrval) base + matchIndex);
             assert(matchPtr >= lowPrefixPtr);
             assert(matchPtr < ip);
             assert(longest >= 1);
@@ -293,9 +293,9 @@ LZ4HC_InsertAndGetWiderMatch (
                         *startpos = ip + back;
             }   }   }
         } else {   /* lowestMatchIndex <= matchIndex < dictLimit */
-            const BYTE* const matchPtr = dictBase + matchIndex;
+            const BYTE* const matchPtr = (const BYTE*) ((uptrval) dictBase + matchIndex);
             if (LZ4_read32(matchPtr) == pattern) {
-                const BYTE* const dictStart = dictBase + hc4->lowLimit;
+                const BYTE* const dictStart = (const BYTE*) ((uptrval) dictBase + hc4->lowLimit);
                 int back = 0;
                 const BYTE* vLimit = ip + (dictLimit - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
@@ -306,7 +306,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 matchLength -= back;
                 if (matchLength > longest) {
                     longest = matchLength;
-                    *matchpos = base + matchIndex + back;   /* virtual pos, relative to ip, to retrieve offset */
+                    *matchpos = (const BYTE*) ((uptrval) base + matchIndex + back);   /* virtual pos, relative to ip, to retrieve offset */
                     *startpos = ip + back;
         }   }   }
 
@@ -349,9 +349,9 @@ LZ4HC_InsertAndGetWiderMatch (
                 if ( (repeat == rep_confirmed) && (matchCandidateIdx >= lowestMatchIndex)
                   && LZ4HC_protectDictEnd(dictLimit, matchCandidateIdx) ) {
                     const int extDict = matchCandidateIdx < dictLimit;
-                    const BYTE* const matchPtr = (extDict ? dictBase : base) + matchCandidateIdx;
+                    const BYTE* const matchPtr = (const BYTE*) ((uptrval) (extDict ? dictBase : base) + matchCandidateIdx);
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
-                        const BYTE* const dictStart = dictBase + hc4->lowLimit;
+                        const BYTE* const dictStart = (const BYTE*) ((uptrval) dictBase + hc4->lowLimit);
                         const BYTE* const iLimit = extDict ? dictBase + dictLimit : iHighLimit;
                         size_t forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iLimit, pattern) + sizeof(pattern);
                         if (extDict && matchPtr + forwardPatternLength == iLimit) {
@@ -390,11 +390,11 @@ LZ4HC_InsertAndGetWiderMatch (
                                     if (lookBackLength==0) {  /* no back possible */
                                         size_t const maxML = MIN(currentSegmentLength, srcPatternLength);
                                         if ((size_t)longest < maxML) {
-                                            assert(base + matchIndex != ip);
+                                            assert((uptrval) base + matchIndex != (uptrval) ip);
                                             if ((size_t)(ip - base) - matchIndex > LZ4_DISTANCE_MAX) break;
                                             assert(maxML < 2 GB);
                                             longest = (int)maxML;
-                                            *matchpos = base + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
+                                            *matchpos = (const BYTE*) ((uptrval)base + matchIndex);   /* virtual pos, relative to ip, to retrieve offset */
                                             *startpos = ip;
                                         }
                                         {   U32 const distToNextPattern = DELTANEXTU16(chainTable, matchIndex);
@@ -430,7 +430,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
-                    *matchpos = base + matchIndex + back;
+                    *matchpos = (const BYTE*) ((uptrval) base + matchIndex + back);
                     *startpos = ip + back;
             }   }
 
@@ -1034,7 +1034,7 @@ void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
     } else {
         /* preserve end - base : can trigger clearTable's threshold */
         if (LZ4_streamHCPtr->internal_donotuse.end != NULL) {
-            LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.base;
+            LZ4_streamHCPtr->internal_donotuse.end = (const LZ4_byte*) ((uptrval) LZ4_streamHCPtr->internal_donotuse.end - (uptrval)LZ4_streamHCPtr->internal_donotuse.base);
         } else {
             assert(LZ4_streamHCPtr->internal_donotuse.base == NULL);
         }
@@ -1089,14 +1089,14 @@ void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
     DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
-    if (ctxPtr->end >= ctxPtr->base + ctxPtr->dictLimit + 4)
+    if (ctxPtr->end >= (const LZ4_byte*) ((uptrval) ctxPtr->base + ctxPtr->dictLimit + 4))
         LZ4HC_Insert (ctxPtr, ctxPtr->end-3);   /* Referencing remaining dictionary content */
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
     ctxPtr->dictLimit = (U32)(ctxPtr->end - ctxPtr->base);
     ctxPtr->dictBase  = ctxPtr->base;
-    ctxPtr->base = newBlock - ctxPtr->dictLimit;
+    ctxPtr->base = (const LZ4_byte*) ((uptrval) newBlock - ctxPtr->dictLimit);
     ctxPtr->end  = newBlock;
     ctxPtr->nextToUpdate = ctxPtr->dictLimit;   /* match referencing will resume from there */
 
@@ -1130,8 +1130,8 @@ LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
 
     /* Check overlapping input/dictionary space */
     {   const BYTE* sourceEnd = (const BYTE*) src + *srcSizePtr;
-        const BYTE* const dictBegin = ctxPtr->dictBase + ctxPtr->lowLimit;
-        const BYTE* const dictEnd   = ctxPtr->dictBase + ctxPtr->dictLimit;
+        const BYTE* const dictBegin = (const BYTE*) ((uptrval) ctxPtr->dictBase + ctxPtr->lowLimit);
+        const BYTE* const dictEnd   = (const BYTE*) ((uptrval) ctxPtr->dictBase + ctxPtr->dictLimit);
         if ((sourceEnd > dictBegin) && ((const BYTE*)src < dictEnd)) {
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
             ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictBase);
@@ -1164,7 +1164,7 @@ int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const ch
 int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictSize)
 {
     LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
-    int const prefixSize = (int)(streamPtr->end - (streamPtr->base + streamPtr->dictLimit));
+    int const prefixSize = (int)((uptrval) streamPtr->end - ((uptrval) streamPtr->base + streamPtr->dictLimit));
     DEBUGLOG(5, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
     assert(prefixSize >= 0);
     if (dictSize > 64 KB) dictSize = 64 KB;
@@ -1174,8 +1174,8 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     if (dictSize > 0)
         memmove(safeBuffer, streamPtr->end - dictSize, dictSize);
     {   U32 const endIndex = (U32)(streamPtr->end - streamPtr->base);
-        streamPtr->end = (const BYTE*)safeBuffer + dictSize;
-        streamPtr->base = streamPtr->end - endIndex;
+        streamPtr->end = (const BYTE*) ((uptrval) safeBuffer + dictSize);
+        streamPtr->base = (const BYTE*) ((uptrval) streamPtr->end - endIndex);
         streamPtr->dictLimit = endIndex - (U32)dictSize;
         streamPtr->lowLimit = endIndex - (U32)dictSize;
         if (streamPtr->nextToUpdate < streamPtr->dictLimit)
@@ -1369,7 +1369,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
          if ((size_t)firstMatch.len > sufficient_len) {
              /* good enough solution : immediate encoding */
              int const firstML = firstMatch.len;
-             const BYTE* const matchPos = ip - firstMatch.off;
+             const BYTE* const matchPos = (const BYTE*) ((uptrval) ip - firstMatch.off);
              opSaved = op;
              if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), firstML, matchPos, limit, oend) ) {  /* updates ip, op and anchor */
                  ovml = firstML;
@@ -1547,7 +1547,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                  assert(ml >= MINMATCH);
                  assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
                  opSaved = op;
-                 if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ip - offset, limit, oend) ) {  /* updates ip, op and anchor */
+                 if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, (const BYTE*) ((uptrval) ip - offset), limit, oend) ) {  /* updates ip, op and anchor */
                      ovml = ml;
                      ovref = ip - offset;
                      goto _dest_overflow;
