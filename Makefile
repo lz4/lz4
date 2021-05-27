@@ -155,7 +155,7 @@ usan: CC      = clang
 usan: CFLAGS  = -O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined -fsanitize-recover=pointer-overflow
 usan: LDFLAGS = $(CFLAGS)
 usan: clean
-	$(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
+	CC=$(CC) CFLAGS='$(CFLAGS)' LDFLAGS='$(LDFLAGS)' $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
 .PHONY: usan32
 usan32: CFLAGS = -m32 -O3 -g -fsanitize=undefined
