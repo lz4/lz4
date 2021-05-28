@@ -1,0 +1,474 @@
+# Known issues:
+# - For now, this CI script ignores exit code of `make usan`.  Because
+#   there're several issues which may take relatively long time to
+#   resolve.  We'll fully enable it when we ensure `make usan` is ready
+#   for all commits and PRs.
+#   See https://github.com/lz4/lz4/pull/983 for details.  Also you can
+#   investigate its raw log in "Linux x64 usan" at the GitHub Actions.
+#
+# - This test script ignores exit code of cppcheck which can see under
+#   Job:Linux x64 scan-build + cppcheck in the GitHub Actions report.
+#   Because this project doesn't 100% follow their recommendation.
+#   Also sometimes it reports false positives.
+#
+# Notes:
+# - You can investigate various information at the right pane of GitHub
+#   Actions report page.
+#
+#   | Item                      | Section in the right pane             |
+#   | ------------------------- | ------------------------------------- |
+#   | OS, VM                    | Set up job                            |
+#   | git repo, commit hash     | Run actions/checkout@v2               |
+#   | gcc, tools                | Environment info                      |
+#
+# - To fail earlier, order of tests in the same job are roughly sorted by
+#   elapsed time.
+#
+# Tests which we still leave at travis-ci
+# - name: (Trusty) gcc-4.4 compilation
+# - name: (Xenial) gcc-5 compilation
+# - name: (Trusty) clang-3.8 compilation
+# - name: Compile OSS-Fuzz targets
+# - name: tag build
+# - name: aarch64 real-hw tests
+# - name: PPC64LE real-hw tests
+# - name: IBM s390x real-hw tests
+
+
+# Name of the workflow is also displayed as a SVG badge
+name: lz4 CI
+
+on: [push, pull_request]
+
+jobs:
+  # CI Environment information
+  #
+  # - "ubuntu-latest" (Ubuntu 20.04) has the following software
+  #   https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
+  basic-env-info:
+    name: Linux x64 Environment Info (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: gcc
+      run: echo && gcc --version
+
+    - name: clang
+      run: echo && clang --version
+
+    - name: make
+      run: echo && make -v
+
+    - name: gcc packages
+      run: apt-cache search gcc | grep "^gcc-[0-9\.]* " | sort
+
+    - name: clang packages
+      run: apt-cache search clang | grep "^clang-[0-9\.]* " | sort
+
+    - name: QEMU packages
+      run: apt-cache search qemu | grep "^qemu-system-.*QEMU full system" | sort
+
+    - name: git
+      run: echo && git --version
+
+    - name: g++
+      run: echo && g++ --version
+
+
+  # travis-ci: (Precise) benchmark test
+  ubuntu-benchmark:
+    name: Linux x64 benchmark test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: benchmark
+      run: |
+        make -C tests test-lz4 test-lz4c test-fullbench
+
+
+  # travis-ci: Custom LZ4_DISTANCE_MAX ; lz4-wlib (CLI linked to dynamic library); LZ4_USER_MEMORY_FUNCTIONS
+  ubuntu-custom-distance:
+    name: Linux x64 Custom LZ4_DISTANCE_MAX
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: custom LZ4_DISTANCE_MAX
+      run: |
+        MOREFLAGS=-DLZ4_DISTANCE_MAX=8000 make check
+        make clean
+        make -C programs lz4-wlib
+        make clean
+        make -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
+        make clean
+        CC="c++ -Wno-deprecated" make -C tests fullbench-wmalloc  # stricter function signature check
+
+
+  # travis-ci: (Precise) frame and fuzzer test
+  ubuntu-frame-and-fuzzer:
+    name: Linux x64 frame and fuzzer test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo sysctl -w vm.mmap_min_addr=4096
+    - name: frame + fuzzer test
+      run: |
+        make -C tests test-frametest test-fuzzer
+
+
+  # travis-ci: (Trusty) i386 frame + fuzzer test
+  ubuntu-i386-frame-and-fuzzer:
+    name: Linux x64 i386 frame + fuzzer test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get install gcc-multilib
+        sudo sysctl -w vm.mmap_min_addr=4096
+    - name: frame + fuzzer test (i386)
+      run: |
+        make -C tests test-frametest32 test-fuzzer32
+
+
+  # travis-ci: (Trusty) i386 benchmark + version test
+  ubuntu-i386-bench-and-versions:
+    name: Linux x64 i386 benchmark + version test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get install gcc-multilib
+    - name: benchmark & versionsTest
+      run: |
+        make -C tests test-lz4c32 test-fullbench32 versionsTest
+
+
+  # travis-ci: x32 compatibility test
+  ubuntu-x32:
+    name: Linux x64 x32
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get install gcc-multilib
+    - name: make -C tests
+      run: |
+        make -C tests test MOREFLAGS=-mx32
+
+
+  # travis-ci: (Precise) g++ and clang CMake test
+  ubuntu-gxx-clang-cmake-test:
+    name: Linux x64 g++ and clang CMake test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: g++
+      # note : This test can be merged with ubntu-latest-cc.
+      run: |
+        make clean cxxtest
+    - name: examples
+      run: |
+        make clean examples
+    - name: cmake
+      run: |
+        make clean examples
+    - name: travis-install
+      run: |
+        make clean travis-install
+    - name: clang
+      # note : This test can be merged with ubntu-latest-cc.
+      run: |
+        make clean clangtest
+
+
+  ubuntu-ctocpp:
+    name: Linux x64 c-to-c++
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: c-to-c++
+      run: |
+        make clean ctocpptest
+
+
+  ubuntu-usan:
+    name: Linux x64 usan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: usan
+      # For now, we ignore the exit code of `make usan`.
+      # See "Known issues" at the top of the this file.
+      run: |
+        make clean usan MOREFLAGS='-Wcomma -Werror' || echo Ignore these errors for now.  For details, see https://github.com/lz4/lz4/pull/983
+
+
+  ubuntu-valgrind:
+    name: Linux x64 valgrind
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get install valgrind
+
+    - name: Environment info
+      run: |
+        echo && gcc --version
+        echo && valgrind --version
+
+    - name: valgrind
+      run: |
+        make -C tests test-mem
+
+
+  ubuntu-cppcheck:
+    name: Linux x64 scan-build + cppcheck
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get install cppcheck clang-tools
+
+    - name: Environment info
+      run: |
+        echo && gcc --version
+        echo && clang --version
+        echo && cppcheck --version
+        echo && which scan-build # scan-build doesn't have any --version equivalent option
+        echo && make -v
+        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
+
+    - name: staticAnalyze
+      run: |
+        make clean staticAnalyze
+
+    - name: cppcheck
+      run: |
+        # This test script ignores exit code of cppcheck.  See knowin issues
+        # at the top of this file.
+        make clean cppcheck || echo There are some cppcheck reports
+
+
+  # Test various C compilers
+  #
+  # Invoke the following commands for each C compiler
+  #   make all c_standards
+  #   make -C programs
+  #   make -C tests
+  #
+  ubuntu-latest-cc:
+    name: Linux x64 ${{ matrix.xcc_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
+      matrix:
+        include: [
+          { xcc_name: 'gcc 7',      xcc_pkg: gcc-7,       xcc: gcc-7     },
+          { xcc_name: 'gcc 8',      xcc_pkg: gcc-8,       xcc: gcc-8     },
+          { xcc_name: 'gcc 9',      xcc_pkg: gcc-9,       xcc: gcc-9     },
+          { xcc_name: 'gcc 10',     xcc_pkg: gcc-10,      xcc: gcc-10    },
+          { xcc_name: 'clang 6',    xcc_pkg: clang-6.0,   xcc: clang-6.0 },
+          { xcc_name: 'clang 7',    xcc_pkg: clang-7,     xcc: clang-7   },
+          { xcc_name: 'clang 8',    xcc_pkg: clang-8,     xcc: clang-8   },
+          { xcc_name: 'clang 9',    xcc_pkg: clang-9,     xcc: clang-9   },
+          { xcc_name: 'clang 10',   xcc_pkg: clang-10,    xcc: clang-10  },
+          { xcc_name: 'clang 11',   xcc_pkg: clang-11,    xcc: clang-11  },
+        ]
+    env:                        # Set environment variables
+      XCC: ${{ matrix.xcc }}
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get install gcc-multilib ${{ matrix.xcc_pkg }} 
+
+    - name: Environment info
+      run: |
+        echo && which $XCC
+        echo && $XCC --version
+
+    - name: make all
+      run: |
+        CC=$XCC make clean all MOREFLAGS=-Werror
+
+    - name: make c_standards
+      run: |
+        CC=$XCC make clean c_standards
+
+    - name: make -C programs
+      run: |
+        CC=$XCC make -C programs CFLAGS=-fPIC LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2'
+
+    - name: make -C tests
+      run: |
+        CC=$XCC make -C tests test-lz4 clean test-lz4c32 MOREFLAGS=-Werror
+
+
+  ubuntu-build-meson:
+    name: Linux x64 Meson + Ninja
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/setup-python@v2 # https://github.com/actions/setup-python
+      with:
+        python-version: '3.x'
+
+    - name: install
+      run: |
+        sudo apt-get install tree ninja-build
+        python -m pip install --upgrade pip
+        pip3 install --user meson
+
+    - name: Environment info
+      run: |
+        echo && clang --version
+        echo && python --version
+        echo && meson --version
+        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
+
+    - name: meson
+      # 'run: >' replaces all newlines in the following block with spaces
+      run: >
+        meson setup
+        --buildtype=debug
+        -Db_lundef=false
+        -Dauto_features=enabled
+        -Ddefault_library=both
+        -Dbin_programs=true
+        -Dbin_contrib=true
+        -Dbin_tests=true
+        -Dbin_examples=true
+        contrib/meson build
+
+    - name: staging
+      run: |
+        pushd build
+        DESTDIR=./staging ninja install
+        tree ./staging
+
+
+  ubuntu-build-cmake:
+    name: Linux x64 cmake
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: Environment info
+      run: |
+        echo && gcc --version
+        echo && cmake --version
+        echo && make -v
+        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
+
+    - name: cmake
+      run: |
+        cd build/cmake
+        mkdir build
+        cd build
+        cmake ..
+        CFLAGS=-Werror make
+
+
+  # make cmake
+  # note: This test can be merged with ubuntu-build-cmake
+  ubuntu-cmake:
+    name: Linux x64 make cmake
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: make cmake
+      run: |
+        make clean cmake
+
+
+  # Linux, { ARM, ARM64, PPC, PPC64LE, S390X }
+  # All tests are using QEMU and gcc cross compiler.
+  qemu-platformtest:
+    name: QEMU ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
+      matrix:
+        include: [
+          { name: ARM,      xcc_pkg: gcc-arm-linux-gnueabi,     xcc: arm-linux-gnueabi-gcc,     xemu_pkg: qemu-system-arm,    xemu: qemu-arm-static     },
+          { name: ARM64,    xcc_pkg: gcc-aarch64-linux-gnu,     xcc: aarch64-linux-gnu-gcc,     xemu_pkg: qemu-system-arm,    xemu: qemu-aarch64-static },
+          { name: PPC,      xcc_pkg: gcc-powerpc-linux-gnu,     xcc: powerpc-linux-gnu-gcc,     xemu_pkg: qemu-system-ppc,    xemu: qemu-ppc-static     },
+          { name: PPC64LE,  xcc_pkg: gcc-powerpc64le-linux-gnu, xcc: powerpc64le-linux-gnu-gcc, xemu_pkg: qemu-system-ppc,    xemu: qemu-ppc64le-static },
+          { name: S390X,    xcc_pkg: gcc-s390x-linux-gnu,       xcc: s390x-linux-gnu-gcc,       xemu_pkg: qemu-system-s390x,  xemu: qemu-s390x-static   },
+        ]
+    env:                        # Set environment variables
+      XCC: ${{ matrix.xcc }}
+      XEMU: ${{ matrix.xemu }}
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt update & install
+      run: |
+        sudo apt-get update
+        sudo apt-get install gcc-multilib g++-multilib qemu-utils qemu-user-static
+        sudo apt-get install ${{ matrix.xcc_pkg }} ${{ matrix.xemu_pkg }} 
+
+    - name: Environment info
+      run: |
+        echo && which $XCC
+        echo && $XCC --version
+        echo && $XCC -v  # Show built-in specs
+        echo && which $XEMU
+        echo && $XEMU --version
+
+    - name: ARM
+      if: ${{ matrix.name == 'ARM' }}
+      run: |
+        make platformTest CC=$XCC QEMU_SYS=$XEMU
+
+    - name: ARM64
+      if: ${{ matrix.name == 'ARM64' }}
+      run: |
+        make platformTest CC=$XCC QEMU_SYS=$XEMU
+
+    - name: PPC
+      if: ${{ matrix.name == 'PPC' }}
+      run: |
+        make platformTest CC=$XCC QEMU_SYS=$XEMU
+
+    - name: PPC64LE
+      if: ${{ matrix.name == 'PPC64LE' }}
+      run: |
+        make platformTest CC=$XCC QEMU_SYS=$XEMU MOREFLAGS=-m64
+
+    - name: S390X
+      if: ${{ matrix.name == 'S390X' }}
+      run: |
+        make platformTest CC=$XCC QEMU_SYS=$XEMU
+
+
+  # macOS
+  macos-latest-general:
+    name: macOS general test
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Environment info
+      run: |
+        echo && clang --version
+        echo && sysctl -a | grep machdep.cpu   # cpuinfo
+
+    - name: make
+      run: |
+        CFLAGS="-Werror" make clean default
+
+    - name: library build
+      run: |
+        make clean default
+
+    - name: test
+      run: |
+        # test scenario where `stdout` is not the console
+        make clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee
