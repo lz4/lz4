@@ -248,7 +248,8 @@ LZ4FLIB_API unsigned LZ4F_getVersion(void);
  * The version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
  * The function will provide a pointer to a fully allocated LZ4F_cctx object.
  * If @return != zero, there was an error during context creation.
- * Object can release its memory using LZ4F_freeCompressionContext();
+ * Object can be released using LZ4F_freeCompressionContext();
+ * Note: LZ4F_freeCompressionContext() works with NULL pointers (do nothing).
  */
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
@@ -301,8 +302,7 @@ LZ4FLIB_API size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* 
  *  Important rule: dstCapacity MUST be large enough to ensure operation success even in worst case situations.
  *  This value is provided by LZ4F_compressBound().
  *  If this condition is not respected, LZ4F_compress() will fail (result is an errorCode).
- *  LZ4F_compressUpdate() doesn't guarantee error recovery.
- *  When an error occurs, compression context must be freed or resized.
+ *  After an error, the state is left in a UB state, and must be re-initialized or freed.
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())
