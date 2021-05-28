@@ -558,7 +558,10 @@ int basicTests(U32 seed, double compressibility)
                                               cdict, NULL) );
         DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
                         (unsigned)dictSize, (unsigned)cSizeWithDict);
-        if ((LZ4_DISTANCE_MAX > dictSize) && (cSizeWithDict >= cSizeNoDict)) goto _output_error;  /* must be more efficient */
+        if ((LZ4_DISTANCE_MAX > dictSize) && (cSizeWithDict >= cSizeNoDict)) {
+            DISPLAYLEVEL(3, "cSizeWithDict (%zu) should have been more compact than cSizeNoDict(%zu) \n", cSizeWithDict, cSizeNoDict);
+            goto _output_error;  /* must be more efficient */
+        }
         crcOrig = XXH64(CNBuffer, dictSize, 0);
 
         DISPLAYLEVEL(3, "LZ4F_decompress_usingDict : ");
