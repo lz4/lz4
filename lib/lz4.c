@@ -1568,12 +1568,12 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
                                 int acceleration)
 {
     const tableType_t tableType = byU32;
-    LZ4_stream_t_internal* streamPtr = &LZ4_stream->internal_donotuse;
-    const BYTE* dictEnd = streamPtr->dictionary + streamPtr->dictSize;
+    LZ4_stream_t_internal* const streamPtr = &LZ4_stream->internal_donotuse;
+    const BYTE* dictEnd = streamPtr->dictSize ? streamPtr->dictionary + streamPtr->dictSize : streamPtr->dictionary;
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i)", inputSize);
 
-    LZ4_renormDictT(streamPtr, inputSize);   /* avoid index overflow */
+    LZ4_renormDictT(streamPtr, inputSize);   /* fix index overflow */
     if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
     if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
 
@@ -1587,7 +1587,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
     }
 
     /* Check overlapping input/dictionary space */
-    {   const BYTE* sourceEnd = (const BYTE*) source + inputSize;
+    {   const BYTE* const sourceEnd = (const BYTE*)source + inputSize;
         if ((sourceEnd > streamPtr->dictionary) && (sourceEnd < dictEnd)) {
             streamPtr->dictSize = (U32)(dictEnd - sourceEnd);
             if (streamPtr->dictSize > 64 KB) streamPtr->dictSize = 64 KB;
@@ -1623,7 +1623,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
             } else {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, tableType, usingDictCtx, noDictIssue, acceleration);
             }
-        } else {
+        } else {  /* small data <= 4 KB */
             if ((streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset)) {
                 result = LZ4_compress_generic(streamPtr, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, tableType, usingExtDict, dictSmall, acceleration);
             } else {
