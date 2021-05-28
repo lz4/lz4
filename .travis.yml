@@ -197,35 +197,35 @@ matrix:
         - make -C tests checkTag
         - tests/checkTag "$TRAVIS_BRANCH"
 
-    - name: (Xenial) Meson + clang build
-      #env: ALLOW_FAILURES=true
-      dist: xenial
-      language: cpp
-      compiler: clang
-      install:
-        - sudo apt-get install -qq python3 tree
-        - |
-          travis_retry curl -o ~/ninja.zip -L 'https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip' &&
-          unzip ~/ninja.zip -d ~/.local/bin
-        - |
-          travis_retry curl -o ~/get-pip.py 'https://bootstrap.pypa.io/get-pip.py' &&
-          python3 ~/get-pip.py --user &&
-          pip3 install --user meson
-      script:
-        - |
-          meson setup \
-            --buildtype=debug \
-            -Db_lundef=false \
-            -Dauto_features=enabled \
-            -Ddefault_library=both \
-            -Dbin_programs=true \
-            -Dbin_contrib=true \
-            -Dbin_tests=true \
-            -Dbin_examples=true \
-            contrib/meson build
-        - pushd build
-        - DESTDIR=./staging ninja install
-        - tree ./staging
+#   - name: (Xenial) Meson + clang build
+#     #env: ALLOW_FAILURES=true
+#     dist: xenial
+#     language: cpp
+#     compiler: clang
+#     install:
+#       - sudo apt-get install -qq python3 tree
+#       - |
+#         travis_retry curl -o ~/ninja.zip -L 'https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip' &&
+#         unzip ~/ninja.zip -d ~/.local/bin
+#       - |
+#         travis_retry curl -o ~/get-pip.py 'https://bootstrap.pypa.io/get-pip.py' &&
+#         python3 ~/get-pip.py --user &&
+#         pip3 install --user meson
+#     script:
+#       - |
+#         meson setup \
+#           --buildtype=debug \
+#           -Db_lundef=false \
+#           -Dauto_features=enabled \
+#           -Ddefault_library=both \
+#           -Dbin_programs=true \
+#           -Dbin_contrib=true \
+#           -Dbin_tests=true \
+#           -Dbin_examples=true \
+#           contrib/meson build
+#       - pushd build
+#       - DESTDIR=./staging ninja install
+#       - tree ./staging
 
     # oss-fuzz compilation test
     - name: Compile OSS-Fuzz targets
