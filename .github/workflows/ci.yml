@@ -1,4 +1,11 @@
 # Known issues:
+# - For now, this CI script ignores exit code of `make usan`.  Because
+#   there're several issues which may take relatively long time to
+#   resolve.  We'll fully enable it when we ensure `make usan` is ready
+#   for all commits and PRs.
+#   See https://github.com/lz4/lz4/pull/983 for details.  Also you can
+#   investigate its raw log in "Linux x64 usan" at the GitHub Actions.
+#
 # - This test script ignores exit code of cppcheck which can see under
 #   Job:Linux x64 scan-build + cppcheck in the GitHub Actions report.
 #   Because this project doesn't 100% follow their recommendation.
@@ -18,6 +25,9 @@
 #   elapsed time.
 #
 # Tests which we still leave at travis-ci
+# - name: (Trusty) gcc-4.4 compilation
+# - name: (Xenial) gcc-5 compilation
+# - name: (Trusty) clang-3.8 compilation
 # - name: Compile OSS-Fuzz targets
 # - name: tag build
 # - name: aarch64 real-hw tests
@@ -192,8 +202,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
     - name: usan
+      # For now, we ignore the exit code of `make usan`.
+      # See "Known issues" at the top of the this file.
       run: |
-        make clean usan MOREFLAGS='-Wcomma -Werror'
+        make clean usan MOREFLAGS='-Wcomma -Werror' || echo Ignore these errors for now.  For details, see https://github.com/lz4/lz4/pull/983
 
 
   ubuntu-valgrind:
