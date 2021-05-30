@@ -1,0 +1,78 @@
+This directory contains [GitHub Actions](https://github.com/features/actions) workflow files.
+
+# Known issue which will be resolved soon
+
+- `make cxxtest`
+  - Disabled for now.  Will be enabled after #993.
+- `make c_standards_c90`, `make c_standards_c11`
+  - Disabled for now.  Will be enabled after #994.
+
+
+# Maintenance Schedule
+
+`ubuntu-16.04` environment will be removed at September, 2021.
+--------------------------------------------------------------
+
+It also will remove test for the following compilers:
+
+- gcc: 4.4, 4.6, 4.7
+- clang: 3.5, 3.6, 3.7, 3.8
+
+See also GitHub official announcement :
+["Ubuntu 16.04 LTS will be removed on September 20, 2021"](https://github.blog/changelog/2021-04-29-github-actions-ubuntu-16-04-lts-virtual-environment-will-be-removed-on-september-20-2021/).
+
+
+# Difference with `.travis.yml`
+
+The following tests are not included yet.
+
+- name: Compile OSS-Fuzz targets
+- name: tag build
+- name: aarch64 real-hw tests
+- name: PPC64LE real-hw tests
+- name: IBM s390x real-hw tests
+
+
+# Known issues
+
+## USAN, ASAN (`lz4-ubsan-x64`, `lz4-ubsan-x86`, `lz4-asan-x64`)
+
+For now, `lz4-ubsan-*` ignores the exit code of `make usan` and `make usan32`.
+Because there're several issues which may take relatively long time to resolve.
+
+We'll fully enable it when we ensure `make usan` is ready for all commits and PRs.
+
+See https://github.com/lz4/lz4/pull/983 for details.
+
+
+## C Compilers (`lz4-c-compilers`)
+
+- Our test doesn't use `gcc-4.5` due to installation issue of its package.  (`apt-get install gcc-4.5` fails on GH-Actions VM)
+
+- Currently, the following 32bit executable tests fail with all versions of `clang`.
+  - `CC=clang-X CFLAGS='-O3' make V=1 -C tests clean test-lz4c32`
+  - `CC=clang-X CFLAGS='-O3 -mx32' make V=1 -C tests clean test-lz4c32`
+  - See [#991](https://github.com/lz4/lz4/issues/991) for details.
+
+- Currently, the following 32bit executable tests fail with `gcc-11`
+  - `CC=clang-X CFLAGS='-O3' make V=1 -C tests clean test-lz4c32`
+  - `CC=clang-X CFLAGS='-O3 -mx32' make V=1 -C tests clean test-lz4c32`
+
+
+## cppcheck.yml
+
+This test script ignores the exit code of `make cppcheck`.
+Because this project doesn't 100% follow their recommendation.
+Also sometimes it reports false positives.
+
+
+# Notes
+
+- You can investigate various information at the right pane of GitHub
+  Actions report page.
+
+| Item                      | Section in the right pane             |
+| ------------------------- | ------------------------------------- |
+| OS, VM                    | Set up job                            |
+| git repo, commit hash     | Run actions/checkout@v2               |
+| gcc, tools                | Environment info                      |
