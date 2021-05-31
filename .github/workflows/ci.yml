@@ -587,6 +587,22 @@ jobs:
 
 
 ############################################################
+# Check git tag for LZ4 releases
+#
+  lz4-check-tag:
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: make -C tests checkTag
+      if: startsWith(github.ref, 'refs/tags/v')   # If git tag name starts with 'v'
+      run: |
+        echo "tag=${GITHUB_REF#refs/*/}"
+        make -C tests checkTag
+        tests/checkTag ${GITHUB_REF#refs/*/}
+
+
+
+############################################################
 # Gather CI environment information.
 #
   lz4-env-info:
