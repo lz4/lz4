@@ -18,13 +18,13 @@ matrix:
 #     script:
 #       - make -C tests test-lz4 test-lz4c test-fullbench
 #
-    - name: (Precise) frame and fuzzer test
-      dist: precise
-      install:
-        - sudo sysctl -w vm.mmap_min_addr=4096
-      script:
-        - make -C tests test-frametest test-fuzzer
-
+#   - name: (Precise) frame and fuzzer test
+#     dist: precise
+#     install:
+#       - sudo sysctl -w vm.mmap_min_addr=4096
+#     script:
+#       - make -C tests test-frametest test-fuzzer
+#
     - name: ASAN tests with fuzzer and frametest
       install:
         - sudo sysctl -w vm.mmap_min_addr=4096
