@@ -108,9 +108,9 @@ jobs:
       if: always()
       run: make V=1 clean ctocpptest
 
-##  - name: make cxxtest
-##    if: ${{ matrix.cxxtest == 'true' }}
-##    run: make V=1 clean cxxtest
+    - name: make cxxtest
+      if: ${{ matrix.cxxtest == 'true' }}
+      run: make V=1 clean cxxtest
 
     - name: make -C programs default
       if: always()
