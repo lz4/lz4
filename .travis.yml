@@ -165,15 +165,15 @@ matrix:
 #       - make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc-static
 #       - make platformTest CC=powerpc-linux-gnu-gcc QEMU_SYS=qemu-ppc64-static MOREFLAGS=-m64
 #
-    - name: (Trusty) scan-build + cppcheck
-      dist: trusty
-      compiler: clang
-      install:
-        - sudo apt-get install -qq cppcheck
-      script:
-        - make staticAnalyze
-        - make cppcheck
-
+#   - name: (Trusty) scan-build + cppcheck
+#     dist: trusty
+#     compiler: clang
+#     install:
+#       - sudo apt-get install -qq cppcheck
+#     script:
+#       - make staticAnalyze
+#       - make cppcheck
+#
     - name: (Trusty) gcc-4.4 compilation
       dist: trusty
       addons:
