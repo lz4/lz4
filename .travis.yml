@@ -80,13 +80,13 @@ matrix:
 #     script:
 #       - make ctocpptest
 #
-    - name: (Trusty) i386 benchmark + version test
-      dist: trusty
-      install:
-        - sudo apt-get install -qq python3 libc6-dev-i386 gcc-multilib
-      script:
-        - make -C tests test-lz4c32 test-fullbench32 versionsTest
-
+#   - name: (Trusty) i386 benchmark + version test
+#     dist: trusty
+#     install:
+#       - sudo apt-get install -qq python3 libc6-dev-i386 gcc-multilib
+#     script:
+#       - make -C tests test-lz4c32 test-fullbench32 versionsTest
+#
     - name: (Trusty) i386 frame + fuzzer test
       dist: trusty
       install:
