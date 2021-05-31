@@ -12,12 +12,12 @@ matrix:
 #       - make clean
 #       - make test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee # test scenario where `stdout` is not the console
 #
-    # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
-    - name: (Precise) benchmark test
-      dist: precise
-      script:
-        - make -C tests test-lz4 test-lz4c test-fullbench
-
+#   # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
+#   - name: (Precise) benchmark test
+#     dist: precise
+#     script:
+#       - make -C tests test-lz4 test-lz4c test-fullbench
+#
     - name: (Precise) frame and fuzzer test
       dist: precise
       install:
