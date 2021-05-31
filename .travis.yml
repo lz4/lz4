@@ -75,11 +75,11 @@ matrix:
 #       - make c_standards
 #       - make -C tests test-lz4 test-mem
 #
-    - name: (Trusty) c-to-c++ test
-      dist: trusty
-      script:
-        - make ctocpptest
-
+#   - name: (Trusty) c-to-c++ test
+#     dist: trusty
+#     script:
+#       - make ctocpptest
+#
     - name: (Trusty) i386 benchmark + version test
       dist: trusty
       install:
