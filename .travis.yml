@@ -59,14 +59,14 @@ matrix:
 #     script:
 #       - make -C tests test MOREFLAGS=-mx32
 #
-    # 14.04 LTS Server Edition 64 bit
-    # presume clang >= v3.9.0
-    - name: (Trusty) USan test
-      dist: trusty
-      compiler: clang
-      script:
-        - make usan MOREFLAGS=-Wcomma -Werror
-
+#   # 14.04 LTS Server Edition 64 bit
+#   # presume clang >= v3.9.0
+#   - name: (Trusty) USan test
+#     dist: trusty
+#     compiler: clang
+#     script:
+#       - make usan MOREFLAGS=-Wcomma -Werror
+#
     - name: (Trusty) valgrind test
       dist: trusty
       install:
