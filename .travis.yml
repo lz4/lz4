@@ -174,20 +174,20 @@ matrix:
 #       - make staticAnalyze
 #       - make cppcheck
 #
-    - name: (Trusty) gcc-4.4 compilation
-      dist: trusty
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - libc6-dev-i386
-            - gcc-multilib
-            - gcc-4.4
-      script:
-        - make clean all CC=gcc-4.4 MOREFLAGS=-Werror
-        - make clean
-        - CFLAGS=-fPIC LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2' make -C programs
+#   - name: (Trusty) gcc-4.4 compilation
+#     dist: trusty
+#     addons:
+#       apt:
+#         sources:
+#           - ubuntu-toolchain-r-test
+#         packages:
+#           - libc6-dev-i386
+#           - gcc-multilib
+#           - gcc-4.4
+#     script:
+#       - make clean all CC=gcc-4.4 MOREFLAGS=-Werror
+#       - make clean
+#       - CFLAGS=-fPIC LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2' make -C programs
 
     # tag-specific test
     - name: tag build
