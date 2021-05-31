@@ -3,15 +3,15 @@ language: c
 matrix:
   fast_finish: true
   include:
-    # OS X Mavericks
-    - name: (macOS) General Test
-      os: osx
-      compiler: clang
-      script:
-        - make   # test library build
-        - make clean
-        - make test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee # test scenario where `stdout` is not the console
-
+#   # OS X Mavericks
+#   - name: (macOS) General Test
+#     os: osx
+#     compiler: clang
+#     script:
+#       - make   # test library build
+#       - make clean
+#       - make test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee # test scenario where `stdout` is not the console
+#
     # Container-based 12.04 LTS Server Edition 64 bit (doesn't support 32-bit includes)
     - name: (Precise) benchmark test
       dist: precise
