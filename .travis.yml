@@ -67,14 +67,14 @@ matrix:
 #     script:
 #       - make usan MOREFLAGS=-Wcomma -Werror
 #
-    - name: (Trusty) valgrind test
-      dist: trusty
-      install:
-        - sudo apt-get install -qq valgrind
-      script:
-        - make c_standards
-        - make -C tests test-lz4 test-mem
-
+#   - name: (Trusty) valgrind test
+#     dist: trusty
+#     install:
+#       - sudo apt-get install -qq valgrind
+#     script:
+#       - make c_standards
+#       - make -C tests test-lz4 test-mem
+#
     - name: (Trusty) c-to-c++ test
       dist: trusty
       script:
