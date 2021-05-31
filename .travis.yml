@@ -138,13 +138,13 @@ matrix:
       script:
         - make test
 
-    - name: (Xenial) gcc-5 compilation
-      dist: xenial
-      install:
-        - sudo apt-get install -qq libc6-dev-i386 gcc-multilib
-      script:
-        - make -C tests test-lz4 clean test-lz4c32 MOREFLAGS=-Werror
-
+#   - name: (Xenial) gcc-5 compilation
+#     dist: xenial
+#     install:
+#       - sudo apt-get install -qq libc6-dev-i386 gcc-multilib
+#     script:
+#       - make -C tests test-lz4 clean test-lz4c32 MOREFLAGS=-Werror
+#
     - name: (Trusty) clang-3.8 compilation
       dist: trusty
       addons:
