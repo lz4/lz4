@@ -590,6 +590,7 @@ jobs:
 # Check git tag for LZ4 releases
 #
   lz4-check-tag:
+    name: git version tag checking for release
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
