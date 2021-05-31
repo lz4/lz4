@@ -41,16 +41,16 @@ matrix:
 #       - make clean
 #       - CC="c++ -Wno-deprecated" make -C tests fullbench-wmalloc  # stricter function signature check
 #
-    - name: (Precise) g++ and clang CMake test
-      dist: precise
-      script:
-        - make cxxtest
-        - make clean
-        - make examples
-        - make clean cmake
-        - make clean travis-install
-        - make clean clangtest
-
+#   - name: (Precise) g++ and clang CMake test
+#     dist: precise
+#     script:
+#       - make cxxtest
+#       - make clean
+#       - make examples
+#       - make clean cmake
+#       - make clean travis-install
+#       - make clean clangtest
+#
     - name: x32 compatibility test
       addons:
         apt:
