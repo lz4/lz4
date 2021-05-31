@@ -95,20 +95,20 @@ matrix:
 #     script:
 #       - make -C tests test-frametest32 test-fuzzer32
 #
-    - name: (Trusty) gcc-6 standard C compilation
-      dist: trusty
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - gcc-6
-      env:
-        - CC=gcc-6
-      script:
-        - make c_standards
-        - make -C tests test-lz4 MOREFLAGS=-Werror
-
+#   - name: (Trusty) gcc-6 standard C compilation
+#     dist: trusty
+#     addons:
+#       apt:
+#         sources:
+#           - ubuntu-toolchain-r-test
+#         packages:
+#           - gcc-6
+#     env:
+#       - CC=gcc-6
+#     script:
+#       - make c_standards
+#       - make -C tests test-lz4 MOREFLAGS=-Werror
+#
 #   - name: (Trusty) arm + aarch64 compilation
 #     dist: trusty
 #     install:
