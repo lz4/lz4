@@ -96,14 +96,14 @@ jobs:
       if: always()
       run: make V=1 clean all
 
-##  - name: make c_standards (C90)
-##    if: ${{ matrix.stdc90 == 'true' }}
-##    run: make V=1 clean c_standards_c90
-##
-##  - name: make c_standards (C11)
-##    if: ${{ matrix.stdc11 == 'true' }}
-##    run: make V=1 clean c_standards_c11
-##
+    - name: make c_standards (C90)
+      if: ${{ matrix.stdc90 == 'true' }}
+      run: make V=1 clean c_standards_c90
+
+    - name: make c_standards (C11)
+      if: ${{ matrix.stdc11 == 'true' }}
+      run: make V=1 clean c_standards_c11
+
     - name: make c-to-c++
       if: always()
       run: make V=1 clean ctocpptest
