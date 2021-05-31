@@ -51,14 +51,14 @@ matrix:
 #       - make clean travis-install
 #       - make clean clangtest
 #
-    - name: x32 compatibility test
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
-      script:
-        - make -C tests test MOREFLAGS=-mx32
-
+#   - name: x32 compatibility test
+#     addons:
+#       apt:
+#         packages:
+#           - gcc-multilib
+#     script:
+#       - make -C tests test MOREFLAGS=-mx32
+#
     # 14.04 LTS Server Edition 64 bit
     # presume clang >= v3.9.0
     - name: (Trusty) USan test
