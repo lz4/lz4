@@ -87,14 +87,14 @@ matrix:
 #     script:
 #       - make -C tests test-lz4c32 test-fullbench32 versionsTest
 #
-    - name: (Trusty) i386 frame + fuzzer test
-      dist: trusty
-      install:
-        - sudo apt-get install -qq libc6-dev-i386 gcc-multilib
-        - sudo sysctl -w vm.mmap_min_addr=4096
-      script:
-        - make -C tests test-frametest32 test-fuzzer32
-
+#   - name: (Trusty) i386 frame + fuzzer test
+#     dist: trusty
+#     install:
+#       - sudo apt-get install -qq libc6-dev-i386 gcc-multilib
+#       - sudo sysctl -w vm.mmap_min_addr=4096
+#     script:
+#       - make -C tests test-frametest32 test-fuzzer32
+#
     - name: (Trusty) gcc-6 standard C compilation
       dist: trusty
       addons:
