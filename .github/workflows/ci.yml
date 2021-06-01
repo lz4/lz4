@@ -601,7 +601,7 @@ jobs:
 #
   lz4-check-tag:
     name: git version tag checking for release
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: make -C tests checkTag
