@@ -1,318 +1,560 @@
-# Known issues:
-# - For now, this CI script ignores exit code of `make usan`.  Because
-#   there're several issues which may take relatively long time to
-#   resolve.  We'll fully enable it when we ensure `make usan` is ready
-#   for all commits and PRs.
-#   See https://github.com/lz4/lz4/pull/983 for details.  Also you can
-#   investigate its raw log in "Linux x64 usan" at the GitHub Actions.
-#
-# - This test script ignores exit code of cppcheck which can see under
-#   Job:Linux x64 scan-build + cppcheck in the GitHub Actions report.
-#   Because this project doesn't 100% follow their recommendation.
-#   Also sometimes it reports false positives.
-#
-# Notes:
-# - You can investigate various information at the right pane of GitHub
-#   Actions report page.
-#
-#   | Item                      | Section in the right pane             |
-#   | ------------------------- | ------------------------------------- |
-#   | OS, VM                    | Set up job                            |
-#   | git repo, commit hash     | Run actions/checkout@v2               |
-#   | gcc, tools                | Environment info                      |
-#
-# - To fail earlier, order of tests in the same job are roughly sorted by
-#   elapsed time.
-#
-# Tests which we still leave at travis-ci
-# - name: (Trusty) gcc-4.4 compilation
-# - name: (Xenial) gcc-5 compilation
-# - name: (Trusty) clang-3.8 compilation
-# - name: Compile OSS-Fuzz targets
-# - name: tag build
-# - name: aarch64 real-hw tests
-# - name: PPC64LE real-hw tests
-# - name: IBM s390x real-hw tests
+# For details, see README.md in this directory.
 
-
-# Name of the workflow is also displayed as a SVG badge
+###############################################################
+# C compilers
+#
+# - gcc
+# - clang
+#
+# Known Issue
+# - All test cases which described as 'fail' must be fixed and replaced with 'true'.
+#   - gcc-11 (x32, x86) : "../lib/lz4hc.c:148: LZ4HC_countBack: Assertion `(size_t)(match - mMin) < (1U<<31)' failed."
+#   - all clangs (x32, x86) : "../lib/lz4hc.c:282: int LZ4HC_InsertAndGetWiderMatch(...): Assertion `matchPtr >= lowPrefixPtr' failed."
+#
 name: lz4 CI
-
 on: [push, pull_request]
-
 jobs:
-  # CI Environment information
-  #
-  # - "ubuntu-latest" (Ubuntu 20.04) has the following software
-  #   https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
-  basic-env-info:
-    name: Linux x64 Environment Info (ubuntu-latest)
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: gcc
-      run: echo && gcc --version
-
-    - name: clang
-      run: echo && clang --version
-
-    - name: make
-      run: echo && make -v
-
-    - name: gcc packages
-      run: apt-cache search gcc | grep "^gcc-[0-9\.]* " | sort
-
-    - name: clang packages
-      run: apt-cache search clang | grep "^clang-[0-9\.]* " | sort
-
-    - name: QEMU packages
-      run: apt-cache search qemu | grep "^qemu-system-.*QEMU full system" | sort
-
-    - name: git
-      run: echo && git --version
-
-    - name: g++
-      run: echo && g++ --version
-
-
-  # travis-ci: (Precise) benchmark test
-  ubuntu-benchmark:
-    name: Linux x64 benchmark test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: benchmark
-      run: |
-        make -C tests test-lz4 test-lz4c test-fullbench
-
-
-  # travis-ci: Custom LZ4_DISTANCE_MAX ; lz4-wlib (CLI linked to dynamic library); LZ4_USER_MEMORY_FUNCTIONS
-  ubuntu-custom-distance:
-    name: Linux x64 Custom LZ4_DISTANCE_MAX
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: custom LZ4_DISTANCE_MAX
-      run: |
-        MOREFLAGS=-DLZ4_DISTANCE_MAX=8000 make check
-        make clean
-        make -C programs lz4-wlib
-        make clean
-        make -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
-        make clean
-        CC="c++ -Wno-deprecated" make -C tests fullbench-wmalloc  # stricter function signature check
-
-
-  # travis-ci: (Precise) frame and fuzzer test
-  ubuntu-frame-and-fuzzer:
-    name: Linux x64 frame and fuzzer test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt-get install
-      run: |
-        sudo sysctl -w vm.mmap_min_addr=4096
-    - name: frame + fuzzer test
-      run: |
-        make -C tests test-frametest test-fuzzer
-
-
-  # travis-ci: (Trusty) i386 frame + fuzzer test
-  ubuntu-i386-frame-and-fuzzer:
-    name: Linux x64 i386 frame + fuzzer test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt-get install
-      run: |
-        sudo apt-get install gcc-multilib
-        sudo sysctl -w vm.mmap_min_addr=4096
-    - name: frame + fuzzer test (i386)
-      run: |
-        make -C tests test-frametest32 test-fuzzer32
-
-
-  # travis-ci: (Trusty) i386 benchmark + version test
-  ubuntu-i386-bench-and-versions:
-    name: Linux x64 i386 benchmark + version test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt-get install
-      run: |
-        sudo apt-get install gcc-multilib
-    - name: benchmark & versionsTest
-      run: |
-        make -C tests test-lz4c32 test-fullbench32 versionsTest
-
-
-  # travis-ci: x32 compatibility test
-  ubuntu-x32:
-    name: Linux x64 x32
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt-get install
-      run: |
-        sudo apt-get install gcc-multilib
-    - name: make -C tests
-      run: |
-        make -C tests test MOREFLAGS=-mx32
-
-
-  # travis-ci: (Precise) g++ and clang CMake test
-  ubuntu-gxx-clang-cmake-test:
-    name: Linux x64 g++ and clang CMake test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: g++
-      # note : This test can be merged with ubntu-latest-cc.
-      run: |
-        make clean cxxtest
-    - name: examples
-      run: |
-        make clean examples
-    - name: cmake
-      run: |
-        make clean examples
-    - name: travis-install
-      run: |
-        make clean travis-install
-    - name: clang
-      # note : This test can be merged with ubntu-latest-cc.
-      run: |
-        make clean clangtest
-
-
-  ubuntu-ctocpp:
-    name: Linux x64 c-to-c++
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: c-to-c++
-      run: |
-        make clean ctocpptest
-
-
-  ubuntu-usan:
-    name: Linux x64 usan
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: usan
-      # For now, we ignore the exit code of `make usan`.
-      # See "Known issues" at the top of the this file.
-      run: |
-        make clean usan MOREFLAGS='-Wcomma -Werror' || echo Ignore these errors for now.  For details, see https://github.com/lz4/lz4/pull/983
-
-
-  ubuntu-valgrind:
-    name: Linux x64 valgrind
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt-get install
-      run: |
-        sudo apt-get install valgrind
-
-    - name: Environment info
-      run: |
-        echo && gcc --version
-        echo && valgrind --version
-
-    - name: valgrind
-      run: |
-        make -C tests test-mem
-
-
-  ubuntu-cppcheck:
-    name: Linux x64 scan-build + cppcheck
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt-get install
-      run: |
-        sudo apt-get install cppcheck clang-tools
-
-    - name: Environment info
-      run: |
-        echo && gcc --version
-        echo && clang --version
-        echo && cppcheck --version
-        echo && which scan-build # scan-build doesn't have any --version equivalent option
-        echo && make -v
-        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
-
-    - name: staticAnalyze
-      run: |
-        make clean staticAnalyze
-
-    - name: cppcheck
-      run: |
-        # This test script ignores exit code of cppcheck.  See knowin issues
-        # at the top of this file.
-        make clean cppcheck || echo There are some cppcheck reports
-
-
-  # Test various C compilers
-  #
-  # Invoke the following commands for each C compiler
-  #   make all c_standards
-  #   make -C programs
-  #   make -C tests
-  #
-  ubuntu-latest-cc:
-    name: Linux x64 ${{ matrix.xcc_name }}
-    runs-on: ubuntu-latest
+  lz4-c-compilers:
+    name: CC=${{ matrix.cc }}, ${{ matrix.os }}
     strategy:
       fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
       matrix:
         include: [
-          { xcc_name: 'gcc 7',      xcc_pkg: gcc-7,       xcc: gcc-7     },
-          { xcc_name: 'gcc 8',      xcc_pkg: gcc-8,       xcc: gcc-8     },
-          { xcc_name: 'gcc 9',      xcc_pkg: gcc-9,       xcc: gcc-9     },
-          { xcc_name: 'gcc 10',     xcc_pkg: gcc-10,      xcc: gcc-10    },
-          { xcc_name: 'clang 6',    xcc_pkg: clang-6.0,   xcc: clang-6.0 },
-          { xcc_name: 'clang 7',    xcc_pkg: clang-7,     xcc: clang-7   },
-          { xcc_name: 'clang 8',    xcc_pkg: clang-8,     xcc: clang-8   },
-          { xcc_name: 'clang 9',    xcc_pkg: clang-9,     xcc: clang-9   },
-          { xcc_name: 'clang 10',   xcc_pkg: clang-10,    xcc: clang-10  },
-          { xcc_name: 'clang 11',   xcc_pkg: clang-11,    xcc: clang-11  },
+          # You can access the following values via ${{ matrix.??? }}
+          #
+          #   pkgs    : apt-get package names.  It can include multiple package names which are delimited by space.
+          #   cc      : C compiler executable.
+          #   cxx     : C++ compiler executable for `make ctocpptest`.
+          #   stdc11  : Set 'true' if compiler supports C11 standard.  Otherwise, set 'false'.
+          #   stdc90  : Set 'true' if compiler supports C90 standard.  Otherwise, set 'false'.
+          #   x32     : Set 'true' if compiler supports x32.  Otherwise, set 'false'.
+          #             Set 'fail' if it supports x32 but fails for now.  'fail' cases must be removed.
+          #   x86     : Set 'true' if compiler supports x86 (-m32).  Otherwise, set 'false'.
+          #             Set 'fail' if it supports x86 but fails for now.  'fail' cases must be removed.
+          #   cxxtest : Set 'true' if it can be compiled as C++ code.  Otherwise, set 'false'.
+          #   os      : GitHub Actions YAML workflow label.  See https://github.com/actions/virtual-environments#available-environments
+
+          # cc
+          { pkgs: '',                                                   cc: cc,        cxx: c++,         stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-latest, },
+
+          # gcc
+          { pkgs: '',                                                   cc: gcc,       cxx: g++,         stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-latest, },
+          { pkgs: 'gcc-11 lib32gcc-11-dev libx32gcc-11-dev',            cc: gcc-11,    cxx: g++-11,      stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'gcc-10 lib32gcc-10-dev libx32gcc-10-dev',            cc: gcc-10,    cxx: g++-10,      stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'gcc-9  lib32gcc-9-dev  libx32gcc-9-dev',             cc: gcc-9,     cxx: g++-9,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'gcc-8 g++-8 lib32gcc-8-dev libx32gcc-8-dev',         cc: gcc-8,     cxx: g++-8,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'gcc-7 g++-7 lib32gcc-7-dev libx32gcc-7-dev',         cc: gcc-7,     cxx: g++-7,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'gcc-6 g++-6 lib32gcc-6-dev libx32gcc-6-dev',         cc: gcc-6,     cxx: g++-6,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'gcc-5 g++-5 lib32gcc-5-dev libx32gcc-5-dev',         cc: gcc-5,     cxx: g++-5,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'gcc-4.8 g++-4.8 lib32gcc-4.8-dev libx32gcc-4.8-dev', cc: gcc-4.8,   cxx: g++-4.8,     stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'gcc-4.7 g++-4.7 lib32gcc-4.7-dev',                   cc: gcc-4.7,   cxx: g++-4.7,     stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'true', cxxtest: 'true',  os: ubuntu-16.04,  },
+          { pkgs: 'gcc-4.6 g++-4.6 gcc-4.6-multilib',                   cc: gcc-4.6,   cxx: g++-4.6,     stdc11: 'false', stdc90: 'true',  x32: 'false', x86: 'true', cxxtest: 'true',  os: ubuntu-16.04,  },
+          { pkgs: 'gcc-4.4 g++-4.4 gcc-4.4-multilib',                   cc: gcc-4.4,   cxx: g++-4.4,     stdc11: 'false', stdc90: 'false', x32: 'false', x86: 'true', cxxtest: 'true',  os: ubuntu-16.04,  },
+
+          # clang
+          { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-latest, },
+          { pkgs: 'clang-12  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-12,  cxx: clang++-12,  stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-11  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-11,  cxx: clang++-11,  stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-7   lib32gcc-7-dev  libx32gcc-7-dev',          cc: clang-7,   cxx: clang++-7,   stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-6.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-6.0, cxx: clang++-6.0, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-5.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-5.0, cxx: clang++-5.0, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'clang-4.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-4.0, cxx: clang++-4.0, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'clang-3.9 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-3.9, cxx: clang++-3.9, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'false', os: ubuntu-18.04,  },
+          { pkgs: 'clang-3.8',                                          cc: clang-3.8, cxx: clang++-3.8, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
+          { pkgs: 'clang-3.7',                                          cc: clang-3.7, cxx: clang++-3.7, stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
+          { pkgs: 'clang-3.6',                                          cc: clang-3.6, cxx: clang++-3.6, stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
+          { pkgs: 'clang-3.5',                                          cc: clang-3.5, cxx: clang++-3.5, stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
         ]
+
+    runs-on: ${{ matrix.os }}
     env:                        # Set environment variables
-      XCC: ${{ matrix.xcc }}
+      # We globally set CC and CXX to improve compatibility with .travis.yml
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
     - name: apt-get install
       run: |
-        sudo apt-get install gcc-multilib ${{ matrix.xcc_pkg }} 
+        sudo apt-get install gcc-multilib
+        sudo apt-get install ${{ matrix.pkgs }}
 
     - name: Environment info
       run: |
-        echo && which $XCC
-        echo && $XCC --version
+        echo && type $CC && which $CC && $CC --version
+        echo && type $CXX && which $CXX && $CXX --version
+
+    - name: make
+      if: always()
+      run: make V=1
 
     - name: make all
+      if: always()
+      run: make V=1 clean all
+
+    - name: make c_standards (C90)
+      if: ${{ matrix.stdc90 == 'true' }}
+      run: make V=1 clean c_standards_c90
+
+    - name: make c_standards (C11)
+      if: ${{ matrix.stdc11 == 'true' }}
+      run: make V=1 clean c_standards_c11
+
+    - name: make c-to-c++
+      if: always()
+      run: make V=1 clean ctocpptest
+
+    - name: make cxxtest
+      if: ${{ matrix.cxxtest == 'true' }}
+      run: make V=1 clean cxxtest
+
+    - name: make -C programs default
+      if: always()
+      run: make V=1 -C programs clean default
+
+    - name: make -C programs default -D_FORTIFY_SOURCE=2
+      if: always()
+      run: CFLAGS='-fPIC' LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2' make V=1 -C programs clean default
+
+    - name: make -C tests test-lz4
+      if: always()
+      run: MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4
+
+    - name: make clangtest (clang only)
+      if: ${{ startsWith( matrix.cc , 'clang' ) }}
+      run: make V=1 clean clangtest
+
+    - name: make -C tests test MOREFLAGS='-mx32'
+      if: ${{ matrix.x32 == 'true' }}
+      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make V=1 -C tests clean test
+
+    - name: make -C tests test-lz4c32
+      if: ${{ matrix.x86 == 'true' }}
+      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4c32
+
+
+    ###############################################################
+    #                                                             #
+    #      Remove this block when we stabilize the tests.         #
+    #                                                             #
+
+    - name: make -C tests test MOREFLAGS='-mx32' || echo Ignore failure for now.
+      if: ${{ matrix.x32 == 'fail' }}
+      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make V=1 -C tests clean test || $FIXME__LZ4_CI_IGNORE
+
+    - name: make -C tests test-lz4c32 || echo Ignore failure for now.
+      if: ${{ matrix.x86 == 'fail' }}
+      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4c32 || $FIXME__LZ4_CI_IGNORE
+
+    #                                                             #
+    ###############################################################
+
+
+
+###############################################################
+# LZ4 self tests
+#
+# - Benchmark
+# - Fuzzer
+# - LZ4 Frame
+# - LZ4 versions
+# - Custom LZ4_DISTANCE_MAX
+# 
+  lz4-benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
+      run: sudo apt-get install gcc-multilib
+
+    - name: benchmark (-C tests test-lz4)
+      run: make V=1 -C tests test-lz4
+
+    - name: benchmark (-C tests test-lz4c)
+      run: make V=1 -C tests test-lz4c
+
+    - name: benchmark (-C tests test-lz4c32)
+      run: make V=1 -C tests test-lz4c32
+
+    - name: benchmark (-C tests test-fullbench)
+      run: make V=1 -C tests test-fullbench
+
+    - name: benchmark (-C tests test-fullbench32)
+      run: make V=1 -C tests test-fullbench32
+
+
+  lz4-fuzzer:
+    name: Fuzzer test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
+      run: sudo apt-get install gcc-multilib
+
+    - name: setup
+      run: sudo sysctl -w vm.mmap_min_addr=4096
+
+    - name: fuzzer
+      run: make V=1 -C tests test-fuzzer
+
+    - name: fuzzer32
+      run: make V=1 -C tests test-fuzzer32
+
+
+  lz4-versions:
+    name: LZ4 versions test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
+      run: sudo apt-get install gcc-multilib
+
+    - name: make -C tests versionsTest
+      run: make V=1 -C tests versionsTest
+
+
+  lz4-frame:
+    name: LZ4 frame test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
+      run: sudo apt-get install gcc-multilib
+
+    - name: LZ4 frame test
+      run: make V=1 -C tests test-frametest
+
+    - name: LZ4 frame test (32-bit)
+      run: make V=1 -C tests test-frametest32
+
+
+  # Custom LZ4_DISTANCE_MAX ; lz4-wlib (CLI linked to dynamic library); LZ4_USER_MEMORY_FUNCTIONS
+  lz4-custom-distance:
+    name: Custom LZ4_DISTANCE_MAX
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: custom LZ4_DISTANCE_MAX
       run: |
-        CC=$XCC make clean all MOREFLAGS=-Werror
+        MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
+        make V=1 clean
+        make V=1 -C programs lz4-wlib
+        make V=1 clean
+        make V=1 -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
+        make V=1 clean
+        CC="c++ -Wno-deprecated" make V=1 -C tests fullbench-wmalloc  # stricter function signature check
 
-    - name: make c_standards
+
+
+###############################################################
+# Check tools
+#
+# - cppcheck
+# - scan-build
+# - valgrind
+# - ubsan
+# - asan
+#
+  lz4-cppcheck:
+    name: make cppcheck
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: sudo apt-get install cppcheck
+
+    - name: Environment info
+      run: echo && type cppcheck && which cppcheck && cppcheck --version
+
+    - name: cppcheck
+      # This test script ignores the exit code of cppcheck.
+      # See known issues in README.md.
+      run: make V=1 clean cppcheck || echo There are some cppcheck reports but we ignore it.
+
+
+  lz4-scan-build:
+    name: make staticAnalyze
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: sudo apt-get install clang-tools
+
+    - name: Environment info
       run: |
-        CC=$XCC make clean c_standards
+        echo && type gcc && which gcc && gcc --version
+        echo && type clang && which clang && clang --version
+        echo && type scan-build && which scan-build               # scan-build doesn't have any --version equivalent option
+        echo && type make && which make && make -v
+        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
 
-    - name: make -C programs
+    - name: make staticAnalyze
+      run: make V=1 clean staticAnalyze
+
+
+  lz4-valgrind:
+    name: valgrind
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: sudo apt-get install valgrind
+
+    - name: Environment info
       run: |
-        CC=$XCC make -C programs CFLAGS=-fPIC LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2'
+        echo && type cc && which cc && cc --version
+        echo && type valgrind && which valgrind && valgrind --version
 
-    - name: make -C tests
+    - name: valgrind
+      run: make V=1 -C tests test-mem
+
+
+  lz4-ubsan-x64:
+    name: Linux x64 ubsan
+    runs-on: ubuntu-latest
+    env:                        # Set environment variables
+      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: ubsan
+      #########################################################
+      # For now, we ignore the exit code of `make usan`.
+      # See "Known issues / lz4-ubsan-x64" in README.md
+      # When we'll resolve this issue, remove "|| $FIXME__LZ4_CI_IGNORE"
+      #########################################################
+      run: make V=1 clean usan MOREFLAGS='-Wcomma -Werror' || $FIXME__LZ4_CI_IGNORE
+
+
+  lz4-ubsan-x86:
+    name: Linux x86 ubsan
+    runs-on: ubuntu-latest
+    env:                        # Set environment variables
+      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
       run: |
-        CC=$XCC make -C tests test-lz4 clean test-lz4c32 MOREFLAGS=-Werror
+        sudo apt-get install gcc-multilib
+        sudo apt-get install lib32gcc-11-dev
+
+    - name: ubsan32
+      #########################################################
+      # For now, we ignore the exit code of `make usan32`.
+      # See "Known issues / lz4-ubsaan-x86" in README.md.
+      # When we'll resolve this issue, remove "|| $FIXME__LZ4_CI_IGNORE"
+      #########################################################
+      run: CC=clang make V=1 clean usan32 MOREFLAGS='-Wcomma -Werror' || $FIXME__LZ4_CI_IGNORE
 
 
-  ubuntu-build-meson:
-    name: Linux x64 Meson + Ninja
+  lz4-asan-x64:
+    name: Linux x64 ASAN
+    runs-on: ubuntu-latest
+    env:                        # Set environment variables
+      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: setup
+      run: sudo sysctl -w vm.mmap_min_addr=4096
+
+    - name: frametest
+      run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
+
+    - name: fuzzer
+      run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
+
+
+
+###############################################################
+# Platforms
+#
+# - QEMU (ARM, ARM64, PPC, PPC64LE, S390X)
+# - macOS
+#
+
+  # QEMU
+  # All tests use QEMU (static) and gcc cross compiler.
+  #
+  # note:
+  #   We don't employ completely matrix method which provides `MOREFLAGS`
+  #   etc in the matrix.  Because some platform may need its special
+  #   compiler options and test.
+  #   For example, xxHash already has tests for scalar and SIMD version of
+  #   it.  But compiler options are quite different between platforms.
+  #
+  #   So, please keep them simple and independent.
+  #
+  lz4-qemu-platforms:
+    name: QEMU ${{ matrix.type }}
+    strategy:
+      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix instance failed.
+      matrix:
+        include: [
+          # You can access the following values via ${{ matrix.??? }}
+          #   type : Architecture type for `if:` statement.
+          #   pkgs : apt-get package names.  You can include multiple packages which are delimited by space.
+          #   xcc  : gcc cross C compiler executable.
+          #   xemu : QEMU static emulator executable.
+          #   os   : GitHub Actions YAML workflow label.  See https://github.com/actions/virtual-environments#available-environments
+
+          { type: ARM,      pkgs: 'qemu-system-arm   gcc-arm-linux-gnueabi',     xcc: arm-linux-gnueabi-gcc,     xemu: qemu-arm-static,     os: ubuntu-latest, },
+          { type: ARM64,    pkgs: 'qemu-system-arm   gcc-aarch64-linux-gnu',     xcc: aarch64-linux-gnu-gcc,     xemu: qemu-aarch64-static, os: ubuntu-latest, },
+          { type: PPC,      pkgs: 'qemu-system-ppc   gcc-powerpc-linux-gnu',     xcc: powerpc-linux-gnu-gcc,     xemu: qemu-ppc-static,     os: ubuntu-latest, },
+          { type: PPC64LE,  pkgs: 'qemu-system-ppc   gcc-powerpc64le-linux-gnu', xcc: powerpc64le-linux-gnu-gcc, xemu: qemu-ppc64le-static, os: ubuntu-latest, },
+          { type: S390X,    pkgs: 'qemu-system-s390x gcc-s390x-linux-gnu',       xcc: s390x-linux-gnu-gcc,       xemu: qemu-s390x-static,   os: ubuntu-latest, },
+        ]
+
+    runs-on: ${{ matrix.os }}
+    env:                        # Set environment variables
+      XCC: ${{ matrix.xcc }}
+      XEMU: ${{ matrix.xemu }}
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
+      run: |
+        sudo apt-get install gcc-multilib
+        sudo apt-get install qemu-utils qemu-user-static
+        sudo apt-get install ${{ matrix.pkgs }}
+
+    - name: Environment info
+      run: |
+        echo && type $XCC && which $XCC && $XCC --version
+        echo && $XCC -v                       # Show built-in specs
+        echo && type $XEMU && which $XEMU && $XEMU --version
+
+    - name: ARM64
+      if: ${{ matrix.type == 'ARM64' }}
+      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+
+    - name: ARM
+      if: ${{ matrix.type == 'ARM' }}
+      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+
+    - name: PPC
+      if: ${{ matrix.type == 'PPC' }}
+      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+
+    - name: PPC64LE
+      if: ${{ matrix.type == 'PPC64LE' }}
+      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU MOREFLAGS=-m64
+
+    - name: S390X
+      if: ${{ matrix.type == 'S390X' }}
+      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+
+
+  # macOS
+  lz4-platform-macos-latest:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Environment info
+      run: |
+        echo && type cc && which cc && cc --version
+        echo && type make && which make && make -v
+        echo && sysctl -a | grep machdep.cpu   # cpuinfo
+
+    - name: make default
+      run: CFLAGS="-Werror" make V=1 clean default
+
+    - name: make test
+      run: make V=1 clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion'
+
+    - name: make test | tee
+      # test scenario where `stdout` is not the console
+      run: make V=1 clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee
+
+
+
+###############################################################
+# Build systems
+#
+# - make
+# - cmake
+# - meson
+#
+
+  # make
+  lz4-build-make:
+    name: make
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: Environment info
+      run: |
+        echo && type cc && which cc && cc --version
+        echo && type make && which make && make -v
+
+    - name: make
+      run: make V=1
+
+
+  lz4-build-make-travis-install:
+    name: make travis-install
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: travis-install
+      run: make V=1 clean travis-install
+
+    - name: travis-install result
+      run: |
+        echo && echo Installed files
+        ( cd ~/install_test_dir; find .; )
+
+
+  # cmake
+  lz4-build-cmake:
+    name: cmake
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: Environment info
+      run: |
+        echo && type cmake && which cmake && cmake --version
+        echo && type make && which make && make -v
+
+    - name: cmake
+      run: |
+        cd build/cmake
+        mkdir build
+        cd build
+        cmake ..
+        CFLAGS=-Werror make VERBOSE=1
+
+
+  # Invoke cmake via Makefile
+  lz4-build-make-cmake:
+    name: make cmake
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: make cmake
+      # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
+      run: make V=1 VERBOSE=1 clean cmake
+
+
+  # Meson
+  lz4-build-meson:
+    name: Meson + Ninja
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
@@ -320,7 +562,7 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: install
+    - name: Install
       run: |
         sudo apt-get install tree ninja-build
         python -m pip install --upgrade pip
@@ -328,10 +570,9 @@ jobs:
 
     - name: Environment info
       run: |
-        echo && clang --version
-        echo && python --version
-        echo && meson --version
-        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
+        echo && type clang && which clang && clang --version
+        echo && type python && which python && python --version
+        echo && type meson && which meson && meson --version
 
     - name: meson
       # 'run: >' replaces all newlines in the following block with spaces
@@ -349,126 +590,79 @@ jobs:
 
     - name: staging
       run: |
-        pushd build
+        cd build
         DESTDIR=./staging ninja install
         tree ./staging
 
 
-  ubuntu-build-cmake:
-    name: Linux x64 cmake
+
+############################################################
+# Check git tag for LZ4 releases
+#
+  lz4-check-tag:
+    name: git version tag checking for release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-
-    - name: Environment info
+    - uses: actions/checkout@v2
+    - name: make -C tests checkTag
+      if: startsWith(github.ref, 'refs/tags/v')   # If git tag name starts with 'v'
       run: |
-        echo && gcc --version
-        echo && cmake --version
-        echo && make -v
-        echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
-
-    - name: cmake
-      run: |
-        cd build/cmake
-        mkdir build
-        cd build
-        cmake ..
-        CFLAGS=-Werror make
+        echo "tag=${GITHUB_REF#refs/*/}"
+        make -C tests checkTag
+        tests/checkTag ${GITHUB_REF#refs/*/}
 
 
-  # make cmake
-  # note: This test can be merged with ubuntu-build-cmake
-  ubuntu-cmake:
-    name: Linux x64 make cmake
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: make cmake
-      run: |
-        make clean cmake
 
-
-  # Linux, { ARM, ARM64, PPC, PPC64LE, S390X }
-  # All tests are using QEMU and gcc cross compiler.
-  qemu-platformtest:
-    name: QEMU ${{ matrix.name }}
-    runs-on: ubuntu-latest
+############################################################
+# Gather CI environment information.
+#
+  lz4-env-info:
+    name: GH-Actions Virtual Env Info (${{ matrix.os }})
     strategy:
-      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
       matrix:
         include: [
-          { name: ARM,      xcc_pkg: gcc-arm-linux-gnueabi,     xcc: arm-linux-gnueabi-gcc,     xemu_pkg: qemu-system-arm,    xemu: qemu-arm-static     },
-          { name: ARM64,    xcc_pkg: gcc-aarch64-linux-gnu,     xcc: aarch64-linux-gnu-gcc,     xemu_pkg: qemu-system-arm,    xemu: qemu-aarch64-static },
-          { name: PPC,      xcc_pkg: gcc-powerpc-linux-gnu,     xcc: powerpc-linux-gnu-gcc,     xemu_pkg: qemu-system-ppc,    xemu: qemu-ppc-static     },
-          { name: PPC64LE,  xcc_pkg: gcc-powerpc64le-linux-gnu, xcc: powerpc64le-linux-gnu-gcc, xemu_pkg: qemu-system-ppc,    xemu: qemu-ppc64le-static },
-          { name: S390X,    xcc_pkg: gcc-s390x-linux-gnu,       xcc: s390x-linux-gnu-gcc,       xemu_pkg: qemu-system-s390x,  xemu: qemu-s390x-static   },
+          { os: ubuntu-latest,  }, # https://github.com/actions/virtual-environments/
+          { os: ubuntu-20.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
+          { os: ubuntu-18.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu1804-README.md
+          { os: ubuntu-16.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu1604-README.md
         ]
-    env:                        # Set environment variables
-      XCC: ${{ matrix.xcc }}
-      XEMU: ${{ matrix.xemu }}
-    steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - name: apt update & install
-      run: |
-        sudo apt-get update
-        sudo apt-get install gcc-multilib g++-multilib qemu-utils qemu-user-static
-        sudo apt-get install ${{ matrix.xcc_pkg }} ${{ matrix.xemu_pkg }} 
 
-    - name: Environment info
-      run: |
-        echo && which $XCC
-        echo && $XCC --version
-        echo && $XCC -v  # Show built-in specs
-        echo && which $XEMU
-        echo && $XEMU --version
-
-    - name: ARM
-      if: ${{ matrix.name == 'ARM' }}
-      run: |
-        make platformTest CC=$XCC QEMU_SYS=$XEMU
-
-    - name: ARM64
-      if: ${{ matrix.name == 'ARM64' }}
-      run: |
-        make platformTest CC=$XCC QEMU_SYS=$XEMU
-
-    - name: PPC
-      if: ${{ matrix.name == 'PPC' }}
-      run: |
-        make platformTest CC=$XCC QEMU_SYS=$XEMU
-
-    - name: PPC64LE
-      if: ${{ matrix.name == 'PPC64LE' }}
-      run: |
-        make platformTest CC=$XCC QEMU_SYS=$XEMU MOREFLAGS=-m64
-
-    - name: S390X
-      if: ${{ matrix.name == 'S390X' }}
-      run: |
-        make platformTest CC=$XCC QEMU_SYS=$XEMU
-
-
-  # macOS
-  macos-latest-general:
-    name: macOS general test
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
 
-    - name: Environment info
-      run: |
-        echo && clang --version
-        echo && sysctl -a | grep machdep.cpu   # cpuinfo
+    - name: cc --version
+      run: echo && type cc && which cc && cc --version
 
-    - name: make
-      run: |
-        CFLAGS="-Werror" make clean default
+    - name: gcc --version
+      run: echo && type gcc && which gcc && gcc --version
 
-    - name: library build
-      run: |
-        make clean default
+    - name: clang --version
+      run: echo && type clang && which clang && clang --version
 
-    - name: test
-      run: |
-        # test scenario where `stdout` is not the console
-        make clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee
+    - name: make -v
+      run: echo && type make && which make && make -v
+
+    - name: g++ --version
+      run: echo && type g++ && which g++ && g++ --version
+
+    - name: git --version
+      run: echo && type git && which git && git --version
+
+    - name: gcc packages (apt-cache)
+      run: apt-cache search gcc | grep "^gcc-[0-9\.]* " | sort
+
+    - name: lib32gcc packages for i386 (apt-cache)
+      run: apt-cache search lib32gcc | grep "^lib32gcc-" | sort
+
+    - name: libx32gcc packages for x32 (apt-cache)
+      run: apt-cache search libx32gcc | grep "^libx32gcc-" | sort
+
+    - name: gcc multilib packages (apt-cache)
+      run: apt-cache search multilib | grep "gcc-" | sort
+
+    - name: clang packages (apt-cache)
+      run: apt-cache search clang | grep "^clang-[0-9\.]* " | sort
+
+    - name: QEMU packages (apt-cache)
+      run: apt-cache search qemu | grep "^qemu-system-.*QEMU full system" | sort
