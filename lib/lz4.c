@@ -193,10 +193,18 @@
  * and be available at link time */
 void* LZ4_malloc(size_t s);
 void* LZ4_calloc(size_t n, size_t s);
+#ifdef LZ4_FREE_ACCEPTS_SIZE
 void  LZ4_free(void* p, size_t s);
+#else
+void  LZ4_free(void* p);
+#endif
 # define ALLOC(s)          LZ4_malloc(s)
 # define ALLOC_AND_ZERO(s) LZ4_calloc(1,s)
+#ifdef LZ4_FREE_ACCEPTS_SIZE
 # define FREEMEM(p)        LZ4_free(p,sizeof(*(p)))
+#else
+# define FREEMEM(p)        LZ4_free(p)
+#endif
 #else
 # include <stdlib.h>   /* malloc, calloc, free */
 # define ALLOC(s)          malloc(s)
