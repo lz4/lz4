@@ -73,6 +73,9 @@ The following build macro can be selected to adjust source code behavior at comp
   by user-defined functions, which must be called `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
   User functions must be available at link time.
 
+- `LZ4_FREE_ACCEPTS_SIZE` : this will require a user-provided LZ4_free function to accept a second argument,
+  a size_t representing the size of the block to be freed
+
 - `LZ4_FORCE_SW_BITCOUNT` : by default, the compression algorithm tries to determine lengths
   by using bitcount instructions, generally implemented as fast single instructions in many cpus.
   In case the target cpus doesn't support it, or compiler intrinsic doesn't work, or feature bad performance,
