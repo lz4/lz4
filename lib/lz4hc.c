@@ -1331,7 +1331,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 {
     int retval = 0;
 #define TRAILING_LITERALS 3
-#ifdef LZ4HC_HEAPMODE
+#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
 #else
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which is a bit large for stack... */
@@ -1349,7 +1349,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     const BYTE* ovref = NULL;
 
     /* init */
-#ifdef LZ4HC_HEAPMODE
+#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     if (opt == NULL) goto _return_label;
 #endif
     DEBUGLOG(5, "LZ4HC_compress_optimal(dst=%p, dstCapa=%u)", dst, (unsigned)dstCapacity);
@@ -1614,7 +1614,7 @@ if (limit == fillOutput) {
      goto _last_literals;
 }
 _return_label:
-#ifdef LZ4HC_HEAPMODE
+#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
      FREEMEM(opt);
 #endif
      return retval;
