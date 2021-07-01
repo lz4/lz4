@@ -146,7 +146,9 @@ if (LZ4_BUILD_LEGACY_LZ4C)
   list(APPEND LZ4_PROGRAMS_BUILT lz4c)
   add_executable(lz4c ${LZ4_CLI_SOURCES})
   set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
-  target_link_libraries(lz4c ${LZ4_LINK_LIBRARY})
+  if (BUILD_STATIC_LIBS)
+    target_link_libraries(lz4c ${LZ4_LINK_LIBRARY})
+  endif()
 endif()
 
 # Extra warning flags
