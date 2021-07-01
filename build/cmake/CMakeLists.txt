@@ -125,20 +125,10 @@ if(BUILD_STATIC_LIBS)
   list(APPEND LZ4_LIBRARIES_BUILT lz4_static)
 endif()
 
-if(WIN32)
-# link to static library first because some functions may not exports to shared library
-  if(BUILD_STATIC_LIBS)
-    set(LZ4_LINK_LIBRARY lz4_static)
-  else()
-    set(LZ4_LINK_LIBRARY lz4_shared)
-  endif()
+if(BUILD_STATIC_LIBS)
+  set(LZ4_LINK_LIBRARY lz4_static)
 else()
-# link to shared whenever possible, to static otherwise
-  if(BUILD_SHARED_LIBS)
-    set(LZ4_LINK_LIBRARY lz4_shared)
-  else()
-    set(LZ4_LINK_LIBRARY lz4_static)
-  endif()
+  list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES})
 endif()
 
 # lz4
@@ -146,7 +136,9 @@ if (LZ4_BUILD_CLI)
   set(LZ4_PROGRAMS_BUILT lz4cli)
   add_executable(lz4cli ${LZ4_CLI_SOURCES})
   set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
-  target_link_libraries(lz4cli ${LZ4_LINK_LIBRARY})
+  if (BUILD_STATIC_LIBS)
+    target_link_libraries(lz4cli ${LZ4_LINK_LIBRARY})
+  endif()
 endif()
 
 # lz4c
