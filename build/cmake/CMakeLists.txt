@@ -114,18 +114,21 @@ if(BUILD_SHARED_LIBS)
   list(APPEND LZ4_LIBRARIES_BUILT lz4_shared)
 endif()
 if(BUILD_STATIC_LIBS)
+  set(STATIC_LIB_NAME lz4)
+  if (MSVC AND BUILD_SHARED_LIBS)
+    set(STATIC_LIB_NAME lz4_static)
+  endif()
   add_library(lz4_static STATIC ${LZ4_SOURCES})
   set_target_properties(lz4_static PROPERTIES
-    OUTPUT_NAME lz4
+    OUTPUT_NAME ${STATIC_LIB_NAME}
     POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_LIB})
   list(APPEND LZ4_LIBRARIES_BUILT lz4_static)
 endif()
 
-# link to shared whenever possible, to static otherwise
-if(BUILD_SHARED_LIBS)
-  set(LZ4_LINK_LIBRARY lz4_shared)
-else()
+if(BUILD_STATIC_LIBS)
   set(LZ4_LINK_LIBRARY lz4_static)
+else()
+  list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES})
 endif()
 
 # lz4
@@ -133,7 +136,9 @@ if (LZ4_BUILD_CLI)
   set(LZ4_PROGRAMS_BUILT lz4cli)
   add_executable(lz4cli ${LZ4_CLI_SOURCES})
   set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
-  target_link_libraries(lz4cli ${LZ4_LINK_LIBRARY})
+  if (BUILD_STATIC_LIBS)
+    target_link_libraries(lz4cli ${LZ4_LINK_LIBRARY})
+  endif()
 endif()
 
 # lz4c
@@ -141,7 +146,9 @@ if (LZ4_BUILD_LEGACY_LZ4C)
   list(APPEND LZ4_PROGRAMS_BUILT lz4c)
   add_executable(lz4c ${LZ4_CLI_SOURCES})
   set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
-  target_link_libraries(lz4c ${LZ4_LINK_LIBRARY})
+  if (BUILD_STATIC_LIBS)
+    target_link_libraries(lz4c ${LZ4_LINK_LIBRARY})
+  endif()
 endif()
 
 # Extra warning flags
