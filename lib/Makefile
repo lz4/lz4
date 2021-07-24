@@ -181,7 +181,7 @@ liblz4.pc: liblz4.pc.in Makefile
 install: lib liblz4.pc
 	$(INSTALL_DIR) $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
 	$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(pkgconfigdir)/
-	@echo Installing libraries
+	@echo Installing libraries in $(DESTDIR)$(libdir)
   ifeq ($(BUILD_STATIC),yes)
 	$(INSTALL_DATA) liblz4.a $(DESTDIR)$(libdir)/liblz4.a
 	$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(includedir)/lz4frame_static.h
@@ -199,7 +199,7 @@ install: lib liblz4.pc
 	$(LN_SF) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
     endif
   endif
-	@echo Installing headers in $(includedir)
+	@echo Installing headers in $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) lz4.h $(DESTDIR)$(includedir)/lz4.h
 	$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(includedir)/lz4hc.h
 	$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(includedir)/lz4frame.h
