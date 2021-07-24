@@ -175,6 +175,7 @@ liblz4.pc: liblz4.pc.in Makefile
          -e 's|@LIBDIR@|$(libdir)|' \
          -e 's|@INCLUDEDIR@|$(includedir)|' \
          -e 's|@VERSION@|$(LIBVER)|' \
+         -e 's|=${prefix}/|=$${prefix}/|' \
           $< >$@
 
 install: lib liblz4.pc
