@@ -47,9 +47,6 @@ jobs:
           { pkgs: 'gcc-6 g++-6 lib32gcc-6-dev libx32gcc-6-dev',         cc: gcc-6,     cxx: g++-6,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
           { pkgs: 'gcc-5 g++-5 lib32gcc-5-dev libx32gcc-5-dev',         cc: gcc-5,     cxx: g++-5,       stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
           { pkgs: 'gcc-4.8 g++-4.8 lib32gcc-4.8-dev libx32gcc-4.8-dev', cc: gcc-4.8,   cxx: g++-4.8,     stdc11: 'true',  stdc90: 'true',  x32: 'true',  x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
-          { pkgs: 'gcc-4.7 g++-4.7 lib32gcc-4.7-dev',                   cc: gcc-4.7,   cxx: g++-4.7,     stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'true', cxxtest: 'true',  os: ubuntu-16.04,  },
-          { pkgs: 'gcc-4.6 g++-4.6 gcc-4.6-multilib',                   cc: gcc-4.6,   cxx: g++-4.6,     stdc11: 'false', stdc90: 'true',  x32: 'false', x86: 'true', cxxtest: 'true',  os: ubuntu-16.04,  },
-          { pkgs: 'gcc-4.4 g++-4.4 gcc-4.4-multilib',                   cc: gcc-4.4,   cxx: g++-4.4,     stdc11: 'false', stdc90: 'false', x32: 'false', x86: 'true', cxxtest: 'true',  os: ubuntu-16.04,  },
 
           # clang
           { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-latest, },
@@ -63,10 +60,6 @@ jobs:
           { pkgs: 'clang-5.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-5.0, cxx: clang++-5.0, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-18.04,  },
           { pkgs: 'clang-4.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-4.0, cxx: clang++-4.0, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-18.04,  },
           { pkgs: 'clang-3.9 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-3.9, cxx: clang++-3.9, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'false', os: ubuntu-18.04,  },
-          { pkgs: 'clang-3.8',                                          cc: clang-3.8, cxx: clang++-3.8, stdc11: 'true',  stdc90: 'true',  x32: 'fail',  x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
-          { pkgs: 'clang-3.7',                                          cc: clang-3.7, cxx: clang++-3.7, stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
-          { pkgs: 'clang-3.6',                                          cc: clang-3.6, cxx: clang++-3.6, stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
-          { pkgs: 'clang-3.5',                                          cc: clang-3.5, cxx: clang++-3.5, stdc11: 'true',  stdc90: 'true',  x32: 'false', x86: 'fail', cxxtest: 'true',  os: ubuntu-16.04,  },
         ]
 
     runs-on: ${{ matrix.os }}
@@ -642,7 +635,6 @@ jobs:
           { os: ubuntu-latest,  }, # https://github.com/actions/virtual-environments/
           { os: ubuntu-20.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
           { os: ubuntu-18.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu1804-README.md
-          { os: ubuntu-16.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu1604-README.md
         ]
 
     runs-on: ${{ matrix.os }}
