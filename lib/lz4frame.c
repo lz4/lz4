@@ -588,6 +588,16 @@ static void LZ4F_initStream(void* ctx,
     }
 }
 
+static int ctxTypeID_to_size(int ctxTypeID) {
+    switch(ctxTypeID) {
+    case 1:
+        return LZ4_sizeofState();
+    case 2:
+        return LZ4_sizeofStateHC();
+    default:
+        return 0;
+    }
+}
 
 /*! LZ4F_compressBegin_usingCDict() :
  *  init streaming compression AND writes frame header into @dstBuffer.
@@ -610,7 +620,9 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
 
     /* cctx Management */
     {   U16 const ctxTypeID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;
-        if (cctxPtr->lz4CtxAlloc < ctxTypeID) {
+        int requiredSize = ctxTypeID_to_size(ctxTypeID);
+        int allocatedSize = ctxTypeID_to_size(cctxPtr->lz4CtxAlloc);
+        if (allocatedSize < requiredSize) {
             /* not enough space allocated */
             FREEMEM(cctxPtr->lz4CtxPtr);
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
