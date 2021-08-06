@@ -52,13 +52,19 @@ DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS   += $(DEBUGFLAGS) $(MOREFLAGS)
+
+include ../Makefile.inc
+
+ifeq ($(TARGET_OS)$(shell uname -r),SunOS5.10)
+LDFLAGS  += -lrt
+endif
+
 FLAGS     = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 LZ4_VERSION=$(LIBVER)
 MD2ROFF   = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
-include ../Makefile.inc
 
 default: lz4-release
 
