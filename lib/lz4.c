@@ -516,8 +516,14 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
     if (LZ4_isLittleEndian()) {
         if (sizeof(val) == 8) {
 #       if defined(_MSC_VER) && (_MSC_VER >= 1800) && defined(_M_AMD64) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#         if defined(__clang__) && (__clang_major__ < 10)
+            /* Avoid undefined clang-cl intrinics issue.
+             * See https://github.com/lz4/lz4/pull/1017 for details. */
+            return (unsigned)__builtin_ia32_tzcnt_u64(val) >> 3;
+#         else
             /* x64 CPUS without BMI support interpret `TZCNT` as `REP BSF` */
             return (unsigned)_tzcnt_u64(val) >> 3;
+#         endif
 #       elif defined(_MSC_VER) && defined(_WIN64) && !defined(LZ4_FORCE_SW_BITCOUNT)
             unsigned long r = 0;
             _BitScanForward64(&r, (U64)val);
