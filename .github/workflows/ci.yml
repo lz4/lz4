@@ -389,9 +389,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
     - name: unicode lint
-      run: |
-      chmod +x ./tests/unicode_lint.sh
-      ./tests/unicode_lint.sh
+      run: ./tests/unicode_lint.sh
 
 
 ###############################################################
