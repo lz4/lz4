@@ -9,7 +9,7 @@ pass=true
 
 # Scan ./lib/ for Unicode in source (*.c, *.h) files
 result=$(
-	find ./lib/ -regex '.*\.\(c\|h\)$' -exec grep -P -n "[^\x00-\x7F]" {} \; -exec echo "FAIL: {}" \;
+	find ./lib/ -regex '.*\.\(c\|h\)$' -exec grep -P -n "[^\x00-\x7F]" {} \; -exec echo "{}: FAIL" \;
 )
 if [[ $result ]]; then
 	echo "$result"
