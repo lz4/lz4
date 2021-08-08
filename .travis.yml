@@ -231,6 +231,12 @@ matrix:
     - name: Compile OSS-Fuzz targets
       script:
         - ./ossfuzz/travisoss.sh
+        
+    # Unicode lint
+    # See https://github.com/lz4/lz4/issues/1018
+    - name: Run Unicode lint
+      script:
+        - ./tests/unicode_lint.sh
 
   allow_failures:
     - env: ALLOW_FAILURES=true
