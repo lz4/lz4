@@ -264,6 +264,7 @@ jobs:
 # - valgrind
 # - ubsan
 # - asan
+# - unicode-lint
 #
   lz4-cppcheck:
     name: make cppcheck
@@ -382,6 +383,13 @@ jobs:
     - name: fuzzer
       run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
 
+  unicode-lint:
+    name: lint unicode in ./lib/, ./tests/ and ./programs/
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: unicode lint
+      run: bash ./tests/unicode_lint.sh
 
 
 ###############################################################
