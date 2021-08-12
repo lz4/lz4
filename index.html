@@ -215,10 +215,10 @@ Here are a few compatible alternatives to lz4 command line utility :
 
 <br/>
 <a name="customs-lz4"></a>
-## Customs LZ4 ports and bindings
+## Customs LZ4 implementations
 The following versions compress data blocks with LZ4 compression algorithm in various programming languages.
 They use the [block] compression format, but add their own frame / header logic.
-They are not interoperable with LZ4 command line utility.
+Consequently, they are not interoperable with LZ4 command line utility, nor (generally) between themselves.
 
 |Language             |Author               |URL                              |
 |--                   |--                   |--                               |
@@ -249,7 +249,7 @@ They are not interoperable with LZ4 command line utility.
 |__Z80 assembly__ decoder | Edouard Berge   | https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8
 |__Atari XL/XE assembly__ decoder | xxl     | http://xxl.atari.pl/lz4-decompressor/
 |__v810 assembly__ decoder | Martin Wendt   | https://github.com/enthusi/lz4_v810_decode
-|__jsonlz4__          | Avi Halachmi        | https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format
+|__jsonlz4__ decoder  | Avi Halachmi        | https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format
 
 
 <br/>
