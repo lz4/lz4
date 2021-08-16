@@ -393,7 +393,7 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
 <pre><b></b><p>
  It's possible to have input and output sharing the same buffer,
- for highly contrained memory environments.
+ for highly constrained memory environments.
  In both cases, it requires input to lay at the end of the buffer,
  and decompression to start at beginning of the buffer.
  Buffer size must feature some margin, hence be larger than final size.
@@ -459,7 +459,7 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
     size_t prefixSize;
 } LZ4_streamDecode_t_internal;
 </b></pre><BR>
-<pre><b>#define LZ4_STREAMSIZE       16416  </b>/* static size, for inter-version compatibility */<b>
+<pre><b>#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + 32)  </b>/* static size, for inter-version compatibility */<b>
 #define LZ4_STREAMSIZE_VOIDP (LZ4_STREAMSIZE / sizeof(void*))
 union LZ4_stream_u {
     void* table[LZ4_STREAMSIZE_VOIDP];

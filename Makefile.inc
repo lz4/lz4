@@ -30,7 +30,9 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 
-TARGET_OS ?= $(shell uname)
+UNAME ?= uname
+
+TARGET_OS ?= $(shell $(UNAME))
 ifeq ($(TARGET_OS),)
   TARGET_OS ?= $(OS)
 endif
@@ -67,7 +69,7 @@ WINDRES    = windres
 endif
 
 #determine if dev/nul based on host environment
-ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
+ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell $(UNAME))))
 VOID := /dev/null
 else
   ifneq (,$(filter Windows%,$(OS)))
@@ -77,7 +79,7 @@ VOID  := /dev/null
   endif
 endif
 
-ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS%,$(shell uname)))
+ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS%,$(shell $(UNAME))))
 POSIX_ENV = Yes
 else
 POSIX_ENV = No
@@ -87,7 +89,7 @@ endif
 ifeq ($(WINBASED),yes)
 LN_SF = cp -p
 else
-  ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
+  ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell $(UNAME))))
 LN_SF = cp -p
   else
     ifneq (,$(filter Windows%,$(OS)))
@@ -98,7 +100,7 @@ LN_SF  = ln -sf
   endif
 endif
 
-ifneq (,$(filter $(shell uname),SunOS))
+ifneq (,$(filter $(shell $(UNAME)),SunOS))
 INSTALL ?= ginstall
 else
 INSTALL ?= install
