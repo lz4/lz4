@@ -125,7 +125,7 @@ compress_file(FILE* f_in, FILE* f_out)
     assert(f_in != NULL);
     assert(f_out != NULL);
 
-    /* ressource allocation */
+    /* resource allocation */
     LZ4F_compressionContext_t ctx;
     size_t const ctxCreation = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
     void* const src = malloc(IN_CHUNK_SIZE);
@@ -286,7 +286,7 @@ static int decompress_file(FILE* f_in, FILE* f_out)
 {
     assert(f_in != NULL); assert(f_out != NULL);
 
-    /* Ressource allocation */
+    /* Resource allocation */
     void* const src = malloc(IN_CHUNK_SIZE);
     if (!src) { perror("decompress_file(src)"); return 1; }
 
