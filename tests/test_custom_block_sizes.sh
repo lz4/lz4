@@ -62,7 +62,7 @@ do
 done
 
 rm $TMPFILE.lz4 $TMPFILE1 $TMPFILE1.lz4 $TMPFILE2 $TMPFILE2.lz4
-if [ "$failures" == "" ]
+if [ "$failures" = "" ]
 then
   echo ---- All tests passed
   exit 0
