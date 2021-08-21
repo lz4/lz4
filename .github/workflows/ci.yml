@@ -155,7 +155,7 @@ jobs:
 # - LZ4 Frame
 # - LZ4 versions
 # - Custom LZ4_DISTANCE_MAX
-# 
+#
   lz4-benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
