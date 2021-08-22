@@ -37,7 +37,7 @@ Additional remarks:
 The example usage with two test files, one e-mail address, and with an additional message:
 ```
 ./test-lz4-speed.py "silesia.tar calgary.tar" "email@gmail.com" --message "tested on my laptop" --sleepTime 60
-``` 
+```
 
 To run the script in background please use:
 ```

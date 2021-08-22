@@ -6,8 +6,8 @@ LZ4 Frame Format Description
 Copyright (c) 2013-2020 Yann Collet
 
 Permission is granted to copy and distribute this document
-for any  purpose and without charge,
-including translations into other  languages
+for any purpose and without charge,
+including translations into other languages
 and incorporation into compilations,
 provided that the copyright notice and this notice are preserved,
 and that any substantive changes or deletions from the original
@@ -47,7 +47,7 @@ at the level of bits and other primitive data representations.
 Unless otherwise indicated below,
 a compliant compressor must produce data sets
 that conform to the specifications presented here.
-It doesn’t need to support all options though.
+It doesn't need to support all options though.
 
 A compliant decompressor must be able to decompress
 at least one working set of parameters
@@ -385,7 +385,7 @@ __EndMark__
 
 End of legacy frame is implicit only.
 It must be followed by a standard EOF (End Of File) signal,
-wether it is a file or a stream.
+whether it is a file or a stream.
 
 Alternatively, if the frame is followed by a valid Frame Magic Number,
 it is considered completed.
