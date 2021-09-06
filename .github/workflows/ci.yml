@@ -404,8 +404,8 @@ jobs:
 
     - name: Environment info
       run: |
-        echo && type $CC && which $CC && $CC --version
-        echo && type $CXX && which $CXX && $CXX --version
+        echo && type cc && which cc && cc --version
+        echo && type c++ && which c++ && c++ --version
 
     - name: examples
       run: make V=1 clean examples
