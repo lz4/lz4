@@ -265,6 +265,7 @@ jobs:
 # - ubsan
 # - asan
 # - unicode-lint
+# - build examples
 #
   lz4-cppcheck:
     name: make cppcheck
@@ -390,6 +391,27 @@ jobs:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
     - name: unicode lint
       run: bash ./tests/unicode_lint.sh
+
+
+  lz4-examples:
+    name: make examples
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: apt-get install
+      run: |
+        sudo apt-get update
+
+    - name: Environment info
+      run: |
+        echo && type cc && which cc && cc --version
+        echo && type c++ && which c++ && c++ --version
+
+    - name: examples
+      run: make V=1 clean examples
+
+    - name: examples (compile as C++ code)
+      run: make V=1 -C examples clean cxxtest
 
 
 ###############################################################
