@@ -95,6 +95,11 @@ test : all $(LZ4)
 	./frameCompress$(EXT) $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
 
+.PHONY: cxxtest
+cxxtest: CFLAGS := -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
+cxxtest: clean
+	CC=$(CXX) $(MAKE) -C . all CFLAGS="$(CFLAGS)"
+
 clean:
 	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s *.lz4 \
 	 printVersion$(EXT) doubleBuffer$(EXT) dictionaryRandomAccess$(EXT) \
