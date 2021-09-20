@@ -109,7 +109,7 @@ cmake:
 endif   # POSIX_ENV
 
 
-ifneq (,$(filter MSYS%,$(shell uname)))
+ifneq (,$(filter MSYS%,$(shell $(UNAME))))
 HOST_OS = MSYS
 CMAKE_PARAMS = -G"MSYS Makefiles"
 endif

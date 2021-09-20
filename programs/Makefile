@@ -55,7 +55,8 @@ CFLAGS   += $(DEBUGFLAGS) $(MOREFLAGS)
 
 include ../Makefile.inc
 
-ifeq ($(TARGET_OS)$(shell uname -r),SunOS5.10)
+OS_VERSION ?= $(UNAME) -r
+ifeq ($(TARGET_OS)$(shell $(OS_VERSION)),SunOS5.10)
 LDFLAGS  += -lrt
 endif
 
