@@ -31,6 +31,11 @@ if host_machine_os == os_windows and default_library != 'static'
   liblz4_c_args += '-DLZ4_DLL_EXPORT=1'
 endif
 
+if cc.has_argument('-fvisibility=hidden')
+  liblz4_c_args += ['-fvisibility=hidden',
+                    '-DLZ4LIB_VISIBILITY=__attribute__((visibility("default")))']
+endif
+
 liblz4 = library('lz4',
   liblz4_sources,
   include_directories: liblz4_includes,
