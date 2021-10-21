@@ -103,6 +103,9 @@ option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static li
 set(LZ4_LIBRARIES_BUILT)
 if(BUILD_SHARED_LIBS)
   add_library(lz4_shared SHARED ${LZ4_SOURCES})
+  target_include_directories(lz4_shared
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(lz4_shared PROPERTIES
     OUTPUT_NAME lz4
     SOVERSION "${LZ4_VERSION_MAJOR}"
@@ -119,6 +122,9 @@ if(BUILD_STATIC_LIBS)
     set(STATIC_LIB_NAME lz4_static)
   endif()
   add_library(lz4_static STATIC ${LZ4_SOURCES})
+  target_include_directories(lz4_static
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(lz4_static PROPERTIES
     OUTPUT_NAME ${STATIC_LIB_NAME}
     POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_LIB})
@@ -189,6 +195,7 @@ if(NOT LZ4_BUNDLED_MODE)
     BUNDLE	DESTINATION "${CMAKE_INSTALL_BINDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
   install(TARGETS ${LZ4_LIBRARIES_BUILT}
+    EXPORT lz4Targets
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -201,6 +208,30 @@ if(NOT LZ4_BUNDLED_MODE)
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+
+  include(CMakePackageConfigHelpers)
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/lz4ConfigVersion.cmake"
+    VERSION ${LZ4_VERSION_STRING}
+    COMPATIBILITY SameMajorVersion)
+
+  set(LZ4_PKG_INSTALLDIR "${CMAKE_INSTALL_LIBDIR}/cmake/lz4")
+  configure_package_config_file(
+    "${CMAKE_CURRENT_LIST_DIR}/lz4Config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/lz4Config.cmake"
+    INSTALL_DESTINATION ${LZ4_PKG_INSTALLDIR})
+  export(EXPORT lz4Targets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/lz4Targets.cmake
+    NAMESPACE LZ4::)
+
+  install(EXPORT lz4Targets
+    FILE lz4Targets.cmake
+    NAMESPACE LZ4::
+    DESTINATION ${LZ4_PKG_INSTALLDIR})
+  install(FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/lz4Config.cmake
+      ${CMAKE_CURRENT_BINARY_DIR}/lz4ConfigVersion.cmake
+    DESTINATION ${LZ4_PKG_INSTALLDIR})
 
   # install lz4cat and unlz4 symlinks on *nix
   if(UNIX AND LZ4_BUILD_CLI)
