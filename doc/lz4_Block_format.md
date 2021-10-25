@@ -64,7 +64,7 @@ Example 3 : A literal length of 15 will be represented as :
 
 Following `token` and optional length bytes, are the literals themselves.
 They are exactly as numerous as previously decoded (length of literals).
-It's possible that there are zero literal.
+It's possible that there are zero literals.
 
 
 Following the literals is the match copy operation.
