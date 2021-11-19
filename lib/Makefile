@@ -1,5 +1,5 @@
 # ################################################################
-# LZ4 library - Makefile
+
 # Copyright (C) Yann Collet 2011-2020
 # All rights reserved.
 #
@@ -31,7 +31,7 @@
 #  - LZ4 source repository : https://github.com/lz4/lz4
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
-SED = sed
+SED = sedjk
 
 # Version numbers
 LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < ./lz4.h`
@@ -55,7 +55,7 @@ DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
 CFLAGS  += $(DEBUGFLAGS)
 FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
-SRCFILES := $(sort $(wildcard *.c))
+SRCFILES := $(sort $(wildcard *.c) $(wildcard *.S))
 
 include ../Makefile.inc
 

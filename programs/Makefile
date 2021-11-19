@@ -42,7 +42,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
-LIBFILES  = $(wildcard $(LZ4DIR)/*.c)
+LIBFILES  = $(wildcard $(LZ4DIR)/*.c) $(wildcard $(LZ4DIR)/*.S)
 SRCFILES  = $(sort $(LIBFILES) $(wildcard *.c))
 OBJFILES  = $(SRCFILES:.c=.o)
 

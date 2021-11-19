@@ -31,6 +31,7 @@
     - LZ4 homepage : http://www.lz4.org
     - LZ4 source repository : https://github.com/lz4/lz4
 */
+#include <stdio.h>
 
 /*-************************************
 *  Tuning parameters
@@ -238,6 +239,9 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Error detection
 **************************************/
+#ifndef LZ4_DEBUG
+#define LZ4_DEBUG 0
+#endif
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
 #  include <assert.h>
 #else
@@ -957,6 +961,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
 
             } while ( (match+LZ4_DISTANCE_MAX < ip)
+                   || (ip - match < 16)
                    || (LZ4_read32(match) != LZ4_read32(ip)) );
 
         } else {   /* byU32, byU16 */
@@ -1007,6 +1012,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
                 DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
+                if (current - matchIndex < 16) continue;
                 if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) { continue; }    /* match outside of valid area */
                 assert(matchIndex < current);
                 if ( ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
@@ -1160,6 +1166,7 @@ _next_match:
             match = LZ4_getPosition(ip, cctx->hashTable, tableType, base);
             LZ4_putPosition(ip, cctx->hashTable, tableType, base);
             if ( (match+LZ4_DISTANCE_MAX >= ip)
+              && (ip - match >= 16)
               && (LZ4_read32(match) == LZ4_read32(ip)) )
             { token=op++; *token=0; goto _next_match; }
 
@@ -1196,7 +1203,8 @@ _next_match:
             assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
               && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
-              && (LZ4_read32(match) == LZ4_read32(ip)) ) {
+              && (LZ4_read32(match) == LZ4_read32(ip))
+              && (ip - match >= 16)) {
                 token=op++;
                 *token=0;
                 if (maybe_extMem) offset = current - matchIndex;
@@ -1747,6 +1755,15 @@ read_variable_length(const BYTE**ip, const BYTE* lencheck,
     return length;
 }
 
+typedef struct {
+    BYTE const* ip;
+    BYTE* op;
+    BYTE const* iend;
+    BYTE* oend;
+} LZ4_DecompressAsmArgs;
+
+int LZ4_decompress_asm_loop(LZ4_DecompressAsmArgs* args);
+
 /*! LZ4_decompress_generic() :
  *  This generic decompression function covers all use cases.
  *  It shall be instantiated several times, using different sets of directives.
@@ -1812,6 +1829,34 @@ LZ4_decompress_generic(
             goto safe_decode;
         }
 
+        if (    1 &&
+                (iend - ip) >= FASTLOOP_SAFE_DISTANCE &&
+                endOnInput == endOnInputSize &&
+                partialDecoding == decode_full_block &&
+                dict == noDict) {
+            LZ4_DecompressAsmArgs args;
+            args.ip = ip;
+            args.iend = iend;
+            args.op = op;
+            args.oend = oend;
+        #if LZ4_DEBUG >= 1
+            fprintf(stderr, "0x%p=istart=ip\n0x%p=ostart=op\n0x%p=iend\n0x%p=oend\n%zu=isize\n%zu=osize\n", ip, op, iend, oend, (size_t)(iend - ip), (size_t)(oend - op));
+        #endif
+            {
+                int const fail = LZ4_decompress_asm_loop(&args);
+                op = args.op;
+                ip = args.ip;
+        #if LZ4_DEBUG >= 1
+                fprintf(stderr, "0x%p=istart=ip\n0x%p=ostart=op\n0x%p=iend\n0x%p=oend\n%zu=isize\n%zu=osize\n", ip, op, iend, oend, (size_t)(iend - ip), (size_t)(oend - op));
+        #endif
+                if (fail) {
+                    fprintf(stderr, "Failed!\n");
+                    goto _output_error;
+                }
+            }
+            goto safe_decode;
+        }
+
         /* Fast loop : decode sequences as long as output < iend-FASTLOOP_SAFE_DISTANCE */
         while (1) {
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
@@ -1863,6 +1908,7 @@ LZ4_decompress_generic(
             offset = LZ4_readLE16(ip); ip+=2;
             match = op - offset;
             assert(match <= op);
+            assert(offset >= 16);
 
             /* get matchlength */
             length = token & ML_MASK;

@@ -457,6 +457,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             break;
                         }
                         blockTable[blockNb].resSize = (size_t)regenSize;
+                        assert(blockTable[blockNb].resSize == blockTable[blockNb].srcSize);
                 }   }
                 {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
                     if (clockSpan > 0) {
