@@ -93,7 +93,9 @@ LZ4_decompress_asm_loop:
 	je .L_long_match_length
 
 	cmpq $16, %r11
-	jb copy_short_offset
+	jb .L_copy_short_offset
+
+	addq $4, %rbx
 
 	movdqu 0(%rsi), %xmm0
 	movups %xmm0, 0(%op)
@@ -101,14 +103,14 @@ LZ4_decompress_asm_loop:
 	movw %di, 16(%op)
 
 	addq %rbx, %op
-	addq $4,   %op
 
 	cmpq %op, %olimit
 	jb .L_exit_success
 
 	jmp .L_match_copied
 
-copy_short_offset:
+.L_copy_short_offset:
+	addq $4, %rbx
 	salq $4, %r11
 	movdqu 0(%rsi), %xmm0
 	vpshufb (%r15, %r11), %xmm0, %xmm0
@@ -119,7 +121,6 @@ copy_short_offset:
 	movw %di, 16(%op)
 
 	addq %rbx, %op
-	addq $4,   %op
 
 	cmpq %op, %olimit
 	jb .L_exit_success
@@ -132,7 +133,7 @@ copy_short_offset:
 	addq $1, %ip
 
 	cmpq $0xFF, %rsi
-	je very_long_literal_length
+	je .L_very_long_literal_length
 
 .L_literal_length_computed:
 	movq %ip, %rsi
@@ -158,14 +159,14 @@ copy_short_offset:
 
 	jmp .L_literals_copied
 
-very_long_literal_length:
+.L_very_long_literal_length:
 	movzbq 0(%ip), %rdi
 	addq %rdi, %rax
 	addq $1, %ip
 	cmpq %ip, %ilimit
 	jb .L_rewind_sequence
 	cmpq $0xFF, %rdi
-	je very_long_literal_length
+	je .L_very_long_literal_length
 
 	jmp .L_literal_length_computed
 
@@ -176,7 +177,7 @@ very_long_literal_length:
 	addq $1, %ip
 
 	cmpq $0xFF, %rdi
-	je very_long_match_length
+	je .L_very_long_match_length
 
 .L_match_length_computed:
 	movq %op, %rdi
@@ -186,7 +187,7 @@ very_long_literal_length:
 	jb .L_rewind_sequence
 
 	cmpq $16, %r11
-	jb copy_short_offset_loop_header
+	jb .L_copy_short_offset_loop_header
 
 	/* TODO: Handle short offsets */
 
@@ -203,7 +204,7 @@ very_long_literal_length:
 
 	jmp .L_match_copied
 
-copy_short_offset_loop_header:
+.L_copy_short_offset_loop_header:
 	salq $4, %r11
 	movdqu 0(%rsi), %xmm0
 	vpshufb (%r15, %r11), %xmm0, %xmm0
@@ -212,14 +213,14 @@ copy_short_offset_loop_header:
 	addq $16, %rdi
 	jmp .L_match_copy_loop
 
-very_long_match_length:
+.L_very_long_match_length:
 	movzbq 0(%ip), %rdi
 	addq %rdi, %rbx
 	addq $1, %ip
 	cmpq %ip, %ilimit
 	jb .L_rewind_sequence
 	cmpq $0xFF, %rdi
-	je very_long_match_length
+	je .L_very_long_match_length
 
 	jmp .L_match_length_computed
 
