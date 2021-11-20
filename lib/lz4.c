@@ -31,7 +31,6 @@
     - LZ4 homepage : http://www.lz4.org
     - LZ4 source repository : https://github.com/lz4/lz4
 */
-#include <stdio.h>
 
 /*-************************************
 *  Tuning parameters
@@ -239,9 +238,6 @@ static const int LZ4_minLength = (MFLIMIT+1);
 /*-************************************
 *  Error detection
 **************************************/
-#ifndef LZ4_DEBUG
-#define LZ4_DEBUG 0
-#endif
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=1)
 #  include <assert.h>
 #else
@@ -1200,7 +1196,7 @@ _next_match:
             assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
               && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
-              && (LZ4_read32(match) == LZ4_read32(ip))) {
+              && (LZ4_read32(match) == LZ4_read32(ip)) ) {
                 token=op++;
                 *token=0;
                 if (maybe_extMem) offset = current - matchIndex;
@@ -1834,18 +1830,11 @@ LZ4_decompress_generic(
             args.iend = iend;
             args.op = op;
             args.oend = oend;
-        #if LZ4_DEBUG >= 1
-            fprintf(stderr, "0x%p=istart=ip\n0x%p=ostart=op\n0x%p=iend\n0x%p=oend\n%zu=isize\n%zu=osize\n", ip, op, iend, oend, (size_t)(iend - ip), (size_t)(oend - op));
-        #endif
             {
                 int const fail = LZ4_decompress_asm_loop(&args);
                 op = args.op;
                 ip = args.ip;
-        #if LZ4_DEBUG >= 1
-                fprintf(stderr, "0x%p=istart=ip\n0x%p=ostart=op\n0x%p=iend\n0x%p=oend\n%zu=isize\n%zu=osize\n", ip, op, iend, oend, (size_t)(iend - ip), (size_t)(oend - op));
-        #endif
                 if (fail) {
-                    fprintf(stderr, "Failed!\n");
                     goto _output_error;
                 }
             }
@@ -1903,7 +1892,6 @@ LZ4_decompress_generic(
             offset = LZ4_readLE16(ip); ip+=2;
             match = op - offset;
             assert(match <= op);
-            assert(offset >= 16);
 
             /* get matchlength */
             length = token & ML_MASK;
