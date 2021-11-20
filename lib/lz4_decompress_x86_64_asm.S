@@ -1,12 +1,10 @@
 .global LZ4_decompress_asm_loop
 .text
-
 #define ip	rcx
 #define op	rdx
 #define ilimit	r8
 #define olimit	r9
 #define ostart	r10
-#define oend	r11
 
 #define LIMIT	64
 
@@ -42,19 +40,21 @@ LZ4_decompress_asm_loop:
 	movq 0(%rdi), %ip
 	movq 8(%rdi), %op
 	movq 16(%rdi), %ilimit
-	movq 24(%rdi), %oend
+	movq 24(%rdi), %olimit
 
 	push %rdi
 
-	movq %oend, %olimit
 	subq $LIMIT, %ilimit
 	subq $LIMIT, %olimit
+
+	leaq pattern_forward(%rip), %r14
+	leaq pattern(%rip), %r15
 
 	movq %op, %ostart
 
 .L_match_copied:
-	movq %ip, %r13
-	movq %op, %r14
+	movq %ip, %r12
+	movq %op, %r13
 	/* Load the token */
 	movzbq 0(%ip), %rax
 	addq $1, %ip
@@ -82,18 +82,18 @@ LZ4_decompress_asm_loop:
 
 .L_literals_copied:
 	movq %op, %rsi
-	movzwq 0(%ip), %rdi
+	movzwq 0(%ip), %r11
 	addq $2, %ip
-	subq %rdi, %rsi
+	subq %r11, %rsi
 
 	cmpq %ostart, %rsi
 	jb .L_output_error
 
-	/* TOOD: Handle short offsets */
 	cmpq $0xF, %rbx
 	je .L_long_match_length
 
-	addq $4, %rbx
+	cmpq $16, %r11
+	jb copy_short_offset
 
 	movdqu 0(%rsi), %xmm0
 	movups %xmm0, 0(%op)
@@ -101,6 +101,25 @@ LZ4_decompress_asm_loop:
 	movw %di, 16(%op)
 
 	addq %rbx, %op
+	addq $4,   %op
+
+	cmpq %op, %olimit
+	jb .L_exit_success
+
+	jmp .L_match_copied
+
+copy_short_offset:
+	salq $4, %r11
+	movdqu 0(%rsi), %xmm0
+	vpshufb (%r15, %r11), %xmm0, %xmm0
+	addq (%r14, %r11), %rsi
+
+	movdqu %xmm0, 0(%op)
+	movzwq 0(%rsi), %rdi
+	movw %di, 16(%op)
+
+	addq %rbx, %op
+	addq $4,   %op
 
 	cmpq %op, %olimit
 	jb .L_exit_success
@@ -166,6 +185,9 @@ very_long_literal_length:
 	cmpq %op, %olimit
 	jb .L_rewind_sequence
 
+	cmpq $16, %r11
+	jb copy_short_offset_loop_header
+
 	/* TODO: Handle short offsets */
 
 .L_match_copy_loop:
@@ -180,6 +202,15 @@ very_long_literal_length:
 	jb .L_match_copy_loop
 
 	jmp .L_match_copied
+
+copy_short_offset_loop_header:
+	salq $4, %r11
+	movdqu 0(%rsi), %xmm0
+	vpshufb (%r15, %r11), %xmm0, %xmm0
+	movdqu %xmm0, 0(%rdi)
+	addq (%r14, %r11), %rsi
+	addq $16, %rdi
+	jmp .L_match_copy_loop
 
 very_long_match_length:
 	movzbq 0(%ip), %rdi
@@ -200,8 +231,8 @@ very_long_match_length:
 	jmp .L_exit_success
 
 .L_rewind_sequence:
-	movq %r13, %ip
-	movq %r14, %op
+	movq %r12, %ip
+	movq %r13, %op
 	jmp .L_exit_success
 
 .L_output_error:
@@ -239,5 +270,300 @@ very_long_match_length:
 	ret
 
 #ifndef NDEBUG
-.assert_fail:
+.L_assert_fail:
 #endif
+        .section        .rodata
+	.align 8
+pattern_forward:
+	.quad 0 /* 0 */
+	.quad 0 /* padding */
+	.quad 0 /* 1 */
+	.quad 0 /* padding */
+	.quad 0 /* 2 */
+	.quad 0 /* padding */
+	.quad 1 /* 3 */
+	.quad 0 /* padding */
+	.quad 0 /* 4 */
+	.quad 0 /* padding */
+	.quad 1 /* 5 */
+	.quad 0 /* padding */
+	.quad 4 /* 6 */
+	.quad 0 /* padding */
+	.quad 2 /* 7 */
+	.quad 0 /* padding */
+	.quad 0 /* 8 */
+	.quad 0 /* padding */
+	.quad 7 /* 9 */
+	.quad 0 /* padding */
+	.quad 6 /* 10 */
+	.quad 0 /* padding */
+	.quad 5 /* 11 */
+	.quad 0 /* padding */
+	.quad 4 /* 12 */
+	.quad 0 /* padding */
+	.quad 3 /* 13 */
+	.quad 0 /* padding */
+	.quad 2 /* 14 */
+	.quad 0 /* padding */
+	.quad 1 /* 15 */
+	.align 16
+pattern:
+	.quad   0 /* padding */
+	.quad   0 /* padding */
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   0
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   0
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   10
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   10
+        .byte   11
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   10
+        .byte   11
+        .byte   12
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   10
+        .byte   11
+        .byte   12
+        .byte   13
+        .byte   0
+        .byte   1
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   10
+        .byte   11
+        .byte   12
+        .byte   13
+        .byte   14
+        .byte   0
+        .byte   0
+        .byte   1
+        .byte   2
+        .byte   3
+        .byte   4
+        .byte   5
+        .byte   6
+        .byte   7
+        .byte   8
+        .byte   9
+        .byte   10
+        .byte   11
+        .byte   12
+        .byte   13
+        .byte   14
+        .byte   15
+	.text

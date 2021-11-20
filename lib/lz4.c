@@ -961,7 +961,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType, base);
 
             } while ( (match+LZ4_DISTANCE_MAX < ip)
-                   || (ip - match < 16)
                    || (LZ4_read32(match) != LZ4_read32(ip)) );
 
         } else {   /* byU32, byU16 */
@@ -1012,7 +1011,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
                 DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
-                if (current - matchIndex < 16) continue;
                 if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) { continue; }    /* match outside of valid area */
                 assert(matchIndex < current);
                 if ( ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
@@ -1166,7 +1164,6 @@ _next_match:
             match = LZ4_getPosition(ip, cctx->hashTable, tableType, base);
             LZ4_putPosition(ip, cctx->hashTable, tableType, base);
             if ( (match+LZ4_DISTANCE_MAX >= ip)
-              && (ip - match >= 16)
               && (LZ4_read32(match) == LZ4_read32(ip)) )
             { token=op++; *token=0; goto _next_match; }
 
@@ -1203,8 +1200,7 @@ _next_match:
             assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
               && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
-              && (LZ4_read32(match) == LZ4_read32(ip))
-              && (ip - match >= 16)) {
+              && (LZ4_read32(match) == LZ4_read32(ip))) {
                 token=op++;
                 *token=0;
                 if (maybe_extMem) offset = current - matchIndex;
@@ -1829,8 +1825,7 @@ LZ4_decompress_generic(
             goto safe_decode;
         }
 
-        if (    1 &&
-                (iend - ip) >= FASTLOOP_SAFE_DISTANCE &&
+        if (    (iend - ip) >= FASTLOOP_SAFE_DISTANCE &&
                 endOnInput == endOnInputSize &&
                 partialDecoding == decode_full_block &&
                 dict == noDict) {
