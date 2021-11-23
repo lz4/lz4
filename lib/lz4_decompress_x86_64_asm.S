@@ -63,9 +63,8 @@ LZ4_decompress_asm_loop:
 	/* %rax = literal length */
 	/* %rbx = match length */
 	movq %rax, %rbx
-	shrq $4, %rax
-	andq $0xF, %rbx
 
+	shrq $4, %rax
 	cmpq $0xF, %rax
 	je .L_long_literal_length
 
@@ -89,6 +88,7 @@ LZ4_decompress_asm_loop:
 	cmpq %ostart, %rsi
 	jb .L_output_error
 
+	andq $0xF, %rbx
 	cmpq $0xF, %rbx
 	je .L_long_match_length
 
