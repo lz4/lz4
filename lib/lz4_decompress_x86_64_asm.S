@@ -172,8 +172,8 @@ LZ4_decompress_asm_loop:
 
 .L_long_match_length:
 	movzbq 0(%ip), %rdi
-	addq %rdi, %rbx
 	addq $4, %rbx
+	addq %rdi, %rbx
 	addq $1, %ip
 
 	cmpq $0xFF, %rdi
