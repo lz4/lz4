@@ -189,15 +189,15 @@ LZ4_decompress_asm_loop:
 	cmpq $16, %r11
 	jb .L_copy_short_offset_loop_header
 
-	/* TODO: Handle short offsets */
-
 .L_match_copy_loop:
 	movdqu  0(%rsi), %xmm0
 	movups %xmm0,  0(%rdi)
-	movdqu 16(%rsi), %xmm0
-	movups %xmm0, 16(%rdi)
-	addq $32, %rsi
-	addq $32, %rdi
+	movdqu 16(%rsi), %xmm1
+	movups %xmm1, 16(%rdi)
+	movdqu 32(%rsi), %xmm2
+	movups %xmm2, 32(%rdi)
+	addq $48, %rsi
+	addq $48, %rdi
 
 	cmpq %op, %rdi
 	jb .L_match_copy_loop
