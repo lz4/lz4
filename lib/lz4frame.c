@@ -143,7 +143,7 @@ static int g_debuglog_enable = 1;
 #endif
 
 
-/* unoptimized version; solves endianess & alignment issues */
+/* unoptimized version; solves endianness & alignment issues */
 static U32 LZ4F_readLE32 (const void* src)
 {
     const BYTE* const srcPtr = (const BYTE*)src;

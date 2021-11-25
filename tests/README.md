@@ -13,7 +13,7 @@ This directory contains the following programs and scripts:
 #### `test-lz4-versions.py` - script for testing lz4 interoperability between versions
 
 This script creates `versionsTest` directory to which lz4 repository is cloned.
-Then all taged (released) versions of lz4 are compiled.
+Then all tagged (released) versions of lz4 are compiled.
 In the following step interoperability between lz4 versions is checked.
 
 

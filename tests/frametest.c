@@ -51,7 +51,7 @@
 #include "xxhash.h"     /* XXH64 */
 
 
-/* unoptimized version; solves endianess & alignment issues */
+/* unoptimized version; solves endianness & alignment issues */
 static void FUZ_writeLE32 (void* dstVoidPtr, U32 value32)
 {
     BYTE* dstPtr = (BYTE*)dstVoidPtr;

@@ -139,7 +139,7 @@ compress_file(FILE* f_in, FILE* f_out)
                                         src, IN_CHUNK_SIZE,
                                         outbuff, outbufCapacity);
     } else {
-        printf("error : ressource allocation failed \n");
+        printf("error : resource allocation failed \n");
     }
 
     LZ4F_freeCompressionContext(ctx);   /* supports free on NULL */

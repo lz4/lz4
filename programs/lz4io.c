@@ -377,7 +377,7 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* con
 *   Legacy Compression
 ***************************************/
 
-/* unoptimized version; solves endianess & alignment issues */
+/* unoptimized version; solves endianness & alignment issues */
 static void LZ4IO_writeLE32 (void* p, unsigned value32)
 {
     unsigned char* const dstPtr = (unsigned char*)p;
@@ -1387,7 +1387,7 @@ static const char * LZ4IO_frameTypeNames[] = {"LZ4Frame", "LegacyFrame", "Skippa
 /* Read block headers and skip block data
    Return total blocks size for this frame including block headers,
    block checksums and content checksums.
-   returns 0 in case it can't succesfully skip block data.
+   returns 0 in case it can't successfully skip block data.
    Assumes SEEK_CUR after frame header.
  */
 static unsigned long long
@@ -1427,7 +1427,7 @@ LZ4IO_skipBlocksData(FILE* finput,
 /* For legacy frames only.
    Read block headers and skip block data.
    Return total blocks size for this frame including block headers.
-   or 0 in case it can't succesfully skip block data.
+   or 0 in case it can't successfully skip block data.
    This works as long as legacy block header size = magic number size.
    Assumes SEEK_CUR after frame header.
  */
@@ -1445,7 +1445,7 @@ static unsigned long long LZ4IO_skipLegacyBlocksData(FILE* finput)
             if ( nextCBlockSize == LEGACY_MAGICNUMBER ||
                     nextCBlockSize == LZ4IO_MAGICNUMBER ||
                     LZ4IO_isSkippableMagicNumber(nextCBlockSize)) {
-                /* Rewind back. we want cursor at the begining of next frame.*/
+                /* Rewind back. we want cursor at the beginning of next frame.*/
                 if (fseek(finput, -LZIO_LEGACY_BLOCK_HEADER_SIZE, SEEK_CUR) != 0) {
                     return 0;
                 }

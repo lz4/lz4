@@ -85,7 +85,7 @@ else
 POSIX_ENV = No
 endif
 
-# Avoid symlinks when targetting Windows or building on a Windows host
+# Avoid symlinks when targeting Windows or building on a Windows host
 ifeq ($(WINBASED),yes)
 LN_SF = cp -p
 else

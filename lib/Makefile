@@ -187,7 +187,7 @@ install: lib liblz4.pc
 	$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(includedir)/lz4frame_static.h
   endif
   ifeq ($(BUILD_SHARED),yes)
-# Traditionnally, one installs the DLLs in the bin directory as programs
+# Traditionally, one installs the DLLs in the bin directory as programs
 # search them first in their directory. This allows to not pollute system
 # directories (like c:/windows/system32), nor modify the PATH variable.
     ifeq ($(WINBASED),yes)
