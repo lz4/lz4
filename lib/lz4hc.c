@@ -201,7 +201,7 @@ LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 
 /* LZ4HC_reverseCountPattern() :
  * pattern must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!)
- * read using natural platform endianess */
+ * read using natural platform endianness */
 static unsigned
 LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
 {
@@ -211,7 +211,7 @@ LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
         if (LZ4_read32(ip-4) != pattern) break;
         ip -= 4;
     }
-    {   const BYTE* bytePtr = (const BYTE*)(&pattern) + 3; /* works for any endianess */
+    {   const BYTE* bytePtr = (const BYTE*)(&pattern) + 3; /* works for any endianness */
         while (likely(ip>iLow)) {
             if (ip[-1] != *bytePtr) break;
             ip--; bytePtr--;

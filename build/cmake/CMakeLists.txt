@@ -13,7 +13,7 @@
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
-option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c progam with legacy argument support" ON)
+option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
 
 # Parse version information
 file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MAJOR REGEX "^#define LZ4_VERSION_MAJOR +([0-9]+) +.*$")

@@ -7,7 +7,7 @@ Please note that the output file is not compatible with lz4frame and is platform
 
 ## What's the point of this example ?
 
- - Dictionary based compression for homogenous files.
+ - Dictionary based compression for homogeneous files.
  - Random access to compressed blocks.
 
 

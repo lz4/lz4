@@ -39,7 +39,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     /* No dictionary. */
     LZ4_decompress_safe_usingDict((char const*)data, dst, size,
                                   dstCapacity, NULL, 0);
-    /* Small external dictonary. */
+    /* Small external dictionary. */
     LZ4_decompress_safe_usingDict((char const*)data, dst, size,
                                   dstCapacity, smallDict, smallDictSize);
     /* Large external dictionary. */

@@ -257,7 +257,7 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 /*----    Compression    ----*/
 
-#define LZ4F_HEADER_SIZE_MIN  7   /* LZ4 Frame header size can vary, depending on selected paramaters */
+#define LZ4F_HEADER_SIZE_MIN  7   /* LZ4 Frame header size can vary, depending on selected parameters */
 #define LZ4F_HEADER_SIZE_MAX 19
 
 /* Size in bytes of a block header in little-endian format. Highest bit indicates if block data is uncompressed */
