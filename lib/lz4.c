@@ -517,7 +517,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
     assert(val != 0);
     if (LZ4_isLittleEndian()) {
         if (sizeof(val) == 8) {
-#       if defined(_MSC_VER) && (_MSC_VER >= 1800) && defined(_M_AMD64) && !defined(LZ4_FORCE_SW_BITCOUNT)
+#       if defined(_MSC_VER) && (_MSC_VER >= 1800) && (defined(_M_AMD64) && !defined(_M_ARM64EC)) && !defined(LZ4_FORCE_SW_BITCOUNT)
 #         if defined(__clang__) && (__clang_major__ < 10)
             /* Avoid undefined clang-cl intrinics issue.
              * See https://github.com/lz4/lz4/pull/1017 for details. */
