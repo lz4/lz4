@@ -448,6 +448,7 @@ test-lz4-opt-parser: lz4 datagen
 	$(DATAGEN) -g256K      | $(LZ4) -12B4D   | $(LZ4) -t
 	$(DATAGEN) -g512K -P25 | $(LZ4) -12BD    | $(LZ4) -t
 	$(DATAGEN) -g1M        | $(LZ4) -12B5    | $(LZ4) -t
+	$(DATAGEN) -g1M -s2    | $(LZ4) -12B4D   | $(LZ4) -t
 	$(DATAGEN) -g2M -P99   | $(LZ4) -11B4D   | $(LZ4) -t
 	$(DATAGEN) -g4M        | $(LZ4) -11vq    | $(LZ4) -qt
 	$(DATAGEN) -g8M        | $(LZ4) -11B4    | $(LZ4) -t
