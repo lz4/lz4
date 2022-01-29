@@ -128,7 +128,7 @@ class TestVerbose(unittest.TestCase):
                     end = i
         self.vinfo_list.append(VerboseFileInfo(output[start:end]))
         # Populate file_frame_map as a reference of the expected info
-        concat_file_list = glob.glob("/tmp/test_list_[!concat]*.lz4")
+        concat_file_list = glob.glob(f"{TEMP}/test_list_[!concat]*.lz4")
         # One of the files has 2 frames so duplicate it in this list to map each frame 1 to a single file
         for i, filename in enumerate(concat_file_list):
             if "2f--content-size" in filename:
