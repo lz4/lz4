@@ -5,6 +5,7 @@ import glob
 import os
 import tempfile
 import unittest
+import sys
 
 SIZES = [3, 11]  # Always 2 sizes
 MIB = 1048576
@@ -278,5 +279,6 @@ def generate_files():
 if __name__ == '__main__':
     cleanup()
     generate_files()
-    unittest.main(verbosity=2, exit=False)
+    ret = unittest.main(verbosity=2, exit=False)
     cleanup(silent=True)
+    sys.exit(not ret.result.wasSuccessful())
