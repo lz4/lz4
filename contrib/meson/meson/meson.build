@@ -28,13 +28,8 @@ lz4_version = meson.project_version()
 
 lz4_h_file = join_paths(meson.current_source_dir(), '../../../lib/lz4.h')
 GetLz4LibraryVersion_py = find_program('GetLz4LibraryVersion.py', native : true)
-r = run_command(GetLz4LibraryVersion_py, lz4_h_file)
-if r.returncode() == 0
-  lz4_version = r.stdout().strip()
-  message('Project version is now: @0@'.format(lz4_version))
-else
-  error('Cannot find project version in @0@'.format(lz4_h_file))
-endif
+lz4_version = run_command(GetLz4LibraryVersion_py, lz4_h_file, check: true).stdout().strip()
+message('Project version is now: @0@'.format(lz4_version))
 
 lz4_libversion = lz4_version
 
