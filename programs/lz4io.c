@@ -1639,7 +1639,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         /* Get file info */
         LZ4IO_cFileInfo_t cfinfo = LZ4IO_INIT_CFILEINFO;
         cfinfo.fileName = LZ4IO_baseName(inFileNames[idx]);
-        if (!UTIL_isRegFile(inFileNames[idx])) {
+        if (strcmp(inFileNames[idx], stdinmark) == 0 ? !UTIL_isRegFD(0) : !UTIL_isRegFile(inFileNames[idx])) {
             DISPLAYLEVEL(1, "lz4: %s is not a regular file \n", inFileNames[idx]);
             return 0;
         }
