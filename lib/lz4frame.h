@@ -1,5 +1,5 @@
 /*
-   LZ4 auto-framing library
+   LZ4F - LZ4-Frame library
    Header File
    Copyright (C) 2011-2020, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
@@ -39,7 +39,7 @@
  * LZ4F also offers streaming capabilities.
  *
  * lz4.h is not required when using lz4frame.h,
- * except to extract common constant such as LZ4_VERSION_NUMBER.
+ * except to extract common constants such as LZ4_VERSION_NUMBER.
  * */
 
 #ifndef LZ4F_H_09782039843
@@ -210,7 +210,7 @@ LZ4FLIB_API int LZ4F_compressionLevel_max(void);   /* v1.8.0+ */
  *  Returns the maximum possible compressed size with LZ4F_compressFrame() given srcSize and preferences.
  * `preferencesPtr` is optional. It can be replaced by NULL, in which case, the function will assume default preferences.
  *  Note : this result is only usable with LZ4F_compressFrame().
- *         It may also be used with LZ4F_compressUpdate() _if no flush() operation_ is performed.
+ *         It may also be relevant to LZ4F_compressUpdate() _only if_ no flush() operation is ever performed.
  */
 LZ4FLIB_API size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
@@ -230,7 +230,7 @@ LZ4FLIB_API size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
 *  Advanced compression functions
 *************************************/
 typedef struct LZ4F_cctx_s LZ4F_cctx;   /* incomplete type */
-typedef LZ4F_cctx* LZ4F_compressionContext_t;   /* for compatibility with previous API version */
+typedef LZ4F_cctx* LZ4F_compressionContext_t;  /* for compatibility with older APIs, prefer using LZ4F_cctx */
 
 typedef struct {
   unsigned stableSrc;    /* 1 == src content will remain present on future calls to LZ4F_compress(); skip copying src content within tmp buffer */
