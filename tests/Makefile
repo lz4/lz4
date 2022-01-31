@@ -174,14 +174,22 @@ test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install 
 test32: CFLAGS+=-m32
 test32: test
 
+.PHONY: test-amalgamation
 test-amalgamation: lz4_all.o
 
 lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
 	$(CAT) $^ > $@
 
+.PHONY: test-install
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
 
+.PHONY: test-compile-with-lz4-memory-usage
+test-compile-with-lz4-memory-usage:
+	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MIN' $(MAKE) all
+	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MAX' $(MAKE) all
+
+.PHONY: test-lz4-sparse
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
 	$(DATAGEN) -g5M  -P100 > tmplsdg5M

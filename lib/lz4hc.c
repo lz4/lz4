@@ -277,6 +277,8 @@ LZ4HC_InsertAndGetWiderMatch (
             /* do nothing */
         } else if (matchIndex >= dictLimit) {   /* within current Prefix */
             const BYTE* const matchPtr = base + matchIndex;
+            DEBUGLOG(2, "matchPtr = %p", matchPtr);
+            DEBUGLOG(2, "lowPrefixPtr = %p", lowPrefixPtr);
             assert(matchPtr >= lowPrefixPtr);
             assert(matchPtr < ip);
             assert(longest >= 1);

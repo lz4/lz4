@@ -116,17 +116,28 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
 /*-************************************
 *  Tuning parameter
 **************************************/
+#define LZ4_MEMORY_USAGE_MIN 10
+#define LZ4_MEMORY_USAGE_DEFAULT 14
+#define LZ4_MEMORY_USAGE_MAX 20
+
 /*!
  * LZ4_MEMORY_USAGE :
- * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
- * Increasing memory usage improves compression ratio.
- * Reduced memory usage may improve speed, thanks to better cache locality.
+ * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
+ * Increasing memory usage improves compression ratio, at the cost of speed.
+ * Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
  * Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  */
 #ifndef LZ4_MEMORY_USAGE
-# define LZ4_MEMORY_USAGE 14
+# define LZ4_MEMORY_USAGE LZ4_MEMORY_USAGE_DEFAULT
 #endif
 
+#if (LZ4_MEMORY_USAGE < LZ4_MEMORY_USAGE_MIN)
+#  error "LZ4_MEMORY_USAGE is too small !"
+#endif
+
+#if (LZ4_MEMORY_USAGE > LZ4_MEMORY_USAGE_MAX)
+#  error "LZ4_MEMORY_USAGE is too large !"
+#endif
 
 /*-************************************
 *  Simple Functions

@@ -485,12 +485,12 @@ struct LZ4F_CDict_s {
  *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
  *  LZ4F_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
  *  LZ4F_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
- * `dictBuffer` can be released after LZ4F_CDict creation, since its content is copied within CDict
+ * @dictBuffer can be released after LZ4F_CDict creation, since its content is copied within CDict
  * @return : digested dictionary for compression, or NULL if failed */
 LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
-    LZ4F_CDict* cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
+    LZ4F_CDict* const cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
     DEBUGLOG(4, "LZ4F_createCDict");
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
