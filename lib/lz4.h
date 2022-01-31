@@ -116,6 +116,10 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
 /*-************************************
 *  Tuning parameter
 **************************************/
+#define LZ4_MEMORY_USAGE_MIN 10
+#define LZ4_MEMORY_USAGE_DEFAULT 14
+#define LZ4_MEMORY_USAGE_MAX 20
+
 /*!
  * LZ4_MEMORY_USAGE :
  * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
@@ -124,11 +128,8 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
  * Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  */
 #ifndef LZ4_MEMORY_USAGE
-# define LZ4_MEMORY_USAGE 14
+# define LZ4_MEMORY_USAGE LZ4_MEMORY_USAGE_DEFAULT
 #endif
-
-#define LZ4_MEMORY_USAGE_MIN 10
-#define LZ4_MEMORY_USAGE_MAX 20
 
 #if (LZ4_MEMORY_USAGE < LZ4_MEMORY_USAGE_MIN)
 #  error "LZ4_MEMORY_USAGE is too small !"
