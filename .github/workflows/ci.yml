@@ -236,6 +236,13 @@ jobs:
     - name: LZ4 frame test (32-bit)
       run: make V=1 -C tests test-frametest32
 
+  lz4-memory-usage:
+    name: test different values of LZ4_MEMORY_USAGE
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: LZ4_MEMORY_USAGE
+      run: make V=1 -C tests test-compile-with-lz4-memory-usage
 
   # Custom LZ4_DISTANCE_MAX ; lz4-wlib (CLI linked to dynamic library); LZ4_USER_MEMORY_FUNCTIONS
   lz4-custom-distance:
@@ -244,7 +251,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
 
-    - name: custom LZ4_DISTANCE_MAX
+    - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
         MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
         make V=1 clean
@@ -391,7 +398,6 @@ jobs:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
     - name: unicode lint
       run: bash ./tests/unicode_lint.sh
-
 
   lz4-examples:
     name: make examples

@@ -317,6 +317,7 @@ UTIL_STATIC void UTIL_waitForNextTick(void)
 
 
 UTIL_STATIC int UTIL_isRegFile(const char* infilename);
+UTIL_STATIC int UTIL_isRegFD(int fd);
 
 
 UTIL_STATIC int UTIL_setFileStat(const char *filename, stat_t *statbuf)
@@ -352,6 +353,19 @@ UTIL_STATIC int UTIL_setFileStat(const char *filename, stat_t *statbuf)
 }
 
 
+UTIL_STATIC int UTIL_getFDStat(int fd, stat_t *statbuf)
+{
+    int r;
+#if defined(_MSC_VER)
+    r = _fstat64(fd, statbuf);
+    if (r || !(statbuf->st_mode & S_IFREG)) return 0;   /* No good... */
+#else
+    r = fstat(fd, statbuf);
+    if (r || !S_ISREG(statbuf->st_mode)) return 0;   /* No good... */
+#endif
+    return 1;
+}
+
 UTIL_STATIC int UTIL_getFileStat(const char* infilename, stat_t *statbuf)
 {
     int r;
@@ -363,6 +377,17 @@ UTIL_STATIC int UTIL_getFileStat(const char* infilename, stat_t *statbuf)
     if (r || !S_ISREG(statbuf->st_mode)) return 0;   /* No good... */
 #endif
     return 1;
+}
+
+
+UTIL_STATIC int UTIL_isRegFD(int fd)
+{
+    stat_t statbuf;
+#ifdef _WIN32
+    /* Windows runtime library always open file descriptors 0, 1 and 2 in text mode, therefore we can't use them for binary I/O */
+    if(fd < 3) return 0;
+#endif
+    return UTIL_getFDStat(fd, &statbuf); /* Only need to know whether it is a regular file */
 }
 
 
