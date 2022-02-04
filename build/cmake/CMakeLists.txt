@@ -104,7 +104,7 @@ set(LZ4_LIBRARIES_BUILT)
 if(BUILD_SHARED_LIBS)
   add_library(lz4_shared SHARED ${LZ4_SOURCES})
   target_include_directories(lz4_shared
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    PUBLIC $<BUILD_INTERFACE:${LZ4_LIB_SOURCE_DIR}>
     INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(lz4_shared PROPERTIES
     OUTPUT_NAME lz4
@@ -123,7 +123,7 @@ if(BUILD_STATIC_LIBS)
   endif()
   add_library(lz4_static STATIC ${LZ4_SOURCES})
   target_include_directories(lz4_static
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    PUBLIC $<BUILD_INTERFACE:${LZ4_LIB_SOURCE_DIR}>
     INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(lz4_static PROPERTIES
     OUTPUT_NAME ${STATIC_LIB_NAME}
