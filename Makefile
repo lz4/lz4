@@ -84,11 +84,12 @@ clean:
 	$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
 	$(MAKE) -C contrib/gen_manual $@ > $(VOID)
 	$(RM) lz4$(EXT)
+	$(RM) -r $(CMAKE_BUILD_DIR)
 	@echo Cleaning completed
 
 
 #-----------------------------------------------------------------------------
-# make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
+# make install is validated only for Posix environments
 #-----------------------------------------------------------------------------
 ifeq ($(POSIX_ENV),Yes)
 HOST_OS = POSIX
@@ -102,21 +103,24 @@ install uninstall:
 travis-install:
 	$(MAKE) -j1 install DESTDIR=~/install_test_dir
 
-.PHONY: cmake
-cmake:
-	cd build/cmake; cmake $(CMAKE_PARAMS) CMakeLists.txt; $(MAKE)
-
 endif   # POSIX_ENV
 
 
+CMAKE ?= cmake
+CMAKE_BUILD_DIR ?= build/cmake/build
 ifneq (,$(filter MSYS%,$(shell $(UNAME))))
 HOST_OS = MSYS
 CMAKE_PARAMS = -G"MSYS Makefiles"
 endif
 
+.PHONY: cmake
+cmake:
+	mkdir -p $(CMAKE_BUILD_DIR)
+	cd $(CMAKE_BUILD_DIR); $(CMAKE) $(CMAKE_PARAMS) ..; $(CMAKE) --build .
+
 
 #------------------------------------------------------------------------
-#make tests validated only for MSYS, Linux, OSX, kFreeBSD and Hurd targets
+# make tests validated only for MSYS and Posix environments
 #------------------------------------------------------------------------
 ifneq (,$(filter $(HOST_OS),MSYS POSIX))
 
