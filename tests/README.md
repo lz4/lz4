@@ -13,7 +13,7 @@ This directory contains the following programs and scripts:
 #### `test-lz4-versions.py` - script for testing lz4 interoperability between versions
 
 This script creates `versionsTest` directory to which lz4 repository is cloned.
-Then all taged (released) versions of lz4 are compiled.
+Then all tagged (released) versions of lz4 are compiled.
 In the following step interoperability between lz4 versions is checked.
 
 
@@ -37,7 +37,7 @@ Additional remarks:
 The example usage with two test files, one e-mail address, and with an additional message:
 ```
 ./test-lz4-speed.py "silesia.tar calgary.tar" "email@gmail.com" --message "tested on my laptop" --sleepTime 60
-``` 
+```
 
 To run the script in background please use:
 ```

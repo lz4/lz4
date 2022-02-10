@@ -81,7 +81,7 @@ FUZZ_STATIC uint32_t FUZZ_rand(uint32_t *state) {
     return rand32 >> 5;
 }
 
-/* Returns a random numer in the range [min, max]. */
+/* Returns a random number in the range [min, max]. */
 FUZZ_STATIC uint32_t FUZZ_rand32(uint32_t *state, uint32_t min, uint32_t max) {
     uint32_t random = FUZZ_rand(state);
     return min + (random % (max - min + 1));

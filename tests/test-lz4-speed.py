@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 
 #
 # Copyright (c) 2016-2020, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.

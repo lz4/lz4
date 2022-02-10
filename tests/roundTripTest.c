@@ -104,7 +104,7 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
                           int clevel)
 {
     int const proposed_clevel = clevel ? clevel : select_clevel(srcBuff, srcSize);
-    int const selected_clevel = proposed_clevel < 0 ? -proposed_clevel : proposed_clevel;   /* if level < 0, it becomes an accelearion value */
+    int const selected_clevel = proposed_clevel < 0 ? -proposed_clevel : proposed_clevel;   /* if level < 0, it becomes an acceleration value */
     compressFn compress = selected_clevel >= LZ4HC_CLEVEL_MIN ? LZ4_compress_HC : LZ4_compress_fast;
     int const cSize = compress((const char*)srcBuff, (char*)compressedBuff, (int)srcSize, (int)compressedBuffCapacity, selected_clevel);
     CONTROL_MSG(cSize == 0, "Compression error !");
@@ -126,7 +126,7 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
 
 static void roundTripCheck(const void* srcBuff, size_t srcSize, int clevel)
 {
-    size_t const cBuffSize = LZ4_compressBound((int)srcSize);
+    size_t const cBuffSize = LZ4_COMPRESSBOUND(srcSize);
     void* const cBuff = malloc(cBuffSize);
     void* const rBuff = malloc(cBuffSize);
 

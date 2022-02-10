@@ -145,14 +145,14 @@ checkTag: checkTag.c $(LZ4DIR)/lz4.h
 ifeq ($(POSIX_ENV),Yes)
 
 MD5:=md5sum
-ifneq (,$(filter $(shell uname), Darwin ))
+ifneq (,$(filter $(shell $(UNAME)), Darwin ))
 MD5:=md5 -r
 endif
 
 # note : we should probably settle on a single compare utility
 CMP:=cmp
 DIFF:=diff
-ifneq (,$(filter $(shell uname),SunOS))
+ifneq (,$(filter $(shell $(UNAME)),SunOS))
 DIFF:=gdiff
 endif
 
@@ -174,14 +174,22 @@ test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install 
 test32: CFLAGS+=-m32
 test32: test
 
+.PHONY: test-amalgamation
 test-amalgamation: lz4_all.o
 
 lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
 	$(CAT) $^ > $@
 
+.PHONY: test-install
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
 
+.PHONY: test-compile-with-lz4-memory-usage
+test-compile-with-lz4-memory-usage:
+	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MIN' $(MAKE) all
+	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MAX' $(MAKE) all
+
+.PHONY: test-lz4-sparse
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
 	$(DATAGEN) -g5M  -P100 > tmplsdg5M
@@ -360,8 +368,9 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(DIFF) -q tmp-tlb-hw tmp-tlb4
 	$(LZ4) -f tmp-tlb-hw
 	$(LZ4) --list tmp-tlb-hw.lz4           # test --list on valid single-frame file
+	$(LZ4) --list < tmp-tlb-hw.lz4         # test --list from stdin (file only)
 	$(CAT) tmp-tlb-hw >> tmp-tlb-hw.lz4
-	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
+	! $(LZ4) -f tmp-tlb-hw.lz4             # uncompress valid frame followed by invalid data (must fail now)
 	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
 	# $(DATAGEN) -g20KB generates the same file every single time
 	# cannot save output of $(DATAGEN) -g20KB as input file to lz4 because the following shell commands are run before $(DATAGEN) -g20KB
@@ -448,6 +457,7 @@ test-lz4-opt-parser: lz4 datagen
 	$(DATAGEN) -g256K      | $(LZ4) -12B4D   | $(LZ4) -t
 	$(DATAGEN) -g512K -P25 | $(LZ4) -12BD    | $(LZ4) -t
 	$(DATAGEN) -g1M        | $(LZ4) -12B5    | $(LZ4) -t
+	$(DATAGEN) -g1M -s2    | $(LZ4) -12B4D   | $(LZ4) -t
 	$(DATAGEN) -g2M -P99   | $(LZ4) -11B4D   | $(LZ4) -t
 	$(DATAGEN) -g4M        | $(LZ4) -11vq    | $(LZ4) -qt
 	$(DATAGEN) -g8M        | $(LZ4) -11B4    | $(LZ4) -t

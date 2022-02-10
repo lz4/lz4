@@ -143,7 +143,7 @@ static int g_debuglog_enable = 1;
 #endif
 
 
-/* unoptimized version; solves endianess & alignment issues */
+/* unoptimized version; solves endianness & alignment issues */
 static U32 LZ4F_readLE32 (const void* src)
 {
     const BYTE* const srcPtr = (const BYTE*)src;
@@ -485,12 +485,12 @@ struct LZ4F_CDict_s {
  *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
  *  LZ4F_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
  *  LZ4F_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
- * `dictBuffer` can be released after LZ4F_CDict creation, since its content is copied within CDict
+ * @dictBuffer can be released after LZ4F_CDict creation, since its content is copied within CDict
  * @return : digested dictionary for compression, or NULL if failed */
 LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
-    LZ4F_CDict* cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
+    LZ4F_CDict* const cdict = (LZ4F_CDict*) ALLOC(sizeof(*cdict));
     DEBUGLOG(4, "LZ4F_createCDict");
     if (!cdict) return NULL;
     if (dictSize > 64 KB) {
@@ -589,6 +589,16 @@ static void LZ4F_initStream(void* ctx,
     }
 }
 
+static int ctxTypeID_to_size(int ctxTypeID) {
+    switch(ctxTypeID) {
+    case 1:
+        return LZ4_sizeofState();
+    case 2:
+        return LZ4_sizeofStateHC();
+    default:
+        return 0;
+    }
+}
 
 /*! LZ4F_compressBegin_usingCDict() :
  *  init streaming compression AND writes frame header into @dstBuffer.
@@ -611,7 +621,9 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
 
     /* cctx Management */
     {   U16 const ctxTypeID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;
-        if (cctxPtr->lz4CtxAlloc < ctxTypeID) {
+        int requiredSize = ctxTypeID_to_size(ctxTypeID);
+        int allocatedSize = ctxTypeID_to_size(cctxPtr->lz4CtxAlloc);
+        if (allocatedSize < requiredSize) {
             /* not enough space allocated */
             FREEMEM(cctxPtr->lz4CtxPtr, sizeof(LZ4_stream_t));
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {

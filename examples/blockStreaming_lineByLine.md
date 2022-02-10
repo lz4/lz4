@@ -1,7 +1,7 @@
 ﻿# LZ4 Streaming API Example : Line by Line Text Compression
 by *Takayuki Matsuoka*
 
-`blockStreaming_lineByLine.c` is LZ4 Straming API example which implements line by line incremental (de)compression.
+`blockStreaming_lineByLine.c` is LZ4 Streaming API example which implements line by line incremental (de)compression.
 
 Please note the following restrictions :
 
@@ -117,6 +117,6 @@ Decompression will do reverse order.
  - Read compressed line from the file to buffer.
  - Decompress it to the ringbuffer.
  - Output decompressed plain text line to the file.
- - Forward ringbuffer offset. If offset exceedes end of the ringbuffer, reset it.
+ - Forward ringbuffer offset. If offset exceeds end of the ringbuffer, reset it.
 
 Continue these procedure to the end of the compressed file.

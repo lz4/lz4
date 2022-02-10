@@ -52,13 +52,20 @@ DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS   += $(DEBUGFLAGS) $(MOREFLAGS)
+
+include ../Makefile.inc
+
+OS_VERSION ?= $(UNAME) -r
+ifeq ($(TARGET_OS)$(shell $(OS_VERSION)),SunOS5.10)
+LDFLAGS  += -lrt
+endif
+
 FLAGS     = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 LZ4_VERSION=$(LIBVER)
 MD2ROFF   = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
-include ../Makefile.inc
 
 default: lz4-release
 
@@ -164,13 +171,13 @@ MAN1DIR     ?= $(mandir)/man1
 man1dir     ?= $(MAN1DIR)
 
 install: lz4
-	@echo Installing binaries
+	@echo Installing binaries in $(DESTDIR)$(bindir)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
 	$(INSTALL_PROGRAM) lz4$(EXT) $(DESTDIR)$(bindir)/lz4$(EXT)
 	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4c$(EXT)
 	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4cat$(EXT)
 	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/unlz4$(EXT)
-	@echo Installing man pages
+	@echo Installing man pages in $(DESTDIR)$(man1dir)
 	$(INSTALL_DATA) lz4.1 $(DESTDIR)$(man1dir)/lz4.1
 	$(LN_SF) lz4.1 $(DESTDIR)$(man1dir)/lz4c.1
 	$(LN_SF) lz4.1 $(DESTDIR)$(man1dir)/lz4cat.1
