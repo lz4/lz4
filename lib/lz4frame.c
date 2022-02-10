@@ -481,6 +481,15 @@ struct LZ4F_CDict_s {
     LZ4_streamHC_t* HCCtx;
 }; /* typedef'd to LZ4F_CDict within lz4frame_static.h */
 
+static void LZ4F_freeCDictWithSize(LZ4F_CDict* cdict, size_t size)
+{
+    assert(cdict != NULL);
+    FREEMEM(cdict->dictContent, size);
+    LZ4_freeStream(cdict->fastCtx);
+    LZ4_freeStreamHC(cdict->HCCtx);
+    FREEMEM(cdict, sizeof(LZ4F_CDict));
+}
+
 /*! LZ4F_createCDict() :
  *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
  *  LZ4F_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
@@ -501,7 +510,7 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
     cdict->fastCtx = LZ4_createStream();
     cdict->HCCtx = LZ4_createStreamHC();
     if (!cdict->dictContent || !cdict->fastCtx || !cdict->HCCtx) {
-        LZ4F_freeCDict(cdict);
+        LZ4F_freeCDictWithSize(cdict, dictSize);
         return NULL;
     }
     memcpy(cdict->dictContent, dictStart, dictSize);
@@ -514,7 +523,7 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 void LZ4F_freeCDict(LZ4F_CDict* cdict)
 {
     if (cdict==NULL) return;  /* support free on NULL */
-    FREEMEM(cdict->dictContent, cdict->fastCtx->internal_donotuse.dictSize);
+    LZ4F_freeCDictWithSize(cdict,  cdict->fastCtx->internal_donotuse.dictSize);
     LZ4_freeStream(cdict->fastCtx);
     LZ4_freeStreamHC(cdict->HCCtx);
     FREEMEM(cdict, sizeof(LZ4F_CDict));
