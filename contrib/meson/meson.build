@@ -16,6 +16,7 @@ project('lz4', ['c'],
   default_options : ['c_std=c99',
     'buildtype=release'],
   version: 'DUMMY',
-  meson_version: '>=0.47.0')
+  meson_version: '>=0.48.0')
 
 subdir('meson')
+

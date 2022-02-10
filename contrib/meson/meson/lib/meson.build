@@ -35,6 +35,8 @@ liblz4 = library('lz4',
   liblz4_sources,
   include_directories: liblz4_includes,
   c_args: liblz4_c_args,
+  gnu_symbol_visibility: 'hidden',
+  pic: true,
   install: true,
   version: lz4_libversion)
 
