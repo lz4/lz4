@@ -201,15 +201,15 @@ void  LZ4_free(void* p);
 # define ALLOC(s)          LZ4_malloc(s)
 # define ALLOC_AND_ZERO(s) LZ4_calloc(1,s)
 #ifdef LZ4_FREE_ACCEPTS_SIZE
-# define FREEMEM(p)        LZ4_free(p,sizeof(*(p)))
+# define FREEMEM(p,s)      LZ4_free((p),(s))
 #else
-# define FREEMEM(p)        LZ4_free(p)
+# define FREEMEM(p,s)      (void)(s); LZ4_free((p))
 #endif
 #else
 # include <stdlib.h>   /* malloc, calloc, free */
 # define ALLOC(s)          malloc(s)
 # define ALLOC_AND_ZERO(s) calloc(1,s)
-# define FREEMEM(p)        free(p)
+# define FREEMEM(p,s)      (void)(s); free((p))
 #endif
 
 #include <string.h>   /* memset, memcpy */
@@ -1376,7 +1376,7 @@ int LZ4_compress_fast(const char* source, char* dest, int inputSize, int maxOutp
     result = LZ4_compress_fast_extState(ctxPtr, source, dest, inputSize, maxOutputSize, acceleration);
 
 #if (LZ4_HEAPMODE)
-    FREEMEM(ctxPtr);
+    FREEMEM(ctxPtr, sizeof(LZ4_stream_t));
 #endif
     return result;
 }
@@ -1421,7 +1421,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
     int result = LZ4_compress_destSize_extState(ctx, src, dst, srcSizePtr, targetDstSize);
 
 #if (LZ4_HEAPMODE)
-    FREEMEM(ctx);
+    FREEMEM(ctx, sizeof(LZ4_stream_t));
 #endif
     return result;
 }
@@ -1478,7 +1478,7 @@ int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     if (!LZ4_stream) return 0;   /* support free on NULL */
     DEBUGLOG(5, "LZ4_freeStream %p", LZ4_stream);
-    FREEMEM(LZ4_stream);
+    FREEMEM(LZ4_stream, sizeof(LZ4_stream_t));
     return (0);
 }
 
@@ -2293,7 +2293,7 @@ LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
     if (LZ4_stream == NULL) { return 0; }  /* support free on NULL */
-    FREEMEM(LZ4_stream);
+    FREEMEM(LZ4_stream, sizeof(LZ4_streamDecode_t));
     return 0;
 }
 

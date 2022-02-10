@@ -963,7 +963,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
 #endif
     cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    FREEMEM(statePtr);
+    FREEMEM(statePtr, sizeof(LZ4_streamHC_t));
 #endif
     return cSize;
 }
@@ -997,7 +997,7 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 {
     DEBUGLOG(4, "LZ4_freeStreamHC(%p)", LZ4_streamHCPtr);
     if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
-    FREEMEM(LZ4_streamHCPtr);
+    FREEMEM(LZ4_streamHCPtr, sizeof(LZ4_streamHC_t));
     return 0;
 }
 
@@ -1228,7 +1228,7 @@ void* LZ4_createHC (const char* inputBuffer)
 int LZ4_freeHC (void* LZ4HC_Data)
 {
     if (!LZ4HC_Data) return 0;  /* support free on NULL */
-    FREEMEM(LZ4HC_Data);
+    FREEMEM(LZ4HC_Data, sizeof(LZ4_streamHC_t));
     return 0;
 }
 
@@ -1615,7 +1615,7 @@ if (limit == fillOutput) {
 }
 _return_label:
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-     FREEMEM(opt);
+     FREEMEM(opt, sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
 #endif
      return retval;
 }

@@ -75,7 +75,7 @@
 #  include <stdlib.h>   /* malloc, calloc, free */
 #  define ALLOC(s)          malloc(s)
 #  define ALLOC_AND_ZERO(s) calloc(1,(s))
-#  define FREEMEM(p)        free(p)
+#  define FREEMEM(p,s)      (void)(s); free((p))
 #endif
 
 #include <string.h>   /* memset, memcpy, memmove */
@@ -464,7 +464,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
     if (preferencesPtr != NULL &&
         preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN)
     {
-        FREEMEM(cctxPtr->lz4CtxPtr);
+        FREEMEM(cctxPtr->lz4CtxPtr, sizeof(LZ4_streamHC_t));
     }
 #endif
     return result;
@@ -514,10 +514,10 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
 void LZ4F_freeCDict(LZ4F_CDict* cdict)
 {
     if (cdict==NULL) return;  /* support free on NULL */
-    FREEMEM(cdict->dictContent);
+    FREEMEM(cdict->dictContent, cdict->fastCtx->internal_donotuse.dictSize);
     LZ4_freeStream(cdict->fastCtx);
     LZ4_freeStreamHC(cdict->HCCtx);
-    FREEMEM(cdict);
+    FREEMEM(cdict, sizeof(LZ4F_CDict));
 }
 
 
@@ -550,9 +550,10 @@ LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** LZ4F_compressionConte
 LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctxPtr)
 {
     if (cctxPtr != NULL) {  /* support free on NULL */
-       FREEMEM(cctxPtr->lz4CtxPtr);  /* note: LZ4_streamHC_t and LZ4_stream_t are simple POD types */
-       FREEMEM(cctxPtr->tmpBuff);
-       FREEMEM(cctxPtr);
+       const size_t lz4CtxAllocSize = (cctxPtr->lz4CtxAlloc == 2) ? sizeof(LZ4_streamHC_t) : sizeof(LZ4_stream_t);
+       FREEMEM(cctxPtr->lz4CtxPtr, lz4CtxAllocSize);  /* note: LZ4_streamHC_t and LZ4_stream_t are simple POD types */
+       FREEMEM(cctxPtr->tmpBuff, cctxPtr->maxBufferSize);
+       FREEMEM(cctxPtr, sizeof(LZ4F_cctx_t));
     }
 
     return LZ4F_OK_NoError;
@@ -612,7 +613,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     {   U16 const ctxTypeID = (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;
         if (cctxPtr->lz4CtxAlloc < ctxTypeID) {
             /* not enough space allocated */
-            FREEMEM(cctxPtr->lz4CtxPtr);
+            FREEMEM(cctxPtr->lz4CtxPtr, sizeof(LZ4_stream_t));
             if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
                 cctxPtr->lz4CtxPtr = LZ4_createStream();
             } else {
@@ -645,8 +646,8 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
                 cctxPtr->maxBlockSize + ((cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 128 KB : 0);
 
         if (cctxPtr->maxBufferSize < requiredBuffSize) {
+            FREEMEM(cctxPtr->tmpBuff, cctxPtr->maxBufferSize);
             cctxPtr->maxBufferSize = 0;
-            FREEMEM(cctxPtr->tmpBuff);
             cctxPtr->tmpBuff = (BYTE*)ALLOC_AND_ZERO(requiredBuffSize);
             if (cctxPtr->tmpBuff == NULL) return err0r(LZ4F_ERROR_allocation_failed);
             cctxPtr->maxBufferSize = requiredBuffSize;
@@ -1093,9 +1094,9 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx)
     LZ4F_errorCode_t result = LZ4F_OK_NoError;
     if (dctx != NULL) {   /* can accept NULL input, like free() */
       result = (LZ4F_errorCode_t)dctx->dStage;
-      FREEMEM(dctx->tmpIn);
-      FREEMEM(dctx->tmpOutBuffer);
-      FREEMEM(dctx);
+      FREEMEM(dctx->tmpIn, dctx->tmpInSize);
+      FREEMEM(dctx->tmpOutBuffer, dctx->maxBufferSize);
+      FREEMEM(dctx, sizeof(LZ4F_dctx));
     }
     return result;
 }
@@ -1461,12 +1462,13 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             {   size_t const bufferNeeded = dctx->maxBlockSize
                     + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
                 if (bufferNeeded > dctx->maxBufferSize) {   /* tmp buffers too small */
+                    FREEMEM(dctx->tmpIn, dctx->tmpInSize);
+                    int maxBufferSize = dctx->maxBufferSize;
                     dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
-                    FREEMEM(dctx->tmpIn);
                     dctx->tmpIn = (BYTE*)ALLOC(dctx->maxBlockSize + BFSize /* block checksum */);
                     if (dctx->tmpIn == NULL)
                         return err0r(LZ4F_ERROR_allocation_failed);
-                    FREEMEM(dctx->tmpOutBuffer);
+                    FREEMEM(dctx->tmpOutBuffer, maxBufferSize);
                     dctx->tmpOutBuffer= (BYTE*)ALLOC(bufferNeeded);
                     if (dctx->tmpOutBuffer== NULL)
                         return err0r(LZ4F_ERROR_allocation_failed);
