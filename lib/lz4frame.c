@@ -1475,7 +1475,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
                 if (bufferNeeded > dctx->maxBufferSize) {   /* tmp buffers too small */
                     FREEMEM(dctx->tmpIn, dctx->tmpInSize);
-                    int maxBufferSize = dctx->maxBufferSize;
+                    size_t maxBufferSize = dctx->maxBufferSize;
                     dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
                     dctx->tmpIn = (BYTE*)ALLOC(dctx->maxBlockSize + BFSize /* block checksum */);
                     if (dctx->tmpIn == NULL)
