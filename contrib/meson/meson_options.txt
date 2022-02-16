@@ -1,5 +1,6 @@
 # #############################################################################
 # Copyright (c) 2018-present        lzutao <taolzu(at)gmail.com>
+# Copyright (c) 2022-present        Tristan Partin <tristan(at)partin.io>
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -7,18 +8,17 @@
 # in the COPYING file in the root directory of this source tree).
 # #############################################################################
 
-# Read guidelines from https://wiki.gnome.org/Initiatives/GnomeGoals/MesonPorting
-
-option('debug_level', type: 'integer', min: 0, max: 7, value: 1,
+option('debug-level', type: 'integer', min: 0, max: 7, value: 1,
   description: 'Enable run-time debug. See lib/lz4hc.c')
-option('backtrace', type: 'boolean', value: false,
-  description: 'Display a stack backtrace when execution generates a runtime exception')
-
-option('bin_programs', type: 'boolean', value: false,
+option('unstable', type: 'boolean', value: false,
+  description: 'Expose unstable interfaces')
+option('programs', type: 'boolean', value: false,
   description: 'Enable programs build')
-option('bin_tests', type: 'boolean', value: false,
+option('tests', type: 'boolean', value: false,
   description: 'Enable tests build')
-option('bin_contrib', type: 'boolean', value: false,
+option('contrib', type: 'boolean', value: false,
   description: 'Enable contrib build')
-option('bin_examples', type: 'boolean', value: false,
+option('examples', type: 'boolean', value: false,
   description: 'Enable examples build')
+option('memory-usage', type: 'integer', min: 0, value: 0,
+  description: 'See LZ4_MEMORY_USAGE. 0 means use the LZ4 default')
