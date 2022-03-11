@@ -608,15 +608,16 @@ struct LZ4_stream_t_internal {
     LZ4_u32 hashTable[LZ4_HASH_SIZE_U32];
     LZ4_u32 currentOffset;
     LZ4_u32 tableType;
+    LZ4_u32 dictSize;
+    /* Implicit padding to ensure pointer is aligned */
     const LZ4_byte* dictionary;
     const LZ4_stream_t_internal* dictCtx;
-    LZ4_u32 dictSize;
 };
 
 typedef struct {
     const LZ4_byte* externalDict;
-    size_t extDictSize;
     const LZ4_byte* prefixEnd;
+    size_t extDictSize;
     size_t prefixSize;
 } LZ4_streamDecode_t_internal;
 
@@ -631,7 +632,7 @@ typedef struct {
  *  note : only use this definition in association with static linking !
  *  this definition is not API/ABI safe, and may change in future versions.
  */
-#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
+#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + sizeof(void*) + sizeof(void*) + 16)  /* static size, for inter-version compatibility */
 #define LZ4_STREAMSIZE_VOIDP (LZ4_STREAMSIZE / sizeof(void*))
 union LZ4_stream_u {
     void* table[LZ4_STREAMSIZE_VOIDP];
