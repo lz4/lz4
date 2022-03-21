@@ -2,16 +2,20 @@ LZ4 - Library Files
 ================================
 
 The `/lib` directory contains many files, but depending on project's objectives,
-not all of them are necessary.
+not all of them are required.
+Limited systems may want to reduce the nb of source files to include
+as a way to reduce binary size and dependencies.
 
-#### Minimal LZ4 build
+Capabilities are added at the "level" granularity, detailed below.
+
+#### Level 1 : Minimal LZ4 build
 
 The minimum required is **`lz4.c`** and **`lz4.h`**,
 which provides the fast compression and decompression algorithms.
 They generate and decode data using the [LZ4 block format].
 
 
-#### High Compression variant
+#### Level 2 : High Compression variant
 
 For more compression ratio at the cost of compression speed,
 the High Compression variant called **lz4hc** is available.
@@ -20,7 +24,7 @@ This variant also compresses data using the [LZ4 block format],
 and depends on regular `lib/lz4.*` source files.
 
 
-#### Frame support, for interoperability
+#### Level 3 : Frame support, for interoperability
 
 In order to produce compressed data compatible with `lz4` command line utility,
 it's necessary to use the [official interoperable frame format].
@@ -28,14 +32,29 @@ This format is generated and decoded automatically by the **lz4frame** library.
 Its public API is described in `lib/lz4frame.h`.
 In order to work properly, lz4frame needs all other modules present in `/lib`,
 including, lz4 and lz4hc, and also **xxhash**.
-So it's necessary to include all `*.c` and `*.h` files present in `/lib`.
+So it's necessary to also include `xxhash.c` and `xxhash.h`.
+
+
+#### Level 4 : File compression operations
+
+As a helper around file operations,
+the library has been recently extended with `lz4file.c` and `lz4file.h`
+(still considered experimental at the time of this writing).
+These helpers allow opening, reading, writing, and closing files
+using transparent LZ4 compression / decompression.
+As a consequence, using `lz4file` adds a dependency on `<stdio.h>`.
+
+`lz4file` relies on `lz4frame` in order to produce compressed data
+conformant to the [LZ4 Frame format] specification.
+Consequently, to enable this capability,
+it's necessary to include all `*.c` and `*.h` files from `lib/` directory.
 
 
 #### Advanced / Experimental API
 
 Definitions which are not guaranteed to remain stable in future versions,
 are protected behind macros, such as `LZ4_STATIC_LINKING_ONLY`.
-As the name strongly implies, these definitions should only be invoked
+As the name suggests, these definitions should only be invoked
 in the context of static linking ***only***.
 Otherwise, dependent application may fail on API or ABI break in the future.
 The associated symbols are also not exposed by the dynamic library by default.
@@ -127,6 +146,7 @@ Other files present in the directory are not source code. They are :
  - `README.md` : this file
 
 [official interoperable frame format]: ../doc/lz4_Frame_format.md
+[LZ4 Frame format]: ../doc/lz4_Frame_format.md
 [LZ4 block format]: ../doc/lz4_Block_format.md
 
 
