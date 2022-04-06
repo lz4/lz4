@@ -1687,7 +1687,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                         (const char*)selectedIn, (char*)dstPtr,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
                         dict, (int)dictSize);
-                if (decodedSize < 0) return err0r(LZ4F_ERROR_GENERIC);   /* decompression failed */
+                if (decodedSize < 0) return err0r(LZ4F_ERROR_decompressionFailed);
                 if (dctx->frameInfo.contentChecksumFlag)
                     XXH32_update(&(dctx->xxh), dstPtr, (size_t)decodedSize);
                 if (dctx->frameInfo.contentSize)
