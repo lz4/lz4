@@ -13,7 +13,7 @@ This Meson build system is provided with no guarantee.
 `cd` to this meson directory (`contrib/meson`)
 
 ```sh
-meson setup --buildtype=release -Ddefault_library=shared -Dbin_programs=true builddir
+meson setup --buildtype=release -Ddefault_library=shared -Dprograms=true builddir
 cd builddir
 ninja             # to build
 ninja install     # to install
