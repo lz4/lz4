@@ -1,10 +1,10 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.9.3 Manual</title>
+<title>1.9.4 Manual</title>
 </head>
 <body>
-<h1>1.9.3 Manual</h1>
+<h1>1.9.4 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
@@ -57,11 +57,11 @@
 <a name="Chapter3"></a><h2>Tuning parameter</h2><pre></pre>
 
 <pre><b>#ifndef LZ4_MEMORY_USAGE
-# define LZ4_MEMORY_USAGE 14
+# define LZ4_MEMORY_USAGE LZ4_MEMORY_USAGE_DEFAULT
 #endif
-</b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
- Increasing memory usage improves compression ratio.
- Reduced memory usage may improve speed, thanks to better cache locality.
+</b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
+ Increasing memory usage improves compression ratio, at the cost of speed.
+ Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
  Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  
 </p></pre><BR>
