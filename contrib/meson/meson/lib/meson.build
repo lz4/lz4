@@ -19,7 +19,7 @@ sources = files(
 
 c_args = []
 
-if host_machine.system() == 'windows' and default_library != 'static'
+if host_machine.system() == 'windows' and get_option('default_library') != 'static'
   c_args += '-DLZ4_DLL_EXPORT=1'
 endif
 
