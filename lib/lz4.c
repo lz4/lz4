@@ -939,8 +939,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
         outputDirective == notLimited && /* Cannot be relaxed, ip changes between match and table update. */
         dictDirective == noDict &&       /* Cannot be relaxed, ip changes between match and table update. */
         dictIssue == noDictIssue &&      /* Cannot be relaxed, ip changes between match and table update. */
-        LZ4_isLittleEndian() &&          /* Can be relaxed. */
-        sizeof(reg_t) == 8               /* Can be relaxed. */
+        LZ4_isLittleEndian() &&          /* Can be relaxed for 64 bit BIG ENDIAN. */
+        sizeof(reg_t) == 8               /* Can be relaxed but not all hacks can be applied. */
         ;
 
 
