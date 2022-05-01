@@ -933,15 +933,17 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                  const dictIssue_directive dictIssue,
                  const int acceleration)
 {
-    // During the match encoding, we can fetch in a branchless way last 5 bytes
-    // without any dependency chain on x86 and aarch which results in faster
-    // compression speeds for highly compressed data (with lots of matches).
+    /* During the match encoding, we can fetch in a branchless way last 5 bytes
+       without any dependency chain on x86 and aarch which results in faster
+       compression speeds for highly compressed data (with lots of matches). */
     int const eligibleForTrailByteLoopOpt =
-        outputDirective == notLimited &&
-        dictDirective == noDict &&
-        dictIssue == noDictIssue &&
-        LZ4_isLittleEndian() && sizeof(reg_t) == 8
+        outputDirective == notLimited && /* Cannot be relaxed, ip changes between match and table update. */
+        dictDirective == noDict &&       /* Cannot be relaxed, ip changes between match and table update. */
+        dictIssue == noDictIssue &&      /* Cannot be relaxed, ip changes between match and table update. */
+        LZ4_isLittleEndian() &&          /* Can be relaxed. */
+        sizeof(reg_t) == 8               /* Can be relaxed. */
         ;
+
 
     int result;
     const BYTE* ip = (const BYTE*) source;
@@ -1006,6 +1008,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     /* First Byte */
     LZ4_putPosition(ip, cctx->hashTable, tableType, base);
     ip++; forwardH = LZ4_hashPosition(ip, tableType);
+
     /* Main Loop */
     for ( ; ; ) {
         const BYTE* match;
@@ -1154,6 +1157,8 @@ _next_match:
             assert(ip-match <= LZ4_DISTANCE_MAX);
             LZ4_writeLE16(op, (U16)(ip - match)); op+=2;
         }
+        /* Trailing bytes that are fetched during the match length. */
+        /* TODO: In 32 bit mode it should fetch last 3 bytes */
         U64 last5Bytes = 0;
 
         /* Encode MatchLength */
@@ -1289,7 +1294,7 @@ _next_match:
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
               && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
               // TODO(Danlark): fix.
-              && (LZ4_read32(match) == (U32)(last5Bytes)) ) {
+              && (eligibleForTrailByteLoopOpt ? (LZ4_read32(match) == (U32)(last5Bytes)) : (LZ4_read32(match) == LZ4_read32(ip))) ) {
                 token=op++;
                 *token=0;
                 if (maybe_extMem) offset = current - matchIndex;
@@ -1301,6 +1306,7 @@ _next_match:
 
         /* Prepare next loop */
         forwardH = LZ4_hashPosition(++ip, tableType);
+
     }
 
 _last_literals:
