@@ -271,6 +271,7 @@ static int LZ4_isAligned(const void* ptr, size_t alignment)
 *  Types
 **************************************/
 #include <limits.h>
+#include <stdio.h>
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
   typedef  uint8_t BYTE;
@@ -638,6 +639,63 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
     return (unsigned)(pIn - pStart);
 }
 
+LZ4_FORCE_INLINE
+unsigned LZ4_count_with_trail_bytes(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit, U64* last5Bytes)
+{
+    assert(sizeof(reg_t) == 8);
+    const BYTE* const pStart = pIn;
+
+    if (likely(pIn < pInLimit-(STEPSIZE-1))) {
+        reg_t a1 = LZ4_read_ARCH(pMatch);
+        reg_t a2 = LZ4_read_ARCH(pIn);
+        reg_t const diff = a1 ^ a2;
+        if (!diff) {
+            pIn+=STEPSIZE; pMatch+=STEPSIZE;
+        } else {
+            unsigned matchedBytes = LZ4_NbCommonBytes(diff);
+            reg_t a3 = LZ4_read_ARCH(pIn + 4);
+#ifdef __x86_64__
+            // Neither clang, nor gcc recognize cmov.
+            asm("testl %k2, %k2\n\t"
+                "cmovzq %1, %0\n\t"
+                : "+r"(a2)
+                : "r"(a3), "r"(diff));
+#else
+            // clang aarch64 correctly uses `csel`.
+            a2 = (U32)(diff) == 0 ? a3 : a2;
+#endif
+            *last5Bytes = a2 >> ((matchedBytes & 3) << 3);
+            return matchedBytes;
+    }   }
+
+    while (likely(pIn < pInLimit-(STEPSIZE-1))) {
+        reg_t a1 = LZ4_read_ARCH(pMatch);
+        reg_t a2 = LZ4_read_ARCH(pIn);
+        reg_t const diff = a1 ^ a2;
+        if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
+        unsigned matchedBytes = LZ4_NbCommonBytes(diff);
+        reg_t a3 = LZ4_read_ARCH(pIn + 4);
+#ifdef __x86_64__
+        // Neither clang, nor gcc recognize cmov.
+        asm("testl %k2, %k2\n\t"
+            "cmovzq %1, %0\n\t"
+            : "+r"(a2)
+            : "r"(a3), "r"(diff));
+#else
+        // clang aarch64 correctly uses `csel`.
+        a2 = (U32)(diff) == 0 ? a3 : a2;
+#endif
+        *last5Bytes = a2 >> ((matchedBytes & 3) << 3);
+        pIn += matchedBytes;
+        return (unsigned)(pIn - pStart);
+    }
+
+    if ((STEPSIZE==8) && (pIn<(pInLimit-3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn+=4; pMatch+=4; }
+    if ((pIn<(pInLimit-1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn+=2; pMatch+=2; }
+    if ((pIn<pInLimit) && (*pMatch == *pIn)) pIn++;
+    return (unsigned)(pIn - pStart);
+}
+
 
 #ifndef LZ4_COMMONDEFS_ONLY
 /*-************************************
@@ -875,6 +933,16 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                  const dictIssue_directive dictIssue,
                  const int acceleration)
 {
+    // During the match encoding, we can fetch in a branchless way last 5 bytes
+    // without any dependency chain on x86 and aarch which results in faster
+    // compression speeds for highly compressed data (with lots of matches).
+    int const eligibleForTrailByteLoopOpt =
+        outputDirective == notLimited &&
+        dictDirective == noDict &&
+        dictIssue == noDictIssue &&
+        LZ4_isLittleEndian() && sizeof(reg_t) == 8
+        ;
+
     int result;
     const BYTE* ip = (const BYTE*) source;
 
@@ -938,7 +1006,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     /* First Byte */
     LZ4_putPosition(ip, cctx->hashTable, tableType, base);
     ip++; forwardH = LZ4_hashPosition(ip, tableType);
-
     /* Main Loop */
     for ( ; ; ) {
         const BYTE* match;
@@ -1087,6 +1154,7 @@ _next_match:
             assert(ip-match <= LZ4_DISTANCE_MAX);
             LZ4_writeLE16(op, (U16)(ip - match)); op+=2;
         }
+        U64 last5Bytes = 0;
 
         /* Encode MatchLength */
         {   unsigned matchCode;
@@ -1105,7 +1173,14 @@ _next_match:
                 }
                 DEBUGLOG(6, "             with matchLength=%u starting in extDict", matchCode+MINMATCH);
             } else {
-                matchCode = LZ4_count(ip+MINMATCH, match+MINMATCH, matchlimit);
+                if (eligibleForTrailByteLoopOpt) {
+                    matchCode =
+                            LZ4_count_with_trail_bytes(ip+MINMATCH, match+MINMATCH, matchlimit, &last5Bytes);
+                } else {
+                    matchCode =
+                            LZ4_count(ip+MINMATCH, match+MINMATCH, matchlimit);
+                }
+
                 ip += (size_t)matchCode + MINMATCH;
                 DEBUGLOG(6, "             with matchLength=%u", matchCode+MINMATCH);
             }
@@ -1158,21 +1233,31 @@ _next_match:
         /* Test end of chunk */
         if (ip >= mflimitPlusOne) break;
 
+        /* Ensure trail bytes were correctly fetched. */
+        assert(!eligibleForTrailByteLoopOpt ||
+               ((last5Bytes & 0xFFFFFFFFFF) == (LZ4_read_ARCH(ip) & 0xFFFFFFFFFF)));
         /* Fill table */
         LZ4_putPosition(ip-2, cctx->hashTable, tableType, base);
 
         /* Test next position */
         if (tableType == byPtr) {
-
-            match = LZ4_getPosition(ip, cctx->hashTable, tableType, base);
+            if (eligibleForTrailByteLoopOpt) {
+                match = LZ4_getPosition((BYTE*)&last5Bytes, cctx->hashTable, tableType, base);
+            } else {
+                match = LZ4_getPosition(ip, cctx->hashTable, tableType, base);
+            }
             LZ4_putPosition(ip, cctx->hashTable, tableType, base);
             if ( (match+LZ4_DISTANCE_MAX >= ip)
               && (LZ4_read32(match) == LZ4_read32(ip)) )
             { token=op++; *token=0; goto _next_match; }
 
         } else {   /* byU32, byU16 */
-
-            U32 const h = LZ4_hashPosition(ip, tableType);
+            U32 h;
+            if (eligibleForTrailByteLoopOpt) {
+                h = LZ4_hashPosition(&last5Bytes, tableType);
+            } else {
+                h = LZ4_hashPosition(ip, tableType);
+            }
             U32 const current = (U32)(ip-base);
             U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
             assert(matchIndex < current);
@@ -1203,7 +1288,8 @@ _next_match:
             assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
               && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
-              && (LZ4_read32(match) == LZ4_read32(ip)) ) {
+              // TODO(Danlark): fix.
+              && (LZ4_read32(match) == (U32)(last5Bytes)) ) {
                 token=op++;
                 *token=0;
                 if (maybe_extMem) offset = current - matchIndex;
@@ -1215,7 +1301,6 @@ _next_match:
 
         /* Prepare next loop */
         forwardH = LZ4_hashPosition(++ip, tableType);
-
     }
 
 _last_literals:
