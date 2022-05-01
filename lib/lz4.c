@@ -271,7 +271,6 @@ static int LZ4_isAligned(const void* ptr, size_t alignment)
 *  Types
 **************************************/
 #include <limits.h>
-#include <stdio.h>
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
   typedef  uint8_t BYTE;
@@ -1293,7 +1292,6 @@ _next_match:
             assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
               && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
-              // TODO(Danlark): fix.
               && (eligibleForTrailByteLoopOpt ? (LZ4_read32(match) == (U32)(last5Bytes)) : (LZ4_read32(match) == LZ4_read32(ip))) ) {
                 token=op++;
                 *token=0;
