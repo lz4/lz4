@@ -666,6 +666,7 @@ jobs:
       matrix:
         include: [
           { os: ubuntu-latest,  }, # https://github.com/actions/virtual-environments/
+          { os: ubuntu-22.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2204-Readme.md
           { os: ubuntu-20.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
           { os: ubuntu-18.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu1804-Readme.md
         ]
