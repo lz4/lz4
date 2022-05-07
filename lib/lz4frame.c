@@ -857,7 +857,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
 
     DEBUGLOG(4, "LZ4F_compressUpdate (srcSize=%zu)", srcSize);
 
-    if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_GENERIC);   /* state must be initialized and waiting for next block */
+    if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_compressionState_uninitialized);   /* state must be initialized and waiting for next block */
     if (dstCapacity < LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize))
         return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     if (compressOptionsPtr == NULL) compressOptionsPtr = &k_cOptionsNull;
@@ -916,7 +916,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
             cctxPtr->tmpIn = cctxPtr->tmpBuff;  /* src is stable : dictionary remains in src across invocations */
         } else {
             int const realDictSize = LZ4F_localSaveDict(cctxPtr);
-            if (realDictSize==0) return err0r(LZ4F_ERROR_GENERIC);
+            assert(0 <= realDictSize && realDictSize <= 64 KB);
             cctxPtr->tmpIn = cctxPtr->tmpBuff + realDictSize;
         }
     }
@@ -965,7 +965,7 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
     compressFunc_t compress;
 
     if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
-    if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_GENERIC);
+    if (cctxPtr->cStage != 1) return err0r(LZ4F_ERROR_compressionState_uninitialized);
     if (dstCapacity < (cctxPtr->tmpInSize + BHSize + BFSize))
         return err0r(LZ4F_ERROR_dstMaxSize_tooSmall);
     (void)compressOptionsPtr;   /* not yet useful */
