@@ -271,7 +271,9 @@ static LZ4F_errorCode_t LZ4F_returnErrorCode(LZ4F_errorCodes code)
     return (LZ4F_errorCode_t)-(ptrdiff_t)code;
 }
 
-#define LZ4F_RETURN_ERROR(e) return LZ4F_returnErrorCode(LZ4F_ERROR_ ## e);
+#define LZ4F_RETURN_ERROR(e) return LZ4F_returnErrorCode(LZ4F_ERROR_ ## e)
+
+#define LZ4F_RETURN_ERROR_IF(c,e) if (c) LZ4F_RETURN_ERROR(e);
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
@@ -282,8 +284,7 @@ size_t LZ4F_getBlockSize(unsigned blockSizeID)
     static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
 
     if (blockSizeID == 0) blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
-    if (blockSizeID < LZ4F_max64KB || blockSizeID > LZ4F_max4MB)
-        LZ4F_RETURN_ERROR(maxBlockSize_invalid);
+    LZ4F_RETURN_ERROR_IF(blockSizeID < LZ4F_max64KB || blockSizeID > LZ4F_max4MB, maxBlockSize_invalid);
     blockSizeID -= LZ4F_max64KB;
     return blockSizes[blockSizeID];
 }
@@ -399,8 +400,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     MEM_INIT(&options, 0, sizeof(options));
     options.stableSrc = 1;
 
-    if (dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs))  /* condition to guarantee success */
-        LZ4F_RETURN_ERROR(dstMaxSize_tooSmall);
+    LZ4F_RETURN_ERROR_IF(dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs), dstMaxSize_tooSmall);
 
     { size_t const headerSize = LZ4F_compressBegin_usingCDict(cctx, dstBuffer, dstCapacity, cdict, &prefs);  /* write header */
       if (LZ4F_isError(headerSize)) return headerSize;
@@ -538,7 +538,7 @@ void LZ4F_freeCDict(LZ4F_CDict* cdict)
 LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** LZ4F_compressionContextPtr, unsigned version)
 {
     LZ4F_cctx_t* const cctxPtr = (LZ4F_cctx_t*)ALLOC_AND_ZERO(sizeof(LZ4F_cctx_t));
-    if (cctxPtr==NULL) LZ4F_RETURN_ERROR(allocation_failed);
+    LZ4F_RETURN_ERROR_IF(cctxPtr==NULL, allocation_failed);
 
     cctxPtr->version = version;
     cctxPtr->cStage = 0;   /* Uninitialized. Next stage : init cctx */
@@ -616,7 +616,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
 
-    if (dstCapacity < maxFHSize) LZ4F_RETURN_ERROR(dstMaxSize_tooSmall);
+    LZ4F_RETURN_ERROR_IF(dstCapacity < maxFHSize, dstMaxSize_tooSmall);
     if (preferencesPtr == NULL) preferencesPtr = &prefNull;
     cctxPtr->prefs = *preferencesPtr;
 
@@ -632,8 +632,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
             } else {
                 cctxPtr->lz4CtxPtr = LZ4_createStreamHC();
             }
-            if (cctxPtr->lz4CtxPtr == NULL)
-                LZ4F_RETURN_ERROR(allocation_failed);
+            LZ4F_RETURN_ERROR_IF(cctxPtr->lz4CtxPtr == NULL, allocation_failed);
             cctxPtr->lz4CtxAlloc = ctxTypeID;
             cctxPtr->lz4CtxState = ctxTypeID;
         } else if (cctxPtr->lz4CtxState != ctxTypeID) {
@@ -662,7 +661,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
             cctxPtr->maxBufferSize = 0;
             FREEMEM(cctxPtr->tmpBuff);
             cctxPtr->tmpBuff = (BYTE*)ALLOC_AND_ZERO(requiredBuffSize);
-            if (cctxPtr->tmpBuff == NULL) LZ4F_RETURN_ERROR(allocation_failed);
+            LZ4F_RETURN_ERROR_IF(cctxPtr->tmpBuff == NULL, allocation_failed);
             cctxPtr->maxBufferSize = requiredBuffSize;
     }   }
     cctxPtr->tmpIn = cctxPtr->tmpBuff;
@@ -968,8 +967,7 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
 
     if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
     if (cctxPtr->cStage != 1) LZ4F_RETURN_ERROR(compressionState_uninitialized);
-    if (dstCapacity < (cctxPtr->tmpInSize + BHSize + BFSize))
-        LZ4F_RETURN_ERROR(dstMaxSize_tooSmall);
+    LZ4F_RETURN_ERROR_IF(dstCapacity < (cctxPtr->tmpInSize + BHSize + BFSize), dstMaxSize_tooSmall);
     (void)compressOptionsPtr;   /* not yet useful */
 
     /* select compression function */
@@ -1021,13 +1019,13 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
     assert(flushSize <= dstCapacity);
     dstCapacity -= flushSize;
 
-    if (dstCapacity < 4) LZ4F_RETURN_ERROR(dstMaxSize_tooSmall);
+    LZ4F_RETURN_ERROR_IF(dstCapacity < 4, dstMaxSize_tooSmall);
     LZ4F_writeLE32(dstPtr, 0);
     dstPtr += 4;   /* endMark */
 
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
         U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
-        if (dstCapacity < 8) LZ4F_RETURN_ERROR(dstMaxSize_tooSmall);
+        LZ4F_RETURN_ERROR_IF(dstCapacity < 8, dstMaxSize_tooSmall);
         DEBUGLOG(5,"Writing 32-bit content checksum");
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */
@@ -1141,7 +1139,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
 
     DEBUGLOG(5, "LZ4F_decodeHeader");
     /* need to decode header to get frameInfo */
-    if (srcSize < minFHSize) LZ4F_RETURN_ERROR(frameHeader_incomplete);   /* minimal frame header size */
+    LZ4F_RETURN_ERROR_IF(srcSize < minFHSize, frameHeader_incomplete);   /* minimal frame header size */
     MEM_INIT(&(dctx->frameInfo), 0, sizeof(dctx->frameInfo));
 
     /* special case : skippable frames */
@@ -1177,7 +1175,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
         dictIDFlag = FLG & _1BIT;
         /* validate */
         if (((FLG>>1)&_1BIT) != 0) LZ4F_RETURN_ERROR(reservedFlag_set); /* Reserved bit */
-        if (version != 1) LZ4F_RETURN_ERROR(headerVersion_wrong);       /* Version Number, only supported value */
+        LZ4F_RETURN_ERROR_IF(version != 1, headerVersion_wrong);       /* Version Number, only supported value */
     }
 
     /* Frame Header Size */
@@ -1205,8 +1203,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     assert(frameHeaderSize > 5);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     {   BYTE const HC = LZ4F_headerChecksum(srcPtr+4, frameHeaderSize-5);
-        if (HC != srcPtr[frameHeaderSize-1])
-            LZ4F_RETURN_ERROR(headerChecksum_invalid);
+        LZ4F_RETURN_ERROR_IF(HC != srcPtr[frameHeaderSize-1], headerChecksum_invalid);
     }
 #endif
 
@@ -1234,7 +1231,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
  */
 size_t LZ4F_headerSize(const void* src, size_t srcSize)
 {
-    if (src == NULL) LZ4F_RETURN_ERROR(srcPtr_wrong);
+    LZ4F_RETURN_ERROR_IF(src == NULL, srcPtr_wrong);
 
     /* minimal srcSize to determine header size */
     if (srcSize < LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH)
@@ -1478,12 +1475,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
                     FREEMEM(dctx->tmpIn);
                     dctx->tmpIn = (BYTE*)ALLOC(dctx->maxBlockSize + BFSize /* block checksum */);
-                    if (dctx->tmpIn == NULL)
-                        LZ4F_RETURN_ERROR(allocation_failed);
+                    LZ4F_RETURN_ERROR_IF(dctx->tmpIn == NULL, allocation_failed);
                     FREEMEM(dctx->tmpOutBuffer);
                     dctx->tmpOutBuffer= (BYTE*)ALLOC(bufferNeeded);
-                    if (dctx->tmpOutBuffer== NULL)
-                        LZ4F_RETURN_ERROR(allocation_failed);
+                    LZ4F_RETURN_ERROR_IF(dctx->tmpOutBuffer== NULL, allocation_failed);
                     dctx->maxBufferSize = bufferNeeded;
             }   }
             dctx->tmpInSize = 0;
@@ -1666,8 +1661,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 {   U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
                     U32 const calcBlockCrc = XXH32(selectedIn, dctx->tmpInTarget, 0);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-                    if (readBlockCrc != calcBlockCrc)
-                        LZ4F_RETURN_ERROR(blockChecksum_invalid);
+                    LZ4F_RETURN_ERROR_IF(readBlockCrc != calcBlockCrc, blockChecksum_invalid);
 #else
                     (void)readBlockCrc;
                     (void)calcBlockCrc;
@@ -1689,7 +1683,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                         (const char*)selectedIn, (char*)dstPtr,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
                         dict, (int)dictSize);
-                if (decodedSize < 0) LZ4F_RETURN_ERROR(decompressionFailed);
+                LZ4F_RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
                 if (dctx->frameInfo.contentChecksumFlag)
                     XXH32_update(&(dctx->xxh), dstPtr, (size_t)decodedSize);
                 if (dctx->frameInfo.contentSize)
@@ -1732,8 +1726,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                         (const char*)selectedIn, (char*)dctx->tmpOut,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
                         dict, (int)dictSize);
-                if (decodedSize < 0)  /* decompression failed */
-                    LZ4F_RETURN_ERROR(decompressionFailed);
+                LZ4F_RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
                 if (dctx->frameInfo.contentChecksumFlag)
                     XXH32_update(&(dctx->xxh), dctx->tmpOut, (size_t)decodedSize);
                 if (dctx->frameInfo.contentSize)
@@ -1767,8 +1760,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             break;
 
         case dstage_getSuffix:
-            if (dctx->frameRemainingSize)
-                LZ4F_RETURN_ERROR(frameSize_wrong);   /* incorrect frame size decoded */
+            LZ4F_RETURN_ERROR_IF(dctx->frameRemainingSize, frameSize_wrong);   /* incorrect frame size decoded */
             if (!dctx->frameInfo.contentChecksumFlag) {  /* no checksum, frame is completed */
                 nextSrcSizeHint = 0;
                 LZ4F_resetDecompressionContext(dctx);
@@ -1803,8 +1795,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             {   U32 const readCRC = LZ4F_readLE32(selectedIn);
                 U32 const resultCRC = XXH32_digest(&(dctx->xxh));
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-                if (readCRC != resultCRC)
-                    LZ4F_RETURN_ERROR(contentChecksum_invalid);
+                LZ4F_RETURN_ERROR_IF(readCRC != resultCRC, contentChecksum_invalid);
 #else
                 (void)readCRC;
                 (void)resultCRC;
