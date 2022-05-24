@@ -446,7 +446,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
         outSize = compressionFunction(in_buff, out_buff+4, (int)inSize, outBuffSize, compressionlevel);
         assert(outSize >= 0);
         compressedfilesize += (unsigned long long)outSize+4;
-        DISPLAYUPDATE(2, "\rRead : %i MB  ==> %.2f%%   ",
+        DISPLAYUPDATE(2, "\rRead : %i MiB  ==> %.2f%%   ",
                 (int)(filesize>>20), (double)compressedfilesize/filesize*100);
 
         /* Write Block */
@@ -466,7 +466,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
         filesize, compressedfilesize, (double)compressedfilesize / filesize * 100);
     {   double const seconds = (double)(clockEnd - clockStart) / CLOCKS_PER_SEC;
-        DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MB/s\n", seconds,
+        DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MiB/s\n", seconds,
                         (double)filesize / seconds / 1024 / 1024);
     }
 
@@ -697,7 +697,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
         if (LZ4F_isError(cSize))
             EXM_THROW(31, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
-        DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
+        DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(filesize+!filesize)*100);   /* avoid division by zero */
 
         /* Write Block */
@@ -722,7 +722,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
             if (LZ4F_isError(outSize))
                 EXM_THROW(35, "Compression failed : %s", LZ4F_getErrorName(outSize));
             compressedfilesize += outSize;
-            DISPLAYUPDATE(2, "\rRead : %u MB   ==> %.2f%%   ",
+            DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
                         (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
 
             /* Write Block */
@@ -1093,7 +1093,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
                 if (!prefs->testMode)
                     storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, prefs->sparseFileSupport, storedSkips);
                 filesize += decodedBytes;
-                DISPLAYUPDATE(2, "\rDecompressed : %u MB  ", (unsigned)(filesize>>20));
+                DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(filesize>>20));
             }
 
             if (!nextToLoad) break;
