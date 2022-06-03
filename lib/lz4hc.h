@@ -173,6 +173,8 @@ LZ4LIB_API int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr
                                            const char* src, char* dst,
                                                  int* srcSizePtr, int targetDstSize);
 
+LZ4LIB_API int LZ4_DictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize);
+
 LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, int maxDictSize);
 
 

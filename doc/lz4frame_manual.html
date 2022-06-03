@@ -75,6 +75,11 @@
     LZ4F_OBSOLETE_ENUM(skippableFrame)
 } LZ4F_frameType_t;
 </b></pre><BR>
+<pre><b>typedef enum {
+  LZ4B_COMPRESSED,
+  LZ4B_UNCOMPRESSED,
+} LZ4F_blockCompression_t;
+</b></pre><BR>
 <pre><b>typedef struct {
   LZ4F_blockSizeID_t     blockSizeID;         </b>/* max64KB, max256KB, max1MB, max4MB; 0 == default */<b>
   LZ4F_blockMode_t       blockMode;           </b>/* LZ4F_blockLinked, LZ4F_blockIndependent; 0 == default */<b>

@@ -346,6 +346,8 @@ LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, in
  */
 LZ4LIB_API int LZ4_compress_fast_continue (LZ4_stream_t* streamPtr, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
+LZ4LIB_API int LZ4_DictSize (LZ4_stream_t* LZ4_dict, int dictSize);
+
 /*! LZ4_saveDict() :
  *  If last 64KB data cannot be guaranteed to remain available at its current memory location,
  *  save it into a safer place (char* safeBuffer).

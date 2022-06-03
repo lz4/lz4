@@ -160,6 +160,11 @@ typedef enum {
     LZ4F_OBSOLETE_ENUM(skippableFrame)
 } LZ4F_frameType_t;
 
+typedef enum {
+  LZ4B_COMPRESSED,
+  LZ4B_UNCOMPRESSED
+} LZ4F_blockCompression_t;
+
 #ifdef LZ4F_ENABLE_OBSOLETE_ENUMS
 typedef LZ4F_blockSizeID_t blockSizeID_t;
 typedef LZ4F_blockMode_t blockMode_t;
@@ -303,6 +308,8 @@ LZ4FLIB_API size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* 
  *  This value is provided by LZ4F_compressBound().
  *  If this condition is not respected, LZ4F_compress() will fail (result is an errorCode).
  *  After an error, the state is left in a UB state, and must be re-initialized or freed.
+ *  If previously an uncompressed block was written, buffered data is flushed
+ *  before appending compressed data is continued.
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())
@@ -312,6 +319,22 @@ LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx,
                                  const void* srcBuffer, size_t srcSize,
                                  const LZ4F_compressOptions_t* cOptPtr);
 
+/*! LZ4F_uncompressedUpdate() :
+ *  LZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.
+ *  Important rule: dstCapacity MUST be large enough to store the entire source buffer as
+ *  no compression is done for this operation
+ *  If this condition is not respected, LZ4F_uncompressedUpdate() will fail (result is an errorCode).
+ *  After an error, the state is left in a UB state, and must be re-initialized or freed.
+ *  If previously a compressed block was written, buffered data is flushed
+ *  before appending uncompressed data is continued.
+ * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
+ * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
+ *           or an error code if it fails (which can be tested using LZ4F_isError())
+ */
+LZ4FLIB_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
+                                       void* dstBuffer, size_t dstCapacity,
+                                       const void* srcBuffer, size_t srcSize,
+                                       const LZ4F_compressOptions_t* cOptPtr);
 /*! LZ4F_flush() :
  *  When data must be generated and sent immediately, without waiting for a block to be completely filled,
  *  it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.

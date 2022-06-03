@@ -1679,6 +1679,15 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
     return result;
 }
 
+int LZ4_DictSize (LZ4_stream_t* LZ4_dict, int dictSize)
+{
+  LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
+
+  if ((U32)dictSize > 64 KB) { dictSize = 64 KB; } /* useless to define a dictionary > 64 KB */
+  if ((U32)dictSize > dict->dictSize) { dictSize = (int)dict->dictSize; }
+
+  return dictSize;
+}
 
 /*! LZ4_saveDict() :
  *  If previously compressed data block is not guaranteed to remain available at its memory location,
@@ -1690,11 +1699,8 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
 int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 {
     LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
-
+    dictSize = LZ4_DictSize(LZ4_dict, dictSize);
     DEBUGLOG(5, "LZ4_saveDict : dictSize=%i, safeBuffer=%p", dictSize, safeBuffer);
-
-    if ((U32)dictSize > 64 KB) { dictSize = 64 KB; } /* useless to define a dictionary > 64 KB */
-    if ((U32)dictSize > dict->dictSize) { dictSize = (int)dict->dictSize; }
 
     if (safeBuffer == NULL) assert(dictSize == 0);
     if (dictSize > 0) {
