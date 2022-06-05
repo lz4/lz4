@@ -243,13 +243,16 @@ typedef struct {
 LZ4FLIB_API unsigned LZ4F_getVersion(void);
 
 /*! LZ4F_createCompressionContext() :
- * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
+ * The first thing to do is to create a compressionContext object,
+ * which will keep track of operation state during streaming compression.
  * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version.
  * The version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
  * The function will provide a pointer to a fully allocated LZ4F_cctx object.
- * If @return != zero, there was an error during context creation.
- * Object can be released using LZ4F_freeCompressionContext();
- * Note: LZ4F_freeCompressionContext() works with NULL pointers (do nothing).
+ * If @return != zero, there context creation failed.
+ * Once all streaming compression jobs are completed,
+ * the state object can be released using LZ4F_freeCompressionContext().
+ * Note1 : LZ4F_freeCompressionContext() is always successful. Its return value can be ignored.
+ * Note2 : LZ4F_freeCompressionContext() works fine with NULL input pointers (do nothing).
  */
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
