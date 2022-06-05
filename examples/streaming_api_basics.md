@@ -22,7 +22,7 @@ But if you want to write advanced application, it's time to use Block or Streami
 Block API (de)compresses a single contiguous memory block.
 In other words, LZ4 library finds redundancy from a single contiguous memory block.
 Streaming API does same thing but (de)compresses multiple adjacent contiguous memory blocks.
-So LZ4 library could find more redundancy than Block API.
+So Streaming API could find more redundancy than Block API.
 
 The following figure shows difference between API and block sizes.
 In these figures, the original data is split into 4KiBytes contiguous chunks.

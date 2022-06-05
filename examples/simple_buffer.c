@@ -47,7 +47,7 @@ int main(void) {
   char* compressed_data = (char*)malloc((size_t)max_dst_size);
   if (compressed_data == NULL)
     run_screaming("Failed to allocate memory for *compressed_data.", 1);
-  // That's all the information and preparation LZ4 needs to compress *src into *compressed_data.
+  // That's all the information and preparation LZ4 needs to compress *src into* compressed_data.
   // Invoke LZ4_compress_default now with our size values and pointers to our memory locations.
   // Save the return value for error checking.
   const int compressed_data_size = LZ4_compress_default(src, compressed_data, src_size, max_dst_size);
