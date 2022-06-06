@@ -112,6 +112,9 @@ checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 decompress-partial: lz4.o decompress-partial.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
@@ -547,8 +550,10 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
 
-test-decompress-partial : decompress-partial
+test-decompress-partial : decompress-partial decompress-partial-usingDict
 	@echo "\n ---- test decompress-partial ----"
 	./decompress-partial$(EXT)
+	@echo "\n ---- test decompress-partial-usingDict ----"
+	./decompress-partial-usingDict$(EXT)
 
 endif
