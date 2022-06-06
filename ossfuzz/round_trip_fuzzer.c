@@ -20,8 +20,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     size_t const partialCapacity = FUZZ_getRange_from_uint32(partialCapacitySeed, 0, size);
     size_t const dstCapacity = LZ4_compressBound(size);
-
-    char* const dst = (char*)malloc(dstCapacity);
+    size_t const largeSize = 64 * 1024 - 1;
+    size_t const smallSize = 1024;
+    char* const dstPlusLargePrefix = (char*)malloc(dstCapacity + largeSize);
+    char* const dstPlusSmallPrefix = dstPlusLargePrefix + largeSize - smallSize;
+    char* const largeDict = (char*)malloc(largeSize);
+    char* const smallDict = largeDict + largeSize - smallSize;
+    char* const dst = dstPlusLargePrefix + largeSize;
     char* const rt = (char*)malloc(size);
 
     FUZZ_ASSERT(dst);
@@ -47,7 +52,61 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         FUZZ_ASSERT_MSG(!memcmp(data, partial, partialSize), "Corruption!");
         free(partial);
     }
-
+    /* Partial decompression using dict with no dict. */
+    {
+        char* const partial = (char*)malloc(partialCapacity);
+        FUZZ_ASSERT(partial);
+        int const partialSize = LZ4_decompress_safe_partial_usingDict(
+                dst, partial, dstSize, partialCapacity, partialCapacity, NULL, 0);
+        FUZZ_ASSERT(partialSize >= 0);
+        FUZZ_ASSERT_MSG(partialSize == partialCapacity, "Incorrect size");
+        FUZZ_ASSERT_MSG(!memcmp(data, partial, partialSize), "Corruption!");
+        free(partial);
+    }
+    /* Partial decompression using dict with small prefix as dict */
+    {
+        char* const partial = (char*)malloc(partialCapacity);
+        FUZZ_ASSERT(partial);
+        int const partialSize = LZ4_decompress_safe_partial_usingDict(
+                dst, partial, dstSize, partialCapacity, partialCapacity, dstPlusSmallPrefix, smallSize);
+        FUZZ_ASSERT(partialSize >= 0);
+        FUZZ_ASSERT_MSG(partialSize == partialCapacity, "Incorrect size");
+        FUZZ_ASSERT_MSG(!memcmp(data, partial, partialSize), "Corruption!");
+        free(partial);
+    }
+    /* Partial decompression using dict with large prefix as dict */
+    {
+        char* const partial = (char*)malloc(partialCapacity);
+        FUZZ_ASSERT(partial);
+        int const partialSize = LZ4_decompress_safe_partial_usingDict(
+                dst, partial, dstSize, partialCapacity, partialCapacity, dstPlusLargePrefix, largeSize);
+        FUZZ_ASSERT(partialSize >= 0);
+        FUZZ_ASSERT_MSG(partialSize == partialCapacity, "Incorrect size");
+        FUZZ_ASSERT_MSG(!memcmp(data, partial, partialSize), "Corruption!");
+        free(partial);
+    }
+    /* Partial decompression using dict with small external dict */
+    {
+        char* const partial = (char*)malloc(partialCapacity);
+        FUZZ_ASSERT(partial);
+        int const partialSize = LZ4_decompress_safe_partial_usingDict(
+                dst, partial, dstSize, partialCapacity, partialCapacity, smallDict, smallSize);
+        FUZZ_ASSERT(partialSize >= 0);
+        FUZZ_ASSERT_MSG(partialSize == partialCapacity, "Incorrect size");
+        FUZZ_ASSERT_MSG(!memcmp(data, partial, partialSize), "Corruption!");
+        free(partial);
+    }
+    /* Partial decompression using dict with large external dict */
+    {
+        char* const partial = (char*)malloc(partialCapacity);
+        FUZZ_ASSERT(partial);
+        int const partialSize = LZ4_decompress_safe_partial_usingDict(
+                dst, partial, dstSize, partialCapacity, partialCapacity, largeDict, largeSize);
+        FUZZ_ASSERT(partialSize >= 0);
+        FUZZ_ASSERT_MSG(partialSize == partialCapacity, "Incorrect size");
+        FUZZ_ASSERT_MSG(!memcmp(data, partial, partialSize), "Corruption!");
+        free(partial);
+    }
 
     free(dst);
     free(rt);
