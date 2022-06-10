@@ -1154,7 +1154,17 @@ int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const ch
     return LZ4_compressHC_continue_generic(LZ4_streamHCPtr, src, dst, srcSizePtr, targetDestSize, fillOutput);
 }
 
-int LZ4_DictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize) {
+/*! LZ4_getDictHCSize():
+ * Get the size of the dictionary. This can be used for adding data without
+ * compression to the LZ4 archive. If linked blocked mode is used the memory
+ * of the dictionary is kept free.
+ * This way uncompressed data does not influence the effectiveness of the
+ * dictionary.
+ * @param LZ4_dict Pointer to the dictionary to get the size of.
+ * @param dictSize The maximum dictionary size. (Normally 64 KB).
+ * @return The size of the dictionary.
+ */
+int LZ4_getDictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize) {
   LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
   int const prefixSize = (int)(streamPtr->end - (streamPtr->base + streamPtr->dictLimit));
   DEBUGLOG(5, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
@@ -1174,7 +1184,7 @@ int LZ4_DictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize) {
 int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictSize)
 {
     LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
-    dictSize = LZ4_DictHCSize(LZ4_streamHCPtr, dictSize);
+    dictSize = LZ4_getDictHCSize(LZ4_streamHCPtr, dictSize);
     if (safeBuffer == NULL) assert(dictSize == 0);
     if (dictSize > 0)
         memmove(safeBuffer, streamPtr->end - dictSize, dictSize);

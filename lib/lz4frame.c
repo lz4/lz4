@@ -221,6 +221,9 @@ static const size_t BFSize = LZ4F_BLOCK_CHECKSUM_SIZE;  /* block footer : checks
 /*-************************************
 *  Structures and local types
 **************************************/
+
+typedef enum { LZ4B_COMPRESSED, LZ4B_UNCOMPRESSED} LZ4F_blockCompression_t;
+
 typedef struct LZ4F_cctx_s
 {
     LZ4F_preferences_t prefs;
@@ -854,8 +857,8 @@ static int LZ4F_localSaveDict(LZ4F_cctx_t* cctxPtr)
 static int LZ4F_localDictSize(LZ4F_cctx_t* cctxPtr)
 {
   if (cctxPtr->prefs.compressionLevel < LZ4HC_CLEVEL_MIN)
-    return LZ4_DictSize ((LZ4_stream_t*)(cctxPtr->lz4CtxPtr), LZ4F_maxDictSize());
-  return LZ4_DictHCSize ((LZ4_streamHC_t*)(cctxPtr->lz4CtxPtr), LZ4F_maxDictSize());
+    return LZ4_getDictSize ((LZ4_stream_t*)(cctxPtr->lz4CtxPtr), LZ4F_maxDictSize());
+  return LZ4_getDictHCSize ((LZ4_streamHC_t*)(cctxPtr->lz4CtxPtr), LZ4F_maxDictSize());
 }
 
 typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;

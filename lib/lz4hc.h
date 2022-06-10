@@ -173,8 +173,6 @@ LZ4LIB_API int LZ4_compress_HC_continue_destSize(LZ4_streamHC_t* LZ4_streamHCPtr
                                            const char* src, char* dst,
                                                  int* srcSizePtr, int targetDstSize);
 
-LZ4LIB_API int LZ4_DictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize);
-
 LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, int maxDictSize);
 
 
@@ -406,6 +404,18 @@ LZ4LIB_STATIC_API int LZ4_compress_HC_extStateHC_fastReset (
 LZ4LIB_STATIC_API void LZ4_attach_HC_dictionary(
           LZ4_streamHC_t *working_stream,
     const LZ4_streamHC_t *dictionary_stream);
+
+/*! LZ4_getDictHCSize():
+ * Get the size of the dictionary. This can be used for adding data without
+ * compression to the LZ4 archive. If linked blocked mode is used the memory
+ * of the dictionary is kept free.
+ * This way uncompressed data does not influence the effectiveness of the
+ * dictionary.
+ * @param LZ4_dict Pointer to the dictionary to get the size of.
+ * @param dictSize The maximum dictionary size. (Normally 64 KB).
+ * @return The size of the dictionary.
+ */
+LZ4LIB_STATIC_API int LZ4_getDictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize);
 
 #if defined (__cplusplus)
 }

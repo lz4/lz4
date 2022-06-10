@@ -1679,7 +1679,17 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
     return result;
 }
 
-int LZ4_DictSize (LZ4_stream_t* LZ4_dict, int dictSize)
+/*! LZ4_getDictSize():
+ * Get the size of the dictionary. This can be used for adding data without
+ * compression to the LZ4 archive. If linked blocked mode is used the memory
+ * of the dictionary is kept free.
+ * This way uncompressed data does not influence the effectiveness of the
+ * dictionary.
+ * @param LZ4_dict Pointer to the dictionary to get the size of.
+ * @param dictSize The maximum dictionary size. (Normally 64 KB).
+ * @return The size of the dictionary.
+ */
+int LZ4_getDictSize (LZ4_stream_t* LZ4_dict, int dictSize)
 {
   LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
 
@@ -1699,7 +1709,7 @@ int LZ4_DictSize (LZ4_stream_t* LZ4_dict, int dictSize)
 int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 {
     LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
-    dictSize = LZ4_DictSize(LZ4_dict, dictSize);
+    dictSize = LZ4_getDictSize(LZ4_dict, dictSize);
     DEBUGLOG(5, "LZ4_saveDict : dictSize=%i, safeBuffer=%p", dictSize, safeBuffer);
 
     if (safeBuffer == NULL) assert(dictSize == 0);

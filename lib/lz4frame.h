@@ -160,11 +160,6 @@ typedef enum {
     LZ4F_OBSOLETE_ENUM(skippableFrame)
 } LZ4F_frameType_t;
 
-typedef enum {
-  LZ4B_COMPRESSED,
-  LZ4B_UNCOMPRESSED
-} LZ4F_blockCompression_t;
-
 #ifdef LZ4F_ENABLE_OBSOLETE_ENUMS
 typedef LZ4F_blockSizeID_t blockSizeID_t;
 typedef LZ4F_blockMode_t blockMode_t;
