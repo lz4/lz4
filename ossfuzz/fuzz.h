@@ -41,6 +41,11 @@ extern "C" {
 
 int LLVMFuzzerTestOneInput(const uint8_t *src, size_t size);
 
+/**
+ * Test if injection of uncompressed data into a stream is working properly
+ */
+int LLVMFuzzerUncompressedDataInjection(const uint8_t *data, size_t size)
+
 #ifdef __cplusplus
 }
 #endif

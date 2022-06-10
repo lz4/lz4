@@ -13,6 +13,7 @@
 
 #include <getopt.h>
 #include <lz4frame.h>
+#include <lz4frame_static.h>
 
 #define IN_CHUNK_SIZE  (16*1024)
 

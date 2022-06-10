@@ -192,32 +192,16 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  
 </p></pre><BR>
 
-<pre><b>size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
-                                       void* dstBuffer, size_t dstCapacity,
-                                       const void* srcBuffer, size_t srcSize,
-                                       const LZ4F_compressOptions_t* cOptPtr);
-/*! LZ4F_flush() :
- *  When data must be generated and sent immediately, without waiting for a block to be completely filled,
- *  it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.
- * `dstCapacity` must be large enough to ensure the operation will be successful.
- * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
- * @return : nb of bytes written into dstBuffer (can be zero, when there is no data stored within cctx)
- *           or an error code if it fails (which can be tested using LZ4F_isError())
- *  Note : LZ4F_flush() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
- */
-size_t LZ4F_flush(LZ4F_cctx* cctx,
+<pre><b>size_t LZ4F_flush(LZ4F_cctx* cctx,
                               void* dstBuffer, size_t dstCapacity,
                         const LZ4F_compressOptions_t* cOptPtr);
-</b><p>  LZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.
-  Important rule: dstCapacity MUST be large enough to store the entire source buffer as
-  no compression is done for this operation
-  If this condition is not respected, LZ4F_uncompressedUpdate() will fail (result is an errorCode).
-  After an error, the state is left in a UB state, and must be re-initialized or freed.
-  If previously a compressed block was written, buffered data is flushed
-  before appending uncompressed data is continued.
- `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
- @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
+</b><p>  When data must be generated and sent immediately, without waiting for a block to be completely filled,
+  it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.
+ `dstCapacity` must be large enough to ensure the operation will be successful.
+ `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
+ @return : nb of bytes written into dstBuffer (can be zero, when there is no data stored within cctx)
            or an error code if it fails (which can be tested using LZ4F_isError())
+  Note : LZ4F_flush() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
  
 </p></pre><BR>
 
@@ -360,6 +344,23 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 <pre><b>typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
               _LZ4F_dummy_error_enum_for_c89_never_used } LZ4F_errorCodes;
 </b></pre><BR>
+<pre><b>LZ4FLIB_STATIC_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
+                                                  void* dstBuffer, size_t dstCapacity,
+                                                  const void* srcBuffer, size_t srcSize,
+                                                  const LZ4F_compressOptions_t* cOptPtr);
+</b><p>  LZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.
+  Important rule: dstCapacity MUST be large enough to store the entire source buffer as
+  no compression is done for this operation
+  If this condition is not respected, LZ4F_uncompressedUpdate() will fail (result is an errorCode).
+  After an error, the state is left in a UB state, and must be re-initialized or freed.
+  If previously a compressed block was written, buffered data is flushed
+  before appending uncompressed data is continued.
+ `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
+ @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
+           or an error code if it fails (which can be tested using LZ4F_isError())
+ 
+</p></pre><BR>
+
 <a name="Chapter11"></a><h2>Bulk processing dictionary API</h2><pre></pre>
 
 <pre><b>LZ4FLIB_STATIC_API LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
