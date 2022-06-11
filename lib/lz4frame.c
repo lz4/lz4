@@ -1047,7 +1047,7 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
  *           or an error code if it fails (which can be tested using LZ4F_isError())
  *  After an error, the state is left in a UB state, and must be re-initialized.
  */
-LZ4FLIB_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctxPtr,
+LZ4FLIB_STATIC_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctxPtr,
                                                void* dstBuffer, size_t dstCapacity,
                                                const void* srcBuffer, size_t srcSize,
                                                const LZ4F_compressOptions_t* compressOptionsPtr) {
