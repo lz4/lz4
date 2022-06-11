@@ -415,7 +415,7 @@ LZ4LIB_STATIC_API void LZ4_attach_HC_dictionary(
  * @param dictSize The maximum dictionary size. (Normally 64 KB).
  * @return The size of the dictionary.
  */
-LZ4LIB_STATIC_API int LZ4_getDictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize);
+LZ4LIB_STATIC_API int LZ4_getDictHCSize(const LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize);
 
 #if defined (__cplusplus)
 }

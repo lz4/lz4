@@ -1689,9 +1689,9 @@ int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char*
  * @param dictSize The maximum dictionary size. (Normally 64 KB).
  * @return The size of the dictionary.
  */
-int LZ4_getDictSize (LZ4_stream_t* LZ4_dict, int dictSize)
+int LZ4_getDictSize (const LZ4_stream_t* LZ4_dict, int dictSize)
 {
-  LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
+  const LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
 
   if ((U32)dictSize > 64 KB) { dictSize = 64 KB; } /* useless to define a dictionary > 64 KB */
   if ((U32)dictSize > dict->dictSize) { dictSize = (int)dict->dictSize; }

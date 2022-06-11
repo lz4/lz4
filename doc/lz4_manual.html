@@ -391,7 +391,7 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  
 </p></pre><BR>
 
-<pre><b>LZ4LIB_STATIC_API int LZ4_getDictSize (LZ4_stream_t* LZ4_dict, int dictSize);
+<pre><b>LZ4LIB_STATIC_API int LZ4_getDictSize (const LZ4_stream_t* LZ4_dict, int dictSize);
 </b><p> Get the size of the dictionary. This can be used for adding data without
  compression to the LZ4 archive. If linked blocked mode is used the memory
  of the dictionary is kept free.

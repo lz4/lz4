@@ -1164,8 +1164,8 @@ int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const ch
  * @param dictSize The maximum dictionary size. (Normally 64 KB).
  * @return The size of the dictionary.
  */
-int LZ4_getDictHCSize(LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize) {
-  LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
+int LZ4_getDictHCSize(const LZ4_streamHC_t* LZ4_streamHCPtr, int dictSize) {
+  const LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
   int const prefixSize = (int)(streamPtr->end - (streamPtr->base + streamPtr->dictLimit));
   DEBUGLOG(5, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
   assert(prefixSize >= 0);

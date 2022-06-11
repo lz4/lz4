@@ -519,7 +519,7 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
  * @param dictSize The maximum dictionary size. (Normally 64 KB).
  * @return The size of the dictionary.
  */
-LZ4LIB_STATIC_API int LZ4_getDictSize (LZ4_stream_t* LZ4_dict, int dictSize);
+LZ4LIB_STATIC_API int LZ4_getDictSize (const LZ4_stream_t* LZ4_dict, int dictSize);
 
 /*! In-place compression and decompression
  *
