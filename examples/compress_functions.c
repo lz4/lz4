@@ -48,7 +48,7 @@
  *               Special Note About Decompression:
  *               Using the LZ4_decompress_safe() function protects against malicious (user) input.  If you are using data from a
  *               trusted source, or if your program is the producer (P) as well as its consumer (C) in a PC or MPMC setup, you can
- *               safely use the LZ4_decompress_fast function
+ *               safely use the LZ4_decompress_fast function.
  */
 
 /* Since lz4 compiles with c99 and not gnu/std99 we need to enable POSIX linking for time.h structs and functions. */

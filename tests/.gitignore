@@ -12,7 +12,7 @@ roundTripTest
 checkTag
 checkFrame
 decompress-partial
-
+decompress-partial-usingDict
 # test artefacts
 tmp*
 versionsTest
