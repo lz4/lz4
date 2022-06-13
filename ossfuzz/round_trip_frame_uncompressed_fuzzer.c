@@ -15,7 +15,7 @@
 #include "lz4frame.h"
 #include "lz4frame_static.h"
 
-static void decompress_data(LZ4F_dctx *dctx, void *src, void *dst,
+static void decompress(LZ4F_dctx *dctx, void *src, void *dst,
                            size_t dstCapacity, size_t readSize) {
   size_t ret = 1;
   const void *srcPtr = (const char *)src;
@@ -40,9 +40,8 @@ static void decompress_data(LZ4F_dctx *dctx, void *src, void *dst,
   }
 }
 
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
-  LZ4F_preferences_t const prefs = FUZZ_dataProducer_preferences(producer);
+static void compress_round_trip(const uint8_t* data, size_t size,
+                                FUZZ_dataProducer_t *producer, LZ4F_preferences_t const prefs) {
   size = FUZZ_dataProducer_remainingBytes(producer);
 
   uint8_t *uncompressedData = malloc(size);
@@ -103,7 +102,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
   FUZZ_ASSERT(dctx);
 
-  decompress_data(dctx, dst, rt, rtCapacity, compressedSize);
+  decompress(dctx, dst, rt, rtCapacity, compressedSize);
 
   LZ4F_freeDecompressionContext(dctx);
 
@@ -123,5 +122,25 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   FUZZ_dataProducer_free(producer);
   FUZZ_dataProducer_free(uncompressedProducer);
   LZ4F_freeCompressionContext(ctx);
+}
+
+static void compress_linked_block_mode(const uint8_t* data, size_t size) {
+  FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
+  LZ4F_preferences_t prefs = FUZZ_dataProducer_preferences(producer);
+  prefs.frameInfo.blockMode = LZ4F_blockLinked;
+  compress_round_trip(data, size, producer, prefs);
+}
+
+static void compress_independent_block_mode(const uint8_t* data, size_t size) {
+  FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
+  LZ4F_preferences_t prefs = FUZZ_dataProducer_preferences(producer);
+  prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+  compress_round_trip(data, size, producer, prefs);
+}
+
+
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  compress_linked_block_mode(data, size);
+  compress_independent_block_mode(data, size);
   return 0;
 }
