@@ -361,7 +361,7 @@ UTIL_STATIC int UTIL_getFDStat(int fd, stat_t *statbuf)
     if (r || !(statbuf->st_mode & S_IFREG)) return 0;   /* No good... */
 #else
     r = fstat(fd, statbuf);
-    if (r || !S_ISREG(statbuf->st_mode)) return 0;   /* No good... */
+    if (r || (!S_ISREG(statbuf->st_mode) && !S_ISBLK(statbuf->st_mode))) return 0;   /* No good... */
 #endif
     return 1;
 }
