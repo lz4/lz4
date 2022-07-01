@@ -250,7 +250,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
-
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
         MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
@@ -261,6 +260,21 @@ jobs:
         make V=1 clean
         CC="c++ -Wno-deprecated" make V=1 -C tests fullbench-wmalloc  # stricter function signature check
 
+  # test block device compression #1086
+  lz4cli-block-device:
+    name: Test lz4 compression on a block device
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - name: create a block device, compress it with lz4 # alternative : blindly use /dev/loop0, seems to always exist
+      run: |
+        make lz4
+        dd if=/dev/zero of=full0.img bs=2M count=1
+        BLOCK_DEVICE=$(sudo losetup --show -fP full0.img)
+        sudo chmod 666 $BLOCK_DEVICE
+        ./lz4 -v $BLOCK_DEVICE -c > /dev/null
+        sudo losetup -d $BLOCK_DEVICE
+        rm full0.img
 
 
 ###############################################################
