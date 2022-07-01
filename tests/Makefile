@@ -293,7 +293,7 @@ test-lz4-multiple: lz4 datagen
 	# test lz4-compressed file
 	$(LZ4) -tm tmp-tlm-concat1.lz4
 	$(LZ4) -tm tmp-tlm-concat1.lz4 tmp-tlm-concat2.lz4
-	# compress multiple lz4 files, one of which is absent (must fail)
+	# test multiple lz4 files, one of which is absent (must fail)
 	! $(LZ4) -tm tmp-tlm-concat1.lz4 notHere.lz4 tmp-tlm-concat2.lz4
 	@$(RM) tmp-tlm*
 

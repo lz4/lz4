@@ -685,8 +685,8 @@ UTIL_createFileList(const char** inputNames, unsigned inputNamesNb,
 UTIL_STATIC void
 UTIL_freeFileList(const char** filenameTable, char* allocatedBuffer)
 {
-    if (allocatedBuffer) free(allocatedBuffer);
-    if (filenameTable) free((void*)filenameTable);
+    free(allocatedBuffer);
+    free((void*)filenameTable);
 }
 
 

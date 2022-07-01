@@ -331,9 +331,8 @@ int main(int argc, const char** argv)
     const char extension[] = LZ4_EXTENSION;
     size_t blockSize = LZ4IO_setBlockSizeID(prefs, LZ4_BLOCKSIZEID_DEFAULT);
     const char* const exeName = lastNameFromPath(argv[0]);
-#ifdef UTIL_HAS_CREATEFILELIST
-    const char** extendedFileList = NULL;
     char* fileNamesBuf = NULL;
+#ifdef UTIL_HAS_CREATEFILELIST
     unsigned fileNamesNb, recursive=0;
 #endif
 
@@ -622,7 +621,7 @@ int main(int argc, const char** argv)
         input_filename = inFileNames[0];
 #ifdef UTIL_HAS_CREATEFILELIST
         if (recursive) {  /* at this stage, filenameTable is a list of paths, which can contain both files and directories */
-            extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
+            const char** extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
             if (extendedFileList) {
                 unsigned u;
                 for (u=0; u<fileNamesNb; u++) DISPLAYLEVEL(4, "%u %s\n", u, extendedFileList[u]);
@@ -770,10 +769,7 @@ int main(int argc, const char** argv)
 _cleanup:
     if (main_pause) waitEnter();
     free(dynNameSpace);
-#ifdef UTIL_HAS_CREATEFILELIST
-    UTIL_freeFileList(extendedFileList, fileNamesBuf);
-    inFileNames = NULL;
-#endif
+    free(fileNamesBuf);
     LZ4IO_freePreferences(prefs);
     free((void*)inFileNames);
     return operationResult;
