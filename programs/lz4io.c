@@ -348,7 +348,7 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* con
                     DISPLAY("%s already exists; not overwritten  \n", dstFileName);
                     return NULL;
                 }
-                DISPLAY("%s already exists; do you wish to overwrite (y/N) ? ", dstFileName);
+                DISPLAY("%s already exists; do you want to overwrite (y/N) ? ", dstFileName);
                 {   int ch = getchar();
                     if ((ch!='Y') && (ch!='y')) {
                         DISPLAY("    not overwritten  \n");

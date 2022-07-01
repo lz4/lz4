@@ -314,6 +314,7 @@ int main(int argc, const char** argv)
         cLevelLast=-10000,
         legacy_format=0,
         forceStdout=0,
+        forceOverwrite=0,
         main_pause=0,
         multiple_inputs=0,
         all_arguments_are_files=0,
@@ -491,7 +492,7 @@ int main(int argc, const char** argv)
                 case 't': mode = om_test; break;
 
                     /* Overwrite */
-                case 'f': LZ4IO_setOverwrite(prefs, 1); break;
+                case 'f': forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); break;
 
                     /* Verbose mode */
                 case 'v': displayLevel++; break;
@@ -581,20 +582,24 @@ int main(int argc, const char** argv)
         }
 
         /* Store in *inFileNames[] if -m is used. */
-        if (multiple_inputs) { inFileNames[ifnIdx++]=argument; continue; }
+        if (multiple_inputs) { inFileNames[ifnIdx++] = argument; continue; }
 
-        /* Store first non-option arg in input_filename to preserve original cli logic. */
-        if (!input_filename) { input_filename=argument; continue; }
+        /* original cli logic : lz4 input output */
+        /* First non-option arg is input_filename. */
+        if (!input_filename) { input_filename = argument; continue; }
 
-        /* Second non-option arg in output_filename to preserve original cli logic. */
+        /* Second non-option arg is output_filename */
         if (!output_filename) {
-            output_filename=argument;
+            output_filename = argument;
             if (!strcmp (output_filename, nullOutput)) output_filename = nulmark;
             continue;
         }
 
-        /* 3rd non-option arg should not exist */
-        DISPLAYLEVEL(1, "Warning : %s won't be used ! Do you want multiple input files (-m) ? \n", argument);
+        /* 3rd+ non-option arg should not exist */
+        DISPLAYLEVEL(1, "%s : %s won't be used ! Do you want multiple input files (-m) ? \n",
+            forceOverwrite ? "Warning" : "Error",
+            argument);
+        if (!forceOverwrite) exit(1);
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
@@ -659,8 +664,7 @@ int main(int argc, const char** argv)
     if (!strcmp(input_filename, stdinmark)) {
         /* if input==stdin and no output defined, stdout becomes default output */
         if (!output_filename) output_filename = stdoutmark;
-    }
-    else{
+    } else {
 #ifdef UTIL_HAS_CREATEFILELIST
         if (!recursive && !UTIL_isRegFile(input_filename)) {
 #else
@@ -668,8 +672,7 @@ int main(int argc, const char** argv)
 #endif
             DISPLAYLEVEL(1, "%s: is not a regular file \n", input_filename);
             exit(1);
-        }
-    }
+    }   }
 
     /* No output filename ==> try to select one automatically (when possible) */
     while ((!output_filename) && (multiple_inputs==0)) {
@@ -679,7 +682,7 @@ int main(int argc, const char** argv)
              * To ensure `stdout` is explicitly selected, use `-c` command flag.
              * Conversely, to ensure output will not become `stdout`, use `-m` command flag */
             DISPLAYLEVEL(1, "Warning : using stdout as default output. Do not rely on this behavior: use explicit `-c` instead ! \n");
-            output_filename=stdoutmark;
+            output_filename = stdoutmark;
             break;
         }
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
@@ -695,7 +698,7 @@ int main(int argc, const char** argv)
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
             break;
         }
-        if (mode == om_decompress) {/* decompression to file (automatic name will work only if input filename has correct format extension) */
+        if (mode == om_decompress) {/* decompress to file (automatic output name only works if input filename has correct format extension) */
             size_t outl;
             size_t const inl = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,inl+1);
@@ -704,20 +707,17 @@ int main(int argc, const char** argv)
             outl = inl;
             if (inl>4)
                 while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) dynNameSpace[outl--]=0;
-            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(exeName); }
+            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename \n"); badusage(exeName); }
             output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
         }
         break;
     }
 
-    if (mode == om_list){
-        if(!multiple_inputs){
-            inFileNames[ifnIdx++] = input_filename;
-        }
-    }
-    else{
-        if (multiple_inputs==0) assert(output_filename);
+    if (mode == om_list) {
+        if (!multiple_inputs) inFileNames[ifnIdx++] = input_filename;
+    } else {
+        if (!multiple_inputs) assert(output_filename != NULL);
     }
     /* when multiple_inputs==1, output_filename may simply be useless,
      * however, output_filename must be !NULL for next strcmp() tests */
@@ -775,10 +775,8 @@ _cleanup:
     if (main_pause) waitEnter();
     free(dynNameSpace);
 #ifdef UTIL_HAS_CREATEFILELIST
-    if (extendedFileList) {
-        UTIL_freeFileList(extendedFileList, fileNamesBuf);
-        inFileNames = NULL;
-    }
+    UTIL_freeFileList(extendedFileList, fileNamesBuf);
+    inFileNames = NULL;
 #endif
     LZ4IO_freePreferences(prefs);
     free((void*)inFileNames);

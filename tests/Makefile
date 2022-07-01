@@ -154,6 +154,7 @@ endif
 
 # note : we should probably settle on a single compare utility
 CMP:=cmp
+GREP:=grep
 DIFF:=diff
 ifneq (,$(filter $(shell $(UNAME)),SunOS))
 DIFF:=gdiff
@@ -347,8 +348,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(LZ4) --rm -f tmp-tlb-hw tmp-tlb-hw.lz4
 	test ! -f tmp-tlb-hw                      # must fail (--rm)
 	test   -f tmp-tlb-hw.lz4
-	$(PRGDIR)/lz4cat tmp-tlb-hw.lz4           # must display hello world
-	test   -f tmp-tlb-hw.lz4
+	$(PRGDIR)/lz4cat tmp-tlb-hw.lz4 | $(GREP) "hello world"
 	$(PRGDIR)/unlz4 --rm tmp-tlb-hw.lz4 tmp-tlb-hw
 	test   -f tmp-tlb-hw
 	test ! -f tmp-tlb-hw.lz4                  # must fail (--rm)
@@ -369,7 +369,8 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(LZ4) -d --rm -- -z tmp-tlb4          # uncompresses ./-z into tmp-tlb4
 	test ! -f ./-z
 	$(DIFF) -q tmp-tlb-hw tmp-tlb4
-	$(LZ4) -f tmp-tlb-hw
+	! $(LZ4) tmp-tlb2 tmp-tlb3 tmp-tlb4    # must fail: refuse to handle 3+ file names
+	$(LZ4) -f tmp-tlb-hw                   # create tmp-tlb-hw.lz4, for next tests
 	$(LZ4) --list tmp-tlb-hw.lz4           # test --list on valid single-frame file
 	$(LZ4) --list < tmp-tlb-hw.lz4         # test --list from stdin (file only)
 	$(CAT) tmp-tlb-hw >> tmp-tlb-hw.lz4
@@ -390,7 +391,6 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(LZ4) tmp-tlb-test.lz4 tmp-tlb-test2
 	$(DIFF) -q tmp-tlb-test tmp-tlb-test2
 	@$(RM) tmp-tlb*
-
 
 
 test-lz4-dict: lz4 datagen
@@ -415,7 +415,6 @@ test-lz4-dict: lz4 datagen
 		< tmp-dict-$$l      $(LZ4) -D stdin tmp-dict-data-128KB -c | $(LZ4) -dD tmp-dict-$$l-tail | $(DIFF) - tmp-dict-data-128KB; \
 		< tmp-dict-$$l-tail $(LZ4) -D stdin tmp-dict-data-128KB -c | $(LZ4) -dD tmp-dict-$$l      | $(DIFF) - tmp-dict-data-128KB; \
 	done
-
 	@$(RM) tmp-dict*
 
 test-lz4-hugefile: lz4 datagen
