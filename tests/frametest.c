@@ -54,7 +54,7 @@
 /* unoptimized version; solves endianness & alignment issues */
 static void FUZ_writeLE32 (void* dstVoidPtr, U32 value32)
 {
-    BYTE* dstPtr = (BYTE*)dstVoidPtr;
+    BYTE* const dstPtr = (BYTE*)dstVoidPtr;
     dstPtr[0] = (BYTE) value32;
     dstPtr[1] = (BYTE)(value32 >> 8);
     dstPtr[2] = (BYTE)(value32 >> 16);
@@ -1015,18 +1015,38 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
             while (ip < iend) {
                 unsigned const nbBitsSeg = FUZ_rand(&randState) % maxBits;
                 size_t const sampleMax = (FUZ_rand(&randState) & ((1<<nbBitsSeg)-1)) + 1;
-                size_t const iSize = MIN(sampleMax, (size_t)(iend-ip));
+                size_t iSize = MIN(sampleMax, (size_t)(iend-ip));
                 size_t const oSize = LZ4F_compressBound(iSize, prefsPtr);
-                size_t flushedSize;
                 cOptions.stableSrc = ((FUZ_rand(&randState) & 3) == 1);
                 DISPLAYLEVEL(6, "Sending %u bytes to compress (stableSrc:%u) \n",
                                 (unsigned)iSize, cOptions.stableSrc);
 
-                flushedSize = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &cOptions);
-                CHECK(LZ4F_isError(flushedSize), "Compression failed (error %i : %s)",
+#if 1
+                /* insert uncompressed segment */
+                if ((iSize>0) && !neverFlush && ((FUZ_rand(&randState) & 15) == 1)) {
+                    size_t const uSize = FUZ_rand(&randState) % iSize;
+                    DISPLAYLEVEL(2, "insert %zu / %zu (blockSize=%uKB) \n", uSize, iSize, 1 << (2*prefs.frameInfo.blockSizeID - 2));
+                    {   size_t const flushedSize = LZ4F_uncompressedUpdate(cCtx, op, (size_t)(oend-op), ip, uSize, &cOptions);
+                        CHECK(LZ4F_isError(flushedSize), "Insert uncompressed data failed (error %i : %s)",
+                                (int)flushedSize, LZ4F_getErrorName(flushedSize));
+                        op += flushedSize;
+                        ip += uSize;
+                    }
+                    iSize -= uSize;
+                    {   size_t const flushedSize = LZ4F_flush(cCtx, op, (size_t)(oend-op), &cOptions);
+                        CHECK(LZ4F_isError(flushedSize), "Flush after LZ4F_uncompressedUpdate failed (error %i : %s)",
+                                (int)flushedSize, LZ4F_getErrorName(flushedSize));
+                        op += flushedSize;
+                    }
+                }
+#endif
+
+                {   size_t const flushedSize = LZ4F_compressUpdate(cCtx, op, oSize, ip, iSize, &cOptions);
+                    CHECK(LZ4F_isError(flushedSize), "Compression failed (error %i : %s)",
                             (int)flushedSize, LZ4F_getErrorName(flushedSize));
-                op += flushedSize;
-                ip += iSize;
+                    op += flushedSize;
+                    ip += iSize;
+                }
 
                 {   unsigned const forceFlush = neverFlush ? 0 : ((FUZ_rand(&randState) & 3) == 1);
                     if (forceFlush) {
@@ -1040,11 +1060,8 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                             op[3] = 0x80; /* 0x80000000U in little-endian format */
                             op += 4;
                             if ((prefsPtr!= NULL) && prefsPtr->frameInfo.blockChecksumFlag) {
-                                U32 const bc32 = XXH32(op, 0, 0);
-                                op[0] = (BYTE)bc32;  /* little endian format */
-                                op[1] = (BYTE)(bc32>>8);
-                                op[2] = (BYTE)(bc32>>16);
-                                op[3] = (BYTE)(bc32>>24);
+                                /* add block checksum (even for empty blocks) */
+                                FUZ_writeLE32(op, XXH32(op, 0, 0));
                                 op += 4;
                 }   }   }   }
             }  /* while (ip<iend) */
