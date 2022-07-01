@@ -1,0 +1,27 @@
+# Object files
+*.o
+*.ko
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+*.dSYM   # apple
+
+# Executables
+compress_frame_fuzzer
+compress_fuzzer
+compress_hc_fuzzer
+decompress_frame_fuzzer
+decompress_fuzzer
+round_trip_frame_fuzzer
+round_trip_fuzzer
+round_trip_hc_fuzzer
+round_trip_stream_fuzzer
+
+
