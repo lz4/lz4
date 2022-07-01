@@ -654,17 +654,19 @@ int main(int argc, const char** argv)
         mode = om_decompress;   /* defer to decompress */
     }
 
-    /* compress or decompress */
+    /* No input provided => use stdin */
     if (!input_filename) input_filename = stdinmark;
-    /* Check if input is defined as console; trigger an error in this case */
+
+    /* Refuse to use the console as input */
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) {
         DISPLAYLEVEL(1, "refusing to read from a console\n");
         exit(1);
     }
+
     if (!strcmp(input_filename, stdinmark)) {
         /* if input==stdin and no output defined, stdout becomes default output */
         if (!output_filename) output_filename = stdoutmark;
-    } else {
+    } else {  /* input != stdin, so it's a file name */
 #ifdef UTIL_HAS_CREATEFILELIST
         if (!recursive && !UTIL_isRegFile(input_filename)) {
 #else

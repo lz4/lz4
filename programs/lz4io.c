@@ -103,7 +103,25 @@ static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result 
         }   }
 static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_time = 0;
+
 #define LZ4IO_STATIC_ASSERT(c)   { enum { LZ4IO_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
+
+
+/**************************************
+*  Exceptions
+***************************************/
+#ifndef DEBUG
+#  define DEBUG 0
+#endif
+#define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
+#define EXM_THROW(error, ...)                                             \
+{                                                                         \
+    DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
+    DISPLAYLEVEL(1, "Error %i : ", error);                                \
+    DISPLAYLEVEL(1, __VA_ARGS__);                                         \
+    DISPLAYLEVEL(1, " \n");                                               \
+    exit(error);                                                          \
+}
 
 
 /**************************************
@@ -127,27 +145,6 @@ struct LZ4IO_prefs_s {
     int removeSrcFile;
 };
 
-/**************************************
-*  Exceptions
-***************************************/
-#ifndef DEBUG
-#  define DEBUG 0
-#endif
-#define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
-#define EXM_THROW(error, ...)                                             \
-{                                                                         \
-    DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                \
-    DISPLAYLEVEL(1, __VA_ARGS__);                                         \
-    DISPLAYLEVEL(1, " \n");                                               \
-    exit(error);                                                          \
-}
-
-
-/**************************************
-*  Version modifiers
-**************************************/
-#define DEFAULT_DECOMPRESSOR LZ4IO_decompressLZ4F
 
 
 /* ************************************************** */
@@ -295,6 +292,26 @@ void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* const prefs, unsigned flag)
 
 
 /* ************************************************************************ **
+** ********************** String functions ********************* **
+** ************************************************************************ */
+
+static int LZ4IO_isDevNull(const char* s)
+{
+    return UTIL_sameString(s, nulmark);
+}
+
+static int LZ4IO_isStdin(const char* s)
+{
+    return UTIL_sameString(s, stdinmark);
+}
+
+static int LZ4IO_isStdout(const char* s)
+{
+    return UTIL_sameString(s, stdoutmark);
+}
+
+
+/* ************************************************************************ **
 ** ********************** LZ4 File / Pipe compression ********************* **
 ** ************************************************************************ */
 
@@ -310,13 +327,13 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 {
     FILE* f;
 
-    if (!strcmp (srcFileName, stdinmark)) {
-        DISPLAYLEVEL(4,"Using stdin for input\n");
+    if (LZ4IO_isStdin(srcFileName)) {
+        DISPLAYLEVEL(4,"Using stdin for input \n");
         f = stdin;
         SET_BINARY_MODE(stdin);
     } else {
         f = fopen(srcFileName, "rb");
-        if ( f==NULL ) DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(errno));
+        if (f==NULL) DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(errno));
     }
 
     return f;
@@ -331,7 +348,7 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* con
     FILE* f;
     assert(dstFileName != NULL);
 
-    if (!strcmp (dstFileName, stdoutmark)) {
+    if (LZ4IO_isStdout(dstFileName)) {
         DISPLAYLEVEL(4, "Using stdout for output \n");
         f = stdout;
         SET_BINARY_MODE(stdout);
@@ -340,7 +357,7 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* con
                             " to force-enable it, add --sparse command \n");
         }
     } else {
-        if (!prefs->overwrite && strcmp (dstFileName, nulmark)) {  /* Check if destination file already exists */
+        if (!prefs->overwrite && !LZ4IO_isDevNull(dstFileName)) {  /* Check if destination file already exists */
             FILE* const testf = fopen( dstFileName, "rb" );
             if (testf != NULL) {  /* dest exists, prompt for overwrite authorization */
                 fclose(testf);
@@ -474,7 +491,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output
     free(in_buff);
     free(out_buff);
     fclose(finput);
-    if (strcmp(output_filename,stdoutmark)) fclose(foutput);   /* do not close stdout */
+    if (!LZ4IO_isStdout(output_filename)) fclose(foutput);   /* do not close stdout */
 
     return 0;
 }
@@ -499,7 +516,7 @@ int LZ4IO_compressMultipleFilenames_Legacy(
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
-        if (!strcmp(suffix, stdoutmark)) {
+        if (LZ4IO_isStdout(suffix)) {
             missed_files += LZ4IO_compressFilename_Legacy(
                                     inFileNamesTable[i], stdoutmark,
                                     compressionLevel, prefs);
@@ -558,9 +575,9 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* const dictFilename)
     dictFile = LZ4IO_openSrcFile(dictFilename);
     if (!dictFile) EXM_THROW(25, "Dictionary error : could not open dictionary file");
 
-    /* opportunistically seek to the part of the file we care about. If this */
-    /* fails it's not a problem since we'll just read everything anyways.    */
-    if (strcmp(dictFilename, stdinmark)) {
+    /* opportunistically seek to the part of the file we care about.
+     * If this fails it's not a problem since we'll just read everything anyways. */
+    if (!LZ4IO_isStdin(dictFilename)) {
         (void)UTIL_fseek(dictFile, -LZ4_MAX_DICT_SIZE, SEEK_END);
     }
 
@@ -746,13 +763,13 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
 
     /* Release file handlers */
     fclose (srcFile);
-    if (strcmp(dstFileName,stdoutmark)) fclose (dstFile);  /* do not close stdout */
+    if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
-        if (strcmp (srcFileName, stdinmark)
-         && strcmp (dstFileName, stdoutmark)
-         && strcmp (dstFileName, nulmark)
+        if (!LZ4IO_isStdin(srcFileName)
+         && !LZ4IO_isStdout(dstFileName)
+         && !LZ4IO_isDevNull(dstFileName)
          && UTIL_getFileStat(srcFileName, &statbuf)) {
             UTIL_setFileStat(dstFileName, &statbuf);
     }   }
@@ -815,12 +832,13 @@ int LZ4IO_compressMultipleFilenames(
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
-        if (!strcmp(suffix, stdoutmark)) {
+        if (LZ4IO_isStdout(suffix)) {
             missed_files += LZ4IO_compressFilename_extRess(ress,
                                     inFileNamesTable[i], stdoutmark,
                                     compressionLevel, prefs);
             continue;
         }
+        /* suffix != stdout => compress into a file => generate its name */
         if (ofnSize <= ifnSize+suffixSize+1) {
             free(dstFileName);
             ofnSize = ifnSize + 20;
@@ -1275,7 +1293,7 @@ LZ4IO_decompressDstFile(dRess_t ress,
     FILE* const foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput==NULL) return 1;   /* failure */
 
-    if ( strcmp(input_filename, stdinmark)
+    if ( !LZ4IO_isStdin(input_filename)
       && UTIL_getFileStat(input_filename, &statbuf))
         stat_result = 1;
 
@@ -1286,8 +1304,8 @@ LZ4IO_decompressDstFile(dRess_t ress,
 
     /* Copy owner, file permissions and modification time */
     if ( stat_result != 0
-      && strcmp (output_filename, stdoutmark)
-      && strcmp (output_filename, nulmark)) {
+      && !LZ4IO_isStdout(output_filename)
+      && !LZ4IO_isDevNull(output_filename)) {
         UTIL_setFileStat(output_filename, &statbuf);
         /* should return value be read ? or is silent fail good enough ? */
     }
@@ -1331,7 +1349,7 @@ int LZ4IO_decompressMultipleFilenames(
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
-        if (!strcmp(suffix, stdoutmark)) {
+        if (LZ4IO_isStdout(suffix)) {
             missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], stdoutmark, prefs);
             continue;
         }
@@ -1341,7 +1359,7 @@ int LZ4IO_decompressMultipleFilenames(
             outFileName = (char*)malloc(ofnSize);
             if (outFileName==NULL) EXM_THROW(71, "Memory allocation error");
         }
-        if (ifnSize <= suffixSize  ||  strcmp(suffixPtr, suffix) != 0) {
+        if (ifnSize <= suffixSize  || !UTIL_sameString(suffixPtr, suffix) ) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
             continue;
@@ -1662,7 +1680,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         /* Get file info */
         LZ4IO_cFileInfo_t cfinfo = LZ4IO_INIT_CFILEINFO;
         cfinfo.fileName = LZ4IO_baseName(inFileNames[idx]);
-        if ((strcmp(inFileNames[idx], stdinmark) == 0) ? !UTIL_isRegFD(0) : !UTIL_isRegFile(inFileNames[idx])) {
+        if (LZ4IO_isStdin(inFileNames[idx]) ? !UTIL_isRegFD(0) : !UTIL_isRegFile(inFileNames[idx])) {
             DISPLAYLEVEL(1, "lz4: %s is not a regular file \n", inFileNames[idx]);
             return 1;
         }
