@@ -666,15 +666,7 @@ int main(int argc, const char** argv)
     if (!strcmp(input_filename, stdinmark)) {
         /* if input==stdin and no output defined, stdout becomes default output */
         if (!output_filename) output_filename = stdoutmark;
-    } else {  /* input != stdin, so it's a file name */
-#ifdef UTIL_HAS_CREATEFILELIST
-        if (!recursive && !UTIL_isRegFile(input_filename)) {
-#else
-        if (!UTIL_isRegFile(input_filename)) {
-#endif
-            DISPLAYLEVEL(1, "%s: is not a regular file \n", input_filename);
-            exit(1);
-    }   }
+    }
 
     /* No output filename ==> try to select one automatically (when possible) */
     while ((!output_filename) && (multiple_inputs==0)) {
