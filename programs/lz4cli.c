@@ -739,8 +739,10 @@ int main(int argc, const char** argv)
     if (ifnIdx == 0) multiple_inputs = 0;
     if (mode == om_decompress) {
         if (multiple_inputs) {
-            const char* const dec_extension = !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION;
-            assert(ifnIdx <= INT_MAX);
+            const char* dec_extension = LZ4_EXTENSION;
+            if (!strcmp(output_filename, stdoutmark)) dec_extension = stdoutmark;
+            if (!strcmp(output_filename, nulmark)) dec_extension = nulmark;
+            assert(ifnIdx < INT_MAX);
             operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, (int)ifnIdx, dec_extension, prefs);
         } else {
             operationResult = DEFAULT_DECOMPRESSOR(input_filename, output_filename, prefs);

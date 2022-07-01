@@ -1343,8 +1343,8 @@ int LZ4IO_decompressMultipleFilenames(
     for (i=0; i<ifntSize; i++) {
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
-        if (LZ4IO_isStdout(suffix)) {
-            missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], stdoutmark, prefs);
+        if (LZ4IO_isStdout(suffix) || LZ4IO_isDevNull(suffix)) {
+            missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], suffix, prefs);
             continue;
         }
         if (ofnSize <= ifnSize-suffixSize+1) {
