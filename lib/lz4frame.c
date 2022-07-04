@@ -886,7 +886,7 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     size_t const blockSize = cctxPtr->maxBlockSize;
     const BYTE* srcPtr = (const BYTE*)srcBuffer;
     const BYTE* const srcEnd = srcPtr + srcSize;
-    BYTE* const dstStart = (BYTE*)dstBuffer;
+    BYTE* dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
     LZ4F_lastBlockStatus lastBlockCompressed = notDone;
     compressFunc_t const compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel);
@@ -896,6 +896,9 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     /* flush currently written block, to continue with new block compression */
     if (cctxPtr->blockCompression != blockCompression) {
       bytesWritten = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
+      dstStart = (BYTE*)dstBuffer + bytesWritten;
+      dstPtr = dstStart;
+      dstCapacity -= bytesWritten;
       cctxPtr->blockCompression = blockCompression;
     }
 
