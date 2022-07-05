@@ -1023,21 +1023,18 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
 #if 1
                 /* insert uncompressed segment */
-                if ((iSize>0) && !neverFlush && ((FUZ_rand(&randState) & 15) == 1)) {
+                if ( (iSize>0)
+                  && !neverFlush   /* do not mess with compressBound when neverFlush is set */
+                  && prefsPtr != NULL   /* prefs are set */
+                  && prefs.frameInfo.blockMode == LZ4F_blockIndependent  /* uncompressedUpdate is only valid with blockMode==independent */
+                  && (FUZ_rand(&randState) & 15) == 1 ) {
                     size_t const uSize = FUZ_rand(&randState) % iSize;
-                    DISPLAYLEVEL(2, "insert %zu / %zu (blockSize=%uKB) \n", uSize, iSize, 1 << (2*prefs.frameInfo.blockSizeID - 2));
-                    {   size_t const flushedSize = LZ4F_uncompressedUpdate(cCtx, op, (size_t)(oend-op), ip, uSize, &cOptions);
-                        CHECK(LZ4F_isError(flushedSize), "Insert uncompressed data failed (error %i : %s)",
-                                (int)flushedSize, LZ4F_getErrorName(flushedSize));
-                        op += flushedSize;
-                        ip += uSize;
-                    }
+                    size_t const flushedSize = LZ4F_uncompressedUpdate(cCtx, op, (size_t)(oend-op), ip, uSize, &cOptions);
+                    CHECK(LZ4F_isError(flushedSize), "Insert uncompressed data failed (error %i : %s)",
+                            (int)flushedSize, LZ4F_getErrorName(flushedSize));
+                    op += flushedSize;
+                    ip += uSize;
                     iSize -= uSize;
-                    {   size_t const flushedSize = LZ4F_flush(cCtx, op, (size_t)(oend-op), &cOptions);
-                        CHECK(LZ4F_isError(flushedSize), "Flush after LZ4F_uncompressedUpdate failed (error %i : %s)",
-                                (int)flushedSize, LZ4F_getErrorName(flushedSize));
-                        op += flushedSize;
-                    }
                 }
 #endif
 
