@@ -1,27 +1,8 @@
-# Object files
-*.o
-*.ko
 
-# Libraries
-*.lib
-*.a
+# build artefacts
+round_trip_frame_uncompressed_fuzzer
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-*.dSYM   # apple
+# test artefacts
 
-# Executables
-compress_frame_fuzzer
-compress_fuzzer
-compress_hc_fuzzer
-decompress_frame_fuzzer
-decompress_fuzzer
-round_trip_frame_fuzzer
-round_trip_fuzzer
-round_trip_hc_fuzzer
-round_trip_stream_fuzzer
-
+# local tests
 
