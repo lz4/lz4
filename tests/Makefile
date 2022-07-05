@@ -127,7 +127,8 @@ clean:
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
         frameTest$(EXT) decompress-partial$(EXT) \
-		lz4_all.c
+        abiTest$(EXT) \
+        lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
@@ -138,6 +139,12 @@ versionsTest:
 .PHONY: listTest
 listTest: lz4
 	QEMU_SYS=$(QEMU_SYS) $(PYTHON) test-lz4-list.py
+
+abiTest: LDLIBS += -llz4
+
+.PHONY: abiTests
+abiTests:
+	$(PYTHON) test-lz4-abi.py
 
 checkTag: checkTag.c $(LZ4DIR)/lz4.h
 	$(CC) $(FLAGS) $< -o $@$(EXT)
