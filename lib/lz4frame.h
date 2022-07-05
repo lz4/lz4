@@ -306,6 +306,8 @@ LZ4FLIB_API size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* 
  *  This value is provided by LZ4F_compressBound().
  *  If this condition is not respected, LZ4F_compress() will fail (result is an errorCode).
  *  After an error, the state is left in a UB state, and must be re-initialized or freed.
+ *  If previously an uncompressed block was written, buffered data is flushed
+ *  before appending compressed data is continued.
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())
@@ -544,6 +546,24 @@ typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
 LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
+
+/*! LZ4F_uncompressedUpdate() :
+ *  LZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.
+ *  Important rule: dstCapacity MUST be large enough to store the entire source buffer as
+ *  no compression is done for this operation
+ *  If this condition is not respected, LZ4F_uncompressedUpdate() will fail (result is an errorCode).
+ *  After an error, the state is left in a UB state, and must be re-initialized or freed.
+ *  If previously a compressed block was written, buffered data is flushed
+ *  before appending uncompressed data is continued.
+ *  This is only supported when LZ4F_blockIndependent is used
+ * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
+ * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
+ *           or an error code if it fails (which can be tested using LZ4F_isError())
+ */
+LZ4FLIB_STATIC_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
+                                                  void* dstBuffer, size_t dstCapacity,
+                                                  const void* srcBuffer, size_t srcSize,
+                                                  const LZ4F_compressOptions_t* cOptPtr);
 
 /**********************************
  *  Bulk processing dictionary API

@@ -26,7 +26,7 @@ foreach e, src : examples
   executable(
     e,
     lz4_source_root / 'examples' / src,
-    dependencies: liblz4_dep,
+    dependencies: [liblz4_internal_dep],
     install: false
   )
 endforeach
