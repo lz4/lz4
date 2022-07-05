@@ -552,6 +552,7 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
  *  After an error, the state is left in a UB state, and must be re-initialized or freed.
  *  If previously a compressed block was written, buffered data is flushed
  *  before appending uncompressed data is continued.
+ *  This is only supported when LZ4F_blockIndependent is used
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())

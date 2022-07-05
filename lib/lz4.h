@@ -509,17 +509,6 @@ LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const c
  */
 LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream);
 
-/*! LZ4_getDictSize():
- * Get the size of the dictionary. This can be used for adding data without
- * compression to the LZ4 archive. If linked blocked mode is used the memory
- * of the dictionary is kept free.
- * This way uncompressed data does not influence the effectiveness of the
- * dictionary.
- * @param LZ4_dict Pointer to the dictionary to get the size of.
- * @param dictSize The maximum dictionary size. (Normally 64 KB).
- * @return The size of the dictionary.
- */
-LZ4LIB_STATIC_API int LZ4_getDictSize (const LZ4_stream_t* LZ4_dict, int dictSize);
 
 /*! In-place compression and decompression
  *
