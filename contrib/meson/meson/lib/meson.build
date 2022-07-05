@@ -43,7 +43,7 @@ liblz4_dep = declare_dependency(
   include_directories: include_directories(lz4_source_root / 'lib')
 )
 
-if get_option('tests') or get_option('programs')
+if get_option('tests') or get_option('programs') or get_option('examples')
   liblz4_internal = static_library(
     'lz4-internal',
     objects: liblz4.extract_all_objects(recursive: true),

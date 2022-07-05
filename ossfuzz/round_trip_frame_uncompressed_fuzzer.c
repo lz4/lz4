@@ -124,13 +124,6 @@ static void compress_round_trip(const uint8_t* data, size_t size,
   LZ4F_freeCompressionContext(ctx);
 }
 
-static void compress_linked_block_mode(const uint8_t* data, size_t size) {
-  FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
-  LZ4F_preferences_t prefs = FUZZ_dataProducer_preferences(producer);
-  prefs.frameInfo.blockMode = LZ4F_blockLinked;
-  compress_round_trip(data, size, producer, prefs);
-}
-
 static void compress_independent_block_mode(const uint8_t* data, size_t size) {
   FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
   LZ4F_preferences_t prefs = FUZZ_dataProducer_preferences(producer);
@@ -140,7 +133,6 @@ static void compress_independent_block_mode(const uint8_t* data, size_t size) {
 
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  compress_linked_block_mode(data, size);
   compress_independent_block_mode(data, size);
   return 0;
 }
