@@ -108,7 +108,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         free(partial);
     }
 
-    free(dst);
+    free(dstPlusLargePrefix);
     free(rt);
     FUZZ_dataProducer_free(producer);
 
