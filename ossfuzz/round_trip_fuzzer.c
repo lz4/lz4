@@ -23,13 +23,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     size_t const largeSize = 64 * 1024 - 1;
     size_t const smallSize = 1024;
     char* const dstPlusLargePrefix = (char*)malloc(dstCapacity + largeSize);
+    FUZZ_ASSERT(dstPlusLargePrefix);
     char* const dstPlusSmallPrefix = dstPlusLargePrefix + largeSize - smallSize;
     char* const largeDict = (char*)malloc(largeSize);
+    FUZZ_ASSERT(largeDict);
     char* const smallDict = largeDict + largeSize - smallSize;
     char* const dst = dstPlusLargePrefix + largeSize;
     char* const rt = (char*)malloc(size);
-
-    FUZZ_ASSERT(dst);
     FUZZ_ASSERT(rt);
 
     /* Compression must succeed and round trip correctly. */
@@ -109,6 +109,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     }
 
     free(dstPlusLargePrefix);
+    free(largeDict);
     free(rt);
     FUZZ_dataProducer_free(producer);
 
