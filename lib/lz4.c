@@ -686,7 +686,7 @@ typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
 int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 const char* LZ4_versionString(void) { return LZ4_VERSION_STRING; }
 int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
-int LZ4_sizeofState(void) { return LZ4_STREAMSIZE; }
+int LZ4_sizeofState(void) { return sizeof(LZ4_stream_t); }
 
 
 /*-****************************************
@@ -1443,7 +1443,7 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 LZ4_stream_t* LZ4_createStream(void)
 {
     LZ4_stream_t* const lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
-    LZ4_STATIC_ASSERT(LZ4_STREAMSIZE >= sizeof(LZ4_stream_t_internal));    /* A compilation error here means LZ4_STREAMSIZE is not large enough */
+    LZ4_STATIC_ASSERT(sizeof(LZ4_stream_t) >= sizeof(LZ4_stream_t_internal));
     DEBUGLOG(4, "LZ4_createStream %p", lz4s);
     if (lz4s == NULL) return NULL;
     LZ4_initStream(lz4s, sizeof(*lz4s));
@@ -2323,9 +2323,8 @@ int LZ4_decompress_fast_doubleDict(const char* source, char* dest, int originalS
 
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
-    LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOC_AND_ZERO(sizeof(LZ4_streamDecode_t));
-    LZ4_STATIC_ASSERT(LZ4_STREAMDECODESIZE >= sizeof(LZ4_streamDecode_t_internal));    /* A compilation error here means LZ4_STREAMDECODESIZE is not large enough */
-    return lz4s;
+    LZ4_STATIC_ASSERT(sizeof(LZ4_streamDecode_t) >= sizeof(LZ4_streamDecode_t_internal));
+    return (LZ4_streamDecode_t*) ALLOC_AND_ZERO(sizeof(LZ4_streamDecode_t));
 }
 
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
@@ -2550,7 +2549,7 @@ int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize,
 
 /* Obsolete Streaming functions */
 
-int LZ4_sizeofStreamState(void) { return LZ4_STREAMSIZE; }
+int LZ4_sizeofStreamState(void) { return sizeof(LZ4_stream_t); }
 
 int LZ4_resetStreamState(void* state, char* inputBuffer)
 {

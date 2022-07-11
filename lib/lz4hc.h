@@ -217,37 +217,36 @@ struct LZ4HC_CCtx_internal
 };
 
 
-/* Do not use these definitions directly !
+/* Never ever use these definitions directly !
  * Declare or allocate an LZ4_streamHC_t instead.
  * Note : OS400 uses 16 byte pointers and so the structure size is larger than other
  *        platforms
  *        |===========================================================
- *        |      Offset       |      Length       | Member Name       
+ *        |      Offset       |      Length       | Member Name
  *        |===========================================================
- *        |       0           |  131072           |  hashTable[32768] 
+ *        |       0           |  131072           |  hashTable[32768]
  *        |  131072           |  131072           |  chainTable[65536]
- *        |  262144           |      16           |  end              
- *        |  262160           |      16           |  base             
- *        |  262176           |      16           |  dictBase         
- *        |  262192           |       4           |  dictLimit        
- *        |  262196           |       4           |  lowLimit         
- *        |  262200           |       4           |  nextToUpdate     
- *        |  262204           |       2           |  compressionLevel 
- *        |  262206           |       1           |  favorDecSpeed    
- *        |  262207           |       1           |  dirty            
- *        |  262208           |      16           |  dictCtx           
+ *        |  262144           |      16           |  end
+ *        |  262160           |      16           |  base
+ *        |  262176           |      16           |  dictBase
+ *        |  262192           |       4           |  dictLimit
+ *        |  262196           |       4           |  lowLimit
+ *        |  262200           |       4           |  nextToUpdate
+ *        |  262204           |       2           |  compressionLevel
+ *        |  262206           |       1           |  favorDecSpeed
+ *        |  262207           |       1           |  dirty
+ *        |  262208           |      16           |  dictCtx
  *        ============================================================
  */
-#define LZ4_STREAMHCSIZE       (262200 + ((sizeof(void*)==16) ? 24 : 0)) /* static size, for inter-version compatibility */
-#define LZ4_STREAMHCSIZE_VOIDP (LZ4_STREAMHCSIZE / sizeof(void*))
+#define LZ4_STREAMHCSIZE  262200  /* static size, for inter-version compatibility */
 union LZ4_streamHC_u {
-    void* table[LZ4_STREAMHCSIZE_VOIDP];
     LZ4HC_CCtx_internal internal_donotuse;
+    char minStateSize[LZ4_STREAMHCSIZE];
 }; /* previously typedef'd to LZ4_streamHC_t */
 
 /* LZ4_streamHC_t :
  * This structure allows static allocation of LZ4 HC streaming state.
- * This can be used to allocate statically, on state, or as part of a larger structure.
+ * This can be used to allocate statically on stack, or as part of a larger structure.
  *
  * Such state **must** be initialized using LZ4_initStreamHC() before first use.
  *
@@ -262,7 +261,7 @@ union LZ4_streamHC_u {
  * Required before first use of a statically allocated LZ4_streamHC_t.
  * Before v1.9.0 : use LZ4_resetStreamHC() instead
  */
-LZ4LIB_API LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size);
+LZ4LIB_API LZ4_streamHC_t* LZ4_initStreamHC(void* buffer, size_t size);
 
 
 /*-************************************

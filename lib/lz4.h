@@ -623,34 +623,14 @@ typedef struct {
 
 
 /*! LZ4_stream_t :
- *  Do not use below internal definitions directly !
- *  Declare or allocate an LZ4_stream_t instead.
- *  LZ4_stream_t can also be created using LZ4_createStream(), which is recommended.
- *  The structure definition can be convenient for static allocation
- *  (on stack, or as part of larger structure).
- *  Init this structure with LZ4_initStream() before first use.
- *  note : only use this definition in association with static linking !
- *  this definition is not API/ABI safe, and may change in future versions.
- *  Note : OS400 pointers are 16 bytes and the compiler adds 8 bytes of padding after
- *  tableType and 12 bytes after dictSize to ensure the structure is word aligned:
- *  |=========================================================
- *  |      Offset       |      Length       | Member Name
- *  |=========================================================
- *  |       0           |   16384           |  hashTable[4096]
- *  |   16384           |       4           |  currentOffset
- *  |   16388           |       4           |  tableType
- *  |   16392           |       8           |  ***PADDING***
- *  |   16400           |      16           |  dictionary
- *  |   16416           |      16           |  dictCtx
- *  |   16432           |       4           |  dictSize
- *  |   16436           |      12           |  ***PADDING***
- *  ==========================================================
+ *  Never ever use below internal definitions directly !
+ *  These definitions are not API/ABI safe, and may change in future versions.
+ *  If you need static allocation, declare or allocate an LZ4_stream_t object.
  */
-#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + ((sizeof(void*)==16) ? 64 : 32))  /* static size, for inter-version compatibility */
-#define LZ4_STREAMSIZE_VOIDP (LZ4_STREAMSIZE / sizeof(void*))
+#define LZ4_STREAMSIZE  ((1UL << LZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
 union LZ4_stream_u {
-    void* table[LZ4_STREAMSIZE_VOIDP];
     LZ4_stream_t_internal internal_donotuse;
+    char minStateSize[LZ4_STREAMSIZE];
 }; /* previously typedef'd to LZ4_stream_t */
 
 
@@ -672,29 +652,14 @@ LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
 
 
 /*! LZ4_streamDecode_t :
- *  information structure to track an LZ4 stream during decompression.
- *  init this structure  using LZ4_setStreamDecode() before first use.
- *  note : only use in association with static linking !
- *         this definition is not API/ABI safe,
- *         and may change in a future version !
- *  Note : Same story as LZ4_STREAMSIZE for OS400 in terms of additional padding to 
- *         ensure pointers start on and structures finish on 16 byte boundaries
- *         |=========================================================
- *         |      Offset       |      Length       | Member Name
- *         |=========================================================
- *         |       0           |      16           |    externalDict 
- *         |      16           |       4           |    extDictSize  
- *         |      20           |      12           |    ***PADDING***
- *         |      32           |      16           |    prefixEnd    
- *         |      48           |       4           |    prefixSize   
- *         |      52           |      12           |    ***PADDING***
- *         ==========================================================
+ *  Never ever use below internal definitions directly !
+ *  These definitions are not API/ABI safe, and may change in future versions.
+ *  If you need static allocation, declare or allocate an LZ4_streamDecode_t object.
  */
-#define LZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 4 : 0))
-#define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
+#define LZ4_STREAMDECODESIZE 32
 union LZ4_streamDecode_u {
-    unsigned long long table[LZ4_STREAMDECODESIZE_U64];
     LZ4_streamDecode_t_internal internal_donotuse;
+    char minStateSize[LZ4_STREAMDECODESIZE];
 } ;   /* previously typedef'd to LZ4_streamDecode_t */
 
 
