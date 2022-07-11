@@ -631,8 +631,22 @@ typedef struct {
  *  Init this structure with LZ4_initStream() before first use.
  *  note : only use this definition in association with static linking !
  *  this definition is not API/ABI safe, and may change in future versions.
+ *  Note : OS400 pointers are 16 bytes and the compiler adds 8 bytes of padding after
+ *  tableType and 12 bytes after dictSize to ensure the structure is word aligned:
+ *  |=========================================================
+ *  |      Offset       |      Length       | Member Name
+ *  |=========================================================
+ *  |       0           |   16384           |  hashTable[4096]
+ *  |   16384           |       4           |  currentOffset
+ *  |   16388           |       4           |  tableType
+ *  |   16392           |       8           |  ***PADDING***
+ *  |   16400           |      16           |  dictionary
+ *  |   16416           |      16           |  dictCtx
+ *  |   16432           |       4           |  dictSize
+ *  |   16436           |      12           |  ***PADDING***
+ *  ==========================================================
  */
-#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
+#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + ((sizeof(void*)==16) ? 64 : 32))  /* static size, for inter-version compatibility */
 #define LZ4_STREAMSIZE_VOIDP (LZ4_STREAMSIZE / sizeof(void*))
 union LZ4_stream_u {
     void* table[LZ4_STREAMSIZE_VOIDP];
@@ -663,8 +677,20 @@ LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
  *  note : only use in association with static linking !
  *         this definition is not API/ABI safe,
  *         and may change in a future version !
+ *  Note : Same story as LZ4_STREAMSIZE for OS400 in terms of additional padding to 
+ *         ensure pointers start on and structures finish on 16 byte boundaries
+ *         |=========================================================
+ *         |      Offset       |      Length       | Member Name
+ *         |=========================================================
+ *         |       0           |      16           |    externalDict 
+ *         |      16           |       4           |    extDictSize  
+ *         |      20           |      12           |    ***PADDING***
+ *         |      32           |      16           |    prefixEnd    
+ *         |      48           |       4           |    prefixSize   
+ *         |      52           |      12           |    ***PADDING***
+ *         ==========================================================
  */
-#define LZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 2 : 0) /*AS-400*/ )
+#define LZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 4 : 0))
 #define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
 union LZ4_streamDecode_u {
     unsigned long long table[LZ4_STREAMDECODESIZE_U64];
