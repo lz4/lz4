@@ -222,6 +222,21 @@ jobs:
       run: make V=1 -C tests versionsTest
 
 
+  lz4-abi:
+    name: LZ4 inter-versions ABI test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: apt-get install
+      run: |
+        sudo apt-get update
+        sudo apt-get install gcc-multilib
+
+    - name: make -C tests abiTests
+      run: make V=1 -C tests abiTests
+
+
   lz4-frame:
     name: LZ4 frame test
     runs-on: ubuntu-latest
