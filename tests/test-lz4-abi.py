@@ -26,8 +26,6 @@ head = 'v999'
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
-        # we want the address sanitizer for abi tests
-        env["MOREFLAGS"] = "-fsanitize=address"
     if pipe:
         s = subprocess.Popen(cmd_args,
                              stdout=subprocess.PIPE,
@@ -42,6 +40,10 @@ def proc(cmd_args, pipe=True, env=False):
     return r
 
 def make(args, pipe=True, env=False):
+    if env == False:
+        env = os.environ.copy()
+        # we want the address sanitizer for abi tests
+        env["MOREFLAGS"] = "-fsanitize=address"
     return proc([make_cmd] + ['-j'] + ['V=1'] + args, pipe, env)
 
 def git(args, pipe=True):
@@ -78,77 +80,91 @@ if __name__ == '__main__':
     tags = [x for x in tags if (x >= 'v1.7.5')]
     print(tags)
 
-    # Build all versions of liblz4
-    # note : naming scheme only works on Linux
-    for tag in tags:
-        print('building library ', tag)
-        os.chdir(base_dir)
-#        if not os.path.isfile(dst_liblz4) or tag == head:
-        if tag != head:
-            r_dir = '{}/{}'.format(tmp_dir, tag)  # /path/to/lz4/test/lz4test/<TAG>
-            #print('r_dir = ', r_dir)  # for debug
-            os.makedirs(r_dir, exist_ok=True)
-            os.chdir(clone_dir)
-            git(['--work-tree=' + r_dir, 'checkout', tag, '--', '.'])
-            os.chdir(r_dir + '/lib')  # /path/to/lz4/lz4test/<TAG>/lib
-        else:
-            # print('lib_dir = {}', lib_dir)  # for debug
-            os.chdir(lib_dir)  # for debug
-        make(['clean'])
-        make(['liblz4'])
-
-    print(' ')
-    print('******************************')
-    print('Round trip expecting current ABI but linking to older Dynamic Library version')
-    print('******************************')
-    os.chdir(test_dir)
-    # Start with matching version : should be no problem
-    build_env = os.environ.copy()
-    build_env["LDFLAGS"] = "-L../lib"
-    build_env["LDLIBS"] = "-llz4"
-    # we use asan to detect any out-of-bound read or write
-    build_env["MOREFLAGS"] = "-fsanitize=address"
-    if os.path.isfile('abiTest'): 
-        os.remove('abiTest')
-    make(['abiTest'], env=build_env)
-    proc(['./abiTest'] + ['README.md'])
-
-    for tag in tags:
-        print('linking to lib tag = ', tag)
-        run_env = os.environ.copy()
-        run_env["LD_LIBRARY_PATH"] = 'abiTests/{}/lib'.format(tag)
-        # check we are linking to the right library version at run time
-        proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
-        # now run with mismatched library version
-        proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
-
-    print(' ')
-    print('******************************')
-    print('Round trip using current Dynamic Library expecting older ABI version')
-    print('******************************')
-
-    for tag in tags:
+    # loop across architectures
+    for march in ['-m64', '-m32', '-mx32']:
         print(' ')
-        print('building using older lib ', tag)
-        build_env = os.environ.copy()
-        if tag != head:
-            build_env["CPPFLAGS"] = '-IabiTests/{}/lib'.format(tag)
-            build_env["LDFLAGS"] = '-LabiTests/{}/lib'.format(tag)
-        else:
-            build_env["CPPFLAGS"] = '-I../lib'
-            build_env["LDFLAGS"] = '-L../lib'
-        build_env["LDLIBS"] = "-llz4"
-        build_env["MOREFLAGS"] = "-fsanitize=address"
-        os.remove('abiTest')
-        make(['abiTest'], pipe=False, env=build_env)
+        print('=====================================')
+        print('Testing architecture ' + march);
+        print('=====================================')
 
-        print('run with CURRENT library version (head)')
-        run_env = os.environ.copy()
-        run_env["LD_LIBRARY_PATH"] = '../lib'
-        # check we are linking to the right library version at run time
-        proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
-        # now run with mismatched library version
-        proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
+        # Build all versions of liblz4
+        # note : naming scheme only works on Linux
+        for tag in tags:
+            print('building library ', tag)
+            os.chdir(base_dir)
+    #        if not os.path.isfile(dst_liblz4) or tag == head:
+            if tag != head:
+                r_dir = '{}/{}'.format(tmp_dir, tag)  # /path/to/lz4/test/lz4test/<TAG>
+                #print('r_dir = ', r_dir)  # for debug
+                os.makedirs(r_dir, exist_ok=True)
+                os.chdir(clone_dir)
+                git(['--work-tree=' + r_dir, 'checkout', tag, '--', '.'])
+                os.chdir(r_dir + '/lib')  # /path/to/lz4/lz4test/<TAG>/lib
+            else:
+                # print('lib_dir = {}', lib_dir)  # for debug
+                os.chdir(lib_dir)
+            make(['clean'])
+            build_env = os.environ.copy()
+            build_env["CFLAGS"] = march
+            build_env["MOREFLAGS"] = "-fsanitize=address"
+            make(['liblz4'], env=build_env)
+
+        print(' ')
+        print('******************************')
+        print('Round trip expecting current ABI but linking to older Dynamic Library version')
+        print('******************************')
+        os.chdir(test_dir)
+        # Start with matching version : should be no problem
+        build_env = os.environ.copy()
+        build_env["CFLAGS"] = march
+        build_env["LDFLAGS"] = "-L../lib"
+        build_env["LDLIBS"] = "-llz4"
+        # we use asan to detect any out-of-bound read or write
+        build_env["MOREFLAGS"] = "-fsanitize=address"
+        if os.path.isfile('abiTest'):
+            os.remove('abiTest')
+        make(['abiTest'], env=build_env, pipe=False)
+
+        for tag in tags:
+            print('linking to lib tag = ', tag)
+            run_env = os.environ.copy()
+            if tag == head:
+                run_env["LD_LIBRARY_PATH"] = '../lib'
+            else:
+                run_env["LD_LIBRARY_PATH"] = 'abiTests/{}/lib'.format(tag)
+            # check we are linking to the right library version at run time
+            proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
+            # now run with mismatched library version
+            proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
+
+        print(' ')
+        print('******************************')
+        print('Round trip using current Dynamic Library expecting older ABI version')
+        print('******************************')
+
+        for tag in tags:
+            print(' ')
+            print('building using older lib ', tag)
+            build_env = os.environ.copy()
+            if tag != head:
+                build_env["CPPFLAGS"] = '-IabiTests/{}/lib'.format(tag)
+                build_env["LDFLAGS"] = '-LabiTests/{}/lib'.format(tag)
+            else:
+                build_env["CPPFLAGS"] = '-I../lib'
+                build_env["LDFLAGS"] = '-L../lib'
+            build_env["LDLIBS"] = "-llz4"
+            build_env["CFLAGS"] = march
+            build_env["MOREFLAGS"] = "-fsanitize=address"
+            os.remove('abiTest')
+            make(['abiTest'], pipe=False, env=build_env)
+
+            print('run with CURRENT library version (head)')
+            run_env = os.environ.copy()
+            run_env["LD_LIBRARY_PATH"] = '../lib'
+            # check we are linking to the right library version at run time
+            proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
+            # now run with mismatched library version
+            proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
 
 
     if error_code != 0:

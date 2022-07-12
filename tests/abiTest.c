@@ -77,7 +77,6 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
 {
     int const acceleration = 1;
     // Note : can't use LZ4_initStream(), because it's only present since v1.9.0
-    MSG("Initializing LZ4_cState, of size %zu bytes \n", sizeof(LZ4_cState));
     memset(&LZ4_cState, 0, sizeof(LZ4_cState));
     {   int const cSize = LZ4_compress_fast_continue(&LZ4_cState, (const char*)srcBuff, (char*)compressedBuff, (int)srcSize, (int)compressedBuffCapacity, acceleration);
         CONTROL_MSG(cSize == 0, "Compression error !");
