@@ -107,10 +107,10 @@ extern "C" {
 #define LZ4_LIB_VERSION LZ4_VERSION_MAJOR.LZ4_VERSION_MINOR.LZ4_VERSION_RELEASE
 #define LZ4_QUOTE(str) #str
 #define LZ4_EXPAND_AND_QUOTE(str) LZ4_QUOTE(str)
-#define LZ4_VERSION_STRING LZ4_EXPAND_AND_QUOTE(LZ4_LIB_VERSION)
+#define LZ4_VERSION_STRING LZ4_EXPAND_AND_QUOTE(LZ4_LIB_VERSION)  /* requires v1.7.3+ */
 
-LZ4LIB_API int LZ4_versionNumber (void);  /**< library version number; useful to check dll version */
-LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; useful to check dll version */
+LZ4LIB_API int LZ4_versionNumber (void);  /**< library version number; useful to check dll version; requires v1.3.0+ */
+LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; useful to check dll version; requires v1.7.5+ */
 
 
 /*-************************************
@@ -604,6 +604,12 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
   typedef unsigned int   LZ4_u32;
 #endif
 
+/*! LZ4_stream_t :
+ *  Never ever use below internal definitions directly !
+ *  These definitions are not API/ABI safe, and may change in future versions.
+ *  If you need static allocation, declare or allocate an LZ4_stream_t object.
+**/
+
 typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
 struct LZ4_stream_t_internal {
     LZ4_u32 hashTable[LZ4_HASH_SIZE_U32];
@@ -614,23 +620,10 @@ struct LZ4_stream_t_internal {
     LZ4_u32 dictSize;
 };
 
-typedef struct {
-    const LZ4_byte* externalDict;
-    size_t extDictSize;
-    const LZ4_byte* prefixEnd;
-    size_t prefixSize;
-} LZ4_streamDecode_t_internal;
-
-
-/*! LZ4_stream_t :
- *  Never ever use below internal definitions directly !
- *  These definitions are not API/ABI safe, and may change in future versions.
- *  If you need static allocation, declare or allocate an LZ4_stream_t object.
- */
-#define LZ4_STREAMSIZE  ((1UL << LZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
+#define LZ4_STREAM_MINSIZE  ((1UL << LZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
 union LZ4_stream_u {
+    char minStateSize[LZ4_STREAM_MINSIZE];
     LZ4_stream_t_internal internal_donotuse;
-    char minStateSize[LZ4_STREAMSIZE];
 }; /* previously typedef'd to LZ4_stream_t */
 
 
@@ -655,11 +648,18 @@ LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
  *  Never ever use below internal definitions directly !
  *  These definitions are not API/ABI safe, and may change in future versions.
  *  If you need static allocation, declare or allocate an LZ4_streamDecode_t object.
- */
-#define LZ4_STREAMDECODESIZE 32
+**/
+typedef struct {
+    const LZ4_byte* externalDict;
+    size_t extDictSize;
+    const LZ4_byte* prefixEnd;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+
+#define LZ4_STREAMDECODE_MINSIZE 32
 union LZ4_streamDecode_u {
+    char minStateSize[LZ4_STREAMDECODE_MINSIZE];
     LZ4_streamDecode_t_internal internal_donotuse;
-    char minStateSize[LZ4_STREAMDECODESIZE];
 } ;   /* previously typedef'd to LZ4_streamDecode_t */
 
 
