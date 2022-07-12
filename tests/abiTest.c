@@ -202,6 +202,7 @@ int main(int argCount, const char** argv)
 {
     const char* const exeName = argv[0];
     int argNb = 1;
+    // Note : LZ4_VERSION_STRING requires >= v1.7.3+
     MSG("abiTest, built binary based on API %s \n", LZ4_VERSION_STRING);
     // Note : LZ4_versionString() requires >= v1.7.5+
     MSG("currently linked to dll %s \n", LZ4_versionString());

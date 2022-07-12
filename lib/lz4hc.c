@@ -1005,8 +1005,6 @@ int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
 {
     LZ4_streamHC_t* const LZ4_streamHCPtr = (LZ4_streamHC_t*)buffer;
-    /* if compilation fails here, LZ4_STREAMHCSIZE must be increased */
-    LZ4_STATIC_ASSERT(sizeof(LZ4HC_CCtx_internal) <= LZ4_STREAMHCSIZE);
     DEBUGLOG(4, "LZ4_initStreamHC(%p, %u)", buffer, (unsigned)size);
     /* check conditions */
     if (buffer == NULL) return NULL;
@@ -1205,7 +1203,7 @@ int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* ctx, const char* src,
 
 
 /* Deprecated streaming functions */
-int LZ4_sizeofStreamStateHC(void) { return LZ4_STREAMHCSIZE; }
+int LZ4_sizeofStreamStateHC(void) { return sizeof(LZ4_streamHC_t); }
 
 /* state is presumed correctly sized, aka >= sizeof(LZ4_streamHC_t)
  * @return : 0 on success, !=0 if error */
