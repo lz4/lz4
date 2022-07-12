@@ -29,13 +29,17 @@ def proc(cmd_args, pipe=True, env=False):
         # we want the address sanitizer for abi tests
         env["MOREFLAGS"] = "-fsanitize=address"
     if pipe:
-        subproc = subprocess.Popen(cmd_args,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   env = env)
+        s = subprocess.Popen(cmd_args,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             env = env)
     else:
-        subproc = subprocess.Popen(cmd_args, env = env)
-    return subproc.communicate()
+        s = subprocess.Popen(cmd_args, env = env)
+    r = s.communicate()
+    if s.poll() != 0:
+        print(' s.poll() = ', s.poll())
+        sys.exit(1)
+    return r
 
 def make(args, pipe=True, env=False):
     return proc([make_cmd] + ['-j'] + ['V=1'] + args, pipe, env)
@@ -68,10 +72,11 @@ if __name__ == '__main__':
         git(['clone', repo_url, clone_dir])
 
     # Retrieve all release tags
-    print('Retrieve all release tags :')
+    print('Retrieve release tags >= v1.7.5 :')
     os.chdir(clone_dir)
     tags = [head] + get_git_tags()
-    print(tags);
+    tags = [x for x in tags if (x >= 'v1.7.5')]
+    print(tags)
 
     # Build all versions of liblz4
     # note : naming scheme only works on Linux
@@ -103,7 +108,8 @@ if __name__ == '__main__':
     build_env["LDLIBS"] = "-llz4"
     # we use asan to detect any out-of-bound read or write
     build_env["MOREFLAGS"] = "-fsanitize=address"
-    os.remove('abiTest')
+    if os.path.isfile('abiTest'): 
+        os.remove('abiTest')
     make(['abiTest'], env=build_env)
     proc(['./abiTest'] + ['README.md'])
 
@@ -112,7 +118,7 @@ if __name__ == '__main__':
         run_env = os.environ.copy()
         run_env["LD_LIBRARY_PATH"] = 'abiTests/{}/lib'.format(tag)
         # check we are linking to the right library version at run time
-        proc(['ldd'] + ['./abiTest'], pipe=False, env=run_env)
+        proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
         # now run with mismatched library version
         proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
 
@@ -122,6 +128,7 @@ if __name__ == '__main__':
     print('******************************')
 
     for tag in tags:
+        print(' ')
         print('building using older lib ', tag)
         build_env = os.environ.copy()
         if tag != head:
@@ -139,7 +146,7 @@ if __name__ == '__main__':
         run_env = os.environ.copy()
         run_env["LD_LIBRARY_PATH"] = '../lib'
         # check we are linking to the right library version at run time
-        proc(['ldd'] + ['./abiTest'], pipe=False, env=run_env)
+        proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
         # now run with mismatched library version
         proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
 

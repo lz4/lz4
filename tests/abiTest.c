@@ -77,6 +77,7 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
 {
     int const acceleration = 1;
     // Note : can't use LZ4_initStream(), because it's only present since v1.9.0
+    MSG("Initializing LZ4_cState, of size %zu bytes \n", sizeof(LZ4_cState));
     memset(&LZ4_cState, 0, sizeof(LZ4_cState));
     {   int const cSize = LZ4_compress_fast_continue(&LZ4_cState, (const char*)srcBuff, (char*)compressedBuff, (int)srcSize, (int)compressedBuffCapacity, acceleration);
         CONTROL_MSG(cSize == 0, "Compression error !");
@@ -95,7 +96,6 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
                     "Silent decoding corruption, at pos %u !!!",
                     (unsigned)errorPos);
     }
-
 }
 
 static void roundTripCheck(const void* srcBuff, size_t srcSize)
@@ -203,7 +203,9 @@ int main(int argCount, const char** argv)
 {
     const char* const exeName = argv[0];
     int argNb = 1;
-    MSG("starting abiTest: \n");
+    MSG("abiTest, built binary based on API %s \n", LZ4_VERSION_STRING);
+    // Note : LZ4_versionString() requires >= v1.7.5+
+    MSG("currently linked to dll %s \n", LZ4_versionString());
 
     assert(argCount >= 1);
     if (argCount < 2) return bad_usage(exeName);
