@@ -25,6 +25,7 @@ _codelite/
 _codelite_lz4/
 bin/
 *.zip
+*.swp
 
 # analyzers
 infer-out

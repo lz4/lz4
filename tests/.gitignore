@@ -13,9 +13,12 @@ checkTag
 checkFrame
 decompress-partial
 decompress-partial-usingDict
+abiTest
+
 # test artefacts
 tmp*
 versionsTest
+abiTests
 lz4_all.c
 
 # local tests
