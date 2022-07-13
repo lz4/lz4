@@ -285,7 +285,7 @@ unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
 int LZ4F_compressionLevel_max(void) { return LZ4HC_CLEVEL_MAX; }
 
-size_t LZ4F_getBlockSize(unsigned blockSizeID)
+size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID)
 {
     static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
 

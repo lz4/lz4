@@ -135,13 +135,16 @@
 
 <pre><b>LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
-</b><p> The first thing to do is to create a compressionContext object, which will be used in all compression operations.
+</b><p> The first thing to do is to create a compressionContext object,
+ which will keep track of operation state during streaming compression.
  This is achieved using LZ4F_createCompressionContext(), which takes as argument a version.
  The version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
  The function will provide a pointer to a fully allocated LZ4F_cctx object.
- If @return != zero, there was an error during context creation.
- Object can be released using LZ4F_freeCompressionContext();
- Note: LZ4F_freeCompressionContext() works with NULL pointers (do nothing).
+ If @return != zero, there context creation failed.
+ Once all streaming compression jobs are completed,
+ the state object can be released using LZ4F_freeCompressionContext().
+ Note1 : LZ4F_freeCompressionContext() is always successful. Its return value can be ignored.
+ Note2 : LZ4F_freeCompressionContext() works fine with NULL input pointers (do nothing).
  
 </p></pre><BR>
 
@@ -344,6 +347,11 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 <pre><b>typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
               _LZ4F_dummy_error_enum_for_c89_never_used } LZ4F_errorCodes;
 </b></pre><BR>
+<pre><b>LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
+</b><p>  Return, in scalar format (size_t),
+  the maximum block size associated with blockSizeID.
+</p></pre><BR>
+
 <pre><b>LZ4FLIB_STATIC_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
                                                   void* dstBuffer, size_t dstCapacity,
                                                   const void* srcBuffer, size_t srcSize,
