@@ -545,6 +545,29 @@ typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
 
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
+
+/*! Custom memory allocation :
+ *  These prototypes make it possible to pass your own allocation/free functions.
+ *  ZSTD_customMem is provided at creation time, using ZSTD_create*_advanced() variants listed below.
+ *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
+ */
+typedef void* (*LZ4F_allocFunction) (void* opaqueState, size_t size);
+typedef void* (*LZ4F_callocFunction) (void* opaqueState, size_t size);
+typedef void  (*LZ4F_freeFunction) (void* opaqueState, void* address);
+typedef struct {
+    LZ4F_allocFunction customAlloc;
+    LZ4F_callocFunction customCalloc;
+    LZ4F_freeFunction customFree;
+    void* opaqueState;
+} LZ4F_customMem;
+static
+#ifdef __GNUC__
+__attribute__((__unused__))
+#endif
+LZ4F_customMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
+
+LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_customMem customMem);
+
 LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
 
 /*! LZ4F_uncompressedUpdate() :
