@@ -104,11 +104,62 @@ static U32 use_pause = 0;
 #define MIN(a,b)  ( (a) < (b) ? (a) : (b) )
 #define MAX(a,b)  ( (a) > (b) ? (a) : (b) )
 
+typedef struct {
+    int nbAllocs;
+} Test_alloc_state;
+static Test_alloc_state g_testAllocState = { 0 };
+
+static void* dummy_malloc(void* state, size_t s)
+{
+    Test_alloc_state* const t = (Test_alloc_state*)state;
+    void* const p = malloc(s);
+    if (p==NULL) return NULL;
+    assert(t != NULL);
+    t->nbAllocs += 1;
+    DISPLAYLEVEL(6, "Allocating %zu bytes at address %p \n", s, p);
+    DISPLAYLEVEL(5, "nb allocated memory segments : %i \n", t->nbAllocs);
+    return p;
+}
+
+static void* dummy_calloc(void* state, size_t s)
+{
+    Test_alloc_state* const t = (Test_alloc_state*)state;
+    void* const p = calloc(1, s);
+    if (p==NULL) return NULL;
+    assert(t != NULL);
+    t->nbAllocs += 1;
+    DISPLAYLEVEL(6, "Allocating and zeroing %zu bytes at address %p \n", s, p);
+    DISPLAYLEVEL(5, "nb allocated memory segments : %i \n", t->nbAllocs);
+    return p;
+}
+
+static void dummy_free(void* state, void* p)
+{
+    Test_alloc_state* const t = (Test_alloc_state*)state;
+    if (p==NULL) {
+        DISPLAYLEVEL(5, "free() on NULL \n");
+        return;
+    }
+    DISPLAYLEVEL(6, "freeing memory at address %p \n", p);
+    free(p);
+    assert(t != NULL);
+    DISPLAYLEVEL(5, "nb of allocated memory segments before this free : %i \n", t->nbAllocs);
+    assert(t->nbAllocs > 0);
+    t->nbAllocs -= 1;
+}
+
+static const LZ4F_CustomMem lz4f_cmem_test = {
+    dummy_malloc,
+    dummy_calloc,
+    dummy_free,
+    &g_testAllocState
+};
+
+
 static clock_t FUZ_GetClockSpan(clock_t clockStart)
 {
     return clock() - clockStart;   /* works even if overflow; max span ~ 30 mn */
 }
-
 
 #define FUZ_rotl32(x,r) ((x << r) | (x >> (32 - r)))
 unsigned int FUZ_rand(unsigned int* src)
@@ -120,7 +171,6 @@ unsigned int FUZ_rand(unsigned int* src)
     *src = rand32;
     return rand32 >> 5;
 }
-
 
 #define FUZ_RAND15BITS  (FUZ_rand(seed) & 0x7FFF)
 #define FUZ_RANDLENGTH  ( (FUZ_rand(seed) & 3) ? (FUZ_rand(seed) % 15) : (FUZ_rand(seed) % 510) + 15)
@@ -515,7 +565,9 @@ int basicTests(U32 seed, double compressibility)
     /* dictID tests */
     {   size_t cErr;
         U32 const dictID = 0x99;
-        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+        /* test advanced variant with custom allocator functions */
+        cctx = LZ4F_createCompressionContext_advanced(lz4f_cmem_test, LZ4F_VERSION);
+        if (cctx==NULL) goto _output_error;
 
         DISPLAYLEVEL(3, "insert a dictID : ");
         memset(&prefs.frameInfo, 0, sizeof(prefs.frameInfo));
@@ -944,7 +996,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     clock_t const startClock = clock();
     clock_t const clockDuration = duration_s * CLOCKS_PER_SEC;
 
-    /* Create buffers */
+    /* Create states & buffers */
     {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
         CHECK(LZ4F_isError(creationStatus), "Allocation failed (error %i)", (int)creationStatus); }
     {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtxNoise, LZ4F_VERSION);

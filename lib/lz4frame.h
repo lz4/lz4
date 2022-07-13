@@ -243,17 +243,20 @@ typedef struct {
 LZ4FLIB_API unsigned LZ4F_getVersion(void);
 
 /*! LZ4F_createCompressionContext() :
- * The first thing to do is to create a compressionContext object,
- * which will keep track of operation state during streaming compression.
- * This is achieved using LZ4F_createCompressionContext(), which takes as argument a version.
- * The version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
- * The function will provide a pointer to a fully allocated LZ4F_cctx object.
- * If @return != zero, there context creation failed.
- * Once all streaming compression jobs are completed,
- * the state object can be released using LZ4F_freeCompressionContext().
- * Note1 : LZ4F_freeCompressionContext() is always successful. Its return value can be ignored.
- * Note2 : LZ4F_freeCompressionContext() works fine with NULL input pointers (do nothing).
- */
+ *  The first thing to do is to create a compressionContext object,
+ *  which will keep track of operation state during streaming compression.
+ *  This is achieved using LZ4F_createCompressionContext(), which takes as argument a version,
+ *  and a pointer to LZ4F_cctx*, to write the resulting pointer into.
+ *  @version provided MUST be LZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
+ *  The function provides a pointer to a fully allocated LZ4F_cctx object.
+ *  @cctxPtr MUST be != NULL.
+ *  If @return != zero, context creation failed.
+ *  A created compression context can be employed multiple times for consecutive streaming operations.
+ *  Once all streaming compression jobs are completed,
+ *  the state object can be released using LZ4F_freeCompressionContext().
+ *  Note1 : LZ4F_freeCompressionContext() is always successful. Its return value can be ignored.
+ *  Note2 : LZ4F_freeCompressionContext() works fine with NULL input pointers (do nothing).
+**/
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
@@ -535,6 +538,7 @@ extern "C" {
         ITEM(ERROR_contentChecksum_invalid) \
         ITEM(ERROR_frameDecoding_alreadyStarted) \
         ITEM(ERROR_compressionState_uninitialized) \
+        ITEM(ERROR_parameter_null) \
         ITEM(ERROR_maxCode)
 
 #define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
@@ -547,26 +551,26 @@ LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
 
 /*! Custom memory allocation :
- *  These prototypes make it possible to pass your own allocation/free functions.
- *  ZSTD_customMem is provided at creation time, using ZSTD_create*_advanced() variants listed below.
+ *  These prototypes make it possible to pass custom allocation/free functions.
+ *  LZ4F_customMem is provided at state creation time, using LZ4F_createCompressionContext_advanced() listed below.
  *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
  */
-typedef void* (*LZ4F_allocFunction) (void* opaqueState, size_t size);
-typedef void* (*LZ4F_callocFunction) (void* opaqueState, size_t size);
-typedef void  (*LZ4F_freeFunction) (void* opaqueState, void* address);
+typedef void* (*LZ4F_AllocFunction) (void* opaqueState, size_t size);
+typedef void* (*LZ4F_CallocFunction) (void* opaqueState, size_t size);
+typedef void  (*LZ4F_FreeFunction) (void* opaqueState, void* address);
 typedef struct {
-    LZ4F_allocFunction customAlloc;
-    LZ4F_callocFunction customCalloc;
-    LZ4F_freeFunction customFree;
+    LZ4F_AllocFunction customAlloc;
+    LZ4F_CallocFunction customCalloc; /* optional; when not defined, uses customAlloc + memset */
+    LZ4F_FreeFunction customFree;
     void* opaqueState;
-} LZ4F_customMem;
+} LZ4F_CustomMem;
 static
 #ifdef __GNUC__
 __attribute__((__unused__))
 #endif
-LZ4F_customMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
+LZ4F_CustomMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
 
-LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_customMem customMem);
+LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
 
 LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
 
