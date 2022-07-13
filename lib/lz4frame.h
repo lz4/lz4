@@ -545,7 +545,11 @@ typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
 
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
-LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
+/*! LZ4F_getBlockSize() :
+ *  Return, in scalar format (size_t),
+ *  the maximum block size associated with blockSizeID.
+**/
+LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
 
 /*! LZ4F_uncompressedUpdate() :
  *  LZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.
