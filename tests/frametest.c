@@ -143,9 +143,9 @@ static void dummy_free(void* state, void* p)
     DISPLAYLEVEL(6, "freeing memory at address %p \n", p);
     free(p);
     assert(t != NULL);
-    DISPLAYLEVEL(5, "nb of allocated memory segments before this free : %i \n", t->nbAllocs);
-    assert(t->nbAllocs > 0);
     t->nbAllocs -= 1;
+    DISPLAYLEVEL(5, "nb of allocated memory segments after this free : %i \n", t->nbAllocs);
+    assert(t->nbAllocs >= 0);
 }
 
 static const LZ4F_CustomMem lz4f_cmem_test = {
@@ -594,6 +594,13 @@ int basicTests(U32 seed, double compressibility)
         LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
         if (cdict == NULL) goto _output_error;
         CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+
+        DISPLAYLEVEL(3, "Testing LZ4F_createCDict_advanced : ");
+        {   LZ4F_CDict* const cda = LZ4F_createCDict_advanced(lz4f_cmem_test, CNBuffer, dictSize);
+            if (cda == NULL) goto _output_error;
+            LZ4F_freeCDict(cda);
+        }
+        DISPLAYLEVEL(3, "OK \n");
 
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with NULL dict : ");
         CHECK_V(cSizeNoDict,

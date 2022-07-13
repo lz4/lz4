@@ -551,30 +551,6 @@ typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
 
-/*! Custom memory allocation :
- *  These prototypes make it possible to pass custom allocation/free functions.
- *  LZ4F_customMem is provided at state creation time, using LZ4F_createCompressionContext_advanced() listed below.
- *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
- */
-typedef void* (*LZ4F_AllocFunction) (void* opaqueState, size_t size);
-typedef void* (*LZ4F_CallocFunction) (void* opaqueState, size_t size);
-typedef void  (*LZ4F_FreeFunction) (void* opaqueState, void* address);
-typedef struct {
-    LZ4F_AllocFunction customAlloc;
-    LZ4F_CallocFunction customCalloc; /* optional; when not defined, uses customAlloc + memset */
-    LZ4F_FreeFunction customFree;
-    void* opaqueState;
-} LZ4F_CustomMem;
-static
-#ifdef __GNUC__
-__attribute__((__unused__))
-#endif
-LZ4F_CustomMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
-
-LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
-LZ4FLIB_STATIC_API LZ4F_dctx* LZ4F_createDecompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
-
-
 /*! LZ4F_getBlockSize() :
  *  Return, in scalar format (size_t),
  *  the maximum block size associated with blockSizeID.
@@ -673,6 +649,32 @@ LZ4FLIB_STATIC_API size_t LZ4F_decompress_usingDict(
     const void* srcBuffer, size_t* srcSizePtr,
     const void* dict, size_t dictSize,
     const LZ4F_decompressOptions_t* decompressOptionsPtr);
+
+
+/*! Custom memory allocation :
+ *  These prototypes make it possible to pass custom allocation/free functions.
+ *  LZ4F_customMem is provided at state creation time, using LZ4F_create*_advanced() listed below.
+ *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
+ */
+typedef void* (*LZ4F_AllocFunction) (void* opaqueState, size_t size);
+typedef void* (*LZ4F_CallocFunction) (void* opaqueState, size_t size);
+typedef void  (*LZ4F_FreeFunction) (void* opaqueState, void* address);
+typedef struct {
+    LZ4F_AllocFunction customAlloc;
+    LZ4F_CallocFunction customCalloc; /* optional; when not defined, uses customAlloc + memset */
+    LZ4F_FreeFunction customFree;
+    void* opaqueState;
+} LZ4F_CustomMem;
+static
+#ifdef __GNUC__
+__attribute__((__unused__))
+#endif
+LZ4F_CustomMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
+
+LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
+LZ4FLIB_STATIC_API LZ4F_dctx* LZ4F_createDecompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
+LZ4FLIB_STATIC_API LZ4F_CDict* LZ4F_createCDict_advanced(LZ4F_CustomMem customMem, const void* dictBuffer, size_t dictSize);
+
 
 #if defined (__cplusplus)
 }

@@ -522,30 +522,31 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
 *****************************************************/
 
 struct LZ4F_CDict_s {
+    LZ4F_CustomMem cmem;
     void* dictContent;
     LZ4_stream_t* fastCtx;
     LZ4_streamHC_t* HCCtx;
 }; /* typedef'd to LZ4F_CDict within lz4frame_static.h */
 
-/*! LZ4F_createCDict() :
- *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
- *  LZ4F_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
- *  LZ4F_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
- * @dictBuffer can be released after LZ4F_CDict creation, since its content is copied within CDict
- * @return : digested dictionary for compression, or NULL if failed */
-LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
+LZ4F_CDict*
+LZ4F_createCDict_advanced(LZ4F_CustomMem cmem, const void* dictBuffer, size_t dictSize)
 {
     const char* dictStart = (const char*)dictBuffer;
-    LZ4F_CDict* const cdict = (LZ4F_CDict*)LZ4F_malloc(sizeof(*cdict), LZ4F_defaultCMem);
-    DEBUGLOG(4, "LZ4F_createCDict");
+    LZ4F_CDict* const cdict = (LZ4F_CDict*)LZ4F_malloc(sizeof(*cdict), cmem);
+    DEBUGLOG(4, "LZ4F_createCDict_advanced");
     if (!cdict) return NULL;
+    cdict->cmem = cmem;
     if (dictSize > 64 KB) {
         dictStart += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    cdict->dictContent = LZ4F_malloc(dictSize, LZ4F_defaultCMem);
-    cdict->fastCtx = LZ4_createStream();
-    cdict->HCCtx = LZ4_createStreamHC();
+    cdict->dictContent = LZ4F_malloc(dictSize, cmem);
+    cdict->fastCtx = (LZ4_stream_t*)LZ4F_malloc(sizeof(LZ4_stream_t), cmem);
+    if (cdict->fastCtx)
+        LZ4_initStream(cdict->fastCtx, sizeof(LZ4_stream_t));
+    cdict->HCCtx = (LZ4_streamHC_t*)LZ4F_malloc(sizeof(LZ4_streamHC_t), cmem);
+    if (cdict->HCCtx)
+        LZ4_initStream(cdict->HCCtx, sizeof(LZ4_streamHC_t));
     if (!cdict->dictContent || !cdict->fastCtx || !cdict->HCCtx) {
         LZ4F_freeCDict(cdict);
         return NULL;
@@ -557,13 +558,25 @@ LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
     return cdict;
 }
 
+/*! LZ4F_createCDict() :
+ *  When compressing multiple messages / blocks with the same dictionary, it's recommended to load it just once.
+ *  LZ4F_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
+ *  LZ4F_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
+ * @dictBuffer can be released after LZ4F_CDict creation, since its content is copied within CDict
+ * @return : digested dictionary for compression, or NULL if failed */
+LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize)
+{
+    DEBUGLOG(4, "LZ4F_createCDict");
+    return LZ4F_createCDict_advanced(LZ4F_defaultCMem, dictBuffer, dictSize);
+}
+
 void LZ4F_freeCDict(LZ4F_CDict* cdict)
 {
     if (cdict==NULL) return;  /* support free on NULL */
-    LZ4F_free(cdict->dictContent, LZ4F_defaultCMem);
-    LZ4_freeStream(cdict->fastCtx);
-    LZ4_freeStreamHC(cdict->HCCtx);
-    LZ4F_free(cdict, LZ4F_defaultCMem);
+    LZ4F_free(cdict->dictContent, cdict->cmem);
+    LZ4F_free(cdict->fastCtx, cdict->cmem);
+    LZ4F_free(cdict->HCCtx, cdict->cmem);
+    LZ4F_free(cdict, cdict->cmem);
 }
 
 
