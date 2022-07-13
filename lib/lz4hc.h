@@ -207,8 +207,8 @@ struct LZ4HC_CCtx_internal
     LZ4_u32   hashTable[LZ4HC_HASHTABLESIZE];
     LZ4_u16   chainTable[LZ4HC_MAXD];
     const LZ4_byte* end;       /* next block here to continue on current prefix */
-    const LZ4_byte* base;      /* All index relative to this position */
-    const LZ4_byte* dictBase;  /* alternate base for extDict */
+    const LZ4_byte* prefixStart;  /* Indexes relative to this position */
+    const LZ4_byte* dictStart; /* alternate reference for extDict */
     LZ4_u32   dictLimit;       /* below that point, need extDict */
     LZ4_u32   lowLimit;        /* below that point, no more dict */
     LZ4_u32   nextToUpdate;    /* index from which to continue dictionary update */
