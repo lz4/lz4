@@ -110,7 +110,7 @@ static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
     hc4->nextToUpdate = (U32) newStartingOffset;
     hc4->prefixStart = start;
     hc4->end = start;
-    hc4->dictBase = start - newStartingOffset;
+    hc4->dictStart = start;
     hc4->dictLimit = (U32) newStartingOffset;
     hc4->lowLimit = (U32) newStartingOffset;
 }
@@ -257,7 +257,8 @@ LZ4HC_InsertAndGetWiderMatch (
     const U32 ipIndex = (U32)(ip - prefixPtr) + prefixIdx;
     const int withinStartDistance = (hc4->lowLimit + (LZ4_DISTANCE_MAX + 1) > ipIndex);
     const U32 lowestMatchIndex = (withinStartDistance) ? hc4->lowLimit : ipIndex - LZ4_DISTANCE_MAX;
-    const BYTE* const dictBase = hc4->dictBase;
+    const BYTE* const dictStart = hc4->dictStart;
+    const U32 dictIdx = hc4->lowLimit;
     int const lookBackLength = (int)(ip-iLowLimit);
     int nbAttempts = maxNbAttempts;
     U32 matchChainPos = 0;
@@ -294,10 +295,9 @@ LZ4HC_InsertAndGetWiderMatch (
                         *startpos = ip + back;
             }   }   }
         } else {   /* lowestMatchIndex <= matchIndex < dictLimit */
-            const BYTE* const matchPtr = dictBase + matchIndex;
+            const BYTE* const matchPtr = dictStart - dictIdx + matchIndex;
             if ( likely(matchIndex <= prefixIdx - 4)
               && (LZ4_read32(matchPtr) == pattern) ) {
-                const BYTE* const dictStart = dictBase + hc4->lowLimit;
                 int back = 0;
                 const BYTE* vLimit = ip + (prefixIdx - matchIndex);
                 if (vLimit > iHighLimit) vLimit = iHighLimit;
@@ -350,10 +350,9 @@ LZ4HC_InsertAndGetWiderMatch (
                 if ( (repeat == rep_confirmed) && (matchCandidateIdx >= lowestMatchIndex)
                   && LZ4HC_protectDictEnd(prefixIdx, matchCandidateIdx) ) {
                     const int extDict = matchCandidateIdx < prefixIdx;
-                    const BYTE* const matchPtr = (extDict ? dictBase : prefixPtr - prefixIdx) + matchCandidateIdx;
+                    const BYTE* const matchPtr = (extDict ? dictStart - dictIdx : prefixPtr - prefixIdx) + matchCandidateIdx;
                     if (LZ4_read32(matchPtr) == pattern) {  /* good candidate */
-                        const BYTE* const dictStart = dictBase + hc4->lowLimit;
-                        const BYTE* const iLimit = extDict ? dictBase + prefixIdx : iHighLimit;
+                        const BYTE* const iLimit = extDict ? dictStart - dictIdx + prefixIdx : iHighLimit;
                         size_t forwardPatternLength = LZ4HC_countPattern(matchPtr+sizeof(pattern), iLimit, pattern) + sizeof(pattern);
                         if (extDict && matchPtr + forwardPatternLength == iLimit) {
                             U32 const rotatedPattern = LZ4HC_rotatePattern(forwardPatternLength, pattern);
@@ -364,7 +363,7 @@ LZ4HC_InsertAndGetWiderMatch (
                             size_t currentSegmentLength;
                             if (!extDict && matchPtr - backLength == prefixPtr && hc4->lowLimit < prefixIdx) {
                                 U32 const rotatedPattern = LZ4HC_rotatePattern((U32)(-(int)backLength), pattern);
-                                backLength += LZ4HC_reverseCountPattern(dictBase + prefixIdx, dictStart, rotatedPattern);
+                                backLength += LZ4HC_reverseCountPattern(dictStart - dictIdx + prefixIdx, dictStart, rotatedPattern);
                             }
                             /* Limit backLength not go further than lowestMatchIndex */
                             backLength = matchCandidateIdx - MAX(matchCandidateIdx - (U32)backLength, lowestMatchIndex);
@@ -1093,7 +1092,7 @@ static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBl
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
     ctxPtr->lowLimit  = ctxPtr->dictLimit;
-    ctxPtr->dictBase  = ctxPtr->prefixStart - ctxPtr->dictLimit;
+    ctxPtr->dictStart  = ctxPtr->prefixStart;
     ctxPtr->dictLimit += (U32)(ctxPtr->end - ctxPtr->prefixStart);
     ctxPtr->prefixStart = newBlock;
     ctxPtr->end  = newBlock;
@@ -1129,11 +1128,11 @@ LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
 
     /* Check overlapping input/dictionary space */
     {   const BYTE* sourceEnd = (const BYTE*) src + *srcSizePtr;
-        const BYTE* const dictBegin = ctxPtr->dictBase + ctxPtr->lowLimit;
-        const BYTE* const dictEnd   = ctxPtr->dictBase + ctxPtr->dictLimit;
+        const BYTE* const dictBegin = ctxPtr->dictStart;
+        const BYTE* const dictEnd   = ctxPtr->dictStart - ctxPtr->lowLimit + ctxPtr->dictLimit;
         if ((sourceEnd > dictBegin) && ((const BYTE*)src < dictEnd)) {
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
-            ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictBase);
+            ctxPtr->lowLimit = (U32)(sourceEnd - ctxPtr->dictStart) + ctxPtr->lowLimit;
             if (ctxPtr->dictLimit - ctxPtr->lowLimit < 4) ctxPtr->lowLimit = ctxPtr->dictLimit;
     }   }
 
