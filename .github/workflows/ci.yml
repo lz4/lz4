@@ -50,17 +50,17 @@ jobs:
           { pkgs: 'gcc-4.8 g++-4.8 lib32gcc-4.8-dev libx32gcc-4.8-dev', cc: gcc-4.8,   cxx: g++-4.8,     x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
 
           # clang
-          { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-latest, },
+          { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-latest, },
           { pkgs: 'clang-12  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-11  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-7   lib32gcc-7-dev  libx32gcc-7-dev',          cc: clang-7,   cxx: clang++-7,   x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-6.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-6.0, cxx: clang++-6.0, x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'clang-5.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-5.0, cxx: clang++-5.0, x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-18.04,  },
-          { pkgs: 'clang-4.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-4.0, cxx: clang++-4.0, x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-18.04,  },
-          { pkgs: 'clang-3.9 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-3.9, cxx: clang++-3.9, x32: 'fail', x86: 'fail', cxxtest: 'false', os: ubuntu-18.04,  },
+          { pkgs: 'clang-11  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-7   lib32gcc-7-dev  libx32gcc-7-dev',          cc: clang-7,   cxx: clang++-7,   x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-6.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-6.0, cxx: clang++-6.0, x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-5.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-5.0, cxx: clang++-5.0, x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'clang-4.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-4.0, cxx: clang++-4.0, x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-18.04,  },
+          { pkgs: 'clang-3.9',                                          cc: clang-3.9, cxx: clang++-3.9, x32: 'fail', x86: 'fail', cxxtest: 'false', os: ubuntu-18.04,  },
         ]
 
     runs-on: ${{ matrix.os }}
