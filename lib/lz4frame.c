@@ -1193,6 +1193,7 @@ typedef enum {
 } dStage_t;
 
 struct LZ4F_dctx_s {
+    LZ4F_CustomMem cmem;
     LZ4F_frameInfo_t frameInfo;
     U32    version;
     dStage_t dStage;
@@ -1214,22 +1215,32 @@ struct LZ4F_dctx_s {
 };  /* typedef'd to LZ4F_dctx in lz4frame.h */
 
 
+LZ4F_dctx* LZ4F_createDecompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version)
+{
+    LZ4F_dctx* const dctx = (LZ4F_dctx*)LZ4F_calloc(sizeof(LZ4F_dctx), customMem);
+    if (dctx == NULL) return NULL;
+
+    dctx->cmem = customMem;
+    dctx->version = version;
+    return dctx;
+}
+
 /*! LZ4F_createDecompressionContext() :
  *  Create a decompressionContext object, which will track all decompression operations.
  *  Provides a pointer to a fully allocated and initialized LZ4F_decompressionContext object.
  *  Object can later be released using LZ4F_freeDecompressionContext().
  * @return : if != 0, there was an error during context creation.
  */
-LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** LZ4F_decompressionContextPtr, unsigned versionNumber)
+LZ4F_errorCode_t
+LZ4F_createDecompressionContext(LZ4F_dctx** LZ4F_decompressionContextPtr, unsigned versionNumber)
 {
-    LZ4F_dctx* const dctx = (LZ4F_dctx*)LZ4F_calloc(sizeof(LZ4F_dctx), LZ4F_defaultCMem);
-    if (dctx == NULL) {  /* failed allocation */
-        *LZ4F_decompressionContextPtr = NULL;
+    assert(LZ4F_decompressionContextPtr != NULL);  /* violation of narrow contract */
+    RETURN_ERROR_IF(LZ4F_decompressionContextPtr == NULL, parameter_null);  /* in case it nonetheless happen in production */
+
+    *LZ4F_decompressionContextPtr = LZ4F_createDecompressionContext_advanced(LZ4F_defaultCMem, versionNumber);
+    if (*LZ4F_decompressionContextPtr == NULL) {  /* failed allocation */
         RETURN_ERROR(allocation_failed);
     }
-
-    dctx->version = versionNumber;
-    *LZ4F_decompressionContextPtr = dctx;
     return LZ4F_OK_NoError;
 }
 
@@ -1238,9 +1249,9 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx)
     LZ4F_errorCode_t result = LZ4F_OK_NoError;
     if (dctx != NULL) {   /* can accept NULL input, like free() */
       result = (LZ4F_errorCode_t)dctx->dStage;
-      LZ4F_free(dctx->tmpIn, LZ4F_defaultCMem);
-      LZ4F_free(dctx->tmpOutBuffer, LZ4F_defaultCMem);
-      LZ4F_free(dctx, LZ4F_defaultCMem);
+      LZ4F_free(dctx->tmpIn, dctx->cmem);
+      LZ4F_free(dctx->tmpOutBuffer, dctx->cmem);
+      LZ4F_free(dctx, dctx->cmem);
     }
     return result;
 }
@@ -1604,11 +1615,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
                 if (bufferNeeded > dctx->maxBufferSize) {   /* tmp buffers too small */
                     dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
-                    LZ4F_free(dctx->tmpIn, LZ4F_defaultCMem);
-                    dctx->tmpIn = (BYTE*)LZ4F_malloc(dctx->maxBlockSize + BFSize /* block checksum */, LZ4F_defaultCMem);
+                    LZ4F_free(dctx->tmpIn, dctx->cmem);
+                    dctx->tmpIn = (BYTE*)LZ4F_malloc(dctx->maxBlockSize + BFSize /* block checksum */, dctx->cmem);
                     RETURN_ERROR_IF(dctx->tmpIn == NULL, allocation_failed);
-                    LZ4F_free(dctx->tmpOutBuffer, LZ4F_defaultCMem);
-                    dctx->tmpOutBuffer= (BYTE*)LZ4F_malloc(bufferNeeded, LZ4F_defaultCMem);
+                    LZ4F_free(dctx->tmpOutBuffer, dctx->cmem);
+                    dctx->tmpOutBuffer= (BYTE*)LZ4F_malloc(bufferNeeded, dctx->cmem);
                     RETURN_ERROR_IF(dctx->tmpOutBuffer== NULL, allocation_failed);
                     dctx->maxBufferSize = bufferNeeded;
             }   }

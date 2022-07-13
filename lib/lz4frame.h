@@ -364,9 +364,10 @@ typedef struct {
 
 /*! LZ4F_createDecompressionContext() :
  *  Create an LZ4F_dctx object, to track all decompression operations.
- *  The version provided MUST be LZ4F_VERSION.
- *  The function provides a pointer to an allocated and initialized LZ4F_dctx object.
- *  The result is an errorCode, which can be tested using LZ4F_isError().
+ *  @version provided MUST be LZ4F_VERSION.
+ *  @dctxPtr MUST be valid.
+ *  The function fills @dctxPtr with the value of a pointer to an allocated and initialized LZ4F_dctx object.
+ *  The @return is an errorCode, which can be tested using LZ4F_isError().
  *  dctx memory can be released using LZ4F_freeDecompressionContext();
  *  Result of LZ4F_freeDecompressionContext() indicates current state of decompressionContext when being released.
  *  That is, it should be == 0 if decompression has been completed fully and correctly.
@@ -571,6 +572,7 @@ __attribute__((__unused__))
 LZ4F_CustomMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
 
 LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
+LZ4FLIB_STATIC_API LZ4F_dctx* LZ4F_createDecompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
 
 
 /*! LZ4F_getBlockSize() :
