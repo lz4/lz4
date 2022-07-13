@@ -51,7 +51,7 @@ jobs:
 
           # clang
           { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-latest, },
-          { pkgs: 'clang-12  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
+          { pkgs: 'clang-12  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'true', x86: 'true', cxxtest: 'true',  os: ubuntu-20.04,  },
           { pkgs: 'clang-11  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
           { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
           { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'fail', x86: 'fail', cxxtest: 'true',  os: ubuntu-20.04,  },
