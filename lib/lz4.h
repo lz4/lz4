@@ -613,11 +613,12 @@ LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const 
 typedef struct LZ4_stream_t_internal LZ4_stream_t_internal;
 struct LZ4_stream_t_internal {
     LZ4_u32 hashTable[LZ4_HASH_SIZE_U32];
-    LZ4_u32 currentOffset;
-    LZ4_u32 tableType;
     const LZ4_byte* dictionary;
     const LZ4_stream_t_internal* dictCtx;
+    LZ4_u32 currentOffset;
+    LZ4_u32 tableType;
     LZ4_u32 dictSize;
+    /* Implicit padding to ensure structure is aligned */
 };
 
 #define LZ4_STREAM_MINSIZE  ((1UL << LZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
@@ -640,7 +641,7 @@ union LZ4_stream_u {
  *         In which case, the function will @return NULL.
  *  Note2: An LZ4_stream_t structure guarantees correct alignment and size.
  *  Note3: Before v1.9.0, use LZ4_resetStream() instead
- */
+**/
 LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
 
 
@@ -651,8 +652,8 @@ LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
 **/
 typedef struct {
     const LZ4_byte* externalDict;
-    size_t extDictSize;
     const LZ4_byte* prefixEnd;
+    size_t extDictSize;
     size_t prefixSize;
 } LZ4_streamDecode_t_internal;
 
