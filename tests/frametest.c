@@ -738,20 +738,20 @@ int basicTests(U32 seed, double compressibility)
     { size_t result;
       unsigned blockSizeID;
       for (blockSizeID = 4; blockSizeID < 8; ++blockSizeID) {
-        result = LZ4F_getBlockSize(blockSizeID);
+        result = LZ4F_getBlockSize((LZ4F_blockSizeID_t)blockSizeID);
         CHECK(result);
         DISPLAYLEVEL(3, "Returned block size of %u bytes for blockID %u \n",
                          (unsigned)result, blockSizeID);
       }
 
       /* Test an invalid input that's too large */
-      result = LZ4F_getBlockSize(8);
+      result = LZ4F_getBlockSize((LZ4F_blockSizeID_t)8);
       if(!LZ4F_isError(result) ||
           LZ4F_getErrorCode(result) != LZ4F_ERROR_maxBlockSize_invalid)
         goto _output_error;
 
       /* Test an invalid input that's too small */
-      result = LZ4F_getBlockSize(3);
+      result = LZ4F_getBlockSize((LZ4F_blockSizeID_t)3);
       if(!LZ4F_isError(result) ||
           LZ4F_getErrorCode(result) != LZ4F_ERROR_maxBlockSize_invalid)
         goto _output_error;

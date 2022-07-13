@@ -324,16 +324,16 @@ unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
 int LZ4F_compressionLevel_max(void) { return LZ4HC_CLEVEL_MAX; }
 
-size_t LZ4F_getBlockSize(unsigned blockSizeID)
+size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID)
 {
     static const size_t blockSizes[4] = { 64 KB, 256 KB, 1 MB, 4 MB };
 
     if (blockSizeID == 0) blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
     if (blockSizeID < LZ4F_max64KB || blockSizeID > LZ4F_max4MB)
         RETURN_ERROR(maxBlockSize_invalid);
-    blockSizeID -= LZ4F_max64KB;
-    return blockSizes[blockSizeID];
-}
+    {   int const blockSizeIdx = (int)blockSizeID - (int)LZ4F_max64KB;
+        return blockSizes[blockSizeIdx];
+}   }
 
 /*-************************************
 *  Private functions
@@ -1345,7 +1345,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     dctx->frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)blockChecksumFlag;
     dctx->frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)contentChecksumFlag;
     dctx->frameInfo.blockSizeID = (LZ4F_blockSizeID_t)blockSizeID;
-    dctx->maxBlockSize = LZ4F_getBlockSize(blockSizeID);
+    dctx->maxBlockSize = LZ4F_getBlockSize((LZ4F_blockSizeID_t)blockSizeID);
     if (contentSizeFlag)
         dctx->frameRemainingSize =
             dctx->frameInfo.contentSize = LZ4F_readLE64(srcPtr+6);

@@ -572,7 +572,12 @@ LZ4F_CustomMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this c
 
 LZ4FLIB_STATIC_API LZ4F_cctx* LZ4F_createCompressionContext_advanced(LZ4F_CustomMem customMem, unsigned version);
 
-LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(unsigned);
+
+/*! LZ4F_getBlockSize() :
+ *  Return, in scalar format (size_t),
+ *  the maximum block size associated with blockSizeID.
+**/
+LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
 
 /*! LZ4F_uncompressedUpdate() :
  *  LZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.

@@ -50,9 +50,9 @@
 
 <a name="Chapter2"></a><h2>Version</h2><pre></pre>
 
-<pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; useful to check dll version */<b>
+<pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; useful to check dll version; requires v1.3.0+ */<b>
 </b></pre><BR>
-<pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; useful to check dll version */<b>
+<pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; useful to check dll version; requires v1.7.5+ */<b>
 </b></pre><BR>
 <a name="Chapter3"></a><h2>Tuning parameter</h2><pre></pre>
 
@@ -452,28 +452,9 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  Accessing members will expose user code to API and/or ABI break in future versions of the library.
 <BR></pre>
 
-<pre><b>typedef struct {
-    const LZ4_byte* externalDict;
-    size_t extDictSize;
-    const LZ4_byte* prefixEnd;
-    size_t prefixSize;
-} LZ4_streamDecode_t_internal;
-</b></pre><BR>
-<pre><b>#define LZ4_STREAMSIZE       ((1UL << LZ4_MEMORY_USAGE) + 32)  </b>/* static size, for inter-version compatibility */<b>
-#define LZ4_STREAMSIZE_VOIDP (LZ4_STREAMSIZE / sizeof(void*))
-union LZ4_stream_u {
-    void* table[LZ4_STREAMSIZE_VOIDP];
-    LZ4_stream_t_internal internal_donotuse;
-}; </b>/* previously typedef'd to LZ4_stream_t */<b>
-</b><p>  Do not use below internal definitions directly !
-  Declare or allocate an LZ4_stream_t instead.
-  LZ4_stream_t can also be created using LZ4_createStream(), which is recommended.
-  The structure definition can be convenient for static allocation
-  (on stack, or as part of larger structure).
-  Init this structure with LZ4_initStream() before first use.
-  note : only use this definition in association with static linking !
-  this definition is not API/ABI safe, and may change in future versions.
- 
+<pre><b></b><p>  Never ever use below internal definitions directly !
+  These definitions are not API/ABI safe, and may change in future versions.
+  If you need static allocation, declare or allocate an LZ4_stream_t object.
 </p></pre><BR>
 
 <pre><b>LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
@@ -489,21 +470,17 @@ union LZ4_stream_u {
          In which case, the function will @return NULL.
   Note2: An LZ4_stream_t structure guarantees correct alignment and size.
   Note3: Before v1.9.0, use LZ4_resetStream() instead
- 
 </p></pre><BR>
 
-<pre><b>#define LZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 2 : 0) </b>/*AS-400*/ )<b>
-#define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
-union LZ4_streamDecode_u {
-    unsigned long long table[LZ4_STREAMDECODESIZE_U64];
-    LZ4_streamDecode_t_internal internal_donotuse;
-} ;   </b>/* previously typedef'd to LZ4_streamDecode_t */<b>
-</b><p>  information structure to track an LZ4 stream during decompression.
-  init this structure  using LZ4_setStreamDecode() before first use.
-  note : only use in association with static linking !
-         this definition is not API/ABI safe,
-         and may change in a future version !
- 
+<pre><b>typedef struct {
+    const LZ4_byte* externalDict;
+    const LZ4_byte* prefixEnd;
+    size_t extDictSize;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+</b><p>  Never ever use below internal definitions directly !
+  These definitions are not API/ABI safe, and may change in future versions.
+  If you need static allocation, declare or allocate an LZ4_streamDecode_t object.
 </p></pre><BR>
 
 <a name="Chapter10"></a><h2>Obsolete Functions</h2><pre></pre>
