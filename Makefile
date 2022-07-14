@@ -233,6 +233,43 @@ c_standards_c99: clean
 
 .PHONY: c_standards_c11
 c_standards_c11: clean
-	$(MAKE) clean; CFLAGS="-std=c11   -Werror" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=c11 -Werror" $(MAKE) all
+
+# The following test ensures that standard Makefile variables set through environment
+# are correctly transmitted at compilation stage.
+# This test is meant to detect issues like https://github.com/lz4/lz4/issues/958
+.PHONY: standard_variables
+standard_variables: clean
+	@echo =================
+	@echo Check support of Makefile Standard variables through environment
+	@echo note : this test requires V=1 to work properly
+	@echo =================
+	CC="cc -DCC_TEST" \
+	CFLAGS=-DCFLAGS_TEST \
+	CPPFLAGS=-DCPPFLAGS_TEST \
+	LDFLAGS=-DLDFLAGS_TEST \
+	LDLIBS=-DLDLIBS_TEST \
+	$(MAKE) V=1 > tmpsv
+	# Note: just checking the presence of custom flags
+	# would not detect situations where custom flags are
+	# supported in some part of the Makefile, and missed in others.
+	# So the test checks if they are present the _right nb of times_.
+	# However, checking static quantities makes this test brittle,
+	# because quantities (7, 2 and 1) can still evolve in future,
+	# for example when source directories or Makefile evolve.
+	if [ $$(grep CC_TEST tmpsv | wc -l) -ne 7 ]; then \
+		echo "CC environment variable missed" && False; fi
+	if [ $$(grep CFLAGS_TEST tmpsv | wc -l) -ne 7 ]; then \
+		echo "CFLAGS environment variable missed" && False; fi
+	if [ $$(grep CPPFLAGS_TEST tmpsv | wc -l) -ne 7 ]; then \
+		echo "CPPFLAGS environment variable missed" && False; fi
+	if [ $$(grep LDFLAGS_TEST tmpsv | wc -l) -ne 2 ]; then \
+		echo "LDFLAGS environment variable missed" && False; fi
+	if [ $$(grep LDLIBS_TEST tmpsv | wc -l) -ne 1 ]; then \
+		echo "LDLIBS environment variable missed" && False; fi
+	@echo =================
+	@echo all custom variables detected
+	@echo =================
+	$(RM) tmpsv
 
 endif   # MSYS POSIX
