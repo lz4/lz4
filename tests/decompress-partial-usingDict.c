@@ -1,6 +1,7 @@
-#include "stdio.h"
-#include "string.h"
-#include "stdlib.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
 #include "lz4.h"
 
 const char source[] =
@@ -33,27 +34,35 @@ int main(void)
   size_t const smallSize = 1024;
   size_t const largeSize = 64 * 1024 - 1;
   char cmpBuffer[BUFFER_SIZE];
-  char buffer[BUFFER_SIZE + largeSize];
+  char* const buffer = (char*)malloc(BUFFER_SIZE + largeSize);
   char* outBuffer = buffer + largeSize;
   char* const dict = (char*)malloc(largeSize);
   char* const largeDict = dict;
   char* const smallDict = dict + largeSize - smallSize;
-  int cmpSize;
   int i;
+  int cmpSize;
+
+  printf("starting test decompress-partial-usingDict : \n");
+  assert(buffer != NULL);
+  assert(dict != NULL);
 
   cmpSize = LZ4_compress_default(source, cmpBuffer, srcLen, BUFFER_SIZE);
 
   for (i = cmpSize; i < cmpSize + 10; ++i) {
     int result = LZ4_decompress_safe_partial_usingDict(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE, NULL, 0);
-    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
+    if ( (result < 0)
+      || (result != srcLen)
+      || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with no dict error \n");
       return -1;
     }
   }
-  
+
   for (i = cmpSize; i < cmpSize + 10; ++i) {
     int result = LZ4_decompress_safe_partial_usingDict(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE, outBuffer - smallSize, smallSize);
-    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
+    if ( (result < 0)
+      || (result != srcLen)
+      || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with small prefix error \n");
       return -1;
     }
@@ -61,7 +70,9 @@ int main(void)
 
   for (i = cmpSize; i < cmpSize + 10; ++i) {
     int result = LZ4_decompress_safe_partial_usingDict(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE, buffer, largeSize);
-    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
+    if ( (result < 0)
+      || (result != srcLen)
+      || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with large prefix error \n");
       return -1;
     }
@@ -69,7 +80,9 @@ int main(void)
 
   for (i = cmpSize; i < cmpSize + 10; ++i) {
     int result = LZ4_decompress_safe_partial_usingDict(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE, smallDict, smallSize);
-    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
+    if ( (result < 0)
+      || (result != srcLen)
+      || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with small external dict error \n");
       return -1;
     }
@@ -77,7 +90,9 @@ int main(void)
 
   for (i = cmpSize; i < cmpSize + 10; ++i) {
     int result = LZ4_decompress_safe_partial_usingDict(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE, largeDict, largeSize);
-    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
+    if ( (result < 0)
+      || (result != srcLen)
+      || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with large external dict error \n");
       return -1;
     }
