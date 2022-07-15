@@ -591,10 +591,9 @@ jobs:
     - name: make test
       run: make V=1 clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion'
 
-    - name: make test | tee
-      # test scenario where `stdout` is not the console
-      run: make V=1 clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion' | tee
-
+    - name: Ensure `make test` doesn't depend on the status of the console
+      # see issue #990 for detailed explanations
+      run: make test > /dev/null
 
 
 ###############################################################
