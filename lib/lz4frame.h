@@ -376,6 +376,8 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 *  Streaming decompression functions
 *************************************/
 
+#define LZ4F_MAGICNUMBER 0x184D2204U
+#define LZ4F_MAGIC_SKIPPABLE_START 0x184D2A50U
 #define LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH 5
 
 /*! LZ4F_headerSize() : v1.9.0+
