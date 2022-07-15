@@ -342,6 +342,17 @@ test-lz4-multiple-legacy: lz4 datagen
 	! $(LZ4) -f -l -m tmp-tlm-concat1 notHere-legacy tmp-tlm-concat2  # must fail : notHere-legacy not present
 	@$(RM) tmp-tlm*
 
+SKIPFILE = goldenSamples/skip.bin
+test-lz4-skippable: lz4 datagen
+	@echo "\n ---- test lz4 with skippable frames ----"
+	$(LZ4) -dc $(SKIPFILE)
+	$(LZ4) -dc < $(SKIPFILE)
+	cat $(SKIPFILE) | $(LZ4) -dc
+	echo "Hello from Valid Frame!\n" > tmplsk
+	$(LZ4) tmplsk -c > tmplsk.lz4
+	cat $(SKIPFILE) tmplsk.lz4 $(SKIPFILE) | $(LZ4) -dc
+	$(RM) tmplsk*
+
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	$(DATAGEN) -g0       | $(LZ4) -v     | $(LZ4) -t
@@ -484,7 +495,8 @@ test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-mult
 	@$(RM) tmp*
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
-          test-lz4-sparse test-lz4-hugefile test-lz4-dict
+          test-lz4-sparse test-lz4-hugefile test-lz4-dict \
+          test-lz4-skippable
 	@$(RM) tmp*
 
 test-lz4c: lz4c datagen

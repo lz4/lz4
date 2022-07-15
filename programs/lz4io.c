@@ -1152,6 +1152,23 @@ LZ4IO_passThrough(FILE* finput, FILE* foutput,
     return total;
 }
 
+/* when fseek() doesn't work (pipe scenario),
+ * read and forget from input.
+**/
+#define SKIP_BUFF_SIZE (16 KB)
+#define MIN(a,b)   ( ((a)<(b)) ? (a) : (b) )
+static int skipStream(FILE* f, unsigned offset)
+{
+    char buf[SKIP_BUFF_SIZE];
+    while (offset > 0) {
+        size_t const tr = MIN(offset, sizeof(buf));
+        size_t const r = fread(buf, 1, tr, f);
+        if (r != tr) return 1; /* error reading f */
+        offset -= (unsigned)tr;
+    }
+    assert(offset == 0);
+    return 0;
+}
 
 /** Safely handle cases when (unsigned)offset > LONG_MAX */
 static int fseek_u32(FILE *fp, unsigned offset, int where)
@@ -1163,12 +1180,14 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
     while (offset > 0) {
         unsigned s = offset;
         if (s > stepMax) s = stepMax;
-        errorNb = UTIL_fseek(fp, (long) s, SEEK_CUR);
-        if (errorNb != 0) break;
-        offset -= s;
+        errorNb = UTIL_fseek(fp, (long)s, SEEK_CUR);
+        if (errorNb==0) { offset -= s; continue; }
+        errorNb = skipStream(fp, offset);
+        offset = 0;
     }
     return errorNb;
 }
+
 
 #define ENDOFSTREAM ((unsigned long long)-1)
 #define DECODING_ERROR ((unsigned long long)-2)

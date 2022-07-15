@@ -65,8 +65,6 @@ static void FUZ_writeLE32 (void* dstVoidPtr, U32 value32)
 /*-************************************
 *  Constants
 **************************************/
-#define LZ4F_MAGIC_SKIPPABLE_START 0x184D2A50U
-
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define GB *(1U<<30)
