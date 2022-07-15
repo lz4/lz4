@@ -207,6 +207,16 @@ jobs:
       run: make V=1 -C tests test-fuzzer32
 
 
+  lz4-standard-makefile-variables:
+    name: LZ4 Makefile - support for standard variables
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+
+    - name: make standard_variables
+      run: make V=1 standard_variables
+
+
   lz4-versions:
     name: LZ4 versions test
     runs-on: ubuntu-latest
