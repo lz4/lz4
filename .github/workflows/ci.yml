@@ -87,6 +87,10 @@ jobs:
       if: always()
       run: make V=1
 
+    - name: install test
+      if: always()
+      run: make clean; make V=1 -C tests test-install
+
     - name: make all
       if: always()
       run: make V=1 clean all
