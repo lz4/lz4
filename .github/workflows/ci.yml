@@ -117,7 +117,7 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4
+      run: make clean; MOREFLAGS='-Werror' make -j V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
@@ -125,7 +125,7 @@ jobs:
 
     - name: make -C tests test MOREFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make V=1 -C tests clean test
+      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make -j V=1 -C tests test
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
@@ -139,11 +139,11 @@ jobs:
 
     - name: make -C tests test MOREFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
-      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make V=1 -C tests clean test || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
 
     - name: make -C tests test-lz4c32 || echo Ignore failure for now.
       if: ${{ matrix.x86 == 'fail' }}
-      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4c32 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################
@@ -171,10 +171,10 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: benchmark (-C tests test-lz4)
-      run: make V=1 -C tests test-lz4
+      run: make -j V=1 -C tests test-lz4
 
     - name: benchmark (-C tests test-lz4c)
-      run: make V=1 -C tests test-lz4c
+      run: make -j V=1 -C tests test-lz4c
 
     - name: benchmark (-C tests test-lz4c32)
       run: make V=1 -C tests test-lz4c32
@@ -589,11 +589,11 @@ jobs:
       run: CFLAGS="-Werror" make V=1 clean default
 
     - name: make test
-      run: make V=1 clean test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion'
+      run: make clean; make -j V=1 test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion'
 
     - name: Ensure `make test` doesn't depend on the status of the console
       # see issue #990 for detailed explanations
-      run: make test > /dev/null
+      run: make -j test > /dev/null
 
 
 ###############################################################
