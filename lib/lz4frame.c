@@ -1222,6 +1222,7 @@ struct LZ4F_dctx_s {
     size_t tmpOutStart;
     XXH32_state_t xxh;
     XXH32_state_t blockChecksum;
+    int    skipChecksum;
     BYTE   header[LZ4F_HEADER_SIZE_MAX];
 };  /* typedef'd to LZ4F_dctx in lz4frame.h */
 
@@ -1275,6 +1276,7 @@ void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
     dctx->dStage = dstage_getFrameHeader;
     dctx->dict = NULL;
     dctx->dictSize = 0;
+    dctx->skipChecksum = 0;
 }
 
 
@@ -1537,7 +1539,6 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
 }
 
 
-
 /*! LZ4F_decompress() :
  *  Call this function repetitively to regenerate compressed data in srcBuffer.
  *  The function will attempt to decode up to *srcSizePtr bytes from srcBuffer
@@ -1581,6 +1582,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     *srcSizePtr = 0;
     *dstSizePtr = 0;
     assert(dctx != NULL);
+    dctx->skipChecksum |= (decompressOptionsPtr->skipChecksums != 0); /* once set, disable for the remainder of the frame */
 
     /* behaves as a state machine */
 
@@ -1711,11 +1713,13 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     size_t const minBuffSize = MIN((size_t)(srcEnd-srcPtr), (size_t)(dstEnd-dstPtr));
                     sizeToCopy = MIN(dctx->tmpInTarget, minBuffSize);
                     memcpy(dstPtr, srcPtr, sizeToCopy);
-                    if (dctx->frameInfo.blockChecksumFlag) {
-                        (void)XXH32_update(&dctx->blockChecksum, srcPtr, sizeToCopy);
+                    if (!dctx->skipChecksum) {
+                        if (dctx->frameInfo.blockChecksumFlag) {
+                            (void)XXH32_update(&dctx->blockChecksum, srcPtr, sizeToCopy);
+                        }
+                        if (dctx->frameInfo.contentChecksumFlag)
+                            (void)XXH32_update(&dctx->xxh, srcPtr, sizeToCopy);
                     }
-                    if (dctx->frameInfo.contentChecksumFlag)
-                        (void)XXH32_update(&dctx->xxh, srcPtr, sizeToCopy);
                     if (dctx->frameInfo.contentSize)
                         dctx->frameRemainingSize -= sizeToCopy;
 
@@ -1761,7 +1765,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     }
                     crcSrc = dctx->header;
                 }
-                {   U32 const readCRC = LZ4F_readLE32(crcSrc);
+                if (!dctx->skipChecksum) {
+                    U32 const readCRC = LZ4F_readLE32(crcSrc);
                     U32 const calcCRC = XXH32_digest(&dctx->blockChecksum);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                     DEBUGLOG(6, "compare block checksum");
@@ -1837,7 +1842,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
                         dict, (int)dictSize);
                 RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
-                if (dctx->frameInfo.contentChecksumFlag)
+                if ((dctx->frameInfo.contentChecksumFlag) && (!dctx->skipChecksum))
                     XXH32_update(&(dctx->xxh), dstPtr, (size_t)decodedSize);
                 if (dctx->frameInfo.contentSize)
                     dctx->frameRemainingSize -= (size_t)decodedSize;
@@ -1880,7 +1885,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
                         dict, (int)dictSize);
                 RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
-                if (dctx->frameInfo.contentChecksumFlag)
+                if (dctx->frameInfo.contentChecksumFlag && !dctx->skipChecksum)
                     XXH32_update(&(dctx->xxh), dctx->tmpOut, (size_t)decodedSize);
                 if (dctx->frameInfo.contentSize)
                     dctx->frameRemainingSize -= (size_t)decodedSize;
@@ -1945,7 +1950,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   /* if (dctx->dStage == dstage_storeSuffix) */
 
         /* case dstage_checkSuffix: */   /* no direct entry, avoid initialization risks */
-            {   U32 const readCRC = LZ4F_readLE32(selectedIn);
+            if (!dctx->skipChecksum) {
+                U32 const readCRC = LZ4F_readLE32(selectedIn);
                 U32 const resultCRC = XXH32_digest(&(dctx->xxh));
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                 RETURN_ERROR_IF(readCRC != resultCRC, contentChecksum_invalid);
