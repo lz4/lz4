@@ -1959,11 +1959,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 (void)readCRC;
                 (void)resultCRC;
 #endif
-                nextSrcSizeHint = 0;
-                LZ4F_resetDecompressionContext(dctx);
-                doAnotherStage = 0;
-                break;
             }
+            nextSrcSizeHint = 0;
+            LZ4F_resetDecompressionContext(dctx);
+            doAnotherStage = 0;
+            break;
 
         case dstage_getSFrameSize:
             if ((srcEnd - srcPtr) >= 4) {

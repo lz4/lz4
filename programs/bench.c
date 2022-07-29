@@ -123,6 +123,7 @@ static size_t g_blockSize = 0;
 int g_additionalParam = 0;
 int g_benchSeparately = 0;
 int g_decodeOnly = 0;
+unsigned g_skipChecksums = 0;
 
 void BMK_setNotificationLevel(unsigned level) { g_displayLevel=level; }
 
@@ -139,6 +140,8 @@ void BMK_setBlockSize(size_t blockSize) { g_blockSize = blockSize; }
 void BMK_setBenchSeparately(int separate) { g_benchSeparately = (separate!=0); }
 
 void BMK_setDecodeOnlyMode(int set) { g_decodeOnly = (set!=0); }
+
+void BMK_skipChecksums(int skip) { g_skipChecksums = (skip!=0); }
 
 
 /* *************************************
@@ -318,10 +321,11 @@ LZ4F_decompress_binding(const char* src, char* dst,
 {
     size_t dstSize = (size_t)dstCapacity;
     size_t readSize = (size_t)srcSize;
+    LZ4F_decompressOptions_t const dOpt = { 1, g_skipChecksums, 0, 0 };
     size_t const decStatus = LZ4F_decompress(g_dctx,
                     dst, &dstSize,
                     src, &readSize,
-                    NULL /* dOptPtr */);
+                    &dOpt);
     if ( (decStatus == 0)   /* decompression successful */
       && ((int)readSize==srcSize) /* consume all input */ )
         return (int)dstSize;
@@ -775,7 +779,12 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
 
     if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
     if (g_decodeOnly) {
-        DISPLAYLEVEL(2, "Benchmark Decompression (only) of LZ4 Frame \n");
+        DISPLAYLEVEL(2, "Benchmark Decompression of LZ4 Frame ");
+        if (g_skipChecksums) {
+            DISPLAYLEVEL(2, "_without_ checksum even when present \n");
+        } else {
+            DISPLAYLEVEL(2, "+ Checksum when present \n");
+        }
         cLevelLast = cLevel;
     }
     if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;

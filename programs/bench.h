@@ -47,6 +47,7 @@ void BMK_setBlockSize(size_t blockSize);    /* Internally cut input file(s) into
 void BMK_setNotificationLevel(unsigned level);  /* Influence verbosity level */
 void BMK_setBenchSeparately(int separate);  /* When providing multiple files, output one result per file */
 void BMK_setDecodeOnlyMode(int set);        /* v1.9.4+: set benchmark mode to decode only */
+void BMK_skipChecksums(int skip);           /* v1.9.4+: only useful for DecodeOnlyMode; do not calculate checksum when present, to save CPU time */
 
 void BMK_setAdditionalParam(int additionalParam); /* hidden param, influence output format, for python parsing */
 
