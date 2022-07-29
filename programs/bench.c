@@ -677,7 +677,8 @@ static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility
 }
 
 
-int BMK_benchFilesSeparately(const char** fileNamesTable, unsigned nbFiles,
+static int
+BMK_benchFilesSeparately(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast,
                    const char* dictBuf, int dictSize)
 {
@@ -685,7 +686,6 @@ int BMK_benchFilesSeparately(const char** fileNamesTable, unsigned nbFiles,
     if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
     if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
     if (cLevelLast < cLevel) cLevelLast = cLevel;
-    if (cLevelLast > cLevel) DISPLAYLEVEL(2, "Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
 
     for (fileNb=0; fileNb<nbFiles; fileNb++)
         BMK_benchFileTable(fileNamesTable+fileNb, 1, cLevel, cLevelLast, dictBuf, dictSize);
