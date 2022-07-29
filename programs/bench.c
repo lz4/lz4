@@ -51,6 +51,7 @@
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
+#include "lz4frame.h"   /* LZ4F_decompress */
 
 
 /* *************************************
@@ -121,6 +122,7 @@ static U32 g_nbSeconds = NBSECONDS;
 static size_t g_blockSize = 0;
 int g_additionalParam = 0;
 int g_benchSeparately = 0;
+int g_decodeOnly = 0;
 
 void BMK_setNotificationLevel(unsigned level) { g_displayLevel=level; }
 
@@ -135,6 +137,8 @@ void BMK_setNbSeconds(unsigned nbSeconds)
 void BMK_setBlockSize(size_t blockSize) { g_blockSize = blockSize; }
 
 void BMK_setBenchSeparately(int separate) { g_benchSeparately = (separate!=0); }
+
+void BMK_setDecodeOnlyMode(int set) { g_decodeOnly = (set!=0); }
 
 
 /* *************************************
@@ -301,6 +305,32 @@ LZ4_buildCompressionParameters(struct compressionParameters* pParams,
 }
 
 
+typedef int (*DecFunction_f)(const char* src, char* dst,
+                             int srcSize, int dstCapacity,
+                             const char* dictStart, int dictSize);
+
+static LZ4F_dctx* g_dctx = NULL;
+
+static int
+LZ4F_decompress_binding(const char* src, char* dst,
+                        int srcSize, int dstCapacity,
+                  const char* dictStart, int dictSize)
+{
+    size_t dstSize = (size_t)dstCapacity;
+    size_t readSize = (size_t)srcSize;
+    size_t const decStatus = LZ4F_decompress(g_dctx,
+                    dst, &dstSize,
+                    src, &readSize,
+                    NULL /* dOptPtr */);
+    if ( (decStatus == 0)   /* decompression successful */
+      && ((int)readSize==srcSize) /* consume all input */ )
+        return (int)dstSize;
+    /* else, error */
+    return -1;
+    (void)dictStart; (void)dictSize;  /* not compatible with dictionary yet */
+}
+
+
 /* ********************************************************
 *  Bench functions
 **********************************************************/
@@ -322,12 +352,15 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         const size_t* fileSizes, U32 nbFiles,
                         const char* dictBuf, int dictSize)
 {
-    size_t const blockSize = (g_blockSize>=32 ? g_blockSize : srcSize) + (!srcSize) /* avoid div by 0 */ ;
-    U32 const maxNbBlocks = (U32) ((srcSize + (blockSize-1)) / blockSize) + nbFiles;
+    size_t const blockSize = (g_blockSize>=32 && !g_decodeOnly ? g_blockSize : srcSize) + (!srcSize) /* avoid div by 0 */ ;
+    U32 const maxNbBlocks = (U32)((srcSize + (blockSize-1)) / blockSize) + nbFiles;
     blockParam_t* const blockTable = (blockParam_t*) malloc(maxNbBlocks * sizeof(blockParam_t));
     size_t const maxCompressedSize = (size_t)LZ4_compressBound((int)srcSize) + (maxNbBlocks * 1024);   /* add some room for safety */
     void* const compressedBuffer = malloc(maxCompressedSize);
-    void* const resultBuffer = malloc(srcSize);
+    size_t const decMultiplier = g_decodeOnly ? 255 : 1;
+    size_t const maxInSize = (size_t)LZ4_MAX_INPUT_SIZE / decMultiplier;
+    size_t const maxDecSize = srcSize < maxInSize ? srcSize * decMultiplier : LZ4_MAX_INPUT_SIZE;
+    void* const resultBuffer = malloc(maxDecSize);
     U32 nbBlocks;
     struct compressionParameters compP;
 
@@ -340,6 +373,11 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     /* init */
     LZ4_buildCompressionParameters(&compP, cLevel, dictBuf, dictSize);
     compP.initFunction(&compP);
+    if (g_dctx==NULL) {
+        LZ4F_createDecompressionContext(&g_dctx, LZ4F_VERSION);
+        if (g_dctx==NULL)
+            END_PROCESS(1, "allocation error - decompression state");
+    }
 
     /* Init blockTable data */
     {   const char* srcPtr = (const char*)srcBuffer;
@@ -352,6 +390,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             U32 const blockEnd = nbBlocks + nbBlocksforThisFile;
             for ( ; nbBlocks<blockEnd; nbBlocks++) {
                 size_t const thisBlockSize = MIN(remaining, blockSize);
+                size_t const resMaxSize = thisBlockSize * decMultiplier;
+                size_t const resCapa = (thisBlockSize < maxInSize) ? resMaxSize : LZ4_MAX_INPUT_SIZE;
                 blockTable[nbBlocks].srcPtr = srcPtr;
                 blockTable[nbBlocks].cPtr = cPtr;
                 blockTable[nbBlocks].resPtr = resPtr;
@@ -359,29 +399,37 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 blockTable[nbBlocks].cRoom = (size_t)LZ4_compressBound((int)thisBlockSize);
                 srcPtr += thisBlockSize;
                 cPtr += blockTable[nbBlocks].cRoom;
-                resPtr += thisBlockSize;
+                resPtr += resCapa;
                 remaining -= thisBlockSize;
     }   }   }
 
     /* warmimg up memory */
     RDG_genBuffer(compressedBuffer, maxCompressedSize, 0.10, 0.50, 1);
 
+    /* decode-only mode : copy input to @compressedBuffer */
+    if (g_decodeOnly) {
+        U32 blockNb;
+        for (blockNb=0; blockNb < nbBlocks; blockNb++) {
+            memcpy(blockTable[blockNb].cPtr, blockTable[blockNb].srcPtr, blockTable[blockNb].srcSize);
+            blockTable[blockNb].cSize = blockTable[blockNb].srcSize;
+    }   }
+
     /* Bench */
     {   U64 fastestC = (U64)(-1LL), fastestD = (U64)(-1LL);
         U64 const crcOrig = XXH64(srcBuffer, srcSize, 0);
-        UTIL_time_t coolTime;
+        UTIL_time_t coolTime = UTIL_getTime();
         U64 const maxTime = (g_nbSeconds * TIMELOOP_NANOSEC) + 100;
         U32 nbCompressionLoops = (U32)((5 MB) / (srcSize+1)) + 1;  /* conservative initial compression speed estimate */
         U32 nbDecodeLoops = (U32)((200 MB) / (srcSize+1)) + 1;  /* conservative initial decode speed estimate */
         U64 totalCTime=0, totalDTime=0;
-        U32 cCompleted=0, dCompleted=0;
+        U32 cCompleted=(g_decodeOnly==1), dCompleted=0;
 #       define NB_MARKS 4
         const char* const marks[NB_MARKS] = { " |", " /", " =",  "\\" };
         U32 markNb = 0;
-        size_t cSize = 0;
+        size_t cSize = srcSize;
+        size_t totalRSize = srcSize;
         double ratio = 0.;
 
-        coolTime = UTIL_getTime();
         DISPLAYLEVEL(2, "\r%79s\r", "");
         while (!cCompleted || !dCompleted) {
             /* overheat protection */
@@ -392,8 +440,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             }
 
             /* Compression */
-            DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->\r", marks[markNb], displayName, (U32)srcSize);
-            if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase result buffer */
+            DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->\r", marks[markNb], displayName, (U32)totalRSize);
+            if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase compressed buffer */
 
             UTIL_sleepMilli(1);  /* give processor time to other processes */
             UTIL_waitForNextTick();
@@ -424,17 +472,18 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                     }
                     totalCTime += clockSpan;
                     cCompleted = totalCTime>maxTime;
-            }   }
+                }
 
-            cSize = 0;
-            { U32 blockNb; for (blockNb=0; blockNb<nbBlocks; blockNb++) cSize += blockTable[blockNb].cSize; }
-            cSize += !cSize;  /* avoid div by 0 */
-            ratio = (double)srcSize / (double)cSize;
-            markNb = (markNb+1) % NB_MARKS;
-            DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
-                    marks[markNb], displayName, (U32)srcSize, (U32)cSize, ratio,
-                    ((double)srcSize / fastestC) * 1000 );
-
+                cSize = 0;
+                { U32 blockNb; for (blockNb=0; blockNb<nbBlocks; blockNb++) cSize += blockTable[blockNb].cSize; }
+                cSize += !cSize;  /* avoid div by 0 */
+                ratio = (double)totalRSize / (double)cSize;
+                markNb = (markNb+1) % NB_MARKS;
+                DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
+                        marks[markNb], displayName,
+                        (U32)totalRSize, (U32)cSize, ratio,
+                        ((double)totalRSize / fastestC) * 1000 );
+            }
             (void)fastestD; (void)crcOrig;   /*  unused when decompression disabled */
 #if 1
             /* Decompression */
@@ -444,17 +493,30 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             UTIL_waitForNextTick();
 
             if (!dCompleted) {
+                const DecFunction_f decFunction = g_decodeOnly ?
+                    LZ4F_decompress_binding : LZ4_decompress_safe_usingDict;
+                const char* const decString = g_decodeOnly ?
+                    "LZ4F_decompress" : "LZ4_decompress_safe_usingDict";
                 UTIL_time_t const clockStart = UTIL_getTime();
                 U32 nbLoops;
+
                 for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
                     U32 blockNb;
                     for (blockNb=0; blockNb<nbBlocks; blockNb++) {
-                        int const regenSize = LZ4_decompress_safe_usingDict(
+                        size_t const inMaxSize = (size_t)INT_MAX / decMultiplier;
+                        size_t const resCapa = (blockTable[blockNb].srcSize < inMaxSize) ?
+                                                blockTable[blockNb].srcSize * decMultiplier :
+                                                INT_MAX;
+                        int const regenSize = decFunction(
                             blockTable[blockNb].cPtr, blockTable[blockNb].resPtr,
-                            (int)blockTable[blockNb].cSize, (int)blockTable[blockNb].srcSize,
+                            (int)blockTable[blockNb].cSize, (int)resCapa,
                             dictBuf, dictSize);
                         if (regenSize < 0) {
-                            DISPLAY("LZ4_decompress_safe_usingDict() failed on block %u \n", blockNb);
+                            DISPLAY("%s() failed on block %u of size %u \n",
+                                decString, blockNb, (unsigned)blockTable[blockNb].srcSize);
+                            if (g_decodeOnly)
+                                DISPLAY("Is input using LZ4 Frame format ? \n");
+                            END_PROCESS(2, "error during decoding");
                             break;
                         }
                         blockTable[blockNb].resSize = (size_t)regenSize;
@@ -473,14 +535,22 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                     dCompleted = totalDTime > (DECOMP_MULT*maxTime);
             }   }
 
+            if (g_decodeOnly) {
+                unsigned u;
+                totalRSize = 0;
+                for (u=0; u<nbBlocks; u++) totalRSize += blockTable[u].resSize;
+            }
             markNb = (markNb+1) % NB_MARKS;
+            ratio  = (double)totalRSize / (double)cSize;
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s ,%6.1f MB/s\r",
-                    marks[markNb], displayName, (U32)srcSize, (U32)cSize, ratio,
-                    ((double)srcSize / fastestC) * 1000,
-                    ((double)srcSize / fastestD) * 1000);
+                    marks[markNb], displayName,
+                    (U32)totalRSize, (U32)cSize, ratio,
+                    ((double)totalRSize / fastestC) * 1000,
+                    ((double)totalRSize / fastestD) * 1000);
 
-            /* CRC Checking */
-            {   U64 const crcCheck = XXH64(resultBuffer, srcSize, 0);
+            /* CRC Checking (not possible in decode-only mode)*/
+            if (!g_decodeOnly) {
+                U64 const crcCheck = XXH64(resultBuffer, srcSize, 0);
                 if (crcOrig!=crcCheck) {
                     size_t u;
                     DISPLAY("\n!!! WARNING !!! %17s : Invalid Checksum : %x != %x   \n", displayName, (unsigned)crcOrig, (unsigned)crcCheck);
@@ -704,17 +774,26 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
     size_t dictSize = 0;
 
     if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
+    if (g_decodeOnly) {
+        DISPLAYLEVEL(2, "Benchmark Decompression (only) of LZ4 Frame \n");
+        cLevelLast = cLevel;
+    }
     if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
     if (cLevelLast < cLevel) cLevelLast = cLevel;
-    if (cLevelLast > cLevel) DISPLAYLEVEL(2, "Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
+    if (cLevelLast > cLevel)
+        DISPLAYLEVEL(2, "Benchmarking levels from %d to %d\n", cLevel, cLevelLast);
 
     if (dictFileName) {
         FILE* dictFile = NULL;
         U64 const dictFileSize = UTIL_getFileSize(dictFileName);
-        if (!dictFileSize) END_PROCESS(25, "Dictionary error : could not stat dictionary file");
+        if (!dictFileSize)
+            END_PROCESS(25, "Dictionary error : could not stat dictionary file");
+        if (g_decodeOnly)
+            END_PROCESS(26, "Error : LZ4 Frame decoder mode not compatible with dictionary yet");
 
         dictFile = fopen(dictFileName, "rb");
-        if (!dictFile) END_PROCESS(25, "Dictionary error : could not open dictionary file");
+        if (!dictFile)
+            END_PROCESS(25, "Dictionary error : could not open dictionary file");
 
         if (dictFileSize > LZ4_MAX_DICT_SIZE) {
             dictSize = LZ4_MAX_DICT_SIZE;

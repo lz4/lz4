@@ -54,12 +54,12 @@ extern "C" {
 
 
 /**
-  Introduction
-
-  lz4frame.h implements LZ4 frame specification: see doc/lz4_Frame_format.md .
-  LZ4 Frames are interoperable on any systems.
-  The are compatible with `lz4` CLI.
-*/
+ * Introduction
+ *
+ * lz4frame.h implements LZ4 frame specification: see doc/lz4_Frame_format.md .
+ * LZ4 Frames are compatible with `lz4` CLI,
+ * and designed to be interoperable with any system.
+**/
 
 /*-***************************************************************
  *  Compiler specifics

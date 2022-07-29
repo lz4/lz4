@@ -433,7 +433,7 @@ LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
  */
 LZ4LIB_API int
 LZ4_decompress_safe_usingDict(const char* src, char* dst,
-                              int srcSize, int dstCapcity,
+                              int srcSize, int dstCapacity,
                               const char* dictStart, int dictSize);
 
 LZ4LIB_API int

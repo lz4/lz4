@@ -476,6 +476,9 @@ test-lz4-testmode: FPREFIX = tmp-ltm
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
 	$(LZ4) -bi0
+	$(DATAGEN) > $(FPREFIX)
+	$(LZ4) -f $(FPREFIX) -c > $(FPREFIX).lz4
+	$(LZ4) -bdi0 $(FPREFIX).lz4 # test benchmark decode-only mode
 	@echo "\n ---- test mode ----"
 	! $(DATAGEN) | $(LZ4) -t
 	! $(DATAGEN) | $(LZ4) -tf

@@ -397,7 +397,8 @@ static int local_LZ4F_decompress_followHint(const char* src, char* dst, int srcS
     size_t outRemaining = maxOutSize - outPos;
 
     for (;;) {
-        size_t const sizeHint = LZ4F_decompress(g_dCtx, dst+outPos, &outRemaining, src+inPos, &inSize, NULL);
+        size_t const sizeHint =
+            LZ4F_decompress(g_dCtx, dst+outPos, &outRemaining, src+inPos, &inSize, NULL);
         assert(!LZ4F_isError(sizeHint));
 
         inPos += inSize;
