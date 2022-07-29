@@ -380,7 +380,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(DATAGEN) -g6M -P99 | $(LZ4) -9BD   | $(LZ4) -t
 	$(DATAGEN) -g17M     | $(LZ4) -9v    | $(LZ4) -qt
 	$(DATAGEN) -g33M     | $(LZ4) --no-frame-crc | $(LZ4) -t
-	$(DATAGEN) -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t
+	$(DATAGEN) -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t --no-crc
 	@echo "hello world" > $(FPREFIX)-hw
 	$(LZ4) --rm -f $(FPREFIX)-hw $(FPREFIX)-hw.lz4
 	test ! -f $(FPREFIX)-hw                      # must fail (--rm)

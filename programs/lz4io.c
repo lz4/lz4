@@ -1072,13 +1072,22 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     unsigned long long filesize = 0;
     LZ4F_errorCode_t nextToLoad;
     unsigned storedSkips = 0;
+    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, 1, 0, 0 };
+    const LZ4F_decompressOptions_t* const dOptPtr =
+        ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
+        &dOpt_skipCrc : NULL;
 
     /* Init feed with magic number (already consumed from FILE* sFile) */
     {   size_t inSize = MAGICNUMBER_SIZE;
         size_t outSize= 0;
         LZ4IO_writeLE32(ress.srcBuffer, LZ4IO_MAGICNUMBER);
-        nextToLoad = LZ4F_decompress_usingDict(ress.dCtx, ress.dstBuffer, &outSize, ress.srcBuffer, &inSize, ress.dictBuffer, ress.dictBufferSize, NULL);
-        if (LZ4F_isError(nextToLoad)) END_PROCESS(62, "Header error : %s", LZ4F_getErrorName(nextToLoad));
+        nextToLoad = LZ4F_decompress_usingDict(ress.dCtx,
+                            ress.dstBuffer, &outSize,
+                            ress.srcBuffer, &inSize,
+                            ress.dictBuffer, ress.dictBufferSize,
+                            dOptPtr);  /* set it once, it's enough */
+        if (LZ4F_isError(nextToLoad))
+            END_PROCESS(62, "Header error : %s", LZ4F_getErrorName(nextToLoad));
     }
 
     /* Main Loop */
@@ -1096,8 +1105,13 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             /* Decode Input (at least partially) */
             size_t remaining = readSize - pos;
             decodedBytes = ress.dstBufferSize;
-            nextToLoad = LZ4F_decompress_usingDict(ress.dCtx, ress.dstBuffer, &decodedBytes, (char*)(ress.srcBuffer)+pos, &remaining, ress.dictBuffer, ress.dictBufferSize, NULL);
-            if (LZ4F_isError(nextToLoad)) END_PROCESS(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
+            nextToLoad = LZ4F_decompress_usingDict(ress.dCtx,
+                                    ress.dstBuffer, &decodedBytes,
+                                    (char*)(ress.srcBuffer)+pos, &remaining,
+                                    ress.dictBuffer, ress.dictBufferSize,
+                                    NULL);
+            if (LZ4F_isError(nextToLoad))
+                END_PROCESS(66, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             pos += remaining;
 
             /* Write Block */
@@ -1327,6 +1341,10 @@ LZ4IO_decompressDstFile(dRess_t ress,
 }
 
 
+/* Note : LZ4IO_decompressFilename()
+ * can provide total decompression time for the specified fileName.
+ * This information is not available with LZ4IO_decompressMultipleFilenames().
+ */
 int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename, const LZ4IO_prefs_t* prefs)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
@@ -1357,6 +1375,9 @@ int LZ4IO_decompressMultipleFilenames(
     dRess_t ress = LZ4IO_createDResources(prefs);
 
     if (outFileName==NULL) END_PROCESS(70, "Memory allocation error");
+    if (prefs->blockChecksum==0 && prefs->streamChecksum==0) {
+        DISPLAYLEVEL(4, "disabling checksum validation during decoding \n");
+    }
     ress.dstFile = LZ4IO_openDstFile(stdoutmark, prefs);
 
     for (i=0; i<ifntSize; i++) {
