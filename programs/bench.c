@@ -267,7 +267,7 @@ static clock_t g_time = 0;
 #  define DEBUG 0
 #endif
 #define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
-#define EXM_THROW(error, ...)                                             \
+#define END_PROCESS(error, ...)                                             \
 {                                                                         \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
     DISPLAYLEVEL(1, "Error %i : ", error);                                \
@@ -324,7 +324,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     size_t const blockSize = (g_blockSize>=32 ? g_blockSize : srcSize) + (!srcSize) /* avoid div by 0 */ ;
     U32 const maxNbBlocks = (U32) ((srcSize + (blockSize-1)) / blockSize) + nbFiles;
     blockParam_t* const blockTable = (blockParam_t*) malloc(maxNbBlocks * sizeof(blockParam_t));
-    size_t const maxCompressedSize = LZ4_compressBound((int)srcSize) + (maxNbBlocks * 1024);   /* add some room for safety */
+    size_t const maxCompressedSize = (size_t)LZ4_compressBound((int)srcSize) + (maxNbBlocks * 1024);   /* add some room for safety */
     void* const compressedBuffer = malloc(maxCompressedSize);
     void* const resultBuffer = malloc(srcSize);
     U32 nbBlocks;
@@ -332,7 +332,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
     /* checks */
     if (!compressedBuffer || !resultBuffer || !blockTable)
-        EXM_THROW(31, "allocation error : not enough memory");
+        END_PROCESS(31, "allocation error : not enough memory");
 
     if (strlen(displayName)>17) displayName += strlen(displayName)-17;   /* can only display 17 characters */
 
@@ -408,7 +408,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             &compP,
                             blockTable[blockNb].srcPtr, blockTable[blockNb].cPtr,
                             (int)blockTable[blockNb].srcSize, (int)blockTable[blockNb].cRoom);
-                        if (LZ4_isError(rSize)) EXM_THROW(1, "LZ4 compression failed");
+                        if (LZ4_isError(rSize)) END_PROCESS(1, "LZ4 compression failed");
                         blockTable[blockNb].cSize = rSize;
                 }   }
                 {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
@@ -594,21 +594,21 @@ static void BMK_loadFiles(void* buffer, size_t bufferSize,
             continue;
         }
         f = fopen(fileNamesTable[n], "rb");
-        if (f==NULL) EXM_THROW(10, "impossible to open file %s", fileNamesTable[n]);
+        if (f==NULL) END_PROCESS(10, "impossible to open file %s", fileNamesTable[n]);
         DISPLAYUPDATE(2, "Loading %s...       \r", fileNamesTable[n]);
         if (fileSize > bufferSize-pos) { /* buffer too small - stop after this file */
             fileSize = bufferSize-pos;
             nbFiles=n;
         }
         { size_t const readSize = fread(((char*)buffer)+pos, 1, (size_t)fileSize, f);
-          if (readSize != (size_t)fileSize) EXM_THROW(11, "could not read %s", fileNamesTable[n]);
+          if (readSize != (size_t)fileSize) END_PROCESS(11, "could not read %s", fileNamesTable[n]);
           pos += readSize; }
         fileSizes[n] = (size_t)fileSize;
         totalSize += (size_t)fileSize;
         fclose(f);
     }
 
-    if (totalSize == 0) EXM_THROW(12, "no data to bench");
+    if (totalSize == 0) END_PROCESS(12, "no data to bench");
 }
 
 static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
@@ -621,11 +621,11 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     U64 const totalSizeToLoad = UTIL_getTotalFileSize(fileNamesTable, nbFiles);
     char mfName[20] = {0};
 
-    if (!fileSizes) EXM_THROW(12, "not enough memory for fileSizes");
+    if (!fileSizes) END_PROCESS(12, "not enough memory for fileSizes");
 
     /* Memory allocation & restrictions */
     benchedSize = BMK_findMaxMem(totalSizeToLoad * 3) / 3;
-    if (benchedSize==0) EXM_THROW(12, "not enough memory");
+    if (benchedSize==0) END_PROCESS(12, "not enough memory");
     if ((U64)benchedSize > totalSizeToLoad) benchedSize = (size_t)totalSizeToLoad;
     if (benchedSize > LZ4_MAX_INPUT_SIZE) {
         benchedSize = LZ4_MAX_INPUT_SIZE;
@@ -635,7 +635,7 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
             DISPLAY("Not enough memory; testing %u MB only...\n", (U32)(benchedSize >> 20));
     }
     srcBuffer = malloc(benchedSize + !benchedSize);   /* avoid alloc of zero */
-    if (!srcBuffer) EXM_THROW(12, "not enough memory");
+    if (!srcBuffer) END_PROCESS(12, "not enough memory");
 
     /* Load input buffer */
     BMK_loadFiles(srcBuffer, benchedSize, fileSizes, fileNamesTable, nbFiles);
@@ -663,7 +663,7 @@ static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility
     void* const srcBuffer = malloc(benchedSize);
 
     /* Memory allocation */
-    if (!srcBuffer) EXM_THROW(21, "not enough memory");
+    if (!srcBuffer) END_PROCESS(21, "not enough memory");
 
     /* Fill input buffer */
     RDG_genBuffer(srcBuffer, benchedSize, compressibility, 0.0, 0);
@@ -700,7 +700,7 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
 {
     double const compressibility = (double)g_compressibilityDefault / 100;
     char* dictBuf = NULL;
-    int dictSize = 0;
+    size_t dictSize = 0;
 
     if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
     if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
@@ -709,36 +709,36 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
 
     if (dictFileName) {
         FILE* dictFile = NULL;
-        U64 dictFileSize = UTIL_getFileSize(dictFileName);
-        if (!dictFileSize) EXM_THROW(25, "Dictionary error : could not stat dictionary file");
+        U64 const dictFileSize = UTIL_getFileSize(dictFileName);
+        if (!dictFileSize) END_PROCESS(25, "Dictionary error : could not stat dictionary file");
 
         dictFile = fopen(dictFileName, "rb");
-        if (!dictFile) EXM_THROW(25, "Dictionary error : could not open dictionary file");
+        if (!dictFile) END_PROCESS(25, "Dictionary error : could not open dictionary file");
 
         if (dictFileSize > LZ4_MAX_DICT_SIZE) {
             dictSize = LZ4_MAX_DICT_SIZE;
-            if (UTIL_fseek(dictFile, dictFileSize - dictSize, SEEK_SET))
-                EXM_THROW(25, "Dictionary error : could not seek dictionary file");
+            if (UTIL_fseek(dictFile, (long)(dictFileSize - dictSize), SEEK_SET))
+                END_PROCESS(25, "Dictionary error : could not seek dictionary file");
         } else {
-            dictSize = (int)dictFileSize;
+            dictSize = (size_t)dictFileSize;
         }
 
-        dictBuf = (char *)malloc(dictSize);
-        if (!dictBuf) EXM_THROW(25, "Allocation error : not enough memory");
+        dictBuf = (char*)malloc(dictSize);
+        if (!dictBuf) END_PROCESS(25, "Allocation error : not enough memory");
 
-        if (fread(dictBuf, 1, dictSize, dictFile) != (size_t)dictSize)
-            EXM_THROW(25, "Dictionary error : could not read dictionary file");
+        if (fread(dictBuf, 1, dictSize, dictFile) != dictSize)
+            END_PROCESS(25, "Dictionary error : could not read dictionary file");
 
         fclose(dictFile);
     }
 
     if (nbFiles == 0)
-        BMK_syntheticTest(cLevel, cLevelLast, compressibility, dictBuf, dictSize);
+        BMK_syntheticTest(cLevel, cLevelLast, compressibility, dictBuf, (int)dictSize);
     else {
         if (g_benchSeparately)
-            BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, dictSize);
+            BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
         else
-            BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, dictSize);
+            BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
     }
 
     free(dictBuf);
