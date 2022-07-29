@@ -417,7 +417,10 @@ LZ4LIB_API int LZ4_decoderRingBufferSize(int maxBlockSize);
  *  save the last 64KB of decoded data into a safe buffer where it can't be modified during decompression,
  *  then indicate where this data is saved using LZ4_setStreamDecode(), before decompressing next block.
 */
-LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int srcSize, int dstCapacity);
+LZ4LIB_API int
+LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
+                        const char* src, char* dst,
+                        int srcSize, int dstCapacity);
 
 
 /*! LZ4_decompress_*_usingDict() :
@@ -428,9 +431,17 @@ LZ4LIB_API int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecod
  *  Performance tip : Decompression speed can be substantially increased
  *                    when dst == dictStart + dictSize.
  */
-LZ4LIB_API int LZ4_decompress_safe_usingDict (const char* src, char* dst, int srcSize, int dstCapcity, const char* dictStart, int dictSize);
+LZ4LIB_API int
+LZ4_decompress_safe_usingDict(const char* src, char* dst,
+                              int srcSize, int dstCapcity,
+                              const char* dictStart, int dictSize);
 
-LZ4LIB_API int LZ4_decompress_safe_partial_usingDict(const char* source, char* dest, int compressedSize, int targetOutputSize, int maxOutputSize, const char* dictStart, int dictSize);
+LZ4LIB_API int
+LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
+                                      int compressedSize,
+                                      int targetOutputSize, int maxOutputSize,
+                                      const char* dictStart, int dictSize);
+
 #endif /* LZ4_H_2983827168210 */
 
 
@@ -508,7 +519,9 @@ LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const c
  *  stream (and source buffer) must remain in-place / accessible / unchanged
  *  through the completion of the first compression call on the stream.
  */
-LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream);
+LZ4LIB_STATIC_API void
+LZ4_attach_dictionary(LZ4_stream_t* workingStream,
+                const LZ4_stream_t* dictionaryStream);
 
 
 /*! In-place compression and decompression
