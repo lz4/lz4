@@ -321,8 +321,10 @@ LZ4F_decompress_binding(const char* src, char* dst,
 {
     size_t dstSize = (size_t)dstCapacity;
     size_t readSize = (size_t)srcSize;
-    LZ4F_decompressOptions_t const dOpt = { 1, g_skipChecksums, 0, 0 };
-    size_t const decStatus = LZ4F_decompress(g_dctx,
+    LZ4F_decompressOptions_t dOpt = { 1, 0, 0, 0 };
+    size_t decStatus;
+    dOpt.skipChecksums = g_skipChecksums;
+    decStatus = LZ4F_decompress(g_dctx,
                     dst, &dstSize,
                     src, &readSize,
                     &dOpt);
