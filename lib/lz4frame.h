@@ -54,12 +54,12 @@ extern "C" {
 
 
 /**
-  Introduction
-
-  lz4frame.h implements LZ4 frame specification (doc/lz4_Frame_format.md).
-  lz4frame.h provides frame compression functions that take care
-  of encoding standard metadata alongside LZ4-compressed blocks.
-*/
+ * Introduction
+ *
+ * lz4frame.h implements LZ4 frame specification: see doc/lz4_Frame_format.md .
+ * LZ4 Frames are compatible with `lz4` CLI,
+ * and designed to be interoperable with any system.
+**/
 
 /*-***************************************************************
  *  Compiler specifics
@@ -397,7 +397,7 @@ LZ4FLIB_API size_t LZ4F_headerSize(const void* src, size_t srcSize);
 
 /*! LZ4F_getFrameInfo() :
  *  This function extracts frame parameters (max blockSize, dictID, etc.).
- *  Its usage is optional: user can call LZ4F_decompress() directly.
+ *  Its usage is optional: user can also invoke LZ4F_decompress() directly.
  *
  *  Extracted information will fill an existing LZ4F_frameInfo_t structure.
  *  This can be useful for allocation and dictionary identification purposes.
@@ -438,9 +438,10 @@ LZ4FLIB_API size_t LZ4F_headerSize(const void* src, size_t srcSize);
  *  note 1 : in case of error, dctx is not modified. Decoding operation can resume from beginning safely.
  *  note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
  */
-LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
-                                     LZ4F_frameInfo_t* frameInfoPtr,
-                                     const void* srcBuffer, size_t* srcSizePtr);
+LZ4FLIB_API size_t
+LZ4F_getFrameInfo(LZ4F_dctx* dctx,
+                  LZ4F_frameInfo_t* frameInfoPtr,
+            const void* srcBuffer, size_t* srcSizePtr);
 
 /*! LZ4F_decompress() :
  *  Call this function repetitively to regenerate data compressed in `srcBuffer`.
@@ -473,10 +474,11 @@ LZ4FLIB_API size_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  *
  *  After a frame is fully decoded, dctx can be used again to decompress another frame.
  */
-LZ4FLIB_API size_t LZ4F_decompress(LZ4F_dctx* dctx,
-                                   void* dstBuffer, size_t* dstSizePtr,
-                                   const void* srcBuffer, size_t* srcSizePtr,
-                                   const LZ4F_decompressOptions_t* dOptPtr);
+LZ4FLIB_API size_t
+LZ4F_decompress(LZ4F_dctx* dctx,
+                void* dstBuffer, size_t* dstSizePtr,
+          const void* srcBuffer, size_t* srcSizePtr,
+          const LZ4F_decompressOptions_t* dOptPtr);
 
 
 /*! LZ4F_resetDecompressionContext() : added in v1.8.0
@@ -572,10 +574,11 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())
  */
-LZ4FLIB_STATIC_API size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
-                                                  void* dstBuffer, size_t dstCapacity,
-                                                  const void* srcBuffer, size_t srcSize,
-                                                  const LZ4F_compressOptions_t* cOptPtr);
+LZ4FLIB_STATIC_API size_t
+LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
+                        void* dstBuffer, size_t dstCapacity,
+                  const void* srcBuffer, size_t srcSize,
+                  const LZ4F_compressOptions_t* cOptPtr);
 
 /**********************************
  *  Bulk processing dictionary API
@@ -619,12 +622,12 @@ LZ4FLIB_STATIC_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
  *  but it's not recommended, as it's the only way to provide dictID in the frame header.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError()) */
-LZ4FLIB_STATIC_API size_t LZ4F_compressFrame_usingCDict(
-    LZ4F_cctx* cctx,
-    void* dst, size_t dstCapacity,
-    const void* src, size_t srcSize,
-    const LZ4F_CDict* cdict,
-    const LZ4F_preferences_t* preferencesPtr);
+LZ4FLIB_STATIC_API size_t
+LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
+                              void* dst, size_t dstCapacity,
+                        const void* src, size_t srcSize,
+                        const LZ4F_CDict* cdict,
+                        const LZ4F_preferences_t* preferencesPtr);
 
 
 /*! LZ4F_compressBegin_usingCDict() :
@@ -634,23 +637,23 @@ LZ4FLIB_STATIC_API size_t LZ4F_compressFrame_usingCDict(
  *  however, it's the only way to provide dictID in the frame header.
  * @return : number of bytes written into dstBuffer for the header,
  *           or an error code (which can be tested using LZ4F_isError()) */
-LZ4FLIB_STATIC_API size_t LZ4F_compressBegin_usingCDict(
-    LZ4F_cctx* cctx,
-    void* dstBuffer, size_t dstCapacity,
-    const LZ4F_CDict* cdict,
-    const LZ4F_preferences_t* prefsPtr);
+LZ4FLIB_STATIC_API size_t
+LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctx,
+                              void* dstBuffer, size_t dstCapacity,
+                        const LZ4F_CDict* cdict,
+                        const LZ4F_preferences_t* prefsPtr);
 
 
 /*! LZ4F_decompress_usingDict() :
  *  Same as LZ4F_decompress(), using a predefined dictionary.
  *  Dictionary is used "in place", without any preprocessing.
- *  It must remain accessible throughout the entire frame decoding. */
-LZ4FLIB_STATIC_API size_t LZ4F_decompress_usingDict(
-    LZ4F_dctx* dctxPtr,
-    void* dstBuffer, size_t* dstSizePtr,
-    const void* srcBuffer, size_t* srcSizePtr,
-    const void* dict, size_t dictSize,
-    const LZ4F_decompressOptions_t* decompressOptionsPtr);
+**  It must remain accessible throughout the entire frame decoding. */
+LZ4FLIB_STATIC_API size_t
+LZ4F_decompress_usingDict(LZ4F_dctx* dctxPtr,
+                          void* dstBuffer, size_t* dstSizePtr,
+                    const void* srcBuffer, size_t* srcSizePtr,
+                    const void* dict, size_t dictSize,
+                    const LZ4F_decompressOptions_t* decompressOptionsPtr);
 
 
 /*! Custom memory allocation :

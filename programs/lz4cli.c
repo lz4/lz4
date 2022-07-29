@@ -377,8 +377,12 @@ int main(int argc, const char** argv)
             if (argument[1]=='-') {
                 if (!strcmp(argument,  "--")) { all_arguments_are_files = 1; continue; }
                 if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
-                if ((!strcmp(argument, "--decompress"))
-                    || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }
+                if ( (!strcmp(argument, "--decompress"))
+                  || (!strcmp(argument, "--uncompress"))) {
+                      if (mode != om_bench) mode = om_decompress;
+                      BMK_setDecodeOnlyMode(1);
+                      continue;
+                 }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
                 if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(prefs, 1); continue; }
@@ -478,7 +482,10 @@ int main(int argc, const char** argv)
                 case 'l': legacy_format = 1; blockSize = 8 MB; break;
 
                     /* Decoding */
-                case 'd': mode = om_decompress; break;
+                case 'd':
+                    if (mode != om_bench) mode = om_decompress;
+                    BMK_setDecodeOnlyMode(1);
+                    break;
 
                     /* Force stdout, even if stdout==console */
                 case 'c':
