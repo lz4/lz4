@@ -188,6 +188,9 @@ only the latest one will be applied.
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)
 
+* `--no-crc`:
+  Disable both frame and block checksums
+
 * `--[no-]content-size`:
   Header includes original size (default:not present)<br/>
   Note : this option can only be activated when the original size can be
