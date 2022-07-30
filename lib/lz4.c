@@ -1732,19 +1732,19 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  * @initial_check - check ip >= ipmax before start of loop.  Returns initial_error if so.
  * @error (output) - error code.  Must be set to 0 before call.
  */
+typedef unsigned Rvl_t;  /* note : using size_t seems to result in slowdown */
 typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
-LZ4_FORCE_INLINE unsigned
+LZ4_FORCE_INLINE Rvl_t
 read_variable_length(const BYTE**ip, const BYTE* ipmax,
                      int loop_check, int initial_check,
                      variable_length_error* error)
 {
-    U32 length = 0;
-    U32 s;
-    assert(ip != NULL);
-    assert(*ip != NULL);
-    assert(ipmax != NULL);
-    assert(error != NULL);
-    assert(*error == 0);
+    Rvl_t length = 0;
+    Rvl_t s;
+    assert(ip != NULL); assert(*ip != NULL);
+    if (initial_check) assert(loop_check);
+    if (loop_check) assert(ipmax != NULL);
+    assert(error != NULL); assert(*error == 0);
     if (initial_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
         *error = initial_error;
         return length;
