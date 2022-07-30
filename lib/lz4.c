@@ -1755,21 +1755,20 @@ read_variable_length(const BYTE**ip, const BYTE* ipmax,
     s = **ip;
     (*ip)++;
     length += s;
-    if (s == 255) {
+    if (s < 255) return length;
+    if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
+        *error = loop_error;
+        return length;
+    }
+    do {
+        s = **ip;
+        (*ip)++;
+        length += s;
         if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
             *error = loop_error;
             return length;
         }
-        do {
-            s = **ip;
-            (*ip)++;
-            length += s;
-            if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
-                *error = loop_error;
-                return length;
-            }
-        } while (s==255);
-    }
+    } while (s==255);
     return length;
 }
 
