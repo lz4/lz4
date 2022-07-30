@@ -1732,40 +1732,44 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  * @initial_check - check ip >= ipmax before start of loop.  Returns initial_error if so.
  * @error (output) - error code.  Must be set to 0 before call.
  */
-typedef unsigned Rvl_t;  /* note : using size_t seems to result in slowdown */
+typedef size_t Rvl_t;
 typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
 LZ4_FORCE_INLINE Rvl_t
 read_variable_length(const BYTE**ip, const BYTE* ipmax,
                      int loop_check, int initial_check,
                      variable_length_error* error)
 {
-    Rvl_t length;
+    Rvl_t length = 0;
     assert(ip != NULL); assert(*ip != NULL);
     if (initial_check) assert(loop_check);
     if (loop_check) assert(ipmax != NULL);
     assert(error != NULL); assert(*error == 0);
-    if (initial_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
+    if (initial_check && unlikely((*ip) >= ipmax)) {    /* read overflow detection */
         *error = initial_error;
-        return 0;
+        return length;
     } else {
         if (loop_check) assert(*ip < ipmax);
     }
     /* separate branch of first extra byte from rest of the loop */
-    {   Rvl_t const acc = **ip;
+    if (sizeof(length) > 4) { /* 32-bit mode doesn't like this optimization */
+        Rvl_t const acc = **ip;
         (*ip)++;
-        if (acc < 255) return acc;
         length = acc;
-    }
-    if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
-        *error = loop_error;
-        return length;
-    }
+        if (acc < 255) return length;
+        if (loop_check && unlikely((*ip) >= ipmax)) {    /* read overflow detection */
+            *error = loop_error;
+            return length;
+    }   }
     do {
         Rvl_t const s = **ip;
         (*ip)++;
         length += s;
         if (s != 255) break;
-        if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
+        if (loop_check && unlikely((*ip) >= ipmax)) {    /* read overflow detection */
+            *error = loop_error;
+            return length;
+        }
+        if ((sizeof(length)<8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {    /* accumulator overflow detection */
             *error = loop_error;
             return length;
         }
