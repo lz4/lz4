@@ -1726,34 +1726,50 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
 
 /* Read the variable-length literal or match length.
  *
- * ip - pointer to use as input.
- * lencheck - end ip.  Return an error if ip advances >= lencheck.
- * loop_check - check ip >= lencheck in body of loop.  Returns loop_error if so.
- * initial_check - check ip >= lencheck before start of loop.  Returns initial_error if so.
- * error (output) - error code.  Should be set to 0 before call.
+ * @ip : input pointer
+ * @ipmax : end ip.  Return an error if ip advances >= ipmax.
+ * @loop_check - check ip >= ipmax in body of loop.  Returns loop_error if so.
+ * @initial_check - check ip >= ipmax before start of loop.  Returns initial_error if so.
+ * @error (output) - error code.  Must be set to 0 before call.
  */
 typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
 LZ4_FORCE_INLINE unsigned
-read_variable_length(const BYTE**ip, const BYTE* lencheck,
+read_variable_length(const BYTE**ip, const BYTE* ipmax,
                      int loop_check, int initial_check,
                      variable_length_error* error)
 {
     U32 length = 0;
     U32 s;
-    if (initial_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
+    assert(ip != NULL);
+    assert(*ip != NULL);
+    assert(ipmax != NULL);
+    assert(error != NULL);
+    assert(*error == 0);
+    if (initial_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
         *error = initial_error;
         return length;
+    } else {
+        if (loop_check) assert(*ip < ipmax);
     }
-    do {
-        s = **ip;
-        (*ip)++;
-        length += s;
-        if (loop_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
+    /* separate branch of first extra byte from rest of the loop */
+    s = **ip;
+    (*ip)++;
+    length += s;
+    if (s == 255) {
+        if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
             *error = loop_error;
             return length;
         }
-    } while (s==255);
-
+        do {
+            s = **ip;
+            (*ip)++;
+            length += s;
+            if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
+                *error = loop_error;
+                return length;
+            }
+        } while (s==255);
+    }
     return length;
 }
 

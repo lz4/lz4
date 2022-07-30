@@ -1223,7 +1223,7 @@ static void FUZ_unitTests(int compressionLevel)
         }   }
         DISPLAYLEVEL(3, "OK \n");
 
-        /* ring buffer test */
+        DISPLAYLEVEL(3, "ring buffer test : ");
         {   XXH64_state_t xxhOrig;
             XXH64_state_t xxhNewSafe, xxhNewFast;
             LZ4_streamDecode_t decodeStateSafe, decodeStateFast;
@@ -1273,6 +1273,7 @@ static void FUZ_unitTests(int compressionLevel)
                 if (rNext + messageSize > ringBufferSize) rNext = 0;
                 if (dNext + messageSize > dBufferSize) dNext = 0;
         }   }
+        DISPLAYLEVEL(3, "OK \n");
     }
 
     DISPLAYLEVEL(3, "LZ4_initStreamHC with multiple valid alignments : ");
