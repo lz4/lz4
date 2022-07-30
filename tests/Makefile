@@ -376,10 +376,11 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	$(LZ4) --no-frame-crc < $(FPREFIX)-dg20k | $(LZ4) -d > $(FPREFIX)-dec
 	$(DIFF) -q $(FPREFIX)-dg20k $(FPREFIX)-dec
 	$(DATAGEN)           | $(LZ4) -BI    | $(LZ4) -t
+	$(DATAGEN)           | $(LZ4) --no-crc | $(LZ4) -t
 	$(DATAGEN) -g6M -P99 | $(LZ4) -9BD   | $(LZ4) -t
 	$(DATAGEN) -g17M     | $(LZ4) -9v    | $(LZ4) -qt
 	$(DATAGEN) -g33M     | $(LZ4) --no-frame-crc | $(LZ4) -t
-	$(DATAGEN) -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t
+	$(DATAGEN) -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t --no-crc
 	@echo "hello world" > $(FPREFIX)-hw
 	$(LZ4) --rm -f $(FPREFIX)-hw $(FPREFIX)-hw.lz4
 	test ! -f $(FPREFIX)-hw                      # must fail (--rm)
@@ -479,6 +480,7 @@ test-lz4-testmode: lz4 datagen
 	$(DATAGEN) > $(FPREFIX)
 	$(LZ4) -f $(FPREFIX) -c > $(FPREFIX).lz4
 	$(LZ4) -bdi0 $(FPREFIX).lz4 # test benchmark decode-only mode
+	$(LZ4) -bdi0 --no-crc $(FPREFIX).lz4 # test benchmark decode-only mode
 	@echo "\n ---- test mode ----"
 	! $(DATAGEN) | $(LZ4) -t
 	! $(DATAGEN) | $(LZ4) -tf

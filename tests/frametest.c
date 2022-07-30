@@ -906,6 +906,7 @@ size_t test_lz4f_decompression_wBuffers(
         memset(&dOptions, 0, sizeof(dOptions));
         dOptions.stableDst = FUZ_rand(randState) & 1;
         if (o_scenario == o_overwrite) dOptions.stableDst = 0;  /* overwrite mode */
+        dOptions.skipChecksums = FUZ_rand(randState) & 127;
         if (sentinelTest) op[oSizeMax] = mark;
 
         DISPLAYLEVEL(7, "dstCapacity=%u,  presentedInput=%u \n", (unsigned)oSize, (unsigned)iSize);
