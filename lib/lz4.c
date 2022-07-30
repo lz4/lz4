@@ -1739,36 +1739,37 @@ read_variable_length(const BYTE**ip, const BYTE* ipmax,
                      int loop_check, int initial_check,
                      variable_length_error* error)
 {
-    Rvl_t length = 0;
-    Rvl_t s;
+    Rvl_t length;
     assert(ip != NULL); assert(*ip != NULL);
     if (initial_check) assert(loop_check);
     if (loop_check) assert(ipmax != NULL);
     assert(error != NULL); assert(*error == 0);
     if (initial_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
         *error = initial_error;
-        return length;
+        return 0;
     } else {
         if (loop_check) assert(*ip < ipmax);
     }
     /* separate branch of first extra byte from rest of the loop */
-    s = **ip;
-    (*ip)++;
-    length += s;
-    if (s < 255) return length;
+    {   Rvl_t const acc = **ip;
+        (*ip)++;
+        if (acc < 255) return acc;
+        length = acc;
+    }
     if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
         *error = loop_error;
         return length;
     }
     do {
-        s = **ip;
+        Rvl_t const s = **ip;
         (*ip)++;
         length += s;
+        if (s != 255) break;
         if (loop_check && unlikely((*ip) >= ipmax)) {    /* overflow detection */
             *error = loop_error;
             return length;
         }
-    } while (s==255);
+    } while (1);
     return length;
 }
 
