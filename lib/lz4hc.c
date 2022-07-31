@@ -755,7 +755,7 @@ _last_literals:
         } else {
             *op++ = (BYTE)(lastRunSize << ML_BITS);
         }
-        memcpy(op, anchor, lastRunSize);
+        LZ4_memcpy(op, anchor, lastRunSize);
         op += lastRunSize;
     }
 
@@ -894,7 +894,7 @@ LZ4HC_compress_generic_dictCtx (
         ctx->dictCtx = NULL;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else if (position == 0 && *srcSizePtr > 4 KB) {
-        memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
+        LZ4_memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
         LZ4HC_setExternalDict(ctx, (const BYTE *)src);
         ctx->compressionLevel = (short)cLevel;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
@@ -1177,7 +1177,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     if (dictSize > prefixSize) dictSize = prefixSize;
     if (safeBuffer == NULL) assert(dictSize == 0);
     if (dictSize > 0)
-        memmove(safeBuffer, streamPtr->end - dictSize, dictSize);
+        LZ4_memmove(safeBuffer, streamPtr->end - dictSize, dictSize);
     {   U32 const endIndex = (U32)(streamPtr->end - streamPtr->prefixStart) + streamPtr->dictLimit;
         streamPtr->end = (const BYTE*)safeBuffer + dictSize;
         streamPtr->prefixStart = streamPtr->end - dictSize;
@@ -1587,7 +1587,7 @@ _last_literals:
          } else {
              *op++ = (BYTE)(lastRunSize << ML_BITS);
          }
-         memcpy(op, anchor, lastRunSize);
+         LZ4_memcpy(op, anchor, lastRunSize);
          op += lastRunSize;
      }
 
