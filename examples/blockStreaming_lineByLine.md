@@ -107,7 +107,7 @@ This is called "External Dictionary Mode".
 In Line#X+2 (see (5)), finally LZ4 forget almost all memories but still remains Line#X+1.
 This is the same situation as Line#2.
 
-Continue these procedure to the end of text file.
+Continue these procedures to the end of text file.
 
 
 ## How the decompression works
@@ -119,4 +119,4 @@ Decompression will do reverse order.
  - Output decompressed plain text line to the file.
  - Forward ringbuffer offset. If offset exceeds end of the ringbuffer, reset it.
 
-Continue these procedure to the end of the compressed file.
+Continue these procedures to the end of the compressed file.

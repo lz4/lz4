@@ -60,7 +60,7 @@ Example 2 : A literal length of 280 will be represented as :
 
   - 15  : value for the 4-bits High field
   - 255 : following byte is maxed, since 280-15 >= 255
-  - 10  : (=280 - 15 - 255) ) remaining length to reach 280
+  - 10  : (=280 - 15 - 255) remaining length to reach 280
 
 Example 3 : A literal length of 15 will be represented as :
 
@@ -239,6 +239,6 @@ searches and selects matches within the source data block.
 For example, an upper compression limit can be reached,
 using a technique called "full optimal parsing", at high cpu and memory cost.
 But multiple other techniques can be considered,
-featuring distinct time / performance trade offs.
+featuring distinct time / performance trade-offs.
 As long as the specified format is respected,
 the result will be compatible with and decodable by any compliant decoder.
