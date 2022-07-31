@@ -407,7 +407,7 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 	test ! -f ./-z
 	$(DIFF) -q $(FPREFIX)-hw $(FPREFIX)4
 	! $(LZ4) $(FPREFIX)2 $(FPREFIX)3 $(FPREFIX)4    # must fail: refuse to handle 3+ file names
-	$(LZ4) -f $(FPREFIX)-hw                   # create $(FPREFIX)-hw.lz4, for next tests
+	$(LZ4) -f $(FPREFIX)-hw -c > $(FPREFIX)-hw.lz4  # create $(FPREFIX)-hw.lz4, for next tests
 	$(LZ4) --list $(FPREFIX)-hw.lz4           # test --list on valid single-frame file
 	$(LZ4) --list < $(FPREFIX)-hw.lz4         # test --list from stdin (file only)
 	$(CAT) $(FPREFIX)-hw >> $(FPREFIX)-hw.lz4
