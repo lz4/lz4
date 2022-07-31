@@ -189,12 +189,9 @@
 *  Memory routines
 **************************************/
 #if defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
-#  undef LZ4_ALLOC
-#  undef LZ4_ALLOC_AND_ZERO
-#  undef LZ4_FREEMEM
-#  define LZ4_ALLOC(x)			lz4_error_memory_allocation_is_disabled
-#  define LZ4_ALLOC_AND_ZERO(x)	lz4_error_memory_allocation_is_disabled
-#  define LZ4_FREEMEM(x)		lz4_error_memory_allocation_is_disabled
+#  define ALLOC(s)          lz4_error_memory_allocation_is_disabled
+#  define ALLOC_AND_ZERO(s) lz4_error_memory_allocation_is_disabled
+#  define FREEMEM(p)        lz4_error_memory_allocation_is_disabled
 #elif defined(LZ4_USER_MEMORY_FUNCTIONS)
 /* memory management functions can be customized by user project.
  * Below functions must exist somewhere in the Project
