@@ -538,7 +538,7 @@ static unsigned LZ4_NbCommonBytes (reg_t val)
 * including _tzcnt_u64. Therefore, we need to neuter the _tzcnt_u64 code path for ARM64EC.
 ****************************************************************************************************/
 #         if defined(__clang__) && (__clang_major__ < 10)
-            /* Avoid undefined clang-cl intrinics issue.
+            /* Avoid undefined clang-cl intrinsics issue.
              * See https://github.com/lz4/lz4/pull/1017 for details. */
             return (unsigned)__builtin_ia32_tzcnt_u64(val) >> 3;
 #         else

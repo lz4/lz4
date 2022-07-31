@@ -9,7 +9,7 @@ LZ4 has the following API sets :
    It guarantees interoperability with other LZ4 framing format compliant tools/libraries
    such as LZ4 command line utility, node-lz4, etc.
  - "Block" API : This is recommended for simple purpose.
-   It compress single raw memory block to LZ4 memory block and vice versa.
+   It compresses single raw memory block to LZ4 memory block and vice versa.
  - "Streaming" API : This is designed for complex things.
    For example, compress huge stream data in restricted memory environment.
 

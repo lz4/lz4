@@ -96,7 +96,7 @@ The following build macro can be selected to adjust source code behavior at comp
   by using bitcount instructions, generally implemented as fast single instructions in many cpus.
   In case the target cpus doesn't support it, or compiler intrinsic doesn't work, or feature bad performance,
   it's possible to use an optimized software path instead.
-  This is achieved by setting this build macros .
+  This is achieved by setting this build macros.
   In most cases, it's not expected to be necessary,
   but it can be legitimately considered for less common platforms.
 

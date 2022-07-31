@@ -51,7 +51,7 @@ The compiled executable will require LZ4 DLL which is available at `dll\msys-lz4
 Open `example\fullbench-dll.sln` to compile `fullbench-dll` that uses a
 dynamic LZ4 library from the `dll` directory. The solution works with Visual C++
 2010 or newer. When one will open the solution with Visual C++ newer than 2010
-then the solution will upgraded to the current version.
+then the solution will be upgraded to the current version.
 
 
 #### Using LZ4 DLL with Visual C++

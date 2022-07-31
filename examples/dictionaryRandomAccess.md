@@ -64,4 +64,4 @@ Decompression will do reverse order.
  - Read the next block.
  - Decompress it and write that page to the file.
 
-Continue these procedure until all the required data has been read.
+Continue these procedures until all the required data has been read.

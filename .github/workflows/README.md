@@ -5,7 +5,7 @@ This directory contains [GitHub Actions](https://github.com/features/actions) wo
 ## USAN, ASAN (`lz4-ubsan-x64`, `lz4-ubsan-x86`, `lz4-asan-x64`)
 
 For now, `lz4-ubsan-*` ignores the exit code of `make usan` and `make usan32`.
-Because there're several issues which may take relatively long time to resolve.
+Because there are several issues which may take relatively long time to resolve.
 
 We'll fully enable it when we ensure `make usan` is ready for all commits and PRs.
 

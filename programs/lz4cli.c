@@ -186,7 +186,7 @@ static int usage_longhelp(const char* exeName)
     DISPLAY( "\n");
     DISPLAY( "Compression levels : \n");
     DISPLAY( "---------------------\n");
-    DISPLAY( "-0 ... -2  => Fast compression, all identicals\n");
+    DISPLAY( "-0 ... -2  => Fast compression, all identical\n");
     DISPLAY( "-3 ... -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
     DISPLAY( "\n");
     DISPLAY( "stdin, stdout and the console : \n");
