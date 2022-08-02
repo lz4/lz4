@@ -1860,21 +1860,23 @@ LZ4_decompress_unsafe_generic(
 
 /* Read the variable-length literal or match length.
  *
- * ip - pointer to use as input.
- * lencheck - end ip.  Return an error if ip advances >= lencheck.
- * loop_check - check ip >= lencheck in body of loop.  Returns loop_error if so.
- * initial_check - check ip >= lencheck before start of loop.  Returns initial_error if so.
- * error (output) - error code.  Should be set to 0 before call.
- */
+ * @ip : input pointer
+ * @ilimit : position after which if length is not decoded, the input is necessarily corrupted.
+ * @initial_check - check ip >= ipmax before start of loop.  Returns initial_error if so.
+ * @error (output) - error code.  Must be set to 0 before call.
+**/
 typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
-LZ4_FORCE_INLINE unsigned
-read_variable_length(const BYTE**ip, const BYTE* lencheck,
+typedef size_t Rvl_t;
+LZ4_FORCE_INLINE Rvl_t
+read_variable_length(const BYTE**ip, const BYTE* ilimit,
                      int initial_check,
                      variable_length_error* error)
 {
-    U32 length = 0;
-    U32 s;
-    if (initial_check && unlikely((*ip) >= lencheck)) {    /* overflow detection */
+    Rvl_t s, length = 0;
+    assert(ip != NULL);
+    assert(*ip !=  NULL);
+    assert(ilimit != NULL);
+    if (initial_check && unlikely((*ip) >= ilimit)) {    /* overflow detection */
         *error = initial_error;
         return length;
     }
@@ -1882,7 +1884,12 @@ read_variable_length(const BYTE**ip, const BYTE* lencheck,
         s = **ip;
         (*ip)++;
         length += s;
-        if (unlikely((*ip) >= lencheck)) {    /* overflow detection */
+        if (unlikely((*ip) >= ilimit)) {    /* overflow detection */
+            *error = loop_error;
+            return length;
+        }
+        /* accumulator overflow detection (32-bit mode only) */
+        if ((sizeof(length)<8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
             *error = loop_error;
             return length;
         }
@@ -1946,14 +1953,17 @@ LZ4_decompress_generic(
         }
         if (unlikely(srcSize==0)) { return -1; }
 
-	/* Currently the fast loop shows a regression on qualcomm arm chips. */
+    /* LZ4_FAST_DEC_LOOP:
+     * designed for modern OoO performance cpus,
+     * where copying reliably 32-bytes is preferable to an unpredictable branch.
+     * note : fast loop may show a regression for some client arm chips. */
 #if LZ4_FAST_DEC_LOOP
         if ((oend - op) < FASTLOOP_SAFE_DISTANCE) {
             DEBUGLOG(6, "skip fast decode loop");
             goto safe_decode;
         }
 
-        /* Fast loop : decode sequences as long as output < iend-FASTLOOP_SAFE_DISTANCE */
+        /* Fast loop : decode sequences as long as output < oend-FASTLOOP_SAFE_DISTANCE */
         while (1) {
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
             assert(oend - op >= FASTLOOP_SAFE_DISTANCE);
@@ -1980,7 +1990,7 @@ LZ4_decompress_generic(
                 DEBUGLOG(7, "copy %u bytes in a 16-bytes stripe", (unsigned)length);
                 /* We don't need to check oend, since we check it once for each loop below */
                 if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { goto safe_literal_copy; }
-                /* Literals can only be 14, but hope compilers optimize if we copy by a register size */
+                /* Literals can only be <= 14, but hope compilers optimize better when copy by a register size */
                 LZ4_memcpy(op, ip, 16);
                 ip += length; op = cpy;
             }
@@ -1988,7 +1998,7 @@ LZ4_decompress_generic(
             /* get offset */
             offset = LZ4_readLE16(ip); ip+=2;
             match = op - offset;
-            assert(match <= op);
+            assert(match <= op);  /* overflow check */
 
             /* get matchlength */
             length = token & ML_MASK;
@@ -2009,7 +2019,7 @@ LZ4_decompress_generic(
                     goto safe_match_copy;
                 }
 
-                /* Fastpath check: Avoids a branch in LZ4_wildCopy32 if true */
+                /* Fastpath check: skip LZ4_wildCopy32 when true */
                 if ((dict == withPrefix64k) || (match >= lowPrefix)) {
                     if (offset >= 8) {
                         assert(match >= lowPrefix);
@@ -2172,7 +2182,7 @@ LZ4_decompress_generic(
                         goto _output_error;
                     }
                 }
-                LZ4_memmove(op, ip, length);  /* supports overlapping memory regions; only matters for in-place decompression scenarios */
+                LZ4_memmove(op, ip, length);  /* supports overlapping memory regions, for in-place decompression scenarios */
                 ip += length;
                 op += length;
                 /* Necessarily EOF when !partialDecoding.
@@ -2184,7 +2194,7 @@ LZ4_decompress_generic(
                     break;
                 }
             } else {
-                LZ4_wildCopy8(op, ip, cpy);   /* may overwrite up to WILDCOPYLENGTH beyond cpy */
+                LZ4_wildCopy8(op, ip, cpy);   /* can overwrite up to 8 bytes beyond cpy */
                 ip += length; op = cpy;
             }
 
