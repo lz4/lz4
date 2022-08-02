@@ -1737,6 +1737,128 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
 #undef MIN
 #define MIN(a,b)    ( (a) < (b) ? (a) : (b) )
 
+
+/* variant for decompress_unsafe()
+ * does not know end of input
+ * presumes input is well formed
+ * note : will consume at least one byte */
+size_t read_long_length_no_check(const BYTE** pp)
+{
+    size_t b, l = 0;
+    do { b = **pp; (*pp)++; l += b; } while (b==255);
+    DEBUGLOG(6, "read_long_length_no_check: +length=%zu using %zu input bytes", l, l/255 + 1)
+    return l;
+}
+
+/* core decoder variant for LZ4_decompress_fast*()
+ * for legacy support only : these entry points are deprecated.
+ * - Presumes input is correctly formed (no defense vs malformed inputs)
+ * - Does not know input size (presume input buffer is "large enough")
+ * - Decompress a full block (only)
+ * @return : nb of bytes read from input.
+ * Note : this variant is not optimized for speed, just for maintenance.
+ *        the goal is to remove support of decompress_fast*() variants by v2.0
+**/
+LZ4_FORCE_INLINE int
+LZ4_decompress_unsafe_generic(
+                 const BYTE* const istart,
+                 BYTE* const ostart,
+                 int decompressedSize,
+
+                 size_t prefixSize,
+                 const BYTE* const dictStart,  /* only if dict==usingExtDict */
+                 const size_t dictSize         /* note: =0 if dictStart==NULL */
+                 )
+{
+    const BYTE* ip = istart;
+    BYTE* op = (BYTE*)ostart;
+    BYTE* const oend = ostart + decompressedSize;
+    const BYTE* const prefixStart = ostart - prefixSize;
+
+    DEBUGLOG(5, "LZ4_decompress_unsafe_generic");
+    if (dictStart == NULL) assert(dictSize == 0);
+
+    while (1) {
+        /* start new sequence */
+        unsigned token = *ip++;
+
+        /* literals */
+        {   size_t ll = token >> ML_BITS;
+            if (ll==15) {
+                /* long literal length */
+                ll += read_long_length_no_check(&ip);
+            }
+            if ((size_t)(oend-op) < ll) return -1; /* output buffer overflow */
+            LZ4_memmove(op, ip, ll); /* support in-place decompression */
+            op += ll;
+            ip += ll;
+            if ((size_t)(oend-op) < MFLIMIT) {
+                if (op==oend) break;  /* end of block */
+                DEBUGLOG(5, "invalid: literals end at distance %zi from end of block", oend-op);
+                /* incorrect end of block :
+                 * last match must start at least MFLIMIT==12 bytes before end of output block */
+                return -1;
+        }   }
+
+        /* match */
+        {   size_t ml = token & 15;
+            size_t const offset = LZ4_readLE16(ip);
+            ip+=2;
+
+            if (ml==15) {
+                /* long literal length */
+                ml += read_long_length_no_check(&ip);
+            }
+            ml += MINMATCH;
+
+            if ((size_t)(oend-op) < ml) return -1; /* output buffer overflow */
+
+            {   const BYTE* match = op - offset;
+
+                /* out of range */
+                if (offset > (size_t)(op - prefixStart) + dictSize) {
+                    DEBUGLOG(6, "offset out of range");
+                    return -1;
+                }
+
+                /* check special case : extDict */
+                if (offset > (size_t)(op - prefixStart)) {
+                    /* extDict scenario */
+                    const BYTE* const dictEnd = dictStart + dictSize;
+                    const BYTE* extMatch = dictEnd - (offset - (size_t)(op-prefixStart));
+                    size_t const extml = (size_t)(dictEnd - extMatch);
+                    if (extml > ml) {
+                        /* match entirely within extDict */
+                        LZ4_memmove(op, extMatch, ml);
+                        op += ml;
+                        ml = 0;
+                    } else {
+                        /* match split between extDict & prefix */
+                        LZ4_memmove(op, extMatch, extml);
+                        op += extml;
+                        ml -= extml;
+                    }
+                    match = prefixStart;
+                }
+
+                /* match copy - slow variant, supporting overlap copy */
+                {   size_t u;
+                    for (u=0; u<ml; u++) {
+                        op[u] = match[u];
+            }   }   }
+            op += ml;
+            if ((size_t)(oend-op) < LASTLITERALS) {
+                DEBUGLOG(5, "invalid: match ends at distance %zi from end of block", oend-op);
+                /* incorrect end of block :
+                 * last match must stop at least LASTLITERALS==5 bytes before end of output block */
+                return -1;
+            }
+        } /* match */
+    } /* main loop */
+    return (int)(ip - istart);
+}
+
+
 /* Read the variable-length literal or match length.
  *
  * ip - pointer to use as input.
@@ -2229,9 +2351,16 @@ int LZ4_decompress_safe_partial(const char* src, char* dst, int compressedSize, 
 LZ4_FORCE_O2
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
+    DEBUGLOG(5, "LZ4_decompress_fast");
+#if 0
     return LZ4_decompress_generic(source, dest, 0, originalSize,
                                   endOnOutputSize, decode_full_block, withPrefix64k,
                                   (BYTE*)dest - 64 KB, NULL, 0);
+#else
+    return LZ4_decompress_unsafe_generic(
+                (const BYTE*)source, (BYTE*)dest, originalSize,
+                0, NULL, 0);
+#endif
 }
 
 /*===== Instantiate a few more decoding cases, used more than once. =====*/
@@ -2256,9 +2385,15 @@ static int LZ4_decompress_safe_partial_withPrefix64k(const char* source, char* d
 /* Another obsolete API function, paired with the previous one. */
 int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int originalSize)
 {
+#if 0
     /* LZ4_decompress_fast doesn't validate match offsets,
      * and thus serves well with any prefixed dictionary. */
     return LZ4_decompress_fast(source, dest, originalSize);
+#else
+    return LZ4_decompress_unsafe_generic(
+                (const BYTE*)source, (BYTE*)dest, originalSize,
+                64 KB, NULL, 0);
+#endif
 }
 
 LZ4_FORCE_O2
@@ -2305,9 +2440,15 @@ LZ4_FORCE_O2
 static int LZ4_decompress_fast_extDict(const char* source, char* dest, int originalSize,
                                        const void* dictStart, size_t dictSize)
 {
+#if 0
     return LZ4_decompress_generic(source, dest, 0, originalSize,
                                   endOnOutputSize, decode_full_block, usingExtDict,
                                   (BYTE*)dest, (const BYTE*)dictStart, dictSize);
+#else
+    return LZ4_decompress_unsafe_generic(
+                (const BYTE*)source, (BYTE*)dest, originalSize,
+                0, (const BYTE*)dictStart, dictSize);
+#endif
 }
 
 /* The "double dictionary" mode, for use with e.g. ring buffers: the first part
@@ -2320,15 +2461,6 @@ int LZ4_decompress_safe_doubleDict(const char* source, char* dest, int compresse
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize,
                                   endOnInputSize, decode_full_block, usingExtDict,
-                                  (BYTE*)dest-prefixSize, (const BYTE*)dictStart, dictSize);
-}
-
-LZ4_FORCE_INLINE
-int LZ4_decompress_fast_doubleDict(const char* source, char* dest, int originalSize,
-                                   size_t prefixSize, const void* dictStart, size_t dictSize)
-{
-    return LZ4_decompress_generic(source, dest, 0, originalSize,
-                                  endOnOutputSize, decode_full_block, usingExtDict,
                                   (BYTE*)dest-prefixSize, (const BYTE*)dictStart, dictSize);
 }
 
@@ -2434,29 +2566,35 @@ int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
     return result;
 }
 
-LZ4_FORCE_O2
-int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* source, char* dest, int originalSize)
+LZ4_FORCE_O2 int
+LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode,
+                        const char* source, char* dest, int originalSize)
 {
-    LZ4_streamDecode_t_internal* lz4sd = &LZ4_streamDecode->internal_donotuse;
+    LZ4_streamDecode_t_internal* const lz4sd =
+        (assert(LZ4_streamDecode!=NULL), &LZ4_streamDecode->internal_donotuse);
     int result;
+
+    DEBUGLOG(5, "LZ4_decompress_fast_continue (toDecodeSize=%i)", originalSize);
     assert(originalSize >= 0);
 
     if (lz4sd->prefixSize == 0) {
+        DEBUGLOG(5, "first invocation : no prefix nor extDict");
         assert(lz4sd->extDictSize == 0);
         result = LZ4_decompress_fast(source, dest, originalSize);
         if (result <= 0) return result;
         lz4sd->prefixSize = (size_t)originalSize;
         lz4sd->prefixEnd = (BYTE*)dest + originalSize;
     } else if (lz4sd->prefixEnd == (BYTE*)dest) {
-        if (lz4sd->prefixSize >= 64 KB - 1 || lz4sd->extDictSize == 0)
-            result = LZ4_decompress_fast(source, dest, originalSize);
-        else
-            result = LZ4_decompress_fast_doubleDict(source, dest, originalSize,
-                                                    lz4sd->prefixSize, lz4sd->externalDict, lz4sd->extDictSize);
+        DEBUGLOG(5, "continue using existing prefix");
+        result = LZ4_decompress_unsafe_generic(
+                        (const BYTE*)source, (BYTE*)dest, originalSize,
+                        lz4sd->prefixSize,
+                        lz4sd->externalDict, lz4sd->extDictSize);
         if (result <= 0) return result;
         lz4sd->prefixSize += (size_t)originalSize;
         lz4sd->prefixEnd  += originalSize;
     } else {
+        DEBUGLOG(5, "prefix becomes extDict");
         lz4sd->extDictSize = lz4sd->prefixSize;
         lz4sd->externalDict = lz4sd->prefixEnd - lz4sd->extDictSize;
         result = LZ4_decompress_fast_extDict(source, dest, originalSize,
@@ -2510,7 +2648,9 @@ int LZ4_decompress_safe_partial_usingDict(const char* source, char* dest, int co
 int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
 {
     if (dictSize==0 || dictStart+dictSize == dest)
-        return LZ4_decompress_fast(source, dest, originalSize);
+        return LZ4_decompress_unsafe_generic(
+                        (const BYTE*)source, (BYTE*)dest, originalSize,
+                        (size_t)dictSize, NULL, 0);
     assert(dictSize >= 0);
     return LZ4_decompress_fast_extDict(source, dest, originalSize, dictStart, (size_t)dictSize);
 }
