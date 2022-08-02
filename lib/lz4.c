@@ -1865,33 +1865,29 @@ LZ4_decompress_unsafe_generic(
  * @initial_check - check ip >= ipmax before start of loop.  Returns initial_error if so.
  * @error (output) - error code.  Must be set to 0 before call.
 **/
-typedef enum { loop_error = -2, initial_error = -1, ok = 0 } variable_length_error;
 typedef size_t Rvl_t;
+static const Rvl_t rvl_error = (Rvl_t)(-1);
 LZ4_FORCE_INLINE Rvl_t
-read_variable_length(const BYTE**ip, const BYTE* ilimit,
-                     int initial_check,
-                     variable_length_error* error)
+read_variable_length(const BYTE** ip, const BYTE* ilimit,
+                     int initial_check)
 {
     Rvl_t s, length = 0;
     assert(ip != NULL);
     assert(*ip !=  NULL);
     assert(ilimit != NULL);
-    if (initial_check && unlikely((*ip) >= ilimit)) {    /* overflow detection */
-        *error = initial_error;
-        return length;
+    if (initial_check && unlikely((*ip) >= ilimit)) {    /* read limit reached */
+        return rvl_error;
     }
     do {
         s = **ip;
         (*ip)++;
         length += s;
-        if (unlikely((*ip) >= ilimit)) {    /* overflow detection */
-            *error = loop_error;
-            return length;
+        if (unlikely((*ip) > ilimit)) {    /* read limit reached */
+            return rvl_error;
         }
         /* accumulator overflow detection (32-bit mode only) */
         if ((sizeof(length)<8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
-            *error = loop_error;
-            return length;
+            return rvl_error;
         }
     } while (s==255);
 
@@ -1973,9 +1969,9 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-                variable_length_error error = ok;
-                length += read_variable_length(&ip, iend-RUN_MASK, 1, &error);
-                if (error == initial_error) { goto _output_error; }
+                size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
+                if (addl == rvl_error) { goto _output_error; }
+                length += addl;
                 if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
 
@@ -2004,12 +2000,12 @@ LZ4_decompress_generic(
             length = token & ML_MASK;
 
             if (length == ML_MASK) {
-                variable_length_error error = ok;
-                if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
-                length += read_variable_length(&ip, iend - LASTLITERALS + 1, 0, &error);
-                if (error != ok) { goto _output_error; }
-                if (unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
+                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS + 1, 0);
+                if (addl == rvl_error) { goto _output_error; }
+                length += addl;
                 length += MINMATCH;
+                if (unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
+                if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
                     goto safe_match_copy;
                 }
@@ -2036,6 +2032,7 @@ LZ4_decompress_generic(
             if (checkOffset && (unlikely(match + dictSize < lowPrefix))) { goto _output_error; } /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
+                assert(dictEnd != NULL);
                 if (unlikely(op+length > oend-LASTLITERALS)) {
                     if (partialDecoding) {
                         DEBUGLOG(7, "partialDecoding: dictionary match, close to dstEnd");
@@ -2129,9 +2126,9 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-                variable_length_error error = ok;
-                length += read_variable_length(&ip, iend-RUN_MASK, 1, &error);
-                if (error == initial_error) { goto _output_error; }
+                size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
+                if (addl == rvl_error) { goto _output_error; }
+                length += addl;
                 if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
             }
@@ -2207,9 +2204,9 @@ LZ4_decompress_generic(
 
     _copy_match:
             if (length == ML_MASK) {
-              variable_length_error error = ok;
-              length += read_variable_length(&ip, iend - LASTLITERALS + 1, 0, &error);
-              if (error != ok) goto _output_error;
+                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS + 1, 0);
+                if (addl == rvl_error) { goto _output_error; }
+                length += addl;
                 if (unlikely((uptrval)(op)+length<(uptrval)op)) goto _output_error;   /* overflow detection */
             }
             length += MINMATCH;
@@ -2220,6 +2217,7 @@ LZ4_decompress_generic(
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
+                assert(dictEnd != NULL);
                 if (unlikely(op+length > oend-LASTLITERALS)) {
                     if (partialDecoding) length = MIN(length, (size_t)(oend-op));
                     else goto _output_error;   /* doesn't respect parsing restriction */
