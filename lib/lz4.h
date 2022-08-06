@@ -281,8 +281,10 @@ LZ4LIB_API int LZ4_decompress_safe_partial (const char* src, char* dst, int srcS
 ***********************************************/
 typedef union LZ4_stream_u LZ4_stream_t;  /* incomplete type (defined later) */
 
+#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4LIB_API LZ4_stream_t* LZ4_createStream(void);
 LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
+#endif /* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */
 
 /*! LZ4_resetStream_fast() : v1.9.0+
  *  Use this to prepare an LZ4_stream_t for a new chain of dependent blocks
@@ -366,8 +368,10 @@ typedef union LZ4_streamDecode_u LZ4_streamDecode_t;   /* tracking context */
  *  creation / destruction of streaming decompression tracking context.
  *  A tracking context can be re-used multiple times.
  */
+#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
+#endif /* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */
 
 /*! LZ4_setStreamDecode() :
  *  An LZ4_streamDecode_t context can be allocated once and re-used multiple times.
