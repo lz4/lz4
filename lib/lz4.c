@@ -188,6 +188,17 @@
 /*-************************************
 *  Memory routines
 **************************************/
+
+/*! LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION :
+ *  Disable relatively high-level LZ4/HC functions that use dynamic memory
+ *  allocation functions (malloc(), calloc(), free()).
+ *
+ *  Note that this is a compile-time switch. And since it disables
+ *  public/stable LZ4 v1 API functions, we don't recommend using this
+ *  symbol to generate a library for distribution.
+ *
+ *  The following functions are removed when this symbol is defined.
+ */
 #if defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 #  define ALLOC(s)          lz4_error_memory_allocation_is_disabled
 #  define ALLOC_AND_ZERO(s) lz4_error_memory_allocation_is_disabled
