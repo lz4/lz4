@@ -29,7 +29,7 @@
 static void MY_exit(int exitCode);
 static void MY_abort(void);
 void *memmove(void *dst, const void *src, size_t n);
-void *memcpy(void * restrict dst, const void * restrict src, size_t n);
+void *memcpy(void * __restrict__ dst, const void * __restrict__ src, size_t n);
 void *memset(void *s, int c, size_t n);
 int memcmp(const void *s1, const void *s2, size_t n);
 
@@ -48,8 +48,8 @@ static void test_lz4(const uint8_t* srcData, int srcSize) {
     // Compress
     static uint8_t compressBuffer[1024 * 1024];
     const int compressedSize = LZ4_compress_default(
-        srcData,
-        compressBuffer,
+        (const char*) srcData,
+        (char*) compressBuffer,
         srcSize,
         sizeof(compressBuffer)
     );
@@ -60,8 +60,8 @@ static void test_lz4(const uint8_t* srcData, int srcSize) {
     // Decompress
     static uint8_t decompressBuffer[1024 * 1024];
     const int decompressedSize = LZ4_decompress_safe(
-        compressBuffer,
-        decompressBuffer,
+        (const char*) compressBuffer,
+        (char*) decompressBuffer,
         compressedSize,
         sizeof(decompressBuffer)
     );
@@ -84,8 +84,8 @@ static void test_lz4hc(const uint8_t* srcData, int srcSize) {
     // Compress
     static uint8_t compressBuffer[1024 * 1024];
     const int compressedSize = LZ4_compress_HC(
-        srcData,
-        compressBuffer,
+        (const char*) srcData,
+        (char*) compressBuffer,
         srcSize,
         sizeof(compressBuffer),
         LZ4HC_CLEVEL_DEFAULT
@@ -97,8 +97,8 @@ static void test_lz4hc(const uint8_t* srcData, int srcSize) {
     // Decompress
     static uint8_t decompressBuffer[1024 * 1024];
     const int decompressedSize = LZ4_decompress_safe(
-        compressBuffer,
-        decompressBuffer,
+        (const char*) compressBuffer,
+        (char*) decompressBuffer,
         compressedSize,
         sizeof(decompressBuffer)
     );
@@ -173,8 +173,8 @@ void __assert_fail(const char * assertion, const char * file, unsigned int line,
 // https://gcc.gnu.org/onlinedocs/gcc/Standards.html
 // > GCC requires the freestanding environment provide memcpy, memmove, memset and memcmp.
 void *memmove(void *dst, const void *src, size_t n) {
-    uint8_t* d = dst;
-    const uint8_t* s = src;
+    uint8_t* d = (uint8_t*) dst;
+    const uint8_t* s = (const uint8_t*) src;
 
     if (d > s) {
         d += n;
@@ -190,12 +190,12 @@ void *memmove(void *dst, const void *src, size_t n) {
     return dst;
 }
 
-void *memcpy(void * restrict dst, const void * restrict src, size_t n) {
+void *memcpy(void * __restrict__ dst, const void * __restrict__ src, size_t n) {
     return memmove(dst, src, n);
 }
 
 void *memset(void *s, int c, size_t n) {
-    uint8_t* p = s;
+    uint8_t* p = (uint8_t*) s;
     while (n--) {
         *p++ = (uint8_t) c;
     }
@@ -219,6 +219,9 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
 
 //
+#if defined(__cplusplus)
+extern "C"
+#endif
 void _start(void) {
     test();
     MY_exit(0);
