@@ -19,10 +19,6 @@
 // $ ltrace ./a.out
 // +++ exited (status 0) +++
 
-#if !defined(__x86_64__) || !defined(__linux__)
-#  error This test only supports Linux __x86_64__
-#endif
-
 #include <stddef.h>
 #include <stdint.h>
 
@@ -32,6 +28,11 @@
 #  define EXTERN_C
 #endif
 
+
+#if !defined(__x86_64__) || !defined(__linux__)
+EXTERN_C void _start(void) { }
+int main(int argc, char** argv) { return 0; }
+#else
 
 static void MY_exit(int exitCode);
 static void MY_abort(void);
@@ -235,3 +236,4 @@ int main(int argc, char** argv) {
     MY_exit(0);
     return 0;
 }
+#endif
