@@ -612,7 +612,7 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 test-freestanding: freestanding
 	@echo "\n ---- test freestanding ----"
 	./freestanding$(EXT)
-	strace ./freestanding$(EXT)
-	ltrace ./freestanding$(EXT)
+	-strace ./freestanding$(EXT)
+	-ltrace ./freestanding$(EXT)
 
 endif
