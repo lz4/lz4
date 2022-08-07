@@ -26,12 +26,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(__cplusplus)
+#  define EXTERN_C extern "C"
+#else
+#  define EXTERN_C
+#endif
+
+
 static void MY_exit(int exitCode);
 static void MY_abort(void);
-void *memmove(void *dst, const void *src, size_t n);
-void *memcpy(void * __restrict__ dst, const void * __restrict__ src, size_t n);
-void *memset(void *s, int c, size_t n);
-int memcmp(const void *s1, const void *s2, size_t n);
+EXTERN_C void *memmove(void *dst, const void *src, size_t n);
+EXTERN_C void *memcpy(void * __restrict__ dst, const void * __restrict__ src, size_t n);
+EXTERN_C void *memset(void *s, int c, size_t n);
+EXTERN_C int memcmp(const void *s1, const void *s2, size_t n);
 
 // LZ4/HC basic freestanding setup
 #define LZ4_FREESTANDING 1
@@ -41,7 +48,6 @@ int memcmp(const void *s1, const void *s2, size_t n);
 
 #include "../lib/lz4.c"
 #include "../lib/lz4hc.c"
-
 
 // Test for LZ4
 static void test_lz4(const uint8_t* srcData, int srcSize) {
@@ -172,7 +178,7 @@ void __assert_fail(const char * assertion, const char * file, unsigned int line,
 // GCC requires memcpy, memmove, memset and memcmp.
 // https://gcc.gnu.org/onlinedocs/gcc/Standards.html
 // > GCC requires the freestanding environment provide memcpy, memmove, memset and memcmp.
-void *memmove(void *dst, const void *src, size_t n) {
+EXTERN_C void *memmove(void *dst, const void *src, size_t n) {
     uint8_t* d = (uint8_t*) dst;
     const uint8_t* s = (const uint8_t*) src;
 
@@ -190,11 +196,11 @@ void *memmove(void *dst, const void *src, size_t n) {
     return dst;
 }
 
-void *memcpy(void * __restrict__ dst, const void * __restrict__ src, size_t n) {
+EXTERN_C void *memcpy(void * __restrict__ dst, const void * __restrict__ src, size_t n) {
     return memmove(dst, src, n);
 }
 
-void *memset(void *s, int c, size_t n) {
+EXTERN_C void *memset(void *s, int c, size_t n) {
     uint8_t* p = (uint8_t*) s;
     while (n--) {
         *p++ = (uint8_t) c;
@@ -202,7 +208,7 @@ void *memset(void *s, int c, size_t n) {
     return s;
 }
 
-int memcmp(const void *s1, const void *s2, size_t n) {
+EXTERN_C int memcmp(const void *s1, const void *s2, size_t n) {
     const uint8_t* p1 = (const uint8_t*) s1;
     const uint8_t* p2 = (const uint8_t*) s2;
     while (n--) {
@@ -219,10 +225,7 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
 
 //
-#if defined(__cplusplus)
-extern "C"
-#endif
-void _start(void) {
+EXTERN_C void _start(void) {
     test();
     MY_exit(0);
 }
