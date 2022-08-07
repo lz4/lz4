@@ -209,7 +209,9 @@ void  LZ4_free(void* p);
 # define FREEMEM(p)        free(p)
 #endif
 
-#include <string.h>   /* memset, memcpy */
+#if ! LZ4_FREESTANDING
+#  include <string.h>   /* memset, memcpy */
+#endif
 #if !defined(LZ4_memset)
 #  define LZ4_memset(p,v,s) memset((p),(v),(s))
 #endif

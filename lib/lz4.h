@@ -97,6 +97,29 @@ extern "C" {
 #  define LZ4LIB_API LZ4LIB_VISIBILITY
 #endif
 
+/*!
+ * LZ4_FREESTANDING :
+ * Enable "freestanding mode" that is suitable for typical freestanding environment.
+ * In freestanding mode, some LZ4/HC functions which use heap are disabled.
+ */
+#if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
+#  define LZ4_HEAPMODE 0
+#  define LZ4HC_HEAPMODE 0
+#  define LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
+#  if !defined(LZ4_memcpy)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memcpy'."
+#  endif
+#  if !defined(LZ4_memset)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memset'."
+#  endif
+#  if !defined(LZ4_memmove)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memmove'."
+#  endif
+#elif ! defined(LZ4_FREESTANDING)
+#  define LZ4_FREESTANDING 0
+#endif
+
+
 /*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define LZ4_VERSION_MINOR    9    /* for new (non-breaking) interface capabilities */
