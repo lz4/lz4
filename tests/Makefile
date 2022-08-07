@@ -56,7 +56,7 @@ NB_LOOPS     ?= -i1
 .PHONY: default
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial freestanding
 
 all32: CFLAGS+=-m32
 all32: all
@@ -115,6 +115,9 @@ decompress-partial: lz4.o decompress-partial.c
 decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+freestanding: freestanding.c
+	$(CC) -ffreestanding -nostdlib $^ -o $@$(EXT)
+
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
@@ -127,7 +130,7 @@ clean:
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
         frameTest$(EXT) decompress-partial$(EXT) \
-        abiTest$(EXT) \
+        abiTest$(EXT) freestanding$(EXT) \
         lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
@@ -179,7 +182,7 @@ list:
 check: test-lz4-essentials
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial test-freestanding
 
 .PHONY: test32
 test32: CFLAGS+=-m32
@@ -605,5 +608,11 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 	./decompress-partial$(EXT)
 	@echo "\n ---- test decompress-partial-usingDict ----"
 	./decompress-partial-usingDict$(EXT)
+
+test-freestanding: freestanding
+	@echo "\n ---- test freestanding ----"
+	./freestanding$(EXT)
+	strace ./freestanding$(EXT)
+	ltrace ./freestanding$(EXT)
 
 endif
