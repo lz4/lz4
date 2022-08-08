@@ -56,7 +56,7 @@ NB_LOOPS     ?= -i1
 .PHONY: default
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial freestanding
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
 
 all32: CFLAGS+=-m32
 all32: all
@@ -182,7 +182,7 @@ list:
 check: test-lz4-essentials
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial test-freestanding
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
 
 .PHONY: test32
 test32: CFLAGS+=-m32
