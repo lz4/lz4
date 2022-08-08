@@ -190,6 +190,10 @@ platformTest: clean
 versionsTest: clean
 	$(MAKE) -C $(TESTDIR) $@
 
+.PHONY: test-freestanding
+test-freestanding:
+	$(MAKE) -C $(TESTDIR) clean $@
+
 .PHONY: cxxtest cxx32test
 cxxtest cxx32test: CC := "$(CXX) -Wno-deprecated"
 cxxtest cxx32test: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
