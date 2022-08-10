@@ -97,10 +97,17 @@ extern "C" {
 #  define LZ4LIB_API LZ4LIB_VISIBILITY
 #endif
 
-/*!
- * LZ4_FREESTANDING :
- * Enable "freestanding mode" that is suitable for typical freestanding environment.
- * In freestanding mode, some LZ4/HC functions which use heap are disabled.
+/*! LZ4_FREESTANDING :
+ *  When this macro is set to 1, it enables "freestanding mode" that is
+ *  suitable for typical freestanding environment which doesn't support
+ *  standard C library.
+ *
+ *  - LZ4_FREESTANDING is a compile-time switch.
+ *  - It requires the following macros to be defined:
+ *    LZ4_memcpy, LZ4_memmove, LZ4_memset.
+ *  - It only enables LZ4/HC functions which don't use heap.
+ *    All LZ4F_* functions are not supported.
+ *  - See tests/freestanding.c to check its basic setup.
  */
 #if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
 #  define LZ4_HEAPMODE 0
