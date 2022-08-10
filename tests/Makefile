@@ -115,6 +115,9 @@ decompress-partial: lz4.o decompress-partial.c
 decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+freestanding: freestanding.c
+	$(CC) -ffreestanding -nostdlib $^ -o $@$(EXT)
+
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
@@ -127,7 +130,7 @@ clean:
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
         frameTest$(EXT) decompress-partial$(EXT) \
-        abiTest$(EXT) \
+        abiTest$(EXT) freestanding$(EXT) \
         lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
@@ -605,5 +608,11 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 	./decompress-partial$(EXT)
 	@echo "\n ---- test decompress-partial-usingDict ----"
 	./decompress-partial-usingDict$(EXT)
+
+test-freestanding: freestanding
+	@echo "\n ---- test freestanding ----"
+	./freestanding$(EXT)
+	-strace ./freestanding$(EXT)
+	-ltrace ./freestanding$(EXT)
 
 endif
