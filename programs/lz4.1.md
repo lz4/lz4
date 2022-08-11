@@ -185,6 +185,9 @@ only the latest one will be applied.
 * `-BD`:
   Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 
+* `-BX`:
+  Generate block checksums (default:disabled)
+
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)
 

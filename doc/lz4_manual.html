@@ -48,6 +48,35 @@
   The `lz4` CLI can only manage frames.
 <BR></pre>
 
+<pre><b>#if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
+#  define LZ4_HEAPMODE 0
+#  define LZ4HC_HEAPMODE 0
+#  define LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
+#  if !defined(LZ4_memcpy)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memcpy'."
+#  endif
+#  if !defined(LZ4_memset)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memset'."
+#  endif
+#  if !defined(LZ4_memmove)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memmove'."
+#  endif
+#elif ! defined(LZ4_FREESTANDING)
+#  define LZ4_FREESTANDING 0
+#endif
+</b><p>  When this macro is set to 1, it enables "freestanding mode" that is
+  suitable for typical freestanding environment which doesn't support
+  standard C library.
+
+  - LZ4_FREESTANDING is a compile-time switch.
+  - It requires the following macros to be defined:
+    LZ4_memcpy, LZ4_memmove, LZ4_memset.
+  - It only enables LZ4/HC functions which don't use heap.
+    All LZ4F_* functions are not supported.
+  - See tests/freestanding.c to check its basic setup.
+ 
+</p></pre><BR>
+
 <a name="Chapter2"></a><h2>Version</h2><pre></pre>
 
 <pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; useful to check dll version; requires v1.3.0+ */<b>
@@ -267,8 +296,10 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 <a name="Chapter7"></a><h2>Streaming Decompression Functions</h2><pre>  Bufferless synchronous API
 <BR></pre>
 
-<pre><b>LZ4_streamDecode_t* LZ4_createStreamDecode(void);
+<pre><b>#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
+#endif </b>/* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */<b>
 </b><p>  creation / destruction of streaming decompression tracking context.
   A tracking context can be re-used multiple times.
  
@@ -297,7 +328,10 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  
 </p></pre><BR>
 
-<pre><b>int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int srcSize, int dstCapacity);
+<pre><b>int
+LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
+                        const char* src, char* dst,
+                        int srcSize, int dstCapacity);
 </b><p>  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
   A block is an unsplittable entity, it must be presented entirely to a decompression function.
   Decompression functions only accepts one block at a time.
@@ -323,7 +357,10 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
   then indicate where this data is saved using LZ4_setStreamDecode(), before decompressing next block.
 </p></pre><BR>
 
-<pre><b>int LZ4_decompress_safe_usingDict (const char* src, char* dst, int srcSize, int dstCapcity, const char* dictStart, int dictSize);
+<pre><b>int
+LZ4_decompress_safe_usingDict(const char* src, char* dst,
+                              int srcSize, int dstCapacity,
+                              const char* dictStart, int dictSize);
 </b><p>  These decoding functions work the same as
   a combination of LZ4_setStreamDecode() followed by LZ4_decompress_*_continue()
   They are stand-alone, and don't need an LZ4_streamDecode_t structure.
@@ -363,7 +400,9 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  
 </p></pre><BR>
 
-<pre><b>LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream);
+<pre><b>LZ4LIB_STATIC_API void
+LZ4_attach_dictionary(LZ4_stream_t* workingStream,
+                const LZ4_stream_t* dictionaryStream);
 </b><p>  This is an experimental API that allows
   efficient use of a static dictionary many times.
 
