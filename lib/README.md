@@ -104,6 +104,18 @@ The following build macro can be selected to adjust source code behavior at comp
   passed as argument to become a compression state is suitably aligned.
   This test can be disabled if it proves flaky, by setting this value to 0.
 
+- `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` : some LZ4/HC (level 1 and 2) public
+  functions internally invoke dynamic memory allocation functions of the C standard library.
+  By defining this build macro, these LZ4/HC functions are disabled to ensure to remove
+  dependency to the standard library.
+  See also the description of this macro in lib/lz4.c.
+
+- `LZ4_FREESTANDING` : by setting this build macro to 1, LZ4/HC (level 1 and 2) removes
+  dependencies on the C standard library, including memmove, memcpy, and memset.
+  This build macro is designed to help use LZ4/HC in restricted environments
+  (embedded, bootloader, etc).
+  See also the description of this macro in lib/lz4.h.
+
 
 #### Amalgamation
 
