@@ -77,7 +77,7 @@ The following build macro can be selected to adjust source code behavior at comp
   Set to 65535 by default, which is the maximum value supported by lz4 format.
   Reducing maximum distance will reduce opportunities for LZ4 to find matches,
   hence will produce a worse compression ratio.
-  However, a smaller max distance can allow compatibility with specific decoders using limited memory budget.
+  Setting a smaller max distance could allow compatibility with specific decoders with limited memory budget.
   This build macro only influences the compressed output of the compressor.
 
 - `LZ4_DISABLE_DEPRECATE_WARNINGS` : invoking a deprecated function will make the compiler generate a warning.
@@ -87,10 +87,6 @@ The following build macro can be selected to adjust source code behavior at comp
   or `_CRT_SECURE_NO_WARNINGS` for Visual Studio.
   This build macro offers another project-specific method
   by defining `LZ4_DISABLE_DEPRECATE_WARNINGS` before including the LZ4 header files.
-
-- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to <stdlib>'s `malloc`, `calloc` and `free`
-  by user-defined functions, which must be called `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
-  User functions must be available at link time.
 
 - `LZ4_FORCE_SW_BITCOUNT` : by default, the compression algorithm tries to determine lengths
   by using bitcount instructions, generally implemented as fast single instructions in many cpus.
@@ -104,17 +100,21 @@ The following build macro can be selected to adjust source code behavior at comp
   passed as argument to become a compression state is suitably aligned.
   This test can be disabled if it proves flaky, by setting this value to 0.
 
-- `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` : some LZ4/HC (level 1 and 2) public
-  functions internally invoke dynamic memory allocation functions of the C standard library.
-  By defining this build macro, these LZ4/HC functions are disabled to ensure to remove
-  dependency to the standard library.
-  See also the description of this macro in lib/lz4.c.
+- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to `<stdlib,h>`'s `malloc()`, `calloc()` and `free()`
+  by user-defined functions, which must be named `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
+  User functions must be available at link time.
 
-- `LZ4_FREESTANDING` : by setting this build macro to 1, LZ4/HC (level 1 and 2) removes
-  dependencies on the C standard library, including memmove, memcpy, and memset.
+- `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` :
+  Remove support of dynamic memory allocation.
+  For more details, see description of this macro in `lib/lz4.c`.
+
+- `LZ4_FREESTANDING` : by setting this build macro to 1,
+  LZ4/HC removes dependencies on the C standard library,
+  including allocation functions and `memmove()`, `memcpy()`, and `memset()`.
   This build macro is designed to help use LZ4/HC in restricted environments
   (embedded, bootloader, etc).
-  See also the description of this macro in lib/lz4.h.
+  For more details, see description of this macro in `lib/lz4.h`.
+
 
 
 #### Amalgamation

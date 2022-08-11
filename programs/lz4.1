@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "July 2019" "lz4 1.9.2" "User Commands"
+.TH "LZ4" "1" "August 2022" "lz4 v1.9.4" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -17,7 +17,7 @@
 When writing scripts that need to decompress files, it is recommended to always use the name \fBlz4\fR with appropriate arguments (\fBlz4 \-d\fR or \fBlz4 \-dc\fR) instead of the names \fBunlz4\fR and \fBlz4cat\fR\.
 .
 .SH "DESCRIPTION"
-\fBlz4\fR is an extremely fast lossless compression algorithm, based on \fBbyte\-aligned LZ77\fR family of compression scheme\. \fBlz4\fR offers compression speeds of 400 MB/s per core, linearly scalable with multi\-core CPUs\. It features an extremely fast decoder, with speed in multiple GB/s per core, typically reaching RAM speed limit on multi\-core systems\. The native file format is the \fB\.lz4\fR format\.
+\fBlz4\fR is an extremely fast lossless compression algorithm, based on \fBbyte\-aligned LZ77\fR family of compression scheme\. \fBlz4\fR offers compression speeds > 500 MB/s per core, linearly scalable with multi\-core CPUs\. It features an extremely fast decoder, offering speed in multiple GB/s per core, typically reaching RAM speed limit on multi\-core systems\. The native file format is the \fB\.lz4\fR format\.
 .
 .SS "Difference between lz4 and gzip"
 \fBlz4\fR supports a command line syntax similar \fIbut not identical\fR to \fBgzip(1)\fR\. Differences are :
@@ -32,7 +32,7 @@ When writing scripts that need to decompress files, it is recommended to always 
 \fBlz4 file\.lz4\fR will default to decompression (use \fB\-z\fR to force compression)
 .
 .IP "\(bu" 4
-\fBlz4\fR preserves original files
+\fBlz4\fR preserves original files (see \fB\-\-rm\fR to erase source file on completion)
 .
 .IP "\(bu" 4
 \fBlz4\fR shows real\-time notification statistics during compression or decompression of a single file (use \fB\-q\fR to silence them)
@@ -121,7 +121,7 @@ Switch to ultra\-fast compression levels\. The higher the value, the faster the 
 .
 .TP
 \fB\-\-best\fR
-Set highest compression level\. Same as -12\.
+Set highest compression level\. Same as \-12\.
 .
 .TP
 \fB\-\-favor\-decSpeed\fR
@@ -169,8 +169,16 @@ Produce independent blocks (default)
 Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 .
 .TP
+\fB\-BX\fR
+Generate block checksums (default:disabled)
+.
+.TP
 \fB\-\-[no\-]frame\-crc\fR
 Select frame checksum (default:enabled)
+.
+.TP
+\fB\-\-no\-crc\fR
+Disable both frame and block checksums
 .
 .TP
 \fB\-\-[no\-]content\-size\fR
