@@ -197,7 +197,12 @@
  *  public/stable LZ4 v1 API functions, we don't recommend using this
  *  symbol to generate a library for distribution.
  *
- *  The following functions are removed when this symbol is defined.
+ *  The following public functions are removed when this symbol is defined.
+ *  - lz4   : LZ4_createStream, LZ4_freeStream,
+ *            LZ4_createStreamDecode, LZ4_freeStreamDecode, LZ4_create (deprecated)
+ *  - lz4hc : LZ4_createStreamHC, LZ4_freeStreamHC,
+ *            LZ4_createHC (deprecated), LZ4_freeHC  (deprecated)
+ *  - lz4frame, lz4file : All LZ4F_* functions
  */
 #if defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 #  define ALLOC(s)          lz4_error_memory_allocation_is_disabled
