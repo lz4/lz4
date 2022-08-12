@@ -1310,8 +1310,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
         } else {
             dctx->dStage = dstage_getSFrameSize;
             return 4;
-        }
-    }
+    }   }
 
     /* control magic number */
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
@@ -1371,8 +1370,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     dctx->frameInfo.blockSizeID = (LZ4F_blockSizeID_t)blockSizeID;
     dctx->maxBlockSize = LZ4F_getBlockSize((LZ4F_blockSizeID_t)blockSizeID);
     if (contentSizeFlag)
-        dctx->frameRemainingSize =
-            dctx->frameInfo.contentSize = LZ4F_readLE64(srcPtr+6);
+        dctx->frameRemainingSize = dctx->frameInfo.contentSize = LZ4F_readLE64(srcPtr+6);
     if (dictIDFlag)
         dctx->frameInfo.dictID = LZ4F_readLE32(srcPtr + frameHeaderSize - 5);
 
@@ -1467,16 +1465,14 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
 
 /* LZ4F_updateDict() :
  * only used for LZ4F_blockLinked mode
- * Condition : dstPtr != NULL
+ * Condition : @dstPtr != NULL
  */
 static void LZ4F_updateDict(LZ4F_dctx* dctx,
                       const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
                       unsigned withinTmp)
 {
     assert(dstPtr != NULL);
-    if (dctx->dictSize==0) {
-        dctx->dict = (const BYTE*)dstPtr;   /* priority to prefix mode */
-    }
+    if (dctx->dictSize==0) dctx->dict = (const BYTE*)dstPtr;  /* will lead to prefix mode */
     assert(dctx->dict != NULL);
 
     if (dctx->dict + dctx->dictSize == dstPtr) {  /* prefix mode, everything within dstBuffer */
@@ -1813,7 +1809,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }
 
             /* At this stage, input is large enough to decode a block */
+
+            /* First, decode and control block checksum if it exists */
             if (dctx->frameInfo.blockChecksumFlag) {
+                assert(dctx->tmpInTarget >= 4);
                 dctx->tmpInTarget -= 4;
                 assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
                 {   U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
@@ -1826,17 +1825,22 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 #endif
             }   }
 
-            if ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize) {
+            /* decode directly into destination buffer if there is enough room */
+            if ( ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize)
+                 /* unless the dictionary is stored in tmpOut:
+                  * in which case it's faster to decode within tmpOut
+                  * to benefit from prefix speedup */
+              && !(dctx->dict!= NULL && (const BYTE*)dctx->dict + dctx->dictSize == dctx->tmpOut) )
+            {
                 const char* dict = (const char*)dctx->dict;
                 size_t dictSize = dctx->dictSize;
                 int decodedSize;
                 assert(dstPtr != NULL);
                 if (dict && dictSize > 1 GB) {
-                    /* the dictSize param is an int, avoid truncation / sign issues */
+                    /* overflow control : dctx->dictSize is an int, avoid truncation / sign issues */
                     dict += dictSize - 64 KB;
                     dictSize = 64 KB;
                 }
-                /* enough capacity in `dst` to decompress directly there */
                 decodedSize = LZ4_decompress_safe_usingDict(
                         (const char*)selectedIn, (char*)dstPtr,
                         (int)dctx->tmpInTarget, (int)dctx->maxBlockSize,
@@ -1853,25 +1857,27 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
 
                 dstPtr += decodedSize;
-                dctx->dStage = dstage_getBlockHeader;
+                dctx->dStage = dstage_getBlockHeader;  /* end of block, let's get another one */
                 break;
             }
 
             /* not enough place into dst : decode into tmpOut */
-            /* ensure enough place for tmpOut */
+
+            /* manage dictionary */
             if (dctx->frameInfo.blockMode == LZ4F_blockLinked) {
                 if (dctx->dict == dctx->tmpOutBuffer) {
+                    /* truncate dictionary to 64 KB if too big */
                     if (dctx->dictSize > 128 KB) {
                         memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - 64 KB, 64 KB);
                         dctx->dictSize = 64 KB;
                     }
                     dctx->tmpOut = dctx->tmpOutBuffer + dctx->dictSize;
-                } else {  /* dict not within tmp */
+                } else {  /* dict not within tmpOut */
                     size_t const reservedDictSpace = MIN(dctx->dictSize, 64 KB);
                     dctx->tmpOut = dctx->tmpOutBuffer + reservedDictSpace;
             }   }
 
-            /* Decode block */
+            /* Decode block into tmpOut */
             {   const char* dict = (const char*)dctx->dict;
                 size_t dictSize = dctx->dictSize;
                 int decodedSize;
@@ -2014,7 +2020,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
         }   /* switch (dctx->dStage) */
     }   /* while (doAnotherStage) */
 
-    /* preserve history within tmp whenever necessary */
+    /* preserve history within tmpOut whenever necessary */
     LZ4F_STATIC_ASSERT((unsigned)dstage_init == 2);
     if ( (dctx->frameInfo.blockMode==LZ4F_blockLinked)  /* next block will use up to 64KB from previous ones */
       && (dctx->dict != dctx->tmpOutBuffer)             /* dictionary is not already within tmp */
