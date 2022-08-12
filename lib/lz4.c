@@ -524,7 +524,14 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
     case 2:
         LZ4_memcpy(v, srcPtr, 2);
         LZ4_memcpy(&v[2], srcPtr, 2);
+#if defined(_MSC_VER) && (_MSC_VER <= 1933) /* MSVC 2022 ver 17.3 or earlier */
+#  pragma warning(push)
+#  pragma warning(disable : 6385) /* warning C6385: Reading invalid data from 'v'. */
+#endif
         LZ4_memcpy(&v[4], v, 4);
+#if defined(_MSC_VER) && (_MSC_VER <= 1933) /* MSVC 2022 ver 17.3 or earlier */
+#  pragma warning(pop)
+#endif
         break;
     case 4:
         LZ4_memcpy(v, srcPtr, 4);
