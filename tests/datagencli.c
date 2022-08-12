@@ -104,12 +104,7 @@ int main(int argc, char** argv)
                 case 'g':
                     argument++;
                     size=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
-                        size *= 10;
-                        size += *argument - '0';
-                        argument++;
-                    }
+                    size = strtoull(argument, &argument, 10);
                     if (*argument=='K') { size <<= 10; argument++; }
                     if (*argument=='M') { size <<= 20; argument++; }
                     if (*argument=='G') { size <<= 30; argument++; }
@@ -117,35 +112,16 @@ int main(int argc, char** argv)
                     break;
                 case 's':
                     argument++;
-                    seed=0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
-                        seed *= 10;
-                        seed += *argument - '0';
-                        argument++;
-                    }
+                    seed = (U32) strtoul(argument, &argument, 10);
                     break;
                 case 'P':
                     argument++;
-                    proba=0.0;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
-                        proba *= 10;
-                        proba += *argument - '0';
-                        argument++;
-                    }
-                    if (proba>100.) proba=100.;
+                    proba = (double) strtoull(argument, &argument, 10);
                     proba /= 100.;
                     break;
                 case 'L':   /* hidden argument : Literal distribution probability */
                     argument++;
-                    litProba=0.;
-                    while ((*argument>='0') && (*argument<='9'))
-                    {
-                        litProba *= 10;
-                        litProba += *argument - '0';
-                        argument++;
-                    }
+                    litProba = (double) strtoull(argument, &argument, 10);
                     if (litProba>100.) litProba=100.;
                     litProba /= 100.;
                     break;
