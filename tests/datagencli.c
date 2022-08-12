@@ -103,7 +103,6 @@ int main(int argc, char** argv)
                     return usage(programName);
                 case 'g':
                     argument++;
-                    size=0;
                     size = strtoull(argument, &argument, 10);
                     if (*argument=='K') { size <<= 10; argument++; }
                     if (*argument=='M') { size <<= 20; argument++; }
