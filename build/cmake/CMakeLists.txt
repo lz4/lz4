@@ -10,10 +10,9 @@
 # LZ4's CMake support is maintained by Evan Nemerson; when filing
 # bugs please mention @nemequ to make sure I see it.
 
-set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+cmake_minimum_required(VERSION 2.8.12)
 
-option(LZ4_BUILD_CLI "Build lz4 program" ON)
-option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
+set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 # Parse version information
 file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MAJOR REGEX "^#define LZ4_VERSION_MAJOR +([0-9]+) +.*$")
@@ -34,7 +33,8 @@ else()
     LANGUAGES C)
 endif()
 
-cmake_minimum_required (VERSION 2.8.12)
+option(LZ4_BUILD_CLI "Build lz4 program" ON)
+option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
 
 # If LZ4 is being bundled in another project, we don't want to
 # install anything.  However, we want to let people override this, so
