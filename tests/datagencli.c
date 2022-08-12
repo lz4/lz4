@@ -34,6 +34,14 @@
 
 
 /**************************************
+*  Compiler specific
+**************************************/
+#ifdef _MSC_VER    /* Visual Studio */
+#define strtoull    _strtoui64  /* https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/strtoui64-wcstoui64-strtoui64-l-wcstoui64-l */
+#endif
+
+
+/**************************************
 *  Constants
 **************************************/
 #define KB *(1 <<10)
