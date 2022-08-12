@@ -30,6 +30,7 @@
 #  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4146)    /* disable: C4146: minus unsigned expression */
 #  pragma warning(disable : 4310)    /* disable: C4310: constant char value > 127 */
+#  pragma warning(disable : 26451)   /* disable: C26451: Arithmetic overflow */
 #endif
 
 
@@ -494,7 +495,14 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         {   char* const cBuffer_exact = (char*)malloc((size_t)compressedSize);
             assert(cBuffer_exact != NULL);
             assert(compressedSize <= (int)compressedBufferSize);
+#if defined(_MSC_VER) && (_MSC_VER <= 1933) /* MSVC 2022 ver 17.3 or earlier */
+#  pragma warning(push)
+#  pragma warning(disable : 6385) /* lz4\tests\fuzzer.c(497): warning C6385: Reading invalid data from 'compressedBuffer'. */
+#endif
             memcpy(cBuffer_exact, compressedBuffer, compressedSize);
+#if defined(_MSC_VER) && (_MSC_VER <= 1933) /* MSVC 2022 ver 17.3 or earlier */
+#  pragma warning(pop)
+#endif
 
             /* Test decoding with output size exactly correct => must work */
             FUZ_DISPLAYTEST("LZ4_decompress_fast() with exact output buffer");
@@ -571,7 +579,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 for (;;) {
                     /* keep some original src */
                     {   U32 const nbBits = FUZ_rand(&randState) % maxNbBits;
-                        size_t const mask = (1<<nbBits) - 1;
+                        size_t const mask = (1ULL <<nbBits) - 1;
                         size_t const skipLength = FUZ_rand(&randState) & mask;
                         pos += skipLength;
                     }
@@ -579,7 +587,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                     /* add noise */
                     {   U32 const nbBitsCodes = FUZ_rand(&randState) % maxNbBits;
                         U32 const nbBits = nbBitsCodes ? nbBitsCodes-1 : 0;
-                        size_t const mask = (1<<nbBits) - 1;
+                        size_t const mask = (1ULL <<nbBits) - 1;
                         size_t const rNoiseLength = (FUZ_rand(&randState) & mask) + 1;
                         size_t const noiseLength = MIN(rNoiseLength, (size_t)compressedSize-pos);
                         size_t const noiseStart = FUZ_rand(&randState) % (COMPRESSIBLE_NOISE_LENGTH - noiseLength);
