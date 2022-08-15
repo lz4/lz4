@@ -1,5 +1,6 @@
 v1.9.4
 perf : faster decoding speed (~+20%) on aarch64 platforms
+perf : faster decoding speed (~+70%) for -BD4 setting in CLI
 api  : new function `LZ4_decompress_safe_partial_usingDict()` by @yawqi
 api  : lz4frame: ability to provide custom allocators at state creation
 api  : can skip checksum validation for improved decoding speed
@@ -14,6 +15,7 @@ build: `LZ4_FREESTANDING`, new build macro for freestanding environments, by @t-
 build: `make` and `make test` are compatible with `-j` parallel run
 build: AS/400 compatibility, by @jonrumsey
 build: Solaris 10 compatibility, by @pekdon
+build: MSVC 2022 support, by @t-mat
 build: improved meson script, by @eli-schwartz
 doc  : Updated LZ4 block format, provide an "implementation notes" section
 
