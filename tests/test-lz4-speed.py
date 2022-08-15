@@ -1,7 +1,7 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 
 #
-# Copyright (c) 2016-present, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.
+# Copyright (c) 2016-2020, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
@@ -152,7 +152,7 @@ def benchmark_and_compare(branch, commit, last_commit, args, executableName, md5
             % (os.getloadavg()[0], args.maxLoadAvg, sleepTime))
         time.sleep(sleepTime)
     start_load = str(os.getloadavg())
-    result = execute('programs/%s -rqi5b1e%s %s' % (executableName, args.lastCLevel, testFilePath), print_output=True)   
+    result = execute('programs/%s -rqi5b1e%s %s' % (executableName, args.lastCLevel, testFilePath), print_output=True)
     end_load = str(os.getloadavg())
     linesExpected = args.lastCLevel + 1
     if len(result) != linesExpected:

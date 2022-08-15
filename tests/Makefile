@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-present
+# Copyright (C) Yann Collet 2011-2020
 #
 # GPL v2 License
 #
@@ -112,6 +112,12 @@ checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
 decompress-partial: lz4.o decompress-partial.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+freestanding: freestanding.c
+	$(CC) -ffreestanding -nostdlib $^ -o $@$(EXT)
+
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
@@ -124,7 +130,8 @@ clean:
         fasttest$(EXT) roundTripTest$(EXT) \
         datagen$(EXT) checkTag$(EXT) \
         frameTest$(EXT) decompress-partial$(EXT) \
-		lz4_all.c
+        abiTest$(EXT) freestanding$(EXT) \
+        lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
 
@@ -136,6 +143,12 @@ versionsTest:
 listTest: lz4
 	QEMU_SYS=$(QEMU_SYS) $(PYTHON) test-lz4-list.py
 
+abiTest: LDLIBS += -llz4
+
+.PHONY: abiTests
+abiTests:
+	$(PYTHON) test-lz4-abi.py
+
 checkTag: checkTag.c $(LZ4DIR)/lz4.h
 	$(CC) $(FLAGS) $< -o $@$(EXT)
 
@@ -145,14 +158,15 @@ checkTag: checkTag.c $(LZ4DIR)/lz4.h
 ifeq ($(POSIX_ENV),Yes)
 
 MD5:=md5sum
-ifneq (,$(filter $(shell uname), Darwin ))
+ifneq (,$(filter $(shell $(UNAME)), Darwin ))
 MD5:=md5 -r
 endif
 
 # note : we should probably settle on a single compare utility
 CMP:=cmp
+GREP:=grep
 DIFF:=diff
-ifneq (,$(filter $(shell uname),SunOS))
+ifneq (,$(filter $(shell $(UNAME)),SunOS))
 DIFF:=gdiff
 endif
 
@@ -168,278 +182,327 @@ list:
 check: test-lz4-essentials
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-install test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
 
 .PHONY: test32
 test32: CFLAGS+=-m32
 test32: test
 
+.PHONY: test-amalgamation
 test-amalgamation: lz4_all.o
 
 lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
 	$(CAT) $^ > $@
 
+.PHONY: test-install
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./test_install.sh
 
+.PHONY: test-compile-with-lz4-memory-usage
+test-compile-with-lz4-memory-usage:
+	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MIN' $(MAKE) all
+	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MAX' $(MAKE) all
+
+.PHONY: test-lz4-sparse
+# Rules regarding Temporary test files :
+# Each test must use its own unique set of names during execution.
+# Each temporary test file must begin by an FPREFIX.
+# Each FPREFIX must be unique for each test.
+# All FPREFIX must start with `tmp`, for `make clean`
+# All tests must clean their temporary test files on successful completion,
+# and only their test files : do not employ sweeping statements such `rm tmp*` or `rm *.lz4`
+test-lz4-sparse: FPREFIX = tmp-tls
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
-	$(DATAGEN) -g5M  -P100 > tmplsdg5M
-	$(LZ4) -B4D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB4
-	$(DIFF) -s tmplsdg5M tmplscB4
-	$(LZ4) -B5D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB5
-	$(DIFF) -s tmplsdg5M tmplscB5
-	$(LZ4) -B6D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB6
-	$(DIFF) -s tmplsdg5M tmplscB6
-	$(LZ4) -B7D tmplsdg5M -c | $(LZ4) -dv --sparse > tmplscB7
-	$(DIFF) -s tmplsdg5M tmplscB7
-	$(LZ4) tmplsdg5M -c | $(LZ4) -dv --no-sparse > tmplsnosparse
-	$(DIFF) -s tmplsdg5M tmplsnosparse
-	ls -ls tmpls*
-	$(DATAGEN) -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > tmplsodd   # Odd size file (to generate non-full last block)
-	$(DATAGEN) -s1 -g1200007 -P100 | $(DIFF) -s - tmplsodd
-	ls -ls tmplsodd
-	@$(RM) tmpls*
+	$(DATAGEN) -g5M  -P100 > $(FPREFIX)dg5M
+	$(LZ4) -B4D $(FPREFIX)dg5M -c | $(LZ4) -dv --sparse > $(FPREFIX)cB4
+	$(DIFF) -s $(FPREFIX)dg5M $(FPREFIX)cB4
+	$(LZ4) -B5D $(FPREFIX)dg5M -c | $(LZ4) -dv --sparse > $(FPREFIX)cB5
+	$(DIFF) -s $(FPREFIX)dg5M $(FPREFIX)cB5
+	$(LZ4) -B6D $(FPREFIX)dg5M -c | $(LZ4) -dv --sparse > $(FPREFIX)cB6
+	$(DIFF) -s $(FPREFIX)dg5M $(FPREFIX)cB6
+	$(LZ4) -B7D $(FPREFIX)dg5M -c | $(LZ4) -dv --sparse > $(FPREFIX)cB7
+	$(DIFF) -s $(FPREFIX)dg5M $(FPREFIX)cB7
+	$(LZ4) $(FPREFIX)dg5M -c | $(LZ4) -dv --no-sparse > $(FPREFIX)nosparse
+	$(DIFF) -s $(FPREFIX)dg5M $(FPREFIX)nosparse
+	ls -ls $(FPREFIX)*
+	$(DATAGEN) -s1 -g1200007 -P100 | $(LZ4) | $(LZ4) -dv --sparse > $(FPREFIX)odd   # Odd size file (to generate non-full last block)
+	$(DATAGEN) -s1 -g1200007 -P100 | $(DIFF) -s - $(FPREFIX)odd
+	ls -ls $(FPREFIX)odd
+	@$(RM) $(FPREFIX)*
 	@echo "\n Compatibility with Console :"
 	echo "Hello World 1 !" | $(LZ4) | $(LZ4) -d -c
 	echo "Hello World 2 !" | $(LZ4) | $(LZ4) -d | $(CAT)
 	echo "Hello World 3 !" | $(LZ4) --no-frame-crc | $(LZ4) -d -c
 	@echo "\n Compatibility with Append :"
-	$(DATAGEN) -P100 -g1M > tmplsdg1M
-	$(CAT) tmplsdg1M tmplsdg1M > tmpls2M
-	$(LZ4) -B5 -v tmplsdg1M tmplsc
-	$(LZ4) -d -v tmplsc tmplsr
-	$(LZ4) -d -v tmplsc -c >> tmplsr
-	ls -ls tmp*
-	$(DIFF) tmpls2M tmplsr
-	@$(RM) tmpls*
+	$(DATAGEN) -P100 -g1M > $(FPREFIX)dg1M
+	$(CAT) $(FPREFIX)dg1M $(FPREFIX)dg1M > $(FPREFIX)2M
+	$(LZ4) -B5 -v $(FPREFIX)dg1M $(FPREFIX)c
+	$(LZ4) -d -v $(FPREFIX)c $(FPREFIX)r
+	$(LZ4) -d -v $(FPREFIX)c -c >> $(FPREFIX)r
+	ls -ls $(FPREFIX)*
+	$(DIFF) $(FPREFIX)2M $(FPREFIX)r
+	@$(RM) $(FPREFIX)*
 
+test-lz4-contentSize: FPREFIX = tmp-lzc
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
-	$(DATAGEN) -g15M > tmplc1
-	$(LZ4) -v tmplc1 -c | $(LZ4) -t
-	$(LZ4) -v --content-size tmplc1 -c | $(LZ4) -d > tmplc2
-	$(DIFF) tmplc1 tmplc2
-	$(LZ4) -f tmplc1 -c > tmplc1.lz4
-	$(LZ4) --content-size tmplc1 -c > tmplc2.lz4
-	! $(DIFF) tmplc1.lz4 tmplc2.lz4  # must differ, due to content size
-	$(LZ4) --content-size < tmplc1 > tmplc3.lz4
-	$(DIFF) tmplc2.lz4 tmplc3.lz4  # both must contain content size
-	$(CAT) tmplc1 | $(LZ4) > tmplc4.lz4
-	$(DIFF) tmplc1.lz4 tmplc4.lz4  # both don't have content size
-	$(CAT) tmplc1 | $(LZ4) --content-size > tmplc5.lz4 # can't determine content size
-	$(DIFF) tmplc1.lz4 tmplc5.lz4  # both don't have content size
-	@$(RM) tmplc*
+	$(DATAGEN) -g15M > $(FPREFIX)
+	$(LZ4) -v $(FPREFIX) -c | $(LZ4) -t
+	$(LZ4) -v --content-size $(FPREFIX) -c | $(LZ4) -d > $(FPREFIX)-dup
+	$(DIFF) $(FPREFIX) $(FPREFIX)-dup
+	$(LZ4) -f $(FPREFIX) -c > $(FPREFIX).lz4 # compressed with content size
+	$(LZ4) --content-size $(FPREFIX) -c > $(FPREFIX)-wcz.lz4
+	! $(DIFF) $(FPREFIX).lz4 $(FPREFIX)-wcz.lz4  # must differ, due to content size
+	$(LZ4) --content-size < $(FPREFIX) > $(FPREFIX)-wcz2.lz4 # can determine content size because stdin is just a file
+	$(DIFF) $(FPREFIX)-wcz.lz4 $(FPREFIX)-wcz2.lz4  # both must contain content size
+	$(CAT) $(FPREFIX) | $(LZ4) > $(FPREFIX)-ncz.lz4
+	$(DIFF) $(FPREFIX).lz4 $(FPREFIX)-ncz.lz4  # both don't have content size
+	$(CAT) $(FPREFIX) | $(LZ4) --content-size > $(FPREFIX)-ncz2.lz4 # can't determine content size
+	$(DIFF) $(FPREFIX).lz4 $(FPREFIX)-ncz2.lz4  # both don't have content size
+	@$(RM) $(FPREFIX)*
 
+test-lz4-frame-concatenation: FPREFIX = tmp-lfc
 test-lz4-frame-concatenation: lz4 datagen
 	@echo "\n ---- test frame concatenation ----"
-	@echo -n > tmp-lfc-empty
-	@echo hi > tmp-lfc-nonempty
-	$(CAT) tmp-lfc-nonempty tmp-lfc-empty tmp-lfc-nonempty > tmp-lfc-src
-	$(LZ4) -zq tmp-lfc-empty -c > tmp-lfc-empty.lz4
-	$(LZ4) -zq tmp-lfc-nonempty -c > tmp-lfc-nonempty.lz4
-	$(CAT) tmp-lfc-nonempty.lz4 tmp-lfc-empty.lz4 tmp-lfc-nonempty.lz4 > tmp-lfc-concat.lz4
-	$(LZ4) -d tmp-lfc-concat.lz4 -c > tmp-lfc-result
-	$(CMP) tmp-lfc-src tmp-lfc-result
-	@$(RM) tmp-lfc-*
+	@echo -n > $(FPREFIX)-empty
+	@echo hi > $(FPREFIX)-nonempty
+	$(CAT) $(FPREFIX)-nonempty $(FPREFIX)-empty $(FPREFIX)-nonempty > $(FPREFIX)-src
+	$(LZ4) -zq $(FPREFIX)-empty -c > $(FPREFIX)-empty.lz4
+	$(LZ4) -zq $(FPREFIX)-nonempty -c > $(FPREFIX)-nonempty.lz4
+	$(CAT) $(FPREFIX)-nonempty.lz4 $(FPREFIX)-empty.lz4 $(FPREFIX)-nonempty.lz4 > $(FPREFIX)-concat.lz4
+	$(LZ4) -d $(FPREFIX)-concat.lz4 -c > $(FPREFIX)-result
+	$(CMP) $(FPREFIX)-src $(FPREFIX)-result
+	@$(RM) $(FPREFIX)*
 	@echo frame concatenation test completed
 
+test-lz4-multiple: FPREFIX = tmp-tml
 test-lz4-multiple: lz4 datagen
 	@echo "\n ---- test multiple files ----"
-	@$(DATAGEN) -s1        > tmp-tlm1 2> $(VOID)
-	@$(DATAGEN) -s2 -g100K > tmp-tlm2 2> $(VOID)
-	@$(DATAGEN) -s3 -g200K > tmp-tlm3 2> $(VOID)
+	@$(DATAGEN) -s1        > $(FPREFIX)1 2> $(VOID)
+	@$(DATAGEN) -s2 -g100K > $(FPREFIX)2 2> $(VOID)
+	@$(DATAGEN) -s3 -g200K > $(FPREFIX)3 2> $(VOID)
 	# compress multiple files : one .lz4 per source file
-	$(LZ4) -f -m tmp-tlm*
-	test -f tmp-tlm1.lz4
-	test -f tmp-tlm2.lz4
-	test -f tmp-tlm3.lz4
+	$(LZ4) -f -m $(FPREFIX)*
+	test -f $(FPREFIX)1.lz4
+	test -f $(FPREFIX)2.lz4
+	test -f $(FPREFIX)3.lz4
 	# decompress multiple files : one output file per .lz4
-	mv tmp-tlm1 tmp-tlm1-orig
-	mv tmp-tlm2 tmp-tlm2-orig
-	mv tmp-tlm3 tmp-tlm3-orig
-	$(LZ4) -d -f -m tmp-tlm*.lz4
-	$(CMP) tmp-tlm1 tmp-tlm1-orig   # must be identical
-	$(CMP) tmp-tlm2 tmp-tlm2-orig
-	$(CMP) tmp-tlm3 tmp-tlm3-orig
+	mv $(FPREFIX)1 $(FPREFIX)1-orig
+	mv $(FPREFIX)2 $(FPREFIX)2-orig
+	mv $(FPREFIX)3 $(FPREFIX)3-orig
+	$(LZ4) -d -f -m $(FPREFIX)*.lz4
+	$(CMP) $(FPREFIX)1 $(FPREFIX)1-orig   # must be identical
+	$(CMP) $(FPREFIX)2 $(FPREFIX)2-orig
+	$(CMP) $(FPREFIX)3 $(FPREFIX)3-orig
 	# compress multiple files into stdout
-	$(CAT) tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
-	$(RM) *.lz4
-	$(LZ4) -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
-	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
-	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(CAT) $(FPREFIX)1.lz4 $(FPREFIX)2.lz4 $(FPREFIX)3.lz4 > $(FPREFIX)-concat1
+	$(RM) $(FPREFIX)*.lz4
+	$(LZ4) -m $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3 -c > $(FPREFIX)-concat2
+	test ! -f $(FPREFIX)1.lz4  # must not create .lz4 artefact
+	$(CMP) $(FPREFIX)-concat1 $(FPREFIX)-concat2  # must be equivalent
 	# decompress multiple files into stdout
-	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
-	$(LZ4) -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
-	$(CAT) tmp-tlm1 tmp-tlm2 tmp-tlm3 > tmp-tlm-concat1   # create concatenated reference
-	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
-	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
-	test ! -f tmp-tlm1  # must not create file artefact
-	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(RM) $(FPREFIX)-concat1 $(FPREFIX)-concat2
+	$(LZ4) -f -m $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3   # generate .lz4 to decompress
+	$(CAT) $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3 > $(FPREFIX)-concat1   # create concatenated reference
+	$(RM) $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3
+	$(LZ4) -d -m $(FPREFIX)1.lz4 $(FPREFIX)2.lz4 $(FPREFIX)3.lz4 -c > $(FPREFIX)-concat2
+	test ! -f $(FPREFIX)1  # must not create file artefact
+	$(CMP) $(FPREFIX)-concat1 $(FPREFIX)-concat2  # must be equivalent
 	# compress multiple files, one of which is absent (must fail)
-	! $(LZ4) -f -m tmp-tlm-concat1 notHere tmp-tlm-concat2  # must fail : notHere not present
-	@$(RM) tmp-tlm*
+	! $(LZ4) -f -m $(FPREFIX)-concat1 notHere $(FPREFIX)-concat2  # must fail : notHere not present
+	# test lz4-compressed file
+	$(LZ4) -tm $(FPREFIX)-concat1.lz4
+	$(LZ4) -tm $(FPREFIX)-concat1.lz4 $(FPREFIX)-concat2.lz4
+	# test multiple lz4 files, one of which is absent (must fail)
+	! $(LZ4) -tm $(FPREFIX)-concat1.lz4 notHere.lz4 $(FPREFIX)-concat2.lz4
+	@$(RM) $(FPREFIX)*
 
+test-lz4-multiple-legacy: FPREFIX = tmp-lml
 test-lz4-multiple-legacy: lz4 datagen
 	@echo "\n ---- test multiple files (Legacy format) ----"
-	@$(DATAGEN) -s1        > tmp-tlm1 2> $(VOID)
-	@$(DATAGEN) -s2 -g100K > tmp-tlm2 2> $(VOID)
-	@$(DATAGEN) -s3 -g200K > tmp-tlm3 2> $(VOID)
+	@$(DATAGEN) -s1        > $(FPREFIX)1 2> $(VOID)
+	@$(DATAGEN) -s2 -g100K > $(FPREFIX)2 2> $(VOID)
+	@$(DATAGEN) -s3 -g200K > $(FPREFIX)3 2> $(VOID)
 	# compress multiple files using legacy format: one .lz4 per source file
-	$(LZ4) -f -l -m tmp-tlm*
-	test -f tmp-tlm1.lz4
-	test -f tmp-tlm2.lz4
-	test -f tmp-tlm3.lz4
+	$(LZ4) -f -l -m $(FPREFIX)*
+	test -f $(FPREFIX)1.lz4
+	test -f $(FPREFIX)2.lz4
+	test -f $(FPREFIX)3.lz4
 	# decompress multiple files compressed using legacy format: one output file per .lz4
-	mv tmp-tlm1 tmp-tlm1-orig
-	mv tmp-tlm2 tmp-tlm2-orig
-	mv tmp-tlm3 tmp-tlm3-orig
-	$(LZ4) -d -f -m tmp-tlm*.lz4
-	$(LZ4) -l -d -f -m tmp-tlm*.lz4 # -l mustn't impact -d option
-	$(CMP) tmp-tlm1 tmp-tlm1-orig   # must be identical
-	$(CMP) tmp-tlm2 tmp-tlm2-orig
-	$(CMP) tmp-tlm3 tmp-tlm3-orig
+	mv $(FPREFIX)1 $(FPREFIX)1-orig
+	mv $(FPREFIX)2 $(FPREFIX)2-orig
+	mv $(FPREFIX)3 $(FPREFIX)3-orig
+	$(LZ4) -d -f -m $(FPREFIX)*.lz4
+	$(LZ4) -l -d -f -m $(FPREFIX)*.lz4 # -l mustn't impact -d option
+	$(CMP) $(FPREFIX)1 $(FPREFIX)1-orig   # must be identical
+	$(CMP) $(FPREFIX)2 $(FPREFIX)2-orig
+	$(CMP) $(FPREFIX)3 $(FPREFIX)3-orig
 	# compress multiple files into stdout using legacy format
-	$(CAT) tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 > tmp-tlm-concat1
-	$(RM) *.lz4
-	$(LZ4) -l -m tmp-tlm1 tmp-tlm2 tmp-tlm3 -c > tmp-tlm-concat2
-	test ! -f tmp-tlm1.lz4  # must not create .lz4 artefact
-	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(CAT) $(FPREFIX)1.lz4 $(FPREFIX)2.lz4 $(FPREFIX)3.lz4 > $(FPREFIX)-concat1
+	$(RM) $(FPREFIX)*.lz4
+	$(LZ4) -l -m $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3 -c > $(FPREFIX)-concat2
+	test ! -f $(FPREFIX)1.lz4  # must not create .lz4 artefact
+	$(CMP) $(FPREFIX)-concat1 $(FPREFIX)-concat2  # must be equivalent
 	# # # decompress multiple files into stdout using legacy format
-	$(RM) tmp-tlm-concat1 tmp-tlm-concat2
-	$(LZ4) -l -f -m tmp-tlm1 tmp-tlm2 tmp-tlm3   # generate .lz4 to decompress
-	$(CAT) tmp-tlm1 tmp-tlm2 tmp-tlm3 > tmp-tlm-concat1   # create concatenated reference
-	$(RM) tmp-tlm1 tmp-tlm2 tmp-tlm3
-	$(LZ4) -d -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2
-	$(LZ4) -d -l -m tmp-tlm1.lz4 tmp-tlm2.lz4 tmp-tlm3.lz4 -c > tmp-tlm-concat2 # -l mustn't impact option -d
-	test ! -f tmp-tlm1  # must not create file artefact
-	$(CMP) tmp-tlm-concat1 tmp-tlm-concat2  # must be equivalent
+	$(RM) $(FPREFIX)-concat1 $(FPREFIX)-concat2
+	$(LZ4) -l -f -m $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3   # generate .lz4 to decompress
+	$(CAT) $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3 > $(FPREFIX)-concat1   # create concatenated reference
+	$(RM) $(FPREFIX)1 $(FPREFIX)2 $(FPREFIX)3
+	$(LZ4) -d -m $(FPREFIX)1.lz4 $(FPREFIX)2.lz4 $(FPREFIX)3.lz4 -c > $(FPREFIX)-concat2
+	$(LZ4) -d -l -m $(FPREFIX)1.lz4 $(FPREFIX)2.lz4 $(FPREFIX)3.lz4 -c > $(FPREFIX)-concat2 # -l mustn't impact option -d
+	test ! -f $(FPREFIX)1  # must not create file artefact
+	$(CMP) $(FPREFIX)-concat1 $(FPREFIX)-concat2  # must be equivalent
 	# # # compress multiple files, one of which is absent (must fail)
-	! $(LZ4) -f -l -m tmp-tlm-concat1 notHere-legacy tmp-tlm-concat2  # must fail : notHere-legacy not present
-	@$(RM) tmp-tlm*
+	! $(LZ4) -f -l -m $(FPREFIX)-concat1 notHere-legacy $(FPREFIX)-concat2  # must fail : notHere-legacy not present
+	@$(RM) $(FPREFIX)*
 
+SKIPFILE = goldenSamples/skip.bin
+test-lz4-skippable: FPREFIX = tmp-lsk
+test-lz4-skippable: lz4 datagen
+	@echo "\n ---- test lz4 with skippable frames ----"
+	$(LZ4) -dc $(SKIPFILE)
+	$(LZ4) -dc < $(SKIPFILE)
+	cat $(SKIPFILE) | $(LZ4) -dc
+	echo "Hello from Valid Frame!\n" | $(LZ4) -c > $(FPREFIX).lz4
+	cat $(SKIPFILE) $(FPREFIX).lz4 $(SKIPFILE) | $(LZ4) -dc
+	$(RM) $(FPREFIX)*
+
+test-lz4-basic: FPREFIX = tmp-tlb
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	$(DATAGEN) -g0       | $(LZ4) -v     | $(LZ4) -t
 	$(DATAGEN) -g16KB    | $(LZ4) -9     | $(LZ4) -t
-	$(DATAGEN) -g20KB > tmp-tlb-dg20k
-	$(LZ4) < tmp-tlb-dg20k | $(LZ4) -d > tmp-tlb-dec
-	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
-	$(LZ4) --no-frame-crc < tmp-tlb-dg20k | $(LZ4) -d > tmp-tlb-dec
-	$(DIFF) -q tmp-tlb-dg20k tmp-tlb-dec
+	$(DATAGEN) -g20KB > $(FPREFIX)-dg20k
+	$(LZ4) < $(FPREFIX)-dg20k | $(LZ4) -d > $(FPREFIX)-dec
+	$(DIFF) -q $(FPREFIX)-dg20k $(FPREFIX)-dec
+	$(LZ4) --no-frame-crc < $(FPREFIX)-dg20k | $(LZ4) -d > $(FPREFIX)-dec
+	$(DIFF) -q $(FPREFIX)-dg20k $(FPREFIX)-dec
 	$(DATAGEN)           | $(LZ4) -BI    | $(LZ4) -t
+	$(DATAGEN)           | $(LZ4) --no-crc | $(LZ4) -t
 	$(DATAGEN) -g6M -P99 | $(LZ4) -9BD   | $(LZ4) -t
 	$(DATAGEN) -g17M     | $(LZ4) -9v    | $(LZ4) -qt
 	$(DATAGEN) -g33M     | $(LZ4) --no-frame-crc | $(LZ4) -t
-	$(DATAGEN) -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t
-	@echo "hello world" > tmp-tlb-hw
-	$(LZ4) --rm -f tmp-tlb-hw tmp-tlb-hw.lz4
-	test ! -f tmp-tlb-hw                      # must fail (--rm)
-	test   -f tmp-tlb-hw.lz4
-	$(PRGDIR)/lz4cat tmp-tlb-hw.lz4           # must display hello world
-	test   -f tmp-tlb-hw.lz4
-	$(PRGDIR)/unlz4 --rm tmp-tlb-hw.lz4 tmp-tlb-hw
-	test   -f tmp-tlb-hw
-	test ! -f tmp-tlb-hw.lz4                  # must fail (--rm)
-	test ! -f tmp-tlb-hw.lz4.lz4              # must fail (unlz4)
-	$(PRGDIR)/lz4cat tmp-tlb-hw               # pass-through mode
-	test   -f tmp-tlb-hw
-	test ! -f tmp-tlb-hw.lz4                  # must fail (lz4cat)
-	$(LZ4) tmp-tlb-hw tmp-tlb-hw.lz4          # creates tmp-tlb-hw.lz4
-	$(PRGDIR)/lz4cat < tmp-tlb-hw.lz4 > tmp-tlb3  # checks lz4cat works with stdin (#285)
-	$(DIFF) -q tmp-tlb-hw tmp-tlb3
-	$(PRGDIR)/lz4cat < tmp-tlb-hw > tmp-tlb2      # checks lz4cat works in pass-through mode
-	$(DIFF) -q tmp-tlb-hw tmp-tlb2
-	cp tmp-tlb-hw ./-d
+	$(DATAGEN) -g256MB   | $(LZ4) -vqB4D | $(LZ4) -t --no-crc
+	@echo "hello world" > $(FPREFIX)-hw
+	$(LZ4) --rm -f $(FPREFIX)-hw $(FPREFIX)-hw.lz4
+	test ! -f $(FPREFIX)-hw                      # must fail (--rm)
+	test   -f $(FPREFIX)-hw.lz4
+	$(PRGDIR)/lz4cat $(FPREFIX)-hw.lz4 | $(GREP) "hello world"
+	$(PRGDIR)/unlz4 --rm $(FPREFIX)-hw.lz4 $(FPREFIX)-hw
+	test   -f $(FPREFIX)-hw
+	test ! -f $(FPREFIX)-hw.lz4                  # must fail (--rm)
+	test ! -f $(FPREFIX)-hw.lz4.lz4              # must fail (unlz4)
+	$(PRGDIR)/lz4cat $(FPREFIX)-hw               # pass-through mode
+	test   -f $(FPREFIX)-hw
+	test ! -f $(FPREFIX)-hw.lz4                  # must fail (lz4cat)
+	$(LZ4) $(FPREFIX)-hw $(FPREFIX)-hw.lz4          # creates $(FPREFIX)-hw.lz4
+	$(PRGDIR)/lz4cat < $(FPREFIX)-hw.lz4 > $(FPREFIX)3  # checks lz4cat works with stdin (#285)
+	$(DIFF) -q $(FPREFIX)-hw $(FPREFIX)3
+	$(PRGDIR)/lz4cat < $(FPREFIX)-hw > $(FPREFIX)2      # checks lz4cat works in pass-through mode
+	$(DIFF) -q $(FPREFIX)-hw $(FPREFIX)2
+	cp $(FPREFIX)-hw ./-d
 	$(LZ4) --rm -- -d -d.lz4               # compresses ./d into ./-d.lz4
 	test   -f ./-d.lz4
 	test ! -f ./-d
 	mv ./-d.lz4 ./-z
-	$(LZ4) -d --rm -- -z tmp-tlb4          # uncompresses ./-z into tmp-tlb4
+	$(LZ4) -d --rm -- -z $(FPREFIX)4          # uncompresses ./-z into $(FPREFIX)4
 	test ! -f ./-z
-	$(DIFF) -q tmp-tlb-hw tmp-tlb4
-	$(LZ4) -f tmp-tlb-hw
-	$(LZ4) --list tmp-tlb-hw.lz4           # test --list on valid single-frame file
-	$(CAT) tmp-tlb-hw >> tmp-tlb-hw.lz4
-	$(LZ4) -f tmp-tlb-hw.lz4               # uncompress valid frame followed by invalid data
-	$(LZ4) -BX tmp-tlb-hw -c -q | $(LZ4) -tv  # test block checksum
+	$(DIFF) -q $(FPREFIX)-hw $(FPREFIX)4
+	! $(LZ4) $(FPREFIX)2 $(FPREFIX)3 $(FPREFIX)4    # must fail: refuse to handle 3+ file names
+	$(LZ4) -f $(FPREFIX)-hw                   # create $(FPREFIX)-hw.lz4, for next tests
+	$(LZ4) --list $(FPREFIX)-hw.lz4           # test --list on valid single-frame file
+	$(LZ4) --list < $(FPREFIX)-hw.lz4         # test --list from stdin (file only)
+	$(CAT) $(FPREFIX)-hw >> $(FPREFIX)-hw.lz4
+	! $(LZ4) -f $(FPREFIX)-hw.lz4             # uncompress valid frame followed by invalid data (must fail now)
+	$(LZ4) -BX $(FPREFIX)-hw -c -q | $(LZ4) -tv  # test block checksum
 	# $(DATAGEN) -g20KB generates the same file every single time
 	# cannot save output of $(DATAGEN) -g20KB as input file to lz4 because the following shell commands are run before $(DATAGEN) -g20KB
 	test "$(shell $(DATAGEN) -g20KB | $(LZ4) -c --fast | wc -c)" -lt "$(shell $(DATAGEN) -g20KB | $(LZ4) -c --fast=9 | wc -c)" # -1 vs -9
 	test "$(shell $(DATAGEN) -g20KB | $(LZ4) -c -1 | wc -c)" -lt "$(shell $(DATAGEN) -g20KB| $(LZ4) -c --fast=1 | wc -c)" # 1 vs -1
 	test "$(shell $(DATAGEN) -g20KB | $(LZ4) -c --fast=1 | wc -c)" -eq "$(shell $(DATAGEN) -g20KB| $(LZ4) -c --fast| wc -c)" # checks default fast compression is -1
-	! $(LZ4) -c --fast=0 tmp-tlb-dg20K # lz4 should fail when fast=0
-	! $(LZ4) -c --fast=-1 tmp-tlb-dg20K # lz4 should fail when fast=-1
+	! $(LZ4) -c --fast=0 $(FPREFIX)-dg20K # lz4 should fail when fast=0
+	! $(LZ4) -c --fast=-1 $(FPREFIX)-dg20K # lz4 should fail when fast=-1
 	# High --fast values can result in out-of-bound dereferences #876
 	$(DATAGEN) -g1M | $(LZ4) -c --fast=999999999 > /dev/null
 	# Test for #596
-	@echo "TEST" > tmp-tlb-test
-	$(LZ4) -m tmp-tlb-test
-	$(LZ4) tmp-tlb-test.lz4 tmp-tlb-test2
-	$(DIFF) -q tmp-tlb-test tmp-tlb-test2
-	@$(RM) tmp-tlb*
+	@echo "TEST" > $(FPREFIX)-test
+	$(LZ4) -m $(FPREFIX)-test
+	$(LZ4) $(FPREFIX)-test.lz4 $(FPREFIX)-test2
+	$(DIFF) -q $(FPREFIX)-test $(FPREFIX)-test2
+	@$(RM) $(FPREFIX)*
 
 
-
+test-lz4-dict: FPREFIX = tmp-dict
 test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
-	$(DATAGEN) -g16KB > tmp-dict
-	$(DATAGEN) -g32KB > tmp-dict-sample-32k
-	< tmp-dict-sample-32k $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-32k
-	$(DATAGEN) -g128MB > tmp-dict-sample-128m
-	< tmp-dict-sample-128m $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-128m
-	touch tmp-dict-sample-0
-	< tmp-dict-sample-0 $(LZ4) -D tmp-dict | $(LZ4) -dD tmp-dict | diff - tmp-dict-sample-0
+	$(DATAGEN) -g16KB > $(FPREFIX)
+	$(DATAGEN) -g32KB > $(FPREFIX)-sample-32k
+	< $(FPREFIX)-sample-32k $(LZ4) -D $(FPREFIX) | $(LZ4) -dD $(FPREFIX) | diff - $(FPREFIX)-sample-32k
+	$(DATAGEN) -g128MB > $(FPREFIX)-sample-128m
+	< $(FPREFIX)-sample-128m $(LZ4) -D $(FPREFIX) | $(LZ4) -dD $(FPREFIX) | diff - $(FPREFIX)-sample-128m
+	touch $(FPREFIX)-sample-0
+	< $(FPREFIX)-sample-0 $(LZ4) -D $(FPREFIX) | $(LZ4) -dD $(FPREFIX) | diff - $(FPREFIX)-sample-0
 
-	< tmp-dict-sample-32k $(LZ4) -D tmp-dict-sample-0 | $(LZ4) -dD tmp-dict-sample-0 | diff - tmp-dict-sample-32k
-	< tmp-dict-sample-0 $(LZ4) -D tmp-dict-sample-0 | $(LZ4) -dD tmp-dict-sample-0 | diff - tmp-dict-sample-0
+	< $(FPREFIX)-sample-32k $(LZ4) -D $(FPREFIX)-sample-0 | $(LZ4) -dD $(FPREFIX)-sample-0 | diff - $(FPREFIX)-sample-32k
+	< $(FPREFIX)-sample-0 $(LZ4) -D $(FPREFIX)-sample-0 | $(LZ4) -dD $(FPREFIX)-sample-0 | diff - $(FPREFIX)-sample-0
 
 	@echo "\n ---- test lz4 dictionary loading ----"
-	$(DATAGEN) -g128KB > tmp-dict-data-128KB
+	$(DATAGEN) -g128KB > $(FPREFIX)-data-128KB
 	set -e; \
 	for l in 0 1 4 128 32767 32768 32769 65535 65536 65537 98303 98304 98305 131071 131072 131073; do \
-		$(DATAGEN) -g$$l > tmp-dict-$$l; \
-		$(DD) if=tmp-dict-$$l of=tmp-dict-$$l-tail bs=1 count=65536 skip=$$((l > 65536 ? l - 65536 : 0)); \
-		< tmp-dict-$$l      $(LZ4) -D stdin tmp-dict-data-128KB -c | $(LZ4) -dD tmp-dict-$$l-tail | $(DIFF) - tmp-dict-data-128KB; \
-		< tmp-dict-$$l-tail $(LZ4) -D stdin tmp-dict-data-128KB -c | $(LZ4) -dD tmp-dict-$$l      | $(DIFF) - tmp-dict-data-128KB; \
+		$(DATAGEN) -g$$l > $(FPREFIX)-$$l; \
+		$(DD) if=$(FPREFIX)-$$l of=$(FPREFIX)-$$l-tail bs=1 count=65536 skip=$$((l > 65536 ? l - 65536 : 0)); \
+		< $(FPREFIX)-$$l      $(LZ4) -D stdin $(FPREFIX)-data-128KB -c | $(LZ4) -dD $(FPREFIX)-$$l-tail | $(DIFF) - $(FPREFIX)-data-128KB; \
+		< $(FPREFIX)-$$l-tail $(LZ4) -D stdin $(FPREFIX)-data-128KB -c | $(LZ4) -dD $(FPREFIX)-$$l      | $(DIFF) - $(FPREFIX)-data-128KB; \
 	done
+	@$(RM) $(FPREFIX)*
 
-	@$(RM) tmp-dict*
+test-lz4hc-hugefile: lz4 datagen
+	@echo "\n ---- test HC compression/decompression of huge files ----"
+	$(DATAGEN) -g4200MB | $(LZ4) -v3BD | $(LZ4) -qt
 
-test-lz4-hugefile: lz4 datagen
+test-lz4-fast-hugefile: FPREFIX = tmp-lfh
+test-lz4-fast-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
-	./datagen -g6GB    | $(LZ4) -vB5D  | $(LZ4) -qt
-	./datagen -g4500MB | $(LZ4) -v3BD | $(LZ4) -qt
+	$(DATAGEN) -g6GB    | $(LZ4) -vB5D | $(LZ4) -qt
 	# test large file size [2-4] GB
-	@$(DATAGEN) -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - tmphf1
-	@ls -ls tmphf1
-	@$(DATAGEN) -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - tmphf2
-	@ls -ls tmphf2
-	$(DIFF) -s tmphf1 tmphf2
-	@$(RM) tmphf*
+	@$(DATAGEN) -g3G -P100 | $(LZ4) -vv | $(LZ4) --decompress --force --sparse - $(FPREFIX)1
+	@ls -ls $(FPREFIX)1
+	@$(DATAGEN) -g3G -P100 | $(LZ4) --quiet --content-size | $(LZ4) --verbose --decompress --force --sparse - $(FPREFIX)2
+	@ls -ls $(FPREFIX)2
+	$(DIFF) -s $(FPREFIX)1 $(FPREFIX)2
+	@$(RM) $(FPREFIX)*
 
+test-lz4-hugefile: test-lz4-fast-hugefile test-lz4hc-hugefile
+
+test-lz4-testmode: FPREFIX = tmp-ltm
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
 	$(LZ4) -bi0
+	$(DATAGEN) > $(FPREFIX)
+	$(LZ4) -f $(FPREFIX) -c > $(FPREFIX).lz4
+	$(LZ4) -bdi0 $(FPREFIX).lz4 # test benchmark decode-only mode
+	$(LZ4) -bdi0 --no-crc $(FPREFIX).lz4 # test benchmark decode-only mode
 	@echo "\n ---- test mode ----"
 	! $(DATAGEN) | $(LZ4) -t
 	! $(DATAGEN) | $(LZ4) -tf
 	@echo "\n ---- pass-through mode ----"
-	@echo "Why hello there " > tmp-tlt2.lz4
-	! $(LZ4) -f tmp-tlt2.lz4 > $(VOID)
+	@echo "Why hello there " > $(FPREFIX)2.lz4
+	! $(LZ4) -f $(FPREFIX)2.lz4 > $(VOID)
 	! $(DATAGEN) | $(LZ4) -dc  > $(VOID)
 	! $(DATAGEN) | $(LZ4) -df > $(VOID)
 	$(DATAGEN) | $(LZ4) -dcf > $(VOID)
-	@echo "Hello World !" > tmp-tlt1
-	$(LZ4) -dcf tmp-tlt1
-	@echo "from underground..." > tmp-tlt2
-	$(LZ4) -dcfm tmp-tlt1 tmp-tlt2
-	@echo "\n ---- non-existing source ----"
+	@echo "Hello World !" > $(FPREFIX)1
+	$(LZ4) -dcf $(FPREFIX)1
+	@echo "from underground..." > $(FPREFIX)2
+	$(LZ4) -dcfm $(FPREFIX)1 $(FPREFIX)2
+	@echo "\n ---- non-existing source (must fail cleanly) ----"
 	! $(LZ4)     file-does-not-exist
 	! $(LZ4) -f  file-does-not-exist
 	! $(LZ4) -t  file-does-not-exist
 	! $(LZ4) -fm file1-dne file2-dne
-	@$(RM) tmp-tlt tmp-tlt1 tmp-tlt2 tmp-tlt2.lz4
+	@$(RM) $(FPREFIX)*
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
@@ -448,6 +511,7 @@ test-lz4-opt-parser: lz4 datagen
 	$(DATAGEN) -g256K      | $(LZ4) -12B4D   | $(LZ4) -t
 	$(DATAGEN) -g512K -P25 | $(LZ4) -12BD    | $(LZ4) -t
 	$(DATAGEN) -g1M        | $(LZ4) -12B5    | $(LZ4) -t
+	$(DATAGEN) -g1M -s2    | $(LZ4) -12B4D   | $(LZ4) -t
 	$(DATAGEN) -g2M -P99   | $(LZ4) -11B4D   | $(LZ4) -t
 	$(DATAGEN) -g4M        | $(LZ4) -11vq    | $(LZ4) -qt
 	$(DATAGEN) -g8M        | $(LZ4) -11B4    | $(LZ4) -t
@@ -457,15 +521,15 @@ test-lz4-opt-parser: lz4 datagen
 test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-multiple-legacy \
                       test-lz4-frame-concatenation test-lz4-testmode \
                       test-lz4-contentSize test-lz4-dict
-	@$(RM) tmp*
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
-          test-lz4-sparse test-lz4-hugefile test-lz4-dict
-	@$(RM) tmp*
+          test-lz4-sparse test-lz4-hugefile test-lz4-dict \
+          test-lz4-skippable
 
+test-lz4c: LZ4C = $(LZ4)c
 test-lz4c: lz4c datagen
 	@echo "\n ---- test lz4c variant ----"
-	$(DATAGEN) -g256MB | $(LZ4)c -l -v    | $(LZ4)c   -t
+	$(DATAGEN) -g256MB | $(LZ4C) -l -v | $(LZ4C) -t
 
 test-lz4c32: CFLAGS+=-m32
 test-lz4c32: test-lz4
@@ -514,31 +578,41 @@ test-frametest: frametest
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
 
+VALGRIND = valgrind --leak-check=yes --error-exitcode=1
+test-mem: FPREFIX = tmp-tvm
 test-mem: lz4 datagen fuzzer frametest fullbench
 	@echo "\n ---- valgrind tests : memory analyzer ----"
-	valgrind --leak-check=yes --error-exitcode=1 $(DATAGEN) -g50M > $(VOID)
-	$(DATAGEN) -g16KB > ftmdg16K
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -BD -f ftmdg16K $(VOID)
-	$(DATAGEN) -g16KB -s2 > ftmdg16K2
-	$(DATAGEN) -g16KB -s3 > ftmdg16K3
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --force --multiple ftmdg16K ftmdg16K2 ftmdg16K3
-	$(DATAGEN) -g7MB > ftmdg7M
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -9 -B5D -f ftmdg7M ftmdg16K2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -t ftmdg16K2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -bi1 ftmdg7M
-	valgrind --leak-check=yes --error-exitcode=1 ./fullbench -i1 ftmdg7M ftmdg16K2
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) -B4D -f -vq ftmdg7M $(VOID)
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m ftm*.lz4
-	valgrind --leak-check=yes --error-exitcode=1 $(LZ4) --list -m -v ftm*.lz4
-	$(RM) ftm*
-	valgrind --leak-check=yes --error-exitcode=1 ./fuzzer -i64 -t1
-	valgrind --leak-check=yes --error-exitcode=1 ./frametest -i256
+	$(VALGRIND) $(DATAGEN) -g50M > $(VOID)
+	$(DATAGEN) -g16KB > $(FPREFIX)dg16K
+	$(VALGRIND) $(LZ4) -9 -BD -f $(FPREFIX)dg16K $(VOID)
+	$(DATAGEN) -g16KB -s2 > $(FPREFIX)dg16K2
+	$(DATAGEN) -g16KB -s3 > $(FPREFIX)dg16K3
+	$(VALGRIND) $(LZ4) --force --multiple $(FPREFIX)dg16K $(FPREFIX)dg16K2 $(FPREFIX)dg16K3
+	$(DATAGEN) -g7MB > $(FPREFIX)dg7M
+	$(VALGRIND) $(LZ4) -9 -B5D -f $(FPREFIX)dg7M $(FPREFIX)dg16K2
+	$(VALGRIND) $(LZ4) -t $(FPREFIX)dg16K2
+	$(VALGRIND) $(LZ4) -bi1 $(FPREFIX)dg7M
+	$(VALGRIND) ./fullbench -i1 $(FPREFIX)dg7M $(FPREFIX)dg16K2
+	$(VALGRIND) $(LZ4) -B4D -f -vq $(FPREFIX)dg7M $(VOID)
+	$(VALGRIND) $(LZ4) --list -m $(FPREFIX)*.lz4
+	$(VALGRIND) $(LZ4) --list -m -v $(FPREFIX)*.lz4
+	$(RM) $(FPREFIX)*
+	$(VALGRIND) ./fuzzer -i64 -t1
+	$(VALGRIND) ./frametest -i256
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
 
-test-decompress-partial : decompress-partial
+test-decompress-partial : decompress-partial decompress-partial-usingDict
 	@echo "\n ---- test decompress-partial ----"
 	./decompress-partial$(EXT)
+	@echo "\n ---- test decompress-partial-usingDict ----"
+	./decompress-partial-usingDict$(EXT)
+
+test-freestanding: freestanding
+	@echo "\n ---- test freestanding ----"
+	./freestanding$(EXT)
+	-strace ./freestanding$(EXT)
+	-ltrace ./freestanding$(EXT)
 
 endif

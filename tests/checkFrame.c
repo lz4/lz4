@@ -1,6 +1,6 @@
   /*
       checkFrame - verify frame headers
-      Copyright (C) Yann Collet 2014-present
+      Copyright (C) Yann Collet 2014-2020
 
       GPL v2 License
 
@@ -153,7 +153,7 @@ int frameCheck(cRess_t ress, FILE* const srcFile, unsigned bsid, size_t blockSiz
                 if (LZ4F_isError(nextToLoad))
                     EXM_THROW(22, "Error getting frame info: %s",
                                 LZ4F_getErrorName(nextToLoad));
-                if (frameInfo.blockSizeID != bsid)
+                if (frameInfo.blockSizeID != (LZ4F_blockSizeID_t) bsid)
                     EXM_THROW(23, "Block size ID %u != expected %u",
                                 frameInfo.blockSizeID, bsid);
                 pos += remaining;

@@ -20,9 +20,9 @@ DESCRIPTION
 
 `lz4` is an extremely fast lossless compression algorithm,
 based on **byte-aligned LZ77** family of compression scheme.
-`lz4` offers compression speeds of 400 MB/s per core, linearly scalable with
-multi-core CPUs.
-It features an extremely fast decoder, with speed in multiple GB/s per core,
+`lz4` offers compression speeds > 500 MB/s per core,
+linearly scalable with multi-core CPUs.
+It features an extremely fast decoder, offering speed in multiple GB/s per core,
 typically reaching RAM speed limit on multi-core systems.
 The native file format is the `.lz4` format.
 
@@ -34,7 +34,7 @@ Differences are :
   * `lz4` compresses a single file by default (see `-m` for multiple files)
   * `lz4 file1 file2` means : compress file1 _into_ file2
   * `lz4 file.lz4` will default to decompression (use `-z` to force compression)
-  * `lz4` preserves original files
+  * `lz4` preserves original files (see `--rm` to erase source file on completion)
   * `lz4` shows real-time notification statistics
      during compression or decompression of a single file
      (use `-q` to silence them)
@@ -185,8 +185,14 @@ only the latest one will be applied.
 * `-BD`:
   Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
 
+* `-BX`:
+  Generate block checksums (default:disabled)
+
 * `--[no-]frame-crc`:
   Select frame checksum (default:enabled)
+
+* `--no-crc`:
+  Disable both frame and block checksums
 
 * `--[no-]content-size`:
   Header includes original size (default:not present)<br/>

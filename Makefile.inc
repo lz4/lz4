@@ -1,10 +1,38 @@
-ifeq ($(V), 1)
-Q =
-else
-Q = @
-endif
+# ################################################################
+# LZ4 - Makefile common definitions
+# Copyright (C) Yann Collet 2020
+# All rights reserved.
+#
+# BSD license
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice, this
+#   list of conditions and the following disclaimer in the documentation and/or
+#   other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# You can contact the author at :
+#  - LZ4 source repository : https://github.com/lz4/lz4
+#  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
+# ################################################################
 
-TARGET_OS ?= $(shell uname)
+UNAME ?= uname
+
+TARGET_OS ?= $(shell $(UNAME))
 ifeq ($(TARGET_OS),)
   TARGET_OS ?= $(OS)
 endif
@@ -41,7 +69,7 @@ WINDRES    = windres
 endif
 
 #determine if dev/nul based on host environment
-ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
+ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell $(UNAME))))
 VOID := /dev/null
 else
   ifneq (,$(filter Windows%,$(OS)))
@@ -51,32 +79,28 @@ VOID  := /dev/null
   endif
 endif
 
-ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS%,$(shell uname)))
+ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS%,$(shell $(UNAME))))
 POSIX_ENV = Yes
 else
 POSIX_ENV = No
 endif
 
-# Avoid symlinks when targetting Windows or building on a Windows host
+# Avoid symlinks when targeting Windows or building on a Windows host
 ifeq ($(WINBASED),yes)
-LN_S  = cp -p
 LN_SF = cp -p
 else
-  ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell uname)))
-LN_S  = cp -p
+  ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(shell $(UNAME))))
 LN_SF = cp -p
   else
     ifneq (,$(filter Windows%,$(OS)))
-LN_S  = cp -p
 LN_SF = cp -p
     else
-LN_S   = ln -s
 LN_SF  = ln -sf
     endif
   endif
 endif
 
-ifneq (,$(filter $(shell uname),SunOS))
+ifneq (,$(filter $(shell $(UNAME)),SunOS))
 INSTALL ?= ginstall
 else
 INSTALL ?= install

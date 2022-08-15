@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 examples - Makefile
-# Copyright (C) Yann Collet 2011-2014
+# Copyright (C) Yann Collet 2011-2020
 #
 # GPL v2 License
 #
@@ -41,7 +41,7 @@ include ../Makefile.inc
 default: all
 
 all: printVersion doubleBuffer dictionaryRandomAccess ringBuffer ringBufferHC \
-     lineCompress frameCompress simpleBuffer
+     lineCompress frameCompress fileCompress simpleBuffer
 
 $(LZ4DIR)/liblz4.a: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.h $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h
 	$(MAKE) -C $(LZ4DIR) liblz4.a
@@ -65,6 +65,9 @@ lineCompress: blockStreaming_lineByLine.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 frameCompress: frameCompress.c $(LZ4DIR)/liblz4.a
+	$(CC) $(FLAGS) $^ -o $@$(EXT)
+
+fileCompress: fileCompress.c $(LZ4DIR)/liblz4.a
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
 compressFunctions: compress_functions.c $(LZ4DIR)/liblz4.a
@@ -94,10 +97,18 @@ test : all $(LZ4)
 	@echo "\n=== Frame compression ==="
 	./frameCompress$(EXT) $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
+	@echo "\n=== file compression ==="
+	./fileCompress$(EXT) $(TESTFILE)
+	$(LZ4) -vt $(TESTFILE).lz4
+
+.PHONY: cxxtest
+cxxtest: CFLAGS := -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
+cxxtest: clean
+	CC=$(CXX) $(MAKE) -C . all CFLAGS="$(CFLAGS)"
 
 clean:
 	@rm -f core *.o *.dec *-0 *-9 *-8192 *.lz4s *.lz4 \
 	 printVersion$(EXT) doubleBuffer$(EXT) dictionaryRandomAccess$(EXT) \
 	 ringBuffer$(EXT) ringBufferHC$(EXT) lineCompress$(EXT) frameCompress$(EXT) \
-	 compressFunctions$(EXT) simpleBuffer$(EXT)
+	 fileCompress$(EXT) compressFunctions$(EXT) simpleBuffer$(EXT)
 	@echo Cleaning completed

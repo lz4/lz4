@@ -1,10 +1,10 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.9.3 Manual</title>
+<title>1.9.4 Manual</title>
 </head>
 <body>
-<h1>1.9.3 Manual</h1>
+<h1>1.9.4 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
@@ -48,20 +48,49 @@
   The `lz4` CLI can only manage frames.
 <BR></pre>
 
+<pre><b>#if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
+#  define LZ4_HEAPMODE 0
+#  define LZ4HC_HEAPMODE 0
+#  define LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
+#  if !defined(LZ4_memcpy)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memcpy'."
+#  endif
+#  if !defined(LZ4_memset)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memset'."
+#  endif
+#  if !defined(LZ4_memmove)
+#    error "LZ4_FREESTANDING requires macro 'LZ4_memmove'."
+#  endif
+#elif ! defined(LZ4_FREESTANDING)
+#  define LZ4_FREESTANDING 0
+#endif
+</b><p>  When this macro is set to 1, it enables "freestanding mode" that is
+  suitable for typical freestanding environment which doesn't support
+  standard C library.
+
+  - LZ4_FREESTANDING is a compile-time switch.
+  - It requires the following macros to be defined:
+    LZ4_memcpy, LZ4_memmove, LZ4_memset.
+  - It only enables LZ4/HC functions which don't use heap.
+    All LZ4F_* functions are not supported.
+  - See tests/freestanding.c to check its basic setup.
+ 
+</p></pre><BR>
+
 <a name="Chapter2"></a><h2>Version</h2><pre></pre>
 
-<pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; useful to check dll version */<b>
+<pre><b>int LZ4_versionNumber (void);  </b>/**< library version number; useful to check dll version; requires v1.3.0+ */<b>
 </b></pre><BR>
-<pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; useful to check dll version */<b>
+<pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; useful to check dll version; requires v1.7.5+ */<b>
 </b></pre><BR>
 <a name="Chapter3"></a><h2>Tuning parameter</h2><pre></pre>
 
 <pre><b>#ifndef LZ4_MEMORY_USAGE
-# define LZ4_MEMORY_USAGE 14
+# define LZ4_MEMORY_USAGE LZ4_MEMORY_USAGE_DEFAULT
 #endif
-</b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
- Increasing memory usage improves compression ratio.
- Reduced memory usage may improve speed, thanks to better cache locality.
+</b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
+ Increasing memory usage improves compression ratio, at the cost of speed.
+ Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
  Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  
 </p></pre><BR>
@@ -267,8 +296,10 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 <a name="Chapter7"></a><h2>Streaming Decompression Functions</h2><pre>  Bufferless synchronous API
 <BR></pre>
 
-<pre><b>LZ4_streamDecode_t* LZ4_createStreamDecode(void);
+<pre><b>#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
+#endif </b>/* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */<b>
 </b><p>  creation / destruction of streaming decompression tracking context.
   A tracking context can be re-used multiple times.
  
@@ -297,7 +328,10 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  
 </p></pre><BR>
 
-<pre><b>int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int srcSize, int dstCapacity);
+<pre><b>int
+LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
+                        const char* src, char* dst,
+                        int srcSize, int dstCapacity);
 </b><p>  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
   A block is an unsplittable entity, it must be presented entirely to a decompression function.
   Decompression functions only accepts one block at a time.
@@ -323,7 +357,10 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
   then indicate where this data is saved using LZ4_setStreamDecode(), before decompressing next block.
 </p></pre><BR>
 
-<pre><b>int LZ4_decompress_safe_usingDict (const char* src, char* dst, int srcSize, int dstCapcity, const char* dictStart, int dictSize);
+<pre><b>int
+LZ4_decompress_safe_usingDict(const char* src, char* dst,
+                              int srcSize, int dstCapacity,
+                              const char* dictStart, int dictSize);
 </b><p>  These decoding functions work the same as
   a combination of LZ4_setStreamDecode() followed by LZ4_decompress_*_continue()
   They are stand-alone, and don't need an LZ4_streamDecode_t structure.
@@ -363,7 +400,9 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  
 </p></pre><BR>
 
-<pre><b>LZ4LIB_STATIC_API void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream);
+<pre><b>LZ4LIB_STATIC_API void
+LZ4_attach_dictionary(LZ4_stream_t* workingStream,
+                const LZ4_stream_t* dictionaryStream);
 </b><p>  This is an experimental API that allows
   efficient use of a static dictionary many times.
 
@@ -393,7 +432,7 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 
 <pre><b></b><p>
  It's possible to have input and output sharing the same buffer,
- for highly contrained memory environments.
+ for highly constrained memory environments.
  In both cases, it requires input to lay at the end of the buffer,
  and decompression to start at beginning of the buffer.
  Buffer size must feature some margin, hence be larger than final size.
@@ -452,28 +491,9 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
  Accessing members will expose user code to API and/or ABI break in future versions of the library.
 <BR></pre>
 
-<pre><b>typedef struct {
-    const LZ4_byte* externalDict;
-    size_t extDictSize;
-    const LZ4_byte* prefixEnd;
-    size_t prefixSize;
-} LZ4_streamDecode_t_internal;
-</b></pre><BR>
-<pre><b>#define LZ4_STREAMSIZE       16416  </b>/* static size, for inter-version compatibility */<b>
-#define LZ4_STREAMSIZE_VOIDP (LZ4_STREAMSIZE / sizeof(void*))
-union LZ4_stream_u {
-    void* table[LZ4_STREAMSIZE_VOIDP];
-    LZ4_stream_t_internal internal_donotuse;
-}; </b>/* previously typedef'd to LZ4_stream_t */<b>
-</b><p>  Do not use below internal definitions directly !
-  Declare or allocate an LZ4_stream_t instead.
-  LZ4_stream_t can also be created using LZ4_createStream(), which is recommended.
-  The structure definition can be convenient for static allocation
-  (on stack, or as part of larger structure).
-  Init this structure with LZ4_initStream() before first use.
-  note : only use this definition in association with static linking !
-  this definition is not API/ABI safe, and may change in future versions.
- 
+<pre><b></b><p>  Never ever use below internal definitions directly !
+  These definitions are not API/ABI safe, and may change in future versions.
+  If you need static allocation, declare or allocate an LZ4_stream_t object.
 </p></pre><BR>
 
 <pre><b>LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
@@ -489,21 +509,17 @@ union LZ4_stream_u {
          In which case, the function will @return NULL.
   Note2: An LZ4_stream_t structure guarantees correct alignment and size.
   Note3: Before v1.9.0, use LZ4_resetStream() instead
- 
 </p></pre><BR>
 
-<pre><b>#define LZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 2 : 0) </b>/*AS-400*/ )<b>
-#define LZ4_STREAMDECODESIZE     (LZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
-union LZ4_streamDecode_u {
-    unsigned long long table[LZ4_STREAMDECODESIZE_U64];
-    LZ4_streamDecode_t_internal internal_donotuse;
-} ;   </b>/* previously typedef'd to LZ4_streamDecode_t */<b>
-</b><p>  information structure to track an LZ4 stream during decompression.
-  init this structure  using LZ4_setStreamDecode() before first use.
-  note : only use in association with static linking !
-         this definition is not API/ABI safe,
-         and may change in a future version !
- 
+<pre><b>typedef struct {
+    const LZ4_byte* externalDict;
+    const LZ4_byte* prefixEnd;
+    size_t extDictSize;
+    size_t prefixSize;
+} LZ4_streamDecode_t_internal;
+</b><p>  Never ever use below internal definitions directly !
+  These definitions are not API/ABI safe, and may change in future versions.
+  If you need static allocation, declare or allocate an LZ4_streamDecode_t object.
 </p></pre><BR>
 
 <a name="Chapter10"></a><h2>Obsolete Functions</h2><pre></pre>

@@ -1,6 +1,6 @@
 /*
   LZ4cli - LZ4 Command Line Interface
-  Copyright (C) Yann Collet 2011-2016
+  Copyright (C) Yann Collet 2011-2020
 
   GPL v2 License
 
@@ -186,7 +186,7 @@ static int usage_longhelp(const char* exeName)
     DISPLAY( "\n");
     DISPLAY( "Compression levels : \n");
     DISPLAY( "---------------------\n");
-    DISPLAY( "-0 ... -2  => Fast compression, all identicals\n");
+    DISPLAY( "-0 ... -2  => Fast compression, all identical\n");
     DISPLAY( "-3 ... -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
     DISPLAY( "\n");
     DISPLAY( "stdin, stdout and the console : \n");
@@ -314,6 +314,7 @@ int main(int argc, const char** argv)
         cLevelLast=-10000,
         legacy_format=0,
         forceStdout=0,
+        forceOverwrite=0,
         main_pause=0,
         multiple_inputs=0,
         all_arguments_are_files=0,
@@ -330,9 +331,8 @@ int main(int argc, const char** argv)
     const char extension[] = LZ4_EXTENSION;
     size_t blockSize = LZ4IO_setBlockSizeID(prefs, LZ4_BLOCKSIZEID_DEFAULT);
     const char* const exeName = lastNameFromPath(argv[0]);
-#ifdef UTIL_HAS_CREATEFILELIST
-    const char** extendedFileList = NULL;
     char* fileNamesBuf = NULL;
+#ifdef UTIL_HAS_CREATEFILELIST
     unsigned fileNamesNb, recursive=0;
 #endif
 
@@ -377,16 +377,21 @@ int main(int argc, const char** argv)
             if (argument[1]=='-') {
                 if (!strcmp(argument,  "--")) { all_arguments_are_files = 1; continue; }
                 if (!strcmp(argument,  "--compress")) { mode = om_compress; continue; }
-                if ((!strcmp(argument, "--decompress"))
-                    || (!strcmp(argument, "--uncompress"))) { mode = om_decompress; continue; }
+                if ( (!strcmp(argument, "--decompress"))
+                  || (!strcmp(argument, "--uncompress"))) {
+                      if (mode != om_bench) mode = om_decompress;
+                      BMK_setDecodeOnlyMode(1);
+                      continue;
+                 }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
                 if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(prefs, 1); continue; }
                 if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(prefs, 0); continue; }
                 if ((!strcmp(argument, "--stdout"))
                     || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; continue; }
-                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); continue; }
-                if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); continue; }
+                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); BMK_skipChecksums(0); continue; }
+                if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
+                if (!strcmp(argument,  "--no-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_setBlockChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
                 if (!strcmp(argument,  "--content-size")) { LZ4IO_setContentSize(prefs, 1); continue; }
                 if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(prefs, 0); continue; }
                 if (!strcmp(argument,  "--list")) { mode = om_list; continue; }
@@ -478,7 +483,10 @@ int main(int argc, const char** argv)
                 case 'l': legacy_format = 1; blockSize = 8 MB; break;
 
                     /* Decoding */
-                case 'd': mode = om_decompress; break;
+                case 'd':
+                    if (mode != om_bench) mode = om_decompress;
+                    BMK_setDecodeOnlyMode(1);
+                    break;
 
                     /* Force stdout, even if stdout==console */
                 case 'c':
@@ -491,7 +499,7 @@ int main(int argc, const char** argv)
                 case 't': mode = om_test; break;
 
                     /* Overwrite */
-                case 'f': LZ4IO_setOverwrite(prefs, 1); break;
+                case 'f': forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); break;
 
                     /* Verbose mode */
                 case 'v': displayLevel++; break;
@@ -581,20 +589,24 @@ int main(int argc, const char** argv)
         }
 
         /* Store in *inFileNames[] if -m is used. */
-        if (multiple_inputs) { inFileNames[ifnIdx++]=argument; continue; }
+        if (multiple_inputs) { inFileNames[ifnIdx++] = argument; continue; }
 
-        /* Store first non-option arg in input_filename to preserve original cli logic. */
-        if (!input_filename) { input_filename=argument; continue; }
+        /* original cli logic : lz4 input output */
+        /* First non-option arg is input_filename. */
+        if (!input_filename) { input_filename = argument; continue; }
 
-        /* Second non-option arg in output_filename to preserve original cli logic. */
+        /* Second non-option arg is output_filename */
         if (!output_filename) {
-            output_filename=argument;
+            output_filename = argument;
             if (!strcmp (output_filename, nullOutput)) output_filename = nulmark;
             continue;
         }
 
-        /* 3rd non-option arg should not exist */
-        DISPLAYLEVEL(1, "Warning : %s won't be used ! Do you want multiple input files (-m) ? \n", argument);
+        /* 3rd+ non-option arg should not exist */
+        DISPLAYLEVEL(1, "%s : %s won't be used ! Do you want multiple input files (-m) ? \n",
+            forceOverwrite ? "Warning" : "Error",
+            argument);
+        if (!forceOverwrite) exit(1);
     }
 
     DISPLAYLEVEL(3, WELCOME_MESSAGE);
@@ -617,7 +629,7 @@ int main(int argc, const char** argv)
         input_filename = inFileNames[0];
 #ifdef UTIL_HAS_CREATEFILELIST
         if (recursive) {  /* at this stage, filenameTable is a list of paths, which can contain both files and directories */
-            extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
+            const char** extendedFileList = UTIL_createFileList(inFileNames, ifnIdx, &fileNamesBuf, &fileNamesNb);
             if (extendedFileList) {
                 unsigned u;
                 for (u=0; u<fileNamesNb; u++) DISPLAYLEVEL(4, "%u %s\n", u, extendedFileList[u]);
@@ -649,26 +661,18 @@ int main(int argc, const char** argv)
         mode = om_decompress;   /* defer to decompress */
     }
 
-    /* compress or decompress */
+    /* No input provided => use stdin */
     if (!input_filename) input_filename = stdinmark;
-    /* Check if input is defined as console; trigger an error in this case */
+
+    /* Refuse to use the console as input */
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) {
         DISPLAYLEVEL(1, "refusing to read from a console\n");
         exit(1);
     }
+
     if (!strcmp(input_filename, stdinmark)) {
         /* if input==stdin and no output defined, stdout becomes default output */
         if (!output_filename) output_filename = stdoutmark;
-    }
-    else{
-#ifdef UTIL_HAS_CREATEFILELIST
-        if (!recursive && !UTIL_isRegFile(input_filename)) {
-#else
-        if (!UTIL_isRegFile(input_filename)) {
-#endif
-            DISPLAYLEVEL(1, "%s: is not a regular file \n", input_filename);
-            exit(1);
-        }
     }
 
     /* No output filename ==> try to select one automatically (when possible) */
@@ -679,7 +683,7 @@ int main(int argc, const char** argv)
              * To ensure `stdout` is explicitly selected, use `-c` command flag.
              * Conversely, to ensure output will not become `stdout`, use `-m` command flag */
             DISPLAYLEVEL(1, "Warning : using stdout as default output. Do not rely on this behavior: use explicit `-c` instead ! \n");
-            output_filename=stdoutmark;
+            output_filename = stdoutmark;
             break;
         }
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
@@ -695,7 +699,7 @@ int main(int argc, const char** argv)
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
             break;
         }
-        if (mode == om_decompress) {/* decompression to file (automatic name will work only if input filename has correct format extension) */
+        if (mode == om_decompress) {/* decompress to file (automatic output name only works if input filename has correct format extension) */
             size_t outl;
             size_t const inl = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,inl+1);
@@ -704,32 +708,27 @@ int main(int argc, const char** argv)
             outl = inl;
             if (inl>4)
                 while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) dynNameSpace[outl--]=0;
-            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename\n"); badusage(exeName); }
+            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename \n"); badusage(exeName); }
             output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
         }
         break;
     }
 
-    if (mode == om_list){
-        /* Exit if trying to read from stdin as this isn't supported in this mode */
-        if(!strcmp(input_filename, stdinmark)){
-            DISPLAYLEVEL(1, "refusing to read from standard input in --list mode\n");
-            exit(1);
-        }
-        if(!multiple_inputs){
-            inFileNames[ifnIdx++] = input_filename;
-        }
-    }
-    else{
-        if (multiple_inputs==0) assert(output_filename);
+    if (mode == om_list) {
+        if (!multiple_inputs) inFileNames[ifnIdx++] = input_filename;
+    } else {
+        if (!multiple_inputs) assert(output_filename != NULL);
     }
     /* when multiple_inputs==1, output_filename may simply be useless,
      * however, output_filename must be !NULL for next strcmp() tests */
     if (!output_filename) output_filename = "*\\dummy^!//";
 
     /* Check if output is defined as console; trigger an error in this case */
-    if (!strcmp(output_filename,stdoutmark) && IS_CONSOLE(stdout) && !forceStdout) {
+    if ( !strcmp(output_filename,stdoutmark)
+      && mode != om_list
+      && IS_CONSOLE(stdout)
+      && !forceStdout) {
         DISPLAYLEVEL(1, "refusing to write to console without -c \n");
         exit(1);
     }
@@ -747,8 +746,10 @@ int main(int argc, const char** argv)
     if (ifnIdx == 0) multiple_inputs = 0;
     if (mode == om_decompress) {
         if (multiple_inputs) {
-            const char* const dec_extension = !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION;
-            assert(ifnIdx <= INT_MAX);
+            const char* dec_extension = LZ4_EXTENSION;
+            if (!strcmp(output_filename, stdoutmark)) dec_extension = stdoutmark;
+            if (!strcmp(output_filename, nulmark)) dec_extension = nulmark;
+            assert(ifnIdx < INT_MAX);
             operationResult = LZ4IO_decompressMultipleFilenames(inFileNames, (int)ifnIdx, dec_extension, prefs);
         } else {
             operationResult = DEFAULT_DECOMPRESSOR(input_filename, output_filename, prefs);
@@ -776,12 +777,7 @@ int main(int argc, const char** argv)
 _cleanup:
     if (main_pause) waitEnter();
     free(dynNameSpace);
-#ifdef UTIL_HAS_CREATEFILELIST
-    if (extendedFileList) {
-        UTIL_freeFileList(extendedFileList, fileNamesBuf);
-        inFileNames = NULL;
-    }
-#endif
+    free(fileNamesBuf);
     LZ4IO_freePreferences(prefs);
     free((void*)inFileNames);
     return operationResult;
