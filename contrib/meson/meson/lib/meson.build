@@ -17,33 +17,32 @@ sources = files(
   lz4_source_root / 'lib/xxhash.c'
 )
 
+if get_option('unstable')
+  sources += files(lz4_source_root / 'lib/lz4file.c')
+endif
+
 c_args = []
 
 if host_machine.system() == 'windows' and get_option('default_library') != 'static'
   c_args += '-DLZ4_DLL_EXPORT=1'
 endif
 
-if get_option('unstable')
-  compile_args += '-DLZ4_STATIC_LINKING_ONLY'
-  if get_option('default_library') != 'static'
-    c_args += '-DLZ4_PUBLISH_STATIC_FUNCTIONS'
-  endif
-endif
-
 liblz4 = library(
   'lz4',
   sources,
+  c_args: c_args,
   install: true,
-  version: lz4_version,
+  version: meson.project_version(),
   gnu_symbol_visibility: 'hidden'
 )
 
 liblz4_dep = declare_dependency(
   link_with: liblz4,
+  compile_args: compile_args,
   include_directories: include_directories(lz4_source_root / 'lib')
 )
 
-if get_option('tests') or get_option('programs') or get_option('examples')
+if get_option('tests') or get_option('programs') or get_option('examples') or get_option('ossfuzz')
   liblz4_internal = static_library(
     'lz4-internal',
     objects: liblz4.extract_all_objects(recursive: true),
@@ -52,6 +51,7 @@ if get_option('tests') or get_option('programs') or get_option('examples')
 
   liblz4_internal_dep = declare_dependency(
     link_with: liblz4_internal,
+    compile_args: compile_args,
     include_directories: include_directories(lz4_source_root / 'lib')
   )
 endif
@@ -61,7 +61,7 @@ pkgconfig.generate(
   name: 'lz4',
   filebase: 'liblz4',
   description: 'extremely fast lossless compression algorithm library',
-  version: lz4_version,
+  version: meson.project_version(),
   url: 'http://www.lz4.org/'
 )
 
@@ -73,4 +73,8 @@ install_headers(
 
 if get_option('default_library') != 'shared'
   install_headers(lz4_source_root / 'lib/lz4frame_static.h')
+endif
+
+if get_option('unstable')
+  install_headers(lz4_source_root / 'lib/lz4file.h')
 endif
