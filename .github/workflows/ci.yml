@@ -16,6 +16,10 @@ on: [push, pull_request]
 permissions:
   contents: read
 
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+
 jobs:
   lz4-c-compilers:
     name: CC=${{ matrix.cc }}, ${{ matrix.os }}
