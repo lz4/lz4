@@ -446,8 +446,9 @@ void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
-
-    do { LZ4_memcpy(d,s,8); d+=8; s+=8; } while (d<e);
+    int diff = (int)(e - d);
+    int copy_num = diff < 8 ? 8 : ((diff + 8 - 1) & ~(8 - 1));
+    memcpy(d, s, copy_num);
 }
 
 static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
@@ -503,8 +504,9 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
-
-    do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+    int diff = e - d;
+    int copy_num = diff < 32 ? 32 : ((diff + 32 - 1) & ~(32 - 1));
+    memcpy(d, s, copy_num);
 }
 
 /* LZ4_memcpy_using_offset()  presumes :
