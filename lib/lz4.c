@@ -448,12 +448,14 @@ void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* const e = (BYTE*)dstEnd;
 
     int diff = (int)(e - d);
-    int copy_num = diff < 8 ? 8 : ((diff + 8 - 1) & ~(8 - 1));
-    if (d + copy_num < s || s + copy_num < d) {
-        LZ4_memcpy(d, s, copy_num);
-    } else {
-        do { LZ4_memcpy(d,s,8); d+=8; s+=8; } while (d<e);
+    if (unlikely(diff > 128)) {
+        int copy_num = (diff + 8 - 1) & ~(8 - 1);
+        if (d + copy_num < s || s + copy_num < d) {
+            LZ4_memcpy(d, s, copy_num);
+            return;
+        }
     }
+    do { LZ4_memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
 static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
@@ -511,12 +513,14 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     BYTE* const e = (BYTE*)dstEnd;
 
     int diff = (int)(e - d);
-    int copy_num = diff < 32 ? 32 : ((diff + 32 - 1) & ~(32 - 1));
-    if (d + copy_num < s || s + copy_num < d) {
-        LZ4_memcpy(d, s, copy_num);
-    } else {
-        do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+    if (unlikely(diff > 512)) {
+        int copy_num = ((diff + 32 - 1) & ~(32 - 1));
+        if (d + copy_num < s || s + copy_num < d) {
+            LZ4_memcpy(d, s, copy_num);
+            return;
+        }
     }
+    do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 }
 
 /* LZ4_memcpy_using_offset()  presumes :
