@@ -79,7 +79,7 @@ jobs:
       CXX: ${{ matrix.cxx }}
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -180,7 +180,7 @@ jobs:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -207,7 +207,7 @@ jobs:
     name: Fuzzer test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -228,7 +228,7 @@ jobs:
     name: LZ4 Makefile - support for standard variables
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: make standard_variables
       run: make V=1 standard_variables
@@ -238,7 +238,7 @@ jobs:
     name: LZ4 versions test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -253,7 +253,7 @@ jobs:
     name: LZ4 inter-versions ABI test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -268,7 +268,7 @@ jobs:
     name: LZ4 frame test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -285,7 +285,7 @@ jobs:
     name: test different values of LZ4_MEMORY_USAGE
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: LZ4_MEMORY_USAGE
       run: make V=1 -C tests test-compile-with-lz4-memory-usage
 
@@ -294,7 +294,7 @@ jobs:
     name: Custom LZ4_DISTANCE_MAX
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
         MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
@@ -310,7 +310,7 @@ jobs:
     name: Test lz4 compression on a block device
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: create a block device, compress it with lz4 # alternative : blindly use /dev/loop0, seems to always exist
       run: |
         make lz4
@@ -337,7 +337,7 @@ jobs:
     name: make cppcheck
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -356,7 +356,7 @@ jobs:
     name: make staticAnalyze
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -378,7 +378,7 @@ jobs:
     name: valgrind
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -399,7 +399,7 @@ jobs:
     env:                        # Set environment variables
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: ubsan
       #########################################################
@@ -416,7 +416,7 @@ jobs:
     env:                        # Set environment variables
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -439,7 +439,7 @@ jobs:
     env:                        # Set environment variables
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: setup
       run: sudo sysctl -w vm.mmap_min_addr=4096
@@ -454,7 +454,7 @@ jobs:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: unicode lint
       run: bash ./tests/unicode_lint.sh
 
@@ -462,7 +462,7 @@ jobs:
     name: make examples
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -553,7 +553,7 @@ jobs:
       XCC: ${{ matrix.xcc }}
       XEMU: ${{ matrix.xemu }}
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -594,7 +594,7 @@ jobs:
     name: macOS
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Environment info
       run: |
@@ -626,7 +626,7 @@ jobs:
     name: make
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: Environment info
       run: |
@@ -641,7 +641,7 @@ jobs:
     name: make travis-install
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: travis-install
       run: make V=1 clean travis-install
@@ -657,7 +657,7 @@ jobs:
     name: cmake
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: Environment info
       run: |
@@ -678,7 +678,7 @@ jobs:
     name: make cmake
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: make cmake
       # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
       run: make V=1 VERBOSE=1 clean cmake
@@ -689,7 +689,7 @@ jobs:
     name: Meson + Ninja
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - uses: actions/setup-python@v4 # https://github.com/actions/setup-python
       with:
         python-version: '3.x'
@@ -735,7 +735,7 @@ jobs:
     name: git version tag checking for release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: make -C tests checkTag
       if: startsWith(github.ref, 'refs/tags/v')   # If git tag name starts with 'v'
       run: |
@@ -761,7 +761,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: init
       run: |
