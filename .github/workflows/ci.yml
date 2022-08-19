@@ -690,7 +690,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - uses: actions/setup-python@v2 # https://github.com/actions/setup-python
+    - uses: actions/setup-python@v4 # https://github.com/actions/setup-python
       with:
         python-version: '3.x'
 
