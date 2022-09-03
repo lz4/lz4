@@ -17,16 +17,14 @@ sources = files(
   lz4_source_root / 'lib/xxhash.c'
 )
 
-c_args = []
-
 if host_machine.system() == 'windows' and get_option('default_library') != 'static'
-  c_args += '-DLZ4_DLL_EXPORT=1'
+  add_project_arguments('-DLZ4_DLL_EXPORT=1', language: 'c')
 endif
 
 if get_option('unstable')
-  compile_args += '-DLZ4_STATIC_LINKING_ONLY'
+  add_project_arguments('-DLZ4_STATIC_LINKING_ONLY', language: 'c')
   if get_option('default_library') != 'static'
-    c_args += '-DLZ4_PUBLISH_STATIC_FUNCTIONS'
+    add_project_arguments('-DLZ4_PUBLISH_STATIC_FUNCTIONS', language: 'c')
   endif
 endif
 
