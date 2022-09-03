@@ -12,15 +12,6 @@ cc = meson.get_compiler('c')
 
 pkgconfig = import('pkgconfig')
 
-lz4_source_root = '../../..'
-
-lz4_version = meson.project_version()
-
-lz4_h_file = lz4_source_root / 'lib/lz4.h'
-GetLz4LibraryVersion_py = find_program('GetLz4LibraryVersion.py')
-lz4_version = run_command(GetLz4LibraryVersion_py, lz4_h_file, check: true).stdout().strip()
-message('Project version is now: @0@'.format(lz4_version))
-
 add_project_arguments('-DXXH_NAMESPACE=LZ4_', language: 'c')
 
 if get_option('debug')
