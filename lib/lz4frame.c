@@ -264,7 +264,7 @@ typedef struct LZ4F_cctx_s
     LZ4F_CustomMem cmem;
     LZ4F_preferences_t prefs;
     U32    version;
-    U32    cStage;
+    U32    cStage;     /* 0 : compression uninitialized ; 1 : initialized, can compress */
     const LZ4F_CDict* cdict;
     size_t maxBlockSize;
     size_t maxBufferSize;
@@ -732,7 +732,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
         if (cctxPtr->maxBufferSize < requiredBuffSize) {
             cctxPtr->maxBufferSize = 0;
             LZ4F_free(cctxPtr->tmpBuff, cctxPtr->cmem);
-            cctxPtr->tmpBuff = (BYTE*)LZ4F_calloc(requiredBuffSize, cctxPtr->cmem);
+            cctxPtr->tmpBuff = (BYTE*)LZ4F_malloc(requiredBuffSize, cctxPtr->cmem);
             RETURN_ERROR_IF(cctxPtr->tmpBuff == NULL, allocation_failed);
             cctxPtr->maxBufferSize = requiredBuffSize;
     }   }
@@ -1176,7 +1176,6 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
     }
 
     cctxPtr->cStage = 0;   /* state is now re-usable (with identical preferences) */
-    cctxPtr->maxBufferSize = 0;  /* reuse HC context */
 
     if (cctxPtr->prefs.frameInfo.contentSize) {
         if (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)
@@ -1722,10 +1721,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     /* history management (linked blocks only)*/
                     if (dctx->frameInfo.blockMode == LZ4F_blockLinked) {
                         LZ4F_updateDict(dctx, dstPtr, sizeToCopy, dstStart, 0);
-                }   }
-
-                srcPtr += sizeToCopy;
-                dstPtr += sizeToCopy;
+                    }
+                    srcPtr += sizeToCopy;
+                    dstPtr += sizeToCopy;
+                }
                 if (sizeToCopy == dctx->tmpInTarget) {   /* all done */
                     if (dctx->frameInfo.blockChecksumFlag) {
                         dctx->tmpInSize = 0;
