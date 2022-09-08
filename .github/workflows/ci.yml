@@ -396,25 +396,18 @@ jobs:
   lz4-ubsan-x64:
     name: Linux x64 ubsan
     runs-on: ubuntu-latest
-    env:                        # Set environment variables
-      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
     - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: ubsan
-      #########################################################
-      # For now, we ignore the exit code of `make usan`.
-      # See "Known issues / lz4-ubsan-x64" in README.md
-      # When we'll resolve this issue, remove "|| $FIXME__LZ4_CI_IGNORE"
-      #########################################################
-      run: make V=1 clean usan MOREFLAGS='-Wcomma -Werror' || $FIXME__LZ4_CI_IGNORE
+      run: |
+        make clean
+        make V=1 usan
 
 
   lz4-ubsan-x86:
     name: Linux x86 ubsan
     runs-on: ubuntu-latest
-    env:                        # Set environment variables
-      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
     - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
@@ -425,19 +418,14 @@ jobs:
         sudo apt-get install lib32gcc-11-dev
 
     - name: ubsan32
-      #########################################################
-      # For now, we ignore the exit code of `make usan32`.
-      # See "Known issues / lz4-ubsaan-x86" in README.md.
-      # When we'll resolve this issue, remove "|| $FIXME__LZ4_CI_IGNORE"
-      #########################################################
-      run: CC=clang make V=1 clean usan32 MOREFLAGS='-Wcomma -Werror' || $FIXME__LZ4_CI_IGNORE
+      run: |
+        make clean
+        CC=clang make V=1 usan32
 
 
   lz4-asan-x64:
     name: Linux x64 ASAN
     runs-on: ubuntu-latest
-    env:                        # Set environment variables
-      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
     - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
