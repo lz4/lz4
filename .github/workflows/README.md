@@ -4,12 +4,17 @@ This directory contains [GitHub Actions](https://github.com/features/actions) wo
 
 ## USAN, ASAN (`lz4-ubsan-x64`, `lz4-ubsan-x86`, `lz4-asan-x64`)
 
-For now, `lz4-ubsan-*` ignores the exit code of `make usan` and `make usan32`.
-Because there are several issues which may take relatively long time to resolve.
-
-We'll fully enable it when we ensure `make usan` is ready for all commits and PRs.
-
-See [#983](https://github.com/lz4/lz4/pull/983) for details.
+For now, `lz4-ubsan-*` uses the `-fsanitize-recover=pointer-overflow` flag:
+there are known cases of pointer overflow arithmetic within `lz4.c` fast compression.
+These cases are not dangerous with current architecture,
+but they are not guaranteed to work by the C standard,
+which means that, in some future, some new architecture or some new compiler
+may decide to do something funny that would break this behavior.
+Hence it's proper to remove them.
+This has been done in `lz4hc.c`.
+However, the same attempt in `lz4.c` resulted in massive speed loss,
+which is not acceptable to solve a "potential future" problem that does not exist anywhere today.
+Therefore, a better work-around will have to be found.
 
 
 ## C Compilers (`lz4-c-compilers`)
@@ -50,11 +55,7 @@ Also sometimes it reports false positives.
 
 # Difference with `.travis.yml`
 
-The following tests are not included yet.
-
-- name: Compile OSS-Fuzz targets
-
-The following tests will not be included due to limitation of GH-Actions.
+The following tests are not be included due to limitation of GH-Actions.
 
 - name: aarch64 real-hw tests
 - name: PPC64LE real-hw tests
