@@ -85,6 +85,7 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 /* Make fields passed to, and updated by LZ4HC_encodeSequence explicit */
 #define UPDATABLE(ip, op, anchor) &ip, &op, &anchor
 
+#define LZ4HC_HASHSIZE 4
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
 
@@ -1032,18 +1033,16 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
+    LZ4HC_CCtx_internal* const s = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(4, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
-    if (LZ4_streamHCPtr->internal_donotuse.dirty) {
+    if (s->dirty) {
         LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
     } else {
-        /* preserve end - prefixStart : can trigger clearTable's threshold */
-        if (LZ4_streamHCPtr->internal_donotuse.end != NULL) {
-            LZ4_streamHCPtr->internal_donotuse.end -= (uptrval)LZ4_streamHCPtr->internal_donotuse.prefixStart;
-        } else {
-            assert(LZ4_streamHCPtr->internal_donotuse.prefixStart == NULL);
-        }
-        LZ4_streamHCPtr->internal_donotuse.prefixStart = NULL;
-        LZ4_streamHCPtr->internal_donotuse.dictCtx = NULL;
+        assert(s->end >= s->prefixStart);
+        s->dictLimit += (U32)(s->end - s->prefixStart);
+        s->prefixStart = NULL;
+        s->end = NULL;
+        s->dictCtx = NULL;
     }
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
@@ -1080,7 +1079,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
     }
     LZ4HC_init_internal (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
-    if (dictSize >= 4) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
+    if (dictSize >= LZ4HC_HASHSIZE) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
     return dictSize;
 }
 
@@ -1140,7 +1139,8 @@ LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
             if (sourceEnd > dictEnd) sourceEnd = dictEnd;
             ctxPtr->lowLimit += (U32)(sourceEnd - ctxPtr->dictStart);
             ctxPtr->dictStart += (U32)(sourceEnd - ctxPtr->dictStart);
-            if (ctxPtr->dictLimit - ctxPtr->lowLimit < 4) {
+            /* invalidate dictionary is it's too small */
+            if (ctxPtr->dictLimit - ctxPtr->lowLimit < LZ4HC_HASHSIZE) {
                 ctxPtr->lowLimit = ctxPtr->dictLimit;
                 ctxPtr->dictStart = ctxPtr->prefixStart;
     }   }   }
@@ -1179,10 +1179,10 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     if (dictSize > prefixSize) dictSize = prefixSize;
     if (safeBuffer == NULL) assert(dictSize == 0);
     if (dictSize > 0)
-        LZ4_memmove(safeBuffer, streamPtr->end - dictSize, dictSize);
+        LZ4_memmove(safeBuffer, streamPtr->end - dictSize, (size_t)dictSize);
     {   U32 const endIndex = (U32)(streamPtr->end - streamPtr->prefixStart) + streamPtr->dictLimit;
-        streamPtr->end = (const BYTE*)safeBuffer + dictSize;
-        streamPtr->prefixStart = streamPtr->end - dictSize;
+        streamPtr->end = (safeBuffer == NULL) ? NULL : (const BYTE*)safeBuffer + dictSize;
+        streamPtr->prefixStart = (const BYTE*)safeBuffer;
         streamPtr->dictLimit = endIndex - (U32)dictSize;
         streamPtr->lowLimit = endIndex - (U32)dictSize;
         streamPtr->dictStart = streamPtr->prefixStart;
@@ -1254,10 +1254,10 @@ int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* src, c
 
 char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
 {
-    LZ4_streamHC_t* const ctx = (LZ4_streamHC_t*)LZ4HC_Data;
-    const BYTE* bufferStart = ctx->internal_donotuse.prefixStart - ctx->internal_donotuse.dictLimit + ctx->internal_donotuse.lowLimit;
-    LZ4_resetStreamHC_fast(ctx, ctx->internal_donotuse.compressionLevel);
-    /* avoid const char * -> char * conversion warning :( */
+    LZ4HC_CCtx_internal* const s = &((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse;
+    const BYTE* const bufferStart = s->prefixStart - s->dictLimit + s->lowLimit;
+    LZ4_resetStreamHC_fast((LZ4_streamHC_t*)LZ4HC_Data, s->compressionLevel);
+    /* ugly conversion trick, required to evade (const char*) -> (char*) cast-qual warning :( */
     return (char*)(uptrval)bufferStart;
 }
 
