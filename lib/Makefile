@@ -112,17 +112,21 @@ liblz4-dll.o: liblz4-dll.rc
 	$(WINDRES) -i liblz4-dll.rc -o liblz4-dll.o
 
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
+ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
 	$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll/$@.dll -Wl,--out-implib,dll/$(LIBLZ4_EXP)
+endif
 
 else   # not windows
 
 $(LIBLZ4): $(SRCFILES)
+ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
 	$(CC) $(FLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
 	$(LN_SF) $@ liblz4.$(SHARED_EXT_MAJOR)
 	$(LN_SF) $@ liblz4.$(SHARED_EXT)
+endif
 
 endif
 
