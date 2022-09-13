@@ -119,6 +119,13 @@ The following build macro can be selected to adjust source code behavior at comp
   either on stack (default, value 0) or using heap memory (value 1).
 
 
+#### Makefile variables
+
+The following `Makefile` variables can be selected to alter the profile of produced binaries :
+- `BUILD_SHARED` : generate `libzstd` dynamic library (enabled by default)
+- `BUILD_STATIC` : generate `libzstd` static library (enabled by default)
+
+
 #### Amalgamation
 
 lz4 source code can be amalgamated into a single file.
