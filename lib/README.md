@@ -100,7 +100,7 @@ The following build macro can be selected to adjust source code behavior at comp
   passed as argument to become a compression state is suitably aligned.
   This test can be disabled if it proves flaky, by setting this value to 0.
 
-- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to `<stdlib,h>`'s `malloc()`, `calloc()` and `free()`
+- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to `<stdlib.h>`'s `malloc()`, `calloc()` and `free()`
   by user-defined functions, which must be named `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
   User functions must be available at link time.
 
@@ -115,6 +115,8 @@ The following build macro can be selected to adjust source code behavior at comp
   (embedded, bootloader, etc).
   For more details, see description of this macro in `lib/lz4.h`.
 
+- `LZ4F_HEAPMODE` : selects how `LZ4F_compressFrame()` allocates the compression state,
+  either on stack (default, value 0) or using heap memory (value 1).
 
 
 #### Amalgamation
