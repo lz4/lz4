@@ -312,8 +312,14 @@ test-lz4-multiple: lz4 datagen
 	# compress multiple files, one of which is absent (must fail)
 	! $(LZ4) -f -m $(FPREFIX)-concat1 notHere $(FPREFIX)-concat2  # must fail : notHere not present
 	# test lz4-compressed file
+	$(RM) $(FPREFIX)-concat1 $(FPREFIX)-concat2
 	$(LZ4) -tm $(FPREFIX)-concat1.lz4
+	# ensure the test doesn't create artifact
+	test ! -f $(FPREFIX)-concat1  # must not create file artefact
+	# test multiple lz4-compressed file
 	$(LZ4) -tm $(FPREFIX)-concat1.lz4 $(FPREFIX)-concat2.lz4
+	test ! -f $(FPREFIX)-concat1  # must not create file artefact
+	test ! -f $(FPREFIX)-concat2  # must not create file artefact
 	# test multiple lz4 files, one of which is absent (must fail)
 	! $(LZ4) -tm $(FPREFIX)-concat1.lz4 notHere.lz4 $(FPREFIX)-concat2.lz4
 	@$(RM) $(FPREFIX)*
