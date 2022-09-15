@@ -242,6 +242,7 @@ LZ4_compressBlockStream(const struct compressionParameters* pThis,
                         int srcSize, int dstSize)
 {
     int const acceleration = (pThis->cLevel < 0) ? -pThis->cLevel + 1 : 1;
+    LZ4_compressResetStream(pThis);
     return LZ4_compress_fast_continue(pThis->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
 }
 
@@ -250,6 +251,7 @@ LZ4_compressBlockStreamHC(const struct compressionParameters* pThis,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
+    LZ4_compressResetStreamHC(pThis);
     return LZ4_compress_HC_continue(pThis->LZ4_streamHC, src, dst, srcSize, dstSize);
 }
 

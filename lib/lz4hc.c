@@ -102,6 +102,7 @@ static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     size_t const bufferSize = (size_t)(hc4->end - hc4->prefixStart);
     size_t newStartingOffset = bufferSize + hc4->dictLimit;
+    DEBUGLOG(5, "LZ4HC_init_internal");
     assert(newStartingOffset >= bufferSize);  /* check overflow */
     if (newStartingOffset > 1 GB) {
         LZ4HC_clearTables(hc4);
@@ -422,6 +423,7 @@ LZ4HC_InsertAndGetWiderMatch (
         U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         assert(dictEndOffset <= 1 GB);
         matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
+        if (dictMatchIndex>0) DEBUGLOG(7, "dictEndOffset = %zu, dictMatchIndex = %u => relative matchIndex = %i", dictEndOffset, dictMatchIndex, (int)dictMatchIndex - (int)dictEndOffset);
         while (ipIndex - matchIndex <= LZ4_DISTANCE_MAX && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->prefixStart - dictCtx->dictLimit + dictMatchIndex;
 
@@ -437,6 +439,7 @@ LZ4HC_InsertAndGetWiderMatch (
                     longest = mlt;
                     *matchpos = prefixPtr - prefixIdx + matchIndex + back;
                     *startpos = ip + back;
+                    DEBUGLOG(8, "found match of length %i at vPos=%i", longest, (int)matchIndex - (int)prefixIdx + back);
             }   }
 
             {   U32 const nextOffset = DELTANEXTU16(dictCtx->chainTable, dictMatchIndex);
@@ -456,6 +459,7 @@ LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table wi
                        const dictCtx_directive dict)
 {
     const BYTE* uselessPtr = ip;
+    DEBUGLOG(7, "LZ4HC_InsertAndFindBestMatch");
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
@@ -585,6 +589,7 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     const BYTE* ref3 = NULL;
 
     /* init */
+    DEBUGLOG(5, "LZ4HC_compress_hashChain (dict?=>%i)", dict);
     *srcSizePtr = 0;
     if (limit == fillOutput) oend -= LASTLITERALS;                  /* Hack for support LZ4 format restriction */
     if (inputSize < LZ4_minLength) goto _last_literals;             /* Input too small, no compression (all literals) */
@@ -831,8 +836,8 @@ LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
         { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
     };
 
-    DEBUGLOG(4, "LZ4HC_compress_generic(ctx=%p, src=%p, srcSize=%d, limit=%d)",
-                ctx, src, *srcSizePtr, limit);
+    DEBUGLOG(5, "LZ4HC_compress_generic_internal(src=%p, srcSize=%d)",
+                src, *srcSizePtr);
 
     if (limit == fillOutput && dstCapacity < 1) return 0;   /* Impossible to store anything */
     if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;    /* Unsupported input size (too large or negative) */
@@ -966,6 +971,7 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
     LZ4_streamHC_t state;
     LZ4_streamHC_t* const statePtr = &state;
 #endif
+    DEBUGLOG(5, "LZ4_compress_HC")
     cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     FREEMEM(statePtr);
@@ -1034,7 +1040,7 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
     LZ4HC_CCtx_internal* const s = &LZ4_streamHCPtr->internal_donotuse;
-    DEBUGLOG(4, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
+    DEBUGLOG(5, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (s->dirty) {
         LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
     } else {
@@ -1150,6 +1156,7 @@ LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
 
 int LZ4_compress_HC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* src, char* dst, int srcSize, int dstCapacity)
 {
+    DEBUGLOG(5, "LZ4_compress_HC_continue");
     if (dstCapacity < LZ4_compressBound(srcSize))
         return LZ4_compressHC_continue_generic (LZ4_streamHCPtr, src, dst, &srcSize, dstCapacity, limitedOutput);
     else
