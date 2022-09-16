@@ -312,7 +312,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 matchLength -= back;
                 if (matchLength > longest) {
                     longest = matchLength;
-                    *matchpos = prefixPtr - prefixIdx + matchIndex + back;   /* virtual pos, relative to ip, to retrieve offset */
+                    *matchpos = prefixPtr + matchIndex - prefixIdx + back;   /* virtual pos, relative to ip, to retrieve offset */
                     *startpos = ip + back;
         }   }   }
 
@@ -437,7 +437,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
-                    *matchpos = prefixPtr - prefixIdx + matchIndex + back;
+                    *matchpos = prefixPtr - (prefixIdx - matchIndex) + back;
                     *startpos = ip + back;
                     DEBUGLOG(8, "found match of length %i at vPos=%i", longest, (int)matchIndex - (int)prefixIdx + back);
             }   }
@@ -803,16 +803,17 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const HCfavor_e favorDecSpeed);
 
 
-LZ4_FORCE_INLINE int LZ4HC_compress_generic_internal (
-    LZ4HC_CCtx_internal* const ctx,
-    const char* const src,
-    char* const dst,
-    int* const srcSizePtr,
-    int const dstCapacity,
-    int cLevel,
-    const limitedOutput_directive limit,
-    const dictCtx_directive dict
-    )
+LZ4_FORCE_INLINE int
+LZ4HC_compress_generic_internal (
+            LZ4HC_CCtx_internal* const ctx,
+            const char* const src,
+            char* const dst,
+            int* const srcSizePtr,
+            int const dstCapacity,
+            int cLevel,
+            const limitedOutput_directive limit,
+            const dictCtx_directive dict
+            )
 {
     typedef enum { lz4hc, lz4opt } lz4hc_strat_e;
     typedef struct {
