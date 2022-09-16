@@ -242,6 +242,7 @@ LZ4_compressBlockStream(const struct compressionParameters* pThis,
                         int srcSize, int dstSize)
 {
     int const acceleration = (pThis->cLevel < 0) ? -pThis->cLevel + 1 : 1;
+    LZ4_compressResetStream(pThis);
     return LZ4_compress_fast_continue(pThis->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
 }
 
@@ -250,6 +251,7 @@ LZ4_compressBlockStreamHC(const struct compressionParameters* pThis,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
+    LZ4_compressResetStreamHC(pThis);
     return LZ4_compress_HC_continue(pThis->LZ4_streamHC, src, dst, srcSize, dstSize);
 }
 
@@ -367,6 +369,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     size_t const maxInSize = (size_t)LZ4_MAX_INPUT_SIZE / decMultiplier;
     size_t const maxDecSize = srcSize < maxInSize ? srcSize * decMultiplier : LZ4_MAX_INPUT_SIZE;
     void* const resultBuffer = malloc(maxDecSize);
+    int benchError = 0;
     U32 nbBlocks;
     struct compressionParameters compP;
 
@@ -463,7 +466,10 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             &compP,
                             blockTable[blockNb].srcPtr, blockTable[blockNb].cPtr,
                             (int)blockTable[blockNb].srcSize, (int)blockTable[blockNb].cRoom);
-                        if (LZ4_isError(rSize)) END_PROCESS(1, "LZ4 compression failed");
+                        if (LZ4_isError(rSize)) {
+                            DISPLAY("LZ4 compression failed on block %u", blockNb);
+                            benchError =1 ;
+                        }
                         blockTable[blockNb].cSize = rSize;
                 }   }
                 {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
@@ -522,7 +528,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                                 decString, blockNb, (unsigned)blockTable[blockNb].srcSize);
                             if (g_decodeOnly)
                                 DISPLAY("Is input using LZ4 Frame format ? \n");
-                            END_PROCESS(2, "error during decoding");
+                            benchError = 1;
                             break;
                         }
                         blockTable[blockNb].resSize = (size_t)regenSize;
@@ -560,6 +566,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 if (crcOrig!=crcCheck) {
                     size_t u;
                     DISPLAY("\n!!! WARNING !!! %17s : Invalid Checksum : %x != %x   \n", displayName, (unsigned)crcOrig, (unsigned)crcCheck);
+                    benchError = 1;
                     for (u=0; u<srcSize; u++) {
                         if (((const BYTE*)srcBuffer)[u] != ((const BYTE*)resultBuffer)[u]) {
                             U32 segNb, bNb, pos;
@@ -598,7 +605,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     free(blockTable);
     free(compressedBuffer);
     free(resultBuffer);
-    return 0;
+    return benchError;
 }
 
 
@@ -626,13 +633,13 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 }
 
 
-static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
+static int BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
                             const char* displayName, int cLevel, int cLevelLast,
                             const size_t* fileSizes, unsigned nbFiles,
                             const char* dictBuf, int dictSize)
 {
     int l;
-
+    int benchError = 0;
     const char* pch = strrchr(displayName, '\\'); /* Windows */
     if (!pch) pch = strrchr(displayName, '/'); /* Linux */
     if (pch) displayName = pch+1;
@@ -645,11 +652,13 @@ static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
     if (cLevelLast < cLevel) cLevelLast = cLevel;
 
     for (l=cLevel; l <= cLevelLast; l++) {
-        BMK_benchMem(srcBuffer, benchedSize,
-                     displayName, l,
-                     fileSizes, nbFiles,
-                     dictBuf, dictSize);
+        benchError |= BMK_benchMem(
+                            srcBuffer, benchedSize,
+                            displayName, l,
+                            fileSizes, nbFiles,
+                            dictBuf, dictSize);
     }
+    return benchError;
 }
 
 
@@ -688,12 +697,13 @@ static void BMK_loadFiles(void* buffer, size_t bufferSize,
     if (totalSize == 0) END_PROCESS(12, "no data to bench");
 }
 
-static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
-                               int cLevel, int cLevelLast,
-                               const char* dictBuf, int dictSize)
+static int BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
+                              int cLevel, int cLevelLast,
+                              const char* dictBuf, int dictSize)
 {
     void* srcBuffer;
     size_t benchedSize;
+    int benchError = 0;
     size_t* fileSizes = (size_t*)malloc(nbFiles * sizeof(size_t));
     U64 const totalSizeToLoad = UTIL_getTotalFileSize(fileNamesTable, nbFiles);
     char mfName[20] = {0};
@@ -720,7 +730,7 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     /* Bench */
     snprintf (mfName, sizeof(mfName), " %u files", nbFiles);
     {   const char* displayName = (nbFiles > 1) ? mfName : fileNamesTable[0];
-        BMK_benchCLevel(srcBuffer, benchedSize,
+        benchError = BMK_benchCLevel(srcBuffer, benchedSize,
                         displayName, cLevel, cLevelLast,
                         fileSizes, nbFiles,
                         dictBuf, dictSize);
@@ -729,12 +739,14 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     /* clean up */
     free(srcBuffer);
     free(fileSizes);
+    return benchError;
 }
 
 
-static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility,
-                              const char* dictBuf, int dictSize)
+static int BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility,
+                             const char* dictBuf, int dictSize)
 {
+    int benchError = 0;
     char name[20] = {0};
     size_t benchedSize = 10000000;
     void* const srcBuffer = malloc(benchedSize);
@@ -747,10 +759,12 @@ static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility
 
     /* Bench */
     snprintf (name, sizeof(name), "Synthetic %2u%%", (unsigned)(compressibility*100));
-    BMK_benchCLevel(srcBuffer, benchedSize, name, cLevel, cLevelLast, &benchedSize, 1, dictBuf, dictSize);
+    benchError = BMK_benchCLevel(srcBuffer, benchedSize, name, cLevel, cLevelLast, &benchedSize, 1, dictBuf, dictSize);
 
     /* clean up */
     free(srcBuffer);
+
+    return benchError;
 }
 
 
@@ -759,15 +773,16 @@ BMK_benchFilesSeparately(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast,
                    const char* dictBuf, int dictSize)
 {
+    int benchError = 0;
     unsigned fileNb;
     if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
     if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
     if (cLevelLast < cLevel) cLevelLast = cLevel;
 
     for (fileNb=0; fileNb<nbFiles; fileNb++)
-        BMK_benchFileTable(fileNamesTable+fileNb, 1, cLevel, cLevelLast, dictBuf, dictSize);
+        benchError |= BMK_benchFileTable(fileNamesTable+fileNb, 1, cLevel, cLevelLast, dictBuf, dictSize);
 
-    return 0;
+    return benchError;
 }
 
 
@@ -775,6 +790,7 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast,
                    const char* dictFileName)
 {
+    int benchError = 0;
     double const compressibility = (double)g_compressibilityDefault / 100;
     char* dictBuf = NULL;
     size_t dictSize = 0;
@@ -824,14 +840,14 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
     }
 
     if (nbFiles == 0)
-        BMK_syntheticTest(cLevel, cLevelLast, compressibility, dictBuf, (int)dictSize);
+        benchError = BMK_syntheticTest(cLevel, cLevelLast, compressibility, dictBuf, (int)dictSize);
     else {
         if (g_benchSeparately)
-            BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
+            benchError = BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
         else
-            BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
+            benchError = BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
     }
 
     free(dictBuf);
-    return 0;
+    return benchError;
 }

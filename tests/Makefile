@@ -452,6 +452,7 @@ test-lz4-dict: lz4 datagen
 
 	< $(FPREFIX)-sample-32k $(LZ4) -D $(FPREFIX)-sample-0 | $(LZ4) -dD $(FPREFIX)-sample-0 | diff - $(FPREFIX)-sample-32k
 	< $(FPREFIX)-sample-0 $(LZ4) -D $(FPREFIX)-sample-0 | $(LZ4) -dD $(FPREFIX)-sample-0 | diff - $(FPREFIX)-sample-0
+	$(LZ4) -bi0 -D $(FPREFIX) $(FPREFIX)-sample-32k $(FPREFIX)-sample-32k
 
 	@echo "\n ---- test lz4 dictionary loading ----"
 	$(DATAGEN) -g128KB > $(FPREFIX)-data-128KB
