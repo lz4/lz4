@@ -54,7 +54,7 @@
 **************************************/
 /*
  * LZ4F_HEAPMODE :
- * Select how LZ4F_compressFrame will allocate the Compression Context,
+ * Control how LZ4F_compressFrame allocates the Compression State,
  * either on stack (0:default, fastest), or in memory heap (1:requires malloc()).
  */
 #ifndef LZ4F_HEAPMODE

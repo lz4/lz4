@@ -215,9 +215,19 @@ LZ4FLIB_API int LZ4F_compressionLevel_max(void);   /* v1.8.0+ */
 LZ4FLIB_API size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
 /*! LZ4F_compressFrame() :
- *  Compress an entire srcBuffer into a valid LZ4 frame.
- *  dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
- *  The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+ *  Compress srcBuffer content into an LZ4-compressed frame.
+ *  It's a one shot operation, all input content is consumed, and all output is generated.
+ *
+ *  Note : it's a stateless operation (no LZ4F_cctx state needed).
+ *  In order to reduce load on the allocator, LZ4F_compressFrame(), by default,
+ *  uses the stack to allocate space for the compression state and some table.
+ *  If this usage of the stack is too much for your application,
+ *  consider compiling `lz4frame.c` with compile-time macro LZ4F_HEAPMODE set to 1 instead.
+ *  All state allocations will use the Heap.
+ *  It also means each invocation of LZ4F_compressFrame() will trigger several internal alloc/free invocations.
+ *
+ * @dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ * @preferencesPtr is optional : one can provide NULL, in which case all preferences are set to default.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError())
  */
