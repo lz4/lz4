@@ -39,9 +39,10 @@
 ***************************************/
 
 /*! HEAPMODE :
- *  Select how default compression function will allocate workplace memory,
- *  in stack (0:fastest), or in heap (1:requires malloc()).
- *  Since workplace is rather large, heap mode is recommended.
+ *  Select how stateless HC compression functions like `LZ4_compress_HC()`
+ *  allocate memory for their workspace:
+ *  in stack (0:fastest), or in heap (1:default, requires malloc()).
+ *  Since workspace is rather large, heap mode is recommended.
 **/
 #ifndef LZ4HC_HEAPMODE
 #  define LZ4HC_HEAPMODE 1

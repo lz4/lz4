@@ -115,6 +115,15 @@ The following build macro can be selected to adjust source code behavior at comp
   (embedded, bootloader, etc).
   For more details, see description of this macro in `lib/lz4.h`.
 
+- `LZ4_HEAPMODE` : Select how stateless compression functions like `LZ4_compress_default()`
+  allocate memory for their hash table,
+  in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
+
+- `LZ4HC_HEAPMODE` :  Select how stateless HC compression functions like `LZ4_compress_HC()`
+  allocate memory for their workspace:
+  in stack (0), or in heap (1:default).
+  Since workspace is rather large, stack can be inconvenient, hence heap mode is recommended.
+
 - `LZ4F_HEAPMODE` : selects how `LZ4F_compressFrame()` allocates the compression state,
   either on stack (default, value 0) or using heap memory (value 1).
 
