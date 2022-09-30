@@ -1378,7 +1378,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     BYTE* opSaved = (BYTE*) dst;
     BYTE* oend = op + dstCapacity;
     int ovml = MINMATCH;  /* overflow - last sequence */
-    const BYTE* ovref = NULL;
+    int ovoff = 0;
 
     /* init */
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
@@ -1401,11 +1401,10 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
          if ((size_t)firstMatch.len > sufficient_len) {
              /* good enough solution : immediate encoding */
              int const firstML = firstMatch.len;
-             const BYTE* const matchPos = ip - firstMatch.off;
              opSaved = op;
              if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), firstML, firstMatch.off, limit, oend) ) {  /* updates ip, op and anchor */
                  ovml = firstML;
-                 ovref = matchPos;
+                 ovoff = firstMatch.off;
                  goto _dest_overflow;
              }
              continue;
@@ -1581,7 +1580,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                  opSaved = op;
                  if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
                      ovml = ml;
-                     ovref = ip - offset;
+                     ovoff = offset;
                      goto _dest_overflow;
          }   }   }
      }  /* while (ip <= mflimit) */
@@ -1640,7 +1639,7 @@ if (limit == fillOutput) {
          if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + ovml >= MFLIMIT) {
              DEBUGLOG(6, "Space to end : %i + ml (%i)", (int)((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1), ovml);
              DEBUGLOG(6, "Before : ip = %p, anchor = %p", ip, anchor);
-             LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, (int)(ip - ovref), notLimited, oend);
+             LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, ovoff, notLimited, oend);
              DEBUGLOG(6, "After : ip = %p, anchor = %p", ip, anchor);
      }   }
      goto _last_literals;
