@@ -491,7 +491,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     BYTE** _op,
     const BYTE** _anchor,
     int matchLength,
-    const BYTE* const match,
+    int offset,
     limitedOutput_directive limit,
     BYTE* oend)
 {
@@ -512,9 +512,9 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
     if (start==NULL) start = anchor;  /* only works for single segment */
     /* g_debuglog_enable = (pos >= 2228) & (pos <= 2262); */
-    DEBUGLOG(6, "pos:%7u -- literals:%4u, match:%4i, offset:%5u, cost:%4u + %5u",
+    DEBUGLOG(6, "pos:%7u -- literals:%4u, match:%4i, offset:%5i, cost:%4u + %5u",
                 pos,
-                (U32)(ip - anchor), matchLength, (U32)(ip-match),
+                (U32)(ip - anchor), matchLength, offset,
                 cost, totalCost);
     totalCost += cost;
 #endif
@@ -542,8 +542,9 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     op += length;
 
     /* Encode Offset */
-    assert( (ip - match) <= LZ4_DISTANCE_MAX );   /* note : consider providing offset as a value, rather than as a pointer difference */
-    LZ4_writeLE16(op, (U16)(ip - match)); op += 2;
+    assert(offset <= LZ4_DISTANCE_MAX );
+    assert(offset > 0);
+    LZ4_writeLE16(op, (U16)(offset)); op += 2;
 
     /* Encode MatchLength */
     assert(matchLength >= MINMATCH);
@@ -636,7 +637,7 @@ _Search2:
 
         if (ml2 <= ml) { /* No better match => encode ML1 immediately */
             optr = op;
-            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend)) goto _dest_overflow;
+            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, (int)(ip - ref), limit, oend)) goto _dest_overflow;
             continue;
         }
 
@@ -683,11 +684,11 @@ _Search3:
             if (start2 < ip+ml)  ml = (int)(start2 - ip);
             /* Now, encode 2 sequences */
             optr = op;
-            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend))
+            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, (int)(ip - ref), limit, oend))
                 goto _dest_overflow;
             ip = start2;
             optr = op;
-            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml2, ref2, limit, oend)) {
+            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml2, (int)(ip - ref2), limit, oend)) {
                 ml  = ml2;
                 ref = ref2;
                 goto _dest_overflow;
@@ -710,7 +711,7 @@ _Search3:
                 }
 
                 optr = op;
-                if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend)) goto _dest_overflow;
+                if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, (int)(ip - ref), limit, oend)) goto _dest_overflow;
                 ip  = start3;
                 ref = ref3;
                 ml  = ml3;
@@ -748,7 +749,7 @@ _Search3:
             }
         }
         optr = op;
-        if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend)) goto _dest_overflow;
+        if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, (int)(ip - ref), limit, oend)) goto _dest_overflow;
 
         /* ML2 becomes ML1 */
         ip = start2; ref = ref2; ml = ml2;
@@ -808,7 +809,7 @@ _dest_overflow:
             assert(maxMlSize < INT_MAX); assert(ml >= 0);
             if ((size_t)ml > maxMlSize) ml = (int)maxMlSize;
             if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + ml >= MFLIMIT) {
-                LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, notLimited, oend);
+                LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, (int)(ip - ref), notLimited, oend);
         }   }
         goto _last_literals;
     }
@@ -1405,7 +1406,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
              int const firstML = firstMatch.len;
              const BYTE* const matchPos = ip - firstMatch.off;
              opSaved = op;
-             if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), firstML, matchPos, limit, oend) ) {  /* updates ip, op and anchor */
+             if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), firstML, firstMatch.off, limit, oend) ) {  /* updates ip, op and anchor */
                  ovml = firstML;
                  ovref = matchPos;
                  goto _dest_overflow;
@@ -1581,7 +1582,7 @@ encode: /* cur, last_match_pos, best_mlen, best_off must be set */
                  assert(ml >= MINMATCH);
                  assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
                  opSaved = op;
-                 if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ip - offset, limit, oend) ) {  /* updates ip, op and anchor */
+                 if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
                      ovml = ml;
                      ovref = ip - offset;
                      goto _dest_overflow;
@@ -1642,7 +1643,7 @@ if (limit == fillOutput) {
          if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + ovml >= MFLIMIT) {
              DEBUGLOG(6, "Space to end : %i + ml (%i)", (int)((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1), ovml);
              DEBUGLOG(6, "Before : ip = %p, anchor = %p", ip, anchor);
-             LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, ovref, notLimited, oend);
+             LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, (int)(ip - ovref), notLimited, oend);
              DEBUGLOG(6, "After : ip = %p, anchor = %p", ip, anchor);
      }   }
      goto _last_literals;
