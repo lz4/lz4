@@ -239,13 +239,17 @@ static int LZ4HC_protectDictEnd(U32 const dictLimit, U32 const matchIndex)
 typedef enum { rep_untested, rep_not, rep_confirmed } repeat_state_e;
 typedef enum { favorCompressionRatio=0, favorDecompressionSpeed } HCfavor_e;
 
-LZ4_FORCE_INLINE int
+typedef struct {
+    int off;
+    int len;
+} LZ4HC_match_t;
+
+LZ4_FORCE_INLINE LZ4HC_match_t
 LZ4HC_InsertAndGetWiderMatch (
         LZ4HC_CCtx_internal* const hc4,
         const BYTE* const ip,
         const BYTE* const iLowLimit, const BYTE* const iHighLimit,
         int longest,
-        const BYTE** matchpos,
         const BYTE** startpos,
         const int maxNbAttempts,
         const int patternAnalysis, const int chainSwap,
@@ -270,20 +274,24 @@ LZ4HC_InsertAndGetWiderMatch (
     U32 matchIndex;
     repeat_state_e repeat = rep_untested;
     size_t srcPatternLength = 0;
+    int offset = 0;
 
     DEBUGLOG(7, "LZ4HC_InsertAndGetWiderMatch");
+    assert(startpos != NULL);
+    *startpos = ip;  /* in case there is no solution */
     /* First Match */
     LZ4HC_Insert(hc4, ip);
     matchIndex = HashTable[LZ4HC_hashPtr(ip)];
-    DEBUGLOG(7, "First match at index %u / %u (lowestMatchIndex)",
-                matchIndex, lowestMatchIndex);
+    DEBUGLOG(7, "First candidate match for pos %u found at index %u / %u (lowestMatchIndex)",
+                ipIndex, matchIndex, lowestMatchIndex);
 
     while ((matchIndex>=lowestMatchIndex) && (nbAttempts>0)) {
         int matchLength=0;
         nbAttempts--;
         assert(matchIndex < ipIndex);
         if (favorDecSpeed && (ipIndex - matchIndex < 8)) {
-            /* do nothing */
+            /* do nothing:
+             * favorDecSpeed intentionally skips matches with offset < 8 */
         } else if (matchIndex >= prefixIdx) {   /* within current Prefix */
             const BYTE* const matchPtr = prefixPtr + matchIndex - prefixIdx;
             assert(matchPtr < ip);
@@ -295,10 +303,11 @@ LZ4HC_InsertAndGetWiderMatch (
                     matchLength -= back;
                     if (matchLength > longest) {
                         longest = matchLength;
-                        *matchpos = matchPtr + back;
+                        offset = (int)(ipIndex - matchIndex);
                         *startpos = ip + back;
+                        DEBUGLOG(7, "Found match of len=%i within prefix, offset=%i, back=%i", longest, offset, -back);
             }   }   }
-        } else {   /* lowestMatchIndex <= matchIndex < dictLimit */
+        } else {   /* lowestMatchIndex <= matchIndex < dictLimit : within Ext Dict */
             const BYTE* const matchPtr = dictStart + (matchIndex - dictIdx);
             assert(matchIndex >= dictIdx);
             if ( likely(matchIndex <= prefixIdx - 4)
@@ -313,8 +322,9 @@ LZ4HC_InsertAndGetWiderMatch (
                 matchLength -= back;
                 if (matchLength > longest) {
                     longest = matchLength;
-                    *matchpos = prefixPtr + matchIndex - prefixIdx + back;   /* virtual pos, relative to ip, to retrieve offset */
+                    offset = (int)(ipIndex - matchIndex);
                     *startpos = ip + back;
+                    DEBUGLOG(7, "Found match of len=%i within dict, offset=%i, back=%i", longest, offset, -back);
         }   }   }
 
         if (chainSwap && matchLength==longest) {   /* better match => select a better chain */
@@ -347,6 +357,7 @@ LZ4HC_InsertAndGetWiderMatch (
                 if (repeat == rep_untested) {
                     if ( ((pattern & 0xFFFF) == (pattern >> 16))
                       &  ((pattern & 0xFF)   == (pattern >> 24)) ) {
+                        DEBUGLOG(7, "Repeat pattern detected, char %02X", pattern >> 24);
                         repeat = rep_confirmed;
                         srcPatternLength = LZ4HC_countPattern(ip+sizeof(pattern), iHighLimit, pattern) + sizeof(pattern);
                     } else {
@@ -401,8 +412,9 @@ LZ4HC_InsertAndGetWiderMatch (
                                             if ((size_t)(ip - prefixPtr) + prefixIdx - matchIndex > LZ4_DISTANCE_MAX) break;
                                             assert(maxML < 2 GB);
                                             longest = (int)maxML;
-                                            *matchpos = prefixPtr - prefixIdx + matchIndex;   /* virtual pos, relative to ip, to retrieve offset */
+                                            offset = (int)(ipIndex - matchIndex);
                                             *startpos = ip;
+                                            DEBUGLOG(7, "Found repeat pattern match of len=%i, offset=%i", longest, offset);
                                         }
                                         {   U32 const distToNextPattern = DELTANEXTU16(chainTable, matchIndex);
                                             if (distToNextPattern > matchIndex) break;  /* avoid overflow */
@@ -438,9 +450,9 @@ LZ4HC_InsertAndGetWiderMatch (
                 mlt -= back;
                 if (mlt > longest) {
                     longest = mlt;
-                    *matchpos = prefixPtr - (prefixIdx - matchIndex) + back;
+                    offset = (int)(ipIndex - matchIndex);
                     *startpos = ip + back;
-                    DEBUGLOG(8, "found match of length %i at vPos=%i", longest, (int)matchIndex - (int)prefixIdx + back);
+                    DEBUGLOG(7, "found match of length %i within extDictCtx", longest);
             }   }
 
             {   U32 const nextOffset = DELTANEXTU16(dictCtx->chainTable, dictMatchIndex);
@@ -448,13 +460,17 @@ LZ4HC_InsertAndGetWiderMatch (
                 matchIndex -= nextOffset;
     }   }   }
 
-    return longest;
+    {   LZ4HC_match_t md;
+        assert(longest >= 0);
+        md.len = longest;
+        md.off = offset;
+        return md;
+    }
 }
 
-LZ4_FORCE_INLINE int
+LZ4_FORCE_INLINE LZ4HC_match_t
 LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table will be updated */
                        const BYTE* const ip, const BYTE* const iLimit,
-                       const BYTE** matchpos,
                        const int maxNbAttempts,
                        const int patternAnalysis,
                        const dictCtx_directive dict)
@@ -464,7 +480,7 @@ LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table wi
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
      * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, matchpos, &uselessPtr, maxNbAttempts, patternAnalysis, 0 /*chainSwap*/, dict, favorCompressionRatio);
+    return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, &uselessPtr, maxNbAttempts, patternAnalysis, 0 /*chainSwap*/, dict, favorCompressionRatio);
 }
 
 /* LZ4HC_encodeSequence() :
@@ -597,22 +613,28 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
 
     /* Main Loop */
     while (ip <= mflimit) {
-        ml = LZ4HC_InsertAndFindBestMatch(ctx, ip, matchlimit, &ref, maxNbAttempts, patternAnalysis, dict);
+        {   LZ4HC_match_t const md = LZ4HC_InsertAndFindBestMatch(ctx, ip, matchlimit, maxNbAttempts, patternAnalysis, dict);
+            ml = md.len;
+            ref = ip - md.off;
+        }
         if (ml<MINMATCH) { ip++; continue; }
 
         /* saved, in case we would skip too much */
         start0 = ip; ref0 = ref; ml0 = ml;
 
 _Search2:
+        DEBUGLOG(7, "_Search2 (currently found match of size %i)", ml);
         if (ip+ml <= mflimit) {
-            ml2 = LZ4HC_InsertAndGetWiderMatch(ctx,
-                            ip + ml - 2, ip + 0, matchlimit, ml, &ref2, &start2,
+            LZ4HC_match_t const md = LZ4HC_InsertAndGetWiderMatch(ctx,
+                            ip + ml - 2, ip + 0, matchlimit, ml, &start2,
                             maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
+            ml2 = md.len;
+            ref2 = start2 - md.off;
         } else {
-            ml2 = ml;
+            ml2 = ml;  /* do not search further */
         }
 
-        if (ml2 == ml) { /* No better match => encode ML1 */
+        if (ml2 <= ml) { /* No better match => encode ML1 immediately */
             optr = op;
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend)) goto _dest_overflow;
             continue;
@@ -627,19 +649,17 @@ _Search2:
         if ((start2 - ip) < 3) {  /* First Match too small : removed */
             ml = ml2;
             ip = start2;
-            ref =ref2;
+            ref = ref2;
             goto _Search2;
         }
 
 _Search3:
-        /* At this stage, we have :
-        *  ml2 > ml1, and
-        *  ip1+3 <= ip2 (usually < ip1+ml1) */
         if ((start2 - ip) < OPTIMAL_ML) {
             int correction;
             int new_ml = ml;
             if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-            if (ip+new_ml > start2 + ml2 - MINMATCH) new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
+            if (ip+new_ml > start2 + ml2 - MINMATCH)
+                new_ml = (int)(start2 - ip) + ml2 - MINMATCH;
             correction = new_ml - (int)(start2 - ip);
             if (correction > 0) {
                 start2 += correction;
@@ -647,22 +667,24 @@ _Search3:
                 ml2 -= correction;
             }
         }
-        /* Now, we have start2 = ip+new_ml, with new_ml = min(ml, OPTIMAL_ML=18) */
 
         if (start2 + ml2 <= mflimit) {
-            ml3 = LZ4HC_InsertAndGetWiderMatch(ctx,
-                            start2 + ml2 - 3, start2, matchlimit, ml2, &ref3, &start3,
+            LZ4HC_match_t const md = LZ4HC_InsertAndGetWiderMatch(ctx,
+                            start2 + ml2 - 3, start2, matchlimit, ml2, &start3,
                             maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
+            ml3 = md.len;
+            ref3 = start3 - md.off;
         } else {
             ml3 = ml2;
         }
 
-        if (ml3 == ml2) {  /* No better match => encode ML1 and ML2 */
+        if (ml3 <= ml2) {  /* No better match => encode ML1 and ML2 */
             /* ip & ref are known; Now for ml */
             if (start2 < ip+ml)  ml = (int)(start2 - ip);
             /* Now, encode 2 sequences */
             optr = op;
-            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend)) goto _dest_overflow;
+            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, ref, limit, oend))
+                goto _dest_overflow;
             ip = start2;
             optr = op;
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml2, ref2, limit, oend)) {
@@ -1308,10 +1330,6 @@ LZ4_FORCE_INLINE int LZ4HC_sequencePrice(int litlen, int mlen)
 }
 
 
-typedef struct {
-    int off;
-    int len;
-} LZ4HC_match_t;
 
 LZ4_FORCE_INLINE LZ4HC_match_t
 LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
@@ -1320,19 +1338,16 @@ LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
                       const dictCtx_directive dict,
                       const HCfavor_e favorDecSpeed)
 {
-    LZ4HC_match_t match = { 0 , 0 };
-    const BYTE* matchPtr = NULL;
+    LZ4HC_match_t const match0 = { 0 , 0 };
     /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
      * but this won't be the case here, as we define iLowLimit==ip,
-     * so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
-    int matchLength = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &matchPtr, &ip, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
-    if (matchLength <= minLen) return match;
+    ** so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
+    LZ4HC_match_t md = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, &ip, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
+    if (md.len <= minLen) return match0;
     if (favorDecSpeed) {
-        if ((matchLength>18) & (matchLength<=36)) matchLength=18;   /* favor shortcut */
+        if ((md.len>18) & (md.len<=36)) md.len=18;   /* favor shortcut */
     }
-    match.len = matchLength;
-    match.off = (int)(ip-matchPtr);
-    return match;
+    return md;
 }
 
 
