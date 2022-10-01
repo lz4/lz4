@@ -257,7 +257,7 @@ LZ4HC_InsertAndGetWiderMatch (
         const HCfavor_e favorDecSpeed)
 {
     U16* const chainTable = hc4->chainTable;
-    U32* const HashTable = hc4->hashTable;
+    U32* const hashTable = hc4->hashTable;
     const LZ4HC_CCtx_internal * const dictCtx = hc4->dictCtx;
     const BYTE* const prefixPtr = hc4->prefixStart;
     const U32 prefixIdx = hc4->dictLimit;
@@ -280,8 +280,8 @@ LZ4HC_InsertAndGetWiderMatch (
     assert(startpos != NULL);
     *startpos = ip;  /* in case there is no solution */
     /* First Match */
-    LZ4HC_Insert(hc4, ip);
-    matchIndex = HashTable[LZ4HC_hashPtr(ip)];
+    LZ4HC_Insert(hc4, ip);  /* insert all prior positions up to ip (excluded) */
+    matchIndex = hashTable[LZ4HC_hashPtr(ip)];
     DEBUGLOG(7, "First candidate match for pos %u found at index %u / %u (lowestMatchIndex)",
                 ipIndex, matchIndex, lowestMatchIndex);
 
@@ -293,7 +293,7 @@ LZ4HC_InsertAndGetWiderMatch (
             /* do nothing:
              * favorDecSpeed intentionally skips matches with offset < 8 */
         } else if (matchIndex >= prefixIdx) {   /* within current Prefix */
-            const BYTE* const matchPtr = prefixPtr + matchIndex - prefixIdx;
+            const BYTE* const matchPtr = prefixPtr + (matchIndex - prefixIdx);
             assert(matchPtr < ip);
             assert(longest >= 1);
             if (LZ4_read16(iLowLimit + longest - 1) == LZ4_read16(matchPtr - lookBackLength + longest - 1)) {
