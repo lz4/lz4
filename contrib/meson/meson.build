@@ -13,15 +13,19 @@
 
 project(
   'lz4',
-  ['c'],
+  'c',
   license: 'BSD-2-Clause-Patent AND GPL-2.0-or-later',
   default_options: [
     'c_std=c99',
     'buildtype=release',
     'warning_level=3'
   ],
-  version: 'DUMMY',
-  meson_version: '>=0.49.0'
+  version: run_command(
+    find_program('GetLz4LibraryVersion.py'),
+    '../../lib/lz4.h',
+    check: true
+  ).stdout().strip(),
+  meson_version: '>=0.58.0'
 )
 
 subdir('meson')

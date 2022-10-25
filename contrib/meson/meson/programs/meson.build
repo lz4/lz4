@@ -26,6 +26,36 @@ lz4 = executable(
   install: true
 )
 
+lz4cat = custom_target(
+  'lz4cat',
+  input: lz4,
+  output: 'lz4cat',
+  command: [
+    'ln',
+    '--symbolic',
+    '--force',
+    fs.name(lz4.full_path()),
+    '@OUTPUT@'
+  ]
+)
+
+unlz4 = custom_target(
+  'unlz4',
+  input: lz4,
+  output: 'unlz4',
+  command: [
+    'ln',
+    '--symbolic',
+    '--force',
+    fs.name(lz4.full_path()),
+    '@OUTPUT@'
+  ]
+)
+
+meson.override_find_program('lz4', lz4)
+
+run_env.prepend('PATH', meson.current_build_dir())
+
 install_man(lz4_source_root / 'programs/lz4.1')
 
 if meson.version().version_compare('>=0.61.0')

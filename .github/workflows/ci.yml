@@ -695,10 +695,11 @@ jobs:
         echo && type python && which python && python --version
         echo && type meson && which meson && meson --version
 
-    - name: meson
+    - name: setup
       # 'run: >' replaces all newlines in the following block with spaces
       run: >
         meson setup
+        --fatal-meson-warnings
         --buildtype=debug
         -Db_lundef=false
         -Dauto_features=enabled
@@ -707,6 +708,10 @@ jobs:
         -Dtests=true
         -Dexamples=true
         contrib/meson build
+
+    - name: test
+      run: |
+        meson test -C build
 
     - name: staging
       run: |
