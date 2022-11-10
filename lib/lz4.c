@@ -1786,7 +1786,7 @@ typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
  * does not know end of input
  * presumes input is well formed
  * note : will consume at least one byte */
-size_t read_long_length_no_check(const BYTE** pp)
+static size_t read_long_length_no_check(const BYTE** pp)
 {
     size_t b, l = 0;
     do { b = **pp; (*pp)++; l += b; } while (b==255);
