@@ -249,7 +249,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
 
 size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf, size_t size)
 {
-  LZ4_byte* p = (LZ4_byte*)buf;
+  const LZ4_byte* p = (const LZ4_byte*)buf;
   size_t remain = size;
   size_t chunk;
   size_t ret;
