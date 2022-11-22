@@ -207,6 +207,7 @@ install: lib liblz4.pc
 	$(INSTALL_DATA) lz4.h $(DESTDIR)$(includedir)/lz4.h
 	$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(includedir)/lz4hc.h
 	$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(includedir)/lz4frame.h
+	$(INSTALL_DATA) lz4file.h $(DESTDIR)$(includedir)/lz4file.h
 	@echo lz4 libraries installed
 
 uninstall:
