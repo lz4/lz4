@@ -225,6 +225,7 @@ uninstall:
 	$(RM) $(DESTDIR)$(includedir)/lz4hc.h
 	$(RM) $(DESTDIR)$(includedir)/lz4frame.h
 	$(RM) $(DESTDIR)$(includedir)/lz4frame_static.h
+	$(RM) $(DESTDIR)$(includedir)/lz4file.h
 	@echo lz4 libraries successfully uninstalled
 
 endif
