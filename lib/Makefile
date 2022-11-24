@@ -189,6 +189,7 @@ install: lib liblz4.pc
   ifeq ($(BUILD_STATIC),yes)
 	$(INSTALL_DATA) liblz4.a $(DESTDIR)$(libdir)/liblz4.a
 	$(INSTALL_DATA) lz4frame_static.h $(DESTDIR)$(includedir)/lz4frame_static.h
+	$(INSTALL_DATA) lz4file.h $(DESTDIR)$(includedir)/lz4file.h
   endif
   ifeq ($(BUILD_SHARED),yes)
 # Traditionally, one installs the DLLs in the bin directory as programs
@@ -224,6 +225,7 @@ uninstall:
 	$(RM) $(DESTDIR)$(includedir)/lz4hc.h
 	$(RM) $(DESTDIR)$(includedir)/lz4frame.h
 	$(RM) $(DESTDIR)$(includedir)/lz4frame_static.h
+	$(RM) $(DESTDIR)$(includedir)/lz4file.h
 	@echo lz4 libraries successfully uninstalled
 
 endif
