@@ -214,53 +214,53 @@ test-compile-with-lz4-memory-usage:
 # and only their test files : do not employ sweeping statements such `rm tmp*` or `rm *.lz4`
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
-	PATH=$(PATH) ./test-lz4-sparse.sh
+	./test-lz4-sparse.sh
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
-	PATH=$(PATH) ./test-lz4-contentSize.sh
+	./test-lz4-contentSize.sh
 
 test-lz4-frame-concatenation: lz4 datagen
 	@echo "\n ---- test frame concatenation ----"
-	PATH=$(PATH) ./test-lz4-frame-concatenation.sh
+	./test-lz4-frame-concatenation.sh
 
 test-lz4-multiple: lz4 datagen
 	@echo "\n ---- test multiple files ----"
-	PATH=$(PATH) ./test-lz4-multiple.sh
+	./test-lz4-multiple.sh
 
 test-lz4-multiple-legacy: lz4 datagen
 	@echo "\n ---- test multiple files (Legacy format) ----"
-	PATH=$(PATH) ./test-lz4-multiple-legacy.sh
+	./test-lz4-multiple-legacy.sh
 
 test-lz4-skippable: lz4
 	@echo "\n ---- test lz4 with skippable frames ----"
-	PATH=$(PATH) ./test-lz4-skippable.sh
+	./test-lz4-skippable.sh
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
-	PATH=$(PATH) ./test-lz4-basic.sh
+	./test-lz4-basic.sh
 
 test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
-	PATH=$(PATH) ./test-lz4-dict.sh
+	./test-lz4-dict.sh
 
 test-lz4hc-hugefile: lz4 datagen
 	@echo "\n ---- test HC compression/decompression of huge files ----"
-	PATH=$(PATH) ./test-lz4hc-hugefile.sh
+	./test-lz4hc-hugefile.sh
 
 test-lz4-fast-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
-	PATH=$(PATH) ./test-lz4-fast-hugefile.sh
+	./test-lz4-fast-hugefile.sh
 
 test-lz4-hugefile: test-lz4-fast-hugefile test-lz4hc-hugefile
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
-	PATH=$(PATH) ./test-lz4-testmode.sh
+	./test-lz4-testmode.sh
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
-	PATH=$(PATH) ./test-lz4-opt-parser.sh
+	./test-lz4-opt-parser.sh
 
 test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-multiple-legacy \
                       test-lz4-frame-concatenation test-lz4-testmode \
