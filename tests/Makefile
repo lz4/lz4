@@ -115,9 +115,6 @@ decompress-partial: lz4.o decompress-partial.c
 decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
-freestanding: freestanding.c
-	$(CC) -ffreestanding -nostdlib $^ -o $@$(EXT)
-
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
@@ -353,10 +350,44 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 	@echo "\n ---- test decompress-partial-usingDict ----"
 	./decompress-partial-usingDict$(EXT)
 
+
+#-----------------------------------------------------------------------------
+# freestanding test only for Linux x86_64
+#-----------------------------------------------------------------------------
+ifeq ($(OS),Windows_NT)
+  UNAME_S := Windows
+else
+  UNAME_S := $(shell uname -s)
+endif
+
+ifeq ($(OS),Windows_NT)
+  UNAME_P := Unknown
+else
+  UNAME_P := $(shell uname -p)
+endif
+
+FREESTANDING_CFLAGS := -ffreestanding -nostdlib
+
+ifneq ($(UNAME_S), Linux)
+  FREESTANDING_CFLAGS :=
+endif
+
+ifneq ($(UNAME_P), x86_64)
+  FREESTANDING_CFLAGS :=
+endif
+
+freestanding: freestanding.c
+	$(CC) $(FREESTANDING_CFLAGS) $^ -o $@$(EXT)
+
 test-freestanding: freestanding
 	@echo "\n ---- test freestanding ----"
+ifeq ($(FREESTANDING_CFLAGS),)
+	@echo "\n (skip)"
+else
 	./freestanding$(EXT)
 	-strace ./freestanding$(EXT)
 	-ltrace ./freestanding$(EXT)
+endif
+
 
 endif
