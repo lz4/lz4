@@ -56,7 +56,7 @@ NB_LOOPS     ?= -i1
 .PHONY: default
 default: all
 
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial freestanding
 
 all32: CFLAGS+=-m32
 all32: all
@@ -180,7 +180,7 @@ list:
 check: test-lz4-essentials
 
 .PHONY: test
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial test-freestanding
 
 .PHONY: test32
 test32: CFLAGS+=-m32
@@ -373,6 +373,10 @@ ifneq ($(UNAME_S), Linux)
 endif
 
 ifneq ($(UNAME_P), x86_64)
+  FREESTANDING_CFLAGS :=
+endif
+
+ifneq (,$(findstring -m32,$(CFLAGS)))
   FREESTANDING_CFLAGS :=
 endif
 
