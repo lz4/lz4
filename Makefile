@@ -162,10 +162,10 @@ usan: clean
 	CC=$(CC) CFLAGS='$(CFLAGS)' LDFLAGS='$(LDFLAGS)' $(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
 .PHONY: usan32
-usan32: CFLAGS = -m32 -O3 -g -fsanitize=undefined
+usan32: CFLAGS = -m32 -O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined -fsanitize-recover=pointer-overflow
 usan32: LDFLAGS = $(CFLAGS)
 usan32: clean
-	$(MAKE) test FUZZER_TIME="-T30s" NB_LOOPS=-i1
+	CFLAGS='$(CFLAGS)' LDFLAGS='$(LDFLAGS)' $(MAKE) V=1 test FUZZER_TIME="-T30s" NB_LOOPS=-i1
 
 SCANBUILD ?= scan-build
 SCANBUILD_FLAGS += --status-bugs -v --force-analyze-debug-code
