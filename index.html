@@ -175,11 +175,12 @@ They are in conformance with the LZ4 [block] and [frame] specifications, and are
 
 |Language                 |Author               |URL           |
 |----                     |----                 |----          |
-|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/javadocs/api-release/org/apache/commons/compress/compressors/lz4/package-summary.html
-|__Javascript__           | Pierre Curto        | https://github.com/pierrec/node-lz4
 |__Python__ multi-threadable | Iotic Labs       | https://pypi.python.org/pypi/py-lz4framed
 |__Python__ standard handlers | Jonathan Underwood | https://pypi.python.org/pypi/lz4
 |__Python__               | Christopher Jackson | https://github.com/darkdragn/lz4tools
+|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/javadocs/api-release/org/apache/commons/compress/compressors/lz4/package-summary.html
+|__Javascript__ (binding) | Pierre Curto        | https://github.com/pierrec/node-lz4
+|__Javascript__ (port)    | Benzinga            | https://github.com/Benzinga/lz4js
 |__C#__                   | Milosz Krajewski    | https://github.com/MiloszKrajewski/K4os.Compression.LZ4
 |__Perl__                 | Felix Bytow         | http://search.cpan.org/~autinity/Compress-LZ4Frame
 |__Delphi__               | Hanno Hugenberg     | https://github.com/Hugie/lz4-delphi
@@ -191,6 +192,7 @@ They are in conformance with the LZ4 [block] and [frame] specifications, and are
 |__Lua__                  | Witchu Promjunyakul | https://github.com/witchu/lua-lz4
 |__Haskell__              | Niklas Hambüchen    | https://hackage.haskell.org/package/lz4-frame-conduit
 |__VA Smalltalk__         | Instantiations      | http://www.instantiations.com/docs/91/wwhelp/wwhimpl/js/html/wwhelp.htm#href=pr/compression2.html#pID0E0LB0FA
+|__WASM__                 | Syu Kato            | https://github.com/ukyo/lz4.js
 |__Tcl__ decoder          | D. Bohdan           | https://wiki.tcl-lang.org/48789
 |__Z80 assembly__ decoder | Piotr Drapich       | http://www.union.org.pl/download/z80/LZ4_Z80.asm
 |__8086 assembly__ decoder| E. C. Masloch       | https://hg.pushbx.org/ecm/inicomp/
@@ -218,7 +220,7 @@ Here are a few compatible alternatives to lz4 command line utility :
 <a name="customs-lz4"></a>
 ## Customs LZ4 implementations
 The following versions compress data blocks with LZ4 compression algorithm in various programming languages.
-They use the [block] compression format, but add their own frame / header logic.
+They use the [block] compression format, but add their own frame / header logic (or none at all)
 Consequently, they are not interoperable with LZ4 command line utility, nor (generally) between themselves.
 
 |Language             |Author               |URL                              |
@@ -250,6 +252,7 @@ Consequently, they are not interoperable with LZ4 command line utility, nor (gen
 |__Z80 assembly__ decoder | Edouard Berge   | https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8
 |__Atari XL/XE assembly__ decoder | xxl     | http://xxl.atari.pl/lz4-decompressor/
 |__v810 assembly__ decoder | Martin Wendt   | https://github.com/enthusi/lz4_v810_decode
+|__Lua__ decoder      | Scott Lembcke       | https://github.com/slembcke/mini-lz4
 |__jsonlz4__ decoder  | Avi Halachmi        | https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format
 
 
