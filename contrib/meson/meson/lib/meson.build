@@ -42,6 +42,8 @@ liblz4_dep = declare_dependency(
   include_directories: include_directories(lz4_source_root / 'lib')
 )
 
+meson.override_dependency('liblz4', liblz4_dep)
+
 if get_option('tests') or get_option('programs') or get_option('examples') or get_option('ossfuzz')
   liblz4_internal = static_library(
     'lz4-internal',
@@ -73,8 +75,7 @@ install_headers(
 
 if get_option('default_library') != 'shared'
   install_headers(lz4_source_root / 'lib/lz4frame_static.h')
-endif
-
-if get_option('unstable')
-  install_headers(lz4_source_root / 'lib/lz4file.h')
+  if get_option('unstable')
+    install_headers(lz4_source_root / 'lib/lz4file.h')
+  endif
 endif

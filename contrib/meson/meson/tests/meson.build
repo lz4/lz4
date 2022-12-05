@@ -45,8 +45,9 @@ test_exes = {
     'sources': files(lz4_source_root / 'tests/freestanding.c'),
     'c_args': ['-ffreestanding', '-Wno-unused-parameter', '-Wno-declaration-after-statement'],
     'link_args': ['-nostdlib'],
-    'build': cc.get_id() in ['gcc', 'clang'],
-    'override_options': ['optimization=1']
+    'build': cc.get_id() in ['gcc', 'clang'] and
+      host_machine.system() == 'linux' and host_machine.cpu_family() == 'x86_64',
+    'override_options': ['optimization=1'],
   },
   'fullbench': {
     'sources': files(lz4_source_root / 'tests/fullbench.c'),
