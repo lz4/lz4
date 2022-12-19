@@ -670,7 +670,7 @@ LZ4F_decompress_usingDict(LZ4F_dctx* dctxPtr,
                     const LZ4F_decompressOptions_t* decompressOptionsPtr);
 
 
-/*! Custom memory allocation :
+/*! Custom memory allocation : v1.9.4+
  *  These prototypes make it possible to pass custom allocation/free functions.
  *  LZ4F_customMem is provided at state creation time, using LZ4F_create*_advanced() listed below.
  *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
