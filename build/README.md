@@ -5,6 +5,7 @@ Projects for various integrated development environments (IDE)
 
 The following projects are included with the lz4 distribution:
 - `cmake` - CMake project
+- `meson` - Meson project
 - `VS2010` - Visual Studio 2010 project (which also works well with Visual Studio 2012, 2013, 2015)
 - `VS2017` - Visual Studio 2017 project
 
