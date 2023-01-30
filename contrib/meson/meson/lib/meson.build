@@ -45,11 +45,17 @@ liblz4_dep = declare_dependency(
 meson.override_dependency('liblz4', liblz4_dep)
 
 if get_option('tests') or get_option('programs') or get_option('examples') or get_option('ossfuzz')
-  liblz4_internal = static_library(
-    'lz4-internal',
-    objects: liblz4.extract_all_objects(recursive: true),
-    gnu_symbol_visibility: 'hidden'
-  )
+  if get_option('default_library') == 'shared'
+    liblz4_internal = static_library(
+      'lz4-internal',
+      objects: liblz4.extract_all_objects(recursive: true),
+      gnu_symbol_visibility: 'hidden'
+    )
+  elif get_option('default_library') == 'static'
+    liblz4_internal = liblz4
+  elif get_option('default_library') == 'both'
+    liblz4_internal = liblz4.get_static_lib()
+  endif
 
   liblz4_internal_dep = declare_dependency(
     link_with: liblz4_internal,
