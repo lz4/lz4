@@ -707,15 +707,15 @@ jobs:
         -Dcontrib=true
         -Dtests=true
         -Dexamples=true
-        contrib/meson build
+        build/meson builddir
 
     - name: test
       run: |
-        meson test -C build
+        meson test -C builddir
 
     - name: staging
       run: |
-        cd build
+        cd builddir
         DESTDIR=./staging ninja install
         tree ./staging
 
