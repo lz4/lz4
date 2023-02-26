@@ -195,10 +195,7 @@ UTIL_STATIC void* UTIL_realloc(void* ptr, size_t size)
 /*-****************************************
 *  String functions
 ******************************************/
-/*
- * A modified version of realloc().
- * If UTIL_realloc() fails the original block is freed.
-*/
+/* supports a==NULL or b==NULL */
 UTIL_STATIC int UTIL_sameString(const char* a, const char* b)
 {
     assert(a!=NULL && b!=NULL);  /* unsupported scenario */
@@ -428,6 +425,21 @@ UTIL_STATIC int UTIL_isRegFile(const char* infilename)
 {
     stat_t statbuf;
     return UTIL_getFileStat(infilename, &statbuf); /* Only need to know whether it is a regular file */
+}
+
+UTIL_STATIC int UTIL_isDir(const char* infilename)
+{
+    stat_t statbuf;
+    int r;
+#if defined(_MSC_VER)
+    r = _stat64(infilename, &statbuf);
+    if (r) return 0;
+    return (statbuf.st_mode & S_IFDIR);
+#else
+    r = stat(infilename, &statbuf);
+    if (r) return 0;
+    return (S_ISDIR(statbuf.st_mode));
+#endif
 }
 
 
