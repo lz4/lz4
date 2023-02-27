@@ -328,7 +328,7 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
         return f;
     }
 
-    if (UTIL_isDir(srcFileName)) {
+    if (UTIL_isDirectory(srcFileName)) {
         DISPLAYLEVEL(1, "lz4: %s is a directory -- ignored \n", srcFileName);
         return NULL;
     }
@@ -387,7 +387,6 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 }
 
 
-
 /***************************************
 *   Legacy Compression
 ***************************************/
@@ -415,8 +414,10 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename,
-                                  int compressionlevel, const LZ4IO_prefs_t* prefs)
+int LZ4IO_compressFilename_Legacy(const char* input_filename,
+                                  const char* output_filename,
+                                  int compressionlevel,
+                                  const LZ4IO_prefs_t* prefs)
 {
     typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
