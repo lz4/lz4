@@ -2593,9 +2593,11 @@ LZ4_FORCE_O2 int
 LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode,
                         const char* source, char* dest, int originalSize)
 {
-    LZ4_streamDecode_t_internal* const lz4sd =
-        (assert(LZ4_streamDecode!=NULL), &LZ4_streamDecode->internal_donotuse);
     int result;
+    LZ4_streamDecode_t_internal* const lz4sd = &LZ4_streamDecode->internal_donotuse;
+
+    assert(LZ4_streamDecode != NULL);
+    assert(lz4sd != NULL);
 
     DEBUGLOG(5, "LZ4_decompress_fast_continue (toDecodeSize=%i)", originalSize);
     assert(originalSize >= 0);
