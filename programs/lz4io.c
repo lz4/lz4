@@ -325,11 +325,16 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
         DISPLAYLEVEL(4,"Using stdin for input \n");
         f = stdin;
         SET_BINARY_MODE(stdin);
-    } else {
-        f = fopen(srcFileName, "rb");
-        if (f==NULL) DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(errno));
+        return f;
     }
 
+    if (UTIL_isDirectory(srcFileName)) {
+        DISPLAYLEVEL(1, "lz4: %s is a directory -- ignored \n", srcFileName);
+        return NULL;
+    }
+
+    f = fopen(srcFileName, "rb");
+    if (f==NULL) DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(errno));
     return f;
 }
 
@@ -337,7 +342,8 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
  *  prefs is writable, because sparseFileSupport might be updated.
  *  condition : `dstFileName` must be non-NULL.
  * @result : FILE* to `dstFileName`, or NULL if it fails */
-static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
+static FILE*
+LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 {
     FILE* f;
     assert(dstFileName != NULL);
@@ -381,7 +387,6 @@ static FILE* LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* con
 }
 
 
-
 /***************************************
 *   Legacy Compression
 ***************************************/
@@ -409,8 +414,10 @@ static int LZ4IO_LZ4_compress(const char* src, char* dst, int srcSize, int dstSi
 /* LZ4IO_compressFilename_Legacy :
  * This function is intentionally "hidden" (not published in .h)
  * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(const char* input_filename, const char* output_filename,
-                                  int compressionlevel, const LZ4IO_prefs_t* prefs)
+int LZ4IO_compressFilename_Legacy(const char* input_filename,
+                                  const char* output_filename,
+                                  int compressionlevel,
+                                  const LZ4IO_prefs_t* prefs)
 {
     typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
@@ -563,11 +570,14 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* const dictFilename)
     char*  dictBuf;
     FILE* dictFile;
 
-    if (!circularBuf) END_PROCESS(25, "Allocation error : not enough memory for circular buffer");
-    if (!dictFilename) END_PROCESS(26, "Dictionary error : no filename provided");
+    if (!dictFilename)
+        END_PROCESS(26, "Dictionary error : no filename provided");
+    if (!circularBuf)
+        END_PROCESS(25, "Allocation error : not enough memory for circular buffer");
 
     dictFile = LZ4IO_openSrcFile(dictFilename);
-    if (!dictFile) END_PROCESS(27, "Dictionary error : could not open dictionary file");
+    if (!dictFile)
+        END_PROCESS(27, "Dictionary error : could not open dictionary file");
 
     /* opportunistically seek to the part of the file we care about.
      * If this fails it's not a problem since we'll just read everything anyways. */
@@ -1311,7 +1321,8 @@ LZ4IO_decompressSrcFile(dRess_t ress,
 
 static int
 LZ4IO_decompressDstFile(dRess_t ress,
-                        const char* input_filename, const char* output_filename,
+                        const char* input_filename,
+                        const char* output_filename,
                         const LZ4IO_prefs_t* const prefs)
 {
     int result;
