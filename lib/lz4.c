@@ -2122,7 +2122,6 @@ LZ4_decompress_generic(
 
             assert((op <= oend) && (oend-op >= 32));
             if (unlikely(offset<16)) {
-                assert(op + length >= dstPtr + MINMATCH);
                 LZ4_memcpy_using_offset(op, match, length, offset);
             } else {
                 LZ4_wildCopy32(op, match, op + length);
