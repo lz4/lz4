@@ -528,8 +528,6 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, size_t length, const s
 {
     reg_t r;
 
-    assert(dstEnd >= dstPtr + MINMATCH);
-
     switch(offset) {
     case 1:
         r = *srcPtr * ((reg_t)0x0101010101010101ULL);
@@ -2124,6 +2122,7 @@ LZ4_decompress_generic(
 
             assert((op <= oend) && (oend-op >= 32));
             if (unlikely(offset<16)) {
+                assert(op + length >= dstPtr + MINMATCH);
                 LZ4_memcpy_using_offset(op, match, length, offset);
             } else {
                 LZ4_wildCopy32(op, match, op + length);
