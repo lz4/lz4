@@ -375,6 +375,7 @@ static reg_t LZ4_read_ARCH(const void* memPtr) { return *(const reg_t*) memPtr; 
 
 static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
 static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
+static void LZ4_write_ARCH(void* memPtr, reg_t value) { *(reg_t*)memPtr = value; }
 
 #elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
 
@@ -390,6 +391,7 @@ static reg_t LZ4_read_ARCH(const void* ptr) { return ((const LZ4_unalignST*)ptr)
 
 static void LZ4_write16(void* memPtr, U16 value) { ((LZ4_unalign16*)memPtr)->u16 = value; }
 static void LZ4_write32(void* memPtr, U32 value) { ((LZ4_unalign32*)memPtr)->u32 = value; }
+static void LZ4_write_ARCH(void* memPtr, reg_t value) { ((LZ4_unalignST*)memPtr)->uArch = value; }
 
 #else  /* safe and portable access using memcpy() */
 
@@ -414,6 +416,11 @@ static void LZ4_write16(void* memPtr, U16 value)
 }
 
 static void LZ4_write32(void* memPtr, U32 value)
+{
+    LZ4_memcpy(memPtr, &value, sizeof(value));
+}
+
+static void LZ4_write_ARCH(void* memPtr, reg_t value)
 {
     LZ4_memcpy(memPtr, &value, sizeof(value));
 }
@@ -475,7 +482,7 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #if LZ4_FAST_DEC_LOOP
 
 LZ4_FORCE_INLINE void
-LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
+LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, size_t length, const size_t offset)
 {
     assert(srcPtr + offset == dstPtr);
     if (offset < 8) {
@@ -487,14 +494,17 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
         srcPtr += inc32table[offset];
         LZ4_memcpy(dstPtr+4, srcPtr, 4);
         srcPtr -= dec64table[offset];
-        dstPtr += 8;
     } else {
         LZ4_memcpy(dstPtr, srcPtr, 8);
-        dstPtr += 8;
         srcPtr += 8;
     }
 
-    LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
+    while (length > 8) {
+        dstPtr += 8;
+        LZ4_memcpy(dstPtr, srcPtr, 8);
+        srcPtr += 8;
+        length -= 8;
+    }
 }
 
 /* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd
@@ -514,42 +524,36 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
  * - dstEnd >= dstPtr + MINMATCH
  * - there is at least 8 bytes available to write after dstEnd */
 LZ4_FORCE_INLINE void
-LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
+LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, size_t length, const size_t offset)
 {
-    BYTE v[8];
-
-    assert(dstEnd >= dstPtr + MINMATCH);
+    reg_t r;
 
     switch(offset) {
     case 1:
-        MEM_INIT(v, *srcPtr, 8);
+        r = *srcPtr * ((reg_t)0x0101010101010101ULL);
         break;
     case 2:
-        LZ4_memcpy(v, srcPtr, 2);
-        LZ4_memcpy(&v[2], srcPtr, 2);
-#if defined(_MSC_VER) && (_MSC_VER <= 1936) /* MSVC 2022 ver 17.6 or earlier */
-#  pragma warning(push)
-#  pragma warning(disable : 6385) /* warning C6385: Reading invalid data from 'v'. */
-#endif
-        LZ4_memcpy(&v[4], v, 4);
-#if defined(_MSC_VER) && (_MSC_VER <= 1936) /* MSVC 2022 ver 17.6 or earlier */
-#  pragma warning(pop)
-#endif
+        r = LZ4_read16(srcPtr) * ((reg_t)0x0001000100010001ULL);
         break;
     case 4:
-        LZ4_memcpy(v, srcPtr, 4);
-        LZ4_memcpy(&v[4], srcPtr, 4);
+        r = LZ4_read32(srcPtr) * ((reg_t)0x0000000100000001ULL);
         break;
+    case 8:
+        if (sizeof(reg_t) == 8) {
+            r = LZ4_read_ARCH(srcPtr);
+            break;
+        }
+        /* fallthrough */
     default:
-        LZ4_memcpy_using_offset_base(dstPtr, srcPtr, dstEnd, offset);
+        LZ4_memcpy_using_offset_base(dstPtr, srcPtr, length, offset);
         return;
     }
 
-    LZ4_memcpy(dstPtr, v, 8);
-    dstPtr += 8;
-    while (dstPtr < dstEnd) {
-        LZ4_memcpy(dstPtr, v, 8);
-        dstPtr += 8;
+    LZ4_write_ARCH(dstPtr, r);
+    while (length > sizeof(reg_t)) {
+        dstPtr += sizeof(reg_t);
+        LZ4_write_ARCH(dstPtr, r);
+        length -= sizeof(reg_t);
     }
 }
 #endif
@@ -2122,16 +2126,15 @@ LZ4_decompress_generic(
             }
 
             /* copy match within block */
-            cpy = op + length;
 
             assert((op <= oend) && (oend-op >= 32));
             if (unlikely(offset<16)) {
-                LZ4_memcpy_using_offset(op, match, cpy, offset);
+                LZ4_memcpy_using_offset(op, match, length, offset);
             } else {
-                LZ4_wildCopy32(op, match, cpy);
+                LZ4_wildCopy32(op, match, op + length);
             }
 
-            op = cpy;   /* wildcopy correction */
+            op += length;   /* wildcopy correction */
         }
     safe_decode:
 #endif
