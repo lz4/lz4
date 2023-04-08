@@ -2058,10 +2058,6 @@ LZ4_decompress_generic(
                 length += addl;
                 length += MINMATCH;
                 if (unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
-                if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) {
-                    DEBUGLOG(6, "Error : offset outside buffers");
-                    goto _output_error;
-                }
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
                     goto safe_match_copy;
                 }
