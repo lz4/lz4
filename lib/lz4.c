@@ -543,6 +543,7 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, size_t length, const s
             r = LZ4_read_ARCH(srcPtr);
             break;
         }
+        /* fallthrough */
     default:
         LZ4_memcpy_using_offset_base(dstPtr, srcPtr, length, offset);
         return;
