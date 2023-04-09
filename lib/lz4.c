@@ -365,6 +365,20 @@ static unsigned LZ4_isLittleEndian(void)
     return one.c[0];
 }
 
+#ifndef LZ4_FAST_DEC_LOOP
+#  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
+#    define LZ4_FAST_DEC_LOOP 1
+#  elif defined(__aarch64__) && defined(__APPLE__)
+#    define LZ4_FAST_DEC_LOOP 1
+#  elif defined(__aarch64__) && !defined(__clang__)
+/* On non-Apple aarch64, we disable this optimization for clang because
+ * on certain mobile chipsets, performance is reduced with clang. For
+ * more information refer to https://github.com/lz4/lz4/pull/707 */
+#    define LZ4_FAST_DEC_LOOP 1
+#  else
+#    define LZ4_FAST_DEC_LOOP 0
+#  endif
+#endif
 
 #if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
 /* lie to the compiler about data alignment; use with caution */
@@ -375,7 +389,9 @@ static reg_t LZ4_read_ARCH(const void* memPtr) { return *(const reg_t*) memPtr; 
 
 static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
 static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
+#if LZ4_FAST_DEC_LOOP
 static void LZ4_write_ARCH(void* memPtr, reg_t value) { *(reg_t*)memPtr = value; }
+#endif
 
 #elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
 
@@ -391,7 +407,9 @@ static reg_t LZ4_read_ARCH(const void* ptr) { return ((const LZ4_unalignST*)ptr)
 
 static void LZ4_write16(void* memPtr, U16 value) { ((LZ4_unalign16*)memPtr)->u16 = value; }
 static void LZ4_write32(void* memPtr, U32 value) { ((LZ4_unalign32*)memPtr)->u32 = value; }
+#if LZ4_FAST_DEC_LOOP
 static void LZ4_write_ARCH(void* memPtr, reg_t value) { ((LZ4_unalignST*)memPtr)->uArch = value; }
+#endif
 
 #else  /* safe and portable access using memcpy() */
 
@@ -420,10 +438,12 @@ static void LZ4_write32(void* memPtr, U32 value)
     LZ4_memcpy(memPtr, &value, sizeof(value));
 }
 
+#if LZ4_FAST_DEC_LOOP
 static void LZ4_write_ARCH(void* memPtr, reg_t value)
 {
     LZ4_memcpy(memPtr, &value, sizeof(value));
 }
+#endif
 
 #endif /* LZ4_FORCE_MEMORY_ACCESS */
 
@@ -464,20 +484,7 @@ static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
 static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
 
-#ifndef LZ4_FAST_DEC_LOOP
-#  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && defined(__APPLE__)
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && !defined(__clang__)
-     /* On non-Apple aarch64, we disable this optimization for clang because
-      * on certain mobile chipsets, performance is reduced with clang. For
-      * more information refer to https://github.com/lz4/lz4/pull/707 */
-#    define LZ4_FAST_DEC_LOOP 1
-#  else
-#    define LZ4_FAST_DEC_LOOP 0
-#  endif
-#endif
+
 
 #if LZ4_FAST_DEC_LOOP
 
