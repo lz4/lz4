@@ -535,6 +535,11 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, size_t length, const s
 {
     reg_t r;
 
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 4310) /* warning C4310: cast truncates constant value. */
+#endif
+
     switch(offset) {
     case 1:
         r = *srcPtr * ((reg_t)0x0101010101010101ULL);
@@ -556,12 +561,17 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, size_t length, const s
         return;
     }
 
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
+
     LZ4_write_ARCH(dstPtr, r);
     while (length > sizeof(reg_t)) {
         dstPtr += sizeof(reg_t);
         LZ4_write_ARCH(dstPtr, r);
         length -= sizeof(reg_t);
     }
+
 }
 #endif
 
