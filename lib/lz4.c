@@ -385,9 +385,9 @@ static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
 
 /* __pack instructions are safer, but compiler specific, hence potentially problematic for some compilers */
 /* currently only defined for gcc and icc */
-typedef struct LZ4_PACK({ U16 u16; }) LZ4_unalign16;
-typedef struct LZ4_PACK({ U32 u32; }) LZ4_unalign32;
-typedef struct LZ4_PACK({ reg_t uArch; }) LZ4_unalignST;
+LZ4_PACK(typedef struct { U16 u16; }) LZ4_unalign16;
+LZ4_PACK(typedef struct { U32 u32; }) LZ4_unalign32;
+LZ4_PACK(typedef struct { reg_t uArch; }) LZ4_unalignST;
 
 static U16 LZ4_read16(const void* ptr) { return ((const LZ4_unalign16*)ptr)->u16; }
 static U32 LZ4_read32(const void* ptr) { return ((const LZ4_unalign32*)ptr)->u32; }
