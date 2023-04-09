@@ -371,7 +371,6 @@ static unsigned LZ4_isLittleEndian(void)
 #define LZ4_PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop))
 #endif
 
-
 #if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
 /* lie to the compiler about data alignment; use with caution */
 
