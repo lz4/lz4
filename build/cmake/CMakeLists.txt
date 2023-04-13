@@ -10,7 +10,7 @@
 # LZ4's CMake support is maintained by Evan Nemerson; when filing
 # bugs please mention @nemequ to make sure I see it.
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.8.12...3.26)
 
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
