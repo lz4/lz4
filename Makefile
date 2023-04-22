@@ -99,8 +99,8 @@ install uninstall:
 	$(MAKE) -C $(LZ4DIR) $@
 	$(MAKE) -C $(PRGDIR) $@
 
-.PHONY: travis-install
-travis-install:
+.PHONY: test-install
+test-install:
 	$(MAKE) -j1 install DESTDIR=~/install_test_dir
 
 endif   # POSIX_ENV
