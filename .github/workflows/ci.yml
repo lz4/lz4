@@ -68,7 +68,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:                        # Set environment variables
-      # We globally set CC and CXX to improve compatibility with .travis.yml
+      # We globally set CC and CXX to improve compatibility
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
@@ -619,16 +619,16 @@ jobs:
       run: make V=1
 
 
-  lz4-build-make-travis-install:
-    name: make travis-install
+  lz4-build-make-test-install:
+    name: make test-install
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
-    - name: travis-install
-      run: make V=1 clean travis-install
+    - name: test-install
+      run: make V=1 clean test-install
 
-    - name: travis-install result
+    - name: test-install result
       run: |
         echo && echo Installed files
         ( cd ~/install_test_dir; find .; )
