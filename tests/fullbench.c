@@ -371,6 +371,33 @@ static int local_LZ4F_compressFrame(const char* in, char* out, int inSize)
     return (int)LZ4F_compressFrame(out, LZ4F_compressFrameBound((size_t)inSize, NULL), in, (size_t)inSize, NULL);
 }
 
+LZ4F_cctx* g_cctx = NULL;
+static int local_LZ4F_compress(const char* in, char* out, int inSize)
+{
+    /* output buffer size is assumed */
+    size_t const outSize = LZ4F_compressFrameBound((size_t)inSize, NULL);
+    size_t cSize = 0;
+    assert(inSize >= 0);
+    if (g_cctx == NULL) {
+        /* create and initialize LZ4F compression context the first time */
+        LZ4F_createCompressionContext(&g_cctx, LZ4F_VERSION);
+        assert(g_cctx != NULL);
+    } /* re-use existing compression context otherwise */
+    {   size_t const cbSize = LZ4F_compressBegin(g_cctx, out, outSize, NULL);
+        assert(!LZ4F_isError(cbSize));
+        cSize += cbSize;
+    }
+    {   size_t const cuSize = LZ4F_compressUpdate(g_cctx, out+cSize, outSize-cSize, in, (size_t)inSize, NULL);
+        assert(!LZ4F_isError(cuSize));
+        cSize += cuSize;
+    }
+    {   size_t const ceSize = LZ4F_compressEnd(g_cctx, out+cSize, outSize-cSize, NULL);
+        assert(!LZ4F_isError(ceSize));
+        cSize += ceSize;
+    }
+    return (int)cSize;
+}
+
 static LZ4F_decompressionContext_t g_dCtx;
 
 static int local_LZ4F_decompress(const char* in, char* out, int inSize, int outSize)
@@ -584,6 +611,9 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
             case 20: compressionFunction = local_LZ4_compress_forceDict; initFunction = local_LZ4_resetDictT; compressorName = "LZ4_compress_forceDict"; break;
 #endif
             case 30: compressionFunction = local_LZ4F_compressFrame; compressorName = "LZ4F_compressFrame";
+                        chunkP[0].origSize = (int)benchedSize; nbChunks=1;
+                        break;
+            case 31: compressionFunction = local_LZ4F_compress; compressorName = "LZ4F_compressUpdate";
                         chunkP[0].origSize = (int)benchedSize; nbChunks=1;
                         break;
             case 40: compressionFunction = local_LZ4_saveDict; compressorName = "LZ4_saveDict";

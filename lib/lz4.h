@@ -189,8 +189,9 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
 LZ4LIB_API int LZ4_compress_default(const char* src, char* dst, int srcSize, int dstCapacity);
 
 /*! LZ4_decompress_safe() :
- *  compressedSize : is the exact complete size of the compressed block.
- *  dstCapacity : is the size of destination buffer (which must be already allocated), presumed an upper bound of decompressed size.
+ * @compressedSize : is the exact complete size of the compressed block.
+ * @dstCapacity : is the size of destination buffer (which must be already allocated),
+ *                is an upper bound of decompressed size.
  * @return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
  *           If destination buffer is not large enough, decoding will stop and output an error code (negative value).
  *           If the source stream is detected malformed, the function will stop decoding and return a negative result.
@@ -443,11 +444,24 @@ LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const 
 LZ4LIB_API int LZ4_decoderRingBufferSize(int maxBlockSize);
 #define LZ4_DECODER_RING_BUFFER_SIZE(maxBlockSize) (65536 + 14 + (maxBlockSize))  /* for static allocation; maxBlockSize presumed valid */
 
-/*! LZ4_decompress_*_continue() :
- *  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
- *  A block is an unsplittable entity, it must be presented entirely to a decompression function.
- *  Decompression functions only accepts one block at a time.
- *  The last 64KB of previously decoded data *must* remain available and unmodified at the memory position where they were decoded.
+/*! LZ4_decompress_safe_continue() :
+ *  This decoding function allows decompression of consecutive blocks in "streaming" mode.
+ *  The difference with the usual independent blocks is that
+ *  new blocks are allowed to find references into former blocks.
+ *  A block is an unsplittable entity, and must be presented entirely to the decompression function.
+ *  LZ4_decompress_safe_continue() only accepts one block at a time.
+ *  It's modeled after `LZ4_decompress_safe()` and behaves similarly.
+ *
+ * @LZ4_streamDecode : decompression state, tracking the position in memory of past data
+ * @compressedSize : exact complete size of one compressed block.
+ * @dstCapacity : size of destination buffer (which must be already allocated),
+ *                must be an upper bound of decompressed size.
+ * @return : number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
+ *           If destination buffer is not large enough, decoding will stop and output an error code (negative value).
+ *           If the source stream is detected malformed, the function will stop decoding and return a negative result.
+ *
+ *  The last 64KB of previously decoded data *must* remain available and unmodified
+ *  at the memory position where they were previously decoded.
  *  If less than 64KB of data has been decoded, all the data must be present.
  *
  *  Special : if decompression side sets a ring buffer, it must respect one of the following conditions :
@@ -474,10 +488,10 @@ LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
                         int srcSize, int dstCapacity);
 
 
-/*! LZ4_decompress_*_usingDict() :
- *  These decoding functions work the same as
- *  a combination of LZ4_setStreamDecode() followed by LZ4_decompress_*_continue()
- *  They are stand-alone, and don't need an LZ4_streamDecode_t structure.
+/*! LZ4_decompress_safe_usingDict() :
+ *  Works the same as
+ *  a combination of LZ4_setStreamDecode() followed by LZ4_decompress_safe_continue()
+ *  However, it's stateless: it doesn't need any LZ4_streamDecode_t state.
  *  Dictionary is presumed stable : it must remain accessible and unmodified during decompression.
  *  Performance tip : Decompression speed can be substantially increased
  *                    when dst == dictStart + dictSize.
@@ -487,6 +501,12 @@ LZ4_decompress_safe_usingDict(const char* src, char* dst,
                               int srcSize, int dstCapacity,
                               const char* dictStart, int dictSize);
 
+/*! LZ4_decompress_safe_partial_usingDict() :
+ *  Behaves the same as LZ4_decompress_safe_partial()
+ *  with the added ability to specify a memory segment for past data.
+ *  Performance tip : Decompression speed can be substantially increased
+ *                    when dst == dictStart + dictSize.
+ */
 LZ4LIB_API int
 LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
                                       int compressedSize,

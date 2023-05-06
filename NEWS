@@ -9,6 +9,7 @@ api  : new experimental function `LZ4F_uncompressedUpdate()`, by @alexmohr
 cli  : `--list` works on `stdin` input, by @Low-power
 cli  : `--no-crc` does not produce (compression) nor check (decompression) checksums
 cli  : fix: `--test` and `--list` produce an error code when parsing invalid input
+cli  : fix: `--test -m` does no longer create decompressed file artifacts
 cli  : fix: support skippable frames when passed via `stdin`, reported by @davidmankin
 build: fix: Makefile respects CFLAGS directives passed via environment variable
 build: `LZ4_FREESTANDING`, new build macro for freestanding environments, by @t-mat

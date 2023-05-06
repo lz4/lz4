@@ -16,6 +16,10 @@ on: [push, pull_request]
 permissions:
   contents: read
 
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+
 jobs:
   lz4-c-compilers:
     name: CC=${{ matrix.cc }}, ${{ matrix.os }}
@@ -48,34 +52,28 @@ jobs:
           { pkgs: 'gcc-9 g++-9 lib32gcc-9-dev libx32gcc-9-dev',         cc: gcc-9,     cxx: g++-9,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
           { pkgs: 'gcc-8 g++-8 lib32gcc-8-dev libx32gcc-8-dev',         cc: gcc-8,     cxx: g++-8,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-20.04,  },
           { pkgs: 'gcc-7 g++-7 lib32gcc-7-dev libx32gcc-7-dev',         cc: gcc-7,     cxx: g++-7,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-20.04,  },
-          { pkgs: 'gcc-6 g++-6 lib32gcc-6-dev libx32gcc-6-dev',         cc: gcc-6,     cxx: g++-6,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-18.04,  },
-          { pkgs: 'gcc-5 g++-5 lib32gcc-5-dev libx32gcc-5-dev',         cc: gcc-5,     cxx: g++-5,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-18.04,  },
-          { pkgs: 'gcc-4.8 g++-4.8 lib32gcc-4.8-dev libx32gcc-4.8-dev', cc: gcc-4.8,   cxx: g++-4.8,     x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-18.04,  },
 
           # clang
           { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-latest, },
           { pkgs: 'clang-14  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-14,  cxx: clang++-14,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-13  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-13,  cxx: clang++-13,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-12  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-11  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-12  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-11  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
           { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
           { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
           { pkgs: 'clang-7   lib32gcc-7-dev  libx32gcc-7-dev',          cc: clang-7,   cxx: clang++-7,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
           { pkgs: 'clang-6.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-6.0, cxx: clang++-6.0, x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
-          { pkgs: 'clang-5.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-5.0, cxx: clang++-5.0, x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-18.04,  },
-          { pkgs: 'clang-4.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-4.0, cxx: clang++-4.0, x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-18.04,  },
-          { pkgs: 'clang-3.9',                                          cc: clang-3.9, cxx: clang++-3.9, x32: 'fail', x86: 'fail', cxxtest: 'false', freestanding: 'false', os: ubuntu-18.04,  },
         ]
 
     runs-on: ${{ matrix.os }}
     env:                        # Set environment variables
-      # We globally set CC and CXX to improve compatibility with .travis.yml
+      # We globally set CC and CXX to improve compatibility
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -176,7 +174,7 @@ jobs:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -203,7 +201,7 @@ jobs:
     name: Fuzzer test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -224,7 +222,7 @@ jobs:
     name: LZ4 Makefile - support for standard variables
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: make standard_variables
       run: make V=1 standard_variables
@@ -234,7 +232,7 @@ jobs:
     name: LZ4 versions test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -249,7 +247,7 @@ jobs:
     name: LZ4 inter-versions ABI test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -264,7 +262,7 @@ jobs:
     name: LZ4 frame test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -281,7 +279,7 @@ jobs:
     name: test different values of LZ4_MEMORY_USAGE
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: LZ4_MEMORY_USAGE
       run: make V=1 -C tests test-compile-with-lz4-memory-usage
 
@@ -290,7 +288,7 @@ jobs:
     name: Custom LZ4_DISTANCE_MAX
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
         MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
@@ -306,7 +304,7 @@ jobs:
     name: Test lz4 compression on a block device
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: create a block device, compress it with lz4 # alternative : blindly use /dev/loop0, seems to always exist
       run: |
         make lz4
@@ -333,7 +331,7 @@ jobs:
     name: make cppcheck
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -352,7 +350,7 @@ jobs:
     name: make staticAnalyze
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -374,7 +372,7 @@ jobs:
     name: valgrind
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -392,27 +390,20 @@ jobs:
   lz4-ubsan-x64:
     name: Linux x64 ubsan
     runs-on: ubuntu-latest
-    env:                        # Set environment variables
-      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: ubsan
-      #########################################################
-      # For now, we ignore the exit code of `make usan`.
-      # See "Known issues / lz4-ubsan-x64" in README.md
-      # When we'll resolve this issue, remove "|| $FIXME__LZ4_CI_IGNORE"
-      #########################################################
-      run: make V=1 clean usan MOREFLAGS='-Wcomma -Werror' || $FIXME__LZ4_CI_IGNORE
+      run: |
+        make clean
+        make V=1 usan
 
 
   lz4-ubsan-x86:
     name: Linux x86 ubsan
     runs-on: ubuntu-latest
-    env:                        # Set environment variables
-      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -421,21 +412,16 @@ jobs:
         sudo apt-get install lib32gcc-11-dev
 
     - name: ubsan32
-      #########################################################
-      # For now, we ignore the exit code of `make usan32`.
-      # See "Known issues / lz4-ubsaan-x86" in README.md.
-      # When we'll resolve this issue, remove "|| $FIXME__LZ4_CI_IGNORE"
-      #########################################################
-      run: CC=clang make V=1 clean usan32 MOREFLAGS='-Wcomma -Werror' || $FIXME__LZ4_CI_IGNORE
+      run: |
+        make clean
+        CC=clang make V=1 usan32
 
 
   lz4-asan-x64:
     name: Linux x64 ASAN
     runs-on: ubuntu-latest
-    env:                        # Set environment variables
-      FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: setup
       run: sudo sysctl -w vm.mmap_min_addr=4096
@@ -450,7 +436,7 @@ jobs:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: unicode lint
       run: bash ./tests/unicode_lint.sh
 
@@ -458,7 +444,7 @@ jobs:
     name: make examples
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -497,7 +483,7 @@ jobs:
         dry-run: false
         sanitizer: ${{ matrix.sanitizer }}
     - name: Upload Crash
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v3
       if: failure() && steps.build.outcome == 'success'
       with:
         name: ${{ matrix.sanitizer }}-artifacts
@@ -549,7 +535,7 @@ jobs:
       XCC: ${{ matrix.xcc }}
       XEMU: ${{ matrix.xemu }}
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: apt-get install
       run: |
@@ -590,7 +576,7 @@ jobs:
     name: macOS
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Environment info
       run: |
@@ -622,7 +608,7 @@ jobs:
     name: make
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: Environment info
       run: |
@@ -633,16 +619,16 @@ jobs:
       run: make V=1
 
 
-  lz4-build-make-travis-install:
-    name: make travis-install
+  lz4-build-make-test-install:
+    name: make test-install
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
-    - name: travis-install
-      run: make V=1 clean travis-install
+    - name: test-install
+      run: make V=1 clean test-install
 
-    - name: travis-install result
+    - name: test-install result
       run: |
         echo && echo Installed files
         ( cd ~/install_test_dir; find .; )
@@ -653,7 +639,7 @@ jobs:
     name: cmake
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
 
     - name: Environment info
       run: |
@@ -674,7 +660,7 @@ jobs:
     name: make cmake
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
     - name: make cmake
       # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
       run: make V=1 VERBOSE=1 clean cmake
@@ -685,8 +671,8 @@ jobs:
     name: Meson + Ninja
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 # https://github.com/actions/checkout
-    - uses: actions/setup-python@v2 # https://github.com/actions/setup-python
+    - uses: actions/checkout@v3 # https://github.com/actions/checkout
+    - uses: actions/setup-python@v4 # https://github.com/actions/setup-python
       with:
         python-version: '3.x'
 
@@ -703,10 +689,11 @@ jobs:
         echo && type python && which python && python --version
         echo && type meson && which meson && meson --version
 
-    - name: meson
+    - name: setup
       # 'run: >' replaces all newlines in the following block with spaces
       run: >
         meson setup
+        --fatal-meson-warnings
         --buildtype=debug
         -Db_lundef=false
         -Dauto_features=enabled
@@ -714,11 +701,15 @@ jobs:
         -Dcontrib=true
         -Dtests=true
         -Dexamples=true
-        contrib/meson build
+        build/meson builddir
+
+    - name: test
+      run: |
+        meson test -C builddir
 
     - name: staging
       run: |
-        cd build
+        cd builddir
         DESTDIR=./staging ninja install
         tree ./staging
 
@@ -731,7 +722,7 @@ jobs:
     name: git version tag checking for release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: make -C tests checkTag
       if: startsWith(github.ref, 'refs/tags/v')   # If git tag name starts with 'v'
       run: |
@@ -752,12 +743,11 @@ jobs:
           { os: ubuntu-latest,  }, # https://github.com/actions/virtual-environments/
           { os: ubuntu-22.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2204-Readme.md
           { os: ubuntu-20.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
-          { os: ubuntu-18.04,   }, # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu1804-Readme.md
         ]
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: init
       run: |

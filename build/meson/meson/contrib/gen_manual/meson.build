@@ -10,7 +10,7 @@
 
 lz4_source_root = '../../../../..'
 
-add_languages('cpp')
+add_languages('cpp', native: true)
 
 sources = files(
   lz4_source_root / 'contrib/gen_manual/gen_manual.cpp'
@@ -33,7 +33,7 @@ foreach mp : manual_pages
     output: '@0@_manual.html'.format(mp),
     command: [
       gen_manual,
-      lz4_version,
+      meson.project_version(),
       '@INPUT@',
       '@OUTPUT@',
     ],

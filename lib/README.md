@@ -100,7 +100,7 @@ The following build macro can be selected to adjust source code behavior at comp
   passed as argument to become a compression state is suitably aligned.
   This test can be disabled if it proves flaky, by setting this value to 0.
 
-- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to `<stdlib,h>`'s `malloc()`, `calloc()` and `free()`
+- `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to `<stdlib.h>`'s `malloc()`, `calloc()` and `free()`
   by user-defined functions, which must be named `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
   User functions must be available at link time.
 
@@ -115,6 +115,24 @@ The following build macro can be selected to adjust source code behavior at comp
   (embedded, bootloader, etc).
   For more details, see description of this macro in `lib/lz4.h`.
 
+- `LZ4_HEAPMODE` : Select how stateless compression functions like `LZ4_compress_default()`
+  allocate memory for their hash table,
+  in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
+
+- `LZ4HC_HEAPMODE` :  Select how stateless HC compression functions like `LZ4_compress_HC()`
+  allocate memory for their workspace:
+  in stack (0), or in heap (1:default).
+  Since workspace is rather large, stack can be inconvenient, hence heap mode is recommended.
+
+- `LZ4F_HEAPMODE` : selects how `LZ4F_compressFrame()` allocates the compression state,
+  either on stack (default, value 0) or using heap memory (value 1).
+
+
+#### Makefile variables
+
+The following `Makefile` variables can be selected to alter the profile of produced binaries :
+- `BUILD_SHARED` : generate `libzstd` dynamic library (enabled by default)
+- `BUILD_STATIC` : generate `libzstd` static library (enabled by default)
 
 
 #### Amalgamation

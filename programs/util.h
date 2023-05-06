@@ -195,13 +195,10 @@ UTIL_STATIC void* UTIL_realloc(void* ptr, size_t size)
 /*-****************************************
 *  String functions
 ******************************************/
-/*
- * A modified version of realloc().
- * If UTIL_realloc() fails the original block is freed.
-*/
+/* supports a==NULL or b==NULL */
 UTIL_STATIC int UTIL_sameString(const char* a, const char* b)
 {
-    assert(a!=NULL && b!=NULL);  /* unsupported scenario */
+    assert(a != NULL || b != NULL);  /* unsupported scenario */
     if (a==NULL) return 0;
     if (b==NULL) return 0;
     return !strcmp(a,b);
@@ -412,7 +409,6 @@ UTIL_STATIC int UTIL_getFileStat(const char* infilename, stat_t *statbuf)
     return 1;
 }
 
-
 UTIL_STATIC int UTIL_isRegFD(int fd)
 {
     stat_t statbuf;
@@ -423,26 +419,25 @@ UTIL_STATIC int UTIL_isRegFD(int fd)
     return UTIL_getFDStat(fd, &statbuf); /* Only need to know whether it is a regular file */
 }
 
-
 UTIL_STATIC int UTIL_isRegFile(const char* infilename)
 {
     stat_t statbuf;
     return UTIL_getFileStat(infilename, &statbuf); /* Only need to know whether it is a regular file */
 }
 
-
-UTIL_STATIC U32 UTIL_isDirectory(const char* infilename)
+UTIL_STATIC int UTIL_isDirectory(const char* infilename)
 {
-    int r;
     stat_t statbuf;
+    int r;
 #if defined(_MSC_VER)
     r = _stat64(infilename, &statbuf);
-    if (!r && (statbuf.st_mode & _S_IFDIR)) return 1;
+    if (r) return 0;
+    return (statbuf.st_mode & S_IFDIR);
 #else
     r = stat(infilename, &statbuf);
-    if (!r && S_ISDIR(statbuf.st_mode)) return 1;
+    if (r) return 0;
+    return (S_ISDIR(statbuf.st_mode));
 #endif
-    return 0;
 }
 
 

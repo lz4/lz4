@@ -4,27 +4,19 @@ This directory contains [GitHub Actions](https://github.com/features/actions) wo
 
 ## USAN, ASAN (`lz4-ubsan-x64`, `lz4-ubsan-x86`, `lz4-asan-x64`)
 
-For now, `lz4-ubsan-*` ignores the exit code of `make usan` and `make usan32`.
-Because there are several issues which may take relatively long time to resolve.
+For now, `lz4-ubsan-*` uses the `-fsanitize-recover=pointer-overflow` flag:
+there are known cases of pointer overflow arithmetic within `lz4.c` fast compression.
+These cases are not dangerous with known architecture,
+but they are not guaranteed to work by the C standard,
+which means that, in some future, some new architecture or some new compiler
+may decide to do something funny that could break this behavior.
+Hence, in anticipation, it's better to remove them.
+This has been already achieved in `lz4hc.c`.
+However, the same attempt in `lz4.c` resulted in massive speed losses,
+which is not an acceptable cost for preemptively solving a "potential future" problem
+not active anywhere today.
+Therefore, a more acceptable work-around will have to be found first.
 
-We'll fully enable it when we ensure `make usan` is ready for all commits and PRs.
-
-See [#983](https://github.com/lz4/lz4/pull/983) for details.
-
-
-## C Compilers (`lz4-c-compilers`)
-
-- Our test doesn't use `gcc-4.5` due to installation issue of its package.  (`apt-get install gcc-4.5` fails on GH-Actions VM)
-
-- Currently, the following 32bit executable tests fail with all versions of `clang`.
-  - `CC=clang-X CFLAGS='-O3' make V=1 -C tests clean test-lz4c32`
-  - `CC=clang-X CFLAGS='-O3 -mx32' make V=1 -C tests clean test-lz4c32`
-  - See [#991](https://github.com/lz4/lz4/issues/991) for details.
-
-- Currently, the following 32bit executable tests fail with `gcc-11`
-  - `CC=gcc-11 CFLAGS='-O3' make V=1 -C tests clean test-lz4c32`
-  - `CC=gcc-11 CFLAGS='-O3 -mx32' make V=1 -C tests clean test-lz4c32`
-  - See [#991](https://github.com/lz4/lz4/issues/991) for details.
 
 
 ## cppcheck (`lz4-cppcheck`)
@@ -50,11 +42,7 @@ Also sometimes it reports false positives.
 
 # Difference with `.travis.yml`
 
-The following tests are not included yet.
-
-- name: Compile OSS-Fuzz targets
-
-The following tests will not be included due to limitation of GH-Actions.
+The following tests are not be included due to limitation of GH-Actions.
 
 - name: aarch64 real-hw tests
 - name: PPC64LE real-hw tests

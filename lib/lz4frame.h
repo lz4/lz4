@@ -215,9 +215,19 @@ LZ4FLIB_API int LZ4F_compressionLevel_max(void);   /* v1.8.0+ */
 LZ4FLIB_API size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr);
 
 /*! LZ4F_compressFrame() :
- *  Compress an entire srcBuffer into a valid LZ4 frame.
- *  dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
- *  The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+ *  Compress srcBuffer content into an LZ4-compressed frame.
+ *  It's a one shot operation, all input content is consumed, and all output is generated.
+ *
+ *  Note : it's a stateless operation (no LZ4F_cctx state needed).
+ *  In order to reduce load on the allocator, LZ4F_compressFrame(), by default,
+ *  uses the stack to allocate space for the compression state and some table.
+ *  If this usage of the stack is too much for your application,
+ *  consider compiling `lz4frame.c` with compile-time macro LZ4F_HEAPMODE set to 1 instead.
+ *  All state allocations will use the Heap.
+ *  It also means each invocation of LZ4F_compressFrame() will trigger several internal alloc/free invocations.
+ *
+ * @dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ * @preferencesPtr is optional : one can provide NULL, in which case all preferences are set to default.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError())
  */
@@ -278,7 +288,7 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 /*! LZ4F_compressBegin() :
  *  will write the frame header into dstBuffer.
  *  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
- * `prefsPtr` is optional : you can provide NULL as argument, all preferences will then be set to default.
+ * `prefsPtr` is optional : NULL can be provided to set all preferences to default.
  * @return : number of bytes written into dstBuffer for the header
  *           or an error code (which can be tested using LZ4F_isError())
  */
@@ -462,6 +472,11 @@ LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  *
  * `dstBuffer` can freely change between each consecutive function invocation.
  * `dstBuffer` content will be overwritten.
+ *
+ *  Note: if `LZ4F_getFrameInfo()` is called before `LZ4F_decompress()`, srcBuffer must be updated to reflect
+ *  the number of bytes consumed after reading the frame header. Failure to update srcBuffer before calling
+ *  `LZ4F_decompress()` will cause decompression failure or, even worse, successful but incorrect decompression.
+ *  See the `LZ4F_getFrameInfo()` docs for details.
  *
  * @return : an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
  *  Schematically, it's the size of the current (or remaining) compressed block + header of next block.
@@ -660,7 +675,7 @@ LZ4F_decompress_usingDict(LZ4F_dctx* dctxPtr,
                     const LZ4F_decompressOptions_t* decompressOptionsPtr);
 
 
-/*! Custom memory allocation :
+/*! Custom memory allocation : v1.9.4+
  *  These prototypes make it possible to pass custom allocation/free functions.
  *  LZ4F_customMem is provided at state creation time, using LZ4F_create*_advanced() listed below.
  *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
