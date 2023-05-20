@@ -604,7 +604,7 @@ jobs:
       fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
       matrix:
         system: [
-          { os: windows-2022, build_path: ".\build\VS2022" },
+          { os: windows-2022, build_path: ".\\build\\VS2022" },
         ]
     steps:
     - uses: actions/checkout@v3
@@ -612,13 +612,13 @@ jobs:
     - name: Build ${{ matrix.system.os }}, Win32
       run: |
         pushd ${{ matrix.system.build_path }}
-        .\build-and-test-win32-release.bat
+        .\\build-and-test-win32-release.bat
         popd
 
     - name: Build ${{ matrix.system.os }}, x64
       run: |
         pushd ${{ matrix.system.build_path }}
-        .\build-and-test-x64-release.bat
+        .\\build-and-test-x64-release.bat
         popd
 
 
