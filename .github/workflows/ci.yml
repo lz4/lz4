@@ -496,6 +496,7 @@ jobs:
 #
 # - QEMU (ARM, ARM64, PPC, PPC64LE, S390X)
 # - macOS
+# - Windows
 #
 
   # QEMU
@@ -593,6 +594,32 @@ jobs:
     - name: Ensure `make test` doesn't depend on the status of the console
       # see issue #990 for detailed explanations
       run: make -j test > /dev/null
+
+
+  # Windows
+  lz4-platform-windows:
+    name: ${{ matrix.system.os }}
+    runs-on: ${{ matrix.system.os }}
+    strategy:
+      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
+      matrix:
+        system: [
+          { os: windows-2022, build_path: ".\\build\\VS2022" },
+        ]
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build ${{ matrix.system.os }}, Win32
+      run: |
+        pushd ${{ matrix.system.build_path }}
+        .\\build-and-test-win32-release.bat
+        popd
+
+    - name: Build ${{ matrix.system.os }}, x64
+      run: |
+        pushd ${{ matrix.system.build_path }}
+        .\\build-and-test-x64-release.bat
+        popd
 
 
 ###############################################################

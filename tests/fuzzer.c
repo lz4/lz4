@@ -495,12 +495,12 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         {   char* const cBuffer_exact = (char*)malloc((size_t)compressedSize);
             assert(cBuffer_exact != NULL);
             assert(compressedSize <= (int)compressedBufferSize);
-#if defined(_MSC_VER) && (_MSC_VER <= 1933) /* MSVC 2022 ver 17.3 or earlier */
+#if defined(_MSC_VER) && (_MSC_VER <= 1936) /* MSVC 2022 ver 17.6 or earlier */
 #  pragma warning(push)
 #  pragma warning(disable : 6385) /* lz4\tests\fuzzer.c(497): warning C6385: Reading invalid data from 'compressedBuffer'. */
 #endif
             memcpy(cBuffer_exact, compressedBuffer, compressedSize);
-#if defined(_MSC_VER) && (_MSC_VER <= 1933) /* MSVC 2022 ver 17.3 or earlier */
+#if defined(_MSC_VER) && (_MSC_VER <= 1936) /* MSVC 2022 ver 17.6 or earlier */
 #  pragma warning(pop)
 #endif
 
