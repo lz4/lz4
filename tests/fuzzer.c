@@ -93,7 +93,7 @@ typedef size_t uintptr_t;   /* true on most systems, except OpenVMS-64 (which do
 *  Macros
 *****************************************/
 #define DISPLAY(...)         fprintf(stdout, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) do { if (g_displayLevel>=l) DISPLAY(__VA_ARGS__); } while (0)
 static int g_displayLevel = 2;
 
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
@@ -336,22 +336,23 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     int result = 0;
     unsigned cycleNb;
 
-#   define EXIT_MSG(...) {                             \
+#   define EXIT_MSG(...) do {                          \
     printf("Test %u : ", testNb); printf(__VA_ARGS__); \
     printf(" (seed %u, cycle %u) \n", seed, cycleNb);  \
     exit(1);                                           \
-}
+} while (0)
 
-#   define FUZ_CHECKTEST(cond, ...)  if (cond) { EXIT_MSG(__VA_ARGS__) }
+#   define FUZ_CHECKTEST(cond, ...)  do { if (cond) EXIT_MSG(__VA_ARGS__); } while (0)
 
-#   define FUZ_DISPLAYTEST(...) {                 \
+#   define FUZ_DISPLAYTEST(...) do {              \
                 testNb++;                         \
                 if (g_displayLevel>=4) {          \
                     printf("\r%4u - %2u :", cycleNb, testNb);  \
                     printf(" " __VA_ARGS__);      \
                     printf("   ");                \
                     fflush(stdout);               \
-            }   }
+                }                                 \
+            } while (0)
 
 
     /* init */
@@ -465,7 +466,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Test compression HC using external state */
         FUZ_DISPLAYTEST("test LZ4_compress_HC_extStateHC()");
         {   int const r = LZ4_compress_HC_extStateHC(stateLZ4HC, block, compressedBuffer, blockSize, (int)compressedBufferSize, compressionLevel);
-            FUZ_CHECKTEST(r==0, "LZ4_compress_HC_extStateHC() failed")
+            FUZ_CHECKTEST(r==0, "LZ4_compress_HC_extStateHC() failed");
         }
 
         /* Test compression HC using fast reset external state */
@@ -709,7 +710,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             {   int const cSize = LZ4_compress_default(block, compressedBuffer, blockSize, compressedSize-missingBytes);
                 FUZ_CHECKTEST(cSize, "LZ4_compress_default should have failed (output buffer too small by %i byte)", missingBytes);
             }
-            FUZ_CHECKTEST(compressedBuffer[compressedSize-missingBytes], "LZ4_compress_default overran output buffer ! (%i missingBytes)", missingBytes)
+            FUZ_CHECKTEST(compressedBuffer[compressedSize-missingBytes], "LZ4_compress_default overran output buffer ! (%i missingBytes)", missingBytes);
         }
 
         /* Test HC compression with missing bytes into output buffer => must fail */
@@ -721,7 +722,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             {   int const hcSize = LZ4_compress_HC(block, compressedBuffer, blockSize, HCcompressedSize-missingBytes, compressionLevel);
                 FUZ_CHECKTEST(hcSize, "LZ4_compress_HC should have failed (output buffer too small by %i byte)", missingBytes);
             }
-            FUZ_CHECKTEST(compressedBuffer[HCcompressedSize-missingBytes], "LZ4_compress_HC overran output buffer ! (%i missingBytes)", missingBytes)
+            FUZ_CHECKTEST(compressedBuffer[HCcompressedSize-missingBytes], "LZ4_compress_HC overran output buffer ! (%i missingBytes)", missingBytes);
         }
 
 
@@ -1016,7 +1017,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             decodedBuffer[consumedSize] = 0;
             ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, consumedSize, dict, dictSize);
             FUZ_CHECKTEST(ret != consumedSize, "LZ4_decompress_safe_usingDict regenerated %i bytes (%i expected)", ret, consumedSize);
-            FUZ_CHECKTEST(decodedBuffer[consumedSize], "LZ4_decompress_safe_usingDict overrun specified output buffer size")
+            FUZ_CHECKTEST(decodedBuffer[consumedSize], "LZ4_decompress_safe_usingDict overrun specified output buffer size");
             {   U32 const crcSrc = XXH32(block, (size_t)consumedSize, 0);
                 U32 const crcDst = XXH32(decodedBuffer, (size_t)consumedSize, 0);
                 if (crcSrc!=crcDst) {

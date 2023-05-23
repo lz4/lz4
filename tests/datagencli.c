@@ -24,6 +24,7 @@
    - Public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
+
 /**************************************
 *  Includes
 **************************************/
@@ -37,6 +38,7 @@
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
+#pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
 #define strtoull    _strtoui64  /* https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/strtoui64-wcstoui64-strtoui64-l-wcstoui64-l */
 #endif
 
@@ -57,7 +59,7 @@
 *  Macros
 **************************************/
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) do { if (displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while (0)
 static unsigned displayLevel = 2;
 
 

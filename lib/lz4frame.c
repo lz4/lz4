@@ -314,9 +314,9 @@ static LZ4F_errorCode_t LZ4F_returnErrorCode(LZ4F_errorCodes code)
 
 #define RETURN_ERROR(e) return LZ4F_returnErrorCode(LZ4F_ERROR_ ## e)
 
-#define RETURN_ERROR_IF(c,e) if (c) RETURN_ERROR(e)
+#define RETURN_ERROR_IF(c,e) do { if (c) RETURN_ERROR(e); } while (0)
 
-#define FORWARD_IF_ERROR(r)  if (LZ4F_isError(r)) return (r)
+#define FORWARD_IF_ERROR(r) do { if (LZ4F_isError(r)) return (r); } while (0)
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 

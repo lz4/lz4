@@ -103,14 +103,14 @@ static clock_t g_time = 0;
 #  define DEBUG 0
 #endif
 #define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
-#define END_PROCESS(error, ...)                                             \
-{                                                                         \
+#define END_PROCESS(error, ...)                                           \
+do {                                                                      \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
     DISPLAYLEVEL(1, "Error %i : ", error);                                \
     DISPLAYLEVEL(1, __VA_ARGS__);                                         \
     DISPLAYLEVEL(1, "\n");                                                \
     exit(error);                                                          \
-}
+} while (0)
 
 #define LZ4_isError(errcode) (errcode==0)
 
