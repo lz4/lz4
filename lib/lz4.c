@@ -359,6 +359,14 @@ typedef enum {
 #  endif
 #endif
 
+#if defined(LZ4_USER_DICT_FUNCTION)
+#   define LZ4_memcpy_dict(dst, src, size) LZ4_user_dict_memcpy(dst, src, size)
+#   define LZ4_memmove_dict(dst, src, size) LZ4_user_dict_memmove(dst, src, size)
+#else
+#   define LZ4_memcpy_dict(dst, src, size) LZ4_memcpy(dst, src, size)
+#   define LZ4_memmove_dict(dst, src, size) LZ4_memmove(dst, src, size)
+#endif
+
 static unsigned LZ4_isLittleEndian(void)
 {
     const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
@@ -1873,12 +1881,12 @@ LZ4_decompress_unsafe_generic(
                     size_t const extml = (size_t)(dictEnd - extMatch);
                     if (extml > ml) {
                         /* match entirely within extDict */
-                        LZ4_memmove(op, extMatch, ml);
+                        LZ4_memmove_dict(op, extMatch, ml);
                         op += ml;
                         ml = 0;
                     } else {
                         /* match split between extDict & prefix */
-                        LZ4_memmove(op, extMatch, extml);
+                        LZ4_memmove_dict(op, extMatch, extml);
                         op += extml;
                         ml -= extml;
                     }
@@ -2103,13 +2111,13 @@ LZ4_decompress_generic(
 
                 if (length <= (size_t)(lowPrefix-match)) {
                     /* match fits entirely within external dictionary : just copy */
-                    LZ4_memmove(op, dictEnd - (lowPrefix-match), length);
+                    LZ4_memmove_dict(op, dictEnd - (lowPrefix-match), length);
                     op += length;
                 } else {
                     /* match stretches into both external dictionary and current block */
                     size_t const copySize = (size_t)(lowPrefix - match);
                     size_t const restSize = length - copySize;
-                    LZ4_memcpy(op, dictEnd - copySize, copySize);
+                    LZ4_memcpy_dict(op, dictEnd - copySize, copySize);
                     op += copySize;
                     if (restSize > (size_t)(op - lowPrefix)) {  /* overlap copy */
                         BYTE* const endOfMatch = op + restSize;
@@ -2286,13 +2294,13 @@ LZ4_decompress_generic(
 
                 if (length <= (size_t)(lowPrefix-match)) {
                     /* match fits entirely within external dictionary : just copy */
-                    LZ4_memmove(op, dictEnd - (lowPrefix-match), length);
+                    LZ4_memmove_dict(op, dictEnd - (lowPrefix-match), length);
                     op += length;
                 } else {
                     /* match stretches into both external dictionary and current block */
                     size_t const copySize = (size_t)(lowPrefix - match);
                     size_t const restSize = length - copySize;
-                    LZ4_memcpy(op, dictEnd - copySize, copySize);
+                    LZ4_memcpy_dict(op, dictEnd - copySize, copySize);
                     op += copySize;
                     if (restSize > (size_t)(op - lowPrefix)) {  /* overlap copy */
                         BYTE* const endOfMatch = op + restSize;
