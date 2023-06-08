@@ -256,7 +256,7 @@ LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* d
  * @return : Nb bytes written into 'dst' (necessarily <= targetDestSize)
  *           or 0 if compression fails.
  *
- * Note : from v1.8.2 to v1.9.1, this function had a bug (fixed un v1.9.2+):
+ * Note : from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
  *        the produced compressed content could, in specific circumstances,
  *        require to be decompressed into a destination buffer larger
  *        by at least 1 byte than the content to decompress.
