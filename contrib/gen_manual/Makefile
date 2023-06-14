@@ -56,8 +56,9 @@ endif
 .PHONY: default
 default: gen_manual
 
+CXX_FOR_BUILD = $(CXX)
 gen_manual: gen_manual.cpp
-	$(CXX) $(FLAGS) $^ -o $@$(EXT)
+	$(CXX_FOR_BUILD) $(FLAGS) $^ -o $@$(EXT)
 
 $(LZ4MANUAL) : gen_manual $(LZ4API)
 	echo "Update lz4 manual in /doc"
