@@ -72,7 +72,7 @@ default: lz4-release
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
 
-all: lz4 lz4c
+all: lz4$(EXT) lz4c$(EXT)
 
 all32: CFLAGS+=-m32
 all32: all
@@ -90,16 +90,16 @@ lz4-exe.rc: lz4-exe.rc.in
 lz4-exe.o: lz4-exe.rc
 	$(WINDRES) -i lz4-exe.rc -o lz4-exe.o
 
-lz4: $(OBJFILES) lz4-exe.o
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+lz4$(EXT): $(OBJFILES) lz4-exe.o
+	$(CC) $(FLAGS) $^ -o $@
 else
-lz4: $(OBJFILES)
-	$(CC) $(FLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+lz4$(EXT): $(OBJFILES)
+	$(CC) $(FLAGS) $(OBJFILES) -o $@ $(LDLIBS)
 endif
 
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
-lz4-release: lz4
+lz4-release: lz4$(EXT)
 
 lz4-wlib: LIBFILES =
 lz4-wlib: SRCFILES+= $(LZ4DIR)/xxhash.c  # benchmark unit needs XXH64()
@@ -113,12 +113,12 @@ lz4-wlib: liblz4 $(OBJFILES)
 liblz4:
 	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LZ4DIR) liblz4
 
-lz4c: lz4
+lz4c$(EXT): lz4$(EXT)
 	$(LN_SF) lz4$(EXT) lz4c$(EXT)
 
-lz4c32: CFLAGS += -m32
-lz4c32 : $(SRCFILES)
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+lz4c32$(EXT): CFLAGS += -m32
+lz4c32$(EXT): $(SRCFILES)
+	$(CC) $(FLAGS) $^ -o $@
 
 lz4.1: lz4.1.md $(LIBVER_SRC)
 	cat $< | $(MD2ROFF) $(MD2ROFF_FLAGS) | $(SED) -n '/^\.\\\".*/!p' > $@
@@ -147,10 +147,10 @@ endif
 #-----------------------------------------------------------------------------
 ifeq ($(POSIX_ENV),Yes)
 
-unlz4: lz4
+unlz4$(EXT): lz4$(EXT)
 	$(LN_SF) lz4$(EXT) unlz4$(EXT)
 
-lz4cat: lz4
+lz4cat$(EXT): lz4$(EXT)
 	$(LN_SF) lz4$(EXT) lz4cat$(EXT)
 
 DESTDIR     ?=
@@ -170,7 +170,7 @@ mandir      ?= $(MANDIR)
 MAN1DIR     ?= $(mandir)/man1
 man1dir     ?= $(MAN1DIR)
 
-install: lz4
+install: lz4$(EXT)
 	@echo Installing binaries in $(DESTDIR)$(bindir)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
 	$(INSTALL_PROGRAM) lz4$(EXT) $(DESTDIR)$(bindir)/lz4$(EXT)
