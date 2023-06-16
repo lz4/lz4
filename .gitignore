@@ -41,3 +41,7 @@ ld.exe*
 # test artifacts
 *.lz4
 tmp*
+
+# generated Windows resource files
+lib/*.rc
+programs/*.rc
