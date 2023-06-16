@@ -60,7 +60,7 @@ lib lib-release liblz4.a:
 lz4 : liblz4.a
 lz4-release : lib-release
 lz4 lz4-release :
-	$(MAKE) -C $(PRGDIR) lz4$(EXT) lz4-release
+	$(MAKE) -C $(PRGDIR) lz4-nonrelease lz4-release
 	cp $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples

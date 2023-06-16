@@ -97,6 +97,9 @@ lz4$(EXT): $(OBJFILES)
 	$(CC) $(FLAGS) $(OBJFILES) -o $@ $(LDLIBS)
 endif
 
+.PHONY: lz4-nonrelease
+lz4-nonrelease: lz4$(EXT)
+
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
 lz4-release: lz4$(EXT)
