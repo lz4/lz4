@@ -212,7 +212,7 @@ install: lib liblz4.pc
 
 uninstall:
 	$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
-  ifeq (WINBASED,1)
+  ifeq (WINBASED,yes)
 	$(RM) $(DESTDIR)$(bindir)/$(LIBLZ4).dll
 	$(RM) $(DESTDIR)$(libdir)/$(LIBLZ4_EXP)
   else
