@@ -65,11 +65,7 @@ endif
 
 ifeq ($(WINBASED),yes)
 EXT        = .exe
-  ifneq (,$(filter MINGW%,$(TARGET_OS)))
-# WINDRES should already be set correctly for MinGW
-  else
-WINDRES    = windres
-  endif
+WINDRES ?= windres
 endif
 
 #determine if dev/nul based on host environment
