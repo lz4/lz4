@@ -339,7 +339,8 @@ int main(int argc, const char** argv)
     /* Init */
     if (inFileNames==NULL) {
         DISPLAY("Allocation error : not enough memory \n");
-        return 1;
+        operationResult = 1;
+        goto _cleanup;
     }
     inFileNames[0] = stdinmark;
     LZ4IO_setOverwrite(prefs, 0);
