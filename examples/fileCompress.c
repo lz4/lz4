@@ -1,7 +1,7 @@
 /* LZ4file API example : compress a file
  * Modified from an example code by anjiahao
  *
- * This example will demonstrate how 
+ * This example will demonstrate how
  * to manipulate lz4 compressed files like
  * normal files */
 

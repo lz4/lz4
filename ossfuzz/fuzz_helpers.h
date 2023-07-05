@@ -44,7 +44,7 @@ extern "C" {
           : (fprintf(stderr, "%s: %u: Assertion: `%s' failed. %s\n", __FILE__, \
                      __LINE__, FUZZ_QUOTE(cond), (msg)),                       \
              abort()))
-#define FUZZ_ASSERT(cond) FUZZ_ASSERT_MSG((cond), "");
+#define FUZZ_ASSERT(cond) FUZZ_ASSERT_MSG((cond), "")
 
 #if defined(__GNUC__)
 #define FUZZ_STATIC static __inline __attribute__((unused))

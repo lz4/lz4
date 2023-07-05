@@ -28,6 +28,7 @@
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
 #  pragma warning(disable : 26451)     /* disable: Arithmetic overflow */
+#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
 #endif
 
 
@@ -79,11 +80,11 @@ static const U32 prime2 = 2246822519U;
 *  Macros
 **************************************/
 #define DISPLAY(...)          fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...)  if (displayLevel>=l) { DISPLAY(__VA_ARGS__); }
-#define DISPLAYUPDATE(l, ...) if (displayLevel>=l) { \
+#define DISPLAYLEVEL(l, ...)  do { if (displayLevel>=(l)) DISPLAY(__VA_ARGS__); } while (0)
+#define DISPLAYUPDATE(l, ...) do { if (displayLevel>=(l)) { \
             if ((FUZ_GetClockSpan(g_clockTime) > refreshRate) || (displayLevel>=4)) \
             { g_clockTime = clock(); DISPLAY(__VA_ARGS__); \
-            if (displayLevel>=4) fflush(stdout); } }
+            if (displayLevel>=4) fflush(stdout); } } } while (0)
 static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
 static clock_t g_clockTime = 0;
 
@@ -484,7 +485,7 @@ int basicTests(U32 seed, double compressibility)
     prefs.frameInfo.blockSizeID = LZ4F_max4MB;
     prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
     {   size_t const dstCapacity = LZ4F_compressFrameBound(testSize, &prefs);
-        DISPLAYLEVEL(4, "dstCapacity = %u  ; ", (U32)dstCapacity)
+        DISPLAYLEVEL(4, "dstCapacity = %u  ; ", (U32)dstCapacity);
         CHECK_V(cSize, LZ4F_compressFrame(compressedBuffer, dstCapacity, CNBuffer, testSize, &prefs) );
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
     }
@@ -492,7 +493,7 @@ int basicTests(U32 seed, double compressibility)
     DISPLAYLEVEL(3, "without frame checksum : ");
     prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
     {   size_t const dstCapacity = LZ4F_compressFrameBound(testSize, &prefs);
-        DISPLAYLEVEL(4, "dstCapacity = %u  ; ", (U32)dstCapacity)
+        DISPLAYLEVEL(4, "dstCapacity = %u  ; ", (U32)dstCapacity);
         CHECK_V(cSize, LZ4F_compressFrame(compressedBuffer, dstCapacity, CNBuffer, testSize, &prefs) );
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
     }
