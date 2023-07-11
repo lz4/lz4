@@ -79,6 +79,7 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
   (*lz4fRead)->fp = fp;
   consumedSize = fread(buf, 1, sizeof(buf), (*lz4fRead)->fp);
   if (consumedSize != sizeof(buf)) {
+    LZ4F_freeDecompressionContext((*lz4fRead)->dctxPtr);
     free(*lz4fRead);
     return -LZ4F_ERROR_GENERIC;
   }
