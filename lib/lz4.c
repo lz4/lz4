@@ -431,6 +431,16 @@ static U16 LZ4_readLE16(const void* memPtr)
     }
 }
 
+static U32 LZ4_readLE32(const void* memPtr)
+{
+    if (LZ4_isLittleEndian()) {
+        return LZ4_read32(memPtr);
+    } else {
+        const BYTE* p = (const BYTE*)memPtr;
+        return (U32)p[0] + (p[1]<<8) + (p[2]<<16) + (p[3]<<24);
+    }
+}
+
 static void LZ4_writeLE16(void* memPtr, U16 value)
 {
     if (LZ4_isLittleEndian()) {
@@ -779,7 +789,7 @@ LZ4_FORCE_INLINE U32 LZ4_hash5(U64 sequence, tableType_t const tableType)
 LZ4_FORCE_INLINE U32 LZ4_hashPosition(const void* const p, tableType_t const tableType)
 {
     if ((sizeof(reg_t)==8) && (tableType != byU16)) return LZ4_hash5(LZ4_read_ARCH(p), tableType);
-    return LZ4_hash4(LZ4_read32(p), tableType);
+    return LZ4_hash4(LZ4_readLE32(p), tableType);
 }
 
 LZ4_FORCE_INLINE void LZ4_clearHash(U32 h, void* tableBase, tableType_t const tableType)
