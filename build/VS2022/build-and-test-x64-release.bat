@@ -3,10 +3,11 @@
 set /a errorno=1
 for /F "delims=#" %%E in ('"prompt #$E# & for %%E in (1) do rem"') do set "esc=%%E"
 
+call _setup.bat || goto :ERROR
+
 set "Configuration=Release"
 set "Platform=x64"
 
-call _setup.bat || goto :ERROR
 call _build.bat || goto :ERROR
 call _test.bat  || goto :ERROR
 

@@ -46,6 +46,7 @@ jobs:
 
           # gcc
           { pkgs: '',                                                   cc: gcc,       cxx: g++,         x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-latest, },
+          { pkgs: 'gcc-13 g++-13 lib32gcc-13-dev libx32gcc-13-dev',     cc: gcc-13,    cxx: g++-13,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
           { pkgs: 'gcc-12 g++-12 lib32gcc-12-dev libx32gcc-12-dev',     cc: gcc-12,    cxx: g++-12,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
           { pkgs: 'gcc-11 g++-11 lib32gcc-11-dev libx32gcc-11-dev',     cc: gcc-11,    cxx: g++-11,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
           { pkgs: 'gcc-10 g++-10 lib32gcc-10-dev libx32gcc-10-dev',     cc: gcc-10,    cxx: g++-10,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
@@ -55,6 +56,7 @@ jobs:
 
           # clang
           { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-latest, },
+          { pkgs: 'clang-15  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-15,  cxx: clang++-15,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-14  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-14,  cxx: clang++-14,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-13  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-13,  cxx: clang++-13,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-12  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
