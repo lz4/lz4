@@ -65,7 +65,7 @@ endif
 
 ifeq ($(WINBASED),yes)
 EXT        = .exe
-WINDRES    = windres
+WINDRES ?= windres
 endif
 
 #determine if dev/nul based on host environment
