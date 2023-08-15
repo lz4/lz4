@@ -10,7 +10,7 @@
 # LZ4's CMake support is maintained by Evan Nemerson; when filing
 # bugs please mention @nemequ to make sure I see it.
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.5)
 
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
@@ -24,14 +24,7 @@ string(REGEX REPLACE "^#define LZ4_VERSION_RELEASE +([0-9]+) +.*$" "\\1" LZ4_VER
 set(LZ4_VERSION_STRING "${LZ4_VERSION_MAJOR}.${LZ4_VERSION_MINOR}.${LZ4_VERSION_RELEASE}")
 mark_as_advanced(LZ4_VERSION_STRING LZ4_VERSION_MAJOR LZ4_VERSION_MINOR LZ4_VERSION_RELEASE)
 
-if("${CMAKE_VERSION}" VERSION_LESS "3.0")
-  project(LZ4 C)
-else()
-  cmake_policy (SET CMP0048 NEW)
-  project(LZ4
-    VERSION ${LZ4_VERSION_STRING}
-    LANGUAGES C)
-endif()
+project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
 
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
