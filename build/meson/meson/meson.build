@@ -81,6 +81,15 @@ if get_option('memory-usage') > 0
   compile_args += '-DLZ4_MEMORY_USAGE=@0@'.format(get_option('memory-usage'))
 endif
 
+if get_option('endianness-independent-output')
+  if get_option('default_library') != 'static'
+    error('Endianness-independent output can only be enabled in static builds')
+  endif
+
+  add_project_arguments('-DLZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT')
+  compile_args += '-DLZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT'
+endif
+
 if get_option('unstable')
   add_project_arguments('-DLZ4_STATIC_LINKING_ONLY', language: 'c')
   compile_args += '-DLZ4_STATIC_LINKING_ONLY'

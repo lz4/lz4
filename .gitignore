@@ -21,6 +21,7 @@ lz4
 
 # IDE / editors files
 .clang_complete
+.vscode
 _codelite/
 _codelite_lz4/
 bin/
