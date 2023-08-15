@@ -124,6 +124,16 @@ if(BUILD_STATIC_LIBS)
   list(APPEND LZ4_LIBRARIES_BUILT lz4_static)
 endif()
 
+# xxhash namesapce
+if(BUILD_SHARED_LIBS)
+  target_compile_definitions(lz4_shared PRIVATE 
+    XXH_NAMESPACE=LZ4_)
+endif()
+if(BUILD_STATIC_LIBS)
+  target_compile_definitions(lz4_static PRIVATE 
+    XXH_NAMESPACE=LZ4_)
+endif()
+
 if(BUILD_STATIC_LIBS)
   set(LZ4_LINK_LIBRARY lz4_static)
 else()
