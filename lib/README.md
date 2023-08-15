@@ -111,7 +111,8 @@ The following build macro can be selected to adjust source code behavior at comp
 - `LZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT` : experimental feature aimed at producing the same
   compressed output on platforms of different endianness (i.e. little-endian and big-endian).
   Output on little-endian platforms shall remain unchanged, while big-endian platforms will start producing
-  the same output as little-endian. This isn't expected to impact backward- and forward-compatibility in any way.
+  the same output as little-endian ones. This isn't expected to impact backward- and forward-compatibility
+  in any way.
 
 - `LZ4_FREESTANDING` : by setting this build macro to 1,
   LZ4/HC removes dependencies on the C standard library,
