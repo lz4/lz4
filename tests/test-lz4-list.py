@@ -15,7 +15,7 @@ if not os.path.exists(LZ4):
 TEMP = tempfile.gettempdir()
 
 
-class NVerboseFileInfo(object):
+class NVerboseFileInfo:
     def __init__(self, line_in):
         self.line = line_in
         splitlines = line_in.split()
@@ -92,7 +92,7 @@ class TestNonVerbose(unittest.TestCase):
                 self.assertEqual(nvinfo.uncompressed, to_human(nvinfo.exp_unc_size), nvinfo.line)
 
 
-class VerboseFileInfo(object):
+class VerboseFileInfo:
     def __init__(self, lines):
         # Parse lines
         self.frame_list = []
