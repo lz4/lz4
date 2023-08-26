@@ -1041,7 +1041,7 @@ LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
         if (fstat(fileno(finput), &sb) != 0) END_PROCESS(74, "Stat error: %s", strerror(errno));
         if (sb.st_size >= INT_MAX) END_PROCESS(74, "Input file too large - %llu bytes",
             (unsigned long long)sb.st_size);
-        inputSize = sb.st_size - 12;
+        inputSize = (U32)sb.st_size - 12;
     }
 
 #ifdef __unix__
