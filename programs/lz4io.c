@@ -51,6 +51,9 @@
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strerror, strcmp, strlen */
 #include <time.h>      /* clock */
+#ifdef __unix__
+#include <sys/mman.h>  /* mmap */
+#endif
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
 #include "lz4.h"       /* still required for legacy format */
@@ -78,6 +81,8 @@
 #define LZ4IO_SKIPPABLE0    0x184D2A50
 #define LZ4IO_SKIPPABLEMASK 0xFFFFFFF0
 #define LEGACY_MAGICNUMBER  0x184C2102
+#define MOZILLA_MAGIC1      0x4c7a6f6d /* First four bytes of "mozLz40\0" */
+#define MOZILLA_MAGIC2      0x0030347a /* Last four bytes of "mozLz40\0" */
 
 #define CACHELINE 64
 #define LEGACY_BLOCKSIZE   (8 MB)
@@ -1017,6 +1022,74 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
     return streamSize;
 }
 
+static unsigned long long
+LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
+{
+    U32 outputSize, inputSize;
+    unsigned storedSkips;
+    char *in_buff;
+    char *out_buff;
+#ifdef __unix__
+    int mmapped;
+#endif
+
+    {   size_t const sizeCheck = fread(&outputSize, 1, 4, finput);
+        if (sizeCheck != 4) END_PROCESS(73, "Read error: %s", strerror(errno));
+        outputSize = LZ4IO_readLE32(&outputSize);
+    }
+    {   struct stat sb;
+        if (fstat(fileno(finput), &sb) != 0) END_PROCESS(74, "Stat error: %s", strerror(errno));
+        if (sb.st_size >= INT_MAX) END_PROCESS(74, "Input file too large - %jd bytes", sb.st_size);
+        inputSize = sb.st_size - 12;
+    }
+
+#ifdef __unix__
+    /*
+     * On Unix we try to mmap the input -- to save memory -- falling back
+     * to stdio, if mmap fails. Output is always written "normally".
+     */
+    in_buff = mmap(NULL, inputSize, PROT_READ, MAP_SHARED, fileno(finput), 12);
+    if (in_buff == MAP_FAILED) {
+        DISPLAYLEVEL(1, "mmap-ing input failed (%s), falling back to stdio\n", strerror(errno));
+        in_buff  = malloc(inputSize);
+        mmapped = 0;
+    } else {
+        DISPLAYLEVEL(2, "Using mmap for input\n");
+        fseek(finput, 0, SEEK_END); /* Lest there will be noise about undecodable data */
+        mmapped = 1;
+    }
+#else
+    in_buff  = malloc(inputSize);
+#endif
+    out_buff = malloc(outputSize);
+    if (!in_buff || !out_buff) END_PROCESS(75, "Allocation error : not enough memory");
+
+#ifdef __unix__
+    if (!mmapped)
+#endif
+    {   size_t const sizeCheck = fread(in_buff, 1, inputSize, finput);
+        if (sizeCheck != inputSize) END_PROCESS(76, "Read error : cannot read input: %s", strerror(errno));
+    }
+
+    /* Decode Block */
+    {   int const decodeSize = LZ4_decompress_safe(in_buff, out_buff, inputSize, outputSize);
+        if (decodeSize < 0) END_PROCESS(77, "Decoding Failed ! Corrupted input detected !");
+        if (decodeSize != (int)outputSize) DISPLAYLEVEL(2, "Suspect: decoded size %d differs from the expected %zd", decodeSize, (size_t)outputSize);
+        /* Write Block */
+        storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, decodeSize, prefs->sparseFileSupport, 0); /* success or die */
+    }
+
+    LZ4IO_fwriteSparseEnd(foutput, storedSkips);
+
+    /* Free */
+#ifdef __unix__
+    if (!mmapped)
+#endif
+    free(in_buff);
+    free(out_buff);
+
+    return outputSize;
+}
 
 
 typedef struct {
@@ -1260,6 +1333,12 @@ selectDecoder(dRess_t ress,
                 END_PROCESS(43, "Stream error : cannot skip skippable area");
         }
         return 0;
+    case MOZILLA_MAGIC1:
+        /* Start over having skipped 4 bytes, and end up in the next case */
+        DISPLAYLEVEL(4, "Detected : Mozilla format\n");
+        return selectDecoder(ress, finput, foutput, prefs);
+    case MOZILLA_MAGIC2:
+        return LZ4IO_decodeMozilla(finput, foutput, prefs);
     default:
         if (nbFrames == 1) {  /* just started */
             /* Wrong magic number at the beginning of 1st stream */
