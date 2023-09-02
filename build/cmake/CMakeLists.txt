@@ -93,6 +93,7 @@ set(LZ4_CLI_SOURCES
 option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static library (if applicable)" ON)
 
 # liblz4
+include(GNUInstallDirs)
 set(LZ4_LIBRARIES_BUILT)
 if(BUILD_SHARED_LIBS)
   add_library(lz4_shared SHARED ${LZ4_SOURCES})
@@ -192,8 +193,6 @@ foreach (flag
 endforeach (flag)
 
 if(NOT LZ4_BUNDLED_MODE)
-  include(GNUInstallDirs)
-
   install(TARGETS ${LZ4_PROGRAMS_BUILT}
     BUNDLE	DESTINATION "${CMAKE_INSTALL_BINDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
