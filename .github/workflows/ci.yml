@@ -677,12 +677,10 @@ jobs:
 
     - name: cmake
       run: |
-        cd build/cmake
-        mkdir build
-        cd build
-        cmake ..
-        CFLAGS=-Werror make VERBOSE=1
-
+        CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install
+        VERBOSE=1 cmake --build build --target install
+        cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
+        VERBOSE=1 cmake --build build_test
 
   # Invoke cmake via Makefile
   lz4-build-make-cmake:
