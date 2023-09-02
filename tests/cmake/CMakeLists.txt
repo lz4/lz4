@@ -19,5 +19,5 @@ endif()
 
 # Add a test that builds against the installation
 set(LZ4_TESTS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
-add_executable(frametest "${LZ4_TESTS_SOURCE_DIR}/frametest.c")
-target_link_libraries(frametest LZ4::lz4_shared)
+add_executable(decompress-partial "${LZ4_TESTS_SOURCE_DIR}/decompress-partial.c")
+target_link_libraries(decompress-partial LZ4::lz4_shared)
