@@ -485,7 +485,6 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
 
 
-
 #if LZ4_FAST_DEC_LOOP
 
 LZ4_FORCE_INLINE void
