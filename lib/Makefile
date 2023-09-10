@@ -67,10 +67,15 @@ ifeq ($(TARGET_OS), Darwin)
 	SHARED_EXT_VER = $(LIBVER).$(SHARED_EXT)
 	SONAME_FLAGS = -install_name $(libdir)/liblz4.$(SHARED_EXT_MAJOR) -compatibility_version $(LIBVER_MAJOR) -current_version $(LIBVER) -dynamiclib
 else
-	SONAME_FLAGS = -Wl,-soname=liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
-	SHARED_EXT = so
-	SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
-	SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
+	ifeq ($(WINBASED),yes)
+		SHARED_EXT = dll
+		SHARED_EXT_VER = $(SHARED_EXT)
+	else
+		SONAME_FLAGS = -Wl,-soname=liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
+		SHARED_EXT = so
+		SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
+		SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
+	endif
 endif
 
 .PHONY: default
@@ -102,7 +107,7 @@ endif
 ifeq ($(WINBASED),yes)
 liblz4-dll.rc: liblz4-dll.rc.in
 	@echo creating library resource
-	$(SED) -e 's|@LIBLZ4@|$(LIBLZ4)|' \
+	$(SED) -e 's|@LIBLZ4@|$(LIBLZ4_NAME)|' \
          -e 's|@LIBVER_MAJOR@|$(LIBVER_MAJOR)|g' \
          -e 's|@LIBVER_MINOR@|$(LIBVER_MINOR)|g' \
          -e 's|@LIBVER_PATCH@|$(LIBVER_PATCH)|g' \
@@ -114,7 +119,7 @@ liblz4-dll.o: liblz4-dll.rc
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
 ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o dll/$@.dll -Wl,--out-implib,dll/$(LIBLZ4_EXP)
+	$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
 endif
 
 else   # not windows
@@ -138,7 +143,7 @@ clean:
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
-	$(RM) core *.o liblz4.pc dll/$(LIBLZ4).dll dll/$(LIBLZ4_EXP)
+	$(RM) core *.o liblz4.pc $(LIBLZ4) $(LIBLZ4_EXP)
 	$(RM) *.a *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	@echo Cleaning library completed
 
@@ -196,8 +201,8 @@ install: lib liblz4.pc
 # search them first in their directory. This allows to not pollute system
 # directories (like c:/windows/system32), nor modify the PATH variable.
     ifeq ($(WINBASED),yes)
-	$(INSTALL_PROGRAM) dll/$(LIBLZ4).dll $(DESTDIR)$(bindir)
-	$(INSTALL_PROGRAM) dll/$(LIBLZ4_EXP) $(DESTDIR)$(libdir)
+	$(INSTALL_PROGRAM) $(LIBLZ4) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) $(LIBLZ4_EXP) $(DESTDIR)$(libdir)
     else
 	$(INSTALL_PROGRAM) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)
 	$(LN_SF) liblz4.$(SHARED_EXT_VER) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT_MAJOR)
@@ -212,8 +217,8 @@ install: lib liblz4.pc
 
 uninstall:
 	$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
-  ifeq (WINBASED,1)
-	$(RM) $(DESTDIR)$(bindir)/$(LIBLZ4).dll
+  ifeq (WINBASED,yes)
+	$(RM) $(DESTDIR)$(bindir)/$(LIBLZ4)
 	$(RM) $(DESTDIR)$(libdir)/$(LIBLZ4_EXP)
   else
 	$(RM) $(DESTDIR)$(libdir)/liblz4.$(SHARED_EXT)
