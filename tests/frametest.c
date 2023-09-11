@@ -863,11 +863,12 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, o_
     }
 }
 
-#   define EXIT_MSG(...) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                           DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(1); }
-#   undef CHECK
-#   define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
+#define EXIT_MSG(...) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                        DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(1); }
+#undef CHECK
+#define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
 
+#define RAND_BITS(N) (FUZ_rand(randState) & ((1 << (N))-1))
 
 size_t test_lz4f_decompression_wBuffers(
           const void* cSrc, size_t cSize,
@@ -895,27 +896,28 @@ size_t test_lz4f_decompression_wBuffers(
     while (ip < iend) {
         unsigned const nbBitsI = (FUZ_rand(randState) % (maxBits-1)) + 1;
         unsigned const nbBitsO = (FUZ_rand(randState) % (maxBits)) + 1;
-        size_t const iSizeCand = (FUZ_rand(randState) & ((1<<nbBitsI)-1)) + 1;
+        size_t const iSizeCand = RAND_BITS(nbBitsI) + 1;
         size_t const iSizeMax = MIN(iSizeCand, (size_t)(iend-ip));
         size_t iSize = iSizeMax;
-        size_t const oSizeCand = (FUZ_rand(randState) & ((1<<nbBitsO)-1)) + 2;
+        size_t const oSizeCand = RAND_BITS(nbBitsO) + 2;
         size_t const oSizeMax = MIN(oSizeCand, (size_t)(oend-op));
         int const sentinelTest = (op + oSizeMax < oend);
         size_t oSize = oSizeMax;
-        BYTE const mark = (BYTE)(FUZ_rand(randState) & 255);
+        BYTE const mark = (BYTE)(RAND_BITS(8));
         LZ4F_decompressOptions_t dOptions;
         memset(&dOptions, 0, sizeof(dOptions));
-        dOptions.stableDst = FUZ_rand(randState) & 1;
+        dOptions.stableDst = RAND_BITS(1);
         if (o_scenario == o_overwrite) dOptions.stableDst = 0;  /* overwrite mode */
-        dOptions.skipChecksums = FUZ_rand(randState) & 127;
+        dOptions.skipChecksums = RAND_BITS(1);
         if (sentinelTest) op[oSizeMax] = mark;
 
         DISPLAYLEVEL(7, "dstCapacity=%u,  presentedInput=%u \n", (unsigned)oSize, (unsigned)iSize);
 
         /* read data from byte-exact buffer to catch out-of-bound reads */
         {   void* const iBuffer = malloc(iSizeMax);
-            void* const tmpop = (FUZ_rand(randState) & (oSize == 0)) ? NULL : op;
-            const void* const tmpip = (FUZ_rand(randState) & (iSize == 0)) ? NULL : iBuffer;
+            /*test NULL supported if size==0 */
+            void* const tmpop = RAND_BITS(oSize == 0) ? NULL : op;
+            const void* const tmpip = RAND_BITS(iSize == 0) ? NULL : iBuffer;
             assert(iBuffer != NULL);
             memcpy(iBuffer, ip, iSizeMax);
             moreToFlush = LZ4F_decompress(dCtx, tmpop, &oSize, tmpip, &iSize, &dOptions);
