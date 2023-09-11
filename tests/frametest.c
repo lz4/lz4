@@ -863,10 +863,10 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, o_
     }
 }
 
-#   define EXIT_MSG(...) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
-                           DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(1); }
-#   undef CHECK
-#   define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
+#define EXIT_MSG(...) { DISPLAY("Error => "); DISPLAY(__VA_ARGS__); \
+                        DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(1); }
+#undef CHECK
+#define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
 
 #define RAND_BITS(N) (FUZ_rand(randState) & ((1 << (N))-1))
 
@@ -915,6 +915,7 @@ size_t test_lz4f_decompression_wBuffers(
 
         /* read data from byte-exact buffer to catch out-of-bound reads */
         {   void* const iBuffer = malloc(iSizeMax);
+            /*test NULL supported if size==0 */
             void* const tmpop = RAND_BITS(oSize == 0) ? NULL : op;
             const void* const tmpip = RAND_BITS(iSize == 0) ? NULL : iBuffer;
             assert(iBuffer != NULL);

@@ -365,8 +365,9 @@ typedef struct LZ4F_dctx_s LZ4F_dctx;   /* incomplete type */
 typedef LZ4F_dctx* LZ4F_decompressionContext_t;   /* compatibility with previous API versions */
 
 typedef struct {
-  unsigned stableDst;     /* pledges that last 64KB decompressed data will remain available unmodified between invocations.
-                           * This optimization skips storage operations in tmp buffers. */
+  unsigned stableDst;     /* pledges that last 64KB decompressed data is present right before @dstBuffer pointer.
+                           * This optimization skips internal storage operations.
+                           * Once set, this pledge must remain valid up to the end of current frame. */
   unsigned skipChecksums; /* disable checksum calculation and verification, even when one is present in frame, to save CPU time.
                            * Setting this option to 1 once disables all checksums for the rest of the frame. */
   unsigned reserved1;     /* must be set to zero for forward compatibility */
