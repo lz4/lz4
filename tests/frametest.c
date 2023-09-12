@@ -1060,15 +1060,12 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     void* decodedBuffer = NULL;
     U32 coreRand = seed;
     LZ4F_decompressionContext_t dCtx = NULL;
-    LZ4F_decompressionContext_t dCtxNoise = NULL;
     LZ4F_compressionContext_t cCtx = NULL;
     clock_t const startClock = clock();
     clock_t const clockDuration = duration_s * CLOCKS_PER_SEC;
 
     /* Create states & buffers */
     {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtx, LZ4F_VERSION);
-        CHECK(LZ4F_isError(creationStatus), "Allocation failed (error %i)", (int)creationStatus); }
-    {   size_t const creationStatus = LZ4F_createDecompressionContext(&dCtxNoise, LZ4F_VERSION);
         CHECK(LZ4F_isError(creationStatus), "Allocation failed (error %i)", (int)creationStatus); }
     {   size_t const creationStatus = LZ4F_createCompressionContext(&cCtx, LZ4F_VERSION);
         CHECK(LZ4F_isError(creationStatus), "Allocation failed (error %i)", (int)creationStatus); }
@@ -1240,17 +1237,16 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
         /* test decompression on noisy src */
         DISPLAYLEVEL(6, "noisy decompression \n");
-        test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtxNoise, seed, testNb, 0 /*don't search error Pos*/ );
+        test_lz4f_decompression(compressedBuffer, cSize, srcStart, srcSize, crcOrig, &randState, dCtx, seed, testNb, 0 /*don't search error Pos*/ );
         /* note : we don't analyze result here : it probably failed, which is expected.
          * The sole purpose is to catch potential out-of-bound reads and writes. */
-        LZ4F_resetDecompressionContext(dCtxNoise);  /* context must be reset after an error */
+        LZ4F_resetDecompressionContext(dCtx);  /* state must be reset to clean after an error */
 
     }   /* for ( ; (testNb < nbTests) ; ) */
 
     DISPLAYLEVEL(2, "\rAll tests completed   \n");
 
     LZ4F_freeDecompressionContext(dCtx);
-    LZ4F_freeDecompressionContext(dCtxNoise);
     LZ4F_freeCompressionContext(cCtx);
     free(CNBuffer);
     free(compressedBuffer);
