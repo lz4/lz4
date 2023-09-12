@@ -218,7 +218,7 @@ static unsigned FUZ_highbit(U32 v32)
 #define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s \n", LZ4F_getErrorName(v)); goto _output_error; }
 #define CHECK(f)   { LZ4F_errorCode_t const CHECK_V(err_ , f); }
 
-int basicTests(U32 seed, double compressibility)
+static int unitTests(U32 seed, double compressibility)
 {
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)
     void* const CNBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
@@ -1156,8 +1156,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                                         (int)result, LZ4F_getErrorName(result));
         }
 
-#if 1
-        /* insert noise into src */
+        /* insert noise into src - ensure decoder survives with no sanitizer error */
         {   U32 const maxNbBits = FUZ_highbit((U32)cSize);
             size_t pos = 0;
             for (;;) {
@@ -1185,7 +1184,6 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
         /* note : we don't analyze result here : it probably failed, which is expected.
          * The sole purpose is to catch potential out-of-bound reads and writes. */
         LZ4F_resetDecompressionContext(dCtxNoise);  /* context must be reset after an error */
-#endif
 
 }   /* for ( ; (testNb < nbTests) ; ) */
 
@@ -1231,7 +1229,6 @@ int main(int argc, const char** argv)
     unsigned nbTests = nbTestsDefault;
     unsigned testNb = 0;
     int proba = FUZ_COMPRESSIBILITY_DEFAULT;
-    int result=0;
     U32 duration=0;
     const char* const programName = argv[0];
 
@@ -1341,20 +1338,26 @@ int main(int argc, const char** argv)
         }
     }
 
-    /* Get Seed */
-    DISPLAY("Starting lz4frame tester (%i-bits, %s)\n", (int)(sizeof(size_t)*8), LZ4_VERSION_STRING);
+    DISPLAY("Starting lz4frame tester (%i-bits, %s) \n", (int)(sizeof(size_t)*8), LZ4_VERSION_STRING);
 
+    /* Select a random seed if none given */
     if (!seedset) {
         time_t const t = time(NULL);
         U32 const h = XXH32(&t, sizeof(t), 1);
         seed = h % 10000;
     }
-    DISPLAY("Seed = %u\n", seed);
-    if (proba!=FUZ_COMPRESSIBILITY_DEFAULT) DISPLAY("Compressibility : %i%%\n", proba);
+    DISPLAY("Seed = %u \n", seed);
+    if (proba != FUZ_COMPRESSIBILITY_DEFAULT)
+        DISPLAY("Compressibility : %i%% \n", proba);
 
-    nbTests += (nbTests==0);  /* avoid zero */
+    {   double const compressibility = (double)proba / 100;
+        /* start by unit tests if not requesting a specific run nb */
+        if (testNb==0) {
+            if (unitTests(seed, compressibility))
+                return 1;
+        }
 
-    if (testNb==0) result = basicTests(seed, ((double)proba) / 100);
-    if (result) return 1;
-    return fuzzerTests(seed, nbTests, testNb, ((double)proba) / 100, duration);
+        nbTests += (nbTests==0);  /* avoid zero */
+        return fuzzerTests(seed, nbTests, testNb, compressibility, duration);
+    }
 }
