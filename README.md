@@ -60,7 +60,7 @@ in single-thread mode.
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
 
-LZ4 is also compatible and optimized for x32 mode,
+LZ4 is also compatible and optimized for x32 mode (`-mx32`),
 for which it provides additional speed performance.
 
 
