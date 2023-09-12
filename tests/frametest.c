@@ -215,6 +215,64 @@ static unsigned FUZ_highbit(U32 v32)
 /*-*******************************************************
 *  Tests
 *********************************************************/
+
+#define CONTROL(c) { \
+    if (!(c)) {      \
+        DISPLAY("Error (line %i) => %s not respected \n", __LINE__, #c); \
+        return 1;    \
+}   }
+
+static int bug1227(void)
+{
+    LZ4F_dctx* dctx;
+    CONTROL(!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION)));
+
+    /* first session */
+    {   const char s9Buffer[9] = { 0 };
+        char d9Buffer[sizeof(s9Buffer)];
+        size_t const c9SizeBound = LZ4F_compressFrameBound(sizeof(s9Buffer), NULL);
+        void* const c9Buffer = malloc(c9SizeBound);
+        /* First compress a valid frame */
+        LZ4F_preferences_t pref = LZ4F_INIT_PREFERENCES;
+        pref.frameInfo.contentSize = sizeof(s9Buffer);
+        CONTROL(c9Buffer != NULL);
+        {   size_t const c9Size = LZ4F_compressFrame(c9Buffer, c9SizeBound, s9Buffer, sizeof(s9Buffer), &pref);
+            CONTROL(!LZ4F_isError(c9Size));
+            assert(c9Size > 15);
+            /* decompress it, but do not complete the process - state not terminated correctly */
+            {   size_t dstSize = sizeof(d9Buffer);
+                size_t srcSize = 15;
+                size_t const d9Size = LZ4F_decompress(dctx, d9Buffer, &dstSize, c9Buffer, &srcSize, NULL);
+                CONTROL(!LZ4F_isError(d9Size));
+                CONTROL(srcSize < c9Size); /* not entirely consumed */
+            }
+        }
+        free(c9Buffer);
+    }
+    LZ4F_resetDecompressionContext(dctx); /* unfinished session -> reset should make it clean */
+
+    /* second session : generate a valid 0-size frame with no content size field (default) */
+    {   size_t const c0SizeBound = LZ4F_compressFrameBound(0, NULL);
+        void* const c0Buffer = malloc(c0SizeBound);
+        char d0Buffer[1];
+        CONTROL(c0Buffer != NULL);
+        {   size_t const c0Size = LZ4F_compressFrame(c0Buffer, c0SizeBound, NULL, 0, NULL);
+            CONTROL(!LZ4F_isError(c0Size));
+            /* now decompress this valid empty frame */
+            {   size_t dstSize = sizeof(d0Buffer);
+                size_t srcSize = c0Size;
+                size_t const d0Size = LZ4F_decompress(dctx, d0Buffer, &dstSize, c0Buffer, &srcSize, NULL);
+                CONTROL(!LZ4F_isError(d0Size));
+                CONTROL(dstSize == 0);
+                CONTROL(srcSize == c0Size);
+        }   }
+        free(c0Buffer);
+    }
+
+    LZ4F_freeDecompressionContext(dctx);
+    return 0;
+}
+
 #define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s \n", LZ4F_getErrorName(v)); goto _output_error; }
 #define CHECK(f)   { LZ4F_errorCode_t const CHECK_V(err_ , f); }
 
@@ -764,6 +822,9 @@ static int unitTests(U32 seed, double compressibility)
         goto _output_error;
     }
 
+    DISPLAYLEVEL(3, "check bug1227: reused dctx after error => ");
+    if (bug1227()) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
 
     DISPLAYLEVEL(3, "Skippable frame test : \n");
     {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
@@ -1026,7 +1087,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
     for ( ; (testNb < nbTests) || (clockDuration > FUZ_GetClockSpan(startClock)) ; testNb++) {
         U32 randState = coreRand ^ prime1;
         unsigned const srcBits = (FUZ_rand(&randState) % (FUZ_highbit((U32)(CNBufferLength-1)) - 1)) + 1;
-        size_t const srcSize = (FUZ_rand(&randState) & ((1<<srcBits)-1)) + 1;
+        size_t const srcSize = (FUZ_rand(&randState) & ((1<<srcBits)-1));
         size_t const srcStartId = FUZ_rand(&randState) % (CNBufferLength - srcSize);
         const BYTE* const srcStart = (const BYTE*)CNBuffer + srcStartId;
         unsigned const neverFlush = (FUZ_rand(&randState) & 15) == 1;
