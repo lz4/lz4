@@ -171,16 +171,17 @@ unsigned int FUZ_rand(unsigned int* src)
     return rand32 >> 5;
 }
 
-#define FUZ_RAND15BITS  (FUZ_rand(seed) & 0x7FFF)
-#define FUZ_RANDLENGTH  ( (FUZ_rand(seed) & 3) ? (FUZ_rand(seed) % 15) : (FUZ_rand(seed) % 510) + 15)
-static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, double proba, U32* seed)
+#define RAND_BITS(N) (FUZ_rand(randState) & ((1 << (N))-1))
+#define FUZ_RAND15BITS  RAND_BITS(15)
+#define FUZ_RANDLENGTH  ( RAND_BITS(2) ? (FUZ_rand(randState) % 15) : (FUZ_rand(randState) % 510) + 15)
+static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, double proba, U32* randState)
 {
     BYTE* BBuffer = (BYTE*)buffer;
     size_t pos = 0;
     U32 P32 = (U32)(32768 * proba);
 
     /* First Byte */
-    BBuffer[pos++] = (BYTE)(FUZ_rand(seed));
+    BBuffer[pos++] = (BYTE)(FUZ_rand(randState));
 
     while (pos < bufferSize) {
         /* Select : Literal (noise) or copy (within 64K) */
@@ -198,10 +199,9 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
             size_t const lengthRand = FUZ_RANDLENGTH + 4;
             size_t const length = MIN(lengthRand, bufferSize - pos);
             size_t const end = pos + length;
-            while (pos < end) BBuffer[pos++] = (BYTE)(FUZ_rand(seed) >> 5);
+            while (pos < end) BBuffer[pos++] = (BYTE)(FUZ_rand(randState) >> 5);
     }   }
 }
-
 
 static unsigned FUZ_highbit(U32 v32)
 {
@@ -225,7 +225,8 @@ static int unitTests(U32 seed, double compressibility)
     size_t const cBuffSize = LZ4F_compressFrameBound(COMPRESSIBLE_NOISE_LENGTH, NULL);
     void* const compressedBuffer = malloc(cBuffSize);
     void* const decodedBuffer = malloc(COMPRESSIBLE_NOISE_LENGTH);
-    U32 randState = seed;
+    U32 randVal = seed;
+    U32* const randState = &randVal;
     size_t cSize, testSize;
     LZ4F_decompressionContext_t dCtx = NULL;
     LZ4F_compressionContext_t cctx = NULL;
@@ -238,7 +239,7 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAY("allocation error, not enough memory to start fuzzer tests \n");
         goto _output_error;
     }
-    FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, &randState);
+    FUZ_fillCompressibleNoiseBuffer(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, compressibility, randState);
     crcOrig = XXH64(CNBuffer, COMPRESSIBLE_NOISE_LENGTH, 1);
 
     /* LZ4F_compressBound() : special case : srcSize == 0 */
@@ -447,8 +448,8 @@ static int unitTests(U32 seed, double compressibility)
 
         DISPLAYLEVEL(3, "random segment sizes : ");
         while (ip < iend) {
-            unsigned const nbBits = FUZ_rand(&randState) % maxBits;
-            size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
+            unsigned const nbBits = FUZ_rand(randState) % maxBits;
+            size_t iSize = RAND_BITS(nbBits) + 1;
             size_t oSize = (size_t)(oend-op);
             if (iSize > (size_t)(iend-ip)) iSize = (size_t)(iend-ip);
             CHECK( LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL) );
@@ -780,8 +781,8 @@ static int unitTests(U32 seed, double compressibility)
 
         DISPLAYLEVEL(3, "random segment sizes : \n");
         while (ip < iend) {
-            unsigned nbBits = FUZ_rand(&randState) % maxBits;
-            size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
+            unsigned nbBits = FUZ_rand(randState) % maxBits;
+            size_t iSize = RAND_BITS(nbBits) + 1;
             size_t oSize = (size_t)(oend-op);
             if (iSize > (size_t)(iend-ip)) iSize = (size_t)(iend-ip);
             CHECK( LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL) );
@@ -799,8 +800,8 @@ static int unitTests(U32 seed, double compressibility)
         iend = ip+8;
 
         while (ip < iend) {
-            unsigned const nbBits = FUZ_rand(&randState) % maxBits;
-            size_t iSize = (FUZ_rand(&randState) & ((1<<nbBits)-1)) + 1;
+            unsigned const nbBits = FUZ_rand(randState) % maxBits;
+            size_t iSize = RAND_BITS(nbBits) + 1;
             size_t oSize = (size_t)(oend-op);
             if (iSize > (size_t)(iend-ip)) iSize = (size_t)(iend-ip);
             CHECK( LZ4F_decompress(dCtx, op, &oSize, ip, &iSize, NULL) );
@@ -867,8 +868,6 @@ static void locateBuffDiff(const void* buff1, const void* buff2, size_t size, o_
                         DISPLAY(" (seed %u, test nb %u)  \n", seed, testNb); exit(1); }
 #undef CHECK
 #define CHECK(cond, ...) { if (cond) { EXIT_MSG(__VA_ARGS__); } }
-
-#define RAND_BITS(N) (FUZ_rand(randState) & ((1 << (N))-1))
 
 size_t test_lz4f_decompression_wBuffers(
           const void* cSrc, size_t cSize,
@@ -1185,7 +1184,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
          * The sole purpose is to catch potential out-of-bound reads and writes. */
         LZ4F_resetDecompressionContext(dCtxNoise);  /* context must be reset after an error */
 
-}   /* for ( ; (testNb < nbTests) ; ) */
+    }   /* for ( ; (testNb < nbTests) ; ) */
 
     DISPLAYLEVEL(2, "\rAll tests completed   \n");
 
@@ -1335,8 +1334,8 @@ int main(int argc, const char** argv)
                     return FUZ_usage(programName);
                 }
             }
-        }
-    }
+        } /* if (argument[0]=='-') */
+    } /* for (argNb=1; argNb<argc; argNb++) */
 
     DISPLAY("Starting lz4frame tester (%i-bits, %s) \n", (int)(sizeof(size_t)*8), LZ4_VERSION_STRING);
 
