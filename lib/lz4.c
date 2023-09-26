@@ -903,7 +903,7 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
     cctx->dictSize = 0;
 }
 
-/** LZ4_compress_generic() :
+/** LZ4_compress_generic_validated() :
  *  inlined, to ensure branches are decided at compilation time.
  *  The following conditions are presumed already validated:
  *  - source != NULL
