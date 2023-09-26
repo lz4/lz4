@@ -11,15 +11,15 @@
 lz4_source_root = '../../../..'
 
 examples = {
-  'printVersion': 'printVersion.c',
-  'doubleBuffer': 'blockStreaming_doubleBuffer.c',
+  'print_version': 'print_version.c',
+  'blockStreaming_doubleBuffer': 'blockStreaming_doubleBuffer.c',
   'dictionaryRandomAccess': 'dictionaryRandomAccess.c',
-  'ringBuffer': 'blockStreaming_ringBuffer.c',
-  'ringBufferHC': 'HCStreaming_ringBuffer.c',
-  'lineCompress': 'blockStreaming_lineByLine.c',
+  'blockStreaming_ringBuffer': 'blockStreaming_ringBuffer.c',
+  'streamingHC_ringBuffer': 'streamingHC_ringBuffer.c',
+  'blockStreaming_lineByLine': 'blockStreaming_lineByLine.c',
   'frameCompress': 'frameCompress.c',
-  'compressFunctions': 'compress_functions.c',
-  'simpleBuffer': 'simple_buffer.c',
+  'bench_functions': 'bench_functions.c',
+  'simple_buffer': 'simple_buffer.c',
 }
 
 foreach e, src : examples
