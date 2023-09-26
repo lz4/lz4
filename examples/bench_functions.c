@@ -1,5 +1,5 @@
 /*
- * compress_functions.c
+ * bench_functions.c
  * Copyright  : Kyle Harper
  * License    : Follows same licensing as the lz4.c/lz4.h program at any given time.  Currently, BSD 2.
  * Description: A program to demonstrate the various compression functions involved in when using LZ4_compress_default().  The idea
@@ -67,8 +67,10 @@
 #include <string.h>   /* for atoi() memcmp() */
 #include <stdint.h>   /* for uint_types */
 #include <inttypes.h> /* for PRIu64 */
-#include <time.h>     /* for clock_gettime() */
+#include <time.h>     /* for clock() */
 #include <locale.h>   /* for setlocale() */
+#include <limits.h>   /* for INT_MAX */
+#include <assert.h>
 
 /* We need to know what one billion is for clock timing. */
 #define BILLION 1000000000L
@@ -82,46 +84,45 @@
 #define ID__LZ4_DECOMPRESS_FAST         6
 
 
-
 /*
  * Easy show-error-and-bail function.
  */
 void run_screaming(const char *message, const int code) {
-  printf("%s\n", message);
+  printf("%s \n", message);
   exit(code);
 }
-
 
 /*
  * Centralize the usage function to keep main cleaner.
  */
-void usage(const char *message) {
-  printf("Usage: ./argPerformanceTesting <iterations>\n");
+void usage(const char* exeName, const char* message) {
+  printf("Usage: %s <iterations> \n", exeName);
   run_screaming(message, 1);
   return;
 }
 
+#define CHECK(c) { if (!(c)) { run_screaming(#c, 1); } }
 
 
 /*
- * Runs the benchmark for LZ4_compress_* based on function_id.
+ * Runs the benchmark for LZ4_* function based on function_id.
+ * @return : benchmark duration, in ns
  */
 uint64_t bench(
     const char *known_good_dst,
     const int function_id,
-    const int iterations,
+    int iterations,
     const char *src,
     char *dst,
     const size_t src_size,
     const size_t max_dst_size,
     const size_t comp_size
   ) {
-  uint64_t time_taken = 0;
   int rv = 0;
   const int warm_up = 5000;
-  struct timespec start, end;
   const int acceleration = 1;
   LZ4_stream_t state;
+  clock_t start = clock();
 
   // Select the right function to perform the benchmark on.  We perform 5000 initial loops to warm the cache and ensure that dst
   // remains matching to known_good_dst between successive calls.
@@ -134,7 +135,7 @@ uint64_t bench(
         run_screaming("Couldn't run LZ4_compress_default()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
-      clock_gettime(CLOCK_MONOTONIC, &start);
+      start = clock();
       for (int i=1; i<=iterations; i++)
         LZ4_compress_default(src, dst, src_size, max_dst_size);
       break;
@@ -147,7 +148,7 @@ uint64_t bench(
         run_screaming("Couldn't run LZ4_compress_fast()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
-      clock_gettime(CLOCK_MONOTONIC, &start);
+      start = clock();
       for (int i=1; i<=iterations; i++)
         LZ4_compress_fast(src, dst, src_size, max_dst_size, acceleration);
       break;
@@ -160,7 +161,7 @@ uint64_t bench(
         run_screaming("Couldn't run LZ4_compress_fast_extState()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
-      clock_gettime(CLOCK_MONOTONIC, &start);
+      start = clock();
       for (int i=1; i<=iterations; i++)
         LZ4_compress_fast_extState(&state, src, dst, src_size, max_dst_size, acceleration);
       break;
@@ -193,7 +194,7 @@ uint64_t bench(
         run_screaming("Couldn't run LZ4_decompress_safe()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, src_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
-      clock_gettime(CLOCK_MONOTONIC, &start);
+      start = clock();
       for (int i=1; i<=iterations; i++)
         LZ4_decompress_safe(src, dst, comp_size, src_size);
       break;
@@ -206,7 +207,7 @@ uint64_t bench(
         run_screaming("Couldn't run LZ4_decompress_fast()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, src_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
-      clock_gettime(CLOCK_MONOTONIC, &start);
+      start = clock();
       for (int i=1; i<=iterations; i++)
         LZ4_decompress_fast(src, dst, src_size);
       break;
@@ -216,13 +217,19 @@ uint64_t bench(
       break;
   }
 
-  // Stop timer and return time taken.
-  clock_gettime(CLOCK_MONOTONIC, &end);
-  time_taken = BILLION *(end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+  { clock_t end = clock();
 
-  return time_taken;
+    // Low resolution timer => requires more iterations to measure something
+    if (end == start) {
+      assert(iterations < (INT_MAX / 10));
+      iterations *= 10;
+      printf("not enough iterations => increase nb of iterations to %i \n", iterations);
+      return bench(known_good_dst, function_id, iterations, src, dst, src_size, max_dst_size, comp_size);
+    }
+
+    return (uint64_t)((double)(end - start) / CLOCKS_PER_SEC * BILLION);
+  }
 }
-
 
 
 /*
@@ -235,11 +242,12 @@ uint64_t bench(
  */
 int main(int argc, char **argv) {
   // Get and verify options.  There's really only 1:  How many iterations to run.
+  const char* exeName = argv[0];
   int iterations = 1000000;
   if (argc > 1)
     iterations = atoi(argv[1]);
   if (iterations < 1)
-    usage("Argument 1 (iterations) must be > 0.");
+    usage(exeName, "Argument 1 (iterations) must be > 0.");
 
   // First we will create 2 sources (char *) of 2000 bytes each.  One normal text, the other highly-compressible text.
   const char *src    = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed luctus purus et risus vulputate, et mollis orci ullamcorper. Nulla facilisi. Fusce in ligula sed purus varius aliquet interdum vitae justo. Proin quis diam velit. Nulla varius iaculis auctor. Cras volutpat, justo eu dictum pulvinar, elit sem porttitor metus, et imperdiet metus sapien et ante. Nullam nisi nulla, ornare eu tristique eu, dignissim vitae diam. Nulla sagittis porta libero, a accumsan felis sagittis scelerisque.  Integer laoreet eleifend congue. Etiam rhoncus leo vel dolor fermentum, quis luctus nisl iaculis. Praesent a erat sapien. Aliquam semper mi in lorem ultrices ultricies. Lorem ipsum dolor sit amet, consectetur adipiscing elit. In feugiat risus sed enim ultrices, at sodales nulla tristique. Maecenas eget pellentesque justo, sed pellentesque lectus. Fusce sagittis sit amet elit vel varius. Donec sed ligula nec ligula vulputate rutrum sed ut lectus. Etiam congue pharetra leo vitae cursus. Morbi enim ante, porttitor ut varius vel, tincidunt quis justo. Nunc iaculis, risus id ultrices semper, metus est efficitur ligula, vel posuere risus nunc eget purus. Ut lorem turpis, condimentum at sem sed, porta aliquam turpis. In ut sapien a nulla dictum tincidunt quis sit amet lorem. Fusce at est egestas, luctus neque eu, consectetur tortor. Phasellus eleifend ultricies nulla ac lobortis.  Morbi maximus quam cursus vehicula iaculis. Maecenas cursus vel justo ut rutrum. Curabitur magna orci, dignissim eget dapibus vitae, finibus id lacus. Praesent rhoncus mattis augue vitae bibendum. Praesent porta mauris non ultrices fermentum. Quisque vulputate ipsum in sodales pulvinar. Aliquam nec mollis felis. Donec vitae augue pulvinar, congue nisl sed, pretium purus. Fusce lobortis mi ac neque scelerisque semper. Pellentesque vel est vitae magna aliquet aliquet. Nam non dolor. Nulla facilisi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Morbi ac lacinia felis metus.";
@@ -249,9 +257,9 @@ int main(int argc, char **argv) {
   const size_t max_dst_size = LZ4_compressBound(src_size);
   int bytes_returned = 0;
   // Now build allocations for the data we'll be playing with.
-  char *dst               = calloc(1, max_dst_size);
-  char *known_good_dst    = calloc(1, max_dst_size);
-  char *known_good_hc_dst = calloc(1, max_dst_size);
+  char *dst               = (char*)calloc(1, max_dst_size);
+  char *known_good_dst    = (char*)calloc(1, max_dst_size);
+  char *known_good_hc_dst = (char*)calloc(1, max_dst_size);
   if (dst == NULL || known_good_dst == NULL || known_good_hc_dst == NULL)
     run_screaming("Couldn't allocate memory for the destination buffers.  Sad :(", 1);
 
@@ -315,7 +323,8 @@ int main(int argc, char **argv) {
    * Remember, we cannot call LZ4_compress_generic() directly (yet) so it's disabled.
    */
   // Suite A - Normal Compressibility
-  char *dst_d = calloc(1, src_size);
+  char *dst_d = (char*)calloc(1, src_size);
+  CHECK(dst_d!=NULL);
   memset(dst, 0, max_dst_size);
   printf("\nStarting suite A:  Normal compressible text.\n");
   uint64_t time_taken__default       = bench(known_good_dst, ID__LZ4_COMPRESS_DEFAULT,       iterations, src,            dst,   src_size, max_dst_size, src_comp_size);
@@ -336,26 +345,27 @@ int main(int argc, char **argv) {
 
   // Report and leave.
   setlocale(LC_ALL, "");
-  const char *format        = "|%-14s|%-30s|%'14.9f|%'16d|%'14d|%'13.2f%%|\n";
+  const char *format        = "|%-14s|%-30s|%'14.9f|%'16d|%'14llu|%'13.2f%%|\n";
   const char *header_format = "|%-14s|%-30s|%14s|%16s|%14s|%14s|\n";
   const char *separator     = "+--------------+------------------------------+--------------+----------------+--------------+--------------+\n";
+  uint64_t iterllu = (uint64_t)iterations;
   printf("\n");
   printf("%s", separator);
   printf(header_format, "Source", "Function Benchmarked", "Total Seconds", "Iterations/sec", "ns/Iteration", "% of default");
   printf("%s", separator);
-  printf(format, "Normal Text", "LZ4_compress_default()",       (double)time_taken__default       / BILLION, (int)(iterations / ((double)time_taken__default       /BILLION)), (int)time_taken__default       / iterations, (double)time_taken__default       * 100 / time_taken__default);
-  printf(format, "Normal Text", "LZ4_compress_fast()",          (double)time_taken__fast          / BILLION, (int)(iterations / ((double)time_taken__fast          /BILLION)), (int)time_taken__fast          / iterations, (double)time_taken__fast          * 100 / time_taken__default);
-  printf(format, "Normal Text", "LZ4_compress_fast_extState()", (double)time_taken__fast_extstate / BILLION, (int)(iterations / ((double)time_taken__fast_extstate /BILLION)), (int)time_taken__fast_extstate / iterations, (double)time_taken__fast_extstate * 100 / time_taken__default);
+  printf(format, "Normal Text", "LZ4_compress_default()",       (double)time_taken__default       / BILLION, (int)(iterations / ((double)time_taken__default       /BILLION)), time_taken__default       / iterllu, (double)time_taken__default       * 100 / time_taken__default);
+  printf(format, "Normal Text", "LZ4_compress_fast()",          (double)time_taken__fast          / BILLION, (int)(iterations / ((double)time_taken__fast          /BILLION)), time_taken__fast          / iterllu, (double)time_taken__fast          * 100 / time_taken__default);
+  printf(format, "Normal Text", "LZ4_compress_fast_extState()", (double)time_taken__fast_extstate / BILLION, (int)(iterations / ((double)time_taken__fast_extstate /BILLION)), time_taken__fast_extstate / iterllu, (double)time_taken__fast_extstate * 100 / time_taken__default);
   //printf(format, "Normal Text", "LZ4_compress_generic()",       (double)time_taken__generic       / BILLION, (int)(iterations / ((double)time_taken__generic       /BILLION)), (int)time_taken__generic       / iterations, (double)time_taken__generic       * 100 / time_taken__default);
-  printf(format, "Normal Text", "LZ4_decompress_safe()",        (double)time_taken__decomp_safe   / BILLION, (int)(iterations / ((double)time_taken__decomp_safe   /BILLION)), (int)time_taken__decomp_safe   / iterations, (double)time_taken__decomp_safe   * 100 / time_taken__default);
-  printf(format, "Normal Text", "LZ4_decompress_fast()",        (double)time_taken__decomp_fast   / BILLION, (int)(iterations / ((double)time_taken__decomp_fast   /BILLION)), (int)time_taken__decomp_fast   / iterations, (double)time_taken__decomp_fast   * 100 / time_taken__default);
+  printf(format, "Normal Text", "LZ4_decompress_safe()",        (double)time_taken__decomp_safe   / BILLION, (int)(iterations / ((double)time_taken__decomp_safe   /BILLION)), time_taken__decomp_safe   / iterllu, (double)time_taken__decomp_safe   * 100 / time_taken__default);
+  printf(format, "Normal Text", "LZ4_decompress_fast()",        (double)time_taken__decomp_fast   / BILLION, (int)(iterations / ((double)time_taken__decomp_fast   /BILLION)), time_taken__decomp_fast   / iterllu, (double)time_taken__decomp_fast   * 100 / time_taken__default);
   printf(header_format, "", "", "", "", "", "");
-  printf(format, "Compressible", "LZ4_compress_default()",       (double)time_taken_hc__default       / BILLION, (int)(iterations / ((double)time_taken_hc__default       /BILLION)), (int)time_taken_hc__default       / iterations, (double)time_taken_hc__default       * 100 / time_taken_hc__default);
-  printf(format, "Compressible", "LZ4_compress_fast()",          (double)time_taken_hc__fast          / BILLION, (int)(iterations / ((double)time_taken_hc__fast          /BILLION)), (int)time_taken_hc__fast          / iterations, (double)time_taken_hc__fast          * 100 / time_taken_hc__default);
-  printf(format, "Compressible", "LZ4_compress_fast_extState()", (double)time_taken_hc__fast_extstate / BILLION, (int)(iterations / ((double)time_taken_hc__fast_extstate /BILLION)), (int)time_taken_hc__fast_extstate / iterations, (double)time_taken_hc__fast_extstate * 100 / time_taken_hc__default);
+  printf(format, "Compressible", "LZ4_compress_default()",       (double)time_taken_hc__default       / BILLION, (int)(iterations / ((double)time_taken_hc__default       /BILLION)), time_taken_hc__default       / iterllu, (double)time_taken_hc__default       * 100 / time_taken_hc__default);
+  printf(format, "Compressible", "LZ4_compress_fast()",          (double)time_taken_hc__fast          / BILLION, (int)(iterations / ((double)time_taken_hc__fast          /BILLION)), time_taken_hc__fast          / iterllu, (double)time_taken_hc__fast          * 100 / time_taken_hc__default);
+  printf(format, "Compressible", "LZ4_compress_fast_extState()", (double)time_taken_hc__fast_extstate / BILLION, (int)(iterations / ((double)time_taken_hc__fast_extstate /BILLION)), time_taken_hc__fast_extstate / iterllu, (double)time_taken_hc__fast_extstate * 100 / time_taken_hc__default);
   //printf(format, "Compressible", "LZ4_compress_generic()",       (double)time_taken_hc__generic       / BILLION, (int)(iterations / ((double)time_taken_hc__generic       /BILLION)), (int)time_taken_hc__generic       / iterations, (double)time_taken_hc__generic       * 100 / time_taken_hc__default);
-  printf(format, "Compressible", "LZ4_decompress_safe()",        (double)time_taken_hc__decomp_safe   / BILLION, (int)(iterations / ((double)time_taken_hc__decomp_safe   /BILLION)), (int)time_taken_hc__decomp_safe   / iterations, (double)time_taken_hc__decomp_safe   * 100 / time_taken_hc__default);
-  printf(format, "Compressible", "LZ4_decompress_fast()",        (double)time_taken_hc__decomp_fast   / BILLION, (int)(iterations / ((double)time_taken_hc__decomp_fast   /BILLION)), (int)time_taken_hc__decomp_fast   / iterations, (double)time_taken_hc__decomp_fast   * 100 / time_taken_hc__default);
+  printf(format, "Compressible", "LZ4_decompress_safe()",        (double)time_taken_hc__decomp_safe   / BILLION, (int)(iterations / ((double)time_taken_hc__decomp_safe   /BILLION)), time_taken_hc__decomp_safe   / iterllu, (double)time_taken_hc__decomp_safe   * 100 / time_taken_hc__default);
+  printf(format, "Compressible", "LZ4_decompress_fast()",        (double)time_taken_hc__decomp_fast   / BILLION, (int)(iterations / ((double)time_taken_hc__decomp_fast   /BILLION)), time_taken_hc__decomp_fast   / iterllu, (double)time_taken_hc__decomp_fast   * 100 / time_taken_hc__default);
   printf("%s", separator);
   printf("\n");
   printf("All done, ran %d iterations per test.\n", iterations);

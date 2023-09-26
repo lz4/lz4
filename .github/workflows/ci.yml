@@ -459,9 +459,6 @@ jobs:
     - name: examples
       run: make V=1 clean examples
 
-    - name: examples (compile as C++ code)
-      run: make V=1 -C examples clean cxxtest
-
   # lasts ~20mn
   oss-fuzz:
     runs-on: ubuntu-latest
