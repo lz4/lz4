@@ -42,25 +42,25 @@ jobs:
           #   os           : GitHub Actions YAML workflow label.  See https://github.com/actions/virtual-environments#available-environments
 
           # cc
-          { pkgs: '',                                                   cc: cc,        cxx: c++,         x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-latest, },
+          { pkgs: '',                                                   cc: cc,        cxx: c++,         x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-latest, },
 
           # gcc
-          { pkgs: '',                                                   cc: gcc,       cxx: g++,         x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-latest, },
-          { pkgs: 'gcc-13 g++-13 lib32gcc-13-dev libx32gcc-13-dev',     cc: gcc-13,    cxx: g++-13,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
-          { pkgs: 'gcc-12 g++-12 lib32gcc-12-dev libx32gcc-12-dev',     cc: gcc-12,    cxx: g++-12,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
-          { pkgs: 'gcc-11 g++-11 lib32gcc-11-dev libx32gcc-11-dev',     cc: gcc-11,    cxx: g++-11,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
-          { pkgs: 'gcc-10 g++-10 lib32gcc-10-dev libx32gcc-10-dev',     cc: gcc-10,    cxx: g++-10,      x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
-          { pkgs: 'gcc-9 g++-9 lib32gcc-9-dev libx32gcc-9-dev',         cc: gcc-9,     cxx: g++-9,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
+          { pkgs: '',                                                   cc: gcc,       cxx: g++,         x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-latest, },
+          { pkgs: 'gcc-13 g++-13 lib32gcc-13-dev libx32gcc-13-dev',     cc: gcc-13,    cxx: g++-13,      x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
+          { pkgs: 'gcc-12 g++-12 lib32gcc-12-dev libx32gcc-12-dev',     cc: gcc-12,    cxx: g++-12,      x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
+          { pkgs: 'gcc-11 g++-11 lib32gcc-11-dev libx32gcc-11-dev',     cc: gcc-11,    cxx: g++-11,      x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
+          { pkgs: 'gcc-10 g++-10 lib32gcc-10-dev libx32gcc-10-dev',     cc: gcc-10,    cxx: g++-10,      x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
+          { pkgs: 'gcc-9 g++-9 lib32gcc-9-dev libx32gcc-9-dev',         cc: gcc-9,     cxx: g++-9,       x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-22.04,  },
           { pkgs: 'gcc-8 g++-8 lib32gcc-8-dev libx32gcc-8-dev',         cc: gcc-8,     cxx: g++-8,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-20.04,  },
           { pkgs: 'gcc-7 g++-7 lib32gcc-7-dev libx32gcc-7-dev',         cc: gcc-7,     cxx: g++-7,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-20.04,  },
 
           # clang
-          { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-latest, },
-          { pkgs: 'clang-15  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-15,  cxx: clang++-15,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-14  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-14,  cxx: clang++-14,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-13  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-13,  cxx: clang++-13,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-12  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-11  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-latest, },
+          { pkgs: 'clang-15  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-15,  cxx: clang++-15,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-14  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-14,  cxx: clang++-14,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-13  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-13,  cxx: clang++-13,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-12  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-11  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
           { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
           { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
@@ -699,7 +699,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac # https://github.com/actions/checkout v4.0.0
-    - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # https://github.com/actions/setup-python v4.7.0 
+    - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # https://github.com/actions/setup-python v4.7.0
       with:
         python-version: '3.x'
 
