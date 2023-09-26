@@ -69,6 +69,8 @@
 #include <inttypes.h> /* for PRIu64 */
 #include <time.h>     /* for clock() */
 #include <locale.h>   /* for setlocale() */
+#include <limits.h>   /* for INT_MAX */
+#include <assert.h>
 
 /* We need to know what one billion is for clock timing. */
 #define BILLION 1000000000L
@@ -109,7 +111,7 @@ void usage(const char* exeName, const char* message) {
 uint64_t bench(
     const char *known_good_dst,
     const int function_id,
-    const int iterations,
+    int iterations,
     const char *src,
     char *dst,
     const size_t src_size,
@@ -215,15 +217,19 @@ uint64_t bench(
       break;
   }
 
-  // Stop timer and return time taken.
   { clock_t end = clock();
-    if (end == start)
-      run_screaming("not enough iterations => increase nb of iterations", 1);
+
+    // Low resolution timer => requires more iterations to measure something
+    if (end == start) {
+      assert(iterations < (INT_MAX / 10));
+      iterations *= 10;
+      printf("not enough iterations => increase nb of iterations to %i \n", iterations);
+      return bench(known_good_dst, function_id, iterations, src, dst, src_size, max_dst_size, comp_size);
+    }
 
     return (uint64_t)((double)(end - start) / CLOCKS_PER_SEC * BILLION);
   }
 }
-
 
 
 /*
