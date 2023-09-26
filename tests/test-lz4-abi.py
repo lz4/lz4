@@ -81,7 +81,8 @@ if __name__ == '__main__':
     print(tags)
 
     # loop across architectures
-    for march in ['-m64', '-m32', '-mx32']:
+    # note : '-mx32' was removed, because some CI environment (GA) do not support x32 well
+    for march in ['-m64', '-m32']:
         print(' ')
         print('=====================================')
         print('Testing architecture ' + march);
