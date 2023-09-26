@@ -251,9 +251,9 @@ int main(int argc, char **argv) {
   const size_t max_dst_size = LZ4_compressBound(src_size);
   int bytes_returned = 0;
   // Now build allocations for the data we'll be playing with.
-  char *dst               = calloc(1, max_dst_size);
-  char *known_good_dst    = calloc(1, max_dst_size);
-  char *known_good_hc_dst = calloc(1, max_dst_size);
+  char *dst               = (char*)calloc(1, max_dst_size);
+  char *known_good_dst    = (char*)calloc(1, max_dst_size);
+  char *known_good_hc_dst = (char*)calloc(1, max_dst_size);
   if (dst == NULL || known_good_dst == NULL || known_good_hc_dst == NULL)
     run_screaming("Couldn't allocate memory for the destination buffers.  Sad :(", 1);
 
@@ -317,7 +317,7 @@ int main(int argc, char **argv) {
    * Remember, we cannot call LZ4_compress_generic() directly (yet) so it's disabled.
    */
   // Suite A - Normal Compressibility
-  char *dst_d = calloc(1, src_size);
+  char *dst_d = (char*)calloc(1, src_size);
   CHECK(dst_d!=NULL);
   memset(dst, 0, max_dst_size);
   printf("\nStarting suite A:  Normal compressible text.\n");
