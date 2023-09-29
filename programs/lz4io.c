@@ -1039,9 +1039,12 @@ LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
     }
     {   struct stat sb;
         if (fstat(UTIL_fileno(finput), &sb) != 0) END_PROCESS(74, "Stat error: %s", strerror(errno));
-        if (sb.st_size >= INT_MAX) END_PROCESS(74, "Input file too large - %llu bytes",
-            (unsigned long long)sb.st_size);
-        inputSize = (U32)sb.st_size - 12;
+        if (!S_ISREG(sb.st_mode)) {
+            DISPLAYLEVEL(2, "input not a regular file, not attempting mmap()");
+            inputSize = 0;
+        } else if (sb.st_size >= INT_MAX) {
+            END_PROCESS(74, "Input file too large - %llu bytes", (unsigned long long)sb.st_size);
+        } else inputSize = sb.st_size - 12;
     }
 
 #ifdef __unix__
@@ -1049,10 +1052,14 @@ LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
      * On Unix we try to mmap the input -- to save memory -- falling back
      * to stdio, if mmap fails. Output is always written "normally".
      */
-    in_buff = (char *)mmap(NULL, inputSize, PROT_READ, MAP_SHARED, UTIL_fileno(finput), 12);
-    if (in_buff == MAP_FAILED) {
+    if (inputSize == 0) {
+        in_buff = malloc(LEGACY_BLOCKSIZE);
+        inputSize = LEGACY_BLOCKSIZE;
+        mmapped = 0;
+    } else if ((in_buff = (char *)mmap(NULL, inputSize, PROT_READ, MAP_SHARED,
+        UTIL_fileno(finput), 12)) == MAP_FAILED) {
         DISPLAYLEVEL(1, "mmap-ing input failed (%s), falling back to stdio\n", strerror(errno));
-        in_buff  = (char *)malloc(inputSize);
+        in_buff = (char *)malloc(inputSize);
         mmapped = 0;
     } else {
         DISPLAYLEVEL(2, "Using mmap for input\n");
@@ -1069,12 +1076,16 @@ LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
     if (!mmapped)
 #endif
     {   size_t const sizeCheck = fread(in_buff, 1, inputSize, finput);
-        if (sizeCheck != inputSize) END_PROCESS(76, "Read error : cannot read input: %s", strerror(errno));
+        if (sizeCheck != inputSize) {
+            if (ferror(finput)) END_PROCESS(76, "Read error : cannot read input: %s", strerror(errno));
+            DISPLAYLEVEL(2, "Read %u bytes into buffer", (unsigned)sizeCheck);
+            inputSize = (U32)sizeCheck;
+        }
     }
 
     /* Decode Block */
     {   int const decodeSize = LZ4_decompress_safe(in_buff, out_buff, inputSize, outputSize);
-        if (decodeSize < 0) END_PROCESS(77, "Decoding Failed ! Corrupted input detected !");
+        if (decodeSize < 0) END_PROCESS(77, "Decoding Failed ! Corrupted input detected (%d)!", decodeSize);
         if (decodeSize != (int)outputSize) DISPLAYLEVEL(2, "Suspect: decoded size %d differs from the expected %u",
             decodeSize, (unsigned)outputSize);
         /* Write Block */
