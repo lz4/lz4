@@ -1031,54 +1031,50 @@ LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
     char *out_buff;
 #ifdef __unix__
     int mmapped;
-#endif
 
-    {   size_t const sizeCheck = fread(&outputSize, 1, 4, finput);
-        if (sizeCheck != 4) END_PROCESS(73, "Read error: %s", strerror(errno));
-        outputSize = LZ4IO_readLE32(&outputSize);
-    }
     {   struct stat sb;
-        if (fstat(UTIL_fileno(finput), &sb) != 0) END_PROCESS(74, "Stat error: %s", strerror(errno));
+        if (fstat(fileno(finput), &sb) != 0) END_PROCESS(74, "Stat error: %s", strerror(errno));
         if (!S_ISREG(sb.st_mode)) {
-            DISPLAYLEVEL(2, "input not a regular file, not attempting mmap()");
-            inputSize = 0;
+            DISPLAYLEVEL(2, "input not a regular file, not attempting mmap()\n");
+            goto fallback;
         } else if (sb.st_size >= INT_MAX) {
             END_PROCESS(74, "Input file too large - %llu bytes", (unsigned long long)sb.st_size);
-        } else inputSize = sb.st_size - 12;
+        } else inputSize = (U32)sb.st_size - 12;
     }
 
-#ifdef __unix__
     /*
      * On Unix we try to mmap the input -- to save memory -- falling back
      * to stdio, if mmap fails. Output is always written "normally".
      */
-    if (inputSize == 0) {
-        in_buff = (char *)malloc(LEGACY_BLOCKSIZE);
-        inputSize = LEGACY_BLOCKSIZE;
-        mmapped = 0;
-    } else if ((in_buff = (char *)mmap(NULL, inputSize, PROT_READ, MAP_SHARED,
-        UTIL_fileno(finput), 12)) == MAP_FAILED) {
-        DISPLAYLEVEL(1, "mmap-ing input failed (%s), falling back to stdio\n", strerror(errno));
-        in_buff = (char *)malloc(inputSize);
-        mmapped = 0;
-    } else {
+    if ((in_buff = (char *)mmap(NULL, inputSize, PROT_READ, MAP_SHARED,
+        fileno(finput), 12)) != MAP_FAILED) {
         DISPLAYLEVEL(2, "Using mmap for input\n");
-        fseek(finput, 0, SEEK_END); /* Lest there will be noise about undecodable data */
         mmapped = 1;
+    } else {
+        DISPLAYLEVEL(1, "mmap-ing input failed (%s), falling back to stdio\n", strerror(errno));
+fallback:
+        in_buff = (char *)malloc(inputSize = LEGACY_BLOCKSIZE);
+        mmapped = 0;
     }
 #else
-    in_buff  = (char *)malloc(inputSize);
+    in_buff  = (char *)malloc(inputSize = LEGACY_BLOCKSIZE);
 #endif
+    {   size_t const sizeCheck = fread(&outputSize, 1, 4, finput);
+        if (sizeCheck != 4) END_PROCESS(73, "Read error: %s", strerror(errno));
+        outputSize = LZ4IO_readLE32(&outputSize);
+    }
     out_buff = (char *)malloc(outputSize);
     if (!in_buff || !out_buff) END_PROCESS(75, "Allocation error : not enough memory");
 
 #ifdef __unix__
-    if (!mmapped)
+    if (mmapped)
+        fseek(finput, 0, SEEK_END); /* Lest there will be noise about undecodable data */
+    else
 #endif
     {   size_t const sizeCheck = fread(in_buff, 1, inputSize, finput);
         if (sizeCheck != inputSize) {
             if (ferror(finput)) END_PROCESS(76, "Read error : cannot read input: %s", strerror(errno));
-            DISPLAYLEVEL(2, "Read %u bytes into buffer", (unsigned)sizeCheck);
+            DISPLAYLEVEL(2, "Read %u bytes into buffer\n", (unsigned)sizeCheck);
             inputSize = (U32)sizeCheck;
         }
     }
