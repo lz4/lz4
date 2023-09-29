@@ -1053,7 +1053,7 @@ LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
      * to stdio, if mmap fails. Output is always written "normally".
      */
     if (inputSize == 0) {
-        in_buff = malloc(LEGACY_BLOCKSIZE);
+        in_buff = (char *)malloc(LEGACY_BLOCKSIZE);
         inputSize = LEGACY_BLOCKSIZE;
         mmapped = 0;
     } else if ((in_buff = (char *)mmap(NULL, inputSize, PROT_READ, MAP_SHARED,
