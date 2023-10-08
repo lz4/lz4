@@ -86,6 +86,7 @@ set(LZ4_CLI_SOURCES
   "${LZ4_PROG_SOURCE_DIR}/lz4cli.c"
   "${LZ4_PROG_SOURCE_DIR}/lz4io.c"
   "${LZ4_PROG_SOURCE_DIR}/datagen.c")
+list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES}) # LZ4_CLI always use liblz4 sources directly.
 
 # Whether to use position independent code for the static library.  If
 # we're building a shared library this is ignored and PIC is always
@@ -135,20 +136,11 @@ if(BUILD_STATIC_LIBS)
     XXH_NAMESPACE=LZ4_)
 endif()
 
-if(BUILD_STATIC_LIBS)
-  set(LZ4_LINK_LIBRARY lz4_static)
-else()
-  list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES})
-endif()
-
 # lz4
 if (LZ4_BUILD_CLI)
   set(LZ4_PROGRAMS_BUILT lz4cli)
   add_executable(lz4cli ${LZ4_CLI_SOURCES})
   set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
-  if (BUILD_STATIC_LIBS)
-    target_link_libraries(lz4cli ${LZ4_LINK_LIBRARY})
-  endif()
 endif()
 
 # lz4c
@@ -156,9 +148,6 @@ if (LZ4_BUILD_LEGACY_LZ4C)
   list(APPEND LZ4_PROGRAMS_BUILT lz4c)
   add_executable(lz4c ${LZ4_CLI_SOURCES})
   set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
-  if (BUILD_STATIC_LIBS)
-    target_link_libraries(lz4c ${LZ4_LINK_LIBRARY})
-  endif()
 endif()
 
 # Extra warning flags
