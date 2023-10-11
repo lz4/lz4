@@ -679,6 +679,24 @@ jobs:
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build_test
 
+  lz4-build-cmake-static-lib: # See https://github.com/lz4/lz4/issues/1269
+    name: cmake (static lib)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # https://github.com/actions/checkout v4.1.0
+
+    - name: Environment info
+      run: |
+        echo && type cmake && which cmake && cmake --version
+        echo && type make && which make && make -v
+
+    - name: cmake (static lib)
+      run: |
+        CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
+        VERBOSE=1 cmake --build build
+        cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install_test_dir
+        VERBOSE=1 cmake --build build_test
+
   # Invoke cmake via Makefile
   lz4-build-make-cmake:
     name: make cmake
