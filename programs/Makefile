@@ -33,9 +33,9 @@ SED = sed
 # Version numbers
 LZ4DIR   := ../lib
 LIBVER_SRC := $(LZ4DIR)/lz4.h
-LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
-LIBVER_MINOR_SCRIPT:=`$(SED) -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
-LIBVER_PATCH_SCRIPT:=`$(SED) -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_MINOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
+LIBVER_PATCH_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCRIPT)
 LIBVER_MAJOR := $(shell echo $(LIBVER_MAJOR_SCRIPT))
 LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))

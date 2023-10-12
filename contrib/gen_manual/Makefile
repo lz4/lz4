@@ -39,9 +39,9 @@ LZ4API = ../../lib/lz4.h
 LZ4MANUAL = ../../doc/lz4_manual.html
 LZ4FAPI = ../../lib/lz4frame.h
 LZ4FMANUAL = ../../doc/lz4frame_manual.html
-LIBVER_MAJOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
-LIBVER_MINOR_SCRIPT:=`sed -n '/define LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
-LIBVER_PATCH_SCRIPT:=`sed -n '/define LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
+LIBVER_MAJOR_SCRIPT:=`sed -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
+LIBVER_MINOR_SCRIPT:=`sed -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
+LIBVER_PATCH_SCRIPT:=`sed -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LZ4API)`
 LIBVER_SCRIPT:= $(LIBVER_MAJOR_SCRIPT).$(LIBVER_MINOR_SCRIPT).$(LIBVER_PATCH_SCRIPT)
 LZ4VER := $(shell echo $(LIBVER_SCRIPT))
 
