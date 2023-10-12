@@ -27,6 +27,9 @@ bin/
 *.zip
 *.swp
 compile_flags.txt
+compile_commands.json
+.vscode
+.cache
 
 # analyzers
 infer-out
