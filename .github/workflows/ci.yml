@@ -693,7 +693,7 @@ jobs:
     - name: cmake (static lib)
       run: |
         CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
-        VERBOSE=1 cmake --build build
+        VERBOSE=1 cmake --build build --target install
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install_test_dir
         VERBOSE=1 cmake --build build_test
 
