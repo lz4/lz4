@@ -15,9 +15,9 @@ def find_version_tuple(filepath):
   with open(filepath) as fd:
     version_file_data = fd.read()
 
-  patterns = r"""#\s*define\s+LZ4_VERSION_MAJOR\s+([0-9]+).*$
-#\s*define\s+LZ4_VERSION_MINOR\s+([0-9]+).*$
-#\s*define\s+LZ4_VERSION_RELEASE\s+([0-9]+).*$
+  patterns = r"""\s*#\s*define\s+LZ4_VERSION_MAJOR\s+([0-9]+).*$
+\s*#\s*define\s+LZ4_VERSION_MINOR\s+([0-9]+).*$
+\s*#\s*define\s+LZ4_VERSION_RELEASE\s+([0-9]+).*$
 """
   regex = re.compile(patterns, re.MULTILINE)
   version_match = regex.search(version_file_data)
