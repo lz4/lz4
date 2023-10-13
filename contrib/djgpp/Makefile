@@ -19,7 +19,7 @@ CC = $(CROSS)-gcc
 AR = $(CROSS)-ar
 LD = $(CROSS)-gcc
 
-CFLAGS ?= -O3 -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -pedantic -DLZ4_VERSION=\"$(RELEASE)\"
+CFLAGS ?= -O3 -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -Wpedantic -DLZ4_VERSION=\"$(RELEASE)\"
 LDFLAGS ?= -s
 SRC = programs/bench.c programs/lz4io.c programs/lz4cli.c
 OBJ = $(SRC:.c=.o)

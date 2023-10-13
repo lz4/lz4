@@ -206,7 +206,7 @@ cxxtest cxx32test: clean
 
 .PHONY: cxx17build
 cxx17build : CC = "$(CXX) -Wno-deprecated"
-cxx17build : CFLAGS = -std=c++17 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror -pedantic
+cxx17build : CFLAGS = -std=c++17 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror -Wpedantic
 cxx17build : clean
 	$(CXX) -v
 	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
@@ -227,13 +227,13 @@ c_standards: clean c_standards_c11 c_standards_c99 c_standards_c90
 
 .PHONY: c_standards_c90
 c_standards_c90: clean
-	$(MAKE) clean; CFLAGS="-std=c90   -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
-	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -pedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=c90   -Werror -Wpedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -Wpedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
 
 .PHONY: c_standards_c99
 c_standards_c99: clean
-	$(MAKE) clean; CFLAGS="-std=c99   -Werror -pedantic" $(MAKE) all
-	$(MAKE) clean; CFLAGS="-std=gnu99 -Werror -pedantic" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=c99   -Werror -Wpedantic" $(MAKE) all
+	$(MAKE) clean; CFLAGS="-std=gnu99 -Werror -Wpedantic" $(MAKE) all
 
 .PHONY: c_standards_c11
 c_standards_c11: clean
