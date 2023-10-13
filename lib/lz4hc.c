@@ -1058,7 +1058,6 @@ LZ4_streamHC_t* LZ4_createStreamHC(void)
 int LZ4_freeStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr)
 {
     DEBUGLOG(4, "LZ4_freeStreamHC(%p)", LZ4_streamHCPtr);
-    if (!LZ4_streamHCPtr) return 0;  /* support free on NULL */
     FREEMEM(LZ4_streamHCPtr);
     return 0;
 }
@@ -1293,7 +1292,6 @@ void* LZ4_createHC (const char* inputBuffer)
 
 int LZ4_freeHC (void* LZ4HC_Data)
 {
-    if (!LZ4HC_Data) return 0;  /* support free on NULL */
     FREEMEM(LZ4HC_Data);
     return 0;
 }
