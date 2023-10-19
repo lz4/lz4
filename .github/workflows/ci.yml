@@ -528,6 +528,9 @@ jobs:
           { type: PPC,      pkgs: 'qemu-system-ppc   gcc-powerpc-linux-gnu',     xcc: powerpc-linux-gnu-gcc,     xemu: qemu-ppc-static,     os: ubuntu-latest, },
           { type: PPC64LE,  pkgs: 'qemu-system-ppc   gcc-powerpc64le-linux-gnu', xcc: powerpc64le-linux-gnu-gcc, xemu: qemu-ppc64le-static, os: ubuntu-latest, },
           { type: S390X,    pkgs: 'qemu-system-s390x gcc-s390x-linux-gnu',       xcc: s390x-linux-gnu-gcc,       xemu: qemu-s390x-static,   os: ubuntu-latest, },
+          { type: MIPS,     pkgs: 'qemu-system-mips gcc-mips-linux-gnu',         xcc: mips-linux-gnu-gcc,        xemu: qemu-mips-static,    os: ubuntu-latest, },
+          { type: M68K,     pkgs: 'qemu-system-m68k gcc-m68k-linux-gnu',         xcc: m68k-linux-gnu-gcc,        xemu: qemu-m68k-static,    os: ubuntu-latest, },
+          { type: RISC-V,   pkgs: 'qemu-system-riscv64 gcc-riscv64-linux-gnu',   xcc: riscv64-linux-gnu-gcc,     xemu: qemu-riscv64-static, os: ubuntu-latest, },
         ]
 
     runs-on: ${{ matrix.os }}
@@ -550,25 +553,18 @@ jobs:
         echo && $XCC -v                       # Show built-in specs
         echo && type $XEMU && which $XEMU && $XEMU --version
 
-    - name: ARM64
-      if: ${{ matrix.type == 'ARM64' }}
-      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
-
-    - name: ARM
-      if: ${{ matrix.type == 'ARM' }}
-      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
-
-    - name: PPC
-      if: ${{ matrix.type == 'PPC' }}
+    - name: ARM-ARM64-PPC
+      if: ${{ matrix.type == 'ARM' || matrix.type == 'ARM64' || matrix.type == 'PPC' || matrix.type == 'S390X'}}
       run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
 
     - name: PPC64LE
       if: ${{ matrix.type == 'PPC64LE' }}
       run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU MOREFLAGS=-m64
 
-    - name: S390X
-      if: ${{ matrix.type == 'S390X' }}
+    - name: MIPS-M68K-RISCV
+      if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' }}
       run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+
 
 
   # macOS
