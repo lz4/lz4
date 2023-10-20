@@ -1,3 +1,12 @@
+v1.9.5 (in dev)
+perf : Slightly faster (+5%) HC compression speed (levels 3-9)
+lib  : lz4frame states can now be reset and reused after a processing error (described by @QrczakMK)
+cli  : fix: refuse to compress directories
+cli  : fix dictionary compression benchmark on multiple files
+build: cmake minimum version raised to 3.5
+build: meson scripts are now hosted into `build/` directory
+port : support for loongArch, risc-V, m68k and mips architectures
+
 v1.9.4
 perf : faster decoding speed (~+20%) on aarch64 platforms
 perf : faster decoding speed (~+70%) for -BD4 setting in CLI
