@@ -1674,7 +1674,7 @@ if (limit == fillOutput) {
 }
 _return_label:
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-     FREEMEM(opt);
+     if (opt) FREEMEM(opt);
 #endif
      return retval;
 }
