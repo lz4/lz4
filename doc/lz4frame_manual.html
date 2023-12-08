@@ -1,10 +1,10 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.9.4 Manual</title>
+<title>1.9.5 Manual</title>
 </head>
 <body>
-<h1>1.9.4 Manual</h1>
+<h1>1.9.5 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
@@ -116,9 +116,19 @@
 <pre><b>size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
                                 const void* srcBuffer, size_t srcSize,
                                 const LZ4F_preferences_t* preferencesPtr);
-</b><p>  Compress an entire srcBuffer into a valid LZ4 frame.
-  dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
-  The LZ4F_preferences_t structure is optional : you can provide NULL as argument. All preferences will be set to default.
+</b><p>  Compress srcBuffer content into an LZ4-compressed frame.
+  It's a one shot operation, all input content is consumed, and all output is generated.
+
+  Note : it's a stateless operation (no LZ4F_cctx state needed).
+  In order to reduce load on the allocator, LZ4F_compressFrame(), by default,
+  uses the stack to allocate space for the compression state and some table.
+  If this usage of the stack is too much for your application,
+  consider compiling `lz4frame.c` with compile-time macro LZ4F_HEAPMODE set to 1 instead.
+  All state allocations will use the Heap.
+  It also means each invocation of LZ4F_compressFrame() will trigger several internal alloc/free invocations.
+
+ @dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ @preferencesPtr is optional : one can provide NULL, in which case all preferences are set to default.
  @return : number of bytes written into dstBuffer.
            or an error code if it fails (can be tested using LZ4F_isError())
  
@@ -157,7 +167,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
                                       const LZ4F_preferences_t* prefsPtr);
 </b><p>  will write the frame header into dstBuffer.
   dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
- `prefsPtr` is optional : you can provide NULL as argument, all preferences will then be set to default.
+ `prefsPtr` is optional : NULL can be provided to set all preferences to default.
  @return : number of bytes written into dstBuffer for the header
            or an error code (which can be tested using LZ4F_isError())
  
@@ -227,8 +237,9 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 <a name="Chapter9"></a><h2>Decompression functions</h2><pre></pre>
 
 <pre><b>typedef struct {
-  unsigned stableDst;     /* pledges that last 64KB decompressed data will remain available unmodified between invocations.
-                           * This optimization skips storage operations in tmp buffers. */
+  unsigned stableDst;     /* pledges that last 64KB decompressed data is present right before @dstBuffer pointer.
+                           * This optimization skips internal storage operations.
+                           * Once set, this pledge must remain valid up to the end of current frame. */
   unsigned skipChecksums; /* disable checksum calculation and verification, even when one is present in frame, to save CPU time.
                            * Setting this option to 1 once disables all checksums for the rest of the frame. */
   unsigned reserved1;     </b>/* must be set to zero for forward compatibility */<b>
@@ -328,6 +339,11 @@ LZ4F_decompress(LZ4F_dctx* dctx,
 
  `dstBuffer` can freely change between each consecutive function invocation.
  `dstBuffer` content will be overwritten.
+
+  Note: if `LZ4F_getFrameInfo()` is called before `LZ4F_decompress()`, srcBuffer must be updated to reflect
+  the number of bytes consumed after reading the frame header. Failure to update srcBuffer before calling
+  `LZ4F_decompress()` will cause decompression failure or, even worse, successful but incorrect decompression.
+  See the `LZ4F_getFrameInfo()` docs for details.
 
  @return : an hint of how many `srcSize` bytes LZ4F_decompress() expects for next call.
   Schematically, it's the size of the current (or remaining) compressed block + header of next block.

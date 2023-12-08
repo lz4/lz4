@@ -1,16 +1,16 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.9.4 Manual</title>
+<title>1.9.5 Manual</title>
 </head>
 <body>
-<h1>1.9.4 Manual</h1>
+<h1>1.9.5 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
 <li><a href="#Chapter1">Introduction</a></li>
 <li><a href="#Chapter2">Version</a></li>
-<li><a href="#Chapter3">Tuning parameter</a></li>
+<li><a href="#Chapter3">Tuning memory usage</a></li>
 <li><a href="#Chapter4">Simple Functions</a></li>
 <li><a href="#Chapter5">Advanced Functions</a></li>
 <li><a href="#Chapter6">Streaming Compression Functions</a></li>
@@ -83,15 +83,15 @@
 </b></pre><BR>
 <pre><b>const char* LZ4_versionString (void);   </b>/**< library version string; useful to check dll version; requires v1.7.5+ */<b>
 </b></pre><BR>
-<a name="Chapter3"></a><h2>Tuning parameter</h2><pre></pre>
+<a name="Chapter3"></a><h2>Tuning memory usage</h2><pre></pre>
 
 <pre><b>#ifndef LZ4_MEMORY_USAGE
 # define LZ4_MEMORY_USAGE LZ4_MEMORY_USAGE_DEFAULT
 #endif
-</b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
- Increasing memory usage improves compression ratio, at the cost of speed.
+</b><p> Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB)
+ Increasing memory usage improves compression ratio, generally at the cost of speed.
  Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
- Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
+ Default value is 14, for 16KB, which nicely fits into most L1 caches.
  
 </p></pre><BR>
 
@@ -114,8 +114,9 @@
 </p></pre><BR>
 
 <pre><b>int LZ4_decompress_safe (const char* src, char* dst, int compressedSize, int dstCapacity);
-</b><p>  compressedSize : is the exact complete size of the compressed block.
-  dstCapacity : is the size of destination buffer (which must be already allocated), presumed an upper bound of decompressed size.
+</b><p> @compressedSize : is the exact complete size of the compressed block.
+ @dstCapacity : is the size of destination buffer (which must be already allocated),
+                presumed an upper bound of decompressed size.
  @return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
            If destination buffer is not large enough, decoding will stop and output an error code (negative value).
            If the source stream is detected malformed, the function will stop decoding and return a negative result.
@@ -171,7 +172,7 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
  @return : Nb bytes written into 'dst' (necessarily <= targetDestSize)
            or 0 if compression fails.
 
- Note : from v1.8.2 to v1.9.1, this function had a bug (fixed un v1.9.2+):
+ Note : from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
         the produced compressed content could, in specific circumstances,
         require to be decompressed into a destination buffer larger
         by at least 1 byte than the content to decompress.
@@ -221,6 +222,24 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 </p></pre><BR>
 
 <a name="Chapter6"></a><h2>Streaming Compression Functions</h2><pre></pre>
+
+<pre><b>#if !defined(RC_INVOKED) </b>/* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */<b>
+#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+LZ4_stream_t* LZ4_createStream(void);
+int           LZ4_freeStream (LZ4_stream_t* streamPtr);
+#endif </b>/* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */<b>
+#endif
+</b><p>
+ - RC_INVOKED is predefined symbol of rc.exe (the resource compiler which is part of MSVC/Visual Studio).
+   https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros
+
+ - Since rc.exe is a legacy compiler, it truncates long symbol (> 30 chars)
+   and reports warning "RC4011: identifier truncated".
+
+ - To eliminate the warning, we surround long preprocessor symbol with
+   "#if !defined(RC_INVOKED) ... #endif" block that means
+   "skip this block when rc.exe is trying to read it".
+</p></pre><BR>
 
 <pre><b>void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
 </b><p>  Use this to prepare an LZ4_stream_t for a new chain of dependent blocks
@@ -296,10 +315,12 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 <a name="Chapter7"></a><h2>Streaming Decompression Functions</h2><pre>  Bufferless synchronous API
 <BR></pre>
 
-<pre><b>#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+<pre><b>#if !defined(RC_INVOKED) </b>/* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */<b>
+#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 #endif </b>/* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */<b>
+#endif
 </b><p>  creation / destruction of streaming decompression tracking context.
   A tracking context can be re-used multiple times.
  
@@ -332,10 +353,23 @@ int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
                         const char* src, char* dst,
                         int srcSize, int dstCapacity);
-</b><p>  These decoding functions allow decompression of consecutive blocks in "streaming" mode.
-  A block is an unsplittable entity, it must be presented entirely to a decompression function.
-  Decompression functions only accepts one block at a time.
-  The last 64KB of previously decoded data *must* remain available and unmodified at the memory position where they were decoded.
+</b><p>  This decoding function allows decompression of consecutive blocks in "streaming" mode.
+  The difference with the usual independent blocks is that
+  new blocks are allowed to find references into former blocks.
+  A block is an unsplittable entity, and must be presented entirely to the decompression function.
+  LZ4_decompress_safe_continue() only accepts one block at a time.
+  It's modeled after `LZ4_decompress_safe()` and behaves similarly.
+
+ @LZ4_streamDecode : decompression state, tracking the position in memory of past data
+ @compressedSize : exact complete size of one compressed block.
+ @dstCapacity : size of destination buffer (which must be already allocated),
+                must be an upper bound of decompressed size.
+ @return : number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
+           If destination buffer is not large enough, decoding will stop and output an error code (negative value).
+           If the source stream is detected malformed, the function will stop decoding and return a negative result.
+
+  The last 64KB of previously decoded data *must* remain available and unmodified
+  at the memory position where they were previously decoded.
   If less than 64KB of data has been decoded, all the data must be present.
 
   Special : if decompression side sets a ring buffer, it must respect one of the following conditions :
@@ -361,10 +395,22 @@ LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode,
 LZ4_decompress_safe_usingDict(const char* src, char* dst,
                               int srcSize, int dstCapacity,
                               const char* dictStart, int dictSize);
-</b><p>  These decoding functions work the same as
-  a combination of LZ4_setStreamDecode() followed by LZ4_decompress_*_continue()
-  They are stand-alone, and don't need an LZ4_streamDecode_t structure.
+</b><p>  Works the same as
+  a combination of LZ4_setStreamDecode() followed by LZ4_decompress_safe_continue()
+  However, it's stateless: it doesn't need any LZ4_streamDecode_t state.
   Dictionary is presumed stable : it must remain accessible and unmodified during decompression.
+  Performance tip : Decompression speed can be substantially increased
+                    when dst == dictStart + dictSize.
+ 
+</p></pre><BR>
+
+<pre><b>int
+LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
+                                      int compressedSize,
+                                      int targetOutputSize, int maxOutputSize,
+                                      const char* dictStart, int dictSize);
+</b><p>  Behaves the same as LZ4_decompress_safe_partial()
+  with the added ability to specify a memory segment for past data.
   Performance tip : Decompression speed can be substantially increased
                     when dst == dictStart + dictSize.
  
@@ -568,11 +614,12 @@ LZ4_DEPRECATED("use LZ4_decompress_safe() instead") LZ4LIB_API int LZ4_uncompres
 LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
 </b><p></p></pre><BR>
 
-<pre><b>LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe() instead")
+<pre><b>LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_partial() instead")
 int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
-LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_continue() instead")
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider migrating towards LZ4_decompress_safe_continue() instead. "
+               "Note that the contract will change (requires block's compressed size, instead of decompressed size)")
 int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
-LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_usingDict() instead")
+LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_partial_usingDict() instead")
 int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
 </b><p>  These functions used to be faster than LZ4_decompress_safe(),
   but this is no longer the case. They are now slower.
