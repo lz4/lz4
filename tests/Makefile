@@ -128,6 +128,7 @@ clean:
         datagen$(EXT) checkTag$(EXT) \
         frameTest$(EXT) decompress-partial$(EXT) \
         abiTest$(EXT) freestanding$(EXT) \
+        checkFrame$(EXT) \
         lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
