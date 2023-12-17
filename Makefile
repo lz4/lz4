@@ -1,6 +1,6 @@
 # ################################################################
 # LZ4 - Makefile
-# Copyright (C) Yann Collet 2011-2020
+# Copyright (C) Yann Collet 2011-2023
 # All rights reserved.
 #
 # BSD license
@@ -61,7 +61,7 @@ lz4 : liblz4.a
 lz4-release : lib-release
 lz4 lz4-release :
 	$(MAKE) -C $(PRGDIR) $@
-	cp $(PRGDIR)/lz4$(EXT) .
+	$(LN_SF) $(PRGDIR)/lz4$(EXT) .
 
 .PHONY: examples
 examples: liblz4.a
