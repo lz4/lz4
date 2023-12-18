@@ -243,6 +243,13 @@ LZ4LIB_API int LZ4_compress_fast (const char* src, char* dst, int srcSize, int d
 LZ4LIB_API int LZ4_sizeofState(void);
 LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
+/*! LZ4_compress_fast_extState_destSize() :
+ *  Same as LZ4_compress_fast(), but compresses as much data as possible from 'src' buffer into
+ *  already allocated buffer 'dst', of size >= 'dstCapacity'. This function either compresses the
+ *  entire 'src' content into 'dst' if it's large enough, or fills 'dst' buffer completely with as
+ *  much data as possible from 'src'.
+ */
+LZ4LIB_API int LZ4_compress_fast_extState_destSize(void* state, const char* src, char* dst, int *srcSizePtr, int dstCapacity, int acceleration);
 
 /*! LZ4_compress_destSize() :
  *  Reverse the logic : compresses as much data as possible from 'src' buffer
