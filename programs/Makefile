@@ -1,6 +1,6 @@
 # ##########################################################################
 # LZ4 programs - Makefile
-# Copyright (C) Yann Collet 2011-2020
+# Copyright (C) Yann Collet 2011-2023
 #
 # This Makefile is validated for Linux, macOS, *BSD, Hurd, Solaris, MSYS2 targets
 #
@@ -28,7 +28,7 @@
 # lz4c  : CLU, supporting also legacy lz4demo arguments
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # ##########################################################################
-SED = sed
+SED ?= sed
 
 # Version numbers
 LZ4DIR   := ../lib
