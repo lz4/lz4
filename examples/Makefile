@@ -62,27 +62,27 @@ $(LZ4) :
 
 test : all $(LZ4)
 	@echo "\n=== Print Version ==="
-	./print_version$(EXT)
+	./print_version
 	@echo "\n=== Simple compression example ==="
-	./simple_buffer$(EXT)
+	./simple_buffer
 	@echo "\n=== Double-buffer ==="
-	./blockStreaming_doubleBuffer$(EXT) $(TESTFILE)
+	./blockStreaming_doubleBuffer $(TESTFILE)
 	@echo "\n=== Ring Buffer ==="
-	./blockStreaming_ringBuffer$(EXT)   $(TESTFILE)
+	./blockStreaming_ringBuffer   $(TESTFILE)
 	@echo "\n=== Ring Buffer + LZ4 HC ==="
-	./streamingHC_ringBuffer$(EXT) $(TESTFILE)
+	./streamingHC_ringBuffer $(TESTFILE)
 	@echo "\n=== Compress line by line ==="
-	./blockStreaming_lineByLine$(EXT) $(TESTFILE)
+	./blockStreaming_lineByLine $(TESTFILE)
 	@echo "\n=== Dictionary Random Access ==="
-	./dictionaryRandomAccess$(EXT) $(TESTFILE) $(TESTFILE) 1100 1400
+	./dictionaryRandomAccess $(TESTFILE) $(TESTFILE) 1100 1400
 	@echo "\n=== Frame compression ==="
-	./frameCompress$(EXT) $(TESTFILE)
+	./frameCompress $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
 	@echo "\n=== file compression ==="
-	./fileCompress$(EXT) $(TESTFILE)
+	./fileCompress $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
 	@echo "\n=== Q&D benchmark ==="
-	./bench_functions$(EXT) 10000
+	./bench_functions 10000
 
 .PHONY: clean
 clean:

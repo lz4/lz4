@@ -57,14 +57,12 @@ WINBASED    = yes
       else
 LIBLZ4_NAME = liblz4
 WINBASED    = no
-EXT         =
       endif
     endif
   endif
 endif
 
 ifeq ($(WINBASED),yes)
-EXT        = .exe
 WINDRES ?= windres
 endif
 

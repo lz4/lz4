@@ -84,17 +84,17 @@ lz4-exe.rc: lz4-exe.rc.in
          -e 's|@LIBVER_MAJOR@|$(LIBVER_MAJOR)|g' \
          -e 's|@LIBVER_MINOR@|$(LIBVER_MINOR)|g' \
          -e 's|@LIBVER_PATCH@|$(LIBVER_PATCH)|g' \
-         -e 's|@EXT@|$(EXT)|g' \
+         -e 's|@EXT@|.exe|g' \
           $< >$@
 
 lz4-exe.o: lz4-exe.rc
 	$(WINDRES) -i lz4-exe.rc -o lz4-exe.o
 
 lz4: $(OBJFILES) lz4-exe.o
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 else
 lz4: $(OBJFILES)
-	$(CC) $(FLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+	$(CC) $(FLAGS) $(OBJFILES) -o $@ $(LDLIBS)
 endif
 
 .PHONY: lz4-release
@@ -107,18 +107,18 @@ lz4-wlib: LDFLAGS += -L $(LZ4DIR)
 lz4-wlib: LDLIBS   = -llz4
 lz4-wlib: liblz4 $(OBJFILES)
 	@echo WARNING: $@ must link to an extended variant of the dynamic library which also exposes unstable symbols
-	$(CC) $(FLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+	$(CC) $(FLAGS) $(OBJFILES) -o $@ $(LDLIBS)
 
 .PHONY:liblz4
 liblz4:
 	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LZ4DIR) liblz4
 
 lz4c: lz4
-	$(LN_SF) lz4$(EXT) lz4c$(EXT)
+	$(LN_SF) lz4 lz4c
 
 lz4c32: CFLAGS += -m32
 lz4c32 : $(SRCFILES)
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 lz4.1: lz4.1.md $(LIBVER_SRC)
 	cat $< | $(MD2ROFF) $(MD2ROFF_FLAGS) | $(SED) -n '/^\.\\\".*/!p' > $@
@@ -137,8 +137,8 @@ ifeq ($(WINBASED),yes)
 endif
 	$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) lz4-wlib$(EXT) \
-           unlz4$(EXT) lz4cat$(EXT)
+           lz4 lz4c lz4c32 lz4-wlib \
+           unlz4 lz4cat
 	@echo Cleaning completed
 
 
@@ -148,10 +148,10 @@ endif
 ifeq ($(POSIX_ENV),Yes)
 
 unlz4: lz4
-	$(LN_SF) lz4$(EXT) unlz4$(EXT)
+	$(LN_SF) lz4 unlz4
 
 lz4cat: lz4
-	$(LN_SF) lz4$(EXT) lz4cat$(EXT)
+	$(LN_SF) lz4 lz4cat
 
 DESTDIR     ?=
 # directory variables : GNU conventions prefer lowercase
@@ -173,10 +173,10 @@ man1dir     ?= $(MAN1DIR)
 install: lz4
 	@echo Installing binaries in $(DESTDIR)$(bindir)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
-	$(INSTALL_PROGRAM) lz4$(EXT) $(DESTDIR)$(bindir)/lz4$(EXT)
-	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4c$(EXT)
-	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4cat$(EXT)
-	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/unlz4$(EXT)
+	$(INSTALL_PROGRAM) lz4 $(DESTDIR)$(bindir)/lz4
+	$(LN_SF) lz4 $(DESTDIR)$(bindir)/lz4c
+	$(LN_SF) lz4 $(DESTDIR)$(bindir)/lz4cat
+	$(LN_SF) lz4 $(DESTDIR)$(bindir)/unlz4
 	@echo Installing man pages in $(DESTDIR)$(man1dir)
 	$(INSTALL_DATA) lz4.1 $(DESTDIR)$(man1dir)/lz4.1
 	$(LN_SF) lz4.1 $(DESTDIR)$(man1dir)/lz4c.1
@@ -185,10 +185,10 @@ install: lz4
 	@echo lz4 installation completed
 
 uninstall:
-	$(RM) $(DESTDIR)$(bindir)/lz4cat$(EXT)
-	$(RM) $(DESTDIR)$(bindir)/unlz4$(EXT)
-	$(RM) $(DESTDIR)$(bindir)/lz4$(EXT)
-	$(RM) $(DESTDIR)$(bindir)/lz4c$(EXT)
+	$(RM) $(DESTDIR)$(bindir)/lz4cat
+	$(RM) $(DESTDIR)$(bindir)/unlz4
+	$(RM) $(DESTDIR)$(bindir)/lz4
+	$(RM) $(DESTDIR)$(bindir)/lz4c
 	$(RM) $(DESTDIR)$(man1dir)/lz4.1
 	$(RM) $(DESTDIR)$(man1dir)/lz4c.1
 	$(RM) $(DESTDIR)$(man1dir)/lz4cat.1

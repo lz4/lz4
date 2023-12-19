@@ -61,7 +61,7 @@ lz4 : liblz4.a
 lz4-release : lib-release
 lz4 lz4-release :
 	$(MAKE) -C $(PRGDIR) $@
-	$(LN_SF) $(PRGDIR)/lz4$(EXT) .
+	$(LN_SF) $(PRGDIR)/lz4 .
 
 .PHONY: examples
 examples: liblz4.a
@@ -83,7 +83,7 @@ clean:
 	$(MAKE) -C $(EXDIR) $@ > $(VOID)
 	$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
 	$(MAKE) -C contrib/gen_manual $@ > $(VOID)
-	$(RM) lz4$(EXT)
+	$(RM) lz4
 	$(RM) -r $(CMAKE_BUILD_DIR)
 	@echo Cleaning completed
 

@@ -45,7 +45,7 @@ FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 include ../Makefile.inc
 
-LZ4 := $(PRGDIR)/lz4$(EXT)
+LZ4 := $(PRGDIR)/lz4
 
 
 # Default test parameters
@@ -78,57 +78,57 @@ lz4c32:   # create a 32-bits version for 32/64 interop tests
 
 fullbench : DEBUGLEVEL=0
 fullbench : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 $(LZ4DIR)/liblz4.a:
 	$(MAKE) -C $(LZ4DIR) liblz4.a
 
 fullbench-lib: fullbench.c $(LZ4DIR)/liblz4.a
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
 	$(MAKE) -C $(LZ4DIR) liblz4
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/$(LIBLZ4).dll
+	$(CC) $(FLAGS) $^ -o $@ -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/$(LIBLZ4).dll
 
 # test LZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: fullbench
 
 fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 roundTripTest : lz4.o lz4hc.o xxhash.o roundTripTest.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 datagen : $(PRGDIR)/datagen.c datagencli.c
-	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) -I$(PRGDIR) $^ -o $@
 
 checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 decompress-partial: lz4.o decompress-partial.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(FLAGS) $^ -o $@
 
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(RM) -rf core *.o *.test tmp* \
-        fullbench-dll$(EXT) fullbench-lib$(EXT) \
-        fullbench$(EXT) fullbench32$(EXT) \
-        fuzzer$(EXT) fuzzer32$(EXT) \
-        frametest$(EXT) frametest32$(EXT) \
-        fasttest$(EXT) roundTripTest$(EXT) \
-        datagen$(EXT) checkTag$(EXT) \
-        frameTest$(EXT) decompress-partial$(EXT) \
-        abiTest$(EXT) freestanding$(EXT) \
-        checkFrame$(EXT) \
+        fullbench-dll fullbench-lib \
+        fullbench fullbench32 \
+        fuzzer fuzzer32 \
+        frametest frametest32 \
+        fasttest roundTripTest \
+        datagen checkTag \
+        frameTest decompress-partial \
+        abiTest freestanding \
+        checkFrame \
         lz4_all.c
 	@$(RM) -rf $(TESTDIR)
 	@echo Cleaning completed
@@ -148,7 +148,7 @@ abiTests:
 	$(PYTHON) test-lz4-abi.py
 
 checkTag: checkTag.c $(LZ4DIR)/lz4.h
-	$(CC) $(FLAGS) $< -o $@$(EXT)
+	$(CC) $(FLAGS) $< -o $@
 
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
@@ -347,9 +347,9 @@ test-mem32: lz4c32 datagen
 
 test-decompress-partial : decompress-partial decompress-partial-usingDict
 	@echo "\n ---- test decompress-partial ----"
-	./decompress-partial$(EXT)
+	./decompress-partial
 	@echo "\n ---- test decompress-partial-usingDict ----"
-	./decompress-partial-usingDict$(EXT)
+	./decompress-partial-usingDict
 
 
 #-----------------------------------------------------------------------------
@@ -378,16 +378,16 @@ ifneq ($(UNAME_P), x86_64)
 endif
 
 freestanding: freestanding.c
-	$(CC) $(FREESTANDING_CFLAGS) $^ -o $@$(EXT)
+	$(CC) $(FREESTANDING_CFLAGS) $^ -o $@
 
 test-freestanding: freestanding
 	@echo "\n ---- test freestanding ----"
 ifeq ($(FREESTANDING_CFLAGS),)
 	@echo "\n (skip)"
 else
-	./freestanding$(EXT)
-	-strace ./freestanding$(EXT)
-	-ltrace ./freestanding$(EXT)
+	./freestanding
+	-strace ./freestanding
+	-ltrace ./freestanding
 endif
 
 

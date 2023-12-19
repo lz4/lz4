@@ -37,13 +37,6 @@ CPPFLAGS:= -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
 FLAGS   := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 
-# Define *.exe as extension for Windows systems
-ifneq (,$(filter Windows%,$(OS)))
-EXT =.exe
-else
-EXT =
-endif
-
 .PHONY: default fullbench-dll fullbench-lib
 
 
@@ -53,11 +46,11 @@ all: fullbench-dll fullbench-lib
 
 
 fullbench-lib: fullbench.c xxhash.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT) $(LIBDIR)/liblz4_static.lib
+	$(CC) $(FLAGS) $^ -o $@ $(LIBDIR)/liblz4_static.lib
 
 fullbench-dll: fullbench.c xxhash.c
-	$(CC) $(FLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(DLLDIR)/liblz4.dll
+	$(CC) $(FLAGS) $^ -o $@ -DLZ4_DLL_IMPORT=1 $(DLLDIR)/liblz4.dll
 
 clean:
-	@$(RM) fullbench-dll$(EXT) fullbench-lib$(EXT) \
+	@$(RM) fullbench-dll fullbench-lib
 	@echo Cleaning completed
