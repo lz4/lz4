@@ -102,6 +102,7 @@ build_script:
       msbuild "build\VS2010\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v140 /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
       COPY build\VS2010\bin\%PLATFORM%_%CONFIGURATION%\*.exe programs\
     ) else (
+      DIR tests\ &&
       COPY tests\*.exe programs\
     )
 
