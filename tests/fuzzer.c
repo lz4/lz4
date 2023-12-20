@@ -1042,9 +1042,9 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     bytes += !bytes;   /* avoid division by 0 */
     printf("\r%7u /%7u   - ", cycleNb, nbCycles);
     printf("all tests completed successfully \n");
-    printf("compression ratio: %0.3f%%\n", (double)cbytes/bytes*100);
-    printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/bytes*100);
-    printf("ratio with dict: %0.3f%%\n", (double)ccbytes/bytes*100);
+    printf("compression ratio: %0.3f%%\n", (double)cbytes/(double)bytes*100);
+    printf("HC compression ratio: %0.3f%%\n", (double)hcbytes/(double)bytes*100);
+    printf("ratio with dict: %0.3f%%\n", (double)ccbytes/(double)bytes*100);
 
     /* release memory */
     free(CNBuffer);
