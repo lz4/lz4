@@ -494,7 +494,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
                         marks[markNb], displayName,
                         (U32)totalRSize, (U32)cSize, ratio,
-                        ((double)totalRSize / fastestC) * 1000 );
+                        ((double)totalRSize / (double)fastestC) * 1000 );
             }
             (void)fastestD; (void)crcOrig;   /*  unused when decompression disabled */
 #if 1
@@ -557,8 +557,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s, %6.1f MB/s\r",
                     marks[markNb], displayName,
                     (U32)totalRSize, (U32)cSize, ratio,
-                    ((double)totalRSize / fastestC) * 1000,
-                    ((double)totalRSize / fastestD) * 1000);
+                    ((double)totalRSize / (double)fastestC) * 1000,
+                    ((double)totalRSize / (double)fastestD) * 1000);
 
             /* CRC Checking (not possible in decode-only mode)*/
             if (!g_decodeOnly) {
@@ -590,8 +590,8 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         }   /* for (testNb = 1; testNb <= (g_nbSeconds + !g_nbSeconds); testNb++) */
 
         if (g_displayLevel == 1) {
-            double const cSpeed = ((double)srcSize / fastestC) * 1000;
-            double const dSpeed = ((double)srcSize / fastestD) * 1000;
+            double const cSpeed = ((double)srcSize / (double)fastestC) * 1000;
+            double const dSpeed = ((double)srcSize / (double)fastestD) * 1000;
             if (g_additionalParam)
                 DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
             else

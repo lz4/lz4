@@ -466,7 +466,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
         assert(outSize >= 0);
         compressedfilesize += (unsigned long long)outSize+4;
         DISPLAYUPDATE(2, "\rRead : %i MiB  ==> %.2f%%   ",
-                (int)(filesize>>20), (double)compressedfilesize/filesize*100);
+                (int)(filesize>>20), (double)compressedfilesize/(double)filesize*100);
 
         /* Write Block */
         assert(outSize > 0);
@@ -483,7 +483,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
     filesize += !filesize;   /* avoid division by zero (ratio) */
     DISPLAYLEVEL(2, "\r%79s\r", "");   /* blank line */
     DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-        filesize, compressedfilesize, (double)compressedfilesize / filesize * 100);
+        filesize, compressedfilesize, (double)compressedfilesize / (double)filesize * 100);
     {   double const seconds = (double)(clockEnd - clockStart) / CLOCKS_PER_SEC;
         DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MiB/s\n", seconds,
                         (double)filesize / seconds / 1024 / 1024);
@@ -719,7 +719,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
             END_PROCESS(41, "Compression failed : %s", LZ4F_getErrorName(cSize));
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
-                      (unsigned)(filesize>>20), (double)compressedfilesize/(filesize+!filesize)*100);   /* avoid division by zero */
+                      (unsigned)(filesize>>20), (double)compressedfilesize/(double)(filesize+!filesize)*100);   /* avoid division by zero */
 
         /* Write Block */
         if (fwrite(dstBuffer, 1, cSize, dstFile) != cSize) {
@@ -744,7 +744,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
                 END_PROCESS(45, "Compression failed : %s", LZ4F_getErrorName(outSize));
             compressedfilesize += outSize;
             DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
-                        (unsigned)(filesize>>20), (double)compressedfilesize/filesize*100);
+                        (unsigned)(filesize>>20), (double)compressedfilesize/(double)filesize*100);
 
             /* Write Block */
             if (fwrite(dstBuffer, 1, outSize, dstFile) != outSize)
@@ -787,7 +787,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
                     filesize, compressedfilesize,
-                    (double)compressedfilesize / (filesize + !filesize /* avoid division by zero */ ) * 100);
+                    (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100);
 
     return 0;
 }
@@ -1636,7 +1636,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                                              bTypeBuffer,
                                              frameInfo.lz4FrameInfo.contentChecksumFlag ? "XXH32" : "-");
                                 if (frameInfo.lz4FrameInfo.contentSize) {
-                                    {   double const ratio = (double)(totalBlocksSize + hSize) / frameInfo.lz4FrameInfo.contentSize * 100;
+                                    {   double const ratio = (double)(totalBlocksSize + hSize) / (double)frameInfo.lz4FrameInfo.contentSize * 100;
                                         DISPLAYLEVEL(3, " %20llu %20llu %9.2f%%\n",
                                                      totalBlocksSize + hSize,
                                                      frameInfo.lz4FrameInfo.contentSize,
@@ -1750,7 +1750,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
                         LZ4IO_toHuman((long double)cfinfo.fileSize, buffers[1]),
                         cfinfo.allContentSize ? LZ4IO_toHuman((long double)cfinfo.frameSummary.lz4FrameInfo.contentSize, buffers[2]) : "-");
                 if (cfinfo.allContentSize) {
-                    double const ratio = (double)cfinfo.fileSize / cfinfo.frameSummary.lz4FrameInfo.contentSize * 100;
+                    double const ratio = (double)cfinfo.fileSize / (double)cfinfo.frameSummary.lz4FrameInfo.contentSize * 100;
                     DISPLAYOUT("%9.2f%%  %s \n", ratio, cfinfo.fileName);
                 } else {
                     DISPLAYOUT("%9s   %s\n",
