@@ -85,13 +85,13 @@ default: lib-release
 $(V)$(VERBOSE).SILENT:
 
 lib-release: DEBUGFLAGS :=
-lib-release: lib
+lib-release: lib liblz4.pc
 
 .PHONY: lib
 lib: liblz4.a liblz4
 
 .PHONY: all
-all: lib
+all: lib liblz4.pc
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -138,6 +138,15 @@ endif
 .PHONY: liblz4
 liblz4: $(LIBLZ4)
 
+liblz4.pc: liblz4.pc.in Makefile
+	@echo creating pkgconfig
+	$(SED) -e 's|@PREFIX@|$(prefix)|' \
+           -e 's|@LIBDIR@|$(libdir)|' \
+           -e 's|@INCLUDEDIR@|$(includedir)|' \
+           -e 's|@VERSION@|$(LIBVER)|' \
+           -e 's|=${prefix}/|=$${prefix}/|' \
+           $< >$@
+
 .PHONY: clean
 clean:
 ifeq ($(WINBASED),yes)
@@ -177,15 +186,6 @@ PKGCONFIGDIR ?= $(prefix)/libdata/pkgconfig
 PKGCONFIGDIR ?= $(libdir)/pkgconfig
   endif
 pkgconfigdir ?= $(PKGCONFIGDIR)
-
-liblz4.pc: liblz4.pc.in Makefile
-	@echo creating pkgconfig
-	$(SED) -e 's|@PREFIX@|$(prefix)|' \
-         -e 's|@LIBDIR@|$(libdir)|' \
-         -e 's|@INCLUDEDIR@|$(includedir)|' \
-         -e 's|@VERSION@|$(LIBVER)|' \
-         -e 's|=${prefix}/|=$${prefix}/|' \
-          $< >$@
 
 install: lib liblz4.pc
 	$(INSTALL_DIR) $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
