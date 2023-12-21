@@ -193,7 +193,7 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
     while ((back - min) > 3) {
         U32 const v = LZ4_read32(ip + back - 4) ^ LZ4_read32(match + back - 4);
         if (v) {
-            return (back - LZ4HC_NbCommonBytes32(v));
+            return (back - (int)LZ4HC_NbCommonBytes32(v));
         } else back -= 4; /* 4-byte step */
     }
     /* check remainder if any */
