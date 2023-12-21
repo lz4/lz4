@@ -31,7 +31,7 @@
  * - LZ4 homepage : http://www.lz4.org
  * - LZ4 source repository : https://github.com/lz4/lz4
  */
-#include <stdlib.h>  // malloc, free
+#include <stdlib.h>  /* malloc, free */
 #include <string.h>
 #include <assert.h>
 #include "lz4.h"
