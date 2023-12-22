@@ -26,6 +26,7 @@ head = 'v999'
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
+    print("Executing command:", cmd_args)
     if pipe:
         s = subprocess.Popen(cmd_args,
                              stdout=subprocess.PIPE,
@@ -33,11 +34,12 @@ def proc(cmd_args, pipe=True, env=False):
                              env = env)
     else:
         s = subprocess.Popen(cmd_args, env = env)
-    r = s.communicate()
+    stdout_data, stderr_data = s.communicate()
     if s.poll() != 0:
-        print(' s.poll() = ', s.poll())
+        print('Error Code:', s.poll())
+        print('Standard Error:', stderr_data.decode())
         sys.exit(1)
-    return r
+    return stdout_data, stderr_data
 
 def make(args, pipe=True, env=False):
     if env == False:
@@ -45,7 +47,7 @@ def make(args, pipe=True, env=False):
         # we want the address sanitizer for abi tests
         env["CFLAGS"] = "-fsanitize=address"
         env["LDFLAGS"] = "-fsanitize=address"
-    return proc([make_cmd] + ['-j'] + ['V=1'] + args, pipe, env)
+    return proc([make_cmd] + ['-j'] + ['V=1'] + ['DEBUGFLAGS='] + args, pipe, env)
 
 def git(args, pipe=True):
     return proc([git_cmd] + args, pipe)
@@ -118,11 +120,10 @@ if __name__ == '__main__':
         os.chdir(test_dir)
         # Start with matching version : should be no problem
         build_env = os.environ.copy()
-        build_env["CFLAGS"] = march + " -fsanitize=address"
-        build_env["LDFLAGS"] = "-L../lib"
-        build_env["LDLIBS"] = "-llz4"
         # we use asan to detect any out-of-bound read or write
-        build_env["LDFLAGS"] = "-fsanitize=address"
+        build_env["CFLAGS"] = march + " -fsanitize=address"
+        build_env["LDFLAGS"] = "-L../lib -fsanitize=address"
+        build_env["LDLIBS"] = "-llz4"
         if os.path.isfile('abiTest'):
             os.remove('abiTest')
         make(['abiTest'], env=build_env, pipe=False)
