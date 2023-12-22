@@ -11,7 +11,6 @@ import glob
 import subprocess
 import filecmp
 import os
-import platform
 import shutil
 import sys
 import hashlib
@@ -27,7 +26,7 @@ head = 'v999'
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
-    print("Executing command {} in directory {}".format(cmd_args, os.getcwd()))
+    print("Executing command {} with env {}".format(cmd_args, env))
     if pipe:
         s = subprocess.Popen(cmd_args,
                              stdout=subprocess.PIPE,
@@ -45,9 +44,11 @@ def proc(cmd_args, pipe=True, env=False):
 def make(args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
-        # we want the address sanitizer for abi tests
-        env["CFLAGS"] = "-fsanitize=address"
-        env["LDFLAGS"] = "-fsanitize=address"
+    # we want the address sanitizer for abi tests
+    if 'CFLAGS' in env:
+        env["CFLAGS"] += " -fsanitize=address"
+    if 'LDFLAGS' in env:
+        env["LDFLAGS"] += " -fsanitize=address"
     return proc([make_cmd] + ['-j'] + ['V=1'] + ['DEBUGFLAGS='] + args, pipe, env)
 
 def git(args, pipe=True):
@@ -65,10 +66,8 @@ def sha1_of_file(filepath):
         return hashlib.sha1(f.read()).hexdigest()
 
 if __name__ == '__main__':
-
-    # Note: the test doesn't work on macOS
-    if platform.system() == 'Darwin':  # Darwin is the system name for macOS
-        print('warning : this test is not validated for macos !')
+    if sys.platform == "darwin":
+        print("!!! Warning: this test is not validated for macos !!!")
 
     error_code = 0
     base_dir = os.getcwd() + '/..'           # /path/to/lz4
@@ -115,8 +114,7 @@ if __name__ == '__main__':
                 os.chdir(lib_dir)
             make(['clean'])
             build_env = os.environ.copy()
-            build_env["CFLAGS"] = march + " -fsanitize=address"
-            build_env["LDFLAGS"] = "-fsanitize=address"
+            build_env["CFLAGS"] = "-O1 " + march
             make(['liblz4'], env=build_env)
 
         print(' ')
@@ -127,8 +125,8 @@ if __name__ == '__main__':
         # Start with matching version : should be no problem
         build_env = os.environ.copy()
         # we use asan to detect any out-of-bound read or write
-        build_env["CFLAGS"] = march + " -fsanitize=address"
-        build_env["LDFLAGS"] = "-L../lib -fsanitize=address"
+        build_env["CFLAGS"] = "-O1 " + march
+        build_env["LDFLAGS"] = "-L../lib"
         build_env["LDLIBS"] = "-llz4"
         if os.path.isfile('abiTest'):
             os.remove('abiTest')
@@ -157,13 +155,12 @@ if __name__ == '__main__':
             build_env = os.environ.copy()
             if tag != head:
                 build_env["CPPFLAGS"] = '-IabiTests/{}/lib'.format(tag)
-                build_env["LDFLAGS"] = '-LabiTests/{}/lib'.format(tag)
+                build_env["LDFLAGS"]  = '-LabiTests/{}/lib'.format(tag)
             else:
                 build_env["CPPFLAGS"] = '-I../lib'
-                build_env["LDFLAGS"] = '-L../lib'
-            build_env["LDLIBS"] = "-llz4"
-            build_env["CFLAGS"] = march + " -fsanitize=address"
-            build_env["LDFLAGS"] = "-fsanitize=address"
+                build_env["LDFLAGS"]  = '-L../lib'
+            build_env["LDLIBS"]  = "-llz4"
+            build_env["CFLAGS"]  = "-O1 " + march
             os.remove('abiTest')
             make(['abiTest'], pipe=False, env=build_env)
 
