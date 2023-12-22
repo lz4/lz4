@@ -11,6 +11,7 @@ import glob
 import subprocess
 import filecmp
 import os
+import platform
 import shutil
 import sys
 import hashlib
@@ -26,7 +27,7 @@ head = 'v999'
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
-    print("Executing command:", cmd_args)
+    print("Executing command {} in directory {}".format(cmd_args, os.getcwd()))
     if pipe:
         s = subprocess.Popen(cmd_args,
                              stdout=subprocess.PIPE,
@@ -64,6 +65,11 @@ def sha1_of_file(filepath):
         return hashlib.sha1(f.read()).hexdigest()
 
 if __name__ == '__main__':
+
+    # Note: the test doesn't work on macOS
+    if platform.system() == 'Darwin':  # Darwin is the system name for macOS
+        print('warning : this test is not validated for macos !')
+
     error_code = 0
     base_dir = os.getcwd() + '/..'           # /path/to/lz4
     tmp_dir = base_dir + '/' + tmp_dir_name  # /path/to/lz4/tests/versionsTest
