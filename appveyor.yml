@@ -55,10 +55,10 @@ build_script:
       clang -v &&
       make -v &&
       echo ----- &&
-      make -C programs lz4 CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
-      make -C tests fullbench CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
-      make -C tests fuzzer CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
-      make -C lib lib CC=clang MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
+      make -C programs lz4 CC=clang CFLAGS="-O1 --target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+      make -C tests fullbench CC=clang CFLAGS="-O1 --target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+      make -C tests fuzzer CC=clang CFLAGS="-O1 --target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+      make -C lib lib CC=clang CFLAGS="-O1 --target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion"
     )
   - if [%COMPILER%]==[gcc] (
       MKDIR bin\dll bin\static bin\example bin\include &&
