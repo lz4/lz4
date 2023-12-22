@@ -17,7 +17,7 @@ import hashlib
 
 repo_url = 'https://github.com/lz4/lz4.git'
 tmp_dir_name = 'tests/abiTests'
-env_flags = ' ' # '-j MOREFLAGS="-g -O0 -fsanitize=address"'
+env_flags = ' ' # '-j CFLAGS="-g -O0 -fsanitize=address"'
 make_cmd = 'make'
 git_cmd = 'git'
 test_dat_src = ['README.md']
@@ -43,7 +43,8 @@ def make(args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
         # we want the address sanitizer for abi tests
-        env["MOREFLAGS"] = "-fsanitize=address"
+        env["CFLAGS"] = "-fsanitize=address"
+        env["LDFLAGS"] = "-fsanitize=address"
     return proc([make_cmd] + ['-j'] + ['V=1'] + args, pipe, env)
 
 def git(args, pipe=True):
@@ -106,8 +107,8 @@ if __name__ == '__main__':
                 os.chdir(lib_dir)
             make(['clean'])
             build_env = os.environ.copy()
-            build_env["CFLAGS"] = march
-            build_env["MOREFLAGS"] = "-fsanitize=address"
+            build_env["CFLAGS"] = march + " -fsanitize=address"
+            build_env["LDFLAGS"] = "-fsanitize=address"
             make(['liblz4'], env=build_env)
 
         print(' ')
@@ -117,11 +118,11 @@ if __name__ == '__main__':
         os.chdir(test_dir)
         # Start with matching version : should be no problem
         build_env = os.environ.copy()
-        build_env["CFLAGS"] = march
+        build_env["CFLAGS"] = march + " -fsanitize=address"
         build_env["LDFLAGS"] = "-L../lib"
         build_env["LDLIBS"] = "-llz4"
         # we use asan to detect any out-of-bound read or write
-        build_env["MOREFLAGS"] = "-fsanitize=address"
+        build_env["LDFLAGS"] = "-fsanitize=address"
         if os.path.isfile('abiTest'):
             os.remove('abiTest')
         make(['abiTest'], env=build_env, pipe=False)
@@ -154,8 +155,8 @@ if __name__ == '__main__':
                 build_env["CPPFLAGS"] = '-I../lib'
                 build_env["LDFLAGS"] = '-L../lib'
             build_env["LDLIBS"] = "-llz4"
-            build_env["CFLAGS"] = march
-            build_env["MOREFLAGS"] = "-fsanitize=address"
+            build_env["CFLAGS"] = march + " -fsanitize=address"
+            build_env["LDFLAGS"] = "-fsanitize=address"
             os.remove('abiTest')
             make(['abiTest'], pipe=False, env=build_env)
 
