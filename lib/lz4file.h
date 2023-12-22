@@ -38,7 +38,7 @@ extern "C" {
 #ifndef LZ4FILE_H
 #define LZ4FILE_H
 
-#include <stdio.h>
+#include <stdio.h>  /* FILE* */
 #include "lz4frame_static.h"
 
 typedef struct LZ4_readFile_s LZ4_readFile_t;
