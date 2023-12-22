@@ -47,13 +47,12 @@ BUILD_SHARED:=yes
 BUILD_STATIC:=yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
-CPPFLAGS+= $(MOREFLAGS)
-CFLAGS  ?= -O3
+usercflags:= -O3 $(CFLAGS)
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
              -Wundef -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS  += $(DEBUGFLAGS)
-FLAGS    = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+CFLAGS   = $(DEBUGFLAGS) $(usercflags)
+ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))
 
@@ -70,7 +69,7 @@ else
 	ifeq ($(WINBASED),yes)
 		SHARED_EXT = dll
 		SHARED_EXT_VER = $(SHARED_EXT)
-	else
+	else  # posix non-mac
 		SONAME_FLAGS = -Wl,-soname=liblz4.$(SHARED_EXT).$(LIBVER_MAJOR)
 		SHARED_EXT = so
 		SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
@@ -84,6 +83,7 @@ default: lib-release
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
 
+.PHONY:lib-release
 lib-release: DEBUGFLAGS :=
 lib-release: lib liblz4.pc
 
@@ -97,6 +97,7 @@ all: lib liblz4.pc
 all32: CFLAGS+=-m32
 all32: all
 
+CLEAN += liblz4.a
 liblz4.a: $(SRCFILES)
 ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
@@ -105,6 +106,8 @@ ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 endif
 
 ifeq ($(WINBASED),yes)
+
+CLEAN += $(liblz4-dll.rc)
 liblz4-dll.rc: liblz4-dll.rc.in
 	@echo creating library resource
 	$(SED) -e 's|@LIBLZ4@|$(LIBLZ4_NAME)|' \
@@ -116,28 +119,31 @@ liblz4-dll.rc: liblz4-dll.rc.in
 liblz4-dll.o: liblz4-dll.rc
 	$(WINDRES) -i liblz4-dll.rc -o liblz4-dll.o
 
+CLEAN += $(LIBLZ4_EXP)
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
-ifeq ($(BUILD_SHARED),yes)
+  ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
-endif
+	$(CC) $(ALLFLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
+  endif
 
 else   # not windows
 
 $(LIBLZ4): $(SRCFILES)
-ifeq ($(BUILD_SHARED),yes)
+  ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(FLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
+	$(CC) $(ALLFLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
 	$(LN_SF) $@ liblz4.$(SHARED_EXT_MAJOR)
 	$(LN_SF) $@ liblz4.$(SHARED_EXT)
-endif
+  endif
 
 endif
+CLEAN += $(LIBLZ4)
 
 .PHONY: liblz4
 liblz4: $(LIBLZ4)
 
+CLEAN += liblz4.pc
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
 	$(SED) -e 's|@PREFIX@|$(prefix)|' \
@@ -152,8 +158,8 @@ clean:
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
-	$(RM) core *.o liblz4.pc $(LIBLZ4) $(LIBLZ4_EXP)
-	$(RM) *.a *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
+	$(RM) $(CLEAN) core *.o *.a
+	$(RM) *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	@echo Cleaning library completed
 
 #-----------------------------------------------------------------------------
@@ -187,6 +193,7 @@ PKGCONFIGDIR ?= $(libdir)/pkgconfig
   endif
 pkgconfigdir ?= $(PKGCONFIGDIR)
 
+.PHONY: install
 install: lib liblz4.pc
 	$(INSTALL_DIR) $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
 	$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(pkgconfigdir)/
@@ -215,6 +222,7 @@ install: lib liblz4.pc
 	$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(includedir)/lz4frame.h
 	@echo lz4 libraries installed
 
+.PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
   ifeq (WINBASED,yes)
