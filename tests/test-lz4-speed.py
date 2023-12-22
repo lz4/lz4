@@ -204,9 +204,9 @@ def test_commit(branch, commit, last_commit, args, testFilePaths, have_mutt, hav
     local_branch = branch.split('/')[1]
     version = local_branch.rpartition('-')[2] + '_' + commit
     if not args.dry_run:
-        execute('make -C programs clean lz4 CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion -DLZ4_GIT_COMMIT=%s" && ' % version +
+        execute('make -C programs clean lz4 CC=clang CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion -DLZ4_GIT_COMMIT=%s" && ' % version +
                 'mv programs/lz4 programs/lz4_clang && ' +
-                'make -C programs clean lz4 lz4c32 MOREFLAGS="-DLZ4_GIT_COMMIT=%s"' % version)
+                'make -C programs clean lz4 lz4c32 CPPFLAGS="-DLZ4_GIT_COMMIT=%s"' % version)
     md5_lz4 = hashfile(hashlib.md5(), clone_path + '/programs/lz4')
     md5_lz4c32 = hashfile(hashlib.md5(), clone_path + '/programs/lz4c32')
     md5_lz4_clang = hashfile(hashlib.md5(), clone_path + '/programs/lz4_clang')
