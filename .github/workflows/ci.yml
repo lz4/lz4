@@ -130,19 +130,19 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; MOREFLAGS='-Werror' make -j V=1 -C tests test-lz4
+      run: make clean; CFLAGS='-Werror -O1' make -j V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
       run: make V=1 clean clangtest
 
-    - name: make -C tests test MOREFLAGS='-mx32'
+    - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make -j V=1 -C tests test
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j V=1 -C tests test
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
-      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4c32
+      run: LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make V=1 -C tests clean test-lz4c32
 
 
     ###############################################################
@@ -150,13 +150,13 @@ jobs:
     #      Remove this block when we stabilize the tests.         #
     #                                                             #
 
-    - name: make -C tests test MOREFLAGS='-mx32' || echo Ignore failure for now.
+    - name: make -C tests test CFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O1' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
 
     - name: make -C tests test-lz4c32 || echo Ignore failure for now.
       if: ${{ matrix.x86 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################
@@ -293,7 +293,7 @@ jobs:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
-        MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
+        CPPFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
         make V=1 clean
         make V=1 -C programs lz4-wlib
         make V=1 clean
@@ -429,10 +429,10 @@ jobs:
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
     - name: frametest
-      run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
+      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
 
     - name: fuzzer
-      run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
+      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
 
   unicode-lint:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
@@ -501,15 +501,6 @@ jobs:
   # QEMU
   # All tests use QEMU (static) and gcc cross compiler.
   #
-  # note:
-  #   We don't employ completely matrix method which provides `MOREFLAGS`
-  #   etc in the matrix.  Because some platform may need its special
-  #   compiler options and test.
-  #   For example, xxHash already has tests for scalar and SIMD version of
-  #   it.  But compiler options are quite different between platforms.
-  #
-  #   So, please keep them simple and independent.
-  #
   lz4-qemu-platforms:
     name: QEMU ${{ matrix.type }}
     strategy:
@@ -559,7 +550,7 @@ jobs:
 
     - name: PPC64LE
       if: ${{ matrix.type == 'PPC64LE' }}
-      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU MOREFLAGS=-m64
+      run: CFLAGS=-m64 make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
 
     - name: MIPS-M68K-RISCV
       if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' }}
@@ -581,10 +572,10 @@ jobs:
         echo && sysctl -a | grep machdep.cpu   # cpuinfo
 
     - name: make default
-      run: CFLAGS="-Werror" make V=1 clean default
+      run: CFLAGS="-Werror -O1" make V=1 clean default
 
     - name: make test
-      run: make clean; make -j V=1 test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion'
+      run: make clean; CFLAGS='-O1 -Werror -Wconversion -Wno-sign-conversion' make -j V=1 test
 
     - name: Ensure `make test` doesn't depend on the status of the console
       # see issue #990 for detailed explanations
@@ -670,7 +661,7 @@ jobs:
 
     - name: cmake
       run: |
-        CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install
+        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build --target install
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build_test
@@ -688,7 +679,7 @@ jobs:
 
     - name: cmake (static lib)
       run: |
-        CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
+        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
         VERBOSE=1 cmake --build build --target install
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install_test_dir
         VERBOSE=1 cmake --build build_test
