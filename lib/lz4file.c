@@ -222,7 +222,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   if (fp == NULL || lz4fWrite == NULL)
     RETURN_ERROR(parameter_null);
 
-  *lz4fWrite = (LZ4_writeFile_t*)malloc(sizeof(LZ4_writeFile_t));
+  *lz4fWrite = (LZ4_writeFile_t*)calloc(1, sizeof(LZ4_writeFile_t));
   if (*lz4fWrite == NULL) {
     RETURN_ERROR(allocation_failed);
   }
