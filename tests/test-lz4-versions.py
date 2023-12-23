@@ -23,6 +23,11 @@ test_dat_src = 'README.md'
 test_dat = 'test_dat'
 head = 'v999'
 
+def env_or_empty(env, key):
+    if key in env:
+        return " " + env[key]
+    return ""
+
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
@@ -41,8 +46,13 @@ def proc(cmd_args, pipe=True, env=False):
         sys.exit(1)
     return stdout_data, stderr_data
 
-def make(args, pipe=True):
-    return proc([make_cmd] + args, pipe)
+def make(args, pipe=True, env=False):
+    if env == False:
+        env = os.environ.copy()
+    # old versions of lz4 may require MOREFLAGS
+    env["CFLAGS"] = env_or_empty(env, 'CFLAGS') + " -O1"
+    env["MOREFLAGS"] = env_or_empty(env, 'MOREFLAGS') + env_or_empty(env, 'CFLAGS') + env_or_empty(env, 'CPPFLAGS') + env_or_empty(env, 'LDFLAGS')
+    return proc([make_cmd] + args, pipe, env)
 
 def git(args, pipe=True):
     return proc([git_cmd] + args, pipe)
@@ -81,6 +91,7 @@ if __name__ == '__main__':
 
     # Build all release lz4c and lz4c32
     for tag in tags:
+        print("processing tag " + tag)
         os.chdir(base_dir)
         dst_lz4c   = '{}/lz4c.{}'  .format(tmp_dir, tag) # /path/to/lz4/test/lz4test/lz4c.<TAG>
         dst_lz4c32 = '{}/lz4c32.{}'.format(tmp_dir, tag) # /path/to/lz4/test/lz4test/lz4c32.<TAG>
