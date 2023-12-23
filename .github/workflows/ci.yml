@@ -130,7 +130,7 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; CFLAGS='-Werror -O1' make -j V=1 -C tests test-lz4
+      run: make clean; CFLAGS='-Werror' make -j V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
@@ -142,7 +142,7 @@ jobs:
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
-      run: LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make V=1 -C tests clean test-lz4c32
+      run: LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make V=1 -C tests clean test-lz4c32
 
 
     ###############################################################
@@ -152,11 +152,11 @@ jobs:
 
     - name: make -C tests test CFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O1' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
 
     - name: make -C tests test-lz4c32 || echo Ignore failure for now.
       if: ${{ matrix.x86 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################

@@ -7,6 +7,7 @@
 # GPL v2 License
 #
 
+import argparse
 import glob
 import subprocess
 import filecmp
@@ -23,10 +24,18 @@ git_cmd = 'git'
 test_dat_src = ['README.md']
 head = 'v999'
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--verbose", action="store_true", help="increase output verbosity")
+args = parser.parse_args()
+
+def debug_message(msg):
+    if args.verbose:
+        print(msg)
+
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
-    print("Executing command {} with env {}".format(cmd_args, env))
+    debug_message("Executing command {} with env {}".format(cmd_args, env))
     if pipe:
         s = subprocess.Popen(cmd_args,
                              stdout=subprocess.PIPE,
