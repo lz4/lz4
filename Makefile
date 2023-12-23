@@ -181,9 +181,9 @@ cppcheck:
 platformTest: clean
 	@echo "\n ---- test lz4 with $(CC) compiler ----"
 	$(CC) -v
-	CFLAGS="-O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(PRGDIR) all
-	CFLAGS="-O3 -Werror -static" $(MAKE) -C $(TESTDIR) all
+	CFLAGS="$(CFLAGS) -O3 -Werror"         $(MAKE) -C $(LZ4DIR) all
+	CFLAGS="$(CFLAGS) -O3 -Werror -static" $(MAKE) -C $(PRGDIR) all
+	CFLAGS="$(CFLAGS) -O3 -Werror -static" $(MAKE) -C $(TESTDIR) all
 	$(MAKE) -C $(TESTDIR) test-platform
 
 .PHONY: versionsTest
