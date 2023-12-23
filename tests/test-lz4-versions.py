@@ -23,16 +23,23 @@ test_dat_src = 'README.md'
 test_dat = 'test_dat'
 head = 'v999'
 
-def proc(cmd_args, pipe=True, dummy=False):
-    if dummy:
-        return
+def proc(cmd_args, pipe=True, env=False):
+    if env == False:
+        env = os.environ.copy()
+    print("Executing command {} with env {}".format(cmd_args, env))
     if pipe:
-        subproc = subprocess.Popen(cmd_args,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+        s = subprocess.Popen(cmd_args,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             env = env)
     else:
-        subproc = subprocess.Popen(cmd_args)
-    return subproc.communicate()
+        s = subprocess.Popen(cmd_args, env = env)
+    stdout_data, stderr_data = s.communicate()
+    if s.poll() != 0:
+        print('Error Code:', s.poll())
+        print('Standard Error:', stderr_data.decode())
+        sys.exit(1)
+    return stdout_data, stderr_data
 
 def make(args, pipe=True):
     return proc([make_cmd] + args, pipe)
