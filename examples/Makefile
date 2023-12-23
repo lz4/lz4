@@ -27,19 +27,21 @@
 # kindly provided by Takayuki Matsuoka
 # ##########################################################################
 
-CPPFLAGS += -I../lib
+LIBDIR   := ../lib
+
+CPPFLAGS += -I$(LIBDIR)
 CFLAGS   ?= -O2
 CFLAGS   += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -Wc++-compat
 
 TESTFILE  = Makefile
-LZ4DIR   := ../lib
-SLIBLZ4  := $(LZ4DIR)/liblz4.a
-LZ4       = ../programs/lz4
+SLIBLZ4  := $(LIBDIR)/liblz4.a
+LZ4DIR    = ../programs
+LZ4       = $(LZ4DIR)/lz4
 
 default: all
 
-$(SLIBLZ4): $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c $(LZ4DIR)/lz4.h $(LZ4DIR)/lz4hc.h $(LZ4DIR)/lz4frame.h $(LZ4DIR)/lz4frame_static.h
-	$(MAKE) -j -C $(LZ4DIR) liblz4.a
+$(SLIBLZ4): $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4.h $(LIBDIR)/lz4hc.h $(LIBDIR)/lz4frame.h $(LIBDIR)/lz4frame_static.h
+	$(MAKE) -j -C $(LIBDIR) liblz4.a
 
 ALL = print_version \
 	  simple_buffer \
@@ -50,16 +52,18 @@ ALL = print_version \
 	  streamingHC_ringBuffer \
       blockStreaming_lineByLine \
 	  dictionaryRandomAccess \
-	  bench_functions \
+	  bench_functions
 
+.PHONY: all
 all: $(ALL)
 
 $(ALL): $(SLIBLZ4)
 
 .PHONY:$(LZ4)
 $(LZ4) :
-	$(MAKE) -j -C ../programs lz4
+	$(MAKE) -j -C $(LZ4DIR) lz4
 
+.PHONY: test
 test : all $(LZ4)
 	@echo "\n=== Print Version ==="
 	./print_version$(EXT)
