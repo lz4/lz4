@@ -130,40 +130,40 @@ uint64_t bench(
     case ID__LZ4_COMPRESS_DEFAULT:
       printf("Starting benchmark for function: LZ4_compress_default()\n");
       for(int junk=0; junk<warm_up; junk++)
-        rv = LZ4_compress_default(src, dst, src_size, max_dst_size);
+        rv = LZ4_compress_default(src, dst, (int)src_size, (int)max_dst_size);
       if (rv < 1)
         run_screaming("Couldn't run LZ4_compress_default()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
       start = clock();
       for (int i=1; i<=iterations; i++)
-        LZ4_compress_default(src, dst, src_size, max_dst_size);
+        LZ4_compress_default(src, dst, (int)src_size, (int)max_dst_size);
       break;
 
     case ID__LZ4_COMPRESS_FAST:
       printf("Starting benchmark for function: LZ4_compress_fast()\n");
       for(int junk=0; junk<warm_up; junk++)
-        rv = LZ4_compress_fast(src, dst, src_size, max_dst_size, acceleration);
+        rv = LZ4_compress_fast(src, dst, (int)src_size, (int)max_dst_size, acceleration);
       if (rv < 1)
         run_screaming("Couldn't run LZ4_compress_fast()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
       start = clock();
       for (int i=1; i<=iterations; i++)
-        LZ4_compress_fast(src, dst, src_size, max_dst_size, acceleration);
+        LZ4_compress_fast(src, dst, (int)src_size, (int)max_dst_size, acceleration);
       break;
 
     case ID__LZ4_COMPRESS_FAST_EXTSTATE:
       printf("Starting benchmark for function: LZ4_compress_fast_extState()\n");
       for(int junk=0; junk<warm_up; junk++)
-        rv = LZ4_compress_fast_extState(&state, src, dst, src_size, max_dst_size, acceleration);
+        rv = LZ4_compress_fast_extState(&state, src, dst, (int)src_size, (int)max_dst_size, acceleration);
       if (rv < 1)
         run_screaming("Couldn't run LZ4_compress_fast_extState()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, max_dst_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
       start = clock();
       for (int i=1; i<=iterations; i++)
-        LZ4_compress_fast_extState(&state, src, dst, src_size, max_dst_size, acceleration);
+        LZ4_compress_fast_extState(&state, src, dst, (int)src_size, (int)max_dst_size, acceleration);
       break;
 
 //    Disabled until LZ4_compress_generic() is exposed in the header.
@@ -189,27 +189,27 @@ uint64_t bench(
     case ID__LZ4_DECOMPRESS_SAFE:
       printf("Starting benchmark for function: LZ4_decompress_safe()\n");
       for(int junk=0; junk<warm_up; junk++)
-        rv = LZ4_decompress_safe(src, dst, comp_size, src_size);
+        rv = LZ4_decompress_safe(src, dst, (int)comp_size, (int)src_size);
       if (rv < 1)
         run_screaming("Couldn't run LZ4_decompress_safe()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, src_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
       start = clock();
       for (int i=1; i<=iterations; i++)
-        LZ4_decompress_safe(src, dst, comp_size, src_size);
+        LZ4_decompress_safe(src, dst, (int)comp_size, (int)src_size);
       break;
 
     case ID__LZ4_DECOMPRESS_FAST:
       printf("Starting benchmark for function: LZ4_decompress_fast()\n");
       for(int junk=0; junk<warm_up; junk++)
-        rv = LZ4_decompress_fast(src, dst, src_size);
+        rv = LZ4_decompress_fast(src, dst, (int)src_size);
       if (rv < 1)
         run_screaming("Couldn't run LZ4_decompress_fast()... error code received is in exit code.", rv);
       if (memcmp(known_good_dst, dst, src_size) != 0)
         run_screaming("According to memcmp(), the compressed dst we got doesn't match the known_good_dst... ruh roh.", 1);
       start = clock();
       for (int i=1; i<=iterations; i++)
-        LZ4_decompress_fast(src, dst, src_size);
+        LZ4_decompress_fast(src, dst, (int)src_size);
       break;
 
     default:
@@ -250,11 +250,11 @@ int main(int argc, char **argv) {
     usage(exeName, "Argument 1 (iterations) must be > 0.");
 
   // First we will create 2 sources (char *) of 2000 bytes each.  One normal text, the other highly-compressible text.
-  const char *src    = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed luctus purus et risus vulputate, et mollis orci ullamcorper. Nulla facilisi. Fusce in ligula sed purus varius aliquet interdum vitae justo. Proin quis diam velit. Nulla varius iaculis auctor. Cras volutpat, justo eu dictum pulvinar, elit sem porttitor metus, et imperdiet metus sapien et ante. Nullam nisi nulla, ornare eu tristique eu, dignissim vitae diam. Nulla sagittis porta libero, a accumsan felis sagittis scelerisque.  Integer laoreet eleifend congue. Etiam rhoncus leo vel dolor fermentum, quis luctus nisl iaculis. Praesent a erat sapien. Aliquam semper mi in lorem ultrices ultricies. Lorem ipsum dolor sit amet, consectetur adipiscing elit. In feugiat risus sed enim ultrices, at sodales nulla tristique. Maecenas eget pellentesque justo, sed pellentesque lectus. Fusce sagittis sit amet elit vel varius. Donec sed ligula nec ligula vulputate rutrum sed ut lectus. Etiam congue pharetra leo vitae cursus. Morbi enim ante, porttitor ut varius vel, tincidunt quis justo. Nunc iaculis, risus id ultrices semper, metus est efficitur ligula, vel posuere risus nunc eget purus. Ut lorem turpis, condimentum at sem sed, porta aliquam turpis. In ut sapien a nulla dictum tincidunt quis sit amet lorem. Fusce at est egestas, luctus neque eu, consectetur tortor. Phasellus eleifend ultricies nulla ac lobortis.  Morbi maximus quam cursus vehicula iaculis. Maecenas cursus vel justo ut rutrum. Curabitur magna orci, dignissim eget dapibus vitae, finibus id lacus. Praesent rhoncus mattis augue vitae bibendum. Praesent porta mauris non ultrices fermentum. Quisque vulputate ipsum in sodales pulvinar. Aliquam nec mollis felis. Donec vitae augue pulvinar, congue nisl sed, pretium purus. Fusce lobortis mi ac neque scelerisque semper. Pellentesque vel est vitae magna aliquet aliquet. Nam non dolor. Nulla facilisi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Morbi ac lacinia felis metus.";
-  const char *hc_src = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const char src[]    = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed luctus purus et risus vulputate, et mollis orci ullamcorper. Nulla facilisi. Fusce in ligula sed purus varius aliquet interdum vitae justo. Proin quis diam velit. Nulla varius iaculis auctor. Cras volutpat, justo eu dictum pulvinar, elit sem porttitor metus, et imperdiet metus sapien et ante. Nullam nisi nulla, ornare eu tristique eu, dignissim vitae diam. Nulla sagittis porta libero, a accumsan felis sagittis scelerisque.  Integer laoreet eleifend congue. Etiam rhoncus leo vel dolor fermentum, quis luctus nisl iaculis. Praesent a erat sapien. Aliquam semper mi in lorem ultrices ultricies. Lorem ipsum dolor sit amet, consectetur adipiscing elit. In feugiat risus sed enim ultrices, at sodales nulla tristique. Maecenas eget pellentesque justo, sed pellentesque lectus. Fusce sagittis sit amet elit vel varius. Donec sed ligula nec ligula vulputate rutrum sed ut lectus. Etiam congue pharetra leo vitae cursus. Morbi enim ante, porttitor ut varius vel, tincidunt quis justo. Nunc iaculis, risus id ultrices semper, metus est efficitur ligula, vel posuere risus nunc eget purus. Ut lorem turpis, condimentum at sem sed, porta aliquam turpis. In ut sapien a nulla dictum tincidunt quis sit amet lorem. Fusce at est egestas, luctus neque eu, consectetur tortor. Phasellus eleifend ultricies nulla ac lobortis.  Morbi maximus quam cursus vehicula iaculis. Maecenas cursus vel justo ut rutrum. Curabitur magna orci, dignissim eget dapibus vitae, finibus id lacus. Praesent rhoncus mattis augue vitae bibendum. Praesent porta mauris non ultrices fermentum. Quisque vulputate ipsum in sodales pulvinar. Aliquam nec mollis felis. Donec vitae augue pulvinar, congue nisl sed, pretium purus. Fusce lobortis mi ac neque scelerisque semper. Pellentesque vel est vitae magna aliquet aliquet. Nam non dolor. Nulla facilisi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Morbi ac lacinia felis metus.";
+  const char hc_src[] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
   // Set and derive sizes.  Since we're using strings, use strlen() + 1 for \0.
   const size_t src_size = strlen(src) + 1;
-  const size_t max_dst_size = LZ4_compressBound(src_size);
+  const size_t max_dst_size = (size_t)LZ4_compressBound((int)src_size);
   int bytes_returned = 0;
   // Now build allocations for the data we'll be playing with.
   char *dst               = (char*)calloc(1, max_dst_size);
@@ -264,11 +264,11 @@ int main(int argc, char **argv) {
     run_screaming("Couldn't allocate memory for the destination buffers.  Sad :(", 1);
 
   // Create known-good buffers to verify our tests with other functions will produce the same results.
-  bytes_returned = LZ4_compress_default(src, known_good_dst, src_size, max_dst_size);
+  bytes_returned = LZ4_compress_default(src, known_good_dst, (int)src_size, (int)max_dst_size);
   if (bytes_returned < 1)
     run_screaming("Couldn't create a known-good destination buffer for comparison... this is bad.", 1);
   const size_t src_comp_size = bytes_returned;
-  bytes_returned = LZ4_compress_default(hc_src, known_good_hc_dst, src_size, max_dst_size);
+  bytes_returned = LZ4_compress_default(hc_src, known_good_hc_dst, (int)src_size, (int)max_dst_size);
   if (bytes_returned < 1)
     run_screaming("Couldn't create a known-good (highly compressible) destination buffer for comparison... this is bad.", 1);
   const size_t hc_src_comp_size = bytes_returned;
@@ -280,7 +280,7 @@ int main(int argc, char **argv) {
   /* LZ4_compress_fast() */
   // Using this function is identical to LZ4_compress_default except we need to specify an "acceleration" value.  Defaults to 1.
   memset(dst, 0, max_dst_size);
-  bytes_returned = LZ4_compress_fast(src, dst, src_size, max_dst_size, 1);
+  bytes_returned = LZ4_compress_fast(src, dst, (int)src_size, (int)max_dst_size, 1);
   if (bytes_returned < 1)
     run_screaming("Failed to compress src using LZ4_compress_fast.  echo $? for return code.", bytes_returned);
   if (memcmp(dst, known_good_dst, bytes_returned) != 0)
@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
   // Using this function directly requires that we build an LZ4_stream_t struct ourselves.  We do NOT have to reset it ourselves.
   memset(dst, 0, max_dst_size);
   LZ4_stream_t state;
-  bytes_returned = LZ4_compress_fast_extState(&state, src, dst, src_size, max_dst_size, 1);
+  bytes_returned = LZ4_compress_fast_extState(&state, src, dst, (int)src_size, (int)max_dst_size, 1);
   if (bytes_returned < 1)
     run_screaming("Failed to compress src using LZ4_compress_fast_extState.  echo $? for return code.", bytes_returned);
   if (memcmp(dst, known_good_dst, bytes_returned) != 0)

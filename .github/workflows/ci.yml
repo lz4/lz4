@@ -572,10 +572,10 @@ jobs:
         echo && sysctl -a | grep machdep.cpu   # cpuinfo
 
     - name: make default
-      run: CFLAGS="-Werror -O1" make V=1 clean default
+      run: make clean; CFLAGS="-Werror -O1" make V=1 default
 
     - name: make test
-      run: make clean; CFLAGS='-O1 -Werror -Wconversion -Wno-sign-conversion' make -j V=1 test
+      run: make clean; CFLAGS="-O2 -Werror -Wconversion -Wno-sign-conversion" make -j V=1 test
 
     - name: Ensure `make test` doesn't depend on the status of the console
       # see issue #990 for detailed explanations
