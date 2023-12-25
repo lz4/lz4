@@ -459,7 +459,7 @@ jobs:
     - name: examples
       run: make V=1 clean examples
 
-  # lasts ~20mn
+  # lasts ~8mn
   oss-fuzz:
     runs-on: ubuntu-latest
     strategy:
