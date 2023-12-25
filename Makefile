@@ -213,11 +213,10 @@ cxx17build : clean
 	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
 
-.PHONY: ctocpptest
-ctocpptest: LIBCC="$(CC)"
-ctocpptest: TESTCC="$(CXX)"
-ctocpptest: CFLAGS=
-ctocpptest: clean
+.PHONY: ctocxxtest
+ctocxxtest: LIBCC="$(CC)"
+ctocxxtest: TESTCC="$(CXX)"
+ctocxxtest: CFLAGS=
 	CC=$(LIBCC)  $(MAKE) -C $(LZ4DIR)  CFLAGS="$(CFLAGS)" all
 	CC=$(LIBCC)  $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" lz4.o lz4hc.o lz4frame.o
 	CC=$(TESTCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all

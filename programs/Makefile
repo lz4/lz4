@@ -49,8 +49,8 @@ OBJFILES  = $(SRCFILES:.c=.o)
 DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
-usercflags:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
-CFLAGS    = $(DEBUGFLAGS) $(usercflags)
+USERCFLAGS:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
+CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
 CPPFLAGS += -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
 
 include ../Makefile.inc

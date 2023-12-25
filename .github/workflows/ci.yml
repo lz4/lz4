@@ -31,7 +31,7 @@ jobs:
           #
           #   pkgs         : apt-get package names.  It can include multiple package names which are delimited by space.
           #   cc           : C compiler executable.
-          #   cxx          : C++ compiler executable for `make ctocpptest`.
+          #   cxx          : C++ compiler executable for `make ctocxxtest`.
           #   x32          : Set 'true' if compiler supports x32.  Otherwise, set 'false'.
           #                  Set 'fail' if it supports x32 but fails for now.  'fail' cases must be removed.
           #   x86          : Set 'true' if compiler supports x86 (-m32).  Otherwise, set 'false'.
@@ -110,7 +110,7 @@ jobs:
 
     - name: make c-to-c++
       if: always()
-      run: make V=1 clean ctocpptest
+      run: make V=1 ctocxxtest
 
     - name: make cxxtest
       if: ${{ matrix.cxxtest == 'true' }}

@@ -63,7 +63,6 @@ all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-part
 all32: CFLAGS+=-m32
 all32: all
 
-.PHONY: $(LZ4)
 .PHONY: lz4
 lz4:
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"

@@ -47,11 +47,11 @@ BUILD_SHARED:=yes
 BUILD_STATIC:=yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
-usercflags:= -O3 $(CFLAGS)
+USERCFLAGS:= -O3 $(CFLAGS)
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
              -Wundef -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS   = $(DEBUGFLAGS) $(usercflags)
+CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))
