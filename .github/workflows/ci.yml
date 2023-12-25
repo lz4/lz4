@@ -90,39 +90,39 @@ jobs:
 
     - name: make
       if: always()
-      run: make V=1
+      run: make -j V=1
 
     - name: install test
       if: always()
-      run: make clean; make V=1 -C tests test-install
+      run: make clean; make -C tests test-install V=1
 
     - name: make all
       if: always()
-      run: make V=1 clean all
+      run: make clean; make -j all V=1
 
     - name: make c_standards (C90)
       if: always()
-      run: make V=1 clean c_standards_c90
+      run: make clean; make -j c_standards_c90 V=1
 
     - name: make c_standards (C11)
       if: always()
-      run: make V=1 clean c_standards_c11
+      run: make clean; make -j c_standards_c11 V=1
 
     - name: make c-to-c++
-      if: always()
-      run: make clean; make ctocxxtest V=1
+      if: ${{ matrix.cxxtest == 'true' }}
+      run: make clean; make -j ctocxxtest V=1
 
     - name: make cxxtest
       if: ${{ matrix.cxxtest == 'true' }}
-      run: make clean; make cxxtest V=1
+      run: make clean; make -j cxxtest V=1
 
     - name: make test-freestanding
       if: ${{ matrix.freestanding == 'true' }}
-      run: make V=1 clean test-freestanding
+      run: make clean; make test-freestanding V=1
 
     - name: make -C programs default
       if: always()
-      run: make V=1 -C programs clean default
+      run: make clean; make -j -C programs default V=1
 
     - name: make -C programs default -D_FORTIFY_SOURCE=2
       if: always()
@@ -134,15 +134,15 @@ jobs:
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
-      run: make V=1 clean clangtest
+      run: make clean; make clangtest V=1
 
     - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j V=1 -C tests test
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O1' make -j -C tests test V=1
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
-      run: LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make V=1 -C tests clean test-lz4c32
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make -j -C tests test-lz4c32 V=1
 
 
     ###############################################################
@@ -152,11 +152,11 @@ jobs:
 
     - name: make -C tests test CFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j -C tests test V=1 || $FIXME__LZ4_CI_IGNORE
 
     - name: make -C tests test-lz4c32 || echo Ignore failure for now.
       if: ${{ matrix.x86 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make -C tests test-lz4c32 V=1 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################
@@ -184,19 +184,19 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: benchmark (-C tests test-lz4)
-      run: make -j V=1 -C tests test-lz4
+      run: make -j -C tests test-lz4 V=1
 
     - name: benchmark (-C tests test-lz4c)
-      run: make -j V=1 -C tests test-lz4c
+      run: make -j -C tests test-lz4c V=1
 
     - name: benchmark (-C tests test-lz4c32)
-      run: make V=1 -C tests test-lz4c32
+      run: make -j -C tests test-lz4c32 V=1
 
     - name: benchmark (-C tests test-fullbench)
-      run: make V=1 -C tests test-fullbench
+      run: make -j -C tests test-fullbench V=1
 
     - name: benchmark (-C tests test-fullbench32)
-      run: make V=1 -C tests test-fullbench32
+      run: make -j -C tests test-fullbench32 V=1
 
 
   lz4-fuzzer:
@@ -214,10 +214,10 @@ jobs:
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
     - name: fuzzer
-      run: make V=1 -C tests test-fuzzer
+      run: make -j -C tests test-fuzzer V=1
 
     - name: fuzzer32
-      run: make V=1 -C tests test-fuzzer32
+      run: make -C tests test-fuzzer32 V=1
 
 
   lz4-standard-makefile-variables:
@@ -227,7 +227,7 @@ jobs:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
 
     - name: make standard_variables
-      run: make V=1 standard_variables
+      run: make -j standard_variables V=1
 
 
   lz4-versions:
@@ -242,7 +242,7 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: make -C tests versionsTest
-      run: make V=1 -C tests versionsTest
+      run: make -j -C tests versionsTest V=1
 
 
   lz4-abi:
@@ -257,7 +257,7 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: make -C tests abiTests
-      run: make V=1 -C tests abiTests
+      run: make -j -C tests abiTests V=1
 
 
   lz4-frame:
@@ -272,10 +272,10 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: LZ4 frame test
-      run: make V=1 -C tests test-frametest
+      run: make -j -C tests test-frametest V=1
 
     - name: LZ4 frame test (32-bit)
-      run: make V=1 -C tests test-frametest32
+      run: make -j -C tests test-frametest32 V=1
 
   lz4-memory-usage:
     name: test different values of LZ4_MEMORY_USAGE
@@ -294,12 +294,12 @@ jobs:
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
         CPPFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
-        make V=1 clean
-        make V=1 -C programs lz4-wlib
-        make V=1 clean
-        make V=1 -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
-        make V=1 clean
-        CC="c++ -Wno-deprecated" make V=1 -C tests fullbench-wmalloc  # stricter function signature check
+        make clean
+        make -C programs lz4-wlib V=1
+        make clean
+        make -C tests fullbench-wmalloc V=1  # test LZ4_USER_MEMORY_FUNCTIONS
+        make clean
+        CC="c++ -Wno-deprecated" make -C tests fullbench-wmalloc V=1 # stricter function signature check
 
   # test block device compression #1086
   lz4cli-block-device:

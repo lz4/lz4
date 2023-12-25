@@ -140,7 +140,7 @@ test:
 .PHONY: clangtest
 clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
 clangtest: CC = clang
-clangtest: clean
+clangtest:
 	$(CC) -v
 	$(MAKE) -C $(LZ4DIR)  all CC=$(CC)
 	$(MAKE) -C $(PRGDIR)  all CC=$(CC)
