@@ -187,18 +187,30 @@ platformTest: clean
 	$(MAKE) -C $(TESTDIR) test-platform
 
 .PHONY: versionsTest
-versionsTest: clean
+versionsTest:
+	$(MAKE) -C $(TESTDIR) clean
 	$(MAKE) -C $(TESTDIR) $@
 
 .PHONY: test-freestanding
 test-freestanding:
-	$(MAKE) -C $(TESTDIR) clean $@
+	$(MAKE) -C $(TESTDIR) clean
+	$(MAKE) -C $(TESTDIR) $@
+
+# test linking C libraries from C++ executables
+.PHONY: ctocxxtest
+ctocxxtest: LIBCC="$(CC)"
+ctocxxtest: EXECC="$(CXX) -Wno-deprecated"
+ctocxxtest: CFLAGS=-O0
+ctocxxtest:
+	CC=$(LIBCC) $(MAKE) -C $(LZ4DIR)  CFLAGS="$(CFLAGS)" all
+	CC=$(LIBCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" lz4.o lz4hc.o lz4frame.o
+	CC=$(EXECC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
 .PHONY: cxxtest cxx32test
+cxx32test: CFLAGS += -m32
 cxxtest cxx32test: CC := "$(CXX) -Wno-deprecated"
 cxxtest cxx32test: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
-cxx32test: CFLAGS += -m32
-cxxtest cxx32test: clean
+cxxtest cxx32test:
 	$(CXX) -v
 	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
@@ -212,14 +224,6 @@ cxx17build : clean
 	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
 	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
-
-.PHONY: ctocxxtest
-ctocxxtest: LIBCC="$(CC)"
-ctocxxtest: TESTCC="$(CXX)"
-ctocxxtest: CFLAGS=
-	CC=$(LIBCC)  $(MAKE) -C $(LZ4DIR)  CFLAGS="$(CFLAGS)" all
-	CC=$(LIBCC)  $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" lz4.o lz4hc.o lz4frame.o
-	CC=$(TESTCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
 .PHONY: c_standards
 c_standards: clean c_standards_c11 c_standards_c99 c_standards_c90
