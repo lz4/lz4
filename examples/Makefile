@@ -27,16 +27,17 @@
 # kindly provided by Takayuki Matsuoka
 # ##########################################################################
 
-LIBDIR   := ../lib
+LIBDIR    := ../lib
 
-CPPFLAGS += -I$(LIBDIR)
-CFLAGS   ?= -O2
-CFLAGS   += -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -Wc++-compat
+CPPFLAGS  += -I$(LIBDIR)
+USERCFLAGS:= $(CFLAGS)
+WFLAGS     = -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -Wc++-compat
+CFLAGS     = $(WFLAGS) -O2 $(USERCFLAGS)
 
-TESTFILE  = Makefile
-SLIBLZ4  := $(LIBDIR)/liblz4.a
-LZ4DIR    = ../programs
-LZ4       = $(LZ4DIR)/lz4
+TESTFILE   = Makefile
+SLIBLZ4   := $(LIBDIR)/liblz4.a
+LZ4DIR     = ../programs
+LZ4        = $(LZ4DIR)/lz4
 
 default: all
 
