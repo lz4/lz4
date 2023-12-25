@@ -481,7 +481,19 @@ static int local_LZ4F_decompress_noHint(const char* src, char* dst, int srcSize,
 
 }
 
+#if 0
+#endif
+
 #define NB_COMPRESSION_ALGORITHMS 100
+
+typedef struct {
+    const char* name;
+    int (*compressionF)(const char*, char*, int);
+    void (*initFunction)(void);
+} CompressionDesc;
+
+const CompressionDesc compDescArray[] = { };
+
 
 typedef struct {
     const char* name;
