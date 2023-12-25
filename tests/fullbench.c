@@ -482,7 +482,37 @@ static int local_LZ4F_decompress_noHint(const char* src, char* dst, int srcSize,
 }
 
 #define NB_COMPRESSION_ALGORITHMS 100
-#define NB_DECOMPRESSION_ALGORITHMS 100
+
+typedef struct {
+    const char* name;
+    int (*decompressionF)(const char*, char*, int, int);
+    int checkResult;
+    int frameFormat;
+} DecompressionDesc;
+
+const DecompressionDesc decDescArray[] = {
+    { NULL, NULL, 0, 0 },
+    { "LZ4_decompress_fast", local_LZ4_decompress_fast, 1, 0 },
+    { "LZ4_decompress_fast_usingDict(prefix)", local_LZ4_decompress_fast_usingDict_prefix, 1, 0 },
+    { "LZ4_decompress_fast_using(Ext)Dict", local_LZ4_decompress_fast_usingExtDict, 1, 0 },
+    { "LZ4_decompress_safe", LZ4_decompress_safe, 1, 0 },
+    { "LZ4_decompress_safe_withPrefix64k", local_LZ4_decompress_safe_withPrefix64k, 1, 0 },
+    { "LZ4_decompress_safe_usingDict", local_LZ4_decompress_safe_usingDict, 1, 0 },
+    { "LZ4_decompress_safe_partial", local_LZ4_decompress_safe_partial, 0, 0 },
+    { "LZ4_decompress_safe_partial_usingDict", local_LZ4_decompress_safe_partial_usingDict, 0, 0 },
+#ifndef LZ4_DLL_IMPORT
+    { "LZ4_decompress_safe_partial_forceExtDict", local_LZ4_decompress_safe_partial_forceExtDict, 0, 0 },
+    { "LZ4_decompress_safe_forceExtDict", local_LZ4_decompress_safe_forceExtDict, 1, 0 },
+#endif
+    { "LZ4F_decompress", local_LZ4F_decompress, 1, 1 },
+    { "LZ4F_decompLZ4F_decompress_followHintress", local_LZ4F_decompress_followHint, 1, 1 },
+    { "LZ4F_decompress_noHint", local_LZ4F_decompress_noHint, 1, 1 },
+};
+
+#define ARRAY_SIZE(a) (sizeof(a) / (sizeof((a)[0])))
+
+#define NB_DECOMPRESSION_ALGORITHMS ARRAY_SIZE(decDescArray)
+
 int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 {
     int fileIdx=0;
@@ -695,7 +725,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
         }   }
 
         /* Decompression Algorithms */
-        for (dAlgNb=0; (dAlgNb <= NB_DECOMPRESSION_ALGORITHMS) && g_decompressionTest; dAlgNb++) {
+        for (dAlgNb=0; (dAlgNb <= (int)NB_DECOMPRESSION_ALGORITHMS) && g_decompressionTest; dAlgNb++) {
             const char* dName = NULL;
             int (*decompressionFunction)(const char*, char*, int, int) = NULL;
             double bestTime = 100000000.;
@@ -703,41 +733,25 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 
             if ((g_decompressionAlgo != ALL_DECOMPRESSORS) && (g_decompressionAlgo != dAlgNb)) continue;
 
-            switch(dAlgNb)
-            {
-            case 0: DISPLAY("Decompression functions : \n"); continue;
-            case 1: decompressionFunction = local_LZ4_decompress_fast; dName = "LZ4_decompress_fast"; break;
-            case 2: decompressionFunction = local_LZ4_decompress_fast_usingDict_prefix; dName = "LZ4_decompress_fast_usingDict(prefix)"; break;
-            case 3: decompressionFunction = local_LZ4_decompress_fast_usingExtDict; dName = "LZ4_decompress_fast_using(Ext)Dict"; break;
-            case 4: decompressionFunction = LZ4_decompress_safe; dName = "LZ4_decompress_safe"; break;
-            case 5: decompressionFunction = local_LZ4_decompress_safe_withPrefix64k; dName = "LZ4_decompress_safe_withPrefix64k"; break;
-            case 6: decompressionFunction = local_LZ4_decompress_safe_usingDict; dName = "LZ4_decompress_safe_usingDict"; break;
-            case 7: decompressionFunction = local_LZ4_decompress_safe_partial; dName = "LZ4_decompress_safe_partial"; checkResult = 0; break;
-            case 8: decompressionFunction = local_LZ4_decompress_safe_partial_usingDict; dName = "LZ4_decompress_safe_partial_usingDict"; checkResult = 0; break;
-#ifndef LZ4_DLL_IMPORT
-            case 9: decompressionFunction = local_LZ4_decompress_safe_partial_forceExtDict; dName = "LZ4_decompress_safe_partial_forceExtDict"; checkResult = 0; break;
-            case 10: decompressionFunction = local_LZ4_decompress_safe_forceExtDict; dName = "LZ4_decompress_safe_forceExtDict"; break;
-#endif
-            case 11:
-            case 12:
-            case 13:
-                if (dAlgNb == 11) { decompressionFunction = local_LZ4F_decompress; dName = "LZ4F_decompress"; }  /* can be skipped */
-                if (dAlgNb == 12) { decompressionFunction = local_LZ4F_decompress_followHint; dName = "LZ4F_decompress_followHint"; }  /* can be skipped */
-                if (dAlgNb == 13) { decompressionFunction = local_LZ4F_decompress_noHint; dName = "LZ4F_decompress_noHint"; }  /* can be skipped */
-                /* prepare compressed data using frame format */
-                {   size_t const fcsize = LZ4F_compressFrame(compressed_buff, (size_t)compressedBuffSize, orig_buff, benchedSize, NULL);
-                    assert(!LZ4F_isError(fcsize));
-                    chunkP[0].origSize = (int)benchedSize;
-                    chunkP[0].compressedSize = (int)fcsize;
-                    nbChunks = 1;
-                    break;
-                }
-            default :
-                continue;   /* skip if unknown ID */
+            if (dAlgNb==0) { /* just for display */
+                DISPLAY("Decompression functions : \n");
+                continue;
             }
-
-            assert(decompressionFunction != NULL);
-            assert(dName != NULL);
+            if (dAlgNb >= (int)NB_DECOMPRESSION_ALGORITHMS)
+                continue;
+            dName = decDescArray[dAlgNb].name;
+            decompressionFunction = decDescArray[dAlgNb].decompressionF;
+            if (dName==NULL || decompressionFunction == NULL)
+                continue;
+            checkResult = decDescArray[dAlgNb].checkResult;
+            if (decDescArray[dAlgNb].frameFormat) {
+                /* prepare compressed data using LZ4F frame format */
+                size_t const fcsize = LZ4F_compressFrame(compressed_buff, (size_t)compressedBuffSize, orig_buff, benchedSize, NULL);
+                assert(!LZ4F_isError(fcsize));
+                chunkP[0].origSize = (int)benchedSize;
+                chunkP[0].compressedSize = (int)fcsize;
+                nbChunks = 1;
+            }
 
             { size_t i; for (i=0; i<benchedSize; i++) orig_buff[i]=0; }     /* zeroing source area, for CRC checking */
 
@@ -809,7 +823,7 @@ static int usage_advanced(void)
 {
     DISPLAY( "\nAdvanced options :\n");
     DISPLAY( " -c#    : test only compression function # [1-%i]\n", NB_COMPRESSION_ALGORITHMS);
-    DISPLAY( " -d#    : test only decompression function # [1-%i]\n", NB_DECOMPRESSION_ALGORITHMS);
+    DISPLAY( " -d#    : test only decompression function # [1-%i]\n", (int)NB_DECOMPRESSION_ALGORITHMS);
     DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
     return 0;
