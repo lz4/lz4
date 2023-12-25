@@ -28,7 +28,7 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
-LZ4DIR  := ../lib
+LIBDIR  := ../lib
 PRGDIR  := ../programs
 TESTDIR := versionsTest
 PYTHON  ?= python3
@@ -40,7 +40,7 @@ WFLAGS    = -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(USERCFLAGS)
-CPPFLAGS += -I$(LZ4DIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 include ../Makefile.inc
@@ -70,7 +70,7 @@ lz4:
 
 .PHONY: lib liblz4.pc
 lib liblz4.pc:
-	$(MAKE) -C $(LZ4DIR) $@ CFLAGS="$(CFLAGS)"
+	$(MAKE) -C $(LIBDIR) $@ CFLAGS="$(CFLAGS)"
 
 lz4c unlz4 lz4cat: lz4
 	$(LN_SF) $(LZ4) $(PRGDIR)/$@
@@ -80,7 +80,7 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
 
 # *.o objects are from library
-%.o : $(LZ4DIR)/%.c $(LZ4DIR)/%.h
+%.o : $(LIBDIR)/%.c $(LIBDIR)/%.h
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 CLEAN += fullbench
@@ -89,14 +89,14 @@ fullbench : CPPFLAGS += -DNDEBUG
 fullbench : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 
-.PHONY: $(LZ4DIR)/liblz4.a
-$(LZ4DIR)/liblz4.a:
-	$(MAKE) -C $(LZ4DIR) liblz4.a
+.PHONY: $(LIBDIR)/liblz4.a
+$(LIBDIR)/liblz4.a:
+	$(MAKE) -C $(LIBDIR) liblz4.a
 
 CLEAN += fullbench-lib
 fullbench-lib : DEBUGLEVEL=0
 fullbench-lib : CPPFLAGS += -DNDEBUG
-fullbench-lib: fullbench.c $(LZ4DIR)/liblz4.a
+fullbench-lib: fullbench.c $(LIBDIR)/liblz4.a
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 
 # Note: Windows only
@@ -104,9 +104,9 @@ ifeq ($(WINBASED),yes)
 CLEAN += fullbench-dll
 fullbench-dll : DEBUGLEVEL=0
 fullbench-dll : CPPFLAGS += -DNDEBUG
-fullbench-dll: fullbench.c $(LZ4DIR)/xxhash.c
-	$(MAKE) -C $(LZ4DIR) liblz4
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LZ4DIR)/dll/$(LIBLZ4).dll
+fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
+	$(MAKE) -C $(LIBDIR) liblz4
+	$(CC) $(ALLFLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/$(LIBLZ4).dll
 endif
 
 # test LZ4_USER_MEMORY_FUNCTIONS
@@ -143,7 +143,7 @@ decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
 
 .PHONY: clean
 clean:
-	@$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
+	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
 	@$(RM) $(CLEAN) core *.o *.test tmp*
 	@$(RM) -r $(TESTDIR)
@@ -166,7 +166,7 @@ abiTests:
 	$(PYTHON) test-lz4-abi.py
 
 CLEAN += checkTag
-checkTag: checkTag.c $(LZ4DIR)/lz4.h
+checkTag: checkTag.c $(LIBDIR)/lz4.h
 	$(CC) $(ALLFLAGS) $< -o $@$(EXT)
 
 #-----------------------------------------------------------------------------
@@ -207,7 +207,7 @@ test32: test
 test-amalgamation: lz4_all.o
 
 CLEAN += lz4_all.c
-lz4_all.c: $(LZ4DIR)/lz4.c $(LZ4DIR)/lz4hc.c $(LZ4DIR)/lz4frame.c
+lz4_all.c: $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
 	$(CAT) $^ > $@
 
 test-install: lz4 lib liblz4.pc
