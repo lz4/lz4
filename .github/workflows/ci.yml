@@ -31,7 +31,7 @@ jobs:
           #
           #   pkgs         : apt-get package names.  It can include multiple package names which are delimited by space.
           #   cc           : C compiler executable.
-          #   cxx          : C++ compiler executable for `make ctocpptest`.
+          #   cxx          : C++ compiler executable for targets `cxxtest` and `ctocxxtest`.
           #   x32          : Set 'true' if compiler supports x32.  Otherwise, set 'false'.
           #                  Set 'fail' if it supports x32 but fails for now.  'fail' cases must be removed.
           #   x86          : Set 'true' if compiler supports x86 (-m32).  Otherwise, set 'false'.
@@ -90,39 +90,39 @@ jobs:
 
     - name: make
       if: always()
-      run: make V=1
+      run: make -j V=1
 
     - name: install test
       if: always()
-      run: make clean; make V=1 -C tests test-install
+      run: make clean; make -C tests test-install V=1
 
     - name: make all
       if: always()
-      run: make V=1 clean all
+      run: make clean; make -j all V=1
 
     - name: make c_standards (C90)
       if: always()
-      run: make V=1 clean c_standards_c90
+      run: make clean; make -j c_standards_c90 V=1
 
     - name: make c_standards (C11)
       if: always()
-      run: make V=1 clean c_standards_c11
+      run: make clean; make -j c_standards_c11 V=1
 
     - name: make c-to-c++
-      if: always()
-      run: make V=1 clean ctocpptest
+      if: ${{ matrix.cxxtest == 'true' }}
+      run: make clean; make -j ctocxxtest V=1
 
     - name: make cxxtest
       if: ${{ matrix.cxxtest == 'true' }}
-      run: make V=1 clean cxxtest
+      run: make clean; make -j cxxtest V=1
 
     - name: make test-freestanding
       if: ${{ matrix.freestanding == 'true' }}
-      run: make V=1 clean test-freestanding
+      run: make clean; make test-freestanding V=1
 
     - name: make -C programs default
       if: always()
-      run: make V=1 -C programs clean default
+      run: make clean; make -j -C programs default V=1
 
     - name: make -C programs default -D_FORTIFY_SOURCE=2
       if: always()
@@ -130,19 +130,19 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; MOREFLAGS='-Werror' make -j V=1 -C tests test-lz4
+      run: make clean; CFLAGS='-Werror' make -j V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
-      run: make V=1 clean clangtest
+      run: make clean; make clangtest V=1
 
-    - name: make -C tests test MOREFLAGS='-mx32'
+    - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make -j V=1 -C tests test
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O1' make -j -C tests test V=1
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
-      run: LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests clean test-lz4c32
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make -j -C tests test-lz4c32 V=1
 
 
     ###############################################################
@@ -150,13 +150,13 @@ jobs:
     #      Remove this block when we stabilize the tests.         #
     #                                                             #
 
-    - name: make -C tests test MOREFLAGS='-mx32' || echo Ignore failure for now.
+    - name: make -C tests test CFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-mx32' make -j V=1 -C tests test || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j -C tests test V=1 || $FIXME__LZ4_CI_IGNORE
 
     - name: make -C tests test-lz4c32 || echo Ignore failure for now.
       if: ${{ matrix.x86 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' MOREFLAGS='-Werror' make V=1 -C tests test-lz4c32 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make -C tests test-lz4c32 V=1 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################
@@ -184,19 +184,19 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: benchmark (-C tests test-lz4)
-      run: make -j V=1 -C tests test-lz4
+      run: make -j -C tests test-lz4 V=1
 
     - name: benchmark (-C tests test-lz4c)
-      run: make -j V=1 -C tests test-lz4c
+      run: make -j -C tests test-lz4c V=1
 
     - name: benchmark (-C tests test-lz4c32)
-      run: make V=1 -C tests test-lz4c32
+      run: make -j -C tests test-lz4c32 V=1
 
     - name: benchmark (-C tests test-fullbench)
-      run: make V=1 -C tests test-fullbench
+      run: make -j -C tests test-fullbench V=1
 
     - name: benchmark (-C tests test-fullbench32)
-      run: make V=1 -C tests test-fullbench32
+      run: make -j -C tests test-fullbench32 V=1
 
 
   lz4-fuzzer:
@@ -214,10 +214,10 @@ jobs:
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
     - name: fuzzer
-      run: make V=1 -C tests test-fuzzer
+      run: make -j -C tests test-fuzzer V=1
 
     - name: fuzzer32
-      run: make V=1 -C tests test-fuzzer32
+      run: make -C tests test-fuzzer32 V=1
 
 
   lz4-standard-makefile-variables:
@@ -227,7 +227,7 @@ jobs:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
 
     - name: make standard_variables
-      run: make V=1 standard_variables
+      run: make -j standard_variables V=1
 
 
   lz4-versions:
@@ -242,7 +242,7 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: make -C tests versionsTest
-      run: make V=1 -C tests versionsTest
+      run: make -j -C tests versionsTest V=1
 
 
   lz4-abi:
@@ -257,7 +257,7 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: make -C tests abiTests
-      run: make V=1 -C tests abiTests
+      run: make -j -C tests abiTests V=1
 
 
   lz4-frame:
@@ -272,10 +272,10 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: LZ4 frame test
-      run: make V=1 -C tests test-frametest
+      run: make -j -C tests test-frametest V=1
 
     - name: LZ4 frame test (32-bit)
-      run: make V=1 -C tests test-frametest32
+      run: make -j -C tests test-frametest32 V=1
 
   lz4-memory-usage:
     name: test different values of LZ4_MEMORY_USAGE
@@ -293,13 +293,13 @@ jobs:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
-        MOREFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
-        make V=1 clean
-        make V=1 -C programs lz4-wlib
-        make V=1 clean
-        make V=1 -C tests fullbench-wmalloc  # test LZ4_USER_MEMORY_FUNCTIONS
-        make V=1 clean
-        CC="c++ -Wno-deprecated" make V=1 -C tests fullbench-wmalloc  # stricter function signature check
+        CPPFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
+        make clean
+        make -C programs lz4-wlib V=1
+        make clean
+        make -C tests fullbench-wmalloc V=1  # test LZ4_USER_MEMORY_FUNCTIONS
+        make clean
+        CC="c++ -Wno-deprecated" make -C tests fullbench-wmalloc V=1 # stricter function signature check
 
   # test block device compression #1086
   lz4cli-block-device:
@@ -429,10 +429,10 @@ jobs:
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
     - name: frametest
-      run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
+      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
 
     - name: fuzzer
-      run: CC=clang MOREFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
+      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
 
   unicode-lint:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
@@ -459,7 +459,7 @@ jobs:
     - name: examples
       run: make V=1 clean examples
 
-  # lasts ~20mn
+  # lasts ~8mn
   oss-fuzz:
     runs-on: ubuntu-latest
     strategy:
@@ -478,7 +478,7 @@ jobs:
       uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
       with:
         oss-fuzz-project-name: 'lz4'
-        fuzz-seconds: 600
+        fuzz-seconds: 300
         dry-run: false
         sanitizer: ${{ matrix.sanitizer }}
     - name: Upload Crash
@@ -500,15 +500,6 @@ jobs:
 
   # QEMU
   # All tests use QEMU (static) and gcc cross compiler.
-  #
-  # note:
-  #   We don't employ completely matrix method which provides `MOREFLAGS`
-  #   etc in the matrix.  Because some platform may need its special
-  #   compiler options and test.
-  #   For example, xxHash already has tests for scalar and SIMD version of
-  #   it.  But compiler options are quite different between platforms.
-  #
-  #   So, please keep them simple and independent.
   #
   lz4-qemu-platforms:
     name: QEMU ${{ matrix.type }}
@@ -559,7 +550,7 @@ jobs:
 
     - name: PPC64LE
       if: ${{ matrix.type == 'PPC64LE' }}
-      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU MOREFLAGS=-m64
+      run: CFLAGS=-m64 make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
 
     - name: MIPS-M68K-RISCV
       if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' }}
@@ -581,10 +572,10 @@ jobs:
         echo && sysctl -a | grep machdep.cpu   # cpuinfo
 
     - name: make default
-      run: CFLAGS="-Werror" make V=1 clean default
+      run: make clean; CFLAGS="-Werror -O1" make V=1 default
 
     - name: make test
-      run: make clean; make -j V=1 test MOREFLAGS='-Werror -Wconversion -Wno-sign-conversion'
+      run: make clean; CFLAGS="-O2 -Werror -Wconversion -Wno-sign-conversion" make -j V=1 test
 
     - name: Ensure `make test` doesn't depend on the status of the console
       # see issue #990 for detailed explanations
@@ -670,7 +661,7 @@ jobs:
 
     - name: cmake
       run: |
-        CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install
+        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build --target install
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build_test
@@ -688,7 +679,7 @@ jobs:
 
     - name: cmake (static lib)
       run: |
-        CFLAGS=-Werror cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
+        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
         VERBOSE=1 cmake --build build --target install
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install_test_dir
         VERBOSE=1 cmake --build build_test

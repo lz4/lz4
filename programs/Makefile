@@ -31,8 +31,8 @@
 SED ?= sed
 
 # Version numbers
-LZ4DIR   := ../lib
-LIBVER_SRC := $(LZ4DIR)/lz4.h
+LIBDIR   := ../lib
+LIBVER_SRC := $(LIBDIR)/lz4.h
 LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_MINOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_PATCH_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
@@ -42,16 +42,16 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
-LIBFILES  = $(wildcard $(LZ4DIR)/*.c)
+LIBFILES  = $(wildcard $(LIBDIR)/*.c)
 SRCFILES  = $(sort $(LIBFILES) $(wildcard *.c))
 OBJFILES  = $(SRCFILES:.c=.o)
 
-CPPFLAGS += -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_
-CFLAGS   ?= -O3
 DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS   += $(DEBUGFLAGS) $(MOREFLAGS)
+USERCFLAGS:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
+CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
+CPPFLAGS += -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
 
 include ../Makefile.inc
 
@@ -67,13 +67,16 @@ MD2ROFF   = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
 
+.PHONY:default
 default: lz4-release
 
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
 
-all: lz4 lz4c
+.PHONY:all
+all: lz4 lz4c unlz4 lz4cat
 
+.PHONY:all32
 all32: CFLAGS+=-m32
 all32: all
 
@@ -81,11 +84,11 @@ ifeq ($(WINBASED),yes)
 lz4-exe.rc: lz4-exe.rc.in
 	@echo creating executable resource
 	$(SED) -e 's|@PROGNAME@|lz4|' \
-         -e 's|@LIBVER_MAJOR@|$(LIBVER_MAJOR)|g' \
-         -e 's|@LIBVER_MINOR@|$(LIBVER_MINOR)|g' \
-         -e 's|@LIBVER_PATCH@|$(LIBVER_PATCH)|g' \
-         -e 's|@EXT@|$(EXT)|g' \
-          $< >$@
+           -e 's|@LIBVER_MAJOR@|$(LIBVER_MAJOR)|g' \
+           -e 's|@LIBVER_MINOR@|$(LIBVER_MINOR)|g' \
+           -e 's|@LIBVER_PATCH@|$(LIBVER_PATCH)|g' \
+           -e 's|@EXT@|.exe|g' \
+           $< >$@
 
 lz4-exe.o: lz4-exe.rc
 	$(WINDRES) -i lz4-exe.rc -o lz4-exe.o
@@ -96,14 +99,16 @@ else
 lz4: $(OBJFILES)
 	$(CC) $(FLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
 endif
+CLEAN += lz4
 
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
 lz4-release: lz4
 
+CLEAN += lz4-wlib
 lz4-wlib: LIBFILES =
-lz4-wlib: SRCFILES+= $(LZ4DIR)/xxhash.c  # benchmark unit needs XXH64()
-lz4-wlib: LDFLAGS += -L $(LZ4DIR)
+lz4-wlib: SRCFILES+= $(LIBDIR)/xxhash.c  # benchmark unit needs XXH64()
+lz4-wlib: LDFLAGS += -L $(LIBDIR)
 lz4-wlib: LDLIBS   = -llz4
 lz4-wlib: liblz4 $(OBJFILES)
 	@echo WARNING: $@ must link to an extended variant of the dynamic library which also exposes unstable symbols
@@ -111,34 +116,46 @@ lz4-wlib: liblz4 $(OBJFILES)
 
 .PHONY:liblz4
 liblz4:
-	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LZ4DIR) liblz4
+	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LIBDIR) liblz4
 
+CLEAN += lz4c
 lz4c: lz4
 	$(LN_SF) lz4$(EXT) lz4c$(EXT)
 
+CLEAN += lz4c32
 lz4c32: CFLAGS += -m32
 lz4c32 : $(SRCFILES)
 	$(CC) $(FLAGS) $^ -o $@$(EXT)
 
+CLEAN += unlz4
+unlz4: lz4
+	$(LN_SF) lz4$(EXT) unlz4$(EXT)
+
+CLEAN += lz4cat
+lz4cat: lz4
+	$(LN_SF) lz4$(EXT) lz4cat$(EXT)
+
 lz4.1: lz4.1.md $(LIBVER_SRC)
 	cat $< | $(MD2ROFF) $(MD2ROFF_FLAGS) | $(SED) -n '/^\.\\\".*/!p' > $@
 
+.PHONY:man
 man: lz4.1
 
+.PHONY:clean-man
 clean-man:
 	$(RM) lz4.1
 
+.PHONY:preview-man
 preview-man: clean-man man
 	man ./lz4.1
 
+.PHONY:clean
 clean:
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
-	$(MAKE) -C $(LZ4DIR) $@ > $(VOID)
-	$(RM) core *.o *.test tmp* \
-           lz4$(EXT) lz4c$(EXT) lz4c32$(EXT) lz4-wlib$(EXT) \
-           unlz4$(EXT) lz4cat$(EXT)
+	$(MAKE) -C $(LIBDIR) $@ > $(VOID)
+	$(RM) $(CLEAN) *.o tmp* *.test core
 	@echo Cleaning completed
 
 
@@ -146,12 +163,6 @@ endif
 # make install is validated only for Linux, OSX, BSD, Hurd and Solaris targets
 #-----------------------------------------------------------------------------
 ifeq ($(POSIX_ENV),Yes)
-
-unlz4: lz4
-	$(LN_SF) lz4$(EXT) unlz4$(EXT)
-
-lz4cat: lz4
-	$(LN_SF) lz4$(EXT) lz4cat$(EXT)
 
 DESTDIR     ?=
 # directory variables : GNU conventions prefer lowercase
@@ -170,6 +181,7 @@ mandir      ?= $(MANDIR)
 MAN1DIR     ?= $(mandir)/man1
 man1dir     ?= $(MAN1DIR)
 
+.PHONY: install
 install: lz4
 	@echo Installing binaries in $(DESTDIR)$(bindir)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
@@ -184,6 +196,7 @@ install: lz4
 	$(LN_SF) lz4.1 $(DESTDIR)$(man1dir)/unlz4.1
 	@echo lz4 installation completed
 
+.PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(bindir)/lz4cat$(EXT)
 	$(RM) $(DESTDIR)$(bindir)/unlz4$(EXT)
