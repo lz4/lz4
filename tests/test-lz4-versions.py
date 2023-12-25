@@ -58,8 +58,9 @@ def proc(cmd_args, pipe=True, env=False):
 def make(args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
+    # favor compilation speed for faster total test time, actual runtime is very short
+    env["CFLAGS"] = env_or_empty(env, 'CFLAGS') + " -O0"
     # old versions of lz4 may require MOREFLAGS
-    env["CFLAGS"] = env_or_empty(env, 'CFLAGS') + " -O1"
     env["MOREFLAGS"] = env_or_empty(env, 'MOREFLAGS') + env_or_empty(env, 'CFLAGS') + env_or_empty(env, 'CPPFLAGS') + env_or_empty(env, 'LDFLAGS')
     return proc([make_cmd] + args, pipe, env)
 
@@ -113,9 +114,11 @@ if __name__ == '__main__':
                 os.chdir(r_dir + '/programs')  # /path/to/lz4/lz4test/<TAG>/programs
             else:
                 os.chdir(programs_dir)
-            make(['clean', 'lz4c'], False)
+            make(['clean'], False)
+            make(['lz4c'], False)
             shutil.copy2('lz4c',   dst_lz4c)
-            make(['clean', 'lz4c32'], False)
+            make(['clean'], False)
+            make(['lz4c32'], False)
             shutil.copy2('lz4c32', dst_lz4c32)
 
     # Compress test.dat by all released lz4c and lz4c32
