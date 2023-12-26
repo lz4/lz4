@@ -183,7 +183,7 @@ static void* g_chunk0 = NULL;
 static size_t g_chunk0Size = 0;
 static void local_LZ4_saveDict_init(void)
 {
-    LZ4_loadDict(&LZ4_stream, g_chunk0, (int)g_chunk0Size);
+    LZ4_loadDict(&LZ4_stream, (const char*)g_chunk0, (int)g_chunk0Size);
 }
 
 static int local_LZ4_saveDict(const char* in, char* out, int inSize)
@@ -265,7 +265,7 @@ static void local_LZ4_resetStreamHC(void)
 
 static void local_LZ4_saveDictHC_init(void)
 {
-    LZ4_loadDictHC(&LZ4_streamHC, g_chunk0, (int)g_chunk0Size);
+    LZ4_loadDictHC(&LZ4_streamHC, (const char*)g_chunk0, (int)g_chunk0Size);
 }
 
 static int local_LZ4_saveDictHC(const char* in, char* out, int inSize)
