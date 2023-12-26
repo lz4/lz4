@@ -312,6 +312,11 @@ static int local_LZ4_decompress_fast_usingExtDict(const char* in, char* out, int
     return outSize;
 }
 
+static int local_LZ4_decompress_safe(const char* in, char* out, int inSize, int outSize)
+{
+    return LZ4_decompress_safe(in, out, inSize, outSize);
+}
+
 static int local_LZ4_decompress_safe_withPrefix64k(const char* in, char* out, int inSize, int outSize)
 {
     LZ4_decompress_safe_withPrefix64k(in, out, inSize, outSize);
@@ -536,7 +541,7 @@ static const DecompressionDesc decDescArray[] = {
     { "LZ4_decompress_fast", local_LZ4_decompress_fast, 1, 0 },
     { "LZ4_decompress_fast_usingDict(prefix)", local_LZ4_decompress_fast_usingDict_prefix, 1, 0 },
     { "LZ4_decompress_fast_using(Ext)Dict", local_LZ4_decompress_fast_usingExtDict, 1, 0 },
-    { "LZ4_decompress_safe", LZ4_decompress_safe, 1, 0 },
+    { "LZ4_decompress_safe", local_LZ4_decompress_safe, 1, 0 },
     { "LZ4_decompress_safe_withPrefix64k", local_LZ4_decompress_safe_withPrefix64k, 1, 0 },
     { "LZ4_decompress_safe_usingDict", local_LZ4_decompress_safe_usingDict, 1, 0 },
     { "LZ4_decompress_safe_partial", local_LZ4_decompress_safe_partial, 0, 0 },
