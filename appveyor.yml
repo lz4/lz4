@@ -1,24 +1,24 @@
 version: 1.0.{build}
 environment:
   matrix:
+  - COMPILER: "visual"
+    CONFIGURATION: "Debug"
+    PLATFORM: "x64"
+  - COMPILER: "visual"
+    CONFIGURATION: "Debug"
+    PLATFORM: "Win32"
+  - COMPILER: "visual"
+    CONFIGURATION: "Release"
+    PLATFORM: "x64"
+  - COMPILER: "visual"
+    CONFIGURATION: "Release"
+    PLATFORM: "Win32"
   - COMPILER: "clang"
     PLATFORM: "mingw64"
   - COMPILER: "gcc"
     PLATFORM: "mingw64"
   - COMPILER: "gcc"
     PLATFORM: "mingw32"
-  - COMPILER: "visual"
-    CONFIGURATION: "Debug"
-    PLATFORM: "x64"
-  - COMPILER: "visual"
-    CONFIGURATION: "Debug"
-    PLATFORM: "Win32"
-  - COMPILER: "visual"
-    CONFIGURATION: "Release"
-    PLATFORM: "x64"
-  - COMPILER: "visual"
-    CONFIGURATION: "Release"
-    PLATFORM: "Win32"
 
 install:
   - ECHO Installing %COMPILER% %PLATFORM% %CONFIGURATION%
@@ -88,11 +88,11 @@ build_script:
       ECHO *** %TIME% &&
       ECHO *** Building Visual Studio 2012 %PLATFORM%\%CONFIGURATION% &&
       ECHO *** &&
-      msbuild "build\VS2010\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v110 /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
+      msbuild "build\VS2010\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v110 /property:Optimize=false /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
       ECHO *** %TIME% &&
       ECHO *** Building Visual Studio 2013 %PLATFORM%\%CONFIGURATION% &&
       ECHO *** &&
-      msbuild "build\VS2010\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v120 /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
+      msbuild "build\VS2010\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v120 /property:Optimize=false /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
       ECHO *** %TIME% &&
       ECHO *** Building Visual Studio 2015 %PLATFORM%\%CONFIGURATION% &&
       ECHO *** &&
@@ -114,7 +114,7 @@ test_script:
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
       echo ------- lz4 tested ------- &&
-      fullbench.exe -i1 fullbench.exe &&
+      fullbench.exe -i0 fullbench.exe &&
       echo Launching test program fuzzer.exe &&
       fuzzer.exe -v -T20s
     )
