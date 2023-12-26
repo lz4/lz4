@@ -835,6 +835,23 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
     return 0;
 }
 
+static int list(void)
+{
+    size_t n;
+    DISPLAY("Compression Algorithm ids: \n");
+    for (n=0; n<NB_COMPRESSION_ALGORITHMS; n++) {
+        if (compDescArray[n].name) {
+            DISPLAY("%2u: %s \n", (unsigned)n, compDescArray[n].name);
+        }
+    }
+    DISPLAY("Decompression Algorithm ids: \n");
+    for (n=0; n<NB_DECOMPRESSION_ALGORITHMS; n++) {
+        if (decDescArray[n].name) {
+            DISPLAY("%2u: %s \n", (unsigned)n, decDescArray[n].name);
+        }
+    }
+    return 0;
+}
 
 static int usage(const char* exename)
 {
@@ -854,7 +871,7 @@ static int usage_advanced(void)
     DISPLAY( " -d#    : test only decompression function # [1-%i]\n", (int)NB_DECOMPRESSION_ALGORITHMS);
     DISPLAY( " -i#    : iteration loops [1-9](default : %i)\n", NBLOOPS);
     DISPLAY( " -B#    : Block size [4-7](default : 7)\n");
-    return 0;
+    return list();
 }
 
 static int badusage(const char* exename)
@@ -914,7 +931,8 @@ int main(int argc, const char** argv)
 
                     // Display help on usage
                 case 'h' :
-                case 'H': usage(exename); usage_advanced(); return 0;
+                case 'H': usage(exename); return usage_advanced();
+                case 'l': return list();
 
                     // Modify Block Properties
                 case 'B':
