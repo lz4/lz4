@@ -500,7 +500,7 @@ typedef struct {
     int singleChunk;
 } CompressionDesc;
 
-const CompressionDesc compDescArray[] = {
+static const CompressionDesc compDescArray[] = {
     { NULL, NULL, NULL, 0 },
     { "LZ4_compress_default", local_LZ4_compress_default_large, NULL, 0 },
     { "LZ4_compress_default(small dst)", local_LZ4_compress_default_small, NULL, 0 },
@@ -531,7 +531,7 @@ typedef struct {
     int frameFormat;
 } DecompressionDesc;
 
-const DecompressionDesc decDescArray[] = {
+static const DecompressionDesc decDescArray[] = {
     { NULL, NULL, 0, 0 },
     { "LZ4_decompress_fast", local_LZ4_decompress_fast, 1, 0 },
     { "LZ4_decompress_fast_usingDict(prefix)", local_LZ4_decompress_fast_usingDict_prefix, 1, 0 },
