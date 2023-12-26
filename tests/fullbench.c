@@ -58,7 +58,7 @@
 #define WELCOME_MESSAGE "*** %s v%s %i-bits, by %s ***\n", PROGRAM_DESCRIPTION, LZ4_VERSION_STRING, (int)(sizeof(void*)*8), AUTHOR
 
 #define NBLOOPS    6
-#define TIMELOOP   (CLOCKS_PER_SEC * 25 / 10)
+#define TIMELOOP   (CLOCKS_PER_SEC * 19 / 10)
 
 #define KB *(1 <<10)
 #define MB *(1 <<20)
@@ -558,6 +558,12 @@ const DecompressionDesc decDescArray[] = {
 int fullSpeedBench(const char** fileNamesTable, int nbFiles)
 {
     int fileIdx=0;
+    clock_t loopDuration = TIMELOOP;
+
+    if (g_nbIterations==0) {
+        loopDuration = CLOCKS_PER_SEC / 50 + 1;
+        g_nbIterations = 1;
+    }
 
     /* Init */
     { size_t const errorCode = LZ4F_createDecompressionContext(&g_dCtx, LZ4F_VERSION);
@@ -697,7 +703,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 clockTime = clock();
                 while(clock() == clockTime);
                 clockTime = clock();
-                while(BMK_GetClockSpan(clockTime) < TIMELOOP) {
+                while(BMK_GetClockSpan(clockTime) < loopDuration) {
                     if (initFunction!=NULL) initFunction();
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                         chunkP[chunkNb].compressedSize = compressionFunction(chunkP[chunkNb].origBuffer, chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origSize);
@@ -794,7 +800,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 clockTime = clock();
                 while(clock() == clockTime);
                 clockTime = clock();
-                while(BMK_GetClockSpan(clockTime) < TIMELOOP) {
+                while(BMK_GetClockSpan(clockTime) < loopDuration) {
                     for (chunkNb=0; chunkNb<nbChunks; chunkNb++) {
                         int const decodedSize = decompressionFunction(chunkP[chunkNb].compressedBuffer, chunkP[chunkNb].origBuffer,
                                                                       chunkP[chunkNb].compressedSize, chunkP[chunkNb].origSize);
