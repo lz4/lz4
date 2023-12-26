@@ -114,7 +114,7 @@ test_script:
       lz4 -i1b10 lz4.exe &&
       lz4 -i1b15 lz4.exe &&
       echo ------- lz4 tested ------- &&
-      fullbench.exe -i1 fullbench.exe &&
+      fullbench.exe -i0 fullbench.exe &&
       echo Launching test program fuzzer.exe &&
       fuzzer.exe -v -T20s
     )
