@@ -678,7 +678,7 @@ int fullSpeedBench(const char** fileNamesTable, int nbFiles)
                 DISPLAY("Compression functions : \n");
                 continue;
             }
-            if (cAlgNb > (int)NB_COMPRESSION_ALGORITHMS) {
+            if (cAlgNb >= (int)NB_COMPRESSION_ALGORITHMS) {
                 continue;
             }
             compressorName = compDescArray[cAlgNb].name;
