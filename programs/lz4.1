@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "August 2022" "lz4 v1.9.4" "User Commands"
+.TH "LZ4" "1" "December 2023" "lz4 1.9.5" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -17,7 +17,7 @@
 When writing scripts that need to decompress files, it is recommended to always use the name \fBlz4\fR with appropriate arguments (\fBlz4 \-d\fR or \fBlz4 \-dc\fR) instead of the names \fBunlz4\fR and \fBlz4cat\fR\.
 .
 .SH "DESCRIPTION"
-\fBlz4\fR is an extremely fast lossless compression algorithm, based on \fBbyte\-aligned LZ77\fR family of compression scheme\. \fBlz4\fR offers compression speeds > 500 MB/s per core, linearly scalable with multi\-core CPUs\. It features an extremely fast decoder, offering speed in multiple GB/s per core, typically reaching RAM speed limit on multi\-core systems\. The native file format is the \fB\.lz4\fR format\.
+\fBlz4\fR is a CLI based on \fBliblz4\fR, an extremely fast implementation of lossless compression algorithm\. It offers a default compression speed typically > 500 MB/s, and its extremely fast decoder is mostly I/O bound, reaching multiple GB/s\. While \fBliblz4\fR is multi\-threadable, note that the \fBlz4\fR CLI uses only one thread to offer these speeds\. Its native file format is the \fB\.lz4\fR format\.
 .
 .SS "Difference between lz4 and gzip"
 \fBlz4\fR supports a command line syntax similar \fIbut not identical\fR to \fBgzip(1)\fR\. Differences are :
