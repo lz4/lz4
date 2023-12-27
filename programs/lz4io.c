@@ -680,7 +680,7 @@ static void LZ4IO_compressBlock(void* arg)
     if (!out_buff)
         END_PROCESS(33, "Allocation error : can't allocate output buffer to compress new block");
     {   size_t const cSize = cjd->compress(cjd->compressParameters, out_buff, outCapacity, cjd->in_buff, cjd->inSize, cjd->lastBlock);
-        //DISPLAY("Compressed %i bytes from block %llu into %i bytes \n", cjd->inSize, cjd->blockNb, cSize);
+        //DISPLAY("Compressed %zu bytes from block %llu into %zu bytes \n", cjd->inSize, cjd->blockNb, cSize);
 
         /* check for write */
         {   WriteJobDesc* const wjd = (WriteJobDesc*)malloc(sizeof(*wjd));
@@ -694,6 +694,12 @@ static void LZ4IO_compressBlock(void* arg)
             wjd->wr = cjd->wr;
             TPOOL_submitJob(cjd->wPool, LZ4IO_checkWriteOrder, wjd);
     }   }
+}
+
+static void LZ4IO_compressAndFreeBlock(void* arg)
+{
+    CompressJobDesc* const cjd = arg;
+    LZ4IO_compressBlock(arg);
     /* clean up */
     free(cjd->in_buff);
     free(cjd); /* because cjd is pod */
@@ -748,7 +754,7 @@ static void LZ4IO_readAndProcess(void* arg)
             cjd->wr = rjd->wr;
             cjd->maxCBlockSize = rjd->maxCBlockSize;
             cjd->lastBlock = inSize < blockSize;
-            TPOOL_submitJob(rjd->tpool, LZ4IO_compressBlock, cjd);
+            TPOOL_submitJob(rjd->tpool, LZ4IO_compressAndFreeBlock, cjd);
             if (inSize == blockSize) {
                 /* read one more block */
                 TPOOL_submitJob(rjd->tpool, LZ4IO_readAndProcess, rjd);
@@ -1138,11 +1144,24 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
         prefs.frameInfo.contentChecksumFlag = 0;
 
         /* process first block */
-        if (fseek(srcFile, 0, SEEK_SET)) {
-            END_PROCESS(45, "could not reset file position to beginning");
+        assert(readSize == blockSize);
+        if (checksum) {
+            XXH32_update(rjd.xxh32, srcBuffer, readSize);
         }
-        rjd.totalReadSize = 0;
-        filesize = 0;
+        {   CompressJobDesc cjd = { wPool,
+                        srcBuffer,
+                        readSize,
+                        1,
+                        LZ4IO_compressFrameChunk,
+                        &prefs,
+                        dstFile,
+                        &wr,
+                        rjd.maxCBlockSize,
+                        0 };
+            TPOOL_submitJob(tPool, LZ4IO_compressBlock, &cjd);
+        }
+        rjd.totalReadSize = blockSize;
+        rjd.blockNb = 1;
 
         /* Start the job chain */
         TPOOL_submitJob(tPool, LZ4IO_readAndProcess, &rjd);
@@ -1166,9 +1185,8 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
             if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
                 END_PROCESS(49, "Write error : cannot write end of frame");
             compressedfilesize += endSize;
-            filesize += rjd.totalReadSize;
+            filesize = rjd.totalReadSize;
         }
-
 
         /* clean up*/
         XXH32_freeState(xxh32);
