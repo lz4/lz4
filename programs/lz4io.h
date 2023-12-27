@@ -58,9 +58,9 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void);
 void LZ4IO_freePreferences(LZ4IO_prefs_t* prefs);
 
 
-/* ************************************************** */
-/* ****************** Functions ********************* */
-/* ************************************************** */
+/* *************************************************** */
+/* ****************** Processing ********************* */
+/* *************************************************** */
 
 /* if output_filename == stdoutmark, writes to stdout */
 int LZ4IO_compressFilename(const char* input_filename, const char* output_filename, int compressionlevel, const LZ4IO_prefs_t* prefs);
@@ -74,6 +74,8 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 /* ************************************************** */
 /* ****************** Parameters ******************** */
 /* ************************************************** */
+
+size_t LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename);
 
@@ -127,11 +129,6 @@ void LZ4IO_favorDecSpeed(LZ4IO_prefs_t* const prefs, int favor);
 /* implement --list
  * @return 0 on success, 1 on error */
 int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx);
-
-int LZ4IO_compressMT_test(const char* input_filename,
-                          const char* output_filename,
-                          int compressionlevel,
-                          const LZ4IO_prefs_t* prefs);
 
 
 #endif  /* LZ4IO_H_237902873 */

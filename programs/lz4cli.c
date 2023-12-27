@@ -82,7 +82,7 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 
 
 /*-************************************
-*  Exceptions
+*  Errors and Messages
 ***************************************/
 #define DEBUG 0
 #define DEBUGOUTPUT(...) do { if (DEBUG) DISPLAY(__VA_ARGS__); } while (0)
@@ -94,6 +94,11 @@ do {                                                                      \
     DISPLAYLEVEL(1, "\n");                                                \
     exit(error);                                                          \
 } while (0)
+
+static void errorOut(const char* msg)
+{
+    DISPLAYLEVEL(1, "%s \n", msg); exit(1);
+}
 
 
 /*-************************************
@@ -287,6 +292,34 @@ static unsigned readU32FromChar(const char** stringPtr)
     return result;
 }
 
+#define CLEAN_RETURN(i) { operationResult = (i); goto _cleanup; }
+
+#define NEXT_FIELD(ptr) {         \
+    if (*argument == '=') {       \
+        ptr = ++argument;         \
+        argument += strlen(ptr);  \
+    } else {                      \
+        argNb++;                  \
+        if (argNb >= argCount) {  \
+            DISPLAYLEVEL(1, "error: missing command argument \n"); \
+            CLEAN_RETURN(1);      \
+        }                         \
+        ptr = argv[argNb];        \
+        assert(ptr != NULL);      \
+        if (ptr[0]=='-') {        \
+            DISPLAYLEVEL(1, "error: command cannot be separated from its argument by another command \n"); \
+            CLEAN_RETURN(1);      \
+}   }   }
+
+#define NEXT_UINT32(val32) {      \
+    const char* __nb;             \
+    NEXT_FIELD(__nb);             \
+    val32 = readU32FromChar(&__nb); \
+    if(*__nb != 0) {              \
+        errorOut("error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed"); \
+    }                             \
+}
+
 /** longCommandWArg() :
  *  check if *stringPtr is the same as longCommand.
  *  If yes, @return 1 and advances *stringPtr to the position which immediately follows longCommand.
@@ -315,9 +348,9 @@ static operationMode_e determineOpMode(const char* inputFilename)
     else return om_compress;
 }
 
-int main(int argc, const char** argv)
+int main(int argCount, const char** argv)
 {
-    int i,
+    int argNb,
         cLevel=1,
         cLevelLast=-10000,
         legacy_format=0,
@@ -332,7 +365,7 @@ int main(int argc, const char** argv)
     const char* output_filename= NULL;
     const char* dictionary_filename = NULL;
     char* dynNameSpace = NULL;
-    const char** inFileNames = (const char**)calloc((size_t)argc, sizeof(char*));
+    const char** inFileNames = (const char**)calloc((size_t)argCount, sizeof(char*));
     unsigned ifnIdx=0;
     LZ4IO_prefs_t* const prefs = LZ4IO_defaultPreferences();
     const char nullOutput[] = NULL_OUTPUT;
@@ -368,8 +401,8 @@ int main(int argc, const char** argv)
     if (exeNameMatch(exeName, LZ4_LEGACY)) { g_lz4c_legacy_commands=1; }
 
     /* command switches */
-    for(i=1; i<argc; i++) {
-        const char* argument = argv[i];
+    for(argNb=1; argNb<argCount; argNb++) {
+        const char* argument = argv[argNb];
 
         if(!argument) continue;   /* Protection if argument empty */
 
@@ -391,7 +424,7 @@ int main(int argc, const char** argv)
                       if (mode != om_bench) mode = om_decompress;
                       BMK_setDecodeOnlyMode(1);
                       continue;
-                 }
+                  }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
                 if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(prefs, 1); continue; }
@@ -413,25 +446,32 @@ int main(int argc, const char** argv)
                 if (!strcmp(argument,  "--help")) { usage_advanced(exeName); goto _cleanup; }
                 if (!strcmp(argument,  "--keep")) { LZ4IO_setRemoveSrcFile(prefs, 0); continue; }   /* keep source file (default) */
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(prefs, 1); continue; }
+
+                if (longCommandWArg(&argument, "--threads")) {
+                    unsigned nbWorkers;
+                    NEXT_UINT32(nbWorkers);
+                    LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
+                    continue;
+                }
                 if (longCommandWArg(&argument, "--fast")) {
-                        /* Parse optional acceleration factor */
-                        if (*argument == '=') {
-                            U32 fastLevel;
-                            ++argument;
-                            fastLevel = readU32FromChar(&argument);
-                            if (fastLevel) {
-                              cLevel = -(int)fastLevel;
-                            } else {
-                              badusage(exeName);
-                            }
-                        } else if (*argument != 0) {
-                            /* Invalid character following --fast */
-                            badusage(exeName);
+                    /* Parse optional acceleration factor */
+                    if (*argument == '=') {
+                        U32 fastLevel;
+                        ++argument;
+                        fastLevel = readU32FromChar(&argument);
+                        if (fastLevel) {
+                            cLevel = -(int)fastLevel;
                         } else {
-                            cLevel = -1;  /* default for --fast */
+                            badusage(exeName);
                         }
-                        continue;
+                    } else if (*argument != 0) {
+                        /* Invalid character following --fast */
+                        badusage(exeName);
+                    } else {
+                        cLevel = -1;  /* default for --fast */
                     }
+                    continue;
+                }
 
                 /* For gzip(1) compatibility */
                 if (!strcmp(argument,  "--best")) { cLevel=LZ4HC_CLEVEL_MAX; continue; }
@@ -472,14 +512,24 @@ int main(int argc, const char** argv)
                     /* Compression (default) */
                 case 'z': mode = om_compress; break;
 
+                    /* Modify Nb Worker threads (compression only) */
+                case 'T':
+                    {   unsigned nbWorkers;
+                        argument++;
+                        nbWorkers = readU32FromChar(&argument);
+                        argument--;
+                        LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
+                    }
+                    break;
+
                 case 'D':
                     if (argument[1] == '\0') {
                         /* path is next arg */
-                        if (i + 1 == argc) {
+                        if (argNb + 1 == argCount) {
                             /* there is no next arg */
                             badusage(exeName);
                         }
-                        dictionary_filename = argv[++i];
+                        dictionary_filename = argv[++argNb];
                     } else {
                         /* path follows immediately */
                         dictionary_filename = argument + 1;
@@ -772,7 +822,7 @@ int main(int argc, const char** argv)
                 const char* const leg_extension = !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION;
                 LZ4IO_compressMultipleFilenames_Legacy(inFileNames, (int)ifnIdx, leg_extension, cLevel, prefs);
             } else {
-                LZ4IO_compressMT_test(input_filename, output_filename, cLevel, prefs);
+                LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel, prefs);
             }
         } else {
             if (multiple_inputs) {

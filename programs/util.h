@@ -1,6 +1,6 @@
 /*
     util.h - utility functions
-    Copyright (C) 2016-2020, Przemyslaw Skibinski, Yann Collet
+    Copyright (C) 2016-2023, Przemyslaw Skibinski, Yann Collet
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -91,6 +91,10 @@ extern "C" {
 #   define UTIL_fseek fseek
 #endif
 
+/*-****************************************
+*  Local host Core counting
+******************************************/
+int UTIL_countCores(void);
 
 /*-****************************************
 *  Sleep functions: Windows - Posix - others
