@@ -46,6 +46,7 @@
 #include "datagen.h"     /* RDG_genBuffer */
 #include "xxhash.h"
 #include "bench.h"
+#include "timefn.h"
 
 #define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
@@ -66,7 +67,7 @@
 #define NBSECONDS             3
 #define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
 #define TIMELOOP_NANOSEC      1*1000000000ULL /* 1 second */
-#define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
+#define ACTIVEPERIOD_NANOSEC 70*1000000000ULL /* 70 seconds */
 #define COOLPERIOD_SEC        10
 #define DECOMP_MULT           1 /* test decompression DECOMP_MULT times longer than compression */
 
@@ -426,11 +427,11 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     /* Bench */
     {   U64 fastestC = (U64)(-1LL), fastestD = (U64)(-1LL);
         U64 const crcOrig = XXH64(srcBuffer, srcSize, 0);
-        UTIL_time_t coolTime = UTIL_getTime();
+        TIME_t coolTime = TIME_getTime();
         U64 const maxTime = (g_nbSeconds * TIMELOOP_NANOSEC) + 100;
         U32 nbCompressionLoops = (U32)((5 MB) / (srcSize+1)) + 1;  /* conservative initial compression speed estimate */
         U32 nbDecodeLoops = (U32)((200 MB) / (srcSize+1)) + 1;  /* conservative initial decode speed estimate */
-        U64 totalCTime=0, totalDTime=0;
+        Duration_ns totalCTime=0, totalDTime=0;
         U32 cCompleted=(g_decodeOnly==1), dCompleted=0;
 #       define NB_MARKS 4
         const char* const marks[NB_MARKS] = { " |", " /", " =",  "\\" };
@@ -442,10 +443,10 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         DISPLAYLEVEL(2, "\r%79s\r", "");
         while (!cCompleted || !dCompleted) {
             /* overheat protection */
-            if (UTIL_clockSpanMicro(coolTime) > ACTIVEPERIOD_MICROSEC) {
+            if (TIME_clockSpan_ns(coolTime) > ACTIVEPERIOD_NANOSEC) {
                 DISPLAYLEVEL(2, "\rcooling down ...    \r");
                 UTIL_sleep(COOLPERIOD_SEC);
-                coolTime = UTIL_getTime();
+                coolTime = TIME_getTime();
             }
 
             /* Compression */
@@ -453,10 +454,10 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase compressed buffer */
 
             UTIL_sleepMilli(1);  /* give processor time to other processes */
-            UTIL_waitForNextTick();
+            TIME_waitForNextTick();
 
             if (!cCompleted) {   /* still some time to do compression tests */
-                UTIL_time_t const clockStart = UTIL_getTime();
+                TIME_t const timeStart = TIME_getTime();
                 U32 nbLoops;
                 for (nbLoops=0; nbLoops < nbCompressionLoops; nbLoops++) {
                     U32 blockNb;
@@ -472,17 +473,17 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         }
                         blockTable[blockNb].cSize = rSize;
                 }   }
-                {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
-                    if (clockSpan > 0) {
-                        if (clockSpan < fastestC * nbCompressionLoops)
-                            fastestC = clockSpan / nbCompressionLoops;
+                {   Duration_ns const duration_ns = TIME_clockSpan_ns(timeStart);
+                    if (duration_ns > 0) {
+                        if (duration_ns < fastestC * nbCompressionLoops)
+                            fastestC = duration_ns / nbCompressionLoops;
                         assert(fastestC > 0);
                         nbCompressionLoops = (U32)(TIMELOOP_NANOSEC / fastestC) + 1;  /* aim for ~1sec */
                     } else {
                         assert(nbCompressionLoops < 40000000);   /* avoid overflow */
                         nbCompressionLoops *= 100;
                     }
-                    totalCTime += clockSpan;
+                    totalCTime += duration_ns;
                     cCompleted = totalCTime>maxTime;
                 }
 
@@ -502,14 +503,14 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
 
             UTIL_sleepMilli(5); /* give processor time to other processes */
-            UTIL_waitForNextTick();
+            TIME_waitForNextTick();
 
             if (!dCompleted) {
                 const DecFunction_f decFunction = g_decodeOnly ?
                     LZ4F_decompress_binding : LZ4_decompress_safe_usingDict;
                 const char* const decString = g_decodeOnly ?
                     "LZ4F_decompress" : "LZ4_decompress_safe_usingDict";
-                UTIL_time_t const clockStart = UTIL_getTime();
+                TIME_t const timeStart = TIME_getTime();
                 U32 nbLoops;
 
                 for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
@@ -533,17 +534,17 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         }
                         blockTable[blockNb].resSize = (size_t)regenSize;
                 }   }
-                {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
-                    if (clockSpan > 0) {
-                        if (clockSpan < fastestD * nbDecodeLoops)
-                            fastestD = clockSpan / nbDecodeLoops;
+                {   Duration_ns const duration_ns = TIME_clockSpan_ns(timeStart);
+                    if (duration_ns > 0) {
+                        if (duration_ns < fastestD * nbDecodeLoops)
+                            fastestD = duration_ns / nbDecodeLoops;
                         assert(fastestD > 0);
                         nbDecodeLoops = (U32)(TIMELOOP_NANOSEC / fastestD) + 1;  /* aim for ~1sec */
                     } else {
                         assert(nbDecodeLoops < 40000000);   /* avoid overflow */
                         nbDecodeLoops *= 100;
                     }
-                    totalDTime += clockSpan;
+                    totalDTime += duration_ns;
                     dCompleted = totalDTime > (DECOMP_MULT*maxTime);
             }   }
 

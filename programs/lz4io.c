@@ -46,11 +46,12 @@
 *  Includes
 *****************************/
 #include "platform.h"  /* Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE, PLATFORM_POSIX_VERSION, __64BIT__ */
+#include "timefn.h"    /* TIME_ */
 #include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
 #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strerror, strcmp, strlen */
-#include <time.h>      /* clock */
+#include <time.h>      /* clock_t, for cpu-time */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
 #include "lz4.h"       /* still required for legacy format */
@@ -98,14 +99,14 @@
 static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result + interaction + warnings ; 3 : + progression; 4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
-            if ( ((clock() - g_time) > refreshRate)    \
+            if ( (TIME_clockSpan_ns(g_time) > refreshRate)  \
               || (g_displayLevel>=4) ) {               \
-                g_time = clock();                      \
+                g_time = TIME_getTime();               \
                 DISPLAY(__VA_ARGS__);                  \
                 if (g_displayLevel>=4) fflush(stderr); \
         }   }
-static const clock_t refreshRate = CLOCKS_PER_SEC / 6;
-static clock_t g_time = 0;
+static const Duration_ns refreshRate = 200000000;
+static TIME_t g_time = { 0 };
 
 #undef MIN
 #define MIN(a,b)  ((a)<(b)?(a):(b))
@@ -191,11 +192,12 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     return prefs;
 }
 
-size_t LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers)
+int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers)
 {
     if (nbWorkers < 1 ) nbWorkers = 1;
     nbWorkers = MIN(nbWorkers, LZ4IO_NB_WORKERS_MAX);
     prefs->nbWorkers = nbWorkers;
+    return nbWorkers;
 }
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename)
@@ -475,11 +477,11 @@ static void WR_addBufDesc(WriteRegister* wr, const BufferDesc* bd)
         if (wr->buffers == NULL) {
             END_PROCESS(39, "cannot extend register of buffers")
         }
-        DISPLAY("Increasing buffer register capacity to %zu buffers ", newCapacity);
+        //DISPLAY("Increasing buffer register capacity to %zu buffers ", newCapacity);
         memset(wr->buffers + oldCapacity, 0, addedCapacity * sizeof(BufferDesc));
         wr->buffers[oldCapacity] = bd[0];
         wr->capacity = newCapacity;
-        DISPLAY("and adding buffer at position %zu \n", oldCapacity);
+        //DISPLAY("and adding buffer at position %zu \n", oldCapacity);
     } else {
         /* at least one position (the last one) is free, i.e. buffer==NULL */
         size_t n;
@@ -490,7 +492,7 @@ static void WR_addBufDesc(WriteRegister* wr, const BufferDesc* bd)
             }
         }
         assert(n != wr->capacity);
-        DISPLAY("adding buffer at position %zu \n", n);
+        //DISPLAY("adding buffer at position %zu \n", n);
     }
 }
 
@@ -526,7 +528,7 @@ static BufferDesc WR_getBufID(WriteRegister* wr, unsigned long long id)
 static void WR_removeBuffID(WriteRegister* wr, unsigned long long id)
 {
     size_t n;
-    DISPLAY("WR_removeBuffID %llu \n", id);
+    //DISPLAY("WR_removeBuffID %llu \n", id);
     for (n=0; n<wr->capacity; n++) {
         if (wr->buffers[n].buf == NULL) {
             /* no more buffers stored */
@@ -561,7 +563,7 @@ static void LZ4IO_writeBuffer(BufferDesc bufDesc, FILE* out)
 {
     size_t const size = bufDesc.size;
     char cBlockSize[4];
-    DISPLAY("Writing Block %llu for %zu bytes ", bufDesc.rank, 4 + bufDesc.size);
+    //DISPLAY("Writing Block %llu for %zu bytes ", bufDesc.rank, 4 + bufDesc.size);
     LZ4IO_writeLE32(cBlockSize, (unsigned)size);
     if (fwrite(cBlockSize, 1, 4, out) != 4) {
         END_PROCESS(37, "Write error : cannot write compressed block size");
@@ -576,12 +578,12 @@ static void LZ4IO_checkWriteOrder(void* arg)
     WriteJobDesc* const wjd = arg;
     size_t const cSize = wjd->cSize;
     WriteRegister* const wr = wjd->wr;
-    DISPLAY("Check: block %llu => %llu expected : ", wjd->blockNb, wr->current);
+    //DISPLAY("Check: block %llu => %llu expected : ", wjd->blockNb, wr->current);
 
     if (wjd->blockNb != wr->current) {
         /* incorrect order : let's store this buffer for later write */
         BufferDesc bd = { wjd->cBuf, wjd->cSize, wjd->blockNb };
-        DISPLAY("Incorrect order: ");
+        //DISPLAY("Incorrect order: ");
         WR_addBufDesc(wr, &bd);
         free(wjd);  /* because wjd is pod */
         return;
@@ -589,23 +591,28 @@ static void LZ4IO_checkWriteOrder(void* arg)
 
     /* expected block ID : let's write this block */
     {   BufferDesc const bufDesc = { wjd->cBuf, cSize, wjd->blockNb };
-        DISPLAY("Good order! ");
+        //DISPLAY("Good order! ");
         LZ4IO_writeBuffer(bufDesc, wjd->out);
     }
     wr->current++;
     wr->totalCSize += 4 + cSize;
-    DISPLAY("(totalCSize = %llu) \n", wr->totalCSize);
+    //DISPLAY("(totalCSize = %llu) \n", wr->totalCSize);
     free(wjd->cBuf);
     /* and check for more blocks, previously saved */
     while (WR_isPresent(wr, wr->current)) {
         BufferDesc const bd = WR_getBufID(wr, wr->current);
         LZ4IO_writeBuffer(bd, wjd->out);
         wr->totalCSize += 4 + bd.size;
-        DISPLAY("Block %llu written for totalCSize = %llu bytes \n", wr->current, wr->totalCSize);
+        //DISPLAY("Block %llu written for totalCSize = %llu bytes \n", wr->current, wr->totalCSize);
         WR_removeBuffID(wr, wr->current);
         wr->current++;
     }
     free(wjd);  /* because wjd is pod */
+    {   unsigned long long const processedSize = (unsigned long long)(wr->current-1) * 8 MB;
+        DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
+                (unsigned)(processedSize >> 20),
+                (double)wr->totalCSize / (double)processedSize * 100.);
+    }
 }
 
 typedef int (*compress_f)(const char* src, char* dst, int srcSize, int dstSize, int cLevel);
@@ -631,7 +638,7 @@ static void LZ4IO_compressBlock(void* arg)
     {   int const cSize = cjd->compress(cjd->in_buff, out_buff, cjd->inSize, outCapacity, cjd->clevel);
         if (cSize < 0)
             END_PROCESS(34, "Compression error");
-        DISPLAY("Compressed %i bytes from block %llu into %i bytes \n", cjd->inSize, cjd->blockNb, cSize);
+        //DISPLAY("Compressed %i bytes from block %llu into %i bytes \n", cjd->inSize, cjd->blockNb, cSize);
 
         /* check for write */
         {   WriteJobDesc* const wjd = (WriteJobDesc*)malloc(sizeof(*wjd));
@@ -674,7 +681,7 @@ static void LZ4IO_readAndProcess(void* arg)
         }
         rjd->readSize += inSize;
         rjd->blockNb++;
-        DISPLAY("Read %zu bytes from block %llu (total:%llu) \n", inSize, rjd->blockNb, rjd->readSize);
+        //DISPLAY("Read %zu bytes from block %llu (total:%llu) \n", inSize, rjd->blockNb, rjd->readSize);
         /* send new jobs */
         if (inSize > 0) {
             CompressJobDesc* const cjd = (CompressJobDesc*)malloc(sizeof(*cjd));
@@ -707,14 +714,14 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_LZ4_compress : LZ4_compress_HC;
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     FILE* foutput;
-    clock_t clockEnd;
     /* note: will need something to determine nbThreads */
     TPOOL_ctx* const tPool = TPOOL_create(prefs->nbWorkers, 16);
     TPOOL_ctx* const wPool = TPOOL_create(1, 16);
     WriteRegister wr = WR_init();
 
     /* Init & checks */
-    clock_t const clockStart = clock();
+    TIME_t const timeStart = TIME_getTime();
+    clock_t const cpuStart = clock();
     if (finput == NULL)
         END_PROCESS(20, "%s : open file error ", input_filename);
     if (tPool == NULL || wPool == NULL)
@@ -744,13 +751,16 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
         TPOOL_completeJobs(wPool);
 
         /* Status */
-        clockEnd = clock();
-        clockEnd += (clockEnd==clockStart); /* avoid division by zero (speed) */
         DISPLAYLEVEL(2, "\r%79s\r", "");    /* blank line */
-        DISPLAYLEVEL(2,"Ingested %llu bytes \n", rjd.readSize);
-        {   double const seconds = (double)(clockEnd - clockStart) / CLOCKS_PER_SEC;
-            DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MiB/s\n", seconds,
-                            (double)rjd.readSize / seconds / 1024 / 1024);
+        DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%% \n",
+                    rjd.readSize, wr.totalCSize,
+                    (double)wr.totalCSize / (double)(rjd.readSize + !rjd.readSize) * 100.);
+        {   Duration_ns duration_ns = TIME_clockSpan_ns(timeStart);
+            double const seconds = (double)(duration_ns + !duration_ns) / (double)1000000000.;
+            double const cpuLoad_s = (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
+            DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MiB/s  (cpu load : %.0f%%)\n", seconds,
+                            (double)rjd.readSize / seconds / 1024 / 1024,
+                            (cpuLoad_s / seconds) * 100.);
     }   }
 
     /* Close & Free */
@@ -935,7 +945,8 @@ static void LZ4IO_freeCResources(cRess_t ress)
 static int
 LZ4IO_compressFilename_extRess(cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
-                               int compressionLevel, const LZ4IO_prefs_t* const io_prefs)
+                               int compressionLevel,
+                               const LZ4IO_prefs_t* const io_prefs)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
@@ -996,7 +1007,8 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
     {
         /* Write Frame Header */
         size_t const headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
-        if (LZ4F_isError(headerSize)) END_PROCESS(43, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
+        if (LZ4F_isError(headerSize))
+            END_PROCESS(43, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
         if (fwrite(dstBuffer, 1, headerSize, dstFile) != headerSize)
             END_PROCESS(44, "Write error : cannot write header");
         compressedfilesize += headerSize;
@@ -1051,7 +1063,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
     DISPLAYLEVEL(2, "\r%79s\r", "");
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
                     filesize, compressedfilesize,
-                    (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100);
+                    (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
 
     return 0;
 }
@@ -1059,7 +1071,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
-    UTIL_time_t const timeStart = UTIL_getTime();
+    TIME_t const timeStart = TIME_getTime();
     clock_t const cpuStart = clock();
     cRess_t const ress = LZ4IO_createCResources(prefs);
 
@@ -1071,10 +1083,10 @@ int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int
     /* Final Status */
     {   clock_t const cpuEnd = clock();
         double const cpuLoad_s = (double)(cpuEnd - cpuStart) / CLOCKS_PER_SEC;
-        U64 const timeLength_ns = UTIL_clockSpanNano(timeStart);
-        double const timeLength_s = (double)timeLength_ns / 1000000000;
+        U64 const timeLength_ns = TIME_clockSpan_ns(timeStart);
+        double const timeLength_s = (double)timeLength_ns / 1000000000.;
         DISPLAYLEVEL(4, "Completed in %.2f sec  (cpu load : %.0f%%)\n",
-                        timeLength_s, (cpuLoad_s / timeLength_s) * 100);
+                        timeLength_s, (cpuLoad_s / timeLength_s) * 100.);
     }
 
     return result;
@@ -1622,12 +1634,11 @@ LZ4IO_decompressDstFile(dRess_t ress,
 int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename, const LZ4IO_prefs_t* prefs)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
-    clock_t const start = clock();
+    TIME_t const start = TIME_getTime();
 
     int const status = LZ4IO_decompressDstFile(ress, input_filename, output_filename, prefs);
 
-    clock_t const end = clock();
-    double const seconds = (double)(end - start) / CLOCKS_PER_SEC;
+    double const seconds = (double)TIME_clockSpan_ns(start) / 1000000000.;
     DISPLAYLEVEL(4, "Done in %.2f sec  \n", seconds);
 
     LZ4IO_freeDResources(ress);
