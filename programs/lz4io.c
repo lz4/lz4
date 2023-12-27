@@ -59,6 +59,7 @@
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4io.h"
+#include "xxhash.h"    /* frame checksum (MT mode) */
 
 
 /*****************************
@@ -706,6 +707,7 @@ typedef struct {
     size_t blockSize;
     unsigned long long totalReadSize;
     unsigned long long blockNb;
+    XXH32_state_t* xxh32;
     compress_f compress;
     const void* compressParameters;
     FILE* out;
@@ -732,6 +734,9 @@ static void LZ4IO_readAndProcess(void* arg)
             CompressJobDesc* const cjd = (CompressJobDesc*)malloc(sizeof(*cjd));
             if (cjd==NULL) {
                 END_PROCESS(33, "Allocation error : can't describe new compression job");
+            }
+            if (rjd->xxh32) {
+                XXH32_update(rjd->xxh32, in_buff, inSize);
             }
             cjd->wPool = rjd->wPool;
             cjd->in_buff = in_buff; /* transfer ownership */
@@ -796,6 +801,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
                         LEGACY_BLOCKSIZE,
                         0,
                         0,
+                        NULL,
                         compressionFunction,
                         &cls,
                         foutput,
@@ -1102,19 +1108,34 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
                         blockSize,
                         0,
                         0,
+                        NULL,
                         LZ4IO_compressFrameChunk,
                         &prefs,
                         dstFile,
                         &wr,
                         LZ4F_compressFrameBound(blockSize, &prefs) };
 
+        /* handle checksum */
+        XXH32_state_t* xxh32 = NULL;
+        int checksum = (int)prefs.frameInfo.contentChecksumFlag;
+        if (checksum) {
+            xxh32 = XXH32_createState();
+            if (xxh32==NULL)
+                END_PROCESS(42, "could not init checksum");
+            XXH32_reset(xxh32, 0);
+            rjd.xxh32 = xxh32;
+        }
+
         /* Write Frame Header */
-        size_t const headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
-        if (LZ4F_isError(headerSize))
-            END_PROCESS(43, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
-        if (fwrite(dstBuffer, 1, headerSize, dstFile) != headerSize)
-            END_PROCESS(44, "Write error : cannot write header");
-        compressedfilesize = headerSize;
+        {   size_t const headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
+            if (LZ4F_isError(headerSize))
+                END_PROCESS(43, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
+            if (fwrite(dstBuffer, 1, headerSize, dstFile) != headerSize)
+                END_PROCESS(44, "Write error : cannot write header");
+            compressedfilesize = headerSize;
+        }
+        /* avoid duplicating effort to process content checksum (done externally) */
+        prefs.frameInfo.contentChecksumFlag = 0;
 
         /* process first block */
         if (fseek(srcFile, 0, SEEK_SET)) {
@@ -1132,14 +1153,25 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
         compressedfilesize += wr.totalCSize;
 
         /* End of Frame mark */
-        {   size_t const endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
+        {   size_t endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
             if (LZ4F_isError(endSize))
                 END_PROCESS(48, "End of frame error : %s", LZ4F_getErrorName(endSize));
+            if (checksum) {
+                /* handle frame checksum externally
+                 * note: LZ4F_compressEnd already wrote a (bogus) checksum */
+                U32 const crc = XXH32_digest(xxh32);
+                assert(endSize >= 4);
+                LZ4IO_writeLE32( (char*)dstBuffer + endSize - 4, crc);
+            }
             if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
                 END_PROCESS(49, "Write error : cannot write end of frame");
             compressedfilesize += endSize;
             filesize += rjd.totalReadSize;
         }
+
+
+        /* clean up*/
+        XXH32_freeState(xxh32);
         WR_destroy(&wr);
         TPOOL_free(wPool);
         TPOOL_free(tPool);

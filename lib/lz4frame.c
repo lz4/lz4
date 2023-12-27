@@ -1169,7 +1169,7 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
         U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
         RETURN_ERROR_IF(dstCapacity < 8, dstMaxSize_tooSmall);
-        DEBUGLOG(5,"Writing 32-bit content checksum");
+        DEBUGLOG(5,"Writing 32-bit content checksum (0x%0X)", xxh);
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */
     }
