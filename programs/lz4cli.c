@@ -1,6 +1,6 @@
 /*
   LZ4cli - LZ4 Command Line Interface
-  Copyright (C) Yann Collet 2011-2020
+  Copyright (C) Yann Collet 2011-2023
 
   GPL v2 License
 
@@ -772,7 +772,7 @@ int main(int argc, const char** argv)
                 const char* const leg_extension = !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION;
                 LZ4IO_compressMultipleFilenames_Legacy(inFileNames, (int)ifnIdx, leg_extension, cLevel, prefs);
             } else {
-                LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel, prefs);
+                LZ4IO_compressMT_test(input_filename, output_filename, cLevel, prefs);
             }
         } else {
             if (multiple_inputs) {

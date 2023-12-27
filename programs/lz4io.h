@@ -1,6 +1,6 @@
 /*
   LZ4io.h - LZ4 File/Stream Interface
-  Copyright (C) Yann Collet 2011-2020
+  Copyright (C) Yann Collet 2011-2023
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -127,6 +127,11 @@ void LZ4IO_favorDecSpeed(LZ4IO_prefs_t* const prefs, int favor);
 /* implement --list
  * @return 0 on success, 1 on error */
 int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx);
+
+int LZ4IO_compressMT_test(const char* input_filename,
+                          const char* output_filename,
+                          int compressionlevel,
+                          const LZ4IO_prefs_t* prefs);
 
 
 #endif  /* LZ4IO_H_237902873 */
