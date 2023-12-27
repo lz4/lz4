@@ -1571,7 +1571,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     size_t nextSrcSizeHint = 1;
 
 
-    DEBUGLOG(5, "LZ4F_decompress : %p,%u => %p,%u",
+    DEBUGLOG(5, "LZ4F_decompress: src[%p](%u) => dst[%p](%u)",
             srcBuffer, (unsigned)*srcSizePtr, dstBuffer, (unsigned)*dstSizePtr);
     if (dstBuffer == NULL) assert(*dstSizePtr == 0);
     MEM_INIT(&optionsNull, 0, sizeof(optionsNull));
@@ -1960,6 +1960,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             if (!dctx->skipChecksum) {
                 U32 const readCRC = LZ4F_readLE32(selectedIn);
                 U32 const resultCRC = XXH32_digest(&(dctx->xxh));
+                DEBUGLOG(5, "frame checksum: stored 0x%0X vs 0x%0X processed", readCRC, resultCRC);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                 RETURN_ERROR_IF(readCRC != resultCRC, contentChecksum_invalid);
 #else
