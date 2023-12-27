@@ -893,7 +893,10 @@ LZ4HC_compress_generic_internal (
     if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;    /* Unsupported input size (too large or negative) */
 
     ctx->end += *srcSizePtr;
-    if (cLevel < 1) cLevel = LZ4HC_CLEVEL_DEFAULT;   /* note : convention is different from lz4frame, maybe something to review */
+    /* note : clevel convention is a bit different from lz4frame,
+     * possibly something worth revisiting for consistency */
+    if (cLevel < 1)
+        cLevel = LZ4HC_CLEVEL_DEFAULT;
     cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
     {   cParams_t const cParam = clTable[cLevel];
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
