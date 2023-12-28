@@ -153,7 +153,7 @@ static void LZ4F_free(void* p, LZ4F_CustomMem cmem)
 static int g_debuglog_enable = 1;
 #  define DEBUGLOG(l, ...) {                                  \
                 if ((g_debuglog_enable) && (l<=LZ4_DEBUG)) {  \
-                    fprintf(stderr, __FILE__ ": ");           \
+                    fprintf(stderr, __FILE__ " (%i): ", __LINE__ );  \
                     fprintf(stderr, __VA_ARGS__);             \
                     fprintf(stderr, " \n");                   \
             }   }
@@ -314,7 +314,12 @@ static LZ4F_errorCode_t LZ4F_returnErrorCode(LZ4F_errorCodes code)
 
 #define RETURN_ERROR(e) return LZ4F_returnErrorCode(LZ4F_ERROR_ ## e)
 
-#define RETURN_ERROR_IF(c,e) do { if (c) RETURN_ERROR(e); } while (0)
+#define RETURN_ERROR_IF(c,e) do {  \
+        if (c) {                   \
+            DEBUGLOG(3, "Error: " #c); \
+            RETURN_ERROR(e);       \
+        }                          \
+    } while (0)
 
 #define FORWARD_IF_ERROR(r) do { if (LZ4F_isError(r)) return (r); } while (0)
 
@@ -616,7 +621,6 @@ LZ4F_createCompressionContext(LZ4F_cctx** LZ4F_compressionContextPtr, unsigned v
     return LZ4F_OK_NoError;
 }
 
-
 LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctxPtr)
 {
     if (cctxPtr != NULL) {  /* support free on NULL */
@@ -650,10 +654,10 @@ static void LZ4F_initStream(void* ctx,
              * would be misguided / wasted work. */
             LZ4_resetStream_fast((LZ4_stream_t*)ctx);
         }
-        LZ4_attach_dictionary((LZ4_stream_t *)ctx, cdict ? cdict->fastCtx : NULL);
+        LZ4_attach_dictionary((LZ4_stream_t*)ctx, cdict ? cdict->fastCtx : NULL);
     } else {
         LZ4_resetStreamHC_fast((LZ4_streamHC_t*)ctx, level);
-        LZ4_attach_HC_dictionary((LZ4_streamHC_t *)ctx, cdict ? cdict->HCCtx : NULL);
+        LZ4_attach_HC_dictionary((LZ4_streamHC_t*)ctx, cdict ? cdict->HCCtx : NULL);
     }
 }
 
@@ -750,6 +754,8 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
         LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, (int)preferencesPtr->favorDecSpeed);
     }
 
+    /* Stage 2 : Write Frame Header */
+
     /* Magic Number */
     LZ4F_writeLE32(dstPtr, LZ4F_MAGICNUMBER);
     dstPtr += 4;
@@ -783,7 +789,6 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctxPtr,
     cctxPtr->cStage = 1;   /* header written, now request input data block */
     return (size_t)(dstPtr - dstStart);
 }
-
 
 /*! LZ4F_compressBegin() :
  *  init streaming compression AND writes frame header into @dstBuffer.
@@ -893,7 +898,8 @@ static int LZ4F_doNotCompressBlock(void* ctx, const char* src, char* dst, int sr
 
 static compressFunc_t LZ4F_selectCompression(LZ4F_blockMode_t blockMode, int level, LZ4F_blockCompression_t  compressMode)
 {
-    if (compressMode == LZ4B_UNCOMPRESSED) return LZ4F_doNotCompressBlock;
+    if (compressMode == LZ4B_UNCOMPRESSED)
+        return LZ4F_doNotCompressBlock;
     if (level < LZ4HC_CLEVEL_MIN) {
         if (blockMode == LZ4F_blockIndependent) return LZ4F_compressBlock;
         return LZ4F_compressBlock_continue;
@@ -1068,13 +1074,9 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
                                    compressOptionsPtr, LZ4B_COMPRESSED);
 }
 
-/*! LZ4F_compressUpdate() :
- *  LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
- *  When successful, the function always entirely consumes @srcBuffer.
- *  src data is either buffered or compressed into @dstBuffer.
- *  If previously an uncompressed block was written, buffered data is flushed
- *  before appending compressed data is continued.
- *  This is only supported when LZ4F_blockIndependent is used
+/*! LZ4F_uncompressedUpdate() :
+ *  Same as LZ4F_compressUpdate(), but requests blocks to be sent uncompressed.
+ *  This symbol is only supported when LZ4F_blockIndependent is used
  * @dstCapacity MUST be >= LZ4F_compressBound(srcSize, preferencesPtr).
  * @compressOptionsPtr is optional : provide NULL to mean "default".
  * @return : the number of bytes written into dstBuffer. It can be zero, meaning input data was just buffered.
@@ -1084,7 +1086,8 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
 size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctxPtr,
                                void* dstBuffer, size_t dstCapacity,
                          const void* srcBuffer, size_t srcSize,
-                         const LZ4F_compressOptions_t* compressOptionsPtr) {
+                         const LZ4F_compressOptions_t* compressOptionsPtr)
+{
     return LZ4F_compressUpdateImpl(cctxPtr,
                                    dstBuffer, dstCapacity,
                                    srcBuffer, srcSize,
