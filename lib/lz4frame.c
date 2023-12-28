@@ -762,7 +762,7 @@ size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     }
     if (dictBuffer) {
         assert(cdict == NULL);
-        RETURN_ERROR_IF(dictSize < 0 || dictSize > INT_MAX, parameter_invalid);
+        RETURN_ERROR_IF(dictSize > INT_MAX, parameter_invalid);
         if (cctx->lz4CtxType == ctxFast) {
             /* lz4 fast*/
             LZ4_loadDict((LZ4_stream_t*)cctx->lz4CtxPtr, dictBuffer, (int)dictSize);
