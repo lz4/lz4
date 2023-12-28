@@ -478,10 +478,23 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         /* Test compression using external state */
         FUZ_DISPLAYTEST("test LZ4_compress_fast_extState()");
         {   int const r = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, (int)compressedBufferSize, 8);
-            FUZ_CHECKTEST(r==0, "LZ4_compress_fast_extState() failed"); }
+            FUZ_CHECKTEST(r==0, "LZ4_compress_fast_extState() failed");
+
+            FUZ_DISPLAYTEST("test LZ4_compress_fast_extState() with a too small destination buffer (must fail)");
+            {   int const r2 = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, r-1, 8);
+                FUZ_CHECKTEST(r2!=0, "LZ4_compress_fast_extState() should have failed");
+            }
+
+            FUZ_DISPLAYTEST("test LZ4_compress_destSize_extState() with a too small destination buffer (must succeed, by compressing less than full input)");
+            {   int inputSize = blockSize;
+                int const r3 = LZ4_compress_destSize_extState(stateLZ4, block, compressedBuffer, &inputSize, r-1, 8);
+                FUZ_CHECKTEST(r3==0, "LZ4_compress_destSize_extState() failed");
+                FUZ_CHECKTEST(inputSize>=blockSize, "LZ4_compress_destSize_extState() should consume less than full input");
+            }
+        }
 
         /* Test compression using fast reset external state*/
-        FUZ_DISPLAYTEST();
+        FUZ_DISPLAYTEST("test LZ4_compress_fast_extState_fastReset()");
         {   int const r = LZ4_compress_fast_extState_fastReset(stateLZ4, block, compressedBuffer, blockSize, (int)compressedBufferSize, 8);
             FUZ_CHECKTEST(r==0, "LZ4_compress_fast_extState_fastReset() failed"); }
 
