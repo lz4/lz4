@@ -150,9 +150,6 @@ int UTIL_countCores(void)
 
 #elif defined(__linux__)
 
-/* parse /proc/cpuinfo
- * siblings / cpu cores should give hyperthreading ratio
- * otherwise fall back on sysconf */
 int UTIL_countCores(void)
 {
     static int numCores = 0;
@@ -165,54 +162,7 @@ int UTIL_countCores(void)
         return numCores = 1;
     }
 
-    /* try to determine if there's hyperthreading */
-    {   FILE* const cpuinfo = fopen("/proc/cpuinfo", "r");
-#define BUF_SIZE 80
-        char buff[BUF_SIZE];
-
-        int siblings = 0;
-        int cpu_cores = 0;
-        int ratio = 1;
-
-        if (cpuinfo == NULL) {
-            /* fall back on the sysconf value */
-            return numCores;
-        }
-
-        /* assume the cpu cores/siblings values will be constant across all
-         * present processors */
-        while (!feof(cpuinfo)) {
-            if (fgets(buff, BUF_SIZE, cpuinfo) != NULL) {
-                if (strncmp(buff, "siblings", 8) == 0) {
-                    const char* const sep = strchr(buff, ':');
-                    if (sep == NULL || *sep == '\0') {
-                        /* formatting was broken? */
-                        goto failed;
-                    }
-
-                    siblings = atoi(sep + 1);
-                }
-                if (strncmp(buff, "cpu cores", 9) == 0) {
-                    const char* const sep = strchr(buff, ':');
-                    if (sep == NULL || *sep == '\0') {
-                        /* formatting was broken? */
-                        goto failed;
-                    }
-
-                    cpu_cores = atoi(sep + 1);
-                }
-            } else if (ferror(cpuinfo)) {
-                /* fall back on the sysconf value */
-                goto failed;
-        }   }
-        if (siblings && cpu_cores && siblings > cpu_cores) {
-            ratio = siblings / cpu_cores;
-        }
-
-failed:
-        fclose(cpuinfo);
-        return numCores;
-    }
+    return numCores;
 }
 
 #elif defined(__FreeBSD__)

@@ -421,11 +421,10 @@ LZ4F_compressBegin_usingDict(LZ4F_cctx* cctx,
  `dictBuffer` must outlive the compression session.
  @return : number of bytes written into dstBuffer for the header,
            or an error code (which can be tested using LZ4F_isError())
-  NOTE: this entry point doesn't fully follow the spec:
-        when a frame consists of independent blocks,
-        each block should be compressed using the dictionary.
-        But currently, only the first block uses the dictionary.
-        This is still decodable, but less efficient.
+  NOTE: this entry point doesn't fully exploit the spec,
+        which allows each independent block to be compressed with the dictionary.
+        Currently, only the first block uses the dictionary.
+        This is still technically compliant, but less efficient for large inputs.
  
 </p></pre><BR>
 
