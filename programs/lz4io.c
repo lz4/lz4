@@ -1058,7 +1058,7 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
  *          1 : missing or pb opening srcFileName
  */
 int
-LZ4IO_compressFilename_extRess_new(cRess_t ress,
+LZ4IO_compressFilename_extRess_MT(cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
@@ -1263,7 +1263,7 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
  *          1 : missing or pb opening srcFileName
  */
 int
-LZ4IO_compressFilename_extRess_old(cRess_t ress,
+LZ4IO_compressFilename_extRess_ST(cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
@@ -1396,7 +1396,13 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
-    return LZ4IO_compressFilename_extRess_new(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+    /* do NOT employ multi-threading in the following scenarios: */
+    if ( (io_prefs->contentSizeFlag)  /* content size present in frame header*/
+      || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
+      || (ress.cdict))  /* dictionary compression */
+        return LZ4IO_compressFilename_extRess_ST(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+
+    return LZ4IO_compressFilename_extRess_MT(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 }
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
@@ -1564,7 +1570,7 @@ static void LZ4IO_fwriteSparseEnd(FILE* file, unsigned storedSkips)
     if (storedSkips>0) {   /* implies sparseFileSupport>0 */
         const char lastZeroByte[1] = { 0 };
         if (UTIL_fseek(file, storedSkips-1, SEEK_CUR) != 0)
-            END_PROCESS(68, "Final skip error (sparse file)\n");
+            END_PROCESS(69, "Final skip error (sparse file)\n");
         if (fwrite(lastZeroByte, 1, 1, file) != 1)
             END_PROCESS(69, "Write error : cannot write last zero\n");
     }

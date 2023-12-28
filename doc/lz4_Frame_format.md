@@ -16,7 +16,7 @@ Distribution of this document is unlimited.
 
 ### Version
 
-1.6.3 (12/09/2022)
+1.6.4 (28/12/2023)
 
 
 Introduction
@@ -219,24 +219,26 @@ It can be skipped by a decoder, or used to validate content correctness.
 
 __Dictionary ID__
 
+A dictionary is useful to compress short input sequences.
+When present, the compressor can take advantage of dictionary's content
+as a kind of “known prefix” to encode the input in a more compact manner.
+
+When the frame descriptor defines independent blocks,
+every block is initialized with the same dictionary.
+If the frame descriptor defines linked blocks,
+the dictionary is only used once, at the beginning of the frame.
+
+The compressor and the decompressor must employ exactly the same dictionary for the data to be decodable.
+
+The Dict-ID field is offered as a way to help the decoder determine
+which dictionary must be used to correctly decode the compressed frame.
 Dict-ID is only present if the associated flag is set.
 It's an unsigned 32-bits value, stored using little-endian convention.
-A dictionary is useful to compress short input sequences.
-The compressor can take advantage of the dictionary context
-to encode the input in a more compact manner.
-It works as a kind of “known prefix” which is used by
-both the compressor and the decompressor to “warm-up” reference tables.
+Within a single frame, only a single Dict-ID field can be defined.
 
-The decompressor can use Dict-ID identifier to determine
-which dictionary must be used to correctly decode data.
-The compressor and the decompressor must use exactly the same dictionary.
-It's presumed that the 32-bits dictID uniquely identifies a dictionary.
-
-Within a single frame, a single dictionary can be defined.
-When the frame descriptor defines independent blocks,
-each block will be initialized with the same dictionary.
-If the frame descriptor defines linked blocks,
-the dictionary will only be used once, at the beginning of the frame.
+Note that the Dict-ID field is optional.
+Knowledge of which dictionary to employ can also be passed off-band,
+for example, it could be implied by the context of the application.
 
 __Header Checksum__
 
@@ -397,6 +399,8 @@ and trigger an error if it does not fit within acceptable range.
 Version changes
 ---------------
 
+1.6.4 : minor clarifications for Dictionaries
+
 1.6.3 : minor : clarify Data Block
 
 1.6.2 : clarifies specification of _EndMark_
@@ -429,6 +433,6 @@ Version changes
 
 0.6 : settled : stream size uses 8 bytes, endian convention is little endian
 
-0.5: added copyright notice
+0.5 : added copyright notice
 
 0.4 : changed format to Google Doc compatible OpenDocument

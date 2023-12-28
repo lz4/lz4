@@ -644,7 +644,73 @@ static int unitTests(U32 seed, double compressibility)
         CHECK( LZ4F_freeCompressionContext(cctx) ); cctx = NULL;
     }
 
-    /* Dictionary compression test */
+    /* Raw Dictionary compression test */
+    {   size_t const dictSize = 7 KB; /* small enough for LZ4_MEMORY_USAGE == 10 */
+        size_t const srcSize = 92 KB; /* must be > 64 KB to avoid short-size optimizations */
+        size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
+        size_t cSizeNoDict, cSizeWithDict;
+        const void* dict = CNBuffer;
+        const void* src = (const char*)CNBuffer + dictSize;
+        char* cPtr = (char*)compressedBuffer;
+        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+
+        /* compress without dictionary, just to establish a comparison point */
+        CHECK_V(cSizeNoDict,
+                LZ4F_compressFrame(compressedBuffer, dstCapacity,
+                                    src, srcSize,
+                                    NULL) );
+        /* note: NULL preferences ==> 64 KB linked blocks */
+
+        /* now compress with dictionary */
+        DISPLAYLEVEL(3, "LZ4F_compressBegin_usingDict: ");
+        cSizeWithDict = 0;
+        {   size_t hSize = LZ4F_compressBegin_usingDict(cctx, cPtr, dstCapacity, dict, dictSize, NULL);
+            //size_t hSize = LZ4F_compressBegin(cctx, cPtr, dstCapacity, NULL);
+            CHECK(hSize);
+            cSizeWithDict += hSize;
+            cPtr += hSize;
+        }
+        {   size_t bSize = LZ4F_compressUpdate(cctx, cPtr, dstCapacity, src, srcSize, NULL);
+            CHECK(bSize);
+            cSizeWithDict += bSize;
+            cPtr += bSize;
+        }
+        {   size_t endSize = LZ4F_compressEnd(cctx, cPtr, dstCapacity, NULL);
+            CHECK(endSize);
+            cSizeWithDict += endSize;
+            cPtr += endSize;
+        }
+        DISPLAYLEVEL(3, "compress %u bytes into %u bytes with dict (< %u bytes without) \n",
+                        (unsigned)srcSize, (unsigned)cSizeWithDict, (unsigned)cSizeNoDict);
+        if (cSizeWithDict >= cSizeNoDict) {
+            DISPLAYLEVEL(3, "cSizeWithDict (%zu) should have been more compact than cSizeNoDict(%zu) \n", cSizeWithDict, cSizeNoDict);
+            goto _output_error;  /* must be more efficient */
+        }
+        crcOrig = XXH64(src, srcSize, 0);
+
+        DISPLAYLEVEL(3, "LZ4F_decompress_usingDict: ");
+        {   LZ4F_dctx* dctx;
+            size_t decodedSize = srcSize;
+            size_t compressedSize = cSizeWithDict;
+            CHECK( LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION) );
+            CHECK( LZ4F_decompress_usingDict(dctx,
+                                        decodedBuffer, &decodedSize,
+                                        compressedBuffer, &compressedSize,
+                                        CNBuffer, dictSize,
+                                        NULL) );
+            if (compressedSize != cSizeWithDict) goto _output_error;
+            if (decodedSize != srcSize) goto _output_error;
+            { U64 const crcDest = XXH64(decodedBuffer, decodedSize, 0);
+              if (crcDest != crcOrig) goto _output_error; }
+            DISPLAYLEVEL(3, "Regenerated %u bytes \n", (U32)decodedSize);
+            CHECK( LZ4F_freeDecompressionContext(dctx) );
+        }
+
+        /* clean */
+        CHECK( LZ4F_freeCompressionContext(cctx) );
+    }
+
+    /* Digested Dictionary (cdict) compression test */
     {   size_t const dictSize = 7 KB; /* small enough for LZ4_MEMORY_USAGE == 10 */
         size_t const srcSize = 65 KB; /* must be > 64 KB to avoid short-size optimizations */
         size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
@@ -758,7 +824,6 @@ static int unitTests(U32 seed, double compressibility)
                 CHECK( LZ4F_freeDecompressionContext(dctx) );
             }
         }
-
 
         DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, multiple independent blocks : ");
         {   size_t cSizeIndep;

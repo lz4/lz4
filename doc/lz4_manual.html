@@ -160,16 +160,17 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
  
 </p></pre><BR>
 
-<pre><b>int LZ4_compress_destSize (const char* src, char* dst, int* srcSizePtr, int targetDstSize);
+<pre><b>int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targetDstSize);
 </b><p>  Reverse the logic : compresses as much data as possible from 'src' buffer
-  into already allocated buffer 'dst', of size >= 'targetDestSize'.
+  into already allocated buffer 'dst', of size >= 'dstCapacity'.
   This function either compresses the entire 'src' content into 'dst' if it's large enough,
   or fill 'dst' buffer completely with as much data as possible from 'src'.
   note: acceleration parameter is fixed to "default".
 
- *srcSizePtr : will be modified to indicate how many bytes where read from 'src' to fill 'dst'.
+ *srcSizePtr : in+out parameter. Initially contains size of input.
+               Will be modified to indicate how many bytes where read from 'src' to fill 'dst'.
                New value is necessarily <= input value.
- @return : Nb bytes written into 'dst' (necessarily <= targetDestSize)
+ @return : Nb bytes written into 'dst' (necessarily <= dstCapacity)
            or 0 if compression fails.
 
  Note : from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
@@ -182,6 +183,12 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
         the receiving decompression function should provide
         a dstCapacity which is > decompressedSize, by at least 1 byte.
         See https://github.com/lz4/lz4/issues/859 for details
+ 
+</p></pre><BR>
+
+<pre><b>int LZ4_compress_fast_extState_destSize(void* state, const char* src, char* dst, int *srcSizePtr, int dstCapacity, int acceleration);
+</b><p>  Same as LZ4_compress_destSize(), using an externally allocated state.
+  Also exposes control of @acceleration.
  
 </p></pre><BR>
 
@@ -271,10 +278,10 @@ int           LZ4_freeStream (LZ4_stream_t* streamPtr);
   LZ4_loadDict() triggers a reset, so any previous data will be forgotten.
   The same dictionary will have to be loaded on decompression side for successful decoding.
   Dictionary are useful for better compression of small data (KB range).
-  While LZ4 accept any input as dictionary,
-  results are generally better when using Zstandard's Dictionary Builder.
+  While LZ4 itself accepts any input as dictionary, dictionary efficiency is also a topic.
+  When in doubt, employ the Zstandard's Dictionary Builder.
   Loading a size of 0 is allowed, and is the same as reset.
- @return : loaded dictionary size, in bytes (necessarily <= 64 KB)
+ @return : loaded dictionary size, in bytes (note: only the last 64 KB are loaded)
  
 </p></pre><BR>
 
@@ -446,6 +453,12 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
  
 </p></pre><BR>
 
+<pre><b>int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
+</b><p>  Same as LZ4_compress_destSize(), but using an externally allocated state.
+  Also: exposes @acceleration
+ 
+</p></pre><BR>
+
 <pre><b>LZ4LIB_STATIC_API void
 LZ4_attach_dictionary(LZ4_stream_t* workingStream,
                 const LZ4_stream_t* dictionaryStream);
@@ -542,7 +555,7 @@ LZ4_attach_dictionary(LZ4_stream_t* workingStream,
   If you need static allocation, declare or allocate an LZ4_stream_t object.
 </p></pre><BR>
 
-<pre><b>LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
+<pre><b>LZ4_stream_t* LZ4_initStream (void* stateBuffer, size_t size);
 </b><p>  An LZ4_stream_t structure must be initialized at least once.
   This is automatically done when invoking LZ4_createStream(),
   but it's not when the structure is simply declared on stack (for example).
