@@ -51,6 +51,9 @@
 #include <stdlib.h>    /* malloc, free */
 #include <string.h>    /* strerror, strcmp, strlen */
 #include <time.h>      /* clock */
+#ifdef __unix__
+#include <sys/mman.h>  /* mmap */
+#endif
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
 #include "lz4.h"       /* still required for legacy format */
@@ -78,6 +81,8 @@
 #define LZ4IO_SKIPPABLE0    0x184D2A50
 #define LZ4IO_SKIPPABLEMASK 0xFFFFFFF0
 #define LEGACY_MAGICNUMBER  0x184C2102
+#define MOZILLA_MAGIC1      0x4c7a6f6d /* First four bytes of "mozLz40\0" */
+#define MOZILLA_MAGIC2      0x0030347a /* Last four bytes of "mozLz40\0" */
 
 #define CACHELINE 64
 #define LEGACY_BLOCKSIZE   (8 MB)
@@ -1017,6 +1022,83 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
     return streamSize;
 }
 
+static unsigned long long
+LZ4IO_decodeMozilla(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
+{
+    U32 outputSize, inputSize;
+    unsigned storedSkips;
+    char *in_buff;
+    char *out_buff;
+#ifdef __unix__
+    int mmapped;
+
+    {   struct stat sb;
+        if (fstat(fileno(finput), &sb) != 0) END_PROCESS(74, "Stat error: %s", strerror(errno));
+        if (!S_ISREG(sb.st_mode)) {
+            DISPLAYLEVEL(2, "input not a regular file, not attempting mmap()\n");
+            goto fallback;
+        } else if (sb.st_size >= INT_MAX) {
+            END_PROCESS(74, "Input file too large - %llu bytes", (unsigned long long)sb.st_size);
+        } else inputSize = (U32)sb.st_size - 12;
+    }
+
+    /*
+     * On Unix we try to mmap the input -- to save memory -- falling back
+     * to stdio, if mmap fails. Output is always written "normally".
+     */
+    if ((in_buff = (char *)mmap(NULL, inputSize, PROT_READ, MAP_SHARED,
+        fileno(finput), 12)) != MAP_FAILED) {
+        DISPLAYLEVEL(2, "Using mmap for input\n");
+        mmapped = 1;
+    } else {
+        DISPLAYLEVEL(1, "mmap-ing input failed (%s), falling back to stdio\n", strerror(errno));
+fallback:
+        in_buff = (char *)malloc(inputSize = LEGACY_BLOCKSIZE);
+        mmapped = 0;
+    }
+#else
+    in_buff  = (char *)malloc(inputSize = LEGACY_BLOCKSIZE);
+#endif
+    {   size_t const sizeCheck = fread(&outputSize, 1, 4, finput);
+        if (sizeCheck != 4) END_PROCESS(73, "Read error: %s", strerror(errno));
+        outputSize = LZ4IO_readLE32(&outputSize);
+    }
+    out_buff = (char *)malloc(outputSize);
+    if (!in_buff || !out_buff) END_PROCESS(75, "Allocation error : not enough memory");
+
+#ifdef __unix__
+    if (mmapped)
+        fseek(finput, 0, SEEK_END); /* Lest there will be noise about undecodable data */
+    else
+#endif
+    {   size_t const sizeCheck = fread(in_buff, 1, inputSize, finput);
+        if (sizeCheck != inputSize) {
+            if (ferror(finput)) END_PROCESS(76, "Read error : cannot read input: %s", strerror(errno));
+            DISPLAYLEVEL(2, "Read %u bytes into buffer\n", (unsigned)sizeCheck);
+            inputSize = (U32)sizeCheck;
+        }
+    }
+
+    /* Decode Block */
+    {   int const decodeSize = LZ4_decompress_safe(in_buff, out_buff, inputSize, outputSize);
+        if (decodeSize < 0) END_PROCESS(77, "Decoding Failed ! Corrupted input detected (%d)!", decodeSize);
+        if (decodeSize != (int)outputSize) DISPLAYLEVEL(2, "Suspect: decoded size %d differs from the expected %u",
+            decodeSize, (unsigned)outputSize);
+        /* Write Block */
+        storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, decodeSize, prefs->sparseFileSupport, 0); /* success or die */
+    }
+
+    LZ4IO_fwriteSparseEnd(foutput, storedSkips);
+
+    /* Free */
+#ifdef __unix__
+    if (!mmapped)
+#endif
+    free(in_buff);
+    free(out_buff);
+
+    return outputSize;
+}
 
 
 typedef struct {
@@ -1260,6 +1342,12 @@ selectDecoder(dRess_t ress,
                 END_PROCESS(43, "Stream error : cannot skip skippable area");
         }
         return 0;
+    case MOZILLA_MAGIC1:
+        /* Start over having skipped 4 bytes, and end up in the next case */
+        DISPLAYLEVEL(4, "Detected : Mozilla format\n");
+        return selectDecoder(ress, finput, foutput, prefs);
+    case MOZILLA_MAGIC2:
+        return LZ4IO_decodeMozilla(finput, foutput, prefs);
     default:
         if (nbFrames == 1) {  /* just started */
             /* Wrong magic number at the beginning of 1st stream */
