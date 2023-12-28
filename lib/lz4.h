@@ -243,14 +243,6 @@ LZ4LIB_API int LZ4_compress_fast (const char* src, char* dst, int srcSize, int d
 LZ4LIB_API int LZ4_sizeofState(void);
 LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
-/*! LZ4_compress_fast_extState_destSize() :
- *  Same as LZ4_compress_fast(), but compresses as much data as possible from 'src' buffer into
- *  already allocated buffer 'dst', of size >= 'dstCapacity'. This function either compresses the
- *  entire 'src' content into 'dst' if it's large enough, or fills 'dst' buffer completely with as
- *  much data as possible from 'src'.
- */
-LZ4LIB_API int LZ4_compress_fast_extState_destSize(void* state, const char* src, char* dst, int *srcSizePtr, int dstCapacity, int acceleration);
-
 /*! LZ4_compress_destSize() :
  *  Reverse the logic : compresses as much data as possible from 'src' buffer
  *  into already allocated buffer 'dst', of size >= 'targetDestSize'.
@@ -274,7 +266,7 @@ LZ4LIB_API int LZ4_compress_fast_extState_destSize(void* state, const char* src,
  *        a dstCapacity which is > decompressedSize, by at least 1 byte.
  *        See https://github.com/lz4/lz4/issues/859 for details
  */
-LZ4LIB_API int LZ4_compress_destSize (const char* src, char* dst, int* srcSizePtr, int targetDstSize);
+LZ4LIB_API int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targetDstSize);
 
 
 /*! LZ4_decompress_safe_partial() :
@@ -570,6 +562,12 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
  *  while LZ4_compress_fast_extState() starts with a call to LZ4_resetStream().
  */
 LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
+
+/*! LZ4_compress_destSize_extState() :
+ *  Same as LZ4_compress_destSize(), but using an externally allocated state.
+ *  Also: exposes @acceleration
+ */
+int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
 
 /*! LZ4_attach_dictionary() :
  *  This is an experimental API that allows
