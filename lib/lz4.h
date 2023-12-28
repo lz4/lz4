@@ -245,14 +245,15 @@ LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* d
 
 /*! LZ4_compress_destSize() :
  *  Reverse the logic : compresses as much data as possible from 'src' buffer
- *  into already allocated buffer 'dst', of size >= 'targetDestSize'.
+ *  into already allocated buffer 'dst', of size >= 'dstCapacity'.
  *  This function either compresses the entire 'src' content into 'dst' if it's large enough,
  *  or fill 'dst' buffer completely with as much data as possible from 'src'.
  *  note: acceleration parameter is fixed to "default".
  *
- * *srcSizePtr : will be modified to indicate how many bytes where read from 'src' to fill 'dst'.
+ * *srcSizePtr : in+out parameter. Initially contains size of input.
+ *               Will be modified to indicate how many bytes where read from 'src' to fill 'dst'.
  *               New value is necessarily <= input value.
- * @return : Nb bytes written into 'dst' (necessarily <= targetDestSize)
+ * @return : Nb bytes written into 'dst' (necessarily <= dstCapacity)
  *           or 0 if compression fails.
  *
  * Note : from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
@@ -268,6 +269,11 @@ LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* d
  */
 LZ4LIB_API int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targetDstSize);
 
+/*! LZ4_compress_fast_extState_destSize() :
+ *  Same as LZ4_compress_destSize(), using an externally allocated state.
+ *  Also exposes control of @acceleration.
+ */
+LZ4LIB_API int LZ4_compress_fast_extState_destSize(void* state, const char* src, char* dst, int *srcSizePtr, int dstCapacity, int acceleration);
 
 /*! LZ4_decompress_safe_partial() :
  *  Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
@@ -361,10 +367,10 @@ LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
  *  LZ4_loadDict() triggers a reset, so any previous data will be forgotten.
  *  The same dictionary will have to be loaded on decompression side for successful decoding.
  *  Dictionary are useful for better compression of small data (KB range).
- *  While LZ4 accept any input as dictionary,
- *  results are generally better when using Zstandard's Dictionary Builder.
+ *  While LZ4 itself accepts any input as dictionary, dictionary efficiency is also a topic.
+ *  When in doubt, employ the Zstandard's Dictionary Builder.
  *  Loading a size of 0 is allowed, and is the same as reset.
- * @return : loaded dictionary size, in bytes (necessarily <= 64 KB)
+ * @return : loaded dictionary size, in bytes (note: only the last 64 KB are loaded)
  */
 LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, int dictSize);
 
@@ -731,7 +737,7 @@ union LZ4_stream_u {
  *  Note2: An LZ4_stream_t structure guarantees correct alignment and size.
  *  Note3: Before v1.9.0, use LZ4_resetStream() instead
 **/
-LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* buffer, size_t size);
+LZ4LIB_API LZ4_stream_t* LZ4_initStream (void* stateBuffer, size_t size);
 
 
 /*! LZ4_streamDecode_t :

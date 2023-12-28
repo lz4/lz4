@@ -444,7 +444,7 @@ static size_t LZ4IO_compressBlockLegacy_fast(
     size_t dstCapacity,
     const void* src,
     size_t srcSize,
-    int lastBlock
+    size_t prefixSize
 )
 {
     const CompressLegacyState* const clevel = params;
@@ -453,7 +453,7 @@ static size_t LZ4IO_compressBlockLegacy_fast(
     if (cSize < 0)
         END_PROCESS(51, "fast compression failed");
     LZ4IO_writeLE32(dst, (unsigned)cSize);
-    (void)lastBlock;
+    assert(prefixSize == 0); (void)prefixSize;
     return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
 }
 
@@ -463,7 +463,7 @@ static size_t LZ4IO_compressBlockLegacy_HC(
     size_t dstCapacity,
     const void* src,
     size_t srcSize,
-    int lastBlock
+    size_t prefixSize
 )
 {
     const CompressLegacyState* const cs = params;
@@ -472,7 +472,7 @@ static size_t LZ4IO_compressBlockLegacy_HC(
     if (cSize < 0)
         END_PROCESS(52, "HC compression failed");
     LZ4IO_writeLE32(dst, (unsigned)cSize);
-    (void)lastBlock;
+    assert(prefixSize == 0); (void)prefixSize;
     return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
 }
 
@@ -603,7 +603,7 @@ typedef struct {
 static void LZ4IO_writeBuffer(BufferDesc bufDesc, FILE* out)
 {
     size_t const size = bufDesc.size;
-    DISPLAY("Writing Block %llu for %zu bytes \n", bufDesc.rank, bufDesc.size);
+    //DISPLAY("Writing Block %llu for %zu bytes \n", bufDesc.rank, bufDesc.size);
     if (fwrite(bufDesc.buf, 1, size, out) != size) {
         END_PROCESS(38, "Write error : cannot write compressed block");
     }
@@ -657,11 +657,12 @@ typedef size_t (*compress_f)(
     size_t dstCapacity,
     const void* src,
     size_t srcSize,
-    int lastBlock);
+    size_t prefixSize);
 
 typedef struct {
     TPOOL_ctx* wPool;
-    void* in_buff;
+    void* buffer;
+    size_t prefixSize;
     size_t inSize;
     unsigned long long blockNb;
     compress_f compress;
@@ -679,12 +680,13 @@ static void LZ4IO_compressChunk(void* arg)
     void* const out_buff = malloc(outCapacity);
     if (!out_buff)
         END_PROCESS(33, "Allocation error : can't allocate output buffer to compress new chunk");
-    {   size_t const cSize = cjd->compress(cjd->compressParameters, out_buff, outCapacity, cjd->in_buff, cjd->inSize, cjd->lastBlock);
-        DISPLAY("Compressed %zu bytes from chunk %llu into %zu bytes \n", cjd->inSize, cjd->blockNb, cSize);
+    {   char* const inBuff = (char*)cjd->buffer + cjd->prefixSize;
+        size_t const cSize = cjd->compress(cjd->compressParameters, out_buff, outCapacity, inBuff, cjd->inSize, cjd->prefixSize);
+        //DISPLAY("Compressed %zu bytes from chunk %llu into %zu bytes \n", cjd->inSize, cjd->blockNb, cSize);
 
         /* check for write */
         {   WriteJobDesc* const wjd = (WriteJobDesc*)malloc(sizeof(*wjd));
-            if (wjd==NULL) {
+            if (wjd == NULL) {
                 END_PROCESS(35, "Allocation error : can't describe new write job");
             }
             wjd->cBuf = out_buff;
@@ -701,7 +703,7 @@ static void LZ4IO_compressAndFreeChunk(void* arg)
     CompressJobDesc* const cjd = arg;
     LZ4IO_compressChunk(arg);
     /* clean up */
-    free(cjd->in_buff);
+    free(cjd->buffer);
     free(cjd); /* because cjd is pod */
 }
 
@@ -716,6 +718,7 @@ typedef struct {
     XXH32_state_t* xxh32;
     compress_f compress;
     const void* compressParameters;
+    void* prefix; /* if it exists, assumed to be filled with 64 KB */
     FILE* out;
     WriteRegister* wr;
     size_t maxCBlockSize;
@@ -725,15 +728,21 @@ static void LZ4IO_readAndProcess(void* arg)
 {
     ReadTracker* const rjd = arg;
     size_t const chunkSize = rjd->chunkSize;
-    void* const in_buff = malloc(chunkSize);
-    if (!in_buff)
+    size_t const prefixSize = (rjd->prefix != NULL) * 64 KB;
+    size_t const bufferSize = chunkSize + prefixSize;
+    void* const buffer = malloc(bufferSize);
+    if (!buffer)
         END_PROCESS(31, "Allocation error : can't allocate buffer to read new chunk");
-    {   size_t const inSize = fread(in_buff, (size_t)1, chunkSize, rjd->in);
+    if (prefixSize) {
+        memcpy(buffer, rjd->prefix, 64 KB);
+    }
+    {   char* const in_buff = (char*)buffer + prefixSize;
+        size_t const inSize = fread(in_buff, (size_t)1, chunkSize, rjd->in);
         if (inSize > chunkSize) {
             END_PROCESS(32, "Read error (read %u > %u [chunk size])", (unsigned)inSize, (unsigned)chunkSize);
         }
         rjd->totalReadSize += inSize;
-        DISPLAY("Read %zu bytes from chunk %llu (total:%llu) \n", inSize, rjd->blockNb, rjd->totalReadSize);
+       // DISPLAY("Read %zu bytes from chunk %llu (total:%llu) \n", inSize, rjd->blockNb, rjd->totalReadSize);
         /* send new jobs */
         if (inSize > 0) {
             CompressJobDesc* const cjd = (CompressJobDesc*)malloc(sizeof(*cjd));
@@ -741,11 +750,16 @@ static void LZ4IO_readAndProcess(void* arg)
                 END_PROCESS(33, "Allocation error : can't describe new compression job");
             }
             if (rjd->xxh32) {
-                DISPLAY("XXH32_update (chunk %llu, %zu bytes) \n", rjd->blockNb, inSize);
+                // DISPLAY("XXH32_update (chunk %llu, %zu bytes) \n", rjd->blockNb, inSize);
                 XXH32_update(rjd->xxh32, in_buff, inSize);
             }
+            if (rjd->prefix) {
+                /* dependent blocks mode */
+                memcpy(rjd->prefix, in_buff + inSize - 64 KB, 64 KB);
+            }
             cjd->wPool = rjd->wPool;
-            cjd->in_buff = in_buff; /* transfer ownership */
+            cjd->buffer = buffer; /* transfer ownership */
+            cjd->prefixSize = prefixSize;
             cjd->inSize = inSize;
             cjd->blockNb = rjd->blockNb;
             cjd->compress = rjd->compress;
@@ -811,6 +825,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
                         NULL,
                         compressionFunction,
                         &cls,
+                        NULL,
                         foutput,
                         &wr,
                         (size_t)LZ4_compressBound(LEGACY_BLOCKSIZE) + LZ4IO_LEGACY_BLOCK_HEADER_SIZE };
@@ -1012,7 +1027,7 @@ static void LZ4IO_freeCResources(cRess_t ress)
 static size_t LZ4IO_compressFrameChunk(const void* params,
                                     void* dst, size_t dstCapacity,
                                     const void* src, size_t srcSize,
-                                    int lastBlock)
+                                    size_t prefixSize)
 {
     const LZ4F_preferences_t* const prefs = params;
     LZ4F_cctx* cctx = NULL;
@@ -1020,18 +1035,19 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
         if (cctx==NULL || LZ4F_isError(ccr))
             END_PROCESS(51, "unable to create a LZ4F compression context");
     }
-    /* also writes frame header, will be overwritten at next stage */
-    {   size_t const whr = LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, NULL, prefs);
+    /* init state, and writes frame header, will be overwritten at next stage.
+     * Also: no support for dictionary yet, meaning linked blocks are actually independent */
+    {   size_t const whr = LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
         if (LZ4F_isError(whr))
             END_PROCESS(52, "error initializing LZ4F compression context");
     }
     {   size_t const cSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, NULL);
-        DISPLAY("compress chunk of size %zu into %zu bytes \n", srcSize, cSize);
+        // DISPLAY("compress chunk of size %zu into %zu bytes \n", srcSize, cSize);
         if (LZ4F_isError(cSize))
             END_PROCESS(53, "error compressing with LZ4F_compressUpdate");
 
         LZ4F_freeCompressionContext(cctx);
-        (void)lastBlock;
+        (void)prefixSize;
         return (size_t) cSize;
     }
 }
@@ -1109,6 +1125,7 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
         TPOOL_ctx* const tPool = TPOOL_create(io_prefs->nbWorkers, 4);
         TPOOL_ctx* const wPool = TPOOL_create(1, 4);
         WriteRegister wr = WR_init(chunkSize);
+        void* prefixBuffer = NULL;
 
         ReadTracker rjd = { tPool,
                         wPool,
@@ -1119,11 +1136,12 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
                         NULL,
                         LZ4IO_compressFrameChunk,
                         &prefs,
+                        NULL,
                         dstFile,
                         &wr,
                         LZ4F_compressFrameBound(chunkSize, &prefs) };
 
-        /* handle checksum */
+        /* frame checksum */
         XXH32_state_t* xxh32 = NULL;
         int checksum = (int)prefs.frameInfo.contentChecksumFlag;
         if (checksum) {
@@ -1131,18 +1149,27 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
             if (xxh32==NULL)
                 END_PROCESS(42, "could not init checksum");
             XXH32_reset(xxh32, 0);
-            DISPLAY("XXH32_update (block 0, %zu bytes) \n", readSize);
+            // DISPLAY("XXH32_update (block 0, %zu bytes) \n", readSize);
             XXH32_update(xxh32, srcBuffer, readSize);
             rjd.xxh32 = xxh32;
         }
-        prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+
+        /* block dependency */
+        if (prefs.frameInfo.blockMode == LZ4F_blockLinked) {
+            prefixBuffer = malloc(64 KB);
+            if (prefixBuffer==NULL)
+                END_PROCESS(43, "cannot allocate small dictionary buffer");
+            rjd.prefix = prefixBuffer;
+        }
 
         /* Write Frame Header */
-        {   size_t const headerSize = LZ4F_compressBegin_usingCDict(ctx, dstBuffer, dstBufferSize, ress.cdict, &prefs);
+        /* note: simplification: do not employ dictionary when input size >= 4 MB,
+         * the benefit is very limited anyway, and is not worth the dependency cost */
+        {   size_t const headerSize = LZ4F_compressBegin(ctx, dstBuffer, dstBufferSize, &prefs);
             if (LZ4F_isError(headerSize))
-                END_PROCESS(43, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
+                END_PROCESS(44, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
             if (fwrite(dstBuffer, 1, headerSize, dstFile) != headerSize)
-                END_PROCESS(44, "Write error : cannot write header");
+                END_PROCESS(45, "Write error : cannot write header");
             compressedfilesize = headerSize;
         }
         /* avoid duplicating effort to process content checksum (done externally) */
@@ -1151,6 +1178,7 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
         /* process first block */
         {   CompressJobDesc cjd = { wPool,
                         srcBuffer,
+                        0,
                         readSize,
                         0,
                         LZ4IO_compressFrameChunk,
@@ -1162,6 +1190,10 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
             TPOOL_submitJob(tPool, LZ4IO_compressChunk, &cjd);
             rjd.totalReadSize = readSize;
             rjd.blockNb = 1;
+            if (prefixBuffer) {
+                assert(readSize >= 64 KB);
+                memcpy(prefixBuffer, (char*)srcBuffer + readSize - 64 KB, 64 KB);
+            }
 
             /* Start the job chain */
             TPOOL_submitJob(tPool, LZ4IO_readAndProcess, &rjd);
@@ -1180,7 +1212,7 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
                 /* handle frame checksum externally
                  * note: LZ4F_compressEnd already wrote a (bogus) checksum */
                 U32 const crc = XXH32_digest(xxh32);
-                DISPLAY("final XXH32_digest : 0x%0X \n", crc);
+                // DISPLAY("final XXH32_digest : 0x%0X \n", crc);
                 assert(endSize >= 4);
                 LZ4IO_writeLE32( (char*)dstBuffer + endSize - 4, crc);
             }
@@ -1191,6 +1223,7 @@ LZ4IO_compressFilename_extRess_new(cRess_t ress,
         }
 
         /* clean up*/
+        free(prefixBuffer);
         XXH32_freeState(xxh32);
         WR_destroy(&wr);
         TPOOL_free(wPool);
