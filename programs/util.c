@@ -37,6 +37,7 @@ extern "C" {
 #if defined(_WIN32) || defined(WIN32)
 
 #include <windows.h>
+#include <sysinfoapi.h>
 
 typedef BOOL(WINAPI* LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
 

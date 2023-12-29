@@ -1,6 +1,8 @@
 version: 1.0.{build}
 environment:
   matrix:
+  - COMPILER: "gcc"
+    PLATFORM: "mingw32"
   - COMPILER: "visual"
     CONFIGURATION: "Debug"
     PLATFORM: "x64"
@@ -17,8 +19,6 @@ environment:
     PLATFORM: "mingw64"
   - COMPILER: "gcc"
     PLATFORM: "mingw64"
-  - COMPILER: "gcc"
-    PLATFORM: "mingw32"
 
 install:
   - ECHO Installing %COMPILER% %PLATFORM% %CONFIGURATION%
