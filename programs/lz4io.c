@@ -1414,7 +1414,8 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 {
 #if defined(LZ4IO_MULTITHREAD)
     /* do NOT employ multi-threading in the following scenarios: */
-    if ( (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
+    if ( (io_prefs->nbWorkers == 1) /* manually select single-thread mode */
+      || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
       || (ress.cdict))  /* dictionary compression */
         return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
