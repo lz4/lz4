@@ -115,7 +115,7 @@ static void* dummy_malloc(void* state, size_t s)
     if (p==NULL) return NULL;
     assert(t != NULL);
     t->nbAllocs += 1;
-    DISPLAYLEVEL(6, "Allocating %zu bytes at address %p \n", s, p);
+    DISPLAYLEVEL(6, "Allocating %u bytes at address %p \n", (unsigned)s, p);
     DISPLAYLEVEL(5, "nb allocated memory segments : %i \n", t->nbAllocs);
     return p;
 }
@@ -127,7 +127,7 @@ static void* dummy_calloc(void* state, size_t s)
     if (p==NULL) return NULL;
     assert(t != NULL);
     t->nbAllocs += 1;
-    DISPLAYLEVEL(6, "Allocating and zeroing %zu bytes at address %p \n", s, p);
+    DISPLAYLEVEL(6, "Allocating and zeroing %u bytes at address %p \n", (unsigned)s, p);
     DISPLAYLEVEL(5, "nb allocated memory segments : %i \n", t->nbAllocs);
     return p;
 }
@@ -682,7 +682,7 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "compress %u bytes into %u bytes with dict (< %u bytes without) \n",
                         (unsigned)srcSize, (unsigned)cSizeWithDict, (unsigned)cSizeNoDict);
         if (cSizeWithDict >= cSizeNoDict) {
-            DISPLAYLEVEL(3, "cSizeWithDict (%zu) should have been more compact than cSizeNoDict(%zu) \n", cSizeWithDict, cSizeNoDict);
+            DISPLAYLEVEL(3, "cSizeWithDict (%u) should have been more compact than cSizeNoDict(%u) \n", (unsigned)cSizeWithDict, (unsigned)cSizeNoDict);
             goto _output_error;  /* must be more efficient */
         }
         crcOrig = XXH64(src, srcSize, 0);
@@ -742,7 +742,7 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "compressed %u bytes into %u bytes \n",
                         (unsigned)srcSize, (unsigned)cSizeWithDict);
         if (cSizeWithDict > cSizeNoDict) {
-            DISPLAYLEVEL(3, "cSizeWithDict (%zu) should have been more compact than cSizeNoDict(%zu) \n", cSizeWithDict, cSizeNoDict);
+            DISPLAYLEVEL(3, "cSizeWithDict (%u) should have been more compact than cSizeNoDict(%u) \n", (unsigned)cSizeWithDict, (unsigned)cSizeNoDict);
             goto _output_error;  /* must be more efficient */
         }
         crcOrig = XXH64(CNBuffer, srcSize, 0);
