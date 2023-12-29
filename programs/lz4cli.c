@@ -684,7 +684,7 @@ int main(int argCount, const char** argv)
     DISPLAYLEVEL(4, "PLATFORM_POSIX_VERSION defined: %ldL\n", (long) PLATFORM_POSIX_VERSION);
 #endif
 #ifdef _FILE_OFFSET_BITS
-    DISPLAYLEVEL(4, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
+    DISPLAYLEVEL(5, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
 #ifndef LZ4IO_MULTITHREAD
     if (nbWorkers > 1)
@@ -825,6 +825,13 @@ int main(int argCount, const char** argv)
     } else if (mode == om_list){
         operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
     } else {   /* compression is default action */
+#ifdef LZ4IO_MULTITHREAD
+        if (nbWorkers != 1) {
+            if (nbWorkers==0)
+                nbWorkers = (unsigned)LZ4IO_defaultNbWorkers();
+            DISPLAYLEVEL(3, "Using %u threads for compression \n", nbWorkers);
+        }
+#endif
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
             if(multiple_inputs){

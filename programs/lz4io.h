@@ -76,6 +76,7 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 /* ************************************************** */
 
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
+int LZ4IO_defaultNbWorkers(void);
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename);
 

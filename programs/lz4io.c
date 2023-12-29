@@ -152,7 +152,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
 /* ****************** Init functions ******************** */
 /* ************************************************** */
 
-static int auto_nbWorkers(void)
+int LZ4IO_defaultNbWorkers(void)
 {
 #ifdef LZ4IO_MULTITHREAD
     int const nbCores = UTIL_countCores();
@@ -209,7 +209,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     prefs->favorDecSpeed = 0;
     prefs->dictionaryFilename = NULL;
     prefs->removeSrcFile = 0;
-    prefs->nbWorkers = auto_nbWorkers();
+    prefs->nbWorkers = LZ4IO_defaultNbWorkers();
     return prefs;
 }
 
