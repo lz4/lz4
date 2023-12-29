@@ -1460,7 +1460,6 @@ int LZ4IO_compressMultipleFilenames(
     unsigned long long totalProcessed = 0;
     TIME_t timeStart = TIME_getTime();
     clock_t cpuStart = clock();
-    DISPLAY("LZ4IO_compressMultipleFilenames (%i files) \n", ifntSize);
 
     if (dstFileName == NULL) return ifntSize;   /* not enough memory */
     ress = LZ4IO_createCResources(prefs);
