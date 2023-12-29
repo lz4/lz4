@@ -227,7 +227,7 @@ jobs:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
 
     - name: make standard_variables
-      run: make -j standard_variables V=1
+      run: make standard_variables V=1
 
 
   lz4-versions:
