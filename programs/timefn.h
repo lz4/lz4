@@ -34,8 +34,7 @@ extern "C" {
  *  Types
  ******************************************/
 
-#include <stdint.h>           // uint64_t
-typedef uint64_t Duration_ns; /* Precise Time */
+typedef unsigned long long Duration_ns;
 
 /* TIME_t contains a nanosecond time counter.
  * The absolute value is not meaningful.
@@ -43,10 +42,7 @@ typedef uint64_t Duration_ns; /* Precise Time */
 typedef struct {
     Duration_ns t;
 } TIME_t;
-#define TIME_INITIALIZER \
-    {                    \
-        0                \
-    }
+#define TIME_INITIALIZER { 0 }
 
 /*-****************************************
  *  Time functions

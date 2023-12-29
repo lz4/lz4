@@ -115,6 +115,21 @@ static TIME_t g_time = { 0 };
 #define LZ4IO_STATIC_ASSERT(c)   { enum { LZ4IO_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
 
 
+static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
+{
+#ifdef LZ4IO_MULTITHREAD
+    if (TIME_support_MT_measurements())
+#endif
+    {
+        Duration_ns duration_ns = TIME_clockSpan_ns(timeStart);
+        double const seconds = (double)(duration_ns + !duration_ns) / (double)1000000000.;
+        double const cpuLoad_s = (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
+        DISPLAYLEVEL(3,"Done in %.2f s ==> %.2f MiB/s  (cpu load : %.0f%%)\n", seconds,
+                        size / seconds / 1024 / 1024,
+                        (cpuLoad_s / seconds) * 100.);
+    }
+}
+
 /**************************************
 *  Exceptions
 ***************************************/
@@ -840,14 +855,8 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
         DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%% \n",
                     rjd.totalReadSize, wr.totalCSize,
                     (double)wr.totalCSize / (double)(rjd.totalReadSize + !rjd.totalReadSize) * 100.);
-        {   Duration_ns duration_ns = TIME_clockSpan_ns(timeStart);
-            double const seconds = (double)(duration_ns + !duration_ns) / (double)1000000000.;
-            double const cpuLoad_s = (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
-            DISPLAYLEVEL(4,"Done in %.2f s ==> %.2f MiB/s  (cpu load : %.0f%%)\n", seconds,
-                            (double)rjd.totalReadSize / seconds / 1024 / 1024,
-                            (cpuLoad_s / seconds) * 100.);
-    }   }
-
+        LZ4IO_finalTimeDisplay(timeStart, cpuStart, rjd.totalReadSize);
+    }
     /* Close & Free */
     WR_destroy(&wr);
     TPOOL_free(wPool);
@@ -1058,7 +1067,8 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
  *          1 : missing or pb opening srcFileName
  */
 int
-LZ4IO_compressFilename_extRess_MT(cRess_t ress,
+LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
+                               cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
@@ -1253,6 +1263,7 @@ LZ4IO_compressFilename_extRess_MT(cRess_t ress,
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
                     filesize, compressedfilesize,
                     (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
+    *inStreamSize = filesize;
 
     return 0;
 }
@@ -1263,7 +1274,8 @@ LZ4IO_compressFilename_extRess_MT(cRess_t ress,
  *          1 : missing or pb opening srcFileName
  */
 int
-LZ4IO_compressFilename_extRess_ST(cRess_t ress,
+LZ4IO_compressFilename_extRess_ST(unsigned long long* inStreamSize,
+                               cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
@@ -1386,12 +1398,14 @@ LZ4IO_compressFilename_extRess_ST(cRess_t ress,
     DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
                     filesize, compressedfilesize,
                     (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
+    *inStreamSize = filesize;
 
     return 0;
 }
 
-int
-LZ4IO_compressFilename_extRess(cRess_t ress,
+static int
+LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
+                               cRess_t ress,
                                const char* srcFileName, const char* dstFileName,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
@@ -1401,13 +1415,13 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
     if ( (io_prefs->contentSizeFlag)  /* content size present in frame header*/
       || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
       || (ress.cdict))  /* dictionary compression */
-        return LZ4IO_compressFilename_extRess_ST(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+        return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
-    return LZ4IO_compressFilename_extRess_MT(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+    return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
 #else
     /* Only single-thread available */
-    return LZ4IO_compressFilename_extRess_ST(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+    return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
 #endif
 }
@@ -1417,20 +1431,15 @@ int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int
     TIME_t const timeStart = TIME_getTime();
     clock_t const cpuStart = clock();
     cRess_t const ress = LZ4IO_createCResources(prefs);
+    unsigned long long processed;
 
-    int const result = LZ4IO_compressFilename_extRess(ress, srcFileName, dstFileName, compressionLevel, prefs);
+    int const result = LZ4IO_compressFilename_extRess(&processed, ress, srcFileName, dstFileName, compressionLevel, prefs);
 
     /* Free resources */
     LZ4IO_freeCResources(ress);
 
     /* Final Status */
-    {   clock_t const cpuEnd = clock();
-        double const cpuLoad_s = (double)(cpuEnd - cpuStart) / CLOCKS_PER_SEC;
-        U64 const timeLength_ns = TIME_clockSpan_ns(timeStart);
-        double const timeLength_s = (double)timeLength_ns / 1000000000.;
-        DISPLAYLEVEL(4, "Completed in %.2f sec  (cpu load : %.0f%%)\n",
-                        timeLength_s, (cpuLoad_s / timeLength_s) * 100.);
-    }
+    LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
 
     return result;
 }
@@ -1447,17 +1456,22 @@ int LZ4IO_compressMultipleFilenames(
     size_t ofnSize = FNSPACE;
     const size_t suffixSize = strlen(suffix);
     cRess_t ress;
+    unsigned long long totalProcessed = 0;
+    TIME_t timeStart = TIME_getTime();
+    clock_t cpuStart = clock();
 
     if (dstFileName == NULL) return ifntSize;   /* not enough memory */
     ress = LZ4IO_createCResources(prefs);
 
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
+        unsigned long long processed;
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (LZ4IO_isStdout(suffix)) {
-            missed_files += LZ4IO_compressFilename_extRess(ress,
+            missed_files += LZ4IO_compressFilename_extRess(&processed, ress,
                                     inFileNamesTable[i], stdoutmark,
                                     compressionLevel, prefs);
+            totalProcessed += processed;
             continue;
         }
         /* suffix != stdout => compress into a file => generate its name */
@@ -1472,14 +1486,16 @@ int LZ4IO_compressMultipleFilenames(
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_extRess(ress,
+        missed_files += LZ4IO_compressFilename_extRess(&processed, ress,
                                 inFileNamesTable[i], dstFileName,
                                 compressionLevel, prefs);
+        totalProcessed += processed;
     }
 
     /* Close & Free */
     LZ4IO_freeCResources(ress);
     free(dstFileName);
+    LZ4IO_finalTimeDisplay(timeStart, cpuStart, totalProcessed);
 
     return missed_files;
 }
@@ -1635,7 +1651,6 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
 
     return streamSize;
 }
-
 
 
 typedef struct {
@@ -1899,7 +1914,8 @@ selectDecoder(dRess_t ress,
 
 
 static int
-LZ4IO_decompressSrcFile(dRess_t ress,
+LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
+                        dRess_t ress,
                         const char* input_filename, const char* output_filename,
                         const LZ4IO_prefs_t* const prefs)
 {
@@ -1930,7 +1946,8 @@ LZ4IO_decompressSrcFile(dRess_t ress,
 
     /* Final Status */
     DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "%-20.20s : decoded %llu bytes \n", input_filename, filesize);
+    DISPLAYLEVEL(2, "%-30.30s : decoded %llu bytes \n", input_filename, filesize);
+    *outGenSize = filesize;
     (void)output_filename;
 
     return result;
@@ -1938,7 +1955,8 @@ LZ4IO_decompressSrcFile(dRess_t ress,
 
 
 static int
-LZ4IO_decompressDstFile(dRess_t ress,
+LZ4IO_decompressDstFile(unsigned long long* outGenSize,
+                        dRess_t ress,
                         const char* input_filename,
                         const char* output_filename,
                         const LZ4IO_prefs_t* const prefs)
@@ -1954,7 +1972,7 @@ LZ4IO_decompressDstFile(dRess_t ress,
         stat_result = 1;
 
     ress.dstFile = foutput;
-    result = LZ4IO_decompressSrcFile(ress, input_filename, output_filename, prefs);
+    result = LZ4IO_decompressSrcFile(outGenSize, ress, input_filename, output_filename, prefs);
 
     fclose(foutput);
 
@@ -1977,13 +1995,13 @@ LZ4IO_decompressDstFile(dRess_t ress,
 int LZ4IO_decompressFilename(const char* input_filename, const char* output_filename, const LZ4IO_prefs_t* prefs)
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
-    TIME_t const start = TIME_getTime();
+    TIME_t const timeStart = TIME_getTime();
+    clock_t const cpuStart = clock();
+    unsigned long long processed;
 
-    int const status = LZ4IO_decompressDstFile(ress, input_filename, output_filename, prefs);
+    int const status = LZ4IO_decompressDstFile(&processed, ress, input_filename, output_filename, prefs);
 
-    double const seconds = (double)TIME_clockSpan_ns(start) / 1000000000.;
-    DISPLAYLEVEL(4, "Done in %.2f sec  \n", seconds);
-
+    LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
     LZ4IO_freeDResources(ress);
     return status;
 }
@@ -1995,12 +2013,15 @@ int LZ4IO_decompressMultipleFilenames(
                             const LZ4IO_prefs_t* prefs)
 {
     int i;
+    unsigned long long totalProcessed = 0;
     int skippedFiles = 0;
     int missingFiles = 0;
     char* outFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
     size_t const suffixSize = strlen(suffix);
     dRess_t ress = LZ4IO_createDResources(prefs);
+    TIME_t timeStart = TIME_getTime();
+    clock_t cpuStart = clock();
 
     if (outFileName==NULL) END_PROCESS(70, "Memory allocation error");
     if (prefs->blockChecksum==0 && prefs->streamChecksum==0) {
@@ -2009,10 +2030,12 @@ int LZ4IO_decompressMultipleFilenames(
     ress.dstFile = LZ4IO_openDstFile(stdoutmark, prefs);
 
     for (i=0; i<ifntSize; i++) {
+        unsigned long long processed;
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
         if (LZ4IO_isStdout(suffix) || LZ4IO_isDevNull(suffix)) {
-            missingFiles += LZ4IO_decompressSrcFile(ress, inFileNamesTable[i], suffix, prefs);
+            missingFiles += LZ4IO_decompressSrcFile(&processed, ress, inFileNamesTable[i], suffix, prefs);
+            totalProcessed += processed;
             continue;
         }
         if (ofnSize <= ifnSize-suffixSize+1) {
@@ -2028,11 +2051,13 @@ int LZ4IO_decompressMultipleFilenames(
         }
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
-        missingFiles += LZ4IO_decompressDstFile(ress, inFileNamesTable[i], outFileName, prefs);
+        missingFiles += LZ4IO_decompressDstFile(&processed, ress, inFileNamesTable[i], outFileName, prefs);
+        totalProcessed += processed;
     }
 
     LZ4IO_freeDResources(ress);
     free(outFileName);
+    LZ4IO_finalTimeDisplay(timeStart, cpuStart, totalProcessed);
     return missingFiles + skippedFiles;
 }
 
