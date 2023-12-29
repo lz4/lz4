@@ -78,33 +78,29 @@ TIME_t TIME_getTime(void)
     }
 }
 
+
 /* POSIX.1-2001 (optional) */
-#elif defined(CLOCK_PROCESS_CPUTIME_ID)
+#elif defined(CLOCK_MONOTONIC)
 
-/* Note: CLOCK_PROCESS_CPUTIME_ID is only fine for single-thread performance,
- * which is the scenario we focus on for the time being.
- * For multi-threading performance, prefer CLOCK_MONOTONIC. */
-#    define TIME_MT_MEASUREMENTS_NOT_SUPPORTED
-
-#    include <stdio.h>  /* perror */
-#    include <stdlib.h> /* abort */
+#include <stdlib.h>   /* abort */
+#include <stdio.h>    /* perror */
 
 TIME_t TIME_getTime(void)
 {
     /* time must be initialized, othersize it may fail msan test.
      * No good reason, likely a limitation of timespec_get() for some target */
     struct timespec time = { 0, 0 };
-    if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time) != 0) {
-        perror("timefn::clock_gettime(CLOCK_PROCESS_CPUTIME_ID)");
+    if (clock_gettime(CLOCK_MONOTONIC, &time) != 0) {
+        perror("timefn::clock_gettime(CLOCK_MONOTONIC)");
         abort();
     }
-    {
-        TIME_t r;
+    {   TIME_t r;
         r.t = (Duration_ns)time.tv_sec * 1000000000ULL
                 + (Duration_ns)time.tv_nsec;
         return r;
     }
 }
+
 
 /* C11 requires support of timespec_get().
  * However, FreeBSD 11 claims C11 compliance while lacking timespec_get().
@@ -119,8 +115,7 @@ TIME_t TIME_getTime(void)
 
 TIME_t TIME_getTime(void)
 {
-    /* time must be initialized, othersize it may fail msan test.
-     * No good reason, likely a limitation of timespec_get() for some target */
+    /* time must be initialized, othersize it may fail msan test */
     struct timespec time = { 0, 0 };
     if (timespec_get(&time, TIME_UTC) != TIME_UTC) {
         perror("timefn::timespec_get(TIME_UTC)");

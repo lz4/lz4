@@ -115,7 +115,9 @@ static TIME_t g_time = { 0 };
 static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
 {
 #ifdef LZ4IO_MULTITHREAD
-    if (TIME_support_MT_measurements())
+    if (!TIME_support_MT_measurements()) {
+        DISPLAYLEVEL(5, "time measurements not compatible with multithreading \n");
+    } else
 #endif
     {
         Duration_ns duration_ns = TIME_clockSpan_ns(timeStart);
@@ -1216,15 +1218,15 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         }
 
         /* End of Frame mark */
-        {   size_t endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
-            if (LZ4F_isError(endSize))
-                END_PROCESS(48, "End of frame error : %s", LZ4F_getErrorName(endSize));
+        {   size_t endSize = 4;
+            assert(dstBufferSize >= 8);
+            memset(dstBuffer, 0, 4);
             if (checksum) {
                 /* handle frame checksum externally
                  * note: LZ4F_compressEnd already wrote a (bogus) checksum */
                 U32 const crc = XXH32_digest(xxh32);
-                assert(endSize >= 4);
-                LZ4IO_writeLE32( (char*)dstBuffer + endSize - 4, crc);
+                LZ4IO_writeLE32( (char*)dstBuffer + 4, crc);
+                endSize = 8;
             }
             if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
                 END_PROCESS(49, "Write error : cannot write end of frame");
@@ -1412,8 +1414,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 {
 #if defined(LZ4IO_MULTITHREAD)
     /* do NOT employ multi-threading in the following scenarios: */
-    if ( (io_prefs->contentSizeFlag)  /* content size present in frame header*/
-      || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
+    if ( (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
       || (ress.cdict))  /* dictionary compression */
         return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
@@ -1459,6 +1460,7 @@ int LZ4IO_compressMultipleFilenames(
     unsigned long long totalProcessed = 0;
     TIME_t timeStart = TIME_getTime();
     clock_t cpuStart = clock();
+    DISPLAY("LZ4IO_compressMultipleFilenames (%i files) \n", ifntSize);
 
     if (dstFileName == NULL) return ifntSize;   /* not enough memory */
     ress = LZ4IO_createCResources(prefs);
