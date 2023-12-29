@@ -18,10 +18,11 @@ it is recommended to always use the name `lz4` with appropriate arguments
 DESCRIPTION
 -----------
 
-`lz4` is a CLI based on `liblz4`,  an extremely fast implementation of lossless compression algorithm.
-It offers a default compression speed typically > 500 MB/s, and its extremely fast decoder is mostly I/O bound, reaching multiple GB/s.
-While `liblz4` is multi-threadable, note that the `lz4` CLI uses only one thread to offer these speeds.
-Its native file format is the `.lz4` format.
+`lz4` is a CLI based on `liblz4`, an extremely fast implementation of lossless compression algorithm.
+It provides a default compression speed of typically > 500 MB/s per core.
+Speed can traded for higher compression ratio, by increasing the compression level parameter.
+While decompression is single-threaded, it reaches multiple GB/s, generally fast enough to be I/O bound.
+`lz4` native file format is the `.lz4` format.
 
 ### Difference between lz4 and gzip
 

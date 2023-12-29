@@ -186,12 +186,6 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
  
 </p></pre><BR>
 
-<pre><b>int LZ4_compress_fast_extState_destSize(void* state, const char* src, char* dst, int *srcSizePtr, int dstCapacity, int acceleration);
-</b><p>  Same as LZ4_compress_destSize(), using an externally allocated state.
-  Also exposes control of @acceleration.
- 
-</p></pre><BR>
-
 <pre><b>int LZ4_decompress_safe_partial (const char* src, char* dst, int srcSize, int targetOutputSize, int dstCapacity);
 </b><p>  Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
   into destination buffer 'dst' of size 'dstCapacity'.

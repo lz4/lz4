@@ -17,7 +17,7 @@
 When writing scripts that need to decompress files, it is recommended to always use the name \fBlz4\fR with appropriate arguments (\fBlz4 \-d\fR or \fBlz4 \-dc\fR) instead of the names \fBunlz4\fR and \fBlz4cat\fR\.
 .
 .SH "DESCRIPTION"
-\fBlz4\fR is a CLI based on \fBliblz4\fR, an extremely fast implementation of lossless compression algorithm\. It offers a default compression speed typically > 500 MB/s, and its extremely fast decoder is mostly I/O bound, reaching multiple GB/s\. While \fBliblz4\fR is multi\-threadable, note that the \fBlz4\fR CLI uses only one thread to offer these speeds\. Its native file format is the \fB\.lz4\fR format\.
+\fBlz4\fR is a CLI based on \fBliblz4\fR, an extremely fast implementation of lossless compression algorithm\. It provides a default compression speed of typically > 500 MB/s per core\. Speed can traded for higher compression ratio, by increasing the compression level parameter\. While decompression is single\-threaded, it reaches multiple GB/s, generally fast enough to be I/O bound\. \fBlz4\fR native file format is the \fB\.lz4\fR format\.
 .
 .SS "Difference between lz4 and gzip"
 \fBlz4\fR supports a command line syntax similar \fIbut not identical\fR to \fBgzip(1)\fR\. Differences are :
@@ -58,7 +58,7 @@ Similarly, \fBlz4 \-m \-d\fR can decompress multiple \fB*\.lz4\fR files\.
 It\'s possible to opt\-in to erase source files on successful compression or decompression, using \fB\-\-rm\fR command\.
 .
 .IP "\(bu" 4
-Consequently, \fBlz4 \-m \-\-rm\fR behaves the same as \fBgzip\fR\.
+Consequently, \fBlz4 \-m \-\-rm\fR features a behavior closer to the \fBgzip\fR one\.
 .
 .IP "" 0
 .
@@ -122,6 +122,10 @@ Switch to ultra\-fast compression levels\. The higher the value, the faster the 
 .TP
 \fB\-\-best\fR
 Set highest compression level\. Same as \-12\.
+.
+.TP
+\fB\-T#\fR, \fB\-\-threads=#\fR
+Use \fB#\fR threads for compression\. When \fB0\fR, or none provided: automatically determined from nb of detected cores\.
 .
 .TP
 \fB\-\-favor\-decSpeed\fR
