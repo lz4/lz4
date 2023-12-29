@@ -114,8 +114,8 @@ HOST_OS = MSYS
 CMAKE_PARAMS = -G"MSYS Makefiles"
 endif
 
-.PHONY: cmake
-cmake:
+.PHONY: cmakebuild
+cmakebuild:
 	mkdir -p $(CMAKE_BUILD_DIR)
 	cd $(CMAKE_BUILD_DIR); $(CMAKE) $(CMAKE_PARAMS) ..; $(CMAKE) --build .
 

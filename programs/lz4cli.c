@@ -59,7 +59,7 @@
 #ifdef LZ4IO_MULTITHREAD
 #define IO_MT "multithread"
 #else
-#define IO_MT "singlethread"
+#define IO_MT "single-thread"
 #endif
 #define COMPRESSOR_NAME "lz4"
 #define AUTHOR "Yann Collet"

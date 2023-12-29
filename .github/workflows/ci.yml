@@ -686,13 +686,13 @@ jobs:
 
   # Invoke cmake via Makefile
   lz4-build-make-cmake:
-    name: make cmake
+    name: make cmakebuild
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
-    - name: make cmake
+    - name: make cmakebuild
       # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
-      run: make V=1 VERBOSE=1 clean cmake
+      run: make clean; make cmakebuild V=1 VERBOSE=1
 
 
   # Meson
