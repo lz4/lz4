@@ -134,13 +134,13 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
 #  define DEBUG 0
 #endif
 #define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
-#define END_PROCESS(error, ...)                                           \
-{                                                                         \
-    DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                \
-    DISPLAYLEVEL(1, __VA_ARGS__);                                         \
-    DISPLAYLEVEL(1, " \n");                                               \
-    exit(error);                                                          \
+#define END_PROCESS(error, ...)                                   \
+{                                                                 \
+    DEBUGOUTPUT("Error in %s, line %i : \n", __FILE__, __LINE__); \
+    DISPLAYLEVEL(1, "Error %i : ", error);                        \
+    DISPLAYLEVEL(1, __VA_ARGS__);                                 \
+    DISPLAYLEVEL(1, " \n");                                       \
+    exit(error);                                                  \
 }
 
 #define LZ4IO_STATIC_ASSERT(c)   { enum { LZ4IO_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
@@ -152,10 +152,14 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
 
 static int auto_nbWorkers(void)
 {
+#ifdef LZ4IO_MULTITHREAD
     int const nbCores = UTIL_countCores();
     int const spared = 1 + ((unsigned)nbCores >> 3);
     if (nbCores <= spared) return 1;
     return nbCores - spared;
+#else
+    return 1;
+#endif
 }
 
 /* ************************************************** */

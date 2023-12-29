@@ -57,9 +57,9 @@
 *  Constants
 ******************************/
 #ifdef LZ4IO_MULTITHREAD
-#define IO_MT "multithread"
+# define IO_MT "multithread"
 #else
-#define IO_MT "single-thread"
+# define IO_MT "single-thread"
 #endif
 #define COMPRESSOR_NAME "lz4"
 #define AUTHOR "Yann Collet"
@@ -91,13 +91,13 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 ***************************************/
 #define DEBUG 0
 #define DEBUGOUTPUT(...) do { if (DEBUG) DISPLAY(__VA_ARGS__); } while (0)
-#define EXM_THROW(error, ...)                                             \
-do {                                                                      \
-    DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
-    DISPLAYLEVEL(1, "Error %i : ", error);                                \
-    DISPLAYLEVEL(1, __VA_ARGS__);                                         \
-    DISPLAYLEVEL(1, "\n");                                                \
-    exit(error);                                                          \
+#define END_PROCESS(error, ...)                                   \
+do {                                                              \
+    DEBUGOUTPUT("Error in %s, line %i : \n", __FILE__, __LINE__); \
+    DISPLAYLEVEL(1, "Error %i : ", error);                        \
+    DISPLAYLEVEL(1, __VA_ARGS__);                                 \
+    DISPLAYLEVEL(1, "\n");                                        \
+    exit(error);                                                  \
 } while (0)
 
 static void errorOut(const char* msg)
@@ -128,11 +128,10 @@ static int usage(const char* exeName)
     DISPLAY( "input   : a filename \n");
     DISPLAY( "          with no FILE, or when FILE is - or %s, read standard input\n", stdinmark);
     DISPLAY( "Arguments : \n");
-    DISPLAY( " -1     : Fast compression (default) \n");
-    DISPLAY( " -9     : High compression \n");
+    DISPLAY( " -1     : fast compression (default) \n");
+    DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
+    DISPLAY( " -T#    : use # threads for compression (default:0==auto) \n");
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
-    DISPLAY( " -z     : force compression \n");
-    DISPLAY( " -D FILE: use FILE as dictionary \n");
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -k     : preserve source files(s)  (default) \n");
     DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");
@@ -156,6 +155,8 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -r     : operate recursively on directories (sets also -m) \n");
 #endif
     DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
+    DISPLAY( " -z     : force compression \n");
+    DISPLAY( " -D FILE: use FILE as dictionary (compression & decompression)\n");
     DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
     DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
     DISPLAY( " -BI    : Block Independence (default) \n");
@@ -365,6 +366,7 @@ int main(int argCount, const char** argv)
         multiple_inputs=0,
         all_arguments_are_files=0,
         operationResult=0;
+    unsigned nbWorkers = 0;
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
@@ -453,7 +455,6 @@ int main(int argCount, const char** argv)
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(prefs, 1); continue; }
 
                 if (longCommandWArg(&argument, "--threads")) {
-                    unsigned nbWorkers;
                     NEXT_UINT32(nbWorkers);
                     LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
                     continue;
@@ -519,8 +520,7 @@ int main(int argCount, const char** argv)
 
                     /* Modify Nb Worker threads (compression only) */
                 case 'T':
-                    {   unsigned nbWorkers;
-                        argument++;
+                    {   argument++;
                         nbWorkers = readU32FromChar(&argument);
                         argument--;
                         LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
@@ -685,6 +685,10 @@ int main(int argCount, const char** argv)
 #endif
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(4, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
+#endif
+#ifndef LZ4IO_MULTITHREAD
+    if (nbWorkers > 1)
+        DISPLAYLEVEL(2, "warning: this executable doesn't support multithreading \n");
 #endif
     if ((mode == om_compress) || (mode == om_bench))
         DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));

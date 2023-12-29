@@ -135,6 +135,10 @@ only the latest one will be applied.
 * `--best`:
   Set highest compression level. Same as -12.
 
+* `-T#`, `--threads=#`:
+  Use `#` threads for compression.
+  When `0`, or none provided: automatically determined from nb of detected cores.
+
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.
   Compressed data will be larger as a consequence (typically by ~0.5%),
