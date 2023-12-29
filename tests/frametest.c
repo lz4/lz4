@@ -678,7 +678,6 @@ static int unitTests(U32 seed, double compressibility)
         {   size_t endSize = LZ4F_compressEnd(cctx, cPtr, dstCapacity, NULL);
             CHECK(endSize);
             cSizeWithDict += endSize;
-            cPtr += endSize;
         }
         DISPLAYLEVEL(3, "compress %u bytes into %u bytes with dict (< %u bytes without) \n",
                         (unsigned)srcSize, (unsigned)cSizeWithDict, (unsigned)cSizeNoDict);
