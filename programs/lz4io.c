@@ -700,7 +700,7 @@ static void LZ4IO_compressChunk(void* arg)
 
 static void LZ4IO_compressAndFreeChunk(void* arg)
 {
-    CompressJobDesc* const cjd = arg;
+    CompressJobDesc* const cjd = (CompressJobDesc*)arg;
     LZ4IO_compressChunk(arg);
     /* clean up */
     free(cjd->buffer);
@@ -726,7 +726,7 @@ typedef struct {
 
 static void LZ4IO_readAndProcess(void* arg)
 {
-    ReadTracker* const rjd = arg;
+    ReadTracker* const rjd = (ReadTracker*)arg;
     size_t const chunkSize = rjd->chunkSize;
     size_t const prefixSize = (rjd->prefix != NULL) * 64 KB;
     size_t const bufferSize = chunkSize + prefixSize;
@@ -1029,7 +1029,7 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
                                     const void* src, size_t srcSize,
                                     size_t prefixSize)
 {
-    const LZ4F_preferences_t* const prefs = params;
+    const LZ4F_preferences_t* const prefs = (const LZ4F_preferences_t*)params;
     LZ4F_cctx* cctx = NULL;
     {   LZ4F_errorCode_t const ccr = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
         if (cctx==NULL || LZ4F_isError(ccr))
@@ -1173,7 +1173,7 @@ LZ4IO_compressFilename_extRess_MT(cRess_t ress,
             compressedfilesize = headerSize;
         }
         /* avoid duplicating effort to process content checksum (done externally) */
-        prefs.frameInfo.contentChecksumFlag = 0;
+        prefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
 
         /* process first block */
         {   CompressJobDesc cjd = { wPool,
