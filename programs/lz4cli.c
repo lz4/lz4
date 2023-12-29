@@ -63,7 +63,7 @@
 #endif
 #define COMPRESSOR_NAME "lz4"
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s v%s %i-bits %s, by %s ***\n", COMPRESSOR_NAME, LZ4_versionString(), (int)(sizeof(void*)*8), IO_MT, AUTHOR
+#define WELCOME_MESSAGE "*** %s v%s %i-bit %s, by %s ***\n", COMPRESSOR_NAME, LZ4_versionString(), (int)(sizeof(void*)*8), IO_MT, AUTHOR
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"

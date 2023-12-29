@@ -436,6 +436,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     BYTE* dstPtr = dstStart;
     BYTE* const dstEnd = dstStart + dstCapacity;
 
+    DEBUGLOG(4, "LZ4F_compressFrame_usingCDict (srcSize=%u)", srcSize);
     if (preferencesPtr!=NULL)
         prefs = *preferencesPtr;
     else
