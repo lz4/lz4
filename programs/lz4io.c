@@ -823,8 +823,9 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
     }
     wr.totalCSize = MAGICNUMBER_SIZE;
 
-    {   const CompressLegacyState cls = { compressionlevel };
+    {   CompressLegacyState cls;
         ReadTracker rjd;
+        cls.cLevel = compressionlevel;
         rjd.tpool = tPool;
         rjd.wpool = wPool;
         rjd.fin = finput;
