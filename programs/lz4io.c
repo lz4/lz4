@@ -460,9 +460,9 @@ static size_t LZ4IO_compressBlockLegacy_fast(
     size_t prefixSize
 )
 {
-    const CompressLegacyState* const clevel = params;
+    const CompressLegacyState* const clevel = (const CompressLegacyState*)params;
     int const acceleration = (clevel->cLevel < 0) ? -clevel->cLevel : 0;
-    int const cSize = LZ4_compress_fast(src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, acceleration);
+    int const cSize = LZ4_compress_fast((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, acceleration);
     if (cSize < 0)
         END_PROCESS(51, "fast compression failed");
     LZ4IO_writeLE32(dst, (unsigned)cSize);
@@ -479,9 +479,9 @@ static size_t LZ4IO_compressBlockLegacy_HC(
     size_t prefixSize
 )
 {
-    const CompressLegacyState* const cs = params;
+    const CompressLegacyState* const cs = (const CompressLegacyState*)params;
     int const clevel = cs->cLevel;
-    int const cSize = LZ4_compress_HC(src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, clevel);
+    int const cSize = LZ4_compress_HC((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, clevel);
     if (cSize < 0)
         END_PROCESS(52, "HC compression failed");
     LZ4IO_writeLE32(dst, (unsigned)cSize);
@@ -529,7 +529,7 @@ static void WR_addBufDesc(WriteRegister* wr, const BufferDesc* bd)
         size_t const addedCapacity = MIN(oldCapacity, 256);
         size_t const newCapacity = oldCapacity + addedCapacity;
         size_t const newSize = newCapacity * sizeof(BufferDesc);
-        wr->buffers = realloc(wr->buffers, newSize);
+        wr->buffers = (BufferDesc*)realloc(wr->buffers, newSize);
         if (wr->buffers == NULL) {
             END_PROCESS(39, "cannot extend register of buffers")
         }
@@ -621,7 +621,7 @@ static void LZ4IO_writeBuffer(BufferDesc bufDesc, FILE* out)
 
 static void LZ4IO_checkWriteOrder(void* arg)
 {
-    WriteJobDesc* const wjd = arg;
+    WriteJobDesc* const wjd = (WriteJobDesc*)arg;
     size_t const cSize = wjd->cSize;
     WriteRegister* const wr = wjd->wr;
 
@@ -686,7 +686,7 @@ typedef struct {
 
 static void LZ4IO_compressChunk(void* arg)
 {
-    CompressJobDesc* const cjd = arg;
+    CompressJobDesc* const cjd = (CompressJobDesc*)arg;
     size_t const outCapacity = cjd->maxCBlockSize;
     void* const out_buff = malloc(outCapacity);
     if (!out_buff)
