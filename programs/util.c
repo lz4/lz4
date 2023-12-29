@@ -47,8 +47,7 @@ DWORD CountSetBits(ULONG_PTR bitMask)
     ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
     DWORD i;
 
-    for (i = 0; i <= LSHIFT; ++i)
-    {
+    for (i = 0; i <= LSHIFT; ++i) {
         bitSetCount += ((bitMask & bitTest)?1:0);
         bitTest/=2;
     }

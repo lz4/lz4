@@ -130,7 +130,7 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; CFLAGS='-Werror' make -j V=1 -C tests test-lz4
+      run: make clean; CFLAGS='-Werror -O1' make -j V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
@@ -138,7 +138,7 @@ jobs:
 
     - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O1' make -j -C tests test V=1
+      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O3' make -C tests test V=1
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
