@@ -451,7 +451,10 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 
             /* Compression */
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->\r", marks[markNb], displayName, (U32)totalRSize);
-            if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase compressed buffer */
+            if (!cCompleted) {
+                memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase compressed buffer */
+                { U32 blockNb; for (blockNb=0; blockNb<nbBlocks; blockNb++) blockTable[blockNb].cSize = 0; }
+            }
 
             UTIL_sleepMilli(1);  /* give processor time to other processes */
             TIME_waitForNextTick();
@@ -468,7 +471,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             blockTable[blockNb].srcPtr, blockTable[blockNb].cPtr,
                             (int)blockTable[blockNb].srcSize, (int)blockTable[blockNb].cRoom);
                         if (LZ4_isError(rSize)) {
-                            DISPLAY("LZ4 compression failed on block %u", blockNb);
+                            DISPLAY("LZ4 compression failed on block %u \n", blockNb);
                             benchError =1 ;
                         }
                         blockTable[blockNb].cSize = rSize;
