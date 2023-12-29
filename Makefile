@@ -85,7 +85,7 @@ clean:
 	$(MAKE) -C $(FUZZDIR) $@ > $(VOID)
 	$(MAKE) -C contrib/gen_manual $@ > $(VOID)
 	$(RM) lz4$(EXT)
-	$(RM) -r $(CMAKE_BUILD_DIR)
+	$(RM) -r $(CMAKE_BUILD_DIR) $(MESON_BUILD_DIR)
 	@echo Cleaning completed
 
 
@@ -119,6 +119,13 @@ cmakebuild:
 	mkdir -p $(CMAKE_BUILD_DIR)
 	cd $(CMAKE_BUILD_DIR); $(CMAKE) $(CMAKE_PARAMS) ..; $(CMAKE) --build .
 
+MESON ?= meson
+MESON_BUILD_DIR ?= mesonBuildDir
+
+.PHONY: mesonbuild
+mesonbuild:
+	$(MESON) setup --fatal-meson-warnings --buildtype=debug -Db_lundef=false -Dauto_features=enabled -Dprograms=true -Dcontrib=true -Dtests=true -Dexamples=true build/meson $(MESON_BUILD_DIR)
+	$(MESON) test -C $(MESON_BUILD_DIR)
 
 #------------------------------------------------------------------------
 # make tests validated only for MSYS and Posix environments

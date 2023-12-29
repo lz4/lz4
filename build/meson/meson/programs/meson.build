@@ -10,18 +10,35 @@
 
 lz4_source_root = '../../../..'
 
+# note:
+# it would be preferable to use some kind of glob or wildcard expansion here...
 sources = files(
   lz4_source_root / 'programs/bench.c',
   lz4_source_root / 'programs/datagen.c',
   lz4_source_root / 'programs/lz4cli.c',
   lz4_source_root / 'programs/lz4io.c',
+  lz4_source_root / 'programs/util.c',
+  lz4_source_root / 'programs/threadpool.c',
+  lz4_source_root / 'programs/timefn.c',
 )
+
+# Initialize an empty list for extra dependencies
+extra_deps = []
+
+if get_option('enable_multithread')
+  pthread_dep = dependency('threads', required : true)
+  extra_deps += [pthread_dep]
+  multithread_args = ['-DLZ4IO_MULTITHREAD']
+else
+  multithread_args = []
+endif
 
 lz4 = executable(
   'lz4',
   sources,
   include_directories: include_directories(lz4_source_root / 'programs'),
-  dependencies: [liblz4_internal_dep],
+  dependencies: [liblz4_internal_dep] + extra_deps,
+  c_args: multithread_args,
   export_dynamic: get_option('debug') and host_machine.system() == 'windows',
   install: true
 )
