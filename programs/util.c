@@ -72,9 +72,12 @@ int UTIL_countCores(void)
 #   pragma warning( disable : 4054 )  /* conversion from function ptr to data ptr */
 #   pragma warning( disable : 4055 )  /* conversion from data ptr to function ptr */
 #endif
-        glpi = (LPFN_GLPI)(void*)GetProcAddress(GetModuleHandle(TEXT("kernel32")),
+        HMODULE hModule = GetModuleHandle(TEXT("kernel32"));
+        if (hModule == NULL) {
+            goto failed;
+        }
+        glpi = (LPFN_GLPI)(void*)GetProcAddress(hModule,
                                                "GetLogicalProcessorInformation");
-
         if (glpi == NULL) {
             goto failed;
         }
@@ -100,6 +103,10 @@ int UTIL_countCores(void)
         }   }
 
         ptr = buffer;
+        if (ptr == NULL) {
+            perror("lz4");
+            exit(1);
+        }
 
         while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
 

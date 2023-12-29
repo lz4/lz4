@@ -138,11 +138,11 @@ jobs:
 
     - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O3' make -C tests test V=1
+      run: make clean; CFLAGS='-mx32' make -C tests test V=1
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make -j -C tests test-lz4c32 V=1
+      run: make clean; CFLAGS='-Werror -O1' make -j -C tests test-lz4c32 V=1
 
 
     ###############################################################

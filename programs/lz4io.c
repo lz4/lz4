@@ -533,10 +533,11 @@ static void WR_addBufDesc(WriteRegister* wr, const BufferDesc* bd)
         size_t const addedCapacity = MIN(oldCapacity, 256);
         size_t const newCapacity = oldCapacity + addedCapacity;
         size_t const newSize = newCapacity * sizeof(BufferDesc);
-        wr->buffers = (BufferDesc*)realloc(wr->buffers, newSize);
-        if (wr->buffers == NULL) {
+        void* const newBuf = realloc(wr->buffers, newSize);
+        if (newBuf == NULL) {
             END_PROCESS(39, "cannot extend register of buffers")
         }
+        wr->buffers = (BufferDesc*)newBuf;
         memset(wr->buffers + oldCapacity, 0, addedCapacity * sizeof(BufferDesc));
         wr->buffers[oldCapacity] = bd[0];
         wr->capacity = newCapacity;
