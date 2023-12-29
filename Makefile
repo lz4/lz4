@@ -62,6 +62,7 @@ lz4-release : lib-release
 lz4 lz4-release :
 	$(MAKE) -C $(PRGDIR) $@
 	$(LN_SF) $(PRGDIR)/lz4$(EXT) .
+	echo lz4 build completed
 
 .PHONY: examples
 examples: liblz4.a

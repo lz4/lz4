@@ -33,7 +33,7 @@
 #endif
 
 
-#ifdef LZ4IO_NO_MT
+#if !defined(LZ4IO_MULTITHREAD)
 
 /* ===================================================== */
 /* Backup implementation with no multi-threading support */

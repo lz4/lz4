@@ -1396,6 +1396,7 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
+#if defined(LZ4IO_MULTITHREAD)
     /* do NOT employ multi-threading in the following scenarios: */
     if ( (io_prefs->contentSizeFlag)  /* content size present in frame header*/
       || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
@@ -1403,6 +1404,12 @@ LZ4IO_compressFilename_extRess(cRess_t ress,
         return LZ4IO_compressFilename_extRess_ST(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
     return LZ4IO_compressFilename_extRess_MT(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+
+#else
+    /* Only single-thread available */
+    return LZ4IO_compressFilename_extRess_ST(ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+
+#endif
 }
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
