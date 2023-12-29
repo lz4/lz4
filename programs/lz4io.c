@@ -1992,13 +1992,13 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     dRess_t const ress = LZ4IO_createDResources(prefs);
     TIME_t const timeStart = TIME_getTime();
     clock_t const cpuStart = clock();
-    unsigned long long processed;
+    unsigned long long processed = 0;
 
-    int const status = LZ4IO_decompressDstFile(&processed, ress, input_filename, output_filename, prefs);
-
-    LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
+    int const errStat = LZ4IO_decompressDstFile(&processed, ress, input_filename, output_filename, prefs);
+    if (errStat)
+        LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
     LZ4IO_freeDResources(ress);
-    return status;
+    return errStat;
 }
 
 
