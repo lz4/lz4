@@ -56,9 +56,14 @@
 /*****************************
 *  Constants
 ******************************/
-#define COMPRESSOR_NAME "LZ4 command line interface"
+#ifdef LZ4IO_MULTITHREAD
+#define IO_MT "multithread"
+#else
+#define IO_MT "singlethread"
+#endif
+#define COMPRESSOR_NAME "lz4"
 #define AUTHOR "Yann Collet"
-#define WELCOME_MESSAGE "*** %s %i-bits v%s, by %s ***\n", COMPRESSOR_NAME, (int)(sizeof(void*)*8), LZ4_versionString(), AUTHOR
+#define WELCOME_MESSAGE "*** %s v%s %i-bits %s, by %s ***\n", COMPRESSOR_NAME, LZ4_versionString(), (int)(sizeof(void*)*8), IO_MT, AUTHOR
 #define LZ4_EXTENSION ".lz4"
 #define LZ4CAT "lz4cat"
 #define UNLZ4 "unlz4"
