@@ -86,16 +86,16 @@ int UTIL_countCores(void)
             DWORD rc = glpi(buffer, &returnLength);
             if (FALSE == rc) {
                 if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                    if (buffer)
-                        free(buffer);
+                    free(buffer);
                     buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(returnLength);
-
                     if (buffer == NULL) {
                         perror("lz4");
                         exit(1);
                     }
                 } else {
                     /* some other error */
+                    free(buffer);
+                    buffer = NULL;
                     goto failed;
                 }
             } else {

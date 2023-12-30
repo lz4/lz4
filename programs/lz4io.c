@@ -823,7 +823,6 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     }
     foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput == NULL) {
-        fclose(finput);
         /* write file error : recoverable */
         clResult = 1;
         goto _cfl_clean;
