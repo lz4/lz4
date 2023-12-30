@@ -130,7 +130,7 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; CFLAGS='-Werror -O1' make -j V=1 -C tests test-lz4
+      run: make clean; CFLAGS='-Werror -g -O1' make V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
@@ -184,7 +184,7 @@ jobs:
         sudo apt-get install gcc-multilib
 
     - name: benchmark (-C tests test-lz4)
-      run: make -j -C tests test-lz4 V=1
+      run: make -C tests test-lz4 V=1
 
     - name: benchmark (-C tests test-lz4c)
       run: make -j -C tests test-lz4c V=1
