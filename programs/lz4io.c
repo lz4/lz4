@@ -760,9 +760,13 @@ static void LZ4IO_readAndProcess(void* arg)
             END_PROCESS(32, "Read error (read %u > %u [chunk size])", (unsigned)inSize, (unsigned)chunkSize);
         }
         rjd->totalReadSize += inSize;
-        /* send new jobs */
-        if (inSize > 0) {
-            CompressJobDesc* const cjd = (CompressJobDesc*)malloc(sizeof(*cjd));
+        /* special case: nothing left: stop read operation */
+        if (inSize == 0) {
+            free(buffer);
+            return;
+        }
+        /* process read input */
+        {   CompressJobDesc* const cjd = (CompressJobDesc*)malloc(sizeof(*cjd));
             if (cjd==NULL) {
                 END_PROCESS(33, "Allocation error : can't describe new compression job");
             }
@@ -786,7 +790,7 @@ static void LZ4IO_readAndProcess(void* arg)
             cjd->lastBlock = inSize < chunkSize;
             TPOOL_submitJob(rjd->tpool, LZ4IO_compressAndFreeChunk, cjd);
             if (inSize == chunkSize) {
-                /* read another chunk */
+                /* probably more ? read another chunk */
                 rjd->blockNb++;
                 TPOOL_submitJob(rjd->tpool, LZ4IO_readAndProcess, rjd);
     }   }   }
@@ -1812,7 +1816,8 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     if (ferror(srcFile)) END_PROCESS(67, "Read error");
 
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
-    if (nextToLoad!=0) END_PROCESS(68, "Unfinished stream");
+    if (nextToLoad!=0)
+        END_PROCESS(68, "Unfinished stream (nextToLoad=%u)", (unsigned)nextToLoad);
 
     return filesize;
 }
