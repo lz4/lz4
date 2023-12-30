@@ -964,7 +964,24 @@ typedef struct {
     size_t dstBufferSize;
     LZ4F_compressionContext_t ctx;
     LZ4F_CDict* cdict;
+    TPOOL_ctx* tpool;
+    TPOOL_ctx* wpool; /* writer thread */
 } cRess_t;
+
+static void LZ4IO_freeCResources(cRess_t ress)
+{
+    TPOOL_free(ress.tpool);
+    TPOOL_free(ress.wpool);
+
+    free(ress.srcBuffer);
+    free(ress.dstBuffer);
+
+    LZ4F_freeCDict(ress.cdict);
+    ress.cdict = NULL;
+
+    { LZ4F_errorCode_t const errorCode = LZ4F_freeCompressionContext(ress.ctx);
+      if (LZ4F_isError(errorCode)) END_PROCESS(35, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode)); }
+}
 
 static void* LZ4IO_createDict(size_t* dictSize, const char* dictFilename)
 {
@@ -1057,19 +1074,17 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* prefs)
 
     ress.cdict = LZ4IO_createCDict(prefs);
 
+    if (prefs->nbWorkers > 1) {
+        ress.tpool = TPOOL_create(prefs->nbWorkers, 4);
+        ress.wpool = TPOOL_create(1, 4);
+        if (!ress.tpool || !ress.wpool)
+            END_PROCESS(32, "Allocation error : can't allocate thread pools");
+    } else {
+        ress.tpool = NULL;
+        ress.wpool = NULL;
+    }
+
     return ress;
-}
-
-static void LZ4IO_freeCResources(cRess_t ress)
-{
-    free(ress.srcBuffer);
-    free(ress.dstBuffer);
-
-    LZ4F_freeCDict(ress.cdict);
-    ress.cdict = NULL;
-
-    { LZ4F_errorCode_t const errorCode = LZ4F_freeCompressionContext(ress.ctx);
-      if (LZ4F_isError(errorCode)) END_PROCESS(35, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode)); }
 }
 
 typedef struct {
@@ -1174,9 +1189,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     else
 
     /* multiple-blocks file */
-    {   TPOOL_ctx* const tPool = TPOOL_create(io_prefs->nbWorkers, 4);
-        TPOOL_ctx* const wPool = TPOOL_create(1, 4);
-        WriteRegister wr = WR_init(chunkSize);
+    {   WriteRegister wr = WR_init(chunkSize);
         void* prefixBuffer = NULL;
 
         int checksum = (int)prefs.frameInfo.contentChecksumFlag;
@@ -1186,8 +1199,8 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         ReadTracker rjd;
         cfcp.prefs = &prefs;
         cfcp.cdict = ress.cdict;
-        rjd.tpool = tPool;
-        rjd.wpool = wPool;
+        rjd.tpool = ress.tpool;
+        rjd.wpool = ress.wpool;
         rjd.fin = srcFile;
         rjd.chunkSize = chunkSize;
         rjd.totalReadSize = 0;
@@ -1233,7 +1246,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
 
         /* process first block */
         {   CompressJobDesc cjd;
-            cjd.wpool = wPool;
+            cjd.wpool = ress.wpool;
             cjd.buffer = srcBuffer;
             cjd.prefixSize = 0;
             cjd.inSize = readSize;
@@ -1244,7 +1257,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             cjd.wr = &wr;
             cjd.maxCBlockSize = rjd.maxCBlockSize;
             cjd.lastBlock = 0;
-            TPOOL_submitJob(tPool, LZ4IO_compressChunk, &cjd);
+            TPOOL_submitJob(ress.tpool, LZ4IO_compressChunk, &cjd);
             rjd.totalReadSize = readSize;
             rjd.blockNb = 1;
             if (prefixBuffer) {
@@ -1253,11 +1266,11 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             }
 
             /* Start the job chain */
-            TPOOL_submitJob(tPool, LZ4IO_readAndProcess, &rjd);
+            TPOOL_submitJob(ress.tpool, LZ4IO_readAndProcess, &rjd);
 
             /* Wait for all completion */
-            TPOOL_completeJobs(tPool);
-            TPOOL_completeJobs(wPool);
+            TPOOL_completeJobs(ress.tpool);
+            TPOOL_completeJobs(ress.wpool);
             compressedfilesize += wr.totalCSize;
         }
 
@@ -1282,8 +1295,6 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         free(prefixBuffer);
         XXH32_freeState(xxh32);
         WR_destroy(&wr);
-        TPOOL_free(wPool);
-        TPOOL_free(tPool);
     }
 
     /* Release file handlers */
