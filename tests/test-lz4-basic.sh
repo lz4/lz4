@@ -74,3 +74,6 @@ echo "TEST" > $FPREFIX-test
 lz4 -m $FPREFIX-test
 lz4 $FPREFIX-test.lz4 $FPREFIX-test2
 diff -q $FPREFIX-test $FPREFIX-test2
+# Multithreading commands
+datagen -g16M | lz4 -T2 | lz4 -t
+datagen -g16M | lz4 --threads=2 | lz4 -t

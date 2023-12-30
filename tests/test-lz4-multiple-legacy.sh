@@ -31,7 +31,7 @@ cmp ${FPREFIX}2 ${FPREFIX}2-orig
 cmp ${FPREFIX}3 ${FPREFIX}3-orig
 # compress multiple files into stdout using legacy format
 cat ${FPREFIX}1.lz4 ${FPREFIX}2.lz4 ${FPREFIX}3.lz4 > $FPREFIX-concat1
-rm $FPREFIX*.lz4
+rm -f $FPREFIX*.lz4
 lz4 -l -m ${FPREFIX}1 ${FPREFIX}2 ${FPREFIX}3 -c > $FPREFIX-concat2
 test ! -f ${FPREFIX}1.lz4  # must not create .lz4 artefact
 cmp $FPREFIX-concat1 $FPREFIX-concat2  # must be equivalent
@@ -45,5 +45,7 @@ lz4 -d -l -m ${FPREFIX}1.lz4 ${FPREFIX}2.lz4 ${FPREFIX}3.lz4 -c > $FPREFIX-conca
 test ! -f ${FPREFIX}1  # must not create file artefact
 cmp $FPREFIX-concat1 $FPREFIX-concat2  # must be equivalent
 # # # compress multiple files, one of which is absent (must fail)
+rm -f $FPREFIX-concat2.lz4
 lz4 -f -l -m $FPREFIX-concat1 notHere-legacy $FPREFIX-concat2 && exit 1 # must fail : notHere-legacy not present
+test -f $FPREFIX-concat2.lz4 # notHere was a non-blocking error, concat2.lz4 should be present
 true

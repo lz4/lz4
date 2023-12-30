@@ -179,6 +179,9 @@
     <ClCompile Include="..\..\..\programs\bench.c" />
     <ClCompile Include="..\..\..\programs\lz4cli.c" />
     <ClCompile Include="..\..\..\programs\lz4io.c" />
+    <ClCompile Include="..\..\..\programs\util.c" />
+    <ClCompile Include="..\..\..\programs\threadpool.c" />
+    <ClCompile Include="..\..\..\programs\timefn.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="lz4.rc" />

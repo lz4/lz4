@@ -60,12 +60,24 @@ ifeq ($(TARGET_OS)$(shell $(OS_VERSION)),SunOS5.10)
 LDFLAGS  += -lrt
 endif
 
-FLAGS     = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
+
+# thread detection
+NUM_SYMBOL   := \#
+NO_THREAD_MSG:= ==> no pthread support: building for single-thread mode only
+HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
+HAVE_THREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
+ifeq ($(HAVE_PTHREAD), 1)
+  THREAD_MSG := ==> building with multithreading support
+  THREAD_CPP := -DLZ4IO_MULTITHREAD
+  THREAD_LD  := -pthread
+else
+  THREAD_MSG := $(NO_THREAD_MSG)
+endif
 
 LZ4_VERSION=$(LIBVER)
-MD2ROFF   = ronn
+MD2ROFF    = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
-
 
 .PHONY:default
 default: lz4-release
@@ -74,7 +86,7 @@ default: lz4-release
 $(V)$(VERBOSE).SILENT:
 
 .PHONY:all
-all: lz4 lz4c unlz4 lz4cat
+all: lz4 lz4-nomt lz4c unlz4 lz4cat
 
 .PHONY:all32
 all32: CFLAGS+=-m32
@@ -94,16 +106,23 @@ lz4-exe.o: lz4-exe.rc
 	$(WINDRES) -i lz4-exe.rc -o lz4-exe.o
 
 lz4: $(OBJFILES) lz4-exe.o
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 else
+lz4: CPPFLAGS += $(THREAD_CPP)
+lz4: LDFLAGS += $(THREAD_LD)
 lz4: $(OBJFILES)
-	$(CC) $(FLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+	echo "$(THREAD_MSG)"
+	$(CC) $(ALLFLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
 endif
 CLEAN += lz4
 
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
 lz4-release: lz4
+
+CLEAN += lz4-nomt
+lz4-nomt: $(SRCFILES)
+	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 
 CLEAN += lz4-wlib
 lz4-wlib: LIBFILES =
@@ -112,7 +131,7 @@ lz4-wlib: LDFLAGS += -L $(LIBDIR)
 lz4-wlib: LDLIBS   = -llz4
 lz4-wlib: liblz4 $(OBJFILES)
 	@echo WARNING: $@ must link to an extended variant of the dynamic library which also exposes unstable symbols
-	$(CC) $(FLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+	$(CC) $(ALLFLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
 
 .PHONY:liblz4
 liblz4:
@@ -125,7 +144,7 @@ lz4c: lz4
 CLEAN += lz4c32
 lz4c32: CFLAGS += -m32
 lz4c32 : $(SRCFILES)
-	$(CC) $(FLAGS) $^ -o $@$(EXT)
+	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 
 CLEAN += unlz4
 unlz4: lz4

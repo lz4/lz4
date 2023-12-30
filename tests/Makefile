@@ -174,11 +174,8 @@ checkTag: checkTag.c $(LIBDIR)/lz4.h
 ifeq ($(POSIX_ENV),Yes)
 
 MD5 ?= $(if $(filter Darwin,$(shell $(UNAME))),md5 -r,md5sum)
-CMP ?= cmp
 GREP?= grep
-DIFF?= $(if $(filter SunOS,$(shell $(UNAME))),gdiff,diff)
 CAT ?= cat
-DD  ?= dd
 DATAGEN?=./datagen
 PATH:=../programs:$(shell pwd):$(PATH)
 

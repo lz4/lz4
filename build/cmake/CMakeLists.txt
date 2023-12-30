@@ -73,19 +73,10 @@ set(LZ4_PROG_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/programs")
 include_directories("${LZ4_LIB_SOURCE_DIR}")
 
 # CLI sources
-set(LZ4_SOURCES
-  "${LZ4_LIB_SOURCE_DIR}/lz4.c"
-  "${LZ4_LIB_SOURCE_DIR}/lz4hc.c"
-  "${LZ4_LIB_SOURCE_DIR}/lz4.h"
-  "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
-  "${LZ4_LIB_SOURCE_DIR}/lz4frame.c"
-  "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
-  "${LZ4_LIB_SOURCE_DIR}/xxhash.c")
-set(LZ4_CLI_SOURCES
-  "${LZ4_PROG_SOURCE_DIR}/bench.c"
-  "${LZ4_PROG_SOURCE_DIR}/lz4cli.c"
-  "${LZ4_PROG_SOURCE_DIR}/lz4io.c"
-  "${LZ4_PROG_SOURCE_DIR}/datagen.c")
+file(GLOB LZ4_SOURCES
+     "${LZ4_LIB_SOURCE_DIR}/*.c")
+file(GLOB LZ4_CLI_SOURCES
+     "${LZ4_PROG_SOURCE_DIR}/*.c")
 list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES}) # LZ4_CLI always use liblz4 sources directly.
 
 # Whether to use position independent code for the static library.  If
@@ -128,11 +119,11 @@ endif()
 
 # xxhash namesapce
 if(BUILD_SHARED_LIBS)
-  target_compile_definitions(lz4_shared PRIVATE 
+  target_compile_definitions(lz4_shared PRIVATE
     XXH_NAMESPACE=LZ4_)
 endif()
 if(BUILD_STATIC_LIBS)
-  target_compile_definitions(lz4_static PRIVATE 
+  target_compile_definitions(lz4_static PRIVATE
     XXH_NAMESPACE=LZ4_)
 endif()
 

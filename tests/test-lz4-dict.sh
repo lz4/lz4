@@ -15,8 +15,19 @@ set -x
 datagen -g16KB > $FPREFIX
 datagen -g32KB > $FPREFIX-sample-32k
 < $FPREFIX-sample-32k lz4 -D $FPREFIX | lz4 -dD $FPREFIX | diff - $FPREFIX-sample-32k
-datagen -g128MB > $FPREFIX-sample-128m
-< $FPREFIX-sample-128m lz4 -D $FPREFIX | lz4 -dD $FPREFIX | diff - $FPREFIX-sample-128m
+datagen -g16MB > $FPREFIX-sample-16m
+lz4 -v -B5 $FPREFIX-sample-16m -D $FPREFIX -c | lz4 -d -D $FPREFIX | diff - $FPREFIX-sample-16m
+
+# Check dictionary compression efficiency
+size_dict=$( lz4 -3 -B4 $FPREFIX-sample-16m -D $FPREFIX -c | wc -c)
+size_nodict=$( lz4 -3 -B4 $FPREFIX-sample-16m -c | wc -c)
+if [ "$size_dict" -lt "$size_nodict" ]; then
+    echo "Test Passed: dictionary is effective."
+else
+    echo "Test Failed: dictionary wasn't effective."
+    exit 1
+fi
+
 touch $FPREFIX-sample-0
 < $FPREFIX-sample-0 lz4 -D $FPREFIX | lz4 -dD $FPREFIX | diff - $FPREFIX-sample-0
 

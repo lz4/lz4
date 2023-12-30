@@ -165,6 +165,9 @@
     <ClCompile Include="..\..\..\programs\datagen.c" />
     <ClCompile Include="..\..\..\programs\lz4cli.c" />
     <ClCompile Include="..\..\..\programs\lz4io.c" />
+    <ClCompile Include="..\..\..\programs\util.c" />
+    <ClCompile Include="..\..\..\programs\threadpool.c" />
+    <ClCompile Include="..\..\..\programs\timefn.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\lz4.h" />

@@ -49,7 +49,7 @@ jobs:
     - run: gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -Werror" make check && make clean
     - run: gcc-5 -v; CC=gcc-5 CFLAGS="-O2 -m32 -Werror" CPPFLAGS=-I/usr/include/x86_64-linux-gnu make check && make clean
     - run: gcc-6 -v; CC=gcc-6 CFLAGS="-O2 -Werror" make check  && make clean
-    - run: make cmake                && make clean
+    - run: make cmakebuild           && make clean
     - run: make -C tests test-lz4
     - run: make -C tests test-lz4c
     - run: make -C tests test-frametest

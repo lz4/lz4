@@ -12,7 +12,7 @@ trap remove EXIT
 
 set -x
 
-datagen -g6GB    | lz4 -vB5D | lz4 -qt
+datagen -g6GB    | lz4 -vB5 | lz4 -qt
 # test large file size [2-4] GB
 datagen -g3G -P100 | lz4 -vv | lz4 --decompress --force --sparse - ${FPREFIX}1
 ls -ls ${FPREFIX}1

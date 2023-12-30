@@ -55,17 +55,17 @@ jobs:
           { pkgs: 'gcc-7 g++-7 lib32gcc-7-dev libx32gcc-7-dev',         cc: gcc-7,     cxx: g++-7,       x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'true',  os: ubuntu-20.04,  },
 
           # clang
-          { pkgs: 'lib32gcc-11-dev libx32gcc-11-dev',                   cc: clang,     cxx: clang++,     x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-latest, },
-          { pkgs: 'clang-15  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-15,  cxx: clang++-15,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-14  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-14,  cxx: clang++-14,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-13  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-13,  cxx: clang++-13,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-12  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'lib32gcc-13-dev libx32gcc-13-dev',                   cc: clang,     cxx: clang++,     x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-latest, },
+          { pkgs: 'clang-15  lib32gcc-13-dev libx32gcc-13-dev',         cc: clang-15,  cxx: clang++-15,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-14  lib32gcc-13-dev libx32gcc-13-dev',         cc: clang-14,  cxx: clang++-14,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-13  lib32gcc-13-dev libx32gcc-13-dev',         cc: clang-13,  cxx: clang++-13,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
+          { pkgs: 'clang-12  lib32gcc-13-dev libx32gcc-13-dev',         cc: clang-12,  cxx: clang++-12,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
           { pkgs: 'clang-11  lib32gcc-12-dev libx32gcc-12-dev',         cc: clang-11,  cxx: clang++-11,  x32: 'false', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-22.04,  },
-          { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
-          { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
-          { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
-          { pkgs: 'clang-7   lib32gcc-7-dev  libx32gcc-7-dev',          cc: clang-7,   cxx: clang++-7,   x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
-          { pkgs: 'clang-6.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-6.0, cxx: clang++-6.0, x32: 'true', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
+          { pkgs: 'clang-10  lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-10,  cxx: clang++-10,  x32: 'fail', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
+          { pkgs: 'clang-9   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-9,   cxx: clang++-9,   x32: 'fail', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
+          { pkgs: 'clang-8   lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-8,   cxx: clang++-8,   x32: 'fail', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
+          { pkgs: 'clang-7   lib32gcc-7-dev  libx32gcc-7-dev',          cc: clang-7,   cxx: clang++-7,   x32: 'fail', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
+          { pkgs: 'clang-6.0 lib32gcc-11-dev libx32gcc-11-dev',         cc: clang-6.0, cxx: clang++-6.0, x32: 'fail', x86: 'true', cxxtest: 'true',  freestanding: 'false', os: ubuntu-20.04,  },
         ]
 
     runs-on: ${{ matrix.os }}
@@ -108,7 +108,7 @@ jobs:
       if: always()
       run: make clean; make -j c_standards_c11 V=1
 
-    - name: make c-to-c++
+    - name: c lib for c++ program
       if: ${{ matrix.cxxtest == 'true' }}
       run: make clean; make -j ctocxxtest V=1
 
@@ -126,11 +126,11 @@ jobs:
 
     - name: make -C programs default -D_FORTIFY_SOURCE=2
       if: always()
-      run: CFLAGS='-fPIC' LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2' make V=1 -C programs clean default
+      run: make clean; CFLAGS='-fPIC' LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2' make -j -C programs default V=1
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; CFLAGS='-Werror' make -j V=1 -C tests test-lz4
+      run: make clean; CFLAGS='-Werror -g -O1' make -j V=1 -C tests test-lz4
 
     - name: make clangtest (clang only)
       if: ${{ startsWith( matrix.cc , 'clang' ) }}
@@ -138,11 +138,11 @@ jobs:
 
     - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32 -O1' make -j -C tests test V=1
+      run: make clean; CFLAGS='-mx32' make -j -C tests test V=1
 
     - name: make -C tests test-lz4c32
       if: ${{ matrix.x86 == 'true' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror -O1' make -j -C tests test-lz4c32 V=1
+      run: make clean; CFLAGS='-Werror -O1' make -j -C tests test-lz4c32 V=1
 
 
     ###############################################################
@@ -152,11 +152,11 @@ jobs:
 
     - name: make -C tests test CFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-mx32' make -j -C tests test V=1 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; CFLAGS='-mx32' make -C tests test V=1 || $FIXME__LZ4_CI_IGNORE
 
     - name: make -C tests test-lz4c32 || echo Ignore failure for now.
       if: ${{ matrix.x86 == 'fail' }}
-      run: make clean; LDFLAGS='-Wl,--verbose' CFLAGS='-Werror' make -C tests test-lz4c32 V=1 || $FIXME__LZ4_CI_IGNORE
+      run: make clean; CFLAGS='-Werror' make -C tests test-lz4c32 V=1 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################
@@ -227,7 +227,7 @@ jobs:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
 
     - name: make standard_variables
-      run: make -j standard_variables V=1
+      run: make standard_variables V=1
 
 
   lz4-versions:
@@ -241,7 +241,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install gcc-multilib
 
-    - name: make -C tests versionsTest
+    - name: versionsTest
       run: make -j -C tests versionsTest V=1
 
 
@@ -256,7 +256,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install gcc-multilib
 
-    - name: make -C tests abiTests
+    - name: abiTests
       run: make -j -C tests abiTests V=1
 
 
@@ -686,13 +686,13 @@ jobs:
 
   # Invoke cmake via Makefile
   lz4-build-make-cmake:
-    name: make cmake
+    name: make cmakebuild
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
-    - name: make cmake
+    - name: make cmakebuild
       # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
-      run: make V=1 VERBOSE=1 clean cmake
+      run: make clean; make cmakebuild V=1 VERBOSE=1
 
 
   # Meson

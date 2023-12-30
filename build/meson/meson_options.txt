@@ -8,6 +8,8 @@
 # in the COPYING file in the root directory of this source tree).
 # #############################################################################
 
+option('enable_multithread', type: 'boolean', value: true,
+  description: 'Enable multi-threading support')
 option('align-test', type: 'boolean', value: true,
   description: 'See LZ4_ALIGN_TEST')
 option('contrib', type: 'boolean', value: false,
