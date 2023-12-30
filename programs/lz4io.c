@@ -1074,15 +1074,9 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* prefs)
 
     ress.cdict = LZ4IO_createCDict(prefs);
 
-    if (prefs->nbWorkers > 1) {
-        ress.tpool = TPOOL_create(prefs->nbWorkers, 4);
-        ress.wpool = TPOOL_create(1, 4);
-        if (!ress.tpool || !ress.wpool)
-            END_PROCESS(32, "Allocation error : can't allocate thread pools");
-    } else {
-        ress.tpool = NULL;
-        ress.wpool = NULL;
-    }
+    /* will be created it needed */
+    ress.tpool = NULL;
+    ress.wpool = NULL;
 
     return ress;
 }
@@ -1197,6 +1191,14 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
 
         LZ4IO_CfcParameters cfcp;
         ReadTracker rjd;
+
+        if (ress.tpool == NULL) {
+            ress.tpool = TPOOL_create(io_prefs->nbWorkers, 4);
+            assert(ress.wpool == NULL);
+            ress.wpool = TPOOL_create(1, 4);
+            if (ress.tpool == NULL || ress.wpool == NULL)
+                END_PROCESS(43, "can't create threadpools");
+        }
         cfcp.prefs = &prefs;
         cfcp.cdict = ress.cdict;
         rjd.tpool = ress.tpool;
