@@ -142,6 +142,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
     DISPLAYLEVEL(1, "Error %i : ", error);                        \
     DISPLAYLEVEL(1, __VA_ARGS__);                                 \
     DISPLAYLEVEL(1, " \n");                                       \
+    fflush(NULL);                                                 \
     exit(error);                                                  \
 }
 
@@ -791,33 +792,37 @@ static void LZ4IO_readAndProcess(void* arg)
     }   }   }
 }
 
-/* LZ4IO_compressFilename_Legacy :
- * This function is intentionally "hidden" (not published in .h)
- * It generates compressed streams using the old 'legacy' format */
-int LZ4IO_compressFilename_Legacy(const char* input_filename,
+/* LZ4IO_compressLegacy_internal :
+ * Implementation of LZ4IO_compressFilename_Legacy.
+ * @return: 0 if success, !0 if error
+ */
+static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
+                                  const char* input_filename,
                                   const char* output_filename,
                                   int compressionlevel,
                                   const LZ4IO_prefs_t* prefs)
 {
+    int clResult = 0;
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
-    FILE* foutput;
+    FILE* foutput = NULL;
     TPOOL_ctx* const tPool = TPOOL_create(prefs->nbWorkers, 4);
     TPOOL_ctx* const wPool = TPOOL_create(1, 4);
     WriteRegister wr = WR_init(LEGACY_BLOCKSIZE);
 
     /* Init & checks */
-    TIME_t const timeStart = TIME_getTime();
-    clock_t const cpuStart = clock();
+    *readSize = 0;
     if (finput == NULL) {
         /* read file error : recoverable */
-        return 1;
+        clResult = 1;
+        goto _cfl_clean;
     }
     foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput == NULL) {
         fclose(finput);
         /* write file error : recoverable */
-        return 1;
+        clResult = 1;
+        goto _cfl_clean;
     }
     if (tPool == NULL || wPool == NULL)
         END_PROCESS(21, "threadpool creation error ");
@@ -860,16 +865,35 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
         DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%% \n",
                     rjd.totalReadSize, wr.totalCSize,
                     (double)wr.totalCSize / (double)(rjd.totalReadSize + !rjd.totalReadSize) * 100.);
-        LZ4IO_finalTimeDisplay(timeStart, cpuStart, rjd.totalReadSize);
+        *readSize = rjd.totalReadSize;
     }
     /* Close & Free */
+_cfl_clean:
     WR_destroy(&wr);
     TPOOL_free(wPool);
     TPOOL_free(tPool);
-    fclose(finput);
-    if (!LZ4IO_isStdout(output_filename)) fclose(foutput);  /* do not close stdout */
+    if (finput) fclose(finput);
+    if (foutput && !LZ4IO_isStdout(output_filename)) fclose(foutput);  /* do not close stdout */
 
-    return 0;
+    return clResult;
+}
+
+/* LZ4IO_compressFilename_Legacy :
+ * This function is intentionally "hidden" (not published in .h)
+ * It generates compressed streams using the old 'legacy' format
+ * @return: 0 if success, !0 if error
+ */
+int LZ4IO_compressFilename_Legacy(const char* input_filename,
+                                  const char* output_filename,
+                                  int compressionlevel,
+                                  const LZ4IO_prefs_t* prefs)
+{
+    TIME_t const timeStart = TIME_getTime();
+    clock_t const cpuStart = clock();
+    unsigned long long processed = 0;
+    int r = LZ4IO_compressLegacy_internal(&processed, input_filename, output_filename, compressionlevel, prefs);
+    LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
+    return r;
 }
 
 #define FNSPACE 30
@@ -881,6 +905,9 @@ int LZ4IO_compressMultipleFilenames_Legacy(
                             const char* suffix,
                             int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
+    TIME_t const timeStart = TIME_getTime();
+    clock_t const cpuStart = clock();
+    unsigned long long totalProcessed = 0;
     int i;
     int missed_files = 0;
     char* dstFileName = (char*)malloc(FNSPACE);
@@ -891,11 +918,13 @@ int LZ4IO_compressMultipleFilenames_Legacy(
 
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
+        unsigned long long processed = 0;
         size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (LZ4IO_isStdout(suffix)) {
-            missed_files += LZ4IO_compressFilename_Legacy(
+            missed_files += LZ4IO_compressLegacy_internal(&processed,
                                     inFileNamesTable[i], stdoutmark,
                                     compressionLevel, prefs);
+            totalProcessed += processed;
             continue;
         }
 
@@ -909,12 +938,14 @@ int LZ4IO_compressMultipleFilenames_Legacy(
         strcpy(dstFileName, inFileNamesTable[i]);
         strcat(dstFileName, suffix);
 
-        missed_files += LZ4IO_compressFilename_Legacy(
+        missed_files += LZ4IO_compressLegacy_internal(&processed,
                                 inFileNamesTable[i], dstFileName,
                                 compressionLevel, prefs);
+        totalProcessed += processed;
     }
 
     /* Close & Free */
+    LZ4IO_finalTimeDisplay(timeStart, cpuStart, totalProcessed);
     free(dstFileName);
 
     return missed_files;
@@ -1423,19 +1454,15 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                const LZ4IO_prefs_t* const io_prefs)
 {
 #if defined(LZ4IO_MULTITHREAD)
-    /* do NOT employ multi-threading in the following scenarios: */
-    if ( (io_prefs->nbWorkers == 1) /* manually select single-thread mode */
-      || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
+    /* only employ multi-threading in the following scenarios: */
+    if ( (io_prefs->nbWorkers != 1)
+      && (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
       )
-        return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
-
-    return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
-
-#else
+        return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+#endif
     /* Only single-thread available */
     return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
-#endif
 }
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
