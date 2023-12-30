@@ -809,24 +809,27 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
     /* Init & checks */
     TIME_t const timeStart = TIME_getTime();
     clock_t const cpuStart = clock();
-    if (finput == NULL)
-        END_PROCESS(20, "%s : open file error ", input_filename);
-    if (tPool == NULL || wPool == NULL)
-        END_PROCESS(20, "threadpool creation error ");
-    if (wr.buffers == NULL)
-        END_PROCESS(20, "can't allocate write register");
-
+    if (finput == NULL) {
+        /* read file error : recoverable */
+        return 1;
+    }
     foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput == NULL) {
         fclose(finput);
-        END_PROCESS(20, "%s : open file error ", input_filename);
+        /* write file error : recoverable */
+        return 1;
     }
+    if (tPool == NULL || wPool == NULL)
+        END_PROCESS(21, "threadpool creation error ");
+    if (wr.buffers == NULL)
+        END_PROCESS(22, "can't allocate write register");
+
 
     /* Write Archive Header */
     {   char outHeader[MAGICNUMBER_SIZE];
         LZ4IO_writeLE32(outHeader, LEGACY_MAGICNUMBER);
         if (fwrite(outHeader, 1, MAGICNUMBER_SIZE, foutput) != MAGICNUMBER_SIZE)
-            END_PROCESS(22, "Write error : cannot write header");
+            END_PROCESS(23, "Write error : cannot write header");
     }
     wr.totalCSize = MAGICNUMBER_SIZE;
 

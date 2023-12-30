@@ -836,9 +836,9 @@ int main(int argCount, const char** argv)
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
             if(multiple_inputs){
                 const char* const leg_extension = !strcmp(output_filename,stdoutmark) ? stdoutmark : LZ4_EXTENSION;
-                LZ4IO_compressMultipleFilenames_Legacy(inFileNames, (int)ifnIdx, leg_extension, cLevel, prefs);
+                operationResult = LZ4IO_compressMultipleFilenames_Legacy(inFileNames, (int)ifnIdx, leg_extension, cLevel, prefs);
             } else {
-                LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel, prefs);
+                operationResult = LZ4IO_compressFilename_Legacy(input_filename, output_filename, cLevel, prefs);
             }
         } else {
             if (multiple_inputs) {
