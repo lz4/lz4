@@ -929,7 +929,7 @@ typedef struct {
     LZ4F_CDict* cdict;
 } cRess_t;
 
-static void* LZ4IO_createDict(size_t* dictSize, const char* const dictFilename)
+static void* LZ4IO_createDict(size_t* dictSize, const char* dictFilename)
 {
     size_t readSize;
     size_t dictEnd = 0;
@@ -988,7 +988,7 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* const dictFilename)
     return dictBuf;
 }
 
-static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* const prefs)
+static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* prefs)
 {
     size_t dictionarySize;
     void* dictionaryBuffer;
@@ -1001,7 +1001,7 @@ static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* const prefs)
     return cdict;
 }
 
-static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* const prefs)
+static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* prefs)
 {
     const size_t chunkSize = 4 MB;
     cRess_t ress;
@@ -1035,12 +1035,17 @@ static void LZ4IO_freeCResources(cRess_t ress)
       if (LZ4F_isError(errorCode)) END_PROCESS(35, "Error : can't free LZ4F context resource : %s", LZ4F_getErrorName(errorCode)); }
 }
 
+typedef struct {
+    const LZ4F_preferences_t* prefs;
+    const LZ4F_CDict* cdict;
+} LZ4IO_CfcParameters;
+
 static size_t LZ4IO_compressFrameChunk(const void* params,
                                     void* dst, size_t dstCapacity,
                                     const void* src, size_t srcSize,
                                     size_t prefixSize)
 {
-    const LZ4F_preferences_t* const prefs = (const LZ4F_preferences_t*)params;
+    const LZ4IO_CfcParameters* const cfcp = (const LZ4IO_CfcParameters*)params;
     LZ4F_cctx* cctx = NULL;
     {   LZ4F_errorCode_t const ccr = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
         if (cctx==NULL || LZ4F_isError(ccr))
@@ -1048,7 +1053,7 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
     }
     /* init state, and writes frame header, will be overwritten at next stage.
      * Also: no support for dictionary yet, meaning linked blocks are actually independent */
-    {   size_t const whr = LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
+    {   size_t const whr = LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, cfcp->cdict, cfcp->prefs);
         if (LZ4F_isError(whr))
             END_PROCESS(52, "error initializing LZ4F compression context");
     }
@@ -1132,8 +1137,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     else
 
     /* multiple-blocks file */
-    {
-        TPOOL_ctx* const tPool = TPOOL_create(io_prefs->nbWorkers, 4);
+    {   TPOOL_ctx* const tPool = TPOOL_create(io_prefs->nbWorkers, 4);
         TPOOL_ctx* const wPool = TPOOL_create(1, 4);
         WriteRegister wr = WR_init(chunkSize);
         void* prefixBuffer = NULL;
@@ -1141,7 +1145,10 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         int checksum = (int)prefs.frameInfo.contentChecksumFlag;
         XXH32_state_t* xxh32 = NULL;
 
+        LZ4IO_CfcParameters cfcp;
         ReadTracker rjd;
+        cfcp.prefs = &prefs;
+        cfcp.cdict = ress.cdict;
         rjd.tpool = tPool;
         rjd.wpool = wPool;
         rjd.fin = srcFile;
@@ -1150,7 +1157,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         rjd.blockNb = 0;
         rjd.xxh32 = xxh32;
         rjd.compress = LZ4IO_compressFrameChunk;
-        rjd.compressParameters = &prefs;
+        rjd.compressParameters = &cfcp;
         rjd.prefix = NULL;
         rjd.fout = dstFile;
         rjd.wr = &wr;
@@ -1195,7 +1202,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             cjd.inSize = readSize;
             cjd.blockNb = 0;
             cjd.compress = LZ4IO_compressFrameChunk;
-            cjd.compressParameters = &prefs;
+            cjd.compressParameters = &cfcp;
             cjd.fout = dstFile;
             cjd.wr = &wr;
             cjd.maxCBlockSize = rjd.maxCBlockSize;
@@ -1416,7 +1423,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     /* do NOT employ multi-threading in the following scenarios: */
     if ( (io_prefs->nbWorkers == 1) /* manually select single-thread mode */
       || (io_prefs->blockIndependence == LZ4F_blockLinked)  /* blocks are not independent */
-      || (ress.cdict))  /* dictionary compression */
+      )
         return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 
     return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
