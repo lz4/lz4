@@ -2,26 +2,40 @@ Command Line Interface for LZ4 library
 ============================================
 
 ### Build
-The Command Line Interface (CLI) can be generated
-using the `make` command without any additional parameters.
-
-The `Makefile` script supports all [standard conventions](https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html),
-including standard targets (`all`, `install`, `clean`, etc.)
-and standard variables (`CC`, `CFLAGS`, `CPPFLAGS`, etc.).
-
-For advanced use cases, there are targets to different variations of the CLI:
-- `lz4` : default CLI, with a command line syntax close to gzip
-- `lz4c` : Same as `lz4` with additional support legacy lz4 commands (incompatible with gzip)
-- `lz4c32` : Same as `lz4c`, but forced to compile in 32-bits mode
+The Command Line Interface (CLI) is generated
+using the `make` command, no additional parameter required.
 
 The CLI generates and decodes [LZ4-compressed frames](../doc/lz4_Frame_format.md).
 
+For more control over the build process,
+the `Makefile` script supports all [standard conventions](https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html),
+including standard targets (`all`, `install`, `clean`, etc.)
+and standard variables (`CC`, `CFLAGS`, `CPPFLAGS`, etc.).
 
-#### Aggregation of parameters
-CLI supports aggregation of parameters i.e. `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`.
+The makefile offer several targets for various use cases:
+- `lz4` : default CLI, with a command line syntax similar to gzip
+- `lz4c` : supports legacy lz4 commands (incompatible with gzip)
+- `lz4c32` : Same as `lz4c`, but generates a 32-bits executable
+- `unlz4`, `lz4cat` : symlinks to `lz4`, default to decompression and `cat` compressed files
+- `man` : generates the man page, from `lz4.1.md` markdown source
+
+#### Makefile Build variables
+- `HAVE_PTHREAD` : determines presences of `<pthread>` support, which determines multithreading support of `lz4`. Normally detected automatically, but can be forced to `0` or `1` if needed.
+
+#### C Preprocessor variables
+These variables are read by the preprocessor, at compilation time, and influence executable behavior, such as default starting values.
+On a typical `posix` + `gcc` + `make` environment, they can be changed by using `CPPFLAGS=-DVARIABLE=value` assignment. Methods vary depending on environments.
+- `LZ4_BLOCKSIZEID_DEFAULT`: determines default `lz4` block size. Valid values are [4-7].
+- `LZ4_NBTHREADS_DEFAULT`: determines default nb of threads in multithreading mode.
+   Default is `0`, which means "auto-determine" based on local cpu.
 
 
-#### Benchmark in Command Line Interface
+### Aggregation of parameters
+The `lz4` CLI supports aggregation for short commands. For example, `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`.
+This doesn't work for `--long-commands`, which must be separated.
+
+
+### Benchmark in Command Line Interface
 CLI includes in-memory compression benchmark module for lz4.
 The benchmark is conducted using a given filename.
 The file is read into memory.
@@ -32,8 +46,7 @@ One can select compression levels starting from `-b` and ending with `-e`.
 The `-i` parameter selects a number of seconds used for each of tested levels.
 
 
-
-#### Usage of Command Line Interface
+### Usage of Command Line Interface
 The full list of commands can be obtained with `-h` or `-H` parameter:
 ```
 Usage :
