@@ -428,11 +428,30 @@ jobs:
     - name: setup
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
+    - name: check lz4
+      run: make clean; CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j check V=1
+
     - name: frametest
-      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
+      run: make clean; CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-frametest V=1
 
     - name: fuzzer
-      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
+      run: make clean; CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-fuzzer V=1
+
+  lz4-msan-x64:
+    name: Linux x64 MSAN
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+
+    - name: check lz4
+      run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j check V=1
+
+    - name: frametest
+      run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-frametest V=1
+
+    - name: fuzzer
+      run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-fuzzer V=1
+
 
   unicode-lint:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
