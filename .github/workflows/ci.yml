@@ -94,11 +94,11 @@ jobs:
 
     - name: install test
       if: always()
-      run: make clean; make -C tests test-install V=1
+      run: make -C tests test-install V=1
 
     - name: make all
       if: always()
-      run: make clean; make -j all V=1
+      run: make clean; CFLAGS="-Werror -O0" make -j all V=1
 
     - name: make c_standards (C90)
       if: always()
@@ -112,7 +112,7 @@ jobs:
       if: ${{ matrix.cxxtest == 'true' }}
       run: make clean; make -j ctocxxtest V=1
 
-    - name: make cxxtest
+    - name: compiled as c++ source
       if: ${{ matrix.cxxtest == 'true' }}
       run: make clean; make -j cxxtest V=1
 
@@ -120,21 +120,13 @@ jobs:
       if: ${{ matrix.freestanding == 'true' }}
       run: make clean; make test-freestanding V=1
 
-    - name: make -C programs default
-      if: always()
-      run: make clean; make -j -C programs default V=1
-
     - name: make -C programs default -D_FORTIFY_SOURCE=2
       if: always()
       run: make clean; CFLAGS='-fPIC' LDFLAGS='-pie -fPIE -D_FORTIFY_SOURCE=2' make -j -C programs default V=1
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; CFLAGS='-Werror -g -O1' make -j V=1 -C tests test-lz4
-
-    - name: make clangtest (clang only)
-      if: ${{ startsWith( matrix.cc , 'clang' ) }}
-      run: make clean; make clangtest V=1
+      run: make clean; make -j V=1 -C tests test-lz4
 
     - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
@@ -147,16 +139,12 @@ jobs:
 
     ###############################################################
     #                                                             #
-    #      Remove this block when we stabilize the tests.         #
+    #      Remove this block when we relevant tests run properly  #
     #                                                             #
 
     - name: make -C tests test CFLAGS='-mx32' || echo Ignore failure for now.
       if: ${{ matrix.x32 == 'fail' }}
       run: make clean; CFLAGS='-mx32' make -C tests test V=1 || $FIXME__LZ4_CI_IGNORE
-
-    - name: make -C tests test-lz4c32 || echo Ignore failure for now.
-      if: ${{ matrix.x86 == 'fail' }}
-      run: make clean; CFLAGS='-Werror' make -C tests test-lz4c32 V=1 || $FIXME__LZ4_CI_IGNORE
 
     #                                                             #
     ###############################################################
@@ -166,14 +154,14 @@ jobs:
 ###############################################################
 # LZ4 self tests
 #
-# - Benchmark
+# - Fullbench
 # - Fuzzer
 # - LZ4 Frame
 # - LZ4 versions
 # - Custom LZ4_DISTANCE_MAX
 #
   lz4-benchmark:
-    name: Benchmark
+    name: Fullbench
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
@@ -183,19 +171,19 @@ jobs:
         sudo apt-get update
         sudo apt-get install gcc-multilib
 
-    - name: benchmark (-C tests test-lz4)
+    - name: test-lz4
       run: make -j -C tests test-lz4 V=1
 
-    - name: benchmark (-C tests test-lz4c)
+    - name: test-lz4c
       run: make -j -C tests test-lz4c V=1
 
-    - name: benchmark (-C tests test-lz4c32)
+    - name: test-lz4c32
       run: make -j -C tests test-lz4c32 V=1
 
-    - name: benchmark (-C tests test-fullbench)
+    - name: test-fullbench
       run: make -j -C tests test-fullbench V=1
 
-    - name: benchmark (-C tests test-fullbench32)
+    - name: test-fullbench32
       run: make -j -C tests test-fullbench32 V=1
 
 
@@ -246,7 +234,7 @@ jobs:
 
 
   lz4-abi:
-    name: LZ4 inter-versions ABI test
+    name: LZ4 inter-versions ABI compatibility test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
@@ -428,11 +416,39 @@ jobs:
     - name: setup
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
+    - name: check lz4
+      run: make clean; CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j check V=1
+
     - name: frametest
-      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-frametest
+      run: make clean; CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-frametest V=1
 
     - name: fuzzer
-      run: CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make V=1 -C tests clean test-fuzzer
+      run: make clean; CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-fuzzer V=1
+
+  lz4-msan-x64:
+    name: Linux x64 MSAN
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+
+    - name: check lz4
+      run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j check V=1
+
+    - name: frametest
+      run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-frametest V=1
+
+    - name: fuzzer
+      run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-fuzzer V=1
+
+  lz4-tsan-x64:
+    name: Linux x64 TSAN
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+
+    - name: lz4 cli
+      run: make clean; CC=clang CFLAGS=-fsanitize=thread LDFLAGS=-fsanitize=thread make -j -C tests test-lz4 V=1
+
 
   unicode-lint:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
@@ -544,17 +560,17 @@ jobs:
         echo && $XCC -v                       # Show built-in specs
         echo && type $XEMU && which $XEMU && $XEMU --version
 
-    - name: ARM-ARM64-PPC
+    - name: ARM-ARM64-PPC-S390X
       if: ${{ matrix.type == 'ARM' || matrix.type == 'ARM64' || matrix.type == 'PPC' || matrix.type == 'S390X'}}
-      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+      run: make platformTest V=1  CC=$XCC QEMU_SYS=$XEMU
 
     - name: PPC64LE
       if: ${{ matrix.type == 'PPC64LE' }}
-      run: CFLAGS=-m64 make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+      run: CFLAGS=-m64 make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
 
     - name: MIPS-M68K-RISCV
       if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' }}
-      run: make V=1 platformTest CC=$XCC QEMU_SYS=$XEMU
+      run: make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
 
 
 
@@ -572,10 +588,10 @@ jobs:
         echo && sysctl -a | grep machdep.cpu   # cpuinfo
 
     - name: make default
-      run: make clean; CFLAGS="-Werror -O1" make V=1 default
+      run: make clean; CFLAGS="-Werror -O0" make default V=1
 
     - name: make test
-      run: make clean; CFLAGS="-O2 -Werror -Wconversion -Wno-sign-conversion" make -j V=1 test
+      run: make clean; CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" make -j test V=1
 
     - name: Ensure `make test` doesn't depend on the status of the console
       # see issue #990 for detailed explanations
@@ -609,43 +625,11 @@ jobs:
 
 
 ###############################################################
-# Build systems
+# Build systems (other than make)
 #
-# - make
 # - cmake
 # - meson
 #
-
-  # make
-  lz4-build-make:
-    name: make
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
-
-    - name: Environment info
-      run: |
-        echo && type cc && which cc && cc --version
-        echo && type make && which make && make -v
-
-    - name: make
-      run: make V=1
-
-
-  lz4-build-make-test-install:
-    name: make test-install
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
-
-    - name: test-install
-      run: make V=1 clean test-install
-
-    - name: test-install result
-      run: |
-        echo && echo Installed files
-        ( cd ~/install_test_dir; find .; )
-
 
   # cmake
   lz4-build-cmake:

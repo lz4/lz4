@@ -145,23 +145,6 @@ test:
 	$(MAKE) -C $(TESTDIR) $@
 	$(MAKE) -C $(EXDIR) $@
 
-.PHONY: clangtest
-clangtest: CFLAGS += -Werror -Wconversion -Wno-sign-conversion
-clangtest: CC = clang
-clangtest:
-	$(CC) -v
-	$(MAKE) -C $(LZ4DIR)  all CC=$(CC)
-	$(MAKE) -C $(PRGDIR)  all CC=$(CC)
-	$(MAKE) -C $(TESTDIR) all CC=$(CC)
-
-.PHONY: clangtest-native
-clangtest-native: CFLAGS = -O3 -Werror -Wconversion -Wno-sign-conversion
-clangtest-native: clean
-	clang -v
-	$(MAKE) -C $(LZ4DIR)  all    CC=clang
-	$(MAKE) -C $(PRGDIR)  native CC=clang
-	$(MAKE) -C $(TESTDIR) native CC=clang
-
 .PHONY: usan
 usan: CC      = clang
 usan: CFLAGS  = -O3 -g -fsanitize=undefined -fno-sanitize-recover=undefined -fsanitize-recover=pointer-overflow
