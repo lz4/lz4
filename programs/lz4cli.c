@@ -32,6 +32,25 @@
 
 
 /*-************************************
+*  Compile-time parameters
+**************************************/
+/* Determines default lz4 block size when none provided.
+ * Default value is 7, which represents 4 MB.
+ * Can also be changed at runtime using -B# command */
+#ifndef LZ4_BLOCKSIZEID_DEFAULT
+# define LZ4_BLOCKSIZEID_DEFAULT 7
+#endif
+
+/* Determines default nb of threads
+ * Default value is 0, which means "auto" :
+ * nb of threads will depend on detected local cpu.
+ * Can also be changed at runtime using -T# command */
+#ifndef LZ4_NBTHREADS_DEFAULT
+# define LZ4_NBTHREADS_DEFAULT 0
+#endif
+
+
+/*-************************************
 *  Compiler options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -73,8 +92,6 @@ static int g_lz4c_legacy_commands = 0;
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define GB *(1U<<30)
-
-#define LZ4_BLOCKSIZEID_DEFAULT 7
 
 
 /*-************************************
@@ -130,7 +147,7 @@ static int usage(const char* exeName)
     DISPLAY( "Arguments : \n");
     DISPLAY( " -1     : fast compression (default) \n");
     DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
-    DISPLAY( " -T#    : use # threads for compression (default:0==auto) \n");
+    DISPLAY( " -T#    : use # threads for compression (default:%i==auto) \n", LZ4_NBTHREADS_DEFAULT);
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -k     : preserve source files(s)  (default) \n");
@@ -158,7 +175,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -z     : force compression \n");
     DISPLAY( " -D FILE: use FILE as dictionary (compression & decompression)\n");
     DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
-    DISPLAY( "                     or predefined block size [4-7] (default: 7) \n");
+    DISPLAY( "                     or predefined block size [4-7] (default: %i) \n", LZ4_BLOCKSIZEID_DEFAULT);
     DISPLAY( " -BI    : Block Independence (default) \n");
     DISPLAY( " -BD    : Block dependency (improves compression ratio) \n");
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
@@ -366,7 +383,7 @@ int main(int argCount, const char** argv)
         multiple_inputs=0,
         all_arguments_are_files=0,
         operationResult=0;
-    unsigned nbWorkers = 0;
+    unsigned nbWorkers = LZ4_NBTHREADS_DEFAULT;
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
@@ -456,7 +473,6 @@ int main(int argCount, const char** argv)
 
                 if (longCommandWArg(&argument, "--threads")) {
                     NEXT_UINT32(nbWorkers);
-                    LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
                     continue;
                 }
                 if (longCommandWArg(&argument, "--fast")) {
@@ -523,7 +539,6 @@ int main(int argCount, const char** argv)
                     {   argument++;
                         nbWorkers = readU32FromChar(&argument);
                         argument--;
-                        LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
                     }
                     break;
 
@@ -831,6 +846,7 @@ int main(int argCount, const char** argv)
                 nbWorkers = (unsigned)LZ4IO_defaultNbWorkers();
             DISPLAYLEVEL(3, "Using %u threads for compression \n", nbWorkers);
         }
+        LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
 #endif
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
