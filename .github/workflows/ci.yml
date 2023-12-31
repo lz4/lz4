@@ -429,13 +429,13 @@ jobs:
       run: sudo sysctl -w vm.mmap_min_addr=4096
 
     - name: check lz4
-      run: make clean; CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j check V=1
+      run: make clean; CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j check V=1
 
     - name: frametest
-      run: make clean; CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-frametest V=1
+      run: make clean; CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-frametest V=1
 
     - name: fuzzer
-      run: make clean; CC=clang CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-fuzzer V=1
+      run: make clean; CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-fuzzer V=1
 
   lz4-msan-x64:
     name: Linux x64 MSAN
@@ -451,6 +451,15 @@ jobs:
 
     - name: fuzzer
       run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-fuzzer V=1
+
+  lz4-tsan-x64:
+    name: Linux x64 TSAN
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+
+    - name: lz4 cli
+      run: make clean; CC=clang CFLAGS=-fsanitize=thread LDFLAGS=-fsanitize=thread make -j -C tests test-lz4 V=1
 
 
   unicode-lint:
