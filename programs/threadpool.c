@@ -68,9 +68,34 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx) {
 
 #else
 
-/* pthread only */
+/* pthread or standard <threads.h> */
 #include <stdlib.h>  /* malloc, free*/
-#include <pthread.h> /* pthread_* */
+
+#if defined(LZ4IO_USE_STD_THREADS_H) && (LZ4IO_USE_STD_THREADS_H)
+#  include <threads.h> /* thrd_*, mtx_*, cnd_* */
+#  define pthread_t                     thrd_t
+#  define pthread_create(a,b,c,d)       thrd_create(a,c,d)    /* ignore 2nd argument */
+#  define pthread_join                  thrd_join
+#  define pthread_mutex_t               mtx_t
+#  define pthread_mutex_init(a,b)       mtx_init(a,mtx_plain) /* ignore and replace 2nd argument */
+#  define pthread_mutex_destroy         mtx_destroy
+#  define pthread_mutex_lock            mtx_lock
+#  define pthread_mutex_unlock          mtx_unlock
+#  define pthread_cond_t                cnd_t
+#  define pthread_cond_init(a,b)        cnd_init(a)           /* ignore 2nd argument */
+#  define pthread_cond_destroy          cnd_destroy
+#  define pthread_cond_wait             cnd_wait
+#  define pthread_cond_signal           cnd_signal
+#  define pthread_cond_broadcast        cnd_broadcast
+#  define TPOOL_thread_ReturnType       int
+#  define TPOOL_thread_ReturnFailure    0
+#  define TPOOL_thread_ReturnSuccess    (!0)
+#else
+#  include <pthread.h> /* pthread_* */
+#  define TPOOL_thread_ReturnType       void*
+#  define TPOOL_thread_ReturnFailure    NULL
+#  define TPOOL_thread_ReturnSuccess    opaque /* the argument of TPOOL_thread() */
+#endif
 
 /* A job is just a function with an opaque argument */
 typedef struct TPOOL_job_s {
@@ -117,7 +142,7 @@ void TPOOL_free(TPOOL_ctx* ctx) {
     free(ctx);
 }
 
-static void* TPOOL_thread(void* opaque);
+static TPOOL_thread_ReturnType TPOOL_thread(void* opaque);
 
 TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
 {
@@ -175,9 +200,9 @@ TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
  * Waits for jobs and executes them.
  * @returns : NULL on failure else non-null.
  */
-static void* TPOOL_thread(void* opaque) {
+static TPOOL_thread_ReturnType TPOOL_thread(void* opaque) {
     TPOOL_ctx* const ctx = (TPOOL_ctx*)opaque;
-    if (!ctx) { return NULL; }
+    if (!ctx) { return TPOOL_thread_ReturnFailure; }
     for (;;) {
         /* Lock the mutex and wait for a non-empty queue or until shutdown */
         pthread_mutex_lock(&ctx->queueMutex);
@@ -189,7 +214,7 @@ static void* TPOOL_thread(void* opaque) {
                  * a few threads will be shutdown while !queueEmpty,
                  * but enough threads will remain active to finish the queue */
                 pthread_mutex_unlock(&ctx->queueMutex);
-                return opaque;
+                return TPOOL_thread_ReturnSuccess;
             }
             pthread_cond_wait(&ctx->queuePopCond, &ctx->queueMutex);
         }
