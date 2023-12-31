@@ -32,6 +32,21 @@
 
 
 /*-************************************
+*  Compile-time parameters
+**************************************/
+/* Determines if multithreading is enabled or no
+ * Default: disabled */
+#ifndef LZ4IO_MULTITHREAD
+# define LZ4IO_MULTITHREAD 0
+#endif
+
+/* Maximum nb of threads that can selected at runtime */
+#ifndef LZ4IO_NB_WORKERS_MAX
+# define LZ4IO_NB_WORKERS_MAX 125
+#endif
+
+
+/*-************************************
 *  Compiler options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -87,10 +102,6 @@
 #define LZ4IO_BLOCKSIZEID_DEFAULT 7
 #define LZ4_MAX_DICT_SIZE (64 KB)
 
-#ifndef LZ4IO_NB_WORKERS_MAX
-# define LZ4IO_NB_WORKERS_MAX 200
-#endif
-
 #undef MIN
 #define MIN(a,b)  ((a)<(b)?(a):(b))
 
@@ -114,7 +125,7 @@ static TIME_t g_time = { 0 };
 
 static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
 {
-#ifdef LZ4IO_MULTITHREAD
+#if LZ4IO_MULTITHREAD
     if (!TIME_support_MT_measurements()) {
         DISPLAYLEVEL(5, "time measurements not compatible with multithreading \n");
     } else
@@ -155,7 +166,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
 
 int LZ4IO_defaultNbWorkers(void)
 {
-#ifdef LZ4IO_MULTITHREAD
+#if LZ4IO_MULTITHREAD
     int const nbCores = UTIL_countCores();
     int const spared = 1 + ((unsigned)nbCores >> 3);
     if (nbCores <= spared) return 1;
@@ -1469,7 +1480,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
-#if defined(LZ4IO_MULTITHREAD)
+#if LZ4IO_MULTITHREAD
     /* only employ multi-threading in the following scenarios: */
     if ( (io_prefs->nbWorkers != 1)
       && (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
