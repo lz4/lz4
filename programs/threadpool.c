@@ -23,18 +23,9 @@
 */
 
 
-/*-************************************
-*  Compile-time parameters
-**************************************/
-/* Determines if multithreading is enabled or no
- * Default: disabled */
-#ifndef LZ4IO_MULTITHREAD
-# define LZ4IO_MULTITHREAD 0
-#endif
-
-
 /* ======   Dependencies   ======= */
 #include <assert.h>
+#include "lz4conf.h"  /* LZ4IO_MULTITHREAD */
 #include "threadpool.h"
 
 
@@ -44,7 +35,7 @@
 #endif
 
 
-#if !LZ4IO_MULTITHREAD
+#if !LZ4_MULTITHREAD
 
 /* ===================================================== */
 /* Backup implementation with no multi-threading support */

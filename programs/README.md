@@ -20,12 +20,14 @@ The makefile offer several targets for various use cases:
 - `man` : generates the man page, from `lz4.1.md` markdown source
 
 #### C Preprocessor variables
-These variables are read by the preprocessor at compilation time, they influence executable behavior, such as default starting values.
-Assignment methods vary depending on environments. On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=-DVARIABLE=value` assignment.
-- `LZ4_BLOCKSIZEID_DEFAULT`: code for default `lz4` block size. Valid values are [4-7].
+These variables are read by the preprocessor at compilation time, they influence executable behavior, such as default starting values,
+and are exposed from `programs/lz4conf.h`.
+Assignment methods vary depending on environments.
+On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=-DVARIABLE=value` assignment.
+- `LZ4_MULTITHREAD`: enable multithreading support
 - `LZ4_NBTHREADS_DEFAULT`: default nb of threads in multithreading mode.
    Default is `0`, which means "auto-determine" based on local cpu.
-- `LZ4IO_MULTITHREAD`: enable multithreading support
+- `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7].
 
 #### Makefile Build variables
 - `HAVE_PTHREAD` : determines presences of `<pthread>` support. This is in turn used by `make` to determine multithreading support of `lz4`. Detection is automatic, but can be forced to `0` or `1` if needed.

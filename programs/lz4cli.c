@@ -32,32 +32,6 @@
 
 
 /*-************************************
-*  Compile-time parameters
-**************************************/
-/* Determines default lz4 block size when none provided.
- * Default value is 7, which represents 4 MB.
- * Can also be changed at runtime using -B# command */
-#ifndef LZ4_BLOCKSIZEID_DEFAULT
-# define LZ4_BLOCKSIZEID_DEFAULT 7
-#endif
-
-/* Determines default nb of threads
- * Default value is 0, which means "auto" :
- * nb of threads will depend on detected local cpu.
- * Can also be changed at runtime using -T# command */
-#ifndef LZ4_NBTHREADS_DEFAULT
-# define LZ4_NBTHREADS_DEFAULT 0
-#endif
-
-
-/* Determines if multithreading is enabled or no
- * Default: disabled */
-#ifndef LZ4IO_MULTITHREAD
-# define LZ4IO_MULTITHREAD 0
-#endif
-
-
-/*-************************************
 *  Compiler options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
@@ -73,6 +47,7 @@
 #include <stdio.h>    /* fprintf, getchar */
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
+#include "lz4conf.h"  /* compile-time constants */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 #include "lz4hc.h"    /* LZ4HC_CLEVEL_MAX */
@@ -82,7 +57,7 @@
 /*****************************
 *  Constants
 ******************************/
-#if LZ4IO_MULTITHREAD
+#if LZ4_MULTITHREAD
 # define IO_MT "multithread"
 #else
 # define IO_MT "single-thread"
@@ -154,7 +129,7 @@ static int usage(const char* exeName)
     DISPLAY( "Arguments : \n");
     DISPLAY( " -1     : fast compression (default) \n");
     DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
-    DISPLAY( " -T#    : use # threads for compression (default:%i==auto) \n", LZ4_NBTHREADS_DEFAULT);
+    DISPLAY( " -T#    : use # threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -k     : preserve source files(s)  (default) \n");
@@ -390,7 +365,7 @@ int main(int argCount, const char** argv)
         multiple_inputs=0,
         all_arguments_are_files=0,
         operationResult=0;
-    unsigned nbWorkers = LZ4_NBTHREADS_DEFAULT;
+    unsigned nbWorkers = LZ4_NBWORKERS_DEFAULT;
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
@@ -708,7 +683,7 @@ int main(int argCount, const char** argv)
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(5, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
-#if !LZ4IO_MULTITHREAD
+#if !LZ4_MULTITHREAD
     if (nbWorkers > 1)
         DISPLAYLEVEL(2, "warning: this executable doesn't support multithreading \n");
 #endif
@@ -847,7 +822,7 @@ int main(int argCount, const char** argv)
     } else if (mode == om_list){
         operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
     } else {   /* compression is default action */
-#if LZ4IO_MULTITHREAD
+#if LZ4_MULTITHREAD
         if (nbWorkers != 1) {
             if (nbWorkers==0)
                 nbWorkers = (unsigned)LZ4IO_defaultNbWorkers();
