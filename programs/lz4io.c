@@ -1,6 +1,6 @@
 /*
   LZ4io.c - LZ4 File/Stream Interface
-  Copyright (C) Yann Collet 2011-2023
+  Copyright (C) Yann Collet 2011-2024
 
   GPL v2 License
 
@@ -54,11 +54,12 @@
 #include <time.h>      /* clock_t, for cpu-time */
 #include <sys/types.h> /* stat64 */
 #include <sys/stat.h>  /* stat64 */
-#include "lz4.h"       /* still required for legacy format */
-#include "lz4hc.h"     /* still required for legacy format */
-#define LZ4F_STATIC_LINKING_ONLY
-#include "lz4frame.h"
+#include "lz4conf.h"   /* compile-time constants */
 #include "lz4io.h"
+#include "lz4.h"       /* required for legacy format */
+#include "lz4hc.h"     /* required for legacy format */
+#define LZ4F_STATIC_LINKING_ONLY
+#include "lz4frame.h"  /* LZ4F_* */
 #include "xxhash.h"    /* frame checksum (MT mode) */
 
 
@@ -87,10 +88,6 @@
 #define LZ4IO_BLOCKSIZEID_DEFAULT 7
 #define LZ4_MAX_DICT_SIZE (64 KB)
 
-#ifndef LZ4IO_NB_WORKERS_MAX
-# define LZ4IO_NB_WORKERS_MAX 200
-#endif
-
 #undef MIN
 #define MIN(a,b)  ((a)<(b)?(a):(b))
 
@@ -114,7 +111,7 @@ static TIME_t g_time = { 0 };
 
 static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
 {
-#ifdef LZ4IO_MULTITHREAD
+#if LZ4_MULTITHREAD
     if (!TIME_support_MT_measurements()) {
         DISPLAYLEVEL(5, "time measurements not compatible with multithreading \n");
     } else
@@ -155,7 +152,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
 
 int LZ4IO_defaultNbWorkers(void)
 {
-#ifdef LZ4IO_MULTITHREAD
+#if LZ4_MULTITHREAD
     int const nbCores = UTIL_countCores();
     int const spared = 1 + ((unsigned)nbCores >> 3);
     if (nbCores <= spared) return 1;
@@ -217,7 +214,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers)
 {
     if (nbWorkers < 1 ) nbWorkers = 1;
-    nbWorkers = MIN(nbWorkers, LZ4IO_NB_WORKERS_MAX);
+    nbWorkers = MIN(nbWorkers, LZ4_NBWORKERS_MAX);
     prefs->nbWorkers = nbWorkers;
     return nbWorkers;
 }
@@ -1469,7 +1466,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
-#if defined(LZ4IO_MULTITHREAD)
+#if LZ4_MULTITHREAD
     /* only employ multi-threading in the following scenarios: */
     if ( (io_prefs->nbWorkers != 1)
       && (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
