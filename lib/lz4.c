@@ -577,10 +577,10 @@ LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const si
 #endif
 
     LZ4_write_ARCH(dstPtr, r);
-    dstPtr += 8;
+    dstPtr += sizeof(reg_t);
     while (dstPtr < dstEnd) {
         LZ4_write_ARCH(dstPtr, r);
-        dstPtr += 8;
+        dstPtr += sizeof(reg_t);
     }
 }
 #endif
