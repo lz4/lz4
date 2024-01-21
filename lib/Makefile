@@ -195,7 +195,7 @@ pkgconfigdir ?= $(PKGCONFIGDIR)
 
 .PHONY: install
 install: lib liblz4.pc
-	$(INSTALL_DIR) $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
+	$(MAKE_DIR) $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
 	$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(pkgconfigdir)/
 	@echo Installing libraries in $(DESTDIR)$(libdir)
   ifeq ($(BUILD_STATIC),yes)
