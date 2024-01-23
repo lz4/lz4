@@ -203,7 +203,7 @@ man1dir     ?= $(MAN1DIR)
 .PHONY: install
 install: lz4
 	@echo Installing binaries in $(DESTDIR)$(bindir)
-	$(INSTALL_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
+	$(MAKE_DIR) $(DESTDIR)$(bindir)/ $(DESTDIR)$(man1dir)/
 	$(INSTALL_PROGRAM) lz4$(EXT) $(DESTDIR)$(bindir)/lz4$(EXT)
 	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4c$(EXT)
 	$(LN_SF) lz4$(EXT) $(DESTDIR)$(bindir)/lz4cat$(EXT)
