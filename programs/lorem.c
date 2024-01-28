@@ -30,18 +30,19 @@
  * and print them one after another randomly
  * with a fake sentence / paragraph structure.
  *
- * It would be possible to create some more complex scheme,
- * notably by enlarging the dictionary of words with a word generator,
- * inventing grammatical rules (composition) and syntax rules.
- * But that's probably overkill for the intended goal.
- *
- * The goal is to generate a text which can be printed,
- * and can be used to fake a text compression scenario.
+ * The goal is to generate a printable text
+ * that can be used to fake a text compression scenario.
  * The resulting compression / ratio curve of the lorem ipsum generator
- * is more satisfying than the existing statistical generator,
+ * is more satisfying than the previous statistical generator,
  * which was initially designed for entropy compression,
- * but lacks a regularity more representative of text,
- * which more properly tests the LZ compression part.
+ * and lacks a regularity more representative of text.
+ *
+ * The compression ratio achievable on the generated lorem ipsum
+ * is still a bit too good, presumably because the dictionary is too small.
+ * It would be possible to create some more complex scheme,
+ * notably by enlarging the dictionary with a word generator,
+ * and adding grammatical rules (composition) and syntax rules.
+ * But that's probably overkill for the intended goal.
  */
 
 #include "platform.h"  /* Compiler options, SET_BINARY_MODE */
@@ -69,7 +70,6 @@ const char *words[] = {
     "eu",          "facilisis",  "odio",       "morbi",        "quis",
     "eros",        "donec",      "ac",         "orci",         "purus",
     "turpis",      "cursus",     "leo",        "vel",          "porta"};
-const unsigned wordCount = sizeof(words) / sizeof(words[0]);
 
 /* simple distribution that favors small words :
  * 1 letter : weight 3
