@@ -71,6 +71,8 @@ const char *words[] = {
     "turpis",      "cursus",     "leo",        "vel",          "porta"};
 const int wordCount = sizeof(words) / sizeof(words[0]);
 
+/* Note: this unit only works when invoked sequentially.
+ * No concurrent access is allowed */
 static char *g_ptr = NULL;
 static size_t g_nbChars = 0;
 static size_t g_maxChars = 10000000;
@@ -189,6 +191,7 @@ LOREM_genBlock(void *buffer, size_t size,
     if (!fill)
       break; /* only generate one paragraph in not-fill mode */
   }
+  g_ptr = NULL;
   return g_nbChars;
 }
 
