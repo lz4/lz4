@@ -112,8 +112,11 @@ static void writeLastCharacters(void) {
   if (lastChars == 0)
     return;
   g_ptr[g_nbChars++] = '.';
+  if (lastChars > 2) {
+    memset(g_ptr + g_nbChars, ' ', lastChars - 2);
+  }
   if (lastChars > 1) {
-    memset(g_ptr + g_nbChars, ' ', lastChars - 1);
+    g_ptr[g_maxChars-1] = '\n';
   }
   g_nbChars = g_maxChars;
 }
