@@ -25,7 +25,12 @@ test_exes = {
     'test': false,
   },
   'datagen': {
-    'sources': files(lz4_source_root / 'tests/datagencli.c', lz4_source_root / 'tests/datagen.c'),
+    'sources': files(
+        lz4_source_root / 'programs/lorem.c',
+        lz4_source_root / 'tests/datagencli.c',
+        lz4_source_root / 'tests/datagen.c',
+        lz4_source_root / 'tests/loremOut.c',
+        ),
     'include_directories': include_directories(lz4_source_root / 'programs'),
   },
   'decompress-partial-usingDict.c': {
