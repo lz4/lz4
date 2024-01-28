@@ -43,7 +43,6 @@
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>      /* assert */
 
-#include "datagen.h"     /* RDG_genBuffer */
 #include "lorem.h"       /* LOREM_genBuffer */
 #include "xxhash.h"
 #include "bench.h"
@@ -413,7 +412,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     }   }   }
 
     /* warming up memory */
-    RDG_genBuffer(compressedBuffer, maxCompressedSize, 0.10, 0.50, 1);
+    memset(compressedBuffer, ' ', maxCompressedSize);
 
     /* decode-only mode : copy input to @compressedBuffer */
     if (g_decodeOnly) {

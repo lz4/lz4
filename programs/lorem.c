@@ -111,7 +111,6 @@ static void generateWord(const char *word, const char *separator) {
   g_nbChars += strlen(word);
   memcpy(g_ptr + g_nbChars, separator, strlen(separator));
   g_nbChars += strlen(separator);
-  // fprintf(stderr, "print %s (%i) \n", word, g_nbChars);
 }
 
 static const char* upWord(char *dst, const char *src) {
