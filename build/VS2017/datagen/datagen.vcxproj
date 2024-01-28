@@ -161,11 +161,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\programs\datagen.c" />
+    <ClCompile Include="..\..\..\tests\datagen.c" />
     <ClCompile Include="..\..\..\tests\datagencli.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\programs\datagen.h" />
+    <ClInclude Include="..\..\..\tests\datagen.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

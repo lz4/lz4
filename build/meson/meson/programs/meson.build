@@ -14,7 +14,7 @@ lz4_source_root = '../../../..'
 # it would be preferable to use some kind of glob or wildcard expansion here...
 sources = files(
   lz4_source_root / 'programs/bench.c',
-  lz4_source_root / 'programs/datagen.c',
+  lz4_source_root / 'programs/lorem.c',
   lz4_source_root / 'programs/lz4cli.c',
   lz4_source_root / 'programs/lz4io.c',
   lz4_source_root / 'programs/util.c',
