@@ -31,6 +31,7 @@
 #include "util.h"      /* U32 */
 #include <stdio.h>     /* fprintf, stderr */
 #include "datagen.h"   /* RDG_generate */
+#include "loremOut.h"  /* LOREM_genOut */
 #include "lz4.h"       /* LZ4_VERSION_STRING */
 
 
@@ -38,8 +39,8 @@
 *  Compiler specific
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
-#define strtoull    _strtoui64  /* https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/strtoui64-wcstoui64-strtoui64-l-wcstoui64-l */
+# pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
+# define strtoull  _strtoui64  /* https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/strtoui64-wcstoui64-strtoui64-l-wcstoui64-l */
 #endif
 
 
@@ -87,7 +88,7 @@ static int usage(char* programName)
 int main(int argc, char** argv)
 {
     int argNb;
-    double proba = (double)COMPRESSIBILITY_DEFAULT / 100;
+    unsigned long long proba = COMPRESSIBILITY_DEFAULT;
     double litProba = 0.0;
     U64 size = SIZE_DEFAULT;
     U32 seed = SEED_DEFAULT;
@@ -125,8 +126,7 @@ int main(int argc, char** argv)
                     break;
                 case 'P':
                     argument++;
-                    proba = (double) strtoull(argument, &argument, 10);
-                    proba /= 100.;
+                    proba = strtoull(argument, &argument, 10);
                     break;
                 case 'L':   /* hidden argument : Literal distribution probability */
                     argument++;
@@ -148,9 +148,12 @@ int main(int argc, char** argv)
 
     DISPLAYLEVEL(4, "Data Generator %s \n", LZ4_VERSION_STRING);
     DISPLAYLEVEL(3, "Seed = %u \n", seed);
-    if (proba!=COMPRESSIBILITY_DEFAULT) DISPLAYLEVEL(3, "Compressibility : %i%%\n", (U32)(proba*100));
-
-    RDG_genOut(size, proba, litProba, seed);
+    if (proba != COMPRESSIBILITY_DEFAULT) {
+        DISPLAYLEVEL(3, "Compressibility : %i%%\n", (int)proba);
+        RDG_genOut(size, (double)proba / 100., litProba, seed);
+    } else {
+        LOREM_genOut(size, seed);
+    }
     DISPLAYLEVEL(1, "\n");
 
     return 0;

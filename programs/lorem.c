@@ -45,10 +45,8 @@
  * But that's probably overkill for the intended goal.
  */
 
-#include "platform.h"  /* Compiler options, SET_BINARY_MODE */
-#include <stdio.h>
-#include <string.h>
-#include <limits.h>
+#include <string.h>  /* memcpy */
+#include <limits.h>  /* INT_MAX */
 #include <assert.h>
 
 #define WORD_MAX_SIZE 20
@@ -190,10 +188,9 @@ static void generateFirstSentence(void) {
   generateWord(words[18], ". ", 0);
 }
 
-static size_t
-LOREM_genBlock(void *buffer, size_t size,
-                unsigned seed,
-                int first, int fill)
+size_t LOREM_genBlock(void* buffer, size_t size,
+                      unsigned seed,
+                      int first, int fill)
 {
   g_ptr = (char*)buffer;
   assert(size < INT_MAX);
@@ -218,27 +215,3 @@ void LOREM_genBuffer(void* buffer, size_t size, unsigned seed)
   LOREM_genBlock(buffer, size, seed, 1, 1);
 }
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define LOREM_BLOCKSIZE (1 << 10)
-void LOREM_genOut(unsigned long long size, unsigned seed)
-{
-  char buff[LOREM_BLOCKSIZE + 1] = {0};
-  unsigned long long total = 0;
-  size_t genBlockSize = (size_t)MIN(size, LOREM_BLOCKSIZE);
-
-  /* init */
-  SET_BINARY_MODE(stdout);
-
-  /* Generate data, per blocks */
-  while (total < size) {
-    size_t generated = LOREM_genBlock(buff, genBlockSize, seed++, total == 0, 0);
-    assert(generated <= genBlockSize);
-    total += generated;
-    assert(total <= size);
-    fwrite(buff, 1, generated,
-           stdout); /* note: should check potential write error */
-    if (size - total < genBlockSize)
-      genBlockSize = (size_t)(size - total);
-  }
-  assert(total == size);
-}
