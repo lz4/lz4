@@ -101,26 +101,21 @@ static void writeLastCharacters(void) {
   g_nbChars = g_maxChars;
 }
 
-static void generateWord(const char *word, const char *separator) {
-  size_t const len = strlen(word) + strlen(separator);
-  if (g_nbChars + len > g_maxChars) {
-    writeLastCharacters();
-    return;
-  }
-  memcpy(g_ptr + g_nbChars, word, strlen(word));
-  g_nbChars += strlen(word);
-  memcpy(g_ptr + g_nbChars, separator, strlen(separator));
-  g_nbChars += strlen(separator);
-}
-
-static const char* upWord(char *dst, const char *src) {
-  size_t len = strlen(src);
-  int toUp = 'A' - 'a';
-  assert(len < WORD_MAX_SIZE);
-  memcpy(dst, src, len);
-  dst[0] += toUp;
-  dst[len] = 0;
-  return dst;
+static void generateWord(const char *word, const char *separator, int upCase)
+{
+    size_t const len = strlen(word) + strlen(separator);
+    if (g_nbChars + len > g_maxChars) {
+        writeLastCharacters();
+        return;
+    }
+    memcpy(g_ptr + g_nbChars, word, strlen(word));
+    if (upCase) {
+        static const int toUp = 'A' - 'a';
+        g_ptr[g_nbChars] += toUp;
+    }
+    g_nbChars += strlen(word);
+    memcpy(g_ptr + g_nbChars, separator, strlen(separator));
+    g_nbChars += strlen(separator);
 }
 
 static int about(unsigned target) {
@@ -129,23 +124,19 @@ static int about(unsigned target) {
 
 /* Function to generate a random sentence */
 static void generateSentence(int nbWords) {
-  char upWordBuff[WORD_MAX_SIZE];
   int commaPos = about(9);
   int comma2 = commaPos + about(7);
   int i;
   for (i = 0; i < nbWords; i++) {
     const char *word = words[LOREM_rand() % wordCount];
     const char* sep = " ";
-    if (i == 0) {
-      word = upWord(upWordBuff, word);
-    }
     if (i == commaPos)
       sep = ", ";
     if (i == comma2)
       sep = ", ";
     if (i == nbWords - 1)
       sep = ". ";
-    generateWord(word, sep);
+    generateWord(word, sep, i==0);
   }
 }
 
@@ -166,20 +157,17 @@ static void generateParagraph(int nbSentences) {
 /* It's "common" for lorem ipsum generators to start with the same first
  * pre-defined sentence */
 static void generateFirstSentence(void) {
-  char buffer[WORD_MAX_SIZE];
   int i;
   for (i = 0; i < 18; i++) {
     const char *word = words[i];
     const char *separator = " ";
-    if (i == 0)
-      word = upWord(buffer, word);
     if (i == 4)
       separator = ", ";
     if (i == 7)
       separator = ", ";
-    generateWord(word, separator);
+    generateWord(word, separator, i==0);
   }
-  generateWord(words[18], ". ");
+  generateWord(words[18], ". ", 0);
 }
 
 static size_t

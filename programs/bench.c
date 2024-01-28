@@ -749,8 +749,7 @@ static int BMK_syntheticTest(int cLevel, int cLevelLast,
                              const char* dictBuf, int dictSize)
 {
     int benchError = 0;
-    char name[20] = {0};
-    size_t benchedSize = 10000000;
+    size_t const benchedSize = 10000000;
     void* const srcBuffer = malloc(benchedSize);
 
     /* Memory allocation */
@@ -760,9 +759,8 @@ static int BMK_syntheticTest(int cLevel, int cLevelLast,
     LOREM_genBuffer(srcBuffer, benchedSize, 0);
 
     /* Bench */
-    snprintf(name, sizeof(name), "Lorem ipsum");
     benchError = BMK_benchCLevel(srcBuffer, benchedSize,
-                    name,
+                    "Lorem ipsum",
                     cLevel, cLevelLast,
                     &benchedSize,
                     1,
