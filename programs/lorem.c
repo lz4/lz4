@@ -80,7 +80,7 @@ static size_t g_maxChars = 10000000;
 static unsigned g_randRoot = 0;
 
 #define RDG_rotl32(x, r) ((x << r) | (x >> (32 - r)))
-static unsigned int LOREM_rand(void) {
+static unsigned LOREM_rand(unsigned range) {
   static const unsigned prime1 = 2654435761U;
   static const unsigned prime2 = 2246822519U;
   unsigned rand32 = g_randRoot;
@@ -88,7 +88,7 @@ static unsigned int LOREM_rand(void) {
   rand32 ^= prime2;
   rand32 = RDG_rotl32(rand32, 13);
   g_randRoot = rand32;
-  return rand32;
+  return (unsigned)(((unsigned long long)rand32 * range) >> 32);
 }
 
 static void writeLastCharacters(void) {
@@ -121,7 +121,7 @@ static void generateWord(const char *word, const char *separator, int upCase)
 }
 
 static int about(unsigned target) {
-  return (int)((LOREM_rand() % target) + (LOREM_rand() % target) + 1);
+  return (int)(LOREM_rand(target) + LOREM_rand(target) + 1);
 }
 
 /* Function to generate a random sentence */
@@ -130,7 +130,7 @@ static void generateSentence(int nbWords) {
   int comma2 = commaPos + about(7);
   int i;
   for (i = 0; i < nbWords; i++) {
-    const char *word = words[LOREM_rand() % wordCount];
+    const char *word = words[LOREM_rand(wordCount)];
     const char* sep = " ";
     if (i == commaPos)
       sep = ", ";
