@@ -140,7 +140,7 @@ class TestVerbose(unittest.TestCase):
 
     def test_filename(self):
         for i, vinfo in enumerate(self.vinfo_list):
-            self.assertRegex(vinfo.filename, f"^test_list_.*({i + 1}/{len(self.vinfo_list)})".format(i + 1, len(self.vinfo_list)))
+            self.assertRegex(vinfo.filename, f"^test_list_.*({i + 1}/{len(self.vinfo_list)})")
 
     def test_frame_number(self):
         for vinfo in self.vinfo_list:
