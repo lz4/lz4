@@ -1,6 +1,6 @@
 /*
-    datagen.h - compressible data generator header
-    Copyright (C) Yann Collet 2012-2024
+    lorem.h - lorem ipsum generator
+    Copyright (C) Yann Collet 2024
 
     GPL v2 License
 
@@ -26,17 +26,13 @@
 
 #include <stddef.h>   /* size_t */
 
-/* RDG_genOut():
- * Generate @size bytes of compressible data into stdout.
- * Compressibility can be controlled using @matchProba.
- * @LitProba is optional, and affect variability of bytes. If @litProba==0.0, default value is used.
- * Generated data can be influenced using @seed.
- * If @matchProba, @litProba and @seed are equal, the function always generates the same content.
+/* LOREM_genOut():
+ * Generate @size bytes of compressible data using lorem ipsum generator into stdout.
  */
-void RDG_genOut(unsigned long long size, double matchProba, double litProba, unsigned seed);
+void LOREM_genOut(unsigned long long size, unsigned seed);
 
 /*
- * RDG_genBuffer():
- * Same as RDG_genOut, but generates data into provided @buffer
+ * LOREM_genBuffer():
+ * Same as LOREM_genOut, but generates data into provided @buffer
  */
-void RDG_genBuffer(void* buffer, size_t size, double matchProba, double litProba, unsigned seed);
+void LOREM_genBuffer(void* buffer, size_t size, unsigned seed);
