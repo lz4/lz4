@@ -69,7 +69,24 @@ const char *words[] = {
     "eu",          "facilisis",  "odio",       "morbi",        "quis",
     "eros",        "donec",      "ac",         "orci",         "purus",
     "turpis",      "cursus",     "leo",        "vel",          "porta"};
-const int wordCount = sizeof(words) / sizeof(words[0]);
+const unsigned wordCount = sizeof(words) / sizeof(words[0]);
+
+/* simple distribution that favors small words :
+ * 1 letter : weight 3
+ * 2-3 letters : weight 2
+ * 4+ letters : weight 1
+ * This is expected to be a bit more difficult to compress */
+const int distrib[] = {0, 1, 2, 3, 3, 4, 5, 6, 7, 8,
+    8,9, 9, 10, 11, 12, 13, 13, 14, 15,
+    15, 16, 17, 18, 19, 19, 20, 21, 22, 23,
+    24, 25, 26, 26, 26, 27, 28, 29, 30, 31,
+    32, 33, 34, 34, 35, 36, 37, 38, 39, 40,
+    41, 41, 42, 43, 43, 44, 45, 45, 46, 47,
+    48, 49, 50, 51, 52, 53, 54, 55, 55, 56,
+    57, 58, 58, 59, 60, 60, 61, 62, 63, 64,
+    65, 66, 67, 67, 68, 69, 70, 71, 72, 72,
+    73, 73, 74 };
+const unsigned distribCount = sizeof(distrib) / sizeof(distrib[0]);
 
 /* Note: this unit only works when invoked sequentially.
  * No concurrent access is allowed */
@@ -130,7 +147,8 @@ static void generateSentence(int nbWords) {
   int comma2 = commaPos + about(7);
   int i;
   for (i = 0; i < nbWords; i++) {
-    const char *word = words[LOREM_rand(wordCount)];
+    int const wordID = distrib[LOREM_rand(distribCount)];
+    const char *const word = words[wordID];
     const char* sep = " ";
     if (i == commaPos)
       sep = ", ";
@@ -186,7 +204,7 @@ LOREM_genBlock(void *buffer, size_t size,
     generateFirstSentence();
   }
   while (g_nbChars < g_maxChars) {
-    int sentencePerParagraph = about(6);
+    int sentencePerParagraph = about(7);
     generateParagraph(sentencePerParagraph);
     if (!fill)
       break; /* only generate one paragraph in not-fill mode */
