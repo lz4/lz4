@@ -53,7 +53,7 @@
 
 #define SIZE_DEFAULT (64 KB)
 #define SEED_DEFAULT 0
-#define COMPRESSIBILITY_DEFAULT 50
+#define COMPRESSIBILITY_NOT_SET 9999
 
 
 /**************************************
@@ -76,7 +76,7 @@ static int usage(char* programName)
     DISPLAY( "Arguments :\n");
     DISPLAY( " -g#    : generate # data (default:%i)\n", SIZE_DEFAULT);
     DISPLAY( " -s#    : Select seed (default:%i)\n", SEED_DEFAULT);
-    DISPLAY( " -P#    : Select compressibility in %% (default:%i%%)\n", COMPRESSIBILITY_DEFAULT);
+    DISPLAY( " -P#    : Select compressibility in %% (range [0-100])\n");
     DISPLAY( " -h     : display help and exit\n");
     DISPLAY( "Special values :\n");
     DISPLAY( " -P0    : generate incompressible noise\n");
@@ -88,28 +88,24 @@ static int usage(char* programName)
 int main(int argc, char** argv)
 {
     int argNb;
-    unsigned long long proba = COMPRESSIBILITY_DEFAULT;
+    unsigned long long proba = COMPRESSIBILITY_NOT_SET;
     double litProba = 0.0;
     U64 size = SIZE_DEFAULT;
-    U32 seed = SEED_DEFAULT;
+    unsigned seed = SEED_DEFAULT;
     char* programName;
 
     /* Check command line */
     programName = argv[0];
-    for(argNb=1; argNb<argc; argNb++)
-    {
+    for(argNb=1; argNb<argc; argNb++) {
         char* argument = argv[argNb];
 
         if(!argument) continue;   /* Protection if argument empty */
 
         /* Handle commands. Aggregated commands are allowed */
-        if (*argument=='-')
-        {
+        if (*argument=='-') {
             argument++;
-            while (*argument!=0)
-            {
-                switch(*argument)
-                {
+            while (*argument!=0) {
+                switch(*argument) {
                 case 'h':
                     return usage(programName);
                 case 'g':
@@ -122,7 +118,7 @@ int main(int argc, char** argv)
                     break;
                 case 's':
                     argument++;
-                    seed = (U32) strtoul(argument, &argument, 10);
+                    seed = (unsigned)strtoul(argument, &argument, 10);
                     break;
                 case 'P':
                     argument++;
@@ -142,13 +138,12 @@ int main(int argc, char** argv)
                     return usage(programName);
                 }
             }
-
-        }
-    }
+        }  /* if (*argument=='-') */
+    }  /* for(argNb=1; argNb<argc; argNb++) */
 
     DISPLAYLEVEL(4, "Data Generator %s \n", LZ4_VERSION_STRING);
     DISPLAYLEVEL(3, "Seed = %u \n", seed);
-    if (proba != COMPRESSIBILITY_DEFAULT) {
+    if (proba != COMPRESSIBILITY_NOT_SET) {
         DISPLAYLEVEL(3, "Compressibility : %i%%\n", (int)proba);
         RDG_genOut(size, (double)proba / 100., litProba, seed);
     } else {
