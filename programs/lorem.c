@@ -52,7 +52,7 @@
 #define WORD_MAX_SIZE 20
 
 /* Define the word pool */
-const char *words[] = {
+static const char *words[] = {
     "lorem",       "ipsum",      "dolor",      "sit",          "amet",
     "consectetur", "adipiscing", "elit",       "sed",          "do",
     "eiusmod",     "tempor",     "incididunt", "ut",           "labore",
@@ -74,7 +74,8 @@ const char *words[] = {
  * 2-3 letters : weight 2
  * 4+ letters : weight 1
  * This is expected to be a bit more difficult to compress */
-const int distrib[] = {0, 1, 2, 3, 3, 4, 5, 6, 7, 8,
+static const int distrib[] = {
+    0, 1, 2, 3, 3, 4, 5, 6, 7, 8,
     8,9, 9, 10, 11, 12, 13, 13, 14, 15,
     15, 16, 17, 18, 19, 19, 20, 21, 22, 23,
     24, 25, 26, 26, 26, 27, 28, 29, 30, 31,
@@ -84,14 +85,13 @@ const int distrib[] = {0, 1, 2, 3, 3, 4, 5, 6, 7, 8,
     57, 58, 58, 59, 60, 60, 61, 62, 63, 64,
     65, 66, 67, 67, 68, 69, 70, 71, 72, 72,
     73, 73, 74 };
-const unsigned distribCount = sizeof(distrib) / sizeof(distrib[0]);
+static const unsigned distribCount = sizeof(distrib) / sizeof(distrib[0]);
 
 /* Note: this unit only works when invoked sequentially.
  * No concurrent access is allowed */
 static char *g_ptr = NULL;
 static size_t g_nbChars = 0;
 static size_t g_maxChars = 10000000;
-
 static unsigned g_randRoot = 0;
 
 #define RDG_rotl32(x, r) ((x << r) | (x >> (32 - r)))

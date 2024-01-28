@@ -163,9 +163,9 @@
     <ClCompile Include="..\..\..\tests\loremOut.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\programs\lorem.h" />
+    <ClInclude Include="..\..\..\programs\lorem.h" />
     <ClInclude Include="..\..\..\tests\datagen.h" />
-    <ClCompile Include="..\..\..\tests\loremOut.h" />
+    <ClInclude Include="..\..\..\tests\loremOut.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

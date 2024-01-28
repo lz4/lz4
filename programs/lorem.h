@@ -38,7 +38,7 @@ void LOREM_genBuffer(void* buffer, size_t size, unsigned seed);
  * Similar to LOREM_genBuffer, with additional controls :
  * - @first : generate the first sentence
  * - @fill : fill the entire @buffer,
- *           if ==0: generate only one paragraph.
+ *           if ==0: generate one paragraph at most.
  * @return : nb of bytes generated into @buffer.
  */
 size_t LOREM_genBlock(void* buffer, size_t size,
