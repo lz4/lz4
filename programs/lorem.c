@@ -112,8 +112,8 @@ static void generateWord(const char *word, const char *separator, int upCase)
     }
     memcpy(g_ptr + g_nbChars, word, strlen(word));
     if (upCase) {
-        static const int toUp = 'A' - 'a';
-        g_ptr[g_nbChars] += toUp;
+        static const char toUp = 'A' - 'a';
+        g_ptr[g_nbChars] = (char)(g_ptr[g_nbChars] + toUp);
     }
     g_nbChars += strlen(word);
     memcpy(g_ptr + g_nbChars, separator, strlen(separator));
@@ -206,7 +206,7 @@ void LOREM_genOut(unsigned long long size, unsigned seed)
 {
   char buff[LOREM_BLOCKSIZE + 1] = {0};
   unsigned long long total = 0;
-  size_t genBlockSize = MIN(size, LOREM_BLOCKSIZE);
+  size_t genBlockSize = (size_t)MIN(size, LOREM_BLOCKSIZE);
 
   /* init */
   SET_BINARY_MODE(stdout);
