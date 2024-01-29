@@ -538,6 +538,7 @@ jobs:
           { type: MIPS,     pkgs: 'qemu-system-mips gcc-mips-linux-gnu',         xcc: mips-linux-gnu-gcc,        xemu: qemu-mips-static,    os: ubuntu-latest, },
           { type: M68K,     pkgs: 'qemu-system-m68k gcc-m68k-linux-gnu',         xcc: m68k-linux-gnu-gcc,        xemu: qemu-m68k-static,    os: ubuntu-latest, },
           { type: RISC-V,   pkgs: 'qemu-system-riscv64 gcc-riscv64-linux-gnu',   xcc: riscv64-linux-gnu-gcc,     xemu: qemu-riscv64-static, os: ubuntu-latest, },
+          { type: SPARC,    pkgs: 'qemu-system-sparc gcc-sparc64-linux-gnu',     xcc: sparc64-linux-gnu-gcc,     xemu: qemu-sparc64-static, os: ubuntu-latest, },
         ]
 
     runs-on: ${{ matrix.os }}
@@ -568,8 +569,8 @@ jobs:
       if: ${{ matrix.type == 'PPC64LE' }}
       run: CFLAGS=-m64 make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
 
-    - name: MIPS-M68K-RISCV
-      if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' }}
+    - name: MIPS-M68K-RISCV-SPARC
+      if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' || matrix.type == 'SPARC' }}
       run: make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
 
 
