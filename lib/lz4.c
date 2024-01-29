@@ -1579,8 +1579,11 @@ int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 #endif
 
 
+typedef enum { _ld_fast, _ld_slow } LoadDict_mode_e;
 #define HASH_UNIT sizeof(reg_t)
-int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
+int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
+                    const char* dictionary, int dictSize,
+                    LoadDict_mode_e _ld)
 {
     LZ4_stream_t_internal* const dict = &LZ4_dict->internal_donotuse;
     const tableType_t tableType = byU32;
@@ -1616,11 +1619,37 @@ int LZ4_loadDict (LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
 
     while (p <= dictEnd-HASH_UNIT) {
         U32 const h = LZ4_hashPosition(p, tableType);
+        // Note: overwriting => favors positions end of dictionary
         LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
         p+=3; idx32+=3;
     }
 
+    if (_ld == _ld_slow) {
+        // Fill hash table with additional references, to improve compression capability
+        p = dict->dictionary;
+        idx32 = dict->currentOffset - dict->dictSize;
+        while (p <= dictEnd-HASH_UNIT) {
+            U32 const h = LZ4_hashPosition(p, tableType);
+            U32 const limit = dict->currentOffset - 64 KB;
+            if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= limit) {
+                // Note: not overwriting => favors positions beginning of dictionary
+                LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
+            }
+            p++; idx32++;
+        }
+    }
+
     return (int)dict->dictSize;
+}
+
+int LZ4_loadDict(LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
+{
+    return LZ4_loadDict_internal(LZ4_dict, dictionary, dictSize, _ld_fast);
+}
+
+int LZ4_loadDictSlow(LZ4_stream_t* LZ4_dict, const char* dictionary, int dictSize)
+{
+    return LZ4_loadDict_internal(LZ4_dict, dictionary, dictSize, _ld_slow);
 }
 
 void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dictionaryStream)

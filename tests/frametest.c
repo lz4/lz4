@@ -172,8 +172,8 @@ unsigned int FUZ_rand(unsigned int* src)
 }
 
 #define RAND_BITS(N) (FUZ_rand(randState) & ((1 << (N))-1))
-#define FUZ_RAND15BITS  RAND_BITS(15)
-#define FUZ_RANDLENGTH  ( RAND_BITS(2) ? (FUZ_rand(randState) % 15) : (FUZ_rand(randState) % 510) + 15)
+#define FUZ_LITERAL (RAND_BITS(6) + 'A')
+#define FUZ_ABOUT(_R) ((FUZ_rand(randState) % (_R)) + (FUZ_rand(randState) % (_R)) + 1)
 static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, double proba, U32* randState)
 {
     BYTE* BBuffer = (BYTE*)buffer;
@@ -181,25 +181,25 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
     U32 P32 = (U32)(32768 * proba);
 
     /* First Byte */
-    BBuffer[pos++] = (BYTE)(FUZ_rand(randState));
+    BBuffer[pos++] = FUZ_LITERAL;
 
     while (pos < bufferSize) {
         /* Select : Literal (noise) or copy (within 64K) */
-        if (FUZ_RAND15BITS < P32) {
+        if (RAND_BITS(15) < P32) {
             /* Copy (within 64K) */
-            size_t const lengthRand = FUZ_RANDLENGTH + 4;
+            size_t const lengthRand = FUZ_ABOUT(8) + 4;
             size_t const length = MIN(lengthRand, bufferSize - pos);
             size_t const end = pos + length;
-            size_t const offsetRand = FUZ_RAND15BITS + 1;
+            size_t const offsetRand = RAND_BITS(15) + 1;
             size_t const offset = MIN(offsetRand, pos);
             size_t match = pos - offset;
             while (pos < end) BBuffer[pos++] = BBuffer[match++];
         } else {
             /* Literal (noise) */
-            size_t const lengthRand = FUZ_RANDLENGTH + 4;
+            size_t const lengthRand = FUZ_ABOUT(4);
             size_t const length = MIN(lengthRand, bufferSize - pos);
             size_t const end = pos + length;
-            while (pos < end) BBuffer[pos++] = (BYTE)(FUZ_rand(randState) >> 5);
+            while (pos < end) BBuffer[pos++] = FUZ_LITERAL;
     }   }
 }
 
@@ -646,7 +646,7 @@ static int unitTests(U32 seed, double compressibility)
 
     /* Raw Dictionary compression test */
     {   size_t const dictSize = 7 KB; /* small enough for LZ4_MEMORY_USAGE == 10 */
-        size_t const srcSize = 92 KB; /* must be > 64 KB to avoid short-size optimizations */
+        size_t const srcSize = 66 KB; /* must be > 64 KB to avoid short-size optimizations */
         size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
         size_t cSizeNoDict, cSizeWithDict;
         const void* dict = CNBuffer;
@@ -732,9 +732,9 @@ static int unitTests(U32 seed, double compressibility)
                                               NULL, NULL) );
         DISPLAYLEVEL(3, "%u bytes \n", (unsigned)cSizeNoDict);
 
+        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict : ");
         CHECK( LZ4F_freeCompressionContext(cctx) );
         CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
-        DISPLAYLEVEL(3, "LZ4F_compressFrame_usingCDict, with dict : ");
         CHECK_V(cSizeWithDict,
                 LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, dstCapacity,
                                               CNBuffer, srcSize,

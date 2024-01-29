@@ -436,7 +436,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     BYTE* dstPtr = dstStart;
     BYTE* const dstEnd = dstStart + dstCapacity;
 
-    DEBUGLOG(4, "LZ4F_compressFrame_usingCDict (srcSize=%u)", srcSize);
+    DEBUGLOG(4, "LZ4F_compressFrame_usingCDict (srcSize=%u)", (unsigned)srcSize);
     if (preferencesPtr!=NULL)
         prefs = *preferencesPtr;
     else
@@ -558,7 +558,7 @@ LZ4F_createCDict_advanced(LZ4F_CustomMem cmem, const void* dictBuffer, size_t di
         return NULL;
     }
     memcpy(cdict->dictContent, dictStart, dictSize);
-    LZ4_loadDict (cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
+    LZ4_loadDictSlow(cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
     LZ4_setCompressionLevel(cdict->HCCtx, LZ4HC_CLEVEL_DEFAULT);
     LZ4_loadDictHC(cdict->HCCtx, (const char*)cdict->dictContent, (int)dictSize);
     return cdict;
