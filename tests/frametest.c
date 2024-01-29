@@ -172,7 +172,7 @@ unsigned int FUZ_rand(unsigned int* src)
 }
 
 #define RAND_BITS(N) (FUZ_rand(randState) & ((1 << (N))-1))
-#define FUZ_LITERAL (RAND_BITS(6) + 'A')
+#define FUZ_LITERAL (RAND_BITS(6) + '0')
 #define FUZ_ABOUT(_R) ((FUZ_rand(randState) % (_R)) + (FUZ_rand(randState) % (_R)) + 1)
 static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, double proba, U32* randState)
 {
