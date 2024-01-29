@@ -1619,20 +1619,20 @@ int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
 
     while (p <= dictEnd-HASH_UNIT) {
         U32 const h = LZ4_hashPosition(p, tableType);
-        // Note: overwriting => favors positions end of dictionary
+        /* Note: overwriting => favors positions end of dictionary */
         LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
         p+=3; idx32+=3;
     }
 
     if (_ld == _ld_slow) {
-        // Fill hash table with additional references, to improve compression capability
+        /* Fill hash table with additional references, to improve compression capability */
         p = dict->dictionary;
         idx32 = dict->currentOffset - dict->dictSize;
         while (p <= dictEnd-HASH_UNIT) {
             U32 const h = LZ4_hashPosition(p, tableType);
             U32 const limit = dict->currentOffset - 64 KB;
             if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= limit) {
-                // Note: not overwriting => favors positions beginning of dictionary
+                /* Note: not overwriting => favors positions beginning of dictionary */
                 LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
             }
             p++; idx32++;
