@@ -1,5 +1,5 @@
 /*
-    lorem.h - lorem ipsum generator
+    loremOut.h - lorem ipsum generator to stdout
     Copyright (C) Yann Collet 2024
 
     GPL v2 License
@@ -24,23 +24,7 @@
 */
 
 
-#include <stddef.h>   /* size_t */
-
-/*
- * LOREM_genBuffer():
- * Generate @size bytes of compressible data using lorem ipsum generator
- * into provided @buffer.
+/* LOREM_genOut():
+ * Generate @size bytes of compressible data using lorem ipsum generator into stdout.
  */
-void LOREM_genBuffer(void* buffer, size_t size, unsigned seed);
-
-/*
- * LOREM_genBlock():
- * Similar to LOREM_genBuffer, with additional controls :
- * - @first : generate the first sentence
- * - @fill : fill the entire @buffer,
- *           if ==0: generate one paragraph at most.
- * @return : nb of bytes generated into @buffer.
- */
-size_t LOREM_genBlock(void* buffer, size_t size,
-                      unsigned seed,
-                      int first, int fill);
+void LOREM_genOut(unsigned long long size, unsigned seed);

@@ -165,9 +165,9 @@
     <ClCompile Include="..\..\..\programs\lorem.c" />
     <ClCompile Include="..\..\..\programs\lz4cli.c" />
     <ClCompile Include="..\..\..\programs\lz4io.c" />
-    <ClCompile Include="..\..\..\programs\util.c" />
     <ClCompile Include="..\..\..\programs\threadpool.c" />
     <ClCompile Include="..\..\..\programs\timefn.c" />
+    <ClCompile Include="..\..\..\programs\util.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\lz4.h" />
@@ -178,6 +178,7 @@
     <ClInclude Include="..\..\..\programs\bench.h" />
     <ClInclude Include="..\..\..\programs\lorem.h" />
     <ClInclude Include="..\..\..\programs\lz4io.h" />
+    <ClInclude Include="..\..\..\programs\util.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="lz4.rc" />
