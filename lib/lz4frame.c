@@ -552,7 +552,7 @@ LZ4F_createCDict_advanced(LZ4F_CustomMem cmem, const void* dictBuffer, size_t di
         LZ4_initStream(cdict->fastCtx, sizeof(LZ4_stream_t));
     cdict->HCCtx = (LZ4_streamHC_t*)LZ4F_malloc(sizeof(LZ4_streamHC_t), cmem);
     if (cdict->HCCtx)
-        LZ4_initStream(cdict->HCCtx, sizeof(LZ4_streamHC_t));
+        LZ4_initStreamHC(cdict->HCCtx, sizeof(LZ4_streamHC_t));
     if (!cdict->dictContent || !cdict->fastCtx || !cdict->HCCtx) {
         LZ4F_freeCDict(cdict);
         return NULL;
