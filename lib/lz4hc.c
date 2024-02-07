@@ -52,19 +52,19 @@
 /*===    Dependency    ===*/
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
+#include <limits.h>
 
 
-/*===   Common definitions   ===*/
-#if defined(__GNUC__)
-#  pragma GCC diagnostic ignored "-Wunused-function"
-#endif
-#if defined (__clang__)
-#  pragma clang diagnostic ignored "-Wunused-function"
-#endif
-
-#define LZ4_COMMONDEFS_ONLY
+/*===   Shared lz4.c code   ===*/
 #ifndef LZ4_SRC_INCLUDED
-#include "lz4.c"   /* LZ4_count, constants, mem */
+# if defined(__GNUC__)
+#  pragma GCC diagnostic ignored "-Wunused-function"
+# endif
+# if defined (__clang__)
+#  pragma clang diagnostic ignored "-Wunused-function"
+# endif
+# define LZ4_COMMONDEFS_ONLY
+# include "lz4.c"   /* LZ4_count, constants, mem */
 #endif
 
 
@@ -80,69 +80,43 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 /*===   Macros   ===*/
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
 #define MAX(a,b)   ( (a) > (b) ? (a) : (b) )
-#define HASH_FUNCTION(i)         (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
-#define DELTANEXTMAXD(p)         chainTable[(p) & LZ4HC_MAXD_MASK]    /* flexible, LZ4HC_MAXD dependent */
 #define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
 /* Make fields passed to, and updated by LZ4HC_encodeSequence explicit */
 #define UPDATABLE(ip, op, anchor) &ip, &op, &anchor
 
+
+/*===   Hashing   ===*/
 #define LZ4HC_HASHSIZE 4
+#define HASH_FUNCTION(i)         (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
+#if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
+/* lie to the compiler about data alignment; use with caution */
+static U64 LZ4_read64(const void* memPtr) { return *(const U64*) memPtr; }
 
-/**************************************
-*  HC Compression
-**************************************/
-static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
+#elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
+/* __pack instructions are safer, but compiler specific */
+LZ4_PACK(typedef struct { U64 u64; }) LZ4_unalign64;
+static U64 LZ4_read64(const void* ptr) { return ((const LZ4_unalign64*)ptr)->u64; }
+
+#else  /* safe and portable access using memcpy() */
+static U64 LZ4_read64(const void* memPtr)
 {
-    MEM_INIT(hc4->hashTable, 0, sizeof(hc4->hashTable));
-    MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
+    U64 val; LZ4_memcpy(&val, memPtr, sizeof(val)); return val;
 }
 
-static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
-{
-    size_t const bufferSize = (size_t)(hc4->end - hc4->prefixStart);
-    size_t newStartingOffset = bufferSize + hc4->dictLimit;
-    DEBUGLOG(5, "LZ4HC_init_internal");
-    assert(newStartingOffset >= bufferSize);  /* check overflow */
-    if (newStartingOffset > 1 GB) {
-        LZ4HC_clearTables(hc4);
-        newStartingOffset = 0;
-    }
-    newStartingOffset += 64 KB;
-    hc4->nextToUpdate = (U32)newStartingOffset;
-    hc4->prefixStart = start;
-    hc4->end = start;
-    hc4->dictStart = start;
-    hc4->dictLimit = (U32)newStartingOffset;
-    hc4->lowLimit = (U32)newStartingOffset;
-}
+#endif /* LZ4_FORCE_MEMORY_ACCESS */
+
+#define LZ4MID_HASHSIZE 8
+#define LZ4MID_HASHLOG (LZ4HC_HASH_LOG-1)
+#define LZ4MID_HASHTABLESIZE (1 << LZ4MID_HASHLOG)
+static U32 LZ4MID_hash8(U64 v) { return (U32)(v * 0xCF1BBCDCB7A56463ULL) >> (32-LZ4MID_HASHLOG); }
+static U32 LZ4MID_hash8Ptr(const void* ptr) { return LZ4MID_hash8(LZ4_read64(ptr)); }
+static U32 LZ4MID_hash4(U32 v) { return (v * 2654435761U) >> (32-LZ4MID_HASHLOG); }
+static U32 LZ4MID_hash4Ptr(const void* ptr) { return LZ4MID_hash4(LZ4_read32(ptr)); }
 
 
-/* Update chains up to ip (excluded) */
-LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
-{
-    U16* const chainTable = hc4->chainTable;
-    U32* const hashTable  = hc4->hashTable;
-    const BYTE* const prefixPtr = hc4->prefixStart;
-    U32 const prefixIdx = hc4->dictLimit;
-    U32 const target = (U32)(ip - prefixPtr) + prefixIdx;
-    U32 idx = hc4->nextToUpdate;
-    assert(ip >= prefixPtr);
-    assert(target >= prefixIdx);
-
-    while (idx < target) {
-        U32 const h = LZ4HC_hashPtr(prefixPtr+idx-prefixIdx);
-        size_t delta = idx - hashTable[h];
-        if (delta>LZ4_DISTANCE_MAX) delta = LZ4_DISTANCE_MAX;
-        DELTANEXTU16(chainTable, idx) = (U16)delta;
-        hashTable[h] = idx;
-        idx++;
-    }
-
-    hc4->nextToUpdate = target;
-}
-
+/*===   Count match length   ===*/
 LZ4_FORCE_INLINE
 unsigned LZ4HC_NbCommonBytes32(U32 val)
 {
@@ -201,6 +175,312 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
          && (ip[back-1] == match[back-1]) )
             back--;
     return back;
+}
+
+
+/**************************************
+*  Init
+**************************************/
+static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
+{
+    MEM_INIT(hc4->hashTable, 0, sizeof(hc4->hashTable));
+    MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
+}
+
+static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
+{
+    size_t const bufferSize = (size_t)(hc4->end - hc4->prefixStart);
+    size_t newStartingOffset = bufferSize + hc4->dictLimit;
+    DEBUGLOG(5, "LZ4HC_init_internal");
+    assert(newStartingOffset >= bufferSize);  /* check overflow */
+    if (newStartingOffset > 1 GB) {
+        LZ4HC_clearTables(hc4);
+        newStartingOffset = 0;
+    }
+    newStartingOffset += 64 KB;
+    hc4->nextToUpdate = (U32)newStartingOffset;
+    hc4->prefixStart = start;
+    hc4->end = start;
+    hc4->dictStart = start;
+    hc4->dictLimit = (U32)newStartingOffset;
+    hc4->lowLimit = (U32)newStartingOffset;
+}
+
+
+/**************************************
+*  Encode
+**************************************/
+/* LZ4HC_encodeSequence() :
+ * @return : 0 if ok,
+ *           1 if buffer issue detected */
+LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
+    const BYTE** _ip,
+    BYTE** _op,
+    const BYTE** _anchor,
+    int matchLength,
+    int offset,
+    limitedOutput_directive limit,
+    BYTE* oend)
+{
+#define ip      (*_ip)
+#define op      (*_op)
+#define anchor  (*_anchor)
+
+    size_t length;
+    BYTE* const token = op++;
+
+#if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 6)
+    static const BYTE* start = NULL;
+    static U32 totalCost = 0;
+    U32 const pos = (start==NULL) ? 0 : (U32)(anchor - start);
+    U32 const ll = (U32)(ip - anchor);
+    U32 const llAdd = (ll>=15) ? ((ll-15) / 255) + 1 : 0;
+    U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
+    U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
+    if (start==NULL) start = anchor;  /* only works for single segment */
+    /* g_debuglog_enable = (pos >= 2228) & (pos <= 2262); */
+    DEBUGLOG(6, "pos:%7u -- literals:%4u, match:%4i, offset:%5i, cost:%4u + %5u",
+                pos,
+                (U32)(ip - anchor), matchLength, offset,
+                cost, totalCost);
+    totalCost += cost;
+#endif
+
+    /* Encode Literal length */
+    length = (size_t)(ip - anchor);
+    LZ4_STATIC_ASSERT(notLimited == 0);
+    /* Check output limit */
+    if (limit && ((op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) {
+        DEBUGLOG(6, "Not enough room to write %i literals (%i bytes remaining)",
+                (int)length, (int)(oend - op));
+        return 1;
+    }
+    if (length >= RUN_MASK) {
+        size_t len = length - RUN_MASK;
+        *token = (RUN_MASK << ML_BITS);
+        for(; len >= 255 ; len -= 255) *op++ = 255;
+        *op++ = (BYTE)len;
+    } else {
+        *token = (BYTE)(length << ML_BITS);
+    }
+
+    /* Copy Literals */
+    LZ4_wildCopy8(op, anchor, op + length);
+    op += length;
+
+    /* Encode Offset */
+    assert(offset <= LZ4_DISTANCE_MAX );
+    assert(offset > 0);
+    LZ4_writeLE16(op, (U16)(offset)); op += 2;
+
+    /* Encode MatchLength */
+    assert(matchLength >= MINMATCH);
+    length = (size_t)matchLength - MINMATCH;
+    if (limit && (op + (length / 255) + (1 + LASTLITERALS) > oend)) {
+        DEBUGLOG(6, "Not enough room to write match length");
+        return 1;   /* Check output limit */
+    }
+    if (length >= ML_MASK) {
+        *token += ML_MASK;
+        length -= ML_MASK;
+        for(; length >= 510 ; length -= 510) { *op++ = 255; *op++ = 255; }
+        if (length >= 255) { length -= 255; *op++ = 255; }
+        *op++ = (BYTE)length;
+    } else {
+        *token += (BYTE)(length);
+    }
+
+    /* Prepare next loop */
+    ip += matchLength;
+    anchor = ip;
+
+    return 0;
+
+#undef ip
+#undef op
+#undef anchor
+}
+
+
+/**************************************
+*  Mid Compression (level 2)
+**************************************/
+
+LZ4_FORCE_INLINE void
+LZ4MID_addPosition(U32* hTable, U32 hValue, U32 index)
+{
+    hTable[hValue] = index;
+}
+
+static int LZ4HC_compress_2hashes (
+    LZ4HC_CCtx_internal* const ctx,
+    const char* const src,
+    char* const dst,
+    int* srcSizePtr,
+    int const maxOutputSize,
+    const limitedOutput_directive limit,
+    const dictCtx_directive dict
+    )
+{
+    U32* const hash4Table = ctx->hashTable;
+    U32* const hash8Table = hash4Table + LZ4MID_HASHTABLESIZE;
+    const BYTE* ip = (const BYTE*)src;
+    const BYTE* anchor = ip;
+    const BYTE* const iend = ip + *srcSizePtr;
+    const BYTE* const mflimit = iend - MFLIMIT;
+    const BYTE* const matchlimit = (iend - LASTLITERALS);
+    const BYTE* const ilimit = (iend - LZ4MID_HASHSIZE);
+    BYTE* op = (BYTE*)dst;
+    BYTE* const oend = op + maxOutputSize;
+
+    const BYTE* const prefixPtr = ctx->prefixStart;
+    const U32 prefixIdx = ctx->dictLimit;
+    const U32 ilimitIdx = (U32)(ilimit - prefixPtr) + prefixIdx;
+
+    // not done for the time being
+    (void)limit;
+    (void)dict;
+
+    /* input sanitization */
+    assert(*srcSizePtr >= 0);
+    if (*srcSizePtr) assert(src != NULL);
+    if (maxOutputSize) assert(dst != NULL);
+    if (*srcSizePtr < 0) return 0;  /* invalid */
+    if (maxOutputSize < 0) return 0; /* invalid */
+    if (*srcSizePtr > LZ4_MAX_INPUT_SIZE) {
+        /* forbidden: no input is allowed to be that large */
+        return 0;
+    }
+    if (*srcSizePtr < LZ4_minLength)
+        goto _lz4mid_last_literals;  /* Input too small, no compression (all literals) */
+
+    /* main loop */
+    while (ip <= mflimit) {
+        const U32 ipIndex = (U32)(ip - prefixPtr) + prefixIdx;
+        unsigned matchLength;
+        unsigned matchDistance;
+        /* search long match */
+        {   U32 h8 = LZ4MID_hash8Ptr(ip);
+            U32 pos8 = hash8Table[h8];
+            assert(h8 < LZ4MID_HASHTABLESIZE);
+            assert(h8 < ipIndex);
+            LZ4MID_addPosition(hash8Table, h8, ipIndex);
+            if (ipIndex - pos8 <= LZ4_DISTANCE_MAX) {
+                /* match candidate found */
+                const BYTE* matchPtr = prefixPtr + pos8 - prefixIdx;
+                matchLength = LZ4_count(ip, matchPtr, matchlimit);
+                if (matchLength >= MINMATCH) {
+                    matchDistance = ipIndex - pos8;
+                    goto _lz4mid_encode_sequence;
+                }
+        }   }
+        /* search short match */
+        {   U32 h4 = LZ4MID_hash4Ptr(ip);
+            U32 pos4 = hash4Table[h4];
+            assert(h4 < LZ4MID_HASHTABLESIZE);
+            assert(h4 < ipIndex);
+            LZ4MID_addPosition(hash4Table, h4, ipIndex);
+            if (ipIndex - pos4 <= LZ4_DISTANCE_MAX) {
+                /* match candidate found */
+                const BYTE* matchPtr = prefixPtr + pos4 - prefixIdx;
+                matchLength = LZ4_count(ip, matchPtr, matchlimit);
+                if (matchLength >= MINMATCH) {
+                    matchDistance = ipIndex - pos4;
+                    goto _lz4mid_encode_sequence;
+                }
+        }   }
+        /* no match found */
+        ip++;
+        continue;
+
+_lz4mid_encode_sequence:
+        if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
+                (int)matchLength, (int)matchDistance,
+                limit, oend))
+            goto _lz4mid_dest_overflow;
+
+        /* fill table a bit more */
+        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1);
+            U32 endMatchIdx = ipIndex + matchLength;
+            U32 pos_m2 = endMatchIdx - 2;
+            LZ4MID_addPosition(hash8Table, h8_p1, ipIndex+1);
+            //DEBUGLOG(2, "prefixPtr=%p, m2=%p, iend=%p", prefixPtr, prefixPtr + pos_m2, iend);
+            if (pos_m2 < ilimitIdx) {
+                U32 pos_m1 = endMatchIdx - 1;
+                U32 h8_m2 = LZ4MID_hash8Ptr(ip-2);
+                U32 h4_m1 = LZ4MID_hash4Ptr(ip-1);
+                LZ4MID_addPosition(hash8Table, h8_m2, pos_m2);
+                LZ4MID_addPosition(hash4Table, h4_m1, pos_m1);
+            }
+        }
+        continue;
+    }
+
+_lz4mid_last_literals:
+    /* Encode Last Literals */
+    {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
+        size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
+        size_t const totalSize = 1 + llAdd + lastRunSize;
+        if (op + totalSize > oend) {
+            /* not enough space in @dst */
+            return 0;
+        }
+        ip = anchor + lastRunSize;  /* can be != iend if limit==fillOutput */
+
+        if (lastRunSize >= RUN_MASK) {
+            size_t accumulator = lastRunSize - RUN_MASK;
+            *op++ = (RUN_MASK << ML_BITS);
+            for(; accumulator >= 255 ; accumulator -= 255)
+                *op++ = 255;
+            *op++ = (BYTE) accumulator;
+        } else {
+            *op++ = (BYTE)(lastRunSize << ML_BITS);
+        }
+        LZ4_memcpy(op, anchor, lastRunSize);
+        op += lastRunSize;
+    }
+
+    /* End */
+    assert(ip >= (const BYTE*)src);
+    assert(ip <= iend);
+    *srcSizePtr = (int)(ip - (const BYTE*)src);
+    assert((char*)op >= dst);
+    assert(op <= oend);
+    assert((char*)op - dst < INT_MAX);
+    return (int)((char*)op - dst);
+
+_lz4mid_dest_overflow:
+    /* compression failed */
+    return 0;
+}
+
+
+/**************************************
+*  HC Compression - Search
+**************************************/
+
+/* Update chains up to ip (excluded) */
+LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
+{
+    U16* const chainTable = hc4->chainTable;
+    U32* const hashTable  = hc4->hashTable;
+    const BYTE* const prefixPtr = hc4->prefixStart;
+    U32 const prefixIdx = hc4->dictLimit;
+    U32 const target = (U32)(ip - prefixPtr) + prefixIdx;
+    U32 idx = hc4->nextToUpdate;
+    assert(ip >= prefixPtr);
+    assert(target >= prefixIdx);
+
+    while (idx < target) {
+        U32 const h = LZ4HC_hashPtr(prefixPtr+idx-prefixIdx);
+        size_t delta = idx - hashTable[h];
+        if (delta>LZ4_DISTANCE_MAX) delta = LZ4_DISTANCE_MAX;
+        DELTANEXTU16(chainTable, idx) = (U16)delta;
+        hashTable[h] = idx;
+        idx++;
+    }
+
+    hc4->nextToUpdate = target;
 }
 
 #if defined(_MSC_VER)
@@ -526,95 +806,6 @@ LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table wi
     return LZ4HC_InsertAndGetWiderMatch(hc4, ip, ip, iLimit, MINMATCH-1, &uselessPtr, maxNbAttempts, patternAnalysis, 0 /*chainSwap*/, dict, favorCompressionRatio);
 }
 
-/* LZ4HC_encodeSequence() :
- * @return : 0 if ok,
- *           1 if buffer issue detected */
-LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
-    const BYTE** _ip,
-    BYTE** _op,
-    const BYTE** _anchor,
-    int matchLength,
-    int offset,
-    limitedOutput_directive limit,
-    BYTE* oend)
-{
-#define ip      (*_ip)
-#define op      (*_op)
-#define anchor  (*_anchor)
-
-    size_t length;
-    BYTE* const token = op++;
-
-#if defined(LZ4_DEBUG) && (LZ4_DEBUG >= 6)
-    static const BYTE* start = NULL;
-    static U32 totalCost = 0;
-    U32 const pos = (start==NULL) ? 0 : (U32)(anchor - start);
-    U32 const ll = (U32)(ip - anchor);
-    U32 const llAdd = (ll>=15) ? ((ll-15) / 255) + 1 : 0;
-    U32 const mlAdd = (matchLength>=19) ? ((matchLength-19) / 255) + 1 : 0;
-    U32 const cost = 1 + llAdd + ll + 2 + mlAdd;
-    if (start==NULL) start = anchor;  /* only works for single segment */
-    /* g_debuglog_enable = (pos >= 2228) & (pos <= 2262); */
-    DEBUGLOG(6, "pos:%7u -- literals:%4u, match:%4i, offset:%5i, cost:%4u + %5u",
-                pos,
-                (U32)(ip - anchor), matchLength, offset,
-                cost, totalCost);
-    totalCost += cost;
-#endif
-
-    /* Encode Literal length */
-    length = (size_t)(ip - anchor);
-    LZ4_STATIC_ASSERT(notLimited == 0);
-    /* Check output limit */
-    if (limit && ((op + (length / 255) + length + (2 + 1 + LASTLITERALS)) > oend)) {
-        DEBUGLOG(6, "Not enough room to write %i literals (%i bytes remaining)",
-                (int)length, (int)(oend - op));
-        return 1;
-    }
-    if (length >= RUN_MASK) {
-        size_t len = length - RUN_MASK;
-        *token = (RUN_MASK << ML_BITS);
-        for(; len >= 255 ; len -= 255) *op++ = 255;
-        *op++ = (BYTE)len;
-    } else {
-        *token = (BYTE)(length << ML_BITS);
-    }
-
-    /* Copy Literals */
-    LZ4_wildCopy8(op, anchor, op + length);
-    op += length;
-
-    /* Encode Offset */
-    assert(offset <= LZ4_DISTANCE_MAX );
-    assert(offset > 0);
-    LZ4_writeLE16(op, (U16)(offset)); op += 2;
-
-    /* Encode MatchLength */
-    assert(matchLength >= MINMATCH);
-    length = (size_t)matchLength - MINMATCH;
-    if (limit && (op + (length / 255) + (1 + LASTLITERALS) > oend)) {
-        DEBUGLOG(6, "Not enough room to write match length");
-        return 1;   /* Check output limit */
-    }
-    if (length >= ML_MASK) {
-        *token += ML_MASK;
-        length -= ML_MASK;
-        for(; length >= 510 ; length -= 510) { *op++ = 255; *op++ = 255; }
-        if (length >= 255) { length -= 255; *op++ = 255; }
-        *op++ = (BYTE)length;
-    } else {
-        *token += (BYTE)(length);
-    }
-
-    /* Prepare next loop */
-    ip += matchLength;
-    anchor = ip;
-
-    return 0;
-}
-#undef ip
-#undef op
-#undef anchor
 
 LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
@@ -864,16 +1055,16 @@ LZ4HC_compress_generic_internal (
             const dictCtx_directive dict
             )
 {
-    typedef enum { lz4hc, lz4opt } lz4hc_strat_e;
+    typedef enum { lz4mid, lz4hc, lz4opt } lz4hc_strat_e;
     typedef struct {
         lz4hc_strat_e strat;
         int nbSearches;
         U32 targetLength;
     } cParams_t;
     static const cParams_t clTable[LZ4HC_CLEVEL_MAX+1] = {
-        { lz4hc,     2, 16 },  /* 0, unused */
-        { lz4hc,     2, 16 },  /* 1, unused */
-        { lz4hc,     2, 16 },  /* 2, unused */
+        { lz4mid,    2, 16 },  /* 0, unused */
+        { lz4mid,    2, 16 },  /* 1, unused */
+        { lz4mid,    2, 16 },  /* 2 */
         { lz4hc,     4, 16 },  /* 3 */
         { lz4hc,     8, 16 },  /* 4 */
         { lz4hc,    16, 16 },  /* 5 */
@@ -902,7 +1093,11 @@ LZ4HC_compress_generic_internal (
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
         int result;
 
-        if (cParam.strat == lz4hc) {
+        if (cParam.strat == lz4mid) {
+            result = LZ4HC_compress_2hashes(ctx,
+                                src, dst, srcSizePtr, dstCapacity,
+                                limit, dict);
+        } else if (cParam.strat == lz4hc) {
             result = LZ4HC_compress_hashChain(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
                                 cParam.nbSearches, limit, dict);
