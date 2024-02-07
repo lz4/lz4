@@ -407,7 +407,7 @@ static int LZ4HC_compress_2hashes (
                 }
         }   }
         /* no match found */
-        ip++;
+        ip += 1 + ((ip-anchor) >> 9);  /* skip faster over incompressible data */
         continue;
 
 _lz4mid_encode_sequence:
