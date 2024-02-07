@@ -368,6 +368,7 @@ static int LZ4HC_compress_2hashes (
             if (ipIndex - pos8 <= LZ4_DISTANCE_MAX) {
                 /* match candidate found */
                 const BYTE* matchPtr = prefixPtr + pos8 - prefixIdx;
+                assert(matchPtr < ip);
                 matchLength = LZ4_count(ip, matchPtr, matchlimit);
                 if (matchLength >= MINMATCH) {
                     matchDistance = ipIndex - pos8;
@@ -383,6 +384,7 @@ static int LZ4HC_compress_2hashes (
             if (ipIndex - pos4 <= LZ4_DISTANCE_MAX) {
                 /* match candidate found */
                 const BYTE* matchPtr = prefixPtr + (pos4 - prefixIdx);
+                assert(matchPtr < ip);
                 matchLength = LZ4_count(ip, matchPtr, matchlimit);
                 if (matchLength >= MINMATCH) {
                     /* short match found, let's just check ip+1 for longer */
@@ -406,16 +408,25 @@ static int LZ4HC_compress_2hashes (
         continue;
 
 _lz4mid_encode_sequence:
+        /* catch back */
+        while (((ip > anchor) & (ip - prefixPtr > matchDistance)) && (unlikely(ip[-1] == ip[-(int)matchDistance-1]))) {
+            ip--; matchLength++;
+        };
+
+        /* fill table with beginning of match */
+        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1); /* ip has been updated */
+            LZ4MID_addPosition(hash8Table, h8_p1, ipIndex+1);
+        }
+
+        /* encode - note this actions updates @ip, @op and @anchor */
         if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                 (int)matchLength, (int)matchDistance,
                 limit, oend))
             goto _lz4mid_dest_overflow;
 
-        /* fill table a bit more */
-        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1-matchLength);
-            U32 endMatchIdx = ipIndex + matchLength;
+        /* fill table with end of match */
+        {   U32 endMatchIdx = (U32)(ip-prefixPtr) + prefixIdx;
             U32 pos_m2 = endMatchIdx - 2;
-            LZ4MID_addPosition(hash8Table, h8_p1, ipIndex+1);
             if (pos_m2 < ilimitIdx) {
                 U32 pos_m1 = endMatchIdx - 1;
                 U32 h8_m2 = LZ4MID_hash8Ptr(ip-2);
