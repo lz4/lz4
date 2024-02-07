@@ -315,6 +315,9 @@ LZ4MID_addPosition(U32* hTable, U32 hValue, U32 index)
     hTable[hValue] = index;
 }
 
+#define ADDPOS8(_p, _idx) LZ4MID_addPosition(hash8Table, LZ4MID_hash8Ptr(_p), _idx)
+#define ADDPOS4(_p, _idx) LZ4MID_addPosition(hash4Table, LZ4MID_hash4Ptr(_p), _idx)
+
 static int LZ4HC_compress_2hashes (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
@@ -418,13 +421,9 @@ _lz4mid_encode_sequence:
         };
 
         /* fill table with beginning of match */
-        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1);
-            U32 h8_p2 = LZ4MID_hash8Ptr(ip+2);
-            U32 h4_p1 = LZ4MID_hash4Ptr(ip+1);
-            LZ4MID_addPosition(hash8Table, h8_p1, ipIndex+1);
-            LZ4MID_addPosition(hash8Table, h8_p2, ipIndex+2);
-            LZ4MID_addPosition(hash4Table, h4_p1, ipIndex+1);
-        }
+            ADDPOS8(ip+1, ipIndex+1);
+            ADDPOS8(ip+2, ipIndex+2);
+            ADDPOS4(ip+1, ipIndex+1);
 
         /* encode - note this actions updates @ip, @op and @anchor */
         if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
@@ -436,13 +435,13 @@ _lz4mid_encode_sequence:
         {   U32 endMatchIdx = (U32)(ip-prefixPtr) + prefixIdx;
             U32 pos_m2 = endMatchIdx - 2;
             if (pos_m2 < ilimitIdx) {
-                U32 pos_m1 = endMatchIdx - 1;
-                U32 h8_m2 = LZ4MID_hash8Ptr(ip-2);
-                U32 h4_m2 = LZ4MID_hash4Ptr(ip-2);
-                U32 h4_m1 = LZ4MID_hash4Ptr(ip-1);
-                LZ4MID_addPosition(hash8Table, h8_m2, pos_m2);
-                LZ4MID_addPosition(hash4Table, h4_m2, pos_m2);
-                LZ4MID_addPosition(hash4Table, h4_m1, pos_m1);
+                if (likely(ip - prefixPtr > 5)) {
+                    ADDPOS8(ip-5, endMatchIdx - 5);
+                }
+                ADDPOS8(ip-3, endMatchIdx - 3);
+                ADDPOS8(ip-2, endMatchIdx - 2);
+                ADDPOS4(ip-2, endMatchIdx - 2);
+                ADDPOS4(ip-1, endMatchIdx - 1);
             }
         }
     }
