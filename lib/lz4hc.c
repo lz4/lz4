@@ -399,6 +399,7 @@ static int LZ4HC_compress_2hashes (
                         const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
                         unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
                         if (ml2 > matchLength) {
+                            LZ4MID_addPosition(hash8Table, h8, ipIndex+1);
                             ip++;
                             matchLength = ml2;
                             matchDistance = m2Distance;
@@ -417,8 +418,12 @@ _lz4mid_encode_sequence:
         };
 
         /* fill table with beginning of match */
-        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1); /* ip has been updated */
+        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1);
+            U32 h8_p2 = LZ4MID_hash8Ptr(ip+2);
+            U32 h4_p1 = LZ4MID_hash4Ptr(ip+1);
             LZ4MID_addPosition(hash8Table, h8_p1, ipIndex+1);
+            LZ4MID_addPosition(hash8Table, h8_p2, ipIndex+2);
+            LZ4MID_addPosition(hash4Table, h4_p1, ipIndex+1);
         }
 
         /* encode - note this actions updates @ip, @op and @anchor */
@@ -433,8 +438,10 @@ _lz4mid_encode_sequence:
             if (pos_m2 < ilimitIdx) {
                 U32 pos_m1 = endMatchIdx - 1;
                 U32 h8_m2 = LZ4MID_hash8Ptr(ip-2);
+                U32 h4_m2 = LZ4MID_hash4Ptr(ip-2);
                 U32 h4_m1 = LZ4MID_hash4Ptr(ip-1);
                 LZ4MID_addPosition(hash8Table, h8_m2, pos_m2);
+                LZ4MID_addPosition(hash4Table, h4_m2, pos_m2);
                 LZ4MID_addPosition(hash4Table, h4_m1, pos_m1);
             }
         }
