@@ -382,10 +382,22 @@ static int LZ4HC_compress_2hashes (
             LZ4MID_addPosition(hash4Table, h4, ipIndex);
             if (ipIndex - pos4 <= LZ4_DISTANCE_MAX) {
                 /* match candidate found */
-                const BYTE* matchPtr = prefixPtr + pos4 - prefixIdx;
+                const BYTE* matchPtr = prefixPtr + (pos4 - prefixIdx);
                 matchLength = LZ4_count(ip, matchPtr, matchlimit);
                 if (matchLength >= MINMATCH) {
+                    /* short match found, let's just check ip+1 for longer */
+                    U32 const h8 = LZ4MID_hash8Ptr(ip+1);
+                    U32 const pos8 = hash8Table[h8];
+                    U32 const m2Distance = ipIndex + 1 - pos8;
                     matchDistance = ipIndex - pos4;
+                    if (m2Distance <= LZ4_DISTANCE_MAX) {
+                        const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
+                        unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
+                        if (ml2 > matchLength) {
+                            ip++;
+                            matchLength = ml2;
+                            matchDistance = m2Distance;
+                    }   }
                     goto _lz4mid_encode_sequence;
                 }
         }   }
@@ -400,11 +412,10 @@ _lz4mid_encode_sequence:
             goto _lz4mid_dest_overflow;
 
         /* fill table a bit more */
-        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1);
+        {   U32 h8_p1 = LZ4MID_hash8Ptr(ip+1-matchLength);
             U32 endMatchIdx = ipIndex + matchLength;
             U32 pos_m2 = endMatchIdx - 2;
             LZ4MID_addPosition(hash8Table, h8_p1, ipIndex+1);
-            //DEBUGLOG(2, "prefixPtr=%p, m2=%p, iend=%p", prefixPtr, prefixPtr + pos_m2, iend);
             if (pos_m2 < ilimitIdx) {
                 U32 pos_m1 = endMatchIdx - 1;
                 U32 h8_m2 = LZ4MID_hash8Ptr(ip-2);
@@ -413,7 +424,6 @@ _lz4mid_encode_sequence:
                 LZ4MID_addPosition(hash4Table, h4_m1, pos_m1);
             }
         }
-        continue;
     }
 
 _lz4mid_last_literals:
