@@ -500,7 +500,7 @@ static int LZ4HC_compress_2hashes (
 
 _lz4mid_encode_sequence:
         /* catch back */
-        while (((ip > anchor) & (ip - prefixPtr > matchDistance)) && (unlikely(ip[-1] == ip[-(int)matchDistance-1]))) {
+        while (((ip > anchor) & (ipIndex - prefixIdx > matchDistance)) && (unlikely(ip[-1] == ip[-(int)matchDistance-1]))) {
             ip--; matchLength++;
         };
 
