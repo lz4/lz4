@@ -111,12 +111,25 @@ static U64 LZ4_read64(const void* memPtr)
 #define LZ4MID_HASHLOG (LZ4HC_HASH_LOG-1)
 #define LZ4MID_HASHTABLESIZE (1 << LZ4MID_HASHLOG)
 
-//static U32 LZ4MID_hash8(U64 v) { return (U32)((v * 0xCF1BBCDCB7A56463ULL) >> (64-LZ4MID_HASHLOG)); }
-static U32 LZ4MID_hash8(U64 v) { return (U32)(((v  << (64-56)) * 58295818150454627ULL) >> (64-LZ4MID_HASHLOG)) ; }
-
-static U32 LZ4MID_hash8Ptr(const void* ptr) { return LZ4MID_hash8(LZ4_read64(ptr)); }
 static U32 LZ4MID_hash4(U32 v) { return (v * 2654435761U) >> (32-LZ4MID_HASHLOG); }
 static U32 LZ4MID_hash4Ptr(const void* ptr) { return LZ4MID_hash4(LZ4_read32(ptr)); }
+/* note: hash7 hashes the lower 56-bits.
+ * It presumes input was read using little endian.*/
+static U32 LZ4MID_hash7(U64 v) { return (U32)(((v  << (64-56)) * 58295818150454627ULL) >> (64-LZ4MID_HASHLOG)) ; }
+static U64 LZ4_readLE64(const void* memPtr);
+static U32 LZ4MID_hash8Ptr(const void* ptr) { return LZ4MID_hash7(LZ4_readLE64(ptr)); }
+
+static U64 LZ4_readLE64(const void* memPtr)
+{
+    if (LZ4_isLittleEndian()) {
+        return LZ4_read64(memPtr);
+    } else {
+        const BYTE* p = (const BYTE*)memPtr;
+        /* note: relies on the compiler to simplify this expression */
+        return (U64)p[0] + ((U64)p[1]<<8) + ((U64)p[2]<<16) + ((U64)p[3]<<24)
+            + ((U64)p[4]<<32) + ((U64)p[5]<<40) + ((U64)p[6]<<48) + ((U64)p[7]<<56);
+    }
+}
 
 
 /*===   Count match length   ===*/
