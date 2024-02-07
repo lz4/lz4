@@ -583,7 +583,7 @@ _lz4mid_dest_overflow:
             /* ll validated; now adjust match length */
             size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
             size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
-            assert(maxMlSize < INT_MAX); assert(matchLength >= 0);
+            assert(maxMlSize < INT_MAX);
             if ((size_t)matchLength > maxMlSize) matchLength= (unsigned)maxMlSize;
             if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + matchLength >= MFLIMIT) {
             DEBUGLOG(6, "Let's encode a last sequence (ll=%u, ml=%u)", (unsigned)ll, matchLength);
