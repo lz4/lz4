@@ -436,22 +436,25 @@ static int LZ4HC_compress_2hashes (
                 /* match candidate found */
                 const BYTE* matchPtr = prefixPtr + pos8 - prefixIdx;
                 assert(matchPtr < ip);
-                assert(matchPtr >= prefixPtr);
-                matchLength = LZ4_count(ip, matchPtr, matchlimit);
-                if (matchLength >= MINMATCH) {
-                    matchDistance = ipIndex - pos8;
-                    goto _lz4mid_encode_sequence;
-                }
+                if (matchPtr >= prefixPtr) {
+                    /* note: we only search within prefix */
+                    matchLength = LZ4_count(ip, matchPtr, matchlimit);
+                    if (matchLength >= MINMATCH) {
+                        matchDistance = ipIndex - pos8;
+                        goto _lz4mid_encode_sequence;
+                }   }
         }   }
         /* search short match */
         {   U32 h4 = LZ4MID_hash4Ptr(ip);
             U32 pos4 = hash4Table[h4];
             assert(h4 < LZ4MID_HASHTABLESIZE);
-            assert(h4 < ipIndex);
+            assert(pos4 < ipIndex);
             LZ4MID_addPosition(hash4Table, h4, ipIndex);
-            if (ipIndex - pos4 <= LZ4_DISTANCE_MAX) {
+            if (ipIndex - pos4 <= LZ4_DISTANCE_MAX
+              && pos4 >= prefixIdx /* only search within prefix */
+              ) {
                 /* match candidate found */
-                const BYTE* matchPtr = prefixPtr + (pos4 - prefixIdx);
+                const BYTE* const matchPtr = prefixPtr + (pos4 - prefixIdx);
                 assert(matchPtr < ip);
                 assert(matchPtr >= prefixPtr);
                 matchLength = LZ4_count(ip, matchPtr, matchlimit);
@@ -461,7 +464,9 @@ static int LZ4HC_compress_2hashes (
                     U32 const pos8 = hash8Table[h8];
                     U32 const m2Distance = ipIndex + 1 - pos8;
                     matchDistance = ipIndex - pos4;
-                    if (m2Distance <= LZ4_DISTANCE_MAX) {
+                    if ( m2Distance <= LZ4_DISTANCE_MAX
+                      && pos8 >= prefixIdx /* only search within prefix */
+                      ) {
                         const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
                         unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
                         if (ml2 > matchLength) {
