@@ -433,18 +433,18 @@ static int LZ4HC_compress_2hashes (
             assert(h8 < LZ4MID_HASHTABLESIZE);
             assert(h8 < ipIndex);
             LZ4MID_addPosition(hash8Table, h8, ipIndex);
-            if (ipIndex - pos8 <= LZ4_DISTANCE_MAX) {
+            if ( ipIndex - pos8 <= LZ4_DISTANCE_MAX
+              && pos8 >= prefixIdx  /* note: currently only search within prefix */
+              ) {
                 /* match candidate found */
                 const BYTE* matchPtr = prefixPtr + pos8 - prefixIdx;
                 assert(matchPtr < ip);
-                if (matchPtr >= prefixPtr) {
-                    /* note: currently only search within prefix */
-                    matchLength = LZ4_count(ip, matchPtr, matchlimit);
-                    if (matchLength >= MINMATCH) {
-                        DEBUGLOG(7, "found candidate match at pos %u (len=%u)", pos8, matchLength);
-                        matchDistance = ipIndex - pos8;
-                        goto _lz4mid_encode_sequence;
-                }   }
+                matchLength = LZ4_count(ip, matchPtr, matchlimit);
+                if (matchLength >= MINMATCH) {
+                    DEBUGLOG(7, "found candidate match at pos %u (len=%u)", pos8, matchLength);
+                    matchDistance = ipIndex - pos8;
+                    goto _lz4mid_encode_sequence;
+                }
         }   }
         /* search short match */
         {   U32 h4 = LZ4MID_hash4Ptr(ip);
