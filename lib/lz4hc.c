@@ -440,6 +440,7 @@ static int LZ4HC_compress_2hashes (
                     /* note: we only search within prefix */
                     matchLength = LZ4_count(ip, matchPtr, matchlimit);
                     if (matchLength >= MINMATCH) {
+                        DEBUGLOG(7, "found candidate match at pos %u (len=%u)", pos8, matchLength);
                         matchDistance = ipIndex - pos8;
                         goto _lz4mid_encode_sequence;
                 }   }
@@ -487,6 +488,7 @@ static int LZ4HC_compress_2hashes (
                     ctx->dictCtx, gDictEndIndex,
                     0, 2);
             if (dMatch.len >= MINMATCH) {
+                DEBUGLOG(7, "found Dictionary match (offset=%i)", dMatch.off);
                 ip += dMatch.back;
                 assert(ip >= anchor);
                 matchLength = (unsigned)dMatch.len;
@@ -500,8 +502,8 @@ static int LZ4HC_compress_2hashes (
 
 _lz4mid_encode_sequence:
         /* catch back */
-        while (((ip > anchor) & (ipIndex - prefixIdx > matchDistance)) && (unlikely(ip[-1] == ip[-(int)matchDistance-1]))) {
-            ip--; matchLength++;
+        while (((ip > anchor) & ((U32)(ip-prefixPtr) > matchDistance)) && (unlikely(ip[-1] == ip[-(int)matchDistance-1]))) {
+            ip--;  matchLength++;
         };
 
         /* fill table with beginning of match */
