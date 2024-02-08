@@ -399,7 +399,6 @@ static int LZ4HC_compress_2hashes (
     const BYTE* const matchlimit = (iend - LASTLITERALS);
     const BYTE* const ilimit = (iend - LZ4MID_HASHSIZE);
     BYTE* op = (BYTE*)dst;
-    BYTE* saved_op = op;
     BYTE* oend = op + maxOutputSize;
 
     const BYTE* const prefixPtr = ctx->prefixStart;
@@ -513,12 +512,16 @@ _lz4mid_encode_sequence:
         ADDPOS8(ip+2, ipIndex+2);
         ADDPOS4(ip+1, ipIndex+1);
 
-        /* encode - note this actions updates @ip, @op and @anchor */
-        saved_op = op;
-        if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
-                (int)matchLength, (int)matchDistance,
-                limit, oend))
-            goto _lz4mid_dest_overflow;
+        /* encode */
+        {   BYTE* const saved_op = op;
+            /* LZ4HC_encodeSequence always updates @op; on success, it updates @ip and @anchor */
+            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
+                    (int)matchLength, (int)matchDistance,
+                    limit, oend) ) {
+                op = saved_op;  /* restore @op value before failed LZ4HC_encodeSequence */
+                goto _lz4mid_dest_overflow;
+            }
+        }
 
         /* fill table with end of match */
         {   U32 endMatchIdx = (U32)(ip-prefixPtr) + prefixIdx;
@@ -583,7 +586,6 @@ _lz4mid_dest_overflow:
         size_t const ll_addbytes = (ll + 240) / 255;
         size_t const ll_totalCost = 1 + ll_addbytes + ll;
         BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
-        op = saved_op;  /* restore correct out pointer */
         DEBUGLOG(6, "Last sequence is overflowing : %u literals, %u remaining space",
                 (unsigned)ll, (unsigned)(oend-op));
         if (op + ll_totalCost <= maxLitPos) {
