@@ -410,6 +410,7 @@ static int LZ4HC_compress_2hashes (
     unsigned matchDistance;
 
     /* input sanitization */
+    DEBUGLOG(5, "LZ4HC_compress_2hashes (%i bytes)", *srcSizePtr);
     assert(*srcSizePtr >= 0);
     if (*srcSizePtr) assert(src != NULL);
     if (maxOutputSize) assert(dst != NULL);
@@ -437,7 +438,7 @@ static int LZ4HC_compress_2hashes (
                 const BYTE* matchPtr = prefixPtr + pos8 - prefixIdx;
                 assert(matchPtr < ip);
                 if (matchPtr >= prefixPtr) {
-                    /* note: we only search within prefix */
+                    /* note: currently only search within prefix */
                     matchLength = LZ4_count(ip, matchPtr, matchlimit);
                     if (matchLength >= MINMATCH) {
                         DEBUGLOG(7, "found candidate match at pos %u (len=%u)", pos8, matchLength);
@@ -467,6 +468,7 @@ static int LZ4HC_compress_2hashes (
                     matchDistance = ipIndex - pos4;
                     if ( m2Distance <= LZ4_DISTANCE_MAX
                       && pos8 >= prefixIdx /* only search within prefix */
+                      && likely(ip < mflimit)
                       ) {
                         const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
                         unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
@@ -507,9 +509,9 @@ _lz4mid_encode_sequence:
         };
 
         /* fill table with beginning of match */
-            ADDPOS8(ip+1, ipIndex+1);
-            ADDPOS8(ip+2, ipIndex+2);
-            ADDPOS4(ip+1, ipIndex+1);
+        ADDPOS8(ip+1, ipIndex+1);
+        ADDPOS8(ip+2, ipIndex+2);
+        ADDPOS4(ip+1, ipIndex+1);
 
         /* encode - note this actions updates @ip, @op and @anchor */
         saved_op = op;
@@ -558,11 +560,14 @@ _lz4mid_last_literals:
         } else {
             *op++ = (BYTE)(lastRunSize << ML_BITS);
         }
+        assert(op < oend);
+        assert(lastRunSize <= (size_t)(oend - op));
         LZ4_memcpy(op, anchor, lastRunSize);
         op += lastRunSize;
     }
 
     /* End */
+    DEBUGLOG(5, "compressed %i bytes into %i bytes", *srcSizePtr, (int)((char*)op - dst));
     assert(ip >= (const BYTE*)src);
     assert(ip <= iend);
     *srcSizePtr = (int)(ip - (const BYTE*)src);
