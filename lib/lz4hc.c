@@ -563,7 +563,6 @@ _lz4mid_last_literals:
         } else {
             *op++ = (BYTE)(lastRunSize << ML_BITS);
         }
-        assert(op < oend);
         assert(lastRunSize <= (size_t)(oend - op));
         LZ4_memcpy(op, anchor, lastRunSize);
         op += lastRunSize;
