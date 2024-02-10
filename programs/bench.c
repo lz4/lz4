@@ -83,6 +83,7 @@ static const size_t maxMemory = (sizeof(size_t)==4)  ?  (2 GB - 64 MB) : (size_t
 /* *************************************
 *  console display
 ***************************************/
+#define DISPLAYOUT(...)      fprintf(stdout, __VA_ARGS__)
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
@@ -439,6 +440,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         double ratio = 0.;
 
         DISPLAYLEVEL(2, "\r%79s\r", "");
+        if (g_nbSeconds==0) { nbCompressionLoops = 1; nbDecodeLoops = 1; }
         while (!cCompleted || !dCompleted) {
             /* overheat protection */
             if (TIME_clockSpan_ns(coolTime) > ACTIVEPERIOD_NANOSEC) {
@@ -595,9 +597,9 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             double const cSpeed = ((double)srcSize / (double)fastestC) * 1000;
             double const dSpeed = ((double)srcSize / (double)fastestD) * 1000;
             if (g_additionalParam)
-                DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
+                DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
             else
-                DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
+                DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
         }
         DISPLAYLEVEL(2, "%2i#\n", cLevel);
     }   /* Bench */

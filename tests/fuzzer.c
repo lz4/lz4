@@ -485,7 +485,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 FUZ_CHECKTEST(r2!=0, "LZ4_compress_fast_extState() should have failed");
             }
 
-            FUZ_DISPLAYTEST("test LZ4_compress_destSize_extState() with a too small destination buffer (must succeed, by compressing less than full input)");
+            FUZ_DISPLAYTEST("test LZ4_compress_destSize_extState() with too small dest buffer (must succeed, compress less than full input)");
             {   int inputSize = blockSize;
                 int const r3 = LZ4_compress_destSize_extState(stateLZ4, block, compressedBuffer, &inputSize, r-1, 8);
                 FUZ_CHECKTEST(r3==0, "LZ4_compress_destSize_extState() failed");
