@@ -126,7 +126,7 @@ static void countFreqs(
     unsigned total = 0;
     size_t w;
     for (w = 0; w < nbWords; w++) {
-        unsigned long len = strlen(words[w]);
+        size_t len = strlen(words[w]);
         int lmax;
         if (len >= nbWeights)
             len = nbWeights - 1;
@@ -146,7 +146,7 @@ static void init_word_distrib(
     size_t w, d = 0;
     countFreqs(words, nbWords, weights, nbWeights);
     for (w = 0; w < nbWords; w++) {
-        unsigned long len = strlen(words[w]);
+        size_t len = strlen(words[w]);
         int l, lmax;
         if (len >= nbWeights)
             len = nbWeights - 1;
