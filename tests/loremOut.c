@@ -31,6 +31,7 @@
  */
 
 #include "platform.h"  /* Compiler options, SET_BINARY_MODE */
+#include "loremOut.h"
 #include "lorem.h"     /* LOREM_genBlock */
 #include <stdio.h>
 #include <assert.h>
