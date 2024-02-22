@@ -145,6 +145,7 @@ endif()
 include (CheckCCompilerFlag)
 foreach (flag
     # GCC-style
+    -pedantic-errors
     -Wall
     -Wextra
     -Wundef
