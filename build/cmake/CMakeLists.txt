@@ -128,7 +128,7 @@ if(NOT BUILD_SHARED_LIBS AND BUILD_STATIC_LIBS)
   list(APPEND LZ4_LIBRARIES_BUILT lz4)
 endif()
 
-# xxhash namesapce
+# xxhash namespace
 if(BUILD_SHARED_LIBS)
   target_compile_definitions(lz4_shared PRIVATE
     XXH_NAMESPACE=LZ4_)
