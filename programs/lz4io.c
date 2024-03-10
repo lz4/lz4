@@ -433,65 +433,8 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 
 
 /***************************************
-*   Legacy Compression
+*   MT I/O
 ***************************************/
-
-/* Size in bytes of a legacy block header in little-endian format */
-#define LZ4IO_LEGACY_BLOCK_HEADER_SIZE 4
-#define LZ4IO_LEGACY_BLOCK_SIZE_MAX  (8 MB)
-
-/* unoptimized version; solves endianness & alignment issues */
-static void LZ4IO_writeLE32 (void* p, unsigned value32)
-{
-    unsigned char* const dstPtr = (unsigned char*)p;
-    dstPtr[0] = (unsigned char)value32;
-    dstPtr[1] = (unsigned char)(value32 >> 8);
-    dstPtr[2] = (unsigned char)(value32 >> 16);
-    dstPtr[3] = (unsigned char)(value32 >> 24);
-}
-
-
-typedef struct {
-    int cLevel;
-} CompressLegacyState;
-
-static size_t LZ4IO_compressBlockLegacy_fast(
-    const void* params,
-    void* dst,
-    size_t dstCapacity,
-    const void* src,
-    size_t srcSize,
-    size_t prefixSize
-)
-{
-    const CompressLegacyState* const clevel = (const CompressLegacyState*)params;
-    int const acceleration = (clevel->cLevel < 0) ? -clevel->cLevel : 0;
-    int const cSize = LZ4_compress_fast((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, acceleration);
-    if (cSize < 0)
-        END_PROCESS(51, "fast compression failed");
-    LZ4IO_writeLE32(dst, (unsigned)cSize);
-    assert(prefixSize == 0); (void)prefixSize;
-    return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
-}
-
-static size_t LZ4IO_compressBlockLegacy_HC(
-    const void* params,
-    void* dst,
-    size_t dstCapacity,
-    const void* src,
-    size_t srcSize,
-    size_t prefixSize
-)
-{
-    const CompressLegacyState* const cs = (const CompressLegacyState*)params;
-    int const clevel = cs->cLevel;
-    int const cSize = LZ4_compress_HC((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, clevel);
-    if (cSize < 0)
-        END_PROCESS(52, "HC compression failed");
-    LZ4IO_writeLE32(dst, (unsigned)cSize);
-    assert(prefixSize == 0); (void)prefixSize;
-    return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
-}
 
 #include "threadpool.h"
 
@@ -791,6 +734,68 @@ static void LZ4IO_readAndProcess(void* arg)
                 rjd->blockNb++;
                 TPOOL_submitJob(rjd->tpool, LZ4IO_readAndProcess, rjd);
     }   }   }
+}
+
+
+/***************************************
+*   Legacy Compression
+***************************************/
+
+/* Size in bytes of a legacy block header in little-endian format */
+#define LZ4IO_LEGACY_BLOCK_HEADER_SIZE 4
+#define LZ4IO_LEGACY_BLOCK_SIZE_MAX  (8 MB)
+
+/* unoptimized version; solves endianness & alignment issues */
+static void LZ4IO_writeLE32 (void* p, unsigned value32)
+{
+    unsigned char* const dstPtr = (unsigned char*)p;
+    dstPtr[0] = (unsigned char)value32;
+    dstPtr[1] = (unsigned char)(value32 >> 8);
+    dstPtr[2] = (unsigned char)(value32 >> 16);
+    dstPtr[3] = (unsigned char)(value32 >> 24);
+}
+
+
+typedef struct {
+    int cLevel;
+} CompressLegacyState;
+
+static size_t LZ4IO_compressBlockLegacy_fast(
+    const void* params,
+    void* dst,
+    size_t dstCapacity,
+    const void* src,
+    size_t srcSize,
+    size_t prefixSize
+)
+{
+    const CompressLegacyState* const clevel = (const CompressLegacyState*)params;
+    int const acceleration = (clevel->cLevel < 0) ? -clevel->cLevel : 0;
+    int const cSize = LZ4_compress_fast((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, acceleration);
+    if (cSize < 0)
+        END_PROCESS(51, "fast compression failed");
+    LZ4IO_writeLE32(dst, (unsigned)cSize);
+    assert(prefixSize == 0); (void)prefixSize;
+    return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
+}
+
+static size_t LZ4IO_compressBlockLegacy_HC(
+    const void* params,
+    void* dst,
+    size_t dstCapacity,
+    const void* src,
+    size_t srcSize,
+    size_t prefixSize
+)
+{
+    const CompressLegacyState* const cs = (const CompressLegacyState*)params;
+    int const clevel = cs->cLevel;
+    int const cSize = LZ4_compress_HC((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, clevel);
+    if (cSize < 0)
+        END_PROCESS(52, "HC compression failed");
+    LZ4IO_writeLE32(dst, (unsigned)cSize);
+    assert(prefixSize == 0); (void)prefixSize;
+    return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
 }
 
 /* LZ4IO_compressLegacy_internal :
