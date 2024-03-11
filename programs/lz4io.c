@@ -1695,9 +1695,9 @@ typedef struct {
 static void LZ4IO_decompressBlockLegacy(void* arg)
 {
     int decodedSize;
-    LegacyBlockInput* const lbi = arg;
+    LegacyBlockInput* const lbi = (LegacyBlockInput*)arg;
 
-    decodedSize = LZ4_decompress_safe(lbi->inBuffer, lbi->outBuffer, (int)lbi->inSize, LEGACY_BLOCKSIZE);
+    decodedSize = LZ4_decompress_safe((const char*)lbi->inBuffer, (char*)lbi->outBuffer, (int)lbi->inSize, LEGACY_BLOCKSIZE);
     if (decodedSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
     *lbi->totalSize += (unsigned long long)decodedSize; /* note: works because only 1 thread */
 
