@@ -1659,7 +1659,7 @@ static void LZ4IO_fwriteSparseEnd(FILE* file, unsigned storedSkips)
 
 static unsigned g_magicRead = 0;   /* out-parameter of LZ4IO_decodeLegacyStream() */
 
-#if 1
+#if LZ4IO_MULTITHREAD
 
 typedef struct {
     void* buffer;
