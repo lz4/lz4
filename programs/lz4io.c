@@ -111,7 +111,7 @@ static TIME_t g_time = { 0 };
 
 static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
 {
-#if LZ4_MULTITHREAD
+#if LZ4IO_MULTITHREAD
     if (!TIME_support_MT_measurements()) {
         DISPLAYLEVEL(5, "time measurements not compatible with multithreading \n");
     } else
@@ -152,7 +152,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
 
 int LZ4IO_defaultNbWorkers(void)
 {
-#if LZ4_MULTITHREAD
+#if LZ4IO_MULTITHREAD
     int const nbCores = UTIL_countCores();
     int const spared = 1 + ((unsigned)nbCores >> 3);
     if (nbCores <= spared) return 1;
@@ -1471,7 +1471,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
-#if LZ4_MULTITHREAD
+#if LZ4IO_MULTITHREAD
     /* only employ multi-threading in the following scenarios: */
     if ( (io_prefs->nbWorkers != 1)
       && (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
