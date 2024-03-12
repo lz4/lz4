@@ -28,8 +28,8 @@
 
 /* Determines if multithreading is enabled or not
  * Default: disabled */
-#ifndef LZ4_MULTITHREAD
-# define LZ4_MULTITHREAD 0
+#ifndef LZ4IO_MULTITHREAD
+# define LZ4IO_MULTITHREAD 0
 #endif
 
 /* Determines default nb of threads for compression

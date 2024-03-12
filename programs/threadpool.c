@@ -35,7 +35,7 @@
 #endif
 
 
-#if !LZ4_MULTITHREAD
+#if !LZ4IO_MULTITHREAD
 
 /* ===================================================== */
 /* Backup implementation with no multi-threading support */

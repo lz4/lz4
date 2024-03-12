@@ -57,7 +57,7 @@
 /*****************************
 *  Constants
 ******************************/
-#if LZ4_MULTITHREAD
+#if LZ4IO_MULTITHREAD
 # define IO_MT "multithread"
 #else
 # define IO_MT "single-thread"
@@ -683,7 +683,7 @@ int main(int argCount, const char** argv)
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(5, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
-#if !LZ4_MULTITHREAD
+#if !LZ4IO_MULTITHREAD
     if (nbWorkers > 1)
         DISPLAYLEVEL(2, "warning: this executable doesn't support multithreading \n");
 #endif
@@ -822,7 +822,7 @@ int main(int argCount, const char** argv)
     } else if (mode == om_list){
         operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
     } else {   /* compression is default action */
-#if LZ4_MULTITHREAD
+#if LZ4IO_MULTITHREAD
         if (nbWorkers != 1) {
             if (nbWorkers==0)
                 nbWorkers = (unsigned)LZ4IO_defaultNbWorkers();
