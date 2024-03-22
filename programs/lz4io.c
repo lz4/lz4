@@ -965,6 +965,7 @@ typedef struct {
     void*  dstBuffer;
     size_t dstBufferSize;
     LZ4F_compressionContext_t ctx;
+    LZ4F_preferences_t preparedPrefs;
     LZ4F_CDict* cdict;
     TPOOL_ctx* tpool;
     TPOOL_ctx* wpool; /* writer thread */
@@ -1044,37 +1045,48 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* dictFilename)
     return dictBuf;
 }
 
-static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* prefs)
+static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* io_prefs)
 {
     size_t dictionarySize;
     void* dictionaryBuffer;
     LZ4F_CDict* cdict;
-    if (!prefs->useDictionary) return NULL;
-    dictionaryBuffer = LZ4IO_createDict(&dictionarySize, prefs->dictionaryFilename);
+    if (!io_prefs->useDictionary) return NULL;
+    dictionaryBuffer = LZ4IO_createDict(&dictionarySize, io_prefs->dictionaryFilename);
     if (!dictionaryBuffer) END_PROCESS(29, "Dictionary error : could not create dictionary");
     cdict = LZ4F_createCDict(dictionaryBuffer, dictionarySize);
     free(dictionaryBuffer);
     return cdict;
 }
 
-static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* prefs)
+static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
 {
     const size_t chunkSize = 4 MB;
     cRess_t ress;
+    memset(&ress, 0, sizeof(ress));
 
-    LZ4F_errorCode_t const errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
-    if (LZ4F_isError(errorCode))
-        END_PROCESS(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+    /* set compression advanced parameters */
+    ress.preparedPrefs.autoFlush = 1;
+    ress.preparedPrefs.frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
+    ress.preparedPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
+    ress.preparedPrefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
+    ress.preparedPrefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
+    ress.preparedPrefs.favorDecSpeed = io_prefs->favorDecSpeed;
 
-    /* Allocate Memory */
+    /* Allocate compression state */
+    {   LZ4F_errorCode_t const errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
+        if (LZ4F_isError(errorCode))
+            END_PROCESS(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+    }
+
+    /* Allocate Buffers */
     ress.srcBuffer = malloc(chunkSize);
     ress.srcBufferSize = chunkSize;
-    ress.dstBufferSize = LZ4F_compressFrameBound(chunkSize, NULL);   /* cover worst case */
+    ress.dstBufferSize = LZ4F_compressFrameBound(chunkSize, &ress.preparedPrefs);
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer)
         END_PROCESS(31, "Allocation error : can't allocate buffers");
 
-    ress.cdict = LZ4IO_createCDict(prefs);
+    ress.cdict = LZ4IO_createCDict(io_prefs);
 
     /* will be created it needed */
     ress.tpool = NULL;
@@ -1143,16 +1155,10 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     if (srcFile == NULL) return 1;
     dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
     if (dstFile == NULL) { fclose(srcFile); return 1; }
-    memset(&prefs, 0, sizeof(prefs));
 
-    /* Set compression parameters */
-    prefs.autoFlush = 1;
+    /* Adjust compression parameters */
+    prefs = ress.preparedPrefs;
     prefs.compressionLevel = compressionLevel;
-    prefs.frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
-    prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
-    prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
-    prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
-    prefs.favorDecSpeed = io_prefs->favorDecSpeed;
     if (io_prefs->contentSizeFlag) {
       U64 const fileSize = UTIL_getOpenFileSize(srcFile);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
@@ -1359,14 +1365,9 @@ LZ4IO_compressFilename_extRess_ST(unsigned long long* inStreamSize,
     if (dstFile == NULL) { fclose(srcFile); return 1; }
     memset(&prefs, 0, sizeof(prefs));
 
-    /* Set compression parameters */
-    prefs.autoFlush = 1;
+    /* Adjust compression parameters */
+    prefs = ress.preparedPrefs;
     prefs.compressionLevel = compressionLevel;
-    prefs.frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
-    prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
-    prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
-    prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
-    prefs.favorDecSpeed = io_prefs->favorDecSpeed;
     if (io_prefs->contentSizeFlag) {
       U64 const fileSize = UTIL_getOpenFileSize(srcFile);
       prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
