@@ -88,7 +88,9 @@ static unsigned displayLevel = 2;   /* 0 : no display ; 1: errors only ; 2 : dow
 /*-************************************
 *  Errors and Messages
 ***************************************/
-#define DEBUG 0
+#ifndef DEBUG
+#  define DEBUG 0
+#endif
 #define DEBUGOUTPUT(...) do { if (DEBUG) DISPLAY(__VA_ARGS__); } while (0)
 #define END_PROCESS(error, ...)                                   \
 do {                                                              \
