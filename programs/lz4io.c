@@ -1077,6 +1077,7 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
         if (LZ4F_isError(errorCode))
             END_PROCESS(30, "Allocation error : can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
     }
+    assert(ress.ctx != NULL);
 
     /* Allocate Buffers */
     ress.srcBuffer = malloc(chunkSize);
