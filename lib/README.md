@@ -137,8 +137,8 @@ The following build macro can be selected to adjust source code behavior at comp
 #### Makefile variables
 
 The following `Makefile` variables can be selected to alter the profile of produced binaries :
-- `BUILD_SHARED` : generate `libzstd` dynamic library (enabled by default)
-- `BUILD_STATIC` : generate `libzstd` static library (enabled by default)
+- `BUILD_SHARED` : generate `liblz4` dynamic library (enabled by default)
+- `BUILD_STATIC` : generate `liblz4` static library (enabled by default)
 
 
 #### Amalgamation
