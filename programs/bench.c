@@ -84,8 +84,9 @@ static const size_t maxMemory = (sizeof(size_t)==4)  ?  (2 GB - 64 MB) : (size_t
 *  console display
 ***************************************/
 #define DISPLAYOUT(...)      fprintf(stdout, __VA_ARGS__)
+#define OUTLEVEL(l, ...)     if (g_displayLevel>=(l)) { DISPLAYOUT(__VA_ARGS__); }
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=(l)) { DISPLAY(__VA_ARGS__); }
 static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
@@ -495,10 +496,11 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 cSize += !cSize;  /* avoid div by 0 */
                 ratio = (double)totalRSize / (double)cSize;
                 markNb = (markNb+1) % NB_MARKS;
-                DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
+                OUTLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
                         marks[markNb], displayName,
                         (U32)totalRSize, (U32)cSize, ratio,
                         ((double)totalRSize / (double)fastestC) * 1000 );
+                fflush(NULL);
             }
             (void)fastestD; (void)crcOrig;   /*  unused when decompression disabled */
 #if 1
@@ -558,11 +560,12 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             }
             markNb = (markNb+1) % NB_MARKS;
             ratio  = (double)totalRSize / (double)cSize;
-            DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s, %6.1f MB/s\r",
+            OUTLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s, %6.1f MB/s\r",
                     marks[markNb], displayName,
                     (U32)totalRSize, (U32)cSize, ratio,
                     ((double)totalRSize / (double)fastestC) * 1000,
                     ((double)totalRSize / (double)fastestD) * 1000);
+            fflush(NULL);
 
             /* CRC Checking (not possible in decode-only mode)*/
             if (!g_decodeOnly) {
@@ -593,15 +596,17 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 #endif
         }   /* for (testNb = 1; testNb <= (g_nbSeconds + !g_nbSeconds); testNb++) */
 
+        OUTLEVEL(2, "%2i#\n", cLevel);
+
+        /* quiet mode */
         if (g_displayLevel == 1) {
             double const cSpeed = ((double)srcSize / (double)fastestC) * 1000;
             double const dSpeed = ((double)srcSize / (double)fastestD) * 1000;
+            DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s ", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
             if (g_additionalParam)
-                DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
-            else
-                DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
+                DISPLAYOUT("(param=%d)", g_additionalParam);
+            DISPLAYOUT("\n");
         }
-        DISPLAYLEVEL(2, "%2i#\n", cLevel);
     }   /* Bench */
 
     /* clean up */
