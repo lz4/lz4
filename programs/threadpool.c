@@ -75,20 +75,24 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx) {
 
 #if defined(LZ4IO_USE_STD_THREADS_H) && (LZ4IO_USE_STD_THREADS_H)
 #  include <threads.h> /* thrd_*, mtx_*, cnd_* */
+
+#  define c11thrd_to_pthread(x)         ((x) == thrd_success ? 0 : 1)             /* Convert thrd_cuccess to 0 for pthread compatibility */
+#  define c11thrd_always_success(x)     ((x), 0)                                  /* Always returns 0 for void functions */
+
 #  define pthread_t                     thrd_t
-#  define pthread_create(a,b,c,d)       thrd_create(a,c,d)    /* ignore 2nd argument */
-#  define pthread_join                  thrd_join
+#  define pthread_create(a,b,c,d)       c11thrd_to_pthread(thrd_create(a,c,d))    /* ignore 2nd argument */
+#  define pthread_join(a,b)             c11thrd_to_pthread(thrd_join(a,b))
 #  define pthread_mutex_t               mtx_t
-#  define pthread_mutex_init(a,b)       mtx_init(a,mtx_plain) /* ignore and replace 2nd argument */
-#  define pthread_mutex_destroy         mtx_destroy
-#  define pthread_mutex_lock            mtx_lock
-#  define pthread_mutex_unlock          mtx_unlock
+#  define pthread_mutex_init(a,b)       c11thrd_to_pthread(mtx_init(a,mtx_plain)) /* ignore and replace 2nd argument */
+#  define pthread_mutex_destroy(a)      c11thrd_always_success(mtx_destroy(a))    /* mtx_destroy() never fail */
+#  define pthread_mutex_lock(a)         c11thrd_to_pthread(mtx_lock(a))
+#  define pthread_mutex_unlock(a)       c11thrd_to_pthread(mtx_unlock(a))
 #  define pthread_cond_t                cnd_t
-#  define pthread_cond_init(a,b)        cnd_init(a)           /* ignore 2nd argument */
-#  define pthread_cond_destroy          cnd_destroy
-#  define pthread_cond_wait             cnd_wait
-#  define pthread_cond_signal           cnd_signal
-#  define pthread_cond_broadcast        cnd_broadcast
+#  define pthread_cond_init(a,b)        c11thrd_to_pthread(cnd_init(a))           /* ignore 2nd argument */
+#  define pthread_cond_destroy(a)       c11thrd_always_success(cnd_destroy(a))    /* cnd_destroy() never fail */
+#  define pthread_cond_wait(a,b)        c11thrd_to_pthread(cnd_wait(a,b))
+#  define pthread_cond_signal(a)        c11thrd_to_pthread(cnd_signal(a))
+#  define pthread_cond_broadcast(a)     c11thrd_to_pthread(cnd_broadcast(a))
 #  define TPOOL_thread_ReturnType       int
 #  define TPOOL_thread_ReturnFailure    0
 #  define TPOOL_thread_ReturnSuccess    (!0)
