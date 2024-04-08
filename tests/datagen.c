@@ -1,6 +1,6 @@
 /*
     datagen.c - compressible data generator test tool
-    Copyright (C) Yann Collet 2012-2020
+    Copyright (C) Yann Collet 2012-2024
 
     GPL v2 License
 
@@ -50,7 +50,6 @@
 #define LTSIZE (1<<LTLOG)
 #define LTMASK (LTSIZE-1)
 typedef BYTE litDistribTable[LTSIZE];
-
 
 
 /*********************************************************
@@ -133,7 +132,7 @@ void RDG_genBlock(void* buffer, size_t buffSize, size_t prefixSize, double match
             /* Copy (within 32K) */
             size_t match;
             size_t d;
-            int length = RDG_RANDLENGTH + 4;
+            size_t length = RDG_RANDLENGTH + 4;
             U32 offset = RDG_RAND15BITS + 1;
             if (offset > pos) offset = (U32)pos;
             match = pos - offset;

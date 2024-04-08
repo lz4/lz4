@@ -25,7 +25,9 @@
 
 /* ======   Dependencies   ======= */
 #include <assert.h>
+#include "lz4conf.h"  /* LZ4IO_MULTITHREAD */
 #include "threadpool.h"
+
 
 /* ======   Compiler specifics   ====== */
 #if defined(_MSC_VER)
@@ -33,7 +35,7 @@
 #endif
 
 
-#if !defined(LZ4IO_MULTITHREAD)
+#if !LZ4IO_MULTITHREAD
 
 /* ===================================================== */
 /* Backup implementation with no multi-threading support */

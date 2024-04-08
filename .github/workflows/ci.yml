@@ -75,7 +75,7 @@ jobs:
       CXX: ${{ matrix.cxx }}
       FIXME__LZ4_CI_IGNORE : ' echo Error.  But we ignore it for now.'
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -164,7 +164,7 @@ jobs:
     name: Fullbench
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -191,7 +191,7 @@ jobs:
     name: Fuzzer test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -212,7 +212,7 @@ jobs:
     name: LZ4 Makefile - support for standard variables
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: make standard_variables
       run: make standard_variables V=1
@@ -222,7 +222,7 @@ jobs:
     name: LZ4 versions test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -237,7 +237,7 @@ jobs:
     name: LZ4 inter-versions ABI compatibility test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -252,7 +252,7 @@ jobs:
     name: LZ4 frame test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -269,7 +269,7 @@ jobs:
     name: test different values of LZ4_MEMORY_USAGE
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: LZ4_MEMORY_USAGE
       run: make V=1 -C tests test-compile-with-lz4-memory-usage
 
@@ -278,7 +278,7 @@ jobs:
     name: Custom LZ4_DISTANCE_MAX
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: custom LZ4_DISTANCE_MAX; test LZ4_USER_MEMORY_FUNCTIONS
       run: |
         CPPFLAGS='-DLZ4_DISTANCE_MAX=8000' make V=1 check
@@ -294,7 +294,7 @@ jobs:
     name: Test lz4 compression on a block device
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: create a block device, compress it with lz4 # alternative : blindly use /dev/loop0, seems to always exist
       run: |
         make lz4
@@ -321,7 +321,7 @@ jobs:
     name: make cppcheck
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -340,7 +340,7 @@ jobs:
     name: make staticAnalyze
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -362,7 +362,7 @@ jobs:
     name: valgrind
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -381,7 +381,7 @@ jobs:
     name: Linux x64 ubsan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: ubsan
       run: |
@@ -393,7 +393,7 @@ jobs:
     name: Linux x86 ubsan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -411,7 +411,7 @@ jobs:
     name: Linux x64 ASAN
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: setup
       run: sudo sysctl -w vm.mmap_min_addr=4096
@@ -429,7 +429,7 @@ jobs:
     name: Linux x64 MSAN
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: check lz4
       run: make clean; CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j check V=1
@@ -444,7 +444,7 @@ jobs:
     name: Linux x64 TSAN
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: lz4 cli
       run: make clean; CC=clang CFLAGS=-fsanitize=thread LDFLAGS=-fsanitize=thread make -j -C tests test-lz4 V=1
@@ -454,7 +454,7 @@ jobs:
     name: lint unicode in ./lib/, ./tests/ and ./programs/
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: unicode lint
       run: bash ./tests/unicode_lint.sh
 
@@ -462,7 +462,7 @@ jobs:
     name: make examples
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: apt-get install
       run: |
         sudo apt-get update
@@ -498,7 +498,7 @@ jobs:
         dry-run: false
         sanitizer: ${{ matrix.sanitizer }}
     - name: Upload Crash
-      uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 # https://github.com/actions/upload-artifact v4.0.0
+      uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # https://github.com/actions/upload-artifact v4.3.1
       if: failure() && steps.build.outcome == 'success'
       with:
         name: ${{ matrix.sanitizer }}-artifacts
@@ -538,6 +538,7 @@ jobs:
           { type: MIPS,     pkgs: 'qemu-system-mips gcc-mips-linux-gnu',         xcc: mips-linux-gnu-gcc,        xemu: qemu-mips-static,    os: ubuntu-latest, },
           { type: M68K,     pkgs: 'qemu-system-m68k gcc-m68k-linux-gnu',         xcc: m68k-linux-gnu-gcc,        xemu: qemu-m68k-static,    os: ubuntu-latest, },
           { type: RISC-V,   pkgs: 'qemu-system-riscv64 gcc-riscv64-linux-gnu',   xcc: riscv64-linux-gnu-gcc,     xemu: qemu-riscv64-static, os: ubuntu-latest, },
+          { type: SPARC,    pkgs: 'qemu-system-sparc gcc-sparc64-linux-gnu',     xcc: sparc64-linux-gnu-gcc,     xemu: qemu-sparc64-static, os: ubuntu-20.04, },
         ]
 
     runs-on: ${{ matrix.os }}
@@ -545,7 +546,7 @@ jobs:
       XCC: ${{ matrix.xcc }}
       XEMU: ${{ matrix.xemu }}
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: apt-get install
       run: |
@@ -568,8 +569,8 @@ jobs:
       if: ${{ matrix.type == 'PPC64LE' }}
       run: CFLAGS=-m64 make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
 
-    - name: MIPS-M68K-RISCV
-      if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' }}
+    - name: MIPS-M68K-RISCV-SPARC
+      if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' || matrix.type == 'SPARC' }}
       run: make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
 
 
@@ -579,7 +580,7 @@ jobs:
     name: macOS
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: Environment info
       run: |
@@ -609,7 +610,7 @@ jobs:
           { os: windows-2022, build_path: ".\\build\\VS2022" },
         ]
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: Build ${{ matrix.system.os }}, Win32
       run: |
@@ -636,7 +637,7 @@ jobs:
     name: cmake
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: Environment info
       run: |
@@ -654,7 +655,7 @@ jobs:
     name: cmake (static lib)
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: Environment info
       run: |
@@ -673,7 +674,7 @@ jobs:
     name: make cmakebuild
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: make cmakebuild
       # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
       run: make clean; make cmakebuild V=1 VERBOSE=1
@@ -684,8 +685,8 @@ jobs:
     name: Meson + Ninja
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
-    - uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # https://github.com/actions/setup-python v5.0.0
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
+    - uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # https://github.com/actions/setup-python v5.1.0
       with:
         python-version: '3.x'
 
@@ -735,7 +736,7 @@ jobs:
     name: git version tag checking for release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
     - name: make -C tests checkTag
       if: startsWith(github.ref, 'refs/tags/v')   # If git tag name starts with 'v'
       run: |
@@ -760,7 +761,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # https://github.com/actions/checkout v4.1.1
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # https://github.com/actions/checkout v4.1.2
 
     - name: init
       run: |

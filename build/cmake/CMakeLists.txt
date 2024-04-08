@@ -116,8 +116,19 @@ if(BUILD_STATIC_LIBS)
     POSITION_INDEPENDENT_CODE ${LZ4_POSITION_INDEPENDENT_LIB})
   list(APPEND LZ4_LIBRARIES_BUILT lz4_static)
 endif()
+# Add unified target if building only a shared or static library.
+if(BUILD_SHARED_LIBS AND NOT BUILD_STATIC_LIBS)
+  add_library(lz4 INTERFACE)
+  target_link_libraries(lz4 INTERFACE lz4_shared)
+  list(APPEND LZ4_LIBRARIES_BUILT lz4)
+endif()
+if(NOT BUILD_SHARED_LIBS AND BUILD_STATIC_LIBS)
+  add_library(lz4 INTERFACE)
+  target_link_libraries(lz4 INTERFACE lz4_static)
+  list(APPEND LZ4_LIBRARIES_BUILT lz4)
+endif()
 
-# xxhash namesapce
+# xxhash namespace
 if(BUILD_SHARED_LIBS)
   target_compile_definitions(lz4_shared PRIVATE
     XXH_NAMESPACE=LZ4_)
@@ -145,6 +156,7 @@ endif()
 include (CheckCCompilerFlag)
 foreach (flag
     # GCC-style
+    -pedantic-errors
     -Wall
     -Wextra
     -Wundef

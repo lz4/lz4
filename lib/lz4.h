@@ -148,6 +148,7 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
 **************************************/
 /*!
  * LZ4_MEMORY_USAGE :
+ * Can be selected at compile time, by setting LZ4_MEMORY_USAGE.
  * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB)
  * Increasing memory usage improves compression ratio, generally at the cost of speed.
  * Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
@@ -157,6 +158,7 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
 # define LZ4_MEMORY_USAGE LZ4_MEMORY_USAGE_DEFAULT
 #endif
 
+/* These are absolute limits, they should not be changed by users */
 #define LZ4_MEMORY_USAGE_MIN 10
 #define LZ4_MEMORY_USAGE_DEFAULT 14
 #define LZ4_MEMORY_USAGE_MAX 20
@@ -367,6 +369,15 @@ LZ4LIB_API void LZ4_resetStream_fast (LZ4_stream_t* streamPtr);
  * @return : loaded dictionary size, in bytes (note: only the last 64 KB are loaded)
  */
 LZ4LIB_API int LZ4_loadDict (LZ4_stream_t* streamPtr, const char* dictionary, int dictSize);
+
+/*! LZ4_loadDictSlow() : v1.9.5+
+ *  Same as LZ4_loadDict(),
+ *  but uses a bit more cpu to reference the dictionary content more thoroughly.
+ *  This is expected to slightly improve compression ratio.
+ *  The extra-cpu cost is likely worth it if the dictionary is re-used across multiple sessions.
+ * @return : loaded dictionary size, in bytes (note: only the last 64 KB are loaded)
+ */
+LZ4LIB_API int LZ4_loadDictSlow(LZ4_stream_t* streamPtr, const char* dictionary, int dictSize);
 
 /*! LZ4_compress_fast_continue() :
  *  Compress 'src' content using data from previously compressed blocks, for better compression ratio.

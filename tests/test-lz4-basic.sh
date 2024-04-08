@@ -77,3 +77,5 @@ diff -q $FPREFIX-test $FPREFIX-test2
 # Multithreading commands
 datagen -g16M | lz4 -T2 | lz4 -t
 datagen -g16M | lz4 --threads=2 | lz4 -t
+# bug #1374
+datagen -g4194302 | lz4 -B4 -c > $FPREFIX-test3

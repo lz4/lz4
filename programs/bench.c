@@ -43,7 +43,7 @@
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>      /* assert */
 
-#include "datagen.h"     /* RDG_genBuffer */
+#include "lorem.h"       /* LOREM_genBuffer */
 #include "xxhash.h"
 #include "bench.h"
 #include "timefn.h"
@@ -79,12 +79,11 @@
 
 static const size_t maxMemory = (sizeof(size_t)==4)  ?  (2 GB - 64 MB) : (size_t)(1ULL << ((sizeof(size_t)*8)-31));
 
-static U32 g_compressibilityDefault = 50;
-
 
 /* *************************************
 *  console display
 ***************************************/
+#define DISPLAYOUT(...)      fprintf(stdout, __VA_ARGS__)
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
 #define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
 static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
@@ -414,7 +413,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     }   }   }
 
     /* warming up memory */
-    RDG_genBuffer(compressedBuffer, maxCompressedSize, 0.10, 0.50, 1);
+    memset(compressedBuffer, ' ', maxCompressedSize);
 
     /* decode-only mode : copy input to @compressedBuffer */
     if (g_decodeOnly) {
@@ -441,6 +440,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         double ratio = 0.;
 
         DISPLAYLEVEL(2, "\r%79s\r", "");
+        if (g_nbSeconds==0) { nbCompressionLoops = 1; nbDecodeLoops = 1; }
         while (!cCompleted || !dCompleted) {
             /* overheat protection */
             if (TIME_clockSpan_ns(coolTime) > ACTIVEPERIOD_NANOSEC) {
@@ -597,9 +597,9 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             double const cSpeed = ((double)srcSize / (double)fastestC) * 1000;
             double const dSpeed = ((double)srcSize / (double)fastestD) * 1000;
             if (g_additionalParam)
-                DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
+                DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
             else
-                DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
+                DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
         }
         DISPLAYLEVEL(2, "%2i#\n", cLevel);
     }   /* Bench */
@@ -747,23 +747,26 @@ static int BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
 }
 
 
-static int BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility,
+static int BMK_syntheticTest(int cLevel, int cLevelLast,
                              const char* dictBuf, int dictSize)
 {
     int benchError = 0;
-    char name[20] = {0};
-    size_t benchedSize = 10000000;
+    size_t const benchedSize = 10000000;
     void* const srcBuffer = malloc(benchedSize);
 
     /* Memory allocation */
     if (!srcBuffer) END_PROCESS(21, "not enough memory");
 
     /* Fill input buffer */
-    RDG_genBuffer(srcBuffer, benchedSize, compressibility, 0.0, 0);
+    LOREM_genBuffer(srcBuffer, benchedSize, 0);
 
     /* Bench */
-    snprintf (name, sizeof(name), "Synthetic %2u%%", (unsigned)(compressibility*100));
-    benchError = BMK_benchCLevel(srcBuffer, benchedSize, name, cLevel, cLevelLast, &benchedSize, 1, dictBuf, dictSize);
+    benchError = BMK_benchCLevel(srcBuffer, benchedSize,
+                    "Lorem ipsum",
+                    cLevel, cLevelLast,
+                    &benchedSize,
+                    1,
+                    dictBuf, dictSize);
 
     /* clean up */
     free(srcBuffer);
@@ -795,7 +798,6 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
                    const char* dictFileName)
 {
     int benchError = 0;
-    double const compressibility = (double)g_compressibilityDefault / 100;
     char* dictBuf = NULL;
     size_t dictSize = 0;
 
@@ -843,9 +845,9 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
         fclose(dictFile);
     }
 
-    if (nbFiles == 0)
-        benchError = BMK_syntheticTest(cLevel, cLevelLast, compressibility, dictBuf, (int)dictSize);
-    else {
+    if (nbFiles == 0) {
+        benchError = BMK_syntheticTest(cLevel, cLevelLast, dictBuf, (int)dictSize);
+    } else {
         if (g_benchSeparately)
             benchError = BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
         else

@@ -19,15 +19,18 @@ The makefile offer several targets for various use cases:
 - `unlz4`, `lz4cat` : symlinks to `lz4`, default to decompression and `cat` compressed files
 - `man` : generates the man page, from `lz4.1.md` markdown source
 
-#### Makefile Build variables
-- `HAVE_PTHREAD` : determines presences of `<pthread>` support, which determines multithreading support of `lz4`. Normally detected automatically, but can be forced to `0` or `1` if needed.
-
 #### C Preprocessor variables
-These variables are read by the preprocessor, at compilation time, and influence executable behavior, such as default starting values.
-On a typical `posix` + `gcc` + `make` environment, they can be changed by using `CPPFLAGS=-DVARIABLE=value` assignment. Methods vary depending on environments.
-- `LZ4_BLOCKSIZEID_DEFAULT`: determines default `lz4` block size. Valid values are [4-7].
-- `LZ4_NBTHREADS_DEFAULT`: determines default nb of threads in multithreading mode.
+These variables are read by the preprocessor at compilation time, they influence executable behavior, such as default starting values,
+and are exposed from `programs/lz4conf.h`.
+Assignment methods vary depending on environments.
+On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=-DVARIABLE=value` assignment.
+- `LZ4IO_MULTITHREAD`: enable multithreading support
+- `LZ4_NBTHREADS_DEFAULT`: default nb of threads in multithreading mode.
    Default is `0`, which means "auto-determine" based on local cpu.
+- `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7].
+
+#### Makefile Build variables
+- `HAVE_PTHREAD` : determines presences of `<pthread>` support. This is in turn used by `make` to determine multithreading support of `lz4`. Detection is automatic, but can be forced to `0` or `1` if needed.
 
 
 ### Aggregation of parameters
