@@ -229,14 +229,15 @@ if(NOT LZ4_BUNDLED_MODE)
 
   # install lz4cat and unlz4 symlinks on *nix
   if(UNIX AND LZ4_BUILD_CLI)
-    install(CODE "
-      foreach(f lz4cat unlz4)
-        set(dest \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_BINDIR}/\${f}\")
-        message(STATUS \"Symlinking: \${dest} -> lz4\")
-        execute_process(
-          COMMAND \"${CMAKE_COMMAND}\" -E create_symlink lz4 \"\${dest}\")
-      endforeach()
-    ")
+    foreach(f lz4cat unlz4)
+      add_custom_target("create_${f}" ALL
+        "${CMAKE_COMMAND}" -E create_symlink
+          "$<TARGET_FILE_NAME:lz4cli>" "${f}"
+        BYPRODUCTS "${f}"
+        VERBATIM)
+      install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${f}"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    endforeach()
 
     # create manpage aliases
     foreach(f lz4cat unlz4)
