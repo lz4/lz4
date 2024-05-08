@@ -530,7 +530,7 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
 
 /* LZ4_memcpy_using_offset()  presumes :
  * - dstEnd >= dstPtr + MINMATCH
- * - there is at least 8 bytes available to write after dstEnd */
+ * - there is at least 12 bytes available to write after dstEnd */
 LZ4_FORCE_INLINE void
 LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
 {
