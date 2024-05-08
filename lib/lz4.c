@@ -433,7 +433,7 @@ static U16 LZ4_readLE16(const void* memPtr)
         return LZ4_read16(memPtr);
     } else {
         const BYTE* p = (const BYTE*)memPtr;
-        return (U16)((U16)p[0] + (p[1]<<8));
+        return (U16)((U16)p[0] | (p[1]<<8));
     }
 }
 
@@ -444,7 +444,7 @@ static U32 LZ4_readLE32(const void* memPtr)
         return LZ4_read32(memPtr);
     } else {
         const BYTE* p = (const BYTE*)memPtr;
-        return (U32)p[0] + (p[1]<<8) + (p[2]<<16) + (p[3]<<24);
+        return (U32)p[0] | (p[1]<<8) | (p[2]<<16) | (p[3]<<24);
     }
 }
 #endif
