@@ -1811,11 +1811,11 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                              rPos, cost, opt[rPos].litlen);
          }   }
          /* set prices using initial match */
-         {   int mlen = MINMATCH;
-             int const matchML = firstMatch.len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
+         {   int const matchML = firstMatch.len;   /* necessarily < sufficient_len < LZ4_OPT_NUM */
              int const offset = firstMatch.off;
+             int mlen;
              assert(matchML < LZ4_OPT_NUM);
-             for ( ; mlen <= matchML ; mlen++) {
+             for (mlen = MINMATCH ; mlen <= matchML ; mlen++) {
                  int const cost = LZ4HC_sequencePrice(llen, mlen);
                  opt[mlen].mlen = mlen;
                  opt[mlen].off = offset;
