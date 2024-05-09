@@ -227,16 +227,20 @@ if(NOT LZ4_BUNDLED_MODE)
       ${CMAKE_CURRENT_BINARY_DIR}/lz4ConfigVersion.cmake
     DESTINATION ${LZ4_PKG_INSTALLDIR})
 
-  # install lz4cat and unlz4 symlinks on *nix
+  # Install lz4cat and unlz4 symlinks on Unix systems
   if(UNIX AND LZ4_BUILD_CLI)
-    foreach(f lz4cat unlz4)
-      add_custom_target("create_${f}" ALL
-        "${CMAKE_COMMAND}" -E create_symlink
-          "$<TARGET_FILE_NAME:lz4cli>" "${f}"
-        BYPRODUCTS "${f}"
+    foreach(cli_tool IN ITEMS lz4cat unlz4)
+      # Create a custom target for the symlink creation
+      add_custom_target("create_${cli_tool}_symlink" ALL
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+          $<TARGET_FILE_NAME:lz4cli> ${cli_tool}
+        COMMENT "Creating symlink for ${cli_tool}"
         VERBATIM)
-      install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${f}"
-        DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+      # Install the symlink into the binary installation directory
+      install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${cli_tool}"
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RENAME ${cli_tool})
     endforeach()
 
     # create manpage aliases
