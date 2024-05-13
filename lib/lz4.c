@@ -1130,9 +1130,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 for(; len >= 255 ; len-=255) *op++ = 255;
                 *op++ = (BYTE)len;
                 len = (int)(litLength);
-                BYTE* opWildCopy = op;
+                BYTE* opWildCopy;
+                opWildCopy = op;
                 do {
-                    LZ4_memcpy(opWildCopy, anchor, 16);
+                    LZ4_memcpy(opWildCopy, anchor, 8);
+                    LZ4_memcpy(opWildCopy+8, anchor+8, 8);
                     opWildCopy+=16; anchor+=16; len-=16;
                 } while(len>8);
                 if (len>0)
