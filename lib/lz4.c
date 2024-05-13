@@ -1129,7 +1129,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 *token = (RUN_MASK<<ML_BITS);
                 for(; len >= 255 ; len-=255) *op++ = 255;
                 *op++ = (BYTE)len;
-                int wildCopyIterations = (litLength >> 3);
+                int wildCopyIterations = (int)(litLength >> 3);
                 BYTE* opWildCopy = op;
                 do {
                     LZ4_memcpy(opWildCopy, anchor, 16);
