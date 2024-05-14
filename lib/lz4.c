@@ -1125,7 +1125,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                         (int)(anchor-(const BYTE*)source), litLength, (int)(ip-(const BYTE*)source));
             
             if (litLength >= RUN_MASK) {
-                unsigned len = litLength - RUN_MASK;
                 BYTE* opWildCopy;
                 int len = (int)(litLength - RUN_MASK);
                 *token = (RUN_MASK<<ML_BITS);
