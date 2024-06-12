@@ -5,6 +5,11 @@ project(cmake_install_test LANGUAGES C)
 # Find LZ4 installation in Config mode
 find_package(lz4 CONFIG REQUIRED)
 
+# Verify that the universal target always exists
+if (NOT TARGET LZ4::lz4)
+  message(FATAL_ERROR "LZ4::lz4 target does not exist!")
+endif()
+
 # Verify that the location property is set
 get_property(LZ4_LOCATION TARGET LZ4::lz4_shared PROPERTY LOCATION)
 if (NOT LZ4_LOCATION)
