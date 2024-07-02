@@ -1669,6 +1669,7 @@ typedef struct {
     FILE* f;
     int sparseEnable;
     unsigned* storedSkips;
+    const unsigned long long* totalSize;
 } ChunkToWrite;
 
 static void LZ4IO_writeDecodedChunk(void* arg)
@@ -1678,6 +1679,7 @@ static void LZ4IO_writeDecodedChunk(void* arg)
 
     /* note: works because only 1 thread */
     *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->f, ctw->buffer, ctw->size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
+    DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >>20));
 
     /* clean up */
     free(ctw);
@@ -1713,6 +1715,7 @@ static void LZ4IO_decompressBlockLegacy(void* arg)
         ctw->f = lbi->foutput;
         ctw->sparseEnable = lbi->sparseEnable;
         ctw->storedSkips = lbi->storedSkips;
+        ctw->totalSize = lbi->totalSize;
         TPOOL_submitJob(lbi->wPool, LZ4IO_writeDecodedChunk, ctw);
     }
 
