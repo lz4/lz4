@@ -80,7 +80,6 @@ typedef struct TPOOL_ctx_s {
     HANDLE workerThreads[TPOOL_MAX_WORKERS];
     int numWorkers;
     int queueSize;
-    CRITICAL_SECTION queueLock; // Now only for pending job count
     __LONG32 numPendingJobs;
     HANDLE jobSemaphore;  // For queue size control
 } TPOOL_ctx;
@@ -103,7 +102,6 @@ void TPOOL_free(TPOOL_ctx* ctx) {
     CloseHandle(ctx->completionPort);
 
     // Clean up synchronization objects
-    DeleteCriticalSection(&ctx->queueLock);
     CloseHandle(ctx->jobSemaphore);
 
     free(ctx);
@@ -173,7 +171,6 @@ TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
     }
 
     // Initialize other members (no changes here)
-    InitializeCriticalSection(&ctx->queueLock);
     ctx->queueSize = queueSize;
     ctx->numPendingJobs = 0;
     ctx->jobSemaphore = CreateSemaphore(NULL, 0, queueSize, NULL);
