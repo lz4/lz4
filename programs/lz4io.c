@@ -2032,7 +2032,6 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
     while ((pos < lz4fc->inSize)) {  /* still to read */
         size_t remainingInSize = lz4fc->inSize - pos;
         Buffer b = BufPool_getBuffer(lz4fc->bp);
-        //DISPLAY("Decompressing %zu cBytes from pos %zu \n", remainingInSize, pos);
         if (b.capacity != OUTBUFF_SIZE)
             END_PROCESS(33, "Could not allocate output buffer!");
         assert(b.size == 0);
@@ -2049,7 +2048,6 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         assert(remainingInSize <= lz4fc->inSize - pos);
         pos += remainingInSize;
         assert(b.size <= b.capacity);
-        //DISPLAY("+%zu bytes decompressed \n", b.size);
         *lz4fc->totalSize += (unsigned long long)b.size; /* note: works because only 1 thread */
 
         /* push to write thread */
@@ -2140,7 +2138,6 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             lbi->foutput = dstFile;
             lbi->sparseEnable = prefs->sparseFileSupport;
             lbi->storedSkips = &storedSkips;
-            //DISPLAY("sending %zu cBytes from inBuff%i \n", readSize, bSetNb);
             TPOOL_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
         }
         if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
