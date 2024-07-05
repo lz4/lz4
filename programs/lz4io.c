@@ -1964,7 +1964,7 @@ static BufferPool* LZ4IO_createBufferPool(size_t bufSize)
     bp->availNext = 0;
     bp->usedIdx = 0;
     return bp;
-};
+}
 
 static Buffer BufPool_getBuffer(BufferPool* bp)
 {
