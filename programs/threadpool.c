@@ -190,16 +190,11 @@ void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
 {
     if (!ctx || !job_function) return;
 
-    EnterCriticalSection(&ctx->queueLock);
-    if (ctx->numPendingJobs >= ctx->numWorkers + ctx->queueSize) {
-        LeaveCriticalSection(&ctx->queueLock);
-        // Wait for space in the queue
+    // Atomically increment pending jobs and check for overflow
+    if (InterlockedIncrement(&ctx->numPendingJobs) > ctx->numWorkers + ctx->queueSize) {
+        InterlockedDecrement(&ctx->numPendingJobs);
         WaitForSingleObject(ctx->jobSemaphore, INFINITE);
-        EnterCriticalSection(&ctx->queueLock);
     }
-
-    ctx->numPendingJobs++;
-    LeaveCriticalSection(&ctx->queueLock);
 
     // Post the job directly to the completion port
     PostQueuedCompletionStatus(ctx->completionPort,
