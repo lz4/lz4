@@ -1949,7 +1949,7 @@ static void LZ4IO_freeBufferPool(BufferPool* bp)
 
 static BufferPool* LZ4IO_createBufferPool(size_t bufSize)
 {
-    BufferPool* bp = calloc(1, sizeof(*bp));
+    BufferPool* const bp = (BufferPool*)calloc(1, sizeof(*bp));
     int i;
     if (bp==NULL) return NULL;
     for (i=0; i<PBUFFERS_NB; i++) {
@@ -2026,7 +2026,7 @@ typedef struct {
 static void LZ4IO_decompressLZ4FChunk(void* arg)
 {
     LZ4FChunk* const lz4fc = (LZ4FChunk*)arg;
-    const char* inPtr = lz4fc->inBuffer;
+    const char* inPtr = (const char*)lz4fc->inBuffer;
     size_t pos = 0;
 
     while ((pos < lz4fc->inSize)) {  /* still to read */
