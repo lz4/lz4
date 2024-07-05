@@ -118,6 +118,7 @@ CLEAN += lz4
 
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
+lz4-release: CPPFLAGS+=-DNDEBUG
 lz4-release: lz4
 
 CLEAN += lz4-nomt

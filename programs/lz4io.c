@@ -1738,8 +1738,8 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
 
     if (tPool == NULL || wPool == NULL)
         END_PROCESS(21, "threadpool creation error ");
-    /* allocate buffers up front */
 
+    /* allocate buffers up front */
     for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
         inBuffs[bSetNb] = malloc((size_t)LZ4_compressBound(LEGACY_BLOCKSIZE));
         outBuffs[bSetNb] = malloc(LEGACY_BLOCKSIZE);
@@ -1914,6 +1914,269 @@ static void LZ4IO_freeDResources(dRess_t ress)
 }
 
 
+#if LZ4IO_MULTITHREAD
+
+#define INBUFF_SIZE (4 MB)
+#define OUTBUFF_SIZE (1 * INBUFF_SIZE)
+#define OUTBUFF_QUEUE 1
+#define PBUFFERS_NB (1 /* being decompressed */ + OUTBUFF_QUEUE + 1 /* being written to io */)
+
+typedef struct {
+    void* ptr;
+    size_t capacity;
+    size_t size;
+} Buffer;
+
+/* BufferPool:
+ * Based on ayncio property :
+ * all buffers are allocated and released in order,
+ * maximum nb of buffers limited by queues */
+
+typedef struct {
+    Buffer buffers[PBUFFERS_NB];
+    int availNext;
+    int usedIdx;
+} BufferPool;
+
+static void LZ4IO_freeBufferPool(BufferPool* bp)
+{
+    int i;
+    if (bp==NULL) return;
+    for (i=0; i<PBUFFERS_NB; i++)
+        free(bp->buffers[i].ptr);
+    free(bp);
+}
+
+static BufferPool* LZ4IO_createBufferPool(size_t bufSize)
+{
+    BufferPool* const bp = (BufferPool*)calloc(1, sizeof(*bp));
+    int i;
+    if (bp==NULL) return NULL;
+    for (i=0; i<PBUFFERS_NB; i++) {
+        bp->buffers[i].ptr = malloc(bufSize);
+        if (bp->buffers[i].ptr == NULL) {
+            LZ4IO_freeBufferPool(bp);
+            return NULL;
+        }
+         bp->buffers[i].capacity = bufSize;
+         bp->buffers[i].size = 0;
+    }
+    bp->availNext = 0;
+    bp->usedIdx = 0;
+    return bp;
+}
+
+/* Note: Thread Sanitizer can be detected with below macro
+ * but it's not guaranteed (doesn't seem to work with clang) */
+#ifdef __SANITIZE_THREAD__
+# undef LZ4IO_NO_TSAN_ONLY
+#endif
+
+static Buffer BufPool_getBuffer(BufferPool* bp)
+{
+    assert(bp != NULL);
+#ifdef LZ4IO_NO_TSAN_ONLY
+    /* The following assert() are susceptible to race conditions */
+    assert(bp->availNext >= bp->usedIdx);
+    assert(bp->availNext < bp->usedIdx + PBUFFERS_NB);
+#endif
+    {   int id = bp->availNext++ % PBUFFERS_NB;
+        assert(bp->buffers[id].size == 0);
+        return bp->buffers[id];
+}   }
+
+void BufPool_releaseBuffer(BufferPool* bp, Buffer buf)
+{
+    assert(bp != NULL);
+#ifdef LZ4IO_NO_TSAN_ONLY
+    /* The following assert() is susceptible to race conditions */
+    assert(bp->usedIdx < bp->availNext);
+#endif
+    {   int id = bp->usedIdx++ % PBUFFERS_NB;
+        assert(bp->buffers[id].ptr == buf.ptr);
+        bp->buffers[id].size = 0;
+}   }
+
+typedef struct {
+    Buffer bufOut;
+    FILE* fOut;
+    BufferPool* bp;
+    int sparseEnable;
+    unsigned* storedSkips;
+    unsigned long long* totalSize;
+} LZ4FChunkToWrite;
+
+static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
+{
+    LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)arg;
+    assert(ctw != NULL);
+
+    /* note: works because only 1 thread */
+    *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->fOut, ctw->bufOut.ptr, ctw->bufOut.size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
+    *ctw->totalSize += (unsigned long long)ctw->bufOut.size; /* note: works because only 1 thread */
+    DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >> 20));
+
+    /* clean up */
+    BufPool_releaseBuffer(ctw->bp, ctw->bufOut);
+    free(ctw);
+}
+
+typedef struct {
+    LZ4F_dctx* dctx;
+    const void* inBuffer;
+    size_t inSize;
+    const void* dictBuffer;
+    size_t dictBufferSize;
+    BufferPool* bp;
+    unsigned long long* totalSize;
+    LZ4F_errorCode_t* lastStatus;
+    TPOOL_ctx* wPool;
+    FILE* foutput;
+    int sparseEnable;
+    unsigned* storedSkips;
+} LZ4FChunk;
+
+static void LZ4IO_decompressLZ4FChunk(void* arg)
+{
+    LZ4FChunk* const lz4fc = (LZ4FChunk*)arg;
+    const char* inPtr = (const char*)lz4fc->inBuffer;
+    size_t pos = 0;
+
+    while ((pos < lz4fc->inSize)) {  /* still to read */
+        size_t remainingInSize = lz4fc->inSize - pos;
+        Buffer b = BufPool_getBuffer(lz4fc->bp);
+        if (b.capacity != OUTBUFF_SIZE)
+            END_PROCESS(33, "Could not allocate output buffer!");
+        assert(b.size == 0);
+        b.size = b.capacity;
+        {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
+                                b.ptr, &b.size,
+                                inPtr + pos, &remainingInSize,
+                                lz4fc->dictBuffer, lz4fc->dictBufferSize,
+                                NULL);
+            if (LZ4F_isError(nextToLoad))
+                END_PROCESS(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
+            *lz4fc->lastStatus = nextToLoad;
+        }
+        assert(remainingInSize <= lz4fc->inSize - pos);
+        pos += remainingInSize;
+        assert(b.size <= b.capacity);
+
+        /* push to write thread */
+        {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
+            if (ctw==NULL) {
+                END_PROCESS(35, "Allocation error : can't describe new write job");
+            }
+            ctw->bufOut = b;
+            ctw->fOut = lz4fc->foutput;
+            ctw->bp = lz4fc->bp;
+            ctw->sparseEnable = lz4fc->sparseEnable;
+            ctw->storedSkips = lz4fc->storedSkips;
+            ctw->totalSize = lz4fc->totalSize;
+            TPOOL_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
+        }
+    }
+
+    /* clean up */
+    free(lz4fc);
+}
+
+static unsigned long long
+LZ4IO_decompressLZ4F(dRess_t ress,
+                     FILE* const srcFile, FILE* const dstFile,
+                     const LZ4IO_prefs_t* const prefs)
+{
+    unsigned long long filesize = 0;
+    LZ4F_errorCode_t nextToLoad;
+    LZ4F_errorCode_t lastStatus = 1;
+    unsigned storedSkips = 0;
+    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, 1, 0, 0 };
+    const LZ4F_decompressOptions_t* const dOptPtr =
+        ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
+        &dOpt_skipCrc : NULL;
+    TPOOL_ctx* const tPool = TPOOL_create(1, 1);
+    TPOOL_ctx* const wPool = TPOOL_create(1, 1);
+    BufferPool* const bp = LZ4IO_createBufferPool(OUTBUFF_SIZE);
+#define NB_BUFFSETS 4 /* 1 being read, 1 being processed, 1 being written, 1 being queued */
+    void* inBuffs[NB_BUFFSETS];
+    int bSetNb;
+
+    /* checks */
+    if (tPool == NULL || wPool == NULL || bp==NULL)
+        END_PROCESS(22, "threadpool creation error ");
+
+    /* allocate buffers up front */
+    for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
+        inBuffs[bSetNb] = malloc((size_t)INBUFF_SIZE);
+        if (!inBuffs[bSetNb])
+            END_PROCESS(23, "Allocation error : can't allocate buffer for legacy decoding");
+    }
+
+    /* Init feed with magic number (already consumed from FILE* sFile) */
+    {   size_t inSize = MAGICNUMBER_SIZE;
+        size_t outSize= 0;
+        LZ4IO_writeLE32(ress.srcBuffer, LZ4IO_MAGICNUMBER);
+        nextToLoad = LZ4F_decompress_usingDict(ress.dCtx,
+                            ress.dstBuffer, &outSize,
+                            ress.srcBuffer, &inSize,
+                            ress.dictBuffer, ress.dictBufferSize,
+                            dOptPtr);  /* set it once, it's enough */
+        if (LZ4F_isError(nextToLoad))
+            END_PROCESS(23, "Header error : %s", LZ4F_getErrorName(nextToLoad));
+    }
+
+    /* Main Loop */
+    assert(nextToLoad);
+    for (bSetNb = 0; ; bSetNb = (bSetNb+1) % NB_BUFFSETS) {
+        size_t readSize;
+
+        /* Read input */
+        readSize = fread(inBuffs[bSetNb], 1, INBUFF_SIZE, srcFile);
+        if (ferror(srcFile)) END_PROCESS(26, "Read error");
+
+        /* push to decoding thread */
+        {   LZ4FChunk* const lbi = (LZ4FChunk*)malloc(sizeof(*lbi));
+            if (lbi==NULL)
+                END_PROCESS(25, "Allocation error : not enough memory to allocate job descriptor");
+            lbi->dctx = ress.dCtx;
+            lbi->inBuffer = inBuffs[bSetNb];
+            lbi->inSize = readSize;
+            lbi->dictBuffer = ress.dictBuffer;
+            lbi->dictBufferSize = ress.dictBufferSize;
+            lbi->bp = bp;
+            lbi->wPool = wPool;
+            lbi->totalSize = &filesize;
+            lbi->lastStatus = &lastStatus;
+            lbi->foutput = dstFile;
+            lbi->sparseEnable = prefs->sparseFileSupport;
+            lbi->storedSkips = &storedSkips;
+            TPOOL_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
+        }
+        if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
+    }
+    assert(feof(srcFile));
+
+    /* Wait for all decompression completion */
+    TPOOL_completeJobs(tPool);
+
+    /* flush */
+    assert(lastStatus == 0);
+    TPOOL_completeJobs(wPool);
+    if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
+
+    /* Clean */
+    for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
+        free(inBuffs[bSetNb]);
+    }
+    LZ4IO_freeBufferPool(bp);
+    TPOOL_free(wPool);
+    TPOOL_free(tPool);
+
+    return filesize;
+}
+
+#else
+
 static unsigned long long
 LZ4IO_decompressLZ4F(dRess_t ress,
                      FILE* const srcFile, FILE* const dstFile,
@@ -1985,6 +2248,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     return filesize;
 }
 
+#endif /* LZ4IO_MULTITHREAD */
 
 /* LZ4IO_passThrough:
  * just output the same content as input, no decoding.
