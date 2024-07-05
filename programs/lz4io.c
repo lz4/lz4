@@ -1914,10 +1914,12 @@ static void LZ4IO_freeDResources(dRess_t ress)
 }
 
 
-#if 1 && LZ4IO_MULTITHREAD
+#if LZ4IO_MULTITHREAD
 
 #define INBUFF_SIZE (4 MB)
-#define OUTBUFF_SIZE (12 MB)
+#define OUTBUFF_SIZE (1 * INBUFF_SIZE)
+#define OUTBUFF_QUEUE 1
+#define PBUFFERS_NB (1 /* being decompressed */ + OUTBUFF_QUEUE + 1 /* being written to io */)
 
 typedef struct {
     void* ptr;
@@ -1930,7 +1932,6 @@ typedef struct {
  * all buffers are allocated and released in order,
  * maximum nb of buffers limited by queues */
 
-#define PBUFFERS_NB 6
 typedef struct {
     Buffer buffers[PBUFFERS_NB];
     int availNext;
