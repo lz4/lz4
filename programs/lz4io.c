@@ -1966,11 +1966,20 @@ static BufferPool* LZ4IO_createBufferPool(size_t bufSize)
     return bp;
 }
 
+/* Note: Thread Sanitizer can be detected with below macro
+ * but it's not guaranteed (doesn't seem to work with clang) */
+#ifdef __SANITIZE_THREAD__
+# undef LZ4IO_NO_TSAN_ONLY
+#endif
+
 static Buffer BufPool_getBuffer(BufferPool* bp)
 {
     assert(bp != NULL);
+#ifdef LZ4IO_NO_TSAN_ONLY
+    /* The following assert() are susceptible to race conditions */
     assert(bp->availNext >= bp->usedIdx);
     assert(bp->availNext < bp->usedIdx + PBUFFERS_NB);
+#endif
     {   int id = bp->availNext++ % PBUFFERS_NB;
         assert(bp->buffers[id].size == 0);
         return bp->buffers[id];
@@ -1979,7 +1988,10 @@ static Buffer BufPool_getBuffer(BufferPool* bp)
 void BufPool_releaseBuffer(BufferPool* bp, Buffer buf)
 {
     assert(bp != NULL);
+#ifdef LZ4IO_NO_TSAN_ONLY
+    /* The following assert() is susceptible to race conditions */
     assert(bp->usedIdx < bp->availNext);
+#endif
     {   int id = bp->usedIdx++ % PBUFFERS_NB;
         assert(bp->buffers[id].ptr == buf.ptr);
         bp->buffers[id].size = 0;
@@ -1991,7 +2003,7 @@ typedef struct {
     BufferPool* bp;
     int sparseEnable;
     unsigned* storedSkips;
-    const unsigned long long* totalSize;
+    unsigned long long* totalSize;
 } LZ4FChunkToWrite;
 
 static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
@@ -2001,7 +2013,8 @@ static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
 
     /* note: works because only 1 thread */
     *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->fOut, ctw->bufOut.ptr, ctw->bufOut.size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
-    DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >>20));
+    *ctw->totalSize += (unsigned long long)ctw->bufOut.size; /* note: works because only 1 thread */
+    DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >> 20));
 
     /* clean up */
     BufPool_releaseBuffer(ctw->bp, ctw->bufOut);
@@ -2048,7 +2061,6 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         assert(remainingInSize <= lz4fc->inSize - pos);
         pos += remainingInSize;
         assert(b.size <= b.capacity);
-        *lz4fc->totalSize += (unsigned long long)b.size; /* note: works because only 1 thread */
 
         /* push to write thread */
         {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));

@@ -126,7 +126,7 @@ jobs:
 
     - name: make -C tests test-lz4
       if: always()
-      run: make clean; make -j V=1 -C tests test-lz4
+      run: make clean; CPPFLAGS=-DLZ4IO_NO_TSAN_ONLY make -j V=1 -C tests test-lz4
 
     - name: make -C tests test CFLAGS='-mx32'
       if: ${{ matrix.x32 == 'true' }}
@@ -447,7 +447,7 @@ jobs:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # https://github.com/actions/checkout v4.1.7
 
     - name: lz4 cli
-      run: make clean; CC=clang CFLAGS=-fsanitize=thread LDFLAGS=-fsanitize=thread make -j -C tests test-lz4 V=1
+      run: make clean; CC=clang CPPFLAGS="-fsanitize=thread" make -j -C tests test-lz4 V=1
 
 
   unicode-lint:
