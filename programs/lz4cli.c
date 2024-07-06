@@ -686,11 +686,13 @@ int main(int argCount, const char** argv)
     DISPLAYLEVEL(5, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
 #if !LZ4IO_MULTITHREAD
-    if (nbWorkers > 1)
+    if (nbWorkers > 1) {
         DISPLAYLEVEL(2, "warning: this executable doesn't support multithreading \n");
+    }
 #endif
-    if ((mode == om_compress) || (mode == om_bench))
+    if ((mode == om_compress) || (mode == om_bench)) {
         DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));
+    }
 
     if (multiple_inputs) {
         input_filename = inFileNames[0];
@@ -828,7 +830,13 @@ int main(int argCount, const char** argv)
         if (nbWorkers != 1) {
             if (nbWorkers==0)
                 nbWorkers = (unsigned)LZ4IO_defaultNbWorkers();
-            DISPLAYLEVEL(3, "Using %u threads for compression \n", nbWorkers);
+            if (nbWorkers > LZ4_NBWORKERS_MAX) {
+                DISPLAYLEVEL(3, "Requested %u threads too large => automatically reduced to %u \n",
+                            nbWorkers, LZ4_NBWORKERS_MAX);
+                nbWorkers = LZ4_NBWORKERS_MAX;
+            } else {
+                DISPLAYLEVEL(3, "Using %u threads for compression \n", nbWorkers);
+            }
         }
         LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
 #endif
