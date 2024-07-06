@@ -35,14 +35,14 @@
 /* Determines default nb of threads for compression
  * Default value is 0, which means "auto" :
  * nb of threads is determined from detected local cpu.
- * Can also be selected at runtime using -T# command */
+ * Can be overridden at runtime using -T# command */
 #ifndef LZ4_NBWORKERS_DEFAULT
 # define LZ4_NBWORKERS_DEFAULT 0
 #endif
 
-/* Maximum nb of compression threads that can selected at runtime */
+/* Maximum nb of compression threads selectable at runtime */
 #ifndef LZ4_NBWORKERS_MAX
-# define LZ4_NBWORKERS_MAX 125
+# define LZ4_NBWORKERS_MAX 200
 #endif
 
 /* Determines default lz4 block size when none provided.

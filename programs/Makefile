@@ -64,13 +64,15 @@ ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 # thread detection
 NUM_SYMBOL   := \#
-NO_THREAD_MSG:= ==> no pthread support: building for single-thread mode only
-HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
-HAVE_THREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
-ifeq ($(HAVE_PTHREAD), 1)
+NO_THREAD_MSG:= ==> no multithread support: building for single-thread mode only
+HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
+HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
+ifeq ($(HAVE_MULTITHREAD), 1)
   THREAD_MSG := ==> building with multithreading support
   THREAD_CPP := -DLZ4IO_MULTITHREAD
-  THREAD_LD  := -pthread
+  ifeq ($(HAVE_PTHREAD), 1)
+    THREAD_LD  := -pthread
+  endif
 else
   THREAD_MSG := $(NO_THREAD_MSG)
 endif
@@ -105,7 +107,10 @@ lz4-exe.rc: lz4-exe.rc.in
 lz4-exe.o: lz4-exe.rc
 	$(WINDRES) -i lz4-exe.rc -o lz4-exe.o
 
+lz4: CPPFLAGS += $(THREAD_CPP)
+lz4: LDFLAGS += $(THREAD_LD)
 lz4: $(OBJFILES) lz4-exe.o
+	echo "$(THREAD_MSG)"
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 else
 lz4: CPPFLAGS += $(THREAD_CPP)

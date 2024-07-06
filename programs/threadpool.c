@@ -34,7 +34,6 @@
 #  pragma warning(disable : 4204)        /* disable: C4204: non-constant aggregate initializer */
 #endif
 
-
 #if !LZ4IO_MULTITHREAD
 
 /* ===================================================== */
@@ -68,10 +67,161 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx) {
     (void)ctx;
 }
 
+
+#elif defined(_WIN32)
+
+/* Window TPool implementation using Completion Ports */
+#include <windows.h>
+
+typedef struct TPOOL_ctx_s {
+    HANDLE completionPort;
+    HANDLE* workerThreads;
+    int nbWorkers;
+    int queueSize;
+    LONG numPendingJobs;
+    HANDLE jobSemaphore;  /* For queue size control */
+} TPOOL_ctx;
+
+void TPOOL_free(TPOOL_ctx* ctx) {
+    if (!ctx) return;
+
+    /* Signal workers to exit by posting NULL completions */
+    for (int i = 0; i < ctx->nbWorkers; i++) {
+        PostQueuedCompletionStatus(ctx->completionPort, 0, 0, NULL);
+    }
+
+    /* Wait for worker threads to finish */
+    WaitForMultipleObjects(ctx->nbWorkers, ctx->workerThreads, TRUE, INFINITE);
+
+    /* Close thread handles and completion port */
+    for (int i = 0; i < ctx->nbWorkers; i++) {
+        CloseHandle(ctx->workerThreads[i]);
+    }
+    free(ctx->workerThreads);
+    CloseHandle(ctx->completionPort);
+
+    /* Clean up synchronization objects */
+    CloseHandle(ctx->jobSemaphore);
+
+    free(ctx);
+}
+
+static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
+    TPOOL_ctx* ctx = (TPOOL_ctx*)lpParameter;
+    DWORD bytesTransferred;
+    ULONG_PTR completionKey;
+    LPOVERLAPPED overlapped;
+
+    while (TRUE) {
+        BOOL success = GetQueuedCompletionStatus(ctx->completionPort,
+                                                &bytesTransferred, &completionKey,
+                                                &overlapped, INFINITE);
+
+        if (!success) {
+            break;
+        }
+
+        /* One job taken from the queue: signal room for more */
+        ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
+
+        if (overlapped == NULL) {
+            /* End signal */
+            InterlockedDecrement(&ctx->numPendingJobs);
+            ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
+            break;
+        }
+
+        {   /* Execute job */
+            void (*job_function)(void*) = (void (*)(void*))completionKey;
+            job_function(overlapped);
+        }
+
+        /* Signal job completion and decrement counter */
+        InterlockedDecrement(&ctx->numPendingJobs);
+        ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
+    }
+
+    return 0;
+}
+
+TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
+{
+    TPOOL_ctx* const ctx = calloc(1, sizeof(TPOOL_ctx));
+    if (!ctx) return NULL;
+
+    /* parameters sanitization */
+    if (nbWorkers <= 0 || queueSize <= 0) {
+        return NULL;
+    }
+    if (nbWorkers>LZ4_NBWORKERS_MAX)
+        nbWorkers=LZ4_NBWORKERS_MAX;
+
+    /* Create completion port */
+    ctx->completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, nbWorkers);
+    if (!ctx->completionPort) {
+        free(ctx);
+        return NULL;
+    }
+
+    /* Create worker threads */
+    ctx->nbWorkers = nbWorkers;
+    ctx->workerThreads = (HANDLE*)malloc(sizeof(HANDLE) * nbWorkers);
+    if (ctx->workerThreads == NULL) {
+        TPOOL_free(ctx);
+        return NULL;
+    }
+    for (int i = 0; i < nbWorkers; i++) {
+        ctx->workerThreads[i] = CreateThread(NULL, 0, WorkerThread, ctx, 0, NULL);
+        if (!ctx->workerThreads[i]) {
+            TPOOL_free(ctx);
+            return NULL;
+        }
+    }
+
+    /* Initialize other members (no changes here) */
+    ctx->queueSize = queueSize;
+    ctx->numPendingJobs = 0;
+    ctx->jobSemaphore = CreateSemaphore(NULL, queueSize, queueSize, NULL);
+    if (!ctx->jobSemaphore) {
+        TPOOL_free(ctx);
+        return NULL;
+    }
+
+    return ctx;
+}
+
+
+void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
+{
+    if (!ctx || !job_function) return;
+
+    /* Atomically increment pending jobs and check for overflow */
+    while (InterlockedIncrement(&ctx->numPendingJobs) > ctx->nbWorkers + ctx->queueSize) {
+        InterlockedDecrement(&ctx->numPendingJobs);
+        WaitForSingleObject(ctx->jobSemaphore, INFINITE);
+    }
+
+    /* Post the job directly to the completion port */
+    PostQueuedCompletionStatus(ctx->completionPort,
+                               0, /* Bytes transferred not used */
+                               (ULONG_PTR)job_function, /* Store function pointer in completionKey */
+                               (LPOVERLAPPED)arg);      /* Store argument in overlapped */
+}
+
+void TPOOL_completeJobs(TPOOL_ctx* ctx)
+{
+    if (!ctx) return;
+
+    /* Wait for pending jobs to complete */
+    while (InterlockedCompareExchange(&ctx->numPendingJobs, 0, 0) > 0) {
+        WaitForSingleObject(ctx->jobSemaphore, INFINITE);
+    }
+}
+
 #else
 
-/* pthread only */
-#include <stdlib.h>  /* malloc, free*/
+/* pthread availability assumed */
+#include <stdlib.h>  /* malloc, free */
 #include <pthread.h> /* pthread_* */
 
 /* A job is just a function with an opaque argument */
