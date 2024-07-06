@@ -23,13 +23,16 @@ The makefile offer several targets for various use cases:
 - `HAVE_MULTITHREAD` : build with multithreading support. Detection is generally automatic, but can be forced to `0` or `1` if needed. This is for example useful when cross-compiling for Windows from Linux.
 - `HAVE_PTHREAD` : determines presence of `<pthread>` support. Detection is automatic, but can be forced to `0` or `1` if needed. This is in turn used by `make` to automatically trigger multithreading support.
 
-#### C Preprocessor variables
-These variables are read by the preprocessor at compilation time. They influence executable behavior, such as default starting values, and are exposed from `programs/lz4conf.h`. These variables can modified by other build systems, such as `cmake`.
+#### C Preprocessor Build variables
+These variables are read by the preprocessor at compilation time. They influence executable behavior, such as default starting values, and are exposed from `programs/lz4conf.h`. These variables can manipulated by any build system.
 Assignment methods vary depending on environments.
 On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=-DVARIABLE=value` assignment.
 - `LZ4IO_MULTITHREAD`: enable multithreading support. Default is disabled.
-- `LZ4_NBTHREADS_DEFAULT`: default nb of threads in multithreading mode.
+- `LZ4_NBWORKERS_DEFAULT`: default nb of worker threads used in multithreading mode (can be overridden with command `-T#`).
    Default is `0`, which means "auto-determine" based on local cpu.
+- `LZ4_NBWORKERS_MAX`: absolute maximum nb of workers that can be requested at runtime.
+   Currently set to 200 by default.
+   This is mostly meant to protect the system against unreasonable and likely bogus requests, such as a million threads.
 - `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 7, corresponding to 4 MB block size.
 
 
