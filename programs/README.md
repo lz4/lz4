@@ -2,7 +2,7 @@ Command Line Interface for LZ4 library
 ============================================
 
 ### Build
-The Command Line Interface (CLI) is generated
+The `lz4` Command Line Interface (CLI) is generated
 using the `make` command, no additional parameter required.
 
 The CLI generates and decodes [LZ4-compressed frames](../doc/lz4_Frame_format.md).
@@ -19,35 +19,35 @@ The makefile offer several targets for various use cases:
 - `unlz4`, `lz4cat` : symlinks to `lz4`, default to decompression and `cat` compressed files
 - `man` : generates the man page, from `lz4.1.md` markdown source
 
+#### Makefile Build variables
+- `HAVE_MULTITHREAD` : build with multithreading support. Detection is generally automatic, but can be forced to `0` or `1` if needed. This is for example useful when cross-compiling for Windows from Linux.
+- `HAVE_PTHREAD` : determines presence of `<pthread>` support. Detection is automatic, but can be forced to `0` or `1` if needed. This is in turn used by `make` to automatically trigger multithreading support.
+
 #### C Preprocessor variables
-These variables are read by the preprocessor at compilation time, they influence executable behavior, such as default starting values,
-and are exposed from `programs/lz4conf.h`.
+These variables are read by the preprocessor at compilation time. They influence executable behavior, such as default starting values, and are exposed from `programs/lz4conf.h`. These variables can modified by other build systems, such as `cmake`.
 Assignment methods vary depending on environments.
 On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=-DVARIABLE=value` assignment.
-- `LZ4IO_MULTITHREAD`: enable multithreading support
+- `LZ4IO_MULTITHREAD`: enable multithreading support. Default is disabled.
 - `LZ4_NBTHREADS_DEFAULT`: default nb of threads in multithreading mode.
    Default is `0`, which means "auto-determine" based on local cpu.
-- `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7].
-
-#### Makefile Build variables
-- `HAVE_THREAD` : determines usage of multithreading support. Detection is generally automatic, but can be forced to `0` or `1` if needed. This is for example useful when cross-compiling for Windows from Linux.
-- `HAVE_PTHREAD` : determines presences of `<pthread>` support. This is in turn used by `make` to trigger multithreading support. Detection is automatic, but can be forced to `0` or `1` if needed.
+- `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 7, corresponding to 4 MB block size.
 
 
 ### Aggregation of parameters
-The `lz4` CLI supports aggregation for short commands. For example, `-b1`, `-e18`, and `-i1` can be joined into `-b1e18i1`.
-This doesn't work for `--long-commands`, which must be separated.
+The `lz4` CLI supports aggregation for short commands. For example, `-d`, `-q`, and `-f` can be joined into `-dqf`.
+Aggregation doesn't work for `--long-commands`, which **must** be separated.
 
 
 ### Benchmark in Command Line Interface
-CLI includes in-memory compression benchmark module for lz4.
-The benchmark is conducted using a given filename.
-The file is read into memory.
-It makes benchmark more precise as it eliminates I/O overhead.
+`lz4` CLI includes an in-memory compression benchmark module, triggered by command `-b#`, with `#` representing the compression level.
+The benchmark is conducted on a provided list of filenames.
+The files are then read entirely into memory, to eliminate I/O overhead.
+When multiple files are provided, they are bundled into the same benchmark session (though each file is a separate compression / decompression). Using `-S` command separates them (one session per file).
+When no file is provided, uses an internal Lorem Ipsum generator instead.
 
 The benchmark measures ratio, compressed size, compression and decompression speed.
-One can select compression levels starting from `-b` and ending with `-e`.
-The `-i` parameter selects a number of seconds used for each of tested levels.
+One can select multiple compression levels starting from `-b` and ending with `-e` (ascending).
+The `-i` parameter selects a number of seconds used for each session.
 
 
 ### Usage of Command Line Interface
