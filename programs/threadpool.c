@@ -78,7 +78,7 @@ typedef struct TPOOL_ctx_s {
     HANDLE workerThreads[LZ4_NBWORKERS_MAX];
     int nbWorkers;
     int queueSize;
-    __LONG32 numPendingJobs;
+    LONG numPendingJobs;
     HANDLE jobSemaphore;  /* For queue size control */
 } TPOOL_ctx;
 
