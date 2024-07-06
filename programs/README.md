@@ -30,7 +30,8 @@ On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=
 - `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7].
 
 #### Makefile Build variables
-- `HAVE_PTHREAD` : determines presences of `<pthread>` support. This is in turn used by `make` to determine multithreading support of `lz4`. Detection is automatic, but can be forced to `0` or `1` if needed.
+- `HAVE_THREAD` : determines usage of multithreading support. Detection is generally automatic, but can be forced to `0` or `1` if needed. This is for example useful when cross-compiling for Windows from Linux.
+- `HAVE_PTHREAD` : determines presences of `<pthread>` support. This is in turn used by `make` to trigger multithreading support. Detection is automatic, but can be forced to `0` or `1` if needed.
 
 
 ### Aggregation of parameters
