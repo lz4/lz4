@@ -107,7 +107,10 @@ lz4-exe.rc: lz4-exe.rc.in
 lz4-exe.o: lz4-exe.rc
 	$(WINDRES) -i lz4-exe.rc -o lz4-exe.o
 
+lz4: CPPFLAGS += $(THREAD_CPP)
+lz4: LDFLAGS += $(THREAD_LD)
 lz4: $(OBJFILES) lz4-exe.o
+	echo "$(THREAD_MSG)"
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 else
 lz4: CPPFLAGS += $(THREAD_CPP)
