@@ -26,110 +26,30 @@ extern "C" {
 *  Dependencies
 ******************************************/
 #include "util.h"   /* note : ensure that platform.h is included first ! */
-#include <stdio.h>  /* FILE*, perror */
-#include <errno.h>
-#include <assert.h>
 
 /*-****************************************
 *  count the number of cores
 ******************************************/
 
-#if (defined(_WIN32) || defined(WIN32)) && defined(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)
+#if defined(_WIN32)
 
 #include <windows.h>
-
-typedef BOOL(WINAPI* LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
-
-DWORD CountSetBits(ULONG_PTR bitMask)
-{
-    DWORD LSHIFT = sizeof(ULONG_PTR)*8 - 1;
-    DWORD bitSetCount = 0;
-    ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
-    DWORD i;
-
-    for (i = 0; i <= LSHIFT; ++i) {
-        bitSetCount += ((bitMask & bitTest)?1:0);
-        bitTest/=2;
-    }
-
-    return bitSetCount;
-}
 
 int UTIL_countCores(void)
 {
     static int numCores = 0;
     if (numCores != 0) return numCores;
 
-    {   LPFN_GLPI glpi;
-        BOOL done = FALSE;
-        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
-        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = NULL;
-        DWORD returnLength = 0;
-        size_t byteOffset = 0;
-
-#if defined(_MSC_VER)
-/* Visual Studio does not like the following cast */
-#   pragma warning( disable : 4054 )  /* conversion from function ptr to data ptr */
-#   pragma warning( disable : 4055 )  /* conversion from data ptr to function ptr */
-#endif
-        HMODULE hModule = GetModuleHandle(TEXT("kernel32"));
-        if (hModule == NULL) {
-            goto failed;
-        }
-        glpi = (LPFN_GLPI)(void*)GetProcAddress(hModule,
-                                               "GetLogicalProcessorInformation");
-        if (glpi == NULL) {
-            goto failed;
-        }
-
-        while(!done) {
-            DWORD rc = glpi(buffer, &returnLength);
-            if (FALSE == rc) {
-                if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                    free(buffer);
-                    buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(returnLength);
-                    if (buffer == NULL) {
-                        perror("lz4");
-                        exit(1);
-                    }
-                } else {
-                    /* some other error */
-                    free(buffer);
-                    buffer = NULL;
-                    goto failed;
-                }
-            } else {
-                done = TRUE;
-        }   }
-
-        ptr = buffer;
-        if (ptr == NULL) {
-            perror("lz4");
-            exit(1);
-        }
-
-        while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
-
-            if (ptr->Relationship == RelationProcessorCore) {
-                numCores += CountSetBits(ptr->ProcessorMask);
-            }
-
-            ptr++;
-            byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-        }
-
-        free(buffer);
-
-        return numCores;
-    }
-
-failed:
-    /* try to fall back on GetSystemInfo */
     {   SYSTEM_INFO sysinfo;
         GetSystemInfo(&sysinfo);
         numCores = sysinfo.dwNumberOfProcessors;
-        if (numCores == 0) numCores = 1; /* just in case */
     }
+
+    if (numCores == 0) {
+        /* Unexpected result, fall back on 1 */
+        return numCores = 1;
+    }
+
     return numCores;
 }
 
@@ -173,6 +93,8 @@ int UTIL_countCores(void)
 
 #elif defined(__FreeBSD__)
 
+#include <stdio.h>  /* perror */
+#include <errno.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
 
