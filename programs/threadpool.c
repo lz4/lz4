@@ -34,8 +34,6 @@
 #  pragma warning(disable : 4204)        /* disable: C4204: non-constant aggregate initializer */
 #endif
 
-#define TPOOL_MAX_WORKERS 200
-
 #if !LZ4IO_MULTITHREAD
 
 /* ===================================================== */
@@ -77,7 +75,7 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx) {
 
 typedef struct TPOOL_ctx_s {
     HANDLE completionPort;
-    HANDLE workerThreads[TPOOL_MAX_WORKERS];
+    HANDLE workerThreads[LZ4_NBWORKERS_MAX];
     int numWorkers;
     int queueSize;
     __LONG32 numPendingJobs;
@@ -148,21 +146,28 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
     return 0;
 }
 
-TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
+TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
 {
     TPOOL_ctx* const ctx = malloc(sizeof(TPOOL_ctx));
     if (!ctx) return NULL;
 
+    /* parameters sanitization */
+    if (nbWorkers <= 0 || queueSize <= 0) {
+        return NULL;
+    }
+    if (nbWorkers>LZ4_NBWORKERS_MAX)
+        nbWorkers=LZ4_NBWORKERS_MAX;
+
     // Create completion port
-    ctx->completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, nbThreads);
+    ctx->completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, nbWorkers);
     if (!ctx->completionPort) {
         free(ctx);
         return NULL;
     }
 
     // Create worker threads
-    ctx->numWorkers = nbThreads;
-    for (int i = 0; i < nbThreads; i++) {
+    ctx->numWorkers = nbWorkers;
+    for (int i = 0; i < nbWorkers; i++) {
         ctx->workerThreads[i] = CreateThread(NULL, 0, WorkerThread, ctx, 0, NULL);
         if (!ctx->workerThreads[i]) {
             TPOOL_free(ctx);
