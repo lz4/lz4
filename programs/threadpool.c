@@ -130,12 +130,9 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
             break;
         }
 
-        {   // Extract job function and argument
+        {   // Execute job
             void (*job_function)(void*) = (void (*)(void*))completionKey;
-            void* arg = overlapped;
-
-            // Execute job
-            job_function(arg);
+            job_function(overlapped);
         }
 
         // Signal job completion and decrement counter
@@ -193,7 +190,7 @@ void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
     if (!ctx || !job_function) return;
 
     // Atomically increment pending jobs and check for overflow
-    if (InterlockedIncrement(&ctx->numPendingJobs) > ctx->nbWorkers + ctx->queueSize) {
+    while (InterlockedIncrement(&ctx->numPendingJobs) > ctx->nbWorkers + ctx->queueSize) {
         InterlockedDecrement(&ctx->numPendingJobs);
         WaitForSingleObject(ctx->jobSemaphore, INFINITE);
     }
