@@ -48,14 +48,17 @@ typedef struct {
  *  Time functions
  ******************************************/
 
+/* @return a TIME_t value to be compared to another one in order to compute a duration.
+ * The absolute value returned is meaningless */
 TIME_t TIME_getTime(void);
 
 /* Timer resolution can be low on some platforms.
  * To improve accuracy, it's recommended to wait for a new tick
  * before starting benchmark measurements */
 void TIME_waitForNextTick(void);
-/* tells if timefn will return correct time measurements
- * in presence of multi-threaded workload.
+
+/* tells if TIME_getTime() returns correct time measurements
+ * in scenarios involving multi-threaded workload.
  * note : this is not the case if only C90 clock_t measurements are available */
 int TIME_support_MT_measurements(void);
 
