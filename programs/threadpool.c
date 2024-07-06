@@ -75,7 +75,7 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx) {
 
 typedef struct TPOOL_ctx_s {
     HANDLE completionPort;
-    HANDLE workerThreads[LZ4_NBWORKERS_MAX];
+    HANDLE* workerThreads;
     int nbWorkers;
     int queueSize;
     LONG numPendingJobs;
@@ -97,6 +97,7 @@ void TPOOL_free(TPOOL_ctx* ctx) {
     for (int i = 0; i < ctx->nbWorkers; i++) {
         CloseHandle(ctx->workerThreads[i]);
     }
+    free(ctx->workerThreads);
     CloseHandle(ctx->completionPort);
 
     /* Clean up synchronization objects */
@@ -145,7 +146,7 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
 
 TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
 {
-    TPOOL_ctx* const ctx = malloc(sizeof(TPOOL_ctx));
+    TPOOL_ctx* const ctx = calloc(1, sizeof(TPOOL_ctx));
     if (!ctx) return NULL;
 
     /* parameters sanitization */
@@ -164,6 +165,11 @@ TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
 
     /* Create worker threads */
     ctx->nbWorkers = nbWorkers;
+    ctx->workerThreads = (HANDLE*)malloc(sizeof(HANDLE) * nbWorkers);
+    if (ctx->workerThreads == NULL) {
+        TPOOL_free(ctx);
+        return NULL;
+    }
     for (int i = 0; i < nbWorkers; i++) {
         ctx->workerThreads[i] = CreateThread(NULL, 0, WorkerThread, ctx, 0, NULL);
         if (!ctx->workerThreads[i]) {
