@@ -83,7 +83,8 @@ typedef struct TPOOL_ctx_s {
     HANDLE allJobsCompleted; /* Event */
 } TPOOL_ctx;
 
-void TPOOL_free(TPOOL_ctx* ctx) {
+void TPOOL_free(TPOOL_ctx* ctx)
+{
     if (!ctx) return;
 
     /* Signal workers to exit by posting NULL completions */
@@ -108,7 +109,8 @@ void TPOOL_free(TPOOL_ctx* ctx) {
     free(ctx);
 }
 
-static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
+static DWORD WINAPI WorkerThread(LPVOID lpParameter)
+{
     TPOOL_ctx* ctx = (TPOOL_ctx*)lpParameter;
     DWORD bytesTransferred;
     ULONG_PTR completionKey;
@@ -118,17 +120,13 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
                                     &bytesTransferred, &completionKey,
                                     &overlapped, INFINITE)) {
 
-        if (overlapped == NULL) {
-            /* End signal */
-            break;
-        }
+        /* End signal */
+        if (overlapped == NULL) { break; }
 
-        {   /* Execute job */
-            void (*job_function)(void*) = (void (*)(void*))completionKey;
-            job_function(overlapped);
-        }
+        /* Execute job */
+        ((void (*)(void*))completionKey)(overlapped);
 
-        /* Signal job completion and decrement counter */
+        /* Signal job completion */
         if (InterlockedDecrement(&ctx->nbPendingJobs) == 0) {
             SetEvent(ctx->allJobsCompleted);
         }
