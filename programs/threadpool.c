@@ -143,11 +143,8 @@ TPool* TPool_create(int nbWorkers, int queueSize)
     TPool* pool;
 
     /* parameters sanitization */
-    if (nbWorkers <= 0 || queueSize <= 0) {
-        return NULL;
-    }
-    if (nbWorkers>LZ4_NBWORKERS_MAX)
-        nbWorkers=LZ4_NBWORKERS_MAX;
+    if (nbWorkers <= 0 || queueSize <= 0) return NULL;
+    if (nbWorkers>LZ4_NBWORKERS_MAX) nbWorkers=LZ4_NBWORKERS_MAX;
 
     pool = calloc(1, sizeof(TPool));
     if (!pool) return NULL;
@@ -188,7 +185,7 @@ _cleanup:
 
 void TPool_submitJob(TPool* pool, void (*job_function)(void*), void* arg)
 {
-    if (!pool || !job_function) return;
+    assert(pool);
 
     /* Atomically increment pending jobs and check for overflow */
     WaitForSingleObject(pool->jobSlotAvail, INFINITE);
@@ -204,7 +201,7 @@ void TPool_submitJob(TPool* pool, void (*job_function)(void*), void* arg)
 
 void TPool_jobsCompleted(TPool* pool)
 {
-    if (!pool) return;
+    assert(pool);
     WaitForSingleObject(pool->allJobsCompleted, INFINITE);
 }
 
