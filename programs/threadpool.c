@@ -78,8 +78,9 @@ typedef struct TPOOL_ctx_s {
     HANDLE* workerThreads;
     int nbWorkers;
     int queueSize;
-    LONG numPendingJobs;
-    HANDLE jobSemaphore;  /* For queue size control */
+    LONG nbPendingJobs;
+    HANDLE jobSlotAvail;  /* For queue size control */
+    HANDLE allJobsCompleted; /* Event */
 } TPOOL_ctx;
 
 void TPOOL_free(TPOOL_ctx* ctx) {
@@ -101,7 +102,8 @@ void TPOOL_free(TPOOL_ctx* ctx) {
     CloseHandle(ctx->completionPort);
 
     /* Clean up synchronization objects */
-    CloseHandle(ctx->jobSemaphore);
+    CloseHandle(ctx->jobSlotAvail);
+    CloseHandle(ctx->allJobsCompleted);
 
     free(ctx);
 }
@@ -116,13 +118,8 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
                                     &bytesTransferred, &completionKey,
                                     &overlapped, INFINITE)) {
 
-        /* One job taken from the queue: signal room for more */
-        ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
-
         if (overlapped == NULL) {
             /* End signal */
-            InterlockedDecrement(&ctx->numPendingJobs);
-            ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
             break;
         }
 
@@ -132,8 +129,10 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
         }
 
         /* Signal job completion and decrement counter */
-        InterlockedDecrement(&ctx->numPendingJobs);
-        ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
+        if (InterlockedDecrement(&ctx->nbPendingJobs) == 0) {
+            SetEvent(ctx->allJobsCompleted);
+        }
+        ReleaseSemaphore(ctx->jobSlotAvail, 1, NULL);
     }
 
     return 0;
@@ -175,13 +174,17 @@ TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
 
     /* Initialize other members (no changes here) */
     ctx->queueSize = queueSize;
-    ctx->numPendingJobs = 0;
-    ctx->jobSemaphore = CreateSemaphore(NULL, queueSize, queueSize, NULL);
-    if (!ctx->jobSemaphore) {
+    ctx->nbPendingJobs = 0;
+    ctx->jobSlotAvail = CreateSemaphore(NULL, queueSize+nbWorkers, queueSize+nbWorkers, NULL);
+    if (!ctx->jobSlotAvail) {
         TPOOL_free(ctx);
         return NULL;
     }
-
+    ctx->allJobsCompleted = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!ctx->allJobsCompleted) {
+        TPOOL_free(ctx);
+        return NULL;
+    }
     return ctx;
 }
 
@@ -191,10 +194,9 @@ void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
     if (!ctx || !job_function) return;
 
     /* Atomically increment pending jobs and check for overflow */
-    while (InterlockedIncrement(&ctx->numPendingJobs) > ctx->nbWorkers + ctx->queueSize) {
-        InterlockedDecrement(&ctx->numPendingJobs);
-        WaitForSingleObject(ctx->jobSemaphore, INFINITE);
-    }
+    WaitForSingleObject(ctx->jobSlotAvail, INFINITE);
+    ResetEvent(ctx->allJobsCompleted);
+    InterlockedIncrement(&ctx->nbPendingJobs);
 
     /* Post the job directly to the completion port */
     PostQueuedCompletionStatus(ctx->completionPort,
@@ -206,11 +208,7 @@ void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
 void TPOOL_completeJobs(TPOOL_ctx* ctx)
 {
     if (!ctx) return;
-
-    /* Wait for pending jobs to complete */
-    while (InterlockedCompareExchange(&ctx->numPendingJobs, 0, 0) > 0) {
-        WaitForSingleObject(ctx->jobSemaphore, INFINITE);
-    }
+    WaitForSingleObject(ctx->allJobsCompleted, INFINITE);
 }
 
 #else
