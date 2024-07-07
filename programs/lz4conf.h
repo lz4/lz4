@@ -26,7 +26,15 @@
 #define LZ4CONF_H_32432
 
 
-/* Determines if multithreading is enabled or not */
+/* Default compression level.
+ * Can be overridden by environment variable LZ4_CLEVEL.
+ * Can be overridden at runtime using -# command */
+#ifndef LZ4_CLEVEL_DEFAULT
+# define LZ4_CLEVEL_DEFAULT 1
+#endif
+
+/* Determines if multithreading is enabled or not
+ * Default: disabled */
 #ifndef LZ4IO_MULTITHREAD
 # ifdef _WIN32
     /* Windows support Completion Ports */
