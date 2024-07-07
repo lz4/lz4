@@ -112,14 +112,9 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter) {
     ULONG_PTR completionKey;
     LPOVERLAPPED overlapped;
 
-    while (TRUE) {
-        BOOL success = GetQueuedCompletionStatus(ctx->completionPort,
-                                                &bytesTransferred, &completionKey,
-                                                &overlapped, INFINITE);
-
-        if (!success) {
-            break;
-        }
+    while (GetQueuedCompletionStatus(ctx->completionPort,
+                                    &bytesTransferred, &completionKey,
+                                    &overlapped, INFINITE)) {
 
         /* One job taken from the queue: signal room for more */
         ReleaseSemaphore(ctx->jobSemaphore, 1, NULL);
