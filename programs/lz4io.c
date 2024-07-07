@@ -109,6 +109,20 @@ static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result 
 static const Duration_ns refreshRate = 200000000;
 static TIME_t g_time = { 0 };
 
+static double cpuLoad_sec(clock_t cpuStart)
+{
+#ifdef _WIN32
+    FILETIME creationTime, exitTime, kernelTime, userTime;
+    (void)cpuStart;
+    GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime);
+    assert(kernelTime.dwHighDateTime == 0);
+    assert(userTime.dwHighDateTime == 0);
+    return ((double)kernelTime.dwLowDateTime + (double)userTime.dwLowDateTime) * 100. / 1000000000.;
+#else
+    return (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
+#endif
+}
+
 static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
 {
 #if LZ4IO_MULTITHREAD
@@ -119,7 +133,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
     {
         Duration_ns duration_ns = TIME_clockSpan_ns(timeStart);
         double const seconds = (double)(duration_ns + !duration_ns) / (double)1000000000.;
-        double const cpuLoad_s = (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
+        double const cpuLoad_s = cpuLoad_sec(cpuStart);
         DISPLAYLEVEL(3,"Done in %.2f s ==> %.2f MiB/s  (cpu load : %.0f%%)\n", seconds,
                         (double)size / seconds / 1024. / 1024.,
                         (cpuLoad_s / seconds) * 100.);
