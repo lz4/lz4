@@ -633,7 +633,7 @@ typedef size_t (*compress_f)(
     size_t prefixSize);
 
 typedef struct {
-    TPOOL_ctx* wpool;
+    TPool* wpool;
     void* buffer;
     size_t prefixSize;
     size_t inSize;
@@ -666,7 +666,7 @@ static void LZ4IO_compressChunk(void* arg)
             wjd->blockNb = cjd->blockNb;
             wjd->out = cjd->fout;
             wjd->wr = cjd->wr;
-            TPOOL_submitJob(cjd->wpool, LZ4IO_checkWriteOrder, wjd);
+            TPool_submitJob(cjd->wpool, LZ4IO_checkWriteOrder, wjd);
     }   }
 }
 
@@ -681,8 +681,8 @@ static void LZ4IO_compressAndFreeChunk(void* arg)
 
 /* one ReadTracker per file to compress */
 typedef struct {
-    TPOOL_ctx* tpool;
-    TPOOL_ctx* wpool;
+    TPool* tPool;
+    TPool* wpool;
     FILE* fin;
     size_t chunkSize;
     unsigned long long totalReadSize;
@@ -742,11 +742,11 @@ static void LZ4IO_readAndProcess(void* arg)
             cjd->wr = rjd->wr;
             cjd->maxCBlockSize = rjd->maxCBlockSize;
             cjd->lastBlock = inSize < chunkSize;
-            TPOOL_submitJob(rjd->tpool, LZ4IO_compressAndFreeChunk, cjd);
+            TPool_submitJob(rjd->tPool, LZ4IO_compressAndFreeChunk, cjd);
             if (inSize == chunkSize) {
                 /* probably more ? read another chunk */
                 rjd->blockNb++;
-                TPOOL_submitJob(rjd->tpool, LZ4IO_readAndProcess, rjd);
+                TPool_submitJob(rjd->tPool, LZ4IO_readAndProcess, rjd);
     }   }   }
 }
 
@@ -826,8 +826,8 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     FILE* foutput = NULL;
-    TPOOL_ctx* const tPool = TPOOL_create(prefs->nbWorkers, 4);
-    TPOOL_ctx* const wPool = TPOOL_create(1, 4);
+    TPool* const tPool = TPool_create(prefs->nbWorkers, 4);
+    TPool* const wPool = TPool_create(1, 4);
     WriteRegister wr = WR_init(LEGACY_BLOCKSIZE);
 
     /* Init & checks */
@@ -860,7 +860,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     {   CompressLegacyState cls;
         ReadTracker rjd;
         cls.cLevel = compressionlevel;
-        rjd.tpool = tPool;
+        rjd.tPool = tPool;
         rjd.wpool = wPool;
         rjd.fin = finput;
         rjd.chunkSize = LEGACY_BLOCKSIZE;
@@ -874,10 +874,10 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         rjd.wr = &wr;
         rjd.maxCBlockSize = (size_t)LZ4_compressBound(LEGACY_BLOCKSIZE) + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
         /* Ignite the job chain */
-        TPOOL_submitJob(tPool, LZ4IO_readAndProcess, &rjd);
+        TPool_submitJob(tPool, LZ4IO_readAndProcess, &rjd);
         /* Wait for all completion */
-        TPOOL_completeJobs(tPool);
-        TPOOL_completeJobs(wPool);
+        TPool_jobsCompleted(tPool);
+        TPool_jobsCompleted(wPool);
 
         /* Status */
         DISPLAYLEVEL(2, "\r%79s\r", "");    /* blank line */
@@ -889,8 +889,8 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     /* Close & Free */
 _cfl_clean:
     WR_destroy(&wr);
-    TPOOL_free(wPool);
-    TPOOL_free(tPool);
+    TPool_free(wPool);
+    TPool_free(tPool);
     if (finput) fclose(finput);
     if (foutput && !LZ4IO_isStdout(output_filename)) fclose(foutput);  /* do not close stdout */
 
@@ -981,14 +981,14 @@ typedef struct {
     LZ4F_compressionContext_t ctx;
     LZ4F_preferences_t preparedPrefs;
     LZ4F_CDict* cdict;
-    TPOOL_ctx* tpool;
-    TPOOL_ctx* wpool; /* writer thread */
+    TPool* tPool;
+    TPool* wPool; /* writer thread */
 } cRess_t;
 
 static void LZ4IO_freeCResources(cRess_t ress)
 {
-    TPOOL_free(ress.tpool);
-    TPOOL_free(ress.wpool);
+    TPool_free(ress.tPool);
+    TPool_free(ress.wPool);
 
     free(ress.srcBuffer);
     free(ress.dstBuffer);
@@ -1104,8 +1104,8 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     ress.cdict = LZ4IO_createCDict(io_prefs);
 
     /* will be created it needed */
-    ress.tpool = NULL;
-    ress.wpool = NULL;
+    ress.tPool = NULL;
+    ress.wPool = NULL;
 
     return ress;
 }
@@ -1215,17 +1215,17 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         LZ4IO_CfcParameters cfcp;
         ReadTracker rjd;
 
-        if (ress.tpool == NULL) {
-            ress.tpool = TPOOL_create(io_prefs->nbWorkers, 4);
-            assert(ress.wpool == NULL);
-            ress.wpool = TPOOL_create(1, 4);
-            if (ress.tpool == NULL || ress.wpool == NULL)
+        if (ress.tPool == NULL) {
+            ress.tPool = TPool_create(io_prefs->nbWorkers, 4);
+            assert(ress.wPool == NULL);
+            ress.wPool = TPool_create(1, 4);
+            if (ress.tPool == NULL || ress.wPool == NULL)
                 END_PROCESS(43, "can't create threadpools");
         }
         cfcp.prefs = &prefs;
         cfcp.cdict = ress.cdict;
-        rjd.tpool = ress.tpool;
-        rjd.wpool = ress.wpool;
+        rjd.tPool = ress.tPool;
+        rjd.wpool = ress.wPool;
         rjd.fin = srcFile;
         rjd.chunkSize = chunkSize;
         rjd.totalReadSize = 0;
@@ -1271,7 +1271,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
 
         /* process first block */
         {   CompressJobDesc cjd;
-            cjd.wpool = ress.wpool;
+            cjd.wpool = ress.wPool;
             cjd.buffer = srcBuffer;
             cjd.prefixSize = 0;
             cjd.inSize = readSize;
@@ -1282,7 +1282,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             cjd.wr = &wr;
             cjd.maxCBlockSize = rjd.maxCBlockSize;
             cjd.lastBlock = 0;
-            TPOOL_submitJob(ress.tpool, LZ4IO_compressChunk, &cjd);
+            TPool_submitJob(ress.tPool, LZ4IO_compressChunk, &cjd);
             rjd.totalReadSize = readSize;
             rjd.blockNb = 1;
             if (prefixBuffer) {
@@ -1291,11 +1291,11 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             }
 
             /* Start the job chain */
-            TPOOL_submitJob(ress.tpool, LZ4IO_readAndProcess, &rjd);
+            TPool_submitJob(ress.tPool, LZ4IO_readAndProcess, &rjd);
 
             /* Wait for all completion */
-            TPOOL_completeJobs(ress.tpool);
-            TPOOL_completeJobs(ress.wpool);
+            TPool_jobsCompleted(ress.tPool);
+            TPool_jobsCompleted(ress.wPool);
             compressedfilesize += wr.totalCSize;
         }
 
@@ -1704,7 +1704,7 @@ typedef struct {
     size_t inSize;
     void* outBuffer;
     unsigned long long* totalSize;
-    TPOOL_ctx* wPool;
+    TPool* wPool;
     FILE* foutput;
     int sparseEnable;
     unsigned* storedSkips;
@@ -1730,7 +1730,7 @@ static void LZ4IO_decompressBlockLegacy(void* arg)
         ctw->sparseEnable = lbi->sparseEnable;
         ctw->storedSkips = lbi->storedSkips;
         ctw->totalSize = lbi->totalSize;
-        TPOOL_submitJob(lbi->wPool, LZ4IO_writeDecodedChunk, ctw);
+        TPool_submitJob(lbi->wPool, LZ4IO_writeDecodedChunk, ctw);
     }
 
     /* clean up */
@@ -1743,8 +1743,8 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
     unsigned long long streamSize = 0;
     unsigned storedSkips = 0;
 
-    TPOOL_ctx* const tPool = TPOOL_create(1, 1);
-    TPOOL_ctx* const wPool = TPOOL_create(1, 1);
+    TPool* const tPool = TPool_create(1, 1);
+    TPool* const wPool = TPool_create(1, 1);
 #define NB_BUFFSETS 4 /* 1 being read, 1 being processed, 1 being written, 1 being queued */
     void* inBuffs[NB_BUFFSETS];
     void* outBuffs[NB_BUFFSETS];
@@ -1795,22 +1795,22 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
                 lbi->foutput = foutput;
                 lbi->sparseEnable = prefs->sparseFileSupport;
                 lbi->storedSkips = &storedSkips;
-                TPOOL_submitJob(tPool, LZ4IO_decompressBlockLegacy, lbi);
+                TPool_submitJob(tPool, LZ4IO_decompressBlockLegacy, lbi);
             }
         }
     }
     if (ferror(finput)) END_PROCESS(65, "Read error : ferror");
 
     /* Wait for all completion */
-    TPOOL_completeJobs(tPool);
-    TPOOL_completeJobs(wPool);
+    TPool_jobsCompleted(tPool);
+    TPool_jobsCompleted(wPool);
 
     /* flush last zeroes */
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
 
     /* Free */
-    TPOOL_free(wPool);
-    TPOOL_free(tPool);
+    TPool_free(wPool);
+    TPool_free(tPool);
     for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
         free(inBuffs[bSetNb]);
         free(outBuffs[bSetNb]);
@@ -2044,7 +2044,7 @@ typedef struct {
     BufferPool* bp;
     unsigned long long* totalSize;
     LZ4F_errorCode_t* lastStatus;
-    TPOOL_ctx* wPool;
+    TPool* wPool;
     FILE* foutput;
     int sparseEnable;
     unsigned* storedSkips;
@@ -2087,7 +2087,7 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
             ctw->sparseEnable = lz4fc->sparseEnable;
             ctw->storedSkips = lz4fc->storedSkips;
             ctw->totalSize = lz4fc->totalSize;
-            TPOOL_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
+            TPool_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
         }
     }
 
@@ -2108,8 +2108,8 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     const LZ4F_decompressOptions_t* const dOptPtr =
         ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
         &dOpt_skipCrc : NULL;
-    TPOOL_ctx* const tPool = TPOOL_create(1, 1);
-    TPOOL_ctx* const wPool = TPOOL_create(1, 1);
+    TPool* const tPool = TPool_create(1, 1);
+    TPool* const wPool = TPool_create(1, 1);
     BufferPool* const bp = LZ4IO_createBufferPool(OUTBUFF_SIZE);
 #define NB_BUFFSETS 4 /* 1 being read, 1 being processed, 1 being written, 1 being queued */
     void* inBuffs[NB_BUFFSETS];
@@ -2164,18 +2164,18 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             lbi->foutput = dstFile;
             lbi->sparseEnable = prefs->sparseFileSupport;
             lbi->storedSkips = &storedSkips;
-            TPOOL_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
+            TPool_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
         }
         if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
     }
     assert(feof(srcFile));
 
     /* Wait for all decompression completion */
-    TPOOL_completeJobs(tPool);
+    TPool_jobsCompleted(tPool);
 
     /* flush */
     assert(lastStatus == 0);
-    TPOOL_completeJobs(wPool);
+    TPool_jobsCompleted(wPool);
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
     /* Clean */
@@ -2183,8 +2183,8 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         free(inBuffs[bSetNb]);
     }
     LZ4IO_freeBufferPool(bp);
-    TPOOL_free(wPool);
-    TPOOL_free(tPool);
+    TPool_free(wPool);
+    TPool_free(tPool);
 
     return filesize;
 }
