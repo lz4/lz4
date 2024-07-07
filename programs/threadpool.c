@@ -41,28 +41,28 @@
 /* ===================================================== */
 
 /* Non-zero size, to ensure g_poolCtx != NULL */
-struct TPOOL_ctx_s {
+struct TPool_s {
     int dummy;
 };
-static TPOOL_ctx g_poolCtx;
+static TPool g_poolCtx;
 
-TPOOL_ctx* TPOOL_create(int numThreads, int queueSize) {
+TPool* TPool_create(int numThreads, int queueSize) {
     (void)numThreads;
     (void)queueSize;
     return &g_poolCtx;
 }
 
-void TPOOL_free(TPOOL_ctx* ctx) {
+void TPool_free(TPool* ctx) {
     assert(!ctx || ctx == &g_poolCtx);
     (void)ctx;
 }
 
-void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg) {
+void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg) {
     (void)ctx;
     job_function(arg);
 }
 
-void TPOOL_completeJobs(TPOOL_ctx* ctx) {
+void TPool_jobsCompleted(TPool* ctx) {
     assert(!ctx || ctx == &g_poolCtx);
     (void)ctx;
 }
@@ -73,7 +73,7 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx) {
 /* Window TPool implementation using Completion Ports */
 #include <windows.h>
 
-typedef struct TPOOL_ctx_s {
+typedef struct TPool_s {
     HANDLE completionPort;
     HANDLE* workerThreads;
     int nbWorkers;
@@ -81,9 +81,9 @@ typedef struct TPOOL_ctx_s {
     LONG nbPendingJobs;
     HANDLE jobSlotAvail;  /* For queue size control */
     HANDLE allJobsCompleted; /* Event */
-} TPOOL_ctx;
+} TPool;
 
-void TPOOL_free(TPOOL_ctx* ctx)
+void TPool_free(TPool* ctx)
 {
     if (!ctx) return;
 
@@ -111,7 +111,7 @@ void TPOOL_free(TPOOL_ctx* ctx)
 
 static DWORD WINAPI WorkerThread(LPVOID lpParameter)
 {
-    TPOOL_ctx* ctx = (TPOOL_ctx*)lpParameter;
+    TPool* ctx = (TPool*)lpParameter;
     DWORD bytesTransferred;
     ULONG_PTR completionKey;
     LPOVERLAPPED overlapped;
@@ -136,9 +136,9 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter)
     return 0;
 }
 
-TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
+TPool* TPool_create(int nbWorkers, int queueSize)
 {
-    TPOOL_ctx* const ctx = calloc(1, sizeof(TPOOL_ctx));
+    TPool* const ctx = calloc(1, sizeof(TPool));
     if (!ctx) return NULL;
 
     /* parameters sanitization */
@@ -159,13 +159,13 @@ TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
     ctx->nbWorkers = nbWorkers;
     ctx->workerThreads = (HANDLE*)malloc(sizeof(HANDLE) * nbWorkers);
     if (ctx->workerThreads == NULL) {
-        TPOOL_free(ctx);
+        TPool_free(ctx);
         return NULL;
     }
     for (int i = 0; i < nbWorkers; i++) {
         ctx->workerThreads[i] = CreateThread(NULL, 0, WorkerThread, ctx, 0, NULL);
         if (!ctx->workerThreads[i]) {
-            TPOOL_free(ctx);
+            TPool_free(ctx);
             return NULL;
         }
     }
@@ -175,19 +175,19 @@ TPOOL_ctx* TPOOL_create(int nbWorkers, int queueSize)
     ctx->nbPendingJobs = 0;
     ctx->jobSlotAvail = CreateSemaphore(NULL, queueSize+nbWorkers, queueSize+nbWorkers, NULL);
     if (!ctx->jobSlotAvail) {
-        TPOOL_free(ctx);
+        TPool_free(ctx);
         return NULL;
     }
     ctx->allJobsCompleted = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (!ctx->allJobsCompleted) {
-        TPOOL_free(ctx);
+        TPool_free(ctx);
         return NULL;
     }
     return ctx;
 }
 
 
-void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
+void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg)
 {
     if (!ctx || !job_function) return;
 
@@ -203,7 +203,7 @@ void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
                                (LPOVERLAPPED)arg);      /* Store argument in overlapped */
 }
 
-void TPOOL_completeJobs(TPOOL_ctx* ctx)
+void TPool_jobsCompleted(TPool* ctx)
 {
     if (!ctx) return;
     WaitForSingleObject(ctx->allJobsCompleted, INFINITE);
@@ -216,18 +216,18 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx)
 #include <pthread.h> /* pthread_* */
 
 /* A job is just a function with an opaque argument */
-typedef struct TPOOL_job_s {
+typedef struct TPool_job_s {
     void (*job_function)(void*);
     void *arg;
-} TPOOL_job;
+} TPool_job;
 
-struct TPOOL_ctx_s {
+struct TPool_s {
     pthread_t* threads;
     size_t threadCapacity;
     size_t threadLimit;
 
     /* The queue is a circular buffer */
-    TPOOL_job* queue;
+    TPool_job* queue;
     size_t queueHead;
     size_t queueTail;
     size_t queueSize;
@@ -247,11 +247,11 @@ struct TPOOL_ctx_s {
     int shutdown;
 };
 
-static void TPOOL_shutdown(TPOOL_ctx* ctx);
+static void TPool_shutdown(TPool* ctx);
 
-void TPOOL_free(TPOOL_ctx* ctx) {
+void TPool_free(TPool* ctx) {
     if (!ctx) { return; }
-    TPOOL_shutdown(ctx);
+    TPool_shutdown(ctx);
     pthread_mutex_destroy(&ctx->queueMutex);
     pthread_cond_destroy(&ctx->queuePushCond);
     pthread_cond_destroy(&ctx->queuePopCond);
@@ -260,31 +260,31 @@ void TPOOL_free(TPOOL_ctx* ctx) {
     free(ctx);
 }
 
-static void* TPOOL_thread(void* opaque);
+static void* TPool_thread(void* opaque);
 
-TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
+TPool* TPool_create(int nbThreads, int queueSize)
 {
-    TPOOL_ctx* ctx;
+    TPool* ctx;
     /* Check parameters */
     if (nbThreads<1 || queueSize<1) { return NULL; }
     /* Allocate the context and zero initialize */
-    ctx = (TPOOL_ctx*)calloc(1, sizeof(TPOOL_ctx));
+    ctx = (TPool*)calloc(1, sizeof(TPool));
     if (!ctx) { return NULL; }
     /* init pthread variables */
     {   int error = 0;
         error |= pthread_mutex_init(&ctx->queueMutex, NULL);
         error |= pthread_cond_init(&ctx->queuePushCond, NULL);
         error |= pthread_cond_init(&ctx->queuePopCond, NULL);
-        if (error) { TPOOL_free(ctx); return NULL; }
+        if (error) { TPool_free(ctx); return NULL; }
     }
     /* Initialize the job queue.
      * It needs one extra space since one space is wasted to differentiate
      * empty and full queues.
      */
     ctx->queueSize = (size_t)queueSize + 1;
-    ctx->queue = (TPOOL_job*)calloc(1, ctx->queueSize * sizeof(TPOOL_job));
+    ctx->queue = (TPool_job*)calloc(1, ctx->queueSize * sizeof(TPool_job));
     if (ctx->queue == NULL) {
-        TPOOL_free(ctx);
+        TPool_free(ctx);
         return NULL;
     }
     ctx->queueHead = 0;
@@ -295,16 +295,16 @@ TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
     /* Allocate space for the thread handles */
     ctx->threads = (pthread_t*)calloc(1, (size_t)nbThreads * sizeof(pthread_t));
     if (ctx->threads == NULL) {
-        TPOOL_free(ctx);
+        TPool_free(ctx);
         return NULL;
     }
     ctx->threadCapacity = 0;
     /* Initialize the threads */
     {   int i;
         for (i = 0; i < nbThreads; ++i) {
-            if (pthread_create(&ctx->threads[i], NULL, &TPOOL_thread, ctx)) {
+            if (pthread_create(&ctx->threads[i], NULL, &TPool_thread, ctx)) {
                 ctx->threadCapacity = (size_t)i;
-                TPOOL_free(ctx);
+                TPool_free(ctx);
                 return NULL;
         }   }
         ctx->threadCapacity = (size_t)nbThreads;
@@ -313,13 +313,13 @@ TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize)
     return ctx;
 }
 
-/* TPOOL_thread() :
+/* TPool_thread() :
  * Work thread for the thread pool.
  * Waits for jobs and executes them.
  * @returns : NULL on failure else non-null.
  */
-static void* TPOOL_thread(void* opaque) {
-    TPOOL_ctx* const ctx = (TPOOL_ctx*)opaque;
+static void* TPool_thread(void* opaque) {
+    TPool* const ctx = (TPool*)opaque;
     if (!ctx) { return NULL; }
     for (;;) {
         /* Lock the mutex and wait for a non-empty queue or until shutdown */
@@ -337,7 +337,7 @@ static void* TPOOL_thread(void* opaque) {
             pthread_cond_wait(&ctx->queuePopCond, &ctx->queueMutex);
         }
         /* Pop a job off the queue */
-        {   TPOOL_job const job = ctx->queue[ctx->queueHead];
+        {   TPool_job const job = ctx->queue[ctx->queueHead];
             ctx->queueHead = (ctx->queueHead + 1) % ctx->queueSize;
             ctx->numThreadsBusy++;
             ctx->queueEmpty = (ctx->queueHead == ctx->queueTail);
@@ -357,10 +357,10 @@ static void* TPOOL_thread(void* opaque) {
     assert(0);  /* Unreachable */
 }
 
-/*! TPOOL_shutdown() :
+/*! TPool_shutdown() :
     Shutdown the queue, wake any sleeping threads, and join all of the threads.
 */
-static void TPOOL_shutdown(TPOOL_ctx* ctx) {
+static void TPool_shutdown(TPool* ctx) {
     /* Shut down the queue */
     pthread_mutex_lock(&ctx->queueMutex);
     ctx->shutdown = 1;
@@ -376,10 +376,10 @@ static void TPOOL_shutdown(TPOOL_ctx* ctx) {
 }
 
 
-/*! TPOOL_completeJobs() :
+/*! TPool_jobsCompleted() :
  *  Waits for all queued jobs to finish executing.
  */
-void TPOOL_completeJobs(TPOOL_ctx* ctx){
+void TPool_jobsCompleted(TPool* ctx){
     pthread_mutex_lock(&ctx->queueMutex);
     while(!ctx->queueEmpty || ctx->numThreadsBusy > 0) {
         pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
@@ -393,7 +393,7 @@ void TPOOL_completeJobs(TPOOL_ctx* ctx){
  * When queueSize is 1 (pool was created with an intended queueSize of 0),
  * then a queue is empty if there is a thread free _and_ no job is waiting.
  */
-static int isQueueFull(TPOOL_ctx const* ctx) {
+static int isQueueFull(TPool const* ctx) {
     if (ctx->queueSize > 1) {
         return ctx->queueHead == ((ctx->queueTail + 1) % ctx->queueSize);
     } else {
@@ -403,9 +403,9 @@ static int isQueueFull(TPOOL_ctx const* ctx) {
 }
 
 static void
-TPOOL_submitJob_internal(TPOOL_ctx* ctx, void (*job_function)(void*), void *arg)
+TPool_submitJob_internal(TPool* ctx, void (*job_function)(void*), void *arg)
 {
-    TPOOL_job job;
+    TPool_job job;
     job.job_function = job_function;
     job.arg = arg;
     assert(ctx != NULL);
@@ -417,7 +417,7 @@ TPOOL_submitJob_internal(TPOOL_ctx* ctx, void (*job_function)(void*), void *arg)
     pthread_cond_signal(&ctx->queuePopCond);
 }
 
-void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
+void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg)
 {
     assert(ctx != NULL);
     pthread_mutex_lock(&ctx->queueMutex);
@@ -425,7 +425,7 @@ void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg)
     while (isQueueFull(ctx) && (!ctx->shutdown)) {
         pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
     }
-    TPOOL_submitJob_internal(ctx, job_function, arg);
+    TPool_submitJob_internal(ctx, job_function, arg);
     pthread_mutex_unlock(&ctx->queueMutex);
 }
 

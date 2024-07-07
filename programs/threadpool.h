@@ -29,34 +29,35 @@
 extern "C" {
 #endif
 
-typedef struct TPOOL_ctx_s TPOOL_ctx;
+typedef struct TPool_s TPool;
 
-/*! TPOOL_create() :
+/*! TPool_create() :
  *  Create a thread pool with at most @nbThreads.
  * @nbThreads must be at least 1.
  * @queueSize is the maximum number of pending jobs before blocking.
- * @return : POOL_ctx pointer on success, else NULL.
+ * @return : TPool* pointer on success, else NULL.
 */
-TPOOL_ctx* TPOOL_create(int nbThreads, int queueSize);
+TPool* TPool_create(int nbThreads, int queueSize);
 
-/*! TPOOL_free() :
- *  Free a thread pool returned by TPOOL_create().
- *  Note: if jobs are already running, @free first waits for their completion
+/*! TPool_free() :
+ *  Free a thread pool returned by TPool_create().
+ *  Waits for the completion of running jobs before freeing resources.
  */
-void TPOOL_free(TPOOL_ctx* ctx);
+void TPool_free(TPool* ctx);
 
-/*! TPOOL_submitJob() :
+/*! TPool_submitJob() :
  *  Add @job_function(arg) to the thread pool.
  * @ctx must be valid.
  *  Invocation can block if queue is full.
- *  Note : pay attention to @arg lifetime, which is now owned by @job_function
+ *  Note: Ensure @arg's lifetime extends until @job_function completes.
+ *  Alternatively, @arg's lifetime must be managed by @job_function.
  */
-void TPOOL_submitJob(TPOOL_ctx* ctx, void (*job_function)(void*), void* arg);
+void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg);
 
-/*! TPOOL_completeJobs() :
- *  Blocks, waiting for all queued jobs to be completed
+/*! TPool_jobsCompleted() :
+ *  Blocks until all queued jobs are completed.
  */
-void TPOOL_completeJobs(TPOOL_ctx* ctx);
+void TPool_jobsCompleted(TPool* ctx);
 
 
 
