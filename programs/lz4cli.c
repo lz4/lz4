@@ -355,6 +355,21 @@ static operationMode_e determineOpMode(const char* inputFilename)
     else return om_compress;
 }
 
+#define ENV_NBTHREADS "LZ4_NBWORKERS"
+
+static unsigned init_nbWorkers(void)
+{
+    const char* const env = getenv(ENV_NBTHREADS);
+    if (env != NULL) {
+        const char* ptr = env;
+        if ((*ptr>='0') && (*ptr<='9')) {
+            return readU32FromChar(&ptr);
+        }
+        DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid unsigned value \n", ENV_NBTHREADS, env);
+    }
+    return LZ4_NBWORKERS_DEFAULT;
+}
+
 int main(int argCount, const char** argv)
 {
     int argNb,
@@ -367,7 +382,7 @@ int main(int argCount, const char** argv)
         multiple_inputs=0,
         all_arguments_are_files=0,
         operationResult=0;
-    unsigned nbWorkers = LZ4_NBWORKERS_DEFAULT;
+    unsigned nbWorkers = init_nbWorkers();
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
     const char* output_filename= NULL;

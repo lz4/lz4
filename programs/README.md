@@ -35,6 +35,13 @@ On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=
    This is mostly meant to protect the system against unreasonable and likely bogus requests, such as a million threads.
 - `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 7, corresponding to 4 MB block size.
 
+#### Environment Variables
+It's possible to pass some parameters to `lz4` via environment variables.
+This can be useful in situations where `lz4` is known to be invoked (from a script for example) but there is no way to pass `lz4` parameters to influence the compression session.
+The environment variable has higher priority than binary default, but lower priority than corresponding runtime command.
+When set as global environment variables, it can be a way to enforce personalized defaults different from the binary set ones.
+
+`LZ4_NBWORKERS` can be used to specify a default number of threads that `lz4` will use for compression (binary default is generally `0`, which means auto-determined based on local cpu). This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
 
 ### Aggregation of parameters
 The `lz4` CLI supports aggregation for short commands. For example, `-d`, `-q`, and `-f` can be joined into `-dqf`.
