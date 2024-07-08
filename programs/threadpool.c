@@ -88,8 +88,10 @@ void TPool_free(TPool* pool)
     if (!pool) return;
 
     /* Signal workers to exit by posting NULL completions */
-    for (int i = 0; i < pool->nbWorkers; i++) {
-        PostQueuedCompletionStatus(pool->completionPort, 0, 0, NULL);
+    {   int i;
+        for (i = 0; i < pool->nbWorkers; i++) {
+            PostQueuedCompletionStatus(pool->completionPort, 0, 0, NULL);
+        }
     }
 
     /* Wait for worker threads to finish */
