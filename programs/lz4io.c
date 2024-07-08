@@ -1129,24 +1129,17 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
             END_PROCESS(51, "unable to create a LZ4F compression context");
     }
     /* init state, and writes frame header, will be overwritten at next stage. */
-    {   size_t const whr = LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, cfcp->cdict, cfcp->prefs);
-        if (LZ4F_isError(whr))
-            END_PROCESS(52, "error initializing LZ4F compression context");
-    }
-    /* let's populate compression tables with Prefix */
     if (prefixSize) {
-        size_t pSize;
-        assert(cfcp->prefs->frameInfo.blockMode == LZ4F_blockLinked);
+        size_t const whr = LZ4F_compressBegin_usingDict(cctx, dst, dstCapacity, (const char*)src - prefixSize, prefixSize, cfcp->prefs);
+        if (LZ4F_isError(whr))
+            END_PROCESS(52, "error initializing LZ4F compression context with prefix");
         assert(prefixSize == 64 KB);
-        assert(srcSize >= prefixSize);
-        pSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, (const char*)src - prefixSize, prefixSize, NULL);
-        if (LZ4F_isError(pSize))
-            END_PROCESS(53, "error compressing prefix");
-        pSize = LZ4F_flush(cctx, dst, dstCapacity, NULL);
-        if (LZ4F_isError(pSize))
-            END_PROCESS(54, "error flushing prefix");
+    } else {
+        size_t const whr = LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, cfcp->cdict, cfcp->prefs);
+        if (LZ4F_isError(whr))
+            END_PROCESS(53, "error initializing LZ4F compression context");
     }
-    /* let's overwrite */
+    /* let's now compress, overwriting unused header */
     {   size_t const cSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, NULL);
         if (LZ4F_isError(cSize))
             END_PROCESS(55, "error compressing with LZ4F_compressUpdate");
@@ -1501,17 +1494,10 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
-#if LZ4IO_MULTITHREAD
-    /* only employ multi-threading in the following scenarios: */
-    if ( (io_prefs->nbWorkers > 1)
-      && ( (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
-        || (!io_prefs->useDictionary) )
-      )
+    if (LZ4IO_MULTITHREAD)
         return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
-#endif
     /* Only single-thread available */
     return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
-
 }
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
