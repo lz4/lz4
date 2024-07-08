@@ -370,10 +370,25 @@ static unsigned init_nbWorkers(void)
     return LZ4_NBWORKERS_DEFAULT;
 }
 
+#define ENV_CLEVEL "LZ4_CLEVEL"
+
+static int init_cLevel(void)
+{
+    const char* const env = getenv(ENV_CLEVEL);
+    if (env != NULL) {
+        const char* ptr = env;
+        if ((*ptr>='0') && (*ptr<='9')) {
+            return (int)readU32FromChar(&ptr);
+        }
+        DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid unsigned value \n", ENV_CLEVEL, env);
+    }
+    return LZ4_CLEVEL_DEFAULT;
+}
+
 int main(int argCount, const char** argv)
 {
     int argNb,
-        cLevel=1,
+        cLevel=init_cLevel(),
         cLevelLast=-10000,
         legacy_format=0,
         forceStdout=0,

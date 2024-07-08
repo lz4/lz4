@@ -250,11 +250,14 @@ only the latest one will be applied.
 
 It's possible to pass some parameters to `lz4` via environment variables.
 This can be useful in situations where `lz4` is known to be invoked (from a script for example) but there is no way to pass `lz4` parameters to influence the compression session.
-The environment variable has higher priority than binary default, but lower priority than corresponding runtime command.
-When set as global environment variables, it can be a way to enforce personalized defaults different from the binary set ones.
+The environment variable has higher priority than executable default, but lower priority than corresponding runtime command.
+When set as global environment variables, it can be a way to enforce personalized defaults different from the executable set ones.
+
+* `LZ4_CLEVEL`:
+  specify a default compression level that `lz4` employs for compression when no other compression level is specified on command line. Executable default is generally `1`.
 
 * `LZ4_NBWORKERS`:
-  specify a default number of threads that `lz4` will employ for compression (binary default is generally `0`, which means auto-determined based on local cpu). This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
+  specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu. This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
 
 
 BUGS

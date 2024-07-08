@@ -27,6 +27,7 @@ The makefile offer several targets for various use cases:
 These variables are read by the preprocessor at compilation time. They influence executable behavior, such as default starting values, and are exposed from `programs/lz4conf.h`. These variables can manipulated by any build system.
 Assignment methods vary depending on environments.
 On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=-DVARIABLE=value` assignment.
+- `LZ4_CLEVEL_DEFAULT`: default compression level when none provided. Default is `1`.
 - `LZ4IO_MULTITHREAD`: enable multithreading support. Default is disabled.
 - `LZ4_NBWORKERS_DEFAULT`: default nb of worker threads used in multithreading mode (can be overridden with command `-T#`).
    Default is `0`, which means "auto-determine" based on local cpu.
@@ -37,11 +38,13 @@ On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=
 
 #### Environment Variables
 It's possible to pass some parameters to `lz4` via environment variables.
-This can be useful in situations where `lz4` is known to be invoked (from a script for example) but there is no way to pass `lz4` parameters to influence the compression session.
+This can be useful in situations where `lz4` is known to be invoked (from within a script for example) but there is no way to pass `lz4` parameters to influence the compression session.
 The environment variable has higher priority than binary default, but lower priority than corresponding runtime command.
-When set as global environment variables, it can be a way to enforce personalized defaults different from the binary set ones.
+When set as global environment variables, it can enforce personalized defaults different from the binary set ones.
 
-`LZ4_NBWORKERS` can be used to specify a default number of threads that `lz4` will use for compression (binary default is generally `0`, which means auto-determined based on local cpu). This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
+`LZ4_CLEVEL` can be used to specify a default compression level that `lz4` employs for compression when no other compression level is specified on command line. Executable default is generally `1`.
+
+`LZ4_NBWORKERS` can be used to specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu. This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
 
 ### Aggregation of parameters
 The `lz4` CLI supports aggregation for short commands. For example, `-d`, `-q`, and `-f` can be joined into `-dqf`.
