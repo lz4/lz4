@@ -706,7 +706,8 @@ static void LZ4IO_readAndProcess(void* arg)
     if (!buffer)
         END_PROCESS(31, "Allocation error : can't allocate buffer to read new chunk");
     if (prefixSize) {
-        memcpy(buffer, rjd->prefix, 64 KB);
+        assert(prefixSize == 64 KB);
+        memcpy(buffer, rjd->prefix, prefixSize);
     }
     {   char* const in_buff = (char*)buffer + prefixSize;
         size_t const inSize = fread(in_buff, (size_t)1, chunkSize, rjd->fin);
@@ -744,7 +745,7 @@ static void LZ4IO_readAndProcess(void* arg)
             cjd->lastBlock = inSize < chunkSize;
             TPool_submitJob(rjd->tPool, LZ4IO_compressAndFreeChunk, cjd);
             if (inSize == chunkSize) {
-                /* probably more ? read another chunk */
+                /* likely more => read another chunk */
                 rjd->blockNb++;
                 TPool_submitJob(rjd->tPool, LZ4IO_readAndProcess, rjd);
     }   }   }
@@ -886,6 +887,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
                     (double)wr.totalCSize / (double)(rjd.totalReadSize + !rjd.totalReadSize) * 100.);
         *readSize = rjd.totalReadSize;
     }
+
     /* Close & Free */
 _cfl_clean:
     WR_destroy(&wr);
@@ -1126,18 +1128,30 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
         if (cctx==NULL || LZ4F_isError(ccr))
             END_PROCESS(51, "unable to create a LZ4F compression context");
     }
-    /* init state, and writes frame header, will be overwritten at next stage.
-     * Also: no support for dictionary yet, meaning linked blocks are actually independent */
+    /* init state, and writes frame header, will be overwritten at next stage. */
     {   size_t const whr = LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, cfcp->cdict, cfcp->prefs);
         if (LZ4F_isError(whr))
             END_PROCESS(52, "error initializing LZ4F compression context");
     }
+    /* let's populate compression tables with Prefix */
+    if (prefixSize) {
+        size_t pSize;
+        assert(cfcp->prefs->frameInfo.blockMode == LZ4F_blockLinked);
+        assert(prefixSize == 64 KB);
+        assert(srcSize >= prefixSize);
+        pSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, (const char*)src - prefixSize, prefixSize, NULL);
+        if (LZ4F_isError(pSize))
+            END_PROCESS(53, "error compressing prefix");
+        pSize = LZ4F_flush(cctx, dst, dstCapacity, NULL);
+        if (LZ4F_isError(pSize))
+            END_PROCESS(54, "error flushing prefix");
+    }
+    /* let's overwrite */
     {   size_t const cSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, NULL);
         if (LZ4F_isError(cSize))
-            END_PROCESS(53, "error compressing with LZ4F_compressUpdate");
+            END_PROCESS(55, "error compressing with LZ4F_compressUpdate");
 
         LZ4F_freeCompressionContext(cctx);
-        (void)prefixSize;
         return (size_t) cSize;
     }
 }
@@ -1489,8 +1503,9 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 {
 #if LZ4IO_MULTITHREAD
     /* only employ multi-threading in the following scenarios: */
-    if ( (io_prefs->nbWorkers != 1)
-      && (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
+    if ( (io_prefs->nbWorkers > 1)
+      && ( (io_prefs->blockIndependence == LZ4F_blockIndependent)  /* blocks must be independent */
+        || (!io_prefs->useDictionary) )
       )
         return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 #endif
