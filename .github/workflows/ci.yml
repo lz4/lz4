@@ -530,21 +530,22 @@ jobs:
           #   xemu : QEMU static emulator executable.
           #   os   : GitHub Actions YAML workflow label.  See https://github.com/actions/virtual-environments#available-environments
 
-          { type: ARM,      pkgs: 'qemu-system-arm   gcc-arm-linux-gnueabi',     xcc: arm-linux-gnueabi-gcc,     xemu: qemu-arm-static,     os: ubuntu-latest, },
-          { type: ARM64,    pkgs: 'qemu-system-arm   gcc-aarch64-linux-gnu',     xcc: aarch64-linux-gnu-gcc,     xemu: qemu-aarch64-static, os: ubuntu-latest, },
-          { type: PPC,      pkgs: 'qemu-system-ppc   gcc-powerpc-linux-gnu',     xcc: powerpc-linux-gnu-gcc,     xemu: qemu-ppc-static,     os: ubuntu-latest, },
-          { type: PPC64LE,  pkgs: 'qemu-system-ppc   gcc-powerpc64le-linux-gnu', xcc: powerpc64le-linux-gnu-gcc, xemu: qemu-ppc64le-static, os: ubuntu-latest, },
-          { type: S390X,    pkgs: 'qemu-system-s390x gcc-s390x-linux-gnu',       xcc: s390x-linux-gnu-gcc,       xemu: qemu-s390x-static,   os: ubuntu-latest, },
-          { type: MIPS,     pkgs: 'qemu-system-mips gcc-mips-linux-gnu',         xcc: mips-linux-gnu-gcc,        xemu: qemu-mips-static,    os: ubuntu-latest, },
-          { type: M68K,     pkgs: 'qemu-system-m68k gcc-m68k-linux-gnu',         xcc: m68k-linux-gnu-gcc,        xemu: qemu-m68k-static,    os: ubuntu-latest, },
-          { type: RISC-V,   pkgs: 'qemu-system-riscv64 gcc-riscv64-linux-gnu',   xcc: riscv64-linux-gnu-gcc,     xemu: qemu-riscv64-static, os: ubuntu-latest, },
-          { type: SPARC,    pkgs: 'qemu-system-sparc gcc-sparc64-linux-gnu',     xcc: sparc64-linux-gnu-gcc,     xemu: qemu-sparc64-static, os: ubuntu-20.04, },
+          { type: ARM,      pkgs: 'qemu-system-arm   gcc-arm-linux-gnueabi',     xcc: arm-linux-gnueabi-gcc,     xemu: qemu-arm-static,     os: ubuntu-latest, makevar: "", },
+          { type: ARM64,    pkgs: 'qemu-system-arm   gcc-aarch64-linux-gnu',     xcc: aarch64-linux-gnu-gcc,     xemu: qemu-aarch64-static, os: ubuntu-latest, makevar: "", },
+          { type: PPC,      pkgs: 'qemu-system-ppc   gcc-powerpc-linux-gnu',     xcc: powerpc-linux-gnu-gcc,     xemu: qemu-ppc-static,     os: ubuntu-latest, makevar: "", },
+          { type: PPC64LE,  pkgs: 'qemu-system-ppc   gcc-powerpc64le-linux-gnu', xcc: powerpc64le-linux-gnu-gcc, xemu: qemu-ppc64le-static, os: ubuntu-latest, makevar: "", },
+          { type: S390X,    pkgs: 'qemu-system-s390x gcc-s390x-linux-gnu',       xcc: s390x-linux-gnu-gcc,       xemu: qemu-s390x-static,   os: ubuntu-latest, makevar: "", },
+          { type: MIPS,     pkgs: 'qemu-system-mips gcc-mips-linux-gnu',         xcc: mips-linux-gnu-gcc,        xemu: qemu-mips-static,    os: ubuntu-latest, makevar: "", },
+          { type: M68K,     pkgs: 'qemu-system-m68k gcc-m68k-linux-gnu',         xcc: m68k-linux-gnu-gcc,        xemu: qemu-m68k-static,    os: ubuntu-latest, makevar: "HAVE_MULTITHREAD=0", }, # bug in MT mode on m68k
+          { type: RISC-V,   pkgs: 'qemu-system-riscv64 gcc-riscv64-linux-gnu',   xcc: riscv64-linux-gnu-gcc,     xemu: qemu-riscv64-static, os: ubuntu-latest, makevar: "", },
+          { type: SPARC,    pkgs: 'qemu-system-sparc gcc-sparc64-linux-gnu',     xcc: sparc64-linux-gnu-gcc,     xemu: qemu-sparc64-static, os: ubuntu-20.04, makevar: "", },
         ]
 
     runs-on: ${{ matrix.os }}
     env:                        # Set environment variables
       XCC: ${{ matrix.xcc }}
       XEMU: ${{ matrix.xemu }}
+      MAKEVAR: ${{ matrix.makevar }}
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # https://github.com/actions/checkout v4.1.7
 
@@ -571,7 +572,7 @@ jobs:
 
     - name: MIPS-M68K-RISCV-SPARC
       if: ${{ matrix.type == 'MIPS' || matrix.type == 'M68K' || matrix.type == 'RISC-V' || matrix.type == 'SPARC' }}
-      run: make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
+      run: make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU $MAKEVAR
 
 
 
