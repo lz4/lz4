@@ -163,10 +163,8 @@ foreach (flag
     -Wswitch-enum
     -Wdeclaration-after-statement
     -Wstrict-prototypes
-    -Wpointer-arith
+    -Wpointer-arith)
 
-    # MSVC-style
-    /W4)
   # Because https://gcc.gnu.org/wiki/FAQ#wnowarning
   string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
   string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_${flag_to_test}")
@@ -180,6 +178,12 @@ foreach (flag
   unset(test_name)
   unset(flag_to_test)
 endforeach (flag)
+
+# MSVC-style
+if(MSVC)
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /W4")
+endif()
+
 
 if(NOT LZ4_BUNDLED_MODE)
   install(TARGETS ${LZ4_PROGRAMS_BUILT}
