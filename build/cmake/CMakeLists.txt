@@ -150,38 +150,37 @@ if (LZ4_BUILD_LEGACY_LZ4C)
 endif()
 
 # Extra warning flags
-include (CheckCCompilerFlag)
-foreach (flag
-    # GCC-style
-    -pedantic-errors
-    -Wall
-    -Wextra
-    -Wundef
-    -Wcast-qual
-    -Wcast-align
-    -Wshadow
-    -Wswitch-enum
-    -Wdeclaration-after-statement
-    -Wstrict-prototypes
-    -Wpointer-arith)
-
-  # Because https://gcc.gnu.org/wiki/FAQ#wnowarning
-  string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
-  string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_${flag_to_test}")
-
-  check_c_compiler_flag("${ADD_COMPILER_FLAGS_PREPEND} ${flag_to_test}" ${test_name})
-
-  if(${test_name})
-    set(CMAKE_C_FLAGS "${flag} ${CMAKE_C_FLAGS}")
-  endif()
-
-  unset(test_name)
-  unset(flag_to_test)
-endforeach (flag)
-
-# MSVC-style
 if(MSVC)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /W4")
+else()
+  include (CheckCCompilerFlag)
+  foreach (flag
+      # GCC-style
+      -pedantic-errors
+      -Wall
+      -Wextra
+      -Wundef
+      -Wcast-qual
+      -Wcast-align
+      -Wshadow
+      -Wswitch-enum
+      -Wdeclaration-after-statement
+      -Wstrict-prototypes
+      -Wpointer-arith)
+
+    # Because https://gcc.gnu.org/wiki/FAQ#wnowarning
+    string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
+    string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_${flag_to_test}")
+
+    check_c_compiler_flag("${ADD_COMPILER_FLAGS_PREPEND} ${flag_to_test}" ${test_name})
+
+    if(${test_name})
+      set(CMAKE_C_FLAGS_DEBUG "${flag} ${CMAKE_C_FLAGS_DEBUG}")
+    endif()
+
+    unset(test_name)
+    unset(flag_to_test)
+  endforeach (flag)
 endif()
 
 
