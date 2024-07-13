@@ -6,22 +6,22 @@
 # any warranty.
 #
 # For details, see <http://creativecommons.org/publicdomain/zero/1.0/>.
-#
-# LZ4's CMake support is maintained by Evan Nemerson; when filing
-# bugs please mention @nemequ to make sure I see it.
+
 
 cmake_minimum_required(VERSION 3.5)
 
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 # Parse version information
-foreach(version_type MAJOR MINOR RELEASE)
-    file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_${version_type}
-         REGEX "^#define LZ4_VERSION_${version_type} +([0-9]+).*$")
-    string(REGEX REPLACE "^#define LZ4_VERSION_${version_type} +([0-9]+).*$" "\\1"
-           LZ4_VERSION_${version_type} "${LZ4_VERSION_${version_type}}")
-endforeach()
+function(parse_lz4_version VERSION_TYPE)
+    file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" version_line REGEX "^#define LZ4_VERSION_${VERSION_TYPE} +([0-9]+).*$")
+    string(REGEX REPLACE "^#define LZ4_VERSION_${VERSION_TYPE} +([0-9]+).*$" "\\1" version_number "${version_line}")
+    set(LZ4_VERSION_${VERSION_TYPE} ${version_number} PARENT_SCOPE)
+endfunction()
 
+foreach(version_type IN ITEMS MAJOR MINOR RELEASE)
+    parse_lz4_version(${version_type})
+endforeach()
 
 set(LZ4_VERSION_STRING "${LZ4_VERSION_MAJOR}.${LZ4_VERSION_MINOR}.${LZ4_VERSION_RELEASE}")
 mark_as_advanced(LZ4_VERSION_STRING LZ4_VERSION_MAJOR LZ4_VERSION_MINOR LZ4_VERSION_RELEASE)
@@ -37,7 +37,7 @@ option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" O
 
 # Determine if LZ4 is being built as part of another project.
 # If LZ4 is bundled in another project, we don't want to install anything.
-# This behavior can be overridden by setting the LZ4_BUNDLED_MODE variable.
+# Default behavior can be overridden by setting the LZ4_BUNDLED_MODE variable.
 if(NOT DEFINED LZ4_BUNDLED_MODE)
   get_directory_property(LZ4_IS_SUBPROJECT PARENT_DIRECTORY)
   if(LZ4_IS_SUBPROJECT)
