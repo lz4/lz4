@@ -775,16 +775,7 @@ int main(int argCount, const char** argv)
     }
 
     /* No output filename ==> try to select one automatically (when possible) */
-    while ((!output_filename) && (multiple_inputs==0)) {
-        if (!IS_CONSOLE(stdout) && mode != om_list) {
-            /* Default to stdout whenever stdout is not the console.
-             * Note : this policy may change in the future, therefore don't rely on it !
-             * To ensure `stdout` is explicitly selected, use `-c` command flag.
-             * Conversely, to ensure output will not become `stdout`, use `-m` command flag */
-            DISPLAYLEVEL(1, "Warning : using stdout as default output. Do not rely on this behavior: use explicit `-c` instead ! \n");
-            output_filename = stdoutmark;
-            break;
-        }
+    if ((!output_filename) && (multiple_inputs==0)) {
         if (mode == om_auto) {  /* auto-determine compression or decompression, based on file extension */
             mode = determineOpMode(input_filename);
         }
@@ -796,9 +787,9 @@ int main(int argCount, const char** argv)
             strcat(dynNameSpace, LZ4_EXTENSION);
             output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
-            break;
         }
-        if (mode == om_decompress) {/* decompress to file (automatic output name only works if input filename has correct format extension) */
+        if (mode == om_decompress) {
+            /* decompress to file (automatic output name only works if input filename has correct format extension) */
             size_t outl;
             size_t const inl = strlen(input_filename);
             dynNameSpace = (char*)calloc(1,inl+1);
@@ -811,7 +802,6 @@ int main(int argCount, const char** argv)
             output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
         }
-        break;
     }
 
     if (mode == om_list) {
