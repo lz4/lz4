@@ -15,16 +15,20 @@ cmake_minimum_required(VERSION 3.5)
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 # Parse version information
-file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MAJOR REGEX "^ *# *define +LZ4_VERSION_MAJOR +([0-9]+).*$")
-string(REGEX REPLACE "^ *# *define +LZ4_VERSION_MAJOR +([0-9]+).*$" "\\1" LZ4_VERSION_MAJOR "${LZ4_VERSION_MAJOR}")
-file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MINOR REGEX "^ *# *define +LZ4_VERSION_MINOR +([0-9]+).*$")
-string(REGEX REPLACE "^ *# *define +LZ4_VERSION_MINOR +([0-9]+).*$" "\\1" LZ4_VERSION_MINOR "${LZ4_VERSION_MINOR}")
-file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_RELEASE REGEX "^ *# *define +LZ4_VERSION_RELEASE +([0-9]+).*$")
-string(REGEX REPLACE "^ *# *define +LZ4_VERSION_RELEASE +([0-9]+).*$" "\\1" LZ4_VERSION_RELEASE "${LZ4_VERSION_RELEASE}")
+foreach(version_type MAJOR MINOR RELEASE)
+    file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_${version_type}
+         REGEX "^#define LZ4_VERSION_${version_type} +([0-9]+).*$")
+    string(REGEX REPLACE "^#define LZ4_VERSION_${version_type} +([0-9]+).*$" "\\1"
+           LZ4_VERSION_${version_type} "${LZ4_VERSION_${version_type}}")
+endforeach()
+
 set(LZ4_VERSION_STRING "${LZ4_VERSION_MAJOR}.${LZ4_VERSION_MINOR}.${LZ4_VERSION_RELEASE}")
 mark_as_advanced(LZ4_VERSION_STRING LZ4_VERSION_MAJOR LZ4_VERSION_MINOR LZ4_VERSION_RELEASE)
 
+message(STATUS "Creating build script for LZ4 version: ${LZ4_VERSION_STRING}")
+
 project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
+
 
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
