@@ -22,6 +22,7 @@ foreach(version_type MAJOR MINOR RELEASE)
            LZ4_VERSION_${version_type} "${LZ4_VERSION_${version_type}}")
 endforeach()
 
+
 set(LZ4_VERSION_STRING "${LZ4_VERSION_MAJOR}.${LZ4_VERSION_MINOR}.${LZ4_VERSION_RELEASE}")
 mark_as_advanced(LZ4_VERSION_STRING LZ4_VERSION_MAJOR LZ4_VERSION_MINOR LZ4_VERSION_RELEASE)
 
@@ -33,18 +34,16 @@ project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
 
-# If LZ4 is being bundled in another project, we don't want to
-# install anything.  However, we want to let people override this, so
-# we'll use the LZ4_BUNDLED_MODE variable to let them do that; just
-# set it to OFF in your project before you add_subdirectory(lz4/contrib/cmake_unofficial).
-get_directory_property(LZ4_PARENT_DIRECTORY PARENT_DIRECTORY)
-if("${LZ4_BUNDLED_MODE}" STREQUAL "")
-  # Bundled mode hasn't been set one way or the other, set the default
-  # depending on whether or not we are the top-level project.
-  if("${LZ4_PARENT_DIRECTORY}" STREQUAL "")
-    set(LZ4_BUNDLED_MODE OFF)
-  else()
+
+# Determine if LZ4 is being built as part of another project.
+# If LZ4 is bundled in another project, we don't want to install anything.
+# This behavior can be overridden by setting the LZ4_BUNDLED_MODE variable.
+if(NOT DEFINED LZ4_BUNDLED_MODE)
+  get_directory_property(LZ4_IS_SUBPROJECT PARENT_DIRECTORY)
+  if(LZ4_IS_SUBPROJECT)
     set(LZ4_BUNDLED_MODE ON)
+  else()
+    set(LZ4_BUNDLED_MODE OFF)
   endif()
 endif()
 mark_as_advanced(LZ4_BUNDLED_MODE)
