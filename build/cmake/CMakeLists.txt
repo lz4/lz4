@@ -6,41 +6,44 @@
 # any warranty.
 #
 # For details, see <http://creativecommons.org/publicdomain/zero/1.0/>.
-#
-# LZ4's CMake support is maintained by Evan Nemerson; when filing
-# bugs please mention @nemequ to make sure I see it.
+
 
 cmake_minimum_required(VERSION 3.5)
 
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 # Parse version information
-file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MAJOR REGEX "^ *# *define +LZ4_VERSION_MAJOR +([0-9]+).*$")
-string(REGEX REPLACE "^ *# *define +LZ4_VERSION_MAJOR +([0-9]+).*$" "\\1" LZ4_VERSION_MAJOR "${LZ4_VERSION_MAJOR}")
-file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_MINOR REGEX "^ *# *define +LZ4_VERSION_MINOR +([0-9]+).*$")
-string(REGEX REPLACE "^ *# *define +LZ4_VERSION_MINOR +([0-9]+).*$" "\\1" LZ4_VERSION_MINOR "${LZ4_VERSION_MINOR}")
-file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" LZ4_VERSION_RELEASE REGEX "^ *# *define +LZ4_VERSION_RELEASE +([0-9]+).*$")
-string(REGEX REPLACE "^ *# *define +LZ4_VERSION_RELEASE +([0-9]+).*$" "\\1" LZ4_VERSION_RELEASE "${LZ4_VERSION_RELEASE}")
+function(parse_lz4_version VERSION_TYPE)
+    file(STRINGS "${LZ4_TOP_SOURCE_DIR}/lib/lz4.h" version_line REGEX "^#define LZ4_VERSION_${VERSION_TYPE} +([0-9]+).*$")
+    string(REGEX REPLACE "^#define LZ4_VERSION_${VERSION_TYPE} +([0-9]+).*$" "\\1" version_number "${version_line}")
+    set(LZ4_VERSION_${VERSION_TYPE} ${version_number} PARENT_SCOPE)
+endfunction()
+
+foreach(version_type IN ITEMS MAJOR MINOR RELEASE)
+    parse_lz4_version(${version_type})
+endforeach()
+
 set(LZ4_VERSION_STRING "${LZ4_VERSION_MAJOR}.${LZ4_VERSION_MINOR}.${LZ4_VERSION_RELEASE}")
 mark_as_advanced(LZ4_VERSION_STRING LZ4_VERSION_MAJOR LZ4_VERSION_MINOR LZ4_VERSION_RELEASE)
 
+message(STATUS "Creating build script for LZ4 version: ${LZ4_VERSION_STRING}")
+
 project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
+
 
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" ON)
 
-# If LZ4 is being bundled in another project, we don't want to
-# install anything.  However, we want to let people override this, so
-# we'll use the LZ4_BUNDLED_MODE variable to let them do that; just
-# set it to OFF in your project before you add_subdirectory(lz4/contrib/cmake_unofficial).
-get_directory_property(LZ4_PARENT_DIRECTORY PARENT_DIRECTORY)
-if("${LZ4_BUNDLED_MODE}" STREQUAL "")
-  # Bundled mode hasn't been set one way or the other, set the default
-  # depending on whether or not we are the top-level project.
-  if("${LZ4_PARENT_DIRECTORY}" STREQUAL "")
-    set(LZ4_BUNDLED_MODE OFF)
-  else()
+
+# Determine if LZ4 is being built as part of another project.
+# If LZ4 is bundled in another project, we don't want to install anything.
+# Default behavior can be overridden by setting the LZ4_BUNDLED_MODE variable.
+if(NOT DEFINED LZ4_BUNDLED_MODE)
+  get_directory_property(LZ4_IS_SUBPROJECT PARENT_DIRECTORY)
+  if(LZ4_IS_SUBPROJECT)
     set(LZ4_BUNDLED_MODE ON)
+  else()
+    set(LZ4_BUNDLED_MODE OFF)
   endif()
 endif()
 mark_as_advanced(LZ4_BUNDLED_MODE)
@@ -150,36 +153,39 @@ if (LZ4_BUILD_LEGACY_LZ4C)
 endif()
 
 # Extra warning flags
-include (CheckCCompilerFlag)
-foreach (flag
-    # GCC-style
-    -pedantic-errors
-    -Wall
-    -Wextra
-    -Wundef
-    -Wcast-qual
-    -Wcast-align
-    -Wshadow
-    -Wswitch-enum
-    -Wdeclaration-after-statement
-    -Wstrict-prototypes
-    -Wpointer-arith
+if(MSVC)
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /W4")
+else()
+  include (CheckCCompilerFlag)
+  foreach (flag
+      # GCC-style
+      -pedantic-errors
+      -Wall
+      -Wextra
+      -Wundef
+      -Wcast-qual
+      -Wcast-align
+      -Wshadow
+      -Wswitch-enum
+      -Wdeclaration-after-statement
+      -Wstrict-prototypes
+      -Wpointer-arith)
 
-    # MSVC-style
-    /W4)
-  # Because https://gcc.gnu.org/wiki/FAQ#wnowarning
-  string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
-  string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_${flag_to_test}")
+    # Because https://gcc.gnu.org/wiki/FAQ#wnowarning
+    string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
+    string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_${flag_to_test}")
 
-  check_c_compiler_flag("${ADD_COMPILER_FLAGS_PREPEND} ${flag_to_test}" ${test_name})
+    check_c_compiler_flag("${ADD_COMPILER_FLAGS_PREPEND} ${flag_to_test}" ${test_name})
 
-  if(${test_name})
-    set(CMAKE_C_FLAGS "${flag} ${CMAKE_C_FLAGS}")
-  endif()
+    if(${test_name})
+      set(CMAKE_C_FLAGS_DEBUG "${flag} ${CMAKE_C_FLAGS_DEBUG}")
+    endif()
 
-  unset(test_name)
-  unset(flag_to_test)
-endforeach (flag)
+    unset(test_name)
+    unset(flag_to_test)
+  endforeach (flag)
+endif()
+
 
 if(NOT LZ4_BUNDLED_MODE)
   install(TARGETS ${LZ4_PROGRAMS_BUILT}
@@ -192,8 +198,9 @@ if(NOT LZ4_BUNDLED_MODE)
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
   install(FILES
     "${LZ4_LIB_SOURCE_DIR}/lz4.h"
-    "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
+    "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
+    "${LZ4_LIB_SOURCE_DIR}/lz4file.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
   install(FILES "${LZ4_PROG_SOURCE_DIR}/lz4.1"
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")

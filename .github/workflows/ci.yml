@@ -600,36 +600,11 @@ jobs:
       run: make -j test > /dev/null
 
 
-  # Windows
-  lz4-platform-windows:
-    name: ${{ matrix.system.os }}
-    runs-on: ${{ matrix.system.os }}
-    strategy:
-      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
-      matrix:
-        system: [
-          { os: windows-2022, build_path: ".\\build\\VS2022" },
-        ]
-    steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # https://github.com/actions/checkout v4.1.7
-
-    - name: Build ${{ matrix.system.os }}, Win32
-      run: |
-        pushd ${{ matrix.system.build_path }}
-        .\\build-and-test-win32-release.bat
-        popd
-
-    - name: Build ${{ matrix.system.os }}, x64
-      run: |
-        pushd ${{ matrix.system.build_path }}
-        .\\build-and-test-x64-release.bat
-        popd
-
-
 ###############################################################
 # Build systems (other than make)
 #
 # - cmake
+# - visual
 # - meson
 #
 
@@ -680,6 +655,46 @@ jobs:
       # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
       run: make clean; make cmakebuild V=1 VERBOSE=1
 
+  # Windows + Visual
+  lz4-platform-windows:
+    name: ${{ matrix.system.os }}
+    runs-on: ${{ matrix.system.os }}
+    strategy:
+      fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
+      matrix:
+        system: [
+          { os: windows-2022, build_path: ".\\build\\VS2022" },
+        ]
+    steps:
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # https://github.com/actions/checkout v4.1.7
+
+    - name: Build ${{ matrix.system.os }}, Win32
+      run: |
+        pushd ${{ matrix.system.build_path }}
+        .\\build-and-test-win32-release.bat
+        popd
+
+    - name: Build ${{ matrix.system.os }}, x64
+      run: |
+        pushd ${{ matrix.system.build_path }}
+        .\\build-and-test-x64-release.bat
+        popd
+
+    - name: VS solution generation
+      run: |
+        pushd ".\\build\\visual"
+        .\\generate_vs2022.cmd
+        popd
+
+    - name: Upload Generated VS2022 Directory
+      uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # https://github.com/actions/upload-artifact v4.3.4
+      with:
+        name: VS2022-Build-Dir
+        path: "build/visual/Visual Studio 17 2022"
+
+    - name: Test generated solution
+      run: |
+        cmake --build "build/visual/Visual Studio 17 2022" --config Debug
 
   # Meson
   lz4-build-meson:
