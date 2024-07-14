@@ -29,6 +29,10 @@ echo "hello world" > $FPREFIX-hw
 lz4 --rm -f $FPREFIX-hw $FPREFIX-hw.lz4
 test ! -f $FPREFIX-hw                   # must fail (--rm)
 test   -f $FPREFIX-hw.lz4
+lz4 -d --rm -f $FPREFIX-hw.lz4
+test ! -f $FPREFIX-hw.lz4
+lz4 --rm -f $FPREFIX-hw > /dev/null
+test   -f $FPREFIX-hw.lz4               # no more implicit stdout
 lz4cat $FPREFIX-hw.lz4 | grep "hello world"
 unlz4 --rm $FPREFIX-hw.lz4 $FPREFIX-hw
 test   -f $FPREFIX-hw
@@ -67,6 +71,9 @@ test "$(datagen -g20KB | lz4 -c -1 | wc -c)" -lt "$(datagen -g20KB| lz4 -c --fas
 test "$(datagen -g20KB | lz4 -c --fast=1 | wc -c)" -eq "$(datagen -g20KB| lz4 -c --fast| wc -c)" # checks default fast compression is -1
 lz4 -c --fast=0 $FPREFIX-dg20K && exit 1  # lz4 should fail when fast=0
 lz4 -c --fast=-1 $FPREFIX-dg20K && exit 1 # lz4 should fail when fast=-1
+# Multithreading commands
+datagen -g16M | lz4 -T2 | lz4 -t
+datagen -g16M | lz4 --threads=2 | lz4 -t
 # High --fast values can result in out-of-bound dereferences #876
 datagen -g1M | lz4 -c --fast=999999999 > $FPREFIX-trash
 # Test for #596
@@ -74,8 +81,5 @@ echo "TEST" > $FPREFIX-test
 lz4 -m $FPREFIX-test
 lz4 $FPREFIX-test.lz4 $FPREFIX-test2
 diff -q $FPREFIX-test $FPREFIX-test2
-# Multithreading commands
-datagen -g16M | lz4 -T2 | lz4 -t
-datagen -g16M | lz4 --threads=2 | lz4 -t
 # bug #1374
 datagen -g4194302 | lz4 -B4 -c > $FPREFIX-test3
