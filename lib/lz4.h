@@ -404,6 +404,12 @@ LZ4LIB_API int LZ4_loadDictSlow(LZ4_stream_t* streamPtr, const char* dictionary,
  *  first compression call, at the end of which it is cleared.
  * @dictionaryStream stream (and source buffer) must remain in-place / accessible / unchanged
  *  through the completion of the compression session.
+ *
+ *  Note: there is no equivalent LZ4_attach_*() method on the decompression side
+ *  because there is no initialization cost, hence no need to share the cost across multiple sessions.
+ *  To decompress LZ4 blocks using dictionary, attached or not,
+ *  just employ the regular LZ4_setStreamDecode() for streaming,
+ *  or the stateless LZ4_decompress_safe_usingDict() for one-shot decompression.
  */
 LZ4LIB_API void
 LZ4_attach_dictionary(LZ4_stream_t* workingStream,
