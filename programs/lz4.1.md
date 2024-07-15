@@ -113,7 +113,8 @@ only the latest one will be applied.
 
 * `--list`:
   List information about .lz4 files.
-  note : current implementation is limited to single-frame .lz4 files.
+  For detailed information on files with multiple frames, use `-v`.
+  `--list` automatically triggers `-m` modifier.
 
 ### Operation modifiers
 
