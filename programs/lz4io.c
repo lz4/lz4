@@ -2705,7 +2705,7 @@ static const char* LZ4IO_baseName(const char* input_filename)
  *  + report nb of blocks, hence max. possible decompressed size (when not reported in header)
  */
 static LZ4IO_infoResult
-LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filename)
+LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filename, int displayNow)
 {
     LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
     unsigned char buffer[LZ4F_HEADER_SIZE_MAX];
@@ -2758,23 +2758,22 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                             if (totalBlocksSize) {
                                 char bTypeBuffer[5];
                                 LZ4IO_blockTypeID(frameInfo.lz4FrameInfo.blockSizeID, frameInfo.lz4FrameInfo.blockMode, bTypeBuffer);
-                                DISPLAYLEVEL(3, "    %6llu %14s %5s %8s",
+                                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s",
                                              cfinfo->frameCount + 1,
                                              LZ4IO_frameTypeNames[frameInfo.frameType],
                                              bTypeBuffer,
                                              frameInfo.lz4FrameInfo.contentChecksumFlag ? "XXH32" : "-");
                                 if (frameInfo.lz4FrameInfo.contentSize) {
-                                    {   double const ratio = (double)(totalBlocksSize + hSize) / (double)frameInfo.lz4FrameInfo.contentSize * 100;
-                                        DISPLAYLEVEL(3, " %20llu %20llu %9.2f%%\n",
-                                                     totalBlocksSize + hSize,
-                                                     frameInfo.lz4FrameInfo.contentSize,
-                                                     ratio);
-                                    }
+                                    double const ratio = (double)(totalBlocksSize + hSize) / (double)frameInfo.lz4FrameInfo.contentSize * 100;
+                                    if (displayNow) DISPLAYOUT(" %20llu %20llu %9.2f%%\n",
+                                                    totalBlocksSize + hSize,
+                                                    frameInfo.lz4FrameInfo.contentSize,
+                                                    ratio);
                                     /* Now we've consumed frameInfo we can use it to store the total contentSize */
                                     frameInfo.lz4FrameInfo.contentSize += cfinfo->frameSummary.lz4FrameInfo.contentSize;
                                 }
                                 else {
-                                    DISPLAYLEVEL(3, " %20llu %20s %9s \n", totalBlocksSize + hSize, "-", "-");
+                                    if (displayNow) DISPLAYOUT(" %20llu %20s %9s \n", totalBlocksSize + hSize, "-", "-");
                                     cfinfo->allContentSize = 0;
                                 }
                                 result = LZ4IO_LZ4F_OK;
@@ -2792,7 +2791,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                     break;
                 }
                 if (totalBlocksSize) {
-                    DISPLAYLEVEL(3, "    %6llu %14s %5s %8s %20llu %20s %9s\n",
+                    if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
                                  cfinfo->frameCount + 1,
                                  LZ4IO_frameTypeNames[frameInfo.frameType],
                                  "-", "-",
@@ -2814,7 +2813,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                 int const errorNb = fseek_u32(finput, size, SEEK_CUR);
                 if (errorNb != 0)
                     END_PROCESS(43, "Stream error : cannot skip skippable area");
-                DISPLAYLEVEL(3, "    %6llu %14s %5s %8s %20u %20s %9s\n",
+                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20u %20s %9s\n",
                              cfinfo->frameCount + 1,
                              "SkippableFrame",
                              "-", "-", size + 8, "-", "-");
@@ -2846,7 +2845,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
     int result = 0;
     size_t idx = 0;
     if (g_displayLevel < 3) {
-        DISPLAYOUT("%10s %14s %5s %11s %13s %9s   %s\n",
+        DISPLAYOUT("%10s %14s %5s %11s %13s %8s   %s\n",
                 "Frames", "Type", "Block", "Compressed", "Uncompressed", "Ratio", "Filename");
     }
     for (; idx < ifnIdx; idx++) {
@@ -2857,34 +2856,39 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
             DISPLAYLEVEL(1, "lz4: %s is not a regular file \n", inFileNames[idx]);
             return 1;
         }
-        DISPLAYLEVEL(3, "%s(%llu/%llu)\n", cfinfo.fileName, (unsigned long long)idx + 1, (unsigned  long long)ifnIdx);
-        DISPLAYLEVEL(3, "    %6s %14s %5s %8s %20s %20s %9s\n",
-                     "Frame", "Type", "Block", "Checksum", "Compressed", "Uncompressed", "Ratio")
-        {   LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx]);
+        if (g_displayLevel >= 3) {
+            /* verbose mode */
+            DISPLAYOUT("%s(%llu/%llu)\n", cfinfo.fileName, (unsigned long long)idx + 1, (unsigned  long long)ifnIdx);
+            DISPLAYOUT("    %6s %14s %5s %8s %20s %20s %9s\n",
+                        "Frame", "Type", "Block", "Checksum", "Compressed", "Uncompressed", "Ratio");
+        }
+        {   LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx], g_displayLevel >= 3);
             if (op_result != LZ4IO_LZ4F_OK) {
                 assert(op_result == LZ4IO_format_not_known);
                 DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
                 return 1;
         }   }
-        DISPLAYLEVEL(3, "\n");
+        if (g_displayLevel >= 3) {
+            DISPLAYOUT("\n");
+        }
         if (g_displayLevel < 3) {
-            /* Display Summary */
-            {   char buffers[3][10];
-                DISPLAYOUT("%10llu %14s %5s %11s %13s ",
-                        cfinfo.frameCount,
-                        cfinfo.eqFrameTypes ? LZ4IO_frameTypeNames[cfinfo.frameSummary.frameType] : "-" ,
-                        cfinfo.eqBlockTypes ? LZ4IO_blockTypeID(cfinfo.frameSummary.lz4FrameInfo.blockSizeID,
-                                                                cfinfo.frameSummary.lz4FrameInfo.blockMode, buffers[0]) : "-",
-                        LZ4IO_toHuman((long double)cfinfo.fileSize, buffers[1]),
-                        cfinfo.allContentSize ? LZ4IO_toHuman((long double)cfinfo.frameSummary.lz4FrameInfo.contentSize, buffers[2]) : "-");
-                if (cfinfo.allContentSize) {
-                    double const ratio = (double)cfinfo.fileSize / (double)cfinfo.frameSummary.lz4FrameInfo.contentSize * 100;
-                    DISPLAYOUT("%9.2f%%  %s \n", ratio, cfinfo.fileName);
-                } else {
-                    DISPLAYOUT("%9s   %s\n",
-                            "-",
-                            cfinfo.fileName);
-        }   }   }  /* if (g_displayLevel < 3) */
+            /* Display summary */
+            char buffers[3][10];
+            DISPLAYOUT("%10llu %14s %5s %11s %13s ",
+                    cfinfo.frameCount,
+                    cfinfo.eqFrameTypes ? LZ4IO_frameTypeNames[cfinfo.frameSummary.frameType] : "-" ,
+                    cfinfo.eqBlockTypes ? LZ4IO_blockTypeID(cfinfo.frameSummary.lz4FrameInfo.blockSizeID,
+                                                            cfinfo.frameSummary.lz4FrameInfo.blockMode, buffers[0]) : "-",
+                    LZ4IO_toHuman((long double)cfinfo.fileSize, buffers[1]),
+                    cfinfo.allContentSize ? LZ4IO_toHuman((long double)cfinfo.frameSummary.lz4FrameInfo.contentSize, buffers[2]) : "-");
+            if (cfinfo.allContentSize) {
+                double const ratio = (double)cfinfo.fileSize / (double)cfinfo.frameSummary.lz4FrameInfo.contentSize * 100;
+                DISPLAYOUT("%8.2f%%  %s \n", ratio, cfinfo.fileName);
+            } else {
+                DISPLAYOUT("%8s   %s\n",
+                        "-",
+                        cfinfo.fileName);
+        }   }  /* if (g_displayLevel < 3) */
     }  /* for (; idx < ifnIdx; idx++) */
 
     return result;
