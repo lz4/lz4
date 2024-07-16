@@ -709,7 +709,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # https://github.com/actions/checkout v4.1.7
-    - uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # https://github.com/actions/setup-python v5.1.0
+    - uses: actions/setup-python@39cd14951b08e74b54015e9e001cdefcf80e669f # https://github.com/actions/setup-python v5.1.1
       with:
         python-version: '3.x'
 
