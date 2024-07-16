@@ -2175,7 +2175,9 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     TPool_jobsCompleted(tPool);
 
     /* flush */
-    assert(lastStatus == 0);
+    if (lastStatus != 0) {
+        END_PROCESS(26, "LZ4F frame decoding could not complete: invalid frame");
+    }
     TPool_jobsCompleted(wPool);
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
