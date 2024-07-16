@@ -610,7 +610,7 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
  */
 LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
-/*! LZ4_compress_destSize_extState() :
+/*! LZ4_compress_destSize_extState() : introduced in v1.10.0
  *  Same as LZ4_compress_destSize(), but using an externally allocated state.
  *  Also: exposes @acceleration
  */
