@@ -90,10 +90,6 @@ build_script:
       ECHO *** Building Visual Studio 2013 %PLATFORM%\%CONFIGURATION% &&
       ECHO *** &&
       msbuild "build\VS2022\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v120 /property:Optimize=false /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
-      ECHO *** %TIME% &&
-      ECHO *** Building Visual Studio 2015 %PLATFORM%\%CONFIGURATION% &&
-      ECHO *** &&
-      msbuild "build\VS2022\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v140 /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /p:WarnAsError=true /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
       COPY build\VS2022\bin\%PLATFORM%_%CONFIGURATION%\*.exe programs\
     ) else (
       COPY tests\*.exe programs\
