@@ -692,9 +692,16 @@ jobs:
         name: VS2022-Build-Dir
         path: "build/visual/Visual Studio 17 2022"
 
-    - name: Test generated solution
+    - name: Build executable with generated solution
       run: |
         cmake --build "build/visual/Visual Studio 17 2022" --config Debug
+
+    - name: Minimal runtime test
+      run: |
+        & ".\\build\\visual\\Visual Studio 17 2022\\Debug\\lz4.exe" -vvV
+        & ".\\build\\visual\\Visual Studio 17 2022\\Debug\\lz4.exe" -bi1
+        & ".\\build\\visual\\Visual Studio 17 2022\\Debug\\lz4.exe" ".\\build\\visual\\Visual Studio 17 2022\\Debug\\lz4.exe"
+        & ".\\build\\visual\\Visual Studio 17 2022\\Debug\\lz4.exe" -t ".\\build\\visual\\Visual Studio 17 2022\\Debug\\lz4.exe.lz4"
 
   # Meson
   lz4-build-meson:
