@@ -329,7 +329,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
     void* const stateLZ4   = malloc((size_t)LZ4_sizeofState());
     void* const stateLZ4HC = malloc((size_t)LZ4_sizeofStateHC());
     LZ4_stream_t LZ4dictBody;
-    LZ4_streamHC_t* LZ4dictHC = LZ4_createStreamHC();
+    LZ4_streamHC_t* const LZ4dictHC = LZ4_createStreamHC();
     U32 coreRandState = seed;
     clock_t const clockStart = clock();
     clock_t const clockDuration = (clock_t)duration_s * CLOCKS_PER_SEC;

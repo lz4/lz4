@@ -232,18 +232,18 @@ LZ4_attach_HC_dictionary(LZ4_streamHC_t* working_stream,
 typedef struct LZ4HC_CCtx_internal LZ4HC_CCtx_internal;
 struct LZ4HC_CCtx_internal
 {
-    LZ4_u32   hashTable[LZ4HC_HASHTABLESIZE];
-    LZ4_u16   chainTable[LZ4HC_MAXD];
-    const LZ4_byte* end;       /* next block here to continue on current prefix */
+    LZ4_u32 hashTable[LZ4HC_HASHTABLESIZE];
+    LZ4_u16 chainTable[LZ4HC_MAXD];
+    const LZ4_byte* end;     /* next block here to continue on current prefix */
     const LZ4_byte* prefixStart;  /* Indexes relative to this position */
     const LZ4_byte* dictStart; /* alternate reference for extDict */
-    LZ4_u32   dictLimit;       /* below that point, need extDict */
-    LZ4_u32   lowLimit;        /* below that point, no more dict */
-    LZ4_u32   nextToUpdate;    /* index from which to continue dictionary update */
-    short     compressionLevel;
-    LZ4_i8    favorDecSpeed;   /* favor decompression speed if this flag set,
-                                  otherwise, favor compression ratio */
-    LZ4_i8    dirty;           /* stream has to be fully reset if this flag is set */
+    LZ4_u32 dictLimit;       /* below that point, need extDict */
+    LZ4_u32 lowLimit;        /* below that point, no more history */
+    LZ4_u32 nextToUpdate;    /* index from which to continue dictionary update */
+    short   compressionLevel;
+    LZ4_i8  favorDecSpeed;   /* favor decompression speed if this flag set,
+                                otherwise, favor compression ratio */
+    LZ4_i8  dirty;           /* stream has to be fully reset if this flag is set */
     const LZ4HC_CCtx_internal* dictCtx;
 };
 
