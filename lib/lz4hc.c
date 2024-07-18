@@ -87,7 +87,7 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 
 /*===   Hashing   ===*/
 #define LZ4HC_HASHSIZE 4
-#define HASH_FUNCTION(i)         (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
+#define HASH_FUNCTION(i)      (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
 static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
 #if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
@@ -380,7 +380,36 @@ LZ4MID_addPosition(U32* hTable, U32 hValue, U32 index)
 #define ADDPOS8(_p, _idx) LZ4MID_addPosition(hash8Table, LZ4MID_hash8Ptr(_p), _idx)
 #define ADDPOS4(_p, _idx) LZ4MID_addPosition(hash4Table, LZ4MID_hash4Ptr(_p), _idx)
 
-static int LZ4HC_compress_2hashes (
+/* Fill hash tables with references into dictionary.
+ * The resulting table is only exploitable by LZ4MID (level 2) */
+static void
+LZ4MID_fillHTable (LZ4HC_CCtx_internal* cctx, const void* dict, size_t size)
+{
+    U32* const hash4Table = cctx->hashTable;
+    U32* const hash8Table = hash4Table + LZ4MID_HASHTABLESIZE;
+    const BYTE* const prefixPtr = (const BYTE*)dict;
+    U32 const prefixIdx = cctx->dictLimit;
+    U32 const target = prefixIdx + (U32)size - LZ4MID_HASHSIZE;
+    U32 idx = cctx->nextToUpdate;
+    assert(dict == cctx->prefixStart);
+    DEBUGLOG(4, "LZ4MID_fillHTable (size:%zu)", size);
+    if (size <= LZ4MID_HASHSIZE)
+        return;
+
+    for (; idx < target; idx += 3) {
+        ADDPOS4(prefixPtr+idx-prefixIdx, idx);
+        ADDPOS8(prefixPtr+idx+1-prefixIdx, idx+1);
+    }
+
+    idx = (size > 32 KB + LZ4MID_HASHSIZE) ? target - 32 KB : cctx->nextToUpdate;
+    for (; idx < target; idx += 1) {
+        ADDPOS8(prefixPtr+idx-prefixIdx, idx);
+    }
+
+    cctx->nextToUpdate = target;
+}
+
+static int LZ4MID_compress (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
     char* const dst,
@@ -404,6 +433,8 @@ static int LZ4HC_compress_2hashes (
     const BYTE* const prefixPtr = ctx->prefixStart;
     const U32 prefixIdx = ctx->dictLimit;
     const U32 ilimitIdx = (U32)(ilimit - prefixPtr) + prefixIdx;
+    const BYTE* const dictStart = ctx->dictStart;
+    const U32 dictIdx = ctx->lowLimit;
     const U32 gDictEndIndex = ctx->lowLimit;
     unsigned matchLength;
     unsigned matchDistance;
@@ -427,57 +458,82 @@ static int LZ4HC_compress_2hashes (
     while (ip <= mflimit) {
         const U32 ipIndex = (U32)(ip - prefixPtr) + prefixIdx;
         /* search long match */
-        {   U32 h8 = LZ4MID_hash8Ptr(ip);
-            U32 pos8 = hash8Table[h8];
+        {   U32 const h8 = LZ4MID_hash8Ptr(ip);
+            U32 const pos8 = hash8Table[h8];
             assert(h8 < LZ4MID_HASHTABLESIZE);
-            assert(h8 < ipIndex);
+            assert(pos8 < ipIndex);
             LZ4MID_addPosition(hash8Table, h8, ipIndex);
-            if ( ipIndex - pos8 <= LZ4_DISTANCE_MAX
-              && pos8 >= prefixIdx  /* note: currently only search within prefix */
-              ) {
+            if (ipIndex - pos8 <= LZ4_DISTANCE_MAX) {
                 /* match candidate found */
-                const BYTE* matchPtr = prefixPtr + pos8 - prefixIdx;
-                assert(matchPtr < ip);
-                matchLength = LZ4_count(ip, matchPtr, matchlimit);
-                if (matchLength >= MINMATCH) {
-                    DEBUGLOG(7, "found candidate match at pos %u (len=%u)", pos8, matchLength);
-                    matchDistance = ipIndex - pos8;
-                    goto _lz4mid_encode_sequence;
+                if (pos8 >= prefixIdx) {
+                    const BYTE* const matchPtr = prefixPtr + pos8 - prefixIdx;
+                    assert(matchPtr < ip);
+                    matchLength = LZ4_count(ip, matchPtr, matchlimit);
+                    if (matchLength >= MINMATCH) {
+                        DEBUGLOG(7, "found long match at pos %u (len=%u)", pos8, matchLength);
+                        matchDistance = ipIndex - pos8;
+                        goto _lz4mid_encode_sequence;
+                    }
+                } else {
+                    if (pos8 >= dictIdx) {
+                        /* extDict match candidate */
+                        const BYTE* const matchPtr = dictStart + (pos8 - dictIdx);
+                        const size_t safeLen = MIN(prefixIdx - pos8, (size_t)(matchlimit - ip));
+                        matchLength = LZ4_count(ip, matchPtr, ip + safeLen);
+                        if (matchLength >= MINMATCH) {
+                            DEBUGLOG(7, "found long match at ExtDict pos %u (len=%u)", pos8, matchLength);
+                            matchDistance = ipIndex - pos8;
+                            goto _lz4mid_encode_sequence;
+                        }
+                    }
                 }
         }   }
         /* search short match */
-        {   U32 h4 = LZ4MID_hash4Ptr(ip);
-            U32 pos4 = hash4Table[h4];
+        {   U32 const h4 = LZ4MID_hash4Ptr(ip);
+            U32 const pos4 = hash4Table[h4];
             assert(h4 < LZ4MID_HASHTABLESIZE);
             assert(pos4 < ipIndex);
             LZ4MID_addPosition(hash4Table, h4, ipIndex);
-            if (ipIndex - pos4 <= LZ4_DISTANCE_MAX
-              && pos4 >= prefixIdx /* only search within prefix */
-              ) {
+            if (ipIndex - pos4 <= LZ4_DISTANCE_MAX) {
                 /* match candidate found */
-                const BYTE* const matchPtr = prefixPtr + (pos4 - prefixIdx);
-                assert(matchPtr < ip);
-                assert(matchPtr >= prefixPtr);
-                matchLength = LZ4_count(ip, matchPtr, matchlimit);
-                if (matchLength >= MINMATCH) {
-                    /* short match found, let's just check ip+1 for longer */
-                    U32 const h8 = LZ4MID_hash8Ptr(ip+1);
-                    U32 const pos8 = hash8Table[h8];
-                    U32 const m2Distance = ipIndex + 1 - pos8;
-                    matchDistance = ipIndex - pos4;
-                    if ( m2Distance <= LZ4_DISTANCE_MAX
-                      && pos8 >= prefixIdx /* only search within prefix */
-                      && likely(ip < mflimit)
-                      ) {
-                        const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
-                        unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
-                        if (ml2 > matchLength) {
-                            LZ4MID_addPosition(hash8Table, h8, ipIndex+1);
-                            ip++;
-                            matchLength = ml2;
-                            matchDistance = m2Distance;
-                    }   }
-                    goto _lz4mid_encode_sequence;
+                if (pos4 >= prefixIdx) {
+                /* only search within prefix */
+                    const BYTE* const matchPtr = prefixPtr + (pos4 - prefixIdx);
+                    assert(matchPtr < ip);
+                    assert(matchPtr >= prefixPtr);
+                    matchLength = LZ4_count(ip, matchPtr, matchlimit);
+                    if (matchLength >= MINMATCH) {
+                        /* short match found, let's just check ip+1 for longer */
+                        U32 const h8 = LZ4MID_hash8Ptr(ip+1);
+                        U32 const pos8 = hash8Table[h8];
+                        U32 const m2Distance = ipIndex + 1 - pos8;
+                        matchDistance = ipIndex - pos4;
+                        if ( m2Distance <= LZ4_DISTANCE_MAX
+                        && pos8 >= prefixIdx /* only search within prefix */
+                        && likely(ip < mflimit)
+                        ) {
+                            const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
+                            unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
+                            if (ml2 > matchLength) {
+                                LZ4MID_addPosition(hash8Table, h8, ipIndex+1);
+                                ip++;
+                                matchLength = ml2;
+                                matchDistance = m2Distance;
+                        }   }
+                        goto _lz4mid_encode_sequence;
+                    }
+                } else {
+                    if (pos4 >= dictIdx) {
+                        /* extDict match candidate */
+                        const BYTE* const matchPtr = dictStart + (pos4 - dictIdx);
+                        const size_t safeLen = MIN(prefixIdx - pos4, (size_t)(matchlimit - ip));
+                        matchLength = LZ4_count(ip, matchPtr, ip + safeLen);
+                        if (matchLength >= MINMATCH) {
+                            DEBUGLOG(7, "found match at ExtDict pos %u (len=%u)", pos4, matchLength);
+                            matchDistance = ipIndex - pos4;
+                            goto _lz4mid_encode_sequence;
+                        }
+                    }
                 }
         }   }
         /* no match found in prefix */
@@ -1205,6 +1261,38 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const HCfavor_e favorDecSpeed);
 
 
+typedef enum { lz4mid, lz4hc, lz4opt } lz4hc_strat_e;
+typedef struct {
+    lz4hc_strat_e strat;
+    int nbSearches;
+    U32 targetLength;
+} cParams_t;
+static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
+    { lz4mid,    2, 16 },  /* 0, unused */
+    { lz4mid,    2, 16 },  /* 1, unused */
+    { lz4mid,    2, 16 },  /* 2 */
+    { lz4hc,     4, 16 },  /* 3 */
+    { lz4hc,     8, 16 },  /* 4 */
+    { lz4hc,    16, 16 },  /* 5 */
+    { lz4hc,    32, 16 },  /* 6 */
+    { lz4hc,    64, 16 },  /* 7 */
+    { lz4hc,   128, 16 },  /* 8 */
+    { lz4hc,   256, 16 },  /* 9 */
+    { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+    { lz4opt,  512,128 },  /*11 */
+    { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
+};
+
+static cParams_t LZ4HC_getCLevelParams(int cLevel)
+{
+    /* note : clevel convention is a bit different from lz4frame,
+     * possibly something worth revisiting for consistency */
+    if (cLevel < 1)
+        cLevel = LZ4HC_CLEVEL_DEFAULT;
+    cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
+    return k_clTable[cLevel];
+}
+
 LZ4_FORCE_INLINE int
 LZ4HC_compress_generic_internal (
             LZ4HC_CCtx_internal* const ctx,
@@ -1217,46 +1305,19 @@ LZ4HC_compress_generic_internal (
             const dictCtx_directive dict
             )
 {
-    typedef enum { lz4mid, lz4hc, lz4opt } lz4hc_strat_e;
-    typedef struct {
-        lz4hc_strat_e strat;
-        int nbSearches;
-        U32 targetLength;
-    } cParams_t;
-    static const cParams_t clTable[LZ4HC_CLEVEL_MAX+1] = {
-        { lz4mid,    2, 16 },  /* 0, unused */
-        { lz4mid,    2, 16 },  /* 1, unused */
-        { lz4mid,    2, 16 },  /* 2 */
-        { lz4hc,     4, 16 },  /* 3 */
-        { lz4hc,     8, 16 },  /* 4 */
-        { lz4hc,    16, 16 },  /* 5 */
-        { lz4hc,    32, 16 },  /* 6 */
-        { lz4hc,    64, 16 },  /* 7 */
-        { lz4hc,   128, 16 },  /* 8 */
-        { lz4hc,   256, 16 },  /* 9 */
-        { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-        { lz4opt,  512,128 },  /*11 */
-        { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
-    };
-
     DEBUGLOG(5, "LZ4HC_compress_generic_internal(src=%p, srcSize=%d)",
                 src, *srcSizePtr);
 
     if (limit == fillOutput && dstCapacity < 1) return 0;   /* Impossible to store anything */
-    if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;    /* Unsupported input size (too large or negative) */
+    if ((U32)*srcSizePtr > (U32)LZ4_MAX_INPUT_SIZE) return 0;  /* Unsupported input size (too large or negative) */
 
     ctx->end += *srcSizePtr;
-    /* note : clevel convention is a bit different from lz4frame,
-     * possibly something worth revisiting for consistency */
-    if (cLevel < 1)
-        cLevel = LZ4HC_CLEVEL_DEFAULT;
-    cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
-    {   cParams_t const cParam = clTable[cLevel];
+    {   cParams_t const cParam = LZ4HC_getCLevelParams(cLevel);
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
         int result;
 
         if (cParam.strat == lz4mid) {
-            result = LZ4HC_compress_2hashes(ctx,
+            result = LZ4MID_compress(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
                                 limit, dict);
         } else if (cParam.strat == lz4hc) {
@@ -1268,7 +1329,7 @@ LZ4HC_compress_generic_internal (
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
                                 cParam.nbSearches, cParam.targetLength, limit,
-                                cLevel == LZ4HC_CLEVEL_MAX,   /* ultra mode */
+                                cLevel >= LZ4HC_CLEVEL_MAX,   /* ultra mode */
                                 dict, favor);
         }
         if (result <= 0) ctx->dirty = 1;
@@ -1482,8 +1543,10 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
               const char* dictionary, int dictSize)
 {
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
-    DEBUGLOG(4, "LZ4_loadDictHC(ctx:%p, dict:%p, dictSize:%d)", LZ4_streamHCPtr, dictionary, dictSize);
+    cParams_t cp;
+    DEBUGLOG(4, "LZ4_loadDictHC(ctx:%p, dict:%p, dictSize:%d, clevel=%d)", LZ4_streamHCPtr, dictionary, dictSize, ctxPtr->compressionLevel);
     assert(LZ4_streamHCPtr != NULL);
+    assert(dictSize >= 0);
     if (dictSize > 64 KB) {
         dictionary += (size_t)dictSize - 64 KB;
         dictSize = 64 KB;
@@ -1492,10 +1555,15 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
     {   int const cLevel = ctxPtr->compressionLevel;
         LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
         LZ4_setCompressionLevel(LZ4_streamHCPtr, cLevel);
+        cp = LZ4HC_getCLevelParams(cLevel);
     }
     LZ4HC_init_internal (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
-    if (dictSize >= LZ4HC_HASHSIZE) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
+    if (cp.strat == lz4mid) {
+        LZ4MID_fillHTable (ctxPtr, dictionary, (size_t)dictSize);
+    } else {
+        if (dictSize >= LZ4HC_HASHSIZE) LZ4HC_Insert (ctxPtr, ctxPtr->end-3);
+    }
     return dictSize;
 }
 
