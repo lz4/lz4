@@ -187,7 +187,7 @@ LZ4_compressInitStream(struct compressionParameters* pThis)
     pThis->LZ4_dictStream = LZ4_createStream();
     pThis->LZ4_streamHC = NULL;
     pThis->LZ4_dictStreamHC = NULL;
-    LZ4_loadDict(pThis->LZ4_dictStream, pThis->dictBuf, pThis->dictSize);
+    LZ4_loadDictSlow(pThis->LZ4_dictStream, pThis->dictBuf, pThis->dictSize);
 }
 
 static void
@@ -197,6 +197,7 @@ LZ4_compressInitStreamHC(struct compressionParameters* pThis)
     pThis->LZ4_dictStream = NULL;
     pThis->LZ4_streamHC = LZ4_createStreamHC();
     pThis->LZ4_dictStreamHC = LZ4_createStreamHC();
+    LZ4_resetStreamHC_fast(pThis->LZ4_dictStreamHC, pThis->cLevel);
     LZ4_loadDictHC(pThis->LZ4_dictStreamHC, pThis->dictBuf, pThis->dictSize);
 }
 
