@@ -126,6 +126,8 @@ LZ4LIB_API int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
 
   After reset, a first "fictional block" can be designated as initial dictionary,
   using LZ4_loadDictHC() (Optional).
+  Note: In order for LZ4_loadDictHC() to create the correct data structure,
+  it is essential to set the compression level _before_ loading the dictionary.
 
   Invoke LZ4_compress_HC_continue() to compress each successive block.
   The number of blocks is unlimited.
