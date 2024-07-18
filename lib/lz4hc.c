@@ -387,7 +387,7 @@ LZ4MID_fillHTable (LZ4HC_CCtx_internal* cctx, const void* dict, size_t size)
 {
     U32* const hash4Table = cctx->hashTable;
     U32* const hash8Table = hash4Table + LZ4MID_HASHTABLESIZE;
-    const BYTE* const prefixPtr = dict;
+    const BYTE* const prefixPtr = (const BYTE*)dict;
     U32 const prefixIdx = cctx->dictLimit;
     U32 const target = prefixIdx + (U32)size - LZ4MID_HASHSIZE;
     U32 idx = cctx->nextToUpdate;
