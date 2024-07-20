@@ -173,7 +173,7 @@ static void init_word_buffer(void)
     size_t const bufSize = sumLen(g_wordLen, kNbWords) + 16;
     char* ptr;
     assert(g_wordBuffer == NULL);
-    g_wordBuffer = calloc(1, bufSize);
+    g_wordBuffer = (char*)calloc(1, bufSize);
     if (g_wordBuffer == NULL) abort();
     ptr = g_wordBuffer;
     for (n=0; n<kNbWords; n++) {
