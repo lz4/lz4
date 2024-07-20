@@ -125,6 +125,7 @@ roundTripTest : lz4.o lz4hc.o xxhash.o roundTripTest.c
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 
 CLEAN += datagen
+datagen: CPPFLAGS+=-DNDEBUG
 datagen : datagen.c $(PRGDIR)/lorem.c loremOut.c datagencli.c
 	$(CC) $(ALLFLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
 
