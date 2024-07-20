@@ -202,79 +202,79 @@ LZ4_compressInitStreamHC(struct compressionParameters* pThis)
 }
 
 static void
-LZ4_compressResetNoStream(const struct compressionParameters* pThis)
+LZ4_compressResetNoStream(const struct compressionParameters* cparams)
 {
-    (void)pThis;
+    (void)cparams;
 }
 
 static void
-LZ4_compressResetStream(const struct compressionParameters* pThis)
+LZ4_compressResetStream(const struct compressionParameters* cparams)
 {
-    LZ4_resetStream_fast(pThis->LZ4_stream);
-    LZ4_attach_dictionary(pThis->LZ4_stream, pThis->LZ4_dictStream);
+    LZ4_resetStream_fast(cparams->LZ4_stream);
+    LZ4_attach_dictionary(cparams->LZ4_stream, cparams->LZ4_dictStream);
 }
 
 static void
-LZ4_compressResetStreamHC(const struct compressionParameters* pThis)
+LZ4_compressResetStreamHC(const struct compressionParameters* cparams)
 {
-    LZ4_resetStreamHC_fast(pThis->LZ4_streamHC, pThis->cLevel);
-    LZ4_attach_HC_dictionary(pThis->LZ4_streamHC, pThis->LZ4_dictStreamHC);
+    LZ4_resetStreamHC_fast(cparams->LZ4_streamHC, cparams->cLevel);
+    LZ4_attach_HC_dictionary(cparams->LZ4_streamHC, cparams->LZ4_dictStreamHC);
 }
 
 static int
-LZ4_compressBlockNoStream(const struct compressionParameters* pThis,
+LZ4_compressBlockNoStream(const struct compressionParameters* cparams,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
-    int const acceleration = (pThis->cLevel < 0) ? -pThis->cLevel + 1 : 1;
+    int const acceleration = (cparams->cLevel < 0) ? -cparams->cLevel + 1 : 1;
     return LZ4_compress_fast(src, dst, srcSize, dstSize, acceleration);
 }
 
 static int
-LZ4_compressBlockNoStreamHC(const struct compressionParameters* pThis,
+LZ4_compressBlockNoStreamHC(const struct compressionParameters* cparams,
                             const char* src, char* dst,
                             int srcSize, int dstSize)
 {
-    return LZ4_compress_HC(src, dst, srcSize, dstSize, pThis->cLevel);
+    return LZ4_compress_HC(src, dst, srcSize, dstSize, cparams->cLevel);
 }
 
 static int
-LZ4_compressBlockStream(const struct compressionParameters* pThis,
+LZ4_compressBlockStream(const struct compressionParameters* cparams,
                         const char* src, char* dst,
                         int srcSize, int dstSize)
 {
-    int const acceleration = (pThis->cLevel < 0) ? -pThis->cLevel + 1 : 1;
-    LZ4_compressResetStream(pThis);
-    return LZ4_compress_fast_continue(pThis->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
+    int const acceleration = (cparams->cLevel < 0) ? -cparams->cLevel + 1 : 1;
+    LZ4_compressResetStream(cparams);
+    return LZ4_compress_fast_continue(cparams->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
 }
 
 static int
-LZ4_compressBlockStreamHC(const struct compressionParameters* pThis,
+LZ4_compressBlockStreamHC(const struct compressionParameters* cparams,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
-    LZ4_compressResetStreamHC(pThis);
-    return LZ4_compress_HC_continue(pThis->LZ4_streamHC, src, dst, srcSize, dstSize);
+    LZ4_compressResetStreamHC(cparams);
+    return LZ4_compress_HC_continue(cparams->LZ4_streamHC, src, dst, srcSize, dstSize);
 }
 
 static void
-LZ4_compressCleanupNoStream(const struct compressionParameters* pThis)
+LZ4_compressCleanupNoStream(const struct compressionParameters* cparams)
 {
-    (void)pThis;
+    (void)cparams;
 }
 
 static void
-LZ4_compressCleanupStream(const struct compressionParameters* pThis)
+LZ4_compressCleanupStream(const struct compressionParameters* cparams)
 {
-    LZ4_freeStream(pThis->LZ4_stream);
-    LZ4_freeStream(pThis->LZ4_dictStream);
+    LZ4_freeStream(cparams->LZ4_stream);
+    LZ4_freeStream(cparams->LZ4_dictStream);
 }
 
 static void
-LZ4_compressCleanupStreamHC(const struct compressionParameters* pThis)
+LZ4_compressCleanupStreamHC(const struct compressionParameters* cparams)
 {
-    LZ4_freeStreamHC(pThis->LZ4_streamHC);
-    LZ4_freeStreamHC(pThis->LZ4_dictStreamHC);
+    LZ4_freeStreamHC(cparams->LZ4_streamHC);
+    LZ4_freeStreamHC(cparams->LZ4_dictStreamHC);
 }
 
 static void
