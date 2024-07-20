@@ -48,11 +48,11 @@
 #include "lorem.h"
 #include <assert.h>
 #include <limits.h> /* INT_MAX */
+#include <stdlib.h> /* malloc, abort */
 #include <string.h> /* memcpy */
 
-#define WORD_MAX_SIZE 20
-
-/* Define the word pool */
+/* Define the word pool
+ * Note: all words must have a len <= 16 */
 static const char* kWords[] = {
     "lorem",        "ipsum",      "dolor",       "sit",          "amet",
     "consectetur",  "adipiscing", "elit",        "sed",          "do",
@@ -106,7 +106,12 @@ static const char* kWords[] = {
     "repellat",     "minim",      "nostrud",     "exercitation", "ullamco",
     "laboris",      "aliquip",    "duis",        "aute",         "irure",
 };
-static const unsigned kNbWords = sizeof(kWords) / sizeof(kWords[0]);
+#define KNBWORDS (sizeof(kWords) / sizeof(kWords[0]))
+static const unsigned kNbWords = KNBWORDS;
+
+static const char* g_words[KNBWORDS] = { NULL };
+static unsigned g_wordLen[KNBWORDS] = {0};
+static char* g_wordBuffer = NULL;
 
 /* simple 1-dimension distribution, based on word's length, favors small words
  */
@@ -118,7 +123,7 @@ static int g_distrib[DISTRIB_SIZE_MAX] = { 0 };
 static unsigned g_distribCount         = 0;
 
 static void countFreqs(
-        const char* words[],
+        const unsigned wordLen[],
         size_t nbWords,
         const int* weights,
         unsigned long nbWeights)
@@ -126,7 +131,7 @@ static void countFreqs(
     unsigned total = 0;
     size_t w;
     for (w = 0; w < nbWords; w++) {
-        size_t len = strlen(words[w]);
+        size_t len = wordLen[w];
         int lmax;
         if (len >= nbWeights)
             len = nbWeights - 1;
@@ -137,16 +142,57 @@ static void countFreqs(
     assert(g_distribCount <= DISTRIB_SIZE_MAX);
 }
 
-static void init_word_distrib(
+static void init_word_len(
         const char* words[],
+        size_t nbWords)
+{
+    size_t n;
+    assert(words != NULL);
+    for (n=0; n<nbWords; n++) {
+        assert(words[n] != NULL);
+        assert(strlen(words[n]) < 256);
+        g_wordLen[n] = (unsigned char)strlen(words[n]);
+    }
+
+}
+
+static size_t sumLen(const unsigned* sizes, size_t s)
+{
+    size_t total = 0;
+    size_t n;
+    assert(sizes != NULL);
+    for (n=0; n<s; n++) {
+        total += sizes[n];
+    }
+    return total;
+}
+
+static void init_word_buffer(void)
+{
+    size_t n;
+    size_t const bufSize = sumLen(g_wordLen, kNbWords) + 16;
+    char* ptr;
+    assert(g_wordBuffer == NULL);
+    g_wordBuffer = (char*)calloc(1, bufSize);
+    if (g_wordBuffer == NULL) abort();
+    ptr = g_wordBuffer;
+    for (n=0; n<kNbWords; n++) {
+        memcpy(ptr, kWords[n], g_wordLen[n]);
+        g_words[n] = ptr;
+        ptr += g_wordLen[n];
+    }
+}
+
+static void init_word_distrib(
+        const unsigned wordLen[],
         size_t nbWords,
         const int* weights,
         unsigned long nbWeights)
 {
     size_t w, d = 0;
-    countFreqs(words, nbWords, weights, nbWeights);
+    countFreqs(wordLen, nbWords, weights, nbWeights);
     for (w = 0; w < nbWords; w++) {
-        size_t len = strlen(words[w]);
+        size_t len = wordLen[w];
         int l, lmax;
         if (len >= nbWeights)
             len = nbWeights - 1;
@@ -193,21 +239,39 @@ static void writeLastCharacters(void)
     g_nbChars = g_maxChars;
 }
 
-static void generateWord(const char* word, const char* separator, int upCase)
+static void generateLastWord(const char* word, size_t wordLen, int upCase)
 {
-    size_t const len = strlen(word) + strlen(separator);
-    if (g_nbChars + len > g_maxChars) {
+    if (g_nbChars + wordLen + 2 > g_maxChars) {
         writeLastCharacters();
         return;
     }
-    memcpy(g_ptr + g_nbChars, word, strlen(word));
+    memcpy(g_ptr + g_nbChars, word, wordLen);
     if (upCase) {
         static const char toUp = 'A' - 'a';
         g_ptr[g_nbChars]       = (char)(g_ptr[g_nbChars] + toUp);
     }
-    g_nbChars += strlen(word);
-    memcpy(g_ptr + g_nbChars, separator, strlen(separator));
-    g_nbChars += strlen(separator);
+    g_nbChars += wordLen;
+    writeLastCharacters();
+}
+
+#define MAX(a,b)  ((a)<(b)?(b):(a))
+static void generateWord(const char* word, size_t wordLen, const char* separator, size_t sepLen, int upCase)
+{
+    size_t const wlen = MAX(16, wordLen + 2);
+    if (g_nbChars + wlen > g_maxChars) {
+        generateLastWord(word, wordLen, upCase);
+        return;
+    }
+    assert(wordLen <= 16);
+    memcpy(g_ptr + g_nbChars, word, 16);
+    if (upCase) {
+        static const char toUp = 'A' - 'a';
+        g_ptr[g_nbChars]       = (char)(g_ptr[g_nbChars] + toUp);
+    }
+    g_nbChars += wordLen;
+    assert(sepLen <= 2);
+    memcpy(g_ptr + g_nbChars, separator, 2);
+    g_nbChars += sepLen;
 }
 
 static int about(unsigned target)
@@ -225,15 +289,15 @@ static void generateSentence(int nbWords)
     int i;
     for (i = 0; i < nbWords; i++) {
         int const wordID       = g_distrib[LOREM_rand(g_distribCount)];
-        const char* const word = kWords[wordID];
         const char* sep        = " ";
+        size_t sepLen = 1;
         if (i == commaPos)
-            sep = ", ";
+            sep = ", ", sepLen=2;
         if (i == comma2)
-            sep = ", ";
+            sep = ", ", sepLen=2;
         if (i == nbWords - 1)
-            sep = endSep;
-        generateWord(word, sep, i == 0);
+            sep = endSep, sepLen=2;
+        generateWord(g_words[wordID], g_wordLen[wordID], sep, sepLen, i == 0);
     }
 }
 
@@ -258,15 +322,15 @@ static void generateFirstSentence(void)
 {
     int i;
     for (i = 0; i < 18; i++) {
-        const char* word      = kWords[i];
         const char* separator = " ";
+        size_t sepLen = 1;
         if (i == 4)
-            separator = ", ";
+            separator = ", ", sepLen=2;
         if (i == 7)
-            separator = ", ";
-        generateWord(word, separator, i == 0);
+            separator = ", ", sepLen=2;
+        generateWord(g_words[i], g_wordLen[i], separator, sepLen, i == 0);
     }
-    generateWord(kWords[18], ". ", 0);
+    generateWord(g_words[18], g_wordLen[18], ". ", 2, 0);
 }
 
 size_t
@@ -278,7 +342,9 @@ LOREM_genBlock(void* buffer, size_t size, unsigned seed, int first, int fill)
     g_nbChars  = 0;
     g_randRoot = seed;
     if (g_distribCount == 0) {
-        init_word_distrib(kWords, kNbWords, kWeights, kNbWeights);
+        init_word_len(kWords, kNbWords);
+        init_word_buffer();
+        init_word_distrib(g_wordLen, kNbWords, kWeights, kNbWeights);
     }
 
     if (first) {
