@@ -80,9 +80,40 @@ typedef enum { noDictCtx, usingDictCtxHc } dictCtx_directive;
 /*===   Macros   ===*/
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
 #define MAX(a,b)   ( (a) > (b) ? (a) : (b) )
-#define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
-/* Make fields passed to, and updated by LZ4HC_encodeSequence explicit */
-#define UPDATABLE(ip, op, anchor) &ip, &op, &anchor
+
+
+/*===   Levels definition   ===*/
+typedef enum { lz4mid, lz4hc, lz4opt } lz4hc_strat_e;
+typedef struct {
+    lz4hc_strat_e strat;
+    int nbSearches;
+    U32 targetLength;
+} cParams_t;
+static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
+    { lz4mid,    2, 16 },  /* 0, unused */
+    { lz4mid,    2, 16 },  /* 1, unused */
+    { lz4mid,    2, 16 },  /* 2 */
+    { lz4hc,     4, 16 },  /* 3 */
+    { lz4hc,     8, 16 },  /* 4 */
+    { lz4hc,    16, 16 },  /* 5 */
+    { lz4hc,    32, 16 },  /* 6 */
+    { lz4hc,    64, 16 },  /* 7 */
+    { lz4hc,   128, 16 },  /* 8 */
+    { lz4hc,   256, 16 },  /* 9 */
+    { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+    { lz4opt,  512,128 },  /*11 */
+    { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
+};
+
+static cParams_t LZ4HC_getCLevelParams(int cLevel)
+{
+    /* note : clevel convention is a bit different from lz4frame,
+     * possibly something worth revisiting for consistency */
+    if (cLevel < 1)
+        cLevel = LZ4HC_CLEVEL_DEFAULT;
+    cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
+    return k_clTable[cLevel];
+}
 
 
 /*===   Hashing   ===*/
@@ -192,6 +223,11 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
             back--;
     return back;
 }
+
+/*===   Chain table updates   ===*/
+#define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
+/* Make fields passed to, and updated by LZ4HC_encodeSequence explicit */
+#define UPDATABLE(ip, op, anchor) &ip, &op, &anchor
 
 
 /**************************************
@@ -324,6 +360,63 @@ typedef struct {
     int back;  /* negative value */
 } LZ4HC_match_t;
 
+LZ4HC_match_t LZ4HC_searchExtDict(const BYTE* ip, U32 ipIndex,
+        const BYTE* const iLowLimit, const BYTE* const iHighLimit,
+        const LZ4HC_CCtx_internal* dictCtx, U32 gDictEndIndex,
+        int currentBestML, int nbAttempts)
+{
+    size_t const lDictEndIndex = (size_t)(dictCtx->end - dictCtx->prefixStart) + dictCtx->dictLimit;
+    U32 lDictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
+    U32 matchIndex = lDictMatchIndex + gDictEndIndex - (U32)lDictEndIndex;
+    int offset = 0, sBack = 0;
+    assert(lDictEndIndex <= 1 GB);
+    if (lDictMatchIndex>0)
+        DEBUGLOG(7, "lDictEndIndex = %zu, lDictMatchIndex = %u", lDictEndIndex, lDictMatchIndex);
+    while (ipIndex - matchIndex <= LZ4_DISTANCE_MAX && nbAttempts--) {
+        const BYTE* const matchPtr = dictCtx->prefixStart - dictCtx->dictLimit + lDictMatchIndex;
+
+        if (LZ4_read32(matchPtr) == LZ4_read32(ip)) {
+            int mlt;
+            int back = 0;
+            const BYTE* vLimit = ip + (lDictEndIndex - lDictMatchIndex);
+            if (vLimit > iHighLimit) vLimit = iHighLimit;
+            mlt = (int)LZ4_count(ip+MINMATCH, matchPtr+MINMATCH, vLimit) + MINMATCH;
+            back = (ip > iLowLimit) ? LZ4HC_countBack(ip, matchPtr, iLowLimit, dictCtx->prefixStart) : 0;
+            mlt -= back;
+            if (mlt > currentBestML) {
+                currentBestML = mlt;
+                offset = (int)(ipIndex - matchIndex);
+                sBack = back;
+                DEBUGLOG(7, "found match of length %i within extDictCtx", currentBestML);
+        }   }
+
+        {   U32 const nextOffset = DELTANEXTU16(dictCtx->chainTable, lDictMatchIndex);
+            lDictMatchIndex -= nextOffset;
+            matchIndex -= nextOffset;
+    }   }
+
+    {   LZ4HC_match_t md;
+        md.len = currentBestML;
+        md.off = offset;
+        md.back = sBack;
+        return md;
+    }
+}
+
+typedef LZ4HC_match_t (*LZ4MID_searchIntoDict_f)(const BYTE* ip, U32 ipIndex,
+        const BYTE* const iHighLimit,
+        const LZ4HC_CCtx_internal* dictCtx, U32 gDictEndIndex);
+
+static LZ4HC_match_t LZ4MID_searchHCDict(const BYTE* ip, U32 ipIndex,
+        const BYTE* const iHighLimit,
+        const LZ4HC_CCtx_internal* dictCtx, U32 gDictEndIndex)
+{
+    return LZ4HC_searchExtDict(ip,ipIndex,
+                            ip, iHighLimit,
+                            dictCtx, gDictEndIndex,
+                            MINMATCH-1, 2);
+}
+
 static LZ4HC_match_t LZ4MID_searchExtDict(const BYTE* ip, U32 ipIndex,
         const BYTE* const iHighLimit,
         const LZ4HC_CCtx_internal* dictCtx, U32 gDictEndIndex)
@@ -418,6 +511,14 @@ LZ4MID_fillHTable (LZ4HC_CCtx_internal* cctx, const void* dict, size_t size)
     cctx->nextToUpdate = target;
 }
 
+static LZ4MID_searchIntoDict_f select_searchDict_function(const LZ4HC_CCtx_internal* dictCtx)
+{
+    if (dictCtx == NULL) return NULL;
+    if (LZ4HC_getCLevelParams(dictCtx->compressionLevel).strat == lz4mid)
+        return LZ4MID_searchExtDict;
+    return LZ4MID_searchHCDict;
+}
+
 static int LZ4MID_compress (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
@@ -445,6 +546,7 @@ static int LZ4MID_compress (
     const BYTE* const dictStart = ctx->dictStart;
     const U32 dictIdx = ctx->lowLimit;
     const U32 gDictEndIndex = ctx->lowLimit;
+    const LZ4MID_searchIntoDict_f searchIntoDict = select_searchDict_function(ctx->dictCtx);
     unsigned matchLength;
     unsigned matchDistance;
 
@@ -550,7 +652,7 @@ static int LZ4MID_compress (
         if ( (dict == usingDictCtxHc)
           && (ipIndex - gDictEndIndex < LZ4_DISTANCE_MAX - 8) ) {
             /* search a match in dictionary */
-            LZ4HC_match_t dMatch = LZ4MID_searchExtDict(ip, ipIndex,
+            LZ4HC_match_t dMatch = searchIntoDict(ip, ipIndex,
                     matchlimit,
                     ctx->dictCtx, gDictEndIndex);
             if (dMatch.len >= MINMATCH) {
@@ -1269,39 +1371,6 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const dictCtx_directive dict,
     const HCfavor_e favorDecSpeed);
 
-
-typedef enum { lz4mid, lz4hc, lz4opt } lz4hc_strat_e;
-typedef struct {
-    lz4hc_strat_e strat;
-    int nbSearches;
-    U32 targetLength;
-} cParams_t;
-static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
-    { lz4mid,    2, 16 },  /* 0, unused */
-    { lz4mid,    2, 16 },  /* 1, unused */
-    { lz4mid,    2, 16 },  /* 2 */
-    { lz4hc,     4, 16 },  /* 3 */
-    { lz4hc,     8, 16 },  /* 4 */
-    { lz4hc,    16, 16 },  /* 5 */
-    { lz4hc,    32, 16 },  /* 6 */
-    { lz4hc,    64, 16 },  /* 7 */
-    { lz4hc,   128, 16 },  /* 8 */
-    { lz4hc,   256, 16 },  /* 9 */
-    { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-    { lz4opt,  512,128 },  /*11 */
-    { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
-};
-
-static cParams_t LZ4HC_getCLevelParams(int cLevel)
-{
-    /* note : clevel convention is a bit different from lz4frame,
-     * possibly something worth revisiting for consistency */
-    if (cLevel < 1)
-        cLevel = LZ4HC_CLEVEL_DEFAULT;
-    cLevel = MIN(LZ4HC_CLEVEL_MAX, cLevel);
-    return k_clTable[cLevel];
-}
-
 LZ4_FORCE_INLINE int
 LZ4HC_compress_generic_internal (
             LZ4HC_CCtx_internal* const ctx,
@@ -1363,6 +1432,13 @@ LZ4HC_compress_generic_noDictCtx (
     return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, noDictCtx);
 }
 
+static int isStateCompatible(const LZ4HC_CCtx_internal* ctx1, const LZ4HC_CCtx_internal* ctx2)
+{
+    int const isMid1 = LZ4HC_getCLevelParams(ctx1->compressionLevel).strat == lz4mid;
+    int const isMid2 = LZ4HC_getCLevelParams(ctx2->compressionLevel).strat == lz4mid;
+    return !(isMid1 ^ isMid2);
+}
+
 static int
 LZ4HC_compress_generic_dictCtx (
         LZ4HC_CCtx_internal* const ctx,
@@ -1379,7 +1455,7 @@ LZ4HC_compress_generic_dictCtx (
     if (position >= 64 KB) {
         ctx->dictCtx = NULL;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
-    } else if (position == 0 && *srcSizePtr > 4 KB) {
+    } else if (position == 0 && *srcSizePtr > 4 KB && isStateCompatible(ctx, ctx->dictCtx)) {
         LZ4_memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
         LZ4HC_setExternalDict(ctx, (const BYTE *)src);
         ctx->compressionLevel = (short)cLevel;
