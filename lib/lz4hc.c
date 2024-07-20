@@ -331,19 +331,19 @@ static LZ4HC_match_t LZ4MID_searchExtDict(const BYTE* ip, U32 ipIndex,
     size_t const lDictEndIndex = (size_t)(dictCtx->end - dictCtx->prefixStart) + dictCtx->dictLimit;
     const U32* const hash4Table = dictCtx->hashTable;
     const U32* const hash8Table = hash4Table + LZ4MID_HASHTABLESIZE;
+    DEBUGLOG(7, "LZ4MID_searchExtDict (ipIdx=%u)", ipIndex);
 
     /* search long match first */
     {   U32 l8DictMatchIndex = hash8Table[LZ4MID_hash8Ptr(ip)];
         U32 m8Index = l8DictMatchIndex + gDictEndIndex - (U32)lDictEndIndex;
         assert(lDictEndIndex <= 1 GB);
-        if (l8DictMatchIndex>0)
-            DEBUGLOG(7, "lDictEndIndex = %zu, l8DictMatchIndex = %u", lDictEndIndex, l8DictMatchIndex);
         if (ipIndex - m8Index <= LZ4_DISTANCE_MAX) {
             const BYTE* const matchPtr = dictCtx->prefixStart - dictCtx->dictLimit + l8DictMatchIndex;
             const size_t safeLen = MIN(lDictEndIndex - l8DictMatchIndex, (size_t)(iHighLimit - ip));
             int mlt = (int)LZ4_count(ip, matchPtr, ip + safeLen);
             if (mlt >= MINMATCH) {
                 LZ4HC_match_t md;
+                DEBUGLOG(7, "Found long ExtDict match of len=%u", mlt);
                 md.len = mlt;
                 md.off = (int)(ipIndex - m8Index);
                 md.back = 0;
@@ -361,6 +361,7 @@ static LZ4HC_match_t LZ4MID_searchExtDict(const BYTE* ip, U32 ipIndex,
             int mlt = (int)LZ4_count(ip, matchPtr, ip + safeLen);
             if (mlt >= MINMATCH) {
                 LZ4HC_match_t md;
+                DEBUGLOG(7, "Found short ExtDict match of len=%u", mlt);
                 md.len = mlt;
                 md.off = (int)(ipIndex - m4Index);
                 md.back = 0;
@@ -449,8 +450,7 @@ static int LZ4MID_compress (
 
     /* input sanitization */
     DEBUGLOG(5, "LZ4MID_compress (%i bytes)", *srcSizePtr);
-    if (dict == usingDictCtxHc)
-        DEBUGLOG(2, "usingDictCtxHc");
+    if (dict == usingDictCtxHc) DEBUGLOG(5, "usingDictCtxHc");
     assert(*srcSizePtr >= 0);
     if (*srcSizePtr) assert(src != NULL);
     if (maxOutputSize) assert(dst != NULL);
@@ -1554,8 +1554,8 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
     LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     cParams_t cp;
     DEBUGLOG(4, "LZ4_loadDictHC(ctx:%p, dict:%p, dictSize:%d, clevel=%d)", LZ4_streamHCPtr, dictionary, dictSize, ctxPtr->compressionLevel);
-    assert(LZ4_streamHCPtr != NULL);
     assert(dictSize >= 0);
+    assert(LZ4_streamHCPtr != NULL);
     if (dictSize > 64 KB) {
         dictionary += (size_t)dictSize - 64 KB;
         dictSize = 64 KB;
