@@ -546,7 +546,7 @@ static int LZ4MID_compress (
     const BYTE* const dictStart = ctx->dictStart;
     const U32 dictIdx = ctx->lowLimit;
     const U32 gDictEndIndex = ctx->lowLimit;
-    const LZ4MID_searchIntoDict_f searchIntoDict = select_searchDict_function(ctx->dictCtx);
+    const LZ4MID_searchIntoDict_f searchIntoDict = (dict == usingDictCtxHc) ? select_searchDict_function(ctx->dictCtx) : NULL;
     unsigned matchLength;
     unsigned matchDistance;
 
@@ -651,14 +651,13 @@ static int LZ4MID_compress (
         /* no match found in prefix */
         if ( (dict == usingDictCtxHc)
           && (ipIndex - gDictEndIndex < LZ4_DISTANCE_MAX - 8) ) {
-            /* search a match in dictionary */
+            /* search a match into external dictionary */
             LZ4HC_match_t dMatch = searchIntoDict(ip, ipIndex,
                     matchlimit,
                     ctx->dictCtx, gDictEndIndex);
             if (dMatch.len >= MINMATCH) {
                 DEBUGLOG(7, "found Dictionary match (offset=%i)", dMatch.off);
-                ip += dMatch.back;
-                assert(ip >= anchor);
+                assert(dMatch.back == 0);
                 matchLength = (unsigned)dMatch.len;
                 matchDistance = (unsigned)dMatch.off;
                 goto _lz4mid_encode_sequence;
