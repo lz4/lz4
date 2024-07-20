@@ -126,8 +126,9 @@ static void* LZ4F_malloc(size_t s, LZ4F_CustomMem cmem)
 
 static void LZ4F_free(void* p, LZ4F_CustomMem cmem)
 {
-    /* custom malloc defined : use it */
+    if (p == NULL) return;
     if (cmem.customFree != NULL) {
+        /* custom allocation defined : use it */
         cmem.customFree(cmem.opaqueState, p);
         return;
     }
@@ -547,18 +548,19 @@ LZ4F_createCDict_advanced(LZ4F_CustomMem cmem, const void* dictBuffer, size_t di
         dictSize = 64 KB;
     }
     cdict->dictContent = LZ4F_malloc(dictSize, cmem);
+    /* note: using @cmem to allocate => can't use default create */
     cdict->fastCtx = (LZ4_stream_t*)LZ4F_malloc(sizeof(LZ4_stream_t), cmem);
-    if (cdict->fastCtx)
-        LZ4_initStream(cdict->fastCtx, sizeof(LZ4_stream_t));
     cdict->HCCtx = (LZ4_streamHC_t*)LZ4F_malloc(sizeof(LZ4_streamHC_t), cmem);
-    if (cdict->HCCtx)
-        LZ4_initStreamHC(cdict->HCCtx, sizeof(LZ4_streamHC_t));
     if (!cdict->dictContent || !cdict->fastCtx || !cdict->HCCtx) {
         LZ4F_freeCDict(cdict);
         return NULL;
     }
     memcpy(cdict->dictContent, dictStart, dictSize);
+    LZ4_initStream(cdict->fastCtx, sizeof(LZ4_stream_t));
     LZ4_loadDictSlow(cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
+    LZ4_initStreamHC(cdict->HCCtx, sizeof(LZ4_streamHC_t));
+    /* note: we don't know at this point which compression level is going to be used
+     * as a consequence, HCCtx is created for the more common HC mode */
     LZ4_setCompressionLevel(cdict->HCCtx, LZ4HC_CLEVEL_DEFAULT);
     LZ4_loadDictHC(cdict->HCCtx, (const char*)cdict->dictContent, (int)dictSize);
     return cdict;
