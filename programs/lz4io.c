@@ -1009,8 +1009,8 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* dictFilename)
     size_t dictLen = 0;
     size_t dictStart;
     size_t circularBufSize = LZ4_MAX_DICT_SIZE;
-    char*  circularBuf = (char*)malloc(circularBufSize);
-    char*  dictBuf;
+    char* circularBuf = (char*)malloc(circularBufSize);
+    char* dictBuf;
     FILE* dictFile;
 
     if (!dictFilename)
