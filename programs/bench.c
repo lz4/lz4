@@ -43,9 +43,10 @@
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>      /* assert */
 
-#include "datagen.h"     /* RDG_genBuffer */
+#include "lorem.h"       /* LOREM_genBuffer */
 #include "xxhash.h"
 #include "bench.h"
+#include "timefn.h"
 
 #define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
@@ -66,7 +67,7 @@
 #define NBSECONDS             3
 #define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
 #define TIMELOOP_NANOSEC      1*1000000000ULL /* 1 second */
-#define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
+#define ACTIVEPERIOD_NANOSEC 70*1000000000ULL /* 70 seconds */
 #define COOLPERIOD_SEC        10
 #define DECOMP_MULT           1 /* test decompression DECOMP_MULT times longer than compression */
 
@@ -78,14 +79,14 @@
 
 static const size_t maxMemory = (sizeof(size_t)==4)  ?  (2 GB - 64 MB) : (size_t)(1ULL << ((sizeof(size_t)*8)-31));
 
-static U32 g_compressibilityDefault = 50;
-
 
 /* *************************************
 *  console display
 ***************************************/
+#define DISPLAYOUT(...)      fprintf(stdout, __VA_ARGS__)
+#define OUTLEVEL(l, ...)     if (g_displayLevel>=(l)) { DISPLAYOUT(__VA_ARGS__); }
 #define DISPLAY(...)         fprintf(stderr, __VA_ARGS__)
-#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=l) { DISPLAY(__VA_ARGS__); }
+#define DISPLAYLEVEL(l, ...) if (g_displayLevel>=(l)) { DISPLAY(__VA_ARGS__); }
 static U32 g_displayLevel = 2;   /* 0 : no display;   1: errors;   2 : + result + interaction + warnings;   3 : + progression;   4 : + information */
 
 #define DISPLAYUPDATE(l, ...) if (g_displayLevel>=l) { \
@@ -103,14 +104,14 @@ static clock_t g_time = 0;
 #  define DEBUG 0
 #endif
 #define DEBUGOUTPUT(...) if (DEBUG) DISPLAY(__VA_ARGS__);
-#define END_PROCESS(error, ...)                                             \
-{                                                                         \
+#define END_PROCESS(error, ...)                                           \
+do {                                                                      \
     DEBUGOUTPUT("Error defined at %s, line %i : \n", __FILE__, __LINE__); \
     DISPLAYLEVEL(1, "Error %i : ", error);                                \
     DISPLAYLEVEL(1, __VA_ARGS__);                                         \
     DISPLAYLEVEL(1, "\n");                                                \
     exit(error);                                                          \
-}
+} while (0)
 
 #define LZ4_isError(errcode) (errcode==0)
 
@@ -186,7 +187,7 @@ LZ4_compressInitStream(struct compressionParameters* pThis)
     pThis->LZ4_dictStream = LZ4_createStream();
     pThis->LZ4_streamHC = NULL;
     pThis->LZ4_dictStreamHC = NULL;
-    LZ4_loadDict(pThis->LZ4_dictStream, pThis->dictBuf, pThis->dictSize);
+    LZ4_loadDictSlow(pThis->LZ4_dictStream, pThis->dictBuf, pThis->dictSize);
 }
 
 static void
@@ -196,81 +197,84 @@ LZ4_compressInitStreamHC(struct compressionParameters* pThis)
     pThis->LZ4_dictStream = NULL;
     pThis->LZ4_streamHC = LZ4_createStreamHC();
     pThis->LZ4_dictStreamHC = LZ4_createStreamHC();
+    LZ4_resetStreamHC_fast(pThis->LZ4_dictStreamHC, pThis->cLevel);
     LZ4_loadDictHC(pThis->LZ4_dictStreamHC, pThis->dictBuf, pThis->dictSize);
 }
 
 static void
-LZ4_compressResetNoStream(const struct compressionParameters* pThis)
+LZ4_compressResetNoStream(const struct compressionParameters* cparams)
 {
-    (void)pThis;
+    (void)cparams;
 }
 
 static void
-LZ4_compressResetStream(const struct compressionParameters* pThis)
+LZ4_compressResetStream(const struct compressionParameters* cparams)
 {
-    LZ4_resetStream_fast(pThis->LZ4_stream);
-    LZ4_attach_dictionary(pThis->LZ4_stream, pThis->LZ4_dictStream);
+    LZ4_resetStream_fast(cparams->LZ4_stream);
+    LZ4_attach_dictionary(cparams->LZ4_stream, cparams->LZ4_dictStream);
 }
 
 static void
-LZ4_compressResetStreamHC(const struct compressionParameters* pThis)
+LZ4_compressResetStreamHC(const struct compressionParameters* cparams)
 {
-    LZ4_resetStreamHC_fast(pThis->LZ4_streamHC, pThis->cLevel);
-    LZ4_attach_HC_dictionary(pThis->LZ4_streamHC, pThis->LZ4_dictStreamHC);
+    LZ4_resetStreamHC_fast(cparams->LZ4_streamHC, cparams->cLevel);
+    LZ4_attach_HC_dictionary(cparams->LZ4_streamHC, cparams->LZ4_dictStreamHC);
 }
 
 static int
-LZ4_compressBlockNoStream(const struct compressionParameters* pThis,
+LZ4_compressBlockNoStream(const struct compressionParameters* cparams,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
-    int const acceleration = (pThis->cLevel < 0) ? -pThis->cLevel + 1 : 1;
+    int const acceleration = (cparams->cLevel < 0) ? -cparams->cLevel + 1 : 1;
     return LZ4_compress_fast(src, dst, srcSize, dstSize, acceleration);
 }
 
 static int
-LZ4_compressBlockNoStreamHC(const struct compressionParameters* pThis,
+LZ4_compressBlockNoStreamHC(const struct compressionParameters* cparams,
                             const char* src, char* dst,
                             int srcSize, int dstSize)
 {
-    return LZ4_compress_HC(src, dst, srcSize, dstSize, pThis->cLevel);
+    return LZ4_compress_HC(src, dst, srcSize, dstSize, cparams->cLevel);
 }
 
 static int
-LZ4_compressBlockStream(const struct compressionParameters* pThis,
+LZ4_compressBlockStream(const struct compressionParameters* cparams,
                         const char* src, char* dst,
                         int srcSize, int dstSize)
 {
-    int const acceleration = (pThis->cLevel < 0) ? -pThis->cLevel + 1 : 1;
-    return LZ4_compress_fast_continue(pThis->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
+    int const acceleration = (cparams->cLevel < 0) ? -cparams->cLevel + 1 : 1;
+    LZ4_compressResetStream(cparams);
+    return LZ4_compress_fast_continue(cparams->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
 }
 
 static int
-LZ4_compressBlockStreamHC(const struct compressionParameters* pThis,
+LZ4_compressBlockStreamHC(const struct compressionParameters* cparams,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
-    return LZ4_compress_HC_continue(pThis->LZ4_streamHC, src, dst, srcSize, dstSize);
+    LZ4_compressResetStreamHC(cparams);
+    return LZ4_compress_HC_continue(cparams->LZ4_streamHC, src, dst, srcSize, dstSize);
 }
 
 static void
-LZ4_compressCleanupNoStream(const struct compressionParameters* pThis)
+LZ4_compressCleanupNoStream(const struct compressionParameters* cparams)
 {
-    (void)pThis;
+    (void)cparams;
 }
 
 static void
-LZ4_compressCleanupStream(const struct compressionParameters* pThis)
+LZ4_compressCleanupStream(const struct compressionParameters* cparams)
 {
-    LZ4_freeStream(pThis->LZ4_stream);
-    LZ4_freeStream(pThis->LZ4_dictStream);
+    LZ4_freeStream(cparams->LZ4_stream);
+    LZ4_freeStream(cparams->LZ4_dictStream);
 }
 
 static void
-LZ4_compressCleanupStreamHC(const struct compressionParameters* pThis)
+LZ4_compressCleanupStreamHC(const struct compressionParameters* cparams)
 {
-    LZ4_freeStreamHC(pThis->LZ4_streamHC);
-    LZ4_freeStreamHC(pThis->LZ4_dictStreamHC);
+    LZ4_freeStreamHC(cparams->LZ4_streamHC);
+    LZ4_freeStreamHC(cparams->LZ4_dictStreamHC);
 }
 
 static void
@@ -367,6 +371,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     size_t const maxInSize = (size_t)LZ4_MAX_INPUT_SIZE / decMultiplier;
     size_t const maxDecSize = srcSize < maxInSize ? srcSize * decMultiplier : LZ4_MAX_INPUT_SIZE;
     void* const resultBuffer = malloc(maxDecSize);
+    int benchError = 0;
     U32 nbBlocks;
     struct compressionParameters compP;
 
@@ -410,7 +415,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     }   }   }
 
     /* warming up memory */
-    RDG_genBuffer(compressedBuffer, maxCompressedSize, 0.10, 0.50, 1);
+    memset(compressedBuffer, ' ', maxCompressedSize);
 
     /* decode-only mode : copy input to @compressedBuffer */
     if (g_decodeOnly) {
@@ -423,11 +428,11 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     /* Bench */
     {   U64 fastestC = (U64)(-1LL), fastestD = (U64)(-1LL);
         U64 const crcOrig = XXH64(srcBuffer, srcSize, 0);
-        UTIL_time_t coolTime = UTIL_getTime();
+        TIME_t coolTime = TIME_getTime();
         U64 const maxTime = (g_nbSeconds * TIMELOOP_NANOSEC) + 100;
         U32 nbCompressionLoops = (U32)((5 MB) / (srcSize+1)) + 1;  /* conservative initial compression speed estimate */
         U32 nbDecodeLoops = (U32)((200 MB) / (srcSize+1)) + 1;  /* conservative initial decode speed estimate */
-        U64 totalCTime=0, totalDTime=0;
+        Duration_ns totalCTime=0, totalDTime=0;
         U32 cCompleted=(g_decodeOnly==1), dCompleted=0;
 #       define NB_MARKS 4
         const char* const marks[NB_MARKS] = { " |", " /", " =",  "\\" };
@@ -437,23 +442,27 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
         double ratio = 0.;
 
         DISPLAYLEVEL(2, "\r%79s\r", "");
+        if (g_nbSeconds==0) { nbCompressionLoops = 1; nbDecodeLoops = 1; }
         while (!cCompleted || !dCompleted) {
             /* overheat protection */
-            if (UTIL_clockSpanMicro(coolTime) > ACTIVEPERIOD_MICROSEC) {
+            if (TIME_clockSpan_ns(coolTime) > ACTIVEPERIOD_NANOSEC) {
                 DISPLAYLEVEL(2, "\rcooling down ...    \r");
                 UTIL_sleep(COOLPERIOD_SEC);
-                coolTime = UTIL_getTime();
+                coolTime = TIME_getTime();
             }
 
             /* Compression */
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->\r", marks[markNb], displayName, (U32)totalRSize);
-            if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase compressed buffer */
+            if (!cCompleted) {
+                memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase compressed buffer */
+                { U32 blockNb; for (blockNb=0; blockNb<nbBlocks; blockNb++) blockTable[blockNb].cSize = 0; }
+            }
 
             UTIL_sleepMilli(1);  /* give processor time to other processes */
-            UTIL_waitForNextTick();
+            TIME_waitForNextTick();
 
             if (!cCompleted) {   /* still some time to do compression tests */
-                UTIL_time_t const clockStart = UTIL_getTime();
+                TIME_t const timeStart = TIME_getTime();
                 U32 nbLoops;
                 for (nbLoops=0; nbLoops < nbCompressionLoops; nbLoops++) {
                     U32 blockNb;
@@ -463,20 +472,23 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             &compP,
                             blockTable[blockNb].srcPtr, blockTable[blockNb].cPtr,
                             (int)blockTable[blockNb].srcSize, (int)blockTable[blockNb].cRoom);
-                        if (LZ4_isError(rSize)) END_PROCESS(1, "LZ4 compression failed");
+                        if (LZ4_isError(rSize)) {
+                            DISPLAY("LZ4 compression failed on block %u \n", blockNb);
+                            benchError =1 ;
+                        }
                         blockTable[blockNb].cSize = rSize;
                 }   }
-                {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
-                    if (clockSpan > 0) {
-                        if (clockSpan < fastestC * nbCompressionLoops)
-                            fastestC = clockSpan / nbCompressionLoops;
+                {   Duration_ns const duration_ns = TIME_clockSpan_ns(timeStart);
+                    if (duration_ns > 0) {
+                        if (duration_ns < fastestC * nbCompressionLoops)
+                            fastestC = duration_ns / nbCompressionLoops;
                         assert(fastestC > 0);
                         nbCompressionLoops = (U32)(TIMELOOP_NANOSEC / fastestC) + 1;  /* aim for ~1sec */
                     } else {
                         assert(nbCompressionLoops < 40000000);   /* avoid overflow */
                         nbCompressionLoops *= 100;
                     }
-                    totalCTime += clockSpan;
+                    totalCTime += duration_ns;
                     cCompleted = totalCTime>maxTime;
                 }
 
@@ -485,10 +497,11 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 cSize += !cSize;  /* avoid div by 0 */
                 ratio = (double)totalRSize / (double)cSize;
                 markNb = (markNb+1) % NB_MARKS;
-                DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
+                OUTLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
                         marks[markNb], displayName,
                         (U32)totalRSize, (U32)cSize, ratio,
-                        ((double)totalRSize / fastestC) * 1000 );
+                        ((double)totalRSize / (double)fastestC) * 1000 );
+                fflush(NULL);
             }
             (void)fastestD; (void)crcOrig;   /*  unused when decompression disabled */
 #if 1
@@ -496,14 +509,14 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
 
             UTIL_sleepMilli(5); /* give processor time to other processes */
-            UTIL_waitForNextTick();
+            TIME_waitForNextTick();
 
             if (!dCompleted) {
                 const DecFunction_f decFunction = g_decodeOnly ?
                     LZ4F_decompress_binding : LZ4_decompress_safe_usingDict;
                 const char* const decString = g_decodeOnly ?
                     "LZ4F_decompress" : "LZ4_decompress_safe_usingDict";
-                UTIL_time_t const clockStart = UTIL_getTime();
+                TIME_t const timeStart = TIME_getTime();
                 U32 nbLoops;
 
                 for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
@@ -522,22 +535,22 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                                 decString, blockNb, (unsigned)blockTable[blockNb].srcSize);
                             if (g_decodeOnly)
                                 DISPLAY("Is input using LZ4 Frame format ? \n");
-                            END_PROCESS(2, "error during decoding");
+                            benchError = 1;
                             break;
                         }
                         blockTable[blockNb].resSize = (size_t)regenSize;
                 }   }
-                {   U64 const clockSpan = UTIL_clockSpanNano(clockStart);
-                    if (clockSpan > 0) {
-                        if (clockSpan < fastestD * nbDecodeLoops)
-                            fastestD = clockSpan / nbDecodeLoops;
+                {   Duration_ns const duration_ns = TIME_clockSpan_ns(timeStart);
+                    if (duration_ns > 0) {
+                        if (duration_ns < fastestD * nbDecodeLoops)
+                            fastestD = duration_ns / nbDecodeLoops;
                         assert(fastestD > 0);
                         nbDecodeLoops = (U32)(TIMELOOP_NANOSEC / fastestD) + 1;  /* aim for ~1sec */
                     } else {
                         assert(nbDecodeLoops < 40000000);   /* avoid overflow */
                         nbDecodeLoops *= 100;
                     }
-                    totalDTime += clockSpan;
+                    totalDTime += duration_ns;
                     dCompleted = totalDTime > (DECOMP_MULT*maxTime);
             }   }
 
@@ -548,11 +561,12 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             }
             markNb = (markNb+1) % NB_MARKS;
             ratio  = (double)totalRSize / (double)cSize;
-            DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s ,%6.1f MB/s\r",
+            OUTLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s, %6.1f MB/s\r",
                     marks[markNb], displayName,
                     (U32)totalRSize, (U32)cSize, ratio,
-                    ((double)totalRSize / fastestC) * 1000,
-                    ((double)totalRSize / fastestD) * 1000);
+                    ((double)totalRSize / (double)fastestC) * 1000,
+                    ((double)totalRSize / (double)fastestD) * 1000);
+            fflush(NULL);
 
             /* CRC Checking (not possible in decode-only mode)*/
             if (!g_decodeOnly) {
@@ -560,6 +574,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 if (crcOrig!=crcCheck) {
                     size_t u;
                     DISPLAY("\n!!! WARNING !!! %17s : Invalid Checksum : %x != %x   \n", displayName, (unsigned)crcOrig, (unsigned)crcCheck);
+                    benchError = 1;
                     for (u=0; u<srcSize; u++) {
                         if (((const BYTE*)srcBuffer)[u] != ((const BYTE*)resultBuffer)[u]) {
                             U32 segNb, bNb, pos;
@@ -582,15 +597,17 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
 #endif
         }   /* for (testNb = 1; testNb <= (g_nbSeconds + !g_nbSeconds); testNb++) */
 
+        OUTLEVEL(2, "%2i#\n", cLevel);
+
+        /* quiet mode */
         if (g_displayLevel == 1) {
-            double const cSpeed = ((double)srcSize / fastestC) * 1000;
-            double const dSpeed = ((double)srcSize / fastestD) * 1000;
+            double const cSpeed = ((double)srcSize / (double)fastestC) * 1000;
+            double const dSpeed = ((double)srcSize / (double)fastestD) * 1000;
+            DISPLAYOUT("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s ", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
             if (g_additionalParam)
-                DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
-            else
-                DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName);
+                DISPLAYOUT("(param=%d)", g_additionalParam);
+            DISPLAYOUT("\n");
         }
-        DISPLAYLEVEL(2, "%2i#\n", cLevel);
     }   /* Bench */
 
     /* clean up */
@@ -598,7 +615,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     free(blockTable);
     free(compressedBuffer);
     free(resultBuffer);
-    return 0;
+    return benchError;
 }
 
 
@@ -626,13 +643,13 @@ static size_t BMK_findMaxMem(U64 requiredMem)
 }
 
 
-static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
+static int BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
                             const char* displayName, int cLevel, int cLevelLast,
                             const size_t* fileSizes, unsigned nbFiles,
                             const char* dictBuf, int dictSize)
 {
     int l;
-
+    int benchError = 0;
     const char* pch = strrchr(displayName, '\\'); /* Windows */
     if (!pch) pch = strrchr(displayName, '/'); /* Linux */
     if (pch) displayName = pch+1;
@@ -645,11 +662,13 @@ static void BMK_benchCLevel(void* srcBuffer, size_t benchedSize,
     if (cLevelLast < cLevel) cLevelLast = cLevel;
 
     for (l=cLevel; l <= cLevelLast; l++) {
-        BMK_benchMem(srcBuffer, benchedSize,
-                     displayName, l,
-                     fileSizes, nbFiles,
-                     dictBuf, dictSize);
+        benchError |= BMK_benchMem(
+                            srcBuffer, benchedSize,
+                            displayName, l,
+                            fileSizes, nbFiles,
+                            dictBuf, dictSize);
     }
+    return benchError;
 }
 
 
@@ -688,12 +707,13 @@ static void BMK_loadFiles(void* buffer, size_t bufferSize,
     if (totalSize == 0) END_PROCESS(12, "no data to bench");
 }
 
-static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
-                               int cLevel, int cLevelLast,
-                               const char* dictBuf, int dictSize)
+static int BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
+                              int cLevel, int cLevelLast,
+                              const char* dictBuf, int dictSize)
 {
     void* srcBuffer;
     size_t benchedSize;
+    int benchError = 0;
     size_t* fileSizes = (size_t*)malloc(nbFiles * sizeof(size_t));
     U64 const totalSizeToLoad = UTIL_getTotalFileSize(fileNamesTable, nbFiles);
     char mfName[20] = {0};
@@ -720,7 +740,7 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     /* Bench */
     snprintf (mfName, sizeof(mfName), " %u files", nbFiles);
     {   const char* displayName = (nbFiles > 1) ? mfName : fileNamesTable[0];
-        BMK_benchCLevel(srcBuffer, benchedSize,
+        benchError = BMK_benchCLevel(srcBuffer, benchedSize,
                         displayName, cLevel, cLevelLast,
                         fileSizes, nbFiles,
                         dictBuf, dictSize);
@@ -729,28 +749,35 @@ static void BMK_benchFileTable(const char** fileNamesTable, unsigned nbFiles,
     /* clean up */
     free(srcBuffer);
     free(fileSizes);
+    return benchError;
 }
 
 
-static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility,
-                              const char* dictBuf, int dictSize)
+static int BMK_syntheticTest(int cLevel, int cLevelLast,
+                             const char* dictBuf, int dictSize)
 {
-    char name[20] = {0};
-    size_t benchedSize = 10000000;
+    int benchError = 0;
+    size_t const benchedSize = 10000000;
     void* const srcBuffer = malloc(benchedSize);
 
     /* Memory allocation */
     if (!srcBuffer) END_PROCESS(21, "not enough memory");
 
     /* Fill input buffer */
-    RDG_genBuffer(srcBuffer, benchedSize, compressibility, 0.0, 0);
+    LOREM_genBuffer(srcBuffer, benchedSize, 0);
 
     /* Bench */
-    snprintf (name, sizeof(name), "Synthetic %2u%%", (unsigned)(compressibility*100));
-    BMK_benchCLevel(srcBuffer, benchedSize, name, cLevel, cLevelLast, &benchedSize, 1, dictBuf, dictSize);
+    benchError = BMK_benchCLevel(srcBuffer, benchedSize,
+                    "Lorem ipsum",
+                    cLevel, cLevelLast,
+                    &benchedSize,
+                    1,
+                    dictBuf, dictSize);
 
     /* clean up */
     free(srcBuffer);
+
+    return benchError;
 }
 
 
@@ -759,15 +786,16 @@ BMK_benchFilesSeparately(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast,
                    const char* dictBuf, int dictSize)
 {
+    int benchError = 0;
     unsigned fileNb;
     if (cLevel > LZ4HC_CLEVEL_MAX) cLevel = LZ4HC_CLEVEL_MAX;
     if (cLevelLast > LZ4HC_CLEVEL_MAX) cLevelLast = LZ4HC_CLEVEL_MAX;
     if (cLevelLast < cLevel) cLevelLast = cLevel;
 
     for (fileNb=0; fileNb<nbFiles; fileNb++)
-        BMK_benchFileTable(fileNamesTable+fileNb, 1, cLevel, cLevelLast, dictBuf, dictSize);
+        benchError |= BMK_benchFileTable(fileNamesTable+fileNb, 1, cLevel, cLevelLast, dictBuf, dictSize);
 
-    return 0;
+    return benchError;
 }
 
 
@@ -775,7 +803,7 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
                    int cLevel, int cLevelLast,
                    const char* dictFileName)
 {
-    double const compressibility = (double)g_compressibilityDefault / 100;
+    int benchError = 0;
     char* dictBuf = NULL;
     size_t dictSize = 0;
 
@@ -823,15 +851,15 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
         fclose(dictFile);
     }
 
-    if (nbFiles == 0)
-        BMK_syntheticTest(cLevel, cLevelLast, compressibility, dictBuf, (int)dictSize);
-    else {
+    if (nbFiles == 0) {
+        benchError = BMK_syntheticTest(cLevel, cLevelLast, dictBuf, (int)dictSize);
+    } else {
         if (g_benchSeparately)
-            BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
+            benchError = BMK_benchFilesSeparately(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
         else
-            BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
+            benchError = BMK_benchFileTable(fileNamesTable, nbFiles, cLevel, cLevelLast, dictBuf, (int)dictSize);
     }
 
     free(dictBuf);
-    return 0;
+    return benchError;
 }

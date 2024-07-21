@@ -1,7 +1,7 @@
 /* LZ4file API example : compress a file
  * Modified from an example code by anjiahao
  *
- * This example will demonstrate how 
+ * This example will demonstrate how
  * to manipulate lz4 compressed files like
  * normal files */
 
@@ -41,6 +41,7 @@ static int compress_file(FILE* f_in, FILE* f_out)
     void* const buf = malloc(CHUNK_SIZE);
     if (!buf) {
         printf("error: memory allocation failed \n");
+        return 1;
     }
 
     /* Of course, you can also use prefsPtr to

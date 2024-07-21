@@ -7,6 +7,7 @@
 # GPL v2 License
 #
 
+import argparse
 import glob
 import subprocess
 import filecmp
@@ -17,15 +18,24 @@ import hashlib
 
 repo_url = 'https://github.com/lz4/lz4.git'
 tmp_dir_name = 'tests/abiTests'
-env_flags = ' ' # '-j MOREFLAGS="-g -O0 -fsanitize=address"'
+env_flags = ' ' # '-j CFLAGS="-g -O0 -fsanitize=address"'
 make_cmd = 'make'
 git_cmd = 'git'
 test_dat_src = ['README.md']
 head = 'v999'
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--verbose", action="store_true", help="increase output verbosity")
+args = parser.parse_args()
+
+def debug_message(msg):
+    if args.verbose:
+        print(msg)
+
 def proc(cmd_args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
+    debug_message("Executing command {} with env {}".format(cmd_args, env))
     if pipe:
         s = subprocess.Popen(cmd_args,
                              stdout=subprocess.PIPE,
@@ -33,18 +43,22 @@ def proc(cmd_args, pipe=True, env=False):
                              env = env)
     else:
         s = subprocess.Popen(cmd_args, env = env)
-    r = s.communicate()
+    stdout_data, stderr_data = s.communicate()
     if s.poll() != 0:
-        print(' s.poll() = ', s.poll())
+        print('Error Code:', s.poll())
+        print('Standard Error:', stderr_data.decode())
         sys.exit(1)
-    return r
+    return stdout_data, stderr_data
 
 def make(args, pipe=True, env=False):
     if env == False:
         env = os.environ.copy()
-        # we want the address sanitizer for abi tests
-        env["MOREFLAGS"] = "-fsanitize=address"
-    return proc([make_cmd] + ['-j'] + ['V=1'] + args, pipe, env)
+    # we want the address sanitizer for abi tests
+    if 'CFLAGS' in env:
+        env["CFLAGS"] += " -fsanitize=address"
+    if 'LDFLAGS' in env:
+        env["LDFLAGS"] += " -fsanitize=address"
+    return proc([make_cmd] + ['-j'] + ['V=1'] + ['DEBUGFLAGS='] + args, pipe, env)
 
 def git(args, pipe=True):
     return proc([git_cmd] + args, pipe)
@@ -61,6 +75,9 @@ def sha1_of_file(filepath):
         return hashlib.sha1(f.read()).hexdigest()
 
 if __name__ == '__main__':
+    if sys.platform == "darwin":
+        print("!!! Warning: this test is not validated for macos !!!")
+
     error_code = 0
     base_dir = os.getcwd() + '/..'           # /path/to/lz4
     tmp_dir = base_dir + '/' + tmp_dir_name  # /path/to/lz4/tests/versionsTest
@@ -81,7 +98,8 @@ if __name__ == '__main__':
     print(tags)
 
     # loop across architectures
-    for march in ['-m64', '-m32', '-mx32']:
+    # note : '-mx32' was removed, because some CI environment (GA) do not support x32 well
+    for march in ['-m64', '-m32']:
         print(' ')
         print('=====================================')
         print('Testing architecture ' + march);
@@ -105,8 +123,7 @@ if __name__ == '__main__':
                 os.chdir(lib_dir)
             make(['clean'])
             build_env = os.environ.copy()
-            build_env["CFLAGS"] = march
-            build_env["MOREFLAGS"] = "-fsanitize=address"
+            build_env["CFLAGS"] = "-O1 " + march
             make(['liblz4'], env=build_env)
 
         print(' ')
@@ -116,11 +133,10 @@ if __name__ == '__main__':
         os.chdir(test_dir)
         # Start with matching version : should be no problem
         build_env = os.environ.copy()
-        build_env["CFLAGS"] = march
+        # we use asan to detect any out-of-bound read or write
+        build_env["CFLAGS"] = "-O1 " + march
         build_env["LDFLAGS"] = "-L../lib"
         build_env["LDLIBS"] = "-llz4"
-        # we use asan to detect any out-of-bound read or write
-        build_env["MOREFLAGS"] = "-fsanitize=address"
         if os.path.isfile('abiTest'):
             os.remove('abiTest')
         make(['abiTest'], env=build_env, pipe=False)
@@ -148,13 +164,12 @@ if __name__ == '__main__':
             build_env = os.environ.copy()
             if tag != head:
                 build_env["CPPFLAGS"] = '-IabiTests/{}/lib'.format(tag)
-                build_env["LDFLAGS"] = '-LabiTests/{}/lib'.format(tag)
+                build_env["LDFLAGS"]  = '-LabiTests/{}/lib'.format(tag)
             else:
                 build_env["CPPFLAGS"] = '-I../lib'
-                build_env["LDFLAGS"] = '-L../lib'
-            build_env["LDLIBS"] = "-llz4"
-            build_env["CFLAGS"] = march
-            build_env["MOREFLAGS"] = "-fsanitize=address"
+                build_env["LDFLAGS"]  = '-L../lib'
+            build_env["LDLIBS"]  = "-llz4"
+            build_env["CFLAGS"]  = "-O1 " + march
             os.remove('abiTest')
             make(['abiTest'], pipe=False, env=build_env)
 

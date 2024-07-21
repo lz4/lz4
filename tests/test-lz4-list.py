@@ -15,7 +15,7 @@ if not os.path.exists(LZ4):
 TEMP = tempfile.gettempdir()
 
 
-class NVerboseFileInfo(object):
+class NVerboseFileInfo:
     def __init__(self, line_in):
         self.line = line_in
         splitlines = line_in.split()
@@ -92,7 +92,7 @@ class TestNonVerbose(unittest.TestCase):
                 self.assertEqual(nvinfo.uncompressed, to_human(nvinfo.exp_unc_size), nvinfo.line)
 
 
-class VerboseFileInfo(object):
+class VerboseFileInfo:
     def __init__(self, lines):
         # Parse lines
         self.frame_list = []
@@ -138,23 +138,10 @@ class TestVerbose(unittest.TestCase):
         self.cvinfo.file_frame_map = concat_file_list
         self.cvinfo.compressed_size = os.path.getsize(f"{TEMP}/test_list_concat-all.lz4")
 
-    def test_filename(self):
-        for i, vinfo in enumerate(self.vinfo_list):
-            self.assertRegex(vinfo.filename, f"^test_list_.*({i + 1}/{len(self.vinfo_list)})".format(i + 1, len(self.vinfo_list)))
-
     def test_frame_number(self):
         for vinfo in self.vinfo_list:
             for i, frame_info in enumerate(vinfo.frame_list):
                 self.assertEqual(frame_info["frame"], str(i + 1), frame_info["line"])
-
-    def test_frame_type(self):
-        for i, frame_info in enumerate(self.cvinfo.frame_list):
-            if "-lz4f-" in self.cvinfo.file_frame_map[i]:
-                self.assertEqual(self.cvinfo.frame_list[i]["type"], "LZ4Frame", self.cvinfo.frame_list[i]["line"])
-            elif "-legc-" in self.cvinfo.file_frame_map[i]:
-                self.assertEqual(self.cvinfo.frame_list[i]["type"], "LegacyFrame", self.cvinfo.frame_list[i]["line"])
-            elif "-skip-" in self.cvinfo.file_frame_map[i]:
-                self.assertEqual(self.cvinfo.frame_list[i]["type"], "SkippableFrame", self.cvinfo.frame_list[i]["line"])
 
     def test_block(self):
         for i, frame_info in enumerate(self.cvinfo.frame_list):
@@ -167,15 +154,6 @@ class TestVerbose(unittest.TestCase):
         for i, frame_info in enumerate(self.cvinfo.frame_list):
             if "-lz4f-" in self.cvinfo.file_frame_map[i] and "--no-frame-crc" not in self.cvinfo.file_frame_map[i]:
                 self.assertEqual(self.cvinfo.frame_list[i]["checksum"], "XXH32", self.cvinfo.frame_list[i]["line"])
-
-    def test_compressed(self):
-        total = 0
-        for i, frame_info in enumerate(self.cvinfo.frame_list):
-            if "-2f-" not in self.cvinfo.file_frame_map[i]:
-                expected_size = os.path.getsize(self.cvinfo.file_frame_map[i])
-                self.assertEqual(self.cvinfo.frame_list[i]["compressed"], str(expected_size), self.cvinfo.frame_list[i]["line"])
-            total += int(self.cvinfo.frame_list[i]["compressed"])
-        self.assertEqual(total, self.cvinfo.compressed_size, f"Expected total sum ({total}) to match {self.cvinfo.filename} filesize")
 
     def test_uncompressed(self):
         for i, frame_info in enumerate(self.cvinfo.frame_list):
@@ -227,7 +205,7 @@ def execute(command, print_command=True, print_output=False, print_error=True):
         if stderr_lines and not print_output and print_error:
             print(stderr_lines)
         errout(f"Failed to run: {command}, {stdout_lines + stderr_lines}\n")
-    return (stdout_lines + stderr_lines).splitlines()
+    return (stdout_lines).splitlines()
 
 
 def cleanup(silent=False):

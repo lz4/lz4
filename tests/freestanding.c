@@ -30,7 +30,6 @@
 
 
 #if !defined(__x86_64__) || !defined(__linux__)
-EXTERN_C void _start(void) { }
 int main(int argc, char** argv) { return 0; }
 #else
 

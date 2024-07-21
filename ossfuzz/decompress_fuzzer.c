@@ -67,7 +67,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     /* Partial decompression with small prefix. */
     LZ4_decompress_safe_partial_usingDict((char const*)dataAfterDict, dst, size,
                                   dstCapacity, dstCapacity, smallDict, smallDictSize);
-    /* Partial decompression wtih large prefix. */
+    /* Partial decompression with large prefix. */
     LZ4_decompress_safe_partial_usingDict((char const*)dataAfterDict, dst, size,
                                   dstCapacity, dstCapacity, largeDict, largeDictSize);
     free(dst);

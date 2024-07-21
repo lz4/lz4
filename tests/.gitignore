@@ -5,6 +5,8 @@ frametest
 frametest32
 fullbench
 fullbench32
+fullbench-lib
+fullbench-dll
 fuzzer
 fuzzer32
 fasttest
