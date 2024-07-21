@@ -1,5 +1,5 @@
 .
-.TH "LZ4" "1" "December 2023" "lz4 1.9.5" "User Commands"
+.TH "LZ4" "1" "July 2024" "lz4 1.10.0" "User Commands"
 .
 .SH "NAME"
 \fBlz4\fR \- lz4, unlz4, lz4cat \- Compress or decompress \.lz4 files
@@ -107,7 +107,7 @@ Benchmark mode, using \fB#\fR compression level\.
 .
 .TP
 \fB\-\-list\fR
-List information about \.lz4 files\. note : current implementation is limited to single\-frame \.lz4 files\.
+List information about \.lz4 files\. For detailed information on files with multiple frames, use \fB\-v\fR\. \fB\-\-list\fR automatically triggers \fB\-m\fR modifier\.
 .
 .SS "Operation modifiers"
 .
@@ -245,6 +245,17 @@ Benchmark multiple compression levels, from b# to e# (included)
 .TP
 \fB\-i#\fR
 Minimum evaluation time in seconds [1\-9] (default : 3)
+.
+.SS "Environment Variables"
+It\'s possible to pass some parameters to \fBlz4\fR via environment variables\. This can be useful in situations where \fBlz4\fR is known to be invoked (from a script for example) but there is no way to pass \fBlz4\fR parameters to influence the compression session\. The environment variable has higher priority than executable default, but lower priority than corresponding runtime command\. When set as global environment variables, it can be a way to enforce personalized defaults different from the executable set ones\.
+.
+.TP
+\fBLZ4_CLEVEL\fR
+specify a default compression level that \fBlz4\fR employs for compression when no other compression level is specified on command line\. Executable default is generally \fB1\fR\.
+.
+.TP
+\fBLZ4_NBWORKERS\fR
+specify a default number of threads that \fBlz4\fR will employ for compression\. Executable default is generally \fB0\fR, which means auto\-determined based on local cpu\. This functionality is only relevant when \fBlz4\fR is compiled with multithreading support\. The maximum number of workers is capped at \fBLZ4_NBWORKERS_MAX\fR (\fB200\fR by default)\.
 .
 .SH "BUGS"
 Report bugs at: https://github\.com/lz4/lz4/issues
