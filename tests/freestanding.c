@@ -225,7 +225,7 @@ EXTERN_C int memcmp(const void *s1, const void *s2, size_t n) {
 
 
 //
-EXTERN_C void _start(void) {
+EXTERN_C void __attribute__((force_align_arg_pointer)) _start(void) {
     test();
     MY_exit(0);
 }
