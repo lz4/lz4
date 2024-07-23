@@ -214,9 +214,15 @@ if(NOT LZ4_BUNDLED_MODE)
     FILE ${CMAKE_CURRENT_BINARY_DIR}/lz4Targets.cmake
     NAMESPACE LZ4::)
 
+# Installation of exports with LZ4:: namespace
+  install(EXPORT lz4Targets
+    FILE LZ4Targets.cmake
+    NAMESPACE LZ4::
+    DESTINATION ${LZ4_PKG_INSTALLDIR})
+# Installation of exports with lz4:: namespace
   install(EXPORT lz4Targets
     FILE lz4Targets.cmake
-    NAMESPACE LZ4::
+    NAMESPACE lz4::
     DESTINATION ${LZ4_PKG_INSTALLDIR})
   install(FILES
       ${CMAKE_CURRENT_BINARY_DIR}/lz4Config.cmake
