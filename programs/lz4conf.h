@@ -49,7 +49,7 @@
 /* Determines default nb of threads for compression
  * Default value is 0, which means "auto" :
  * nb of threads is determined from detected local cpu.
- * Can be overriden by Environment Variable LZ4_NBWORKERS.
+ * Can be overridden by Environment Variable LZ4_NBWORKERS.
  * Can be overridden at runtime using -T# command */
 #ifndef LZ4_NBWORKERS_DEFAULT
 # define LZ4_NBWORKERS_DEFAULT 0
