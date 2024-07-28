@@ -32,6 +32,7 @@ project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
 
 
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
+option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
 
 
 # Determine if LZ4 is being built as part of another project.
@@ -142,6 +143,13 @@ if (LZ4_BUILD_CLI)
   set(LZ4_PROGRAMS_BUILT lz4cli)
   add_executable(lz4cli ${LZ4_CLI_SOURCES})
   set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
+endif()
+
+# lz4c
+if (LZ4_BUILD_LEGACY_LZ4C)
+  list(APPEND LZ4_PROGRAMS_BUILT lz4c)
+  add_executable(lz4c ${LZ4_CLI_SOURCES})
+  set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
 endif()
 
 # Extra warning flags
