@@ -289,6 +289,9 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 /* Size in bytes of the content checksum. */
 #define LZ4F_CONTENT_CHECKSUM_SIZE 4
 
+/* Size in bytes of the endmark. */
+#define LZ4F_ENDMARK_SIZE 4
+
 /*! LZ4F_compressBegin() :
  *  will write the frame header into dstBuffer.
  *  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.

@@ -93,7 +93,7 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
 
   (*lz4fRead)->fp = fp;
   consumedSize = fread(buf, 1, sizeof(buf), (*lz4fRead)->fp);
-  if (consumedSize != sizeof(buf)) {
+  if (consumedSize < LZ4F_HEADER_SIZE_MIN + LZ4F_ENDMARK_SIZE) {
     LZ4F_freeAndNullReadFile(lz4fRead);
     RETURN_ERROR(io_read);
   }
