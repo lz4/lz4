@@ -34,14 +34,15 @@
 #endif
 
 /* Determines if multithreading is enabled or not
- * Default: disabled */
+ * Default: enabled on Windows, disabled on other platforms */
 #ifndef LZ4IO_MULTITHREAD
 # ifdef _WIN32
-    /* Windows support Completion Ports */
+    /* Windows supports Completion Ports */
 #   define LZ4IO_MULTITHREAD 1
 # else
     /* Requires <pthread> support.
-     * Can't be reliably and portably tested at source code level */
+     * Can't be reliably and portably tested at source code level
+     * so must be set a build level */
 #   define LZ4IO_MULTITHREAD 0
 # endif
 #endif
