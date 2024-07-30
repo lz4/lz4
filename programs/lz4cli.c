@@ -131,7 +131,9 @@ static int usage(const char* exeName)
     DISPLAY( "Arguments : \n");
     DISPLAY( " -1     : fast compression (default) \n");
     DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
+#if LZ4IO_MULTITHREAD
     DISPLAY( " -T#    : use # threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
+#endif
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -f     : overwrite output without prompting \n");
     DISPLAY( " -k     : preserve source files(s)  (default) \n");
