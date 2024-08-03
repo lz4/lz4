@@ -115,9 +115,9 @@ static double cpuLoad_sec(clock_t cpuStart)
     FILETIME creationTime, exitTime, kernelTime, userTime;
     (void)cpuStart;
     GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime);
-    assert(kernelTime.dwHighDateTime == 0);
-    assert(userTime.dwHighDateTime == 0);
-    return ((double)kernelTime.dwLowDateTime + (double)userTime.dwLowDateTime) * 100. / 1000000000.;
+    return ( ((double)kernelTime.dwLowDateTime + (double)userTime.dwLowDateTime)
+           + ((double)kernelTime.dwHighDateTime + (double)userTime.dwHighDateTime) * (double)(1ULL << 32) )
+           * 100. / 1000000000.;
 #else
     return (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
 #endif
