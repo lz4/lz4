@@ -109,21 +109,31 @@ static int g_displayLevel = 0;   /* 0 : no display  ; 1: errors  ; 2 : + result 
 static const Duration_ns refreshRate = 200000000;
 static TIME_t g_time = { 0 };
 
-static double cpuLoad_sec(clock_t cpuStart)
+/* Gives the cpu time,
+ * i.e. the sum of kernel time + user time spent in all active threads since the beginning of the program.
+ * When compared with time duration, it gives a sense of cpu load.
+ * On Windows: uses GetProcessTimes() counters.
+ * On posix: relies on the fact that `clock()` measures cpu time.
+ */
+static double cpuTime_sec(void)
 {
 #ifdef _WIN32
     FILETIME creationTime, exitTime, kernelTime, userTime;
-    (void)cpuStart;
     GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime);
     return ( ((double)kernelTime.dwLowDateTime + (double)userTime.dwLowDateTime)
            + ((double)kernelTime.dwHighDateTime + (double)userTime.dwHighDateTime) * (double)(1ULL << 32) )
            * 100. / 1000000000.;
 #else
-    return (double)(clock() - cpuStart) / CLOCKS_PER_SEC;
+    return (double)clock() / (double)CLOCKS_PER_SEC;
 #endif
 }
 
-static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned long long size)
+static double cpuTimeSpan_sec(double startTime)
+{
+    return cpuTime_sec() - startTime;
+}
+
+static void LZ4IO_finalTimeDisplay(TIME_t timeStart, double cpuTimeStart, unsigned long long size)
 {
 #if LZ4IO_MULTITHREAD
     if (!TIME_support_MT_measurements()) {
@@ -131,9 +141,9 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, clock_t cpuStart, unsigned 
     } else
 #endif
     {
-        Duration_ns duration_ns = TIME_clockSpan_ns(timeStart);
+        Duration_ns const duration_ns = TIME_clockSpan_ns(timeStart);
         double const seconds = (double)(duration_ns + !duration_ns) / (double)1000000000.;
-        double const cpuLoad_s = cpuLoad_sec(cpuStart);
+        double const cpuLoad_s = cpuTimeSpan_sec(cpuTimeStart);
         DISPLAYLEVEL(3,"Done in %.2f s ==> %.2f MiB/s  (cpu load : %.0f%%)\n", seconds,
                         (double)size / seconds / 1024. / 1024.,
                         (cpuLoad_s / seconds) * 100.);
@@ -910,7 +920,7 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
                                   const LZ4IO_prefs_t* prefs)
 {
     TIME_t const timeStart = TIME_getTime();
-    clock_t const cpuStart = clock();
+    double const cpuStart = cpuTime_sec();
     unsigned long long processed = 0;
     int r = LZ4IO_compressLegacy_internal(&processed, input_filename, output_filename, compressionlevel, prefs);
     LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
@@ -927,7 +937,7 @@ int LZ4IO_compressMultipleFilenames_Legacy(
                             int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
     TIME_t const timeStart = TIME_getTime();
-    clock_t const cpuStart = clock();
+    double const cpuStart = cpuTime_sec();
     unsigned long long totalProcessed = 0;
     int i;
     int missed_files = 0;
@@ -1503,7 +1513,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)
 {
     TIME_t const timeStart = TIME_getTime();
-    clock_t const cpuStart = clock();
+    double const cpuStart = cpuTime_sec();
     cRess_t ress = LZ4IO_createCResources(prefs);
     unsigned long long processed;
 
@@ -1532,7 +1542,7 @@ int LZ4IO_compressMultipleFilenames(
     cRess_t ress;
     unsigned long long totalProcessed = 0;
     TIME_t timeStart = TIME_getTime();
-    clock_t cpuStart = clock();
+    double const cpuStart = cpuTime_sec();
 
     if (dstFileName == NULL) return ifntSize;   /* not enough memory */
     ress = LZ4IO_createCResources(prefs);
@@ -2484,7 +2494,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
 {
     dRess_t const ress = LZ4IO_createDResources(prefs);
     TIME_t const timeStart = TIME_getTime();
-    clock_t const cpuStart = clock();
+    double const cpuStart = cpuTime_sec();
     unsigned long long processed = 0;
 
     int const errStat = LZ4IO_decompressDstFile(&processed, ress, input_filename, output_filename, prefs);
@@ -2509,7 +2519,7 @@ int LZ4IO_decompressMultipleFilenames(
     size_t const suffixSize = strlen(suffix);
     dRess_t ress = LZ4IO_createDResources(prefs);
     TIME_t timeStart = TIME_getTime();
-    clock_t cpuStart = clock();
+    double const cpuStart = cpuTime_sec();
 
     if (outFileName==NULL) END_PROCESS(70, "Memory allocation error");
     if (prefs->blockChecksum==0 && prefs->streamChecksum==0) {
