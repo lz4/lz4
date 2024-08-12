@@ -498,7 +498,7 @@ jobs:
         dry-run: false
         sanitizer: ${{ matrix.sanitizer }}
     - name: Upload Crash
-      uses: actions/upload-artifact@89ef406dd8d7e03cfd12d9e0a4a378f454709029 # https://github.com/actions/upload-artifact v4.3.5
+      uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # https://github.com/actions/upload-artifact v4.3.6
       if: failure() && steps.build.outcome == 'success'
       with:
         name: ${{ matrix.sanitizer }}-artifacts
@@ -687,7 +687,7 @@ jobs:
         popd
 
     - name: Upload Generated VS2022 Directory
-      uses: actions/upload-artifact@89ef406dd8d7e03cfd12d9e0a4a378f454709029 # https://github.com/actions/upload-artifact v4.3.5
+      uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # https://github.com/actions/upload-artifact v4.3.6
       with:
         name: VS2022-Build-Dir
         path: "build/visual/Visual Studio 17 2022"
