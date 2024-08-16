@@ -44,15 +44,19 @@
 #include <assert.h>      /* assert */
 
 #include "lorem.h"       /* LOREM_genBuffer */
-#include "xxhash.h"
+#ifdef LZ4_USE_SYSTEM_XXHASH
+#  include <xxhash.h>
+#else
+#  include "../lib/xxhash/xxhash.h"
+#endif
 #include "bench.h"
 #include "timefn.h"
 
 #define LZ4_STATIC_LINKING_ONLY
-#include "lz4.h"
+#include "../lib/lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
-#include "lz4hc.h"
-#include "lz4frame.h"   /* LZ4F_decompress */
+#include "../lib/lz4hc.h"
+#include "../lib/lz4frame.h"   /* LZ4F_decompress */
 
 
 /* *************************************

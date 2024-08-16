@@ -32,7 +32,7 @@
 #include <stdio.h>     /* fprintf, stderr */
 #include "datagen.h"   /* RDG_generate */
 #include "loremOut.h"  /* LOREM_genOut */
-#include "lz4.h"       /* LZ4_VERSION_STRING */
+#include "../lib/lz4.h"       /* LZ4_VERSION_STRING */
 
 
 /**************************************

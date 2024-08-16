@@ -57,11 +57,15 @@
 
 #define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
 #define LZ4_STATIC_LINKING_ONLY
-#include "lz4.h"
+#include "../lib/lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
-#include "lz4hc.h"
+#include "../lib/lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY
-#include "xxhash.h"
+#ifdef LZ4_USE_SYSTEM_XXHASH
+#  include <xxhash.h>
+#else
+#  include "../lib/xxhash/xxhash.h"
+#endif
 
 
 /*-************************************

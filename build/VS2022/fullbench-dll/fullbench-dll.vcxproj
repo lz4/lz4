@@ -169,14 +169,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\xxhash.c" />
+    <ClCompile Include="..\..\..\lib\xxhash\xxhash.c" />
     <ClCompile Include="..\..\..\tests\fullbench.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\lz4.h" />
     <ClInclude Include="..\..\..\lib\lz4frame.h" />
     <ClInclude Include="..\..\..\lib\lz4hc.h" />
-    <ClInclude Include="..\..\..\lib\xxhash.h" />
+    <ClInclude Include="..\..\..\lib\xxhash\xxhash.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

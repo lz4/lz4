@@ -56,11 +56,15 @@
 #include <sys/stat.h>  /* stat64 */
 #include "lz4conf.h"   /* compile-time constants */
 #include "lz4io.h"
-#include "lz4.h"       /* required for legacy format */
-#include "lz4hc.h"     /* required for legacy format */
+#include "../lib/lz4.h"       /* required for legacy format */
+#include "../lib/lz4hc.h"     /* required for legacy format */
 #define LZ4F_STATIC_LINKING_ONLY
-#include "lz4frame.h"  /* LZ4F_* */
-#include "xxhash.h"    /* frame checksum (MT mode) */
+#include "../lib/lz4frame.h"  /* LZ4F_* */
+#ifdef LZ4_USE_SYSTEM_XXHASH
+#  include <xxhash.h>    /* frame checksum (MT mode) */
+#else
+#  include "../lib/xxhash/xxhash.h"    /* frame checksum (MT mode) */
+#endif
 
 
 /*****************************

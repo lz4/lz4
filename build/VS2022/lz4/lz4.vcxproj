@@ -160,7 +160,7 @@
     <ClCompile Include="..\..\..\lib\lz4.c" />
     <ClCompile Include="..\..\..\lib\lz4frame.c" />
     <ClCompile Include="..\..\..\lib\lz4hc.c" />
-    <ClCompile Include="..\..\..\lib\xxhash.c" />
+    <ClCompile Include="..\..\..\lib\xxhash\xxhash.c" />
     <ClCompile Include="..\..\..\programs\bench.c" />
     <ClCompile Include="..\..\..\programs\lorem.c" />
     <ClCompile Include="..\..\..\programs\lz4cli.c" />
@@ -174,7 +174,7 @@
     <ClInclude Include="..\..\..\lib\lz4frame.h" />
     <ClInclude Include="..\..\..\lib\lz4frame_static.h" />
     <ClInclude Include="..\..\..\lib\lz4hc.h" />
-    <ClInclude Include="..\..\..\lib\xxhash.h" />
+    <ClInclude Include="..\..\..\lib\xxhash\xxhash.h" />
     <ClInclude Include="..\..\..\programs\bench.h" />
     <ClInclude Include="..\..\..\programs\lorem.h" />
     <ClInclude Include="..\..\..\programs\lz4io.h" />

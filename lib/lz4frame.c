@@ -73,7 +73,11 @@
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 #define XXH_STATIC_LINKING_ONLY
-#include "xxhash.h"
+#ifdef LZ4_USE_SYSTEM_XXHASH
+#  include <xxhash.h>
+#else
+#  include "xxhash/xxhash.h"
+#endif
 
 
 /*-************************************

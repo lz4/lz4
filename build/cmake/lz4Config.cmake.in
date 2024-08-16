@@ -1,4 +1,17 @@
 @PACKAGE_INIT@
+
+set(LZ4_USE_SYSTEM_XXHASH "@LZ4_USE_SYSTEM_XXHASH@")
+set(LZ4_USE_SYSTEM_XXHASH_VIA_PKG_CONFIG "@LZ4_USE_SYSTEM_XXHASH_VIA_PKG_CONFIG@")
+
+if(LZ4_USE_SYSTEM_XXHASH AND NOT "@BUILD_SHARED_LIBS@")
+  if(LZ4_USE_SYSTEM_XXHASH_VIA_PKG_CONFIG)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(pkg_libxxhash libxxhash REQUIRED IMPORTED_TARGET)
+  else()
+    find_package(xxHash REQUIRED)
+  endif()
+endif()
+
 include( "${CMAKE_CURRENT_LIST_DIR}/lz4Targets.cmake" )
 if(NOT TARGET lz4::lz4)
     add_library(lz4::lz4 INTERFACE IMPORTED)

@@ -54,7 +54,7 @@ DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
 CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
-SRCFILES := $(sort $(wildcard *.c))
+SRCFILES := $(sort $(wildcard *.c)) xxhash/xxhash.c
 
 include ../Makefile.inc
 
@@ -149,6 +149,7 @@ liblz4.pc: liblz4.pc.in Makefile
 	$(SED) -e 's|@PREFIX@|$(prefix)|' \
            -e 's|@LIBDIR@|$(libdir)|' \
            -e 's|@INCLUDEDIR@|$(includedir)|' \
+           -e 's|@REQUIRES_PRIVATE@||' \
            -e 's|@VERSION@|$(LIBVER)|' \
            -e 's|=${prefix}/|=$${prefix}/|' \
            $< >$@
@@ -158,7 +159,7 @@ clean:
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
-	$(RM) $(CLEAN) core *.o *.a
+	$(RM) $(CLEAN) core *.o *.a xxhash/*.o
 	$(RM) *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	@echo Cleaning library completed
 
