@@ -82,6 +82,9 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 %.o : $(LIBDIR)/%.c $(LIBDIR)/%.h
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
+xxhash.o : $(LIBDIR)/xxhash/xxhash.c $(LIBDIR)/xxhash/xxhash.h
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+
 CLEAN += fullbench
 fullbench : DEBUGLEVEL=0
 fullbench : CPPFLAGS += -DNDEBUG
@@ -103,7 +106,7 @@ ifeq ($(WINBASED),yes)
 CLEAN += fullbench-dll
 fullbench-dll : DEBUGLEVEL=0
 fullbench-dll : CPPFLAGS += -DNDEBUG
-fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
+fullbench-dll: fullbench.c $(LIBDIR)/xxhash/xxhash.c
 	$(MAKE) -C $(LIBDIR) liblz4
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/$(LIBLZ4).dll
 endif

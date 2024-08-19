@@ -41,15 +41,19 @@
 #include <string.h>     /* strcmp */
 #include <time.h>       /* clock_t, clock(), CLOCKS_PER_SEC */
 #include <assert.h>
-#include "lz4frame.h"   /* included multiple times to test correctness/safety */
-#include "lz4frame.h"
+#include "../lib/lz4frame.h"   /* included multiple times to test correctness/safety */
+#include "../lib/lz4frame.h"
 #define LZ4F_STATIC_LINKING_ONLY
-#include "lz4frame.h"
-#include "lz4frame.h"
+#include "../lib/lz4frame.h"
+#include "../lib/lz4frame.h"
 #define LZ4_STATIC_LINKING_ONLY  /* LZ4_DISTANCE_MAX */
-#include "lz4.h"        /* LZ4_VERSION_STRING */
+#include "../lib/lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
-#include "xxhash.h"     /* XXH64 */
+#ifdef LZ4_USE_SYSTEM_XXHASH
+#  include <xxhash.h>     /* XXH64 */
+#else
+#  include "../lib/xxhash/xxhash.h"     /* XXH64 */
+#endif
 
 
 /* unoptimized version; solves endianness & alignment issues */

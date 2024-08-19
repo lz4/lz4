@@ -164,7 +164,7 @@
     <ClCompile Include="..\..\..\lib\lz4.c" />
     <ClCompile Include="..\..\..\lib\lz4frame.c" />
     <ClCompile Include="..\..\..\lib\lz4hc.c" />
-    <ClCompile Include="..\..\..\lib\xxhash.c" />
+    <ClCompile Include="..\..\..\lib\xxhash\xxhash.c" />
     <ClCompile Include="..\..\..\tests\frametest.c" />
   </ItemGroup>
   <ItemGroup>
@@ -172,7 +172,7 @@
     <ClInclude Include="..\..\..\lib\lz4frame.h" />
     <ClInclude Include="..\..\..\lib\lz4frame_static.h" />
     <ClInclude Include="..\..\..\lib\lz4hc.h" />
-    <ClInclude Include="..\..\..\lib\xxhash.h" />
+    <ClInclude Include="..\..\..\lib\xxhash\xxhash.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

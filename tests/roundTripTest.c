@@ -36,10 +36,14 @@
 #include <assert.h>
 #include <sys/types.h>  /* stat */
 #include <sys/stat.h>   /* stat */
-#include "xxhash.h"
+#ifdef LZ4_USE_SYSTEM_XXHASH
+#  include <xxhash.h>
+#else
+#  include "../lib/xxhash/xxhash.h"
+#endif
 
-#include "lz4.h"
-#include "lz4hc.h"
+#include "../lib/lz4.h"
+#include "../lib/lz4hc.h"
 
 
 /*===========================================

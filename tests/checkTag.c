@@ -37,7 +37,7 @@
 
 #include <stdio.h>   /* printf */
 #include <string.h>  /* strlen, strncmp */
-#include "lz4.h"     /* LZ4_VERSION_STRING */
+#include "../lib/lz4.h"     /* LZ4_VERSION_STRING */
 
 
 /*  validate() :

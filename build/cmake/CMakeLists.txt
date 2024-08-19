@@ -33,6 +33,7 @@ project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
 
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
+option(LZ4_USE_SYSTEM_XXHASH "Build with system xxHash" OFF)
 
 
 # Determine if LZ4 is being built as part of another project.
@@ -73,11 +74,12 @@ endif()
 set(LZ4_LIB_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/lib")
 set(LZ4_PROG_SOURCE_DIR "${LZ4_TOP_SOURCE_DIR}/programs")
 
-include_directories("${LZ4_LIB_SOURCE_DIR}")
-
 # CLI sources
 file(GLOB LZ4_SOURCES
      "${LZ4_LIB_SOURCE_DIR}/*.c")
+if(NOT LZ4_USE_SYSTEM_XXHASH)
+  list(APPEND LZ4_SOURCES "${LZ4_LIB_SOURCE_DIR}/xxhash/xxhash.c")
+endif()
 file(GLOB LZ4_CLI_SOURCES
      "${LZ4_PROG_SOURCE_DIR}/*.c")
 list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES}) # LZ4_CLI always use liblz4 sources directly.
@@ -93,7 +95,6 @@ set(LZ4_LIBRARIES_BUILT)
 if(BUILD_SHARED_LIBS)
   add_library(lz4_shared SHARED ${LZ4_SOURCES})
   target_include_directories(lz4_shared
-    PUBLIC $<BUILD_INTERFACE:${LZ4_LIB_SOURCE_DIR}>
     INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(lz4_shared PROPERTIES
     OUTPUT_NAME lz4
@@ -112,7 +113,6 @@ if(BUILD_STATIC_LIBS)
   endif()
   add_library(lz4_static STATIC ${LZ4_SOURCES})
   target_include_directories(lz4_static
-    PUBLIC $<BUILD_INTERFACE:${LZ4_LIB_SOURCE_DIR}>
     INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(lz4_static PROPERTIES
     OUTPUT_NAME ${STATIC_LIB_NAME}
@@ -128,14 +128,41 @@ else()
   target_link_libraries(lz4 INTERFACE lz4_static)
 endif()
 
-# xxhash namespace
-if(BUILD_SHARED_LIBS)
-  target_compile_definitions(lz4_shared PRIVATE
-    XXH_NAMESPACE=LZ4_)
-endif()
-if(BUILD_STATIC_LIBS)
-  target_compile_definitions(lz4_static PRIVATE
-    XXH_NAMESPACE=LZ4_)
+set(LZ4_USE_SYSTEM_XXHASH_VIA_PKG_CONFIG FALSE)
+if(LZ4_USE_SYSTEM_XXHASH)
+  if(CMAKE_VERSION VERSION_LESS 3.6)
+    set(LZ4_HAVE_PKG_CHECK_MODULES_IMPORTED_TARGET FALSE)
+  else()
+    set(LZ4_HAVE_PKG_CHECK_MODULES_IMPORTED_TARGET TRUE)
+  endif()
+  if(LZ4_HAVE_PKG_CHECK_MODULES_IMPORTED_TARGET)
+    # libxxhash.pc fallback is supported
+    find_package(xxHash)
+    if(NOT xxHash_FOUND)
+      find_package(PkgConfig REQUIRED)
+      pkg_check_modules(pkg_libxxhash libxxhash REQUIRED IMPORTED_TARGET)
+      add_library(xxHash::xxhash ALIAS PkgConfig::pkg_libxxhash)
+      set(LZ4_USE_SYSTEM_XXHASH_VIA_PKG_CONFIG TRUE)
+    endif()
+  else()
+    find_package(xxHash REQUIRED)
+  endif()
+  if(BUILD_SHARED_LIBS)
+    target_compile_definitions(lz4_shared PUBLIC $<BUILD_INTERFACE:LZ4_USE_SYSTEM_XXHASH>)
+    target_link_libraries(lz4_shared PRIVATE xxHash::xxhash)
+  endif()
+  if(BUILD_STATIC_LIBS)
+    target_compile_definitions(lz4_static PUBLIC $<BUILD_INTERFACE:LZ4_USE_SYSTEM_XXHASH>)
+    target_link_libraries(lz4_static PUBLIC xxHash::xxhash)
+  endif()
+else()
+  # xxHash namespace
+  if(BUILD_SHARED_LIBS)
+    target_compile_definitions(lz4_shared PRIVATE XXH_NAMESPACE=LZ4_)
+  endif()
+  if(BUILD_STATIC_LIBS)
+    target_compile_definitions(lz4_static PRIVATE XXH_NAMESPACE=LZ4_)
+  endif()
 endif()
 
 # lz4
@@ -143,6 +170,9 @@ if (LZ4_BUILD_CLI)
   set(LZ4_PROGRAMS_BUILT lz4cli)
   add_executable(lz4cli ${LZ4_CLI_SOURCES})
   set_target_properties(lz4cli PROPERTIES OUTPUT_NAME lz4)
+  if(LZ4_USE_SYSTEM_XXHASH)
+    target_link_libraries(lz4cli PRIVATE xxHash::xxhash)
+  endif()
 endif()
 
 # lz4c
@@ -150,6 +180,9 @@ if (LZ4_BUILD_LEGACY_LZ4C)
   list(APPEND LZ4_PROGRAMS_BUILT lz4c)
   add_executable(lz4c ${LZ4_CLI_SOURCES})
   set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
+  if(LZ4_USE_SYSTEM_XXHASH)
+    target_link_libraries(lz4c PRIVATE xxHash::xxhash)
+  endif()
 endif()
 
 # Extra warning flags
@@ -273,4 +306,9 @@ endif()
 
 # for liblz4.pc substitution
 set(VERSION ${LZ4_VERSION_STRING})
+if(LZ4_USE_SYSTEM_XXHASH_VIA_PKG_CONFIG)
+  set(REQUIRES_PRIVATE libxxhash)
+else()
+  set(REQUIRES_PRIVATE)
+endif()
 configure_file(${LZ4_LIB_SOURCE_DIR}/liblz4.pc.in liblz4.pc @ONLY)

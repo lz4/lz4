@@ -14,7 +14,7 @@ sources = files(
   lz4_source_root / 'lib/lz4.c',
   lz4_source_root / 'lib/lz4frame.c',
   lz4_source_root / 'lib/lz4hc.c',
-  lz4_source_root / 'lib/xxhash.c'
+  lz4_source_root / 'lib/xxhash/xxhash.c'
 )
 
 if get_option('unstable')

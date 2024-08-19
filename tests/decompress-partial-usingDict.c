@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include "lz4.h"
+#include "../lib/lz4.h"
 
 const char source[] =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod\n"
