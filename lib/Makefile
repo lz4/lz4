@@ -55,6 +55,7 @@ CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))
+OBJFILES = $(SRCFILES:.c=.o)
 
 include ../Makefile.inc
 
@@ -102,7 +103,7 @@ liblz4.a: $(SRCFILES)
 ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
 	@echo compiling static library
 	$(COMPILE.c) $^
-	$(AR) rcs $@ *.o
+	$(AR) rcs $@ $(OBJFILES)
 endif
 
 ifeq ($(WINBASED),yes)
