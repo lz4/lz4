@@ -28,7 +28,7 @@
 
 /* Default compression level.
  * Can be overridden by environment variable LZ4_CLEVEL.
- * Can be overridden at runtime using -# command */
+ * Is overridden at runtime by command -# */
 #ifndef LZ4_CLEVEL_DEFAULT
 # define LZ4_CLEVEL_DEFAULT 1
 #endif

@@ -208,8 +208,11 @@ static int usage_longhelp(const char* exeName)
     DISPLAY( "\n");
     DISPLAY( "Compression levels : \n");
     DISPLAY( "---------------------\n");
-    DISPLAY( "-0 ... -2  => Fast compression, all identical\n");
-    DISPLAY( "-3 ... -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
+    DISPLAY( "-0  => Default level, identical to -%u \n", LZ4_CLEVEL_DEFAULT);
+    DISPLAY( "-1  => Fast compression \n");
+    DISPLAY( "-2 .. -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
+    DISPLAY( "--best    => Highest available compression level (-%d) \n", LZ4HC_CLEVEL_MAX);
+    DISPLAY( "--fast=#  => Faster compression; higher number == faster but compress less\n");
     DISPLAY( "\n");
     DISPLAY( "stdin, stdout and the console : \n");
     DISPLAY( "--------------------------------\n");
