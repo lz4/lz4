@@ -85,7 +85,11 @@ list(APPEND LZ4_CLI_SOURCES ${LZ4_SOURCES}) # LZ4_CLI always use liblz4 sources 
 # Whether to use position independent code for the static library.  If
 # we're building a shared library this is ignored and PIC is always
 # used.
-option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static library (if applicable)" ON)
+if(NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+  option(LZ4_POSITION_INDEPENDENT_LIB "Use position independent code for static library (if applicable)" ON)
+else()
+  set(LZ4_POSITION_INDEPENDENT_LIB OFF CACHE BOOL "Use position independent code for static library (if applicable)" FORCE)
+endif()
 
 # liblz4
 include(GNUInstallDirs)
