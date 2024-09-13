@@ -179,16 +179,17 @@ They are in conformance with the LZ4 [block] and [frame] specifications, and are
 |__Python__ multi-threadable | Iotic Labs       | https://pypi.python.org/pypi/py-lz4framed
 |__Python__ standard handlers | Jonathan Underwood | https://pypi.python.org/pypi/lz4
 |__Python__               | Christopher Jackson | https://github.com/darkdragn/lz4tools
-|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/apidocs/index.html
+|__Java__                 | Adrien Grand        | https://github.com/lz4/lz4-java
+|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/lz4/package-summary.html
 |__Javascript__ (binding) | Pierre Curto        | https://github.com/pierrec/node-lz4
 |__Javascript__ (port)    | Benzinga            | https://github.com/Benzinga/lz4js
 |__C#__                   | Milosz Krajewski    | https://github.com/MiloszKrajewski/K4os.Compression.LZ4
-|__Perl__                 | Felix Bytow         | http://search.cpan.org/~autinity/Compress-LZ4Frame
-|__Delphi__               | Hanno Hugenberg     | https://github.com/Hugie/lz4-delphi
 |__Go__                   | Pierre Curto        | https://github.com/pierrec/lz4
+|__Delphi__               | Hanno Hugenberg     | https://github.com/Hugie/lz4-delphi
 |__Rust__                 | Artem Navrotskiy    | https://github.com/bozaro/lz4-rs
 |__Rust__                 | picoHz              | https://github.com/picoHz/lzzzz
 |__Rust__                 | Pascal Seitz        | https://github.com/PSeitz/lz4_flex
+|__Perl__                 | Felix Bytow         | http://search.cpan.org/~autinity/Compress-LZ4Frame
 |__Dart__                 | Instantiations      | https://pub.dev/documentation/es_compression/latest/lz4/lz4-library.html
 |__Lua__                  | Witchu Promjunyakul | https://github.com/witchu/lua-lz4
 |__Haskell__              | Niklas Hambüchen    | https://hackage.haskell.org/package/lz4-frame-conduit
@@ -219,19 +220,19 @@ Here are a few compatible alternatives to lz4 command line utility :
 <br/>
 <a name="customs-lz4"></a>
 ## Customs LZ4 implementations
-The following versions compress data blocks with LZ4 compression algorithm in various programming languages.
-They use the [block] compression format, but add their own frame / header logic (or none at all)
+The following versions compress data blocks with the LZ4 compression algorithm in various programming languages.
+They use the [block] compression format, and deal with metadata (like `compressed_size`) in various custom ways (or none at all, letting the caller deal with it).
 Consequently, they are not interoperable with LZ4 command line utility, nor (generally) between themselves.
 
 |Language             |Author               |URL                              |
 |--                   |--                   |--                               |
-|__Java__             | Adrien Grand        | https://github.com/lz4/lz4-java
-|__Perl__             | Gray                | http://search.cpan.org/dist/Compress-LZ4/
 |__C#__ streaming     | Phill Djonov        | https://github.com/pdjonov/Lz4Stream
-|__PHP__              | Kamijo              | https://github.com/kjdev/php-ext-lz4
 |__Go__               | Branimir Karadzic   | https://github.com/bkaradzic/go-lz4
-|__Ruby__             | Komiya Atsushi      | https://rubygems.org/gems/lz4-ruby
+|__PHP__              | Kamijo              | https://github.com/kjdev/php-ext-lz4
+|__PHP__ decoder (port) | Stephan J. Müller | https://heap.ch/blog/2019/05/18/lz4-decompression/
 |__Rust__             | Alex Crichton       | https://github.com/rusty-shell/rust-compress/blob/master/src/lz4.rs
+|__Ruby__             | Komiya Atsushi      | https://rubygems.org/gems/lz4-ruby
+|__Perl__             | Gray                | http://search.cpan.org/dist/Compress-LZ4/
 |__D__                | Jude Young          | http://code.dlang.org/packages/lz4-d
 |__Lua__              | Christophe Delord   | http://cdsoft.fr/bl/bonaluna.html
 |__Haskell__          | Mark Wotton         | https://hackage.haskell.org/package/lz4
