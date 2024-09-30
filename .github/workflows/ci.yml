@@ -663,6 +663,7 @@ jobs:
       fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
       matrix:
         system: [
+          { os: windows-2019, build_path: ".\\build\\VS2019" },
           { os: windows-2022, build_path: ".\\build\\VS2022" },
         ]
     steps:
