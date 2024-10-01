@@ -711,7 +711,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # https://github.com/actions/checkout v4.2.0
-    - uses: actions/setup-python@39cd14951b08e74b54015e9e001cdefcf80e669f # https://github.com/actions/setup-python v5.1.1
+    - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # https://github.com/actions/setup-python v5.2.0
       with:
         python-version: '3.x'
 
