@@ -551,7 +551,7 @@ static const DecompressionDesc decDescArray[] = {
     { "LZ4_decompress_safe_forceExtDict", local_LZ4_decompress_safe_forceExtDict, 1, 0 },
 #endif
     { "LZ4F_decompress", local_LZ4F_decompress, 1, 1 },
-    { "LZ4F_decompLZ4F_decompress_followHintress", local_LZ4F_decompress_followHint, 1, 1 },
+    { "LZ4F_decompress_followHint", local_LZ4F_decompress_followHint, 1, 1 },
     { "LZ4F_decompress_noHint", local_LZ4F_decompress_noHint, 1, 1 },
 };
 
