@@ -663,22 +663,23 @@ jobs:
       fail-fast: false  # 'false' means Don't stop matrix workflows even if some matrix failed.
       matrix:
         system: [
-#          { os: windows-2019, build_path: ".\\build\\VS2019" },
           { os: windows-2022, build_path: ".\\build\\VS2022" },
         ]
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # https://github.com/actions/checkout v4.1.7
 
     - name: Build ${{ matrix.system.os }}, Win32
+      # Switching to debug mode, since vs2022 optimizations seem to introduce a bug since July 2024
       run: |
         pushd ${{ matrix.system.build_path }}
         .\\build-and-test-win32-debug.bat
         popd
 
     - name: Build ${{ matrix.system.os }}, x64
+      # Switching to debug mode, since vs2022 optimizations seem to introduce a bug since July 2024
       run: |
         pushd ${{ matrix.system.build_path }}
-        .\\build-and-test-x64-release.bat
+        .\\build-and-test-x64-debug.bat
         popd
 
     - name: VS solution generation
