@@ -367,7 +367,7 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 # freestanding test only for Linux x86_64
 #-----------------------------------------------------------------------------
 UNAME_S ?= $(if $(filter Windows_NT,$(OS)),Windows,$(shell uname -s))
-UNAME_P ?= $(if $(filter Windows_NT,$(OS)),Unknown,$(shell uname -p))
+UNAME_M ?= $(if $(filter Windows_NT,$(OS)),Unknown,$(shell uname -m))
 
 FREESTANDING_CFLAGS := -ffreestanding -nostdlib
 
@@ -375,7 +375,7 @@ ifneq ($(UNAME_S), Linux)
   FREESTANDING_CFLAGS :=
 endif
 
-ifneq ($(UNAME_P), x86_64)
+ifneq ($(UNAME_M), x86_64)
   FREESTANDING_CFLAGS :=
 endif
 
