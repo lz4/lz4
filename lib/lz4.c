@@ -1120,19 +1120,35 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 op--;
                 goto _last_literals;
             }
+
+            DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i",
+                        (int)(anchor-(const BYTE*)source), litLength, (int)(ip-(const BYTE*)source));
+            
             if (litLength >= RUN_MASK) {
-                unsigned len = litLength - RUN_MASK;
+                BYTE* opWildCopy;
+                int len = (int)(litLength - RUN_MASK);
                 *token = (RUN_MASK<<ML_BITS);
                 for(; len >= 255 ; len-=255) *op++ = 255;
                 *op++ = (BYTE)len;
+                len = (int)(litLength);
+                opWildCopy = op;
+                do {
+                    LZ4_memcpy(opWildCopy, anchor, 8);
+                    LZ4_memcpy(opWildCopy+8, anchor+8, 8);
+                    opWildCopy+=16; anchor+=16; len-=16;
+                } while(len>8);
+                if (len>0)
+                    LZ4_memcpy(opWildCopy, anchor, 8);
             }
-            else *token = (BYTE)(litLength<<ML_BITS);
+            else {
+                *token = (BYTE)(litLength<<ML_BITS);
+                LZ4_memcpy(op, anchor, 8);
+                if (litLength > 8)
+                    LZ4_memcpy(op+8, anchor+8, 8);
+            }
 
-            /* Copy Literals */
-            LZ4_wildCopy8(op, anchor, op+litLength);
-            op+=litLength;
-            DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i",
-                        (int)(anchor-(const BYTE*)source), litLength, (int)(ip-(const BYTE*)source));
+            op += litLength;
+            
         }
 
 _next_match:
