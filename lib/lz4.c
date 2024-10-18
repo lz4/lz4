@@ -506,10 +506,6 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
         LZ4_memcpy(dstPtr+4, srcPtr, 4);
         srcPtr -= dec64table[offset];
         dstPtr += 8;
-    } else {
-        LZ4_memcpy(dstPtr, srcPtr, 8);
-        dstPtr += 8;
-        srcPtr += 8;
     }
 
     LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
