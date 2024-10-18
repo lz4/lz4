@@ -515,17 +515,22 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
     LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
 }
 
-/* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd
- * this version copies two times 16 bytes (instead of one time 32 bytes)
- * because it must be compatible with offsets >= 16. */
+/* customized variant of memcpy, which can overwrite up to 64 bytes beyond dstEnd
+ * copies four times 16 bytes because it must be compatible with offsets >= 16. */
 LZ4_FORCE_INLINE void
-LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
+LZ4_wildCopy64(void* dstPtr, const void* srcPtr, void* dstEnd)
 {
     BYTE* d = (BYTE*)dstPtr;
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
-    do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+    do { 
+        LZ4_memcpy(d,s,16); 
+        LZ4_memcpy(d+16,s+16,16);
+        LZ4_memcpy(d+32,s+32,16);
+        LZ4_memcpy(d+48,s+48,16); 
+        d+=64; s+=64; 
+    } while (d<e);
 }
 
 /* LZ4_memcpy_using_offset()  presumes :
@@ -2101,8 +2106,9 @@ LZ4_decompress_generic(
 
                 /* copy literals */
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
-                if ((op+length>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
-                LZ4_wildCopy32(op, ip, op+length);
+                if ((op+length>oend-FASTLOOP_SAFE_DISTANCE) || (ip+length>iend-FASTLOOP_SAFE_DISTANCE)) 
+                    { goto safe_literal_copy; }
+                LZ4_wildCopy64(op, ip, op+length);
                 ip += length; op += length;
             } else if (ip <= iend-(16 + 1/*max lit + offset + nextToken*/)) {
                 /* We don't need to check oend, since we check it once for each loop below */
@@ -2144,7 +2150,7 @@ LZ4_decompress_generic(
                     goto safe_match_copy;
                 }
 
-                /* Fastpath check: skip LZ4_wildCopy32 when true */
+                /* Fastpath check: skip LZ4_wildCopy64 when true */
                 if ((dict == withPrefix64k) || (match >= lowPrefix)) {
                     if (offset >= 8) {
                         assert(match >= lowPrefix);
@@ -2198,11 +2204,11 @@ LZ4_decompress_generic(
             /* copy match within block */
             cpy = op + length;
 
-            assert((op <= oend) && (oend-op >= 32));
+            assert((op <= oend) && (oend-op >= FASTLOOP_SAFE_DISTANCE));
             if (unlikely(offset<16)) {
                 LZ4_memcpy_using_offset(op, match, cpy, offset);
             } else {
-                LZ4_wildCopy32(op, match, cpy);
+                LZ4_wildCopy64(op, match, cpy);
             }
 
             op = cpy;   /* wildcopy correction */
