@@ -191,7 +191,7 @@ UTIL_STATIC void* UTIL_realloc(void* ptr, size_t size)
 {
     void* const newptr = realloc(ptr, size);
     if (newptr) return newptr;
-    free(ptr);
+    if (size!=0) free(ptr);
     return NULL;
 }
 
