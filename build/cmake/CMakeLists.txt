@@ -8,7 +8,7 @@
 # For details, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5...3.16)
 
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
