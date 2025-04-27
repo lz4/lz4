@@ -624,6 +624,46 @@ jobs:
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build_test
 
+    - name: cmake minimum version v3.10 test
+      run: |
+        CMAKE_VERSION="3.10.0"
+        CMAKE_MAJOR_MINOR="3.10"
+        BASE_DIR="$(pwd)"
+        DOWNLOAD_DIR="${BASE_DIR}/cmake_download"
+        CMAKE_BIN_DIR="${DOWNLOAD_DIR}/cmake-${CMAKE_VERSION}-Linux-x86_64"
+        CMAKE_BIN="${CMAKE_BIN_DIR}/bin/cmake"
+        BUILD_DIR="${BASE_DIR}/cmake_build"
+        INSTALL_TEST_DIR="${BASE_DIR}/cmake_install_test"
+
+        # Create necessary directories
+        mkdir -p "${DOWNLOAD_DIR}" "${BUILD_DIR}" "${INSTALL_TEST_DIR}"
+
+        # Download and extract CMake
+        echo "Downloading CMake ${CMAKE_VERSION}..."
+        wget "https://cmake.org/files/v${CMAKE_MAJOR_MINOR}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" -P "${DOWNLOAD_DIR}"
+        tar xzf "${DOWNLOAD_DIR}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" -C "${DOWNLOAD_DIR}"
+
+        # Verify CMake version
+        echo "Using CMake version:"
+        "${CMAKE_BIN}" --version
+
+        # Configure the build
+        echo "Configuring build..."
+        (cd "${BUILD_DIR}" && "${CMAKE_BIN}" "${BASE_DIR}/build/cmake")
+
+        # Build the project
+        echo "Building project..."
+        "${CMAKE_BIN}" --build "${BUILD_DIR}"
+
+        # Install to test directory
+        echo "Installing to test directory..."
+        DESTDIR="${INSTALL_TEST_DIR}" "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install
+
+        echo "Test completed successfully with cmake ${CMAKE_VERSION}"
+
+        # cleaning
+        rm -rf "${DOWNLOAD_DIR}" "${BUILD_DIR}" "${INSTALL_TEST_DIR}"
+
   lz4-build-cmake-static-lib: # See https://github.com/lz4/lz4/issues/1269
     name: cmake (static lib)
     runs-on: ubuntu-latest

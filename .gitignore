@@ -19,6 +19,10 @@
 *.app
 lz4
 
+# Builders
+cmakebuild/
+builddir/
+
 # IDE / editors files
 .clang_complete
 .vscode
@@ -46,7 +50,10 @@ ld.exe*
 # test artifacts
 *.lz4
 tmp*
-builddir/
+cmake_download/
+cmake_bins/
+cmake_build/
+cmake_install_test/
 
 # generated Windows resource files
 lib/*.rc
