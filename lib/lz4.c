@@ -366,6 +366,21 @@ static unsigned LZ4_isLittleEndian(void)
     return one.c[0];
 }
 
+#ifndef LZ4_FAST_DEC_LOOP
+#  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
+#    define LZ4_FAST_DEC_LOOP 1
+#  elif defined(__aarch64__) && defined(__APPLE__)
+#    define LZ4_FAST_DEC_LOOP 1
+#  elif defined(__aarch64__) && !defined(__clang__)
+     /* On non-Apple aarch64, we disable this optimization for clang because
+      * on certain mobile chipsets, performance is reduced with clang. For
+      * more information refer to https://github.com/lz4/lz4/pull/707 */
+#    define LZ4_FAST_DEC_LOOP 1
+#  else
+#    define LZ4_FAST_DEC_LOOP 0
+#  endif
+#endif
+
 #if defined(__GNUC__) || defined(__INTEL_COMPILER)
 #define LZ4_PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
 #elif defined(_MSC_VER)
@@ -381,6 +396,9 @@ static reg_t LZ4_read_ARCH(const void* memPtr) { return *(const reg_t*) memPtr; 
 
 static void LZ4_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
 static void LZ4_write32(void* memPtr, U32 value) { *(U32*)memPtr = value; }
+#if LZ4_FAST_DEC_LOOP
+static void LZ4_write_ARCH(void* memPtr, reg_t value) { *(reg_t*)memPtr = value; }
+#endif
 
 #elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
 
@@ -396,6 +414,9 @@ static reg_t LZ4_read_ARCH(const void* ptr) { return ((const LZ4_unalignST*)ptr)
 
 static void LZ4_write16(void* memPtr, U16 value) { ((LZ4_unalign16*)memPtr)->u16 = value; }
 static void LZ4_write32(void* memPtr, U32 value) { ((LZ4_unalign32*)memPtr)->u32 = value; }
+#if LZ4_FAST_DEC_LOOP
+static void LZ4_write_ARCH(void* memPtr, reg_t value) { ((LZ4_unalignST*)memPtr)->uArch = value; }
+#endif
 
 #else  /* safe and portable access using memcpy() */
 
@@ -423,6 +444,13 @@ static void LZ4_write32(void* memPtr, U32 value)
 {
     LZ4_memcpy(memPtr, &value, sizeof(value));
 }
+
+#if LZ4_FAST_DEC_LOOP
+static void LZ4_write_ARCH(void* memPtr, reg_t value)
+{
+    LZ4_memcpy(memPtr, &value, sizeof(value));
+}
+#endif
 
 #endif /* LZ4_FORCE_MEMORY_ACCESS */
 
@@ -474,22 +502,6 @@ void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
 static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
 static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
-
-#ifndef LZ4_FAST_DEC_LOOP
-#  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && defined(__APPLE__)
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && !defined(__clang__)
-     /* On non-Apple aarch64, we disable this optimization for clang because
-      * on certain mobile chipsets, performance is reduced with clang. For
-      * more information refer to https://github.com/lz4/lz4/pull/707 */
-#    define LZ4_FAST_DEC_LOOP 1
-#  else
-#    define LZ4_FAST_DEC_LOOP 0
-#  endif
-#endif
-
 #if LZ4_FAST_DEC_LOOP
 
 LZ4_FORCE_INLINE void
@@ -534,40 +546,44 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
 LZ4_FORCE_INLINE void
 LZ4_memcpy_using_offset(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
 {
-    BYTE v[8];
+    reg_t r;
 
     assert(dstEnd >= dstPtr + MINMATCH);
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 4310) /* warning C4310: cast truncates constant value. */
+#endif
 
     switch(offset) {
     case 1:
-        MEM_INIT(v, *srcPtr, 8);
+        r = *srcPtr * ((reg_t)0x0101010101010101ULL);
         break;
     case 2:
-        LZ4_memcpy(v, srcPtr, 2);
-        LZ4_memcpy(&v[2], srcPtr, 2);
-#if defined(_MSC_VER) && (_MSC_VER <= 1937) /* MSVC 2022 ver 17.7 or earlier */
-#  pragma warning(push)
-#  pragma warning(disable : 6385) /* warning C6385: Reading invalid data from 'v'. */
-#endif
-        LZ4_memcpy(&v[4], v, 4);
-#if defined(_MSC_VER) && (_MSC_VER <= 1937) /* MSVC 2022 ver 17.7 or earlier */
-#  pragma warning(pop)
-#endif
+        r = LZ4_read16(srcPtr) * ((reg_t)0x0001000100010001ULL);
         break;
     case 4:
-        LZ4_memcpy(v, srcPtr, 4);
-        LZ4_memcpy(&v[4], srcPtr, 4);
+        r = LZ4_read32(srcPtr) * ((reg_t)0x0000000100000001ULL);
         break;
+    case 8:
+        if (sizeof(reg_t) == 8) {
+            r = LZ4_read_ARCH(srcPtr);
+            break;
+        }
+        /* fallthrough */
     default:
         LZ4_memcpy_using_offset_base(dstPtr, srcPtr, dstEnd, offset);
         return;
     }
 
-    LZ4_memcpy(dstPtr, v, 8);
-    dstPtr += 8;
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
+
+    LZ4_write_ARCH(dstPtr, r);
+    dstPtr += sizeof(reg_t);
     while (dstPtr < dstEnd) {
-        LZ4_memcpy(dstPtr, v, 8);
-        dstPtr += 8;
+        LZ4_write_ARCH(dstPtr, r);
+        dstPtr += sizeof(reg_t);
     }
 }
 #endif
