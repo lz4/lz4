@@ -20,7 +20,7 @@ DESCRIPTION
 
 `lz4` is a CLI based on `liblz4`, an extremely fast implementation of lossless compression algorithm.
 It provides a default compression speed of typically > 500 MB/s per core.
-Speed can traded for higher compression ratio, by increasing the compression level parameter.
+Speed can traded for better compression ratio, by increasing the compression level parameter.
 While decompression is single-threaded, it reaches multiple GB/s, generally fast enough to be I/O bound.
 `lz4` native file format is the `.lz4` format.
 
@@ -120,7 +120,7 @@ only the latest one will be applied.
 
 * `-#`:
   Compression level, with # being any value from 1 to 12.
-  Higher values trade compression speed for compression ratio.
+  Higher values trade compression speed for better compression ratio.
   Values above 12 are considered the same as 12.
   Recommended values are 1 for fast compression (default),
   and 9 for high compression.
@@ -129,7 +129,7 @@ only the latest one will be applied.
 
 * `--fast[=#]`:
   Switch to ultra-fast compression levels.
-  The higher the value, the faster the compression speed, at the cost of some compression ratio.
+  The higher the value, the faster the compression speed, but at the cost of compressed size.
   If `=#` is not present, it defaults to `1`.
   This setting overrides compression level if one was set previously.
   Similarly, if a compression level is set after `--fast`, it overrides it.

@@ -58,7 +58,7 @@ The files are then read entirely into memory, to eliminate I/O overhead.
 When multiple files are provided, they are bundled into the same benchmark session (though each file is a separate compression / decompression). Using `-S` command separates them (one session per file).
 When no file is provided, uses an internal Lorem Ipsum generator instead.
 
-The benchmark measures ratio, compressed size, compression and decompression speed.
+The benchmark measures compressed size, compression factor, compression and decompression speed.
 One can select multiple compression levels starting from `-b` and ending with `-e` (ascending).
 The `-i` parameter selects a number of seconds used for each session.
 

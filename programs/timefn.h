@@ -1,6 +1,6 @@
 /*
   timefn.h - portable time measurement functions
-  Copyright (C) Yann Collet 2023
+  Copyright (c) Yann Collet. All rights reserved.
 
   GPL v2 License
 

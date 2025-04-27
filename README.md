@@ -44,7 +44,7 @@ in single-thread mode.
 [lzbench]: https://github.com/inikep/lzbench
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 
-|  Compressor             | Ratio   | Compression | Decompression |
+|  Compressor             | Factor  | Compression | Decompression |
 |  ----------             | -----   | ----------- | ------------- |
 |  memcpy                 |  1.000  | 13700 MB/s  |  13700 MB/s   |
 |**LZ4 default (v1.9.0)** |**2.101**| **780 MB/s**| **4970 MB/s** |

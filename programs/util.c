@@ -1,6 +1,6 @@
 /*
     util.h - utility functions
-    Copyright (C) 2023, Yann Collet
+    Copyright (c) Yann Collet. All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

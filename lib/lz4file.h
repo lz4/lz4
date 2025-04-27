@@ -1,7 +1,8 @@
 /*
    LZ4 file library
    Header File
-   Copyright (C) 2022, Xiaomi Inc.
+   Copyright (c) Yann Collet and LZ4 contributors. All rights reserved.
+
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without

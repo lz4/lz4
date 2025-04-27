@@ -1,6 +1,6 @@
 /*
  * LZ4 auto-framing library
- * Copyright (C) 2011-2016, Yann Collet.
+ * Copyright (c) Yann Collet. All rights reserved.
  *
  * BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
  *

@@ -1,6 +1,6 @@
 /*
   LZ4conf.h - compile-time parameters
-  Copyright (C) Yann Collet 2011-2024
+  Copyright (c) Yann Collet. All rights reserved.
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
