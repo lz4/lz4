@@ -14,11 +14,14 @@ Please note the following restrictions:
 
 ## What's the point of this example?
 
-- Line by line incremental (de)compression.
-- Handle huge file in small amount of memory
-- Generally better compression ratio than Block API
-- Non-uniform block size
+The LZ4 Streaming API can be used to handle compressing a huge file in a small
+amount of memory. This example shows how to use a "Ring Buffer" to compress
+blocks (i.e. chunks) of a non-uniform size in a stream. The Streaming API used
+in this way generally yields a better compression ratio than the regular Block
+API.
 
+For an example with uniform blocks, see ["LZ4 Streaming API Example: Double
+Buffer"](blockStreaming_doubleBuffer.md).
 
 ## How compression works
 
