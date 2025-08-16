@@ -32,8 +32,14 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
         |
         v
      {Out#1}
+```
 
+Next (see (1)), read first line to ringbuffer and compress it by `LZ4_compress_continue()`.
+For the first time, LZ4 doesn't know any previous dependencies,
+so it just compress the line without dependencies and generates compressed line {Out#1} to LZ4 compressed data buffer.
+After that, write {Out#1} to the file and forward ringbuffer offset.
 
+```
 (2)
     Prefix Mode Dependency
           +----+
@@ -46,7 +52,6 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                  v
               {Out#2}
 
-
 (3)
           Prefix   Prefix
           +----+   +----+
@@ -58,8 +63,13 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                           |
                           v
                        {Out#3}
+```
 
+Do the same things to second line (see (2)). Repeat again for the third line (see (3)).
+But in this time, LZ4 can use dependency to Line#1 (and then Line#2 and Line#1) to improve compression ratio.
+This dependency is called "Prefix mode".
 
+```
 (4)
                         External Dictionary Mode
                 +----+   +----+
@@ -73,8 +83,14 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                             |  {Out#X+1}
                             |
                           Reset
+```
 
+Eventually, we'll reach end of ringbuffer at Line#X (see (4)).
+This time, we should reset ringbuffer offset.
+After resetting, at Line#X+1 pointer is not adjacent, but LZ4 still maintain its memory.
+This is called "External Dictionary Mode".
 
+```
 (5)
                                     Prefix
                                     +-----+
@@ -89,20 +105,6 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                             |
                           Reset
 ```
-
-Next (see (1)), read first line to ringbuffer and compress it by `LZ4_compress_continue()`.
-For the first time, LZ4 doesn't know any previous dependencies,
-so it just compress the line without dependencies and generates compressed line {Out#1} to LZ4 compressed data buffer.
-After that, write {Out#1} to the file and forward ringbuffer offset.
-
-Do the same things to second line (see (2)).
-But in this time, LZ4 can use dependency to Line#1 to improve compression ratio.
-This dependency is called "Prefix mode".
-
-Eventually, we'll reach end of ringbuffer at Line#X (see (4)).
-This time, we should reset ringbuffer offset.
-After resetting, at Line#X+1 pointer is not adjacent, but LZ4 still maintain its memory.
-This is called "External Dictionary Mode".
 
 In Line#X+2 (see (5)), finally LZ4 forget almost all memories but still remains Line#X+1.
 This is the same situation as Line#2.
