@@ -51,7 +51,7 @@
 /* Add RVV support at the top, reference from the provided diff */
 #if defined(__riscv_vector)
 #  include <riscv_vector.h>
-#  define LZ4_VECTOR LZ4_RVV  /* 定义 LZ4 的向量类型，类似于 XXH_VECTOR */
+#  define LZ4_VECTOR LZ4_RVV  /* Define LZ4 vector type, similar to XXH_VECTOR */ 
 
   /* Define RVV_OP macro for compatibility with different compilers, as in diff */
 #  if ((defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 13) || \
