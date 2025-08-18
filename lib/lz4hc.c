@@ -48,6 +48,21 @@
 #  define LZ4HC_HEAPMODE 1
 #endif
 
+/* Add RVV support at the top, reference from the provided diff */
+#if defined(__riscv_vector)
+#  include <riscv_vector.h>
+#  define LZ4_VECTOR LZ4_RVV  /* 定义 LZ4 的向量类型，类似于 XXH_VECTOR */
+
+  /* Define RVV_OP macro for compatibility with different compilers, as in diff */
+#  if ((defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 13) || \
+       (defined(__clang__) && __clang_major__ < 16))
+#    define RVV_OP(op) op
+#  else
+#    define concat2(X, Y) X ## Y
+#    define concat(X, Y) concat2(X, Y)
+#    define RVV_OP(op) concat(__riscv_, op)
+#  endif
+#endif
 
 /*===    Dependency    ===*/
 #define LZ4_HC_STATIC_LINKING_ONLY
@@ -206,23 +221,89 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
                     const BYTE* const iMin, const BYTE* const mMin)
 {
     int back = 0;
+    /* min is a negative value, representing the maximum backward distance from ip/match.
+     * MAX ensures we don't exceed either boundary. */
     int const min = (int)MAX(iMin - ip, mMin - match);
-    assert(min <= 0);
-    assert(ip >= iMin); assert((size_t)(ip-iMin) < (1U<<31));
-    assert(match >= mMin); assert((size_t)(match - mMin) < (1U<<31));
 
+    /* Assertions to ensure pointers are valid and within expected ranges */
+    assert(min <= 0);
+    assert(ip >= iMin); assert((size_t)(ip - iMin) < (1U << 31));
+    assert(match >= mMin); assert((size_t)(match - mMin) < (1U << 31));
+
+#if defined(__riscv_vector)
+    /* ==================================
+     * RISC-V Vector (RVV) optimized implementation
+     * ================================== */
+
+    /* Minimum remaining bytes to engage vector optimization.
+     * This should be at least one full vector register length (e.g., 32 bytes). */
+    const int RVV_MIN_LEN_FOR_VECTOR = 32;
+
+    /* Check if it's worth starting RVV optimization:
+     * (back - min) is the positive total backward bytes available. */
+    if ((back - min) >= RVV_MIN_LEN_FOR_VECTOR) {
+        size_t vl;  /* Actual vector length processed per iteration */
+
+        /* Main loop: Continue as long as there are bytes left to process backward */
+        while ((back - min) > 0) {
+            /* 1. Set vector length to the maximum possible for 8-bit elements, limited by remaining backward bytes.
+             *    This automatically handles tail data near boundaries. */
+            vl = RVV_OP(vsetvl_e8m1)(back - min);
+
+            /* If vl is too small, break to scalar for efficiency */
+            if (vl < 8) break;
+
+            /* 2. Vector load: Since this is backward, load from (ip + back - vl) to (ip + back - 1) */
+            const BYTE* current_ip_load_base = ip + back - (int)vl;
+            const BYTE* current_match_load_base = match + back - (int)vl;
+
+            vuint8m1_t v_ip_data = RVV_OP(vle8_v_u8m1)(current_ip_load_base, vl);
+            vuint8m1_t v_match_data = RVV_OP(vle8_v_u8m1)(current_match_load_base, vl);
+
+            /* 3. Vector comparison to generate mask:
+             *    vmsne (Vector Mask Set if Not Equal)
+             *    Sets mask bit to 1 if bytes differ, else 0. */
+            vbool8_t m_notequal = RVV_OP(vmsne_vv_u8m1_b1)(v_ip_data, v_match_data, vl);
+
+            /* 4. Check if any mismatch in the chunk:
+             *    Use vfirst to detect if there's any set bit (mismatch). */
+            long first_mismatch_idx = RVV_OP(vfirst_m_b1)(m_notequal, vl);
+
+            /* 5. Analyze the result */
+            if (first_mismatch_idx == -1) {
+                /* All vl bytes match: Safely advance backward by vl bytes */
+                back -= (int)vl;
+            } else {
+                /* Mismatch found in this chunk: Break to scalar to handle precisely from here */
+                break;
+            }
+        }
+    }
+
+    /* After RVV loop (or if not used), fall back to scalar for remaining bytes or precision. */
+
+#endif
+
+    /* ==================================
+     * Scalar fallback (for remaining short sequences or non-RVV platforms)
+     * ================================== */
+    /* This handles:
+     * 1. If RVV not enabled (e.g., not RISC-V RVV or length too short).
+     * 2. Remaining tail after RVV, including precise mismatch detection in last chunk. */
     while ((back - min) > 3) {
         U32 const v = LZ4_read32(ip + back - 4) ^ LZ4_read32(match + back - 4);
         if (v) {
+            /* LZ4HC_NbCommonBytes32(v) determines how many bytes match from LSB in the 4-byte block. */
             return (back - (int)LZ4HC_NbCommonBytes32(v));
         } else back -= 4; /* 4-byte step */
     }
-    /* check remainder if any */
-    while ( (back > min)
-         && (ip[back-1] == match[back-1]) )
+    /* Check remainder if any (less than 4 bytes left) */
+    while ((back > min)
+         && (ip[back - 1] == match[back - 1]))
             back--;
     return back;
 }
+
 
 /*===   Chain table updates   ===*/
 #define DELTANEXTU16(table, pos) table[(U16)(pos)]   /* faster */
@@ -885,17 +966,67 @@ LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
 {
     const BYTE* const iStart = ip;
 
-    while (likely(ip >= iLow+4)) {
-        if (LZ4_read32(ip-4) != pattern) break;
+#if defined(__riscv_vector)
+    /* ==================================
+     * RISC-V Vector (RVV) optimized implementation
+     * ================================== */
+
+    /* Key decision: Only engage vector engine if remaining length is sufficiently long.
+     * 32 bytes is an adjustable heuristic; typically needs at least a few vector operations to be worthwhile. */
+    if ((ip - iLow) >= 32) {
+        size_t vl;  /* Vector length processed per iteration (in U32 elements) */
+
+        /* Main loop: Continue as long as there are at least 4 bytes left to process */
+        while (ip >= iLow + 4) {
+            /* 1. Set vector length to the maximum possible for 32-bit elements, limited by remaining U32 blocks.
+             *    This handles automatic scaling based on hardware VLEN and remaining data. */
+            vl = RVV_OP(vsetvl_e32m1)((ip - iLow) / 4);
+
+            /* 2. Vector load: Load vl U32 elements backward from (ip - 4) down to (ip - vl*4) */
+            const U32* load_base = (const U32*)(ip - vl * 4);
+            vuint32m1_t v_data = RVV_OP(vle32_v_u32m1)(load_base, vl);
+
+            /* 3. Broadcast the pattern to a vector */
+            vuint32m1_t v_pattern = RVV_OP(vmv_v_x_u32m1)(pattern, vl);
+
+            /* 4. Vector comparison to generate mask:
+             *    vmsne (Vector Mask Set if Not Equal)
+             *    Sets mask bit to 1 if elements differ, else 0. */
+            vbool32_t m_notequal = RVV_OP(vmsne_vv_u32m1_b32)(v_data, v_pattern, vl);
+
+            /* 5. Find the first set bit in the mask (any mismatch) */
+            long first_mismatch_idx = RVV_OP(vfirst_m_b32)(m_notequal, vl);
+
+            /* 6. Analyze the result */
+            if (first_mismatch_idx == -1) {
+                /* All vl U32 blocks match: Advance backward by vl * 4 bytes */
+                ip -= vl * 4;
+            } else {
+                /* Mismatch found in this chunk: Break to scalar for precise handling */
+                break;
+            }
+        }
+    }
+
+    /* After RVV loop (or if not used), fall back to scalar for remaining blocks or precision. */
+
+#endif
+
+    /* ==================================
+     * Scalar fallback (for short sequences or non-RVV platforms)
+     * ================================== */
+    while (likely(ip >= iLow + 4)) {
+        if (LZ4_read32(ip - 4) != pattern) break;
         ip -= 4;
     }
     {   const BYTE* bytePtr = (const BYTE*)(&pattern) + 3; /* works for any endianness */
-        while (likely(ip>iLow)) {
+        while (likely(ip > iLow)) {
             if (ip[-1] != *bytePtr) break;
             ip--; bytePtr--;
     }   }
     return (unsigned)(iStart - ip);
 }
+
 
 /* LZ4HC_protectDictEnd() :
  * Checks if the match is in the last 3 bytes of the dictionary, so reading the

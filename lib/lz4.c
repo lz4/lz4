@@ -93,7 +93,21 @@
 #  define LZ4_FORCE_SW_BITCOUNT
 #endif
 
+/* Add RVV support at the top, reference from the provided diff */
+#if defined(__riscv_vector)
+#  include <riscv_vector.h>
+#  define LZ4_VECTOR LZ4_RVV  /* 定义 LZ4 的向量类型，类似于 XXH_VECTOR */
 
+  /* Define RVV_OP macro for compatibility with different compilers, as in diff */
+#  if ((defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 13) || \
+       (defined(__clang__) && __clang_major__ < 16))
+#    define RVV_OP(op) op
+#  else
+#    define concat2(X, Y) X ## Y
+#    define concat(X, Y) concat2(X, Y)
+#    define RVV_OP(op) concat(__riscv_, op)
+#  endif
+#endif
 
 /*-************************************
 *  Dependency
@@ -468,8 +482,38 @@ void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
-    do { LZ4_memcpy(d,s,8); d+=8; s+=8; } while (d<e);
+#if defined(__riscv_vector)
+    /* ==================================
+     * RISC-V Vector (RVV) optimized implementation
+     * ================================== */
+    /* Process in vector chunks, adapting vector length dynamically */
+    while (d < e) {
+        /* 1. Set vector length to the maximum possible for 8-bit elements, limited by remaining bytes */
+        size_t vl = RVV_OP(vsetvl_e8m1)(e - d);
+
+        /* 2. Vector load: Load vl bytes from source s into a vector register */
+        vuint8m1_t data_vec = RVV_OP(vle8_v_u8m1)(s, vl);
+
+        /* 3. Vector store: Store the vector data to destination d */
+        RVV_OP(vse8_v_u8m1)(d, data_vec, vl);
+
+        /* 4. Advance pointers by vl bytes */
+        s += vl;
+        d += vl;
+    }
+#else
+    /* ==================================
+     * Scalar fallback for non-RVV platforms:
+     * Use standard memcpy in 8-byte chunks
+     * ================================== */
+    do {
+        LZ4_memcpy(d, s, 8);
+        d += 8;
+        s += 8;
+    } while (d < e);
+#endif
 }
+
 
 static const unsigned inc32table[8] = {0, 1, 2,  1,  0,  4, 4, 4};
 static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
@@ -527,8 +571,39 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
-    do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+#if defined(__riscv_vector)
+    /* ==================================
+     * RISC-V Vector (RVV) optimized implementation
+     * ================================== */
+    /* Process in vector chunks, adapting vector length dynamically */
+    while (d < e) {
+        /* 1. Set vector length to the maximum possible for 8-bit elements, limited by remaining bytes */
+        size_t vl = RVV_OP(vsetvl_e8m1)(e - d);
+
+        /* 2. Vector load: Load vl bytes from source s into a vector register */
+        vuint8m1_t data_vec = RVV_OP(vle8_v_u8m1)(s, vl);
+
+        /* 3. Vector store: Store the vector data to destination d */
+        RVV_OP(vse8_v_u8m1)(d, data_vec, vl);
+
+        /* 4. Advance pointers by vl bytes */
+        s += vl;
+        d += vl;
+    }
+#else
+    /* ==================================
+     * Scalar fallback for non-RVV platforms:
+     * Use standard memcpy in two 16-byte chunks per iteration
+     * ================================== */
+    do {
+        LZ4_memcpy(d, s, 16);
+        LZ4_memcpy(d + 16, s + 16, 16);
+        d += 32;
+        s += 32;
+    } while (d < e);
+#endif
 }
+
 
 /* LZ4_memcpy_using_offset()  presumes :
  * - dstEnd >= dstPtr + MINMATCH
@@ -683,26 +758,73 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
-    if (likely(pIn < pInLimit-(STEPSIZE-1))) {
-        reg_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
-        if (!diff) {
-            pIn+=STEPSIZE; pMatch+=STEPSIZE;
-        } else {
-            return LZ4_NbCommonBytes(diff);
-    }   }
+#if defined(__riscv_vector)
+    /* ==================================
+     * RISC-V Vector (RVV) optimized implementation
+     * ================================== */
 
-    while (likely(pIn < pInLimit-(STEPSIZE-1))) {
+    /* Key decision: Only engage vector engine if remaining length is sufficiently long.
+     * 32 is an adjustable heuristic; typically needs at least 2 vector operations to be worthwhile. */
+    if (pInLimit - pStart >= 32) {
+        size_t vl;  /* Vector length processed per iteration */
+
+        /* Main loop: Continue comparing as long as pIn hasn't exceeded pInLimit */
+        while (pIn < pInLimit) {
+            /* 1. Set vector length to the maximum possible for 8-bit elements, limited by remaining bytes.
+             *    This handles the "tail" data automatically in the last iteration. */
+            vl = RVV_OP(vsetvl_e8m1)(pInLimit - pIn);
+
+            /* 2. Vector load: Load vl bytes from pIn and pMatch into vector registers */
+            vuint8m1_t v_in = RVV_OP(vle8_v_u8m1)(pIn, vl);
+            vuint8m1_t v_match = RVV_OP(vle8_v_u8m1)(pMatch, vl);
+
+            /* 3. Vector comparison to generate mask:
+             *    vmsne (Vector Mask Set if Not Equal)
+             *    Sets mask bit to 1 if bytes in v_in and v_match differ, else 0. */
+            vbool8_t m_notequal = RVV_OP(vmsne_vv_u8m1_b1)(v_in, v_match, vl);
+
+            /* 4. Find the first set bit in the mask:
+             *    vfirst (Find First set bit in mask)
+             *    Returns index of the first mismatch in the current vector chunk. */
+            long first_mismatch_idx = RVV_OP(vfirst_m_b1)(m_notequal, vl);
+
+            /* 5. Analyze the result */
+            if (first_mismatch_idx == -1) {
+                /* Equals -1: All vl bytes match.
+                 * Advance pointers by vl and continue to next iteration. */
+                pIn += vl;
+                pMatch += vl;
+            } else {
+                /* Not -1: Found the first mismatch at index first_mismatch_idx.
+                 * Advance to the mismatch position and return the total match length. */
+                pIn += first_mismatch_idx;
+                return (unsigned)(pIn - pStart);
+            }
+        }
+    }
+
+    /* If remaining length is short, or after RVV loop,
+     * fall back to scalar code to handle the last few bytes. */
+
+#endif
+
+    /* ==================================
+     * Scalar fallback (for short sequences or non-RVV platforms)
+     * ================================== */
+    while (likely(pIn < pInLimit - (STEPSIZE - 1))) {
         reg_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
-        if (!diff) { pIn+=STEPSIZE; pMatch+=STEPSIZE; continue; }
+        if (!diff) { pIn += STEPSIZE; pMatch += STEPSIZE; continue; }
         pIn += LZ4_NbCommonBytes(diff);
         return (unsigned)(pIn - pStart);
     }
 
-    if ((STEPSIZE==8) && (pIn<(pInLimit-3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn+=4; pMatch+=4; }
-    if ((pIn<(pInLimit-1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn+=2; pMatch+=2; }
-    if ((pIn<pInLimit) && (*pMatch == *pIn)) pIn++;
+    if ((STEPSIZE == 8) && (pIn < (pInLimit - 3)) && (LZ4_read32(pMatch) == LZ4_read32(pIn))) { pIn += 4; pMatch += 4; }
+    if ((pIn < (pInLimit - 1)) && (LZ4_read16(pMatch) == LZ4_read16(pIn))) { pIn += 2; pMatch += 2; }
+    if ((pIn < pInLimit) && (*pMatch == *pIn)) pIn++;
+
     return (unsigned)(pIn - pStart);
 }
+
 
 
 #ifndef LZ4_COMMONDEFS_ONLY
