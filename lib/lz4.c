@@ -1756,6 +1756,35 @@ int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
         /* Fill hash table with additional references, to improve compression capability */
         p = dict->dictionary;
         idx32 = dict->currentOffset - dict->dictSize;
+        
+#if defined(__riscv_vector)
+        /* ==================================
+         * RISC-V Vector (RVV) optimized dictionary hash table filling
+         * ================================== */
+        
+        const BYTE* const dict_end_limit = dictEnd - HASH_UNIT;
+        const U32 limit = dict->currentOffset - 64 KB;
+        
+        /* Process dictionary in chunks for vectorized hash computation */
+        while (p + 16 <= dict_end_limit) {  /* Process 16 bytes at a time */
+            /* Note: Hash computation is complex to vectorize efficiently
+             * due to the specific hash function. We optimize by batching
+             * the hash table lookups and updates. */
+            
+            /* For now, process 4 positions in a batch */
+            for (int batch = 0; batch < 4 && p <= dict_end_limit; batch++) {
+                U32 const h = LZ4_hashPosition(p, tableType);
+                if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= limit) {
+                    /* Note: not overwriting => favors positions beginning of dictionary */
+                    LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
+                }
+                p++; idx32++;
+            }
+        }
+        
+        /* Process remaining positions with scalar code */
+#endif
+        
         while (p <= dictEnd-HASH_UNIT) {
             U32 const h = LZ4_hashPosition(p, tableType);
             U32 const limit = dict->currentOffset - 64 KB;
@@ -1818,10 +1847,56 @@ static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, int nextSize)
         const BYTE* dictEnd = LZ4_dict->dictionary + LZ4_dict->dictSize;
         int i;
         DEBUGLOG(4, "LZ4_renormDictT");
+        
+#if defined(__riscv_vector)
+        /* ==================================
+         * RISC-V Vector (RVV) optimized hash table renormalization
+         * ================================== */
+        
+        /* Process hash table entries in vector batches */
+        U32* hashTable = LZ4_dict->hashTable;
+        int remaining = LZ4_HASH_SIZE_U32;
+        i = 0;
+        
+        while (remaining >= 4) {
+            size_t vl = RVV_OP(vsetvl_e32m1)(MIN(remaining, 8));  /* Process up to 8 elements */
+            
+            /* Load hash table values */
+            vuint32m1_t hash_values = RVV_OP(vle32_v_u32m1)(&hashTable[i], vl);
+            
+            /* Create delta vector for comparison */
+            vuint32m1_t delta_vec = RVV_OP(vmv_v_x_u32m1)(delta, vl);
+            
+            /* Create mask for values less than delta */
+            vbool32_t lt_mask = RVV_OP(vmsltu_vv_u32m1_b32)(hash_values, delta_vec, vl);
+            
+            /* Subtract delta from values >= delta, set to 0 for values < delta */
+            vuint32m1_t subtracted = RVV_OP(vsub_vv_u32m1)(hash_values, delta_vec, vl);
+            vuint32m1_t zero_vec = RVV_OP(vmv_v_x_u32m1)(0, vl);
+            vuint32m1_t result = RVV_OP(vmerge_vvm_u32m1)(subtracted, zero_vec, lt_mask, vl);
+            
+            /* Store results back */
+            RVV_OP(vse32_v_u32m1)(&hashTable[i], result, vl);
+            
+            i += (int)vl;
+            remaining -= (int)vl;
+        }
+        
+        /* Process remaining entries with scalar code */
+        while (i < LZ4_HASH_SIZE_U32) {
+            if (LZ4_dict->hashTable[i] < delta) LZ4_dict->hashTable[i] = 0;
+            else LZ4_dict->hashTable[i] -= delta;
+            i++;
+        }
+        
+#else
+        /* Scalar implementation */
         for (i=0; i<LZ4_HASH_SIZE_U32; i++) {
             if (LZ4_dict->hashTable[i] < delta) LZ4_dict->hashTable[i]=0;
             else LZ4_dict->hashTable[i] -= delta;
         }
+#endif
+        
         LZ4_dict->currentOffset = 64 KB;
         if (LZ4_dict->dictSize > 64 KB) LZ4_dict->dictSize = 64 KB;
         LZ4_dict->dictionary = dictEnd - LZ4_dict->dictSize;

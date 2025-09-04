@@ -59,6 +59,9 @@ OBJFILES = $(SRCFILES:.c=.o)
 
 include ../build/make/lz4defs.make
 
+# Include RVV optimization configuration
+-include ../build/make/rvv_config.make
+
 # default is defined as the first target in Makefile, hence before multiconf.make
 .PHONY: default
 default: lib-release
