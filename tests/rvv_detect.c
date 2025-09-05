@@ -51,16 +51,16 @@ static void print_optimization_status(void) {
     printf("===========================\n");
     
 #if defined(__riscv_vector)
-    printf("✓ LZ4_count - String matching\n");
-    printf("✓ LZ4_wildCopy8/32 - Memory copying\n");
-    printf("✓ LZ4HC_countBack - Backward counting\n");
-    printf("✓ LZ4HC_reverseCountPattern - Pattern matching\n");
-    printf("✓ XXH32/XXH64 - Hash computation\n");
-    printf("✓ LZ4HC_Insert - Hash table updates\n");
-    printf("✓ LZ4_renormDictT - Hash table renormalization\n");
-    printf("✓ LZ4_loadDict_internal - Dictionary loading\n");
+    printf("[ENABLED] LZ4_count - String matching\n");
+    printf("[ENABLED] LZ4_wildCopy8/32 - Memory copying\n");
+    printf("[ENABLED] LZ4HC_countBack - Backward counting\n");
+    printf("[ENABLED] LZ4HC_reverseCountPattern - Pattern matching\n");
+    printf("[ENABLED] XXH32/XXH64 - Hash computation\n");
+    printf("[ENABLED] LZ4HC_Insert - Hash table updates\n");
+    printf("[ENABLED] LZ4_renormDictT - Hash table renormalization\n");
+    printf("[ENABLED] LZ4_loadDict_internal - Dictionary loading\n");
 #else
-    printf("✗ All optimizations disabled (RVV not available)\n");
+    printf("[DISABLED] All optimizations disabled (RVV not available)\n");
 #endif
     
     printf("\n");
@@ -85,7 +85,8 @@ static void run_simple_performance_test(void) {
         src[i] = (unsigned char)(i % 256);
     }
     
-    /* Test vector memory copy */\n    printf("Testing vector memory copy...\n");
+    /* Test vector memory copy */
+    printf("Testing vector memory copy...\n");
     
     size_t pos = 0;
     while (pos < test_size) {

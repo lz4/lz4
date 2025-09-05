@@ -108,6 +108,13 @@
 #    define concat(X, Y) concat2(X, Y)
 #    define RVV_OP(op) concat(__riscv_, op)
 #  endif
+  
+  /* Define vector boolean types for compatibility */
+#  if ((__riscv_v_elen >= 64) && defined(__riscv_xlen) && (__riscv_xlen >= 64))
+#    define RVV_BOOL_TYPE(width) concat2(vbool,width ## _t)
+#  else
+#    define RVV_BOOL_TYPE(width) concat2(vbool8_t)
+#  endif
 #endif
 
 /*-************************************
@@ -773,21 +780,26 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
         while (pIn < pInLimit) {
             /* 1. Set vector length to the maximum possible for 8-bit elements, limited by remaining bytes.
              *    This handles the "tail" data automatically in the last iteration. */
+             
+            /* Declare variables at the beginning to comply with C90 */
+            vuint8m1_t v_in, v_match;
+            vbool8_t m_notequal;
+            long first_mismatch_idx;
             vl = RVV_OP(vsetvl_e8m1)(pInLimit - pIn);
 
             /* 2. Vector load: Load vl bytes from pIn and pMatch into vector registers */
-            vuint8m1_t v_in = RVV_OP(vle8_v_u8m1)(pIn, vl);
-            vuint8m1_t v_match = RVV_OP(vle8_v_u8m1)(pMatch, vl);
+            v_in = RVV_OP(vle8_v_u8m1)(pIn, vl);
+            v_match = RVV_OP(vle8_v_u8m1)(pMatch, vl);
 
             /* 3. Vector comparison to generate mask:
              *    vmsne (Vector Mask Set if Not Equal)
              *    Sets mask bit to 1 if bytes in v_in and v_match differ, else 0. */
-            vbool8_t m_notequal = RVV_OP(vmsne_vv_u8m1_b1)(v_in, v_match, vl);
+            m_notequal = RVV_OP(vmsne_vv_u8m1_b8)(v_in, v_match, vl);
 
             /* 4. Find the first set bit in the mask:
              *    vfirst (Find First set bit in mask)
              *    Returns index of the first mismatch in the current vector chunk. */
-            long first_mismatch_idx = RVV_OP(vfirst_m_b1)(m_notequal, vl);
+            first_mismatch_idx = RVV_OP(vfirst_m_b8)(m_notequal, vl);
 
             /* 5. Analyze the result */
             if (first_mismatch_idx == -1) {
@@ -835,6 +847,10 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 static const int LZ4_64Klimit = ((64 KB) + (MFLIMIT-1));
 static const U32 LZ4_skipTrigger = 6;  /* Increase this value ==> compression run slower on incompressible data */
 
+/* Add MIN macro definition */
+#ifndef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
 
 /*-************************************
 *  Local Structures and types
@@ -1762,8 +1778,13 @@ int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
          * RISC-V Vector (RVV) optimized dictionary hash table filling
          * ================================== */
         
-        const BYTE* const dict_end_limit = dictEnd - HASH_UNIT;
-        const U32 limit = dict->currentOffset - 64 KB;
+        const BYTE* const dict_end_limit;
+        const U32 limit;
+        const U32 outer_limit;
+        
+        dict_end_limit = dictEnd - HASH_UNIT;
+        limit = dict->currentOffset - 64 KB;
+        outer_limit = limit; /* Rename to avoid shadowing */
         
         /* Process dictionary in chunks for vectorized hash computation */
         while (p + 16 <= dict_end_limit) {  /* Process 16 bytes at a time */
@@ -1774,7 +1795,7 @@ int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
             /* For now, process 4 positions in a batch */
             for (int batch = 0; batch < 4 && p <= dict_end_limit; batch++) {
                 U32 const h = LZ4_hashPosition(p, tableType);
-                if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= limit) {
+                if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= outer_limit) {
                     /* Note: not overwriting => favors positions beginning of dictionary */
                     LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
                 }
@@ -1787,8 +1808,8 @@ int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
         
         while (p <= dictEnd-HASH_UNIT) {
             U32 const h = LZ4_hashPosition(p, tableType);
-            U32 const limit = dict->currentOffset - 64 KB;
-            if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= limit) {
+            U32 const inner_limit = dict->currentOffset - 64 KB;
+            if (LZ4_getIndexOnHash(h, dict->hashTable, tableType) <= inner_limit) {
                 /* Note: not overwriting => favors positions beginning of dictionary */
                 LZ4_putIndexOnHash(idx32, h, dict->hashTable, tableType);
             }
@@ -1854,8 +1875,11 @@ static void LZ4_renormDictT(LZ4_stream_t_internal* LZ4_dict, int nextSize)
          * ================================== */
         
         /* Process hash table entries in vector batches */
-        U32* hashTable = LZ4_dict->hashTable;
-        int remaining = LZ4_HASH_SIZE_U32;
+        U32* hashTable;
+        int remaining;
+        
+        hashTable = LZ4_dict->hashTable;
+        remaining = LZ4_HASH_SIZE_U32;
         i = 0;
         
         while (remaining >= 4) {
