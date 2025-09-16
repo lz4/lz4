@@ -28,6 +28,9 @@
 # datagen : generates synthetic data samples for tests & benchmarks
 # ##########################################################################
 
+.PHONY: default
+default: all
+
 LIBDIR  := ../lib
 PRGDIR  := ../programs
 VERSIONSTESTDIR := versionsTest
@@ -54,9 +57,6 @@ include ../build/make/multiconf.make
 TEST_FILES   := COPYING
 FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
-
-.PHONY: default
-default: all
 
 .PHONY: all
 all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
