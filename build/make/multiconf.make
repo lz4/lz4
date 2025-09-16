@@ -1,6 +1,6 @@
-# ##########################################################################
+# ################################################################
 # multiconf.make
-# Copyright (C) Yann Collet
+# Copyright (c) Yann Collet. All rights reserved.
 #
 # GPL v2 License
 #
@@ -18,7 +18,9 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
-# ##########################################################################
+# You can contact the author at :
+# - LZ4 source repository : https://github.com/lz4/lz4
+# ################################################################
 
 
 # Provides c_program(_shared_o) and cxx_program(_shared_o) target generation macros
@@ -67,6 +69,7 @@ CACHE_ROOT ?= cachedObjs
 DEPFLAGS = -MT $@ -MMD -MP -MF
 
 # Include dependency files
+
 include $(wildcard $(CACHE_ROOT)/**/*.d)
 include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
 
@@ -94,7 +97,7 @@ else
   HASH_FUNC = $(firstword $(shell echo $(2) | $(HASH) ))
 endif
 
-
+STRIP ?= strip
 MKDIR ?= mkdir
 LN ?= ln
 
@@ -117,7 +120,7 @@ define addTargetAsmObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/$(dir $(1))/.
 	@echo AS $$@
 	$$(CC) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
@@ -127,7 +130,7 @@ define addTargetCObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/$(dir $(1))/.
 	@echo CC $$@
 	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
@@ -137,7 +140,7 @@ define addTargetCxxObject  # targetName, suffix, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/$(dir $(1))/.
 	@echo CXX $$@
 	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
@@ -153,11 +156,19 @@ ASM_SRCDIRS += .
 vpath %.S $(ASM_SRCDIRS)
 
 # If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
-C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
-CPP_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
-CC_SRCS  ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc)))
+C_SRCS   ?= $(foreach dir,$(C_SRCDIRS),$(notdir $(wildcard $(dir)/*.c)))
+CPP_SRCS ?= $(foreach dir,$(CXX_SRCDIRS),$(notdir $(wildcard $(dir)/*.cpp)))
+CC_SRCS  ?= $(foreach dir,$(CXX_SRCDIRS),$(notdir $(wildcard $(dir)/*.cc)))
 CXX_SRCS ?= $(CPP_SRCS) $(CC_SRCS)
-ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
+ASM_SRCS ?= $(foreach dir,$(ASM_SRCDIRS),$(notdir $(wildcard $(dir)/*.S)))
+
+# Normalize source lists so cached object paths do not inherit leading "./"
+MCM_STRIP_DOT = $(patsubst ./%,%,$(1))
+C_SRCS   := $(call MCM_STRIP_DOT,$(C_SRCS))
+CPP_SRCS := $(call MCM_STRIP_DOT,$(CPP_SRCS))
+CC_SRCS  := $(call MCM_STRIP_DOT,$(CC_SRCS))
+CXX_SRCS := $(call MCM_STRIP_DOT,$(CXX_SRCS))
+ASM_SRCS := $(call MCM_STRIP_DOT,$(ASM_SRCS))
 
 # If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
 C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
@@ -176,7 +187,18 @@ $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 # Binaries are built in the cache directory, and then symlinked to the current directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
 
-define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashComplement
+
+# static_library - Create build rules for a static library with caching
+# Parameters:
+#   1. libName       - Library name (becomes output file and phony target)
+#   2. objectDeps    - Object file dependencies (will be built in cache path)
+# The following parameters are all optional:
+#   3. extraDeps     - Additional dependencies (no cache path prefix)
+#   4. postBuildCmds - Extra commands to run after AR
+#   5. extraHash     - Additional key to compute the unique cache path
+# Example:
+#   $(call static_library,libmath.a,vector.o matrix.o,$(CONFIG_H),strip $@,$(VERSION))
+define static_library  # libName, objectDeps, extraDeps, postBuildCmds, extraHash
 
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 MCM_ALL_BINS += $(1)
@@ -184,6 +206,9 @@ MCM_ALL_BINS += $(1)
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo AR $$@
 	$$(AR) $$(ARFLAGS) $$@ $$^
+ifeq ($(MCM_STRIP),1)
+	-$(STRIP) -S $$@
+endif
 	$(4)
 
 .PHONY: $(1)
@@ -194,7 +219,17 @@ $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS)
 endef # static_library
 
 
-define c_dynamic_library  # targetName, targetDeps, addlDeps, addRecipe, hashComplement
+# c_dynamic_library - Create build rules for a C dynamic/shared library with caching
+# Parameters:
+#   1. libName      - Library name (becomes output file and phony target)
+#   2. objectDeps   - Object file dependencies (will be built in cache path)
+# The following parameters are all optional:
+#   3. extraDeps    - Additional dependencies (no cache path prefix)
+#   4. postLinkCmds - Extra commands to run after linking
+#   5. extraHash    - Additional key to compute the unique cache path
+# Example:
+#   $(call c_dynamic_library,libmath.so,vector.o matrix.o,$(CONFIG_H),strip $@,$(VERSION))
+define c_dynamic_library  # libName, objectDeps, extraDeps, postLinkCmds, extraHash
 
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 MCM_ALL_BINS += $(1)
@@ -202,6 +237,9 @@ MCM_ALL_BINS += $(1)
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo LD $$@
 	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(LDFLAGS) -shared -o $$@ $$^ $$(LDLIBS)
+ifeq ($(MCM_STRIP),1)
+	-$(STRIP) -S $$@
+endif
 	$(4)
 
 .PHONY: $(1)
@@ -212,46 +250,85 @@ $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS)
 endef # c_dynamic_library
 
 
-define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashComplement, compiler, flags
+# program_base - Create build rules for an executable program with caching
+# Parameters:
+#   1. progName      - Executable name (becomes output file and phony target)
+#   2. objectDeps    - Object file dependencies (will be prefixed with cache path)
+# Parameters 3 to 5 are optional:
+#   3. extraDeps     - Additional dependencies (without cache path prefix)
+#   4. postLinkCmds  - Extra commands to run after linking
+#   5. extraHash     - Additional data to include in cache path hash
+# Parameters 6 & 7 are compulsory:
+#   6. compiler      - Variable name of compiler to use (CC or CXX)
+#   7. compilerFlags - Variable name of compiler flags to use (CFLAGS or CXXFLAGS)
+# Example:
+#   $(call program_base,myapp,main.o utils.o,$(CONFIG_H),strip $@,$(VERSION),CC,CFLAGS)
+#   $(call program_base,mycppapp,main.o utils.o,$(CONFIG_H),strip $@,$(VERSION),CXX,CXXFLAGS)
+define program_base  # progName, objectDeps, extraDeps, postLinkCmds, extraHash, compiler, compilerFlags
 
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
 MCM_ALL_BINS += $(1)
 
+ifeq ($(MCM_LD_RESPONSE_FILE),1)
+# Use response files when command line length limit is too small to fit the list of object files
+# Note: requires GNU make 4.0 or later
+
+$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+	@echo LD $$@
+	$$(file >$(1)_objects.rsp,$$^)
+	$$($(6)) $$(CPPFLAGS) $$($(7)) @$(1)_objects.rsp -o $$@ $$(LDFLAGS) $$(LDLIBS)
+	$(RM) $(1)_objects.rsp
+ifeq ($(MCM_STRIP),1)
+	-$(STRIP) $$@
+endif
+	$(4)
+
+else
+
+# for normal cases: use direct listing of object files
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo LD $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
+ifeq ($(MCM_STRIP),1)
+	-$(STRIP) $$@
+endif
 	$(4)
 
+endif
+
+MCM_HASH_$(1) = $$(call HASH_FUNC,$(1),$($(6)) $$(CPPFLAGS) $($(7)) $$(LDFLAGS) $$(LDLIBS) $(5))
+
 .PHONY: $(1)
-$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
+$(1) : $$(CACHE_ROOT)/$$(MCM_HASH_$(1))/$(1)
 	$$(LN) -sf $$< $$@$(EXT)
 
 endef # program_base
 # Note: $(EXT) must be set to .exe for Windows
 
-define c_program  # targetName, targetDeps, addlDeps, addRecipe
+define c_program  # progName, objectDeps, extraDeps, postLinkCmds
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1)$(2),CC,CFLAGS))
 endef # c_program
 
-define c_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
+define c_program_shared_o  # progName, objectDeps, extraDeps, postLinkCmds
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CC,CFLAGS))
 endef # c_program_shared_o
 
-define cxx_program  # targetName, targetDeps, addlDeps, addRecipe
+define cxx_program  # progName, objectDeps, extraDeps, postLinkCmds
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1)$(2),CXX,CXXFLAGS))
 endef # cxx_program
 
-define cxx_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
+define cxx_program_shared_o  # progName, objectDeps, extraDeps, postLinkCmds
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CXX,CXXFLAGS))
 endef # cxx_program_shared_o
 
 # --------------------------------------------------------------------------------------------
 
-# Cleaning: delete all objects and binaries created with this script
+# Cleaning: delete all objects and binaries created by this script
 .PHONY: clean_cache
 clean_cache:
 	$(RM) -rf $(CACHE_ROOT)
 	$(RM) $(MCM_ALL_BINS)
+	$(RM) *.rsp
 
 # automatically attach to standard clean target
 .PHONY: clean
