@@ -151,11 +151,8 @@ endef # addTargetCxxObject
 MCM_CACHE_ROOT_DIR := $(patsubst %/,%,$(CACHE_ROOT))
 MCM_SRCDIR_EXCLUDES ?=
 MCM_SRCDIR_EXCLUDES := $(patsubst %/,%,$(strip $(MCM_SRCDIR_EXCLUDES)))
-$(info Auto-discovered source directories, excluding: $(MCM_SRCDIR_EXCLUDES))
-MCM_DISCOVER_SRCDIRS_EXCLUDES := $(foreach dir,$(MCM_SRCDIR_EXCLUDES), ! -path './$(dir)' ! -path './$(dir)/*')
-$(info Exclusion patterns: $(MCM_DISCOVER_SRCDIRS_EXCLUDES))
-MCM_DISCOVER_SRCDIRS := $(shell find . -type d ! -path '*/.*' ! -path './$(MCM_CACHE_ROOT_DIR)' ! -path './$(MCM_CACHE_ROOT_DIR)/*' $(MCM_DISCOVER_SRCDIRS_EXCLUDES) -print)
-$(info Discovered source directories: $(MCM_DISCOVER_SRCDIRS))
+MCM_DISCOVER_SRCDIRS_PRUNE := $(foreach dir,$(MCM_SRCDIR_EXCLUDES), -o -path './$(dir)')
+MCM_DISCOVER_SRCDIRS := $(shell find . \( -path '*/.*' -o -path './$(MCM_CACHE_ROOT_DIR)' $(MCM_DISCOVER_SRCDIRS_PRUNE) \) -prune -o -type d -print)
 C_SRCDIRS += $(MCM_DISCOVER_SRCDIRS)
 CXX_SRCDIRS += $(MCM_DISCOVER_SRCDIRS)
 ASM_SRCDIRS += $(MCM_DISCOVER_SRCDIRS)
