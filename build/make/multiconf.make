@@ -29,18 +29,18 @@
 # Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
 # Complement target clean: delete objects and binaries created by this script
 
-# Requires:
-# - C_SRCDIRS, CXX_SRCDIRS, ASM_SRCDIRS defined
-#   OR
-#   C_SRCS, CXX_SRCS and ASM_SRCS variables defined
-#   *and* vpath set to find all source files
-#   OR
-#   C_OBJS, CXX_OBJS and ASM_OBJS variables defined
-#   *and* vpath set to find all source files
+# Finding source files:
+# - C_SRCDIRS, CXX_SRCDIRS, ASM_SRCDIRS are populated automatically for
+#   directories beneath the current working tree. Only specify them manually
+#   when adding sources outside of './'.
+#   Alternatively, define C_SRCS / CXX_SRCS / ASM_SRCS with matching vpaths
+#   or provide C_OBJS / CXX_OBJS / ASM_OBJS with matching vpaths.
 # - directory `cachedObjs/` available to cache object files.
 #   alternatively: set CACHE_ROOT to some different value.
 # Optional:
 # - HASH can be set to a different custom hash program.
+# - MCM_SRCDIR_EXCLUDES can list directories (relative to '.') skipped during
+#   auto-discovery of source directories.
 
 # *_program*: generates a recipe for a target that will be built in a cache directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
@@ -146,13 +146,23 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/$(dir $(1))/.
 
 endef # addTargetCxxObject
 
-# Create targets for individual object files
-C_SRCDIRS += .
+# Automatically discover source directories.
+# Users may populate MCM_SRCDIR_EXCLUDES to prune heavyweight directories.
+MCM_CACHE_ROOT_DIR := $(patsubst %/,%,$(CACHE_ROOT))
+MCM_SRCDIR_EXCLUDES ?=
+MCM_SRCDIR_EXCLUDES := $(patsubst %/,%,$(strip $(MCM_SRCDIR_EXCLUDES)))
+$(info Auto-discovered source directories, excluding: $(MCM_SRCDIR_EXCLUDES))
+MCM_DISCOVER_SRCDIRS_EXCLUDES := $(foreach dir,$(MCM_SRCDIR_EXCLUDES), ! -path './$(dir)' ! -path './$(dir)/*')
+$(info Exclusion patterns: $(MCM_DISCOVER_SRCDIRS_EXCLUDES))
+MCM_DISCOVER_SRCDIRS := $(shell find . -type d ! -path '*/.*' ! -path './$(MCM_CACHE_ROOT_DIR)' ! -path './$(MCM_CACHE_ROOT_DIR)/*' $(MCM_DISCOVER_SRCDIRS_EXCLUDES) -print)
+$(info Discovered source directories: $(MCM_DISCOVER_SRCDIRS))
+C_SRCDIRS += $(MCM_DISCOVER_SRCDIRS)
+CXX_SRCDIRS += $(MCM_DISCOVER_SRCDIRS)
+ASM_SRCDIRS += $(MCM_DISCOVER_SRCDIRS)
+
 vpath %.c $(C_SRCDIRS)
-CXX_SRCDIRS += .
 vpath %.cpp $(CXX_SRCDIRS)
 vpath %.cc $(CXX_SRCDIRS)
-ASM_SRCDIRS += .
 vpath %.S $(ASM_SRCDIRS)
 
 # If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
@@ -177,6 +187,7 @@ CC_OBJS  ?= $(patsubst %.cc,%.o,$(CC_SRCS))
 CXX_OBJS ?= $(CPP_OBJS) $(CC_OBJS) # Note: not used
 ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
 
+# Create targets for individual object files
 $(foreach OBJ,$(C_OBJS),$(eval $(call addTargetCObject,$(OBJ))))
 $(foreach OBJ,$(CPP_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cpp)))
 $(foreach OBJ,$(CC_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cc)))
