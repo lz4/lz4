@@ -38,7 +38,7 @@
 # - directory `cachedObjs/` available to cache object files.
 #   alternatively: set CACHE_ROOT to some different value.
 # Optional:
-# - HASH can be set to a different custom hash program.
+# - MCM_HASH can be set to a different custom hash program.
 # - MCM_SRCDIR_EXCLUDES can list directories (relative to '.') skipped during
 #   auto-discovery of source directories.
 
@@ -81,20 +81,20 @@ include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
 
 UNAME ?= $(shell uname)
 ifeq ($(UNAME), Darwin)
-  HASH ?= md5
+  MCM_HASH ?= md5
 else ifeq ($(UNAME), FreeBSD)
-  HASH ?= gmd5sum
+  MCM_HASH ?= gmd5sum
 else ifeq ($(UNAME), OpenBSD)
-  HASH ?= md5
+  MCM_HASH ?= md5
 endif
-HASH ?= md5sum
+MCM_HASH ?= md5sum
 
-HAVE_HASH := $(shell echo 1 | $(HASH) > /dev/null && echo 1 || echo 0)
+HAVE_HASH := $(shell echo 1 | $(MCM_HASH) > /dev/null && echo 1 || echo 0)
 ifeq ($(HAVE_HASH),0)
-  $(info warning : could not find HASH ($(HASH)), required to differentiate builds using different flags)
+  $(info warning : could not find hash command ($(MCM_HASH)), required to differentiate builds using different flags)
   HASH_FUNC = generic/$(1)
 else
-  HASH_FUNC = $(firstword $(shell echo $(2) | $(HASH) ))
+  HASH_FUNC = $(firstword $(shell echo $(2) | $(MCM_HASH) ))
 endif
 
 STRIP ?= strip
