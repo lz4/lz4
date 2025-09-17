@@ -101,6 +101,14 @@ STRIP ?= strip
 MKDIR ?= mkdir
 LN ?= ln
 
+# Normalize object directory paths so cache directories stay consistent even
+# when sources are referenced as "./foo.c" or similar.
+MCM_normdir = $(patsubst %/,%,$(patsubst ./%,%,$(1)))
+MCM_objdir = $(call MCM_normdir,$(dir $(1)))
+# Provide a directory prerequisite (with trailing slash) only when the object
+# actually belongs to a subdirectory, avoiding empty `mkdir -p` operands.
+MCM_objdir_dep = $(if $(call MCM_objdir,$(1)),$(call MCM_objdir,$(1))/,)
+
 # --------------------------------------------------------------------------------------------
 # The following macros are used to create object files in the cache directory.
 # The object files are named after the source file, but with a different path.
@@ -120,7 +128,9 @@ define addTargetAsmObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/$(dir $(1))/.
+# Ensure the cache directory prerequisite uses the sanitized path so verbose
+# builds do not emit redundant components like `/.//.`
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/$$(call MCM_objdir_dep,$(1)).
 	@echo AS $$@
 	$$(CC) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
@@ -130,7 +140,7 @@ define addTargetCObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/$(dir $(1))/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/$$(call MCM_objdir_dep,$(1)).
 	@echo CC $$@
 	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
@@ -140,7 +150,7 @@ define addTargetCxxObject  # targetName, suffix, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/$(dir $(1))/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/$$(call MCM_objdir_dep,$(1)).
 	@echo CXX $$@
 	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
