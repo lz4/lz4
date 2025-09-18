@@ -168,12 +168,9 @@ endef # addTargetCxxObject
 
 # Create targets for individual object files
 C_SRCDIRS += .
-vpath %.c $(C_SRCDIRS)
 CXX_SRCDIRS += .
-vpath %.cpp $(CXX_SRCDIRS)
-vpath %.cc $(CXX_SRCDIRS)
 ASM_SRCDIRS += .
-vpath %.S $(ASM_SRCDIRS)
+
 
 # If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
 C_SRCS   ?= $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c))
