@@ -99,6 +99,26 @@ MKDIR ?= mkdir
 LN ?= ln
 
 # --------------------------------------------------------------------------------------------
+# Path sanitization helpers
+# --------------------------------------------------------------------------------------------
+# Object files may originate from sources that sit outside of the current
+# directory (for example "../lib/foo.c").  Building such objects directly under
+# $(CACHE_ROOT) would escape the cache directory because of the "../" segments.
+# The following helpers normalize these paths into a cache-safe representation
+# while keeping enough structure to avoid collisions between same-named files
+# that live in different directories.  In particular, each "../" segment turns
+# into "__/", absolute paths gain a "__root__/" prefix, and `./` prefixes are
+# stripped.
+
+mcm_norm_slashes = $(subst \,/,$(1))
+mcm_escape_colon = $(subst :,_,$(1))
+mcm_strip_leading_dot = $(patsubst ./%,%,$(1))
+mcm_escape_parent = $(subst ../,__/,$(1))
+mcm_prefix_absolute = $(if $(filter /%,$(1)),$(patsubst /%,__root__/%,$(1)),$(1))
+mcm_sanitize = $(call mcm_prefix_absolute,$(call mcm_escape_parent,$(call mcm_strip_leading_dot,$(call mcm_escape_colon,$(call mcm_norm_slashes,$(1))))))
+mcm_sanitize_list = $(foreach f,$(strip $(1)),$(call mcm_sanitize,$(f)))
+
+# --------------------------------------------------------------------------------------------
 # The following macros are used to create object files in the cache directory.
 # The object files are named after the source file, but with a different path.
 
@@ -116,30 +136,33 @@ $(CACHE_ROOT)/%/. :
 define addTargetAsmObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
+.PRECIOUS: $$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1))
+$$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1)) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
+	@$$(MKDIR) -p $$(@D)
 	@echo AS $$@
-	$$(CC) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
+	$$(CC) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(call mcm_sanitize,$(1:.o=.d)) -c $$< -o $$@
 
 endef # addTargetAsmObject
 
 define addTargetCObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+.PRECIOUS: $$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1))
+$$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1)) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+	@$$(MKDIR) -p $$(@D)
 	@echo CC $$@
-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
+	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(call mcm_sanitize,$(1:.o=.d)) -c $$< -o $$@
 
 endef # addTargetCObject
 
 define addTargetCxxObject  # targetName, suffix, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3))))
 
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
+.PRECIOUS: $$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1))
+$$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1)) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
+	@$$(MKDIR) -p $$(@D)
 	@echo CXX $$@
-	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
+	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(call mcm_sanitize,$(1:.o=.d)) -c $$< -o $$@
 
 endef # addTargetCxxObject
 
@@ -153,11 +176,11 @@ ASM_SRCDIRS += .
 vpath %.S $(ASM_SRCDIRS)
 
 # If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
-C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
-CPP_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
-CC_SRCS  ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc)))
+C_SRCS   ?= $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c))
+CPP_SRCS ?= $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp))
+CC_SRCS  ?= $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc))
 CXX_SRCS ?= $(CPP_SRCS) $(CC_SRCS)
-ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
+ASM_SRCS ?= $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S))
 
 # If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
 C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
@@ -181,7 +204,7 @@ define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashComple
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 MCM_ALL_BINS += $(1)
 
-$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+$$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1)) : $$(addprefix $$(CACHE_ROOT)/%/,$(call mcm_sanitize_list,$(2))) $(3)
 	@echo AR $$@
 	$$(AR) $$(ARFLAGS) $$@ $$^
 	$(4)
@@ -199,7 +222,7 @@ define c_dynamic_library  # targetName, targetDeps, addlDeps, addRecipe, hashCom
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 MCM_ALL_BINS += $(1)
 
-$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+$$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1)) : $$(addprefix $$(CACHE_ROOT)/%/,$(call mcm_sanitize_list,$(2))) $(3)
 	@echo LD $$@
 	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(LDFLAGS) -shared -o $$@ $$^ $$(LDLIBS)
 	$(4)
@@ -217,7 +240,7 @@ define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashCompleme
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
 MCM_ALL_BINS += $(1)
 
-$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+$$(CACHE_ROOT)/%/$(call mcm_sanitize,$(1)) : $$(addprefix $$(CACHE_ROOT)/%/,$(call mcm_sanitize_list,$(2))) $(3)
 	@echo LD $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
 	$(4)

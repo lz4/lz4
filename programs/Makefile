@@ -97,7 +97,7 @@ all: lz4 lz4-nomt lz4c unlz4 lz4cat
 all32: CFLAGS+=-m32
 all32: all
 
-LZ4_OBJS := $(notdir $(OBJFILES))
+LZ4_OBJS := $(OBJFILES)
 
 ifeq ($(WINBASED),yes)
 lz4-exe.rc: lz4-exe.rc.in
