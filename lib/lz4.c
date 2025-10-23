@@ -1045,6 +1045,80 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
             const BYTE* forwardIp = ip;
             int step = 1;
             int searchMatchNb = acceleration << LZ4_skipTrigger;
+#if defined(AOCL_PRELOAD_BRANCH_OPT) && (AOCL_PRELOAD_BRANCH_OPT == 1)
+            U32 ipData;
+
+            do {
+                U32 const h = forwardH;
+                U32 const current = (U32)(forwardIp - base);
+                U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
+                U32 matchData;
+
+                assert(matchIndex <= current);
+                assert(forwardIp - base < (ptrdiff_t)(2 GB - 1));
+                ip = forwardIp;
+                forwardIp += step;
+                step = (searchMatchNb++ >> LZ4_skipTrigger);
+
+                if (unlikely(forwardIp > mflimitPlusOne)) goto _last_literals;
+                assert(ip < mflimitPlusOne);
+
+                if (dictDirective == usingDictCtx) {
+                    if (matchIndex < startIndex) {
+                        /* there was no match, try the dictionary */
+                        assert(tableType == byU32);
+                        matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
+                        match = dictBase + matchIndex;
+                        matchIndex += dictDelta;   /* make dictCtx index comparable with current context */
+                        lowLimit = dictionary;
+                    } else {
+                        match = base + matchIndex;
+                        lowLimit = (const BYTE*)source;
+                    }
+                } else if (dictDirective == usingExtDict) {
+                    if (matchIndex < startIndex) {
+                        DEBUGLOG(7, "extDict candidate: matchIndex=%5u  <  startIndex=%5u", matchIndex, startIndex);
+                        assert(startIndex - matchIndex >= MINMATCH);
+                        assert(dictBase);
+                        match = dictBase + matchIndex;
+                        lowLimit = dictionary;
+                    } else {
+                        match = base + matchIndex;
+                        lowLimit = (const BYTE*)source;
+                    }
+                } else {   /* single continuous memory segment */
+                    match = base + matchIndex;
+                }
+                ipData = LZ4_read32(ip);
+
+                forwardH = LZ4_hashPosition(forwardIp, tableType);
+                LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
+
+                DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
+                if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) { continue; }    /* match outside of valid area */
+                assert(matchIndex < current);
+
+                if ((dictDirective != noDict) /* For case where dictDirective == noDict, this check is performed conditional on *match == *ip */ 
+                  && ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX)) && (matchIndex+LZ4_DISTANCE_MAX < current)) {
+                    continue;
+                } /* too far */
+
+                matchData = LZ4_read32(match);
+
+                if (matchData == ipData) {
+                    /* Performing (matchData == ipData) check before LZ4_DISTANCE_MAX check results in better branch predictor behavior. 
+                       It is safe as *match is always within bounds for noDict directive.*/
+                    if ((dictDirective == noDict) && ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
+                        && (matchIndex+LZ4_DISTANCE_MAX < current)) {
+                        continue;
+                    } /* too far */
+                    assert((current - matchIndex) <= LZ4_DISTANCE_MAX);  /* match now expected within distance */
+                    if (maybe_extMem) offset = current - matchIndex;
+                    break;   /* match found */
+                }
+
+            } while(1);
+#else
             do {
                 U32 const h = forwardH;
                 U32 const current = (U32)(forwardIp - base);
@@ -1102,6 +1176,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 }
 
             } while(1);
+#endif
         }
 
         /* Catch up */

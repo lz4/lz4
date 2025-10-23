@@ -58,6 +58,7 @@ SRCFILES := $(sort $(wildcard *.c))
 OBJFILES = $(SRCFILES:.c=.o)
 
 include ../build/make/lz4defs.make
+CFLAGS += $(USEROPTIONALFLAGS)
 
 # default is defined as the first target in Makefile, hence before multiconf.make
 .PHONY: default

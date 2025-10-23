@@ -88,6 +88,11 @@ else
 POSIX_ENV = No
 endif
 
+# `AOCL_PRELOAD_BRANCH_OPT` Enable data preload for byte matching within the inner loop in 
+# LZ4_compress_generic_validated and better branch predictor behavior for noDict directive.
+
+
+USEROPTIONALFLAGS ?= -DAOCL_PRELOAD_BRANCH_OPT=1
 # Avoid symlinks when targeting Windows or building on a Windows host
 ifeq ($(WINBASED),yes)
 LN_SF = cp -p
