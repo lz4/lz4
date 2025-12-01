@@ -488,6 +488,12 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #    else
 #      define LZ4_FAST_DEC_LOOP 1
 #    endif
+#  elif defined(__riscv) && (__riscv_xlen == 64)
+#    /* RISC-V 64-bit: enable fast decode loop */
+#    define LZ4_FAST_DEC_LOOP 1
+#  elif defined(__riscv) && (__riscv_xlen == 32)
+#    /* RISC-V 32-bit: disable fast decode loop for now */
+#    define LZ4_FAST_DEC_LOOP 0
 #  else
 #    define LZ4_FAST_DEC_LOOP 0
 #  endif
