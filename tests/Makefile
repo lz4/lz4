@@ -43,6 +43,17 @@ CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(USERCFLAGS)
 CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
+# C++ compiler settings (for lz4wrapper tests)
+CXX       ?= g++
+CXXWFLAGS  = -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow -Wpointer-arith
+CXXFLAGS   = $(CXXWFLAGS) $(DEBUGFLAGS) -O3
+CXXPPFLAGS = -I$(LIBDIR) -I$(PRGDIR) -std=c++11
+ALLCXXFLAGS = $(CXXFLAGS) $(CXXPPFLAGS) $(LDFLAGS)
+
+# Memory Leak Detection (LLVM LeakSanitizer (Homebrew Clang))
+LSAN_FLAGS = -fsanitize=address -fsanitize=leak -fno-omit-frame-pointer -g -O1
+LLVM_CLANG = /opt/homebrew/opt/llvm/bin/clang++
+
 include ../Makefile.inc
 
 LZ4 := $(PRGDIR)/lz4$(EXT)
@@ -57,7 +68,7 @@ NB_LOOPS     ?= -i1
 default: all
 
 .PHONY: all
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial lz4wrapper lz4wrapperbatch
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -140,6 +151,28 @@ decompress-partial: lz4.o decompress-partial.c
 CLEAN += decompress-partial-usingDict
 decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+
+# lz4wrapper CLI tools (C++)
+CLEAN += lz4wrapper
+lz4wrapper: lz4.o lz4wrappercli.cpp
+	$(CXX) $(ALLCXXFLAGS) lz4wrappercli.cpp lz4.o -o $@$(EXT)
+
+CLEAN += lz4wrapperbatch
+lz4wrapperbatch: lz4.o lz4wrapperbatchcli.cpp
+	$(CXX) $(ALLCXXFLAGS) lz4wrapperbatchcli.cpp lz4.o -o $@$(EXT)
+
+# lz4wrapper with AddressSanitizer
+CLEAN += lz4-lsan.o
+lz4-lsan.o: $(LIBDIR)/lz4.c $(LIBDIR)/lz4.h
+	$(LLVM_CLANG) -c $(ALLCXXFLAGS) $(LSAN_FLAGS) $< -o $@
+
+CLEAN += lz4wrapperlsan
+lz4wrapperlsan: lz4wrappercli.cpp lz4-lsan.o
+	$(LLVM_CLANG) $(ALLCXXFLAGS) $(LSAN_FLAGS) lz4wrappercli.cpp lz4-lsan.o -o $@$(EXT)
+
+CLEAN += lz4wrapperbatchlsan
+lz4wrapperbatchlsan: lz4wrapperbatchcli.cpp lz4-lsan.o
+	$(LLVM_CLANG) $(ALLCXXFLAGS) $(LSAN_FLAGS) lz4wrapperbatchcli.cpp lz4-lsan.o -o $@$(EXT)
 
 .PHONY: clean
 clean:
@@ -252,6 +285,14 @@ test-lz4-basic: lz4 datagen unlz4 lz4cat
 test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
 	./test-lz4-dict.sh
+
+test-lz4wrapper: datagen lz4wrapper lz4wrapperbatch
+	@echo "\n ---- test lz4wrapper streaming compression/decompression ----"
+	./test-lz4wrapper-basic.sh
+
+test-lz4wrapper-memory: datagen lz4wrapperlsan lz4wrapperbatchlsan
+	@echo "\n ---- test lz4wrapper memory leak detection ----"
+	./test-lz4wrapper-memory.sh
 
 test-lz4hc-hugefile: lz4 datagen
 	@echo "\n ---- test HC compression/decompression of huge files ----"

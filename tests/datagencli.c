@@ -149,7 +149,7 @@ int main(int argc, char** argv)
     } else {
         LOREM_genOut(size, seed);
     }
-    DISPLAYLEVEL(1, "\n");
+    // DISPLAYLEVEL(1, "\n");
 
     return 0;
 }

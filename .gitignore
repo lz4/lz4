@@ -50,3 +50,9 @@ tmp*
 # generated Windows resource files
 lib/*.rc
 programs/*.rc
+
+lz4wrapper
+lz4wrapperbatch
+lz4wrapperlsan
+lz4wrapperbatchlsan
+*.log
