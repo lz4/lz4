@@ -114,6 +114,11 @@
 #ifndef LZ4_STATIC_LINKING_ONLY
 #  define LZ4_STATIC_LINKING_ONLY
 #endif
+
+#if defined(__riscv) && defined(__riscv_vector)
+#include <riscv_vector.h>
+#endif
+
 #include "lz4.h"
 /* see also "memory routines" below */
 
@@ -479,6 +484,18 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #ifndef LZ4_FAST_DEC_LOOP
 #  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
 #    define LZ4_FAST_DEC_LOOP 1
+   /* Reason for adding __riscv_vector:
+      * LZ4_FAST_DEC_LOOP is an optimization designed for modern out-of-order (OoO) CPUs.
+      * For some in-order RISC-V cores, enabling this optimization directly may not bring performance gains,
+      * and could even lead to performance degradation.
+      * However, if the in-order core also supports vector instructions (i.e., __riscv_vector is defined),
+      * combining it with RVV optimization can still yield performance improvements.
+      * For out-of-order RISC-V CPUs (e.g., those conforming to the RVA23 profile where vector extension is default),
+      * enabling both LZ4_FAST_DEC_LOOP and RVV optimization can achieve optimal performance.
+      * Currently, there's no reliable way to detect CPUs that are out-of-order but do not support vector extensions,
+      * so we use __riscv_vector as a heuristic to decide whether to enable this optimization. */
+#  elif defined (__riscv) && (__riscv_xlen==64) && defined (__riscv_vector)
+#    define LZ4_FAST_DEC_LOOP 1
 #  elif defined(__aarch64__)
 #    if defined(__clang__) && defined(__ANDROID__)
      /* On Android aarch64, we disable this optimization for clang because
@@ -528,7 +545,12 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
+#if defined __riscv && defined (__riscv_vector)
+    size_t vl = __riscv_vsetvl_e8m1(32);
+    do { __riscv_vse8_v_u8m1(d, __riscv_vle8_v_u8m1(s, vl), vl); d+= vl; s+=vl; } while (d<e);
+#else
     do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+#endif
 }
 
 /* LZ4_memcpy_using_offset()  presumes :
