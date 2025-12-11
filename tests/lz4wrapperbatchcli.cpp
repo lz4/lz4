@@ -415,6 +415,7 @@ static int doCompress(const Options& opts) {
     char* inputData = readFile(opts.inputFile, &inputSize);
     if (!inputData || inputSize <= 0) {
         fprintf(stderr, "Error: Failed to read input data\n");
+        delete[] inputData;  // Safe to delete nullptr
         return EXIT_ERROR_CODE;
     }
 
@@ -556,6 +557,7 @@ static int doDecompress(const Options& opts) {
     char* inputData = readFile(opts.inputFile, &inputSize);
     if (!inputData || inputSize <= 0) {
         fprintf(stderr, "Error: Failed to read input data\n");
+        delete[] inputData;  // Safe to delete nullptr
         return EXIT_ERROR_CODE;
     }
 
