@@ -1,6 +1,6 @@
 /*
     lorem.c - lorem ipsum generator
-    Copyright (C) Yann Collet 2024
+    Copyright (c) Yann Collet. All rights reserved.
 
     GPL v2 License
 

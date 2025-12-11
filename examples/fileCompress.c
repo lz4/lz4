@@ -28,7 +28,7 @@ static size_t get_file_size(char *filename)
         return 0;
     }
 
-    return statbuf.st_size;
+    return (size_t)statbuf.st_size;
 }
 
 static int compress_file(FILE* f_in, FILE* f_out)
@@ -36,7 +36,6 @@ static int compress_file(FILE* f_in, FILE* f_out)
     assert(f_in != NULL); assert(f_out != NULL);
 
     LZ4F_errorCode_t ret = LZ4F_OK_NoError;
-    size_t len;
     LZ4_writeFile_t* lz4fWrite;
     void* const buf = malloc(CHUNK_SIZE);
     if (!buf) {
@@ -56,7 +55,7 @@ static int compress_file(FILE* f_in, FILE* f_out)
     }
 
     while (1) {
-        len = fread(buf, 1, CHUNK_SIZE, f_in);
+        size_t len = fread(buf, 1, CHUNK_SIZE, f_in);
 
         if (ferror(f_in)) {
             printf("fread error\n");
@@ -94,6 +93,7 @@ static int decompress_file(FILE* f_in, FILE* f_out)
     void* const buf= malloc(CHUNK_SIZE);
     if (!buf) {
         printf("error: memory allocation failed \n");
+        return 1;
     }
 
     ret = LZ4F_readOpen(&lz4fRead, f_in);
@@ -135,9 +135,11 @@ out:
     return 0;
 }
 
+/* @return 0 if both FILE* have identical content */
 int compareFiles(FILE* fp0, FILE* fp1)
 {
     int result = 0;
+    assert(fp0 != NULL); assert(fp1 != NULL);
 
     while (result==0) {
         char b0[1024];
@@ -147,7 +149,7 @@ int compareFiles(FILE* fp0, FILE* fp1)
 
         result = (r0 != r1);
         if (!r0 || !r1) break;
-        if (!result) result = memcmp(b0, b1, r0);
+        if (r0 == r1) result = memcmp(b0, b1, r0);
     }
 
     return result;
@@ -175,7 +177,7 @@ int main(int argc, const char **argv) {
     {   FILE* const inpFp = fopen(inpFilename, "rb");
         FILE* const outFp = fopen(lz4Filename, "wb");
         printf("compress : %s -> %s\n", inpFilename, lz4Filename);
-        LZ4F_errorCode_t ret = compress_file(inpFp, outFp);
+        int ret = compress_file(inpFp, outFp);
         fclose(inpFp);
         fclose(outFp);
 
@@ -188,7 +190,7 @@ int main(int argc, const char **argv) {
             inpFilename,
             get_file_size(inpFilename),
             get_file_size(lz4Filename), /* might overflow is size_t is 32 bits and size_{in,out} > 4 GB */
-            (double)get_file_size(lz4Filename) / get_file_size(inpFilename) * 100);
+            (double)get_file_size(lz4Filename) / (double)get_file_size(inpFilename) * 100);
 
         printf("compress : done\n");
     }
@@ -198,8 +200,11 @@ int main(int argc, const char **argv) {
         FILE* const inpFp = fopen(lz4Filename, "rb");
         FILE* const outFp = fopen(decFilename, "wb");
 
+        if (inpFp == NULL) exit(1);
+        if (outFp == NULL) exit(1);
+
         printf("decompress : %s -> %s\n", lz4Filename, decFilename);
-        LZ4F_errorCode_t ret = decompress_file(inpFp, outFp);
+        int ret = decompress_file(inpFp, outFp);
 
         fclose(outFp);
         fclose(inpFp);
@@ -215,6 +220,9 @@ int main(int argc, const char **argv) {
     /* verify */
     {   FILE* const inpFp = fopen(inpFilename, "rb");
         FILE* const decFp = fopen(decFilename, "rb");
+
+        if (inpFp == NULL) exit(1);
+        if (decFp == NULL) exit(1);
 
         printf("verify : %s <-> %s\n", inpFilename, decFilename);
         int const cmp = compareFiles(inpFp, decFp);

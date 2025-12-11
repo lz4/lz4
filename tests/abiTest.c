@@ -97,7 +97,7 @@ static void roundTripTest(void* resultBuff, size_t resultBuffCapacity,
     }
 }
 
-static void roundTripCheck(const void* srcBuff, size_t srcSize)
+static void roundTripCheck(void* srcBuff, size_t srcSize)
 {
     size_t const cBuffSize = LZ4_COMPRESSBOUND(srcSize);
     void* const cBuff = malloc(cBuffSize);
@@ -105,6 +105,7 @@ static void roundTripCheck(const void* srcBuff, size_t srcSize)
 
     if (!cBuff || !rBuff) {
         fprintf(stderr, "not enough memory ! \n");
+        free(srcBuff);
         exit(1);
     }
 
@@ -156,15 +157,20 @@ static void loadFile(void* buffer, const char* fileName, size_t fileSize)
     FILE* const f = fopen(fileName, "rb");
     if (isDirectory(fileName)) {
         MSG("Ignoring %s directory \n", fileName);
+        free(buffer);
+        fclose(f);
         exit(2);
     }
     if (f==NULL) {
         MSG("Impossible to open %s \n", fileName);
+        free(buffer);
         exit(3);
     }
     {   size_t const readSize = fread(buffer, 1, fileSize, f);
         if (readSize != fileSize) {
             MSG("Error reading %s \n", fileName);
+            free(buffer);
+            fclose(f);
             exit(5);
     }   }
     fclose(f);

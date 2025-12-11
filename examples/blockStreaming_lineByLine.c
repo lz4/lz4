@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 static size_t write_uint16(FILE* fp, uint16_t i)
 {
@@ -40,6 +41,8 @@ static void test_compress(
     size_t messageMaxBytes,
     size_t ringBufferBytes)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_stream_t* const lz4Stream = LZ4_createStream();
     const size_t cmpBufBytes = LZ4_COMPRESSBOUND(messageMaxBytes);
     char* const cmpBuf = (char*) malloc(cmpBufBytes);
@@ -89,6 +92,8 @@ static void test_decompress(
     size_t messageMaxBytes,
     size_t ringBufferBytes)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_streamDecode_t* const lz4StreamDecode = LZ4_createStreamDecode();
     char* const cmpBuf = (char*) malloc(LZ4_COMPRESSBOUND(messageMaxBytes));
     char* const decBuf = (char*) malloc(ringBufferBytes);
@@ -123,6 +128,8 @@ static void test_decompress(
 
 static int compare(FILE* f0, FILE* f1)
 {
+    assert(f0 != NULL); assert(f1 != NULL);
+
     int result = 0;
     const size_t tempBufferBytes = 65536;
     char* const b0 = (char*) malloc(tempBufferBytes);

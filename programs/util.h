@@ -1,6 +1,6 @@
 /*
     util.h - utility functions
-    Copyright (C) 2016-2023, Przemyslaw Skibinski, Yann Collet
+    Copyright (c) Yann Collet. All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -185,13 +185,20 @@ int UTIL_countCores(void);
 ******************************************/
 /*
  * A modified version of realloc().
- * If UTIL_realloc() fails the original block is freed.
-*/
-UTIL_STATIC void* UTIL_realloc(void* ptr, size_t size)
+ * Original block is always freed.
+ */
+UTIL_STATIC void* UTIL_realloc(void* prevPtr, size_t newSize)
 {
-    void* const newptr = realloc(ptr, size);
-    if (newptr) return newptr;
-    free(ptr);
+    if (newSize == 0) {
+        free(prevPtr);
+        return NULL;
+    }
+    /* newSize > 0 */
+    {   void* const newptr = realloc(prevPtr, newSize);
+        if (newptr) return newptr;
+    }
+    /* realloc failed */
+    free(prevPtr);
     return NULL;
 }
 

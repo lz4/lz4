@@ -1,10 +1,39 @@
 This directory contains [GitHub Actions](https://github.com/features/actions) workflow files.
 
+# Workflow Organization
+
+The CI/CD workflows are organized into focused, maintainable files:
+
+## Core Testing Workflows
+- **`compilers.yml`** - Tests compatibility across different C compilers (GCC, Clang versions)
+- **`core-tests.yml`** - Core LZ4 functionality testing (benchmarks, fuzzing, frame format, ABI compatibility, etc.)
+- **`sanitizers.yml`** - Memory safety testing (AddressSanitizer, MemorySanitizer, UBSan, ThreadSanitizer)
+
+## Platform & Build System Testing
+- **`cross-platform.yml`** - Cross-platform testing using QEMU emulation and native macOS builds
+- **`build-systems.yml`** - Alternative build systems (Visual Studio, Meson)
+- **`cmake-test.yml`** - CMake build system testing
+
+## Code Quality & Analysis
+- **`code-quality.yml`** - Static analysis tools (cppcheck, scan-build, valgrind, unicode lint)
+- **`oss-fuzz.yml`** - OSS-Fuzz integration for continuous fuzzing
+
+## Utilities & Environment
+- **`release-environment.yml`** - Release validation and environment information gathering
+- **`scorecard.yml`** - Security scorecard analysis
+
+This organization provides:
+- **Better maintainability** - Changes to specific test categories only affect relevant files
+- **Improved parallelization** - Workflows run independently and in parallel
+- **Clearer failure isolation** - Easier to identify which types of tests are failing
+- **Enhanced readability** - Each workflow has a single, clear responsibility
+
 # Known issues
 
-## USAN, ASAN (`lz4-ubsan-x64`, `lz4-ubsan-x86`, `lz4-asan-x64`)
+## Sanitizers (UBSan, ASan) - `sanitizers.yml`
 
-For now, `lz4-ubsan-*` uses the `-fsanitize-recover=pointer-overflow` flag:
+### UBSan (UndefinedBehaviorSanitizer)
+For now, UBSan tests use the `-fsanitize-recover=pointer-overflow` flag:
 there are known cases of pointer overflow arithmetic within `lz4.c` fast compression.
 These cases are not dangerous with known architecture,
 but they are not guaranteed to work by the C standard,
@@ -18,32 +47,10 @@ not active anywhere today.
 Therefore, a more acceptable work-around will have to be found first.
 
 
-
-## cppcheck (`lz4-cppcheck`)
+## cppcheck - `code-quality.yml`
 
 This test script ignores the exit code of `make cppcheck`.
 Because this project doesn't 100% follow their recommendation.
 Also sometimes it reports false positives.
 
 
-
-# Notes
-
-- You can investigate various information at the right pane of GitHub
-  Actions report page.
-
-| Item                      | Section in the right pane             |
-| ------------------------- | ------------------------------------- |
-| OS, VM                    | Set up job                            |
-| git repo, commit hash     | Run actions/checkout@v2               |
-| Version of tools          | Environment info                      |
-
-
-
-# Difference with `.travis.yml`
-
-The following tests are not be included due to limitation of GH-Actions.
-
-- name: aarch64 real-hw tests
-- name: PPC64LE real-hw tests
-- name: IBM s390x real-hw tests

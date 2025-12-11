@@ -49,8 +49,8 @@ lz4cat = custom_target(
   output: 'lz4cat',
   command: [
     'ln',
-    '--symbolic',
-    '--force',
+    '-s',
+    '-f',
     fs.name(lz4.full_path()),
     '@OUTPUT@'
   ]
@@ -62,8 +62,8 @@ unlz4 = custom_target(
   output: 'unlz4',
   command: [
     'ln',
-    '--symbolic',
-    '--force',
+    '-s',
+    '-f',
     fs.name(lz4.full_path()),
     '@OUTPUT@'
   ]

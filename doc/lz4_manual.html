@@ -174,10 +174,12 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
  @return : Nb bytes written into 'dst' (necessarily <= dstCapacity)
            or 0 if compression fails.
 
- Note : from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
-        the produced compressed content could, in specific circumstances,
-        require to be decompressed into a destination buffer larger
-        by at least 1 byte than the content to decompress.
+ Note : 'targetDstSize' must be >= 1, because it's the smallest valid lz4 payload.
+
+ Note 2:from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
+        the produced compressed content could, in rare circumstances,
+        require to be decompressed into a destination buffer
+        larger by at least 1 byte than decompressesSize.
         If an application uses `LZ4_compress_destSize()`,
         it's highly recommended to update liblz4 to v1.9.2 or better.
         If this can't be done or ensured,

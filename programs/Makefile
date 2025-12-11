@@ -31,8 +31,8 @@
 SED ?= sed
 
 # Version numbers
-LIBDIR   := ../lib
-LIBVER_SRC := $(LIBDIR)/lz4.h
+LIBLZ4DIR   := ../lib
+LIBVER_SRC := $(LIBLZ4DIR)/lz4.h
 LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_MINOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_PATCH_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
@@ -42,7 +42,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
-LIBFILES  = $(wildcard $(LIBDIR)/*.c)
+LIBFILES  = $(wildcard $(LIBLZ4DIR)/*.c)
 SRCFILES  = $(sort $(LIBFILES) $(wildcard *.c))
 OBJFILES  = $(SRCFILES:.c=.o)
 
@@ -51,9 +51,9 @@ DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wpointer-arith -Wstrict-aliasing=1
 USERCFLAGS:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
 CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
-CPPFLAGS += -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS += -I$(LIBLZ4DIR) -DXXH_NAMESPACE=LZ4_
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
 
 OS_VERSION ?= $(UNAME) -r
 ifeq ($(TARGET_OS)$(shell $(OS_VERSION)),SunOS5.10)
@@ -62,13 +62,19 @@ endif
 
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
+.PHONY:default
+default: lz4-release
+
+C_SRCDIRS = $(LIBLZ4DIR) .
+include ../build/make/multiconf.make
+
 # thread detection
 NUM_SYMBOL   := \#
-NO_THREAD_MSG:= ==> no multithread support: building for single-thread mode only
+NO_THREAD_MSG:= ==> no multithread support: built for single-thread mode only
 HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
 HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
 ifeq ($(HAVE_MULTITHREAD), 1)
-  THREAD_MSG := ==> building with multithreading support
+  THREAD_MSG := ==> built with multithreading support
   THREAD_CPP := -DLZ4IO_MULTITHREAD
   ifeq ($(HAVE_PTHREAD), 1)
     THREAD_LD  := -pthread
@@ -81,18 +87,17 @@ LZ4_VERSION=$(LIBVER)
 MD2ROFF    = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
 
-.PHONY:default
-default: lz4-release
-
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
 
-.PHONY:all
+.PHONY: all
 all: lz4 lz4-nomt lz4c unlz4 lz4cat
 
-.PHONY:all32
+.PHONY: all32
 all32: CFLAGS+=-m32
 all32: all
+
+LZ4_OBJS := $(notdir $(OBJFILES))
 
 ifeq ($(WINBASED),yes)
 lz4-exe.rc: lz4-exe.rc.in
@@ -109,31 +114,27 @@ lz4-exe.o: lz4-exe.rc
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
-lz4: $(OBJFILES) lz4-exe.o
-	echo "$(THREAD_MSG)"
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
-else
+$(eval $(call c_program,lz4,$(LZ4_OBJS),lz4-exe.o,echo "$(THREAD_MSG)"))
+
+else # not WINBASED
+
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
-lz4: $(OBJFILES)
-	echo "$(THREAD_MSG)"
-	$(CC) $(ALLFLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+$(eval $(call c_program,lz4,$(LZ4_OBJS),,echo "$(THREAD_MSG)"))
 endif
-CLEAN += lz4
 
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
 lz4-release: CPPFLAGS+=-DNDEBUG
 lz4-release: lz4
 
-CLEAN += lz4-nomt
-lz4-nomt: $(SRCFILES)
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+lz4-nomt:
+$(eval $(call c_program,lz4-nomt,$(LZ4_OBJS)))
 
 CLEAN += lz4-wlib
 lz4-wlib: LIBFILES =
-lz4-wlib: SRCFILES+= $(LIBDIR)/xxhash.c  # benchmark unit needs XXH64()
-lz4-wlib: LDFLAGS += -L $(LIBDIR)
+lz4-wlib: SRCFILES+= $(LIBLZ4DIR)/xxhash.c  # benchmark unit needs XXH64()
+lz4-wlib: LDFLAGS += -L $(LIBLZ4DIR)
 lz4-wlib: LDLIBS   = -llz4
 lz4-wlib: liblz4 $(OBJFILES)
 	@echo WARNING: $@ must link to an extended variant of the dynamic library which also exposes unstable symbols
@@ -141,16 +142,14 @@ lz4-wlib: liblz4 $(OBJFILES)
 
 .PHONY:liblz4
 liblz4:
-	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LIBDIR) liblz4
+	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LIBLZ4DIR) liblz4
 
 CLEAN += lz4c
 lz4c: lz4
 	$(LN_SF) lz4$(EXT) lz4c$(EXT)
 
-CLEAN += lz4c32
 lz4c32: CFLAGS += -m32
-lz4c32 : $(SRCFILES)
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+$(eval $(call c_program,lz4c32,$(LZ4_OBJS)))
 
 CLEAN += unlz4
 unlz4: lz4
@@ -175,12 +174,13 @@ preview-man: clean-man man
 	man ./lz4.1
 
 .PHONY:clean
-clean:
+clean: clean_cache
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
-	$(MAKE) -C $(LIBDIR) $@ > $(VOID)
-	$(RM) $(CLEAN) *.o tmp* *.test core
+	$(MAKE) -C $(LIBLZ4DIR) $@ > $(VOID)
+	$(RM) $(CLEAN) *.o *.test core
+	$(RM) -r tmp*
 	@echo Cleaning completed
 
 

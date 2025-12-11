@@ -26,18 +26,21 @@ class NVerboseFileInfo:
         # Get real file sizes
         if "concat-all" in self.filename or "2f--content-size" in self.filename:
             for i in SIZES:
-                self.exp_unc_size += os.path.getsize(f"{TEMP}/test_list_{i}M")
+                self.exp_unc_size += os.path.getsize(f"{TEMP}/test_list_{i:02d}M")
         else:
             uncompressed_filename = self.filename.split("-")[0]
             self.exp_unc_size += os.path.getsize(f"{TEMP}/{uncompressed_filename}")
         self.exp_comp_size = os.path.getsize(f"{TEMP}/{self.filename}")
 
 
+def sorted_list(pattern):
+    return sorted(glob.glob(pattern))
+
 class TestNonVerbose(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.nvinfo_list = []
-        test_list_files = glob.glob(f"{TEMP}/test_list_*.lz4")
+        test_list_files = sorted_list(f"{TEMP}/test_list_*.lz4")
         # One of the files has 2 frames so duplicate it in this list to map each frame 1 to a single file
         for i, filename in enumerate(test_list_files):
             for i, line in enumerate(execute(f"{LZ4} --list -m {filename}", print_output=True)):
@@ -116,7 +119,7 @@ class TestVerbose(unittest.TestCase):
         # we're only really interested in testing the output of the concat-all file.
         self.vinfo_list = []
         start = end = 0
-        test_list_SM_lz4f = glob.glob(f"{TEMP}/test_list_*M-lz4f-2f--content-size.lz4")
+        test_list_SM_lz4f = sorted_list(f"{TEMP}/test_list_*M-lz4f-2f--content-size.lz4")
         for i, filename in enumerate(test_list_SM_lz4f):
             output = execute(f"{LZ4} --list -m -v {TEMP}/test_list_concat-all.lz4 {filename}", print_output=True)
             for i, line in enumerate(output):
@@ -128,7 +131,7 @@ class TestVerbose(unittest.TestCase):
                     end = i
         self.vinfo_list.append(VerboseFileInfo(output[start:end]))
         # Populate file_frame_map as a reference of the expected info
-        concat_file_list = glob.glob(f"{TEMP}/test_list_[!concat]*.lz4")
+        concat_file_list = sorted_list(f"{TEMP}/test_list_[!concat]*.lz4")
         # One of the files has 2 frames so duplicate it in this list to map each frame 1 to a single file
         for i, filename in enumerate(concat_file_list):
             if "2f--content-size" in filename:
@@ -154,13 +157,6 @@ class TestVerbose(unittest.TestCase):
         for i, frame_info in enumerate(self.cvinfo.frame_list):
             if "-lz4f-" in self.cvinfo.file_frame_map[i] and "--no-frame-crc" not in self.cvinfo.file_frame_map[i]:
                 self.assertEqual(self.cvinfo.frame_list[i]["checksum"], "XXH32", self.cvinfo.frame_list[i]["line"])
-
-    def test_uncompressed(self):
-        for i, frame_info in enumerate(self.cvinfo.frame_list):
-            ffm = self.cvinfo.file_frame_map[i]
-            if "-2f-" not in ffm and "--content-size" in ffm:
-                expected_size_unc = int(ffm[ffm.rindex("_") + 1:ffm.index("M")]) * 1048576
-                self.assertEqual(self.cvinfo.frame_list[i]["uncompressed"], str(expected_size_unc), self.cvinfo.frame_list[i]["line"])
 
     def test_ratio(self):
         for i, frame_info in enumerate(self.cvinfo.frame_list):
@@ -209,7 +205,7 @@ def execute(command, print_command=True, print_output=False, print_error=True):
 
 
 def cleanup(silent=False):
-    for f in glob.glob(f"{TEMP}/test_list*"):
+    for f in sorted_list(f"{TEMP}/test_list*"):
         if not silent:
             log(f"Deleting {f}")
         os.unlink(f)
@@ -227,7 +223,7 @@ def generate_files():
     # file format  ~ test_list<frametype>-<no_frames>f<create-args>.lz4 ~
     # Generate LZ4Frames
     for i in SIZES:
-        filename = f"{TEMP}/test_list_{i}M"
+        filename = f"{TEMP}/test_list_{i:02d}M"
         log(f"Generating {filename}")
         datagen(filename, i * MIB)
         for j in ["--content-size", "-BI", "-BD", "-BX", "--no-frame-crc"]:
@@ -245,14 +241,14 @@ def generate_files():
         execute(f"{LZ4} -l {filename} {lz4file}")
 
     # Concatenate --content-size files
-    file_list = glob.glob(f"{TEMP}/test_list_*-lz4f-1f--content-size.lz4")
+    file_list = sorted_list(f"{TEMP}/test_list_*-lz4f-1f--content-size.lz4")
     with open(f"{TEMP}/test_list_{sum(SIZES)}M-lz4f-2f--content-size.lz4", 'ab') as outfile:
         for fname in file_list:
             with open(fname, 'rb') as infile:
                 outfile.write(infile.read())
 
     # Concatenate all files
-    file_list = glob.glob(f"{TEMP}/test_list_*.lz4")
+    file_list = sorted_list(f"{TEMP}/test_list_*.lz4")
     with open(f"{TEMP}/test_list_concat-all.lz4", 'ab') as outfile:
         for fname in file_list:
             with open(fname, 'rb') as infile:

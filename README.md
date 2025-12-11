@@ -44,7 +44,7 @@ in single-thread mode.
 [lzbench]: https://github.com/inikep/lzbench
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 
-|  Compressor             | Ratio   | Compression | Decompression |
+|  Compressor             | Factor  | Compression | Decompression |
 |  ----------             | -----   | ----------- | ------------- |
 |  memcpy                 |  1.000  | 13700 MB/s  |  13700 MB/s   |
 |**LZ4 default (v1.9.0)** |**2.101**| **780 MB/s**| **4970 MB/s** |
@@ -59,9 +59,6 @@ in single-thread mode.
 
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
-
-LZ4 is also compatible and optimized for x32 mode (`-mx32`),
-for which it provides additional speed performance.
 
 
 Installation
@@ -123,7 +120,7 @@ Most distributions are bundled with a package manager
 which allows easy installation of both the `liblz4` library
 and the `lz4` command line interface.
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/lz4.svg)](https://repology.org/project/lz4/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/lz4.svg?columns=4&exclude_unsupported=1)](https://repology.org/project/lz4/versions)
 
 
 ### Special Thanks

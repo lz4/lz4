@@ -1,6 +1,6 @@
 /*
   LZ4conf.h - compile-time parameters
-  Copyright (C) Yann Collet 2011-2024
+  Copyright (c) Yann Collet. All rights reserved.
   GPL v2 License
 
   This program is free software; you can redistribute it and/or modify
@@ -28,20 +28,21 @@
 
 /* Default compression level.
  * Can be overridden by environment variable LZ4_CLEVEL.
- * Can be overridden at runtime using -# command */
+ * Is overridden at runtime by command -# */
 #ifndef LZ4_CLEVEL_DEFAULT
 # define LZ4_CLEVEL_DEFAULT 1
 #endif
 
 /* Determines if multithreading is enabled or not
- * Default: disabled */
+ * Default: enabled on Windows, disabled on other platforms */
 #ifndef LZ4IO_MULTITHREAD
 # ifdef _WIN32
-    /* Windows support Completion Ports */
+    /* Windows supports Completion Ports */
 #   define LZ4IO_MULTITHREAD 1
 # else
     /* Requires <pthread> support.
-     * Can't be reliably and portably tested at source code level */
+     * Can't be reliably and portably tested at source code level
+     * so must be set a build level */
 #   define LZ4IO_MULTITHREAD 0
 # endif
 #endif
@@ -49,7 +50,7 @@
 /* Determines default nb of threads for compression
  * Default value is 0, which means "auto" :
  * nb of threads is determined from detected local cpu.
- * Can be overriden by Environment Variable LZ4_NBWORKERS.
+ * Can be overridden by Environment Variable LZ4_NBWORKERS.
  * Can be overridden at runtime using -T# command */
 #ifndef LZ4_NBWORKERS_DEFAULT
 # define LZ4_NBWORKERS_DEFAULT 0

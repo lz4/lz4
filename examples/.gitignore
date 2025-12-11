@@ -10,3 +10,4 @@
 /dictionaryRandomAccess
 /bench_functions
 /*.exe
+/*.lz4s*

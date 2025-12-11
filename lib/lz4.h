@@ -1,7 +1,7 @@
 /*
  *  LZ4 - Fast LZ compression algorithm
  *  Header File
- *  Copyright (C) 2011-2023, Yann Collet.
+ *  Copyright (c) Yann Collet. All rights reserved.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -258,10 +258,12 @@ LZ4LIB_API int LZ4_compress_fast_extState (void* state, const char* src, char* d
  * @return : Nb bytes written into 'dst' (necessarily <= dstCapacity)
  *           or 0 if compression fails.
  *
- * Note : from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
- *        the produced compressed content could, in specific circumstances,
- *        require to be decompressed into a destination buffer larger
- *        by at least 1 byte than the content to decompress.
+ * Note : 'targetDstSize' must be >= 1, because it's the smallest valid lz4 payload.
+ *
+ * Note 2:from v1.8.2 to v1.9.1, this function had a bug (fixed in v1.9.2+):
+ *        the produced compressed content could, in rare circumstances,
+ *        require to be decompressed into a destination buffer
+ *        larger by at least 1 byte than decompressesSize.
  *        If an application uses `LZ4_compress_destSize()`,
  *        it's highly recommended to update liblz4 to v1.9.2 or better.
  *        If this can't be done or ensured,
@@ -698,10 +700,10 @@ int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int*
 
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
-  typedef  int8_t  LZ4_i8;
-  typedef uint8_t  LZ4_byte;
-  typedef uint16_t LZ4_u16;
-  typedef uint32_t LZ4_u32;
+  typedef int8_t         LZ4_i8;
+  typedef unsigned char  LZ4_byte;
+  typedef uint16_t       LZ4_u16;
+  typedef uint32_t       LZ4_u32;
 #else
   typedef   signed char  LZ4_i8;
   typedef unsigned char  LZ4_byte;

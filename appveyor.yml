@@ -1,141 +1,86 @@
 version: 1.0.{build}
+
+# Test matrix: MinGW compilers only (Visual Studio testing moved to GitHub Actions)
 environment:
   matrix:
-  - COMPILER: "gcc"
-    PLATFORM: "mingw32"
-  - COMPILER: "visual"
-    CONFIGURATION: "Debug"
-    PLATFORM: "Win32"
-  - COMPILER: "visual"
-    CONFIGURATION: "Release"
-    PLATFORM: "x64"
-  - COMPILER: "visual"
-    CONFIGURATION: "Release"
-    PLATFORM: "Win32"
-  - COMPILER: "clang"
-    PLATFORM: "mingw64"
-  - COMPILER: "gcc"
-    PLATFORM: "mingw64"
+    - COMPILER: gcc
+      PLATFORM: mingw32
+    - COMPILER: gcc  
+      PLATFORM: mingw64
+    - COMPILER: clang
+      PLATFORM: mingw64
 
 install:
-  - ECHO Installing %COMPILER% %PLATFORM% %CONFIGURATION%
-  - MKDIR bin
-  - if [%COMPILER%]==[visual] (
-      if [%PLATFORM%]==[x64] (
-        SET ADDITIONALPARAM=/p:LibraryPath="C:\Program Files\Microsoft SDKs\Windows\v7.1\lib\x64;c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\lib\amd64;C:\Program Files (x86)\Microsoft Visual Studio 10.0\;C:\Program Files (x86)\Microsoft Visual Studio 10.0\lib\amd64;"
-      )
-    ) else (
-      SET "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin" &&
-      SET "PATH_MINGW64=c:\msys64\mingw64\bin;c:\msys64\usr\bin" &&
-      COPY C:\MinGW\bin\mingw32-make.exe C:\MinGW\bin\make.exe &&
-      COPY C:\MinGW\bin\gcc.exe C:\MinGW\bin\cc.exe
-    )
+  - echo Installing %COMPILER% %PLATFORM%
+  - mkdir bin
+  # Setup MinGW environment
+  - set "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin"
+  - set "PATH_MINGW64=c:\msys64\mingw64\bin;c:\msys64\usr\bin"
+  - copy C:\MinGW\bin\mingw32-make.exe C:\MinGW\bin\make.exe >nul 2>&1
+  - copy C:\MinGW\bin\gcc.exe C:\MinGW\bin\cc.exe >nul 2>&1
 
 build_script:
-  - if [%PLATFORM%]==[mingw32] SET PATH=%PATH_MINGW32%;%PATH%
-  - if [%PLATFORM%]==[mingw64] SET PATH=%PATH_MINGW64%;%PATH%
-  - ECHO *** &&
-      ECHO Building %COMPILER% %PLATFORM% %CONFIGURATION% &&
-      ECHO ***
+  - echo "*** Building %COMPILER% %PLATFORM% ***"
+  # Configure PATH for MinGW builds
+  - if [%PLATFORM%]==[mingw32] set PATH=%PATH_MINGW32%;%PATH%
+  - if [%PLATFORM%]==[mingw64] set PATH=%PATH_MINGW64%;%PATH%
+  
+  # GCC Build
   - if [%COMPILER%]==[gcc] (
-      echo ----- %TIME% &&
+      echo "GCC build started" &&
       gcc -v &&
       make -v &&
-      echo ----- &&
       make -j -C programs lz4 V=1 &&
       make -j -C tests fullbench V=1 &&
       make -j -C tests fuzzer V=1 &&
-      make -j -C lib lib V=1
+      make -j -C lib lib V=1 &&
+      echo "Packaging GCC build..." &&
+      mkdir bin\dll bin\static bin\example bin\include &&
+      copy tests\fullbench.c bin\example\ &&
+      copy lib\xxhash.* bin\example\ &&
+      copy lib\lz4*.h bin\include\ &&
+      copy lib\liblz4.a bin\static\liblz4_static.lib &&
+      copy lib\liblz4.dll* bin\dll\ >nul 2>&1 &&
+      copy lib\dll\example\* bin\example\ >nul 2>&1 &&
+      copy programs\lz4.exe bin\lz4.exe &&
+      copy tests\*.exe programs\
     )
+  
+  # Clang Build  
   - if [%COMPILER%]==[clang] (
-      echo ----- %TIME% &&
+      echo "Clang build started" &&
       clang -v &&
       make -v &&
-      echo ----- &&
-      set CFLAGS="--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
-      make -j -C programs lz4 CC=clang V=1    &&
+      set "CFLAGS=--target=x86_64-w64-mingw32 -Werror -Wconversion -Wno-sign-conversion" &&
+      make -j -C programs lz4 CC=clang V=1 &&
       make -j -C tests fullbench CC=clang V=1 &&
-      make -j -C tests fuzzer CC=clang V=1    &&
-      make -j -C lib lib CC=clang V=1
+      make -j -C tests fuzzer CC=clang V=1 &&
+      make -j -C lib lib CC=clang V=1 &&
+      copy tests\*.exe programs\
     )
-  - if [%COMPILER%]==[gcc] (
-      MKDIR bin\dll bin\static bin\example bin\include &&
-      COPY tests\fullbench.c bin\example\ &&
-      COPY lib\xxhash.c bin\example\ &&
-      COPY lib\xxhash.h bin\example\ &&
-      COPY lib\lz4.h bin\include\ &&
-      COPY lib\lz4hc.h bin\include\ &&
-      COPY lib\lz4frame.h bin\include\ &&
-      COPY lib\liblz4.a bin\static\liblz4_static.lib &&
-      COPY lib\liblz4.dll* bin\dll\ &&
-      COPY lib\dll\example\Makefile bin\example\ &&
-      COPY lib\dll\example\fullbench-dll.* bin\example\ &&
-      COPY lib\dll\example\README.md bin\ &&
-      COPY programs\lz4.exe bin\lz4.exe
-    )
-  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] (
-      7z.exe a -bb1 bin\lz4_x64.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
-      appveyor PushArtifact bin\lz4_x64.zip
-    )
-  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] (
-      7z.exe a -bb1 bin\lz4_x86.zip NEWS .\bin\lz4.exe .\bin\README.md .\bin\example .\bin\dll .\bin\static .\bin\include &&
-      appveyor PushArtifact bin\lz4_x86.zip
-    )
-  - if [%COMPILER%]==[visual] (
-      ECHO *** %TIME% &&
-      ECHO *** Building Visual Studio 2012 %PLATFORM%\%CONFIGURATION% &&
-      ECHO *** &&
-      msbuild "build\VS2022\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v110 /property:Optimize=false /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
-      ECHO *** %TIME% &&
-      ECHO *** Building Visual Studio 2013 %PLATFORM%\%CONFIGURATION% &&
-      ECHO *** &&
-      msbuild "build\VS2022\lz4.sln" /m /verbosity:minimal /property:PlatformToolset=v120 /property:Optimize=false /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
-      COPY build\VS2022\bin\%PLATFORM%_%CONFIGURATION%\*.exe programs\
-    ) else (
-      COPY tests\*.exe programs\
-    )
+  
+  # Create release archives (GCC only)
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] 7z.exe a -bb1 bin\lz4_x64.zip NEWS .\bin\lz4.exe README.md .\bin\example .\bin\dll .\bin\static .\bin\include
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] appveyor PushArtifact bin\lz4_x64.zip
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] 7z.exe a -bb1 bin\lz4_x86.zip NEWS .\bin\lz4.exe README.md .\bin\example .\bin\dll .\bin\static .\bin\include
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] appveyor PushArtifact bin\lz4_x86.zip
 
 test_script:
-  - ECHO *** %TIME% &&
-      ECHO Testing %COMPILER% %PLATFORM% %CONFIGURATION% &&
-      ECHO ***
-  - if not [%COMPILER%]==[unknown] (
-      CD programs &&
-      lz4 -h &&
-      lz4 -i1b lz4.exe &&
-      lz4 -i1b5 lz4.exe &&
-      lz4 -i1b10 lz4.exe &&
-      lz4 -i1b15 lz4.exe &&
-      echo ------- lz4 tested ------- &&
-      fullbench.exe -i0 fullbench.exe &&
-      echo Launching test program fuzzer.exe &&
-      fuzzer.exe -v -T20s
-    )
-  - ECHO *** %TIME%
+  - echo "*** Testing %COMPILER% %PLATFORM% ***"
+  - cd programs
+  - lz4 -h
+  - lz4 -i1b lz4.exe
+  - lz4 -i1b5 lz4.exe
+  - lz4 -i1b10 lz4.exe
+  - lz4 -i1b15 lz4.exe
+  - echo "------- lz4 tested -------"
+  - fullbench.exe -i0 fullbench.exe
+  - echo "Launching fuzzer test..."
+  - fuzzer.exe -v -T20s
+  - cd ..
 
 artifacts:
   - path: bin\lz4_x64.zip
-  - path: bin\lz4_x86.zip
-
-deploy:
-- provider: GitHub
-  artifact: bin\lz4_x64.zip
-  auth_token:
-    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
-  force_update: true
-  prerelease: true
-  on:
-    COMPILER: gcc
-    PLATFORM: "mingw64"
-    appveyor_repo_tag: true
-
-- provider: GitHub
-  artifact: bin\lz4_x86.zip
-  auth_token:
-    secure: w6UJaGie0qbZvffr/fqyhO/Vj8rMiQWnv9a8qm3gxfngdHDTMT42wYupqJpIExId
-  force_update: true
-  prerelease: true
-  on:
-    COMPILER: gcc
-    PLATFORM: "mingw32"
-    appveyor_repo_tag: true
+    name: LZ4 Windows x64 Build
+  - path: bin\lz4_x86.zip  
+    name: LZ4 Windows x86 Build

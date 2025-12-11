@@ -30,7 +30,7 @@
 
 LIBDIR  := ../lib
 PRGDIR  := ../programs
-TESTDIR := versionsTest
+VERSIONSTESTDIR := versionsTest
 PYTHON  ?= python3
 
 DEBUGLEVEL?= 1
@@ -64,10 +64,12 @@ LLVM_CLANG ?= $(shell \
 		echo $(CXX); \
 	fi)
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
 
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
+C_SRCDIRS = $(LIBDIR) $(PRGDIR) .
+include ../build/make/multiconf.make
 
 # Default test parameters
 TEST_FILES   := COPYING
@@ -96,7 +98,7 @@ lz4:
 
 .PHONY: lib liblz4.pc
 lib liblz4.pc:
-	$(MAKE) -C $(LIBDIR) $@ CFLAGS="$(CFLAGS)"
+	CFLAGS="$(CFLAGS)" $(MAKE) -C $(LIBDIR) $@
 
 lz4c unlz4 lz4cat: lz4
 	$(LN_SF) $(LZ4) $(PRGDIR)/$@
@@ -109,11 +111,9 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 %.o : $(LIBDIR)/%.c $(LIBDIR)/%.h
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) -fPIC $< -o $@
 
-CLEAN += fullbench
 fullbench : DEBUGLEVEL=0
 fullbench : CPPFLAGS += -DNDEBUG
-fullbench : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+$(eval $(call c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
 
 .PHONY: $(LIBDIR)/liblz4.a
 $(LIBDIR)/liblz4.a:
@@ -136,37 +136,30 @@ fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
 endif
 
 # test LZ4_USER_MEMORY_FUNCTIONS
+.PHONY: fullbench-wmalloc
 fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: fullbench
 
-CLEAN += fuzzer
-fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+fuzzer:
+$(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 
-CLEAN += frametest
-frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+frametest:
+$(eval $(call c_program_shared_o,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
 
-CLEAN += roundTripTest
-roundTripTest : lz4.o lz4hc.o xxhash.o roundTripTest.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+roundTripTest:
+$(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
 
-CLEAN += datagen
 datagen: CPPFLAGS+=-DNDEBUG
-datagen : datagen.c $(PRGDIR)/lorem.c loremOut.c datagencli.c
-	$(CC) $(ALLFLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
+$(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
 
-CLEAN += checkFrame
-checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+checkFrame:
+$(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
 
-CLEAN += decompress-partial
-decompress-partial: lz4.o decompress-partial.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+decompress-partial:
+$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
 
-CLEAN += decompress-partial-usingDict
-decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+decompress-partial-usingDict:
+$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
 # lz4wrapper CLI tools (C++)
 CLEAN += lz4wrapper
@@ -191,11 +184,11 @@ lz4wrapperbatchlsan: lz4wrapperbatchcli.cpp lz4-lsan.o
 	$(LLVM_CLANG) $(ALLCXXFLAGS) $(LSAN_FLAGS) lz4wrapperbatchcli.cpp lz4-lsan.o -o $@$(EXT)
 
 .PHONY: clean
-clean:
+clean: clean_cache
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) $(CLEAN) core *.o *.test tmp*
-	@$(RM) -r $(TESTDIR)
+	@$(RM) $(CLEAN) core *.o *.test
+	@$(RM) -r $(VERSIONSTESTDIR) tmp*
 	@echo Cleaning completed
 
 .PHONY: versionsTest
@@ -214,9 +207,9 @@ abiTest: LDLIBS += -llz4
 abiTests:
 	$(PYTHON) test-lz4-abi.py
 
-CLEAN += checkTag
-checkTag: checkTag.c $(LIBDIR)/lz4.h
-	$(CC) $(ALLFLAGS) $< -o $@$(EXT)
+checkTag:
+$(eval $(call c_program_shared_o,checkTag,checkTag.o))
+
 
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
@@ -337,7 +330,7 @@ test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
           test-lz4-sparse test-lz4-hugefile test-lz4-dict \
           test-lz4-skippable
 
-test-lz4c: LZ4C = $(LZ4)c
+test-lz4c: LZ4C := $(basename $(LZ4))c$(suffix $(LZ4))
 test-lz4c: lz4c datagen
 	@echo "\n ---- test lz4c variant ----"
 	$(DATAGEN) -g256MB | $(LZ4C) -l -v | $(LZ4C) -t
@@ -425,7 +418,7 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 # freestanding test only for Linux x86_64
 #-----------------------------------------------------------------------------
 UNAME_S ?= $(if $(filter Windows_NT,$(OS)),Windows,$(shell uname -s))
-UNAME_P ?= $(if $(filter Windows_NT,$(OS)),Unknown,$(shell uname -p))
+UNAME_M ?= $(if $(filter Windows_NT,$(OS)),Unknown,$(shell uname -m))
 
 FREESTANDING_CFLAGS := -ffreestanding -nostdlib
 
@@ -433,7 +426,7 @@ ifneq ($(UNAME_S), Linux)
   FREESTANDING_CFLAGS :=
 endif
 
-ifneq ($(UNAME_P), x86_64)
+ifneq ($(UNAME_M), x86_64)
   FREESTANDING_CFLAGS :=
 endif
 

@@ -504,5 +504,11 @@ LZ4F_CustomMem const LZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  </b>/**< th
  
 </p></pre><BR>
 
+<pre><b>LZ4FLIB_STATIC_API size_t LZ4F_cctx_size(const LZ4F_cctx* cctx);
+LZ4FLIB_STATIC_API size_t LZ4F_dctx_size(const LZ4F_dctx* dctx);
+</b><p>  These functions return the total memory footprint of the provided context.
+ 
+</p></pre><BR>
+
 </html>
 </body>

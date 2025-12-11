@@ -56,6 +56,8 @@ size_t read_bin(FILE* fp, void* array, int arrayBytes) {
 
 void test_compress(FILE* outFp, FILE* inpFp)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_streamHC_t lz4Stream_body = { 0 };
     LZ4_streamHC_t* lz4Stream = &lz4Stream_body;
 
@@ -91,6 +93,8 @@ void test_compress(FILE* outFp, FILE* inpFp)
 
 void test_decompress(FILE* outFp, FILE* inpFp)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     static char decBuf[DEC_BUFFER_BYTES];
     int decOffset = 0;
     LZ4_streamDecode_t lz4StreamDecode_body = { 0 };
@@ -132,6 +136,8 @@ void test_decompress(FILE* outFp, FILE* inpFp)
 // return ByteNb>0 if different
 size_t compare(FILE* f0, FILE* f1)
 {
+    assert(f0 != NULL); assert(f1 != NULL);
+
     size_t result = 1;
 
     for (;;) {

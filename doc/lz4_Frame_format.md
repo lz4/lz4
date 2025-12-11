@@ -358,7 +358,9 @@ Main characteristics of the legacy format :
 - All blocks are always compressed, even when compression is detrimental.
 - The last block is detected either because
   it is followed by the “EOF” (End of File) mark,
-  or because it is followed by a known Frame Magic Number.
+  or because it is followed by a known Frame Magic Number.<br>
+  In the Linux Kernel implementation, it can also be detected because it
+  is followed by a sequence of four zero bytes.
 - No checksum
 - Convention is Little endian
 

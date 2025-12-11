@@ -16,7 +16,6 @@ project(
   'c',
   license: 'BSD-2-Clause-Patent AND GPL-2.0-or-later',
   default_options: [
-    'c_std=c99',
     'buildtype=release',
     'warning_level=3'
   ],

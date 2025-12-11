@@ -10,7 +10,7 @@ This Meson build system is provided with no guarantee.
 
 ## How to build
 
-`cd` to this meson directory (`contrib/meson`)
+`cd` to this meson directory (`build/meson`)
 
 ```sh
 meson setup --buildtype=release -Ddefault_library=shared -Dprograms=true builddir

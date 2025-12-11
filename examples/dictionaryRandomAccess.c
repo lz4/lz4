@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #define MIN(x, y)  ((x) < (y) ? (x) : (y))
 
@@ -55,6 +56,8 @@ void seek_bin(FILE* fp, long offset, int origin) {
 
 void test_compress(FILE* outFp, FILE* inpFp, void *dict, int dictSize)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_stream_t lz4Stream_body;
     LZ4_stream_t* lz4Stream = &lz4Stream_body;
 
@@ -104,6 +107,8 @@ void test_compress(FILE* outFp, FILE* inpFp, void *dict, int dictSize)
 
 void test_decompress(FILE* outFp, FILE* inpFp, void *dict, int dictSize, int offset, int length)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_streamDecode_t lz4StreamDecode_body;
     LZ4_streamDecode_t* lz4StreamDecode = &lz4StreamDecode_body;
 
@@ -174,6 +179,8 @@ int compare(FILE* fp0, FILE* fp1, int length)
 {
     int result = 0;
 
+    assert(fp0 != NULL); assert(fp1 != NULL);
+
     while(0 == result) {
         char b0[4096];
         char b1[4096];
@@ -225,9 +232,13 @@ int main(int argc, char* argv[])
     printf("offset = [%d]\n", offset);
     printf("length = [%d]\n", length);
 
+    assert(offset < INT32_MAX); assert(length < INT32_MAX);
+
     /* Load dictionary */
     {
         FILE* dictFp = fopen(dictFilename, "rb");
+
+        assert(dictFp != NULL);
         dictSize = (int)read_bin(dictFp, dict, DICTIONARY_BYTES);
         fclose(dictFp);
     }
@@ -251,7 +262,7 @@ int main(int argc, char* argv[])
         FILE* outFp = fopen(decFilename, "wb");
 
         printf("decompress : %s -> %s\n", lz4Filename, decFilename);
-        test_decompress(outFp, inpFp, dict, DICTIONARY_BYTES, offset, length);
+        test_decompress(outFp, inpFp, dict, dictSize, offset, length);
         printf("decompress : done\n");
 
         fclose(outFp);
@@ -262,6 +273,8 @@ int main(int argc, char* argv[])
     {
         FILE* inpFp = fopen(inpFilename, "rb");
         FILE* decFp = fopen(decFilename, "rb");
+
+        assert(inpFp != NULL);assert(decFp != NULL);
         seek_bin(inpFp, offset, SEEK_SET);
 
         printf("verify : %s <-> %s\n", inpFilename, decFilename);

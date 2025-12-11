@@ -17,7 +17,7 @@ They generate and decode data using the [LZ4 block format].
 
 #### Level 2 : High Compression variant
 
-For more compression ratio at the cost of compression speed,
+For better compression ratio at the cost of compression speed,
 the High Compression variant called **lz4hc** is available.
 Add files **`lz4hc.c`** and **`lz4hc.h`**.
 This variant also compresses data using the [LZ4 block format],

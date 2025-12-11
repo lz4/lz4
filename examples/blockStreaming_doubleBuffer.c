@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 enum {
     BLOCK_BYTES = 1024 * 8,
@@ -38,6 +39,8 @@ size_t read_bin(FILE* fp, void* array, size_t arrayBytes) {
 
 void test_compress(FILE* outFp, FILE* inpFp)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_stream_t lz4Stream_body;
     LZ4_stream_t* lz4Stream = &lz4Stream_body;
 
@@ -73,6 +76,8 @@ void test_compress(FILE* outFp, FILE* inpFp)
 
 void test_decompress(FILE* outFp, FILE* inpFp)
 {
+    assert(outFp != NULL); assert(inpFp != NULL);
+
     LZ4_streamDecode_t lz4StreamDecode_body;
     LZ4_streamDecode_t* lz4StreamDecode = &lz4StreamDecode_body;
 
@@ -115,6 +120,8 @@ void test_decompress(FILE* outFp, FILE* inpFp)
 int compare(FILE* fp0, FILE* fp1)
 {
     int result = 0;
+
+    assert(fp0 != NULL); assert(fp1 != NULL);
 
     while(0 == result) {
         char b0[65536];

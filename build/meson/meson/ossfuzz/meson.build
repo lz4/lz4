@@ -1,3 +1,5 @@
+lz4_source_root = '../../../..'
+
 fuzzers = [
   'compress_frame_fuzzer',
   'compress_fuzzer',

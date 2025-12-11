@@ -55,8 +55,15 @@ CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))
+OBJFILES = $(SRCFILES:.c=.o)
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
+
+# default is defined as the first target in Makefile, hence before multiconf.make
+.PHONY: default
+default: lib-release
+
+include ../build/make/multiconf.make
 
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
@@ -75,10 +82,11 @@ else
 		SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
 		SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 	endif
+# AIX linker doesn't support -soname, hence assigning nil string
+ifeq ($(TARGET_OS), AIX)
+	SONAME_FLAGS =
 endif
-
-.PHONY: default
-default: lib-release
+endif
 
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
@@ -97,12 +105,9 @@ all: lib liblz4.pc
 all32: CFLAGS+=-m32
 all32: all
 
-CLEAN += liblz4.a
-liblz4.a: $(SRCFILES)
-ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
-	@echo compiling static library
-	$(COMPILE.c) $^
-	$(AR) rcs $@ *.o
+liblz4.a:
+ifeq ($(BUILD_STATIC),yes)
+$(eval $(call static_library,liblz4.a,$(OBJFILES)))
 endif
 
 ifeq ($(WINBASED),yes)
@@ -119,29 +124,30 @@ liblz4-dll.rc: liblz4-dll.rc.in
 liblz4-dll.o: liblz4-dll.rc
 	$(WINDRES) -i liblz4-dll.rc -o liblz4-dll.o
 
-CLEAN += $(LIBLZ4_EXP)
+CLEAN += $(LIBLZ4) $(LIBLZ4_EXP)
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
   ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(ALLFLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
+	$(CC) $(ALLFLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ $(LDLIBS) -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
   endif
 
 else   # not windows
 
-$(LIBLZ4): $(SRCFILES)
-  ifeq ($(BUILD_SHARED),yes)
-	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(ALLFLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
-	@echo creating versioned links
-	$(LN_SF) $@ liblz4.$(SHARED_EXT_MAJOR)
-	$(LN_SF) $@ liblz4.$(SHARED_EXT)
-  endif
+$(LIBLZ4): LDFLAGS += -fvisibility=hidden $(SONAME_FLAGS)
+ifeq ($(BUILD_SHARED),yes)
+$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),,echo "$(LIBLZ4) created"))
+endif
 
 endif
-CLEAN += $(LIBLZ4)
+
+liblz4.$(SHARED_EXT_MAJOR): $(LIBLZ4)
+	$(LN_SF) $< $@
+
+liblz4.$(SHARED_EXT): liblz4.$(SHARED_EXT_MAJOR)
+	$(LN_SF) $< $@
 
 .PHONY: liblz4
-liblz4: $(LIBLZ4)
+liblz4: $(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT)
 
 CLEAN += liblz4.pc
 liblz4.pc: liblz4.pc.in Makefile
@@ -155,11 +161,10 @@ liblz4.pc: liblz4.pc.in Makefile
 
 .PHONY: clean
 clean:
-ifeq ($(WINBASED),yes)
 	$(RM) *.rc
-endif
 	$(RM) $(CLEAN) core *.o *.a
 	$(RM) *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
+	$(RM) -r tmp*
 	@echo Cleaning library completed
 
 #-----------------------------------------------------------------------------
