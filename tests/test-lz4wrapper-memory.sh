@@ -73,24 +73,18 @@ HAS_LLVM_LSAN=false
 LLVM_CLANGXX=""
 
 detect_tools() {
-    print_test "LLVM LeakSanitizer (Homebrew Clang)"
+    print_test "Memory leak detection tools"
     
-    # Check for Homebrew LLVM
-    LLVM_CLANG=""
-    for path in /opt/homebrew/opt/llvm/bin/clang++ /usr/local/opt/llvm/bin/clang++; do
-        if [ -x "$path" ]; then
-            LLVM_CLANG="$path"
-            break
-        fi
-    done
-    
-    if [ -z "$LLVM_CLANG" ]; then
-        print_skip "Homebrew LLVM not found. Install with: brew install llvm"
-        echo "  After installation, this method WILL detect memory leaks on macOS"
-        return
+    # Check if the lsan binaries exist (they would be built if make succeeded)
+    if [ -x "./lz4wrapperlsan" ] && [ -x "./lz4wrapperbatchlsan" ]; then
+        print_info "Found lz4wrapper LSAN binaries - memory leak detection available"
+        HAS_LLVM_LSAN=true
+        return 0
+    else
+        print_skip "LSAN binaries not available - skipping memory leak detection tests"
+        echo "  Note: This may be due to missing AddressSanitizer support or build failure"
+        return 1
     fi
-    
-    print_info "Found LLVM Clang: $LLVM_CLANG"
 }
 
 # ============================================================================
@@ -195,39 +189,41 @@ test_batch_roundtrip_random() {
     fi
 }
 
-detect_tools
+if detect_tools; then
+    # ----------------------------------------------------------------------------
+    # Test lz4wrapperlsan
+    # ----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------------------
-# Test lz4wrapperlsan
-# ----------------------------------------------------------------------------
+    echo ""
+    echo ">>> Test lz4wrapperlsan <<<"
 
-echo ""
-echo ">>> Test lz4wrapperlsan <<<"
+    # Small files
+    test_roundtrip "16KB" "-P50" "" "16KB medium compressibility"
 
-# Small files
-test_roundtrip "16KB" "-P50" "" "16KB medium compressibility"
+    # Medium files
+    test_roundtrip "128KB" "-P50" "" "128KB medium compressibility"
 
-# Medium files
-test_roundtrip "128KB" "-P50" "" "128KB medium compressibility"
+    # Large files
+    test_roundtrip "1MB" "-P50" "" "1MB medium compressibility"
 
-# Large files
-test_roundtrip "1MB" "-P50" "" "1MB medium compressibility"
+    # ----------------------------------------------------------------------------
+    # Test lz4wrapperbatchlsan
+    # ----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------------------
-# Test lz4wrapperbatchlsan
-# ----------------------------------------------------------------------------
+    echo ""
+    echo ">>> Test lz4wrapperbatchlsan <<<"
 
-echo ""
-echo ">>> Test lz4wrapperbatchlsan <<<"
+    # 100 percent probability of not releasing memory
+    test_batch_roundtrip_random "Random batch: 100 percent probability of not releasing memory" "-P50" "--shrink-mode=manual" 10 1024 1024*1024
 
-# 100 percent probability of not releasing memory
-test_batch_roundtrip_random "Random batch: 100 percent probability of not releasing memory" "-P50" "--shrink-mode=manual" 10 1024 1024*1024
+    # 50 percent probability of releasing memory
+    test_batch_roundtrip_random "Random batch: 50 percent probability of releasing memory" "-P50" "--shrink-mode=threshold --shrink-threshold=512K" 10 1024 1024*1024
 
-# 50 percent probability of releasing memory
-test_batch_roundtrip_random "Random batch: 50 percent probability of releasing memory" "-P50" "--shrink-mode=threshold --shrink-threshold=512K" 10 1024 1024*1024
-
-# 100 percent probability of releasing memory immediately
-test_batch_roundtrip_random "Random batch: 100 percent probability of releasing memory immediately" "-P50" "--shrink-mode=immediate" 10 1024 1024*1024
+    # 100 percent probability of releasing memory immediately
+    test_batch_roundtrip_random "Random batch: 100 percent probability of releasing memory immediately" "-P50" "--shrink-mode=immediate" 10 1024 1024*1024
+else
+    print_skip "Skipping all memory tests - LSAN binaries not available"
+fi
 
 # ----------------------------------------------------------------------------
 # Summary

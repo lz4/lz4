@@ -54,6 +54,8 @@ jobs:
     - run: make -C tests test-lz4c
     - run: make -C tests test-frametest
     - run: make -C tests test-fuzzer && make clean
+    - run: make -C tests test-lz4wrapper && make clean
+    - run: make -C tests test-lz4wrapper-memory && make clean
     - run: make -C lib all           && make clean
     - run: pyenv global 3.4.4; CPPFLAGS=-I/usr/include/x86_64-linux-gnu make versionsTest && make clean
     - run: make test-install         && make clean
