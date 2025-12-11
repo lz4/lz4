@@ -77,8 +77,14 @@ NB_LOOPS     ?= -i1
 .PHONY: default
 default: all
 
+.PHONY: allwithcpp
+allwithcpp: lz4wrapper lz4wrapperbatch
+
+.PHONY: allwithc
+allwithc: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
+
 .PHONY: all
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial lz4wrapper lz4wrapperbatch
+all: allwithc allwithcpp
 
 .PHONY: all32
 all32: CFLAGS+=-m32
