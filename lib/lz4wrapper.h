@@ -41,19 +41,28 @@ enum Lz4ErrorCode {
  * Align size to next power of 2 starting from DEFAULT_WORK_AREA (64KB)
  * Example: 100KB -> 128KB, 200KB -> 256KB, 9MB -> 16MB (but capped by max)
  * @param size Required size
- * @return Aligned size (power of 2 * 64KB)
+ * @return Aligned size (power of 2 * 64KB), or size itself on overflow
  */
 inline int alignToPowerOf2(int size)
 {
-    if (size <= DEFAULT_WORK_AREA) {
+    // Use unsigned for defined overflow behavior and to avoid UB
+    unsigned int uSize = static_cast<unsigned int>(size);
+    unsigned int aligned = static_cast<unsigned int>(DEFAULT_WORK_AREA);
+
+    if (uSize < aligned) {
         return DEFAULT_WORK_AREA;
     }
 
-    int aligned = DEFAULT_WORK_AREA;
-    while (aligned < size) {
-        aligned *= 2;
+    while (aligned < uSize) {
+        unsigned int next = aligned << 1;
+        // Check for overflow or exceeding INT_MAX before casting back
+        if (next <= aligned || next > 0x7FFFFFFF) {
+            return size;
+        }
+        aligned = next;
     }
-    return aligned;
+
+    return static_cast<int>(aligned);
 }
 
 /**
