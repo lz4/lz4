@@ -799,7 +799,7 @@ static int unitTests(U32 seed, double compressibility)
         cdict = LZ4F_createCDict(CNBuffer, dictSize);
         if (cdict == NULL)
             goto _output_error;
-        
+
         DISPLAYLEVEL(3, "Testing LZ4F_createCDict_advanced : ");
         {   LZ4F_CDict* const cda = LZ4F_createCDict_advanced(lz4f_cmem_test, CNBuffer, dictSize);
             if (cda == NULL) goto _output_error;
@@ -1257,7 +1257,7 @@ size_t test_lz4f_decompression(const void* cSrc, size_t cSize,
     o_scenario_e const o_scenario = (o_scenario_e)(FUZ_rand(randState) % 3);   /* 0 : contiguous; 1 : non-contiguous; 2 : dst overwritten */
     /* tighten dst buffer conditions */
     size_t const dstCapacity = (o_scenario == o_noncontiguous) ?
-                               (decompressedSize * 2) + 128 : /* should provide enough room to insert spaces beween blocks */
+                               (decompressedSize * 2) + 128 : /* should provide enough room to insert spaces between blocks */
                                decompressedSize;
     size_t result;
     void* const dstBuffer = malloc(dstCapacity);

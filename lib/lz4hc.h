@@ -179,7 +179,7 @@ LZ4LIB_API int LZ4_saveDictHC (LZ4_streamHC_t* streamHCPtr, char* safeBuffer, in
 
 
 /*! LZ4_attach_HC_dictionary() : stable since v1.10.0
- *  This API allows for the efficient re-use of a static dictionary many times.
+ *  This API allows for the efficient reuse of a static dictionary many times.
  *
  *  Rather than re-loading the dictionary buffer into a working context before
  *  each compression, or copying a pre-loaded dictionary's LZ4_streamHC_t into a

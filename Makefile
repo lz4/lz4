@@ -47,10 +47,10 @@ default: lib-release lz4-release
 $(V)$(VERBOSE).SILENT:
 
 .PHONY: all
-all: allmost examples manuals build_tests
+all: almost examples manuals build_tests
 
-.PHONY: allmost
-allmost: lib lz4
+.PHONY: almost
+almost: lib lz4
 
 .PHONY: lib lib-release liblz4.a
 lib lib-release liblz4.a:
@@ -222,8 +222,8 @@ c_standards: clean c_standards_c11 c_standards_c99 c_standards_c90
 
 .PHONY: c_standards_c90
 c_standards_c90: clean
-	$(MAKE) clean; CFLAGS="-std=c90   -Werror -Wpedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
-	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -Wpedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) allmost
+	$(MAKE) clean; CFLAGS="-std=c90   -Werror -Wpedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) almost
+	$(MAKE) clean; CFLAGS="-std=gnu90 -Werror -Wpedantic -Wno-long-long -Wno-variadic-macros" $(MAKE) almost
 
 .PHONY: c_standards_c99
 c_standards_c99: clean

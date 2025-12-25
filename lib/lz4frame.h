@@ -310,7 +310,7 @@ LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
  *  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() instead.
  *  Note that the result is only valid for a single invocation of LZ4F_compressUpdate().
  *  When invoking LZ4F_compressUpdate() multiple times,
- *  if the output buffer is gradually filled up instead of emptied and re-used from its start,
+ *  if the output buffer is gradually filled up instead of emptied and reused from its start,
  *  one must check if there is enough remaining capacity before each invocation, using LZ4F_compressBound().
  * @return is always the same for a srcSize and prefsPtr.
  *  prefsPtr is optional : when NULL is provided, preferences will be set to cover worst case scenario.
@@ -489,9 +489,9 @@ LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  * @return See @retval cases.
  * @retval >0  Hint (in bytes) for how many source bytes are ideal to provide on the next call.
  *             This also indicates the current frame is not yet complete: the decompressor
- *             expects more input, or may require additional output space to make progress. 
+ *             expects more input, or may require additional output space to make progress.
  *             User can always pass any amount of input; this value is only a performance hint.
- * @retval 0   The current frame is fully decoded. If *srcSizePtr is less than the provided value, 
+ * @retval 0   The current frame is fully decoded. If *srcSizePtr is less than the provided value,
  *             the unconsumed tail is the start of another frame (if any).
  * @retval error  An error code; test with LZ4F_isError(ret). After an error, dctx is not
  *                resumable: call LZ4F_resetDecompressionContext() before reusing it.
@@ -522,7 +522,7 @@ LZ4F_decompress(LZ4F_dctx* dctx,
 
 /*! LZ4F_resetDecompressionContext() : added in v1.8.0
  *  In case of an error, the context is left in "undefined" state.
- *  In which case, it's necessary to reset it, before re-using it.
+ *  In which case, it's necessary to reset it, before reusing it.
  *  This method can also be used to abruptly stop any unfinished decompression,
  *  and start a new one using same context resources. */
 LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always successful */

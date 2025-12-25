@@ -261,7 +261,7 @@ Fix : test mode (-t) no longer requires confirmation, thanks to Thary Nguyen
 
 r122:
 Fix : AIX & AIX64 support (SamG)
-Fix : mips 64-bits support (lew van)
+Fix : mips 64-bits support (lieu van)
 Added : Examples directory, using code examples from Takayuki Matsuoka
 Updated : Framing specification, to v1.4.1
 Updated : xxHash, to r36

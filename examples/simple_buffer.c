@@ -67,7 +67,7 @@ int main(void) {
   /* Decompression */
   // Now that we've successfully compressed the information from *src to *compressed_data, let's do the opposite!
   // The decompression will need to know the compressed size, and an upper bound of the decompressed size.
-  // In this example, we just re-use this information from previous section,
+  // In this example, we just reuse this information from previous section,
   // but in a real-world scenario, metadata must be transmitted to the decompression side.
   // Each implementation is in charge of this part. Oftentimes, it adds some header of its own.
   // Sometimes, the metadata can be extracted from the local context.

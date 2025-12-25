@@ -351,7 +351,7 @@ typedef struct {
     size_t cRoom;
     size_t cSize;
     char*  resPtr;
-    size_t resSize;
+    size_t resize;
 } blockParam_t;
 
 #define MIN(a,b) ((a)<(b) ? (a) : (b))
@@ -538,7 +538,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                             benchError = 1;
                             break;
                         }
-                        blockTable[blockNb].resSize = (size_t)regenSize;
+                        blockTable[blockNb].resize = (size_t)regenSize;
                 }   }
                 {   Duration_ns const duration_ns = TIME_clockSpan_ns(timeStart);
                     if (duration_ns > 0) {

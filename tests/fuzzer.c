@@ -900,7 +900,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             LZ4_attach_dictionary(&LZ4_stream, &LZ4dictBody);
             ret = LZ4_compress_fast_continue(&LZ4_stream, block, compressedBuffer, blockSize, blockContinueCompressedSize, 1);
             FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_limitedOutput_compressed size is different (%i != %i)", ret, blockContinueCompressedSize);
-            FUZ_CHECKTEST(ret<=0, "LZ4_compress_fast_continue using extDictCtx with re-used context should work : enough size available within output buffer");
+            FUZ_CHECKTEST(ret<=0, "LZ4_compress_fast_continue using extDictCtx with reused context should work : enough size available within output buffer");
             FUZ_CHECKTEST(ret != expectedSize, "LZ4_compress_fast_continue using extDictCtx produced different-sized output");
             FUZ_CHECKTEST(XXH32(compressedBuffer, (size_t)ret, 0) != expectedCrc, "LZ4_compress_fast_continue using extDictCtx produced different output");
         }

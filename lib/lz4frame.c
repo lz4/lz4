@@ -1246,7 +1246,7 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
         dstPtr+=4;   /* content Checksum */
     }
 
-    cctxPtr->cStage = 0;   /* state is now re-usable (with identical preferences) */
+    cctxPtr->cStage = 0;   /* state is now reusable (with identical preferences) */
 
     if (cctxPtr->prefs.frameInfo.contentSize) {
         if (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)
