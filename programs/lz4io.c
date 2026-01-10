@@ -959,15 +959,25 @@ int LZ4IO_compressMultipleFilenames_Legacy(
             continue;
         }
 
-        if (ofnSize <= ifnSize+suffixSize+1) {
-            free(dstFileName);
-            ofnSize = ifnSize + 20;
-            dstFileName = (char*)malloc(ofnSize);
-            if (dstFileName==NULL) {
+        {   size_t neededSize;
+            if (ifnSize > (size_t)-1 - suffixSize - 1) {  /* size_t overflow */
+                free(dstFileName);
                 return ifntSize;
-        }   }
-        strcpy(dstFileName, inFileNamesTable[i]);
-        strcat(dstFileName, suffix);
+            }
+            neededSize = ifnSize + suffixSize + 1;
+            if (ofnSize < neededSize) {
+                char* const newDstFileName = (char*)realloc(dstFileName, neededSize);
+                if (newDstFileName == NULL) {
+                    free(dstFileName);
+                    return ifntSize;
+                }
+                dstFileName = newDstFileName;
+                ofnSize = neededSize;
+            }
+            memcpy(dstFileName, inFileNamesTable[i], ifnSize);
+            memcpy(dstFileName + ifnSize, suffix, suffixSize);
+            dstFileName[ifnSize + suffixSize] = '\0';
+        }
 
         missed_files += LZ4IO_compressLegacy_internal(&processed,
                                 inFileNamesTable[i], dstFileName,
@@ -1559,16 +1569,27 @@ int LZ4IO_compressMultipleFilenames(
             continue;
         }
         /* suffix != stdout => compress into a file => generate its name */
-        if (ofnSize <= ifnSize+suffixSize+1) {
-            free(dstFileName);
-            ofnSize = ifnSize + 20;
-            dstFileName = (char*)malloc(ofnSize);
-            if (dstFileName==NULL) {
+        {   size_t neededSize;
+            if (ifnSize > (size_t)-1 - suffixSize - 1) {  /* size_t overflow */
+                free(dstFileName);
                 LZ4IO_freeCResources(ress);
                 return ifntSize;
-        }   }
-        strcpy(dstFileName, inFileNamesTable[i]);
-        strcat(dstFileName, suffix);
+            }
+            neededSize = ifnSize + suffixSize + 1;
+            if (ofnSize < neededSize) {
+                char* const newDstFileName = (char*)realloc(dstFileName, neededSize);
+                if (newDstFileName == NULL) {
+                    free(dstFileName);
+                    LZ4IO_freeCResources(ress);
+                    return ifntSize;
+                }
+                dstFileName = newDstFileName;
+                ofnSize = neededSize;
+            }
+            memcpy(dstFileName, inFileNamesTable[i], ifnSize);
+            memcpy(dstFileName + ifnSize, suffix, suffixSize);
+            dstFileName[ifnSize + suffixSize] = '\0';
+        }
 
         missed_files += LZ4IO_compressFilename_extRess(&processed, &ress,
                                 inFileNamesTable[i], dstFileName,
