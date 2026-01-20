@@ -1,14 +1,14 @@
 LZ4 - Extremely fast compression
 ================================
 
-LZ4 is lossless compression algorithm,
+LZ4 is a lossless compression algorithm,
 providing compression speed > 500 MB/s per core,
 scalable with multi-cores CPU.
 It features an extremely fast decoder,
 with speed in multiple GB/s per core,
 typically reaching RAM speed limits on multi-core systems.
 
-Speed can be tuned dynamically, selecting an "acceleration" factor
+The speed can be tuned dynamically, selecting an "acceleration" factor
 which trades compression ratio for faster speed.
 On the other end, a high compression derivative, LZ4_HC, is also provided,
 trading CPU time for improved compression ratio.
@@ -21,7 +21,7 @@ This capability can be combined with the [Zstandard Dictionary Builder](https://
 in order to drastically improve compression performance on small files.
 
 
-LZ4 library is provided as open-source software using BSD 2-Clause license.
+The LZ4 library is provided as open-source software using BSD 2-Clause license.
 
 
 |Branch      |Status   |
