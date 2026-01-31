@@ -217,10 +217,10 @@ typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianness;
 
 /* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example on the compiler command line */
 #ifndef XXH_CPU_LITTLE_ENDIAN
-static int XXH_isLittleEndian(void)
+static XXH_endianness XXH_isLittleEndian(void)
 {
-    const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental  */
-    return one.c[0];
+    const union { U32 u; BYTE c[4]; } one = { XXH_littleEndian };   /* don't use static : performance detrimental  */
+    return (XXH_endianness)one.c[0];
 }
 #   define XXH_CPU_LITTLE_ENDIAN   XXH_isLittleEndian()
 #endif
@@ -398,7 +398,7 @@ XXH_PUBLIC_API unsigned int XXH32 (const void* input, size_t len, unsigned int s
     XXH32_update(&state, input, len);
     return XXH32_digest(&state);
 #else
-    XXH_endianness endian_detected = (XXH_endianness)XXH_CPU_LITTLE_ENDIAN;
+    XXH_endianness endian_detected = XXH_CPU_LITTLE_ENDIAN;
 
     if (XXH_FORCE_ALIGN_CHECK) {
         if ((((size_t)input) & 3) == 0) {   /* Input is 4-bytes aligned, leverage the speed benefit */
@@ -514,7 +514,7 @@ XXH32_update_endian(XXH32_state_t* state, const void* input, size_t len, XXH_end
 
 XXH_PUBLIC_API XXH_errorcode XXH32_update (XXH32_state_t* state_in, const void* input, size_t len)
 {
-    XXH_endianness endian_detected = (XXH_endianness)XXH_CPU_LITTLE_ENDIAN;
+    XXH_endianness endian_detected = XXH_CPU_LITTLE_ENDIAN;
 
     if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
         return XXH32_update_endian(state_in, input, len, XXH_littleEndian);
@@ -545,7 +545,7 @@ XXH32_digest_endian (const XXH32_state_t* state, XXH_endianness endian)
 
 XXH_PUBLIC_API unsigned int XXH32_digest (const XXH32_state_t* state_in)
 {
-    XXH_endianness endian_detected = (XXH_endianness)XXH_CPU_LITTLE_ENDIAN;
+    XXH_endianness endian_detected = XXH_CPU_LITTLE_ENDIAN;
 
     if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
         return XXH32_digest_endian(state_in, XXH_littleEndian);
@@ -861,7 +861,7 @@ XXH_PUBLIC_API unsigned long long XXH64 (const void* input, size_t len, unsigned
     XXH64_update(&state, input, len);
     return XXH64_digest(&state);
 #else
-    XXH_endianness endian_detected = (XXH_endianness)XXH_CPU_LITTLE_ENDIAN;
+    XXH_endianness endian_detected = XXH_CPU_LITTLE_ENDIAN;
 
     if (XXH_FORCE_ALIGN_CHECK) {
         if ((((size_t)input) & 7)==0) {  /* Input is aligned, let's leverage the speed advantage */
@@ -970,7 +970,7 @@ XXH64_update_endian (XXH64_state_t* state, const void* input, size_t len, XXH_en
 
 XXH_PUBLIC_API XXH_errorcode XXH64_update (XXH64_state_t* state_in, const void* input, size_t len)
 {
-    XXH_endianness endian_detected = (XXH_endianness)XXH_CPU_LITTLE_ENDIAN;
+    XXH_endianness endian_detected = XXH_CPU_LITTLE_ENDIAN;
 
     if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
         return XXH64_update_endian(state_in, input, len, XXH_littleEndian);
@@ -1004,7 +1004,7 @@ FORCE_INLINE U64 XXH64_digest_endian (const XXH64_state_t* state, XXH_endianness
 
 XXH_PUBLIC_API unsigned long long XXH64_digest (const XXH64_state_t* state_in)
 {
-    XXH_endianness endian_detected = (XXH_endianness)XXH_CPU_LITTLE_ENDIAN;
+    XXH_endianness endian_detected = XXH_CPU_LITTLE_ENDIAN;
 
     if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
         return XXH64_digest_endian(state_in, XXH_littleEndian);
