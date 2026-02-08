@@ -399,9 +399,11 @@ static int unitTests(U32 seed, double compressibility)
     /* LZ4F_compressBound() : srcSize=0 should return at least as much as srcSize=1 */
     DISPLAYLEVEL(3, "LZ4F_compressBound(0) vs LZ4F_compressBound(1) with explicit prefs: ");
     {   LZ4F_preferences_t testPrefs;
+        size_t bound0;
+        size_t bound1;
         memset(&testPrefs, 0, sizeof(testPrefs));
-        size_t const bound0 = LZ4F_compressBound(0, &testPrefs);
-        size_t const bound1 = LZ4F_compressBound(1, &testPrefs);
+        bound0 = LZ4F_compressBound(0, &testPrefs);
+        bound1 = LZ4F_compressBound(1, &testPrefs);
         if (bound0 < bound1) {
             DISPLAY("error detected : compressBound(0)=%zu < compressBound(1)=%zu \n", bound0, bound1);
             goto _output_error;
