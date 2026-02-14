@@ -442,25 +442,28 @@ static int unitTests(U32 seed, double compressibility)
         LZ4F_preferences_t writePrefs;
         size_t             blockSize;
         char*              data;
+        int                failed;
 
         tmpFile   = tmpfile();
         writeCtx  = NULL;
         blockSize = LZ4F_getBlockSize(LZ4F_default);
         data      = (char*)malloc(blockSize);
+        failed    = 0;
 
         memset(data, 0, blockSize);
         memset(&writePrefs, 0, sizeof(writePrefs));
         writePrefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
         writePrefs.frameInfo.blockChecksumFlag   = LZ4F_noBlockChecksum;
 
-        if (!tmpFile || !data) goto _output_error;
-        if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))) goto _output_error;
-        if (LZ4F_isError(LZ4F_write(writeCtx, data, blockSize - 1))) goto _output_error;
-        if (LZ4F_isError(LZ4F_write(writeCtx, data, 1))) goto _output_error;
+        if (!tmpFile || !data) failed = 1;
+        if (!failed && LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))) failed = 1;
+        if (!failed && LZ4F_isError(LZ4F_write(writeCtx, data, blockSize - 1))) failed = 1;
+        if (!failed && LZ4F_isError(LZ4F_write(writeCtx, data, 1))) failed = 1;
 
-        LZ4F_writeClose(writeCtx);
+        if (writeCtx) LZ4F_writeClose(writeCtx);
         free(data);
-        fclose(tmpFile);
+        if (tmpFile) fclose(tmpFile);
+        if (failed) goto _output_error;
         DISPLAYLEVEL(3, "OK \n");
     }
 
