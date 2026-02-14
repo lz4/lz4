@@ -403,6 +403,36 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, " %u \n", (U32)cBound);
     }
 
+
+    /* Verify compressBound() with LZ4F_write and checksums disabled */
+    DISPLAYLEVEL(3, "LZ4F_write checksums disabled edge case : ");
+    {
+        FILE*              tmpFile;
+        LZ4_writeFile_t*   writeCtx;
+        LZ4F_preferences_t writePrefs;
+        size_t             blockSize;
+        char*              data;
+
+        tmpFile   = tmpfile();
+        writeCtx  = NULL;
+        blockSize = LZ4F_getBlockSize(LZ4F_default);
+        data      = (char*)malloc(blockSize);
+
+        memset(&writePrefs, 0, sizeof(writePrefs));
+        writePrefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
+        writePrefs.frameInfo.blockChecksumFlag   = LZ4F_noBlockChecksum;
+
+        if (!tmpFile || !data) goto _output_error;
+        if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))) pgoto _output_error;
+        if (LZ4F_isError(LZ4F_write(writeCtx, data, blockSize - 1))) goto _output_error;
+        if (LZ4F_isError(LZ4F_write(writeCtx, data, 1))) goto _output_error;
+
+        LZ4F_writeClose(writeCtx);
+        free(data);
+        fclose(tmpFile);
+        DISPLAYLEVEL(3, "OK \n");
+    }
+
     /* Special case : null-content frame */
     testSize = 0;
     DISPLAYLEVEL(3, "LZ4F_compressFrame, compress null content : ");
