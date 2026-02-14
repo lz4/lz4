@@ -423,7 +423,7 @@ static int unitTests(U32 seed, double compressibility)
         writePrefs.frameInfo.blockChecksumFlag   = LZ4F_noBlockChecksum;
 
         if (!tmpFile || !data) goto _output_error;
-        if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))) pgoto _output_error;
+        if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))) goto _output_error;
         if (LZ4F_isError(LZ4F_write(writeCtx, data, blockSize - 1))) goto _output_error;
         if (LZ4F_isError(LZ4F_write(writeCtx, data, 1))) goto _output_error;
 
