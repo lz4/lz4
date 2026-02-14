@@ -40,7 +40,10 @@ test_exes = {
     'sources': files(lz4_source_root / 'tests/decompress-partial.c'),
   },
   'frametest': {
-    'sources': files(lz4_source_root / 'tests/frametest.c'),
+    'sources': files(
+      lz4_source_root / 'tests/frametest.c',
+      lz4_source_root / 'lib/lz4file.c',
+    ),
     'include_directories': include_directories(lz4_source_root / 'programs'),
     'args': ['-v', '-T@0@s'.format(fuzzer_time)],
     'test': false,
