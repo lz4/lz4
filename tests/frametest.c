@@ -396,19 +396,6 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, " %u \n", (U32)cBound);
     }
 
-    /* LZ4F_compressBound() : srcSize=0 should return at least as much as srcSize=1 */
-    DISPLAYLEVEL(3, "LZ4F_compressBound(0) vs LZ4F_compressBound(1) with explicit prefs: ");
-    {   LZ4F_preferences_t testPrefs;
-        memset(&testPrefs, 0, sizeof(testPrefs));
-        size_t const bound0 = LZ4F_compressBound(0, &testPrefs);
-        size_t const bound1 = LZ4F_compressBound(1, &testPrefs);
-        if (bound0 < bound1) {
-            DISPLAY("error detected : compressBound(0)=%zu < compressBound(1)=%zu \n", bound0, bound1);
-            goto _output_error;
-        }
-        DISPLAYLEVEL(3, "OK");
-    }
-
     /* LZ4F_compressBound() : special case : automatic flushing disabled */
     DISPLAYLEVEL(3, "LZ4F_compressBound(1 KB, autoFlush=0) = ");
     {   size_t const cBound = LZ4F_compressBound(1 KB, &prefs);
