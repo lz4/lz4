@@ -55,6 +55,9 @@ TEST_FILES   := COPYING
 FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
 
+LIB_CORE_OBJS  := $(addprefix $(LIBDIR)/,lz4.o lz4hc.o xxhash.o)
+LIB_FRAME_OBJS := $(addprefix $(LIBDIR)/,lz4.o lz4hc.o lz4frame.o xxhash.o)
+
 .PHONY: default
 default: all
 
@@ -89,7 +92,7 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 
 fullbench : DEBUGLEVEL=0
 fullbench : CPPFLAGS += -DNDEBUG
-$(eval $(call c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
+$(eval $(call c_program,fullbench,fullbench.o $(LIB_FRAME_OBJS)))
 
 .PHONY: $(LIBDIR)/liblz4.a
 $(LIBDIR)/liblz4.a: MAKEFLAGS=
@@ -119,25 +122,25 @@ fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: fullbench
 
 fuzzer:
-$(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
+$(eval $(call c_program_shared_o,fuzzer,$(LIB_CORE_OBJS) fuzzer.o))
 
 frametest:
-$(eval $(call c_program_shared_o,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
+$(eval $(call c_program_shared_o,frametest,$(LIB_FRAME_OBJS) frametest.o))
 
 roundTripTest:
-$(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
+$(eval $(call c_program_shared_o,roundTripTest,$(LIB_CORE_OBJS) roundTripTest.o))
 
 datagen: CPPFLAGS+=-DNDEBUG
-$(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
+$(eval $(call c_program,datagen,datagen.o $(PRGDIR)/lorem.o loremOut.o datagencli.o))
 
 checkFrame:
-$(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
+$(eval $(call c_program_shared_o,checkFrame,$(LIB_FRAME_OBJS) checkFrame.o))
 
 decompress-partial:
-$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
+$(eval $(call c_program_shared_o,decompress-partial,$(LIBDIR)/lz4.o decompress-partial.o))
 
 decompress-partial-usingDict:
-$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
+$(eval $(call c_program_shared_o,decompress-partial-usingDict,$(LIBDIR)/lz4.o decompress-partial-usingDict.o))
 
 .PHONY: clean
 clean: clean_cache
