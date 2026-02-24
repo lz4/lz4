@@ -43,6 +43,7 @@
 #include <assert.h>
 #include "lz4frame.h"   /* included multiple times to test correctness/safety */
 #include "lz4frame.h"
+#include "lz4file.h"
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4frame.h"
