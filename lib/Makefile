@@ -140,6 +140,9 @@ endif
 
 endif
 
+# Create symlinks for shared library versions (not needed on Windows)
+ifneq ($(WINBASED),yes)
+
 liblz4.$(SHARED_EXT_MAJOR): $(LIBLZ4)
 	$(LN_SF) $< $@
 
@@ -148,6 +151,14 @@ liblz4.$(SHARED_EXT): liblz4.$(SHARED_EXT_MAJOR)
 
 .PHONY: liblz4
 liblz4: $(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT)
+
+else
+
+# On Windows, LIBLZ4 is the final DLL target (no symlinks needed)
+.PHONY: liblz4
+liblz4: $(LIBLZ4)
+
+endif
 
 CLEAN += liblz4.pc
 liblz4.pc: liblz4.pc.in Makefile

@@ -66,10 +66,12 @@ all32: CFLAGS+=-m32
 all32: all
 
 .PHONY: lz4
+lz4: MAKEFLAGS=
 lz4:
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="$(CFLAGS)"
 
 .PHONY: lib liblz4.pc
+lib liblz4.pc: MAKEFLAGS=
 lib liblz4.pc:
 	CFLAGS="$(CFLAGS)" $(MAKE) -C $(LIBDIR) $@
 
@@ -77,6 +79,7 @@ lz4c unlz4 lz4cat: lz4
 	$(LN_SF) $(LZ4) $(PRGDIR)/$@
 
 .PHONY: lz4c32
+lz4c32: MAKEFLAGS=
 lz4c32:  # create a 32-bits version for 32/64 interop tests
 	$(MAKE) -C $(PRGDIR) $@ CFLAGS="-m32 $(CFLAGS)"
 
@@ -89,6 +92,7 @@ fullbench : CPPFLAGS += -DNDEBUG
 $(eval $(call c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
 
 .PHONY: $(LIBDIR)/liblz4.a
+$(LIBDIR)/liblz4.a: MAKEFLAGS=
 $(LIBDIR)/liblz4.a:
 	$(MAKE) -C $(LIBDIR) liblz4.a
 
@@ -103,6 +107,7 @@ ifeq ($(WINBASED),yes)
 CLEAN += fullbench-dll
 fullbench-dll : DEBUGLEVEL=0
 fullbench-dll : CPPFLAGS += -DNDEBUG
+fullbench-dll : MAKEFLAGS=
 fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
 	$(MAKE) -C $(LIBDIR) liblz4
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/$(LIBLZ4).dll
@@ -196,6 +201,8 @@ test32: test
 
 test-amalgamation: lz4_all.o
 
+lz4_all.o: CFLAGS += -Werror -std=c90
+
 CLEAN += lz4_all.c
 lz4_all.c: $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
 	$(CAT) $^ > $@
@@ -238,6 +245,10 @@ test-lz4-skippable: lz4
 	@echo "\n ---- test lz4 with skippable frames ----"
 	./test-lz4-skippable.sh
 
+test-datagen-invalid-input: datagen
+	@echo "\n ---- test datagen fails correctly on invalid input ----"
+	$(DATAGEN) -g1234l && exit 1 || true
+
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
 	./test-lz4-basic.sh
@@ -264,9 +275,9 @@ test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
 	./test-lz4-opt-parser.sh
 
-test-lz4-essentials : lz4 datagen test-lz4-basic test-lz4-multiple test-lz4-multiple-legacy \
-                      test-lz4-frame-concatenation test-lz4-testmode \
-                      test-lz4-contentSize test-lz4-dict
+test-lz4-essentials : lz4 datagen test-datagen-invalid-input test-lz4-basic test-lz4-multiple \
+                      test-lz4-multiple-legacy test-lz4-frame-concatenation \
+                      test-lz4-testmode test-lz4-contentSize test-lz4-dict
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
           test-lz4-sparse test-lz4-hugefile test-lz4-dict \

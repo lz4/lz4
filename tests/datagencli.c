@@ -135,7 +135,8 @@ int main(int argc, char** argv)
                     argument++;
                     break;
                 default:
-                    return usage(programName);
+                    usage(programName);
+                    return 1; /* Return error if usage is unexpected */
                 }
             }
         }  /* if (*argument=='-') */

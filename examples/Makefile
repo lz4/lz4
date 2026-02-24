@@ -68,8 +68,9 @@ all: $(ALL)
 $(ALL): $(SLIBLZ4)
 
 .PHONY:$(LZ4)
+$(LZ4): MAKEFLAGS=
 $(LZ4) :
-	$(MAKE) -j -C $(LZ4DIR) lz4
+	$(MAKE) -C $(LZ4DIR) lz4
 
 .PHONY: test
 test : all $(LZ4)

@@ -20,16 +20,7 @@ It can ingest any input file as dictionary, though only the final 64KB are used.
 This capability can be combined with the [Zstandard Dictionary Builder](https://github.com/facebook/zstd/blob/v1.3.5/programs/zstd.1.md#dictionary-builder),
 in order to drastically improve compression performance on small files.
 
-
 LZ4 library is provided as open-source software using BSD 2-Clause license.
-
-
-|Branch      |Status   |
-|------------|---------|
-|dev         | [![Build status][AppveyorDevBadge]][AppveyorLink]  |
-
-[AppveyorDevBadge]: https://ci.appveyor.com/api/projects/status/github/lz4/lz4?branch=dev&svg=true "Windows test suite"
-[AppveyorLink]: https://ci.appveyor.com/project/YannCollet/lz4-1lndh
 
 
 Benchmarks

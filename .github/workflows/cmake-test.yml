@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   cancel-in-progress: true
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
   # Core functionality test - multi-platform
@@ -38,7 +38,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
 
     - name: Set up MSVC (Windows)
       if: runner.os == 'Windows'
@@ -79,7 +79,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
 
     - name: Set up CMake
       uses: jwlawson/actions-setup-cmake@v2
@@ -122,6 +122,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
     - name: Test via Makefile
       run: make clean && make cmakebuild

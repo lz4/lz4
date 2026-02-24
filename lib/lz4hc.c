@@ -1797,7 +1797,7 @@ int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictS
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 4) dictSize = 0;
     if (dictSize > prefixSize) dictSize = prefixSize;
-    if (safeBuffer == NULL) assert(dictSize == 0);
+    if (safeBuffer == NULL) assert(dictSize == 0); /* a NULL buffer with !0 size is invalid */
     if (dictSize > 0)
         LZ4_memmove(safeBuffer, streamPtr->end - dictSize, (size_t)dictSize);
     {   U32 const endIndex = (U32)(streamPtr->end - streamPtr->prefixStart) + streamPtr->dictLimit;

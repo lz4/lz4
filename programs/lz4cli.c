@@ -401,7 +401,8 @@ int main(int argCount, const char** argv)
         main_pause=0,
         multiple_inputs=0,
         all_arguments_are_files=0,
-        operationResult=0;
+        operationResult=0,
+        contentSizeFlag=0;
     unsigned nbWorkers = init_nbWorkers();
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
@@ -477,7 +478,7 @@ int main(int argCount, const char** argv)
                 if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); BMK_skipChecksums(0); continue; }
                 if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
                 if (!strcmp(argument,  "--no-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_setBlockChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
-                if (!strcmp(argument,  "--content-size")) { LZ4IO_setContentSize(prefs, 1); continue; }
+                if (!strcmp(argument,  "--content-size")) { contentSizeFlag = 1; LZ4IO_setContentSize(prefs, 1); continue;}
                 if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(prefs, 0); continue; }
                 if (!strcmp(argument,  "--list")) { mode = om_list; multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(prefs, 2); continue; }
@@ -777,6 +778,9 @@ int main(int argCount, const char** argv)
     if (!strcmp(input_filename, stdinmark)) {
         /* if input==stdin and no output defined, stdout becomes default output */
         if (!output_filename) output_filename = stdoutmark;
+        if (contentSizeFlag){
+            DISPLAYLEVEL(2, "warning : --content-size cannot determine size when used with stdin\n");
+        }
     }
 
     /* No output filename ==> try to select one automatically (when possible) */
