@@ -162,6 +162,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\lib\lz4.c" />
+    <ClCompile Include="..\..\..\lib\lz4file.c" />
     <ClCompile Include="..\..\..\lib\lz4frame.c" />
     <ClCompile Include="..\..\..\lib\lz4hc.c" />
     <ClCompile Include="..\..\..\lib\xxhash.c" />
@@ -169,6 +170,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\lz4.h" />
+    <ClInclude Include="..\..\..\lib\lz4file.h" />
     <ClInclude Include="..\..\..\lib\lz4frame.h" />
     <ClInclude Include="..\..\..\lib\lz4frame_static.h" />
     <ClInclude Include="..\..\..\lib\lz4hc.h" />

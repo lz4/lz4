@@ -43,6 +43,7 @@
 #include <assert.h>
 #include "lz4frame.h"   /* included multiple times to test correctness/safety */
 #include "lz4frame.h"
+#include "lz4file.h"
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4frame.h"
@@ -435,6 +436,35 @@ static int unitTests(U32 seed, double compressibility)
         fastCompressPrefs.compressionLevel = -3;
         CHECK_V(cSize, LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, &fastCompressPrefs));
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
+    }
+
+    /* Verify compressBound() with LZ4F_write and checksums disabled */
+    DISPLAYLEVEL(3, "LZ4F_write checksums disabled edge case : ");
+    {
+        FILE* tmpFile  = tmpfile();
+        LZ4_writeFile_t* writeCtx = NULL;
+        LZ4F_preferences_t writePrefs;
+        size_t blockSize = LZ4F_getBlockSize(LZ4F_default);
+        char* data = (char*)calloc(blockSize, sizeof(char));
+        int failed = 0;
+
+        memset(&writePrefs, 0, sizeof(writePrefs));
+        writePrefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
+        writePrefs.frameInfo.blockChecksumFlag   = LZ4F_noBlockChecksum;
+
+        do {
+            if (!tmpFile || !data){ failed = 1; break; }
+            if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))){ failed = 1; break; }
+            if (LZ4F_isError(LZ4F_write(writeCtx, data, blockSize - 1))){ failed = 1; break; }
+            if (LZ4F_isError(LZ4F_write(writeCtx, data, 1))){ failed = 1; break; }
+        } while(0);
+
+        if (writeCtx && LZ4F_isError(LZ4F_writeClose(writeCtx))) { failed = 1; }
+        free(data);
+        if (tmpFile) fclose(tmpFile);
+
+        if (failed) goto _output_error;
+        DISPLAYLEVEL(3, "OK \n");
     }
 
     DISPLAYLEVEL(3, "LZ4F_compressFrame, using default preferences : ");

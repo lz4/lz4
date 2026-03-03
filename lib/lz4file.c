@@ -275,7 +275,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   writeFile->maxWriteSize = blockSize;
 
   /* Calculate and allocate destination buffer */
-  writeFile->dstBufMaxSize = LZ4F_compressBound(0, prefsPtr);
+  writeFile->dstBufMaxSize = LZ4F_compressBound(blockSize, prefsPtr);
   writeFile->dstBuf = (LZ4_byte*)malloc(writeFile->dstBufMaxSize);
   if (writeFile->dstBuf == NULL) {
     freeAndNullWriteFile(&writeFile);
