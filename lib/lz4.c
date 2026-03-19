@@ -2101,13 +2101,15 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-                size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
-                if (addl == rvl_error) {
-                    DEBUGLOG(6, "error reading long literal length");
-                    goto _output_error;
-                }
-                length += addl;
-                if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
+                size_t s;
+                do {
+                    s = *ip++;
+                    if (unlikely(ip >= iend)) { goto _output_error; } /* overflow detection */
+                    length += s;
+                } while (s==255);
+                
+                cpy = op+length;
+                if (unlikely((uptrval)(cpy)<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
 
                 /* copy literals */
@@ -2116,10 +2118,10 @@ LZ4_decompress_generic(
                 if ((cpy>oend-64) || (ip+length>iend-64)) { goto safe_literal_copy; }
                 LZ4_wildCopy64(op, ip, cpy);
               #else
-                if ((op+length>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
-                LZ4_wildCopy32(op, ip, op+length);
+                if ((cpy>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
+                LZ4_wildCopy32(op, ip, cpy);
               #endif
-                ip += length; op += length;
+                ip += length; op = cpy;
             } else {
                 DEBUGLOG(7, "copy %u bytes in a 16-bytes stripe", (unsigned)length);
                 /* Literals can only be <= 14, but hope compilers optimize better when copy by a register size */
