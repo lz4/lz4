@@ -2095,6 +2095,7 @@ LZ4_decompress_generic(
             assert(ip < iend);
             token = *ip++;
             length = token >> ML_BITS;  /* literal length */
+            token &= ML_MASK;
             DEBUGLOG(7, "blockPos%6u: litLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
 
             if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { cpy = op+length; goto safe_literal_copy; }
@@ -2129,14 +2130,15 @@ LZ4_decompress_generic(
                 ip += length; op += length;
             }
 
+            /* get matchlength */
+            length = token;
+
             /* get offset */
             offset = LZ4_readLE16(ip); ip+=2;
             DEBUGLOG(6, "blockPos%6u: offset = %u", (unsigned)(op-(BYTE*)dst), (unsigned)offset);
             match = op - offset;
             assert(match <= op);  /* overflow check */
 
-            /* get matchlength */
-            length = token & ML_MASK;
             DEBUGLOG(7, "  match length token = %u (len==%u)", (unsigned)length, (unsigned)length+MINMATCH);
 
             if (length == ML_MASK) {
@@ -2145,8 +2147,8 @@ LZ4_decompress_generic(
                     DEBUGLOG(5, "error reading long match length");
                     goto _output_error;
                 }
-                length += addl;
                 length += MINMATCH;
+                length += addl;
                 DEBUGLOG(7, "  long match length == %u", (unsigned)length);
                 if (unlikely((uptrval)(op)+length<(uptrval)op)) { goto _output_error; } /* overflow detection */
                 if (op + length >= oend - FASTLOOP_SAFE_DISTANCE) {
