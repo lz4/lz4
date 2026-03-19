@@ -511,6 +511,20 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
     LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
 }
 
+
+#ifdef __aarch64__
+/* customized variant of memcpy, which can overwrite up to 64 bytes beyond dstEnd */
+LZ4_FORCE_INLINE void
+LZ4_wildCopy64(void* dstPtr, const void* srcPtr, void* dstEnd)
+{
+    BYTE* d = (BYTE*)dstPtr;
+    const BYTE* s = (const BYTE*)srcPtr;
+    BYTE* const e = (BYTE*)dstEnd;
+
+    do { LZ4_memcpy(d,s,64); d+=64; s+=64; } while (d<e);
+}
+#endif
+
 /* customized variant of memcpy, which can overwrite up to 32 bytes beyond dstEnd
  * this version copies two times 16 bytes (instead of one time 32 bytes)
  * because it must be compatible with offsets >= 16. */
@@ -2097,8 +2111,13 @@ LZ4_decompress_generic(
 
                 /* copy literals */
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
+              #ifdef __aarch64__
+                if ((cpy>oend-64) || (ip+length>iend-64)) { goto safe_literal_copy; }
+                LZ4_wildCopy64(op, ip, cpy);
+              #else
                 if ((op+length>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
                 LZ4_wildCopy32(op, ip, op+length);
+              #endif
                 ip += length; op += length;
             } else if (ip <= iend-(16 + 1/*max lit + offset + nextToken*/)) {
                 /* We don't need to check oend, since we check it once for each loop below */
@@ -2194,9 +2213,13 @@ LZ4_decompress_generic(
             /* copy match within block */
             cpy = op + length;
 
-            assert((op <= oend) && (oend-op >= 32));
+            assert((op <= oend) && (oend-op >= 64));
             if (unlikely(offset<16)) {
                 LZ4_memcpy_using_offset(op, match, cpy, offset);
+    #ifdef __aarch64__
+            } else if (offset >= 64) {
+                LZ4_wildCopy64(op, match, cpy);
+    #endif
             } else {
                 LZ4_wildCopy32(op, match, cpy);
             }
