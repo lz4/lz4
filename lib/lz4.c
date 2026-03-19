@@ -2098,6 +2098,8 @@ LZ4_decompress_generic(
             length = token >> ML_BITS;  /* literal length */
             DEBUGLOG(7, "blockPos%6u: litLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
 
+            if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { cpy = op+length; goto safe_literal_copy; }
+
             /* decode literal length */
             if (length == RUN_MASK) {
                 size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
@@ -2119,14 +2121,11 @@ LZ4_decompress_generic(
                 LZ4_wildCopy32(op, ip, op+length);
               #endif
                 ip += length; op += length;
-            } else if (ip <= iend-(16 + 1/*max lit + offset + nextToken*/)) {
-                /* We don't need to check oend, since we check it once for each loop below */
+            } else {
                 DEBUGLOG(7, "copy %u bytes in a 16-bytes stripe", (unsigned)length);
                 /* Literals can only be <= 14, but hope compilers optimize better when copy by a register size */
                 LZ4_memcpy(op, ip, 16);
                 ip += length; op += length;
-            } else {
-                goto safe_literal_copy;
             }
 
             /* get offset */
