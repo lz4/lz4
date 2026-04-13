@@ -48,11 +48,33 @@ BUILD_STATIC:=yes
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 USERCFLAGS:= -O3 $(CFLAGS)
+
+# RISC-V RVV support: auto-detect and enable if compiler supports RVV intrinsics
+# Only enable for Clang or GCC >= 14 with RISC-V target, as cross-compilers
+# may accept -march=rv64gcv without complete intrinsic support
+RVV_CFLAGS :=
+IS_RISCV := $(shell $(CC) -v 2>&1 | grep -c 'Target: riscv')
+ifeq ($(IS_RISCV),1)
+  IS_CLANG := $(shell $(CC) --version 2>&1 | grep -c 'clang')
+  ifneq ($(IS_CLANG),0)
+    RVV_CFLAGS := -march=rv64gcv
+    $(info LZ4: Enabling RISC-V RVV for xxHash (Clang))
+  else
+    GCC_VER := $(shell $(CC) -dumpversion | cut -d. -f1)
+    ifeq ($(shell test $(GCC_VER) -ge 14; echo $$?),0)
+      RVV_CFLAGS := -march=rv64gcv
+      $(info LZ4: Enabling RISC-V RVV for xxHash (GCC $(GCC_VER)))
+    endif
+  endif
+endif
+ifneq ($(RVV_CFLAGS),)
+  CPPFLAGS += -DXXH_ENABLE_RVV=1
+endif
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wswitch-enum -Wdeclaration-after-statement \
              -Wstrict-prototypes -Wmissing-prototypes \
              -Wundef -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
+override CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS) $(RVV_CFLAGS)
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))
