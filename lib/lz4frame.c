@@ -1804,8 +1804,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                         if (dctx->frameInfo.contentChecksumFlag)
                             (void)XXH32_update(&dctx->xxh, srcPtr, sizeToCopy);
                     }
-                    if (dctx->frameInfo.contentSize)
+                    if (dctx->frameInfo.contentSize) {
+                        RETURN_ERROR_IF(sizeToCopy > dctx->frameRemainingSize, frameSize_wrong);
                         dctx->frameRemainingSize -= sizeToCopy;
+                    }
 
                     /* history management (linked blocks only)*/
                     if (dctx->frameInfo.blockMode == LZ4F_blockLinked) {
@@ -1936,8 +1938,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
                 if ((dctx->frameInfo.contentChecksumFlag) && (!dctx->skipChecksum))
                     XXH32_update(&(dctx->xxh), dstPtr, (size_t)decodedSize);
-                if (dctx->frameInfo.contentSize)
+                if (dctx->frameInfo.contentSize) {
+                    RETURN_ERROR_IF((size_t)decodedSize > dctx->frameRemainingSize, frameSize_wrong);
                     dctx->frameRemainingSize -= (size_t)decodedSize;
+                }
 
                 /* dictionary management */
                 if (dctx->frameInfo.blockMode==LZ4F_blockLinked) {
@@ -1981,8 +1985,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
                 if (dctx->frameInfo.contentChecksumFlag && !dctx->skipChecksum)
                     XXH32_update(&(dctx->xxh), dctx->tmpOut, (size_t)decodedSize);
-                if (dctx->frameInfo.contentSize)
+                if (dctx->frameInfo.contentSize) {
+                    RETURN_ERROR_IF((size_t)decodedSize > dctx->frameRemainingSize, frameSize_wrong);
                     dctx->frameRemainingSize -= (size_t)decodedSize;
+                }
                 dctx->tmpOutSize = (size_t)decodedSize;
                 dctx->tmpOutStart = 0;
                 dctx->dStage = dstage_flushOut;
