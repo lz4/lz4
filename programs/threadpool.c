@@ -204,7 +204,9 @@ void TPool_submitJob(TPool* pool, void (*job_function)(void*), void* arg)
 void TPool_jobsCompleted(TPool* pool)
 {
     assert(pool);
-    WaitForSingleObject(pool->allJobsCompleted, INFINITE);
+    while (InterlockedCompareExchange(&pool->nbPendingJobs, 0, 0) > 0) {
+        WaitForSingleObject(pool->allJobsCompleted, INFINITE);
+    }
 }
 
 #else
