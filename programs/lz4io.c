@@ -499,6 +499,9 @@ static void WR_addBufDesc(WriteRegister* wr, const BufferDesc* bd)
         size_t const oldCapacity = wr->capacity;
         size_t const addedCapacity = MIN(oldCapacity, 256);
         size_t const newCapacity = oldCapacity + addedCapacity;
+        if (newCapacity > SIZE_MAX / sizeof(BufferDesc)) {
+            END_PROCESS(39, "cannot extend register of buffers : too many buffers")
+        }
         size_t const newSize = newCapacity * sizeof(BufferDesc);
         void* const newBuf = realloc(wr->buffers, newSize);
         if (newBuf == NULL) {
