@@ -2195,8 +2195,11 @@ LZ4_decompress_generic(
             cpy = op + length;
 
             assert((op <= oend) && (oend-op >= 32));
-            if (unlikely(offset<16)) {
+            if (unlikely(offset<16) && length > offset) {
                 LZ4_memcpy_using_offset(op, match, cpy, offset);
+            } else if (unlikely(offset<16)){
+                /* no overlap possible use simple memcpy*/
+                LZ4_memcpy(op, match, length);
             } else {
                 LZ4_wildCopy32(op, match, cpy);
             }
