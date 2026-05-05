@@ -2029,7 +2029,10 @@ int LZ4_saveDict(LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
 typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
 
 #  undef MIN
+#ifndef MIN
 #  define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 
 /* variant for decompress_unsafe()
  * does not know end of input
