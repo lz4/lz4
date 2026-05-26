@@ -33,7 +33,7 @@ Benchmark evaluates the compression of reference [Silesia Corpus]
 in single-thread mode.
 
 [lzbench]: https://github.com/inikep/lzbench
-[Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
+[Silesia Corpus]: https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 
 |  Compressor             | Factor  | Compression | Decompression |
 |  ----------             | -----   | ----------- | ------------- |
@@ -48,8 +48,8 @@ in single-thread mode.
 |**LZ4 HC -9 (v1.9.0)**   |**2.721**|    41 MB/s  | **4900 MB/s** |
 | [zlib] deflate 1.2.11 -6|  3.099  |    36 MB/s  |    445 MB/s   |
 
-[zlib]: http://www.zlib.net/
-[Zstandard]: http://www.zstd.net/
+[zlib]: https://zlib.net/
+[Zstandard]: https://github.com/facebook/zstd
 
 
 Installation
@@ -103,7 +103,7 @@ many contributors have created versions of lz4 in multiple languages
 (Java, C#, Python, Perl, Ruby, etc.).
 A list of known source ports is maintained on the [LZ4 Homepage].
 
-[LZ4 Homepage]: http://www.lz4.org
+[LZ4 Homepage]: https://lz4.github.io/lz4/
 
 ### Packaging status
 
