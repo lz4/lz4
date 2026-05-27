@@ -2102,12 +2102,15 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-                size_t const addl = read_variable_length(&ip, iend, 0);
-                if (addl == rvl_error) {
-                    DEBUGLOG(6, "error reading long literal length");
-                    goto _output_error;
-                }
-                length += addl;
+                size_t s;
+                do {
+                    s = *ip++;
+                    if (unlikely(ip >= iend)) { goto _output_error; } /* overflow detection */
+                    length += s;
+                    if ((sizeof(length)<8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
+                        goto _output_error;
+                    }
+                } while (s==255);
                 cpy = op+length;
                 if (unlikely((uptrval)(cpy)<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
