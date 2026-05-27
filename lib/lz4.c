@@ -494,7 +494,7 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
     assert(srcPtr + offset == dstPtr);
     if (offset < 8) {
         LZ4_write32(dstPtr, 0);   /* silence an msan warning when offset==0 */
-        assert(offset >= 2);
+        assert(offset != 1); // offset==0 only happens on testing
         LZ4_memcpy(dstPtr, srcPtr, 2);
         LZ4_memcpy(dstPtr + 2, srcPtr + 2, 2);
         srcPtr += inc32table[offset];
