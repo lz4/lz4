@@ -2098,35 +2098,35 @@ LZ4_decompress_generic(
             length = token >> ML_BITS;  /* literal length */
             DEBUGLOG(7, "blockPos%6u: litLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
 
+            if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { goto safe_literal_copy_early; }
+
             /* decode literal length */
             if (length == RUN_MASK) {
-                size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
+                size_t const addl = read_variable_length(&ip, iend, 0);
                 if (addl == rvl_error) {
                     DEBUGLOG(6, "error reading long literal length");
                     goto _output_error;
                 }
                 length += addl;
-                if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
+                cpy = op+length;
+                if (unlikely((uptrval)(cpy)<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
 
                 /* copy literals */
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
               #ifdef __aarch64__
-                if ((op+length>oend-64) || (ip+length>iend-64)) { goto safe_literal_copy; }
-                LZ4_wildCopy64(op, ip, op+length);
+                if ((cpy>oend-64) || (ip+length>iend-64)) { goto safe_literal_copy; }
+                LZ4_wildCopy64(op, ip, cpy);
               #else
-                if ((op+length>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
-                LZ4_wildCopy32(op, ip, op+length);
+                if ((cpy>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
+                LZ4_wildCopy32(op, ip, cpy);
               #endif
-                ip += length; op += length;
-            } else if (ip <= iend-(16 + 1/*max lit + offset + nextToken*/)) {
-                /* We don't need to check oend, since we check it once for each loop below */
+                ip += length; op = cpy;
+            } else {
                 DEBUGLOG(7, "copy %u bytes in a 16-bytes stripe", (unsigned)length);
                 /* Literals can only be <= 14, but hope compilers optimize better when copy by a register size */
                 LZ4_memcpy(op, ip, 16);
                 ip += length; op += length;
-            } else {
-                goto safe_literal_copy;
             }
 
             /* get offset */
@@ -2279,6 +2279,10 @@ LZ4_decompress_generic(
                 goto _copy_match;
             }
 
+#if LZ4_FAST_DEC_LOOP
+        safe_literal_copy_early:
+#endif
+
             /* decode literal length */
             if (length == RUN_MASK) {
                 size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
@@ -2288,11 +2292,12 @@ LZ4_decompress_generic(
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
             }
 
+            /* copy literals */
+            cpy = op+length;
+
 #if LZ4_FAST_DEC_LOOP
         safe_literal_copy:
 #endif
-            /* copy literals */
-            cpy = op+length;
 
             LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
             if ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) {
