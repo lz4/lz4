@@ -1998,21 +1998,18 @@ read_variable_length(const BYTE** ip, const BYTE* ilimit,
     s = **ip;
     (*ip)++;
     length += s;
-    if (unlikely((*ip) > ilimit)) {    /* read limit reached */
-        return rvl_error;
-    }
     /* accumulator overflow detection (32-bit mode only) */
     if ((sizeof(length) < 8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
         return rvl_error;
     }
     if (likely(s != 255)) return length;
     do {
+        if (unlikely((*ip) >= ilimit)) {    /* read limit reached */
+            return rvl_error;
+        }
         s = **ip;
         (*ip)++;
         length += s;
-        if (unlikely((*ip) > ilimit)) {    /* read limit reached */
-            return rvl_error;
-        }
         /* accumulator overflow detection (32-bit mode only) */
         if ((sizeof(length) < 8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
             return rvl_error;
