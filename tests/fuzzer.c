@@ -1142,6 +1142,14 @@ static void FUZ_unitTests(int compressionLevel)
     }   }
 
 
+    /* Test decoding with all 0xFF input - OOB read regression test */
+    DISPLAYLEVEL(3, "LZ4_decompress_safe() with all-0xFF input \n");
+    {   char tmp[31];
+        memset(tmp, 0xFF, sizeof(tmp));
+        {   int const r = LZ4_decompress_safe(tmp, testVerify, sizeof(tmp), testInputSize);
+            FUZ_CHECKTEST(r >= 0, "LZ4_decompress_safe() should fail on all-0xFF input");
+    }   }
+
     /* to be tested with undefined sanitizer */
     DISPLAYLEVEL(3, "LZ4_compress_default() with NULL input:");
     {	int const maxCSize = LZ4_compressBound(0);
