@@ -1977,10 +1977,10 @@ LZ4_decompress_unsafe_generic(
 
 /* Read the variable-length literal or match length.
  *
- * @ip : input pointer
- * @ilimit : position after which if length is not decoded, the input is necessarily corrupted.
- * @initial_check - check ip >= ipmax before start of loop.  Returns initial_error if so.
- * @error (output) - error code.  Must be set to 0 before call.
+ * @ipPtr : pointer to input pointer, will be advanced
+ * @ilimit : read is forbidden beyond this position (must be within input buffer)
+ * @initial_check : if non-zero, check *ipPtr >= ilimit before reading.
+ *                  if zero, caller guarantees *ipPtr < ilimit.
 **/
 typedef size_t Rvl_t;
 static const Rvl_t rvl_error = (Rvl_t)(-1);
