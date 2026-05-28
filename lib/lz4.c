@@ -1985,26 +1985,26 @@ LZ4_decompress_unsafe_generic(
 typedef size_t Rvl_t;
 static const Rvl_t rvl_error = (Rvl_t)(-1);
 LZ4_FORCE_INLINE Rvl_t
-read_variable_length(const BYTE** ip, const BYTE* ilimit,
+read_variable_length(const BYTE** ipPtr, const BYTE* ilimit,
                      int initial_check)
 {
     Rvl_t s, length = 0;
-    assert(ip != NULL);
-    assert(*ip !=  NULL);
+    assert(ipPtr != NULL);
+    assert(*ipPtr !=  NULL);
     assert(ilimit != NULL);
-    if (initial_check && unlikely((*ip) >= ilimit)) {    /* read limit reached */
+    if (initial_check && unlikely((*ipPtr) >= ilimit)) {    /* read limit reached */
         return rvl_error;
     }
-    s = **ip;
-    (*ip)++;
+    s = **ipPtr;
+    (*ipPtr)++;
     length += s;
     if (likely(s != 255)) return length;
     do {
-        if (unlikely((*ip) >= ilimit)) {    /* read limit reached */
+        if (unlikely((*ipPtr) >= ilimit)) {    /* read limit reached */
             return rvl_error;
         }
-        s = **ip;
-        (*ip)++;
+        s = **ipPtr;
+        (*ipPtr)++;
         length += s;
         /* accumulator overflow detection (32-bit mode only) */
         if ((sizeof(length) < 8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
