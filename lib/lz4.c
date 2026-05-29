@@ -1992,6 +1992,7 @@ read_variable_length(const BYTE** ipPtr, const BYTE* ilimit,
     assert(ipPtr != NULL);
     assert(*ipPtr !=  NULL);
     assert(ilimit != NULL);
+    assert(initial_check || (*ipPtr < ilimit));  /* if no initial_check, caller guarantees ip < ilimit */
     if (initial_check && unlikely((*ipPtr) >= ilimit)) {    /* read limit reached */
         return rvl_error;
     }
@@ -2132,7 +2133,7 @@ LZ4_decompress_generic(
             DEBUGLOG(7, "  match length token = %u (len==%u)", (unsigned)length, (unsigned)length+MINMATCH);
 
             if (length == ML_MASK) {
-                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS, 0);
+                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS, 1);
                 if (addl == rvl_error) {
                     DEBUGLOG(5, "error reading long match length");
                     goto _output_error;

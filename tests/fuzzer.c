@@ -1150,6 +1150,23 @@ static void FUZ_unitTests(int compressionLevel)
             FUZ_CHECKTEST(r >= 0, "LZ4_decompress_safe() should fail on all-0xFF input");
     }   }
 
+    /* Test that ip does not go beyond iend in the fast decode loop.
+     * The block has 14 literals, ML_MASK match token, offset=14, one extension byte=0.
+     * This positions ip exactly at iend when read_variable_length reads the extension,
+     * then goto safe_match_copy would loop back with ip==iend, triggering assert(ip<iend).
+     * Output buffer is 65 bytes: large enough to enter the fast loop (>=64),
+     * small enough that op+length >= oend-64 triggers the safe_match_copy path. */
+    DISPLAYLEVEL(3, "LZ4_decompress_safe() fast-loop ip-at-iend regression test \n");
+    {   char block[18];
+        char out[65];
+        block[0] = (char)0xEF;          /* 14 literals, ML_MASK match */
+        memset(block + 1, 'A', 14);     /* 14 literal bytes */
+        block[15] = 0x0E; block[16] = 0x00;  /* offset = 14 */
+        block[17] = 0x00;               /* match length extension = 0 */
+        {   int const r = LZ4_decompress_safe(block, out, sizeof(block), sizeof(out));
+            FUZ_CHECKTEST(r >= 0, "LZ4_decompress_safe() should fail on this crafted input");
+    }   }
+
     /* to be tested with undefined sanitizer */
     DISPLAYLEVEL(3, "LZ4_compress_default() with NULL input:");
     {	int const maxCSize = LZ4_compressBound(0);
