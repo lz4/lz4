@@ -1979,21 +1979,17 @@ LZ4_decompress_unsafe_generic(
  *
  * @ipPtr : pointer to input pointer, will be advanced
  * @ilimit : read is forbidden beyond this position (must be within input buffer)
- * @initial_check : if non-zero, check *ipPtr >= ilimit before reading.
- *                  if zero, caller guarantees *ipPtr < ilimit.
 **/
 typedef size_t Rvl_t;
 static const Rvl_t rvl_error = (Rvl_t)(-1);
 LZ4_FORCE_INLINE Rvl_t
-read_variable_length(const BYTE** ipPtr, const BYTE* ilimit,
-                     int initial_check)
+read_variable_length(const BYTE** ipPtr, const BYTE* ilimit)
 {
     Rvl_t s, length = 0;
     assert(ipPtr != NULL);
     assert(*ipPtr !=  NULL);
     assert(ilimit != NULL);
-    assert(initial_check || (*ipPtr < ilimit));  /* if no initial_check, caller guarantees ip < ilimit */
-    if (initial_check && unlikely((*ipPtr) >= ilimit)) {    /* read limit reached */
+    if (unlikely((*ipPtr) >= ilimit)) {    /* read limit reached */
         return rvl_error;
     }
     s = **ipPtr;
@@ -2095,7 +2091,7 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-                size_t const addl = read_variable_length(&ip, iend - RUN_MASK, 0);
+                size_t const addl = read_variable_length(&ip, iend - RUN_MASK);
                 if (addl == rvl_error) {
                     DEBUGLOG(6, "error reading long literal length");
                     goto _output_error;
@@ -2133,7 +2129,7 @@ LZ4_decompress_generic(
             DEBUGLOG(7, "  match length token = %u (len==%u)", (unsigned)length, (unsigned)length+MINMATCH);
 
             if (length == ML_MASK) {
-                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS, 1);
+                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS);
                 if (addl == rvl_error) {
                     DEBUGLOG(5, "error reading long match length");
                     goto _output_error;
@@ -2278,7 +2274,7 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
-                size_t const addl = read_variable_length(&ip, iend-RUN_MASK, 1);
+                size_t const addl = read_variable_length(&ip, iend-RUN_MASK);
                 if (addl == rvl_error) { goto _output_error; }
                 length += addl;
                 if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
@@ -2360,7 +2356,7 @@ LZ4_decompress_generic(
 
     _copy_match:
             if (length == ML_MASK) {
-                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS, 1);
+                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS);
                 if (addl == rvl_error) { goto _output_error; }
                 length += addl;
                 if (unlikely((uptrval)(op)+length<(uptrval)op)) goto _output_error;   /* overflow detection */
