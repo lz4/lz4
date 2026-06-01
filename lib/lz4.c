@@ -2091,6 +2091,8 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
+                /* literal length >= RUN_MASK means >= RUN_MASK literal bytes follow the extension bytes,
+                 * so extension bytes cannot reach the last RUN_MASK bytes of input */
                 size_t const addl = read_variable_length(&ip, iend - RUN_MASK);
                 if (addl == rvl_error) {
                     DEBUGLOG(6, "error reading long literal length");
@@ -2129,7 +2131,8 @@ LZ4_decompress_generic(
             DEBUGLOG(7, "  match length token = %u (len==%u)", (unsigned)length, (unsigned)length+MINMATCH);
 
             if (length == ML_MASK) {
-                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS);
+                /* after match length extension bytes, at least 1 token + LASTLITERALS literals must remain */
+                size_t const addl = read_variable_length(&ip, iend - (1 + LASTLITERALS));
                 if (addl == rvl_error) {
                     DEBUGLOG(5, "error reading long match length");
                     goto _output_error;
@@ -2274,6 +2277,8 @@ LZ4_decompress_generic(
 
             /* decode literal length */
             if (length == RUN_MASK) {
+                /* literal length >= RUN_MASK means >= RUN_MASK literal bytes follow the extension bytes,
+                 * so extension bytes cannot reach the last RUN_MASK bytes of input */
                 size_t const addl = read_variable_length(&ip, iend-RUN_MASK);
                 if (addl == rvl_error) { goto _output_error; }
                 length += addl;
@@ -2356,7 +2361,8 @@ LZ4_decompress_generic(
 
     _copy_match:
             if (length == ML_MASK) {
-                size_t const addl = read_variable_length(&ip, iend - LASTLITERALS);
+                /* after match length extension bytes, at least 1 token + LASTLITERALS literals must remain */
+                size_t const addl = read_variable_length(&ip, iend - (1 + LASTLITERALS));
                 if (addl == rvl_error) { goto _output_error; }
                 length += addl;
                 if (unlikely((uptrval)(op)+length<(uptrval)op)) goto _output_error;   /* overflow detection */
