@@ -188,6 +188,48 @@
 #endif
 
 
+/**************************************
+*  RISC-V RVV Support
+**************************************/
+/* RISC-V Vector Extension (RVV) support for LZ4_count vectorization */
+#if defined(__riscv) && defined(__riscv_vector)
+#  if defined(__GNUC__) && !defined(__clang__)
+#    if __GNUC__ >= 13
+#      define LZ4_RVV_ENABLE 1
+#    endif
+#  elif defined(__clang__)
+#    if __clang_major__ >= 16
+#      define LZ4_RVV_ENABLE 1
+#    endif
+#  endif
+#endif
+
+#ifndef LZ4_RVV_ENABLE
+#  define LZ4_RVV_ENABLE 0
+#endif
+
+#if LZ4_RVV_ENABLE
+#include <riscv_vector.h>
+
+/* Compiler compatibility macros for RVV intrinsics */
+#if defined(__GNUC__) && !defined(__clang__)
+  /* GCC 13+ style - typed intrinsics without vl parameter */
+  #define LZ4_RVV_VSETVL_E8M1(n)  vsetvl_e8m1(n)
+  #define LZ4_RVV_VLE8_V_U8M1(p)  vle8_v_u8m1(p)
+  #define LZ4_RVV_VMSNE_VV_U8M1_B8(v1,v2) vmsne_vv_u8m1_b8(v1,v2)
+  #define LZ4_RVV_VFIRST_M_B8(mask) vfirst_m_b8(mask)
+#elif defined(__clang__)
+  /* Clang 16+ style - __riscv_ prefix intrinsics, vl passed separately */
+  #define LZ4_RVV_VSETVL_E8M1(n)  __riscv_vsetvl_e8m1(n)
+  /* Note: Clang intrinsics require vl parameter, passed inline */
+  #define LZ4_RVV_VLE8(p,vl)  __riscv_vle8_v_u8m1(p, vl)
+  #define LZ4_RVV_VMSNE(p1,p2,vl) __riscv_vmsne_vv_u8m1_b8(p1, p2, vl)
+  #define LZ4_RVV_VFIRST(mask,vl) __riscv_vfirst_m_b8(mask, vl)
+#endif
+
+#endif /* LZ4_RVV_ENABLE */
+
+
 /*-************************************
 *  Memory routines
 **************************************/
@@ -690,6 +732,60 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
+#if LZ4_RVV_ENABLE
+    /* RISC-V RVV vectorized path for byte comparison */
+    size_t const remaining = (size_t)(pInLimit - pIn);
+
+    /* Only engage RVV for reasonably long sequences (>= 32 bytes) */
+    if (remaining >= 32) {
+#if defined(__GNUC__) && !defined(__clang__)
+        /* GCC 13+ implementation - intrinsics don't need explicit vl */
+        while (pIn < pInLimit) {
+            size_t vl = LZ4_RVV_VSETVL_E8M1(pInLimit - pIn);
+
+            vuint8m1_t v_in = LZ4_RVV_VLE8_V_U8M1(pIn);
+            vuint8m1_t v_match = LZ4_RVV_VLE8_V_U8M1(pMatch);
+
+            vbool8_t v_mask = LZ4_RVV_VMSNE_VV_U8M1_B8(v_in, v_match);
+
+            long first_diff = LZ4_RVV_VFIRST_M_B8(v_mask);
+
+            if (first_diff >= 0) {
+                pIn += first_diff;
+                return (unsigned)(pIn - pStart);
+            }
+
+            pIn += vl;
+            pMatch += vl;
+        }
+        return (unsigned)(pIn - pStart);
+#else
+        /* Clang 16+ implementation - intrinsics need explicit vl parameter */
+        while (pIn < pInLimit) {
+            size_t vl = LZ4_RVV_VSETVL_E8M1(pInLimit - pIn);
+
+            vuint8m1_t v_in = LZ4_RVV_VLE8(pIn, vl);
+            vuint8m1_t v_match = LZ4_RVV_VLE8(pMatch, vl);
+
+            vbool8_t v_mask = LZ4_RVV_VMSNE(v_in, v_match, vl);
+
+            long first_diff = LZ4_RVV_VFIRST(v_mask, vl);
+
+            if (first_diff >= 0) {
+                pIn += first_diff;
+                return (unsigned)(pIn - pStart);
+            }
+
+            pIn += vl;
+            pMatch += vl;
+        }
+        return (unsigned)(pIn - pStart);
+#endif
+    }
+    /* Fall through to scalar for short sequences */
+#endif
+
+    /* Scalar fallback - original implementation */
     if (likely(pIn < pInLimit-(STEPSIZE-1))) {
         reg_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
         if (!diff) {
