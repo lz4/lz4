@@ -2487,6 +2487,7 @@ LZ4_FORCE_O2
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
     DEBUGLOG(5, "LZ4_decompress_fast");
+    if (originalSize < 0) return -1;
     return LZ4_decompress_unsafe_generic(
                 (const BYTE*)source, (BYTE*)dest, originalSize,
                 0, NULL, 0);
@@ -2514,6 +2515,7 @@ static int LZ4_decompress_safe_partial_withPrefix64k(const char* source, char* d
 /* Another obsolete API function, paired with the previous one. */
 int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int originalSize)
 {
+    if (originalSize < 0) return -1;
     return LZ4_decompress_unsafe_generic(
                 (const BYTE*)source, (BYTE*)dest, originalSize,
                 64 KB, NULL, 0);
@@ -2767,6 +2769,7 @@ int LZ4_decompress_safe_partial_usingDict(const char* source, char* dest, int co
 
 int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
 {
+     if (originalSize < 0) return -1;
     if (dictSize==0 || dictStart+dictSize == dest)
         return LZ4_decompress_unsafe_generic(
                         (const BYTE*)source, (BYTE*)dest, originalSize,
