@@ -87,6 +87,7 @@
 #define MIN_STREAM_BUFSIZE (192 KB)
 #define LZ4IO_BLOCKSIZEID_DEFAULT 7
 #define LZ4_MAX_DICT_SIZE (64 KB)
+#define LZ4IO_TOHUMAN_BUFSIZE 10
 
 #undef MIN
 #define MIN(a,b)  ((a)<(b)?(a):(b))
@@ -927,6 +928,35 @@ int LZ4IO_compressFilename_Legacy(const char* input_filename,
     return r;
 }
 
+static int LZ4IO_prepareDstFileName(char** dstFileName,
+                                    size_t* dstFileNameCapacity,
+                                    const char* srcFileName,
+                                    const char* suffix)
+{
+    size_t const srcSize = strlen(srcFileName);
+    size_t const suffixSize = strlen(suffix);
+    size_t neededCapacity;
+
+    if (srcSize > (size_t)(-1) - suffixSize - 1) {
+        return 1;
+    }
+    neededCapacity = srcSize + suffixSize + 1;
+
+    if (*dstFileNameCapacity < neededCapacity) {
+        char* const newDstFileName = (char*)malloc(neededCapacity);
+        if (newDstFileName == NULL) {
+            return 1;
+        }
+        free(*dstFileName);
+        *dstFileName = newDstFileName;
+        *dstFileNameCapacity = neededCapacity;
+    }
+
+    memcpy(*dstFileName, srcFileName, srcSize);
+    memcpy(*dstFileName + srcSize, suffix, suffixSize + 1);
+    return 0;
+}
+
 #define FNSPACE 30
 /* LZ4IO_compressMultipleFilenames_Legacy :
  * This function is intentionally "hidden" (not published in .h)
@@ -943,14 +973,12 @@ int LZ4IO_compressMultipleFilenames_Legacy(
     int missed_files = 0;
     char* dstFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
-    const size_t suffixSize = strlen(suffix);
 
     if (dstFileName == NULL) return ifntSize;   /* not enough memory */
 
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         unsigned long long processed = 0;
-        size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (LZ4IO_isStdout(suffix)) {
             missed_files += LZ4IO_compressLegacy_internal(&processed,
                                     inFileNamesTable[i], stdoutmark,
@@ -959,15 +987,10 @@ int LZ4IO_compressMultipleFilenames_Legacy(
             continue;
         }
 
-        if (ofnSize <= ifnSize+suffixSize+1) {
+        if (LZ4IO_prepareDstFileName(&dstFileName, &ofnSize, inFileNamesTable[i], suffix)) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
-            dstFileName = (char*)malloc(ofnSize);
-            if (dstFileName==NULL) {
-                return ifntSize;
-        }   }
-        strcpy(dstFileName, inFileNamesTable[i]);
-        strcat(dstFileName, suffix);
+            return ifntSize;
+        }
 
         missed_files += LZ4IO_compressLegacy_internal(&processed,
                                 inFileNamesTable[i], dstFileName,
@@ -1538,7 +1561,6 @@ int LZ4IO_compressMultipleFilenames(
     int missed_files = 0;
     char* dstFileName = (char*)malloc(FNSPACE);
     size_t ofnSize = FNSPACE;
-    const size_t suffixSize = strlen(suffix);
     cRess_t ress;
     unsigned long long totalProcessed = 0;
     TIME_t timeStart = TIME_getTime();
@@ -1550,7 +1572,6 @@ int LZ4IO_compressMultipleFilenames(
     /* loop on each file */
     for (i=0; i<ifntSize; i++) {
         unsigned long long processed;
-        size_t const ifnSize = strlen(inFileNamesTable[i]);
         if (LZ4IO_isStdout(suffix)) {
             missed_files += LZ4IO_compressFilename_extRess(&processed, &ress,
                                     inFileNamesTable[i], stdoutmark,
@@ -1559,16 +1580,11 @@ int LZ4IO_compressMultipleFilenames(
             continue;
         }
         /* suffix != stdout => compress into a file => generate its name */
-        if (ofnSize <= ifnSize+suffixSize+1) {
+        if (LZ4IO_prepareDstFileName(&dstFileName, &ofnSize, inFileNamesTable[i], suffix)) {
+            LZ4IO_freeCResources(ress);
             free(dstFileName);
-            ofnSize = ifnSize + 20;
-            dstFileName = (char*)malloc(ofnSize);
-            if (dstFileName==NULL) {
-                LZ4IO_freeCResources(ress);
-                return ifntSize;
-        }   }
-        strcpy(dstFileName, inFileNamesTable[i]);
-        strcat(dstFileName, suffix);
+            return ifntSize;
+        }
 
         missed_files += LZ4IO_compressFilename_extRess(&processed, &ress,
                                 inFileNamesTable[i], dstFileName,
@@ -2692,13 +2708,13 @@ const char* LZ4IO_blockTypeID(LZ4F_blockSizeID_t sizeID, LZ4F_blockMode_t blockM
     return buffer;
 }
 
-/* buffer : must be valid memory area of at least 10 bytes */
+/* buffer : must be valid memory area of at least LZ4IO_TOHUMAN_BUFSIZE bytes */
 static const char* LZ4IO_toHuman(long double size, char* buf)
 {
     const char units[] = {"\0KMGTPEZY"};
     size_t i = 0;
-    for (; size >= 1024; i++) size /= 1024;
-    sprintf(buf, "%.2Lf%c", size, units[i]);
+    for (; size >= 1024 && i + 1 < sizeof(units) - 1; i++) size /= 1024;
+    snprintf(buf, LZ4IO_TOHUMAN_BUFSIZE, "%.2Lf%c", size, units[i]);
     return buf;
 }
 
@@ -2885,7 +2901,7 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         }
         if (g_displayLevel < 3) {
             /* Display summary */
-            char buffers[3][10];
+                char buffers[3][LZ4IO_TOHUMAN_BUFSIZE];
             DISPLAYOUT("%10llu %14s %5s %11s %13s ",
                     cfinfo.frameCount,
                     cfinfo.eqFrameTypes ? LZ4IO_frameTypeNames[cfinfo.frameSummary.frameType] : "-" ,
