@@ -2608,8 +2608,7 @@ LZ4IO_skipBlocksData(FILE* finput,
     unsigned char blockInfo[LZ4F_BLOCK_HEADER_SIZE];
     unsigned long long totalBlocksSize = 0;
     for (;;) {
-        if (!fread(blockInfo, 1, LZ4F_BLOCK_HEADER_SIZE, finput)) {
-            if (feof(finput)) return totalBlocksSize;
+        if (fread(blockInfo, 1, LZ4F_BLOCK_HEADER_SIZE, finput) != LZ4F_BLOCK_HEADER_SIZE) {
             return 0;
         }
         totalBlocksSize += LZ4F_BLOCK_HEADER_SIZE;
@@ -2619,7 +2618,7 @@ LZ4IO_skipBlocksData(FILE* finput,
                 /* Reached EndMark */
                 if (contentChecksumFlag) {
                     /* Skip content checksum */
-                    if (UTIL_fseek(finput, LZ4F_CONTENT_CHECKSUM_SIZE, SEEK_CUR) != 0) {
+                    if (fread(blockInfo, 1, LZ4F_CONTENT_CHECKSUM_SIZE, finput) != LZ4F_CONTENT_CHECKSUM_SIZE) {
                         return 0;
                     }
                     totalBlocksSize += LZ4F_CONTENT_CHECKSUM_SIZE;
