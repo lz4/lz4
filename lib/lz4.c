@@ -1995,6 +1995,10 @@ read_variable_length(const BYTE** ipPtr, const BYTE* ilimit)
     s = **ipPtr;
     (*ipPtr)++;
     length += s;
+    /* accumulator overflow detection (32-bit mode only) */
+    if ((sizeof(length) < 8) && unlikely(length > ((Rvl_t)(-1)/2)) ) {
+        return rvl_error;
+    }
     if (likely(s != 255)) return length;
     do {
         if (unlikely((*ipPtr) >= ilimit)) {    /* read limit reached */
