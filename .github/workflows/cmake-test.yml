@@ -38,7 +38,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6.0.2
+      uses: actions/checkout@v7.0.0
 
     - name: Set up MSVC (Windows)
       if: runner.os == 'Windows'
@@ -79,7 +79,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6.0.2
+      uses: actions/checkout@v7.0.0
 
     - name: Set up CMake
       uses: jwlawson/actions-setup-cmake@v2
@@ -122,6 +122,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6.0.2
+      uses: actions/checkout@v7.0.0
     - name: Test via Makefile
       run: make clean && make cmakebuild
