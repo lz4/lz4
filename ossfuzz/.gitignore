@@ -1,5 +1,14 @@
 
 # build artefacts
+compress_fuzzer
+decompress_fuzzer
+compress_frame_fuzzer
+decompress_frame_fuzzer
+compress_hc_fuzzer
+round_trip_fuzzer
+round_trip_hc_fuzzer
+round_trip_stream_fuzzer
+round_trip_frame_fuzzer
 round_trip_frame_uncompressed_fuzzer
 
 # test artefacts

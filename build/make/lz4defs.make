@@ -37,10 +37,13 @@ ifeq ($(TARGET_OS),)
   TARGET_OS ?= $(OS)
 endif
 
-# Default to parallel builds unless a -j flag is already provided.
+# Default to parallel builds for the top-level invocation unless a -j flag is
+# already provided. Recursive makes inherit the jobserver from the parent.
+ifeq ($(MAKELEVEL),0)
 ifeq (,$(filter -j%,$(MAKEFLAGS)))
 NPROC ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 MAKEFLAGS += -j$(NPROC)
+endif
 endif
 
 ifneq (,$(filter Windows%,$(TARGET_OS)))
