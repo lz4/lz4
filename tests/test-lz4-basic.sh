@@ -61,6 +61,7 @@ test ! -f ${FPREFIX}-dir.lz4          # must not create artifact (#1211)
 lz4 -f $FPREFIX-hw                    # create $FPREFIX-hw.lz4, for next tests
 lz4 --list $FPREFIX-hw.lz4            # test --list on valid single-frame file
 lz4 --list < $FPREFIX-hw.lz4          # test --list from stdin (file only)
+lz4 --list goldenSamples/dictID.bin  # test --list on a frame carrying a dictID (11-byte header)
 cat $FPREFIX-hw >> $FPREFIX-hw.lz4
 lz4 -f $FPREFIX-hw.lz4 && exit 1      # uncompress valid frame followed by invalid data (must fail now)
 lz4 -BX $FPREFIX-hw -c -q | lz4 -tv   # test block checksum
