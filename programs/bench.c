@@ -42,6 +42,7 @@
 #include <stdio.h>       /* fprintf, fopen, ftello */
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>      /* assert */
+#include <limits.h>      /* INT_MAX */
 
 #include "lorem.h"       /* LOREM_genBuffer */
 #include "xxhash.h"
@@ -363,19 +364,21 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                         const char* dictBuf, int dictSize)
 {
     size_t const blockSize = (g_blockSize>=32 && !g_decodeOnly ? g_blockSize : srcSize) + (!srcSize) /* avoid div by 0 */ ;
-    U32 const maxNbBlocks = (U32)((srcSize + (blockSize-1)) / blockSize) + nbFiles;
+    size_t const maxNbBlocks = (size_t)((srcSize + (blockSize-1)) / blockSize) + nbFiles;
     blockParam_t* const blockTable = (blockParam_t*) malloc(maxNbBlocks * sizeof(blockParam_t));
-    size_t const maxCompressedSize = (size_t)LZ4_compressBound((int)srcSize) + (maxNbBlocks * 1024);   /* add some room for safety */
+    size_t const maxCompressedSize = (size_t)LZ4_compressBound((int)MIN(srcSize, INT_MAX)) + (maxNbBlocks * 1024);   /* add some room for safety */
     void* const compressedBuffer = malloc(maxCompressedSize);
     size_t const decMultiplier = g_decodeOnly ? 255 : 1;
     size_t const maxInSize = (size_t)LZ4_MAX_INPUT_SIZE / decMultiplier;
-    size_t const maxDecSize = srcSize < maxInSize ? srcSize * decMultiplier : LZ4_MAX_INPUT_SIZE;
+    size_t const maxDecSize = srcSize < maxInSize ? srcSize * decMultiplier : (size_t)LZ4_MAX_INPUT_SIZE;
     void* const resultBuffer = malloc(maxDecSize);
     int benchError = 0;
     U32 nbBlocks;
     struct compressionParameters compP;
 
     /* checks */
+    if (maxNbBlocks > (size_t)-1 / sizeof(blockParam_t))
+        END_PROCESS(30, "too many blocks for memory allocation");
     if (!compressedBuffer || !resultBuffer || !blockTable)
         END_PROCESS(31, "allocation error : not enough memory");
 
