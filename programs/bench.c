@@ -42,7 +42,7 @@
 #include <stdio.h>       /* fprintf, fopen, ftello */
 #include <time.h>        /* clock_t, clock, CLOCKS_PER_SEC */
 #include <assert.h>      /* assert */
-#include <limits.h>       /* INT_MAX */
+#include <limits.h>      /* INT_MAX */
 
 #include "lorem.h"       /* LOREM_genBuffer */
 #include "xxhash.h"
@@ -377,7 +377,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     struct compressionParameters compP;
 
     /* checks */
-    if (maxNbBlocks > SIZE_MAX / sizeof(blockParam_t))
+    if (maxNbBlocks > (size_t)-1 / sizeof(blockParam_t))
         END_PROCESS(30, "too many blocks for memory allocation");
     if (!compressedBuffer || !resultBuffer || !blockTable)
         END_PROCESS(31, "allocation error : not enough memory");
