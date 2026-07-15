@@ -42,6 +42,25 @@ extern "C" {
 #include <stdio.h>  /* FILE* */
 #include "lz4frame_static.h"
 
+#if defined(__has_include)
+#  if __has_include(<ptrcheck.h>)
+#    include <ptrcheck.h>
+#  endif
+#endif
+
+/* Optional pointer annotations for Clang's bounds-safety extension. */
+#if defined(__sized_by)
+#  define LZ4F_FILE_SIZED_BY(size) __sized_by(size)
+#else
+#  define LZ4F_FILE_SIZED_BY(size)
+#endif
+
+#if defined(__single)
+#  define LZ4F_FILE_SINGLE __single
+#else
+#  define LZ4F_FILE_SINGLE
+#endif
+
 typedef struct LZ4_readFile_s LZ4_readFile_t;
 typedef struct LZ4_writeFile_s LZ4_writeFile_t;
 
@@ -54,6 +73,7 @@ typedef struct LZ4_writeFile_s LZ4_writeFile_t;
  * @param lz4fRead  Pointer to receive the read file handle.
  *                  It is an OUT parameter, so its initial value is ignored and will be overwritten.
  *                  Its value on exit is only valid if the function returns LZ4F_OK_NoError.
+ *                  With -fbounds-safety, declare the handle with LZ4F_FILE_SINGLE.
  * @param fp        FILE* positioned at start of LZ4 file (binary mode).
  *
  * @return LZ4F_OK_NoError on success, or error code on failure.
@@ -69,7 +89,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FIL
  * `buf` read data buffer.
  * `size` read data buffer size.
  */
-LZ4FLIB_STATIC_API size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size);
+LZ4FLIB_STATIC_API size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* LZ4F_FILE_SIZED_BY(size) buf, size_t size);
 
 /*! LZ4F_readClose() :
  * Close lz4file handle.
@@ -86,6 +106,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead);
  * @param lz4fWrite Pointer to receive the write file handle.
  *                  It is an OUT parameter, so its initial value is ignored and will be overwritten.
  *                  Its value on exit is only valid if the function returns LZ4F_OK_NoError.
+ *                  With -fbounds-safety, declare the handle with LZ4F_FILE_SINGLE.
  * @param fp        FILE* positioned at start of LZ4 file (binary mode).
  *
  * @return LZ4F_OK_NoError on success, or error code on failure.
@@ -101,7 +122,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, 
  * `buf` write data buffer.
  * `size` write data buffer size.
  */
-LZ4FLIB_STATIC_API size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf, size_t size);
+LZ4FLIB_STATIC_API size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* LZ4F_FILE_SIZED_BY(size) buf, size_t size);
 
 /*! LZ4F_writeClose() :
  * Close lz4file handle.
