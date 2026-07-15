@@ -51,7 +51,7 @@ static LZ4F_errorCode_t returnErrorCode(LZ4F_errorCodes code)
 struct LZ4_readFile_s {
   LZ4F_dctx* dctxPtr;
   FILE* fp;
-  LZ4_byte* srcBuf;
+  LZ4_byte* LZ4F_FILE_SIZED_BY(srcBufMaxSize) srcBuf;
   size_t srcBufNext;
   size_t srcBufSize;
   size_t srcBufMaxSize;
@@ -93,17 +93,18 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
 
     /* Determine buffer size based on block size */
     { const size_t blockSize = LZ4F_getBlockSize(frameInfo.blockSizeID);
+      LZ4_byte* srcBuf;
       if (blockSize == 0) {
           RETURN_ERROR(maxBlockSize_invalid);
       }
-      readFile->srcBufMaxSize = blockSize;
-    }
-
-    /* Allocate source buffer */
-    assert(readFile->srcBuf == NULL); /* Should be NULL from calloc */
-    readFile->srcBuf = (LZ4_byte*)malloc(readFile->srcBufMaxSize);
-    if (readFile->srcBuf == NULL) {
+      /* Allocate source buffer */
+      srcBuf = (LZ4_byte*)malloc(blockSize);
+      if (srcBuf == NULL) {
         RETURN_ERROR(allocation_failed);
+      }
+      assert(readFile->srcBuf == NULL); /* Should be NULL from calloc */
+      readFile->srcBufMaxSize = blockSize;
+      readFile->srcBuf = srcBuf;
     }
 
     /* Store remaining header data in buffer */
@@ -118,7 +119,7 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
 
 LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
 {
-    LZ4_readFile_t* readFile;
+    LZ4_readFile_t* LZ4F_FILE_SINGLE readFile;
 
     /* Validate parameters */
     if (fp == NULL || lz4fRead == NULL) {
@@ -151,7 +152,7 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
     return LZ4F_OK_NoError;
 }
 
-size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
+size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* LZ4F_FILE_SIZED_BY(size) buf, size_t size)
 {
   LZ4_byte* outPtr = (LZ4_byte*)buf;
   size_t totalBytesRead = 0;
@@ -208,7 +209,7 @@ LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead)
 struct LZ4_writeFile_s {
   LZ4F_cctx* cctxPtr;
   FILE* fp;
-  LZ4_byte* dstBuf;
+  LZ4_byte* LZ4F_FILE_SIZED_BY(dstBufMaxSize) dstBuf;
   size_t maxWriteSize;
   size_t dstBufMaxSize;
   LZ4F_errorCode_t errCode;
@@ -252,7 +253,7 @@ static LZ4F_errorCode_t writeHeader(LZ4_writeFile_t* writeFile,
 
 LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4F_preferences_t* prefsPtr)
 {
-  LZ4_writeFile_t* writeFile;
+  LZ4_writeFile_t* LZ4F_FILE_SINGLE writeFile;
   size_t blockSize;
 
   if (fp == NULL || lz4fWrite == NULL)
@@ -275,11 +276,14 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   writeFile->maxWriteSize = blockSize;
 
   /* Calculate and allocate destination buffer */
-  writeFile->dstBufMaxSize = LZ4F_compressBound(blockSize, prefsPtr);
-  writeFile->dstBuf = (LZ4_byte*)malloc(writeFile->dstBufMaxSize);
-  if (writeFile->dstBuf == NULL) {
-    freeAndNullWriteFile(&writeFile);
-    RETURN_ERROR(allocation_failed);
+  { size_t const dstBufMaxSize = LZ4F_compressBound(blockSize, prefsPtr);
+    LZ4_byte* const dstBuf = (LZ4_byte*)malloc(dstBufMaxSize);
+    if (dstBuf == NULL) {
+      freeAndNullWriteFile(&writeFile);
+      RETURN_ERROR(allocation_failed);
+    }
+    writeFile->dstBufMaxSize = dstBufMaxSize;
+    writeFile->dstBuf = dstBuf;
   }
 
   /* Initialize compression context */
@@ -300,7 +304,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   return LZ4F_OK_NoError;
 }
 
-size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf, size_t size)
+size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* LZ4F_FILE_SIZED_BY(size) buf, size_t size)
 {
   const LZ4_byte* p = (const LZ4_byte*)buf;
   size_t remainingBytes = size;

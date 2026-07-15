@@ -82,6 +82,11 @@ jobs:
         make clean
         CFLAGS="-Werror -O0" make default V=1
 
+    - name: Test file API with bounds safety
+      run: |
+        export DEVELOPER_DIR="$(ls -d /Applications/Xcode_26*.app | head -n 1)/Contents/Developer"
+        make -C tests test-bounds-safety V=1 CC="xcrun cc"
+
     - name: Run comprehensive tests
       run: |
         make clean

@@ -124,6 +124,11 @@ $(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 frametest:
 $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o frametest.o))
 
+boundsSafety:
+$(eval $(call c_program_shared_o,boundsSafety,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o boundsSafety.o))
+
+$(CACHE_ROOT)/%/lz4file.o $(CACHE_ROOT)/%/boundsSafety.o: CFLAGS += $(BOUNDS_SAFETY_FLAGS)
+
 roundTripTest:
 $(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
 
@@ -195,6 +200,12 @@ test_targets:
 check: test-lz4-essentials
 
 test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+
+.PHONY: test-bounds-safety
+test-bounds-safety:
+	$(MAKE) CACHE_ROOT=$(CACHE_ROOT)/bounds-safety BOUNDS_SAFETY_FLAGS="-fbounds-safety -Werror" boundsSafety frametest
+	./boundsSafety
+	./frametest -s1 -i1000
 
 test32: CFLAGS+=-m32
 test32: test
