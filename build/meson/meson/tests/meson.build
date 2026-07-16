@@ -34,7 +34,8 @@ test_exes = {
     'include_directories': include_directories(lz4_source_root / 'programs'),
   },
   'decompress-partial-usingDict.c': {
-    'sources': files(lz4_source_root / 'tests/decompress-partial-usingDict.c'),
+    'sources': files(lz4_source_root / 'tests/decompress-partial-usingDict.c')
+               + (get_option('unstable') ? [] : files(lz4_source_root / 'lib/lz4file.c')),
   },
   'decompress-partial.c': {
     'sources': files(lz4_source_root / 'tests/decompress-partial.c'),
