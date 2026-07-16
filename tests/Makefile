@@ -59,7 +59,7 @@ NB_LOOPS     ?= -i1
 default: all
 
 .PHONY: all
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial decompress-partial-usingDict legacy_suffix_repro
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -137,7 +137,8 @@ decompress-partial:
 $(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
 
 decompress-partial-usingDict:
-$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
+$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o lz4hc.o lz4frame.o xxhash.o lz4file.o decompress-partial-usingDict.o))
+decompress-partial-usingDict: LDFLAGS += -Wl,--wrap=LZ4F_createCompressionContext -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=free
 
 .PHONY: clean
 clean: clean_cache
@@ -365,6 +366,15 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 	./decompress-partial$(EXT)
 	@echo "\n ---- test decompress-partial-usingDict ----"
 	./decompress-partial-usingDict$(EXT)
+
+
+CLEAN += legacy_suffix_repro
+legacy_suffix_repro: LDFLAGS += -pthread
+$(eval $(call c_program,legacy_suffix_repro,lz4.o lz4hc.o lz4frame.o xxhash.o lz4file.o lz4io.o util.o timefn.o threadpool.o legacy_suffix_repro.o))
+
+test-legacy-suffix: legacy_suffix_repro
+	@echo "\n ---- test legacy suffix under-allocation ----"
+	./legacy_suffix_repro$(EXT)
 
 
 #-----------------------------------------------------------------------------
