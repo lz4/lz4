@@ -136,9 +136,7 @@ $(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o ch
 decompress-partial:
 $(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
 
-decompress-partial-usingDict:
 $(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o lz4hc.o lz4frame.o xxhash.o lz4file.o decompress-partial-usingDict.o))
-decompress-partial-usingDict: LDFLAGS += -Wl,--wrap=LZ4F_createCompressionContext -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=free
 
 .PHONY: clean
 clean: clean_cache
