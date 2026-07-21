@@ -285,7 +285,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   /* Initialize compression context */
   { LZ4F_errorCode_t const status = LZ4F_createCompressionContext(&writeFile->cctxPtr, LZ4F_VERSION);
     if (LZ4F_isError(status)) {
-        freeAndNullWriteFile(lz4fWrite);
+        freeAndNullWriteFile(&writeFile);
         return status;
   } }
 
