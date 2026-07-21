@@ -408,8 +408,8 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
             if (*bufStart + *pos + pathLength >= *bufEnd) {
                 ptrdiff_t newListSize = (*bufEnd - *bufStart) + LIST_SIZE_INCREASE;
                 *bufStart = (char*)UTIL_realloc(*bufStart, newListSize);
-                *bufEnd = *bufStart + newListSize;
                 if (*bufStart == NULL) { free(path); FindClose(hFile); return 0; }
+                *bufEnd = *bufStart + newListSize;
             }
             if (*bufStart + *pos + pathLength < *bufEnd) {
                 strncpy(*bufStart + *pos, path, *bufEnd - (*bufStart + *pos));
@@ -465,8 +465,8 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
             if (*bufStart + *pos + pathLength >= *bufEnd) {
                 size_t const newListSize = (size_t)(*bufEnd - *bufStart) + LIST_SIZE_INCREASE;
                 *bufStart = (char*)UTIL_realloc(*bufStart, newListSize);
-                *bufEnd = *bufStart + newListSize;
                 if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
+                *bufEnd = *bufStart + newListSize;
             }
             if (*bufStart + *pos + pathLength < *bufEnd) {
                 strncpy(*bufStart + *pos, path, *bufEnd - (*bufStart + *pos));
