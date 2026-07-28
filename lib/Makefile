@@ -49,26 +49,67 @@ BUILD_STATIC:=yes
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 USERCFLAGS:= -O3 $(CFLAGS)
 
-# RISC-V RVV support: auto-detect and enable if compiler supports RVV intrinsics
-# Only enable for Clang or GCC >= 14 with RISC-V target, as cross-compilers
-# may accept -march=rv64gcv without complete intrinsic support
+# RISC-V RVV + ISA extension auto-detection.
+# Enables RVV intrinsics (GCC >= 13 or Clang with RISC-V target), then probes
+# for individual ISA extensions (Zbb, Zbc, Zbs, Zicbop) and adds them only
+# if the compiler accepts the flag.  This makes a single binary that works on
+# any RISC-V machine while getting the best extensions available on the target.
+#
+# Variables (all settable via env or "make VAR=val"):
+#   RISCV_MARCH        - Base march (default: rv64gc)
+#   RISCV_EXT          - Extension selection (default: auto).
+#                        auto = probe zbb->zbc->zbs->zicbop in order.
+#                        "_"-separated list like "zbb_zbc_zbs" to force exact set.
+#   RISCV_STRICT_ALIGN - Set to 1 to omit -mno-strict-align (default: 0)
+RISCV_MARCH ?= rv64gc
+RISCV_EXT   ?= auto
+RISCV_STRICT_ALIGN ?= 0
 RVV_CFLAGS :=
 IS_RISCV := $(shell $(CC) -v 2>&1 | grep -c 'Target: riscv')
 ifeq ($(IS_RISCV),1)
   IS_CLANG := $(shell $(CC) --version 2>&1 | grep -c 'clang')
   ifneq ($(IS_CLANG),0)
-    RVV_CFLAGS := -march=rv64gcv
-    $(info LZ4: Enabling RISC-V RVV for xxHash (Clang))
+    C_HAS_RVV := 1
   else
     GCC_VER := $(shell $(CC) -dumpversion | cut -d. -f1)
-    ifeq ($(shell test $(GCC_VER) -ge 14; echo $$?),0)
-      RVV_CFLAGS := -march=rv64gcv
-      $(info LZ4: Enabling RISC-V RVV for xxHash (GCC $(GCC_VER)))
+    ifeq ($(shell test $(GCC_VER) -ge 13; echo $$?),0)
+      C_HAS_RVV := 1
     endif
+  endif
+  ifeq ($(C_HAS_RVV),1)
+    ifneq ($(RISCV_EXT),auto)
+      ifeq ($(RISCV_EXT),)
+        _MARCH := $(RISCV_MARCH)
+      else
+        _MARCH := $(RISCV_MARCH)_$(RISCV_EXT)
+      endif
+    else
+      _MARCH := $(RISCV_MARCH)
+      $(foreach e,zbb zbc zbs zicbop,\
+        $(if $(subst 0,,$(shell $(CC) -E -march=$(_MARCH)_$(e) - </dev/null >/dev/null 2>&1; echo $$?)),,\
+          $(eval _MARCH := $(_MARCH)_$(e))\
+          $(info LZ4: Enabling RISC-V extension $(e))))
+    endif
+    RVV_CFLAGS := -march=$(_MARCH)
+    ifneq ($(RISCV_STRICT_ALIGN),1)
+      RVV_CFLAGS += -mno-strict-align
+    endif
+  endif
+  # SpacemiT X60 tuning (in-order, dual-issue, VLEN=256). Helps the scheduler
+  # pack the dual-issue slots and avoid pipeline stalls on dependent sequences.
+  # Guard with a compiler support check: -mtune=spacemit-x60 is only available
+  # in GCC >= 16 (SpacemiT's toolchain). Standard riscv64-linux-gnu-gcc rejects it.
+  ifeq ($(shell $(CC) -E -mtune=spacemit-x60 - </dev/null >/dev/null 2>&1; echo $$?),0)
+    RVV_CFLAGS += -mtune=spacemit-x60
+    $(info LZ4: Enabling -mtune=spacemit-x60)
   endif
 endif
 ifneq ($(RVV_CFLAGS),)
-  CPPFLAGS += -DXXH_ENABLE_RVV=1
+  ifneq ($(LZ4_RVV_XXH),)
+    CPPFLAGS += -DXXH_ENABLE_RVV=$(LZ4_RVV_XXH)
+  else
+    CPPFLAGS += -DXXH_ENABLE_RVV=0
+  endif
 endif
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wswitch-enum -Wdeclaration-after-statement \

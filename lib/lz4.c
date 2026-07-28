@@ -115,10 +115,6 @@
 #  define LZ4_STATIC_LINKING_ONLY
 #endif
 
-#if defined(__riscv) && defined(__riscv_vector)
-#include <riscv_vector.h>
-#endif
-
 #include "lz4.h"
 /* see also "memory routines" below */
 
@@ -213,23 +209,36 @@
 #  define LZ4_RVV_ENABLE 0
 #endif
 
+/* LZ4_count RVV path. Disabled by default: the vfirst reduction stalls
+ * in-order RVV cores and is generally slower than the scalar reference.
+ * Set to 1 to enable and benchmark on the target microarchitecture. */
+#ifndef LZ4_RVV_COUNT
+#  define LZ4_RVV_COUNT 0
+#endif
+
+/* LZ4_wildCopy8 RVV path. Disabled by default: on some in-order RVV cores
+ * (e.g. SpacemiT K1) the vectorized literal copy corrupts output under
+ * acceleration (--fast). The scalar path is correct. Set to 1 only after
+ * verifying round-trip correctness on the target microarchitecture. */
+#ifndef LZ4_RVV_WILDCOPY8
+#  define LZ4_RVV_WILDCOPY8 0
+#endif
+
 #if LZ4_RVV_ENABLE
 #include <riscv_vector.h>
 
-/* Compiler compatibility macros for RVV intrinsics */
-#if defined(__GNUC__) && !defined(__clang__)
-  /* GCC 13+ style - typed intrinsics without vl parameter */
-  #define LZ4_RVV_VSETVL_E8M1(n)  vsetvl_e8m1(n)
-  #define LZ4_RVV_VLE8_V_U8M1(p)  vle8_v_u8m1(p)
-  #define LZ4_RVV_VMSNE_VV_U8M1_B8(v1,v2) vmsne_vv_u8m1_b8(v1,v2)
-  #define LZ4_RVV_VFIRST_M_B8(mask) vfirst_m_b8(mask)
-#elif defined(__clang__)
-  /* Clang 16+ style - __riscv_ prefix intrinsics, vl passed separately */
-  #define LZ4_RVV_VSETVL_E8M1(n)  __riscv_vsetvl_e8m1(n)
-  /* Note: Clang intrinsics require vl parameter, passed inline */
+/* Compiler compatibility macros for RVV intrinsics.
+ * The __riscv_-prefixed intrinsics with an explicit vl parameter are the
+ * standard form supported by both GCC (>=13) and Clang (>=16). Use them
+ * uniformly for all compilers. */
+#if defined(__GNUC__) || defined(__clang__)
   #define LZ4_RVV_VLE8(p,vl)  __riscv_vle8_v_u8m1(p, vl)
+  #define LZ4_RVV_VSE8(p,v,vl)  __riscv_vse8_v_u8m1(p, v, vl)
+  #define LZ4_RVV_SETVL_E8M1(n) __riscv_vsetvl_e8m1(n)
   #define LZ4_RVV_VMSNE(p1,p2,vl) __riscv_vmsne_vv_u8m1_b8(p1, p2, vl)
   #define LZ4_RVV_VFIRST(mask,vl) __riscv_vfirst_m_b8(mask, vl)
+  #define LZ4_RVV_VMSEQ(p1,p2,vl) __riscv_vmseq_vv_u8m1_b8(p1, p2, vl)
+  #define LZ4_RVV_VCPOP(mask,vl)  __riscv_vcpop_m_b8(mask, vl)
 #endif
 
 #endif /* LZ4_RVV_ENABLE */
@@ -516,6 +525,15 @@ void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
+#if LZ4_RVV_ENABLE && LZ4_RVV_WILDCOPY8
+    {
+        size_t vl = LZ4_RVV_SETVL_E8M1(16);
+        while (d + vl <= e) {
+            LZ4_RVV_VSE8(d, LZ4_RVV_VLE8(s, vl), vl);
+            d += vl; s += vl;
+        }
+    }
+#endif
     do { LZ4_memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
@@ -595,9 +613,17 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
-#if defined __riscv && defined (__riscv_vector)
-    size_t vl = __riscv_vsetvl_e8m1(32);
-    do { __riscv_vse8_v_u8m1(d, __riscv_vle8_v_u8m1(s, vl), vl); d+= vl; s+=vl; } while (d<e);
+#if LZ4_RVV_ENABLE
+    /* Copy in 32-byte strides (two 16-byte vector chunks on a 128-bit VLEN,
+     * matching the scalar path's two 16-byte memcpy's) so we don't regress to
+     * half the scalar copy width on common VLEN=128 hardware. The loop is
+     * allowed to overrun dstEnd by up to 32 bytes (callers guarantee slack). */
+    size_t vl = LZ4_RVV_SETVL_E8M1(16);
+    do {
+        LZ4_RVV_VSE8(d,      LZ4_RVV_VLE8(s,      vl), vl);
+        LZ4_RVV_VSE8(d+vl,   LZ4_RVV_VLE8(s+vl,   vl), vl);
+        d += 2*vl; s += 2*vl;
+    } while (d < e);
 #else
     do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 #endif
@@ -756,47 +782,41 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
-#if LZ4_RVV_ENABLE
-    /* RISC-V RVV vectorized path for byte comparison */
+#if LZ4_RVV_ENABLE && LZ4_RVV_COUNT
+    /* RISC-V RVV vectorized path for byte comparison.
+     * NOTE: disabled by default (LZ4_RVV_COUNT=0). On in-order RVV cores the
+     * vfirst reduction stalls the pipeline and this path is typically slower
+     * than the scalar 8-byte XOR + LZ4_NbCommonBytes reference below, which it
+     * therefore keeps as the default for compression throughput. */
     size_t const remaining = (size_t)(pInLimit - pIn);
 
     /* Only engage RVV for reasonably long sequences (>= 32 bytes) */
     if (remaining >= 32) {
-#if defined(__GNUC__) && !defined(__clang__)
-        /* GCC 13+ implementation - intrinsics don't need explicit vl */
+        /* Cap the vector length so the load from pMatch stays within the
+         * MATCH_SAFEGUARD_DISTANCE (-16) byte slack guaranteed by callers.
+         * The scalar fallback below handles the remaining tail. */
+        size_t const maxVl = (MATCH_SAFEGUARD_DISTANCE < 16) ? MATCH_SAFEGUARD_DISTANCE : 16;
+
         while (pIn < pInLimit) {
-            size_t vl = LZ4_RVV_VSETVL_E8M1(pInLimit - pIn);
-
-            vuint8m1_t v_in = LZ4_RVV_VLE8_V_U8M1(pIn);
-            vuint8m1_t v_match = LZ4_RVV_VLE8_V_U8M1(pMatch);
-
-            vbool8_t v_mask = LZ4_RVV_VMSNE_VV_U8M1_B8(v_in, v_match);
-
-            long first_diff = LZ4_RVV_VFIRST_M_B8(v_mask);
-
-            if (first_diff >= 0) {
-                pIn += first_diff;
-                return (unsigned)(pIn - pStart);
-            }
-
-            pIn += vl;
-            pMatch += vl;
-        }
-        return (unsigned)(pIn - pStart);
-#else
-        /* Clang 16+ implementation - intrinsics need explicit vl parameter */
-        while (pIn < pInLimit) {
-            size_t vl = LZ4_RVV_VSETVL_E8M1(pInLimit - pIn);
+            size_t vl = LZ4_RVV_SETVL_E8M1(pInLimit - pIn);
+            if (vl > maxVl)
+                vl = maxVl;
 
             vuint8m1_t v_in = LZ4_RVV_VLE8(pIn, vl);
             vuint8m1_t v_match = LZ4_RVV_VLE8(pMatch, vl);
 
             vbool8_t v_mask = LZ4_RVV_VMSNE(v_in, v_match, vl);
 
+            /* vfirst behavior on "no match" is implementation-dependent: the
+             * ratified spec sets rd = vl, while some toolchains leave rd
+             * unchanged. To be robust, only trust the index when it is within
+             * [0, vl) AND the pointed-to bytes truly differ. Otherwise there is
+             * no mismatch in this chunk and we keep scanning. */
             long first_diff = LZ4_RVV_VFIRST(v_mask, vl);
 
-            if (first_diff >= 0) {
-                pIn += first_diff;
+            if (first_diff >= 0 && first_diff < (long)vl
+                && pIn[(size_t)first_diff] != pMatch[(size_t)first_diff]) {
+                pIn += (size_t)first_diff;
                 return (unsigned)(pIn - pStart);
             }
 
@@ -804,7 +824,6 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
             pMatch += vl;
         }
         return (unsigned)(pIn - pStart);
-#endif
     }
     /* Fall through to scalar for short sequences */
 #endif
@@ -1138,6 +1157,16 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
             LZ4_putIndexOnHash(startIndex, h, cctx->hashTable, tableType);
     }   }
     ip++; forwardH = LZ4_hashPosition(ip, tableType);
+
+#if defined(__riscv)
+    /* Prefetch the first hash table entry: on in-order X60 the load latency
+     * of the hash table probe (~3-4 cycles) is fully exposed. */
+    if (tableType == byPtr) {
+        __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(const BYTE*), 0, 1);
+    } else {
+        __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(U32), 0, 1);
+    }
+#endif
 
     /* Main Loop */
     for ( ; ; ) {
@@ -2276,6 +2305,16 @@ LZ4_decompress_generic(
                     if (offset >= 8) {
                         assert(match >= lowPrefix);
                         assert(match <= op);
+#if defined(__riscv)
+                        assert(op + 32 <= oend);
+
+                        LZ4_memcpy(op, match, 8);
+                        LZ4_memcpy(op+8, match+8, 8);
+                        LZ4_memcpy(op+16, match+16, 8);
+                        LZ4_memcpy(op+24, match+24, 8);
+                        op += length;
+                        continue;
+#else
                         assert(op + 18 <= oend);
 
                         LZ4_memcpy(op, match, 8);
@@ -2283,6 +2322,7 @@ LZ4_decompress_generic(
                         LZ4_memcpy(op+16, match+16, 2);
                         op += length;
                         continue;
+#endif
             }   }   }
 
             if ( checkOffset && (unlikely(match + dictSize < lowPrefix)) ) {

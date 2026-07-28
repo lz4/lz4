@@ -255,3 +255,110 @@ test_stdvars:  ## CI helper – verifies CC/CFLAGS/CPPFLAGS/LDFLAGS/LDLIBS propa
 	@$(RM) .stdvars.log
 
 endif   # MSYS POSIX
+
+#-----------------------------------------------------------------------------
+# RISC-V cross-compilation
+#-----------------------------------------------------------------------------
+# Variables (all settable via env or "make VAR=val"):
+#
+#   CC_RISCV          - Cross-compiler path (auto: riscv64-linux-gnu-gcc, riscv64-unknown-linux-gnu-gcc)
+#   RISCV_MARCH       - Base march (default: rv64gc)
+#   RISCV_EXT         - ISA extension selection (default: auto = probe enabled)
+#   RISCV_STRICT_ALIGN- Set to 1 to keep strict alignment (default: 0)
+#   LZ4_RVV_COUNT     - RVV LZ4_count (default: 0, slow on in-order cores)
+#   LZ4_RVV_WILDCOPY8 - RVV wildCopy8 (default: 0, slow on in-order cores)
+#
+# Targets:
+#   riscv             - Build for RISC-V (no PGO, cross-compile)
+#   riscv-lib         - Build library only
+#   riscv-lz4         - Build lz4 CLI only
+#   riscv-version     - Print lz4 version from board
+#   riscv-help        - Print this help
+
+_RISCV_CANDIDATES := riscv64-linux-gnu-gcc riscv64-unknown-linux-gnu-gcc
+CC_RISCV      ?= $(shell \
+  for c in $(_RISCV_CANDIDATES); do \
+    path=$$(command -v "$$c" 2>/dev/null); \
+    if test -n "$$path"; then echo "$$path"; exit 0; fi; \
+  done; \
+  echo "")
+
+# Variables passed through to sub-make invocations
+_RISCV_VARS := \
+  $(if $(LZ4_RVV_COUNT),LZ4_RVV_COUNT=$(LZ4_RVV_COUNT)) \
+  $(if $(LZ4_RVV_WILDCOPY8),LZ4_RVV_WILDCOPY8=$(LZ4_RVV_WILDCOPY8)) \
+  $(if $(LZ4_RVV_XXH),LZ4_RVV_XXH=$(LZ4_RVV_XXH)) \
+  $(if $(RISCV_MARCH),RISCV_MARCH=$(RISCV_MARCH)) \
+  $(if $(RISCV_EXT),RISCV_EXT=$(RISCV_EXT)) \
+  $(if $(RISCV_STRICT_ALIGN),RISCV_STRICT_ALIGN=$(RISCV_STRICT_ALIGN))
+
+# ---------------------------------------------------------------------------
+# Help
+# ---------------------------------------------------------------------------
+.PHONY: riscv-help
+riscv-help:
+	@echo 'RISC-V build targets:'
+	@echo '  riscv (riscv-build)    Build lib + programs (no PGO)'
+	@echo '  riscv-lib              Build lib only'
+	@echo '  riscv-lz4              Build programs only'
+	@echo '  riscv-version          Show lz4 version on board'
+	@echo ''
+	@echo 'Variables (make VAR=val or export):'
+	@echo '  CC_RISCV=...           Cross-compiler (auto: riscv64-linux-gnu-gcc, riscv64-unknown-linux-gnu-gcc)'
+	@echo '  RISCV_MARCH=...        Base march (default: rv64gc; use rv64gcv for vector)'
+	@echo '  RISCV_EXT=...          ISA extensions (default: auto)'
+	@echo '  RISCV_STRICT_ALIGN=1   Keep strict alignment'
+	@echo '  LZ4_RVV_COUNT=...      RVV count (default: 0)'
+	@echo '  LZ4_RVV_WILDCOPY8=...  RVV wildCopy8 (default: 0)'
+
+# ---------------------------------------------------------------------------
+# Env validation helpers
+# ---------------------------------------------------------------------------
+.PHONY: riscv-check-env
+riscv-check-env:
+	@_sel="$(CC_RISCV)"; \
+	_auto="$$([ "$(origin CC_RISCV)" = "file" ] && echo 1 || echo 0)"; \
+	if test -z "$$_sel"; then \
+	  echo 'ERROR: No RISC-V cross-compiler found.'; \
+	  echo '  Install:  sudo apt install gcc-riscv64-linux-gnu'; \
+	  echo '  Or set:   make riscv CC_RISCV=/path/to/riscv64-linux-gnu-gcc'; \
+	  exit 1; \
+	fi; \
+	if test "$$_auto" = "1"; then \
+	  echo "Using: $$_sel"; \
+	  _alt=""; \
+	  for c in $(_RISCV_CANDIDATES); do \
+	    _p=$$(command -v "$$c" 2>/dev/null); \
+	    if test -n "$$_p" && test "$$_p" != "$$_sel"; then \
+	      _alt="$${_alt}  - $$_p\n"; \
+	    fi; \
+	  done; \
+	  if test -n "$$_alt"; then \
+	    printf "Also available:\n$$_alt"; \
+	    echo "Override: make riscv CC_RISCV=/path/to/other-riscv64-gcc"; \
+	  fi; \
+	fi
+
+# ---------------------------------------------------------------------------
+# Build (no PGO)
+# ---------------------------------------------------------------------------
+.PHONY: riscv riscv-build
+riscv: riscv-build
+riscv-build: riscv-check-env
+	$(MAKE) -C $(LZ4DIR) CC="$(CC_RISCV)" $(_RISCV_VARS)
+	$(MAKE) -C $(PRGDIR) CC="$(CC_RISCV)" $(_RISCV_VARS)
+
+.PHONY: riscv-lib
+riscv-lib: riscv-check-env
+	$(MAKE) -C $(LZ4DIR) CC="$(CC_RISCV)" $(_RISCV_VARS)
+
+.PHONY: riscv-lz4
+riscv-lz4: riscv-check-env
+	$(MAKE) -C $(PRGDIR) CC="$(CC_RISCV)" $(_RISCV_VARS)
+
+# ---------------------------------------------------------------------------
+# Version
+# ---------------------------------------------------------------------------
+.PHONY: riscv-version
+riscv-version: riscv-check-env riscv-build
+	$(CC_RISCV) -v 2>&1 | grep 'Target: riscv' && echo "lz4 built for RISC-V"
