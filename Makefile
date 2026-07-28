@@ -269,7 +269,7 @@ endif   # MSYS POSIX
 #   LZ4_RVV_WILDCOPY8 - RVV wildCopy8 (default: 0, slow on in-order cores)
 #
 # Targets:
-#   riscv             - Build for RISC-V (no PGO, cross-compile)
+#   riscv             - Build for RISC-V (cross-compile)
 #   riscv-lib         - Build library only
 #   riscv-lz4         - Build lz4 CLI only
 #   riscv-version     - Print lz4 version from board
@@ -298,7 +298,7 @@ _RISCV_VARS := \
 .PHONY: riscv-help
 riscv-help:
 	@echo 'RISC-V build targets:'
-	@echo '  riscv (riscv-build)    Build lib + programs (no PGO)'
+	@echo '  riscv (riscv-build)    Build lib + programs'
 	@echo '  riscv-lib              Build lib only'
 	@echo '  riscv-lz4              Build programs only'
 	@echo '  riscv-version          Show lz4 version on board'
@@ -340,7 +340,7 @@ riscv-check-env:
 	fi
 
 # ---------------------------------------------------------------------------
-# Build (no PGO)
+# Build
 # ---------------------------------------------------------------------------
 .PHONY: riscv riscv-build
 riscv: riscv-build
