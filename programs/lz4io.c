@@ -961,7 +961,7 @@ int LZ4IO_compressMultipleFilenames_Legacy(
 
         if (ofnSize <= ifnSize+suffixSize+1) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = ifnSize + suffixSize + 1;
             dstFileName = (char*)malloc(ofnSize);
             if (dstFileName==NULL) {
                 return ifntSize;
@@ -1561,7 +1561,7 @@ int LZ4IO_compressMultipleFilenames(
         /* suffix != stdout => compress into a file => generate its name */
         if (ofnSize <= ifnSize+suffixSize+1) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = ifnSize + suffixSize + 1;
             dstFileName = (char*)malloc(ofnSize);
             if (dstFileName==NULL) {
                 LZ4IO_freeCResources(ress);
@@ -2530,22 +2530,22 @@ int LZ4IO_decompressMultipleFilenames(
     for (i=0; i<ifntSize; i++) {
         unsigned long long processed = 0;
         size_t const ifnSize = strlen(inFileNamesTable[i]);
-        const char* const suffixPtr = inFileNamesTable[i] + ifnSize - suffixSize;
         if (LZ4IO_isStdout(suffix) || LZ4IO_isDevNull(suffix)) {
             missingFiles += LZ4IO_decompressSrcFile(&processed, ress, inFileNamesTable[i], suffix, prefs);
             totalProcessed += processed;
             continue;
         }
-        if (ofnSize <= ifnSize-suffixSize+1) {
-            free(outFileName);
-            ofnSize = ifnSize + 20;
-            outFileName = (char*)malloc(ofnSize);
-            if (outFileName==NULL) END_PROCESS(71, "Memory allocation error");
-        }
-        if (ifnSize <= suffixSize  || !UTIL_sameString(suffixPtr, suffix) ) {
+        if (ifnSize <= suffixSize ||
+            !UTIL_sameString(inFileNamesTable[i] + ifnSize - suffixSize, suffix)) {
             DISPLAYLEVEL(1, "File extension doesn't match expected LZ4_EXTENSION (%4s); will not process file: %s\n", suffix, inFileNamesTable[i]);
             skippedFiles++;
             continue;
+        }
+        if (ofnSize <= ifnSize-suffixSize+1) {
+            free(outFileName);
+            ofnSize = ifnSize - suffixSize + 1;
+            outFileName = (char*)malloc(ofnSize);
+            if (outFileName==NULL) END_PROCESS(71, "Memory allocation error");
         }
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
