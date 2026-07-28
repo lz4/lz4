@@ -443,7 +443,7 @@ int main(int argc, char **argv) {
         printf("%s: %zu → %zu bytes, %.1f%%\n",
             inpFilename,
             (size_t)ret.size_in, (size_t)ret.size_out,  /* might overflow is size_t is 32 bits and size_{in,out} > 4 GB */
-            (double)ret.size_out / ret.size_in * 100);
+            (double)ret.size_out / (double)ret.size_in * 100.);
         printf("compress : done\n");
     }
 
