@@ -1157,8 +1157,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     ip++; forwardH = LZ4_hashPosition(ip, tableType);
 
 #if defined(__riscv)
-    /* Prefetch the first hash table entry: on in-order X60 the load latency
-     * of the hash table probe (~3-4 cycles) is fully exposed. */
+    /* Prefetch first hash entry (cold-start only). Per-iteration prefetches
+     * inside the match-find loops cover all subsequent lookups. */
     if (tableType == byPtr) {
         __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(const BYTE*), 0, 1);
     } else {
@@ -1188,6 +1188,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
 
                 match = LZ4_getPositionOnHash(h, cctx->hashTable, tableType);
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
+#if defined(__riscv)
+                __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(const BYTE*), 0, 1);
+#endif
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType);
 
             } while ( (match+LZ4_DISTANCE_MAX < ip)
@@ -1238,6 +1241,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                     match = base + matchIndex;
                 }
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
+#if defined(__riscv)
+                __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(U32), 0, 1);
+#endif
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
                 DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
