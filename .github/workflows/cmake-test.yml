@@ -31,7 +31,7 @@ jobs:
             generator: ""
           - os: windows-latest
             build_type: Release
-            generator: '-G "Visual Studio 17 2022" -A x64'
+            generator: '-G Ninja'
           - os: macos-latest
             build_type: Release
             generator: ""
@@ -42,7 +42,7 @@ jobs:
 
     - name: Set up MSVC (Windows)
       if: runner.os == 'Windows'
-      uses: microsoft/setup-msbuild@v3
+      uses: ilammy/msvc-dev-cmd@v1
 
     - name: Set up CMake
       uses: jwlawson/actions-setup-cmake@v2

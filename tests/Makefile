@@ -41,6 +41,68 @@ WFLAGS    = -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(USERCFLAGS)
 CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
+
+# RISC-V RVV + ISA extension auto-detection.
+# Mirror of the logic in ../lib/Makefile so fuzzer/roundTripTest exercise RVV paths.
+# Enables RVV intrinsics (GCC >= 13 or Clang with RISC-V target), then probes
+# for individual ISA extensions (Zbb, Zbc, Zbs, Zicbop) and adds them only
+# if the compiler accepts the flag.
+#
+# Variables (all settable via env or "make VAR=val"):
+#   RISCV_MARCH        - Base march (default: rv64gc)
+#   RISCV_EXT          - Extension selection (default: auto).
+#                        auto = probe zbb->zbc->zbs->zicbop in order.
+#                        "_"-separated list like "zbb_zbc_zbs" to force exact set.
+#   RISCV_STRICT_ALIGN - Set to 1 to omit -mno-strict-align (default: 0)
+RISCV_MARCH ?= rv64gc
+RISCV_EXT   ?= auto
+RISCV_STRICT_ALIGN ?= 0
+RVV_CFLAGS :=
+IS_RISCV := $(shell $(CC) -v 2>&1 | grep -c 'Target: riscv')
+ifeq ($(IS_RISCV),1)
+  IS_CLANG := $(shell $(CC) --version 2>&1 | grep -c 'clang')
+  ifneq ($(IS_CLANG),0)
+    C_HAS_RVV := 1
+  else
+    GCC_VER := $(shell $(CC) -dumpversion | cut -d. -f1)
+    ifeq ($(shell test $(GCC_VER) -ge 13; echo $$?),0)
+      C_HAS_RVV := 1
+    endif
+  endif
+  ifeq ($(C_HAS_RVV),1)
+    ifneq ($(RISCV_EXT),auto)
+      ifeq ($(RISCV_EXT),)
+        _MARCH := $(RISCV_MARCH)
+      else
+        _MARCH := $(RISCV_MARCH)_$(RISCV_EXT)
+      endif
+    else
+      _MARCH := $(RISCV_MARCH)
+      $(foreach e,zbb zbc zbs zicbop,\
+        $(if $(subst 0,,$(shell $(CC) -E -march=$(_MARCH)_$(e) - </dev/null >/dev/null 2>&1; echo $$?)),,\
+          $(eval _MARCH := $(_MARCH)_$(e))\
+          $(info LZ4: Enabling RISC-V extension $(e))))
+    endif
+    RVV_CFLAGS := -march=$(_MARCH)
+    ifneq ($(RISCV_STRICT_ALIGN),1)
+      RVV_CFLAGS += -mno-strict-align
+    endif
+  endif
+  # SpacemiT X60 tuning - guard with compiler support check
+  ifeq ($(shell $(CC) -E -mtune=spacemit-x60 - </dev/null >/dev/null 2>&1; echo $$?),0)
+    RVV_CFLAGS += -mtune=spacemit-x60
+    $(info LZ4: Enabling -mtune=spacemit-x60 for tests)
+  endif
+endif
+ifneq ($(RVV_CFLAGS),)
+  CFLAGS   += $(RVV_CFLAGS)
+  ifneq ($(LZ4_RVV_XXH),)
+    CPPFLAGS += -DXXH_ENABLE_RVV=$(LZ4_RVV_XXH)
+  else
+    CPPFLAGS += -DXXH_ENABLE_RVV=0
+  endif
+endif
+
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 include ../build/make/lz4defs.make
@@ -97,6 +159,7 @@ $(LIBDIR)/liblz4.a:
 	$(MAKE) -C $(LIBDIR) liblz4.a
 
 CLEAN += fullbench-lib
+CLEAN += xxhash_rvv_test
 fullbench-lib : DEBUGLEVEL=0
 fullbench-lib : CPPFLAGS += -DNDEBUG
 fullbench-lib: fullbench.c $(LIBDIR)/liblz4.a

@@ -114,6 +114,7 @@
 #ifndef LZ4_STATIC_LINKING_ONLY
 #  define LZ4_STATIC_LINKING_ONLY
 #endif
+
 #include "lz4.h"
 /* see also "memory routines" below */
 
@@ -186,6 +187,61 @@
 #ifndef LZ4_ALIGN_TEST  /* can be externally provided */
 # define LZ4_ALIGN_TEST 1
 #endif
+
+
+/**************************************
+*  RISC-V RVV Support
+**************************************/
+/* RISC-V Vector Extension (RVV) support for LZ4_count vectorization */
+#if defined(__riscv) && defined(__riscv_vector)
+#  if defined(__GNUC__) && !defined(__clang__)
+#    if __GNUC__ >= 13
+#      define LZ4_RVV_ENABLE 1
+#    endif
+#  elif defined(__clang__)
+#    if __clang_major__ >= 16
+#      define LZ4_RVV_ENABLE 1
+#    endif
+#  endif
+#endif
+
+#ifndef LZ4_RVV_ENABLE
+#  define LZ4_RVV_ENABLE 0
+#endif
+
+/* LZ4_count RVV path. Disabled by default: the vfirst reduction stalls
+ * in-order RVV cores and is generally slower than the scalar reference.
+ * Set to 1 to enable and benchmark on the target microarchitecture. */
+#ifndef LZ4_RVV_COUNT
+#  define LZ4_RVV_COUNT 0
+#endif
+
+/* LZ4_wildCopy8 RVV path. Disabled by default: on some in-order RVV cores
+ * (e.g. SpacemiT K1) the vectorized literal copy corrupts output under
+ * acceleration (--fast). The scalar path is correct. Set to 1 only after
+ * verifying round-trip correctness on the target microarchitecture. */
+#ifndef LZ4_RVV_WILDCOPY8
+#  define LZ4_RVV_WILDCOPY8 0
+#endif
+
+#if LZ4_RVV_ENABLE
+#include <riscv_vector.h>
+
+/* Compiler compatibility macros for RVV intrinsics.
+ * The __riscv_-prefixed intrinsics with an explicit vl parameter are the
+ * standard form supported by both GCC (>=13) and Clang (>=16). Use them
+ * uniformly for all compilers. */
+#if defined(__GNUC__) || defined(__clang__)
+  #define LZ4_RVV_VLE8(p,vl)  __riscv_vle8_v_u8m1(p, vl)
+  #define LZ4_RVV_VSE8(p,v,vl)  __riscv_vse8_v_u8m1(p, v, vl)
+  #define LZ4_RVV_SETVL_E8M1(n) __riscv_vsetvl_e8m1(n)
+  #define LZ4_RVV_VMSNE(p1,p2,vl) __riscv_vmsne_vv_u8m1_b8(p1, p2, vl)
+  #define LZ4_RVV_VFIRST(mask,vl) __riscv_vfirst_m_b8(mask, vl)
+  #define LZ4_RVV_VMSEQ(p1,p2,vl) __riscv_vmseq_vv_u8m1_b8(p1, p2, vl)
+  #define LZ4_RVV_VCPOP(mask,vl)  __riscv_vcpop_m_b8(mask, vl)
+#endif
+
+#endif /* LZ4_RVV_ENABLE */
 
 
 /*-************************************
@@ -469,6 +525,15 @@ void LZ4_wildCopy8(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
+#if LZ4_RVV_ENABLE && LZ4_RVV_WILDCOPY8
+    {
+        size_t vl = LZ4_RVV_SETVL_E8M1(16);
+        while (d + vl <= e) {
+            LZ4_RVV_VSE8(d, LZ4_RVV_VLE8(s, vl), vl);
+            d += vl; s += vl;
+        }
+    }
+#endif
     do { LZ4_memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
@@ -478,6 +543,18 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 
 #ifndef LZ4_FAST_DEC_LOOP
 #  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
+#    define LZ4_FAST_DEC_LOOP 1
+   /* Reason for adding __riscv_vector:
+      * LZ4_FAST_DEC_LOOP is an optimization designed for modern out-of-order (OoO) CPUs.
+      * For some in-order RISC-V cores, enabling this optimization directly may not bring performance gains,
+      * and could even lead to performance degradation.
+      * However, if the in-order core also supports vector instructions (i.e., __riscv_vector is defined),
+      * combining it with RVV optimization can still yield performance improvements.
+      * For out-of-order RISC-V CPUs (e.g., those conforming to the RVA23 profile where vector extension is default),
+      * enabling both LZ4_FAST_DEC_LOOP and RVV optimization can achieve optimal performance.
+      * Currently, there's no reliable way to detect CPUs that are out-of-order but do not support vector extensions,
+      * so we use __riscv_vector as a heuristic to decide whether to enable this optimization. */
+#  elif defined (__riscv) && (__riscv_xlen==64) && defined (__riscv_vector)
 #    define LZ4_FAST_DEC_LOOP 1
 #  elif defined(__aarch64__)
 #    define LZ4_FAST_DEC_LOOP 1
@@ -534,7 +611,20 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     const BYTE* s = (const BYTE*)srcPtr;
     BYTE* const e = (BYTE*)dstEnd;
 
+#if LZ4_RVV_ENABLE
+    /* Copy in 32-byte strides (two 16-byte vector chunks on a 128-bit VLEN,
+     * matching the scalar path's two 16-byte memcpy's) so we don't regress to
+     * half the scalar copy width on common VLEN=128 hardware. The loop is
+     * allowed to overrun dstEnd by up to 32 bytes (callers guarantee slack). */
+    size_t vl = LZ4_RVV_SETVL_E8M1(16);
+    do {
+        LZ4_RVV_VSE8(d,      LZ4_RVV_VLE8(s,      vl), vl);
+        LZ4_RVV_VSE8(d+vl,   LZ4_RVV_VLE8(s+vl,   vl), vl);
+        d += 2*vl; s += 2*vl;
+    } while (d < e);
+#else
     do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
+#endif
 }
 
 /* LZ4_memcpy_using_offset()  presumes :
@@ -690,6 +780,53 @@ unsigned LZ4_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* pInLimit)
 {
     const BYTE* const pStart = pIn;
 
+#if LZ4_RVV_ENABLE && LZ4_RVV_COUNT
+    /* RISC-V RVV vectorized path for byte comparison.
+     * NOTE: disabled by default (LZ4_RVV_COUNT=0). On in-order RVV cores the
+     * vfirst reduction stalls the pipeline and this path is typically slower
+     * than the scalar 8-byte XOR + LZ4_NbCommonBytes reference below, which it
+     * therefore keeps as the default for compression throughput. */
+    size_t const remaining = (size_t)(pInLimit - pIn);
+
+    /* Only engage RVV for reasonably long sequences (>= 32 bytes) */
+    if (remaining >= 32) {
+        /* Cap the vector length so the load from pMatch stays within the
+         * MATCH_SAFEGUARD_DISTANCE (-16) byte slack guaranteed by callers.
+         * The scalar fallback below handles the remaining tail. */
+        size_t const maxVl = (MATCH_SAFEGUARD_DISTANCE < 16) ? MATCH_SAFEGUARD_DISTANCE : 16;
+
+        while (pIn < pInLimit) {
+            size_t vl = LZ4_RVV_SETVL_E8M1(pInLimit - pIn);
+            if (vl > maxVl)
+                vl = maxVl;
+
+            vuint8m1_t v_in = LZ4_RVV_VLE8(pIn, vl);
+            vuint8m1_t v_match = LZ4_RVV_VLE8(pMatch, vl);
+
+            vbool8_t v_mask = LZ4_RVV_VMSNE(v_in, v_match, vl);
+
+            /* vfirst behavior on "no match" is implementation-dependent: the
+             * ratified spec sets rd = vl, while some toolchains leave rd
+             * unchanged. To be robust, only trust the index when it is within
+             * [0, vl) AND the pointed-to bytes truly differ. Otherwise there is
+             * no mismatch in this chunk and we keep scanning. */
+            long first_diff = LZ4_RVV_VFIRST(v_mask, vl);
+
+            if (first_diff >= 0 && first_diff < (long)vl
+                && pIn[(size_t)first_diff] != pMatch[(size_t)first_diff]) {
+                pIn += (size_t)first_diff;
+                return (unsigned)(pIn - pStart);
+            }
+
+            pIn += vl;
+            pMatch += vl;
+        }
+        return (unsigned)(pIn - pStart);
+    }
+    /* Fall through to scalar for short sequences */
+#endif
+
+    /* Scalar fallback - original implementation */
     if (likely(pIn < pInLimit-(STEPSIZE-1))) {
         reg_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
         if (!diff) {
@@ -1019,6 +1156,16 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     }   }
     ip++; forwardH = LZ4_hashPosition(ip, tableType);
 
+#if defined(__riscv)
+    /* Prefetch first hash entry (cold-start only). Per-iteration prefetches
+     * inside the match-find loops cover all subsequent lookups. */
+    if (tableType == byPtr) {
+        __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(const BYTE*), 0, 1);
+    } else {
+        __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(U32), 0, 1);
+    }
+#endif
+
     /* Main Loop */
     for ( ; ; ) {
         const BYTE* match;
@@ -1041,6 +1188,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
 
                 match = LZ4_getPositionOnHash(h, cctx->hashTable, tableType);
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
+#if defined(__riscv)
+                __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(const BYTE*), 0, 1);
+#endif
                 LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType);
 
             } while ( (match+LZ4_DISTANCE_MAX < ip)
@@ -1091,6 +1241,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                     match = base + matchIndex;
                 }
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
+#if defined(__riscv)
+                __builtin_prefetch((const char*)cctx->hashTable + forwardH * sizeof(U32), 0, 1);
+#endif
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
                 DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
@@ -2156,6 +2309,16 @@ LZ4_decompress_generic(
                     if (offset >= 8) {
                         assert(match >= lowPrefix);
                         assert(match <= op);
+#if defined(__riscv)
+                        assert(op + 32 <= oend);
+
+                        LZ4_memcpy(op, match, 8);
+                        LZ4_memcpy(op+8, match+8, 8);
+                        LZ4_memcpy(op+16, match+16, 8);
+                        LZ4_memcpy(op+24, match+24, 8);
+                        op += length;
+                        continue;
+#else
                         assert(op + 18 <= oend);
 
                         LZ4_memcpy(op, match, 8);
@@ -2163,6 +2326,7 @@ LZ4_decompress_generic(
                         LZ4_memcpy(op+16, match+16, 2);
                         op += length;
                         continue;
+#endif
             }   }   }
 
             if ( checkOffset && (unlikely(match + dictSize < lowPrefix)) ) {
