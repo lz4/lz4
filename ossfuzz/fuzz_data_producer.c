@@ -27,7 +27,10 @@ uint32_t FUZZ_dataProducer_retrieve32(FUZZ_dataProducer_t *producer) {
         return (uint32_t)data[size - 1];
     } else {
         producer->size -= 4;
-        return *(data + size - 4);
+        return (uint32_t)data[size - 4]
+             | ((uint32_t)data[size - 3] << 8)
+             | ((uint32_t)data[size - 2] << 16)
+             | ((uint32_t)data[size - 1] << 24);
     }
 }
 

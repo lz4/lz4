@@ -36,6 +36,8 @@ LZ4_CXXFLAGS = $(CXXFLAGS) $(DEBUGFLAGS) $(MOREFLAGS)
 LZ4_CPPFLAGS = $(CPPFLAGS) -I$(LZ4DIR) -DXXH_NAMESPACE=LZ4_ \
                -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
+FUZZ_DATA_PRODUCER_TEST := fuzz_data_producer_test$(EXT)
+
 FUZZERS := \
 	compress_fuzzer \
 	decompress_fuzzer \
@@ -50,6 +52,10 @@ FUZZERS := \
 
 .PHONY: all
 all: $(FUZZERS)
+
+.PHONY: test
+test: $(FUZZ_DATA_PRODUCER_TEST)
+	./$(FUZZ_DATA_PRODUCER_TEST)
 
 # Include a rule to build the static library if calling this target
 # directly.
@@ -68,6 +74,9 @@ endif
 %_fuzzer: %_fuzzer.o lz4_helpers.o fuzz_data_producer.o $(LZ4DIR)/liblz4.a $(LIB_FUZZING_DEPS)
 	$(CXX) $(LZ4_CXXFLAGS) $(LZ4_CPPFLAGS) $(LDFLAGS) $(LIB_FUZZING_ENGINE) $^ -o $@$(EXT)
 
+$(FUZZ_DATA_PRODUCER_TEST): fuzz_data_producer_test.o fuzz_data_producer.o
+	$(CC) $(LZ4_CFLAGS) $(LZ4_CPPFLAGS) $(LDFLAGS) $^ -o $@
+
 %_fuzzer_clean:
 	$(RM) $*_fuzzer $*_fuzzer.o standaloneengine.o
 
@@ -76,4 +85,5 @@ clean: compress_fuzzer_clean decompress_fuzzer_clean \
 	compress_frame_fuzzer_clean compress_hc_fuzzer_clean \
 	decompress_frame_fuzzer_clean round_trip_frame_fuzzer_clean \
 	round_trip_fuzzer_clean round_trip_hc_fuzzer_clean round_trip_stream_fuzzer_clean
+	$(RM) $(FUZZ_DATA_PRODUCER_TEST) fuzz_data_producer_test.o fuzz_data_producer.o
 	$(MAKE) -C $(LZ4DIR) clean
