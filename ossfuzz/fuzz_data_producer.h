@@ -16,7 +16,7 @@ FUZZ_dataProducer_t *FUZZ_dataProducer_create(const uint8_t *data, size_t size);
 /* Frees the data producer */
 void FUZZ_dataProducer_free(FUZZ_dataProducer_t *producer);
 
-/* Returns 32 bits from the end of data */
+/* Returns 32 bits in little-endian order from the end of data */
 uint32_t FUZZ_dataProducer_retrieve32(FUZZ_dataProducer_t *producer);
 
 /* Returns value between [min, max] */

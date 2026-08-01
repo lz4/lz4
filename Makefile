@@ -138,6 +138,7 @@ list:
 .PHONY: check
 check:
 	$(MAKE) -C $(TESTDIR) test-lz4-essentials
+	$(MAKE) -C $(FUZZDIR) test
 
 .PHONY: test
 test:
