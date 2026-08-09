@@ -469,9 +469,19 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
    && defined(PLATFORM_POSIX_VERSION) && (PLATFORM_POSIX_VERSION >= 200112L)
 #  define LZ4IO_PARALLEL_READ 1
 #  include <unistd.h>     /* pread */
-#  include <sys/mman.h>  /* madvise */
+#  include <errno.h>      /* errno, EINTR */
+#  include <sys/mman.h>   /* mmap (chunk buffers), madvise */
+/* MAP_ANONYMOUS is a widespread extension, but not required by POSIX;
+ * BSD spells it MAP_ANON. Without either, fall back to malloc. */
+#  if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#    define MAP_ANONYMOUS MAP_ANON
+#  endif
 /* nb of workers beyond which the sequential frame checksum
- * is slowed down by memory bandwidth contention */
+ * is slowed down by memory bandwidth contention.
+ * Only relevant for fast compression levels :
+ * they compress faster than XXH32 hashes, making the checksum the
+ * pipeline bottleneck. HC levels are compression-bound and need
+ * every requested worker (see dispatch site). */
 #  define LZ4IO_CHECKSUM_MAX_WORKERS 12
 #else
 #  define LZ4IO_PARALLEL_READ 0
@@ -805,7 +815,12 @@ static void CP_init(ChunkPool* cp, size_t bufSize)
 
 static void CP_free(const ChunkPool* cp, void* buf)
 {
+#if defined(MAP_ANONYMOUS)
     if (buf) munmap(buf, cp->mapSize);
+#else
+    (void)cp;
+    free(buf);
+#endif
 }
 
 static void CP_destroy(ChunkPool* cp)
@@ -822,6 +837,7 @@ static void* CP_acquire(ChunkPool* cp)
     if (cp->nbCached > 0) buf = cp->cached[--cp->nbCached];
     pthread_mutex_unlock(&cp->mutex);
     if (buf == NULL) {
+#if defined(MAP_ANONYMOUS)
         /* fresh 2 MB-aligned anonymous mapping :
          * eligible for Transparent Huge Pages where supported,
          * reducing TLB pressure in the hashing and compression stages.
@@ -841,6 +857,12 @@ static void* CP_acquire(ChunkPool* cp)
         madvise(aligned, cp->mapSize, MADV_HUGEPAGE);
 #endif
         buf = aligned;
+#else
+        /* strictly-POSIX fallback : anonymous mappings are an extension */
+        buf = malloc(cp->mapSize);
+        if (buf == NULL)
+            END_PROCESS(31, "Allocation error : can't allocate buffer to read new chunk");
+#endif
     }
     return buf;
 }
@@ -857,7 +879,7 @@ static void CP_release(ChunkPool* cp, void* buf)
 }
 
 /* Parallel-read compression job:
- * reads its own chunk at a known offset (zero-copy mapping, or pread),
+ * reads its own chunk at a known offset (pread into a pooled buffer),
  * hashes it in order through the hash gate when the frame checksum is enabled,
  * then compresses it like LZ4IO_compressChunk. */
 typedef struct {
@@ -879,46 +901,33 @@ static void LZ4IO_preadAndCompress(void* arg)
 {
     PreadJobDesc* const pjd = (PreadJobDesc*)arg;
     size_t const inSize = pjd->inSize;
-    void* buffer = NULL;
-    void* mapped = NULL;
-    const void* chunk;
+    void* const buffer = CP_acquire(pjd->bpool);
 
-#ifdef MAP_POPULATE
-    /* zero-copy fast path : map the chunk directly from the page cache.
-     * MAP_POPULATE pre-faults the whole range in one syscall,
-     * much cheaper than a fault per page during hashing.
-     * Only worth it when the sequential checksum is the bottleneck :
-     * it frees the memory bandwidth the hashing thread needs.
-     * Without checksum, pooled pread buffers scale better
-     * (no munmap TLB shootdowns across many workers). */
-    if (pjd->hgate)
-        mapped = mmap(NULL, inSize, PROT_READ, MAP_SHARED|MAP_POPULATE, pjd->fd, (off_t)pjd->offset);
-    if (mapped != NULL && mapped != MAP_FAILED) {
-        chunk = mapped;
-    } else
-#endif
-    {
-        mapped = NULL;
-        buffer = CP_acquire(pjd->bpool);
-        /* the input is a regular file whose size was determined at job creation :
-         * an early EOF is an I/O error */
-        {   size_t done = 0;
-            while (done < inSize) {
-                ssize_t const r = pread(pjd->fd, (char*)buffer + done, inSize - done, (off_t)(pjd->offset + done));
-                if (r <= 0)
-                    END_PROCESS(32, "Read error : cannot read chunk at position %llu", pjd->offset + done);
-                done += (size_t)r;
-        }   }
-        chunk = buffer;
-    }
+    /* Read the chunk into an owned buffer.
+     * (A file-backed mapping would be zero-copy, but touching pages of a
+     * file shrunk by a concurrent writer raises SIGBUS : an unhandleable
+     * crash. pread reports the same situation as a plain short read.)
+     * The input is a regular file whose size was determined at job creation :
+     * an early EOF is an I/O error. */
+    {   size_t done = 0;
+        while (done < inSize) {
+            ssize_t const r = pread(pjd->fd, (char*)buffer + done, inSize - done, (off_t)(pjd->offset + done));
+            if (r < 0) {
+                if (errno == EINTR) continue;   /* interrupted by a signal : retry */
+                END_PROCESS(32, "Read error : cannot read chunk at position %llu : %s", pjd->offset + done, strerror(errno));
+            }
+            if (r == 0)   /* premature EOF : file shrunk since the size snapshot */
+                END_PROCESS(32, "Read error : cannot read chunk at position %llu : unexpected end of file", pjd->offset + done);
+            done += (size_t)r;
+    }   }
 
     /* hash first : this warms the cache for compression below */
     if (pjd->hgate)
-        HG_hashInOrder(pjd->hgate, chunk, inSize, pjd->blockNb);
+        HG_hashInOrder(pjd->hgate, buffer, inSize, pjd->blockNb);
 
     {   CompressJobDesc cjd;
         cjd.wpool = pjd->wpool;
-        cjd.buffer = (void*)chunk;   /* only read by LZ4IO_compressChunk */
+        cjd.buffer = buffer;   /* only read by LZ4IO_compressChunk */
         cjd.prefixSize = 0;
         cjd.inSize = inSize;
         cjd.blockNb = pjd->blockNb;
@@ -931,26 +940,45 @@ static void LZ4IO_preadAndCompress(void* arg)
         LZ4IO_compressChunk(&cjd);
     }
 
-    if (mapped) munmap(mapped, inSize);
-    if (buffer) CP_release(pjd->bpool, buffer);
+    CP_release(pjd->bpool, buffer);
     free(pjd);  /* because pjd is pod */
 }
 
-/* LZ4IO_parallelReadSize() :
- * Determines if chunks can be read in parallel (out of order) :
+/* Absolute file range left to read in parallel.
+ * nextOffset == endOffset == 0 when parallel read is not possible. */
+typedef struct {
+    unsigned long long nextOffset;  /* absolute offset of the first byte not read yet */
+    unsigned long long endOffset;   /* absolute end of the readable range (file size) */
+} ParallelReadRange;
+
+/* LZ4IO_parallelReadRange() :
+ * Determines if remaining chunks can be read in parallel (out of order) :
  * requires a seekable regular file, and independent blocks.
- * @return : size of the file if parallel read is possible, 0 otherwise */
-static unsigned long long LZ4IO_parallelReadSize(FILE* f, LZ4F_blockMode_t blockMode, size_t chunkSize)
+ * The stream may start at a nonzero file offset
+ * (e.g. redirected stdin whose position was advanced before invocation),
+ * so ranges are expressed as absolute file offsets,
+ * anchored on the current logical stream position.
+ * @alreadyRead : nb of bytes already consumed from the stream for this frame.
+ * @return : the absolute range still to be read if parallel read is possible,
+ *           {0,0} otherwise */
+static ParallelReadRange LZ4IO_parallelReadRange(FILE* f, LZ4F_blockMode_t blockMode, size_t alreadyRead)
 {
+    ParallelReadRange const no_range = { 0, 0 };
     if (blockMode == LZ4F_blockLinked)
-        return 0;   /* prefix chaining requires sequential reads */
+        return no_range;   /* prefix chaining requires sequential reads */
     if (UTIL_fileno(f) < 0)
-        return 0;
+        return no_range;
     {   U64 const size = UTIL_getOpenFileSize(f);   /* 0 if not a regular file */
-        if (size <= (U64)chunkSize)
-            return 0;   /* single-chunk (or non-regular) : no benefit */
-        return (unsigned long long)size;
-    }
+        off_t const curPos = (size > 0) ? ftello(f) : -1;
+        if (curPos < 0 || (U64)curPos < (U64)alreadyRead)
+            return no_range;   /* position unknown : cannot pread at absolute offsets */
+        if (size <= (U64)curPos)
+            return no_range;   /* nothing left (or file shrunk) : no benefit */
+        {   ParallelReadRange r;
+            r.nextOffset = (unsigned long long)curPos;
+            r.endOffset = (unsigned long long)size;
+            return r;
+    }   }
 }
 
 #endif /* LZ4IO_PARALLEL_READ */
@@ -1496,8 +1524,9 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         XXH32_state_t* xxh32 = NULL;
 
 #if LZ4IO_PARALLEL_READ
-        unsigned long long const parallelReadSize =
-            LZ4IO_parallelReadSize(srcFile, prefs.frameInfo.blockMode, chunkSize);
+        ParallelReadRange const parallelRange =
+            LZ4IO_parallelReadRange(srcFile, prefs.frameInfo.blockMode, readSize);
+        int const parallelRead = (parallelRange.endOffset > parallelRange.nextOffset);
 #endif
 
         LZ4IO_CfcParameters cfcp;
@@ -1510,7 +1539,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
              * which bounds the number of chunk buffers in flight. */
             int const queueSize =
 #if LZ4IO_PARALLEL_READ
-                parallelReadSize ? 64 :
+                parallelRead ? 64 :
 #endif
                 4;
             ress->tPool = TPool_create(io_prefs->nbWorkers, queueSize);
@@ -1588,7 +1617,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             }
 
 #if LZ4IO_PARALLEL_READ
-            if (parallelReadSize) {
+            if (parallelRead) {
                 /* Seekable regular file with independent blocks :
                  * no need for a sequential read job chain;
                  * instead, each compression job reads its own chunk, in parallel.
@@ -1600,26 +1629,30 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
                 TPool* cPool = ress->tPool;
                 TPool* clampedPool = NULL;
                 int const fd = UTIL_fileno(srcFile);
-                unsigned long long offset = (unsigned long long)readSize;
+                unsigned long long offset = parallelRange.nextOffset;
                 unsigned long long blockNb = 1;
-                assert(fd >= 0);   /* already checked by LZ4IO_parallelReadSize() */
+                assert(fd >= 0);   /* already checked by LZ4IO_parallelReadRange() */
                 assert(readSize == chunkSize);
                 CP_init(&bp, chunkSize);
                 if (checksum) {
                     HG_init(&hg, xxh32, 1 /* first chunk already hashed */);
-                    /* The pipeline cannot go faster than the sequential checksum.
-                     * Past the point where compression keeps up with hashing,
-                     * additional workers only slow the hashing thread down,
-                     * through memory bandwidth contention. */
-                    if (io_prefs->nbWorkers > LZ4IO_CHECKSUM_MAX_WORKERS) {
+                    /* At fast compression levels, the pipeline cannot go faster
+                     * than the sequential checksum : past the point where
+                     * compression keeps up with hashing, additional workers only
+                     * slow the hashing thread down, through memory bandwidth
+                     * contention. HC levels are compression-bound
+                     * (compression is far slower than XXH32),
+                     * so they benefit from every requested worker. */
+                    if (compressionLevel < LZ4HC_CLEVEL_MIN
+                     && io_prefs->nbWorkers > LZ4IO_CHECKSUM_MAX_WORKERS) {
                         clampedPool = TPool_create(LZ4IO_CHECKSUM_MAX_WORKERS, 64);
                         if (clampedPool == NULL)
                             END_PROCESS(49, "can't create clamped thread pool");
                         cPool = clampedPool;
                     }
                 }
-                while (offset < parallelReadSize) {
-                    size_t const thisSize = (size_t)MIN((unsigned long long)chunkSize, parallelReadSize - offset);
+                while (offset < parallelRange.endOffset) {
+                    size_t const thisSize = (size_t)MIN((unsigned long long)chunkSize, parallelRange.endOffset - offset);
                     PreadJobDesc* const pjd = (PreadJobDesc*)malloc(sizeof(*pjd));
                     if (pjd == NULL)
                         END_PROCESS(48, "Allocation error : can't describe new read job");
@@ -1639,7 +1672,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
                     offset += thisSize;
                     blockNb++;
                 }
-                rjd.totalReadSize = parallelReadSize;
+                rjd.totalReadSize = readSize + (parallelRange.endOffset - parallelRange.nextOffset);
 
                 /* Wait for all completion.
                  * Note: jobs hash their chunks in order before completing,
