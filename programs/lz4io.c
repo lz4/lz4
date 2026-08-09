@@ -462,6 +462,21 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 
 #include "threadpool.h"
 
+/* Parallel chunk reading, employing pread() at known offsets,
+ * is only possible on seekable regular files,
+ * and requires POSIX.1-2001 support. */
+#if !defined(LZ4IO_NO_PARALLEL_READ) && !defined(_WIN32) \
+   && defined(PLATFORM_POSIX_VERSION) && (PLATFORM_POSIX_VERSION >= 200112L)
+#  define LZ4IO_PARALLEL_READ 1
+#  include <unistd.h>     /* pread */
+#  include <sys/mman.h>  /* madvise */
+/* nb of workers beyond which the sequential frame checksum
+ * is slowed down by memory bandwidth contention */
+#  define LZ4IO_CHECKSUM_MAX_WORKERS 12
+#else
+#  define LZ4IO_PARALLEL_READ 0
+#endif
+
 typedef struct {
     void* buf;
     size_t size;
@@ -688,6 +703,257 @@ static void LZ4IO_compressAndFreeChunk(void* arg)
     free(cjd->buffer);
     free(cjd); /* because cjd is pod */
 }
+
+#if LZ4IO_PARALLEL_READ
+
+#include <pthread.h>   /* the parallel-read path is POSIX-only */
+#include <sched.h>     /* sched_yield */
+
+/* The frame content checksum (XXH32) must be computed sequentially,
+ * ingesting chunks in block order,
+ * while parallel-read compression jobs progress out of order.
+ * The HashGate is a turnstile enforcing that order :
+ * each job hashes its own chunk, right after reading it
+ * (while its content is still warm in the core's cache),
+ * but must wait for its turn before doing so. */
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    XXH32_state_t* xxh32;
+    unsigned long long expectedRank;
+} HashGate;
+
+static void HG_init(HashGate* hg, XXH32_state_t* xxh32, unsigned long long firstRank)
+{
+    if (pthread_mutex_init(&hg->mutex, NULL) || pthread_cond_init(&hg->cond, NULL))
+        END_PROCESS(46, "hash gate creation error");
+    hg->xxh32 = xxh32;
+    hg->expectedRank = firstRank;
+}
+
+static void HG_destroy(HashGate* hg)
+{
+    pthread_mutex_destroy(&hg->mutex);
+    pthread_cond_destroy(&hg->cond);
+}
+
+/* rank accessors : atomic when available, to support the spin fast path */
+#if defined(__GNUC__)
+#  define HG_loadRank(hg)      __atomic_load_n(&(hg)->expectedRank, __ATOMIC_ACQUIRE)
+#  define HG_storeRank(hg, v)  __atomic_store_n(&(hg)->expectedRank, (v), __ATOMIC_RELEASE)
+#else
+#  define HG_loadRank(hg)      ((hg)->expectedRank)
+#  define HG_storeRank(hg, v)  ((hg)->expectedRank = (v))
+#endif
+
+/* HG_hashInOrder() :
+ * hashes chunk @buf of rank @rank, once all previous chunks have been hashed.
+ * Blocks while waiting for this job's turn.
+ * Progress guarantee : jobs are dispatched by rank order into a FIFO pool,
+ * so all chunks with lower ranks are already running (or done)
+ * and will reach the gate without requiring this job to complete. */
+static void HG_hashInOrder(HashGate* hg, const void* buf, size_t size, unsigned long long rank)
+{
+#if defined(__GNUC__)
+    /* opportunistic spin : turns rotate every ~1 ms (hashing one chunk),
+     * so waiting on a condition variable adds a wakeup latency (~10-100 us)
+     * to every single turn transition ;
+     * a short bounded spin absorbs most transitions at negligible latency.
+     * Falls back to the condition variable if the wait gets long. */
+    {   int spins;
+        for (spins=0; spins < 2000000; spins++) {
+            if (__atomic_load_n(&hg->expectedRank, __ATOMIC_ACQUIRE) == rank)
+                goto do_hash;
+            if ((spins & 1023) == 1023) sched_yield();
+    }   }
+#endif
+    pthread_mutex_lock(&hg->mutex);
+    while (rank != HG_loadRank(hg))
+        pthread_cond_wait(&hg->cond, &hg->mutex);
+    pthread_mutex_unlock(&hg->mutex);
+
+#if defined(__GNUC__)
+do_hash:
+#endif
+    /* this job holds the turnstile : hash outside the lock */
+    XXH32_update(hg->xxh32, buf, size);
+    pthread_mutex_lock(&hg->mutex);
+    HG_storeRank(hg, rank + 1);
+    pthread_cond_broadcast(&hg->cond);
+    pthread_mutex_unlock(&hg->mutex);
+}
+
+/* Reused pool of identically-sized chunk buffers.
+ * Reuse keeps pages mapped and warm across chunks,
+ * and buffers are 2 MB-aligned, hinting Transparent Huge Pages when available,
+ * which reduces TLB pressure for the hashing and compression stages. */
+#define CHUNKPOOL_MAX_CACHED 64
+typedef struct {
+    pthread_mutex_t mutex;
+    void* cached[CHUNKPOOL_MAX_CACHED];
+    int nbCached;
+    size_t mapSize;   /* rounded up to a multiple of 2 MB */
+} ChunkPool;
+
+static void CP_init(ChunkPool* cp, size_t bufSize)
+{
+    if (pthread_mutex_init(&cp->mutex, NULL))
+        END_PROCESS(39, "buffer pool creation error");
+    cp->nbCached = 0;
+    cp->mapSize = (bufSize + (2 MB - 1)) & ~((size_t)2 MB - 1);
+}
+
+static void CP_free(const ChunkPool* cp, void* buf)
+{
+    if (buf) munmap(buf, cp->mapSize);
+}
+
+static void CP_destroy(ChunkPool* cp)
+{
+    int n;
+    for (n=0; n<cp->nbCached; n++) CP_free(cp, cp->cached[n]);
+    pthread_mutex_destroy(&cp->mutex);
+}
+
+static void* CP_acquire(ChunkPool* cp)
+{
+    void* buf = NULL;
+    pthread_mutex_lock(&cp->mutex);
+    if (cp->nbCached > 0) buf = cp->cached[--cp->nbCached];
+    pthread_mutex_unlock(&cp->mutex);
+    if (buf == NULL) {
+        /* fresh 2 MB-aligned anonymous mapping :
+         * eligible for Transparent Huge Pages where supported,
+         * reducing TLB pressure in the hashing and compression stages.
+         * Buffers are reused through the pool, amortizing setup costs. */
+        size_t const align = 2 MB;
+        size_t const overSize = cp->mapSize + align;
+        char* const raw = (char*)mmap(NULL, overSize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        char* aligned;
+        size_t frontPad;
+        if (raw == MAP_FAILED)
+            END_PROCESS(31, "Allocation error : can't allocate buffer to read new chunk");
+        frontPad = (align - ((size_t)raw & (align-1))) & (align-1);
+        aligned = raw + frontPad;
+        if (frontPad) munmap(raw, frontPad);                            /* trim front */
+        munmap(aligned + cp->mapSize, align - frontPad);                /* trim back */
+#ifdef MADV_HUGEPAGE
+        madvise(aligned, cp->mapSize, MADV_HUGEPAGE);
+#endif
+        buf = aligned;
+    }
+    return buf;
+}
+
+static void CP_release(ChunkPool* cp, void* buf)
+{
+    pthread_mutex_lock(&cp->mutex);
+    if (cp->nbCached < CHUNKPOOL_MAX_CACHED) {
+        cp->cached[cp->nbCached++] = buf;
+        buf = NULL;
+    }
+    pthread_mutex_unlock(&cp->mutex);
+    CP_free(cp, buf);   /* no-op when cached */
+}
+
+/* Parallel-read compression job:
+ * reads its own chunk at a known offset (zero-copy mapping, or pread),
+ * hashes it in order through the hash gate when the frame checksum is enabled,
+ * then compresses it like LZ4IO_compressChunk. */
+typedef struct {
+    TPool* wpool;
+    HashGate* hgate; /* if != NULL, hash the chunk in order before compressing */
+    ChunkPool* bpool;
+    int fd;
+    unsigned long long offset;
+    size_t inSize;
+    unsigned long long blockNb;
+    compress_f compress;
+    const void* compressParameters;
+    FILE* fout;
+    WriteRegister* wr;
+    size_t maxCBlockSize;
+} PreadJobDesc;
+
+static void LZ4IO_preadAndCompress(void* arg)
+{
+    PreadJobDesc* const pjd = (PreadJobDesc*)arg;
+    size_t const inSize = pjd->inSize;
+    void* buffer = NULL;
+    void* mapped = NULL;
+    const void* chunk;
+
+#ifdef MAP_POPULATE
+    /* zero-copy fast path : map the chunk directly from the page cache.
+     * MAP_POPULATE pre-faults the whole range in one syscall,
+     * much cheaper than a fault per page during hashing.
+     * Only worth it when the sequential checksum is the bottleneck :
+     * it frees the memory bandwidth the hashing thread needs.
+     * Without checksum, pooled pread buffers scale better
+     * (no munmap TLB shootdowns across many workers). */
+    if (pjd->hgate)
+        mapped = mmap(NULL, inSize, PROT_READ, MAP_SHARED|MAP_POPULATE, pjd->fd, (off_t)pjd->offset);
+    if (mapped != NULL && mapped != MAP_FAILED) {
+        chunk = mapped;
+    } else
+#endif
+    {
+        mapped = NULL;
+        buffer = CP_acquire(pjd->bpool);
+        /* the input is a regular file whose size was determined at job creation :
+         * an early EOF is an I/O error */
+        {   size_t done = 0;
+            while (done < inSize) {
+                ssize_t const r = pread(pjd->fd, (char*)buffer + done, inSize - done, (off_t)(pjd->offset + done));
+                if (r <= 0)
+                    END_PROCESS(32, "Read error : cannot read chunk at position %llu", pjd->offset + done);
+                done += (size_t)r;
+        }   }
+        chunk = buffer;
+    }
+
+    /* hash first : this warms the cache for compression below */
+    if (pjd->hgate)
+        HG_hashInOrder(pjd->hgate, chunk, inSize, pjd->blockNb);
+
+    {   CompressJobDesc cjd;
+        cjd.wpool = pjd->wpool;
+        cjd.buffer = (void*)chunk;   /* only read by LZ4IO_compressChunk */
+        cjd.prefixSize = 0;
+        cjd.inSize = inSize;
+        cjd.blockNb = pjd->blockNb;
+        cjd.compress = pjd->compress;
+        cjd.compressParameters = pjd->compressParameters;
+        cjd.fout = pjd->fout;
+        cjd.wr = pjd->wr;
+        cjd.maxCBlockSize = pjd->maxCBlockSize;
+        cjd.lastBlock = 0;
+        LZ4IO_compressChunk(&cjd);
+    }
+
+    if (mapped) munmap(mapped, inSize);
+    if (buffer) CP_release(pjd->bpool, buffer);
+    free(pjd);  /* because pjd is pod */
+}
+
+/* LZ4IO_parallelReadSize() :
+ * Determines if chunks can be read in parallel (out of order) :
+ * requires a seekable regular file, and independent blocks.
+ * @return : size of the file if parallel read is possible, 0 otherwise */
+static unsigned long long LZ4IO_parallelReadSize(FILE* f, LZ4F_blockMode_t blockMode, size_t chunkSize)
+{
+    if (blockMode == LZ4F_blockLinked)
+        return 0;   /* prefix chaining requires sequential reads */
+    if (UTIL_fileno(f) < 0)
+        return 0;
+    {   U64 const size = UTIL_getOpenFileSize(f);   /* 0 if not a regular file */
+        if (size <= (U64)chunkSize)
+            return 0;   /* single-chunk (or non-regular) : no benefit */
+        return (unsigned long long)size;
+    }
+}
+
+#endif /* LZ4IO_PARALLEL_READ */
 
 /* one ReadTracker per file to compress */
 typedef struct {
@@ -1229,11 +1495,25 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         int checksum = (int)prefs.frameInfo.contentChecksumFlag;
         XXH32_state_t* xxh32 = NULL;
 
+#if LZ4IO_PARALLEL_READ
+        unsigned long long const parallelReadSize =
+            LZ4IO_parallelReadSize(srcFile, prefs.frameInfo.blockMode, chunkSize);
+#endif
+
         LZ4IO_CfcParameters cfcp;
         ReadTracker rjd;
 
         if (ress->tPool == NULL) {
-            ress->tPool = TPool_create(io_prefs->nbWorkers, 4);
+            /* parallel read dispatches lightweight job descriptors :
+             * a deeper queue keeps workers fed without buffering more data.
+             * The sequential read chain keeps the original shallow queue,
+             * which bounds the number of chunk buffers in flight. */
+            int const queueSize =
+#if LZ4IO_PARALLEL_READ
+                parallelReadSize ? 64 :
+#endif
+                4;
+            ress->tPool = TPool_create(io_prefs->nbWorkers, queueSize);
             assert(ress->wPool == NULL);
             ress->wPool = TPool_create(1, 4);
             if (ress->tPool == NULL || ress->wPool == NULL)
@@ -1307,12 +1587,82 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
                 memcpy(prefixBuffer, (char*)srcBuffer + readSize - 64 KB, 64 KB);
             }
 
-            /* Start the job chain */
-            TPool_submitJob(ress->tPool, LZ4IO_readAndProcess, &rjd);
+#if LZ4IO_PARALLEL_READ
+            if (parallelReadSize) {
+                /* Seekable regular file with independent blocks :
+                 * no need for a sequential read job chain;
+                 * instead, each compression job reads its own chunk, in parallel.
+                 * The frame checksum, which must be computed sequentially,
+                 * is processed by the jobs themselves,
+                 * each hashing its own chunk in block order (HashGate). */
+                HashGate hg;
+                ChunkPool bp;
+                TPool* cPool = ress->tPool;
+                TPool* clampedPool = NULL;
+                int const fd = UTIL_fileno(srcFile);
+                unsigned long long offset = (unsigned long long)readSize;
+                unsigned long long blockNb = 1;
+                assert(fd >= 0);   /* already checked by LZ4IO_parallelReadSize() */
+                assert(readSize == chunkSize);
+                CP_init(&bp, chunkSize);
+                if (checksum) {
+                    HG_init(&hg, xxh32, 1 /* first chunk already hashed */);
+                    /* The pipeline cannot go faster than the sequential checksum.
+                     * Past the point where compression keeps up with hashing,
+                     * additional workers only slow the hashing thread down,
+                     * through memory bandwidth contention. */
+                    if (io_prefs->nbWorkers > LZ4IO_CHECKSUM_MAX_WORKERS) {
+                        clampedPool = TPool_create(LZ4IO_CHECKSUM_MAX_WORKERS, 64);
+                        if (clampedPool == NULL)
+                            END_PROCESS(49, "can't create clamped thread pool");
+                        cPool = clampedPool;
+                    }
+                }
+                while (offset < parallelReadSize) {
+                    size_t const thisSize = (size_t)MIN((unsigned long long)chunkSize, parallelReadSize - offset);
+                    PreadJobDesc* const pjd = (PreadJobDesc*)malloc(sizeof(*pjd));
+                    if (pjd == NULL)
+                        END_PROCESS(48, "Allocation error : can't describe new read job");
+                    pjd->wpool = ress->wPool;
+                    pjd->hgate = checksum ? &hg : NULL;
+                    pjd->bpool = &bp;
+                    pjd->fd = fd;
+                    pjd->offset = offset;
+                    pjd->inSize = thisSize;
+                    pjd->blockNb = blockNb;
+                    pjd->compress = LZ4IO_compressFrameChunk;
+                    pjd->compressParameters = &cfcp;
+                    pjd->fout = dstFile;
+                    pjd->wr = &wr;
+                    pjd->maxCBlockSize = rjd.maxCBlockSize;
+                    TPool_submitJob(cPool, LZ4IO_preadAndCompress, pjd);
+                    offset += thisSize;
+                    blockNb++;
+                }
+                rjd.totalReadSize = parallelReadSize;
 
-            /* Wait for all completion */
-            TPool_jobsCompleted(ress->tPool);
-            TPool_jobsCompleted(ress->wPool);
+                /* Wait for all completion.
+                 * Note: jobs hash their chunks in order before completing,
+                 * so once all jobs are done, the checksum is complete too.
+                 * The first chunk's compression job runs on ress->tPool,
+                 * which therefore must complete as well before the writer pool
+                 * is drained, even when chunk jobs went to a clamped pool. */
+                TPool_jobsCompleted(cPool);
+                TPool_jobsCompleted(ress->tPool);
+                if (clampedPool) TPool_free(clampedPool);
+                if (checksum) HG_destroy(&hg);
+                TPool_jobsCompleted(ress->wPool);
+                CP_destroy(&bp);
+            } else
+#endif
+            {
+                /* Start the job chain */
+                TPool_submitJob(ress->tPool, LZ4IO_readAndProcess, &rjd);
+
+                /* Wait for all completion */
+                TPool_jobsCompleted(ress->tPool);
+                TPool_jobsCompleted(ress->wPool);
+            }
             compressedfilesize += wr.totalCSize;
         }
 
