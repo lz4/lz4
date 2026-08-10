@@ -730,7 +730,13 @@ typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     XXH32_state_t* xxh32;
-    unsigned long long expectedRank;
+    /* The rank is deliberately 32-bit :
+     * several 32-bit targets have no native 64-bit atomics
+     * (the spin fast path below would not link, or would be misaligned),
+     * while a naturally-aligned unsigned is atomic-friendly everywhere.
+     * Equality comparison stays unambiguous under wraparound,
+     * since at most nbWorkers (<< 2^32) ranks are in flight at any time. */
+    unsigned expectedRank;
 } HashGate;
 
 static void HG_init(HashGate* hg, XXH32_state_t* xxh32, unsigned long long firstRank)
@@ -738,7 +744,7 @@ static void HG_init(HashGate* hg, XXH32_state_t* xxh32, unsigned long long first
     if (pthread_mutex_init(&hg->mutex, NULL) || pthread_cond_init(&hg->cond, NULL))
         END_PROCESS(46, "hash gate creation error");
     hg->xxh32 = xxh32;
-    hg->expectedRank = firstRank;
+    hg->expectedRank = (unsigned)firstRank;
 }
 
 static void HG_destroy(HashGate* hg)
@@ -747,11 +753,14 @@ static void HG_destroy(HashGate* hg)
     pthread_cond_destroy(&hg->cond);
 }
 
-/* rank accessors : atomic when available, to support the spin fast path */
-#if defined(__GNUC__)
+/* rank accessors : atomic when 32-bit atomics are guaranteed lock-free,
+ * to support the spin fast path */
+#if defined(__GNUC__) && defined(__GCC_ATOMIC_INT_LOCK_FREE) && (__GCC_ATOMIC_INT_LOCK_FREE == 2)
+#  define HG_SPIN 1
 #  define HG_loadRank(hg)      __atomic_load_n(&(hg)->expectedRank, __ATOMIC_ACQUIRE)
 #  define HG_storeRank(hg, v)  __atomic_store_n(&(hg)->expectedRank, (v), __ATOMIC_RELEASE)
 #else
+#  define HG_SPIN 0
 #  define HG_loadRank(hg)      ((hg)->expectedRank)
 #  define HG_storeRank(hg, v)  ((hg)->expectedRank = (v))
 #endif
@@ -764,7 +773,8 @@ static void HG_destroy(HashGate* hg)
  * and will reach the gate without requiring this job to complete. */
 static void HG_hashInOrder(HashGate* hg, const void* buf, size_t size, unsigned long long rank)
 {
-#if defined(__GNUC__)
+    unsigned const rank32 = (unsigned)rank;
+#if HG_SPIN
     /* opportunistic spin : turns rotate every ~1 ms (hashing one chunk),
      * so waiting on a condition variable adds a wakeup latency (~10-100 us)
      * to every single turn transition ;
@@ -772,23 +782,23 @@ static void HG_hashInOrder(HashGate* hg, const void* buf, size_t size, unsigned 
      * Falls back to the condition variable if the wait gets long. */
     {   int spins;
         for (spins=0; spins < 2000000; spins++) {
-            if (__atomic_load_n(&hg->expectedRank, __ATOMIC_ACQUIRE) == rank)
+            if (HG_loadRank(hg) == rank32)
                 goto do_hash;
             if ((spins & 1023) == 1023) sched_yield();
     }   }
 #endif
     pthread_mutex_lock(&hg->mutex);
-    while (rank != HG_loadRank(hg))
+    while (rank32 != HG_loadRank(hg))
         pthread_cond_wait(&hg->cond, &hg->mutex);
     pthread_mutex_unlock(&hg->mutex);
 
-#if defined(__GNUC__)
+#if HG_SPIN
 do_hash:
 #endif
     /* this job holds the turnstile : hash outside the lock */
     XXH32_update(hg->xxh32, buf, size);
     pthread_mutex_lock(&hg->mutex);
-    HG_storeRank(hg, rank + 1);
+    HG_storeRank(hg, rank32 + 1);
     pthread_cond_broadcast(&hg->cond);
     pthread_mutex_unlock(&hg->mutex);
 }
