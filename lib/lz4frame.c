@@ -391,7 +391,10 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
         size_t const blockSize = LZ4F_getBlockSize(blockID);
         size_t const maxBuffered = blockSize - 1;
         size_t const bufferedSize = MIN(alreadyBuffered, maxBuffered);
-        size_t const maxSrcSize = srcSize + bufferedSize;
+        size_t const maxSrcSize =
+            (srcSize > (size_t)(-1) - bufferedSize)
+            ? (size_t)(-1)   /* saturate: avoid wrap-around on 32-bit platforms */
+            : srcSize + bufferedSize;
         unsigned const nbFullBlocks = (unsigned)(maxSrcSize / blockSize);
         size_t const partialBlockSize = maxSrcSize & (blockSize-1);
         size_t const lastBlockSize = flush ? partialBlockSize : 0;
