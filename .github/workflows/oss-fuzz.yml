@@ -23,14 +23,14 @@ jobs:
     steps:
     - name: Build Fuzzers
       id: build
-      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@f9bb0e53534a5bf5a8e08524d10ad7b3fdfb0c7b # 2026-08-11
       with:
         oss-fuzz-project-name: 'lz4'
         dry-run: false
         sanitizer: ${{ matrix.sanitizer }}
 
     - name: Run Fuzzers
-      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@f9bb0e53534a5bf5a8e08524d10ad7b3fdfb0c7b # 2026-08-11
       with:
         oss-fuzz-project-name: 'lz4'
         fuzz-seconds: 100
