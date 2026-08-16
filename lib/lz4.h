@@ -520,7 +520,8 @@ LZ4LIB_API int LZ4_decoderRingBufferSize(int maxBlockSize);
  *  - Synchronized mode :
  *    Decompression buffer size is _exactly_ the same as compression buffer size,
  *    and follows exactly same update rule (block boundaries at same positions),
- *    and decoding function is provided with exact decompressed size of each block (exception for last block of the stream),
+ *    and decoding function is provided with exact decompressed size of each block
+ *    (including the last block of the stream),
  *    _then_ decoding & encoding ring buffer can have any size, including small ones ( < 64 KB).
  *  - Decompression buffer is larger than encoding buffer, by a minimum of maxBlockSize more bytes.
  *    In which case, encoding and decoding buffers do not need to be synchronized,
