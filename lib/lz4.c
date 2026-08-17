@@ -1489,12 +1489,12 @@ int LZ4_compress_default(const char* src, char* dst, int srcSize, int dstCapacit
  * _continue() call without resetting it. */
 static int LZ4_compress_destSize_extState_internal(LZ4_stream_t* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration)
 {
-    void* const s = LZ4_initStream(state, sizeof (*state));
-    assert(s != NULL); (void)s;
-
     if (targetDstSize >= LZ4_compressBound(*srcSizePtr)) {  /* compression success is guaranteed */
+        /* no need to initialize @state here: LZ4_compress_fast_extState() does it */
         return LZ4_compress_fast_extState(state, src, dst, *srcSizePtr, targetDstSize, acceleration);
     } else {
+        void* const s = LZ4_initStream(state, sizeof (*state));
+        assert(s != NULL); (void)s;
         if (*srcSizePtr < LZ4_64Klimit) {
             return LZ4_compress_generic(&state->internal_donotuse, src, dst, *srcSizePtr, srcSizePtr, targetDstSize, fillOutput, byU16, noDict, noDictIssue, acceleration);
         } else {
