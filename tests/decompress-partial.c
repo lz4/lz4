@@ -33,13 +33,29 @@ int main(void)
   char outBuffer[BUFFER_SIZE];
   int cmpSize;
   int i;
+  int result;
 
   cmpSize = LZ4_compress_default(source, cmpBuffer, srcLen, BUFFER_SIZE);
 
+  /* Test full size verification with various bounded capacities */
   for (i = cmpSize; i < cmpSize + 10; ++i) {
-    int result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
-    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, srcLen)) {
-      printf("test decompress-partial error \n");
+    result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
+    if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, (size_t)srcLen)) {
+      printf("test decompress-partial full length error \n");
+      return -1;
+    }
+  }
+
+  /* Test all target output prefix lengths from 1 to srcLen */
+  for (i = 1; i <= srcLen; ++i) {
+    memset(outBuffer, 0, sizeof(outBuffer));
+    result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, cmpSize, i, BUFFER_SIZE);
+    if (result < i) {
+      printf("test decompress-partial under-decompressed error at target=%d, got=%d\n", i, result);
+      return -1;
+    }
+    if (memcmp(source, outBuffer, (size_t)i) != 0) {
+      printf("test decompress-partial data mismatch error at target=%d\n", i);
       return -1;
     }
   }
