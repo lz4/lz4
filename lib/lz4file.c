@@ -93,7 +93,7 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
 
     /* Determine buffer size based on block size */
     { const size_t blockSize = LZ4F_getBlockSize(frameInfo.blockSizeID);
-      if (blockSize == 0) {
+      if (LZ4F_isError(blockSize)) {
           RETURN_ERROR(maxBlockSize_invalid);
       }
       readFile->srcBufMaxSize = blockSize;
@@ -261,7 +261,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   /* Validate block size */
   { LZ4F_blockSizeID_t const blockSizeID = prefsPtr ? prefsPtr->frameInfo.blockSizeID : LZ4F_default;
     blockSize = LZ4F_getBlockSize(blockSizeID);
-    if (blockSize == 0) {
+    if (LZ4F_isError(blockSize)) {
         RETURN_ERROR(maxBlockSize_invalid);
   } }
 
