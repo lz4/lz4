@@ -728,6 +728,77 @@ static int unitTests(U32 seed, double compressibility)
         cctx = NULL;
     }
 
+    /* blockSizeID validation tests */
+    {   int const invalidBSID[] = { 1, 2, 3, 8, 9 };
+        int const validBSID[] = { 0 /* == default */, 4, 5, 6, 7 };
+        size_t const srcSize = 256 KB;
+        size_t nb;
+        LZ4F_preferences_t bsidPrefs;
+
+        assert(srcSize <= COMPRESSIBLE_NOISE_LENGTH);
+        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+
+        DISPLAYLEVEL(3, "LZ4F_compressBegin rejects invalid blockSizeID : ");
+        for (nb = 0; nb < sizeof(invalidBSID) / sizeof(invalidBSID[0]); nb++) {
+            memset(&bsidPrefs, 0, sizeof(bsidPrefs));
+            bsidPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)invalidBSID[nb];
+            {   size_t const r = LZ4F_compressBegin(cctx, compressedBuffer, cBuffSize, &bsidPrefs);
+                if (!LZ4F_isError(r)) {
+                    DISPLAYLEVEL(3, "blockSizeID %i not rejected ! \n", invalidBSID[nb]);
+                    goto _output_error;
+        }   }   }
+        DISPLAYLEVEL(3, "OK \n");
+
+        DISPLAYLEVEL(3, "valid blockSizeID still accepted : ");
+        for (nb = 0; nb < sizeof(validBSID) / sizeof(validBSID[0]); nb++) {
+            memset(&bsidPrefs, 0, sizeof(bsidPrefs));
+            bsidPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)validBSID[nb];
+            CHECK( LZ4F_compressFrame(compressedBuffer, cBuffSize,
+                                      CNBuffer, srcSize, &bsidPrefs) );
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
+        DISPLAYLEVEL(3, "failed LZ4F_compressBegin preserves cctx : ");
+        {   BYTE* const ostart = (BYTE*)compressedBuffer;
+            BYTE* op = ostart;
+            size_t cErr;
+
+            memset(&bsidPrefs, 0, sizeof(bsidPrefs));
+            bsidPrefs.frameInfo.blockSizeID = LZ4F_max64KB;
+            bsidPrefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+            CHECK_V(cErr, LZ4F_compressBegin(cctx, op, cBuffSize, &bsidPrefs));
+            op += cErr;
+
+            memset(&bsidPrefs, 0, sizeof(bsidPrefs));   /* must differ by more than blockSizeID */
+            bsidPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)3;   /* invalid */
+            cErr = LZ4F_compressBegin(cctx, op, cBuffSize, &bsidPrefs);
+            if (!LZ4F_isError(cErr)) goto _output_error;
+
+            /* resume the frame started above */
+            CHECK_V(cErr, LZ4F_compressUpdate(cctx, op, cBuffSize - (size_t)(op-ostart),
+                                              CNBuffer, srcSize, NULL));
+            op += cErr;
+            CHECK_V(cErr, LZ4F_compressEnd(cctx, op, cBuffSize - (size_t)(op-ostart), NULL));
+            op += cErr;
+
+            {   size_t iSize = (size_t)(op - ostart);
+                size_t decodedSize = COMPRESSIBLE_NOISE_LENGTH;
+                LZ4F_decompressionContext_t dctx;
+                CHECK( LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION) );
+                CHECK_V(cErr, LZ4F_decompress(dctx, decodedBuffer, &decodedSize, ostart, &iSize, NULL));
+                CHECK( LZ4F_freeDecompressionContext(dctx) );
+                if (cErr != 0) goto _output_error;   /* frame must be entirely decoded */
+                if (decodedSize != srcSize) goto _output_error;
+                {   U64 const crcDest = XXH64(decodedBuffer, decodedSize, extCrcSeed);
+                    U64 const crcSrc = XXH64(CNBuffer, srcSize, extCrcSeed);
+                    if (crcDest != crcSrc) goto _output_error;
+        }   }   }
+        DISPLAYLEVEL(3, "OK \n");
+
+        CHECK( LZ4F_freeCompressionContext(cctx) );
+        cctx = NULL;
+    }
+
     /* dictID tests */
     {   size_t cErr;
         U32 const dictID = 0x99;
