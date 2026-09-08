@@ -734,9 +734,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
 
     /* cctx Management */
     {   U16 const ctxTypeID = (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;
-        int requiredSize = ctxTypeID_to_size(ctxTypeID);
-        int allocatedSize = ctxTypeID_to_size(cctx->lz4CtxAlloc);
-        if (allocatedSize < requiredSize) {
+        if (cctx->lz4CtxAlloc < ctxTypeID) {
             /* not enough space allocated */
             LZ4F_free(cctx->lz4CtxPtr, cctx->cmem);
             if (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
