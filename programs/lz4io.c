@@ -2437,7 +2437,7 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
 
     /* Close input */
     fclose(finput);
-    if (prefs->removeSrcFile) {  /* --rm */
+    if (!result && prefs->removeSrcFile) {  /* --rm */
         if (remove(input_filename))
             END_PROCESS(45, "Remove error : %s: %s", input_filename, strerror(errno));
     }
