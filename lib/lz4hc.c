@@ -88,7 +88,12 @@ typedef struct {
     lz4hc_strat_e strat;
     int nbSearches;
     U32 targetLength;
-} cParams_t;
+}
+#if defined(__FILC__)
+/* FilC checks aggregate copies against pointer-word alignment; the 12-byte table entries at odd indices are only 4-byte aligned. */
+__attribute__((aligned(8)))
+#endif
+cParams_t;
 static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
     { lz4mid,    2, 16 },  /* 0, unused */
     { lz4mid,    2, 16 },  /* 1, unused */
