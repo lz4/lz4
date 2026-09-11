@@ -46,6 +46,13 @@ LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 BUILD_SHARED:=yes
 BUILD_STATIC:=yes
 
+# Optional Clang -fbounds-safety (OFF by default; inert macros otherwise)
+ENABLE_FBOUNDS_SAFETY ?= 0
+ifeq ($(ENABLE_FBOUNDS_SAFETY),1)
+CPPFLAGS += -DLZ4_SUPPORT_FBOUNDS_SAFETY
+CFLAGS   += -fbounds-safety
+endif
+
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 USERCFLAGS:= -O3 $(CFLAGS)
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
@@ -235,6 +242,7 @@ install: lib liblz4.pc
   endif
 	@echo Installing headers in $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) lz4.h $(DESTDIR)$(includedir)/lz4.h
+	$(INSTALL_DATA) lz4_bounds_safety.h $(DESTDIR)$(includedir)/lz4_bounds_safety.h
 	$(INSTALL_DATA) lz4hc.h $(DESTDIR)$(includedir)/lz4hc.h
 	$(INSTALL_DATA) lz4frame.h $(DESTDIR)$(includedir)/lz4frame.h
 	@echo lz4 libraries installed
@@ -252,6 +260,7 @@ uninstall:
   endif
 	$(RM) $(DESTDIR)$(libdir)/liblz4.a
 	$(RM) $(DESTDIR)$(includedir)/lz4.h
+	$(RM) $(DESTDIR)$(includedir)/lz4_bounds_safety.h
 	$(RM) $(DESTDIR)$(includedir)/lz4hc.h
 	$(RM) $(DESTDIR)$(includedir)/lz4frame.h
 	$(RM) $(DESTDIR)$(includedir)/lz4frame_static.h
