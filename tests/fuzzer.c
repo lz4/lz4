@@ -1305,7 +1305,14 @@ static void FUZ_unitTests(int compressionLevel)
             {   char tmp_buffer[240] = { 0 };
                 FUZ_CHECKTEST( LZ4_saveDict(ctx, tmp_buffer, sizeof(tmp_buffer)) != 0,
                 "LZ4_saveDict() can't save anything since compression hasn't started");
-        }   }
+            }
+
+            /* Invalid negative sizes must fail instead of wrapping to 64 KB. */
+            FUZ_CHECKTEST( LZ4_loadDict(ctx, testInput, 64 KB) <= 0,
+            "LZ4_loadDict() failed to prepare saveDict negative-size test");
+            FUZ_CHECKTEST( LZ4_saveDict(ctx, testVerify, -1) != 0,
+            "LZ4_saveDict() must reject negative dictionary sizes");
+        }
         DISPLAYLEVEL(3, "OK \n");
 
         /* ring buffer test */
