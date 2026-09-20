@@ -479,7 +479,7 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #ifndef LZ4_FAST_DEC_LOOP
 #  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
 #    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__)
+#  elif defined(__aarch64__) || defined(__wasm32__) || defined(__wasm64__)
 #    define LZ4_FAST_DEC_LOOP 1
 #  else
 #    define LZ4_FAST_DEC_LOOP 0
@@ -511,7 +511,7 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
 }
 
 
-#ifdef __aarch64__
+#if defined(__aarch64__) || defined(__wasm32__) || defined(__wasm64__)
 /* customized variant of memcpy, which can overwrite up to 64 bytes beyond dstEnd */
 LZ4_FORCE_INLINE void
 LZ4_wildCopy64(void* dstPtr, const void* srcPtr, void* dstEnd)
@@ -2105,7 +2105,7 @@ LZ4_decompress_generic(
 
                 /* copy literals */
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
-              #ifdef __aarch64__
+              #if defined(__aarch64__) || defined(__wasm32__) || defined(__wasm64__)
                 if ((cpy>oend-64) || (ip+length>iend-64)) { goto safe_literal_copy; }
                 LZ4_wildCopy64(op, ip, cpy);
               #else
@@ -2208,7 +2208,7 @@ LZ4_decompress_generic(
             assert((op <= oend) && (oend-op >= 64));
             if (unlikely(offset<16)) {
                 LZ4_memcpy_using_offset(op, match, cpy, offset);
-    #ifdef __aarch64__
+    #if defined(__aarch64__) || defined(__wasm32__) || defined(__wasm64__)
             } else if (offset >= 64) {
                 LZ4_wildCopy64(op, match, cpy);
     #endif
