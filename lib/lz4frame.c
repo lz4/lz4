@@ -435,11 +435,18 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
 {
     LZ4F_preferences_t prefs;
     LZ4F_compressOptions_t options;
-    BYTE* const dstStart = (BYTE*) dstBuffer;
-    BYTE* dstPtr = dstStart;
-    BYTE* const dstEnd = dstStart + dstCapacity;
+    BYTE* dstStart;
+    BYTE* dstPtr;
+    BYTE* dstEnd;
 
     DEBUGLOG(4, "LZ4F_compressFrame_usingCDict (srcSize=%u)", (unsigned)srcSize);
+    RETURN_ERROR_IF(cctx == NULL, parameter_null);
+    RETURN_ERROR_IF(dstBuffer == NULL, parameter_null);
+    RETURN_ERROR_IF(srcBuffer == NULL && srcSize > 0, srcPtr_wrong);
+
+    dstStart = (BYTE*) dstBuffer;
+    dstPtr = dstStart;
+    dstEnd = dstStart + dstCapacity;
     if (preferencesPtr!=NULL)
         prefs = *preferencesPtr;
     else
@@ -710,10 +717,16 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
                           const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_preferences_t const prefNull = LZ4F_INIT_PREFERENCES;
-    BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* dstPtr = dstStart;
+    BYTE* dstStart;
+    BYTE* dstPtr;
 
+    RETURN_ERROR_IF(cctx == NULL, parameter_null);
+    RETURN_ERROR_IF(dstBuffer == NULL, parameter_null);
     RETURN_ERROR_IF(dstCapacity < maxFHSize, dstMaxSize_tooSmall);
+
+    dstStart = (BYTE*)dstBuffer;
+    dstPtr = dstStart;
+
     if (preferencesPtr == NULL) preferencesPtr = &prefNull;
     cctx->prefs = *preferencesPtr;
     DEBUGLOG(5, "LZ4F_compressBegin_internal: Independent_blocks=%u", cctx->prefs.frameInfo.blockMode);
@@ -1011,14 +1024,25 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
                      const LZ4F_compressOptions_t* compressOptionsPtr,
                      LZ4F_BlockCompressMode_e blockCompression)
   {
-    size_t const blockSize = cctxPtr->maxBlockSize;
-    const BYTE* srcPtr = (const BYTE*)srcBuffer;
-    const BYTE* const srcEnd = srcSize ? (assert(srcPtr!=NULL), srcPtr + srcSize) : srcPtr;
-    BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* dstPtr = dstStart;
+    size_t blockSize;
+    const BYTE* srcPtr;
+    const BYTE* srcEnd;
+    BYTE* dstStart;
+    BYTE* dstPtr;
     LZ4F_lastBlockStatus lastBlockCompressed = notDone;
-    compressFunc_t const compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel, blockCompression);
+    compressFunc_t compress;
     size_t bytesWritten;
+
+    RETURN_ERROR_IF(cctxPtr == NULL, parameter_null);
+    RETURN_ERROR_IF(dstBuffer == NULL && dstCapacity > 0, parameter_null);
+    RETURN_ERROR_IF(srcBuffer == NULL && srcSize > 0, srcPtr_wrong);
+
+    blockSize = cctxPtr->maxBlockSize;
+    srcPtr = (const BYTE*)srcBuffer;
+    srcEnd = srcSize ? (assert(srcPtr!=NULL), srcPtr + srcSize) : srcPtr;
+    dstStart = (BYTE*)dstBuffer;
+    dstPtr = dstStart;
+    compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel, blockCompression);
     DEBUGLOG(4, "LZ4F_compressUpdate (srcSize=%zu)", srcSize);
 
     RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);   /* state must be initialized and waiting for next block */
@@ -1176,16 +1200,21 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
                   void* dstBuffer, size_t dstCapacity,
             const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* dstPtr = dstStart;
+    BYTE* dstStart;
+    BYTE* dstPtr;
     compressFunc_t compress;
 
+    RETURN_ERROR_IF(cctxPtr == NULL, parameter_null);
     DEBUGLOG(5, "LZ4F_flush: %zu buffered bytes (saved dict size = %i) (dstCapacity=%u)",
             cctxPtr->tmpInSize, (int)(cctxPtr->tmpIn - cctxPtr->tmpBuff), (unsigned)dstCapacity);
     if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
+    RETURN_ERROR_IF(dstBuffer == NULL, parameter_null);
     RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);
     RETURN_ERROR_IF(dstCapacity < (cctxPtr->tmpInSize + BHSize + BFSize), dstMaxSize_tooSmall);
     (void)compressOptionsPtr;   /* not useful (yet) */
+
+    dstStart = (BYTE*)dstBuffer;
+    dstPtr = dstStart;
 
     /* select compression function */
     compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel, cctxPtr->blockCompressMode);
@@ -1225,10 +1254,17 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
                         void* dstBuffer, size_t dstCapacity,
                   const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* dstPtr = dstStart;
+    BYTE* dstStart;
+    BYTE* dstPtr;
+    size_t flushSize;
 
-    size_t const flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
+    RETURN_ERROR_IF(cctxPtr == NULL, parameter_null);
+    RETURN_ERROR_IF(dstBuffer == NULL, parameter_null);
+
+    dstStart = (BYTE*)dstBuffer;
+    dstPtr = dstStart;
+
+    flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
     DEBUGLOG(5,"LZ4F_compressEnd: dstCapacity=%u", (unsigned)dstCapacity);
     FORWARD_IF_ERROR(flushSize);
     dstPtr += flushSize;
@@ -1354,6 +1390,7 @@ size_t LZ4F_dctx_size(const LZ4F_dctx* dctx) {
 void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
 {
     DEBUGLOG(5, "LZ4F_resetDecompressionContext");
+    if (dctx == NULL) return;
     dctx->dStage = dstage_getFrameHeader;
     dctx->dict = NULL;
     dctx->dictSize = 0;
@@ -1513,7 +1550,7 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
                                    LZ4F_frameInfo_t* frameInfoPtr,
                              const void* srcBuffer, size_t* srcSizePtr)
 {
-    assert(dctx != NULL);
+    RETURN_ERROR_IF(dctx == NULL, parameter_null);
     RETURN_ERROR_IF(frameInfoPtr == NULL, parameter_null);
     RETURN_ERROR_IF(srcSizePtr == NULL, parameter_null);
 
@@ -1647,25 +1684,35 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
     LZ4F_decompressOptions_t optionsNull;
-    const BYTE* const srcStart = (const BYTE*)srcBuffer;
-    const BYTE* const srcEnd = srcStart + *srcSizePtr;
-    const BYTE* srcPtr = srcStart;
-    BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* const dstEnd = dstStart ? dstStart + *dstSizePtr : NULL;
-    BYTE* dstPtr = dstStart;
+    const BYTE* srcStart;
+    const BYTE* srcEnd;
+    const BYTE* srcPtr;
+    BYTE* dstStart;
+    BYTE* dstEnd;
+    BYTE* dstPtr;
     const BYTE* selectedIn = NULL;
     unsigned doAnotherStage = 1;
     size_t nextSrcSizeHint = 1;
 
+    RETURN_ERROR_IF(dctx == NULL, parameter_null);
+    RETURN_ERROR_IF(dstSizePtr == NULL, parameter_null);
+    RETURN_ERROR_IF(srcSizePtr == NULL, parameter_null);
+    RETURN_ERROR_IF(dstBuffer == NULL && *dstSizePtr > 0, parameter_null);
+    RETURN_ERROR_IF(srcBuffer == NULL && *srcSizePtr > 0, srcPtr_wrong);
+
+    srcStart = (const BYTE*)srcBuffer;
+    srcEnd = srcStart + *srcSizePtr;
+    srcPtr = srcStart;
+    dstStart = (BYTE*)dstBuffer;
+    dstEnd = dstStart ? dstStart + *dstSizePtr : NULL;
+    dstPtr = dstStart;
 
     DEBUGLOG(5, "LZ4F_decompress: src[%p](%u) => dst[%p](%u)",
             srcBuffer, (unsigned)*srcSizePtr, dstBuffer, (unsigned)*dstSizePtr);
-    if (dstBuffer == NULL) assert(*dstSizePtr == 0);
     MEM_INIT(&optionsNull, 0, sizeof(optionsNull));
     if (decompressOptionsPtr==NULL) decompressOptionsPtr = &optionsNull;
     *srcSizePtr = 0;
     *dstSizePtr = 0;
-    assert(dctx != NULL);
     dctx->skipChecksum |= (decompressOptionsPtr->skipChecksums != 0); /* once set, disable for the remainder of the frame */
 
     /* behaves as a state machine */
@@ -2157,6 +2204,7 @@ size_t LZ4F_decompress_usingDict(LZ4F_dctx* dctx,
                        const void* dict, size_t dictSize,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
+    RETURN_ERROR_IF(dctx == NULL, parameter_null);
     if (dctx->dStage <= dstage_init) {
         dctx->dict = (const BYTE*)dict;
         dctx->dictSize = dictSize;

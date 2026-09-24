@@ -351,6 +351,98 @@ static int bug1227(void)
     return 0;
 }
 
+static int test_null_params(void)
+{
+    LZ4F_cctx* cctx = NULL;
+    LZ4F_dctx* dctx = NULL;
+    char buf[128];
+    size_t srcSize = sizeof(buf);
+    size_t dstSize = sizeof(buf);
+    LZ4F_frameInfo_t frameInfo;
+    size_t res;
+
+    DISPLAYLEVEL(3, "test null parameter guards : ");
+
+    /* decompress NULL checks */
+    CONTROL(!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION)));
+
+    /* dctx == NULL */
+    res = LZ4F_decompress(NULL, buf, &dstSize, buf, &srcSize, NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* dstSizePtr == NULL */
+    res = LZ4F_decompress(dctx, buf, NULL, buf, &srcSize, NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* srcSizePtr == NULL */
+    res = LZ4F_decompress(dctx, buf, &dstSize, buf, NULL, NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* dstBuffer == NULL with dstSize > 0 */
+    res = LZ4F_decompress(dctx, NULL, &dstSize, buf, &srcSize, NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* srcBuffer == NULL with srcSize > 0 */
+    dstSize = sizeof(buf);
+    res = LZ4F_decompress(dctx, buf, &dstSize, NULL, &srcSize, NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_srcPtr_wrong);
+
+    /* decompress_usingDict with NULL dctx */
+    res = LZ4F_decompress_usingDict(NULL, buf, &dstSize, buf, &srcSize, buf, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* resetDecompressionContext with NULL dctx (must not crash) */
+    LZ4F_resetDecompressionContext(NULL);
+
+    /* getFrameInfo checks */
+    res = LZ4F_getFrameInfo(NULL, &frameInfo, buf, &srcSize);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    res = LZ4F_getFrameInfo(dctx, NULL, buf, &srcSize);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    res = LZ4F_getFrameInfo(dctx, &frameInfo, buf, NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    LZ4F_freeDecompressionContext(dctx);
+
+    /* compress NULL checks */
+    CONTROL(!LZ4F_isError(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION)));
+
+    /* compressBegin */
+    res = LZ4F_compressBegin(NULL, buf, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    res = LZ4F_compressBegin(cctx, NULL, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* compressUpdate */
+    res = LZ4F_compressUpdate(NULL, buf, sizeof(buf), buf, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    res = LZ4F_compressUpdate(cctx, NULL, sizeof(buf), buf, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    res = LZ4F_compressUpdate(cctx, buf, sizeof(buf), NULL, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_srcPtr_wrong);
+
+    /* compressEnd */
+    res = LZ4F_compressEnd(NULL, buf, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    res = LZ4F_compressEnd(cctx, NULL, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    /* flush */
+    res = LZ4F_flush(NULL, buf, sizeof(buf), NULL);
+    CONTROL(LZ4F_isError(res) && LZ4F_getErrorCode(res) == LZ4F_ERROR_parameter_null);
+
+    LZ4F_freeCompressionContext(cctx);
+
+    DISPLAYLEVEL(3, "OK \n");
+    return 0;
+}
+
 #define CHECK_V(v,f) v = f; if (LZ4F_isError(v)) { fprintf(stderr, "%s \n", LZ4F_getErrorName(v)); goto _output_error; }
 #define CHECK(f)   { LZ4F_errorCode_t const CHECK_V(err_ , f); }
 
@@ -1001,6 +1093,8 @@ static int unitTests(U32 seed, double compressibility)
     DISPLAYLEVEL(3, "check bug1227: reused dctx after error => ");
     if (bug1227()) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
+
+    if (test_null_params()) goto _output_error;
 
     DISPLAYLEVEL(3, "Skippable frame test : \n");
     {   size_t decodedBufferSize = COMPRESSIBLE_NOISE_LENGTH;
