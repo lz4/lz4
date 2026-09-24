@@ -124,6 +124,7 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
     if (fp == NULL || lz4fRead == NULL) {
         RETURN_ERROR(parameter_null);
     }
+    *lz4fRead = NULL;
 
     /* Allocate read file structure */
     readFile = (LZ4_readFile_t*)calloc(1, sizeof(LZ4_readFile_t));
@@ -257,6 +258,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
 
   if (fp == NULL || lz4fWrite == NULL)
       RETURN_ERROR(parameter_null);
+  *lz4fWrite = NULL;
 
   /* Validate block size */
   { LZ4F_blockSizeID_t const blockSizeID = prefsPtr ? prefsPtr->frameInfo.blockSizeID : LZ4F_default;
@@ -285,7 +287,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   /* Initialize compression context */
   { LZ4F_errorCode_t const status = LZ4F_createCompressionContext(&writeFile->cctxPtr, LZ4F_VERSION);
     if (LZ4F_isError(status)) {
-        freeAndNullWriteFile(lz4fWrite);
+        freeAndNullWriteFile(&writeFile);
         return status;
   } }
 
@@ -354,6 +356,8 @@ LZ4F_errorCode_t LZ4F_writeClose(LZ4_writeFile_t* lz4fWrite)
     if (ret != fwrite(lz4fWrite->dstBuf, 1, ret, lz4fWrite->fp)) {
       ret = returnErrorCode(LZ4F_ERROR_io_write);
     }
+  } else {
+    ret = lz4fWrite->errCode;
   }
 
 cleanup:
