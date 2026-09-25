@@ -1125,6 +1125,7 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
 typedef struct {
     const LZ4F_preferences_t* prefs;
     const LZ4F_CDict* cdict;
+    size_t blockSize; /* if non-zero, emit one frame block per blockSize bytes (requires prefs->autoFlush) */
 } LZ4IO_CfcParameters;
 
 static size_t LZ4IO_compressFrameChunk(const void* params,
@@ -1149,13 +1150,24 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
         if (LZ4F_isError(whr))
             END_PROCESS(53, "error initializing LZ4F compression context");
     }
-    /* let's now compress, overwriting unused header */
-    {   size_t const cSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, NULL);
-        if (LZ4F_isError(cSize))
-            END_PROCESS(55, "error compressing with LZ4F_compressUpdate");
-
+    /* let's now compress, overwriting unused header.
+     * feed the input one blockSize at a time: with autoFlush set, each update
+     * produces one frame block, so block sizes smaller than the declared
+     * blockSizeID (a valid frame layout) are honored. */
+    {   size_t const blockSize = (cfcp->blockSize && cfcp->blockSize < srcSize) ? cfcp->blockSize : srcSize;
+        size_t cTotal = 0;
+        size_t pos = 0;
+        while (pos < srcSize) {
+            size_t const inSize = MIN(blockSize, srcSize - pos);
+            size_t const cSize = LZ4F_compressUpdate(cctx, (char*)dst + cTotal, dstCapacity - cTotal,
+                                                    (const char*)src + pos, inSize, NULL);
+            if (LZ4F_isError(cSize))
+                END_PROCESS(55, "error compressing with LZ4F_compressUpdate");
+            cTotal += cSize;
+            pos += inSize;
+        }
         LZ4F_freeCompressionContext(cctx);
-        return (size_t) cSize;
+        return cTotal;
     }
 }
 
@@ -1178,6 +1190,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     void* const dstBuffer = ress->dstBuffer;
     const size_t dstBufferSize = ress->dstBufferSize;
     const size_t chunkSize = 4 MB;  /* each job should be "sufficiently large" */
+    const size_t blockSize = io_prefs->blockSize;  /* requested block size, may be smaller than the blockSizeID class */
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
@@ -1206,7 +1219,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     filesize += readSize;
 
     /* single-block file */
-    if (readSize < chunkSize) {
+    if (readSize < chunkSize && (blockSize == 0 || readSize <= blockSize)) {
         /* Compress in single pass */
         size_t const cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress->cdict, &prefs);
         if (LZ4F_isError(cSize))
@@ -1241,6 +1254,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         }
         cfcp.prefs = &prefs;
         cfcp.cdict = ress->cdict;
+        cfcp.blockSize = blockSize;
         rjd.tPool = ress->tPool;
         rjd.wpool = ress->wPool;
         rjd.fin = srcFile;
@@ -1254,6 +1268,14 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         rjd.fout = dstFile;
         rjd.wr = &wr;
         rjd.maxCBlockSize = LZ4F_compressFrameBound(chunkSize, &prefs);
+        if (blockSize && blockSize < 64 KB) {
+            /* LZ4F_compressFrameBound() assumes blockSizeID-sized blocks;
+             * account for the per-block overhead (4-byte size + optional 4-byte checksum)
+             * of the more numerous smaller blocks */
+            size_t const nbBlocks = chunkSize / blockSize + 1;
+            size_t const smallBlocksBound = chunkSize + nbBlocks * 8 + 64;
+            if (smallBlocksBound > rjd.maxCBlockSize) rjd.maxCBlockSize = smallBlocksBound;
+        }
 
         /* process frame checksum externally */
         if (checksum) {
@@ -1303,8 +1325,11 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
             rjd.totalReadSize = readSize;
             rjd.blockNb = 1;
             if (prefixBuffer) {
-                assert(readSize >= 64 KB);
-                memcpy(prefixBuffer, (char*)srcBuffer + readSize - 64 KB, 64 KB);
+                if (readSize >= 64 KB) {
+                    memcpy(prefixBuffer, (char*)srcBuffer + readSize - 64 KB, 64 KB);
+                }
+                /* else: single-chunk input (reachable with a custom small blockSize),
+                 * no further chunk will consume the prefix */
             }
 
             /* Start the job chain */
