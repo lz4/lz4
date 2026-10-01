@@ -1548,8 +1548,12 @@ static size_t LZ4_streamHC_t_alignment(void)
  * in which case its size and alignment have already been validate */
 int LZ4_compress_HC_extStateHC_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
-    LZ4HC_CCtx_internal* const ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
+    LZ4HC_CCtx_internal* ctx;
+    if (state == NULL) return 0;
+    if (src == NULL && srcSize > 0) return 0;
+    if (dst == NULL && dstCapacity > 0) return 0;
     if (!LZ4_isAligned(state, LZ4_streamHC_t_alignment())) return 0;
+    ctx = &((LZ4_streamHC_t*)state)->internal_donotuse;
     LZ4_resetStreamHC_fast((LZ4_streamHC_t*)state, compressionLevel);
     LZ4HC_init_internal (ctx, (const BYTE*)src);
     if (dstCapacity < LZ4_compressBound(srcSize))
@@ -1586,7 +1590,11 @@ int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, in
 /* state is presumed sized correctly (>= sizeof(LZ4_streamHC_t)) */
 int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* sourceSizePtr, int targetDestSize, int cLevel)
 {
-    LZ4_streamHC_t* const ctx = LZ4_initStreamHC(state, sizeof(*ctx));
+    LZ4_streamHC_t* ctx;
+    if (sourceSizePtr == NULL) return 0;
+    if (source == NULL && *sourceSizePtr > 0) return 0;
+    if (dest == NULL && targetDestSize > 0) return 0;
+    ctx = LZ4_initStreamHC(state, sizeof(*ctx));
     if (ctx==NULL) return 0;   /* init failure */
     LZ4HC_init_internal(&ctx->internal_donotuse, (const BYTE*) source);
     LZ4_setCompressionLevel(ctx, cLevel);
@@ -1643,7 +1651,9 @@ void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 
 void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
-    LZ4HC_CCtx_internal* const s = &LZ4_streamHCPtr->internal_donotuse;
+    LZ4HC_CCtx_internal* s;
+    if (LZ4_streamHCPtr == NULL) return;
+    s = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(5, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (s->dirty) {
         LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
@@ -1659,6 +1669,7 @@ void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
 
 void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
+    if (LZ4_streamHCPtr == NULL) return;
     DEBUGLOG(5, "LZ4_setCompressionLevel(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (compressionLevel < 1) compressionLevel = LZ4HC_CLEVEL_DEFAULT;
     if (compressionLevel > LZ4HC_CLEVEL_MAX) compressionLevel = LZ4HC_CLEVEL_MAX;
@@ -1667,6 +1678,7 @@ void LZ4_setCompressionLevel(LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
 
 void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor)
 {
+    if (LZ4_streamHCPtr == NULL) return;
     LZ4_streamHCPtr->internal_donotuse.favorDecSpeed = (favor!=0);
 }
 
@@ -1675,8 +1687,12 @@ void LZ4_favorDecompressionSpeed(LZ4_streamHC_t* LZ4_streamHCPtr, int favor)
 int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
               const char* dictionary, int dictSize)
 {
-    LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    LZ4HC_CCtx_internal* ctxPtr;
     cParams_t cp;
+    int cLevel;
+    if (LZ4_streamHCPtr == NULL) return 0;
+    if (dictionary == NULL || dictSize <= 0) return 0;
+    ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(4, "LZ4_loadDictHC(ctx:%p, dict:%p, dictSize:%d, clevel=%d)", LZ4_streamHCPtr, dictionary, dictSize, ctxPtr->compressionLevel);
     assert(dictSize >= 0);
     assert(LZ4_streamHCPtr != NULL);
@@ -1685,11 +1701,10 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
         dictSize = 64 KB;
     }
     /* need a full initialization, there are bad side-effects when using resetFast() */
-    {   int const cLevel = ctxPtr->compressionLevel;
-        LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
-        LZ4_setCompressionLevel(LZ4_streamHCPtr, cLevel);
-        cp = LZ4HC_getCLevelParams(cLevel);
-    }
+    cLevel = ctxPtr->compressionLevel;
+    LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+    LZ4_setCompressionLevel(LZ4_streamHCPtr, cLevel);
+    cp = LZ4HC_getCLevelParams(cLevel);
     LZ4HC_init_internal (ctxPtr, (const BYTE*)dictionary);
     ctxPtr->end = (const BYTE*)dictionary + dictSize;
     if (cp.strat == lz4mid) {
@@ -1701,6 +1716,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
 }
 
 void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC_t *dictionary_stream) {
+    if (working_stream == NULL) return;
     working_stream->internal_donotuse.dictCtx = dictionary_stream != NULL ? &(dictionary_stream->internal_donotuse) : NULL;
 }
 
@@ -1732,7 +1748,11 @@ LZ4_compressHC_continue_generic (LZ4_streamHC_t* LZ4_streamHCPtr,
                                  int* srcSizePtr, int dstCapacity,
                                  limitedOutput_directive limit)
 {
-    LZ4HC_CCtx_internal* const ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
+    LZ4HC_CCtx_internal* ctxPtr;
+    if (LZ4_streamHCPtr == NULL || srcSizePtr == NULL) return 0;
+    if (src == NULL && *srcSizePtr > 0) return 0;
+    if (dst == NULL && dstCapacity > 0) return 0;
+    ctxPtr = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(5, "LZ4_compressHC_continue_generic(ctx=%p, src=%p, srcSize=%d, limit=%d)",
                 LZ4_streamHCPtr, src, *srcSizePtr, limit);
     assert(ctxPtr != NULL);
@@ -1790,18 +1810,20 @@ int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const ch
  */
 int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictSize)
 {
-    LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
-    int const prefixSize = (int)(streamPtr->end - streamPtr->prefixStart);
+    LZ4HC_CCtx_internal* streamPtr;
+    int prefixSize;
+    if (LZ4_streamHCPtr == NULL || safeBuffer == NULL || dictSize <= 0) return 0;
+    streamPtr = &LZ4_streamHCPtr->internal_donotuse;
+    prefixSize = (int)(streamPtr->end - streamPtr->prefixStart);
     DEBUGLOG(5, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
     assert(prefixSize >= 0);
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 4) dictSize = 0;
     if (dictSize > prefixSize) dictSize = prefixSize;
-    if (safeBuffer == NULL) assert(dictSize == 0); /* a NULL buffer with !0 size is invalid */
     if (dictSize > 0)
         LZ4_memmove(safeBuffer, streamPtr->end - dictSize, (size_t)dictSize);
     {   U32 const endIndex = (U32)(streamPtr->end - streamPtr->prefixStart) + streamPtr->dictLimit;
-        streamPtr->end = (safeBuffer == NULL) ? NULL : (const BYTE*)safeBuffer + dictSize;
+        streamPtr->end = (const BYTE*)safeBuffer + dictSize;
         streamPtr->prefixStart = (const BYTE*)safeBuffer;
         streamPtr->dictLimit = endIndex - (U32)dictSize;
         streamPtr->lowLimit = endIndex - (U32)dictSize;

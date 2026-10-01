@@ -1822,6 +1822,65 @@ static void FUZ_unitTests(int compressionLevel)
     }
     DISPLAYLEVEL(3, " OK \n");
 
+    /* NULL pointer validation tests */
+    DISPLAYLEVEL(3, "NULL pointer rejection tests : ");
+    {   char dummy[64] = "Hello LZ4";
+        char out[128];
+        int srcSize = 9;
+        LZ4_stream_t* const stream = LZ4_createStream();
+        LZ4_streamHC_t* const streamHC = LZ4_createStreamHC();
+        LZ4_streamDecode_t* const streamDecode = LZ4_createStreamDecode();
+
+        assert(stream != NULL);
+        assert(streamHC != NULL);
+        assert(streamDecode != NULL);
+
+        /* NULL stream/ctx resets & setters */
+        LZ4_resetStream(NULL);
+        LZ4_resetStream_fast(NULL);
+        LZ4_resetStreamHC(NULL, compressionLevel);
+        LZ4_resetStreamHC_fast(NULL, compressionLevel);
+        LZ4_setCompressionLevel(NULL, compressionLevel);
+        LZ4_favorDecompressionSpeed(NULL, 1);
+        LZ4_attach_dictionary(NULL, NULL);
+        LZ4_attach_HC_dictionary(NULL, NULL);
+
+        /* LZ4 compression NULL checks */
+        FUZ_CHECKTEST(LZ4_compress_fast_extState(NULL, dummy, out, 9, sizeof(out), 1) != 0, "LZ4_compress_fast_extState should fail on NULL state");
+        FUZ_CHECKTEST(LZ4_compress_fast_extState(stream, NULL, out, 9, sizeof(out), 1) != 0, "LZ4_compress_fast_extState should fail on NULL source");
+        FUZ_CHECKTEST(LZ4_compress_fast_extState(stream, dummy, NULL, 9, sizeof(out), 1) != 0, "LZ4_compress_fast_extState should fail on NULL dest");
+        FUZ_CHECKTEST(LZ4_compress_destSize(dummy, out, NULL, sizeof(out)) != 0, "LZ4_compress_destSize should fail on NULL srcSizePtr");
+        FUZ_CHECKTEST(LZ4_compress_destSize_extState(NULL, dummy, out, &srcSize, sizeof(out), 1) != 0, "LZ4_compress_destSize_extState should fail on NULL state");
+        FUZ_CHECKTEST(LZ4_compress_destSize_extState(stream, dummy, out, NULL, sizeof(out), 1) != 0, "LZ4_compress_destSize_extState should fail on NULL srcSizePtr");
+
+        /* Stream continue and dictionary NULL checks */
+        FUZ_CHECKTEST(LZ4_loadDict(NULL, dummy, 9) != 0, "LZ4_loadDict should fail on NULL stream");
+        FUZ_CHECKTEST(LZ4_compress_fast_continue(NULL, dummy, out, 9, sizeof(out), 1) != 0, "LZ4_compress_fast_continue should fail on NULL stream");
+        FUZ_CHECKTEST(LZ4_saveDict(NULL, out, sizeof(out)) != 0, "LZ4_saveDict should fail on NULL stream");
+        FUZ_CHECKTEST(LZ4_saveDict(stream, NULL, sizeof(out)) != 0, "LZ4_saveDict should fail on NULL safeBuffer");
+
+        /* Decompress stream and decode NULL checks */
+        FUZ_CHECKTEST(LZ4_setStreamDecode(NULL, dummy, 9) != 0, "LZ4_setStreamDecode should fail on NULL streamDecode");
+        FUZ_CHECKTEST(LZ4_decompress_safe_continue(NULL, dummy, out, 9, sizeof(out)) >= 0, "LZ4_decompress_safe_continue should fail on NULL streamDecode");
+        FUZ_CHECKTEST(LZ4_decompress_safe_continue(streamDecode, NULL, out, 9, sizeof(out)) >= 0, "LZ4_decompress_safe_continue should fail on NULL source");
+        FUZ_CHECKTEST(LZ4_decompress_safe_continue(streamDecode, dummy, NULL, 9, sizeof(out)) >= 0, "LZ4_decompress_safe_continue should fail on NULL dest");
+        FUZ_CHECKTEST(LZ4_decompress_safe_usingDict(NULL, out, 9, sizeof(out), dummy, 9) >= 0, "LZ4_decompress_safe_usingDict should fail on NULL src");
+        FUZ_CHECKTEST(LZ4_decompress_safe_usingDict(dummy, NULL, 9, sizeof(out), dummy, 9) >= 0, "LZ4_decompress_safe_usingDict should fail on NULL dst");
+
+        /* LZ4 HC NULL checks */
+        FUZ_CHECKTEST(LZ4_compress_HC_extStateHC(NULL, dummy, out, 9, sizeof(out), compressionLevel) != 0, "LZ4_compress_HC_extStateHC should fail on NULL state");
+        FUZ_CHECKTEST(LZ4_compress_HC_destSize(NULL, dummy, out, &srcSize, sizeof(out), compressionLevel) != 0, "LZ4_compress_HC_destSize should fail on NULL state");
+        FUZ_CHECKTEST(LZ4_compress_HC_destSize(streamHC, dummy, out, NULL, sizeof(out), compressionLevel) != 0, "LZ4_compress_HC_destSize should fail on NULL srcSizePtr");
+        FUZ_CHECKTEST(LZ4_loadDictHC(NULL, dummy, 9) != 0, "LZ4_loadDictHC should fail on NULL stream");
+        FUZ_CHECKTEST(LZ4_compress_HC_continue(NULL, dummy, out, 9, sizeof(out)) != 0, "LZ4_compress_HC_continue should fail on NULL stream");
+        FUZ_CHECKTEST(LZ4_saveDictHC(NULL, out, sizeof(out)) != 0, "LZ4_saveDictHC should fail on NULL stream");
+        FUZ_CHECKTEST(LZ4_saveDictHC(streamHC, NULL, sizeof(out)) != 0, "LZ4_saveDictHC should fail on NULL safeBuffer");
+
+        LZ4_freeStream(stream);
+        LZ4_freeStreamHC(streamHC);
+        LZ4_freeStreamDecode(streamDecode);
+    }
+    DISPLAYLEVEL(3, " OK \n");
 
     /* clean up */
     free(testInput);
