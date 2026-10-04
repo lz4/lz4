@@ -68,6 +68,9 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FIL
  * `lz4f` must use LZ4_readOpen to set first.
  * `buf` read data buffer.
  * `size` read data buffer size.
+ * Returns the number of bytes read, 0 at end of file, or an error code.
+ * A file ending before its frame is complete returns ERROR_io_read.
+ * Use LZ4F_isError() to check the result.
  */
 LZ4FLIB_STATIC_API size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size);
 

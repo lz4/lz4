@@ -438,6 +438,90 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
     }
 
+    DISPLAYLEVEL(3, "LZ4F_read complete and truncated files : ");
+    {
+        static const struct {
+            size_t contentSize;
+            size_t readSize;
+            size_t missingBytes;
+            int headerOnly;
+        } cases[] = {
+            { 0, 1, 0, 0 },
+            { 256, 1, 0, 0 },
+            { 256, 256, 0, 0 },
+            { 256, 257, 0, 0 },
+            { 256, 1, 1, 0 },
+            { 256, 257, 1, 0 },
+            { 256, 257, 4, 0 },
+            { 256, 257, 8, 0 },
+            { 256, 257, 0, 1 }
+        };
+        unsigned checksum;
+        unsigned frameCount;
+        size_t caseNb;
+
+        for (checksum = 0; checksum < 4; ++checksum) {
+            LZ4F_preferences_t readPrefs;
+            memset(&readPrefs, 0, sizeof(readPrefs));
+            readPrefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)(checksum & 1);
+            readPrefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)(checksum >> 1);
+            for (frameCount = 1; frameCount <= 2; ++frameCount) {
+                for (caseNb = 0; caseNb < sizeof(cases) / sizeof(cases[0]); ++caseNb) {
+                    FILE* const tmpFile = tmpfile();
+                    LZ4_readFile_t* readCtx = NULL;
+                    size_t readStatus = 0;
+                    size_t totalRead = 0;
+                    size_t const expectedSize = cases[caseNb].contentSize * frameCount;
+                    unsigned frame;
+                    int failed = 0;
+
+                    if (tmpFile == NULL) goto _output_error;
+                    readPrefs.frameInfo.contentSize = cases[caseNb].headerOnly ? cases[caseNb].contentSize : 0;
+                    cSize = LZ4F_compressFrame(compressedBuffer, cBuffSize, CNBuffer,
+                                              cases[caseNb].contentSize, &readPrefs);
+                    do {
+                        if (LZ4F_isError(cSize)) { failed = 1; break; }
+                        for (frame = 0; frame < frameCount; ++frame) {
+                            size_t const storedSize = frame + 1 != frameCount ? cSize :
+                                (cases[caseNb].headerOnly ? 15 : cSize - cases[caseNb].missingBytes);
+                            if (fwrite(compressedBuffer, 1, storedSize, tmpFile) != storedSize) failed = 1;
+                        }
+                        if (failed) break;
+                        rewind(tmpFile);
+                        readStatus = LZ4F_readOpen(&readCtx, tmpFile);
+                        if (!LZ4F_isError(readStatus)) {
+                            do {
+                                readStatus = LZ4F_read(readCtx, (BYTE*)decodedBuffer + totalRead, cases[caseNb].readSize);
+                                if (LZ4F_isError(readStatus)) break;
+                                totalRead += readStatus;
+                                if (totalRead > expectedSize) { failed = 1; break; }
+                            } while (readStatus != 0);
+                        }
+                        if (cases[caseNb].missingBytes != 0 || cases[caseNb].headerOnly) {
+                            if (LZ4F_getErrorCode(readStatus) != LZ4F_ERROR_io_read) failed = 1;
+                        } else {
+                            if (LZ4F_isError(readStatus) || totalRead != expectedSize) { failed = 1; break; }
+                            for (frame = 0; frame < frameCount; ++frame) {
+                                if (memcmp((BYTE*)decodedBuffer + frame * cases[caseNb].contentSize,
+                                           CNBuffer, cases[caseNb].contentSize) != 0) failed = 1;
+                            }
+                            if (LZ4F_read(readCtx, decodedBuffer, 1) != 0) failed = 1;
+                        }
+                    } while (0);
+                    if (readCtx != NULL && LZ4F_isError(LZ4F_readClose(readCtx))) failed = 1;
+                    if (fclose(tmpFile) != 0) failed = 1;
+                    if (failed) {
+                        DISPLAY("file read failed: case=%u checksum=%u frames=%u read=%u status=%s\n",
+                                (unsigned)caseNb, checksum, frameCount, (unsigned)totalRead,
+                                LZ4F_getErrorName(readStatus));
+                        goto _output_error;
+                    }
+                }
+            }
+        }
+        DISPLAYLEVEL(3, "OK \n");
+    }
+
     /* Verify compressBound() with LZ4F_write and checksums disabled */
     DISPLAYLEVEL(3, "LZ4F_write checksums disabled edge case : ");
     {
