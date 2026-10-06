@@ -87,6 +87,9 @@ jobs:
         make clean
         CFLAGS="-O3 -Werror -Wconversion -Wno-sign-conversion" make -j test V=1
 
+    - name: Test public headers with C++ modules
+      run: make -C tests test-header-modules CC=clang CXX=clang++
+
     - name: Test console independence
       # Ensure `make test` doesn't depend on the status of the console
       # See issue #990 for detailed explanations
