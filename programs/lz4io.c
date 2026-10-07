@@ -90,6 +90,8 @@
 
 #undef MIN
 #define MIN(a,b)  ((a)<(b)?(a):(b))
+#undef MAX
+#define MAX(a,b)  ((a)>(b)?(a):(b))
 
 /**************************************
 *  Time and Display
@@ -220,8 +222,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     prefs->passThrough = 0;
     prefs->overwrite = 1;
     prefs->testMode = 0;
-    prefs->blockSizeId = LZ4IO_BLOCKSIZEID_DEFAULT;
-    prefs->blockSize = 0;
+    LZ4IO_setBlockSizeID(prefs, LZ4IO_BLOCKSIZEID_DEFAULT);
     prefs->blockChecksum = 0;
     prefs->streamChecksum = 1;
     prefs->blockIndependence = 1;
@@ -1084,6 +1085,91 @@ static LZ4F_CDict* LZ4IO_createCDict(const LZ4IO_prefs_t* io_prefs)
     return cdict;
 }
 
+/* LZ4IO_compressBlocksBound() :
+ * worst case compressed size of @srcSize bytes, cut into blocks of @blockSize bytes */
+static size_t LZ4IO_compressBlocksBound(size_t srcSize, size_t blockSize, const LZ4F_preferences_t* prefs)
+{
+    size_t const nbBlocks = (srcSize + blockSize - 1) / blockSize;
+    assert(prefs->autoFlush);
+    return nbBlocks * LZ4F_compressBound(blockSize, prefs);
+}
+
+/* LZ4IO_compressBlocks() :
+ * compress @src into a sequence of blocks of @blockSize bytes (the last one can be smaller).
+ * Custom block sizes are not natively supported by LZ4F :
+ * they require autoFlush, and one LZ4F_compressUpdate() invocation per block.
+ * @src must remain accessible until the end of the frame (stableSrc).
+ * @dstCapacity must be >= LZ4IO_compressBlocksBound(srcSize, blockSize, prefs).
+ * @return : nb of bytes written into @dst */
+static size_t LZ4IO_compressBlocks(LZ4F_cctx* cctx,
+                                   void* dst, size_t dstCapacity,
+                                   const void* src, size_t srcSize,
+                                   size_t blockSize)
+{
+    const char* ip = (const char*)src;
+    const char* const iend = ip + srcSize;
+    char* op = (char*)dst;
+    char* const oend = op + dstCapacity;
+    LZ4F_compressOptions_t cOpts;
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.stableSrc = 1;
+
+    while (ip < iend) {
+        size_t const inSize = MIN(blockSize, (size_t)(iend - ip));
+        size_t const cSize = LZ4F_compressUpdate(cctx, op, (size_t)(oend - op), ip, inSize, &cOpts);
+        if (LZ4F_isError(cSize))
+            END_PROCESS(55, "error compressing with LZ4F_compressUpdate : %s", LZ4F_getErrorName(cSize));
+        ip += inSize;
+        op += cSize;
+    }
+    return (size_t)(op - (char*)dst);
+}
+
+/* LZ4IO_compressFrameBound() :
+ * worst case size of a frame produced by LZ4IO_compressFrame() */
+static size_t LZ4IO_compressFrameBound(size_t srcSize, size_t blockSize, const LZ4F_preferences_t* prefs)
+{
+    return MAX(LZ4F_compressFrameBound(srcSize, prefs),
+               LZ4F_HEADER_SIZE_MAX + LZ4IO_compressBlocksBound(srcSize, blockSize, prefs));
+}
+
+/* LZ4IO_compressFrame() :
+ * same as LZ4F_compressFrame_usingCDict(), but blocks are cut at @blockSize.
+ * @dstCapacity must be >= LZ4IO_compressFrameBound(srcSize, blockSize, prefs).
+ * @return : compressed frame size */
+static size_t LZ4IO_compressFrame(LZ4F_cctx* cctx,
+                                  void* dst, size_t dstCapacity,
+                                  const void* src, size_t srcSize,
+                                  const LZ4F_CDict* cdict,
+                                  const LZ4F_preferences_t* prefs,
+                                  size_t blockSize)
+{
+    char* const ostart = (char*)dst;
+    char* op = ostart;
+    char* const oend = ostart + dstCapacity;
+
+    if (srcSize <= blockSize) {
+        /* single block : LZ4F can also reduce the declared block size */
+        size_t const cSize = LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity, src, srcSize, cdict, prefs);
+        if (LZ4F_isError(cSize))
+            END_PROCESS(41, "Compression failed : %s", LZ4F_getErrorName(cSize));
+        return cSize;
+    }
+
+    {   size_t const headerSize = LZ4F_compressBegin_usingCDict(cctx, op, (size_t)(oend - op), cdict, prefs);
+        if (LZ4F_isError(headerSize))
+            END_PROCESS(43, "File header generation failed : %s", LZ4F_getErrorName(headerSize));
+        op += headerSize;
+    }
+    op += LZ4IO_compressBlocks(cctx, op, (size_t)(oend - op), src, srcSize, blockSize);
+    {   size_t const endSize = LZ4F_compressEnd(cctx, op, (size_t)(oend - op), NULL);
+        if (LZ4F_isError(endSize))
+            END_PROCESS(48, "End of frame error : %s", LZ4F_getErrorName(endSize));
+        op += endSize;
+    }
+    return (size_t)(op - ostart);
+}
+
 static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
 {
     const size_t chunkSize = 4 MB;
@@ -1108,7 +1194,8 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     /* Allocate Buffers */
     ress.srcBuffer = malloc(chunkSize);
     ress.srcBufferSize = chunkSize;
-    ress.dstBufferSize = LZ4F_compressFrameBound(chunkSize, &ress.preparedPrefs);
+    assert(io_prefs->blockSize > 0);
+    ress.dstBufferSize = LZ4IO_compressFrameBound(chunkSize, io_prefs->blockSize, &ress.preparedPrefs);
     ress.dstBuffer = malloc(ress.dstBufferSize);
     if (!ress.srcBuffer || !ress.dstBuffer)
         END_PROCESS(31, "Allocation error : can't allocate buffers");
@@ -1125,6 +1212,7 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
 typedef struct {
     const LZ4F_preferences_t* prefs;
     const LZ4F_CDict* cdict;
+    size_t blockSize;
 } LZ4IO_CfcParameters;
 
 static size_t LZ4IO_compressFrameChunk(const void* params,
@@ -1150,12 +1238,9 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
             END_PROCESS(53, "error initializing LZ4F compression context");
     }
     /* let's now compress, overwriting unused header */
-    {   size_t const cSize = LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, NULL);
-        if (LZ4F_isError(cSize))
-            END_PROCESS(55, "error compressing with LZ4F_compressUpdate");
-
+    {   size_t const cSize = LZ4IO_compressBlocks(cctx, dst, dstCapacity, src, srcSize, cfcp->blockSize);
         LZ4F_freeCompressionContext(cctx);
-        return (size_t) cSize;
+        return cSize;
     }
 }
 
@@ -1177,7 +1262,9 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     void* const srcBuffer = ress->srcBuffer;
     void* const dstBuffer = ress->dstBuffer;
     const size_t dstBufferSize = ress->dstBufferSize;
-    const size_t chunkSize = 4 MB;  /* each job should be "sufficiently large" */
+    const size_t blockSize = io_prefs->blockSize;
+    /* each job should be "sufficiently large", and contain a whole number of blocks */
+    const size_t chunkSize = (4 MB / blockSize) * blockSize;
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
@@ -1199,18 +1286,16 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     }
 
     /* read first chunk */
-    assert(chunkSize <= ress->srcBufferSize);
+    assert(0 < blockSize && blockSize <= chunkSize && chunkSize <= ress->srcBufferSize);
     readSize  = fread(srcBuffer, (size_t)1, chunkSize, srcFile);
     if (ferror(srcFile))
         END_PROCESS(40, "Error reading first chunk (%u bytes) of '%s' ", (unsigned)chunkSize, srcFileName);
     filesize += readSize;
 
-    /* single-block file */
+    /* single-chunk file */
     if (readSize < chunkSize) {
         /* Compress in single pass */
-        size_t const cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress->cdict, &prefs);
-        if (LZ4F_isError(cSize))
-            END_PROCESS(41, "Compression failed : %s", LZ4F_getErrorName(cSize));
+        size_t const cSize = LZ4IO_compressFrame(ctx, dstBuffer, dstBufferSize, srcBuffer, readSize, ress->cdict, &prefs, blockSize);
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(double)(filesize+!filesize)*100);   /* avoid division by zero */
@@ -1241,6 +1326,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         }
         cfcp.prefs = &prefs;
         cfcp.cdict = ress->cdict;
+        cfcp.blockSize = blockSize;
         rjd.tPool = ress->tPool;
         rjd.wpool = ress->wPool;
         rjd.fin = srcFile;
@@ -1253,7 +1339,7 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         rjd.prefix = NULL;
         rjd.fout = dstFile;
         rjd.wr = &wr;
-        rjd.maxCBlockSize = LZ4F_compressFrameBound(chunkSize, &prefs);
+        rjd.maxCBlockSize = LZ4IO_compressBlocksBound(chunkSize, blockSize, &prefs);
 
         /* process frame checksum externally */
         if (checksum) {
