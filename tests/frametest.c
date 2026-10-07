@@ -404,6 +404,95 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, " %u \n", (U32)cBound);
     }
 
+    /* Bounds at size_t limits must not wrap or truncate the block count.
+     * These calls calculate sizes only; no large allocation is needed. */
+    DISPLAYLEVEL(3, "LZ4F compression bounds at size_t limits : ");
+    {   size_t const sizeMax = (size_t)-1;
+        unsigned blockID, autoFlush, blockChecksum, contentChecksum;
+        for (blockID = 4; blockID <= 7; ++blockID) {
+            size_t const blockSize = (size_t)1 << (8 + 2 * blockID);
+            for (autoFlush = 0; autoFlush <= 1; ++autoFlush) {
+                for (blockChecksum = 0; blockChecksum <= 1; ++blockChecksum) {
+                    for (contentChecksum = 0; contentChecksum <= 1; ++contentChecksum) {
+                        LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
+                        size_t bound;
+                        p.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)blockID;
+                        p.autoFlush = autoFlush;
+                        p.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)blockChecksum;
+                        p.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)contentChecksum;
+
+                        bound = LZ4F_compressFrameBound(sizeMax / 2, &p);
+                        if (LZ4F_isError(bound) || bound <= sizeMax / 2) {
+                            DISPLAY("frame bound truncated block count\n");
+                            goto _output_error;
+                        }
+                        bound = LZ4F_compressBound(sizeMax / 2, &p);
+                        if (LZ4F_isError(bound) || bound < sizeMax / 2 - blockSize) {
+                            DISPLAY("stream bound truncated block count\n");
+                            goto _output_error;
+                        }
+
+                        /* The payload fits, but block overhead does not. */
+                        if (LZ4F_getErrorCode(LZ4F_compressFrameBound(sizeMax - 256, &p)) != LZ4F_ERROR_srcSize_tooLarge
+                         || LZ4F_getErrorCode(LZ4F_compressBound(sizeMax - 256, &p)) != LZ4F_ERROR_srcSize_tooLarge) {
+                            DISPLAY("compression bound wrapped block overhead\n");
+                            goto _output_error;
+                        }
+                        /* Includes overflow when adding buffered input, and
+                         * propagation through the frame header addition. */
+                        if (LZ4F_getErrorCode(LZ4F_compressFrameBound(sizeMax, &p)) != LZ4F_ERROR_srcSize_tooLarge
+                         || LZ4F_getErrorCode(LZ4F_compressBound(sizeMax, &p)) != LZ4F_ERROR_srcSize_tooLarge) {
+                            DISPLAY("compression bound wrapped input size\n");
+                            goto _output_error;
+                        }
+                    }
+                }
+            }
+        }
+        if (!LZ4F_isError(LZ4F_compressBound(sizeMax, NULL))
+         || !LZ4F_isError(LZ4F_compressFrameBound(sizeMax, NULL)))
+            goto _output_error;
+
+        /* Locate the last representable streaming bound. Adding only the
+         * frame header must reject it, too. */
+        {   LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
+            size_t low = 0, high = sizeMax;
+            p.autoFlush = 1;
+            while (high - low > 1) {
+                size_t const mid = low + (high - low) / 2;
+                if (LZ4F_isError(LZ4F_compressBound(mid, &p))) high = mid;
+                else low = mid;
+            }
+            if (LZ4F_getErrorCode(LZ4F_compressFrameBound(low, &p)) != LZ4F_ERROR_srcSize_tooLarge) {
+                DISPLAY("compression bound wrapped frame header\n");
+                goto _output_error;
+            }
+        }
+
+        /* Reject an unrepresentable bound before accessing the source or
+         * writing a frame header. The small buffers must remain untouched. */
+        {   LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
+            BYTE src = 0;
+            BYTE dst[LZ4F_HEADER_SIZE_MAX] = { 0 };
+            BYTE const empty[LZ4F_HEADER_SIZE_MAX] = { 0 };
+            size_t result;
+            result = LZ4F_compressFrame(dst, sizeof(dst), &src, sizeMax, &p);
+            if (LZ4F_getErrorCode(result) != LZ4F_ERROR_srcSize_tooLarge
+             || memcmp(dst, empty, sizeof(dst)) != 0)
+                goto _output_error;
+            CHECK(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
+            CHECK(LZ4F_compressBegin(cctx, dst, sizeof(dst), &p));
+            memset(dst, 0, sizeof(dst));
+            result = LZ4F_compressUpdate(cctx, dst, sizeof(dst), &src, sizeMax, NULL);
+            if (LZ4F_getErrorCode(result) != LZ4F_ERROR_srcSize_tooLarge
+             || memcmp(dst, empty, sizeof(dst)) != 0)
+                goto _output_error;
+            CHECK(LZ4F_freeCompressionContext(cctx));
+            cctx = NULL;
+        }
+    }
+    DISPLAYLEVEL(3, "OK\n");
+
     /* Special case : null-content frame */
     testSize = 0;
     DISPLAYLEVEL(3, "LZ4F_compressFrame, compress null content : ");
