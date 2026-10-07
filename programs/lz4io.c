@@ -1504,9 +1504,13 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
-    if (LZ4IO_MULTITHREAD)
+    static const size_t blockSizeTable[] = { 64 KB, 256 KB, 1 MB, 4 MB };
+    int const isStandardBlockSize = (io_prefs->blockSizeId >= 4 && io_prefs->blockSizeId <= 7)
+        && (io_prefs->blockSize == 0 || io_prefs->blockSize == blockSizeTable[io_prefs->blockSizeId - 4]);
+
+    if (LZ4IO_MULTITHREAD && io_prefs->nbWorkers > 1 && isStandardBlockSize)
         return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
-    /* Only single-thread available */
+    /* Only single-thread available, requested, or required by custom block size */
     return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
 }
 

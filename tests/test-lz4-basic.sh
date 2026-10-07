@@ -87,3 +87,7 @@ lz4 $FPREFIX-test.lz4 $FPREFIX-test2
 diff -q $FPREFIX-test $FPREFIX-test2
 # bug #1374
 datagen -g4194302 | lz4 -B4 -c > $FPREFIX-test3
+# bug #1810
+datagen -g100K | lz4 -B2048 -c | lz4 -t
+datagen -g100K | lz4 -B4096 -T1 -c | lz4 -t
+
