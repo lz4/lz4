@@ -63,6 +63,10 @@ lz4 --list $FPREFIX-hw.lz4            # test --list on valid single-frame file
 lz4 --list < $FPREFIX-hw.lz4          # test --list from stdin (file only)
 cat $FPREFIX-hw >> $FPREFIX-hw.lz4
 lz4 -f $FPREFIX-hw.lz4 && exit 1      # uncompress valid frame followed by invalid data (must fail now)
+printf '\120\052\115\030\000\000\000\000BAD!' > $FPREFIX-bad.lz4
+cp $FPREFIX-bad.lz4 $FPREFIX-bad-before.lz4
+lz4 -d --rm -f $FPREFIX-bad.lz4 $FPREFIX-bad.out && exit 1
+diff -q $FPREFIX-bad-before.lz4 $FPREFIX-bad.lz4  # --rm keeps source after decoding failure
 lz4 -BX $FPREFIX-hw -c -q | lz4 -tv   # test block checksum
 # datagen -g20KB generates the same file every single time
 # cannot save output of datagen -g20KB as input file to lz4 because the following shell commands are run before datagen -g20KB
