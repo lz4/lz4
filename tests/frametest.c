@@ -467,6 +467,43 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "OK \n");
     }
 
+    /* LZ4F_writeOpen() must reject an invalid blockSizeID,
+     * instead of sizing its buffers from the error code returned by LZ4F_getBlockSize() */
+    DISPLAYLEVEL(3, "LZ4F_writeOpen rejects invalid blockSizeID : ");
+    {   int const invalidBSID[] = { 1, 2, 3, 8, 9 };
+        int const validBSID[] = { 0 /* == default */, 4, 5, 6, 7 };
+        FILE* const tmpFile = tmpfile();
+        LZ4F_preferences_t writePrefs;
+        size_t nb;
+        int failed = (tmpFile == NULL);
+
+        for (nb = 0; !failed && nb < sizeof(invalidBSID) / sizeof(invalidBSID[0]); nb++) {
+            LZ4_writeFile_t* writeCtx = NULL;
+            size_t r;
+            memset(&writePrefs, 0, sizeof(writePrefs));   /* blockLinked : wrapped buffer size is small, so allocation succeeds */
+            writePrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)invalidBSID[nb];
+            r = LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs);
+            if (LZ4F_getErrorCode(r) != LZ4F_ERROR_maxBlockSize_invalid) {
+                DISPLAYLEVEL(3, "blockSizeID %i not rejected (%s) ", invalidBSID[nb],
+                             LZ4F_isError(r) ? LZ4F_getErrorName(r) : "accepted");
+                failed = 1;   /* don't use writeCtx: its buffers are undersized */
+        }   }
+
+        for (nb = 0; !failed && nb < sizeof(validBSID) / sizeof(validBSID[0]); nb++) {
+            LZ4_writeFile_t* writeCtx = NULL;
+            memset(&writePrefs, 0, sizeof(writePrefs));
+            writePrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)validBSID[nb];
+            if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, &writePrefs))
+             || LZ4F_isError(LZ4F_writeClose(writeCtx))) {
+                DISPLAYLEVEL(3, "valid blockSizeID %i rejected ", validBSID[nb]);
+                failed = 1;
+        }   }
+
+        if (tmpFile) fclose(tmpFile);
+        if (failed) goto _output_error;
+        DISPLAYLEVEL(3, "OK \n");
+    }
+
     DISPLAYLEVEL(3, "LZ4F_compressFrame, using default preferences : ");
     CHECK_V(cSize, LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL));
     DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
