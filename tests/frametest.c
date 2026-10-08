@@ -2164,6 +2164,44 @@ static int unitTests(U32 seed, double compressibility)
             goto _output_error;
         }
 
+        /* sizes remain accurate when contexts are reused with different parameters,
+         * since buffers are only reallocated when too small */
+        {   struct { LZ4F_blockSizeID_t bsid; LZ4F_blockMode_t mode; int level; } const frames[] = {
+                { LZ4F_max4MB,   LZ4F_blockIndependent, 1 },
+                { LZ4F_max64KB,  LZ4F_blockIndependent, 1 },   /* smaller blocks : buffers are reused */
+                { LZ4F_max256KB, LZ4F_blockLinked,      9 },
+                { LZ4F_max64KB,  LZ4F_blockLinked,      1 },
+                { LZ4F_max1MB,   LZ4F_blockIndependent, 9 },
+                { LZ4F_max64KB,  LZ4F_blockIndependent, 1 }
+            };
+            size_t const srcSize = 1 KB;
+            size_t f;
+            for (f = 0; f < sizeof(frames) / sizeof(frames[0]); f++) {
+                LZ4F_preferences_t fPrefs = LZ4F_INIT_PREFERENCES;
+                BYTE* const ostart = (BYTE*)compressedBuffer;
+                BYTE* op = ostart;
+                size_t r, frameSize, dSize = srcSize;
+                fPrefs.frameInfo.blockSizeID = frames[f].bsid;
+                fPrefs.frameInfo.blockMode = frames[f].mode;
+                fPrefs.compressionLevel = frames[f].level;
+                CHECK_V(r, LZ4F_compressBegin(cc, op, cBuffSize, &fPrefs));
+                op += r;
+                CHECK_V(r, LZ4F_compressUpdate(cc, op, cBuffSize - (size_t)(op - ostart), CNBuffer, srcSize, NULL));
+                op += r;
+                CHECK_V(r, LZ4F_compressEnd(cc, op, cBuffSize - (size_t)(op - ostart), NULL));
+                op += r;
+                frameSize = (size_t)(op - ostart);
+                CHECK_V(r, LZ4F_decompress(dc, decodedBuffer, &dSize, compressedBuffer, &frameSize, NULL));
+                if (r != 0 || dSize != srcSize) goto _output_error;
+                if (LZ4F_cctx_size(cc) != c_allocs.live_alloc_total_space) {
+                    DISPLAYLEVEL(3, "frame %u : %llu allocated in cctx but it says its size is %llu.\n", (unsigned)f, (long long unsigned)c_allocs.live_alloc_total_space, (long long unsigned)LZ4F_cctx_size(cc));
+                    goto _output_error;
+                }
+                if (LZ4F_dctx_size(dc) != d_allocs.live_alloc_total_space) {
+                    DISPLAYLEVEL(3, "frame %u : %llu allocated in dctx but it says its size is %llu.\n", (unsigned)f, (long long unsigned)d_allocs.live_alloc_total_space, (long long unsigned)LZ4F_dctx_size(dc));
+                    goto _output_error;
+        }   }   }
+
         LZ4F_freeCompressionContext(cc);
         LZ4F_freeDecompressionContext(dc);
         alloc_state_destroy(&c_allocs);
