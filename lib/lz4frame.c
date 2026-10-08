@@ -1330,6 +1330,7 @@ struct LZ4F_dctx_s {
     size_t maxBlockSize;
     size_t tmpOutBufferCapacity;
     BYTE*  tmpIn;
+    size_t tmpInCapacity;
     size_t tmpInSize;
     size_t tmpInTarget;
     BYTE*  tmpOutBuffer;
@@ -1390,9 +1391,7 @@ size_t LZ4F_dctx_size(const LZ4F_dctx* dctx) {
     if (dctx == NULL) {
         return 0;
     }
-    return sizeof(*dctx)
-         + (dctx->tmpIn != NULL ? dctx->maxBlockSize + BFSize : 0)
-         + (dctx->tmpOutBuffer != NULL ? dctx->tmpOutBufferCapacity : 0);
+    return sizeof(*dctx) + dctx->tmpInCapacity + dctx->tmpOutBufferCapacity;
 }
 
 
@@ -1754,17 +1753,23 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             DEBUGLOG(6, "dstage_init");
             if (dctx->frameInfo.contentChecksumFlag) (void)XXH32_reset(&(dctx->xxh), 0);
             /* internal buffers allocation */
-            {   size_t const bufferNeeded = dctx->maxBlockSize
+            {   size_t const tmpInNeeded = dctx->maxBlockSize + BFSize /* block checksum */;
+                size_t const tmpOutNeeded = dctx->maxBlockSize
                     + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
-                if (bufferNeeded > dctx->tmpOutBufferCapacity) {   /* tmp buffers too small */
-                    dctx->tmpOutBufferCapacity = 0;   /* ensure allocation will be re-attempted on next entry*/
+                if ( (tmpInNeeded > dctx->tmpInCapacity)
+                  || (tmpOutNeeded > dctx->tmpOutBufferCapacity) ) {   /* tmp buffers too small */
+                    /* capacities remain 0 until allocation succeeds,
+                     * so that allocation will be re-attempted on next entry */
                     LZ4F_free(dctx->tmpIn, dctx->cmem);
-                    dctx->tmpIn = (BYTE*)LZ4F_malloc(dctx->maxBlockSize + BFSize /* block checksum */, dctx->cmem);
+                    dctx->tmpInCapacity = 0;
+                    dctx->tmpIn = (BYTE*)LZ4F_malloc(tmpInNeeded, dctx->cmem);
                     RETURN_ERROR_IF(dctx->tmpIn == NULL, allocation_failed);
+                    dctx->tmpInCapacity = tmpInNeeded;
                     LZ4F_free(dctx->tmpOutBuffer, dctx->cmem);
-                    dctx->tmpOutBuffer= (BYTE*)LZ4F_malloc(bufferNeeded, dctx->cmem);
+                    dctx->tmpOutBufferCapacity = 0;
+                    dctx->tmpOutBuffer= (BYTE*)LZ4F_malloc(tmpOutNeeded, dctx->cmem);
                     RETURN_ERROR_IF(dctx->tmpOutBuffer== NULL, allocation_failed);
-                    dctx->tmpOutBufferCapacity = bufferNeeded;
+                    dctx->tmpOutBufferCapacity = tmpOutNeeded;
             }   }
             dctx->tmpInSize = 0;
             dctx->tmpInTarget = 0;
