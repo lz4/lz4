@@ -933,9 +933,19 @@ static size_t LZ4F_makeBlock(void* dst,
 }
 
 
+/* Negative compression levels select LZ4 "fast" mode, with acceleration = -level + 1.
+ * Computed without signed overflow for very negative levels (INT_MIN, INT_MIN+1);
+ * LZ4_compress_fast*() caps acceleration at LZ4_ACCELERATION_MAX anyway. */
+static int LZ4F_levelToAcceleration(int level)
+{
+    if (level >= 0) return 1;
+    if (level < -(INT_MAX - 1)) return INT_MAX;
+    return -level + 1;
+}
+
 static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
-    int const acceleration = (level < 0) ? -level + 1 : 1;
+    int const acceleration = LZ4F_levelToAcceleration(level);
     DEBUGLOG(5, "LZ4F_compressBlock (srcSize=%i)", srcSize);
     LZ4F_initStream(ctx, cdict, level, LZ4F_blockIndependent);
     if (cdict) {
@@ -947,7 +957,7 @@ static int LZ4F_compressBlock(void* ctx, const char* src, char* dst, int srcSize
 
 static int LZ4F_compressBlock_continue(void* ctx, const char* src, char* dst, int srcSize, int dstCapacity, int level, const LZ4F_CDict* cdict)
 {
-    int const acceleration = (level < 0) ? -level + 1 : 1;
+    int const acceleration = LZ4F_levelToAcceleration(level);
     (void)cdict; /* init once at beginning of frame */
     DEBUGLOG(5, "LZ4F_compressBlock_continue (srcSize=%i)", srcSize);
     return LZ4_compress_fast_continue((LZ4_stream_t*)ctx, src, dst, srcSize, dstCapacity, acceleration);
