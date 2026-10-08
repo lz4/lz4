@@ -159,7 +159,9 @@ static int g_debuglog_enable = 1;
                     fprintf(stderr, __VA_ARGS__);             \
                     fprintf(stderr, " \n");                   \
             }   }
-#else
+#endif
+
+#ifndef DEBUGLOG
 #  define DEBUGLOG(l, ...)      {}    /* disabled */
 #endif
 
@@ -346,7 +348,10 @@ size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID)
 /*-************************************
 *  Private functions
 **************************************/
+#ifndef MIN
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
+#endif
+
 
 static BYTE LZ4F_headerChecksum (const void* header, size_t length)
 {
