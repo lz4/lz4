@@ -272,7 +272,7 @@ typedef struct LZ4F_cctx_s
     U32    cStage;     /* 0 : compression uninitialized ; 1 : initialized, can compress */
     const LZ4F_CDict* cdict;
     size_t maxBlockSize;
-    size_t maxBufferSize;
+    size_t tmpBuffCapacity;
     BYTE*  tmpBuff;    /* internal buffer, for streaming */
     BYTE*  tmpIn;      /* starting position of data compress within internal buffer (>= tmpBuff) */
     size_t tmpInSize;  /* amount of data to compress after tmpIn */
@@ -499,7 +499,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
 
     MEM_INIT(&cctx, 0, sizeof(cctx));
     cctx.version = LZ4F_VERSION;
-    cctx.maxBufferSize = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
+    cctx.tmpBuffCapacity = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
     if ( preferencesPtr == NULL
       || preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN ) {
         LZ4_initStream(&lz4ctx, sizeof(lz4ctx));
@@ -703,7 +703,7 @@ size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
     if (cctx == NULL) {
         return 0;
     }
-    return sizeof(*cctx) + cctx->maxBufferSize + LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc);
+    return sizeof(*cctx) + cctx->tmpBuffCapacity + LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc);
 }
 
 /* LZ4F_compressBegin_internal()
@@ -772,12 +772,12 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
                 ((cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 64 KB : 0) :  /* only needs past data up to window size */
                 cctx->maxBlockSize + ((cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 128 KB : 0);
 
-        if (cctx->maxBufferSize < requiredBuffSize) {
-            cctx->maxBufferSize = 0;
+        if (cctx->tmpBuffCapacity < requiredBuffSize) {
+            cctx->tmpBuffCapacity = 0;
             LZ4F_free(cctx->tmpBuff, cctx->cmem);
             cctx->tmpBuff = (BYTE*)LZ4F_malloc(requiredBuffSize, cctx->cmem);
             RETURN_ERROR_IF(cctx->tmpBuff == NULL, allocation_failed);
-            cctx->maxBufferSize = requiredBuffSize;
+            cctx->tmpBuffCapacity = requiredBuffSize;
     }   }
     cctx->tmpIn = cctx->tmpBuff;
     cctx->tmpInSize = 0;
@@ -1137,12 +1137,12 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
 
     /* keep tmpIn within limits */
     if (!(cctxPtr->prefs.autoFlush)  /* no autoflush : there may be some data left within internal buffer */
-      && (cctxPtr->tmpIn + blockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize) )  /* not enough room to store next block */
+      && (cctxPtr->tmpIn + blockSize) > (cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity) )  /* not enough room to store next block */
     {
         /* only preserve 64KB within internal buffer. Ensures there is enough room for next block.
          * note: this situation necessarily implies lastBlockCompressed==fromTmpBuffer */
         LZ4F_localSaveDict(cctxPtr);
-        assert((cctxPtr->tmpIn + blockSize) <= (cctxPtr->tmpBuff + cctxPtr->maxBufferSize));
+        assert((cctxPtr->tmpIn + blockSize) <= (cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity));
     }
 
     /* some input data left, necessarily < blockSize */
@@ -1247,7 +1247,7 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
     cctxPtr->tmpInSize = 0;
 
     /* keep tmpIn within limits */
-    if ((cctxPtr->tmpIn + cctxPtr->maxBlockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize)) {
+    if ((cctxPtr->tmpIn + cctxPtr->maxBlockSize) > (cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity)) {
         assert(cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked);
         LZ4F_localSaveDict(cctxPtr);
     }
@@ -1328,7 +1328,7 @@ struct LZ4F_dctx_s {
     dStage_t dStage;
     U64    frameRemainingSize;
     size_t maxBlockSize;
-    size_t maxBufferSize;
+    size_t tmpOutBufferCapacity;
     BYTE*  tmpIn;
     size_t tmpInSize;
     size_t tmpInTarget;
@@ -1392,7 +1392,7 @@ size_t LZ4F_dctx_size(const LZ4F_dctx* dctx) {
     }
     return sizeof(*dctx)
          + (dctx->tmpIn != NULL ? dctx->maxBlockSize + BFSize : 0)
-         + (dctx->tmpOutBuffer != NULL ? dctx->maxBufferSize : 0);
+         + (dctx->tmpOutBuffer != NULL ? dctx->tmpOutBufferCapacity : 0);
 }
 
 
@@ -1648,7 +1648,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     }
 
     if (dctx->dict == dctx->tmpOutBuffer) {    /* copy dst into tmp to complete dict */
-        if (dctx->dictSize + dstSize > dctx->maxBufferSize) {  /* tmp buffer not large enough */
+        if (dctx->dictSize + dstSize > dctx->tmpOutBufferCapacity) {  /* tmp buffer not large enough */
             size_t const preserveSize = 64 KB - dstSize;
             memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
             dctx->dictSize = preserveSize;
@@ -1756,15 +1756,15 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             /* internal buffers allocation */
             {   size_t const bufferNeeded = dctx->maxBlockSize
                     + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
-                if (bufferNeeded > dctx->maxBufferSize) {   /* tmp buffers too small */
-                    dctx->maxBufferSize = 0;   /* ensure allocation will be re-attempted on next entry*/
+                if (bufferNeeded > dctx->tmpOutBufferCapacity) {   /* tmp buffers too small */
+                    dctx->tmpOutBufferCapacity = 0;   /* ensure allocation will be re-attempted on next entry*/
                     LZ4F_free(dctx->tmpIn, dctx->cmem);
                     dctx->tmpIn = (BYTE*)LZ4F_malloc(dctx->maxBlockSize + BFSize /* block checksum */, dctx->cmem);
                     RETURN_ERROR_IF(dctx->tmpIn == NULL, allocation_failed);
                     LZ4F_free(dctx->tmpOutBuffer, dctx->cmem);
                     dctx->tmpOutBuffer= (BYTE*)LZ4F_malloc(bufferNeeded, dctx->cmem);
                     RETURN_ERROR_IF(dctx->tmpOutBuffer== NULL, allocation_failed);
-                    dctx->maxBufferSize = bufferNeeded;
+                    dctx->tmpOutBufferCapacity = bufferNeeded;
             }   }
             dctx->tmpInSize = 0;
             dctx->tmpInTarget = 0;
