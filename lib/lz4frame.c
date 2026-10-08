@@ -685,9 +685,9 @@ static void LZ4F_initStream(void* ctx,
 static int ctxTypeID_to_size(int ctxTypeID) {
     switch(ctxTypeID) {
     case 1:
-        return LZ4_sizeofState();
+        return (int)sizeof(LZ4_stream_t);
     case 2:
-        return LZ4_sizeofStateHC();
+        return (int)sizeof(LZ4_streamHC_t);
     default:
         return 0;
     }
