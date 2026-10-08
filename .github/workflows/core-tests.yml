@@ -54,6 +54,9 @@ jobs:
     - name: Fuzzer test (32-bit)
       run: make -C tests test-fuzzer32 V=1
 
+    - name: OSS-Fuzz helpers unit test
+      run: make -C ossfuzz test V=1
+
   versions:
     name: Version Compatibility Tests
     runs-on: ubuntu-latest

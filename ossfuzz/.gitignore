@@ -13,6 +13,7 @@ round_trip_frame_fuzzer
 round_trip_frame_uncompressed_fuzzer
 
 # test artefacts
+fuzz_data_producer_test
 
 # local tests
 

@@ -72,9 +72,18 @@ endif
 %_fuzzer_clean:
 	$(RM) $*_fuzzer $*_fuzzer.o standaloneengine.o
 
+# Unit test of the fuzzer helpers (not a fuzzer)
+.PHONY: test
+test: fuzz_data_producer_test
+	./fuzz_data_producer_test$(EXT)
+
+fuzz_data_producer_test: fuzz_data_producer_test.o fuzz_data_producer.o
+	$(CC) $(LZ4_CFLAGS) $(LDFLAGS) $^ -o $@$(EXT)
+
 .PHONY: clean
 clean: compress_fuzzer_clean decompress_fuzzer_clean \
 	compress_frame_fuzzer_clean compress_frame_stream_fuzzer_clean compress_hc_fuzzer_clean \
 	decompress_frame_fuzzer_clean round_trip_frame_fuzzer_clean \
 	round_trip_fuzzer_clean round_trip_hc_fuzzer_clean round_trip_stream_fuzzer_clean
+	$(RM) fuzz_data_producer_test fuzz_data_producer_test.o fuzz_data_producer.o
 	$(MAKE) -C $(LZ4DIR) clean
