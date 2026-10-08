@@ -47,6 +47,7 @@
 #include <stdio.h>    /* fprintf, getchar */
 #include <stdlib.h>   /* exit, calloc, free */
 #include <string.h>   /* strcmp, strlen */
+#include <limits.h>   /* INT_MAX */
 #include "lz4conf.h"  /* compile-time constants */
 #include "bench.h"    /* BMK_benchFile, BMK_SetNbIterations, BMK_SetBlocksize, BMK_SetPause */
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
@@ -281,27 +282,60 @@ static int exeNameMatch(const char* exeName, const char* test)
         (exeName[strlen(test)] == '\0' || exeName[strlen(test)] == '.');
 }
 
-/*! readU32FromChar() :
- * @return : unsigned integer value read from input in `char` format
+/*! readU32FromCharChecked() :
+ * @return 0 if success, and store the result in *value.
  *  allows and interprets K, KB, KiB, M, MB and MiB suffix.
  *  Will also modify `*stringPtr`, advancing it to position where it stopped reading.
- *  Note : function result can overflow if digit string > MAX_UINT */
-static unsigned readU32FromChar(const char** stringPtr)
+ * @return 1 if an overflow error occurs */
+static int readU32FromCharChecked(const char** stringPtr, unsigned* value)
 {
+    unsigned const maxValue = (unsigned)-1;
     unsigned result = 0;
     while ((**stringPtr >='0') && (**stringPtr <='9')) {
-        result *= 10;
-        result += (unsigned)(**stringPtr - '0');
+        unsigned const digit = (unsigned)(**stringPtr - '0');
+        if (result > (maxValue - digit) / 10) return 1;  /* overflow */
+        result = result * 10 + digit;
         (*stringPtr)++ ;
     }
     if ((**stringPtr=='K') || (**stringPtr=='M')) {
+        if (result > (maxValue >> 10)) return 1;  /* overflow */
         result <<= 10;
-        if (**stringPtr=='M') result <<= 10;
+        if (**stringPtr=='M') {
+            if (result > (maxValue >> 10)) return 1;  /* overflow */
+            result <<= 10;
+        }
         (*stringPtr)++ ;
         if (**stringPtr=='i') (*stringPtr)++;
         if (**stringPtr=='B') (*stringPtr)++;
     }
+    *value = result;
+    return 0;
+}
+
+/*! readU32FromChar() :
+ * @return : unsigned integer value read from input in `char` format.
+ *  allows and interprets K, KB, KiB, M, MB and MiB suffix.
+ *  Will also modify `*stringPtr`, advancing it to position where it stopped reading.
+ *  Note : exits with an error message if the value overflows 32 bits */
+static unsigned readU32FromChar(const char** stringPtr)
+{
+    unsigned result;
+    if (readU32FromCharChecked(stringPtr, &result)) {
+        errorOut("error: numeric value overflows 32-bit unsigned int");
+    }
     return result;
+}
+
+/*! readIntFromChar() :
+ *  same as readU32FromChar(), for values stored into an `int` (compression levels).
+ *  Note : exits with an error message if the value is larger than INT_MAX */
+static int readIntFromChar(const char** stringPtr)
+{
+    unsigned const result = readU32FromChar(stringPtr);
+    if (result > (unsigned)INT_MAX) {
+        errorOut("error: numeric value is too large");
+    }
+    return (int)result;
 }
 
 #define CLEAN_RETURN(i) { operationResult = (i); goto _cleanup; }
@@ -367,8 +401,9 @@ static unsigned init_nbWorkers(void)
     const char* const env = getenv(ENV_NBTHREADS);
     if (env != NULL) {
         const char* ptr = env;
-        if ((*ptr>='0') && (*ptr<='9')) {
-            return readU32FromChar(&ptr);
+        unsigned nbWorkers;
+        if ((*ptr>='0') && (*ptr<='9') && !readU32FromCharChecked(&ptr, &nbWorkers)) {
+            return nbWorkers;
         }
         DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid unsigned value \n", ENV_NBTHREADS, env);
     }
@@ -382,8 +417,10 @@ static int init_cLevel(void)
     const char* const env = getenv(ENV_CLEVEL);
     if (env != NULL) {
         const char* ptr = env;
-        if ((*ptr>='0') && (*ptr<='9')) {
-            return (int)readU32FromChar(&ptr);
+        unsigned cLevel;
+        if ((*ptr>='0') && (*ptr<='9') && !readU32FromCharChecked(&ptr, &cLevel)
+          && (cLevel <= (unsigned)INT_MAX)) {
+            return (int)cLevel;
         }
         DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid unsigned value \n", ENV_CLEVEL, env);
     }
@@ -498,11 +535,11 @@ int main(int argCount, const char** argv)
                 if (longCommandWArg(&argument, "--fast")) {
                     /* Parse optional acceleration factor */
                     if (*argument == '=') {
-                        U32 fastLevel;
+                        int fastLevel;
                         ++argument;
-                        fastLevel = readU32FromChar(&argument);
+                        fastLevel = readIntFromChar(&argument);
                         if (fastLevel) {
-                            cLevel = -(int)fastLevel;
+                            cLevel = -fastLevel;
                         } else {
                             badusage(exeName);
                         }
@@ -532,7 +569,7 @@ int main(int argCount, const char** argv)
                 }
 
                 if ((*argument>='0') && (*argument<='9')) {
-                    cLevel = (int)readU32FromChar(&argument);
+                    cLevel = readIntFromChar(&argument);
                     argument--;
                     continue;
                 }
@@ -547,7 +584,7 @@ int main(int argCount, const char** argv)
 
                 case 'e':
                     argument++;
-                    cLevelLast = (int)readU32FromChar(&argument);
+                    cLevelLast = readIntFromChar(&argument);
                     argument--;
                     break;
 
