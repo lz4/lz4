@@ -257,6 +257,10 @@ test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
 	./test-lz4-dict.sh
 
+test-lz4-blocksize: lz4 datagen checkFrame
+	@echo "\n ---- test lz4 with custom block sizes ----"
+	./test-lz4-blocksize.sh
+
 test-lz4hc-hugefile: lz4 datagen
 	@echo "\n ---- test HC compression/decompression of huge files ----"
 	./test-lz4hc-hugefile.sh
@@ -277,7 +281,8 @@ test-lz4-opt-parser: lz4 datagen
 
 test-lz4-essentials : lz4 datagen test-datagen-invalid-input test-lz4-basic test-lz4-multiple \
                       test-lz4-multiple-legacy test-lz4-frame-concatenation \
-                      test-lz4-testmode test-lz4-contentSize test-lz4-dict
+                      test-lz4-testmode test-lz4-contentSize test-lz4-dict \
+                      test-lz4-blocksize
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
           test-lz4-sparse test-lz4-hugefile test-lz4-dict \
