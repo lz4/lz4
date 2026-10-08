@@ -504,7 +504,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
       || preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN ) {
         LZ4_initStream(&lz4ctx, sizeof(lz4ctx));
         cctxPtr->lz4CtxPtr = &lz4ctx;
-        cctxPtr->lz4CtxAlloc = 1;
+        cctxPtr->lz4CtxAlloc = ctxFast;
         cctxPtr->lz4CtxType = ctxFast;
     }
 #endif
@@ -682,22 +682,28 @@ static void LZ4F_initStream(void* ctx,
     }
 }
 
-static int ctxTypeID_to_size(int ctxTypeID) {
-    switch(ctxTypeID) {
-    case 1:
-        return (int)sizeof(LZ4_stream_t);
-    case 2:
-        return (int)sizeof(LZ4_streamHC_t);
-    default:
-        return 0;
+/* LZ4F_sizeofLZ4State() :
+ * @return the size of the inner LZ4 state (pointed by lz4CtxPtr) for @ctxType :
+ *  LZ4_stream_t for fast levels, LZ4_streamHC_t for HC levels.
+ *  ctxNone means no state allocated, hence a size of 0.
+ *  Note : the larger of fast and HC states depends on LZ4_MEMORY_USAGE,
+ *         so reusing an allocated state requires comparing sizes. */
+static size_t LZ4F_sizeofLZ4State(LZ4F_CtxType_e ctxType)
+{
+    switch (ctxType) {
+    case ctxNone: return 0;
+    case ctxFast: return sizeof(LZ4_stream_t);
+    case ctxHC:   return sizeof(LZ4_streamHC_t);
     }
+    assert(0);   /* invalid ctxType */
+    return 0;
 }
 
 size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
     if (cctx == NULL) {
         return 0;
     }
-    return sizeof(*cctx) + cctx->maxBufferSize + ctxTypeID_to_size(cctx->lz4CtxAlloc);
+    return sizeof(*cctx) + cctx->maxBufferSize + LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc);
 }
 
 /* LZ4F_compressBegin_internal()
@@ -725,9 +731,9 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     DEBUGLOG(5, "LZ4F_compressBegin_internal: Independent_blocks=%u", cctx->prefs.frameInfo.blockMode);
 
     /* cctx Management */
-    {   U16 const ctxTypeID = (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? 1 : 2;
-        int requiredSize = ctxTypeID_to_size(ctxTypeID);
-        int allocatedSize = ctxTypeID_to_size(cctx->lz4CtxAlloc);
+    {   LZ4F_CtxType_e const ctxType = (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) ? ctxFast : ctxHC;
+        size_t const requiredSize = LZ4F_sizeofLZ4State(ctxType);
+        size_t const allocatedSize = LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc);
         if (allocatedSize < requiredSize) {
             /* not enough space allocated */
             LZ4F_free(cctx->lz4CtxPtr, cctx->cmem);
@@ -743,9 +749,9 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
                     LZ4_initStreamHC(cctx->lz4CtxPtr, sizeof(LZ4_streamHC_t));
             }
             RETURN_ERROR_IF(cctx->lz4CtxPtr == NULL, allocation_failed);
-            cctx->lz4CtxAlloc = ctxTypeID;
-            cctx->lz4CtxType = ctxTypeID;
-        } else if (cctx->lz4CtxType != ctxTypeID) {
+            cctx->lz4CtxAlloc = (U16)ctxType;
+            cctx->lz4CtxType = (U16)ctxType;
+        } else if (cctx->lz4CtxType != ctxType) {
             /* otherwise, a sufficient buffer is already allocated,
              * but we need to reset it to the correct context type */
             if (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
@@ -754,7 +760,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
                 LZ4_initStreamHC((LZ4_streamHC_t*)cctx->lz4CtxPtr, sizeof(LZ4_streamHC_t));
                 LZ4_setCompressionLevel((LZ4_streamHC_t*)cctx->lz4CtxPtr, cctx->prefs.compressionLevel);
             }
-            cctx->lz4CtxType = ctxTypeID;
+            cctx->lz4CtxType = (U16)ctxType;
     }   }
 
     /* Buffer Management */
