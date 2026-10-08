@@ -455,7 +455,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     MEM_INIT(&options, 0, sizeof(options));
     options.stableSrc = 1;
 
-    RETURN_ERROR_IF(dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs), dstMaxSize_tooSmall);
+    RETURN_ERROR_IF(dstCapacity < LZ4F_compressFrameBound(srcSize, &prefs), dstCapacity_tooSmall);
 
     { size_t const headerSize = LZ4F_compressBegin_usingCDict(cctx, dstBuffer, dstCapacity, cdict, &prefs);  /* write header */
       FORWARD_IF_ERROR(headerSize);
@@ -713,7 +713,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* dstPtr = dstStart;
 
-    RETURN_ERROR_IF(dstCapacity < maxFHSize, dstMaxSize_tooSmall);
+    RETURN_ERROR_IF(dstCapacity < maxFHSize, dstCapacity_tooSmall);
     if (preferencesPtr == NULL) preferencesPtr = &prefNull;
     FORWARD_IF_ERROR( LZ4F_getBlockSize(preferencesPtr->frameInfo.blockSizeID) ); /* validate before modifying @cctx */
     cctx->prefs = *preferencesPtr;
@@ -1037,12 +1037,12 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
                                : 0;
         size_t const updateBound = LZ4F_compressBound_internal(srcSize, &cctxPtr->prefs,
                                                              modeSwitch ? 0 : bufferedSize);
-        RETURN_ERROR_IF(dstCapacity < flushBound, dstMaxSize_tooSmall);
-        RETURN_ERROR_IF(dstCapacity - flushBound < updateBound, dstMaxSize_tooSmall);
+        RETURN_ERROR_IF(dstCapacity < flushBound, dstCapacity_tooSmall);
+        RETURN_ERROR_IF(dstCapacity - flushBound < updateBound, dstCapacity_tooSmall);
     }
 
     if (blockCompression == LZ4B_UNCOMPRESSED && dstCapacity < srcSize)
-        RETURN_ERROR(dstMaxSize_tooSmall);
+        RETURN_ERROR(dstCapacity_tooSmall);
 
     /* flush currently written block, to continue with new block compression */
     if (cctxPtr->blockCompressMode != blockCompression) {
@@ -1201,7 +1201,7 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
             cctxPtr->tmpInSize, (int)(cctxPtr->tmpIn - cctxPtr->tmpBuff), (unsigned)dstCapacity);
     if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
     RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);
-    RETURN_ERROR_IF(dstCapacity < (cctxPtr->tmpInSize + BHSize + BFSize), dstMaxSize_tooSmall);
+    RETURN_ERROR_IF(dstCapacity < (cctxPtr->tmpInSize + BHSize + BFSize), dstCapacity_tooSmall);
     (void)compressOptionsPtr;   /* not useful (yet) */
 
     /* select compression function */
@@ -1253,13 +1253,13 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
     assert(flushSize <= dstCapacity);
     dstCapacity -= flushSize;
 
-    RETURN_ERROR_IF(dstCapacity < 4, dstMaxSize_tooSmall);
+    RETURN_ERROR_IF(dstCapacity < 4, dstCapacity_tooSmall);
     LZ4F_writeLE32(dstPtr, 0);
     dstPtr += 4;   /* endMark */
 
     if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
         U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
-        RETURN_ERROR_IF(dstCapacity < 8, dstMaxSize_tooSmall);
+        RETURN_ERROR_IF(dstCapacity < 8, dstCapacity_tooSmall);
         DEBUGLOG(5,"Writing 32-bit content checksum (0x%0X)", xxh);
         LZ4F_writeLE32(dstPtr, xxh);
         dstPtr+=4;   /* content Checksum */

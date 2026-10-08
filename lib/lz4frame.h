@@ -678,7 +678,7 @@ extern "C" {
         ITEM(ERROR_reservedFlag_set) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) \
-        ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_dstCapacity_tooSmall) \
         ITEM(ERROR_frameHeader_incomplete) \
         ITEM(ERROR_frameType_unknown) \
         ITEM(ERROR_frameSize_wrong) \
@@ -698,6 +698,9 @@ extern "C" {
 /* enum list is exposed, to handle specific errors */
 typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
               _LZ4F_dummy_error_enum_for_c89_never_used } LZ4F_errorCodes;
+
+/* former name, kept for compatibility */
+#define LZ4F_ERROR_dstMaxSize_tooSmall LZ4F_ERROR_dstCapacity_tooSmall
 
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 

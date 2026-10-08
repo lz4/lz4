@@ -460,7 +460,7 @@ static int testMixedUpdates(U32 seed)
                 cSize = uncompressedFirst
                       ? LZ4F_compressUpdate(cctx, dst, capacity, src + firstSize, secondSize, NULL)
                       : LZ4F_uncompressedUpdate(cctx, dst, capacity, src + firstSize, secondSize, NULL);
-                if (LZ4F_getErrorCode(cSize) != LZ4F_ERROR_dstMaxSize_tooSmall)
+                if (LZ4F_getErrorCode(cSize) != LZ4F_ERROR_dstCapacity_tooSmall)
                     goto _output_error;
                 for (pos = 0; pos <= capacity; ++pos)
                     if (dst[pos] != 0xA5) goto _output_error;
