@@ -217,7 +217,9 @@ typedef struct {
  *  All state allocations will use the Heap.
  *  It also means each invocation of LZ4F_compressFrame() will trigger several internal alloc/free invocations.
  *
- * @dstCapacity MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ *  Success is guaranteed when @dstCapacity >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ *  A smaller @dstCapacity is allowed : compression is attempted,
+ *  and fails with LZ4F_ERROR_dstCapacity_tooSmall if the frame doesn't fit.
  * @preferencesPtr is optional : one can provide NULL, in which case all preferences are set to default.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using LZ4F_isError())
@@ -295,7 +297,9 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 /*! LZ4F_compressBegin() :
  *  will write the frame header into dstBuffer.
- *  dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
+ *  Success is guaranteed when dstCapacity >= LZ4F_HEADER_SIZE_MAX bytes.
+ *  Actual header size is between LZ4F_HEADER_SIZE_MIN and LZ4F_HEADER_SIZE_MAX, depending on preferences,
+ *  and only this size is required. A failure doesn't modify `cctx`.
  * `prefsPtr` is optional : NULL can be provided to set all preferences to default.
  * @return : number of bytes written into dstBuffer for the header
  *           or an error code (which can be tested using LZ4F_isError())
@@ -307,6 +311,7 @@ LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
 /*! LZ4F_compressBound() :
  *  Provides minimum dstCapacity required to guarantee success of
  *  LZ4F_compressUpdate() or LZ4F_uncompressedUpdate(), given a srcSize and preferences, for a worst case scenario.
+ *  Smaller capacities are allowed, but then the operation may fail.
  *  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() instead.
  *  Note that the result is only valid for a single invocation of LZ4F_compressUpdate().
  *  When invoking LZ4F_compressUpdate() multiple times,
@@ -324,10 +329,11 @@ LZ4FLIB_API size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* 
 
 /*! LZ4F_compressUpdate() :
  *  LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
- *  Important rule: dstCapacity MUST be large enough to ensure operation success even in worst case situations.
- *  This value is provided by LZ4F_compressBound().
- *  If this condition is not respected, LZ4F_compress() will fail (result is an errorCode).
- *  After an error, the state is left in a UB state, and must be re-initialized or freed.
+ *  Success is guaranteed when dstCapacity >= LZ4F_compressBound(srcSize, prefsPtr).
+ *  A smaller dstCapacity is allowed : compression is attempted,
+ *  and fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit.
+ *  After an error, the frame is invalidated : it can't be continued,
+ *  and subsequent operations fail, until a new frame is started with LZ4F_compressBegin().
  *  If previously an uncompressed block was written, buffered data is flushed
  *  before appending compressed data is continued.
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
@@ -342,11 +348,13 @@ LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx,
 /*! LZ4F_flush() :
  *  When data must be generated and sent immediately, without waiting for a block to be completely filled,
  *  it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.
- * `dstCapacity` must be large enough to ensure the operation will be successful.
  * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
  * @return : nb of bytes written into dstBuffer (can be zero, when there is no data stored within cctx)
  *           or an error code if it fails (which can be tested using LZ4F_isError())
  *  Note : LZ4F_flush() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
+ *  A smaller dstCapacity is allowed : it fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit,
+ *  in which case the frame is invalidated (see LZ4F_compressUpdate()).
+ *  LZ4F_flush() requires a frame in progress.
  */
 LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
                               void* dstBuffer, size_t dstCapacity,
@@ -360,7 +368,9 @@ LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
  * @return : nb of bytes written into dstBuffer, necessarily >= 4 (endMark),
  *           or an error code if it fails (which can be tested using LZ4F_isError())
  *  Note : LZ4F_compressEnd() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
- *  A successful call to LZ4F_compressEnd() makes `cctx` available again for another compression task.
+ *  A smaller dstCapacity is allowed : it fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit,
+ *  in which case the frame is invalidated (see LZ4F_compressUpdate()).
+ *  Whether it succeeds or not, LZ4F_compressEnd() makes `cctx` available again for another compression task.
  */
 LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx,
                                     void* dstBuffer, size_t dstCapacity,
@@ -548,7 +558,7 @@ LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always su
 
 /*! LZ4F_compressBegin_usingDict() : stable since v1.10
  *  Inits dictionary compression streaming, and writes the frame header into dstBuffer.
- * @dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
+ *  Success is guaranteed when @dstCapacity >= LZ4F_HEADER_SIZE_MAX bytes (see LZ4F_compressBegin()).
  * @prefsPtr is optional : one may provide NULL as argument,
  *  however, it's the only way to provide dictID in the frame header.
  * @dictBuffer must outlive the compression session.
@@ -603,8 +613,9 @@ LZ4FLIB_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
  *  Compress an entire srcBuffer into a valid LZ4 frame using a digested Dictionary.
  * @cctx must point to a context created by LZ4F_createCompressionContext().
  *  If @cdict==NULL, compress without a dictionary.
- * @dstBuffer MUST be >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
- *  If this condition is not respected, function will fail (@return an errorCode).
+ *  Success is guaranteed when @dstCapacity >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
+ *  A smaller @dstCapacity is allowed : compression is attempted,
+ *  and fails with LZ4F_ERROR_dstCapacity_tooSmall if the frame doesn't fit.
  *  The LZ4F_preferences_t structure is optional : one may provide NULL as argument,
  *  but it's not recommended, as it's the only way to provide @dictID in the frame header.
  * @return : number of bytes written into dstBuffer.
@@ -620,7 +631,7 @@ LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
 
 /*! LZ4F_compressBegin_usingCDict() : stable since v1.10
  *  Inits streaming dictionary compression, and writes the frame header into dstBuffer.
- * @dstCapacity must be >= LZ4F_HEADER_SIZE_MAX bytes.
+ *  Success is guaranteed when @dstCapacity >= LZ4F_HEADER_SIZE_MAX bytes (see LZ4F_compressBegin()).
  * @prefsPtr is optional : one may provide NULL as argument,
  *  note however that it's the only way to insert a @dictID in the frame header.
  * @cdict must outlive the compression session.
@@ -678,7 +689,7 @@ extern "C" {
         ITEM(ERROR_reservedFlag_set) \
         ITEM(ERROR_allocation_failed) \
         ITEM(ERROR_srcSize_tooLarge) \
-        ITEM(ERROR_dstMaxSize_tooSmall) \
+        ITEM(ERROR_dstCapacity_tooSmall) \
         ITEM(ERROR_frameHeader_incomplete) \
         ITEM(ERROR_frameType_unknown) \
         ITEM(ERROR_frameSize_wrong) \
@@ -699,6 +710,9 @@ extern "C" {
 typedef enum { LZ4F_LIST_ERRORS(LZ4F_GENERATE_ENUM)
               _LZ4F_dummy_error_enum_for_c89_never_used } LZ4F_errorCodes;
 
+/* former name, kept for compatibility */
+#define LZ4F_ERROR_dstMaxSize_tooSmall LZ4F_ERROR_dstCapacity_tooSmall
+
 LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 
 /**********************************
@@ -714,11 +728,11 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
 
 /*! LZ4F_uncompressedUpdate() :
  *  LZ4F_uncompressedUpdate() can be called repetitively to add data stored as uncompressed blocks.
- *  Important rule: dstCapacity MUST be large enough to store uncompressed blocks,
- *  including their headers, optional checksums, and any buffered data flushed on a mode switch.
- *  LZ4F_compressBound() provides a capacity sufficient for this operation.
- *  If this condition is not respected, LZ4F_uncompressedUpdate() will fail (result is an errorCode).
- *  After an error, the state is left in a UB state, and must be re-initialized or freed.
+ *  Success is guaranteed when dstCapacity >= LZ4F_compressBound(srcSize, prefsPtr).
+ *  A smaller dstCapacity is allowed : the operation fails with LZ4F_ERROR_dstCapacity_tooSmall
+ *  if it can't store its uncompressed blocks, including their headers, optional checksums,
+ *  and any buffered data flushed on a mode switch.
+ *  After an error, the frame is invalidated (see LZ4F_compressUpdate()).
  *  If previously a compressed block was written, buffered data is flushed first,
  *  before appending uncompressed data is continued.
  *  This operation is only supported when LZ4F_blockIndependent is used.

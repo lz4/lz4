@@ -77,26 +77,26 @@ static void compress_round_trip(const uint8_t *data, size_t size,
     size_t compressedSize = headerSize;
 
     /* Compress data before uncompressed offset */
-    size_t lz4Return = LZ4F_compressUpdate(ctx, dst + compressedSize, dstCapacity,
+    size_t lz4Return = LZ4F_compressUpdate(ctx, dst + compressedSize, dstCapacity - compressedSize,
                                            data, uncompressedOffset, NULL);
     FUZZ_ASSERT(!LZ4F_isError(lz4Return));
     compressedSize += lz4Return;
 
     /* Add uncompressed data */
-    lz4Return = LZ4F_uncompressedUpdate(ctx, dst + compressedSize, dstCapacity,
+    lz4Return = LZ4F_uncompressedUpdate(ctx, dst + compressedSize, dstCapacity - compressedSize,
                                         uncompressedData, uncompressedSize, NULL);
     FUZZ_ASSERT(!LZ4F_isError(lz4Return));
     compressedSize += lz4Return;
 
     /* Compress data after uncompressed offset */
-    lz4Return = LZ4F_compressUpdate(ctx, dst + compressedSize, dstCapacity,
+    lz4Return = LZ4F_compressUpdate(ctx, dst + compressedSize, dstCapacity - compressedSize,
                                     data + uncompressedEndOffset,
                                     size - uncompressedEndOffset, NULL);
     FUZZ_ASSERT(!LZ4F_isError(lz4Return));
     compressedSize += lz4Return;
 
     /* Finish compression */
-    lz4Return = LZ4F_compressEnd(ctx, dst + compressedSize, dstCapacity, NULL);
+    lz4Return = LZ4F_compressEnd(ctx, dst + compressedSize, dstCapacity - compressedSize, NULL);
     FUZZ_ASSERT(!LZ4F_isError(lz4Return));
     compressedSize += lz4Return;
 
