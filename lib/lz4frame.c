@@ -884,10 +884,16 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctx,
  */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
+    size_t bound;
+    size_t const blockCRCSize = preferencesPtr
+                             ? BFSize * preferencesPtr->frameInfo.blockChecksumFlag
+                             : BFSize;
     if (preferencesPtr && preferencesPtr->autoFlush) {
         return LZ4F_compressBound_internal(srcSize, preferencesPtr, 0);
     }
-    return LZ4F_compressBound_internal(srcSize, preferencesPtr, (size_t)-1);
+    bound = LZ4F_compressBound_internal(srcSize+1, preferencesPtr, (size_t)-1);
+    /* A mode switch may emit buffered input as a separate partial block. */
+    return bound + BHSize + blockCRCSize;
 }
 
 
@@ -1023,8 +1029,17 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     DEBUGLOG(4, "LZ4F_compressUpdate (srcSize=%zu)", srcSize);
 
     RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);   /* state must be initialized and waiting for next block */
-    if (dstCapacity < LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize))
-        RETURN_ERROR(dstMaxSize_tooSmall);
+    {   size_t const bufferedSize = cctxPtr->tmpInSize;
+        unsigned const modeSwitch = cctxPtr->blockCompressMode != blockCompression;
+        size_t const flushBound = modeSwitch && bufferedSize != 0
+                               ? bufferedSize + BHSize
+                                 + BFSize * cctxPtr->prefs.frameInfo.blockChecksumFlag
+                               : 0;
+        size_t const updateBound = LZ4F_compressBound_internal(srcSize, &cctxPtr->prefs,
+                                                             modeSwitch ? 0 : bufferedSize);
+        RETURN_ERROR_IF(dstCapacity < flushBound, dstMaxSize_tooSmall);
+        RETURN_ERROR_IF(dstCapacity - flushBound < updateBound, dstMaxSize_tooSmall);
+    }
 
     if (blockCompression == LZ4B_UNCOMPRESSED && dstCapacity < srcSize)
         RETURN_ERROR(dstMaxSize_tooSmall);
@@ -1032,6 +1047,7 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     /* flush currently written block, to continue with new block compression */
     if (cctxPtr->blockCompressMode != blockCompression) {
         bytesWritten = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
+        FORWARD_IF_ERROR(bytesWritten);
         dstPtr += bytesWritten;
         cctxPtr->blockCompressMode = blockCompression;
     }
