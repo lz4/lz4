@@ -23,6 +23,13 @@ datagen -g100KB       > $FPREFIX-small  # single job
 # invalid block sizes
 lz4 -f -B3  $FPREFIX-small $FPREFIX.lz4 && exit 1  # must fail
 lz4 -f -B31 $FPREFIX-small $FPREFIX.lz4 && exit 1  # must fail
+lz4 -f -B4294967300 $FPREFIX-small $FPREFIX.lz4 && exit 1  # must fail (would wrap to 4)
+lz4 -f -B4194305K   $FPREFIX-small $FPREFIX.lz4 && exit 1  # must fail (would wrap to 1 KB)
+
+# K suffix
+lz4 -f -B64K   $FPREFIX-small $FPREFIX-K.lz4
+lz4 -f -B65536 $FPREFIX-small $FPREFIX.lz4
+cmp $FPREFIX-K.lz4 $FPREFIX.lz4
 
 # custom block sizes, across all block size IDs,
 # compared across thread counts, and across concatenated frames
