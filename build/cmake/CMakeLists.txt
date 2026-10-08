@@ -50,6 +50,9 @@ endif()
 # BUILD OPTIONS - Configure build targets and features
 #-----------------------------------------------------------------------------
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
+option(LZ4_ENABLE_FBOUNDS_SAFETY
+       "Enable experimental Clang -fbounds-safety annotations (OFF by default)"
+       OFF)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
 
 
@@ -205,6 +208,16 @@ if(BUILD_STATIC_LIBS)
     XXH_NAMESPACE=LZ4_)
 endif(BUILD_STATIC_LIBS)
 
+# Optional -fbounds-safety (inert macros unless enabled)
+if(LZ4_ENABLE_FBOUNDS_SAFETY)
+  foreach(_lz4_tgt IN LISTS LZ4_LIBRARIES_BUILT)
+    if(TARGET ${_lz4_tgt} AND NOT ${_lz4_tgt} STREQUAL "lz4")
+      target_compile_definitions(${_lz4_tgt} PUBLIC LZ4_SUPPORT_FBOUNDS_SAFETY)
+      target_compile_options(${_lz4_tgt} PUBLIC -fbounds-safety)
+    endif()
+  endforeach()
+endif(LZ4_ENABLE_FBOUNDS_SAFETY)
+
 #-----------------------------------------------------------------------------
 # CLI EXECUTABLES - Configuring command-line programs
 #-----------------------------------------------------------------------------
@@ -274,6 +287,7 @@ if(NOT LZ4_BUNDLED_MODE)
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
   install(FILES
     "${LZ4_LIB_SOURCE_DIR}/lz4.h"
+    "${LZ4_LIB_SOURCE_DIR}/lz4_bounds_safety.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4hc.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4frame.h"
     "${LZ4_LIB_SOURCE_DIR}/lz4file.h"
