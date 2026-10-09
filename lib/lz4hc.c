@@ -1646,7 +1646,11 @@ void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
     LZ4HC_CCtx_internal* const s = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(5, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
     if (s->dirty) {
+        /* a failed compression left the tables in an undefined state : start from scratch,
+         * but preserve parameters, as a reset without prior failure would */
+        LZ4_i8 const favorDecSpeed = s->favorDecSpeed;
         LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+        s->favorDecSpeed = favorDecSpeed;
     } else {
         assert(s->end >= s->prefixStart);
         s->dictLimit += (U32)(s->end - s->prefixStart);
