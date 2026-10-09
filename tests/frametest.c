@@ -1299,7 +1299,8 @@ _output_error:
 }
 
 
-/* Reproducibility : frames don't depend on the context's history */
+/* Reproducibility : frames don't depend on the context's history,
+ * provided their first block is >= 1 KB (LZ4_CLEAR_TABLE_THRESHOLD) */
 
 /* compresses @src with LZ4F_compressFrame_usingCDict() if @chunkSize == 0,
  * otherwise streams it by chunks of @chunkSize bytes.

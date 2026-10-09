@@ -659,20 +659,16 @@ static void LZ4F_initStream(void* ctx,
                             int level,
                             LZ4F_blockMode_t blockMode) {
     if (level < LZ4HC_CLEVEL_MIN) {
-        /* In these cases, we will call LZ4_compress_fast_continue(),
-         * which needs an already reset context. Otherwise, we'll call a
-         * one-shot API. The non-continued APIs internally perform their own
-         * resets at the beginning of their calls, where they know what
-         * tableType they need the context to be in. So in that case this
-         * would be misguided / wasted work. */
-        if (cdict) {
+        if (cdict || blockMode == LZ4F_blockLinked) {
+            /* In these cases, we will call LZ4_compress_fast_continue(),
+             * which needs an already reset context. Otherwise, we'll call a
+             * one-shot API. The non-continued APIs internally perform their own
+             * resets at the beginning of their calls, where they know what
+             * tableType they need the context to be in. So in that case this
+             * would be misguided / wasted work. */
             LZ4_resetStream_fast((LZ4_stream_t*)ctx);
-            LZ4_attach_dictionary((LZ4_stream_t*)ctx, cdict->fastCtx);
-        } else if (blockMode == LZ4F_blockLinked) {
-            /* Clear the table, rather than LZ4_resetStream_fast() :
-             * output doesn't depend on the context's history,
-             * and it's faster, unless the frame is tiny. */
-            LZ4_initStream(ctx, sizeof(LZ4_stream_t));
+            if (cdict)
+                LZ4_attach_dictionary((LZ4_stream_t*)ctx, cdict->fastCtx);
         }
         /* In these cases, we'll call a one-shot API.
          * The non-continued APIs internally perform their own resets
