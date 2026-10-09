@@ -1299,6 +1299,84 @@ _output_error:
 }
 
 
+/* compress a whole frame, started with the LZ4F_compressBegin*() variant selected by @beginMode */
+static size_t compressFrameWithDict(LZ4F_cctx* cctx, BYTE* dst, size_t dstCapacity,
+                                    const BYTE* src, size_t srcSize,
+                                    unsigned beginMode, const BYTE* dict, size_t dictSize, const LZ4F_CDict* cdict,
+                                    const LZ4F_preferences_t* prefs)
+{
+    size_t pos, r;
+    switch (beginMode) {
+    case 0: r = LZ4F_compressBegin(cctx, dst, dstCapacity, prefs); break;
+    case 1: r = LZ4F_compressBegin_usingDict(cctx, dst, dstCapacity, dict, dictSize, prefs); break;
+    default: r = LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, cdict, prefs); break;
+    }
+    if (LZ4F_isError(r)) return r;
+    pos = r;
+    r = LZ4F_compressUpdate(cctx, dst + pos, dstCapacity - pos, src, srcSize, NULL);
+    if (LZ4F_isError(r)) return r;
+    pos += r;
+    r = LZ4F_compressEnd(cctx, dst + pos, dstCapacity - pos, NULL);
+    if (LZ4F_isError(r)) return r;
+    return pos + r;
+}
+
+/* favorDecSpeed applies to frames started with a dictionary :
+ * neither loading a dictionary (LZ4F_compressBegin_usingDict())
+ * nor attaching a CDict (LZ4F_compressBegin_usingCDict()) may reset it */
+static int testFavorDecSpeedWithDict(U32 seed)
+{
+    size_t const dictSize = 64 KB;
+    size_t const srcSize = 64 KB;
+    BYTE* const dict = (BYTE*)malloc(dictSize);
+    BYTE* const src = (BYTE*)malloc(srcSize);
+    size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL) + LZ4F_HEADER_SIZE_MAX;
+    BYTE* const ref = (BYTE*)malloc(dstCapacity);
+    BYTE* const fds = (BYTE*)malloc(dstCapacity);
+    BYTE* const decoded = (BYTE*)malloc(srcSize);
+    LZ4F_cctx* cctx = NULL;
+    LZ4F_CDict* cdict = NULL;
+    unsigned blockMode, beginMode;
+    int result = 1;
+
+    SD_CHECK(dict != NULL && src != NULL && ref != NULL && fds != NULL && decoded != NULL, "allocation failure");
+    FUZ_fillCompressibleNoiseBuffer(dict, dictSize, 0.5, &seed);
+    FUZ_fillCompressibleNoiseBuffer(src, srcSize, 0.5, &seed);
+    cdict = LZ4F_createCDict(dict, dictSize);
+    SD_CHECK(cdict != NULL, "LZ4F_createCDict failure");
+    SD_CHECK(!LZ4F_isError(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION)), "cctx creation failure");
+
+    /* beginMode 0 (no dictionary) checks this test input is sensitive to favorDecSpeed */
+    for (blockMode = 0; blockMode < 2; blockMode++)
+    for (beginMode = 0; beginMode < 3; beginMode++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t refSize, fdsSize;
+        prefs.frameInfo.blockMode = blockMode ? LZ4F_blockIndependent : LZ4F_blockLinked;
+        prefs.compressionLevel = 10;   /* optimal parser : favorDecSpeed only applies there */
+        refSize = compressFrameWithDict(cctx, ref, dstCapacity, src, srcSize, beginMode, dict, dictSize, cdict, &prefs);
+        SD_CHECK(!LZ4F_isError(refSize), "blockMode=%u, beginMode=%u : %s", blockMode, beginMode, LZ4F_getErrorName(refSize));
+        prefs.favorDecSpeed = 1;
+        fdsSize = compressFrameWithDict(cctx, fds, dstCapacity, src, srcSize, beginMode, dict, dictSize, cdict, &prefs);
+        SD_CHECK(!LZ4F_isError(fdsSize), "blockMode=%u, beginMode=%u : %s", blockMode, beginMode, LZ4F_getErrorName(fdsSize));
+        SD_CHECK(refSize != fdsSize || memcmp(ref, fds, fdsSize),
+                "blockMode=%u, beginMode=%u : favorDecSpeed doesn't change the output (lost ?)", blockMode, beginMode);
+        SD_CHECK(sd_decodesTo(fds, fdsSize, src, srcSize, beginMode ? dict : NULL, beginMode ? dictSize : 0, decoded, srcSize),
+                "blockMode=%u, beginMode=%u : frame corrupted", blockMode, beginMode);
+    }
+    result = 0;
+
+_output_error:
+    free(dict);
+    free(src);
+    free(ref);
+    free(fds);
+    free(decoded);
+    LZ4F_freeCDict(cdict);
+    LZ4F_freeCompressionContext(cctx);
+    return result;
+}
+
+
 /* Reproducibility : frames don't depend on the context's history */
 
 /* compresses @src with LZ4F_compressFrame_usingCDict() if @chunkSize == 0,
@@ -1495,6 +1573,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "favorDecSpeed applies to blocks after an incompressible block : ");
     if (testFavorDecSpeedAfterRawBlock(seed)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "favorDecSpeed applies to frames started with a dictionary : ");
+    if (testFavorDecSpeedWithDict(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     DISPLAYLEVEL(3, "Frames don't depend on the history of the compression context : ");
