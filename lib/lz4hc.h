@@ -366,6 +366,8 @@ LZ4LIB_STATIC_API void LZ4_setCompressionLevel(
 /*! LZ4_favorDecompressionSpeed() : v1.8.2+ (experimental)
  *  Opt. Parser will favor decompression speed over compression ratio.
  *  Only applicable to levels >= LZ4HC_CLEVEL_OPT_MIN.
+ *  The setting is preserved by LZ4_resetStreamHC_fast() and LZ4_loadDictHC(),
+ *  it is reset by LZ4_initStreamHC().
  */
 LZ4LIB_STATIC_API void LZ4_favorDecompressionSpeed(
     LZ4_streamHC_t* LZ4_streamHCPtr, int favor);

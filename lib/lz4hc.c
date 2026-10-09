@@ -1504,9 +1504,12 @@ LZ4HC_compress_generic_dictCtx (
         ctx->dictCtx = NULL;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else if (position == 0 && *srcSizePtr > 4 KB && isStateCompatible(ctx, ctx->dictCtx)) {
+        /* parameters belong to the working context, not to the dictionary */
+        LZ4_i8 const favorDecSpeed = ctx->favorDecSpeed;
         LZ4_memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
         LZ4HC_setExternalDict(ctx, (const BYTE *)src);
         ctx->compressionLevel = (short)cLevel;
+        ctx->favorDecSpeed = favorDecSpeed;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else {
         return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtxHc);
@@ -1688,10 +1691,13 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
         dictionary += (size_t)dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    /* need a full initialization, there are bad side-effects when using resetFast() */
+    /* need a full initialization, there are bad side-effects when using resetFast(),
+     * but preserve parameters */
     {   int const cLevel = ctxPtr->compressionLevel;
+        LZ4_i8 const favorDecSpeed = ctxPtr->favorDecSpeed;
         LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
         LZ4_setCompressionLevel(LZ4_streamHCPtr, cLevel);
+        ctxPtr->favorDecSpeed = favorDecSpeed;
         cp = LZ4HC_getCLevelParams(cLevel);
     }
     LZ4HC_init_internal (ctxPtr, (const BYTE*)dictionary);
