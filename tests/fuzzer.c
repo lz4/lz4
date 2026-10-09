@@ -1483,6 +1483,42 @@ static void FUZ_unitTests(int compressionLevel)
         }
         DISPLAYLEVEL(3, " OK \n");
 
+        /* a failed compression marks the state as dirty, which is fully re-initialized at next reset */
+        DISPLAYLEVEL(3, "favorDecSpeed survives a failed compression : ");
+        {   int const srcSize = 64 KB;
+            int const level = LZ4HC_CLEVEL_OPT_MIN;
+            int refSize, r;
+            U32 refCrc;
+
+            /* reference : favor decompression speed */
+            LZ4_initStreamHC(&sHC, sizeof(sHC));
+            LZ4_resetStreamHC_fast(&sHC, level);
+            LZ4_favorDecompressionSpeed(&sHC, 1);
+            refSize = LZ4_compress_HC_continue(&sHC, testInput, testCompressed, srcSize, testCompressedSize);
+            FUZ_CHECKTEST(refSize <= 0, "LZ4_compress_HC_continue() failed");
+            refCrc = XXH32(testCompressed, (size_t)refSize, 0);
+
+            /* this test is only meaningful if favorDecSpeed changes the output */
+            LZ4_resetStreamHC_fast(&sHC, level);
+            LZ4_favorDecompressionSpeed(&sHC, 0);
+            r = LZ4_compress_HC_continue(&sHC, testInput, testCompressed, srcSize, testCompressedSize);
+            FUZ_CHECKTEST(r == refSize && XXH32(testCompressed, (size_t)r, 0) == refCrc,
+                          "favorDecSpeed doesn't change the output of this test input");
+
+            /* failed compression */
+            LZ4_resetStreamHC_fast(&sHC, level);
+            LZ4_favorDecompressionSpeed(&sHC, 1);
+            r = LZ4_compress_HC_continue(&sHC, testInput, testCompressed, srcSize, refSize - 1);
+            FUZ_CHECKTEST(r != 0, "compression into a too small buffer should fail");
+
+            /* next stream : must still favor decompression speed */
+            LZ4_resetStreamHC_fast(&sHC, level);
+            r = LZ4_compress_HC_continue(&sHC, testInput, testCompressed, srcSize, testCompressedSize);
+            FUZ_CHECKTEST(r != refSize || XXH32(testCompressed, (size_t)r, 0) != refCrc,
+                          "favorDecSpeed lost after a failed compression (%i vs %i bytes)", r, refSize);
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
         /* simple dictionary HC compression test */
         DISPLAYLEVEL(3, "HC dictionary compression test : ");
         {   U64 const crc64 = XXH64(testInput + 64 KB, testCompressedSize, 0);
