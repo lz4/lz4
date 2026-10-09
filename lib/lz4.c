@@ -899,11 +899,13 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
      */
     if ((tableType_t)cctx->tableType != clearedTable) {
         assert(inputSize >= 0);
+        /* beyond LZ4_HASHTABLESIZE / 16 (1 KB by default),
+         * clearing the table is faster than rejecting its stale entries */
         if ((tableType_t)cctx->tableType != tableType
           || ((tableType == byU16) && cctx->currentOffset + (unsigned)inputSize >= 0xFFFFU)
           || ((tableType == byU32) && cctx->currentOffset > 1 GB)
           || tableType == byPtr
-          || inputSize >= 4 KB)
+          || inputSize >= LZ4_HASHTABLESIZE / 16)
         {
             DEBUGLOG(4, "LZ4_prepareTable: Resetting table in %p", (void*)cctx);
             MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
