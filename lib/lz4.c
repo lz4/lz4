@@ -889,6 +889,10 @@ LZ4_getPosition(const BYTE* p,
     return LZ4_getPositionOnHash(h, tableBase, tableType);
 }
 
+/* beyond this input size (1 KB by default),
+ * clearing the table is faster than rejecting its stale entries */
+#define LZ4_CLEAR_TABLE_THRESHOLD (LZ4_HASHTABLESIZE / 16)
+
 LZ4_FORCE_INLINE void
 LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
            const int inputSize,
@@ -899,13 +903,11 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
      */
     if ((tableType_t)cctx->tableType != clearedTable) {
         assert(inputSize >= 0);
-        /* beyond LZ4_HASHTABLESIZE / 16 (1 KB by default),
-         * clearing the table is faster than rejecting its stale entries */
         if ((tableType_t)cctx->tableType != tableType
           || ((tableType == byU16) && cctx->currentOffset + (unsigned)inputSize >= 0xFFFFU)
           || ((tableType == byU32) && cctx->currentOffset > 1 GB)
           || tableType == byPtr
-          || inputSize >= LZ4_HASHTABLESIZE / 16)
+          || inputSize >= LZ4_CLEAR_TABLE_THRESHOLD)
         {
             DEBUGLOG(4, "LZ4_prepareTable: Resetting table in %p", (void*)cctx);
             MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
@@ -1725,6 +1727,10 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
     const char* dictEnd = streamPtr->dictSize ? (const char*)streamPtr->dictionary + streamPtr->dictSize : NULL;
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i, dictSize=%u)", inputSize, streamPtr->dictSize);
+
+    /* new stream (no history) : clear the table beyond LZ4_CLEAR_TABLE_THRESHOLD */
+    if ((streamPtr->dictSize == 0) && (streamPtr->dictCtx == NULL) && (inputSize >= LZ4_CLEAR_TABLE_THRESHOLD))
+        LZ4_prepareTable(streamPtr, inputSize, byU32);
 
     LZ4_renormDictT(streamPtr, inputSize);   /* fix index overflow */
     if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
