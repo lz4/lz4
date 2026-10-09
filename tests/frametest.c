@@ -1274,6 +1274,54 @@ _output_error:
 }
 
 
+/* favorDecSpeed applies to all blocks of a frame, including after an incompressible block :
+ * with independent blocks, a block doesn't depend on the previous ones */
+static int testFavorDecSpeedAfterRawBlock(U32 seed)
+{
+    size_t const blockSize = 64 KB;
+    size_t const headerSize = 7;    /* no content size, no dictID */
+    BYTE* const src = (BYTE*)malloc(2 * blockSize);    /* incompressible block, then compressible block */
+    size_t const dstCapacity = LZ4F_compressFrameBound(2 * blockSize, NULL);
+    BYTE* const frame = (BYTE*)malloc(dstCapacity);
+    BYTE* const alone = (BYTE*)malloc(dstCapacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t frameSize, aloneSize, cBlockSize, n;
+    int result = 1;
+
+    SD_CHECK(src != NULL && frame != NULL && alone != NULL, "allocation failure");
+    for (n = 0; n < blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);
+    FUZ_fillCompressibleNoiseBuffer(src + blockSize, blockSize, 0.5, &seed);
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.compressionLevel = 10;   /* optimal parser : favorDecSpeed only applies there */
+
+    /* this test is only meaningful if favorDecSpeed changes the compressible block */
+    frameSize = LZ4F_compressFrame(frame, dstCapacity, src + blockSize, blockSize, &prefs);
+    SD_CHECK(!LZ4F_isError(frameSize), "%s", LZ4F_getErrorName(frameSize));
+    prefs.favorDecSpeed = 1;
+    aloneSize = LZ4F_compressFrame(alone, dstCapacity, src + blockSize, blockSize, &prefs);
+    SD_CHECK(!LZ4F_isError(aloneSize), "%s", LZ4F_getErrorName(aloneSize));
+    SD_CHECK(frameSize != aloneSize || memcmp(frame, alone, aloneSize),
+            "favorDecSpeed doesn't change the output of this test input");
+
+    /* the same block, after an incompressible one, must be identical */
+    frameSize = LZ4F_compressFrame(frame, dstCapacity, src, 2 * blockSize, &prefs);
+    SD_CHECK(!LZ4F_isError(frameSize), "%s", LZ4F_getErrorName(frameSize));
+    SD_CHECK(FUZ_readLE32(frame + headerSize) == (0x80000000U | (U32)blockSize), "first block should be stored raw");
+    cBlockSize = 4 + (FUZ_readLE32(alone + headerSize) & 0x7FFFFFFFU);   /* block header included */
+    SD_CHECK(frameSize == headerSize + (4 + blockSize) + cBlockSize + 4
+          && !memcmp(frame + headerSize + 4 + blockSize, alone + headerSize, cBlockSize),
+            "block compressed after an incompressible block differs (favorDecSpeed lost ?)");
+    result = 0;
+
+_output_error:
+    free(src);
+    free(frame);
+    free(alone);
+    return result;
+}
+
+
 static int unitTests(U32 seed, double compressibility)
 {
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)
@@ -1342,6 +1390,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "Streaming compression succeeds if and only if each output fits : ");
     if (testSmallDstStream(seed, 24)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "favorDecSpeed applies to blocks after an incompressible block : ");
+    if (testFavorDecSpeedAfterRawBlock(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     /* Special case : null-content frame */
