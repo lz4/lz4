@@ -704,26 +704,19 @@ _output_error:
 
 typedef struct {
     int usingCDict;             /* 0 => LZ4F_compressFrame() */
+    LZ4F_cctx* cctx;            /* used by LZ4F_compressFrame_usingCDict() */
     const LZ4F_CDict* cdict;
     const LZ4F_preferences_t* prefs;
     const BYTE* src;
     size_t srcSize;
 } sd_frameJob;
 
-/* Output of linked blocks at fast levels may depend on context history.
- * Therefore, for comparisons to be exact, each compression starts from a fresh context. */
 static size_t sd_compressFrame(const sd_frameJob* job, void* dst, size_t dstCapacity)
 {
-    LZ4F_cctx* cctx = NULL;
-    size_t r;
     if (!job->usingCDict)
         return LZ4F_compressFrame(dst, dstCapacity, job->src, job->srcSize, job->prefs);
-    r = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
-    if (LZ4F_isError(r)) return r;
-    r = LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity,
-                                      job->src, job->srcSize, job->cdict, job->prefs);
-    LZ4F_freeCompressionContext(cctx);
-    return r;
+    return LZ4F_compressFrame_usingCDict(job->cctx, dst, dstCapacity,
+                                         job->src, job->srcSize, job->cdict, job->prefs);
 }
 
 /* @return 1 if compression into @capacity behaves as expected, 0 otherwise */
@@ -828,6 +821,7 @@ static int testSmallDstFrame(U32 seed)
         prefs.favorDecSpeed = (flags >> 4) & 1;
         prefs.compressionLevel = levels[lv];
         job.usingCDict = (api != 0);
+        job.cctx = cctx;
         job.cdict = (api == 2) ? cdict : NULL;
         job.prefs = &prefs;
         job.src = src + inputs[in].pos;
@@ -1026,16 +1020,6 @@ static int sd_opExactOK(const sd_stream* s, const sd_op* op, BYTE* dst, size_t c
     return 1;
 }
 
-/* Output of linked blocks at fast levels may depend on context history.
- * Therefore, byte-exact comparisons always start from a fresh context. */
-static LZ4F_cctx* sd_freshCctx(LZ4F_cctx* cctx)
-{
-    LZ4F_cctx* fresh = NULL;
-    LZ4F_freeCompressionContext(cctx);
-    if (LZ4F_isError(LZ4F_createCompressionContext(&fresh, LZ4F_VERSION))) return NULL;
-    return fresh;
-}
-
 /* sd_runScript() :
  * runs all @ops, each one using its bound as capacity, writing the frame into @frame.
  * @opStarts and @opSizes are optional.
@@ -1118,6 +1102,7 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
     FUZ_fillCompressibleNoiseBuffer(dictBuf, dictSize, 0.5, &seed);
     cdict = LZ4F_createCDict(dictBuf, dictSize);
     SD_CHECK(cdict != NULL, "LZ4F_createCDict failure");
+    SD_CHECK(!LZ4F_isError(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION)), "cctx creation failure");
 
     for (configNb = 0; configNb < nbConfigs; configNb++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
@@ -1157,8 +1142,6 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
                      (unsigned)nbOps, (unsigned)totalSrcSize);
 
         /* reference pass, each operation using its bound */
-        cctx = sd_freshCctx(cctx);
-        SD_CHECK(cctx != NULL, "cctx creation failure");
         s.cctx = cctx;
         refSize = sd_runScript(&s, ops, nbOps, frame, frameCapacity, opStarts, opSizes);
         SD_CHECK(!LZ4F_isError(refSize), "config %u : reference pass", configNb);
@@ -1174,9 +1157,6 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
             size_t capacity, r;
             while (opSizes[k] == 0) k = (k + 1) % nbOps;   /* begin and end always produce output */
             capacity = sd_pickSmallCapacity(ends, nbEnds, opStarts[k], opSizes[k], &seed);
-            cctx = sd_freshCctx(cctx);
-            SD_CHECK(cctx != NULL, "cctx creation failure");
-            s.cctx = cctx;
             for (n = 0; n < k; n++)
                 SD_CHECK(sd_opExactOK(&s, ops + n, dst, opSizes[n], frame + opStarts[n], opSizes[n]),
                         "config %u, probe %u : replay op %u", configNb, probe, (unsigned)n);
@@ -1209,9 +1189,6 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
         }   }
 
         /* exact pass : each operation into exactly its output size, sometimes more */
-        cctx = sd_freshCctx(cctx);
-        SD_CHECK(cctx != NULL, "cctx creation failure");
-        s.cctx = cctx;
         for (n = 0; n < nbOps; n++) {
             size_t const bound = sd_opBound(&s, ops + n);
             size_t capacity = opSizes[n];
