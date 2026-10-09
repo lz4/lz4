@@ -387,6 +387,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         const char* block = blockSize ? ((char*)CNBuffer) + blockStart : NULL;
         const char* dict = (char*)CNBuffer + blockStart - dictSize;
         int compressedSize, HCcompressedSize;
+        int extStateSize = 0;
+        U32 extStateCrc = 0;
         int blockContinueCompressedSize;
         U32 const crcOrig = XXH32(block, (size_t)blockSize, 0);
         int ret;
@@ -483,6 +485,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_DISPLAYTEST("test LZ4_compress_fast_extState()");
         {   int const r = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, (int)compressedBufferSize, 8);
             FUZ_CHECKTEST(r==0, "LZ4_compress_fast_extState() failed");
+            extStateSize = r;
+            extStateCrc = XXH32(compressedBuffer, (size_t)r, 0);
 
             FUZ_DISPLAYTEST("test LZ4_compress_fast_extState() with a too small destination buffer (must fail)");
             {   int const r2 = LZ4_compress_fast_extState(stateLZ4, block, compressedBuffer, blockSize, r-1, 8);
@@ -500,10 +504,13 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             }
         }
 
-        /* Test compression using fast reset external state*/
+        /* Test compression using fast reset external state : same output as a fully initialized state */
         FUZ_DISPLAYTEST("test LZ4_compress_fast_extState_fastReset()");
         {   int const r = LZ4_compress_fast_extState_fastReset(stateLZ4, block, compressedBuffer, blockSize, (int)compressedBufferSize, 8);
             FUZ_CHECKTEST(r==0, "LZ4_compress_fast_extState_fastReset() failed");
+            FUZ_CHECKTEST(r != extStateSize || XXH32(compressedBuffer, (size_t)r, 0) != extStateCrc,
+                "LZ4_compress_fast_extState_fastReset() output differs from LZ4_compress_fast_extState() (%i vs %i bytes)",
+                r, extStateSize);
         }
 
         /* Test compression */
