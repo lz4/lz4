@@ -1318,6 +1318,56 @@ static void FUZ_unitTests(int compressionLevel)
             FUZ_CHECKTEST(crcOrig!=crcNew, "LZ4_decompress_safe() decompression corruption");
         }
 
+        /* Avoid a short external-dictionary match hiding a much longer prefix match. */
+        DISPLAYLEVEL(3, "LZ4_compress_fast_continue() external-dictionary ratio regression : ");
+        {   char page[4096];
+            static const char dict[8] = { 0, 0, 0, 0, 0, 0, 0, 4 };
+            LZ4_stream_t dictState;
+            LZ4_stream_t streamState;
+            int noDictSize;
+            int dictSize;
+            int slowDictSize;
+            int attachedDictSize;
+            int i;
+
+            for (i = 0; i < (int)sizeof(page); ++i) {
+                page[i] = ((i + 8) / 16) % 2 == 0 ? (char)0xff : 0;
+            }
+
+            LZ4_initStream(&streamState, sizeof(streamState));
+            noDictSize = LZ4_compress_fast_continue(&streamState, page, testCompressed,
+                                                    (int)sizeof(page), LZ4_COMPRESSBOUND(sizeof(page)), 1);
+            FUZ_CHECKTEST(noDictSize <= 0, "compression without dictionary failed");
+
+            LZ4_initStream(&streamState, sizeof(streamState));
+            LZ4_loadDict(&streamState, dict, (int)sizeof(dict));
+            dictSize = LZ4_compress_fast_continue(&streamState, page, testCompressed,
+                                                  (int)sizeof(page), LZ4_COMPRESSBOUND(sizeof(page)), 1);
+            FUZ_CHECKTEST(dictSize <= 0, "compression with dictionary failed");
+            FUZ_CHECKTEST(dictSize > noDictSize * 2,
+                          "short external dictionary match degraded compression ratio (%i vs %i)",
+                          dictSize, noDictSize);
+
+            LZ4_initStream(&streamState, sizeof(streamState));
+            LZ4_loadDictSlow(&streamState, dict, (int)sizeof(dict));
+            slowDictSize = LZ4_compress_fast_continue(&streamState, page, testCompressed,
+                                                      (int)sizeof(page), LZ4_COMPRESSBOUND(sizeof(page)), 1);
+            FUZ_CHECKTEST(slowDictSize <= 0, "compression with slow-loaded dictionary failed");
+            FUZ_CHECKTEST(slowDictSize > noDictSize * 2,
+                          "slow-loaded dictionary degraded compression ratio (%i vs %i)",
+                          slowDictSize, noDictSize);
+
+            LZ4_initStream(&dictState, sizeof(dictState));
+            LZ4_loadDict(&dictState, dict, (int)sizeof(dict));
+            LZ4_initStream(&streamState, sizeof(streamState));
+            LZ4_attach_dictionary(&streamState, &dictState);
+            attachedDictSize = LZ4_compress_fast_continue(&streamState, page, testCompressed,
+                                                          (int)sizeof(page), LZ4_COMPRESSBOUND(sizeof(page)), 1);
+            FUZ_CHECKTEST(attachedDictSize <= 0, "compression with attached dictionary failed");
+            FUZ_CHECKTEST(attachedDictSize > noDictSize * 2,
+                          "attached dictionary degraded compression ratio (%i vs %i)",
+                          attachedDictSize, noDictSize);
+        }
         DISPLAYLEVEL(3, "LZ4_resetStream_fast() : a large first block gives the same output as a new stream : ");
         {   int const blockSize = 64 KB;   /* beyond the table clearing threshold, whatever LZ4_MEMORY_USAGE */
             char* const block = (char*)malloc((size_t)blockSize);
