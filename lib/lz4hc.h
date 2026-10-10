@@ -34,13 +34,13 @@
 #ifndef LZ4_HC_H_19834876238432
 #define LZ4_HC_H_19834876238432
 
-#if defined (__cplusplus)
-extern "C" {
-#endif
-
 /* --- Dependency --- */
 /* note : lz4hc requires lz4.h/lz4.c for compilation */
 #include "lz4.h"   /* stddef, LZ4LIB_API, LZ4_DEPRECATED */
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
 
 
 /* --- Useful constants --- */
