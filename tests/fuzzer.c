@@ -882,6 +882,16 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             int expectedSize;
             U32 expectedCrc;
 
+            /* one-shot compression ignores the dictionary attached to a new state */
+            FUZ_DISPLAYTEST("LZ4_compress_fast_extState_fastReset() after LZ4_attach_dictionary()");
+            LZ4_loadDict(&LZ4dictBody, dict, dictSize);
+            LZ4_initStream(&LZ4_stream, sizeof(LZ4_stream));
+            LZ4_attach_dictionary(&LZ4_stream, &LZ4dictBody);
+            ret = LZ4_compress_fast_extState_fastReset(&LZ4_stream, block, compressedBuffer, blockSize, (int)compressedBufferSize, 8);
+            FUZ_CHECKTEST(ret != extStateSize || XXH32(compressedBuffer, (size_t)ret, 0) != extStateCrc,
+                "LZ4_compress_fast_extState_fastReset() after LZ4_attach_dictionary() differs from LZ4_compress_fast_extState() (%i vs %i bytes)",
+                ret, extStateSize);
+
             FUZ_DISPLAYTEST("LZ4_compress_fast_continue() after LZ4_loadDict()");
             LZ4_loadDict(&LZ4dictBody, dict, dictSize);
             expectedSize = LZ4_compress_fast_continue(&LZ4dictBody, block, compressedBuffer, blockSize, (int)compressedBufferSize, 1);
