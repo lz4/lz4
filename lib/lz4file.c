@@ -55,6 +55,7 @@ struct LZ4_readFile_s {
   size_t srcBufNext;
   size_t srcBufSize;
   size_t srcBufMaxSize;
+  size_t decompressionHint;
 };
 
 static void freeReadFileResources(LZ4_readFile_t* lz4fRead)
@@ -89,7 +90,9 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
     { const LZ4F_errorCode_t result = LZ4F_getFrameInfo(readFile->dctxPtr, &frameInfo, headerBuf, &consumedSize);
       if (LZ4F_isError(result)) {
           return result;
-    } }
+      }
+      readFile->decompressionHint = result;
+    }
 
     /* Determine buffer size based on block size */
     { const size_t blockSize = LZ4F_getBlockSize(frameInfo.blockSizeID);
@@ -166,7 +169,7 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
     if (srcBytes == 0) {
       size_t const bytesRead = fread(lz4fRead->srcBuf, 1, lz4fRead->srcBufMaxSize, lz4fRead->fp);
       if (bytesRead == 0) {
-        if (ferror(lz4fRead->fp)) {
+        if (ferror(lz4fRead->fp) || lz4fRead->decompressionHint != 0) {
           RETURN_ERROR(io_read);
         }
         break; /* end of input reached */
@@ -185,7 +188,9 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
                           NULL);
       if (LZ4F_isError(decStatus)) {
           return decStatus;
-    } }
+      }
+      lz4fRead->decompressionHint = decStatus;
+    }
 
     lz4fRead->srcBufNext += srcBytes;
     totalBytesRead += dstBytes;
