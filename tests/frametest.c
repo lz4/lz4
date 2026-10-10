@@ -1406,7 +1406,7 @@ static int testReproducibleFrames(U32 seed)
     size_t const srcSize = 100 KB;     /* > 64 KB blocks : LZ4F_compressFrame*() keeps blocks linked */
     size_t const otherSize = 64 KB;    /* history frames, and dictionary */
     size_t const dictSize = 16 KB;
-    int const levels[] = { -3, 1, 2, 9 };       /* accelerated, fast, mid, hash chain */
+    int const levels[] = { -3, 1, 2, 9, 10 };   /* accelerated, fast, mid, hash chain, optimal */
     size_t const chunkSizes[] = { 0, 3000, 70 KB };
     size_t const nbLevels = sizeof(levels) / sizeof(levels[0]);
     size_t const nbChunkSizes = sizeof(chunkSizes) / sizeof(chunkSizes[0]);
