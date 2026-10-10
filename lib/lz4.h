@@ -126,6 +126,18 @@ extern "C" {
 #  define LZ4_FREESTANDING 0
 #endif
 
+/* LZ4_DECOMPRESS_FAST_DISABLE :
+ * When set to 1, the deprecated LZ4_decompress_fast*() family is not compiled in.
+ * These functions do not know the size of their input buffer and are documented
+ * as unable to protect against malformed or malicious data (see the note below,
+ * and issue #1783).  An application that must not carry that risk can remove the
+ * whole family at build time instead of auditing every call site.
+ * Default: 0 (the functions are available).
+ */
+#ifndef LZ4_DECOMPRESS_FAST_DISABLE
+#  define LZ4_DECOMPRESS_FAST_DISABLE 0
+#endif
+
 
 /*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
@@ -813,7 +825,9 @@ LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_co
 LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
 
 /*! Obsolete decompression functions (since v1.8.0) */
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_DEPRECATED("use LZ4_decompress_fast() instead") LZ4LIB_API int LZ4_uncompress (const char* source, char* dest, int outputSize);
+#endif
 LZ4_DEPRECATED("use LZ4_decompress_safe() instead") LZ4LIB_API int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
 
 /* Obsolete streaming functions (since v1.7.0)
@@ -833,7 +847,9 @@ LZ4_DEPRECATED("Use LZ4_saveDict() instead")     LZ4LIB_API char* LZ4_slideInput
 
 /*! Obsolete streaming decoding functions (since v1.7.0) */
 LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") LZ4LIB_API int LZ4_decompress_safe_withPrefix64k (const char* src, char* dst, int compressedSize, int maxDstSize);
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
+#endif
 
 /*! Obsolete LZ4_decompress_fast variants (since v1.9.0) :
  *  These functions used to be faster than LZ4_decompress_safe(),
@@ -861,6 +877,7 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4
  *         But they may happen if input data is invalid (error or intentional tampering).
  *         As a consequence, use these functions in trusted environments with trusted data **only**.
  */
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_partial() instead")
 LZ4LIB_API int LZ4_decompress_fast (const char* src, char* dst, int originalSize);
 LZ4_DEPRECATED("This function is deprecated and unsafe. Consider migrating towards LZ4_decompress_safe_continue() instead. "
@@ -868,6 +885,8 @@ LZ4_DEPRECATED("This function is deprecated and unsafe. Consider migrating towar
 LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode, const char* src, char* dst, int originalSize);
 LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_partial_usingDict() instead")
 LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
+#endif
+
 
 /*! LZ4_resetStream() :
  *  An LZ4_stream_t structure must be initialized at least once.

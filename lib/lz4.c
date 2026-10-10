@@ -1883,6 +1883,7 @@ static size_t read_long_length_no_check(const BYTE** pp)
  * Note : this variant is not optimized for speed, just for maintenance.
  *        the goal is to remove support of decompress_fast*() variants by v2.0
 **/
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_FORCE_INLINE int
 LZ4_decompress_unsafe_generic(
                  const BYTE* const istart,
@@ -1981,6 +1982,7 @@ LZ4_decompress_unsafe_generic(
     } /* main loop */
     return (int)(ip - istart);
 }
+#endif
 
 
 /* Read the variable-length literal or match length.
@@ -2491,6 +2493,7 @@ int LZ4_decompress_safe_partial(const char* src, char* dst, int compressedSize, 
                                   noDict, (BYTE*)dst, NULL, 0);
 }
 
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_FORCE_O2
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
@@ -2499,6 +2502,7 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
                 (const BYTE*)source, (BYTE*)dest, originalSize,
                 0, NULL, 0);
 }
+#endif
 
 /*===== Instantiate a few more decoding cases, used more than once. =====*/
 
@@ -2520,12 +2524,14 @@ static int LZ4_decompress_safe_partial_withPrefix64k(const char* source, char* d
 }
 
 /* Another obsolete API function, paired with the previous one. */
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 int LZ4_decompress_fast_withPrefix64k(const char* source, char* dest, int originalSize)
 {
     return LZ4_decompress_unsafe_generic(
                 (const BYTE*)source, (BYTE*)dest, originalSize,
                 64 KB, NULL, 0);
 }
+#endif
 
 LZ4_FORCE_O2
 static int LZ4_decompress_safe_withSmallPrefix(const char* source, char* dest, int compressedSize, int maxOutputSize,
@@ -2568,6 +2574,7 @@ int LZ4_decompress_safe_partial_forceExtDict(const char* source, char* dest,
                                   (BYTE*)dest, (const BYTE*)dictStart, dictSize);
 }
 
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_FORCE_O2
 static int LZ4_decompress_fast_extDict(const char* source, char* dest, int originalSize,
                                        const void* dictStart, size_t dictSize)
@@ -2576,6 +2583,7 @@ static int LZ4_decompress_fast_extDict(const char* source, char* dest, int origi
                 (const BYTE*)source, (BYTE*)dest, originalSize,
                 0, (const BYTE*)dictStart, dictSize);
 }
+#endif
 
 /* The "double dictionary" mode, for use with e.g. ring buffers: the first part
  * of the dictionary is passed as prefix, and the second via dictStart + dictSize.
@@ -2694,6 +2702,7 @@ int LZ4_decompress_safe_continue (LZ4_streamDecode_t* LZ4_streamDecode, const ch
     return result;
 }
 
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 LZ4_FORCE_O2 int
 LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode,
                         const char* source, char* dest, int originalSize)
@@ -2734,6 +2743,7 @@ LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecode,
 
     return result;
 }
+#endif
 
 
 /*
@@ -2773,6 +2783,7 @@ int LZ4_decompress_safe_partial_usingDict(const char* source, char* dest, int co
     return LZ4_decompress_safe_partial_forceExtDict(source, dest, compressedSize, targetOutputSize, dstCapacity, dictStart, (size_t)dictSize);
 }
 
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSize, const char* dictStart, int dictSize)
 {
     if (dictSize==0 || dictStart+dictSize == dest)
@@ -2782,6 +2793,7 @@ int LZ4_decompress_fast_usingDict(const char* source, char* dest, int originalSi
     assert(dictSize >= 0);
     return LZ4_decompress_fast_extDict(source, dest, originalSize, dictStart, (size_t)dictSize);
 }
+#endif
 
 
 /*=*************************************************
@@ -2819,10 +2831,12 @@ They are only provided here for compatibility with older user programs.
 - LZ4_uncompress is totally equivalent to LZ4_decompress_fast
 - LZ4_uncompress_unknownOutputSize is totally equivalent to LZ4_decompress_safe
 */
+#if !LZ4_DECOMPRESS_FAST_DISABLE
 int LZ4_uncompress (const char* source, char* dest, int outputSize)
 {
     return LZ4_decompress_fast(source, dest, outputSize);
 }
+#endif
 int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize)
 {
     return LZ4_decompress_safe(source, dest, isize, maxOutputSize);
