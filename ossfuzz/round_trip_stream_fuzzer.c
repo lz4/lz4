@@ -72,7 +72,7 @@ state_t state_create(char const* data, size_t size, uint32_t seed)
     state.cstream = LZ4_createStream();
     FUZZ_ASSERT(state.cstream);
     state.cstreamHC = LZ4_createStreamHC();
-    FUZZ_ASSERT(state.cstream);
+    FUZZ_ASSERT(state.cstreamHC);
     state.dstream = LZ4_createStreamDecode();
     FUZZ_ASSERT(state.dstream);
 
