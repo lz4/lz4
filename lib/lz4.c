@@ -1685,6 +1685,8 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
          */
         if (workingStream->internal_donotuse.currentOffset == 0) {
             workingStream->internal_donotuse.currentOffset = 64 KB;
+            /* no longer a cleared table : LZ4_prepareTable() must check it */
+            workingStream->internal_donotuse.tableType = (U32)byU32;
         }
 
         /* Don't actually attach an empty dictionary.
