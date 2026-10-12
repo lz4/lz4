@@ -317,6 +317,30 @@ static void FUZ_findDiff(const void* buff1, const void* buff2)
     DISPLAY("\nWrong Byte at position %u \n", (unsigned)u);
 }
 
+/*! FUZ_writeSequence() :
+ *  writes a sequence of @litLength literals, followed by a match,
+ *  or only literals if @matchLength == 0 (last sequence).
+ * @return : nb of bytes written */
+static size_t FUZ_writeSequence(BYTE* op, const BYTE* literals, size_t litLength, unsigned offset, size_t matchLength)
+{
+    BYTE* const ostart = op;
+    size_t const mlCode = matchLength ? matchLength - 4 : 0;   /* minimum match length is 4 */
+    size_t len;
+    *op++ = (BYTE)(((litLength < 15 ? litLength : 15) << 4) | (mlCode < 15 ? mlCode : 15));
+    if (litLength >= 15) {
+        for (len = litLength - 15; len >= 255; len -= 255) *op++ = 255;
+        *op++ = (BYTE)len;
+    }
+    memcpy(op, literals, litLength); op += litLength;
+    if (matchLength == 0) return (size_t)(op - ostart);
+    *op++ = (BYTE)offset; *op++ = (BYTE)(offset >> 8);
+    if (mlCode >= 15) {
+        for (len = mlCode - 15; len >= 255; len -= 255) *op++ = 255;
+        *op++ = (BYTE)len;
+    }
+    return (size_t)(op - ostart);
+}
+
 
 static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double compressibility, U32 duration_s)
 {
@@ -1844,6 +1868,51 @@ static void FUZ_unitTests(int compressionLevel)
                 if (dNext + maxMessageSize > dBufferSize) dNext = 0;
             }
         }  /* Ring buffer test : Non synchronized decoder */
+
+        /* Ring buffer of LZ4_decoderRingBufferSize() : any valid block must decode correctly.
+         * Worst case : decoding restarts at the beginning of the ring with maxBlockSize-1 bytes left at its end,
+         * then a wide copy (long literals or long match) is followed by a match at maximum distance */
+        DISPLAYLEVEL(3, "LZ4_decompress_safe_continue() into a ring of LZ4_decoderRingBufferSize() : ");
+        {   int const maxBlockSize = 1 KB;
+            int const ringSize = LZ4_decoderRingBufferSize(maxBlockSize);
+            int const firstPassSize = ringSize - (maxBlockSize - 1);   /* next block restarts at the beginning */
+            char* const ring = testVerify;
+            char* const dict = testVerify + ringSize;   /* copy of the last 64 KB of the first pass */
+            const BYTE* const literals = (const BYTE*)testInput + 100 KB;   /* must differ from the ring's content */
+            int const cSize = LZ4_compress_default(testInput, testCompressed, firstPassSize, testCompressedSize);
+            size_t len;
+            int pattern;
+            FUZ_CHECKTEST(cSize <= 0, "LZ4_compress_default() failed");
+            assert((size_t)ringSize + 64 KB <= testInputSize);
+            for (pattern = 0; pattern < 2; pattern++)
+            for (len = 0; len < 80; len++) {
+                LZ4_streamDecode_t sd;
+                BYTE block[256];
+                char expected[256];
+                size_t n = 0;
+                int outSize, r;
+                LZ4_setStreamDecode(&sd, NULL, 0);
+                r = LZ4_decompress_safe_continue(&sd, testCompressed, ring, cSize, firstPassSize);
+                FUZ_CHECKTEST(r != firstPassSize, "ring : first pass failed");
+                memcpy(dict, ring + firstPassSize - 64 KB, 64 KB);
+                if (pattern == 0) {   /* long literals */
+                    n += FUZ_writeSequence(block + n, literals, len, 65535, 4);
+                    outSize = (int)len + 4;
+                } else {   /* long match */
+                    n += FUZ_writeSequence(block + n, literals, 16, 16, 4 + len);
+                    n += FUZ_writeSequence(block + n, literals, 0, 65535, 4);
+                    outSize = 16 + 4 + (int)len + 4;
+                }
+                n += FUZ_writeSequence(block + n, literals, 100, 0, 0);   /* the fast loop needs input margin */
+                outSize += 100;
+                r = LZ4_decompress_safe_usingDict((const char*)block, expected, (int)n, outSize, dict, 64 KB);
+                FUZ_CHECKTEST(r != outSize, "ring : reference decoding failed");
+                r = LZ4_decompress_safe_continue(&sd, (const char*)block, ring, (int)n, maxBlockSize);
+                FUZ_CHECKTEST(r != outSize, "ring : decoding failed (pattern %i, length %u)", pattern, (unsigned)len);
+                FUZ_CHECKTEST(memcmp(ring, expected, (size_t)outSize),
+                              "ring : corrupted output (pattern %i, length %u)", pattern, (unsigned)len);
+        }   }
+        DISPLAYLEVEL(3, "OK \n");
     }
 
     DISPLAYLEVEL(3, "LZ4_compress_HC_destSize : ");
