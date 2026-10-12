@@ -1719,9 +1719,14 @@ void LZ4_attach_HC_dictionary(LZ4_streamHC_t *working_stream, const LZ4_streamHC
 static void LZ4HC_setExternalDict(LZ4HC_CCtx_internal* ctxPtr, const BYTE* newBlock)
 {
     DEBUGLOG(4, "LZ4HC_setExternalDict(%p, %p)", ctxPtr, newBlock);
-    if ( (ctxPtr->end >= ctxPtr->prefixStart + 4)
-      && (LZ4HC_getCLevelParams(ctxPtr->compressionLevel).strat != lz4mid) ) {
-        LZ4HC_Insert (ctxPtr, ctxPtr->end-3);  /* Referencing remaining dictionary content */
+    if (LZ4HC_getCLevelParams(ctxPtr->compressionLevel).strat != lz4mid) {
+        U32 const endIdx = ctxPtr->dictLimit + (U32)(ctxPtr->end - ctxPtr->prefixStart);
+        U32 idx;
+        if (ctxPtr->end >= ctxPtr->prefixStart + 4)
+            LZ4HC_Insert (ctxPtr, ctxPtr->end-3);  /* Referencing remaining dictionary content */
+        /* last positions can't be inserted : don't leave stale chains from previous history */
+        for (idx = ctxPtr->nextToUpdate; idx < endIdx; idx++)
+            DELTANEXTU16(ctxPtr->chainTable, idx) = 0;
     }
 
     /* Only one memory segment for extDict, so any previous extDict is lost at this stage */
