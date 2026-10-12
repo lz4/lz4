@@ -1896,55 +1896,49 @@ LZ4HC_setLiteral(LZ4HC_optimal_t* opt, int pos, int litlen, int price)
 }
 
 LZ4_FORCE_INLINE void
-LZ4HC_setMatch(LZ4HC_optimal_t* opt, int pos, int mlen, int off, int litlen, int price)
+LZ4HC_setMatch(LZ4HC_optimal_t* opt, int pos, int mlen, int off, int price)
 {
     opt[pos].mlen = mlen;
     opt[pos].off = off;
-    opt[pos].litlen = litlen;
+    opt[pos].litlen = 0;
     opt[pos].price = price;
     DEBUGLOG(7, "rPos:%3i => price:%3i (matchlen=%i)", pos, price, mlen);
 }
 
+/* price at the start of the literal run ending at @pos
+ * (0 if this run started before position 0, i.e. it includes literals since anchor) */
+LZ4_FORCE_INLINE int LZ4HC_runStartPrice(const LZ4HC_optimal_t* opt, int pos)
+{
+    int const ll = opt[pos].litlen;
+    return (ll <= pos) ? opt[pos - ll].price : 0;
+}
+
 /* LZ4HC_addMatch() :
- * Update prices of positions reachable from @cur,
- * using either a few literals, or @match (found at @cur).
+ * Update prices of positions reachable from @cur using @match.
  * Positions beyond @lastPos + TRAILING_LITERALS are not reached yet.
  * @return : updated @lastPos (end of the furthest match) */
 LZ4_FORCE_INLINE int
 LZ4HC_addMatch(LZ4HC_optimal_t* opt, int cur, LZ4HC_match_t match,
                int lastPos, const HCfavor_e favorDecSpeed)
 {
-    /* literals after @cur */
-    {   int const baseLitlen = opt[cur].litlen;
-        int litlen;
-        for (litlen = 1; litlen < MINMATCH; litlen++) {
-            int const price = opt[cur].price - LZ4HC_literalsPrice(baseLitlen) + LZ4HC_literalsPrice(baseLitlen+litlen);
-            int const pos = cur + litlen;
-            if (price < opt[pos].price)
-                LZ4HC_setLiteral(opt, pos, baseLitlen+litlen, price);
+    int const ll = opt[cur].litlen;
+    int const basePrice = LZ4HC_runStartPrice(opt, cur);
+    int ml;
+    assert(cur + match.len < LZ4_OPT_NUM);
+    assert((U32)favorDecSpeed <= 1);
+    for (ml = MINMATCH; ml <= match.len; ml++) {
+        int const pos = cur + ml;
+        int const price = basePrice + LZ4HC_sequencePrice(ll, ml);
+        /* on equal price, favorDecSpeed keeps the existing solution */
+        if ( pos > lastPos + TRAILING_LITERALS
+          || price <= opt[pos].price - (int)favorDecSpeed) {
+            LZ4HC_setMatch(opt, pos, ml, match.off, price);
+            if ((ml == match.len) && (lastPos < pos)) lastPos = pos;
     }   }
-
-    /* match at @cur */
-    {   int const ll = (opt[cur].mlen == 1) ? opt[cur].litlen : 0;
-        /* price before literals; 0 when they started before current block */
-        int const basePrice = (opt[cur].mlen == 1) ?
-                              ((cur > ll) ? opt[cur - ll].price : 0) :
-                              opt[cur].price;
-        int ml;
-        assert(cur + match.len < LZ4_OPT_NUM);
-        assert((U32)favorDecSpeed <= 1);
-        for (ml = MINMATCH; ml <= match.len; ml++) {
-            int const pos = cur + ml;
-            int const price = basePrice + LZ4HC_sequencePrice(ll, ml);
-            /* on equal price, favorDecSpeed keeps the existing solution */
-            if ( pos > lastPos + TRAILING_LITERALS
-              || price <= opt[pos].price - (int)favorDecSpeed) {
-                LZ4HC_setMatch(opt, pos, ml, match.off, ll, price);
-                if ((ml == match.len) && (lastPos < pos)) lastPos = pos;
-    }   }   }
 
     /* complete following positions with literals */
     {   int addLit;
+        assert(opt[lastPos].mlen >= MINMATCH);
         for (addLit = 1; addLit <= TRAILING_LITERALS; addLit++)
             LZ4HC_setLiteral(opt, lastPos + addLit, addLit,
                              opt[lastPos].price + LZ4HC_literalsPrice(addLit));
@@ -2010,7 +2004,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
          int const llen = (int)(ip - anchor);
          int cur, lastPos;
          int lastSeqPos;         /* position of the last sequence to encode */
-         LZ4HC_match_t lastSeq;  /* can be a literal (len==1) */
+         LZ4HC_match_t lastSeq;
 
          LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches, dict, favorDecSpeed);
          if (firstMatch.len==0) { ip++; continue; }
@@ -2093,7 +2087,7 @@ encode: /* lastSeqPos and lastSeq must be set */
              while (rPos <= lastSeqPos) {
                  int const ml = opt[rPos].mlen;
                  int const offset = opt[rPos].off;
-                 if (ml == 1) { ip++; rPos++; continue; }  /* literal; note: can end up with several literals, in which case, skip them */
+                 if (ml == 1) { ip++; rPos++; continue; }  /* literal */
                  rPos += ml;
                  assert(ml >= MINMATCH);
                  assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
