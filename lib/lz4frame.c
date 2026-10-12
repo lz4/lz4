@@ -391,17 +391,24 @@ static size_t LZ4F_compressBound_internal(size_t srcSize,
         size_t const blockSize = LZ4F_getBlockSize(blockID);
         size_t const maxBuffered = blockSize - 1;
         size_t const bufferedSize = MIN(alreadyBuffered, maxBuffered);
-        size_t const maxSrcSize = srcSize + bufferedSize;
-        unsigned const nbFullBlocks = (unsigned)(maxSrcSize / blockSize);
-        size_t const partialBlockSize = maxSrcSize & (blockSize-1);
-        size_t const lastBlockSize = flush ? partialBlockSize : 0;
-        unsigned const nbBlocks = nbFullBlocks + (lastBlockSize>0);
+        size_t const maxBound = (size_t)-LZ4F_ERROR_maxCode;
+        FORWARD_IF_ERROR(blockSize);
+        RETURN_ERROR_IF(srcSize > (size_t)-1 - bufferedSize, srcSize_tooLarge);
+        {   size_t const maxSrcSize = srcSize + bufferedSize;
+            size_t const nbFullBlocks = maxSrcSize / blockSize;
+            size_t const partialBlockSize = maxSrcSize & (blockSize-1);
+            size_t const lastBlockSize = flush ? partialBlockSize : 0;
+            size_t const nbBlocks = nbFullBlocks + (lastBlockSize>0);
 
-        size_t const blockCRCSize = BFSize * prefsPtr->frameInfo.blockChecksumFlag;
-        size_t const frameEnd = BHSize + (prefsPtr->frameInfo.contentChecksumFlag*BFSize);
+            size_t const blockCRCSize = BFSize * prefsPtr->frameInfo.blockChecksumFlag;
+            size_t const frameEnd = BHSize + (prefsPtr->frameInfo.contentChecksumFlag*BFSize);
+            /* At most 8 bytes per block of at least 64 KB, so overhead fits. */
+            size_t const overhead = (BHSize + blockCRCSize) * nbBlocks + frameEnd;
+            size_t const payload = maxSrcSize - partialBlockSize + lastBlockSize;
 
-        return ((BHSize + blockCRCSize) * nbBlocks) +
-               (blockSize * nbFullBlocks) + lastBlockSize + frameEnd;
+            RETURN_ERROR_IF(payload > maxBound - overhead, srcSize_tooLarge);
+            return payload + overhead;
+        }
     }
 }
 
@@ -414,7 +421,11 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
     else MEM_INIT(&prefs, 0, sizeof(prefs));
     prefs.autoFlush = 1;
 
-    return headerSize + LZ4F_compressBound_internal(srcSize, &prefs, 0);;
+    {   size_t const bound = LZ4F_compressBound_internal(srcSize, &prefs, 0);
+        FORWARD_IF_ERROR(bound);
+        RETURN_ERROR_IF(bound > (size_t)-LZ4F_ERROR_maxCode - headerSize, srcSize_tooLarge);
+        return headerSize + bound;
+    }
 }
 
 
@@ -455,6 +466,10 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
 
     MEM_INIT(&options, 0, sizeof(options));
     options.stableSrc = 1;
+
+    {   size_t const bound = LZ4F_compressFrameBound(srcSize, &prefs);
+        FORWARD_IF_ERROR(bound);
+    }
 
     { size_t const headerSize = LZ4F_compressBegin_usingCDict(cctx, dstBuffer, dstCapacity, cdict, &prefs);  /* write header */
       FORWARD_IF_ERROR(headerSize);
@@ -895,7 +910,7 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctx,
 /*  LZ4F_compressBound() :
  * @return minimum capacity of dstBuffer for a given srcSize to handle worst case scenario.
  *  LZ4F_preferences_t structure is optional : if NULL, preferences will be set to cover worst case scenario.
- *  This function cannot fail.
+ *  Returns an error code if the bound cannot be represented or the block size is invalid.
  */
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
@@ -906,8 +921,11 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
     if (preferencesPtr && preferencesPtr->autoFlush) {
         return LZ4F_compressBound_internal(srcSize, preferencesPtr, 0);
     }
+    RETURN_ERROR_IF(srcSize == (size_t)-1, srcSize_tooLarge);
     bound = LZ4F_compressBound_internal(srcSize+1, preferencesPtr, (size_t)-1);
+    FORWARD_IF_ERROR(bound);
     /* A mode switch may emit buffered input as a separate partial block. */
+    RETURN_ERROR_IF(bound > (size_t)-LZ4F_ERROR_maxCode - BHSize - blockCRCSize, srcSize_tooLarge);
     return bound + BHSize + blockCRCSize;
 }
 
@@ -1054,7 +1072,7 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
   {
     size_t const blockSize = cctxPtr->maxBlockSize;
     const BYTE* srcPtr = (const BYTE*)srcBuffer;
-    const BYTE* const srcEnd = srcSize ? (assert(srcPtr!=NULL), srcPtr + srcSize) : srcPtr;
+    const BYTE* srcEnd;
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* const dstEnd = dstStart + dstCapacity;
     BYTE* dstPtr = dstStart;
@@ -1064,6 +1082,11 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     DEBUGLOG(4, "LZ4F_compressUpdate (srcSize=%zu)", srcSize);
 
     RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);   /* state must be initialized and waiting for next block */
+    {   size_t const bound = LZ4F_compressBound_internal(srcSize, &(cctxPtr->prefs), cctxPtr->tmpInSize);
+        FORWARD_IF_ERROR_INVALIDATE(bound, cctxPtr);
+    }
+
+    srcEnd = srcSize ? (assert(srcPtr!=NULL), srcPtr + srcSize) : srcPtr;
 
     /* flush currently written block, to continue with new block compression */
     if (cctxPtr->blockCompressMode != blockCompression) {
