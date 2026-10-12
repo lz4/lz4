@@ -488,9 +488,10 @@ LZ4LIB_API int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const 
  *  to be compatible with any source respecting maxBlockSize condition.
  * @return : minimum ring buffer size,
  *           or 0 if there is an error (invalid maxBlockSize).
+ *  Note : the former margin (+14 instead of +64) is too small for decoders >= v1.9.0.
  */
 LZ4LIB_API int LZ4_decoderRingBufferSize(int maxBlockSize);
-#define LZ4_DECODER_RING_BUFFER_SIZE(maxBlockSize) (65536 + 14 + (maxBlockSize))  /* for static allocation; maxBlockSize presumed valid */
+#define LZ4_DECODER_RING_BUFFER_SIZE(maxBlockSize) (65536 + 64 + (maxBlockSize))  /* for static allocation; maxBlockSize presumed valid */
 
 /*! LZ4_decompress_safe_continue() :
  *  This decoding function allows decompression of consecutive blocks in "streaming" mode.
