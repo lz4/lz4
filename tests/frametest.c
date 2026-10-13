@@ -1640,6 +1640,53 @@ _output_error:
 }
 
 
+/* Level 12 with linked blocks, on short-period data (ABAB...) :
+ * all candidates in the 64 KB history match up to the end of the block.
+ * Comparing each of them in full (up to 16384 x 64 KB per block)
+ * makes it ~40x slower than level 12 on regular data.
+ * CPU time is compared to a reference of the same size,
+ * so that the test doesn't depend on platform speed (valgrind, qemu, sanitizers). */
+static int testPeriodicLinkedSpeed(U32 seed)
+{
+    size_t const srcSize = 1 MB;
+    size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
+    BYTE* const periodic = (BYTE*)malloc(srcSize);
+    BYTE* const regular = (BYTE*)malloc(srcSize);
+    BYTE* const dst = (BYTE*)malloc(dstCapacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    clock_t start, refTime, periodicTime;
+    size_t n, r;
+    int result = 1;
+
+    SD_CHECK(periodic != NULL && regular != NULL && dst != NULL, "allocation failure");
+    for (n = 0; n < srcSize; n++) periodic[n] = (n & 1) ? 'B' : 'A';
+    FUZ_fillCompressibleNoiseBuffer(regular, srcSize, 0.5, &seed);
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockMode = LZ4F_blockLinked;
+    prefs.compressionLevel = 12;
+
+    start = clock();
+    r = LZ4F_compressFrame(dst, dstCapacity, regular, srcSize, &prefs);
+    refTime = clock() - start;
+    SD_CHECK(!LZ4F_isError(r), "reference : %s", LZ4F_getErrorName(r));
+    start = clock();
+    r = LZ4F_compressFrame(dst, dstCapacity, periodic, srcSize, &prefs);
+    periodicTime = clock() - start;
+    SD_CHECK(!LZ4F_isError(r), "periodic : %s", LZ4F_getErrorName(r));
+    DISPLAYLEVEL(4, "(periodic : %.3f s, reference : %.3f s) ",
+                (double)periodicTime / CLOCKS_PER_SEC, (double)refTime / CLOCKS_PER_SEC);
+    SD_CHECK(periodicTime <= refTime, "periodic data : %.3f s, reference : %.3f s",
+            (double)periodicTime / CLOCKS_PER_SEC, (double)refTime / CLOCKS_PER_SEC);
+    result = 0;
+
+_output_error:
+    free(periodic);
+    free(regular);
+    free(dst);
+    return result;
+}
+
+
 static int unitTests(U32 seed, double compressibility)
 {
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)
@@ -1724,6 +1771,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "Decoding can resume from any block start (random access) : ");
     if (testRandomAccess(seed)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "Level 12 with linked blocks isn't slow on short-period data : ");
+    if (testPeriodicLinkedSpeed(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     /* Special case : null-content frame */
