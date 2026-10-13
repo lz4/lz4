@@ -88,22 +88,21 @@ typedef struct {
     lz4hc_strat_e strat;
     int nbSearches;
     U32 targetLength;
-    int fullUpdate;   /* lz4opt only : search more positions and match lengths (slower) */
 } cParams_t;
 static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
-    { lz4mid,    2, 16, 0 },  /* 0, unused */
-    { lz4mid,    2, 16, 0 },  /* 1, unused */
-    { lz4mid,    2, 16, 0 },  /* 2 */
-    { lz4hc,     4, 16, 0 },  /* 3 */
-    { lz4hc,     8, 16, 0 },  /* 4 */
-    { lz4hc,    16, 16, 0 },  /* 5 */
-    { lz4hc,    32, 16, 0 },  /* 6 */
-    { lz4hc,    64, 16, 0 },  /* 7 */
-    { lz4hc,   128, 16, 0 },  /* 8 */
-    { lz4hc,   256, 16, 0 },  /* 9 */
-    { lz4opt,   96, 64, 0 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-    { lz4opt,  512,128, 0 },  /*11 */
-    { lz4opt,16384,LZ4_OPT_NUM, 1 },  /* 12==LZ4HC_CLEVEL_MAX */
+    { lz4mid,    2, 16 },  /* 0, unused */
+    { lz4mid,    2, 16 },  /* 1, unused */
+    { lz4mid,    2, 16 },  /* 2 */
+    { lz4hc,     4, 16 },  /* 3 */
+    { lz4hc,     8, 16 },  /* 4 */
+    { lz4hc,    16, 16 },  /* 5 */
+    { lz4hc,    32, 16 },  /* 6 */
+    { lz4hc,    64, 16 },  /* 7 */
+    { lz4hc,   128, 16 },  /* 8 */
+    { lz4hc,   256, 16 },  /* 9 */
+    { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+    { lz4opt,  512,128 },  /*11 */
+    { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
 };
 
 static cParams_t LZ4HC_getCLevelParams(int cLevel)
@@ -1416,7 +1415,7 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const char* const source, char* dst,
     int* srcSizePtr, int dstCapacity,
     int const nbSearches, int const targetLength,
-    const limitedOutput_directive limit, int const fullUpdate,
+    const limitedOutput_directive limit,
     const dictCtx_directive dict,
     const HCfavor_e favorDecSpeed);
 
@@ -1460,7 +1459,7 @@ LZ4HC_compress_generic_internal (
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
                                 cParam.nbSearches, (int)cParam.targetLength, limit,
-                                cParam.fullUpdate, dict, favor);
+                                dict, favor);
         }
         if (result <= 0) ctx->dirty = 1;
         return result;
@@ -1870,18 +1869,18 @@ LZ4_FORCE_INLINE int LZ4HC_sequencePrice(int litlen, int mlen)
 }
 
 LZ4_FORCE_INLINE LZ4HC_match_t
-LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
-                      const BYTE* ip, const BYTE* const iHighLimit,
-                      int minLen, int nbSearches,
-                      const dictCtx_directive dict,
-                      const HCfavor_e favorDecSpeed)
+LZ4HC_FindLongestMatch(LZ4HC_CCtx_internal* const ctx,
+                       const BYTE* ip, const BYTE* const iHighLimit,
+                       int nbSearches,
+                       const dictCtx_directive dict,
+                       const HCfavor_e favorDecSpeed)
 {
     LZ4HC_match_t const match0 = { 0 , 0, 0 };
     /* note : LZ4HC_InsertAndGetWiderMatch() can extend a match backward (md.back < 0),
      * but not here, since iLowLimit == ip */
-    LZ4HC_match_t md = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
+    LZ4HC_match_t md = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, MINMATCH-1, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
     assert(md.back == 0);
-    if (md.len <= minLen) return match0;
+    if (md.len < MINMATCH) return match0;
     if (favorDecSpeed) {
         if ((md.len>18) & (md.len<=36)) md.len=18;   /* favor dec.speed (shortcut) */
     }
@@ -1966,7 +1965,6 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
                                 int const nbSearches,
                                 int const targetLength,
                                 const limitedOutput_directive limit,
-                                int const fullUpdate,
                                 const dictCtx_directive dict,
                                 const HCfavor_e favorDecSpeed,
                                 LZ4HC_optimal_t* const opt)
@@ -1999,7 +1997,7 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
         int lastSeqPos;         /* position of the last sequence to encode */
         LZ4HC_match_t lastSeq;
 
-        LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches, dict, favorDecSpeed);
+        LZ4HC_match_t const firstMatch = LZ4HC_FindLongestMatch(ctx, ip, matchlimit, nbSearches, dict, favorDecSpeed);
         if (firstMatch.len==0) { ip++; continue; }
 
         if (firstMatch.len > sufficientLen) {
@@ -2024,16 +2022,10 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
             if (curPtr > mflimit) break;
             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
                     cur, opt[cur].price, opt[cur+1].price, cur+1);
-            /* not useful to search here if next position has same (or lower) cost,
-             * except (fullUpdate) when cost rises sharply after, so a small match would still be beneficial */
-            if ( (opt[cur+1].price <= opt[cur].price)
-              && (!fullUpdate || (opt[cur+MINMATCH].price < opt[cur].price + 3/*min seq price*/)) )
-                continue;
+            /* not useful to search here if next position has same (or lower) cost */
+            if (opt[cur+1].price <= opt[cur].price) continue;
 
-            /* !fullUpdate : only test matches reaching beyond lastPos; slightly faster, but misses a few bytes */
-            newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit,
-                                             fullUpdate ? MINMATCH-1 : lastPos - cur,
-                                             nbSearches, dict, favorDecSpeed);
+            newMatch = LZ4HC_FindLongestMatch(ctx, curPtr, matchlimit, nbSearches, dict, favorDecSpeed);
             if (!newMatch.len) continue;
 
             if ( (newMatch.len > sufficientLen)
@@ -2110,7 +2102,6 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                                     int const nbSearches,
                                     int const targetLength,
                                     const limitedOutput_directive limit,
-                                    int const fullUpdate,
                                     const dictCtx_directive dict,
                                     const HCfavor_e favorDecSpeed)
 {
@@ -2119,13 +2110,13 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     int result;
     if (opt == NULL) return 0;
     result = LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
-                    nbSearches, targetLength, limit, fullUpdate, dict, favorDecSpeed, opt);
+                    nbSearches, targetLength, limit, dict, favorDecSpeed, opt);
     FREEMEM(opt);
     return result;
 #else
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which can be a bit large for some stacks... */
     return LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
-                    nbSearches, targetLength, limit, fullUpdate, dict, favorDecSpeed, opt);
+                    nbSearches, targetLength, limit, dict, favorDecSpeed, opt);
 #endif
 }
 
