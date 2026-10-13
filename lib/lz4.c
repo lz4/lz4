@@ -2643,6 +2643,8 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
  */
 int LZ4_decoderRingBufferSize(int maxBlockSize)
 {
+    /* the margin must cover the widest write beyond a copy (63 bytes, LZ4_wildCopy64), minus 2 */
+    LZ4_STATIC_ASSERT(LZ4_DECODER_RING_BUFFER_SIZE(0) - 65536 >= 63 - 2);
     if (maxBlockSize < 0) return 0;
     if (maxBlockSize > LZ4_MAX_INPUT_SIZE) return 0;
     if (maxBlockSize < 16) maxBlockSize = 16;
