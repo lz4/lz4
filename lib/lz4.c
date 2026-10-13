@@ -1622,6 +1622,9 @@ static int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
      * in LZ4_compress_fast_continue() where it uses noDictIssue even when the
      * dictionary isn't a full 64k. */
     dict->currentOffset += 64 KB;
+    /* no longer a cleared table : LZ4_prepareTable() must check it,
+     * even when the dictionary is too small to be used */
+    dict->tableType = (U32)tableType;
 
     if (dictSize < (int)HASH_UNIT) {
         return 0;
@@ -1630,7 +1633,6 @@ static int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
     if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
-    dict->tableType = (U32)tableType;
     idx32 = dict->currentOffset - dict->dictSize;
 
     while (p <= dictEnd-HASH_UNIT) {
