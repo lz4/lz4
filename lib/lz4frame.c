@@ -1899,6 +1899,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     dctx->tmpInSize += sizeToCopy;
                     srcPtr += sizeToCopy;
                     if (dctx->tmpInSize < 4) {  /* all input consumed */
+                        nextSrcSizeHint = (4 - dctx->tmpInSize) + BHSize /* next header size */;
                         doAnotherStage = 0;
                         break;
                     }
@@ -1942,8 +1943,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 dctx->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
                 if (dctx->tmpInSize < dctx->tmpInTarget) { /* need more input */
-                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)
-                                    + (dctx->frameInfo.blockChecksumFlag ? BFSize : 0)
+                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)   /* block checksum included */
                                     + BHSize /* next header size */;
                     doAnotherStage = 0;
                     break;
