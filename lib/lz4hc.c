@@ -1414,7 +1414,7 @@ _dest_overflow:
 static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const char* const source, char* dst,
     int* srcSizePtr, int dstCapacity,
-    int const nbSearches, size_t sufficient_len,
+    int const nbSearches, int const targetLength,
     const limitedOutput_directive limit, int const fullUpdate,
     const dictCtx_directive dict,
     const HCfavor_e favorDecSpeed);
@@ -1458,7 +1458,7 @@ LZ4HC_compress_generic_internal (
             assert(cParam.strat == lz4opt);
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
-                                cParam.nbSearches, cParam.targetLength, limit,
+                                cParam.nbSearches, (int)cParam.targetLength, limit,
                                 cLevel >= LZ4HC_CLEVEL_MAX,   /* ultra mode */
                                 dict, favor);
         }
@@ -1956,52 +1956,42 @@ LZ4HC_addMatch(LZ4HC_optimal_t* opt, int cur, LZ4HC_match_t match,
  * - src is valid
  * - maxOutputSize >= 1
  * - dst is valid
+ * - @opt : table of LZ4_OPT_NUM + TRAILING_LITERALS cells
  */
-static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
-                                    const char* const source,
-                                    char* dst,
-                                    int* srcSizePtr,
-                                    int dstCapacity,
-                                    int const nbSearches,
-                                    size_t sufficient_len,
-                                    const limitedOutput_directive limit,
-                                    int const fullUpdate,
-                                    const dictCtx_directive dict,
-                                    const HCfavor_e favorDecSpeed)
+LZ4_FORCE_INLINE int
+LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
+                                const char* const source,
+                                char* dst,
+                                int* srcSizePtr,
+                                int dstCapacity,
+                                int const nbSearches,
+                                int const targetLength,
+                                const limitedOutput_directive limit,
+                                int const fullUpdate,
+                                const dictCtx_directive dict,
+                                const HCfavor_e favorDecSpeed,
+                                LZ4HC_optimal_t* const opt)
 {
-    int retval = 0;
-#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
-#else
-    LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which can be a bit large for some stacks... */
-#endif
-
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
     const BYTE* const iend = ip + *srcSizePtr;
     const BYTE* const mflimit = iend - MFLIMIT;
     const BYTE* const matchlimit = iend - LASTLITERALS;
     BYTE* op = (BYTE*) dst;
-    BYTE* opSaved = (BYTE*) dst;
     /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
     BYTE* const oend = op + dstCapacity - ((limit == fillOutput) ? LASTLITERALS : 0);
-    int ovml = MINMATCH;  /* overflow - last sequence */
-    int ovoff = 0;
+    int const sufficientLen = MIN(targetLength, LZ4_OPT_NUM-1);
 
-    /* init */
     DEBUGLOG(5, "LZ4HC_compress_optimal(dst=%p, dstCapa=%u)", dst, (unsigned)dstCapacity);
-#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    if (opt == NULL) goto _return_label;
-#endif
 
     /* preconditions verifications */
     assert(dstCapacity > 0);
     assert(dst != NULL);
     assert(*srcSizePtr > 0);
     assert(source != NULL);
+    assert(opt != NULL);
 
     *srcSizePtr = 0;
-    if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
 
     /* Main Loop */
     while (ip <= mflimit) {
@@ -2013,7 +2003,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
         LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches, dict, favorDecSpeed);
         if (firstMatch.len==0) { ip++; continue; }
 
-        if ((size_t)firstMatch.len > sufficient_len) {
+        if (firstMatch.len > sufficientLen) {
             /* good enough solution : immediate encoding */
             lastSeqPos = 0;
             lastSeq = firstMatch;
@@ -2047,7 +2037,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                                              nbSearches, dict, favorDecSpeed);
             if (!newMatch.len) continue;
 
-            if ( ((size_t)newMatch.len > sufficient_len)
+            if ( (newMatch.len > sufficientLen)
               || (newMatch.len + cur >= LZ4_OPT_NUM) ) {
                 /* immediate encoding */
                 lastSeqPos = cur;
@@ -2095,37 +2085,49 @@ encode: /* lastSeqPos and lastSeq must be set */
                 rPos += ml;
                 assert(ml >= MINMATCH);
                 assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
-                opSaved = op;
-                if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
-                    ovml = ml;
-                    ovoff = offset;
-                    goto _dest_overflow;
-        }   }   }
+                {   BYTE* const opSaved = op;
+                    if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
+                        if (limit != fillOutput) return 0;  /* compression failed */
+                        op = opSaved;  /* restore correct out pointer */
+                        LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ml, offset, oend);
+                        goto _last_literals;
+        }   }   }   }
     }  /* while (ip <= mflimit) */
 
 _last_literals:
-    if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend)) {
-        retval = 0;  /* not enough space in @dst */
-        goto _return_label;
-    }
+    if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend))
+        return 0;  /* not enough space in @dst */
 
     /* End */
     *srcSizePtr = (int) (((const char*)ip) - source);
-    retval = (int) ((char*)op-dst);
-    goto _return_label;
+    return (int) ((char*)op-dst);
+}
 
-_dest_overflow:
-    if (limit == fillOutput) {
-        op = opSaved;  /* restore correct out pointer */
-        LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ovml, ovoff, oend);
-        goto _last_literals;
-    }
-    /* compression failed : retval == 0 */
-_return_label:
+static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
+                                    const char* const source,
+                                    char* dst,
+                                    int* srcSizePtr,
+                                    int dstCapacity,
+                                    int const nbSearches,
+                                    int const targetLength,
+                                    const limitedOutput_directive limit,
+                                    int const fullUpdate,
+                                    const dictCtx_directive dict,
+                                    const HCfavor_e favorDecSpeed)
+{
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    if (opt) FREEMEM(opt);
+    LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
+    int result;
+    if (opt == NULL) return 0;
+    result = LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
+                    nbSearches, targetLength, limit, fullUpdate, dict, favorDecSpeed, opt);
+    FREEMEM(opt);
+    return result;
+#else
+    LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which can be a bit large for some stacks... */
+    return LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
+                    nbSearches, targetLength, limit, fullUpdate, dict, favorDecSpeed, opt);
 #endif
-    return retval;
 }
 
 
