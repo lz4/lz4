@@ -88,21 +88,22 @@ typedef struct {
     lz4hc_strat_e strat;
     int nbSearches;
     U32 targetLength;
+    int fullUpdate;   /* lz4opt only : search more positions and match lengths (slower) */
 } cParams_t;
 static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
-    { lz4mid,    2, 16 },  /* 0, unused */
-    { lz4mid,    2, 16 },  /* 1, unused */
-    { lz4mid,    2, 16 },  /* 2 */
-    { lz4hc,     4, 16 },  /* 3 */
-    { lz4hc,     8, 16 },  /* 4 */
-    { lz4hc,    16, 16 },  /* 5 */
-    { lz4hc,    32, 16 },  /* 6 */
-    { lz4hc,    64, 16 },  /* 7 */
-    { lz4hc,   128, 16 },  /* 8 */
-    { lz4hc,   256, 16 },  /* 9 */
-    { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-    { lz4opt,  512,128 },  /*11 */
-    { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
+    { lz4mid,    2, 16, 0 },  /* 0, unused */
+    { lz4mid,    2, 16, 0 },  /* 1, unused */
+    { lz4mid,    2, 16, 0 },  /* 2 */
+    { lz4hc,     4, 16, 0 },  /* 3 */
+    { lz4hc,     8, 16, 0 },  /* 4 */
+    { lz4hc,    16, 16, 0 },  /* 5 */
+    { lz4hc,    32, 16, 0 },  /* 6 */
+    { lz4hc,    64, 16, 0 },  /* 7 */
+    { lz4hc,   128, 16, 0 },  /* 8 */
+    { lz4hc,   256, 16, 0 },  /* 9 */
+    { lz4opt,   96, 64, 0 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+    { lz4opt,  512,128, 0 },  /*11 */
+    { lz4opt,16384,LZ4_OPT_NUM, 1 },  /* 12==LZ4HC_CLEVEL_MAX */
 };
 
 static cParams_t LZ4HC_getCLevelParams(int cLevel)
@@ -1459,8 +1460,7 @@ LZ4HC_compress_generic_internal (
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
                                 cParam.nbSearches, (int)cParam.targetLength, limit,
-                                cLevel >= LZ4HC_CLEVEL_MAX,   /* ultra mode */
-                                dict, favor);
+                                cParam.fullUpdate, dict, favor);
         }
         if (result <= 0) ctx->dirty = 1;
         return result;
@@ -1877,9 +1877,8 @@ LZ4HC_FindLongerMatch(LZ4HC_CCtx_internal* const ctx,
                       const HCfavor_e favorDecSpeed)
 {
     LZ4HC_match_t const match0 = { 0 , 0, 0 };
-    /* note : LZ4HC_InsertAndGetWiderMatch() is able to modify the starting position of a match (*startpos),
-     * but this won't be the case here, as we define iLowLimit==ip,
-    ** so LZ4HC_InsertAndGetWiderMatch() won't be allowed to search past ip */
+    /* note : LZ4HC_InsertAndGetWiderMatch() can extend a match backward (md.back < 0),
+     * but not here, since iLowLimit == ip */
     LZ4HC_match_t md = LZ4HC_InsertAndGetWiderMatch(ctx, ip, ip, iHighLimit, minLen, nbSearches, 1 /*patternAnalysis*/, 1 /*chainSwap*/, dict, favorDecSpeed);
     assert(md.back == 0);
     if (md.len <= minLen) return match0;
