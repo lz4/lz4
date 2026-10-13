@@ -1695,9 +1695,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                        const void* srcBuffer, size_t* srcSizePtr,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
+    static const BYTE emptySrc = 0;   /* NULL srcBuffer (no input, used by LZ4F_getFrameInfo()) points here instead :
+                                       * NULL+0 and memcpy(dst, NULL, 0) are UB */
     LZ4F_decompressOptions_t optionsNull;
-    const BYTE* const srcStart = (const BYTE*)srcBuffer;
-    const BYTE* const srcEnd = srcStart + *srcSizePtr;
+    const BYTE* const srcStart = srcBuffer ? (const BYTE*)srcBuffer : &emptySrc;
+    const BYTE* const srcEnd = srcBuffer ? srcStart + *srcSizePtr : srcStart;
     const BYTE* srcPtr = srcStart;
     BYTE* const dstStart = (BYTE*)dstBuffer;
     BYTE* const dstEnd = dstStart ? dstStart + *dstSizePtr : NULL;
@@ -1710,6 +1712,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     DEBUGLOG(5, "LZ4F_decompress: src[%p](%u) => dst[%p](%u)",
             srcBuffer, (unsigned)*srcSizePtr, dstBuffer, (unsigned)*dstSizePtr);
     if (dstBuffer == NULL) assert(*dstSizePtr == 0);
+    if (srcBuffer == NULL) assert(*srcSizePtr == 0);
     MEM_INIT(&optionsNull, 0, sizeof(optionsNull));
     if (decompressOptionsPtr==NULL) decompressOptionsPtr = &optionsNull;
     *srcSizePtr = 0;
@@ -1899,6 +1902,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     dctx->tmpInSize += sizeToCopy;
                     srcPtr += sizeToCopy;
                     if (dctx->tmpInSize < 4) {  /* all input consumed */
+                        nextSrcSizeHint = (4 - dctx->tmpInSize) + BHSize /* next header size */;
                         doAnotherStage = 0;
                         break;
                     }
@@ -1942,8 +1946,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 dctx->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
                 if (dctx->tmpInSize < dctx->tmpInTarget) { /* need more input */
-                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)
-                                    + (dctx->frameInfo.blockChecksumFlag ? BFSize : 0)
+                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)   /* block checksum included */
                                     + BHSize /* next header size */;
                     doAnotherStage = 0;
                     break;

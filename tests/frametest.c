@@ -1501,6 +1501,145 @@ _output_error:
 }
 
 
+/* Random access within a frame (#1304, used by Wireshark) :
+ * a first pass, directed by hints, records the start of each block, within the frame and within decoded data.
+ * Decoding can later resume from any block start, using a reset state :
+ * the frame header is decoded again with LZ4F_getFrameInfo(),
+ * the last 64 KB decoded before the block are provided with LZ4F_decompress_usingDict() (linked blocks only),
+ * and checksums are skipped, since they can't be verified from the middle of a frame.
+ * Note : frames declaring their content size can't be resumed this way. */
+
+/* ra_expectedHint() :
+ * @ends : frame elements, as listed by sd_frameElementEnds(). ends[@nbBlocks] is the start of endMark.
+ * @return : hint expected after consuming @pos bytes of the frame,
+ *           up to the end of next block header, or up to the end of frame once endMark is consumed */
+static size_t ra_expectedHint(const size_t* ends, size_t nbBlocks, size_t frameSize, size_t pos)
+{
+    size_t k;
+    for (k = 0; k <= nbBlocks; k++)
+        if (ends[k] + 4 > pos) return ends[k] + 4 - pos;
+    return frameSize - pos;
+}
+
+static int testRandomAccess(U32 seed)
+{
+    size_t const blockSize = 64 KB;
+    size_t const srcSize = 5 * blockSize + 1000;   /* last block is partial */
+    BYTE* const src = (BYTE*)malloc(srcSize);
+    BYTE* const decoded = (BYTE*)malloc(srcSize);
+    BYTE* frame = NULL;
+    size_t frameCapacity;
+    LZ4F_dctx* dctx = NULL;
+    unsigned variant, pass;
+    size_t n;
+    int result = 1;
+
+    {   LZ4F_preferences_t worstPrefs = LZ4F_INIT_PREFERENCES;
+        worstPrefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        worstPrefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+        worstPrefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        frameCapacity = LZ4F_compressFrameBound(srcSize, &worstPrefs);
+    }
+    frame = (BYTE*)malloc(frameCapacity);
+    SD_CHECK(src != NULL && decoded != NULL && frame != NULL, "allocation failure");
+    FUZ_fillCompressibleNoiseBuffer(src, srcSize, 0.5, &seed);
+    for (n = 2 * blockSize; n < 3 * blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);   /* 3rd block is stored uncompressed */
+    SD_CHECK(!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION)), "dctx creation failure");
+
+    for (variant = 0; variant < 8; variant++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_frameInfo_t fi;
+        size_t ends[SD_ELTS_MAX], dStarts[SD_ELTS_MAX];
+        size_t frameSize, nbElts, nbBlocks, hSize, pos, dPos, k, r;
+        prefs.frameInfo.blockMode = (LZ4F_blockMode_t)(variant & 1);
+        prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)((variant >> 1) & 1);
+        prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)((variant >> 2) & 1);
+        frameSize = LZ4F_compressFrame(frame, frameCapacity, src, srcSize, &prefs);
+        SD_CHECK(!LZ4F_isError(frameSize), "variant %u : %s", variant, LZ4F_getErrorName(frameSize));
+        nbElts = sd_frameElementEnds(ends, SD_ELTS_MAX, frame, frameSize);
+        SD_CHECK(nbElts > 0, "variant %u : malformed frame", variant);
+        nbBlocks = nbElts - 2 - prefs.frameInfo.contentChecksumFlag;   /* minus header, endMark, and content checksum */
+        hSize = ends[0];
+
+        /* first pass : providing exactly the hint stops decoding right after each block header */
+        LZ4F_resetDecompressionContext(dctx);
+        pos = hSize;
+        r = LZ4F_getFrameInfo(dctx, &fi, frame, &pos);
+        SD_CHECK(r == 4 && pos == hSize, "variant %u : %s", variant, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "wrong header");
+        dPos = 0;
+        for (k = 0; r != 0; k++) {
+            size_t srcLen = r, dstLen = srcSize - dPos, noInput = 0;
+            r = LZ4F_decompress(dctx, decoded + dPos, &dstLen, frame + pos, &srcLen, NULL);
+            SD_CHECK(!LZ4F_isError(r), "variant %u : %s", variant, LZ4F_getErrorName(r));
+            pos += srcLen;
+            dPos += dstLen;
+            SD_CHECK(r == ra_expectedHint(ends, nbBlocks, frameSize, pos),
+                    "variant %u, pos %u : wrong hint %u", variant, (unsigned)pos, (unsigned)r);
+            if (r == 0) break;
+            SD_CHECK(k <= nbBlocks && pos == ends[k] + 4, "variant %u, pos %u : not after a block header", variant, (unsigned)pos);
+            dStarts[k] = dPos;
+            /* LZ4F_getFrameInfo() mid-frame provides the same hint */
+            SD_CHECK(LZ4F_getFrameInfo(dctx, &fi, NULL, &noInput) == r, "variant %u, pos %u : LZ4F_getFrameInfo() provides a different hint",
+                    variant, (unsigned)pos);
+        }
+        SD_CHECK(pos == frameSize && dPos == srcSize && !memcmp(decoded, src, srcSize), "variant %u : first pass corrupted", variant);
+
+        /* hints remain exact whatever the amount of input and output */
+        for (pass = 0; pass < 16; pass++) {
+            LZ4F_resetDecompressionContext(dctx);
+            pos = hSize;
+            r = LZ4F_getFrameInfo(dctx, &fi, frame, &pos);
+            SD_CHECK(!LZ4F_isError(r), "variant %u : %s", variant, LZ4F_getErrorName(r));
+            dPos = 0;
+            while (r != 0) {
+                size_t const cut = FUZ_rand(&seed) % 12;   /* stops within block checksums and headers */
+                size_t srcLen = (FUZ_rand(&seed) & 1) ? 1 + FUZ_rand(&seed) % r : (cut < r ? r - cut : 1);
+                size_t dstLen = (FUZ_rand(&seed) & 1) ? srcSize - dPos : FUZ_rand(&seed) % (srcSize - dPos + 1);
+                r = LZ4F_decompress(dctx, decoded + dPos, &dstLen, frame + pos, &srcLen, NULL);
+                SD_CHECK(!LZ4F_isError(r), "variant %u : %s", variant, LZ4F_getErrorName(r));
+                pos += srcLen;
+                dPos += dstLen;
+                SD_CHECK(r == ra_expectedHint(ends, nbBlocks, frameSize, pos),
+                        "variant %u, pos %u : wrong hint %u", variant, (unsigned)pos, (unsigned)r);
+            }
+            SD_CHECK(pos == frameSize && dPos == srcSize && !memcmp(decoded, src, srcSize), "variant %u : decoding corrupted", variant);
+        }
+
+        /* resume from each block start */
+        for (k = 0; k < nbBlocks; k++) {
+            size_t const dictSize = (prefs.frameInfo.blockMode == LZ4F_blockLinked) ? MIN(dStarts[k], 64 KB) : 0;
+            size_t hs = hSize, noSrc = 0, noDst = 0;
+            size_t srcLen = frameSize - ends[k], dstLen = srcSize - dStarts[k];
+            LZ4F_decompressOptions_t dOpt;
+            memset(&dOpt, 0, sizeof(dOpt));
+            dOpt.skipChecksums = 1;
+            LZ4F_resetDecompressionContext(dctx);
+            r = LZ4F_getFrameInfo(dctx, &fi, frame, &hs);
+            SD_CHECK(!LZ4F_isError(r) && hs == hSize, "variant %u, block %u : %s", variant, (unsigned)k,
+                    LZ4F_isError(r) ? LZ4F_getErrorName(r) : "wrong header");
+            r = LZ4F_decompress_usingDict(dctx, NULL, &noDst, NULL, &noSrc, src + dStarts[k] - dictSize, dictSize, &dOpt);
+            SD_CHECK(!LZ4F_isError(r), "variant %u, block %u : %s", variant, (unsigned)k, LZ4F_getErrorName(r));
+            /* skipChecksums remains active up to the end of frame */
+            r = LZ4F_decompress(dctx, decoded, &dstLen, frame + ends[k], &srcLen, NULL);
+            SD_CHECK(r == 0, "variant %u, block %u : %s", variant, (unsigned)k,
+                    LZ4F_isError(r) ? LZ4F_getErrorName(r) : "frame not completed");
+            SD_CHECK(srcLen == frameSize - ends[k] && dstLen == srcSize - dStarts[k]
+                  && !memcmp(decoded, src + dStarts[k], dstLen),
+                    "variant %u, block %u : resumed decoding is corrupted", variant, (unsigned)k);
+        }
+    }
+    result = 0;
+
+_output_error:
+    free(src);
+    free(decoded);
+    free(frame);
+    LZ4F_freeDecompressionContext(dctx);
+    return result;
+}
+
+
 static int unitTests(U32 seed, double compressibility)
 {
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)
@@ -1581,6 +1720,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "Frames don't depend on the history of the compression context : ");
     if (testReproducibleFrames(seed)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "Decoding can resume from any block start (random access) : ");
+    if (testRandomAccess(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     /* Special case : null-content frame */
