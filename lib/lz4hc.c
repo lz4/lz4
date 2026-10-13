@@ -979,6 +979,7 @@ LZ4HC_InsertAndGetWiderMatch (
     const U32 dictIdx = hc4->lowLimit;
     const BYTE* const dictEnd = dictStart + prefixIdx - dictIdx;
     int const lookBackLength = (int)(ip-iLowLimit);
+    int const maxLength = (int)(iHighLimit-iLowLimit);   /* no match can be longer */
     int nbAttempts = maxNbAttempts;
     U32 matchChainPos = 0;
     U32 const pattern = LZ4_read32(ip);
@@ -994,7 +995,9 @@ LZ4HC_InsertAndGetWiderMatch (
     DEBUGLOG(7, "First candidate match for pos %u found at index %u / %u (lowestMatchIndex)",
                 ipIndex, matchIndex, lowestMatchIndex);
 
-    while ((matchIndex>=lowestMatchIndex) && (nbAttempts>0)) {
+    /* Candidates only replace the current match if strictly longer,
+     * so stopping once @longest reaches @maxLength doesn't change the result. */
+    while ((matchIndex>=lowestMatchIndex) && (nbAttempts>0) && (longest<maxLength)) {
         int matchLength=0;
         nbAttempts--;
         assert(matchIndex < ipIndex);
@@ -1142,13 +1145,14 @@ LZ4HC_InsertAndGetWiderMatch (
 
     if ( dict == usingDictCtxHc
       && nbAttempts > 0
+      && longest < maxLength
       && withinStartDistance) {
         size_t const dictEndOffset = (size_t)(dictCtx->end - dictCtx->prefixStart) + dictCtx->dictLimit;
         U32 dictMatchIndex = dictCtx->hashTable[LZ4HC_hashPtr(ip)];
         assert(dictEndOffset <= 1 GB);
         matchIndex = dictMatchIndex + lowestMatchIndex - (U32)dictEndOffset;
         if (dictMatchIndex>0) DEBUGLOG(7, "dictEndOffset = %zu, dictMatchIndex = %u => relative matchIndex = %i", dictEndOffset, dictMatchIndex, (int)dictMatchIndex - (int)dictEndOffset);
-        while (ipIndex - matchIndex <= LZ4_DISTANCE_MAX && nbAttempts--) {
+        while (ipIndex - matchIndex <= LZ4_DISTANCE_MAX && longest < maxLength && nbAttempts--) {
             const BYTE* const matchPtr = dictCtx->prefixStart - dictCtx->dictLimit + dictMatchIndex;
 
             if (LZ4_read32(matchPtr) == pattern) {
