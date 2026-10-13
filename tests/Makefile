@@ -374,18 +374,16 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 
 #-----------------------------------------------------------------------------
 # freestanding test only for Linux x86_64
+# Query the compiler's target rather than the host (uname),
+# so that the decision matches the guard in freestanding.c,
+# even with CC="gcc -m32" or a cross-compiler.
 #-----------------------------------------------------------------------------
-UNAME_S ?= $(if $(filter Windows_NT,$(OS)),Windows,$(shell uname -s))
-UNAME_M ?= $(if $(filter Windows_NT,$(OS)),Unknown,$(shell uname -m))
+NUM_SYMBOL := \#
+FREESTANDING_TARGET := $(strip $(shell printf '$(NUM_SYMBOL)if defined(__x86_64__) && defined(__linux__)\nyes\n$(NUM_SYMBOL)endif\n' | $(CC) -E -P -x c - 2> $(VOID)))
 
-FREESTANDING_CFLAGS := -ffreestanding -nostdlib
-
-ifneq ($(UNAME_S), Linux)
-  FREESTANDING_CFLAGS :=
-endif
-
-ifneq ($(UNAME_M), x86_64)
-  FREESTANDING_CFLAGS :=
+FREESTANDING_CFLAGS :=
+ifeq ($(FREESTANDING_TARGET), yes)
+  FREESTANDING_CFLAGS := -ffreestanding -nostdlib
 endif
 
 CLEAN += freestanding

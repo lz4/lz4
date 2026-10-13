@@ -52,6 +52,10 @@ jobs:
         echo "=== QEMU Emulator Information ==="
         type $XEMU && which $XEMU && $XEMU --version
 
+    - name: Freestanding test with non-x86_64 target on x86_64 host
+      # freestanding test must be selected from the compiler's target, not the host (#1464)
+      run: make test-freestanding V=1 CC=$XCC
+
     - name: Run platform tests (ARM/ARM64/PPC/S390X)
       if: contains(fromJSON('["ARM", "ARM64", "PPC", "S390X"]'), matrix.arch)
       run: make platformTest V=1 CC=$XCC QEMU_SYS=$XEMU
