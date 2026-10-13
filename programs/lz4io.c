@@ -1779,6 +1779,7 @@ typedef struct {
     size_t size;
     FILE* f;
     int sparseEnable;
+    int testMode;
     unsigned* storedSkips;
     const unsigned long long* totalSize;
 } ChunkToWrite;
@@ -1789,7 +1790,8 @@ static void LZ4IO_writeDecodedChunk(void* arg)
     assert(ctw != NULL);
 
     /* note: works because only 1 thread */
-    *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->f, ctw->buffer, ctw->size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
+    if (!ctw->testMode)
+        *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->f, ctw->buffer, ctw->size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
     DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >>20));
 
     /* clean up */
@@ -1804,6 +1806,7 @@ typedef struct {
     TPool* wPool;
     FILE* foutput;
     int sparseEnable;
+    int testMode;
     unsigned* storedSkips;
 } LegacyBlockInput;
 
@@ -1825,6 +1828,7 @@ static void LZ4IO_decompressBlockLegacy(void* arg)
         ctw->size = (size_t)decodedSize;
         ctw->f = lbi->foutput;
         ctw->sparseEnable = lbi->sparseEnable;
+        ctw->testMode = lbi->testMode;
         ctw->storedSkips = lbi->storedSkips;
         ctw->totalSize = lbi->totalSize;
         TPool_submitJob(lbi->wPool, LZ4IO_writeDecodedChunk, ctw);
@@ -1891,6 +1895,7 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
                 lbi->totalSize = &streamSize;
                 lbi->foutput = foutput;
                 lbi->sparseEnable = prefs->sparseFileSupport;
+                lbi->testMode = prefs->testMode;
                 lbi->storedSkips = &storedSkips;
                 TPool_submitJob(tPool, LZ4IO_decompressBlockLegacy, lbi);
             }
@@ -1903,7 +1908,7 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
     TPool_jobsCompleted(wPool);
 
     /* flush last zeroes */
-    LZ4IO_fwriteSparseEnd(foutput, storedSkips);
+    if (!prefs->testMode) LZ4IO_fwriteSparseEnd(foutput, storedSkips);
 
     /* Free */
     TPool_free(wPool);
@@ -1955,11 +1960,12 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
             if (decodeSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
             streamSize += (unsigned long long)decodeSize;
             /* Write Block */
-            storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, (size_t)decodeSize, prefs->sparseFileSupport, storedSkips); /* success or die */
+            if (!prefs->testMode)
+                storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, (size_t)decodeSize, prefs->sparseFileSupport, storedSkips); /* success or die */
     }   }
     if (ferror(finput)) END_PROCESS(65, "Read error : ferror");
 
-    LZ4IO_fwriteSparseEnd(foutput, storedSkips);
+    if (!prefs->testMode) LZ4IO_fwriteSparseEnd(foutput, storedSkips);
 
     /* Free */
     free(in_buff);
@@ -2113,6 +2119,7 @@ typedef struct {
     FILE* fOut;
     BufferPool* bp;
     int sparseEnable;
+    int testMode;
     unsigned* storedSkips;
     unsigned long long* totalSize;
 } LZ4FChunkToWrite;
@@ -2123,7 +2130,8 @@ static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
     assert(ctw != NULL);
 
     /* note: works because only 1 thread */
-    *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->fOut, ctw->bufOut.ptr, ctw->bufOut.size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
+    if (!ctw->testMode)
+        *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->fOut, ctw->bufOut.ptr, ctw->bufOut.size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
     *ctw->totalSize += (unsigned long long)ctw->bufOut.size; /* note: works because only 1 thread */
     DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >> 20));
 
@@ -2144,6 +2152,7 @@ typedef struct {
     TPool* wPool;
     FILE* foutput;
     int sparseEnable;
+    int testMode;
     unsigned* storedSkips;
 } LZ4FChunk;
 
@@ -2182,6 +2191,7 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
             ctw->fOut = lz4fc->foutput;
             ctw->bp = lz4fc->bp;
             ctw->sparseEnable = lz4fc->sparseEnable;
+            ctw->testMode = lz4fc->testMode;
             ctw->storedSkips = lz4fc->storedSkips;
             ctw->totalSize = lz4fc->totalSize;
             TPool_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
@@ -2260,6 +2270,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             lbi->lastStatus = &lastStatus;
             lbi->foutput = dstFile;
             lbi->sparseEnable = prefs->sparseFileSupport;
+            lbi->testMode = prefs->testMode;
             lbi->storedSkips = &storedSkips;
             TPool_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
         }
