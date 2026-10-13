@@ -88,21 +88,22 @@ typedef struct {
     lz4hc_strat_e strat;
     int nbSearches;
     U32 targetLength;
+    int nbSearchesSeq;   /* lz4opt with favorDecSpeed only : budget at positions only worth searching to save a sequence */
 } cParams_t;
 static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
-    { lz4mid,    2, 16 },  /* 0, unused */
-    { lz4mid,    2, 16 },  /* 1, unused */
-    { lz4mid,    2, 16 },  /* 2 */
-    { lz4hc,     4, 16 },  /* 3 */
-    { lz4hc,     8, 16 },  /* 4 */
-    { lz4hc,    16, 16 },  /* 5 */
-    { lz4hc,    32, 16 },  /* 6 */
-    { lz4hc,    64, 16 },  /* 7 */
-    { lz4hc,   128, 16 },  /* 8 */
-    { lz4hc,   256, 16 },  /* 9 */
-    { lz4opt,   96, 64 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-    { lz4opt,  512,128 },  /*11 */
-    { lz4opt,16384,LZ4_OPT_NUM },  /* 12==LZ4HC_CLEVEL_MAX */
+    { lz4mid,    2, 16,  0 },  /* 0, unused */
+    { lz4mid,    2, 16,  0 },  /* 1, unused */
+    { lz4mid,    2, 16,  0 },  /* 2 */
+    { lz4hc,     4, 16,  0 },  /* 3 */
+    { lz4hc,     8, 16,  0 },  /* 4 */
+    { lz4hc,    16, 16,  0 },  /* 5 */
+    { lz4hc,    32, 16,  0 },  /* 6 */
+    { lz4hc,    64, 16,  0 },  /* 7 */
+    { lz4hc,   128, 16,  0 },  /* 8 */
+    { lz4hc,   256, 16,  0 },  /* 9 */
+    { lz4opt,   96, 64,  1 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+    { lz4opt,  512,128,  2 },  /*11 */
+    { lz4opt,16384,LZ4_OPT_NUM, 64 },  /* 12==LZ4HC_CLEVEL_MAX */
 };
 
 static cParams_t LZ4HC_getCLevelParams(int cLevel)
@@ -1409,7 +1410,7 @@ _dest_overflow:
 static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     const char* const source, char* dst,
     int* srcSizePtr, int dstCapacity,
-    int const nbSearches, int const targetLength,
+    int const nbSearches, int const nbSearchesSeq, int const targetLength,
     const limitedOutput_directive limit,
     const dictCtx_directive dict,
     const HCfavor_e favorDecSpeed);
@@ -1453,7 +1454,7 @@ LZ4HC_compress_generic_internal (
             assert(cParam.strat == lz4opt);
             result = LZ4HC_compress_optimal(ctx,
                                 src, dst, srcSizePtr, dstCapacity,
-                                cParam.nbSearches, (int)cParam.targetLength, limit,
+                                cParam.nbSearches, cParam.nbSearchesSeq, (int)cParam.targetLength, limit,
                                 dict, favor);
         }
         if (result <= 0) ctx->dirty = 1;
@@ -1838,14 +1839,26 @@ typedef struct {
 
 #define TRAILING_LITERALS 3
 
-/* price in bytes */
+/* Prices are in 1/LZ4HC_PRICE_SCALE byte,
+ * leaving room for a price per sequence, lower than a byte. */
+#define LZ4HC_PRICE_SCALE 4
+
+/* favorDecSpeed : each sequence costs decoding time, so it also costs LZ4HC_SEQ_PRICE_FDS.
+ * Removing a sequence almost always costs at least one byte,
+ * so this price, lower than a byte, mostly acts as a tie-breaker :
+ * among solutions of the same size, the one with fewer sequences is preferred.
+ * They are found at positions only worth searching to save a sequence,
+ * which are searched if at most LZ4HC_SEQ_SEARCH_DIST before the end of the furthest match. */
+#define LZ4HC_SEQ_PRICE_FDS    1
+#define LZ4HC_SEQ_SEARCH_DIST  4
+
 LZ4_FORCE_INLINE int LZ4HC_literalsPrice(int const litlen)
 {
     int price = litlen;
     assert(litlen >= 0);
     if (litlen >= (int)RUN_MASK)
         price += 1 + ((litlen-(int)RUN_MASK) / 255);
-    return price;
+    return price * LZ4HC_PRICE_SCALE;
 }
 
 /* requires mlen >= MINMATCH */
@@ -1855,12 +1868,23 @@ LZ4_FORCE_INLINE int LZ4HC_sequencePrice(int litlen, int mlen)
     assert(litlen >= 0);
     assert(mlen >= MINMATCH);
 
-    price += LZ4HC_literalsPrice(litlen);
-
     if (mlen >= (int)(ML_MASK+MINMATCH))
         price += 1 + ((mlen-(int)(ML_MASK+MINMATCH)) / 255);
 
-    return price;
+    return price * LZ4HC_PRICE_SCALE + LZ4HC_literalsPrice(litlen);
+}
+
+/* LZ4HC_pricedLitlen() :
+ * All solutions of a window start with the same run of @llen literals,
+ * so only price differences matter, and they depend on @llen
+ * only through its position relative to the 255-steps of the literal length field.
+ * Reduce it accordingly : scaled prices of long runs would overflow. */
+LZ4_FORCE_INLINE int LZ4HC_pricedLitlen(int const llen)
+{
+    int const reduceFrom = (int)RUN_MASK + 255;
+    assert(llen >= 0);
+    if (llen < reduceFrom) return llen;
+    return reduceFrom + ((llen - (int)RUN_MASK) % 255);
 }
 
 LZ4_FORCE_INLINE LZ4HC_match_t
@@ -1919,7 +1943,7 @@ LZ4HC_addMatch(LZ4HC_optimal_t* opt, int cur, LZ4HC_match_t match,
                int lastPos, const HCfavor_e favorDecSpeed)
 {
     int const ll = opt[cur].litlen;
-    int const basePrice = LZ4HC_runStartPrice(opt, cur);
+    int const basePrice = LZ4HC_runStartPrice(opt, cur) + (favorDecSpeed ? LZ4HC_SEQ_PRICE_FDS : 0);
     int ml;
     assert(cur + match.len < LZ4_OPT_NUM);
     assert((U32)favorDecSpeed <= 1);
@@ -1958,6 +1982,7 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
                                 int* srcSizePtr,
                                 int dstCapacity,
                                 int const nbSearches,
+                                int const nbSearchesSeq,
                                 int const targetLength,
                                 const limitedOutput_directive limit,
                                 const dictCtx_directive dict,
@@ -1982,12 +2007,13 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
     assert(*srcSizePtr > 0);
     assert(source != NULL);
     assert(opt != NULL);
+    assert(nbSearchesSeq >= 1);
 
     *srcSizePtr = 0;
 
     /* Main Loop */
     while (ip <= mflimit) {
-        int const llen = (int)(ip - anchor);
+        int const llen = LZ4HC_pricedLitlen((int)(ip - anchor));
         int cur, lastPos;
         int lastSeqPos;         /* position of the last sequence to encode */
         LZ4HC_match_t lastSeq;
@@ -2013,14 +2039,21 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
         for (cur = 1; cur < lastPos; cur++) {
             const BYTE* const curPtr = ip + cur;
             LZ4HC_match_t newMatch;
+            int nbS = nbSearches;
 
             if (curPtr > mflimit) break;
             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
                     cur, opt[cur].price, opt[cur+1].price, cur+1);
             /* not useful to search here if next position has same (or lower) cost */
             if (opt[cur+1].price <= opt[cur].price) continue;
+            /* favorDecSpeed : next position costs less than one more byte, the difference comes from sequences.
+             * A match starting here might save some : worth a cheaper search, if close to lastPos */
+            if (favorDecSpeed && (opt[cur+1].price < opt[cur].price + LZ4HC_PRICE_SCALE)) {
+                if (lastPos - cur > LZ4HC_SEQ_SEARCH_DIST) continue;
+                nbS = nbSearchesSeq;
+            }
 
-            newMatch = LZ4HC_FindLongestMatch(ctx, curPtr, matchlimit, nbSearches, dict, favorDecSpeed);
+            newMatch = LZ4HC_FindLongestMatch(ctx, curPtr, matchlimit, nbS, dict, favorDecSpeed);
             if (!newMatch.len) continue;
 
             if ( (newMatch.len > sufficientLen)
@@ -2093,6 +2126,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                                     int* srcSizePtr,
                                     int dstCapacity,
                                     int const nbSearches,
+                                    int const nbSearchesSeq,
                                     int const targetLength,
                                     const limitedOutput_directive limit,
                                     const dictCtx_directive dict,
@@ -2103,13 +2137,13 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     int result;
     if (opt == NULL) return 0;
     result = LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
-                    nbSearches, targetLength, limit, dict, favorDecSpeed, opt);
+                    nbSearches, nbSearchesSeq, targetLength, limit, dict, favorDecSpeed, opt);
     FREEMEM(opt);
     return result;
 #else
     LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which can be a bit large for some stacks... */
     return LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
-                    nbSearches, targetLength, limit, dict, favorDecSpeed, opt);
+                    nbSearches, nbSearchesSeq, targetLength, limit, dict, favorDecSpeed, opt);
 #endif
 }
 
