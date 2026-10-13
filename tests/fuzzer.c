@@ -1382,6 +1382,42 @@ static void FUZ_unitTests(int compressionLevel)
         }
         DISPLAYLEVEL(3, "OK \n");
 
+        DISPLAYLEVEL(3, "LZ4_loadDict() with a dictionary too small to be used : a large first block gives the same output as a new stream : ");
+        {   int const blockSize = 64 KB;   /* beyond the table clearing threshold, whatever LZ4_MEMORY_USAGE */
+            char* const block = (char*)malloc((size_t)blockSize);
+            LZ4_stream_t dictStream;
+            int refSize, dictSize;
+            U32 refCrc;
+            FUZ_CHECKTEST(block == NULL, "allocation failure");
+            memcpy(block, testInput + 64 KB, (size_t)blockSize);
+            /* a match only found when starting from a cleared table */
+            memcpy(block, "ABCDx", 5);
+            memcpy(block + 16, "ABCDy", 5);
+
+            LZ4_initStream(&streamingState, sizeof(streamingState));
+            refSize = LZ4_compress_fast_continue(&streamingState, block, testCompressed, blockSize, testCompressedSize, 1);
+            FUZ_CHECKTEST(refSize <= 0, "LZ4_compress_fast_continue() failed");
+            refCrc = XXH32(testCompressed, (size_t)refSize, 0);
+
+            /* below HASH_UNIT on all platforms : LZ4_loadDict() ignores the dictionary */
+            for (dictSize = 0; dictSize < 4; dictSize++) {
+                int r;
+                LZ4_loadDict(&dictStream, testInput, dictSize);
+                r = LZ4_compress_fast_continue(&dictStream, block, testCompressed, blockSize, testCompressedSize, 1);
+                FUZ_CHECKTEST(r != refSize || XXH32(testCompressed, (size_t)r, 0) != refCrc,
+                              "after LZ4_loadDict() (%i bytes) : output differs from a new stream (%i vs %i bytes)", dictSize, r, refSize);
+
+                LZ4_loadDict(&dictStream, testInput, dictSize);
+                LZ4_initStream(&streamingState, sizeof(streamingState));
+                LZ4_attach_dictionary(&streamingState, &dictStream);
+                r = LZ4_compress_fast_continue(&streamingState, block, testCompressed, blockSize, testCompressedSize, 1);
+                FUZ_CHECKTEST(r != refSize || XXH32(testCompressed, (size_t)r, 0) != refCrc,
+                              "after LZ4_attach_dictionary() (%i bytes) : output differs from a new stream (%i vs %i bytes)", dictSize, r, refSize);
+            }
+            free(block);
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
         /* early saveDict */
         DISPLAYLEVEL(3, "saveDict (right after init) : ");
         {   LZ4_stream_t* const ctx = LZ4_initStream(&streamingState, sizeof(streamingState));
