@@ -1954,6 +1954,60 @@ static void FUZ_unitTests(int compressionLevel)
                               "ring : corrupted output (pattern %i, length %u)", pattern, (unsigned)len);
         }   }
         DISPLAYLEVEL(3, "OK \n");
+
+        /* Ring buffer larger than the encoder's ring by maxBlockSize + 64 bytes, decoded with dstCapacity = maxBlockSize.
+         * Worst case : decoding restarts at the beginning of the ring, a block ends with a wide copy writing beyond its end,
+         * a 1-byte block follows, then a block references the oldest byte allowed by the encoder's ring */
+        DISPLAYLEVEL(3, "LZ4_decompress_safe_continue() into a ring larger than the encoder's : ");
+        {   int const maxBlockSize = 1 KB;
+            int const encRingSize = 4 KB;
+            int const ringSize = encRingSize + maxBlockSize + 64;
+            int const firstPassSize = ringSize - (maxBlockSize - 1);   /* next block restarts at the beginning */
+            int const dist = encRingSize - 13;   /* max distance, from the start of a 13-byte block */
+            char* const ring = testVerify;
+            char* const stream = testVerify + 8 KB;   /* contiguous copy of decoded data */
+            const BYTE* const literals = (const BYTE*)testInput + 100 KB;   /* must differ from the ring's content */
+            unsigned offset;
+            size_t ml;
+            assert(8 KB + (size_t)firstPassSize + 2 KB <= testInputSize);
+            for (offset = 32; offset <= 64; offset += 32)
+            for (ml = 100; ml < 164; ml++) {
+                LZ4_streamDecode_t sd;
+                BYTE block[64];
+                int dpos = 0, spos = 0, n, r;
+                LZ4_setStreamDecode(&sd, NULL, 0);
+                while (dpos < firstPassSize) {   /* first pass : literals only */
+                    int const bs = MIN(maxBlockSize, firstPassSize - dpos);
+                    n = (int)FUZ_writeSequence((BYTE*)testCompressed, literals + dpos, (size_t)bs, 0, 0);
+                    r = LZ4_decompress_safe_continue(&sd, testCompressed, ring + dpos, n, maxBlockSize);
+                    FUZ_CHECKTEST(r != bs, "larger ring : first pass failed");
+                    memcpy(stream + spos, ring + dpos, (size_t)bs);
+                    spos += bs; dpos += bs;
+                }
+                dpos = 0;   /* less than maxBlockSize left : restart at the beginning */
+                /* block A : ends with a wide copy (offset, ml), then 14 literals */
+                n = (int)FUZ_writeSequence(block, literals, 14, 14, 70);
+                n += (int)FUZ_writeSequence(block + n, literals, 0, offset, ml);
+                n += (int)FUZ_writeSequence(block + n, literals + 14, 14, 0, 0);
+                r = LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize);
+                FUZ_CHECKTEST(r != 14 + 70 + (int)ml + 14, "larger ring : block A failed");
+                memcpy(stream + spos, ring + dpos, (size_t)r);
+                spos += r; dpos += r;
+                /* block B : 1 literal */
+                n = (int)FUZ_writeSequence(block, literals, 1, 0, 0);
+                r = LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize);
+                FUZ_CHECKTEST(r != 1, "larger ring : block B failed");
+                memcpy(stream + spos, ring + dpos, (size_t)r);
+                spos += r; dpos += r;
+                /* block C : match at maximum distance, 9 literals */
+                n = (int)FUZ_writeSequence(block, literals, 0, (unsigned)dist, 4);
+                n += (int)FUZ_writeSequence(block + n, literals, 9, 0, 0);
+                r = LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize);
+                FUZ_CHECKTEST(r != 13, "larger ring : block C failed");
+                FUZ_CHECKTEST(memcmp(ring + dpos, stream + spos - dist, 4),
+                              "larger ring : corrupted output (offset %u, length %u)", offset, (unsigned)ml);
+        }   }
+        DISPLAYLEVEL(3, "OK \n");
     }
 
     DISPLAYLEVEL(3, "LZ4_compress_HC_destSize : ");
