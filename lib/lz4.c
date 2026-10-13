@@ -1753,8 +1753,9 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
 
     /* Check overlapping input/dictionary space */
     {   const char* const sourceEnd = source + inputSize;
-        if ((sourceEnd > (const char*)streamPtr->dictionary) && (sourceEnd < dictEnd)) {
-            streamPtr->dictSize = (U32)(dictEnd - sourceEnd);
+        if ((sourceEnd > (const char*)streamPtr->dictionary) && (source < dictEnd)) {
+            /* only the part of the dictionary beyond input remains */
+            streamPtr->dictSize = (sourceEnd < dictEnd) ? (U32)(dictEnd - sourceEnd) : 0;
             if (streamPtr->dictSize > 64 KB) streamPtr->dictSize = 64 KB;
             if (streamPtr->dictSize < 4) streamPtr->dictSize = 0;
             streamPtr->dictionary = (const BYTE*)dictEnd - streamPtr->dictSize;
