@@ -1601,6 +1601,20 @@ static void FUZ_unitTests(int compressionLevel)
         }   }
         DISPLAYLEVEL(3, "OK \n");
 
+        /* deprecated streaming API */
+        DISPLAYLEVEL(3, "LZ4_compressHC2_continue() round-trip : ");
+        {   int const srcSize = 64 KB;   /* LZ4_compressBound(srcSize) fits into testCompressed */
+            void* const ctx = LZ4_createHC(testInput);
+            FUZ_CHECKTEST(ctx==NULL, "LZ4_createHC() allocation failed");
+            result = LZ4_compressHC2_continue(ctx, testInput, testCompressed, srcSize, compressionLevel);
+            FUZ_CHECKTEST(result<=0, "LZ4_compressHC2_continue() compression failed");
+            result = LZ4_decompress_safe(testCompressed, testVerify, result, srcSize);
+            FUZ_CHECKTEST(result!=srcSize || memcmp(testInput, testVerify, (size_t)srcSize),
+                          "LZ4_compressHC2_continue() : corrupted round-trip");
+            LZ4_freeHC(ctx);
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
         /* saveDictHC test #926 */
         DISPLAYLEVEL(3, "saveDictHC test #926 : ");
         {   LZ4_streamHC_t* const ctx = LZ4_initStreamHC(&sHC, sizeof(sHC));
