@@ -2005,127 +2005,127 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 
     /* Main Loop */
     while (ip <= mflimit) {
-         int const llen = (int)(ip - anchor);
-         int cur, lastPos;
-         int lastSeqPos;         /* position of the last sequence to encode */
-         LZ4HC_match_t lastSeq;
+        int const llen = (int)(ip - anchor);
+        int cur, lastPos;
+        int lastSeqPos;         /* position of the last sequence to encode */
+        LZ4HC_match_t lastSeq;
 
-         LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches, dict, favorDecSpeed);
-         if (firstMatch.len==0) { ip++; continue; }
+        LZ4HC_match_t const firstMatch = LZ4HC_FindLongerMatch(ctx, ip, matchlimit, MINMATCH-1, nbSearches, dict, favorDecSpeed);
+        if (firstMatch.len==0) { ip++; continue; }
 
-         if ((size_t)firstMatch.len > sufficient_len) {
-             /* good enough solution : immediate encoding */
-             lastSeqPos = 0;
-             lastSeq = firstMatch;
-             goto encode;
-         }
+        if ((size_t)firstMatch.len > sufficient_len) {
+            /* good enough solution : immediate encoding */
+            lastSeqPos = 0;
+            lastSeq = firstMatch;
+            goto encode;
+        }
 
-         /* set prices for first positions (literals) */
-         {   int rPos;
-             for (rPos = 0 ; rPos < MINMATCH ; rPos++)
-                 LZ4HC_setLiteral(opt, rPos, llen + rPos, LZ4HC_literalsPrice(llen + rPos));
-         }
-         lastPos = LZ4HC_addMatch(opt, 0, firstMatch, 0, favorDecSpeed);
+        /* set prices for first positions (literals) */
+        {   int rPos;
+            for (rPos = 0 ; rPos < MINMATCH ; rPos++)
+                LZ4HC_setLiteral(opt, rPos, llen + rPos, LZ4HC_literalsPrice(llen + rPos));
+        }
+        lastPos = LZ4HC_addMatch(opt, 0, firstMatch, 0, favorDecSpeed);
 
-         /* check further positions */
-         for (cur = 1; cur < lastPos; cur++) {
-             const BYTE* const curPtr = ip + cur;
-             LZ4HC_match_t newMatch;
+        /* check further positions */
+        for (cur = 1; cur < lastPos; cur++) {
+            const BYTE* const curPtr = ip + cur;
+            LZ4HC_match_t newMatch;
 
-             if (curPtr > mflimit) break;
-             DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
-                     cur, opt[cur].price, opt[cur+1].price, cur+1);
-             /* not useful to search here if next position has same (or lower) cost,
-              * except (fullUpdate) when cost rises sharply after, so a small match would still be beneficial */
-                 if ( (opt[cur+1].price <= opt[cur].price)
-               && (!fullUpdate || (opt[cur+MINMATCH].price < opt[cur].price + 3/*min seq price*/)) )
-                     continue;
+            if (curPtr > mflimit) break;
+            DEBUGLOG(7, "rPos:%u[%u] vs [%u]%u",
+                    cur, opt[cur].price, opt[cur+1].price, cur+1);
+            /* not useful to search here if next position has same (or lower) cost,
+             * except (fullUpdate) when cost rises sharply after, so a small match would still be beneficial */
+            if ( (opt[cur+1].price <= opt[cur].price)
+              && (!fullUpdate || (opt[cur+MINMATCH].price < opt[cur].price + 3/*min seq price*/)) )
+                continue;
 
-             /* !fullUpdate : only test matches reaching beyond lastPos; slightly faster, but misses a few bytes */
-             newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit,
-                                              fullUpdate ? MINMATCH-1 : lastPos - cur,
-                                              nbSearches, dict, favorDecSpeed);
-             if (!newMatch.len) continue;
+            /* !fullUpdate : only test matches reaching beyond lastPos; slightly faster, but misses a few bytes */
+            newMatch = LZ4HC_FindLongerMatch(ctx, curPtr, matchlimit,
+                                             fullUpdate ? MINMATCH-1 : lastPos - cur,
+                                             nbSearches, dict, favorDecSpeed);
+            if (!newMatch.len) continue;
 
-             if ( ((size_t)newMatch.len > sufficient_len)
-               || (newMatch.len + cur >= LZ4_OPT_NUM) ) {
-                 /* immediate encoding */
-                 lastSeqPos = cur;
-                 lastSeq = newMatch;
-                 goto encode;
-             }
+            if ( ((size_t)newMatch.len > sufficient_len)
+              || (newMatch.len + cur >= LZ4_OPT_NUM) ) {
+                /* immediate encoding */
+                lastSeqPos = cur;
+                lastSeq = newMatch;
+                goto encode;
+            }
 
-             lastPos = LZ4HC_addMatch(opt, cur, newMatch, lastPos, favorDecSpeed);
-         }  /* for (cur = 1; cur < lastPos; cur++) */
+            lastPos = LZ4HC_addMatch(opt, cur, newMatch, lastPos, favorDecSpeed);
+        }  /* for (cur = 1; cur < lastPos; cur++) */
 
-         assert(lastPos < LZ4_OPT_NUM + TRAILING_LITERALS);
-         lastSeq.len = opt[lastPos].mlen;
-         lastSeq.off = opt[lastPos].off;
-         lastSeqPos = lastPos - lastSeq.len;
+        assert(lastPos < LZ4_OPT_NUM + TRAILING_LITERALS);
+        lastSeq.len = opt[lastPos].mlen;
+        lastSeq.off = opt[lastPos].off;
+        lastSeqPos = lastPos - lastSeq.len;
 
 encode: /* lastSeqPos and lastSeq must be set */
-         assert(0 <= lastSeqPos && lastSeqPos < LZ4_OPT_NUM);
-         DEBUGLOG(6, "reverse traversal, looking for shortest path (lastSeqPos=%i)", lastSeqPos);
-         /* opt[pos] describes the step ending at pos.
-          * Walk the path backward, moving each step to its starting position instead */
-         {   int pos = lastSeqPos;
-             int mlen = lastSeq.len;
-             int off = lastSeq.off;
-             while (pos > 0) {
-                 int const prevMlen = opt[pos].mlen;
-                 int const prevOff = opt[pos].off;
-                 opt[pos].mlen = mlen;
-                 opt[pos].off = off;
-                 mlen = prevMlen;
-                 off = prevOff;
-                 assert(0 < mlen && mlen <= pos);
-                 pos -= mlen;
-             }
-             /* first step of the path; note : opt[0] isn't necessarily initialized */
-             opt[0].mlen = mlen;
-             opt[0].off = off;
-         }
+        assert(0 <= lastSeqPos && lastSeqPos < LZ4_OPT_NUM);
+        DEBUGLOG(6, "reverse traversal, looking for shortest path (lastSeqPos=%i)", lastSeqPos);
+        /* opt[pos] describes the step ending at pos.
+         * Walk the path backward, moving each step to its starting position instead */
+        {   int pos = lastSeqPos;
+            int mlen = lastSeq.len;
+            int off = lastSeq.off;
+            while (pos > 0) {
+                int const prevMlen = opt[pos].mlen;
+                int const prevOff = opt[pos].off;
+                opt[pos].mlen = mlen;
+                opt[pos].off = off;
+                mlen = prevMlen;
+                off = prevOff;
+                assert(0 < mlen && mlen <= pos);
+                pos -= mlen;
+            }
+            /* first step of the path; note : opt[0] isn't necessarily initialized */
+            opt[0].mlen = mlen;
+            opt[0].off = off;
+        }
 
-         /* encode all recorded sequences in order */
-         {   int rPos = 0;  /* relative position (to ip) */
-             while (rPos <= lastSeqPos) {
-                 int const ml = opt[rPos].mlen;
-                 int const offset = opt[rPos].off;
-                 if (ml == 1) { ip++; rPos++; continue; }  /* literal */
-                 rPos += ml;
-                 assert(ml >= MINMATCH);
-                 assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
-                 opSaved = op;
-                 if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
-                     ovml = ml;
-                     ovoff = offset;
-                     goto _dest_overflow;
-         }   }   }
-     }  /* while (ip <= mflimit) */
+        /* encode all recorded sequences in order */
+        {   int rPos = 0;  /* relative position (to ip) */
+            while (rPos <= lastSeqPos) {
+                int const ml = opt[rPos].mlen;
+                int const offset = opt[rPos].off;
+                if (ml == 1) { ip++; rPos++; continue; }  /* literal */
+                rPos += ml;
+                assert(ml >= MINMATCH);
+                assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
+                opSaved = op;
+                if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
+                    ovml = ml;
+                    ovoff = offset;
+                    goto _dest_overflow;
+        }   }   }
+    }  /* while (ip <= mflimit) */
 
 _last_literals:
-     if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend)) {
-         retval = 0;  /* not enough space in @dst */
-         goto _return_label;
-     }
+    if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend)) {
+        retval = 0;  /* not enough space in @dst */
+        goto _return_label;
+    }
 
-     /* End */
-     *srcSizePtr = (int) (((const char*)ip) - source);
-     retval = (int) ((char*)op-dst);
-     goto _return_label;
+    /* End */
+    *srcSizePtr = (int) (((const char*)ip) - source);
+    retval = (int) ((char*)op-dst);
+    goto _return_label;
 
 _dest_overflow:
-     if (limit == fillOutput) {
-         op = opSaved;  /* restore correct out pointer */
-         LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ovml, ovoff, oend);
-         goto _last_literals;
-     }
-     /* compression failed : retval == 0 */
+    if (limit == fillOutput) {
+        op = opSaved;  /* restore correct out pointer */
+        LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ovml, ovoff, oend);
+        goto _last_literals;
+    }
+    /* compression failed : retval == 0 */
 _return_label:
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-     if (opt) FREEMEM(opt);
+    if (opt) FREEMEM(opt);
 #endif
-     return retval;
+    return retval;
 }
 
 
