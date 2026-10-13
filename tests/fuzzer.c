@@ -1398,6 +1398,47 @@ static void FUZ_unitTests(int compressionLevel)
         }   }
         DISPLAYLEVEL(3, "OK \n");
 
+        /* the new block can overwrite the previous one (its dictionary) : any overlap must be handled */
+        DISPLAYLEVEL(3, "LZ4_compress_*_continue() with input overwriting the previous block : ");
+        {   /* block 1 : 1000 bytes at position 1000 ; block 2 : { position, size } */
+            static const int overlaps[4][2] = {
+                {  500, 1000 },   /* covers the beginning of block 1 */
+                { 1000, 1000 },   /* same place */
+                {  500, 2000 },   /* covers block 1 entirely */
+                { 1500, 1000 } }; /* covers the end of block 1 */
+            int const pos1 = 1000, size1 = 1000;
+            char* const src = testVerify + 64 KB;   /* content of both blocks */
+            char* const cBlock2 = testCompressed + LZ4_COMPRESSBOUND(4 KB);
+            LZ4_streamHC_t* const sHC = LZ4_createStreamHC();
+            int ov, hc, trial;
+            FUZ_CHECKTEST(sHC == NULL, "LZ4_createStreamHC() allocation failed");
+            for (ov = 0; ov < 4; ov++)
+            for (hc = 0; hc < 2; hc++)
+            for (trial = 0; trial < 64; trial++) {
+                int const pos2 = overlaps[ov][0], size2 = overlaps[ov][1];
+                LZ4_streamDecode_t sd;
+                int c1, c2, i, r;
+                for (i = 0; i < size1 + size2; i++) src[i] = "ACGT"[FUZ_rand(&randState) & 3];   /* many matches */
+                LZ4_initStream(&streamingState, sizeof(streamingState));
+                LZ4_initStreamHC(sHC, sizeof(*sHC));
+                memcpy(ringBuffer + pos1, src, (size_t)size1);
+                c1 = hc ? LZ4_compress_HC_continue(sHC, ringBuffer + pos1, testCompressed, size1, LZ4_COMPRESSBOUND(4 KB))
+                        : LZ4_compress_fast_continue(&streamingState, ringBuffer + pos1, testCompressed, size1, LZ4_COMPRESSBOUND(4 KB), 1);
+                memcpy(ringBuffer + pos2, src + size1, (size_t)size2);
+                c2 = hc ? LZ4_compress_HC_continue(sHC, ringBuffer + pos2, cBlock2, size2, LZ4_COMPRESSBOUND(4 KB))
+                        : LZ4_compress_fast_continue(&streamingState, ringBuffer + pos2, cBlock2, size2, LZ4_COMPRESSBOUND(4 KB), 1);
+                FUZ_CHECKTEST(c1 <= 0 || c2 <= 0, "compression failed");
+                LZ4_setStreamDecode(&sd, NULL, 0);
+                r = LZ4_decompress_safe_continue(&sd, testCompressed, testVerify, c1, size1);
+                r += LZ4_decompress_safe_continue(&sd, cBlock2, testVerify + size1, c2, size2);
+                FUZ_CHECKTEST(r != size1 + size2 || memcmp(testVerify, src, (size_t)(size1 + size2)),
+                              "%s : corrupted output, block 2 (position %i, size %i) overwrites block 1 (position %i, size %i)",
+                              hc ? "LZ4_compress_HC_continue()" : "LZ4_compress_fast_continue()", pos2, size2, pos1, size1);
+            }
+            LZ4_freeStreamHC(sHC);
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
         /* ring buffer test */
         {   XXH64_state_t xxhOrig;
             XXH64_state_t xxhNewSafe, xxhNewFast;
