@@ -379,6 +379,97 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
 #undef anchor
 }
 
+/* LZ4HC_encodeLastLiterals() :
+ * Encode the final run of literals, from @anchor to @iend.
+ * In fillOutput mode, the run may be truncated, to fit into dst.
+ * @oend : same as LZ4HC_encodeSequence() : end of dst, minus LASTLITERALS in fillOutput mode
+ * @return : 0 if ok,
+ *           1 if dst is too small (limitedOutput) */
+static int LZ4HC_encodeLastLiterals (
+    const BYTE** _ip,
+    BYTE** _op,
+    const BYTE** _anchor,
+    const BYTE* iend,
+    limitedOutput_directive limit,
+    BYTE* oend)
+{
+#define ip      (*_ip)
+#define op      (*_op)
+#define anchor  (*_anchor)
+
+    BYTE* const dstEnd = (limit == fillOutput) ? oend + LASTLITERALS : oend;
+    size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
+    size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
+    size_t const totalSize = 1 + llAdd + lastRunSize;
+    if (limit && (op + totalSize > dstEnd)) {
+        if (limit == limitedOutput) return 1;  /* not enough space in dst */
+        /* adapt lastRunSize to fill dst */
+        lastRunSize  = (size_t)(dstEnd - op) - 1 /*token*/;
+        llAdd = (lastRunSize + 256 - RUN_MASK) / 256;
+        lastRunSize -= llAdd;
+    }
+    DEBUGLOG(6, "Final literal run : %i literals", (int)lastRunSize);
+    ip = anchor + lastRunSize;  /* can be != iend if limit==fillOutput */
+
+    if (lastRunSize >= RUN_MASK) {
+        size_t accumulator = lastRunSize - RUN_MASK;
+        *op++ = (RUN_MASK << ML_BITS);
+        for(; accumulator >= 255 ; accumulator -= 255) *op++ = 255;
+        *op++ = (BYTE) accumulator;
+    } else {
+        *op++ = (BYTE)(lastRunSize << ML_BITS);
+    }
+    assert(lastRunSize <= (size_t)(dstEnd - op));
+    LZ4_memcpy(op, anchor, lastRunSize);
+    op += lastRunSize;
+    return 0;
+
+#undef ip
+#undef op
+#undef anchor
+}
+
+/* LZ4HC_encodeLastSequence_fillOutput() :
+ * fillOutput mode only : current sequence doesn't fit into dst.
+ * Encode it anyway if all its literals fit, shortening its match if need be,
+ * but only if it leaves enough room for the final run of literals (MFLIMIT).
+ * @op : start of this sequence (before the failed LZ4HC_encodeSequence())
+ * @oend : same as LZ4HC_encodeSequence() : end of dst minus LASTLITERALS */
+static void LZ4HC_encodeLastSequence_fillOutput (
+    const BYTE** _ip,
+    BYTE** _op,
+    const BYTE** _anchor,
+    int matchLength,
+    int offset,
+    BYTE* oend)
+{
+#define ip      (*_ip)
+#define op      (*_op)
+#define anchor  (*_anchor)
+
+    BYTE* const dstEnd = oend + LASTLITERALS;
+    size_t const ll = (size_t)(ip - anchor);
+    size_t const ll_addbytes = (ll + 240) / 255;
+    size_t const ll_totalCost = 1 + ll_addbytes + ll;
+    BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
+    DEBUGLOG(6, "Last sequence is overflowing : %u literals, %u remaining space",
+                (unsigned)ll, (unsigned)(oend - op));
+    if (op + ll_totalCost <= maxLitPos) {
+        /* ll validated; now adjust match length */
+        size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
+        size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
+        assert(maxMlSize < INT_MAX); assert(matchLength >= 0);
+        if ((size_t)matchLength > maxMlSize) matchLength = (int)maxMlSize;
+        if (dstEnd - (op + ll_totalCost + 2) - 1 + matchLength >= MFLIMIT) {
+            DEBUGLOG(6, "Let's encode a last sequence (ll=%u, ml=%i)", (unsigned)ll, matchLength);
+            LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), matchLength, offset, notLimited, oend);
+    }   }
+
+#undef ip
+#undef op
+#undef anchor
+}
+
 
 typedef struct {
     int off;
@@ -570,7 +661,8 @@ static int LZ4MID_compress (
     const BYTE* const matchlimit = (iend - LASTLITERALS);
     const BYTE* const ilimit = (iend - LZ4MID_HASHSIZE);
     BYTE* op = (BYTE*)dst;
-    BYTE* oend = op + maxOutputSize;
+    /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
+    BYTE* const oend = op + maxOutputSize - ((limit == fillOutput) ? LASTLITERALS : 0);
 
     const BYTE* const prefixPtr = ctx->prefixStart;
     const U32 prefixIdx = ctx->dictLimit;
@@ -592,7 +684,6 @@ static int LZ4MID_compress (
     assert(maxOutputSize >= 1);
     assert(dst != NULL);
 
-    if (limit == fillOutput) oend -= LASTLITERALS;  /* Hack for support LZ4 format restriction */
     if (*srcSizePtr < LZ4_minLength)
         goto _lz4mid_last_literals;  /* Input too small, no compression (all literals) */
 
@@ -735,34 +826,8 @@ _lz4mid_encode_sequence:
     }
 
 _lz4mid_last_literals:
-    /* Encode Last Literals */
-    {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
-        size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
-        size_t const totalSize = 1 + llAdd + lastRunSize;
-        if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
-        if (limit && (op + totalSize > oend)) {
-            if (limit == limitedOutput) return 0;  /* not enough space in @dst */
-            /* adapt lastRunSize to fill 'dest' */
-            lastRunSize  = (size_t)(oend - op) - 1 /*token*/;
-            llAdd = (lastRunSize + 256 - RUN_MASK) / 256;
-            lastRunSize -= llAdd;
-        }
-        DEBUGLOG(6, "Final literal run : %i literals", (int)lastRunSize);
-        ip = anchor + lastRunSize;  /* can be != iend if limit==fillOutput */
-
-        if (lastRunSize >= RUN_MASK) {
-            size_t accumulator = lastRunSize - RUN_MASK;
-            *op++ = (RUN_MASK << ML_BITS);
-            for(; accumulator >= 255 ; accumulator -= 255)
-                *op++ = 255;
-            *op++ = (BYTE) accumulator;
-        } else {
-            *op++ = (BYTE)(lastRunSize << ML_BITS);
-        }
-        assert(lastRunSize <= (size_t)(oend - op));
-        LZ4_memcpy(op, anchor, lastRunSize);
-        op += lastRunSize;
-    }
+    if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend))
+        return 0;  /* not enough space in @dst */
 
     /* End */
     DEBUGLOG(5, "compressed %i bytes into %i bytes", *srcSizePtr, (int)((char*)op - dst));
@@ -770,36 +835,16 @@ _lz4mid_last_literals:
     assert(ip <= iend);
     *srcSizePtr = (int)(ip - (const BYTE*)src);
     assert((char*)op >= dst);
-    assert(op <= oend);
+    assert((char*)op - dst <= maxOutputSize);
     assert((char*)op - dst < INT_MAX);
     return (int)((char*)op - dst);
 
 _lz4mid_dest_overflow:
-    if (limit == fillOutput) {
-        /* Assumption : @ip, @anchor, @optr and @matchLength must be set correctly */
-        size_t const ll = (size_t)(ip - anchor);
-        size_t const ll_addbytes = (ll + 240) / 255;
-        size_t const ll_totalCost = 1 + ll_addbytes + ll;
-        BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
-        DEBUGLOG(6, "Last sequence is overflowing : %u literals, %u remaining space",
-                (unsigned)ll, (unsigned)(oend-op));
-        if (op + ll_totalCost <= maxLitPos) {
-            /* ll validated; now adjust match length */
-            size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
-            size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
-            assert(maxMlSize < INT_MAX);
-            if ((size_t)matchLength > maxMlSize) matchLength= (unsigned)maxMlSize;
-            if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + matchLength >= MFLIMIT) {
-            DEBUGLOG(6, "Let's encode a last sequence (ll=%u, ml=%u)", (unsigned)ll, matchLength);
-                LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
-                        (int)matchLength, (int)matchDistance,
-                        notLimited, oend);
-        }   }
-        DEBUGLOG(6, "Let's finish with a run of literals (%u bytes left)", (unsigned)(oend-op));
-        goto _lz4mid_last_literals;
-    }
-    /* compression failed */
-    return 0;
+    if (limit != fillOutput) return 0;  /* compression failed */
+    /* note : @op was already restored to the start of this sequence */
+    LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor),
+                        (int)matchLength, (int)matchDistance, oend);
+    goto _lz4mid_last_literals;
 }
 
 
@@ -1178,7 +1223,8 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
 
     BYTE* optr = (BYTE*) dst;
     BYTE* op = (BYTE*) dst;
-    BYTE* oend = op + maxOutputSize;
+    /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
+    BYTE* const oend = op + maxOutputSize - ((limit == fillOutput) ? LASTLITERALS : 0);
 
     const BYTE* start0;
     const BYTE* start2 = NULL;
@@ -1196,7 +1242,6 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     assert(dst != NULL);
 
     *srcSizePtr = 0;
-    if (limit == fillOutput) oend -= LASTLITERALS;                  /* Hack for support LZ4 format restriction */
     if (inputSize < LZ4_minLength) goto _last_literals;             /* Input too small, no compression (all literals) */
 
     /* Main Loop */
@@ -1351,59 +1396,18 @@ _Search3:
     }
 
 _last_literals:
-    /* Encode Last Literals */
-    {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
-        size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
-        size_t const totalSize = 1 + llAdd + lastRunSize;
-        if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
-        if (limit && (op + totalSize > oend)) {
-            if (limit == limitedOutput) return 0;
-            /* adapt lastRunSize to fill 'dest' */
-            lastRunSize  = (size_t)(oend - op) - 1 /*token*/;
-            llAdd = (lastRunSize + 256 - RUN_MASK) / 256;
-            lastRunSize -= llAdd;
-        }
-        DEBUGLOG(6, "Final literal run : %i literals", (int)lastRunSize);
-        ip = anchor + lastRunSize;  /* can be != iend if limit==fillOutput */
-
-        if (lastRunSize >= RUN_MASK) {
-            size_t accumulator = lastRunSize - RUN_MASK;
-            *op++ = (RUN_MASK << ML_BITS);
-            for(; accumulator >= 255 ; accumulator -= 255) *op++ = 255;
-            *op++ = (BYTE) accumulator;
-        } else {
-            *op++ = (BYTE)(lastRunSize << ML_BITS);
-        }
-        LZ4_memcpy(op, anchor, lastRunSize);
-        op += lastRunSize;
-    }
+    if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend))
+        return 0;  /* not enough space in @dst */
 
     /* End */
     *srcSizePtr = (int) (((const char*)ip) - src);
     return (int) (((char*)op)-dst);
 
 _dest_overflow:
-    if (limit == fillOutput) {
-        /* Assumption : @ip, @anchor, @optr and @m1 must be set correctly */
-        size_t const ll = (size_t)(ip - anchor);
-        size_t const ll_addbytes = (ll + 240) / 255;
-        size_t const ll_totalCost = 1 + ll_addbytes + ll;
-        BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
-        DEBUGLOG(6, "Last sequence overflowing");
-        op = optr;  /* restore correct out pointer */
-        if (op + ll_totalCost <= maxLitPos) {
-            /* ll validated; now adjust match length */
-            size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
-            size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
-            assert(maxMlSize < INT_MAX); assert(m1.len >= 0);
-            if ((size_t)m1.len > maxMlSize) m1.len = (int)maxMlSize;
-            if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + m1.len >= MFLIMIT) {
-                LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), m1.len, m1.off, notLimited, oend);
-        }   }
-        goto _last_literals;
-    }
-    /* compression failed */
-    return 0;
+    if (limit != fillOutput) return 0;  /* compression failed */
+    op = optr;  /* restore correct out pointer */
+    LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), m1.len, m1.off, oend);
+    goto _last_literals;
 }
 
 
@@ -1979,7 +1983,8 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     const BYTE* const matchlimit = iend - LASTLITERALS;
     BYTE* op = (BYTE*) dst;
     BYTE* opSaved = (BYTE*) dst;
-    BYTE* oend = op + dstCapacity;
+    /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
+    BYTE* const oend = op + dstCapacity - ((limit == fillOutput) ? LASTLITERALS : 0);
     int ovml = MINMATCH;  /* overflow - last sequence */
     int ovoff = 0;
 
@@ -1996,7 +2001,6 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     assert(source != NULL);
 
     *srcSizePtr = 0;
-    if (limit == fillOutput) oend -= LASTLITERALS;   /* Hack for support LZ4 format restriction */
     if (sufficient_len >= LZ4_OPT_NUM) sufficient_len = LZ4_OPT_NUM-1;
 
     /* Main Loop */
@@ -2100,34 +2104,9 @@ encode: /* lastSeqPos and lastSeq must be set */
      }  /* while (ip <= mflimit) */
 
 _last_literals:
-     /* Encode Last Literals */
-     {   size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
-         size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
-         size_t const totalSize = 1 + llAdd + lastRunSize;
-         if (limit == fillOutput) oend += LASTLITERALS;  /* restore correct value */
-         if (limit && (op + totalSize > oend)) {
-             if (limit == limitedOutput) { /* Check output limit */
-                retval = 0;
-                goto _return_label;
-             }
-             /* adapt lastRunSize to fill 'dst' */
-             lastRunSize  = (size_t)(oend - op) - 1 /*token*/;
-             llAdd = (lastRunSize + 256 - RUN_MASK) / 256;
-             lastRunSize -= llAdd;
-         }
-         DEBUGLOG(6, "Final literal run : %i literals", (int)lastRunSize);
-         ip = anchor + lastRunSize; /* can be != iend if limit==fillOutput */
-
-         if (lastRunSize >= RUN_MASK) {
-             size_t accumulator = lastRunSize - RUN_MASK;
-             *op++ = (RUN_MASK << ML_BITS);
-             for(; accumulator >= 255 ; accumulator -= 255) *op++ = 255;
-             *op++ = (BYTE) accumulator;
-         } else {
-             *op++ = (BYTE)(lastRunSize << ML_BITS);
-         }
-         LZ4_memcpy(op, anchor, lastRunSize);
-         op += lastRunSize;
+     if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend)) {
+         retval = 0;  /* not enough space in @dst */
+         goto _return_label;
      }
 
      /* End */
@@ -2136,28 +2115,12 @@ _last_literals:
      goto _return_label;
 
 _dest_overflow:
-if (limit == fillOutput) {
-     /* Assumption : ip, anchor, ovml and ovref must be set correctly */
-     size_t const ll = (size_t)(ip - anchor);
-     size_t const ll_addbytes = (ll + 240) / 255;
-     size_t const ll_totalCost = 1 + ll_addbytes + ll;
-     BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
-     DEBUGLOG(6, "Last sequence overflowing (only %i bytes remaining)", (int)(oend-1-opSaved));
-     op = opSaved;  /* restore correct out pointer */
-     if (op + ll_totalCost <= maxLitPos) {
-         /* ll validated; now adjust match length */
-         size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
-         size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
-         assert(maxMlSize < INT_MAX); assert(ovml >= 0);
-         if ((size_t)ovml > maxMlSize) ovml = (int)maxMlSize;
-         if ((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1 + ovml >= MFLIMIT) {
-             DEBUGLOG(6, "Space to end : %i + ml (%i)", (int)((oend + LASTLITERALS) - (op + ll_totalCost + 2) - 1), ovml);
-             DEBUGLOG(6, "Before : ip = %p, anchor = %p", ip, anchor);
-             LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ovml, ovoff, notLimited, oend);
-             DEBUGLOG(6, "After : ip = %p, anchor = %p", ip, anchor);
-     }   }
-     goto _last_literals;
-}
+     if (limit == fillOutput) {
+         op = opSaved;  /* restore correct out pointer */
+         LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ovml, ovoff, oend);
+         goto _last_literals;
+     }
+     /* compression failed : retval == 0 */
 _return_label:
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
      if (opt) FREEMEM(opt);
