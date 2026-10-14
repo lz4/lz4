@@ -19,6 +19,7 @@ api  : `LZ4F_ERROR_dstMaxSize_tooSmall` renamed `LZ4F_ERROR_dstCapacity_tooSmall
 api  : lz4frame : after an error, and outside of a frame, compression operations fail until `LZ4F_compressBegin()`
 api  : lz4frame output no longer depends on the compression context's history
 api  : new static functions `LZ4F_cctx_size()` and `LZ4F_dctx_size()`, by @felixhandte
+api  : new static function `LZ4F_resumeFrame()` : resume decoding from any block start, for random access within frames
 cli  : multithreaded compression honors custom block sizes
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666
 cli  : warning when `--content-size` is used with `stdin`, by @jlee303
