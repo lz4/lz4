@@ -107,3 +107,41 @@ jobs:
         cd builddir
         DESTDIR=./staging ninja install
         tree ./staging
+
+  meson-msvc:
+    name: Meson + Ninja (MSVC, shared library)
+    runs-on: windows-2022
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+    - name: Setup Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: '3.x'
+
+    - name: Install build tools
+      run: python -m pip install meson ninja
+
+    - name: Configure build
+      # --vsenv locates and activates the MSVC environment (no VS Command Prompt needed)
+      # CC=cl prevents meson from picking up the gcc preinstalled on the runner
+      env:
+        CC: cl
+      run: >
+        meson setup
+        --vsenv
+        -Ddefault_library=shared
+        -Dossfuzz=false
+        build/meson builddir
+
+    - name: Build
+      run: meson compile -C builddir
+
+    - name: Test installation
+      # MSVC only generates the import library lz4.lib if the DLL exports symbols,
+      # which requires LZ4_DLL_EXPORT=1 to reach the library sources (#1078)
+      run: |
+        meson install -C builddir --no-rebuild --destdir "${{ github.workspace }}\staging"
+        Get-ChildItem -Recurse -File staging | Select-Object -ExpandProperty FullName
+        if (-not (Get-ChildItem -Recurse -Filter lz4.lib staging)) { throw "import library lz4.lib was not installed" }
