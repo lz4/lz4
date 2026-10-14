@@ -1,6 +1,6 @@
 LZ4 Block Format Description
 ============================
-Last revised: 2022-07-31 .
+Last revised: 2026-10-13 .
 Author : Yann Collet
 
 
@@ -100,6 +100,9 @@ A 255 value means there is another byte to read and add.
 There is no limit to the number of optional `255` bytes that can be present,
 and therefore no limit to representable match length,
 though real-life implementations are likely going to enforce limits for practical reasons (see more details in "Implementation Notes" section below).
+
+Match bytes are copied one at a time, in increasing order,
+so `matchlength` may exceed `offset`: bytes just copied are copied again.
 
 Note: this format has a maximum achievable compression ratio of about ~250.
 
