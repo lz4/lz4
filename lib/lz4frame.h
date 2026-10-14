@@ -502,6 +502,10 @@ LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  *             This also indicates the current frame is not yet complete: the decompressor
  *             expects more input, or may require additional output space to make progress. 
  *             User can always pass any amount of input; this value is only a performance hint.
+ *             The hint always extends up to the end of next block header (endMark included),
+ *             or up to the end of frame once endMark is consumed. Hence, providing exactly the hinted
+ *             amount of input stops decoding right after a block header, which locates block starts
+ *             (see LZ4F_resumeFrame() in the static section).
  * @retval 0   The current frame is fully decoded. If *srcSizePtr is less than the provided value, 
  *             the unconsumed tail is the start of another frame (if any).
  * @retval error  An error code; test with LZ4F_isError(ret). After an error, dctx is not
@@ -745,6 +749,34 @@ LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
                         void* dstBuffer, size_t dstCapacity,
                   const void* srcBuffer, size_t srcSize,
                   const LZ4F_compressOptions_t* cOptPtr);
+
+/**********************************
+ *  Advanced decompression operations
+ *********************************/
+
+/*! LZ4F_resumeFrame() : v1.10.1+
+ *  Prepares @dctx to decode a frame starting from one of its blocks, instead of from its beginning.
+ *  Typical use case is random access, using information recorded during a previous decoding pass.
+ *  Block starts can be located by providing LZ4F_decompress() with exactly the hinted amount of input :
+ *  decoding then stops right after a block header (the block starts at the beginning of this header).
+ * @frameInfo  : frame parameters, as provided by LZ4F_getFrameInfo().
+ * @decodedPos : position of the block within the frame's decoded content.
+ * @dict, @dictSize : data the block may refer to, which must be saved during the previous decoding pass :
+ *     - linked blocks : a copy of the (up to) 64 KB decoded right before the block.
+ *       When less than 64 KB were decoded, they must be preceded by the end of the frame's dictionary, if any.
+ *       Saving 64 KB per resume point is the cost of random access within frames using linked blocks.
+ *     - independent blocks : the frame's dictionary if any, or NULL. No history needed.
+ *     @dict must remain accessible until the end of the frame.
+ *  Then, provide LZ4F_decompress() with compressed data starting at the block header.
+ *  Block checksums and content size remain verified,
+ *  but the content checksum, which covers the whole frame, is skipped.
+ *  Any decoding in progress within @dctx is abandoned.
+ * @return : 0, or an error code (can be tested using LZ4F_isError())
+ */
+LZ4FLIB_STATIC_API size_t
+LZ4F_resumeFrame(LZ4F_dctx* dctx, const LZ4F_frameInfo_t* frameInfo,
+                 unsigned long long decodedPos,
+                 const void* dict, size_t dictSize);
 
 /**********************************
  *  Custom memory allocation
