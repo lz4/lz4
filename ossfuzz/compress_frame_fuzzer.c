@@ -61,7 +61,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     size_t const refSize =
             LZ4F_compressFrame(ref, compressBound, data, size, &prefs);
     FUZZ_ASSERT(!LZ4F_isError(refSize));
-    {   size_t const rtSize = FUZZ_decompressFrame(rt, size, ref, refSize);
+    {   size_t const rtSize = FUZZ_decompressFrame(rt, size, ref, refSize, 0);
         FUZZ_ASSERT_MSG(rtSize == size, "Incorrect regenerated size");
         FUZZ_ASSERT_MSG(!memcmp(data, rt, size), "Corruption!");
     }

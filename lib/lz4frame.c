@@ -1963,7 +1963,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 assert(dctx->tmpInTarget >= 4);
                 dctx->tmpInTarget -= 4;
                 assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
-                {   U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
+                if (!dctx->skipBlockChecksum) {
+                    U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
                     U32 const calcBlockCrc = XXH32(selectedIn, dctx->tmpInTarget, 0);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                     RETURN_ERROR_IF(readBlockCrc != calcBlockCrc, blockChecksum_invalid);

@@ -1501,6 +1501,68 @@ _output_error:
 }
 
 
+/* skipChecksums disables verification of all checksums :
+ * block checksums, of compressed and uncompressed blocks, and content checksum */
+static int testSkipChecksums(U32 seed)
+{
+    size_t const blockSize = 64 KB;
+    size_t const srcSize = 3 * blockSize;   /* 2nd block is stored uncompressed */
+    BYTE* const src = (BYTE*)malloc(srcSize);
+    BYTE* const decoded = (BYTE*)malloc(srcSize);
+    BYTE* frame = NULL;
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_dctx* dctx = NULL;
+    size_t ends[SD_ELTS_MAX];
+    size_t frameCapacity, frameSize, n;
+    unsigned corrupted;
+    int result = 1;
+
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    frameCapacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    frame = (BYTE*)malloc(frameCapacity);
+    SD_CHECK(src != NULL && decoded != NULL && frame != NULL, "allocation failure");
+    FUZ_fillCompressibleNoiseBuffer(src, srcSize, 0.5, &seed);
+    for (n = blockSize; n < 2 * blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);
+    frameSize = LZ4F_compressFrame(frame, frameCapacity, src, srcSize, &prefs);
+    SD_CHECK(!LZ4F_isError(frameSize), "%s", LZ4F_getErrorName(frameSize));
+    SD_CHECK(sd_frameElementEnds(ends, SD_ELTS_MAX, frame, frameSize) == 6, "malformed frame");   /* header, 3 blocks, endMark, checksum */
+    SD_CHECK(!(FUZ_readLE32(frame + ends[0]) & 0x80000000U) && (FUZ_readLE32(frame + ends[1]) & 0x80000000U),
+            "1st block should be compressed, and 2nd block uncompressed");
+    SD_CHECK(!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION)), "dctx creation failure");
+
+    for (corrupted = 0; corrupted < 3; corrupted++) {   /* checksum of : compressed block, uncompressed block, content */
+        size_t const crcPos = (corrupted == 2) ? frameSize - 1 : ends[corrupted + 1] - 1;
+        LZ4F_errorCodes const expected = (corrupted == 2) ? LZ4F_ERROR_contentChecksum_invalid : LZ4F_ERROR_blockChecksum_invalid;
+        LZ4F_decompressOptions_t dOpt;
+        size_t srcLen = frameSize, dstLen = srcSize, r;
+        frame[crcPos] ^= 1;
+        LZ4F_resetDecompressionContext(dctx);
+        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, NULL);
+        SD_CHECK(LZ4F_getErrorCode(r) == expected, "checksum %u : %s", corrupted,
+                LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
+        memset(&dOpt, 0, sizeof(dOpt));
+        dOpt.skipChecksums = 1;
+        srcLen = frameSize;
+        dstLen = srcSize;
+        LZ4F_resetDecompressionContext(dctx);
+        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, &dOpt);
+        SD_CHECK(r == 0 && srcLen == frameSize && dstLen == srcSize && !memcmp(decoded, src, srcSize),
+                "checksum %u : %s", corrupted, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "not skipped");
+        frame[crcPos] ^= 1;
+    }
+    result = 0;
+
+_output_error:
+    free(src);
+    free(decoded);
+    free(frame);
+    LZ4F_freeDecompressionContext(dctx);
+    return result;
+}
+
+
 /* Random access within a frame (#1304) :
  * a first pass, directed by hints, records the start of each block, within the frame and within decoded data.
  * Decoding can later resume from any block start.
@@ -2104,6 +2166,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "Frames don't depend on the history of the compression context : ");
     if (testReproducibleFrames(seed)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "skipChecksums skips all checksums : ");
+    if (testSkipChecksums(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     DISPLAYLEVEL(3, "Decoding can resume from any block start (random access) : ");
