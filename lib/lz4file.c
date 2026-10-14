@@ -76,6 +76,7 @@ struct LZ4_readFile_s {
   LZ4F_frameInfo_t frameInfo;     /* parameters of current frame, if frameInfoKnown */
   int frameInfoKnown;
   size_t hint;                    /* input expected by the decoder, up to the end of next block header */
+  int frameInProgress;            /* the decoder is inside a frame and expects more input */
   int seekable;
   LZ4F_resumePoint* points;
   size_t nbPoints;
@@ -119,6 +120,7 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
       }
       readFile->hint = result;
       readFile->frameInfoKnown = 1;
+      readFile->frameInProgress = 1;
     }
 
     /* Determine buffer size based on block size */
@@ -217,9 +219,11 @@ static void trackPosition(LZ4_readFile_t* lz4fRead, size_t decStatus, size_t pro
     lz4fRead->hint = LZ4F_HEADER_SIZE_MIN;
     lz4fRead->frameDPos = lz4fRead->decodedPos;
     lz4fRead->frameInfoKnown = 0;
+    lz4fRead->frameInProgress = 0;
     addResumePoint(lz4fRead, cPos, NULL);
     return;
   }
+  lz4fRead->frameInProgress = 1;
   /* exactly the hinted input was consumed, and next hint covers a block :
    * decoding stopped right after a block header */
   if (consumed == provided && provided == lz4fRead->hint && decStatus > LZ4F_BLOCK_HEADER_SIZE) {
@@ -258,6 +262,12 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
       if (bytesRead == 0) {
         if (ferror(lz4fRead->fp)) {
           RETURN_ERROR(io_read);
+        }
+        if (lz4fRead->frameInProgress) {
+          /* input ends before the end of the frame : the file is truncated.
+           * deliver already-decoded bytes first; the error surfaces on the next call. */
+          if (totalBytesRead != 0) break;
+          RETURN_ERROR(frame_incomplete);
         }
         break; /* end of input reached */
       }
@@ -331,11 +341,13 @@ static LZ4F_errorCode_t restartFrom(LZ4_readFile_t* lz4fRead, const LZ4F_resumeP
     lz4fRead->frameDPos = p->frameDPos;
     lz4fRead->frameInfo = p->frameInfo;
     lz4fRead->frameInfoKnown = 1;
+    lz4fRead->frameInProgress = 1;
   } else {
     LZ4F_resetDecompressionContext(lz4fRead->dctxPtr);
     lz4fRead->hint = LZ4F_HEADER_SIZE_MIN;
     lz4fRead->frameDPos = lz4fRead->decodedPos;
     lz4fRead->frameInfoKnown = 0;
+    lz4fRead->frameInProgress = 0;
   }
   return LZ4F_OK_NoError;
 }
