@@ -706,6 +706,7 @@ extern "C" {
         ITEM(ERROR_parameter_null) \
         ITEM(ERROR_io_write) \
         ITEM(ERROR_io_read) \
+        ITEM(ERROR_frame_incomplete) \
         ITEM(ERROR_maxCode)
 
 #define LZ4F_GENERATE_ENUM(ENUM) LZ4F_##ENUM,
