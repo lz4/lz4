@@ -1859,6 +1859,124 @@ _output_error:
 }
 
 
+/* LZ4F_seek() : random reads within a file, compared to its decoded content.
+ * The file starts after unrelated data, and contains frames using linked or independent blocks,
+ * checksums, content size, a skippable frame, and an empty frame. */
+
+/* fs_writeFrame() : compresses @src into a frame, appended to @f.
+ * @return : 0 on success */
+static int fs_writeFrame(FILE* f, const BYTE* src, size_t srcSize, const LZ4F_preferences_t* prefs)
+{
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, prefs);
+    BYTE* const frame = (BYTE*)malloc(capacity);
+    size_t frameSize;
+    int result = 1;
+    if (frame == NULL) return 1;
+    frameSize = LZ4F_compressFrame(frame, capacity, src, srcSize, prefs);
+    if (!LZ4F_isError(frameSize) && fwrite(frame, 1, frameSize, f) == frameSize) result = 0;
+    free(frame);
+    return result;
+}
+
+static int testFileSeek(U32 seed)
+{
+    size_t const sizes[] = { 1200 KB, 1000, 0, 2500 KB, 200 KB };   /* a skippable frame follows the 1st one */
+    size_t const nbFrames = sizeof(sizes) / sizeof(sizes[0]);
+    size_t const prefixSize = 100;   /* unrelated data before the 1st frame */
+    size_t const bufSize = 200 KB;
+    size_t totalSize = 0, n, srcPos, pos;
+    BYTE* ref = NULL;
+    BYTE* const buf = (BYTE*)malloc(bufSize);
+    FILE* const f = tmpfile();
+    LZ4_readFile_t* rf = NULL;
+    unsigned op;
+    int result = 1;
+
+    for (n = 0; n < nbFrames; n++) totalSize += sizes[n];
+    ref = (BYTE*)malloc(totalSize);
+    SD_CHECK(ref != NULL && buf != NULL && f != NULL, "allocation failure");
+    FUZ_fillCompressibleNoiseBuffer(ref, totalSize, 0.5, &seed);
+    srcPos = sizes[0] + sizes[1] + sizes[2];
+    for (n = srcPos + 64 KB; n < srcPos + 128 KB; n++) ref[n] = (BYTE)FUZ_rand(&seed);   /* uncompressed block in the 4th frame */
+
+    for (n = 0; n < prefixSize; n++) buf[n] = (BYTE)FUZ_rand(&seed);
+    SD_CHECK(fwrite(buf, 1, prefixSize, f) == prefixSize, "write failure");
+    for (srcPos = 0, n = 0; n < nbFrames; srcPos += sizes[n], n++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        prefs.frameInfo.blockMode = (n == 0 || n == 4) ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        if (n == 0 || n == 3) prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        if (n == 3) {
+            prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+            prefs.frameInfo.contentSize = sizes[n];
+        }
+        SD_CHECK(!fs_writeFrame(f, ref + srcPos, sizes[n], &prefs), "frame %u : write failure", (unsigned)n);
+        if (n == 0) {
+            BYTE skippable[8 + 100];
+            FUZ_writeLE32(skippable, LZ4F_MAGIC_SKIPPABLE_START + 5);
+            FUZ_writeLE32(skippable + 4, 100);
+            memset(skippable + 8, 0x5A, 100);
+            SD_CHECK(fwrite(skippable, 1, sizeof(skippable), f) == sizeof(skippable), "write failure");
+    }   }
+    SD_CHECK(fseek(f, (long)prefixSize, SEEK_SET) == 0, "fseek failure");
+    SD_CHECK(!LZ4F_isError(LZ4F_readOpen(&rf, f)), "LZ4F_readOpen failure");
+
+    /* random seeks and reads */
+    for (pos = 0, op = 0; op < 400; op++) {
+        unsigned const kind = FUZ_rand(&seed) % 4;
+        if (kind == 0) {   /* absolute */
+            size_t const target = FUZ_rand(&seed) % (totalSize + 1);
+            size_t const r = LZ4F_seek(rf, (long long)target, SEEK_SET);
+            SD_CHECK(!LZ4F_isError(r), "op %u : seek to %u : %s", op, (unsigned)target, LZ4F_getErrorName(r));
+            pos = target;
+        } else if (kind == 1) {   /* relative, nearby */
+            long long const delta = (long long)(FUZ_rand(&seed) % (400 KB)) - 200 KB;
+            long long const target = MIN(MAX((long long)pos + delta, 0), (long long)totalSize);
+            size_t const r = LZ4F_seek(rf, target - (long long)pos, SEEK_CUR);
+            SD_CHECK(!LZ4F_isError(r), "op %u : seek to %u : %s", op, (unsigned)target, LZ4F_getErrorName(r));
+            pos = (size_t)target;
+        } else {   /* read, large or small */
+            size_t const size = 1 + FUZ_rand(&seed) % ((kind == 2) ? bufSize : 100);
+            size_t const r = LZ4F_read(rf, buf, size);
+            SD_CHECK(r == MIN(size, totalSize - pos), "op %u : read %u bytes at %u : %s", op, (unsigned)size, (unsigned)pos,
+                    LZ4F_isError(r) ? LZ4F_getErrorName(r) : "wrong size");
+            SD_CHECK(!memcmp(buf, ref + pos, r), "op %u : wrong data at %u", op, (unsigned)pos);
+            pos += r;
+        }
+        SD_CHECK(LZ4F_tell(rf) == pos, "op %u : LZ4F_tell() = %u instead of %u", op, (unsigned)LZ4F_tell(rf), (unsigned)pos);
+    }
+
+    /* invalid seeks don't move */
+    SD_CHECK(LZ4F_getErrorCode(LZ4F_seek(NULL, 0, SEEK_SET)) == LZ4F_ERROR_parameter_null, "NULL accepted");
+    SD_CHECK(LZ4F_getErrorCode(LZ4F_seek(rf, 0, SEEK_END)) == LZ4F_ERROR_parameter_invalid, "SEEK_END accepted");
+    SD_CHECK(LZ4F_getErrorCode(LZ4F_seek(rf, -1, SEEK_SET)) == LZ4F_ERROR_parameter_invalid, "negative position accepted");
+    SD_CHECK(LZ4F_getErrorCode(LZ4F_seek(rf, -(long long)pos - 1, SEEK_CUR)) == LZ4F_ERROR_parameter_invalid, "position before start accepted");
+    SD_CHECK(LZ4F_tell(rf) == pos, "failed seek moved the position");
+
+    /* end of data */
+    SD_CHECK(!LZ4F_isError(LZ4F_seek(rf, (long long)totalSize, SEEK_SET)) && LZ4F_read(rf, buf, 1) == 0, "data beyond end");
+    SD_CHECK(LZ4F_getErrorCode(LZ4F_seek(rf, (long long)totalSize + 1, SEEK_SET)) == LZ4F_ERROR_parameter_invalid, "seek beyond end accepted");
+    SD_CHECK(LZ4F_tell(rf) == totalSize, "seek beyond end should stop at end");
+
+    /* full sequential read, from start */
+    SD_CHECK(!LZ4F_isError(LZ4F_seek(rf, 0, SEEK_SET)), "seek to start failed");
+    for (pos = 0; pos < totalSize; ) {
+        size_t const r = LZ4F_read(rf, buf, bufSize);
+        SD_CHECK(!LZ4F_isError(r) && r == MIN(bufSize, totalSize - pos) && !memcmp(buf, ref + pos, r),
+                "sequential read : wrong data at %u", (unsigned)pos);
+        pos += r;
+    }
+    result = 0;
+
+_output_error:
+    LZ4F_readClose(rf);
+    if (f != NULL) fclose(f);
+    free(ref);
+    free(buf);
+    return result;
+}
+
+
 /* Level 12 with linked blocks, on short-period data (ABAB...) :
  * all candidates in the 64 KB history match up to the end of the block.
  * Comparing each of them in full (up to 16384 x 64 KB per block)
@@ -1994,6 +2112,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "LZ4F_resumeFrame() resumes decoding from any block start : ");
     if (testResumeFrame(seed)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "LZ4F_seek() within a file : ");
+    if (testFileSeek(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     DISPLAYLEVEL(3, "Level 12 with linked blocks isn't slow on short-period data : ");
