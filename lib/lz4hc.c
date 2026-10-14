@@ -288,7 +288,7 @@ void LZ4HC_hexOut(const void* src, size_t len)
 
 /* LZ4HC_encodeSequence() :
  * @return : 0 if ok,
- *           1 if buffer issue detected */
+ *           1 if buffer issue detected : @ip, @op and @anchor are then unchanged */
 LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     const BYTE** _ip,
     BYTE** _op,
@@ -330,6 +330,7 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
         if (limit && ((op + (litLen / 255) + litLen + (2 + 1 + LASTLITERALS)) > oend)) {
             DEBUGLOG(6, "Not enough room to write %i literals (%i bytes remaining)",
                     (int)litLen, (int)(oend - op));
+            op = token;
             return 1;
         }
         if (litLen >= RUN_MASK) {
@@ -356,7 +357,8 @@ LZ4_FORCE_INLINE int LZ4HC_encodeSequence (
     {   size_t mlCode = (size_t)matchLength - MINMATCH;
         if (limit && (op + (mlCode / 255) + (1 + LASTLITERALS) > oend)) {
             DEBUGLOG(6, "Not enough room to write match length");
-            return 1;   /* Check output limit */
+            op = token;
+            return 1;
         }
         if (mlCode >= ML_MASK) {
             *token += ML_MASK;
@@ -800,15 +802,10 @@ _lz4mid_encode_sequence:
         ADDPOS4(ip+1, ipIndex+1);
 
         /* encode */
-        {   BYTE* const saved_op = op;
-            /* LZ4HC_encodeSequence always updates @op; on success, it updates @ip and @anchor */
-            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
-                    (int)matchLength, (int)matchDistance,
-                    limit, oend) ) {
-                op = saved_op;  /* restore @op value before failed LZ4HC_encodeSequence */
-                goto _lz4mid_dest_overflow;
-            }
-        }
+        if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
+                (int)matchLength, (int)matchDistance,
+                limit, oend) )
+            goto _lz4mid_dest_overflow;
 
         /* fill table with end of match */
         {   U32 endMatchIdx = (U32)(ip-prefixPtr) + prefixIdx;
@@ -841,7 +838,6 @@ _lz4mid_last_literals:
 
 _lz4mid_dest_overflow:
     if (limit != fillOutput) return 0;  /* compression failed */
-    /* note : @op was already restored to the start of this sequence */
     LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor),
                         (int)matchLength, (int)matchDistance, oend);
     goto _lz4mid_last_literals;
@@ -1225,7 +1221,6 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     const BYTE* const mflimit = iend - MFLIMIT;
     const BYTE* const matchlimit = (iend - LASTLITERALS);
 
-    BYTE* optr = (BYTE*) dst;
     BYTE* op = (BYTE*) dst;
     /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
     BYTE* const oend = op + maxOutputSize - ((limit == fillOutput) ? LASTLITERALS : 0);
@@ -1269,7 +1264,6 @@ _Search2:
         }
 
         if (m2.len <= m1.len) { /* No better match => encode ML1 immediately */
-            optr = op;
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                     m1.len, m1.off,
                     limit, oend) )
@@ -1317,13 +1311,11 @@ _Search3:
             /* ip & ref are known; Now for ml */
             if (start2 < ip+m1.len) m1.len = (int)(start2 - ip);
             /* Now, encode 2 sequences */
-            optr = op;
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                     m1.len, m1.off,
                     limit, oend) )
                 goto _dest_overflow;
             ip = start2;
-            optr = op;
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                     m2.len, m2.off,
                     limit, oend) ) {
@@ -1345,7 +1337,6 @@ _Search3:
                     }
                 }
 
-                optr = op;
                 if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                         m1.len, m1.off,
                         limit, oend) )
@@ -1383,7 +1374,6 @@ _Search3:
                 m1.len = (int)(start2 - ip);
             }
         }
-        optr = op;
         if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                 m1.len, m1.off,
                 limit, oend) )
@@ -1409,7 +1399,6 @@ _last_literals:
 
 _dest_overflow:
     if (limit != fillOutput) return 0;  /* compression failed */
-    op = optr;  /* restore correct out pointer */
     LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), m1.len, m1.off, oend);
     goto _last_literals;
 }
@@ -2080,13 +2069,11 @@ encode: /* lastSeqPos and lastSeq must be set */
                 rPos += ml;
                 assert(ml >= MINMATCH);
                 assert((offset >= 1) && (offset <= LZ4_DISTANCE_MAX));
-                {   BYTE* const opSaved = op;
-                    if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
-                        if (limit != fillOutput) return 0;  /* compression failed */
-                        op = opSaved;  /* restore correct out pointer */
-                        LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ml, offset, oend);
-                        goto _last_literals;
-        }   }   }   }
+                if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor), ml, offset, limit, oend) ) {  /* updates ip, op and anchor */
+                    if (limit != fillOutput) return 0;  /* compression failed */
+                    LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor), ml, offset, oend);
+                    goto _last_literals;
+        }   }   }
     }  /* while (ip <= mflimit) */
 
 _last_literals:
