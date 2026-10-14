@@ -14,6 +14,7 @@ perf : faster decompression on aarch64 (up to +19% on Neoverse-V2), by @Nicoshev
 perf : `LZ4_FAST_DEC_LOOP` enabled on aarch64 with clang, including Android (up to +9% on Cortex-A5xx), by @Nicoshev and @arpadpanyik-arm
 perf : faster compression with reused contexts, for blocks >= 1 KB : linked frames (up to +69%), `LZ4_resetStream_fast()` (up to +94%)
 perf : faster levels 11 (~+25%) and 12 (~+10%)
+perf : `--favor-decSpeed` : faster decompression (~+2-4% at level 12), with fewer sequences
 api  : lz4frame compression accepts any `dstCapacity`, and fails only if the output doesn't fit
 api  : `LZ4F_ERROR_dstMaxSize_tooSmall` renamed `LZ4F_ERROR_dstCapacity_tooSmall` (former name still supported)
 api  : lz4frame : after an error, and outside of a frame, compression operations fail until `LZ4F_compressBegin()`
