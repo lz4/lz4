@@ -168,7 +168,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         }
         if (pos == size || FUZZ_rand32(&seed, 0, 15) == 0) {
             if (runBoth(&s, op_end, NULL, 0, &seed)) {
-                size_t const rtSize = FUZZ_decompressFrame(rt, size, s.frame, s.frameSize);
+                size_t const rtSize = FUZZ_decompressFrame(rt, size, s.frame, s.frameSize,
+                                                           FUZZ_rand32(&seed, 0, 7) == 0 /* occasionally skip checksums */);
                 FUZZ_ASSERT_MSG(rtSize == pos - frameStart, "Incorrect regenerated size");
                 FUZZ_ASSERT_MSG(!memcmp(data + frameStart, rt, rtSize), "Corruption!");
             }
