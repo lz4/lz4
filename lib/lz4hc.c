@@ -1201,6 +1201,26 @@ LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table wi
  * - maxOutputSize >= 1
  * - dst is valid
  */
+/* LZ4HC_splitOverlap() :
+ * m2 (at @*start2) starts less than OPTIMAL_ML bytes after m1 (at @ip).
+ * If they overlap, m1 keeps up to OPTIMAL_ML bytes (no extra length byte),
+ * and m2 starts right after it, keeping at least MINMATCH bytes.
+ * @return : new length of m1 */
+LZ4_FORCE_INLINE int
+LZ4HC_splitOverlap(const BYTE* ip, int ml1, const BYTE** start2, LZ4HC_match_t* m2)
+{
+    int const gap = (int)(*start2 - ip);
+    int newML = MIN(ml1, OPTIMAL_ML);
+    assert(gap < OPTIMAL_ML);
+    if (newML > gap + m2->len - MINMATCH)
+        newML = gap + m2->len - MINMATCH;
+    if (newML > gap) {   /* shift m2 */
+        *start2 += newML - gap;
+        m2->len -= newML - gap;
+    }
+    return newML;
+}
+
 LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
@@ -1284,18 +1304,9 @@ _Search2:
         }
 
 _Search3:
-        if ((start2 - ip) < OPTIMAL_ML) {
-            int correction;
-            int new_ml = m1.len;
-            if (new_ml > OPTIMAL_ML) new_ml = OPTIMAL_ML;
-            if (ip+new_ml > start2 + m2.len - MINMATCH)
-                new_ml = (int)(start2 - ip) + m2.len - MINMATCH;
-            correction = new_ml - (int)(start2 - ip);
-            if (correction > 0) {
-                start2 += correction;
-                m2.len -= correction;
-            }
-        }
+        /* m1.len itself is decided when encoding m1 */
+        if ((start2 - ip) < OPTIMAL_ML)
+            (void)LZ4HC_splitOverlap(ip, m1.len, &start2, &m2);
 
         if (start2 + m2.len <= mflimit) {
             start3 = start2 + m2.len - 3;
@@ -1360,19 +1371,10 @@ _Search3:
         * ip & ref are known; Now decide ml.
         */
         if (start2 < ip+m1.len) {
-            if ((start2 - ip) < OPTIMAL_ML) {
-                int correction;
-                if (m1.len > OPTIMAL_ML) m1.len = OPTIMAL_ML;
-                if (ip + m1.len > start2 + m2.len - MINMATCH)
-                    m1.len = (int)(start2 - ip) + m2.len - MINMATCH;
-                correction = m1.len - (int)(start2 - ip);
-                if (correction > 0) {
-                    start2 += correction;
-                    m2.len -= correction;
-                }
-            } else {
+            if ((start2 - ip) < OPTIMAL_ML)
+                m1.len = LZ4HC_splitOverlap(ip, m1.len, &start2, &m2);
+            else
                 m1.len = (int)(start2 - ip);
-            }
         }
         if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                 m1.len, m1.off,
