@@ -28,7 +28,7 @@ extra_deps = []
 if get_option('enable_multithread')
   pthread_dep = dependency('threads', required : true)
   extra_deps += [pthread_dep]
-  multithread_args = ['-DLZ4IO_MULTITHREAD']
+  multithread_args = ['-DLZ4IO_MULTITHREAD']   # frames : see liblz4_internal_dep
 else
   multithread_args = []
 endif

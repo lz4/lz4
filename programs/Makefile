@@ -75,7 +75,8 @@ HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void)
 HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
 ifeq ($(HAVE_MULTITHREAD), 1)
   THREAD_MSG := ==> built with multithreading support
-  THREAD_CPP := -DLZ4IO_MULTITHREAD
+  # LZ4F_MULTITHREAD : liblz4 sources are compiled into lz4, and compress frames with worker threads
+  THREAD_CPP := -DLZ4IO_MULTITHREAD -DLZ4F_MULTITHREAD=1
   ifeq ($(HAVE_PTHREAD), 1)
     THREAD_LD  := -pthread
   endif
