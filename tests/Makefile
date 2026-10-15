@@ -139,6 +139,15 @@ $(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
 decompress-partial-usingDict:
 $(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
+# multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
+FRAMEMT_SRCS := frameMT.c datagen.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/xxhash.c $(PRGDIR)/timefn.c
+CLEAN += frameMT frameMT-nomt
+frameMT: $(FRAMEMT_SRCS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DLZ4F_MULTITHREAD=1 -pthread $^ -o $@$(EXT) $(LDFLAGS) -pthread
+
+frameMT-nomt: $(FRAMEMT_SRCS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@$(EXT) $(LDFLAGS)
+
 .PHONY: clean
 clean: clean_cache
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
@@ -340,6 +349,12 @@ test-fuzzer32: test-fuzzer
 
 test-frametest: frametest
 	./frametest -v $(FUZZER_TIME)
+
+.PHONY: test-frameMT
+test-frameMT: frameMT frameMT-nomt
+	./frameMT > tmp-frameMT.digest
+	./frameMT-nomt > tmp-frameMT-nomt.digest
+	cmp tmp-frameMT.digest tmp-frameMT-nomt.digest
 
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest

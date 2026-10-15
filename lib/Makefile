@@ -60,6 +60,46 @@ OBJFILES = $(SRCFILES:.c=.o)
 
 include ../build/make/lz4defs.make
 
+# Multi-threaded compression (see LZ4F_preferences_t.nbWorkers) :
+# by default, the dynamic library supports multi-threading, when threads are available,
+# while the static library doesn't, so that programs linking liblz4.a don't need -pthread.
+# MULTITHREAD=1 (or target lib-mt) : both libraries support multi-threading
+#                (programs linking liblz4.a then require -pthread on POSIX systems)
+# MULTITHREAD=0 (or target lib-nomt) : no multi-threading support
+ifneq (,$(filter MINGW% Windows%,$(TARGET_OS)))
+  # Windows threads : no additional library
+  MT_FLAGS := -DLZ4F_MULTITHREAD=1
+else
+  MT_FLAGS := -DLZ4F_MULTITHREAD=1 -pthread
+endif
+
+ifeq ($(MULTITHREAD),1)
+  MT_DYNLIB := 1
+  MT_STATICLIB := 1
+else ifeq ($(MULTITHREAD),0)
+  MT_DYNLIB := 0
+  MT_STATICLIB := 0
+else
+  ifneq (,$(filter -pthread,$(MT_FLAGS)))
+    NUM_SYMBOL := \#
+    MT_DYNLIB := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm -f have_pthread.c)
+  else
+    MT_DYNLIB := 1
+  endif
+  MT_STATICLIB := 0
+endif
+
+ifeq ($(MT_DYNLIB),1)
+  DYNLIB_MT_FLAGS := $(MT_FLAGS)
+  DYNLIB_MT_MSG := with multithreading support
+else
+  DYNLIB_MT_MSG := without multithreading support
+endif
+ifeq ($(MT_STATICLIB),1)
+  STATICLIB_MT_FLAGS := $(MT_FLAGS)
+  PC_LIBS_PRIVATE := $(filter -pthread,$(MT_FLAGS))
+endif
+
 # default is defined as the first target in Makefile, hence before multiconf.make
 .PHONY: default
 default: lib-release
@@ -99,6 +139,14 @@ lib-release: lib liblz4.pc
 .PHONY: lib
 lib: liblz4.a liblz4
 
+.PHONY: lib-mt
+lib-mt:
+	$(MAKE) lib-release MULTITHREAD=1
+
+.PHONY: lib-nomt
+lib-nomt:
+	$(MAKE) lib-release MULTITHREAD=0
+
 .PHONY: all
 all: lib liblz4.pc
 
@@ -106,9 +154,10 @@ all: lib liblz4.pc
 all32: CFLAGS+=-m32
 all32: all
 
-liblz4.a:
+# multi-threading flags are part of the objects' cache key (last argument)
+liblz4.a: CPPFLAGS += $(STATICLIB_MT_FLAGS)
 ifeq ($(BUILD_STATIC),yes)
-$(eval $(call static_library,liblz4.a,$(OBJFILES)))
+$(eval $(call static_library,liblz4.a,$(OBJFILES),,,$(STATICLIB_MT_FLAGS)))
 endif
 
 ifeq ($(WINBASED),yes)
@@ -128,15 +177,16 @@ liblz4-dll.o: liblz4-dll.rc
 CLEAN += $(LIBLZ4) $(LIBLZ4_EXP)
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
   ifeq ($(BUILD_SHARED),yes)
-	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(ALLFLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ $(LDLIBS) -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
+	@echo compiling dynamic library $(LIBVER) $(DYNLIB_MT_MSG)
+	$(CC) $(ALLFLAGS) $(DYNLIB_MT_FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ $(LDLIBS) -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
   endif
 
 else   # not windows
 
-$(LIBLZ4): LDFLAGS += -fvisibility=hidden $(SONAME_FLAGS)
+$(LIBLZ4): override CPPFLAGS += $(DYNLIB_MT_FLAGS)   # also when CPPFLAGS is set on the command line
+$(LIBLZ4): LDFLAGS += -fvisibility=hidden $(SONAME_FLAGS) $(filter -pthread,$(DYNLIB_MT_FLAGS))
 ifeq ($(BUILD_SHARED),yes)
-$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),,echo "$(LIBLZ4) created"))
+$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),,echo "$(LIBLZ4) created $(DYNLIB_MT_MSG)",$(DYNLIB_MT_FLAGS)))
 endif
 
 endif
@@ -162,6 +212,7 @@ liblz4: $(LIBLZ4)
 endif
 
 CLEAN += liblz4.pc
+.PHONY: liblz4.pc   # always regenerated, since its content depends on MULTITHREAD
 liblz4.pc: liblz4.pc.in Makefile
 	@echo creating pkgconfig
 	$(SED) -e 's|@PREFIX@|$(prefix)|' \
@@ -170,6 +221,7 @@ liblz4.pc: liblz4.pc.in Makefile
            -e 's|@VERSION@|$(LIBVER)|' \
            -e 's|=${prefix}/|=$${prefix}/|' \
            $< >$@
+	$(if $(PC_LIBS_PRIVATE),echo "Libs.private: $(PC_LIBS_PRIVATE)" >> $@)
 
 .PHONY: clean
 clean:

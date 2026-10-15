@@ -52,6 +52,10 @@ endif()
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
 option(LZ4_BUILD_MULTITHREAD "Enable multithreading in lz4 programs" ON)
+# By default, the shared library supports multithreaded compression (see LZ4F_preferences_t.nbWorkers),
+# while the static library doesn't, so that programs linking it don't need to link threads.
+option(LZ4_SHARED_MULTITHREAD "Enable multithreading support in shared library" ON)
+option(LZ4_STATIC_MULTITHREAD "Enable multithreading support in static library (programs linking it must then link threads)" OFF)
 
 
 # Determine if LZ4 is being built as part of another project.
@@ -205,6 +209,44 @@ if(BUILD_STATIC_LIBS)
   target_compile_definitions(lz4_static PRIVATE
     XXH_NAMESPACE=LZ4_)
 endif(BUILD_STATIC_LIBS)
+
+#-----------------------------------------------------------------------------
+# LIBRARY MULTITHREADING - requires pthread, except on Windows
+#-----------------------------------------------------------------------------
+set(LZ4_LIB_MT_TARGETS)
+if(BUILD_SHARED_LIBS AND LZ4_SHARED_MULTITHREAD)
+  list(APPEND LZ4_LIB_MT_TARGETS lz4_shared)
+endif()
+if(BUILD_STATIC_LIBS AND LZ4_STATIC_MULTITHREAD)
+  list(APPEND LZ4_LIB_MT_TARGETS lz4_static)
+endif()
+set(LZ4_STATIC_NEEDS_THREADS OFF)   # used by lz4Config.cmake and liblz4.pc
+if(LZ4_LIB_MT_TARGETS)
+  if(WIN32)
+    set(LZ4_LIB_HAVE_THREADS ON)    # Windows threads : no additional library
+  else()
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads)
+    if(CMAKE_USE_PTHREADS_INIT)
+      set(LZ4_LIB_HAVE_THREADS ON)
+      foreach(target ${LZ4_LIB_MT_TARGETS})
+        target_link_libraries(${target} PRIVATE Threads::Threads)
+      endforeach()
+      if(BUILD_STATIC_LIBS AND LZ4_STATIC_MULTITHREAD)
+        set(LZ4_STATIC_NEEDS_THREADS ON)
+      endif()
+    else()
+      set(LZ4_LIB_HAVE_THREADS OFF)
+      message(WARNING "pthread not found : liblz4 is built without multithreading support")
+    endif()
+  endif()
+  if(LZ4_LIB_HAVE_THREADS)
+    foreach(target ${LZ4_LIB_MT_TARGETS})
+      target_compile_definitions(${target} PRIVATE LZ4F_MULTITHREAD=1)
+    endforeach()
+    message(STATUS "liblz4 multithreading support : ${LZ4_LIB_MT_TARGETS}")
+  endif()
+endif()
 
 #-----------------------------------------------------------------------------
 # CLI EXECUTABLES - Configuring command-line programs
@@ -377,3 +419,7 @@ endif("${CMAKE_INSTALL_FULL_INCLUDEDIR}" STREQUAL "${CMAKE_INSTALL_PREFIX}/${CMA
 # for liblz4.pc substitution
 set(VERSION ${LZ4_VERSION_STRING})
 configure_file(${LZ4_LIB_SOURCE_DIR}/liblz4.pc.in liblz4.pc @ONLY)
+if(LZ4_STATIC_NEEDS_THREADS)
+  # static linking (pkg-config --static) must then link threads
+  file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/liblz4.pc" "Libs.private: -pthread\n")
+endif()

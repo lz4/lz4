@@ -194,10 +194,26 @@ typedef struct {
   int      compressionLevel;    /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
   unsigned autoFlush;           /* 1: always flush; reduces usage of internal buffers */
   unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* v1.8.2+ */
-  unsigned reserved[3];         /* must be zero for forward compatibility */
+  unsigned nbWorkers;           /* 0: single-threaded (default); >= 1: multi-threaded one-shot compression, see below (experimental) */  /* v1.10.1+ */
+  unsigned reserved[2];         /* must be zero for forward compatibility */
 } LZ4F_preferences_t;
 
-#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0u, 0u, { 0u, 0u, 0u } }    /* v1.8.3+ */
+#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0u, 0u, 0u, { 0u, 0u } }    /* v1.8.3+ */
+
+/* nbWorkers : experimental
+ *  Only employed by one-shot compression, LZ4F_compressFrame() and LZ4F_compressFrame_usingCDict(), for the time being.
+ *  0 (default) : single-threaded, unchanged behavior.
+ *  >= 1 : input is cut into jobs, compressed by up to nbWorkers threads, including the calling one (capped at 200).
+ *  - Output only depends on parameters : never on nbWorkers value (>= 1), nor on scheduling.
+ *  - With independent blocks, output is identical to nbWorkers == 0.
+ *  - With linked blocks, each 4 MB job restarts with previous 64 KB as dictionary :
+ *    output can differ (slightly) from nbWorkers == 0, at fast levels.
+ *  - Inputs fitting into a single job are compressed by the calling thread.
+ *  - Threads are created and joined within each invocation.
+ *  - Jobs run in parallel only when dstCapacity >= LZ4F_compressFrameBound(), otherwise they run serially.
+ *  Multi-threading requires lz4frame.c to be compiled with LZ4F_MULTITHREAD=1 (and -pthread on POSIX systems) :
+ *  by default, the dynamic library is built with multi-threading support, and the static library without.
+ *  Otherwise, jobs are processed serially by the calling thread, producing the same output. */
 
 
 /*-*********************************
@@ -215,6 +231,7 @@ typedef struct {
  *  consider compiling `lz4frame.c` with compile-time macro LZ4F_HEAPMODE set to 1 instead.
  *  All state allocations will use the Heap.
  *  It also means each invocation of LZ4F_compressFrame() will trigger several internal alloc/free invocations.
+ *  Multi-threaded compression (preferencesPtr->nbWorkers >= 1) also allocates one state per worker on the heap.
  *
  *  Success is guaranteed when @dstCapacity >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
  *  A smaller @dstCapacity is allowed : compression is attempted,
