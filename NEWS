@@ -1,6 +1,7 @@
 v1.10.1
 fix  : `LZ4_decoderRingBufferSize()` could be too small, corrupting decoded data (since v1.9.0); users of `LZ4_DECODER_RING_BUFFER_SIZE()` must recompile
 fix  : `LZ4_compress_fast_continue()` produced wrong data when a block overwrote its whole previous block
+fix  : `LZ4_compress_destSize_extState()` corrupted data with `acceleration <= 0`, and could read out of bounds (since v1.10.0)
 fix  : heap overflow with an invalid `blockSizeID` in `LZ4F_compressBegin()` and `LZ4F_writeOpen()`, by @jaypatrickhoward
 fix  : `LZ4F_uncompressedUpdate()` mixed with `LZ4F_compressUpdate()` could exceed `LZ4F_compressBound()`
 fix  : single-thread `lz4` could truncate concatenated frames with block checksums (wrong decompression hints)
