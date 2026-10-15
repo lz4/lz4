@@ -76,7 +76,8 @@ static int compress_file(FILE* f_in, FILE* f_out)
 
 out:
     free(buf);
-    if (LZ4F_isError(LZ4F_writeClose(lz4fWrite))) {
+    ret = LZ4F_writeClose(lz4fWrite);
+    if (LZ4F_isError(ret)) {
         printf("LZ4F_writeClose: %s\n", LZ4F_getErrorName(ret));
         return 1;
     }

@@ -54,6 +54,7 @@ typedef struct LZ4_writeFile_s LZ4_writeFile_t;
  * @param lz4fRead  Pointer to receive the read file handle.
  *                  It is an OUT parameter, so its initial value is ignored and will be overwritten.
  *                  Its value on exit is only valid if the function returns LZ4F_OK_NoError.
+ *                  On failure, it is set to NULL.
  * @param fp        FILE* positioned at start of LZ4 file (binary mode).
  *
  * @return LZ4F_OK_NoError on success, or error code on failure.
@@ -105,6 +106,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead);
  * @param lz4fWrite Pointer to receive the write file handle.
  *                  It is an OUT parameter, so its initial value is ignored and will be overwritten.
  *                  Its value on exit is only valid if the function returns LZ4F_OK_NoError.
+ *                  On failure, it is set to NULL.
  * @param fp        FILE* positioned at start of LZ4 file (binary mode).
  *
  * @return LZ4F_OK_NoError on success, or error code on failure.
@@ -125,6 +127,9 @@ LZ4FLIB_STATIC_API size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf
 /*! LZ4F_writeClose() :
  * Close lz4file handle.
  * `lz4f` must use LZ4F_writeOpen to set first.
+ * @return LZ4F_OK_NoError on success, or error code on failure,
+ *         including one from a previous LZ4F_write() : the frame is then incomplete.
+ *  Resources are released in all cases.
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeClose(LZ4_writeFile_t* lz4fWrite);
 

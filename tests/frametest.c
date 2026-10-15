@@ -2288,6 +2288,35 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "OK \n");
     }
 
+    /* a failed open sets the handle to NULL,
+     * LZ4F_writeClose() reports an error from a previous LZ4F_write() */
+    DISPLAYLEVEL(3, "lz4file error reporting : ");
+    {   LZ4_writeFile_t* writeCtx = (LZ4_writeFile_t*)CNBuffer;   /* stale value */
+        LZ4_readFile_t* readCtx = (LZ4_readFile_t*)CNBuffer;
+        FILE* const tmpFile = tmpfile();
+        int failed = (tmpFile == NULL);
+
+        if (!LZ4F_isError(LZ4F_writeOpen(&writeCtx, NULL, NULL)) || writeCtx != NULL) failed = 1;
+        if (!LZ4F_isError(LZ4F_readOpen(&readCtx, NULL)) || readCtx != NULL) failed = 1;
+        if (!failed && (LZ4F_isError(LZ4F_writeOpen(&writeCtx, tmpFile, NULL))
+                     || LZ4F_writeClose(writeCtx) != LZ4F_OK_NoError)) failed = 1;
+        if (tmpFile) fclose(tmpFile);
+#if defined(__linux__)
+        {   FILE* const fullFile = fopen("/dev/full", "wb");   /* writes fail when stdio flushes its buffer */
+            if (!failed && fullFile != NULL) {
+                if (LZ4F_isError(LZ4F_writeOpen(&writeCtx, fullFile, NULL))) failed = 1;   /* header remains buffered */
+                else {
+                    size_t const wResult = LZ4F_write(writeCtx, CNBuffer, COMPRESSIBLE_NOISE_LENGTH);
+                    size_t const cResult = LZ4F_writeClose(writeCtx);
+                    if (!LZ4F_isError(wResult) || !LZ4F_isError(cResult)) failed = 1;
+            }   }
+            if (fullFile) fclose(fullFile);
+        }
+#endif
+        if (failed) goto _output_error;
+        DISPLAYLEVEL(3, "OK \n");
+    }
+
     DISPLAYLEVEL(3, "LZ4F_compressFrame, using default preferences : ");
     CHECK_V(cSize, LZ4F_compressFrame(compressedBuffer, LZ4F_compressFrameBound(testSize, NULL), CNBuffer, testSize, NULL));
     DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
