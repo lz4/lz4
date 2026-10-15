@@ -1392,12 +1392,19 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 }
 
 
+/* values < 1 select the default, values > LZ4_ACCELERATION_MAX are capped */
+static int LZ4_clampAcceleration(int acceleration)
+{
+    if (acceleration < 1) return LZ4_ACCELERATION_DEFAULT;
+    if (acceleration > LZ4_ACCELERATION_MAX) return LZ4_ACCELERATION_MAX;
+    return acceleration;
+}
+
 int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
     LZ4_stream_t_internal* const ctx = & LZ4_initStream(state, sizeof(LZ4_stream_t)) -> internal_donotuse;
     assert(ctx != NULL);
-    if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
-    if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
+    acceleration = LZ4_clampAcceleration(acceleration);
     if (maxOutputSize >= LZ4_compressBound(inputSize)) {
         if (inputSize < LZ4_64Klimit) {
             return LZ4_compress_generic(ctx, source, dest, inputSize, NULL, 0, notLimited, byU16, noDict, noDictIssue, acceleration);
@@ -1427,8 +1434,7 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 int LZ4_compress_fast_extState_fastReset(void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration)
 {
     LZ4_stream_t_internal* const ctx = &((LZ4_stream_t*)state)->internal_donotuse;
-    if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
-    if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
+    acceleration = LZ4_clampAcceleration(acceleration);
     assert(ctx != NULL);
 
     if (dstCapacity >= LZ4_compressBound(srcSize)) {
@@ -1495,6 +1501,7 @@ static int LZ4_compress_destSize_extState_internal(LZ4_stream_t* state, const ch
 {
     void* const s = LZ4_initStream(state, sizeof (*state));
     assert(s != NULL); (void)s;
+    acceleration = LZ4_clampAcceleration(acceleration);
 
     if (targetDstSize >= LZ4_compressBound(*srcSizePtr)) {  /* compression success is guaranteed */
         return LZ4_compress_fast_extState(state, src, dst, *srcSizePtr, targetDstSize, acceleration);
@@ -1737,8 +1744,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
         LZ4_prepareTable(streamPtr, inputSize, byU32);
 
     LZ4_renormDictT(streamPtr, inputSize);   /* fix index overflow */
-    if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
-    if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
+    acceleration = LZ4_clampAcceleration(acceleration);
 
     /* invalidate tiny dictionaries */
     if ( (streamPtr->dictSize < 4)     /* tiny dictionary : not enough for a hash */

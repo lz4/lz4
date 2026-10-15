@@ -1262,6 +1262,32 @@ static void FUZ_unitTests(int compressionLevel)
     }
     DISPLAYLEVEL(3, " OK \n");
 
+    DISPLAYLEVEL(3, "LZ4_compress_destSize_extState() with out-of-range acceleration : ");
+    {   static const int accels[] = { 0, -1, -100, INT_MIN, INT_MAX };
+        int const srcSize = 128 KB;
+        int const targetDstSize = srcSize / 4;   /* < LZ4_compressBound(srcSize) : fillOutput mode */
+        LZ4_stream_t state;
+        int refConsumed = srcSize, refSize;
+        U32 refCrc;
+        size_t n;
+        refSize = LZ4_compress_destSize_extState(&state, testInput, testCompressed, &refConsumed, targetDstSize, 1);
+        FUZ_CHECKTEST(refSize <= 0, "LZ4_compress_destSize_extState() failed");
+        refCrc = XXH32(testCompressed, (size_t)refSize, 0);
+        for (n = 0; n < sizeof(accels)/sizeof(accels[0]); n++) {
+            int consumed = srcSize;
+            int const cSize = LZ4_compress_destSize_extState(&state, testInput, testCompressed, &consumed, targetDstSize, accels[n]);
+            FUZ_CHECKTEST(cSize <= 0 || cSize > targetDstSize, "acceleration %i : compression failed (%i)", accels[n], cSize);
+            if (accels[n] < 1) {   /* replaced by the default acceleration, 1 */
+                FUZ_CHECKTEST(cSize != refSize || consumed != refConsumed || XXH32(testCompressed, (size_t)cSize, 0) != refCrc,
+                              "acceleration %i : output differs from acceleration 1", accels[n]);
+            }
+            {   int const dSize = LZ4_decompress_safe(testCompressed, testVerify, cSize, testInputSize);
+                FUZ_CHECKTEST(dSize != consumed || memcmp(testInput, testVerify, (size_t)consumed),
+                              "acceleration %i : round-trip failure", accels[n]);
+        }   }
+    }
+    DISPLAYLEVEL(3, "OK \n");
+
     /* in-place compression test */
     DISPLAYLEVEL(3, "in-place compression using LZ4_compress_default() :");
     {   int const sampleSize = 65 KB;
