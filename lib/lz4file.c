@@ -152,7 +152,11 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
     LZ4_readFile_t* readFile;
 
     /* Validate parameters */
-    if (fp == NULL || lz4fRead == NULL) {
+    if (lz4fRead == NULL) {
+        RETURN_ERROR(parameter_null);
+    }
+    *lz4fRead = NULL;   /* in case of failure */
+    if (fp == NULL) {
         RETURN_ERROR(parameter_null);
     }
 
@@ -451,7 +455,10 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   LZ4_writeFile_t* writeFile;
   size_t blockSize;
 
-  if (fp == NULL || lz4fWrite == NULL)
+  if (lz4fWrite == NULL)
+      RETURN_ERROR(parameter_null);
+  *lz4fWrite = NULL;   /* in case of failure */
+  if (fp == NULL)
       RETURN_ERROR(parameter_null);
 
   /* Validate block size */
@@ -481,7 +488,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   /* Initialize compression context */
   { LZ4F_errorCode_t const status = LZ4F_createCompressionContext(&writeFile->cctxPtr, LZ4F_VERSION);
     if (LZ4F_isError(status)) {
-        freeAndNullWriteFile(lz4fWrite);
+        freeAndNullWriteFile(&writeFile);
         return status;
   } }
 
@@ -533,26 +540,24 @@ size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf, size_t size)
 
 LZ4F_errorCode_t LZ4F_writeClose(LZ4_writeFile_t* lz4fWrite)
 {
-  LZ4F_errorCode_t ret = LZ4F_OK_NoError;
+  LZ4F_errorCode_t ret;
 
   if (lz4fWrite == NULL) {
     RETURN_ERROR(parameter_null);
   }
 
-  if (lz4fWrite->errCode == LZ4F_OK_NoError) {
-    ret =  LZ4F_compressEnd(lz4fWrite->cctxPtr,
-                            lz4fWrite->dstBuf, lz4fWrite->dstBufMaxSize,
-                            NULL);
-    if (LZ4F_isError(ret)) {
-      goto cleanup;
-    }
-
-    if (ret != fwrite(lz4fWrite->dstBuf, 1, ret, lz4fWrite->fp)) {
+  ret = lz4fWrite->errCode;   /* a previous LZ4F_write() failure leaves the frame incomplete */
+  if (ret == LZ4F_OK_NoError) {
+    size_t const endSize = LZ4F_compressEnd(lz4fWrite->cctxPtr,
+                                            lz4fWrite->dstBuf, lz4fWrite->dstBufMaxSize,
+                                            NULL);
+    if (LZ4F_isError(endSize)) {
+      ret = endSize;
+    } else if (endSize != fwrite(lz4fWrite->dstBuf, 1, endSize, lz4fWrite->fp)) {
       ret = returnErrorCode(LZ4F_ERROR_io_write);
     }
   }
 
-cleanup:
   freeWriteFileResources(lz4fWrite);
   return ret;
 }
