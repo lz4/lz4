@@ -51,6 +51,7 @@ endif()
 #-----------------------------------------------------------------------------
 option(LZ4_BUILD_CLI "Build lz4 program" ON)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
+option(LZ4_BUILD_MULTITHREAD "Enable multithreading in lz4 programs" ON)
 
 
 # Determine if LZ4 is being built as part of another project.
@@ -221,6 +222,22 @@ if(LZ4_BUILD_LEGACY_LZ4C)
   add_executable(lz4c ${LZ4_CLI_SOURCES})
   set_target_properties(lz4c PROPERTIES COMPILE_DEFINITIONS "ENABLE_LZ4C_LEGACY_OPTIONS")
 endif(LZ4_BUILD_LEGACY_LZ4C)
+
+# multithreading : requires pthread, except on Windows (see programs/lz4conf.h)
+if(LZ4_PROGRAMS_BUILT)
+  if(NOT LZ4_BUILD_MULTITHREAD)
+    set_property(TARGET ${LZ4_PROGRAMS_BUILT} APPEND PROPERTY COMPILE_DEFINITIONS LZ4IO_MULTITHREAD=0)
+  elseif(NOT WIN32)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads)
+    if(CMAKE_USE_PTHREADS_INIT)
+      set_property(TARGET ${LZ4_PROGRAMS_BUILT} APPEND PROPERTY COMPILE_DEFINITIONS LZ4IO_MULTITHREAD=1)
+      foreach(prog ${LZ4_PROGRAMS_BUILT})
+        target_link_libraries(${prog} PRIVATE Threads::Threads)
+      endforeach()
+    endif()
+  endif()
+endif()
 
 #-----------------------------------------------------------------------------
 # COMPILER FLAGS - Configure warning flags and compiler-specific options

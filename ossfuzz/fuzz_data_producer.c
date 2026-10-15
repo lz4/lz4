@@ -26,8 +26,10 @@ uint32_t FUZZ_dataProducer_retrieve32(FUZZ_dataProducer_t *producer) {
         producer->size -= 1;
         return (uint32_t)data[size - 1];
     } else {
+        const uint8_t* const p = data + size - 4;
         producer->size -= 4;
-        return *(data + size - 4);
+        return (uint32_t)p[0] | ((uint32_t)p[1] << 8)
+            | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
     }
 }
 
@@ -43,7 +45,7 @@ uint32_t FUZZ_getRange_from_uint32(uint32_t seed, uint32_t min, uint32_t max)
 uint32_t FUZZ_dataProducer_range32(FUZZ_dataProducer_t* producer,
     uint32_t min, uint32_t max)
 {
-    size_t const seed = FUZZ_dataProducer_retrieve32(producer);
+    uint32_t const seed = FUZZ_dataProducer_retrieve32(producer);
     return FUZZ_getRange_from_uint32(seed, min, max);
 }
 

@@ -71,6 +71,25 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FIL
  */
 LZ4FLIB_STATIC_API size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size);
 
+/*! LZ4F_seek() : v1.10.1+
+ *  Moves the reading position within decoded data, like fseek().
+ * @origin : SEEK_SET (from the beginning) or SEEK_CUR (from current position).
+ *           SEEK_END is not supported.
+ *  Seeking forward decodes and discards data up to the requested position.
+ *  Seeking backward requires the FILE* to be seekable : decoding restarts from the closest preceding
+ *  resume point, recorded automatically while reading : frame starts, and block starts within frames
+ *  using independent blocks. Within frames using linked blocks, decoding restarts from the frame start :
+ *  prefer independent blocks for files meant for random access.
+ * @return : 0 on success, or an error code (can be tested using LZ4F_isError()).
+ *  Seeking beyond the end of decoded data stops at the end, and returns an error.
+ */
+LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_seek(LZ4_readFile_t* lz4fRead, long long offset, int origin);
+
+/*! LZ4F_tell() : v1.10.1+
+ * @return : current reading position within decoded data.
+ */
+LZ4FLIB_STATIC_API unsigned long long LZ4F_tell(const LZ4_readFile_t* lz4fRead);
+
 /*! LZ4F_readClose() :
  * Close lz4file handle.
  * `lz4f` must use LZ4_readOpen to set first.

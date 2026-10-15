@@ -33,6 +33,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(data, size);
     size_t const dstCapacitySeed = FUZZ_dataProducer_retrieve32(producer);
     size_t const dictSizeSeed = FUZZ_dataProducer_retrieve32(producer);
+    int const skipChecksums = (FUZZ_dataProducer_range32(producer, 0, 7) == 0);   /* occasionally */
     size = FUZZ_dataProducer_remainingBytes(producer);
 
     size_t const dstCapacity = FUZZ_getRange_from_uint32(
@@ -57,6 +58,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     /* Decompress using multiple configurations. */
     memset(&opts, 0, sizeof(opts));
+    opts.skipChecksums = (unsigned)skipChecksums;
     opts.stableDst = 0;
     decompress(dctx, dst, dstCapacity, data, size, NULL, 0, &opts);
     opts.stableDst = 1;

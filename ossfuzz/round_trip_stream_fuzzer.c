@@ -72,7 +72,7 @@ state_t state_create(char const* data, size_t size, uint32_t seed)
     state.cstream = LZ4_createStream();
     FUZZ_ASSERT(state.cstream);
     state.cstreamHC = LZ4_createStreamHC();
-    FUZZ_ASSERT(state.cstream);
+    FUZZ_ASSERT(state.cstreamHC);
     state.dstream = LZ4_createStreamDecode();
     FUZZ_ASSERT(state.dstream);
 
@@ -199,6 +199,7 @@ static void state_attachDictRoundTrip(state_t* state)
     char const* dict = state->data.buf;
     size_t const dictSize = state_trimDict(state);
     LZ4_stream_t* dictStream = LZ4_createStream();
+    FUZZ_ASSERT(dictStream);
     LZ4_loadDict(dictStream, dict, dictSize);
     LZ4_attach_dictionary(state->cstream, dictStream);
     LZ4_setStreamDecode(state->dstream, dict, dictSize);
@@ -262,6 +263,7 @@ static void state_attachDictHCRoundTrip(state_t* state)
     char const* dict = state->data.buf;
     size_t const dictSize = state_trimDict(state);
     LZ4_streamHC_t* dictStream = LZ4_createStreamHC();
+    FUZZ_ASSERT(dictStream);
     LZ4_setCompressionLevel(dictStream, state->level);
     LZ4_loadDictHC(dictStream, dict, dictSize);
     LZ4_attach_HC_dictionary(state->cstreamHC, dictStream);

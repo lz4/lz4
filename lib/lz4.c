@@ -889,6 +889,10 @@ LZ4_getPosition(const BYTE* p,
     return LZ4_getPositionOnHash(h, tableBase, tableType);
 }
 
+/* beyond this input size (1 KB by default),
+ * clearing the table is faster than rejecting its stale entries */
+#define LZ4_CLEAR_TABLE_THRESHOLD (LZ4_HASHTABLESIZE / 16)
+
 LZ4_FORCE_INLINE void
 LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
            const int inputSize,
@@ -903,7 +907,7 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
           || ((tableType == byU16) && cctx->currentOffset + (unsigned)inputSize >= 0xFFFFU)
           || ((tableType == byU32) && cctx->currentOffset > 1 GB)
           || tableType == byPtr
-          || inputSize >= 4 KB)
+          || inputSize >= LZ4_CLEAR_TABLE_THRESHOLD)
         {
             DEBUGLOG(4, "LZ4_prepareTable: Resetting table in %p", (void*)cctx);
             MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
@@ -1388,12 +1392,19 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 }
 
 
+/* values < 1 select the default, values > LZ4_ACCELERATION_MAX are capped */
+static int LZ4_clampAcceleration(int acceleration)
+{
+    if (acceleration < 1) return LZ4_ACCELERATION_DEFAULT;
+    if (acceleration > LZ4_ACCELERATION_MAX) return LZ4_ACCELERATION_MAX;
+    return acceleration;
+}
+
 int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
     LZ4_stream_t_internal* const ctx = & LZ4_initStream(state, sizeof(LZ4_stream_t)) -> internal_donotuse;
     assert(ctx != NULL);
-    if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
-    if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
+    acceleration = LZ4_clampAcceleration(acceleration);
     if (maxOutputSize >= LZ4_compressBound(inputSize)) {
         if (inputSize < LZ4_64Klimit) {
             return LZ4_compress_generic(ctx, source, dest, inputSize, NULL, 0, notLimited, byU16, noDict, noDictIssue, acceleration);
@@ -1423,8 +1434,7 @@ int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int 
 int LZ4_compress_fast_extState_fastReset(void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration)
 {
     LZ4_stream_t_internal* const ctx = &((LZ4_stream_t*)state)->internal_donotuse;
-    if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
-    if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
+    acceleration = LZ4_clampAcceleration(acceleration);
     assert(ctx != NULL);
 
     if (dstCapacity >= LZ4_compressBound(srcSize)) {
@@ -1491,6 +1501,7 @@ static int LZ4_compress_destSize_extState_internal(LZ4_stream_t* state, const ch
 {
     void* const s = LZ4_initStream(state, sizeof (*state));
     assert(s != NULL); (void)s;
+    acceleration = LZ4_clampAcceleration(acceleration);
 
     if (targetDstSize >= LZ4_compressBound(*srcSizePtr)) {  /* compression success is guaranteed */
         return LZ4_compress_fast_extState(state, src, dst, *srcSizePtr, targetDstSize, acceleration);
@@ -1618,6 +1629,9 @@ static int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
      * in LZ4_compress_fast_continue() where it uses noDictIssue even when the
      * dictionary isn't a full 64k. */
     dict->currentOffset += 64 KB;
+    /* no longer a cleared table : LZ4_prepareTable() must check it,
+     * even when the dictionary is too small to be used */
+    dict->tableType = (U32)tableType;
 
     if (dictSize < (int)HASH_UNIT) {
         return 0;
@@ -1626,7 +1640,6 @@ static int LZ4_loadDict_internal(LZ4_stream_t* LZ4_dict,
     if ((dictEnd - p) > 64 KB) p = dictEnd - 64 KB;
     dict->dictionary = p;
     dict->dictSize = (U32)(dictEnd - p);
-    dict->tableType = (U32)tableType;
     idx32 = dict->currentOffset - dict->dictSize;
 
     while (p <= dictEnd-HASH_UNIT) {
@@ -1681,6 +1694,8 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
          */
         if (workingStream->internal_donotuse.currentOffset == 0) {
             workingStream->internal_donotuse.currentOffset = 64 KB;
+            /* no longer a cleared table : LZ4_prepareTable() must check it */
+            workingStream->internal_donotuse.tableType = (U32)byU32;
         }
 
         /* Don't actually attach an empty dictionary.
@@ -1724,9 +1739,12 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
 
     DEBUGLOG(5, "LZ4_compress_fast_continue (inputSize=%i, dictSize=%u)", inputSize, streamPtr->dictSize);
 
+    /* new stream (no history) : clear the table beyond LZ4_CLEAR_TABLE_THRESHOLD */
+    if ((streamPtr->dictSize == 0) && (streamPtr->dictCtx == NULL) && (inputSize >= LZ4_CLEAR_TABLE_THRESHOLD))
+        LZ4_prepareTable(streamPtr, inputSize, byU32);
+
     LZ4_renormDictT(streamPtr, inputSize);   /* fix index overflow */
-    if (acceleration < 1) acceleration = LZ4_ACCELERATION_DEFAULT;
-    if (acceleration > LZ4_ACCELERATION_MAX) acceleration = LZ4_ACCELERATION_MAX;
+    acceleration = LZ4_clampAcceleration(acceleration);
 
     /* invalidate tiny dictionaries */
     if ( (streamPtr->dictSize < 4)     /* tiny dictionary : not enough for a hash */
@@ -1743,8 +1761,9 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
 
     /* Check overlapping input/dictionary space */
     {   const char* const sourceEnd = source + inputSize;
-        if ((sourceEnd > (const char*)streamPtr->dictionary) && (sourceEnd < dictEnd)) {
-            streamPtr->dictSize = (U32)(dictEnd - sourceEnd);
+        if ((sourceEnd > (const char*)streamPtr->dictionary) && (source < dictEnd)) {
+            /* only the part of the dictionary beyond input remains */
+            streamPtr->dictSize = (sourceEnd < dictEnd) ? (U32)(dictEnd - sourceEnd) : 0;
             if (streamPtr->dictSize > 64 KB) streamPtr->dictSize = 64 KB;
             if (streamPtr->dictSize < 4) streamPtr->dictSize = 0;
             streamPtr->dictionary = (const BYTE*)dictEnd - streamPtr->dictSize;
@@ -2633,6 +2652,8 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
  */
 int LZ4_decoderRingBufferSize(int maxBlockSize)
 {
+    /* the margin must cover the widest write beyond a copy (63 bytes, LZ4_wildCopy64), minus 2 */
+    LZ4_STATIC_ASSERT(LZ4_DECODER_RING_BUFFER_SIZE(0) - 65536 >= 63 - 2);
     if (maxBlockSize < 0) return 0;
     if (maxBlockSize > LZ4_MAX_INPUT_SIZE) return 0;
     if (maxBlockSize < 16) maxBlockSize = 16;
