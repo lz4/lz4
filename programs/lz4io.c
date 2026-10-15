@@ -2611,7 +2611,11 @@ int LZ4IO_decompressMultipleFilenames(
     if (prefs->blockChecksum==0 && prefs->streamChecksum==0) {
         DISPLAYLEVEL(4, "disabling checksum validation during decoding \n");
     }
-    ress.dstFile = LZ4IO_openDstFile(stdoutmark, prefs);
+    /* stdout and /dev/null (test mode) are destinations shared by all input files */
+    if (LZ4IO_isStdout(suffix) || LZ4IO_isDevNull(suffix)) {
+        ress.dstFile = LZ4IO_openDstFile(suffix, prefs);
+        if (ress.dstFile == NULL) END_PROCESS(76, "Cannot open destination %s", suffix);
+    }
 
     for (i=0; i<ifntSize; i++) {
         unsigned long long processed = 0;
@@ -2639,6 +2643,7 @@ int LZ4IO_decompressMultipleFilenames(
         totalProcessed += processed;
     }
 
+    if (ress.dstFile != NULL && ress.dstFile != stdout) fclose(ress.dstFile);
     LZ4IO_freeDResources(ress);
     free(outFileName);
     LZ4IO_finalTimeDisplay(timeStart, cpuStart, totalProcessed);
