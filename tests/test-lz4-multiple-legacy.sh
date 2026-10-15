@@ -48,4 +48,7 @@ cmp $FPREFIX-concat1 $FPREFIX-concat2  # must be equivalent
 rm -f $FPREFIX-concat2.lz4
 lz4 -f -l -m $FPREFIX-concat1 notHere-legacy $FPREFIX-concat2 && exit 1 # must fail : notHere-legacy not present
 test -f $FPREFIX-concat2.lz4 # notHere was a non-blocking error, concat2.lz4 should be present
+# test multiple legacy files without writing decoded content
+lz4 -tm $FPREFIX-concat1.lz4 $FPREFIX-concat2.lz4 > $FPREFIX-test-output
+test ! -s $FPREFIX-test-output
 true
