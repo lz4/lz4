@@ -2079,10 +2079,6 @@ LZ4_decompress_generic(
         const int checkOffset = (dictSize < (int)(64 KB));
 
 
-        /* Set up the "end" pointers for the shortcut. */
-        const BYTE* const shortiend = iend - 14 /*maxLL*/ - 2 /*offset*/;
-        const BYTE* const shortoend = oend - 14 /*maxLL*/ - 18 /*maxML*/;
-
         const BYTE* match;
         size_t offset;
         unsigned token;
@@ -2272,8 +2268,10 @@ LZ4_decompress_generic(
              * there is a combined check for both stages).
              */
             if ( (length != RUN_MASK)
-                /* strictly "less than" on input, to re-enter the loop with at least one byte */
-              && likely((ip < shortiend) & (op <= shortoend)) ) {
+                /* Check remaining space without forming pointers before the buffers.
+                 * Keep at least one input byte to re-enter the loop. */
+              && likely(((iend - ip) > 16 /*maxLL + offset*/)
+                      & ((oend - op) >= 32 /*maxLL + maxML*/)) ) {
                 /* Copy the literals */
                 LZ4_memcpy(op, ip, 16);
                 op += length; ip += length;
