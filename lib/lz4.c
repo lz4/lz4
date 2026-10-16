@@ -2079,8 +2079,7 @@ LZ4_decompress_generic(
         const int checkOffset = (dictSize < (int)(64 KB));
 
 
-        /* Clamp shortcut boundaries to the buffer starts for small buffers.
-         * Both shortcut comparisons are strict, so clamped boundaries disable it. */
+        /* Set up the "end" pointers for the shortcut. */
         const BYTE* const shortiend = srcSize >= 16 ? iend - 16 : ip;
         const BYTE* const shortoend = outputSize >= 32 ? oend - 31 : op;
 
