@@ -2079,6 +2079,11 @@ LZ4_decompress_generic(
         const int checkOffset = (dictSize < (int)(64 KB));
 
 
+        /* Clamp shortcut boundaries to the buffer starts for small buffers.
+         * Both shortcut comparisons are strict, so clamped boundaries disable it. */
+        const BYTE* const shortiend = srcSize >= 16 ? iend - 16 : ip;
+        const BYTE* const shortoend = outputSize >= 32 ? oend - 31 : op;
+
         const BYTE* match;
         size_t offset;
         unsigned token;
@@ -2268,10 +2273,8 @@ LZ4_decompress_generic(
              * there is a combined check for both stages).
              */
             if ( (length != RUN_MASK)
-                /* Check remaining space without forming pointers before the buffers.
-                 * Keep at least one input byte to re-enter the loop. */
-              && likely(((iend - ip) > 16 /*maxLL + offset*/)
-                      & ((oend - op) >= 32 /*maxLL + maxML*/)) ) {
+                /* Keep at least one input byte to re-enter the loop. */
+              && likely((ip < shortiend) & (op < shortoend)) ) {
                 /* Copy the literals */
                 LZ4_memcpy(op, ip, 16);
                 op += length; ip += length;
