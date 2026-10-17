@@ -62,3 +62,4 @@ cmake_install_test/
 # generated Windows resource files
 lib/*.rc
 programs/*.rc
+.claude/

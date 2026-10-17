@@ -98,6 +98,28 @@
 #  endif
 #endif
 
+/*!XXH_ENABLE_RVV :
+ * Auto-detect RISC-V Vector Extension support.
+ * Requires GCC >= 13 or Clang >= 16 with -march=rv64gcv
+ */
+#ifndef XXH_ENABLE_RVV
+#  if defined(__riscv) && defined(__riscv_vector)
+#    if defined(__GNUC__) && !defined(__clang__)
+#      if __GNUC__ >= 13
+#        define XXH_ENABLE_RVV 1
+#      endif
+#    elif defined(__clang__)
+#      if __clang_major__ >= 16
+#        define XXH_ENABLE_RVV 1
+#      endif
+#    endif
+#  endif
+#endif
+
+#ifndef XXH_ENABLE_RVV
+#  define XXH_ENABLE_RVV 0
+#endif
+
 
 /* *************************************
 *  Includes & Memory related functions
@@ -134,6 +156,82 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcp
 #    define FORCE_INLINE static
 #  endif /* __STDC_VERSION__ */
 #endif
+
+#if XXH_ENABLE_RVV
+#include <riscv_vector.h>
+
+/* Compiler compatibility macros for RVV intrinsics */
+#if defined(__GNUC__) && !defined(__clang__)
+  /* GCC 13+ style - typed intrinsics (vl parameter not needed) */
+  #define XXH_RVV_VSETVL_E32M1(n)  vsetvl_e32m1(n)
+  #define XXH_RVV_VSETVL_E64M1(n)  vsetvl_e64m1(n)
+  #define XXH_RVV_VLE32_V_U32M1(p,vl)  vle32_v_u32m1(p)
+  #define XXH_RVV_VLE64_V_U64M1(p,vl)  vle64_v_u64m1(p)
+  #define XXH_RVV_VSE32_V_U32M1(p,v,vl) vse32_v_u32m1(p, v)
+  #define XXH_RVV_VSE64_V_U64M1(p,v,vl) vse64_v_u64m1(p, v)
+  #define XXH_RVV_VMUL_VX_U32M1(v,x,vl) vmul_vx_u32m1(v, x)
+  #define XXH_RVV_VMUL_VX_U64M1(v,x,vl) vmul_vx_u64m1(v, x)
+  #define XXH_RVV_VADD_VV_U32M1(v1,v2,vl) vadd_vv_u32m1(v1, v2)
+  #define XXH_RVV_VADD_VV_U64M1(v1,v2,vl) vadd_vv_u64m1(v1, v2)
+  #define XXH_RVV_VSLL_VX_U32M1(v,s,vl) vsll_vx_u32m1(v, s)
+  #define XXH_RVV_VSLL_VX_U64M1(v,s,vl) vsll_vx_u64m1(v, s)
+  #define XXH_RVV_VSRL_VX_U32M1(v,s,vl) vsrl_vx_u32m1(v, s)
+  #define XXH_RVV_VSRL_VX_U64M1(v,s,vl) vsrl_vx_u64m1(v, s)
+  #define XXH_RVV_VOR_VV_U32M1(v1,v2,vl) vor_vv_u32m1(v1, v2)
+  #define XXH_RVV_VOR_VV_U64M1(v1,v2,vl) vor_vv_u64m1(v1, v2)
+  #define XXH_RVV_VMV_V_X_U32M1(x,vl) vmv_v_x_u32m1(x)
+  #define XXH_RVV_VMV_V_X_U64M1(x,vl) vmv_v_x_u64m1(x)
+  #define XXH_RVV_HAS_ROR 1
+#elif defined(__clang__)
+  /* Clang style - __riscv_ prefix with vl parameter */
+  #define XXH_RVV_VSETVL_E32M1(n)  __riscv_vsetvl_e32m1(n)
+  #define XXH_RVV_VSETVL_E64M1(n)  __riscv_vsetvl_e64m1(n)
+  #define XXH_RVV_VLE32_V_U32M1(p,vl)  __riscv_vle32_v_u32m1(p, vl)
+  #define XXH_RVV_VLE64_V_U64M1(p,vl)  __riscv_vle64_v_u64m1(p, vl)
+  #define XXH_RVV_VSE32_V_U32M1(p,v,vl) __riscv_vse32_v_u32m1(p, v, vl)
+  #define XXH_RVV_VSE64_V_U64M1(p,v,vl) __riscv_vse64_v_u64m1(p, v, vl)
+  #define XXH_RVV_VMUL_VX_U32M1(v,x,vl) __riscv_vmul_vx_u32m1(v, x, vl)
+  #define XXH_RVV_VMUL_VX_U64M1(v,x,vl) __riscv_vmul_vx_u64m1(v, x, vl)
+  #define XXH_RVV_VADD_VV_U32M1(v1,v2,vl) __riscv_vadd_vv_u32m1(v1, v2, vl)
+  #define XXH_RVV_VADD_VV_U64M1(v1,v2,vl) __riscv_vadd_vv_u64m1(v1, v2, vl)
+  #define XXH_RVV_VSLL_VX_U32M1(v,s,vl) __riscv_vsll_vx_u32m1(v, s, vl)
+  #define XXH_RVV_VSLL_VX_U64M1(v,s,vl) __riscv_vsll_vx_u64m1(v, s, vl)
+  #define XXH_RVV_VSRL_VX_U32M1(v,s,vl) __riscv_vsrl_vx_u32m1(v, s, vl)
+  #define XXH_RVV_VSRL_VX_U64M1(v,s,vl) __riscv_vsrl_vx_u64m1(v, s, vl)
+  #define XXH_RVV_VOR_VV_U32M1(v1,v2,vl) __riscv_vor_vv_u32m1(v1, v2, vl)
+  #define XXH_RVV_VOR_VV_U64M1(v1,v2,vl) __riscv_vor_vv_u64m1(v1, v2, vl)
+  #define XXH_RVV_VMV_V_X_U32M1(x,vl) __riscv_vmv_v_x_u32m1(x, vl)
+  #define XXH_RVV_VMV_V_X_U64M1(x,vl) __riscv_vmv_v_x_u64m1(x, vl)
+  #define XXH_RVV_HAS_ROR 0  /* Clang 17 lacks vror intrinsic */
+#else
+  /* Unknown compiler - disable RVV */
+  #undef XXH_ENABLE_RVV
+  #define XXH_ENABLE_RVV 0
+#endif
+
+/* Helper: rotate left using shift + or (when vror not available) */
+#if XXH_ENABLE_RVV && !XXH_RVV_HAS_ROR
+static vuint32m1_t XXH_rotx_u32m1(vuint32m1_t v, int amount, size_t vl) {
+    /* rotl(x, n) = (x << n) | (x >> (32-n)) */
+    vuint32m1_t v_sll = XXH_RVV_VSLL_VX_U32M1(v, amount, vl);
+    vuint32m1_t v_srl = XXH_RVV_VSRL_VX_U32M1(v, 32 - amount, vl);
+    return XXH_RVV_VOR_VV_U32M1(v_sll, v_srl, vl);
+}
+
+static vuint64m1_t XXH_rotx_u64m1(vuint64m1_t v, int amount, size_t vl) {
+    /* rotl(x, n) = (x << n) | (x >> (64-n)) */
+    vuint64m1_t v_sll = XXH_RVV_VSLL_VX_U64M1(v, amount, vl);
+    vuint64m1_t v_srl = XXH_RVV_VSRL_VX_U64M1(v, 64 - amount, vl);
+    return XXH_RVV_VOR_VV_U64M1(v_sll, v_srl, vl);
+}
+#define XXH_ROTL32(v, n, vl) XXH_rotx_u32m1(v, n, vl)
+#define XXH_ROTL64(v, n, vl) XXH_rotx_u64m1(v, n, vl)
+#else
+#define XXH_ROTL32(v, n, vl) XXH_RVV_VROR_VI_U32M1(v, 32-(n), vl)
+#define XXH_ROTL64(v, n, vl) XXH_RVV_VROR_VI_U64M1(v, 64-(n), vl)
+#endif
+
+#endif /* XXH_ENABLE_RVV */
 
 
 /* *************************************
@@ -364,6 +462,56 @@ XXH32_endian_align(const void* input, size_t len, U32 seed,
 #endif
 
     if (len>=16) {
+#if XXH_ENABLE_RVV
+        /* RISC-V RVV vectorized path: process 4 accumulators in parallel */
+        const BYTE* const limit = bEnd - 15;
+        size_t vl = XXH_RVV_VSETVL_E32M1(4);
+
+        /* Initialize vector accumulators [v1, v2, v3, v4] using aligned array */
+        typedef struct { U32 v[4] __attribute__((aligned(16))); } aligned_u32x4_t;
+        aligned_u32x4_t init_aligned;
+        init_aligned.v[0] = seed + PRIME32_1 + PRIME32_2;
+        init_aligned.v[1] = seed + PRIME32_2;
+        init_aligned.v[2] = seed + 0;
+        init_aligned.v[3] = seed - PRIME32_1;
+        vuint32m1_t v_acc = XXH_RVV_VLE32_V_U32M1(init_aligned.v, vl);
+
+        vuint32m1_t v_prime2 = XXH_RVV_VMV_V_X_U32M1(PRIME32_2, vl);
+        vuint32m1_t v_prime1 = XXH_RVV_VMV_V_X_U32M1(PRIME32_1, vl);
+
+        do {
+            /* Load 16 bytes: 4 x 32-bit values using XXH_get32bits for alignment safety */
+            typedef struct { U32 v[4] __attribute__((aligned(16))); } aligned_input_t;
+            aligned_input_t in_aligned;
+            in_aligned.v[0] = XXH_get32bits(p + 0);
+            in_aligned.v[1] = XXH_get32bits(p + 4);
+            in_aligned.v[2] = XXH_get32bits(p + 8);
+            in_aligned.v[3] = XXH_get32bits(p + 12);
+            vuint32m1_t v_input = XXH_RVV_VLE32_V_U32M1(in_aligned.v, vl);
+
+            /* v_acc += v_input * PRIME32_2 */
+            vuint32m1_t v_mult = XXH_RVV_VMUL_VX_U32M1(v_input, PRIME32_2, vl);
+            v_acc = XXH_RVV_VADD_VV_U32M1(v_acc, v_mult, vl);
+
+            /* v_acc = rotl13(v_acc) */
+            v_acc = XXH_ROTL32(v_acc, 13, vl);
+
+            /* v_acc *= PRIME32_1 */
+            v_acc = XXH_RVV_VMUL_VX_U32M1(v_acc, PRIME32_1, vl);
+
+            p += 16;
+        } while (p < limit);
+
+        /* Store results back to scalar array */
+        typedef struct { U32 v[4] __attribute__((aligned(16))); } aligned_acc_t;
+        aligned_acc_t acc_aligned;
+        XXH_RVV_VSE32_V_U32M1(acc_aligned.v, v_acc, vl);
+
+        /* Merge accumulators (same as scalar) */
+        h32 = XXH_rotl32(acc_aligned.v[0], 1) + XXH_rotl32(acc_aligned.v[1], 7) +
+              XXH_rotl32(acc_aligned.v[2], 12) + XXH_rotl32(acc_aligned.v[3], 18);
+#else
+        /* Scalar fallback - original implementation */
         const BYTE* const limit = bEnd - 15;
         U32 v1 = seed + PRIME32_1 + PRIME32_2;
         U32 v2 = seed + PRIME32_2;
@@ -379,6 +527,7 @@ XXH32_endian_align(const void* input, size_t len, U32 seed,
 
         h32 = XXH_rotl32(v1, 1)  + XXH_rotl32(v2, 7)
             + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18);
+#endif
     } else {
         h32  = seed + PRIME32_5;
     }
@@ -823,6 +972,57 @@ XXH64_endian_align(const void* input, size_t len, U64 seed,
 #endif
 
     if (len>=32) {
+#if XXH_ENABLE_RVV
+        /* RISC-V RVV vectorized path: process 4 accumulators in parallel */
+        const BYTE* const limit = bEnd - 32;
+        size_t vl = XXH_RVV_VSETVL_E64M1(4);
+
+        /* Initialize vector accumulators [v1, v2, v3, v4] using aligned array */
+        typedef struct { U64 v[4] __attribute__((aligned(32))); } aligned_u64x4_t;
+        aligned_u64x4_t init_aligned;
+        init_aligned.v[0] = seed + PRIME64_1 + PRIME64_2;
+        init_aligned.v[1] = seed + PRIME64_2;
+        init_aligned.v[2] = seed + 0;
+        init_aligned.v[3] = seed - PRIME64_1;
+        vuint64m1_t v_acc = XXH_RVV_VLE64_V_U64M1(init_aligned.v, vl);
+
+        do {
+            /* Load 32 bytes: 4 x 64-bit values using XXH_get64bits for alignment safety */
+            typedef struct { U64 v[4] __attribute__((aligned(32))); } aligned_input64_t;
+            aligned_input64_t in_aligned;
+            in_aligned.v[0] = XXH_get64bits(p + 0);
+            in_aligned.v[1] = XXH_get64bits(p + 8);
+            in_aligned.v[2] = XXH_get64bits(p + 16);
+            in_aligned.v[3] = XXH_get64bits(p + 24);
+            vuint64m1_t v_input = XXH_RVV_VLE64_V_U64M1(in_aligned.v, vl);
+
+            /* v_acc += v_input * PRIME64_2 */
+            vuint64m1_t v_mult = XXH_RVV_VMUL_VX_U64M1(v_input, PRIME64_2, vl);
+            v_acc = XXH_RVV_VADD_VV_U64M1(v_acc, v_mult, vl);
+
+            /* v_acc = rotl31(v_acc) */
+            v_acc = XXH_ROTL64(v_acc, 31, vl);
+
+            /* v_acc *= PRIME64_1 */
+            v_acc = XXH_RVV_VMUL_VX_U64M1(v_acc, PRIME64_1, vl);
+
+            p += 32;
+        } while (p<=limit);
+
+        /* Store results back to scalar array */
+        typedef struct { U64 v[4] __attribute__((aligned(32))); } aligned_acc64_t;
+        aligned_acc64_t acc_aligned;
+        XXH_RVV_VSE64_V_U64M1(acc_aligned.v, v_acc, vl);
+
+        /* Merge accumulators (same as scalar) */
+        h64 = XXH_rotl64(acc_aligned.v[0], 1) + XXH_rotl64(acc_aligned.v[1], 7) +
+              XXH_rotl64(acc_aligned.v[2], 12) + XXH_rotl64(acc_aligned.v[3], 18);
+        h64 = XXH64_mergeRound(h64, acc_aligned.v[0]);
+        h64 = XXH64_mergeRound(h64, acc_aligned.v[1]);
+        h64 = XXH64_mergeRound(h64, acc_aligned.v[2]);
+        h64 = XXH64_mergeRound(h64, acc_aligned.v[3]);
+#else
+        /* Scalar fallback - original implementation */
         const BYTE* const limit = bEnd - 32;
         U64 v1 = seed + PRIME64_1 + PRIME64_2;
         U64 v2 = seed + PRIME64_2;
@@ -841,7 +1041,7 @@ XXH64_endian_align(const void* input, size_t len, U64 seed,
         h64 = XXH64_mergeRound(h64, v2);
         h64 = XXH64_mergeRound(h64, v3);
         h64 = XXH64_mergeRound(h64, v4);
-
+#endif
     } else {
         h64  = seed + PRIME64_5;
     }
