@@ -2104,7 +2104,7 @@ LZ4_decompress_generic(
             if (partialDecoding) return 0;
             return ((srcSize==1) && (*ip==0)) ? 0 : -1;
         }
-        if (unlikely(srcSize==0)) { return -1; }
+        if (unlikely(srcSize<=0)) { return -1; }
 
     /* LZ4_FAST_DEC_LOOP:
      * designed for modern OoO performance cpus,

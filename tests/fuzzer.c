@@ -706,6 +706,12 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         FUZ_CHECKTEST(decodedBuffer[blockSize], "LZ4_decompress_safe overrun specified output buffer size");
 
         if (blockSize) {
+            /* Test partial decoding with a negative input size => must fail */
+            FUZ_DISPLAYTEST("LZ4_decompress_safe_partial() with negative input size");
+            {   int const r = LZ4_decompress_safe_partial(compressedBuffer, decodedBuffer, -1, blockSize, blockSize);
+                FUZ_CHECKTEST(r>=0, "LZ4_decompress_safe_partial should have failed, due to negative input size");
+            }
+
             /* Test partial decoding => must work */
             FUZ_DISPLAYTEST("test LZ4_decompress_safe_partial");
             {   size_t const missingOutBytes = FUZ_rand(&randState) % (unsigned)blockSize;
