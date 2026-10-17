@@ -2080,8 +2080,8 @@ LZ4_decompress_generic(
 
 
         /* Set up the "end" pointers for the shortcut. */
-        const BYTE* const shortiend = iend - 14 /*maxLL*/ - 2 /*offset*/;
-        const BYTE* const shortoend = oend - 14 /*maxLL*/ - 18 /*maxML*/;
+        const BYTE* const shortiend = srcSize >= 16 ? iend - 16 : ip;
+        const BYTE* const shortoend = outputSize >= 32 ? oend - 31 : op;
 
         const BYTE* match;
         size_t offset;
@@ -2272,8 +2272,8 @@ LZ4_decompress_generic(
              * there is a combined check for both stages).
              */
             if ( (length != RUN_MASK)
-                /* strictly "less than" on input, to re-enter the loop with at least one byte */
-              && likely((ip < shortiend) & (op <= shortoend)) ) {
+                /* Keep at least one input byte to re-enter the loop. */
+              && likely((ip < shortiend) & (op < shortoend)) ) {
                 /* Copy the literals */
                 LZ4_memcpy(op, ip, 16);
                 op += length; ip += length;
