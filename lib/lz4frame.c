@@ -326,7 +326,11 @@ static LZ4F_errorCode_t LZ4F_returnErrorCode(LZ4F_errorCodes code)
         }                          \
     } while (0)
 
-#define FORWARD_IF_ERROR(r) do { if (LZ4F_isError(r)) return (r); } while (0)
+/* note : @r is evaluated only once, so it can be an expression with side effects */
+#define FORWARD_IF_ERROR(r) do {                     \
+        size_t const err_code = (r);                 \
+        if (LZ4F_isError(err_code)) return err_code; \
+    } while (0)
 
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
@@ -1026,9 +1030,10 @@ static const LZ4F_compressOptions_t k_cOptionsNull = { 0, { 0, 0, 0 } };
 /* A failed operation leaves the frame in an inconsistent state :
  * it's invalidated, and must be restarted with LZ4F_compressBegin() */
 #define FORWARD_IF_ERROR_INVALIDATE(r, cctx) do { \
-        if (LZ4F_isError(r)) {                     \
+        size_t const err_code = (r);               \
+        if (LZ4F_isError(err_code)) {              \
             (cctx)->cStage = 0;                    \
-            return (r);                            \
+            return err_code;                       \
         }                                          \
     } while (0)
 
