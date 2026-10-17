@@ -37,7 +37,7 @@ int main(void)
 
   cmpSize = LZ4_compress_default(source, cmpBuffer, srcLen, BUFFER_SIZE);
 
-  /* Test full size verification with various bounded capacities */
+  /* Full decompression, with srcSize at and beyond the compressed size */
   for (i = cmpSize; i < cmpSize + 10; ++i) {
     result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, i, srcLen, BUFFER_SIZE);
     if ((result < 0) || (result != srcLen) || memcmp(source, outBuffer, (size_t)srcLen)) {
@@ -46,12 +46,17 @@ int main(void)
     }
   }
 
-  /* Test all target output prefix lengths from 1 to srcLen */
+  /* Every target output size from 1 to srcLen: decoding must stop exactly at target */
   for (i = 1; i <= srcLen; ++i) {
-    memset(outBuffer, 0, sizeof(outBuffer));
+    char const sentinel = (char)(source[i] ^ 0x5A);
+    outBuffer[i] = sentinel;
     result = LZ4_decompress_safe_partial(cmpBuffer, outBuffer, cmpSize, i, BUFFER_SIZE);
-    if (result < i) {
-      printf("test decompress-partial under-decompressed error at target=%d, got=%d\n", i, result);
+    if (result != i) {
+      printf("test decompress-partial wrong size error at target=%d, got=%d\n", i, result);
+      return -1;
+    }
+    if (outBuffer[i] != sentinel) {
+      printf("test decompress-partial overwrite beyond target error at target=%d\n", i);
       return -1;
     }
     if (memcmp(source, outBuffer, (size_t)i) != 0) {
