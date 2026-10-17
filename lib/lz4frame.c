@@ -461,8 +461,12 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
  * It's also the CLI's chunk size, so that both produce the same frames.
  * With independent blocks, output only depends on block boundaries, not on job boundaries :
  * jobs can be smaller, for better load balancing, and to engage multi-threading on smaller inputs. */
-#define LZ4F_MT_JOBSIZE_LINKED      (4 MB)
-#define LZ4F_MT_JOBSIZE_INDEPENDENT (1 MB)
+#ifndef LZ4F_MT_JOBSIZE_LINKED       /* override for testing only : changes output */
+#  define LZ4F_MT_JOBSIZE_LINKED      (4 MB)
+#endif
+#ifndef LZ4F_MT_JOBSIZE_INDEPENDENT
+#  define LZ4F_MT_JOBSIZE_INDEPENDENT (1 MB)
+#endif
 
 static size_t LZ4F_mtJobSize(LZ4F_blockMode_t blockMode, size_t blockSize)
 {
@@ -1741,10 +1745,11 @@ static void LZ4F_mt_abort(LZ4F_mtCtx_t* mt)
 
 /* a failed operation invalidates the frame, and discards its jobs */
 #define FORWARD_IF_ERROR_MT(r, cctx) do {   \
-        if (LZ4F_isError(r)) {               \
+        size_t const err_code = (r);         \
+        if (LZ4F_isError(err_code)) {        \
             LZ4F_mt_abort((cctx)->mt);       \
             (cctx)->cStage = 0;              \
-            return (r);                      \
+            return err_code;                 \
         }                                    \
     } while (0)
 

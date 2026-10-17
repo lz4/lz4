@@ -50,6 +50,7 @@
 #include "lz4hc.h"      /* LZ4HC_CLEVEL_MIN */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
+#include "lz4file.h"    /* LZ4F_writeOpen, LZ4F_readOpen */
 #include "datagen.h"
 #include "timefn.h"
 
@@ -62,7 +63,7 @@
 
 #define DISPLAY(...) fprintf(stderr, __VA_ARGS__)
 #define CHECK(c, ...) do { if (!(c)) {                         \
-        DISPLAY("Error at line %i : ", __LINE__);              \
+        DISPLAY("Error at line %i (%s) : ", __LINE__, g_step); \
         DISPLAY(__VA_ARGS__);                                  \
         DISPLAY(" \n");                                        \
         exit(1);                                               \
@@ -70,6 +71,11 @@
 #define CHECK_LZ4F(r) CHECK(!LZ4F_isError(r), "%s", LZ4F_getErrorName(r))
 
 static int g_verbose = 0;
+static const char* g_step = "";   /* current step, for diagnostics */
+static int g_quick = 0;     /* fewer configurations (-q), for sanitizers and make test */
+
+#undef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 
 /*-************************************
@@ -109,6 +115,18 @@ static size_t compressMT(LZ4F_cctx* cctx, void* dst, size_t dstCapacity,
     return LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity, src, srcSize, cdict, &mtPrefs);
 }
 
+/* when environment variable FRAMEMT_DUMP is set, writes @buffer to FRAMEMT_DUMP@suffix */
+static void dumpFile(const char* suffix, const void* buffer, size_t size)
+{
+    const char* const prefix = getenv("FRAMEMT_DUMP");
+    char name[1024];
+    FILE* f;
+    if ((prefix == NULL) || (buffer == NULL)) return;
+    snprintf(name, sizeof(name), "%s%s", prefix, suffix);
+    f = fopen(name, "wb");
+    if (f) { fwrite(buffer, 1, size, f); fclose(f); }
+}
+
 static void checkRoundTrip(const void* frame, size_t frameSize,
                            const void* src, size_t srcSize,
                            const void* dict, size_t dictSize,
@@ -124,7 +142,14 @@ static void checkRoundTrip(const void* frame, size_t frameSize,
     CHECK(r == 0, "frame not fully decoded");
     CHECK(cSize == frameSize, "frame size mismatch (%u != %u)", (unsigned)cSize, (unsigned)frameSize);
     CHECK(dstSize == srcSize, "decoded size mismatch (%u != %u)", (unsigned)dstSize, (unsigned)srcSize);
-    CHECK(!memcmp(tmp, src, srcSize), "decoded content differs");
+    if (memcmp(tmp, src, srcSize)) {
+        size_t n = 0;
+        while (((const char*)tmp)[n] == ((const char*)src)[n]) n++;
+        dumpFile(".frame", frame, frameSize);
+        dumpFile(".src", src, srcSize);
+        dumpFile(".dict", dict, dictSize);
+        CHECK(0, "decoded content differs, from position %u (frame size %u)", (unsigned)n, (unsigned)frameSize);
+    }
     LZ4F_freeDecompressionContext(dctx);
 }
 
@@ -148,15 +173,17 @@ static int validate(XXH64_state_t* digest)
     char* const decoded = (char*)malloc(srcSizeMax);
     LZ4F_CustomMem const cmem = { countingAlloc, NULL, countingFree, NULL };
     LZ4F_cctx* const cctx = LZ4F_createCompressionContext_advanced(cmem, LZ4F_VERSION);
-    LZ4F_CDict* const cdict = LZ4F_createCDict(dict, dictSize);
+    LZ4F_CDict* cdict;   /* created once dict is filled */
     unsigned nbConfigs = 0;
     unsigned seed = 1;
     size_t si, li;
     int linked;
 
-    CHECK(src && dict && ref0 && ref1 && out && decoded && cctx && cdict, "allocation failed");
+    CHECK(src && dict && ref0 && ref1 && out && decoded && cctx, "allocation failed");
     RDG_genBuffer(src, srcSizeMax, 0.5, 0.0, 7);
     RDG_genBuffer(dict, dictSize, 0.5, 0.0, 8);
+    cdict = LZ4F_createCDict(dict, dictSize);
+    CHECK(cdict != NULL, "allocation failed");
 
     for (si = 0; si < sizeof(srcSizes)/sizeof(srcSizes[0]); si++) {
       for (li = 0; li < sizeof(levels)/sizeof(levels[0]); li++) {
@@ -169,6 +196,7 @@ static int validate(XXH64_state_t* digest)
             size_t wi;
 
             if (level >= 10 && srcSize > 9 MB + 12345) continue;   /* keep test duration reasonable */
+            if (g_quick && ((si == 1) || (si == 4) || (level == 0) || (level == 2) || (level == 4) || (level == 12))) continue;
             seed = seed * 1103515245u + 12345u;
             memset(&prefs, 0, sizeof(prefs));
             prefs.compressionLevel = level;
@@ -345,7 +373,7 @@ static int validateStreaming(XXH64_state_t* digest)
     size_t tmpOutCapacity;
     LZ4F_CustomMem const cmem = { countingAlloc, NULL, countingFree, NULL };
     LZ4F_cctx* const cctx = LZ4F_createCompressionContext_advanced(cmem, LZ4F_VERSION);
-    LZ4F_CDict* const cdict = LZ4F_createCDict(dict, dictSize);
+    LZ4F_CDict* cdict;   /* created once dict is filled */
     unsigned seed = 77;
     unsigned nbConfigs = 0;
     size_t li;
@@ -365,9 +393,11 @@ static int validateStreaming(XXH64_state_t* digest)
         }
         tmpOut = (char*)malloc(tmpOutCapacity);
     }
-    CHECK(src && dict && scratch && ref && refFlush && refAuto && refUnc && out && decoded && tmpOut && cctx && cdict, "allocation failed");
+    CHECK(src && dict && scratch && ref && refFlush && refAuto && refUnc && out && decoded && tmpOut && cctx, "allocation failed");
     RDG_genBuffer(src, srcSize, 0.5, 0.0, 9);
     RDG_genBuffer(dict, dictSize, 0.5, 0.0, 8);
+    cdict = LZ4F_createCDict(dict, dictSize);
+    CHECK(cdict != NULL, "allocation failed");
 
     for (li = 0; li < sizeof(levels)/sizeof(levels[0]); li++) {
         for (linked = 0; linked <= 1; linked++) {
@@ -377,6 +407,7 @@ static int validateStreaming(XXH64_state_t* digest)
             unsigned const sliceSeed = nextRand(&seed);
             size_t wi;
 
+            if (g_quick && ((levels[li] == -2) || (levels[li] == 2) || (levels[li] == 5))) continue;
             seed = seed * 1103515245u + 12345u;
             memset(&prefs, 0, sizeof(prefs));
             prefs.compressionLevel = levels[li];
@@ -410,6 +441,10 @@ static int validateStreaming(XXH64_state_t* digest)
                 CHECK(c == oneShot && !memcmp(out, ref, c), "stream (stableSrc, %u workers) differs from one-shot", nbWorkers);
 
                 /* with flushes : same output whatever nbWorkers */
+                {   static char step[64];
+                    snprintf(step, sizeof(step), "stream with flushes, %u workers", nbWorkers);
+                    g_step = step;
+                }
                 {   streamMode_t const flushMode = { (int)(nbWorkers & 1), 1, 0 };
                     c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, flushMode, sliceSeed + 2, tmpOut, scratch);
                     checkRoundTrip(out, c, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
@@ -428,6 +463,7 @@ static int validateStreaming(XXH64_state_t* digest)
                 }
 
                 /* autoFlush : same output whatever nbWorkers */
+                g_step = "autoFlush stream";
                 {   LZ4F_preferences_t autoPrefs = prefs;
                     autoPrefs.autoFlush = 1;
                     c = streamCompress(cctx, out, src, srcSize, cd, &autoPrefs, nbWorkers, copyMode, sliceSeed + 3, tmpOut, scratch);
@@ -446,6 +482,7 @@ static int validateStreaming(XXH64_state_t* digest)
                 }
 
                 /* uncompressed segments (independent blocks only) */
+                g_step = "stream with uncompressed segments";
                 if (!linked) {
                     streamMode_t const uncMode = { 0, 1, 1 };
                     c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, uncMode, sliceSeed + 4, tmpOut, scratch);
@@ -484,6 +521,205 @@ static int validateStreaming(XXH64_state_t* digest)
     CHECK(g_nbAllocs == g_nbFrees, "memory leak : %u allocations, %u frees", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
     DISPLAY("streaming : %u configurations validated \n", nbConfigs);
     free(src); free(dict); free(scratch); free(ref); free(refFlush); free(refAuto); free(refUnc); free(out); free(decoded); free(tmpOut);
+    return 0;
+}
+
+
+/*-************************************
+*  Allocation failures
+**************************************/
+/* fails the N-th allocation (g_failAt), counting from 1 ; 0 : never */
+static size_t g_failAt = 0;
+static size_t g_allocNb = 0;
+
+static void* failingAlloc(void* opaque, size_t size)
+{
+    (void)opaque;
+    if (++g_allocNb == g_failAt) return NULL;
+    g_nbAllocs++;
+    return malloc(size);
+}
+
+/* compresses @src : one-shot (mode 0), or streaming, copying input (mode 1), or stableSrc (mode 2), with a flush.
+ * @return : frame size, or the first error */
+static size_t compressScenario(LZ4F_cctx* cctx, int mode, const LZ4F_preferences_t* prefs,
+                               char* dst, size_t dstCapacity,
+                               const char* src, size_t srcSize, char* scratch)
+{
+    size_t const slice = 1 MB + 777;
+    LZ4F_compressOptions_t cOpts;
+    size_t pos, consumed = 0, r;
+    int flushed = 0;
+    if (mode == 0) return LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity, src, srcSize, NULL, prefs);
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.stableSrc = (mode == 2);
+    r = LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
+    if (LZ4F_isError(r)) return r;
+    pos = r;
+    while (consumed < srcSize) {
+        size_t const size = MIN(slice, srcSize - consumed);
+        const char* in = src + consumed;
+        if (mode == 1) { memcpy(scratch, in, size); in = scratch; }
+        r = LZ4F_compressUpdate(cctx, dst + pos, dstCapacity - pos, in, size, &cOpts);
+        if (LZ4F_isError(r)) return r;
+        pos += r;
+        consumed += size;
+        if (!flushed && (consumed > srcSize / 2)) {
+            r = LZ4F_flush(cctx, dst + pos, dstCapacity - pos, NULL);
+            if (LZ4F_isError(r)) return r;
+            pos += r;
+            flushed = 1;
+        }
+    }
+    r = LZ4F_compressEnd(cctx, dst + pos, dstCapacity - pos, NULL);
+    if (LZ4F_isError(r)) return r;
+    return pos + r;
+}
+
+/* Each allocation fails in turn : the operation must either succeed with the reference output,
+ * or fail with allocation_failed. In both cases, the context must remain usable, and nothing must leak. */
+static int validateAllocFailures(void)
+{
+    static const unsigned nbWorkersList[] = { 1, 4 };
+    static const int levels[] = { 1, 9 };
+    size_t const srcSize = 5 MB + 333;
+    size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
+    char* const src = (char*)malloc(srcSize);
+    char* const scratch = (char*)malloc(1 MB + 777);
+    char* const ref = (char*)malloc(dstCapacity);
+    char* const out = (char*)malloc(dstCapacity);
+    LZ4F_CustomMem const failingMem = { failingAlloc, NULL, countingFree, NULL };
+    unsigned nbScenarios = 0, nbFailures = 0, nbRecovered = 0;
+    size_t wi, li;
+    int linked, mode;
+
+    CHECK(src && scratch && ref && out, "allocation failed");
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 11);
+    for (li = 0; li < sizeof(levels)/sizeof(levels[0]); li++)
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
+    for (linked = 0; linked <= 1; linked++)
+    for (mode = 0; mode <= 2; mode++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_cctx* cctx;
+        size_t refSize, maxN, n;
+        if (g_quick && ((levels[li] != 1) || (nbWorkersList[wi] != 4))) continue;
+        prefs.compressionLevel = levels[li];
+        prefs.nbWorkers = nbWorkersList[wi];
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        nbScenarios++;
+
+        /* reference, and nb of allocations */
+        g_failAt = 0;
+        g_allocNb = 0;
+        cctx = LZ4F_createCompressionContext_advanced(failingMem, LZ4F_VERSION);
+        CHECK(cctx != NULL, "allocation failed");
+        refSize = compressScenario(cctx, mode, &prefs, ref, dstCapacity, src, srcSize, scratch);
+        CHECK_LZ4F(refSize);
+        LZ4F_freeCompressionContext(cctx);
+        maxN = g_allocNb;   /* can vary slightly with scheduling : try a few more */
+
+        for (n = 1; n <= maxN + 2; n++) {
+            size_t r;
+            g_allocNb = 0;
+            g_failAt = n;
+            cctx = LZ4F_createCompressionContext_advanced(failingMem, LZ4F_VERSION);
+            if (cctx == NULL) {
+                CHECK(n == 1, "context creation failed at allocation %u", (unsigned)n);
+                continue;
+            }
+            r = compressScenario(cctx, mode, &prefs, out, dstCapacity, src, srcSize, scratch);
+            if (LZ4F_isError(r)) {
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_allocation_failed,
+                      "allocation %u : unexpected error %s", (unsigned)n, LZ4F_getErrorName(r));
+                nbFailures++;
+            } else {
+                CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u : output differs", (unsigned)n);
+                if (g_allocNb >= n) nbRecovered++;   /* failure absorbed, ex: fewer worker threads */
+            }
+            /* context remains usable */
+            g_failAt = 0;
+            r = compressScenario(cctx, mode, &prefs, out, dstCapacity, src, srcSize, scratch);
+            CHECK(!LZ4F_isError(r) && (r == refSize) && !memcmp(out, ref, r),
+                  "allocation %u : context not reusable", (unsigned)n);
+            LZ4F_freeCompressionContext(cctx);
+            CHECK(g_nbAllocs == g_nbFrees, "allocation %u : memory leak (%u allocations, %u frees)",
+                  (unsigned)n, (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
+        }
+    }
+    g_failAt = 0;
+    DISPLAY("allocation failures : %u scenarios, %u failures reported, %u absorbed \n", nbScenarios, nbFailures, nbRecovered);
+    free(src); free(scratch); free(ref); free(out);
+    return 0;
+}
+
+
+/*-************************************
+*  File API (lz4file.h)
+**************************************/
+/* LZ4F_write() streams through LZ4F_compressUpdate() : same frame as one-shot compression */
+static int validateFileAPI(void)
+{
+    size_t const srcSize = 9 MB + 5;
+    size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const src = (char*)malloc(srcSize);
+    char* const ref = (char*)malloc(dstCapacity);
+    char* const out = (char*)malloc(dstCapacity);
+    char* const decoded = (char*)malloc(srcSize);
+    LZ4F_cctx* cctx;
+    unsigned seed = 5;
+    int linked;
+
+    CHECK(src && ref && out && decoded, "allocation failed");
+    CHECK_LZ4F(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 12);
+    for (linked = 0; linked <= 1; linked++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4_writeFile_t* wf;
+        LZ4_readFile_t* rf;
+        FILE* const f = tmpfile();
+        size_t refSize, fileSize, pos;
+        CHECK(f != NULL, "tmpfile() failed");
+        prefs.compressionLevel = 1;
+        prefs.nbWorkers = 3;
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        prefs.frameInfo.blockSizeID = LZ4F_max256KB;
+        prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        refSize = compressMT(cctx, ref, dstCapacity, src, srcSize, NULL, &prefs, 3);
+        CHECK_LZ4F(refSize);
+
+        CHECK_LZ4F(LZ4F_writeOpen(&wf, f, &prefs));
+        for (pos = 0; pos < srcSize; ) {
+            size_t const size = MIN((size_t)(nextRand(&seed) % (2 MB)) + 1, srcSize - pos);
+            size_t const w = LZ4F_write(wf, src + pos, size);
+            CHECK_LZ4F(w);
+            CHECK(w == size, "LZ4F_write() : incomplete write");
+            pos += size;
+        }
+        CHECK_LZ4F(LZ4F_writeClose(wf));
+
+        fileSize = (size_t)ftell(f);
+        CHECK(fileSize == refSize, "LZ4F_write() : frame size differs from one-shot (%u != %u)", (unsigned)fileSize, (unsigned)refSize);
+        rewind(f);
+        CHECK(fread(out, 1, fileSize, f) == fileSize, "read error");
+        CHECK(!memcmp(out, ref, refSize), "LZ4F_write() : frame differs from one-shot");
+
+        rewind(f);
+        CHECK_LZ4F(LZ4F_readOpen(&rf, f));
+        for (pos = 0; ; ) {
+            size_t const r = LZ4F_read(rf, decoded + pos, MIN(1 MB + 3, srcSize - pos + 1));
+            CHECK_LZ4F(r);
+            if (r == 0) break;
+            pos += r;
+            CHECK(pos <= srcSize, "LZ4F_read() : too much data");
+        }
+        CHECK(pos == srcSize && !memcmp(decoded, src, srcSize), "LZ4F_read() : content differs");
+        CHECK_LZ4F(LZ4F_readClose(rf));
+        fclose(f);
+    }
+    LZ4F_freeCompressionContext(cctx);
+    DISPLAY("file API : LZ4F_write() with workers matches one-shot \n");
+    free(src); free(ref); free(out); free(decoded);
     return 0;
 }
 
@@ -606,6 +842,7 @@ int main(int argc, const char** argv)
     for (i = 1; i < argc; i++) {
         const char* const arg = argv[i];
         if (!strcmp(arg, "-v")) { g_verbose = 1; continue; }
+        if (!strcmp(arg, "-q")) { g_quick = 1; continue; }
         if (!strcmp(arg, "-b") && i+1 < argc) { benchFile = argv[++i]; continue; }
         if (!strcmp(arg, "-o") && i+1 < argc) { outFile = argv[++i]; continue; }
         if (!strcmp(arg, "-D")) { linked = 1; continue; }
@@ -623,6 +860,8 @@ int main(int argc, const char** argv)
         XXH64_reset(&digest, 0);
         validate(&digest);
         validateStreaming(&digest);
+        validateAllocFailures();
+        validateFileAPI();
         printf("digest : %016llx \n", (unsigned long long)XXH64_digest(&digest));
     }
     return 0;

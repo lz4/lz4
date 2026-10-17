@@ -212,6 +212,8 @@ typedef struct {
  *    output can differ (slightly) from nbWorkers == 0, at fast levels.
  *  - Streaming (LZ4F_compressUpdate()) : output lags behind input, so LZ4F_compressBound() is larger,
  *    covering jobs in flight (~ 2 * nbWorkers jobs of 4 MB) ; LZ4F_compressEnd() emits all of them.
+ *    Without autoFlush, the amount emitted by each invocation depends on scheduling :
+ *    only the whole frame is deterministic.
  *    Input is copied, unless stableSrc is set, or autoFlush, which completes all jobs within each invocation.
  *  - One-shot (LZ4F_compressFrame()) : success is still guaranteed with LZ4F_compressFrameBound().
  *    Inputs fitting into a single job are compressed by the calling thread.

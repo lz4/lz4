@@ -140,13 +140,14 @@ decompress-partial-usingDict:
 $(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
 # multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
-FRAMEMT_SRCS := frameMT.c datagen.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/xxhash.c $(PRGDIR)/timefn.c
-CLEAN += frameMT frameMT-nomt
-frameMT: $(FRAMEMT_SRCS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -DLZ4F_MULTITHREAD=1 -pthread $^ -o $@$(EXT) $(LDFLAGS) -pthread
+# (c_program : objects are not shared, since frameMT employs different flags)
+FRAMEMT_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o frameMT.o
+frameMT: CPPFLAGS += -DLZ4F_MULTITHREAD=1
+frameMT: LDFLAGS += -pthread
+$(eval $(call c_program,frameMT,$(FRAMEMT_OBJS)))
 
-frameMT-nomt: $(FRAMEMT_SRCS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@$(EXT) $(LDFLAGS)
+frameMT-nomt:
+$(eval $(call c_program,frameMT-nomt,$(FRAMEMT_OBJS)))
 
 .PHONY: clean
 clean: clean_cache
@@ -203,7 +204,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
 
 test32: CFLAGS+=-m32
 test32: test
@@ -350,10 +351,16 @@ test-fuzzer32: test-fuzzer
 test-frametest: frametest
 	./frametest -v $(FUZZER_TIME)
 
-.PHONY: test-frameMT
+# same frames with and without multi-threading support
+.PHONY: test-frameMT test-frameMT-quick
 test-frameMT: frameMT frameMT-nomt
 	./frameMT > tmp-frameMT.digest
 	./frameMT-nomt > tmp-frameMT-nomt.digest
+	cmp tmp-frameMT.digest tmp-frameMT-nomt.digest
+
+test-frameMT-quick: frameMT frameMT-nomt
+	./frameMT -q > tmp-frameMT.digest
+	./frameMT-nomt -q > tmp-frameMT-nomt.digest
 	cmp tmp-frameMT.digest tmp-frameMT-nomt.digest
 
 test-frametest32: CFLAGS += -m32
