@@ -952,6 +952,7 @@ int LZ4IO_compressMultipleFilenames_Legacy(
     for (i=0; i<ifntSize; i++) {
         unsigned long long processed = 0;
         size_t const ifnSize = strlen(inFileNamesTable[i]);
+        size_t neededSize;
         if (LZ4IO_isStdout(suffix)) {
             missed_files += LZ4IO_compressLegacy_internal(&processed,
                                     inFileNamesTable[i], stdoutmark,
@@ -960,9 +961,15 @@ int LZ4IO_compressMultipleFilenames_Legacy(
             continue;
         }
 
-        if (ofnSize <= ifnSize+suffixSize+1) {
+        if (ifnSize > ((size_t)-1) - suffixSize - 1) {
+            missed_files++;
+            continue;
+        }
+        neededSize = ifnSize + suffixSize + 1;
+
+        if (ofnSize < neededSize) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = neededSize;
             dstFileName = (char*)malloc(ofnSize);
             if (dstFileName==NULL) {
                 return ifntSize;
@@ -1637,6 +1644,7 @@ int LZ4IO_compressMultipleFilenames(
     for (i=0; i<ifntSize; i++) {
         unsigned long long processed;
         size_t const ifnSize = strlen(inFileNamesTable[i]);
+        size_t neededSize;
         if (LZ4IO_isStdout(suffix)) {
             missed_files += LZ4IO_compressFilename_extRess(&processed, &ress,
                                     inFileNamesTable[i], stdoutmark,
@@ -1644,10 +1652,17 @@ int LZ4IO_compressMultipleFilenames(
             totalProcessed += processed;
             continue;
         }
+
+        if (ifnSize > ((size_t)-1) - suffixSize - 1) {
+            missed_files++;
+            continue;
+        }
+        neededSize = ifnSize + suffixSize + 1;
+
         /* suffix != stdout => compress into a file => generate its name */
-        if (ofnSize <= ifnSize+suffixSize+1) {
+        if (ofnSize < neededSize) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = neededSize;
             dstFileName = (char*)malloc(ofnSize);
             if (dstFileName==NULL) {
                 LZ4IO_freeCResources(ress);
