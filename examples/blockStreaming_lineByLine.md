@@ -1,26 +1,31 @@
-﻿# LZ4 Streaming API Example : Line by Line Text Compression
+﻿# LZ4 Streaming API Example: Line by Line Text Compression
 by *Takayuki Matsuoka*
 
-`blockStreaming_lineByLine.c` is LZ4 Streaming API example which implements line by line incremental (de)compression.
+[`blockStreaming_lineByLine.c`](blockStreaming_lineByLine.c) is an example of
+the LZ4 Streaming API where we implement line by line incremental
+(de)compression.
 
-Please note the following restrictions :
+Please note the following restrictions:
 
- - Firstly, read "LZ4 Streaming API Basics".
- - This is relatively advanced application example.
- - Output file is not compatible with lz4frame and platform dependent.
-
-
-## What's the point of this example ?
-
- - Line by line incremental (de)compression.
- - Handle huge file in small amount of memory
- - Generally better compression ratio than Block API
- - Non-uniform block size
+- Firstly, read ["LZ4 Streaming API Basics"](streaming_api_basics.md).
+- This is a relatively advanced application example.
+- The output file is not compatible with lz4frame and is platform dependent.
 
 
-## How the compression works
+## What's the point of this example?
 
-First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer for output.
+The LZ4 Streaming API can be used to handle compressing a huge file in a small
+amount of memory. This example shows how to use a "Ring Buffer" to compress
+blocks (i.e. chunks) of a non-uniform size in a stream. The Streaming API used
+in this way generally yields a better compression ratio than the regular Block
+API.
+
+For an example with uniform blocks, see ["LZ4 Streaming API Example: Double
+Buffer"](blockStreaming_doubleBuffer.md).
+
+## How compression works
+
+Firstly, allocate "Ring Buffer" for input and "compressed data buffer" for output.
 
 ```
 (1)
@@ -32,8 +37,15 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
         |
         v
      {Out#1}
+```
 
+Next (see (1)), read the first line to the ring buffer and compress it with
+`LZ4_compress_continue()`. On the first compression, LZ4 doesn't have any
+previous dependencies, so it just compresses the line without dependencies and
+writes the compressed line `{Out#1}` to the compressed data buffer. After that,
+write `{Out#1}` to the file and shift the ring buffer offset forward.
 
+```
 (2)
     Prefix Mode Dependency
           +----+
@@ -46,7 +58,6 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                  v
               {Out#2}
 
-
 (3)
           Prefix   Prefix
           +----+   +----+
@@ -58,8 +69,14 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                           |
                           v
                        {Out#3}
+```
 
+Repeat the above for the second line (see (2)). Repeat again for the third line
+(see (3)). However,this time LZ4 can use the dependency on `Line#1` (and then on
+the third invocation, the dependency on both `Line#2` and `Line#1`) to improve
+the compression ratio. This dependency is called "Prefix mode".
 
+```
 (4)
                         External Dictionary Mode
                 +----+   +----+
@@ -73,8 +90,14 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                             |  {Out#X+1}
                             |
                           Reset
+```
 
+Eventually, we'll reach the end of the ring buffer at `Line#X` (see (4)). This
+time, we reset the ring buffer offset. After resetting, the pointer to
+`Line#X+1` is no longer adjacent to `Line#X`, but LZ4 still maintains its memory
+of it. This is called "External Dictionary Mode".
 
+```
 (5)
                                     Prefix
                                     +-----+
@@ -90,33 +113,20 @@ First of all, allocate "Ring Buffer" for input and LZ4 compressed data buffer fo
                           Reset
 ```
 
-Next (see (1)), read first line to ringbuffer and compress it by `LZ4_compress_continue()`.
-For the first time, LZ4 doesn't know any previous dependencies,
-so it just compress the line without dependencies and generates compressed line {Out#1} to LZ4 compressed data buffer.
-After that, write {Out#1} to the file and forward ringbuffer offset.
+In `Line#X+2` (see (5)), LZ4 finally clears all lines except `Line#X+1` from the
+ring buffer. This is the same situation as `Line#2`.
 
-Do the same things to second line (see (2)).
-But in this time, LZ4 can use dependency to Line#1 to improve compression ratio.
-This dependency is called "Prefix mode".
-
-Eventually, we'll reach end of ringbuffer at Line#X (see (4)).
-This time, we should reset ringbuffer offset.
-After resetting, at Line#X+1 pointer is not adjacent, but LZ4 still maintain its memory.
-This is called "External Dictionary Mode".
-
-In Line#X+2 (see (5)), finally LZ4 forget almost all memories but still remains Line#X+1.
-This is the same situation as Line#2.
-
-Continue these procedures to the end of text file.
+Continue this procedure till the end of the text file.
 
 
-## How the decompression works
+## How decompression works
 
-Decompression will do reverse order.
+Decompression follows the reverse order.
 
- - Read compressed line from the file to buffer.
- - Decompress it to the ringbuffer.
- - Output decompressed plain text line to the file.
- - Forward ringbuffer offset. If offset exceeds end of the ringbuffer, reset it.
+- Read compressed line from the input file to buffer.
+- Decompress it to the ring buffer.
+- Write the decompressed plain text line to the output file.
+- Shift the ring buffer offset forward. If the offset exceeds end of the ring
+  buffer, reset it.
 
-Continue these procedures to the end of the compressed file.
+Continue this procedure till the end of the compressed file.
