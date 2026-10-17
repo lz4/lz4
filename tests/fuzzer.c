@@ -601,6 +601,12 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 FUZ_CHECKTEST(r>=0, "LZ4_decompress_fast should have failed, due to Output Size being too large");
             }
 
+            /* Test decoding with a negative output size => must fail */
+            FUZ_DISPLAYTEST("LZ4_decompress_fast() with negative output size");
+            {   int const r = LZ4_decompress_fast(cBuffer_exact, decodedBuffer, -1);
+                FUZ_CHECKTEST(r>=0, "LZ4_decompress_fast should have failed, due to negative Output Size");
+            }
+
             /* Test decoding with output size exactly what's necessary => must work */
             FUZ_DISPLAYTEST();
             decodedBuffer[blockSize] = 0;
