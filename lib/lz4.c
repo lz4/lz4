@@ -2082,7 +2082,8 @@ LZ4_decompress_generic(
 
         const BYTE* const dictEnd = (dictStart == NULL) ? NULL : dictStart + dictSize;
 
-        const int checkOffset = (dictSize < (int)(64 KB));
+        /* withPrefix64k : offset <= 65535 can't reach beyond the 64 KB prefix */
+        const int checkOffset = (dict != withPrefix64k) && (dictSize < (int)(64 KB));
 
 
         /* Set up the "end" pointers for the shortcut. */
@@ -2204,6 +2205,9 @@ LZ4_decompress_generic(
                         continue;
             }   }   }
 
+            /* match ends far from oend : no end-of-block condition to check */
+            assert(op + length < oend - FASTLOOP_SAFE_DISTANCE);
+
             if ( checkOffset && (unlikely(match + dictSize < lowPrefix)) ) {
                 DEBUGLOG(5, "Error : pos=%zi, offset=%zi => outside buffers", op-lowPrefix, op-match);
                 goto _output_error;
@@ -2211,15 +2215,6 @@ LZ4_decompress_generic(
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 assert(dictEnd != NULL);
-                if (unlikely(op+length > oend-LASTLITERALS)) {
-                    if (partialDecoding) {
-                        DEBUGLOG(7, "partialDecoding: dictionary match, close to dstEnd");
-                        length = MIN(length, (size_t)(oend-op));
-                    } else {
-                        DEBUGLOG(6, "end-of-block condition violated")
-                        goto _output_error;
-                }   }
-
                 op = LZ4_copyExtDictMatch(op, match, length, lowPrefix, dictEnd);
                 continue;
             }
