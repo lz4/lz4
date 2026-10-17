@@ -22,6 +22,14 @@ echo !BIN!\lz4 -i1b10
 echo !BIN!\lz4 -i1b15
      !BIN!\lz4 -i1b15	|| goto :ERROR
      
+@rem empty legacy stream : threadpool used to wait forever
+type nul > tmp-empty
+echo !BIN!\lz4 -l -f tmp-empty tmp-empty.lz4
+     !BIN!\lz4 -l -f tmp-empty tmp-empty.lz4	|| goto :ERROR
+echo !BIN!\lz4 -d -f tmp-empty.lz4 tmp-empty.out
+     !BIN!\lz4 -d -f tmp-empty.lz4 tmp-empty.out	|| goto :ERROR
+del tmp-empty tmp-empty.lz4 tmp-empty.out
+
 echo fullbench
 !BIN!\fullbench.exe --no-prompt -i1 %TEST_FILES%	|| goto :ERROR
 

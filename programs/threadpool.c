@@ -204,6 +204,8 @@ void TPool_submitJob(TPool* pool, void (*job_function)(void*), void* arg)
 void TPool_jobsCompleted(TPool* pool)
 {
     assert(pool);
+    /* the event alone can't be trusted : it's never set if no job was submitted,
+     * and can be left set by a job finishing just as a new one gets submitted */
     while (InterlockedCompareExchange(&pool->nbPendingJobs, 0, 0) > 0) {
         WaitForSingleObject(pool->allJobsCompleted, INFINITE);
     }
