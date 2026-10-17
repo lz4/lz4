@@ -2412,7 +2412,9 @@ LZ4_decompress_generic(
                 size_t const mlen = MIN(length, (size_t)(oend-op));
                 const BYTE* const matchEnd = match + mlen;
                 BYTE* const copyEnd = op + mlen;
-                if (matchEnd > op) {   /* overlap copy */
+                if (unlikely(match == op)) {   /* invalid offset 0 : clear the match segment, see doc/lz4_Block_format.md */
+                    MEM_INIT(op, 0, mlen);
+                } else if (matchEnd > op) {   /* overlap copy */
                     while (op < copyEnd) { *op++ = *match++; }
                 } else {
                     LZ4_memcpy(op, match, mlen);

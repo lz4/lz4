@@ -1255,6 +1255,24 @@ static void FUZ_unitTests(int compressionLevel)
             FUZ_CHECKTEST(r >= 0, "LZ4_decompress_safe() should fail on this crafted input");
     }   }
 
+    /* Invalid offset 0 must not leave previous output buffer content in decoded data
+     * (see doc/lz4_Block_format.md). 1 literal, then a match at offset 0,
+     * partially decoded into a 20-byte target which ends within the match. */
+    DISPLAYLEVEL(3, "LZ4_decompress_safe_partial() with offset 0 \n");
+    {   char block[32];
+        char out[20];
+        memset(block, 0, sizeof(block));
+        block[0] = 0x1F;                /* 1 literal, ML_MASK match */
+        block[1] = 'A';                 /* literal */
+        block[2] = 0x00; block[3] = 0x00;  /* offset = 0 (invalid) */
+        block[4] = 64;                  /* match length extension */
+        memset(out, 0xAA, sizeof(out));
+        {   int const r = LZ4_decompress_safe_partial(block, out, sizeof(block), sizeof(out), sizeof(out));
+            int i;
+            for (i = 1; i < r; i++) {
+                FUZ_CHECKTEST(out[i] == (char)0xAA, "LZ4_decompress_safe_partial() kept previous output content at position %i, with offset 0", i);
+    }   }   }
+
     /* to be tested with undefined sanitizer */
     DISPLAYLEVEL(3, "LZ4_compress_default() with NULL input:");
     {	int const maxCSize = LZ4_compressBound(0);
