@@ -95,6 +95,8 @@ ifeq ($(POSIX_ENV),Yes)
 HOST_OS = POSIX
 
 .PHONY: install uninstall
+# build first, so that `make all install` doesn't run 2 concurrent builds in lib/ and programs/
+install: lib lz4
 install uninstall:
 	$(MAKE) -C $(LZ4DIR) $@
 	$(MAKE) -C $(PRGDIR) $@
