@@ -962,7 +962,7 @@ int LZ4IO_compressMultipleFilenames_Legacy(
 
         if (ofnSize <= ifnSize+suffixSize+1) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = ifnSize + suffixSize + 1;
             dstFileName = (char*)malloc(ofnSize);
             if (dstFileName==NULL) {
                 return ifntSize;
@@ -1647,7 +1647,7 @@ int LZ4IO_compressMultipleFilenames(
         /* suffix != stdout => compress into a file => generate its name */
         if (ofnSize <= ifnSize+suffixSize+1) {
             free(dstFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = ifnSize + suffixSize + 1;
             dstFileName = (char*)malloc(ofnSize);
             if (dstFileName==NULL) {
                 LZ4IO_freeCResources(ress);
@@ -2628,7 +2628,7 @@ int LZ4IO_decompressMultipleFilenames(
         }
         if (ofnSize <= ifnSize-suffixSize+1) {
             free(outFileName);
-            ofnSize = ifnSize + 20;
+            ofnSize = ifnSize - suffixSize + 1;
             outFileName = (char*)malloc(ofnSize);
             if (outFileName==NULL) END_PROCESS(71, "Memory allocation error");
         }
