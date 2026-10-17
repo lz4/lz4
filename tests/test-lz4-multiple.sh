@@ -50,7 +50,8 @@ lz4 -tm $FPREFIX-concat1.lz4
 # ensure the test doesn't create artifact
 test ! -f $FPREFIX-concat1  # must not create file artefact
 # test multiple lz4-compressed file
-lz4 -tm $FPREFIX-concat1.lz4 $FPREFIX-concat2.lz4
+lz4 -tm $FPREFIX-concat1.lz4 $FPREFIX-concat2.lz4 > $FPREFIX-test-output
+test ! -s $FPREFIX-test-output  # testing must not write decoded content
 test ! -f $FPREFIX-concat1  # must not create file artefact
 test ! -f $FPREFIX-concat2  # must not create file artefact
 # test multiple lz4 files, one of which is absent (must fail)

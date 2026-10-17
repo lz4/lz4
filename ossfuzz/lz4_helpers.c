@@ -28,11 +28,13 @@ LZ4F_preferences_t FUZZ_randomPreferences(uint32_t* seed)
 }
 
 size_t FUZZ_decompressFrame(void* dst, const size_t dstCapacity,
-                            const void* src, const size_t srcSize)
+                            const void* src, const size_t srcSize,
+                            int skipChecksums)
 {
     LZ4F_decompressOptions_t opts;
     memset(&opts, 0, sizeof(opts));
     opts.stableDst = 1;
+    opts.skipChecksums = (unsigned)skipChecksums;
     LZ4F_dctx* dctx;
     LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
     FUZZ_ASSERT(dctx);

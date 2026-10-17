@@ -95,6 +95,13 @@ jobs:
         make clean
         make test-freestanding V=1
 
+    - name: Freestanding test with 32-bit target on 64-bit host
+      # freestanding test must be selected from the compiler's target, not the host (#1464)
+      if: ${{ matrix.x86 }}
+      run: |
+        make clean
+        make test-freestanding V=1 CC="$CC -m32"
+
     - name: Fortified build test
       run: |
         make clean
