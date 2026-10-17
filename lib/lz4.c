@@ -1895,11 +1895,13 @@ LZ4_decompress_unsafe_generic(
 {
     const BYTE* ip = istart;
     BYTE* op = (BYTE*)ostart;
-    BYTE* const oend = ostart + decompressedSize;
+    BYTE* oend;
     const BYTE* const prefixStart = ostart - prefixSize;
 
     DEBUGLOG(5, "LZ4_decompress_unsafe_generic");
     if (dictStart == NULL) assert(dictSize == 0);
+    if (decompressedSize < 0) return -1;
+    oend = ostart + decompressedSize;
 
     while (1) {
         /* start new sequence */
