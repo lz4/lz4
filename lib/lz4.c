@@ -2021,6 +2021,36 @@ read_variable_length(const BYTE** ipPtr, const BYTE* ilimit)
     return length;
 }
 
+/* LZ4_copyExtDictMatch() :
+ * copy a match starting within the external dictionary (match < lowPrefix),
+ * possibly stretching into the current block.
+ * @return : output position after the match */
+LZ4_FORCE_INLINE BYTE*
+LZ4_copyExtDictMatch(BYTE* op, const BYTE* match, size_t length,
+                     const BYTE* lowPrefix, const BYTE* dictEnd)
+{
+    if (length <= (size_t)(lowPrefix-match)) {
+        /* match fits entirely within external dictionary : just copy */
+        LZ4_memmove(op, dictEnd - (lowPrefix-match), length);
+        return op + length;
+    } else {
+        /* match stretches into both external dictionary and current block */
+        size_t const copySize = (size_t)(lowPrefix - match);
+        size_t const restSize = length - copySize;
+        LZ4_memcpy(op, dictEnd - copySize, copySize);
+        op += copySize;
+        if (restSize > (size_t)(op - lowPrefix)) {  /* overlap copy */
+            BYTE* const endOfMatch = op + restSize;
+            const BYTE* copyFrom = lowPrefix;
+            while (op < endOfMatch) { *op++ = *copyFrom++; }
+        } else {
+            LZ4_memcpy(op, lowPrefix, restSize);
+            op += restSize;
+        }
+        return op;
+    }
+}
+
 /*! LZ4_decompress_generic() :
  *  This generic decompression function covers all use cases.
  *  It shall be instantiated several times, using different sets of directives.
@@ -2190,24 +2220,7 @@ LZ4_decompress_generic(
                         goto _output_error;
                 }   }
 
-                if (length <= (size_t)(lowPrefix-match)) {
-                    /* match fits entirely within external dictionary : just copy */
-                    LZ4_memmove(op, dictEnd - (lowPrefix-match), length);
-                    op += length;
-                } else {
-                    /* match stretches into both external dictionary and current block */
-                    size_t const copySize = (size_t)(lowPrefix - match);
-                    size_t const restSize = length - copySize;
-                    LZ4_memcpy(op, dictEnd - copySize, copySize);
-                    op += copySize;
-                    if (restSize > (size_t)(op - lowPrefix)) {  /* overlap copy */
-                        BYTE* const endOfMatch = op + restSize;
-                        const BYTE* copyFrom = lowPrefix;
-                        while (op < endOfMatch) { *op++ = *copyFrom++; }
-                    } else {
-                        LZ4_memcpy(op, lowPrefix, restSize);
-                        op += restSize;
-                }   }
+                op = LZ4_copyExtDictMatch(op, match, length, lowPrefix, dictEnd);
                 continue;
             }
 
@@ -2390,24 +2403,7 @@ LZ4_decompress_generic(
                     else goto _output_error;   /* doesn't respect parsing restriction */
                 }
 
-                if (length <= (size_t)(lowPrefix-match)) {
-                    /* match fits entirely within external dictionary : just copy */
-                    LZ4_memmove(op, dictEnd - (lowPrefix-match), length);
-                    op += length;
-                } else {
-                    /* match stretches into both external dictionary and current block */
-                    size_t const copySize = (size_t)(lowPrefix - match);
-                    size_t const restSize = length - copySize;
-                    LZ4_memcpy(op, dictEnd - copySize, copySize);
-                    op += copySize;
-                    if (restSize > (size_t)(op - lowPrefix)) {  /* overlap copy */
-                        BYTE* const endOfMatch = op + restSize;
-                        const BYTE* copyFrom = lowPrefix;
-                        while (op < endOfMatch) *op++ = *copyFrom++;
-                    } else {
-                        LZ4_memcpy(op, lowPrefix, restSize);
-                        op += restSize;
-                }   }
+                op = LZ4_copyExtDictMatch(op, match, length, lowPrefix, dictEnd);
                 continue;
             }
             assert(match >= lowPrefix);
