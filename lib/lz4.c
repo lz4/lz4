@@ -2062,7 +2062,7 @@ LZ4_decompress_generic(
                  const char* const src,
                  char* const dst,
                  int srcSize,
-                 int outputSize,         /* If endOnInput==endOnInputSize, this value is `dstCapacity` */
+                 int outputSize,         /* dstCapacity, or MIN(targetOutputSize, dstCapacity) when partialDecoding */
 
                  earlyEnd_directive partialDecoding,  /* full, partial */
                  dict_directive dict,                 /* noDict, withPrefix64k, usingExtDict */
@@ -2117,7 +2117,10 @@ LZ4_decompress_generic(
             goto safe_decode;
         }
 
-        /* Fast loop : decode sequences as long as output < oend-FASTLOOP_SAFE_DISTANCE */
+        /* Fast loop : decode sequences as long as output < oend-FASTLOOP_SAFE_DISTANCE,
+         * and input is not too close to iend.
+         * It hands over to the safe loop either at a sequence start (break),
+         * or once a match is fully decoded (goto safe_match_copy). */
         DEBUGLOG(6, "using fast decode loop");
         while (1) {
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
@@ -2127,29 +2130,32 @@ LZ4_decompress_generic(
             length = token >> ML_BITS;  /* literal length */
             DEBUGLOG(7, "blockPos%6u: litLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
 
-            if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { goto safe_literal_copy_early; }
+            /* too close to input end : the safe loop restarts this sequence */
+            if (ip > iend-(16 + 1/*max lit + offset + nextToken*/)) { ip--; break; }
 
             /* decode literal length */
             if (length == RUN_MASK) {
                 /* literal length >= RUN_MASK means >= RUN_MASK literal bytes follow the extension bytes,
                  * so extension bytes cannot reach the last RUN_MASK bytes of input */
+                const BYTE* const tokenPos = ip-1;
                 size_t const addl = read_variable_length(&ip, iend - RUN_MASK);
                 if (addl == rvl_error) {
                     DEBUGLOG(6, "error reading long literal length");
                     goto _output_error;
                 }
                 length += addl;
-                cpy = op+length;
-                if (unlikely((uptrval)(cpy)<(uptrval)(op))) { goto _output_error; } /* overflow detection */
+                if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
                 if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
 
-                /* copy literals */
+                /* copy literals, unless too close to the end for a wild copy :
+                 * nothing is written yet, so the safe loop can restart this sequence */
+                cpy = op+length;
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
               #ifdef __aarch64__
-                if ((cpy>oend-64) || (ip+length>iend-64)) { goto safe_literal_copy; }
+                if ((cpy>oend-64) || (ip+length>iend-64)) { ip = tokenPos; break; }
                 LZ4_wildCopy64(op, ip, cpy);
               #else
-                if ((cpy>oend-32) || (ip+length>iend-32)) { goto safe_literal_copy; }
+                if ((cpy>oend-32) || (ip+length>iend-32)) { ip = tokenPos; break; }
                 LZ4_wildCopy32(op, ip, cpy);
               #endif
                 ip += length; op = cpy;
@@ -2238,7 +2244,10 @@ LZ4_decompress_generic(
     safe_decode:
 #endif
 
-        /* Main Loop : decode remaining sequences where output < FASTLOOP_SAFE_DISTANCE */
+        /* Safe loop : decode remaining sequences, without writing beyond oend nor reading beyond iend.
+         * With LZ4_FAST_DEC_LOOP, that's the end of the block (or a block too small for the fast loop),
+         * entered at a sequence start, or at safe_match_copy with a decoded match.
+         * Without it, that's the whole block. */
         DEBUGLOG(6, "using safe decode loop");
         while (1) {
             assert(ip < iend);
@@ -2248,8 +2257,7 @@ LZ4_decompress_generic(
 
             /* A two-stage shortcut for the most common case:
              * 1) If the literal length is 0..14, and there is enough space,
-             * enter the shortcut and copy 16 bytes on behalf of the literals
-             * (in the fast mode, only 8 bytes can be safely copied this way).
+             * enter the shortcut and copy 16 bytes on behalf of the literals.
              * 2) Further if the match length is 4..18, copy 18 bytes in a similar
              * manner; but we ensure that there's enough space in the output for
              * those 18 bytes earlier, upon entering the shortcut (in other words,
@@ -2288,10 +2296,6 @@ LZ4_decompress_generic(
                 goto _copy_match;
             }
 
-#if LZ4_FAST_DEC_LOOP
-        safe_literal_copy_early:
-#endif
-
             /* decode literal length */
             if (length == RUN_MASK) {
                 /* literal length >= RUN_MASK means >= RUN_MASK literal bytes follow the extension bytes,
@@ -2305,11 +2309,6 @@ LZ4_decompress_generic(
 
             /* copy literals */
             cpy = op+length;
-
-#if LZ4_FAST_DEC_LOOP
-        safe_literal_copy:
-#endif
-
             LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
             if ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) {
                 /* We've either hit the input parsing restriction or the output parsing restriction.
@@ -2377,6 +2376,7 @@ LZ4_decompress_generic(
             DEBUGLOG(7, "blockPos%6u: matchLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
 
     _copy_match:
+            /* literals copied, offset decoded, length == match length token */
             if (length == ML_MASK) {
                 /* after match length extension bytes, at least 1 token + LASTLITERALS literals must remain */
                 size_t const addl = read_variable_length(&ip, iend - (1 + LASTLITERALS));
@@ -2389,6 +2389,7 @@ LZ4_decompress_generic(
 #if LZ4_FAST_DEC_LOOP
         safe_match_copy:
 #endif
+            /* literals copied, match fully decoded (length includes MINMATCH), offset not validated yet */
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
