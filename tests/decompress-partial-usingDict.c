@@ -41,6 +41,7 @@ int main(void)
   char* const smallDict = dict + largeSize - smallSize;
   int i;
   int cmpSize;
+  int ret = -1;
 
   printf("starting test decompress-partial-usingDict : \n");
   assert(buffer != NULL);
@@ -54,7 +55,7 @@ int main(void)
       || (result != srcLen)
       || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with no dict error \n");
-      return -1;
+      goto _end;
     }
   }
 
@@ -64,7 +65,7 @@ int main(void)
       || (result != srcLen)
       || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with small prefix error \n");
-      return -1;
+      goto _end;
     }
   }
 
@@ -74,7 +75,7 @@ int main(void)
       || (result != srcLen)
       || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with large prefix error \n");
-      return -1;
+      goto _end;
     }
   }
 
@@ -84,7 +85,7 @@ int main(void)
       || (result != srcLen)
       || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with small external dict error \n");
-      return -1;
+      goto _end;
     }
   }
 
@@ -94,10 +95,15 @@ int main(void)
       || (result != srcLen)
       || memcmp(source, outBuffer, (size_t)srcLen) ) {
       printf("test decompress-partial-usingDict with large external dict error \n");
-      return -1;
+      goto _end;
     }
   }
 
   printf("test decompress-partial-usingDict OK \n");
-  return 0;
+  ret = 0;
+
+_end:
+  free(dict);
+  free(buffer);
+  return ret;
 }
