@@ -1081,6 +1081,8 @@ LZ4HC_InsertAndGetWiderMatch (
                         sBack = back;
                         DEBUGLOG(7, "Found match of len=%i within prefix, offset=%i, back=%i", longest, offset, -back);
                         HEX_CMP(7, ip + back, ip + back - offset, (size_t)matchLength);
+                        /* Early exit after a sufficiently strong match to avoid tail searches. */
+                        if (longest >= OPTIMAL_ML + 4) goto _findBestMatch_done;
             }   }   }
         } else {   /* lowestMatchIndex <= matchIndex < dictLimit : within Ext Dict */
             const BYTE* const matchPtr = dictStart + (matchIndex - dictIdx);
@@ -1101,6 +1103,8 @@ LZ4HC_InsertAndGetWiderMatch (
                     sBack = back;
                     DEBUGLOG(7, "Found match of len=%i within dict, offset=%i, back=%i", longest, offset, -back);
                     HEX_CMP(7, ip + back, matchPtr + back, (size_t)matchLength);
+                    /* Early exit after a sufficiently strong match to avoid tail searches. */
+                    if (longest >= OPTIMAL_ML + 4) goto _findBestMatch_done;
         }   }   }
 
         if (chainSwap && matchLength==longest && matchIndex + (U32)longest <= ipIndex) {   /* better match => select a better chain */
@@ -1170,6 +1174,7 @@ LZ4HC_InsertAndGetWiderMatch (
 
     }  /* while ((matchIndex>=lowestMatchIndex) && (nbAttempts)) */
 
+    _findBestMatch_done:
     if ( dict == usingDictCtxHc
       && nbAttempts > 0
       && longest < maxLength
