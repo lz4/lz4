@@ -11,6 +11,8 @@ fix  : level 12 very slow on short-period data with linked blocks, detected by O
 fix  : levels 10+ with `(NULL, 0)` input, reported by @rinsuki
 fix  : lz4frame functions check `NULL` arguments, by @louislafosse
 fix  : `LZ4F_readOpen()` accepts files smaller than 19 bytes, by @axiqia
+fix  : `LZ4F_read()` reports truncated files as an error (`ERROR_io_read`), instead of a clean end of file
+fix  : `LZ4F_writeClose()` reports an earlier `LZ4F_write()` failure, instead of success
 fix  : lz4frame `skipChecksums` also skips block checksums of compressed blocks (decompression up to +23% faster)
 perf : faster decompression on aarch64 (up to +19% on Neoverse-V2), by @Nicoshev
 perf : `LZ4_FAST_DEC_LOOP` enabled on aarch64 with clang, including Android (up to +9% on Cortex-A5xx), by @Nicoshev and @arpadpanyik-arm
@@ -26,9 +28,11 @@ api  : new static function `LZ4F_resumeFrame()` : resume decoding from any block
 api  : `lz4file` : new static functions `LZ4F_seek()` and `LZ4F_tell()`, for random access within compressed files
 cli  : multithreaded compression honors custom block sizes
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666
+cli  : `lz4 -t -m` no longer writes decoded content to stdout, reported by @tansy
 cli  : warning when `--content-size` is used with `stdin`, by @jlee303
 cli  : fix benchmark cpu time on Windows with very large files
 build: refactored `make` build, parallel by default
+build: `make all install` could fail to link, or install incomplete files, by @hotschmoe
 build: cmake : `lz4` supports multithreading on pthread platforms
 build: cmake : exported `lz4::lz4` target by @dg0yt, CMake 4 support by @GeorgH93, `CMAKE_POSITION_INDEPENDENT_CODE` by @ds-sloth
 build: reproducible static library, by @rpurdie
