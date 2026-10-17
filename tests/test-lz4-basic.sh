@@ -73,8 +73,16 @@ lz4 -BX $FPREFIX-hw -c -q | lz4 -tv   # test block checksum
 test "$(datagen -g20KB | lz4 -c --fast | wc -c)" -lt "$(datagen -g20KB | lz4 -c --fast=9 | wc -c)" # -1 vs -9
 test "$(datagen -g20KB | lz4 -c -1 | wc -c)" -lt "$(datagen -g20KB| lz4 -c --fast=1 | wc -c)" # 1 vs -1
 test "$(datagen -g20KB | lz4 -c --fast=1 | wc -c)" -eq "$(datagen -g20KB| lz4 -c --fast| wc -c)" # checks default fast compression is -1
-lz4 -c --fast=0 $FPREFIX-dg20K && exit 1  # lz4 should fail when fast=0
-lz4 -c --fast=-1 $FPREFIX-dg20K && exit 1 # lz4 should fail when fast=-1
+lz4 -c --fast=0 $FPREFIX-dg20k && exit 1  # lz4 should fail when fast=0
+lz4 -c --fast=-1 $FPREFIX-dg20k && exit 1 # lz4 should fail when fast=-1
+# numeric arguments must not silently overflow
+lz4 -c --fast=3000000000 $FPREFIX-dg20k > /dev/null && exit 1  # > INT_MAX
+lz4 -c --fast=4294967297 $FPREFIX-dg20k > /dev/null && exit 1  # > UINT_MAX (would wrap to 1)
+lz4 -c -3000000000 $FPREFIX-dg20k > /dev/null && exit 1        # > INT_MAX
+lz4 -c -4294967305 $FPREFIX-dg20k > /dev/null && exit 1        # > UINT_MAX (would wrap to 9)
+lz4 -c -T4294967297 $FPREFIX-dg20k > /dev/null && exit 1       # > UINT_MAX (would wrap to 1)
+# an overflowing LZ4_CLEVEL is ignored, like other invalid values
+test "$(LZ4_CLEVEL=4294967305 lz4 -c $FPREFIX-dg20k | wc -c)" -eq "$(lz4 -c $FPREFIX-dg20k | wc -c)"
 # Multithreading commands
 datagen -g16M | lz4 -T2 | lz4 -t
 datagen -g16M | lz4 --threads=2 | lz4 -t
