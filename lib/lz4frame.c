@@ -159,7 +159,8 @@ static int g_debuglog_enable = 1;
                     fprintf(stderr, __VA_ARGS__);             \
                     fprintf(stderr, " \n");                   \
             }   }
-#else
+#endif
+#ifndef DEBUGLOG   /* may already be defined, e.g. by lz4.c in an amalgamated build */
 #  define DEBUGLOG(l, ...)      {}    /* disabled */
 #endif
 
