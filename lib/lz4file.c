@@ -75,7 +75,7 @@ struct LZ4_readFile_s {
   unsigned long long frameDPos;   /* position of current frame within decoded data */
   LZ4F_frameInfo_t frameInfo;     /* parameters of current frame, if frameInfoKnown */
   int frameInfoKnown;
-  size_t hint;                    /* input expected by the decoder, up to the end of next block header */
+  size_t hint;                    /* input expected by the decoder, up to the end of next block header : 0 between frames */
   int seekable;
   LZ4F_resumePoint* points;
   size_t nbPoints;
@@ -212,13 +212,26 @@ static void addResumePoint(LZ4_readFile_t* lz4fRead, unsigned long long cPos, co
   if (frameInfo != NULL) p->frameInfo = *frameInfo;
 }
 
+/* the current frame isn't finished : input can't end here */
+static int frameInProgress(const LZ4_readFile_t* lz4fRead)
+{
+  return lz4fRead->hint != 0;
+}
+
+/* input provided at once to the decoder : up to the end of next block header,
+ * or the minimal header of next frame */
+static size_t inputLimit(const LZ4_readFile_t* lz4fRead)
+{
+  return frameInProgress(lz4fRead) ? lz4fRead->hint : LZ4F_HEADER_SIZE_MIN;
+}
+
 /* updates the reading state after LZ4F_decompress() consumed @consumed bytes out of @provided,
  * and records resume points */
 static void trackPosition(LZ4_readFile_t* lz4fRead, size_t decStatus, size_t provided, size_t consumed)
 {
   unsigned long long const cPos = lz4fRead->srcBufPos + lz4fRead->srcBufNext;
   if (decStatus == 0) {   /* end of frame : next frame starts here */
-    lz4fRead->hint = LZ4F_HEADER_SIZE_MIN;
+    lz4fRead->hint = 0;
     lz4fRead->frameDPos = lz4fRead->decodedPos;
     lz4fRead->frameInfoKnown = 0;
     addResumePoint(lz4fRead, cPos, NULL);
@@ -226,7 +239,7 @@ static void trackPosition(LZ4_readFile_t* lz4fRead, size_t decStatus, size_t pro
   }
   /* exactly the hinted input was consumed, and next hint covers a block :
    * decoding stopped right after a block header */
-  if (consumed == provided && provided == lz4fRead->hint && decStatus > LZ4F_BLOCK_HEADER_SIZE) {
+  if (consumed == provided && provided == inputLimit(lz4fRead) && decStatus > LZ4F_BLOCK_HEADER_SIZE) {
     if (!lz4fRead->frameInfoKnown || lz4fRead->frameInfo.frameType != LZ4F_frame) {
       /* fails within a frame header, which isn't followed by a block header yet */
       size_t noInput = 0;
@@ -260,8 +273,8 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
       lz4fRead->srcBufNext = 0;
       bytesRead = fread(lz4fRead->srcBuf, 1, lz4fRead->srcBufMaxSize, lz4fRead->fp);
       if (bytesRead == 0) {
-        if (ferror(lz4fRead->fp)) {
-          RETURN_ERROR(io_read);
+        if (ferror(lz4fRead->fp) || frameInProgress(lz4fRead)) {
+          RETURN_ERROR(io_read);   /* read error, or input ends within a frame */
         }
         break; /* end of input reached */
       }
@@ -271,7 +284,7 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
     }
 
     /* provide at most the hinted amount : decoding then stops right after each block header */
-    if (srcBytes > lz4fRead->hint) srcBytes = lz4fRead->hint;
+    if (srcBytes > inputLimit(lz4fRead)) srcBytes = inputLimit(lz4fRead);
     provided = srcBytes;
 
     { size_t const decStatus = LZ4F_decompress(
@@ -337,7 +350,7 @@ static LZ4F_errorCode_t restartFrom(LZ4_readFile_t* lz4fRead, const LZ4F_resumeP
     lz4fRead->frameInfoKnown = 1;
   } else {
     LZ4F_resetDecompressionContext(lz4fRead->dctxPtr);
-    lz4fRead->hint = LZ4F_HEADER_SIZE_MIN;
+    lz4fRead->hint = 0;
     lz4fRead->frameDPos = lz4fRead->decodedPos;
     lz4fRead->frameInfoKnown = 0;
   }

@@ -1942,7 +1942,10 @@ static int fs_writeFrame(FILE* f, const BYTE* src, size_t srcSize, const LZ4F_pr
 
 static int testFileSeek(U32 seed)
 {
-    size_t const sizes[] = { 1200 KB, 1000, 0, 2500 KB, 200 KB };   /* a skippable frame follows the 1st one */
+    /* a skippable frame follows the 1st one.
+     * the last frame uses linked blocks and is larger than LZ4F_RESUME_SPAN (1 MB) :
+     * a resume point is recorded at its end, which is the end of file */
+    size_t const sizes[] = { 1200 KB, 1000, 0, 2500 KB, 1200 KB };
     size_t const nbFrames = sizeof(sizes) / sizeof(sizes[0]);
     size_t const prefixSize = 100;   /* unrelated data before the 1st frame */
     size_t const bufSize = 200 KB;
@@ -2028,6 +2031,12 @@ static int testFileSeek(U32 seed)
                 "sequential read : wrong data at %u", (unsigned)pos);
         pos += r;
     }
+    /* end of file is reached cleanly, also when restarting from its resume point */
+    SD_CHECK(LZ4F_read(rf, buf, 1) == 0, "data beyond end after sequential read");
+    SD_CHECK(!LZ4F_isError(LZ4F_seek(rf, 0, SEEK_SET)), "seek to start failed");
+    SD_CHECK(LZ4F_read(rf, buf, 1) == 1 && buf[0] == ref[0], "read at start failed");
+    SD_CHECK(!LZ4F_isError(LZ4F_seek(rf, (long long)totalSize, SEEK_SET)), "seek to indexed end failed");
+    SD_CHECK(LZ4F_read(rf, buf, 1) == 0, "end of file reported as truncated after restart");
     result = 0;
 
 _output_error:
@@ -2038,6 +2047,82 @@ _output_error:
     return result;
 }
 
+/* LZ4F_read() : complete files decode fully, then report end of file.
+ * Files ending within a frame report ERROR_io_read. */
+static int testTruncatedFile(U32 seed)
+{
+    static const struct {
+        size_t srcSize;
+        size_t readSize;
+        size_t cut;        /* bytes removed from the end of the last frame */
+        int headerOnly;    /* last frame reduced to its header */
+    } cases[] = {
+        {   0,   1, 0, 0 },   /* empty frame */
+        { 256,   1, 0, 0 },   /* complete, read by small, exact and large chunks */
+        { 256, 256, 0, 0 },
+        { 256, 257, 0, 0 },
+        { 256,   1, 1, 0 },   /* truncated end mark, or checksum */
+        { 256, 257, 1, 0 },
+        { 256, 257, 4, 0 },
+        { 256, 257, 8, 0 },   /* truncated block, without checksums */
+        { 256, 257, 0, 1 }    /* header only */
+    };
+    size_t const nbCases = sizeof(cases) / sizeof(cases[0]);
+    BYTE src[256];
+    BYTE frame[1 KB];
+    BYTE decoded[1 KB];
+    FILE* f = NULL;
+    LZ4_readFile_t* rf = NULL;
+    unsigned checksums, nbFrames, k;
+    size_t n;
+    int result = 1;
+
+    FUZ_fillCompressibleNoiseBuffer(src, sizeof(src), 0.5, &seed);
+    for (checksums = 0; checksums < 4; checksums++)
+    for (nbFrames = 1; nbFrames <= 2; nbFrames++)
+    for (n = 0; n < nbCases; n++) {
+        size_t const expected = cases[n].srcSize * nbFrames;
+        int const truncated = cases[n].cut || cases[n].headerOnly;
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t frameSize, lastSize, total = 0, r;
+        prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)(checksums & 1);
+        prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)(checksums >> 1);
+        if (cases[n].headerOnly) prefs.frameInfo.contentSize = cases[n].srcSize;   /* 15-byte header : LZ4F_readOpen() needs 11 bytes */
+        frameSize = LZ4F_compressFrame(frame, sizeof(frame), src, cases[n].srcSize, &prefs);
+        SD_CHECK(!LZ4F_isError(frameSize), "case %u : compression failed", (unsigned)n);
+        lastSize = cases[n].headerOnly ? LZ4F_headerSize(frame, frameSize) : frameSize - cases[n].cut;
+
+        f = tmpfile();
+        SD_CHECK(f != NULL, "tmpfile failure");
+        for (k = 1; k < nbFrames; k++) SD_CHECK(fwrite(frame, 1, frameSize, f) == frameSize, "write failure");
+        SD_CHECK(fwrite(frame, 1, lastSize, f) == lastSize, "write failure");
+        rewind(f);
+        SD_CHECK(!LZ4F_isError(LZ4F_readOpen(&rf, f)), "case %u : LZ4F_readOpen failure", (unsigned)n);
+        do {
+            r = LZ4F_read(rf, decoded + total, cases[n].readSize);
+            if (LZ4F_isError(r)) break;
+            total += r;
+        } while (r != 0 && total <= expected);
+        if (truncated) {
+            SD_CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_io_read,
+                    "case %u, %u frame(s), checksums %u : truncation not detected", (unsigned)n, nbFrames, checksums);
+        } else {
+            SD_CHECK(!LZ4F_isError(r) && total == expected,
+                    "case %u, %u frame(s), checksums %u : decoded %u bytes", (unsigned)n, nbFrames, checksums, (unsigned)total);
+            for (k = 0; k < nbFrames; k++)
+                SD_CHECK(!memcmp(decoded + k * cases[n].srcSize, src, cases[n].srcSize), "case %u : wrong data", (unsigned)n);
+            SD_CHECK(LZ4F_read(rf, decoded, 1) == 0, "case %u : data beyond end", (unsigned)n);
+        }
+        LZ4F_readClose(rf); rf = NULL;
+        fclose(f); f = NULL;
+    }
+    result = 0;
+
+_output_error:
+    LZ4F_readClose(rf);
+    if (f != NULL) fclose(f);
+    return result;
+}
 
 /* Level 12 with linked blocks, on short-period data (ABAB...) :
  * all candidates in the 64 KB history match up to the end of the block.
@@ -2182,6 +2267,10 @@ static int unitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(3, "LZ4F_seek() within a file : ");
     if (testFileSeek(seed)) goto _output_error;
+    DISPLAYLEVEL(3, "OK \n");
+
+    DISPLAYLEVEL(3, "LZ4F_read() reports truncated files : ");
+    if (testTruncatedFile(seed)) goto _output_error;
     DISPLAYLEVEL(3, "OK \n");
 
     DISPLAYLEVEL(3, "Level 12 with linked blocks isn't slow on short-period data : ");
