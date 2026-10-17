@@ -133,7 +133,7 @@ static int usage(const char* exeName)
     DISPLAY( " -1     : fast compression (default) \n");
     DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
 #if LZ4IO_MULTITHREAD
-    DISPLAY( " -T#    : use # threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
+    DISPLAY( " -T#    : use # worker threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
 #endif
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -f     : overwrite output without prompting \n");
@@ -163,6 +163,9 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -D FILE: use FILE as dictionary (compression & decompression)\n");
     DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
     DISPLAY( "                     or predefined block size [4-7] (default: %i) \n", LZ4_BLOCKSIZEID_DEFAULT);
+#if LZ4IO_MULTITHREAD
+    DISPLAY( "                     (custom sizes : single-threaded compression) \n");
+#endif
     DISPLAY( " -BI    : Block Independence (default) \n");
     DISPLAY( " -BD    : Block dependency (improves compression ratio) \n");
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
@@ -170,6 +173,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--list FILE : lists information about .lz4 files (useful for files compressed with --content-size flag)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
+    DISPLAY( "--[no-]mmap    : memory-map files to compress (default:enabled when supported)\n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
     DISPLAY( "--best  : same as -%d\n", LZ4HC_CLEVEL_MAX);
@@ -519,6 +523,8 @@ int main(int argCount, const char** argv)
                 if (!strcmp(argument,  "--list")) { mode = om_list; multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(prefs, 2); continue; }
                 if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(prefs, 0); continue; }
+                if (!strcmp(argument,  "--mmap")) { LZ4IO_setMmap(prefs, 1); continue; }
+                if (!strcmp(argument,  "--no-mmap")) { LZ4IO_setMmap(prefs, 0); continue; }
                 if (!strcmp(argument,  "--favor-decSpeed")) { LZ4IO_favorDecSpeed(prefs, 1); continue; }
                 if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
                 if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }

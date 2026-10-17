@@ -141,8 +141,10 @@ only the latest one will be applied.
   Set highest compression level. Same as -12.
 
 * `-T#`, `--threads=#`:
-  Use `#` threads for compression.
+  Use `#` worker threads for compression.
+  The main thread also compresses while waiting for them, so up to `#+1` cores can be busy.
   When `0`, or none provided: automatically determined from nb of detected cores.
+  Ignored with a custom block size (see `-B#`).
 
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.
@@ -183,7 +185,9 @@ only the latest one will be applied.
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>
-  `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB
+  `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB<br/>
+  `-B#` with `#` >= 32 : block size in bytes.
+  Sizes other than 64KB, 256KB, 1MB and 4MB are compressed single-threaded (`-T#` is ignored).
 
 * `-BI`:
   Produce independent blocks (default)
@@ -208,6 +212,12 @@ only the latest one will be applied.
 
 * `--[no-]sparse`:
   Sparse mode support (default:enabled on file, disabled on stdout)
+
+* `--[no-]mmap`:
+  Memory-map regular files to compress, so that compression threads read them in place
+  (default:enabled when supported)<br/>
+  Note : a file truncated while being compressed then makes `lz4` crash (`SIGBUS`) ;
+  use `--no-mmap` when sources may be truncated concurrently, such as active log files.
 
 * `-l`:
   Use Legacy format (typically for Linux Kernel compression)<br/>

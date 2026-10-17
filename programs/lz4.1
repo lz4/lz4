@@ -125,7 +125,7 @@ Set highest compression level\. Same as \-12\.
 .
 .TP
 \fB\-T#\fR, \fB\-\-threads=#\fR
-Use \fB#\fR threads for compression\. When \fB0\fR, or none provided: automatically determined from nb of detected cores\.
+Use \fB#\fR worker threads for compression\. The main thread also compresses while waiting for them, so up to \fB#+1\fR cores can be busy\. When \fB0\fR, or none provided: automatically determined from nb of detected cores\. Ignored with a custom block size (see \fB\-B#\fR)\.
 .
 .TP
 \fB\-\-favor\-decSpeed\fR
@@ -164,6 +164,9 @@ Block size [4\-7](default : 7)
 .br
 \fB\-B4\fR= 64KB ; \fB\-B5\fR= 256KB ; \fB\-B6\fR= 1MB ; \fB\-B7\fR= 4MB
 .
+.br
+\fB\-B#\fR with \fB#\fR >= 32 : block size in bytes\. Sizes other than 64KB, 256KB, 1MB and 4MB are compressed single\-threaded (\fB\-T#\fR is ignored)\.
+.
 .TP
 \fB\-BI\fR
 Produce independent blocks (default)
@@ -194,6 +197,13 @@ Note : this option can only be activated when the original size can be determine
 .TP
 \fB\-\-[no\-]sparse\fR
 Sparse mode support (default:enabled on file, disabled on stdout)
+.
+.TP
+\fB\-\-[no\-]mmap\fR
+Memory\-map regular files to compress, so that compression threads read them in place (default:enabled when supported)
+.
+.br
+Note : a file truncated while being compressed then makes \fBlz4\fR crash (\fBSIGBUS\fR) ; use \fB\-\-no\-mmap\fR when sources may be truncated concurrently, such as active log files\.
 .
 .TP
 \fB\-l\fR
