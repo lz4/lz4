@@ -1,0 +1,45 @@
+# FreeBSD testing, in a VM on a Linux runner
+name: FreeBSD
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+
+jobs:
+  freebsd:
+    name: FreeBSD ${{ matrix.release }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['14', '15']
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+    - name: Build and test in a FreeBSD VM
+      timeout-minutes: 30
+      uses: vmactions/freebsd-vm@83b151f58c6047089f4c80eb5ba2039d158ce093 # v1.5.3
+      with:
+        # Only the leading part of the version is needed, the newest matching
+        # release is used, so this tracks 14.4 and 15.1 without an edit here.
+        release: ${{ matrix.release }}
+        usesh: true
+        copyback: false
+        cache-after-prepare: true
+        prepare: |
+          # tests/Makefile runs test-lz4-list.py through $(PYTHON); the base
+          # system has no python, which is why listTest exits 127 without it.
+          pkg install -y gmake python3
+        run: |
+          set -e
+          cc -v
+          gmake test
