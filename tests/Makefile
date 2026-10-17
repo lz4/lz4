@@ -44,6 +44,7 @@ CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 include ../build/make/lz4defs.make
+CFLAGS += $(USEROPTIONALFLAGS)
 
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
