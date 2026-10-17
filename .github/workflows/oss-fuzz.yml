@@ -21,6 +21,8 @@ jobs:
         sanitizer: [address, undefined, memory]
 
     steps:
+    # CIFuzz stays at @master, as documented by OSS-Fuzz :
+    # it builds on a floating base image, so pinning it wouldn't freeze what runs
     - name: Build Fuzzers
       id: build
       uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
