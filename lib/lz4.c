@@ -1268,6 +1268,9 @@ _next_match:
             U32 const h = LZ4_hashPosition(ip, tableType);
             U32 const current = (U32)(ip-base);
             U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
+            int matchInExternalDict = 0;
+            int preferNextPosition = 0;
+            int matchCandidateValid;
             assert(matchIndex < current);
             if (dictDirective == usingDictCtx) {
                 if (matchIndex < startIndex) {
@@ -1277,6 +1280,7 @@ _next_match:
                     match = dictBase + matchIndex;
                     lowLimit = dictionary;   /* required for match length counter */
                     matchIndex += dictDelta;
+                    matchInExternalDict = 1;
                 } else {
                     match = base + matchIndex;
                     lowLimit = (const BYTE*)source;  /* required for match length counter */
@@ -1286,6 +1290,7 @@ _next_match:
                     assert(dictBase);
                     match = dictBase + matchIndex;
                     lowLimit = dictionary;   /* required for match length counter */
+                    matchInExternalDict = 1;
                 } else {
                     match = base + matchIndex;
                     lowLimit = (const BYTE*)source;   /* required for match length counter */
@@ -1295,8 +1300,34 @@ _next_match:
             }
             LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
             assert(matchIndex < current);
-            if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
-              && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
+            matchCandidateValid = ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
+              && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current));
+            /* An external-dictionary match may be short enough to hide a much longer
+             * prefix match at the next byte. Compare them before taking the shortcut. */
+            if (matchCandidateValid && matchInExternalDict && (LZ4_read32(match) == LZ4_read32(ip))) {
+                const BYTE* const nextIp = ip + 1;
+                U32 const nextH = LZ4_hashPosition(nextIp, tableType);
+                U32 const nextCurrent = current + 1;
+                U32 const nextMatchIndex = LZ4_getIndexOnHash(nextH, cctx->hashTable, tableType);
+                if ((nextMatchIndex >= startIndex)
+                  && (nextMatchIndex < nextCurrent)
+                  && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (nextMatchIndex+LZ4_DISTANCE_MAX >= nextCurrent))) {
+                    const BYTE* const nextMatch = base + nextMatchIndex;
+                    if (LZ4_read32(nextMatch) == LZ4_read32(nextIp)) {
+                        const BYTE* dictMatchLimit = ip + (dictEnd - match);
+                        size_t dictMatchLength;
+                        size_t const nextMatchLength = MINMATCH + LZ4_count(nextIp+MINMATCH, nextMatch+MINMATCH, matchlimit);
+                        if (dictMatchLimit > matchlimit) dictMatchLimit = matchlimit;
+                        dictMatchLength = MINMATCH + LZ4_count(ip+MINMATCH, match+MINMATCH, dictMatchLimit);
+                        if (ip + dictMatchLength == dictMatchLimit) {
+                            dictMatchLength += LZ4_count(dictMatchLimit, (const BYTE*)source, matchlimit);
+                        }
+                        preferNextPosition = nextMatchLength > dictMatchLength + 1;
+                    }
+                }
+            }
+            if ( !preferNextPosition
+              && matchCandidateValid
               && (LZ4_read32(match) == LZ4_read32(ip)) ) {
                 token=op++;
                 *token=0;
