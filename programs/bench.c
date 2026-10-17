@@ -351,6 +351,7 @@ typedef struct {
     size_t cRoom;
     size_t cSize;
     char*  resPtr;
+    size_t resCapa;
     size_t resSize;
 } blockParam_t;
 
@@ -402,12 +403,15 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
             for ( ; nbBlocks<blockEnd; nbBlocks++) {
                 size_t const thisBlockSize = MIN(remaining, blockSize);
                 size_t const resMaxSize = thisBlockSize * decMultiplier;
-                size_t const resCapa = (thisBlockSize < maxInSize) ? resMaxSize : LZ4_MAX_INPUT_SIZE;
+                size_t resCapa = (thisBlockSize < maxInSize) ? resMaxSize : LZ4_MAX_INPUT_SIZE;
+                size_t const resRoomLeft = maxDecSize - (size_t)(resPtr - (char*)resultBuffer);
+                if (resCapa > resRoomLeft) resCapa = resRoomLeft;  /* never hand the decoder more room than is actually allocated */
                 blockTable[nbBlocks].srcPtr = srcPtr;
                 blockTable[nbBlocks].cPtr = cPtr;
                 blockTable[nbBlocks].resPtr = resPtr;
                 blockTable[nbBlocks].srcSize = thisBlockSize;
                 blockTable[nbBlocks].cRoom = (size_t)LZ4_compressBound((int)thisBlockSize);
+                blockTable[nbBlocks].resCapa = resCapa;
                 srcPtr += thisBlockSize;
                 cPtr += blockTable[nbBlocks].cRoom;
                 resPtr += resCapa;
@@ -522,13 +526,9 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
                 for (nbLoops=0; nbLoops < nbDecodeLoops; nbLoops++) {
                     U32 blockNb;
                     for (blockNb=0; blockNb<nbBlocks; blockNb++) {
-                        size_t const inMaxSize = (size_t)INT_MAX / decMultiplier;
-                        size_t const resCapa = (blockTable[blockNb].srcSize < inMaxSize) ?
-                                                blockTable[blockNb].srcSize * decMultiplier :
-                                                INT_MAX;
                         int const regenSize = decFunction(
                             blockTable[blockNb].cPtr, blockTable[blockNb].resPtr,
-                            (int)blockTable[blockNb].cSize, (int)resCapa,
+                            (int)blockTable[blockNb].cSize, (int)blockTable[blockNb].resCapa,
                             dictBuf, dictSize);
                         if (regenSize < 0) {
                             DISPLAY("%s() failed on block %u of size %u \n",
