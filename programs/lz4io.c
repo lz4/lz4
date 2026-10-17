@@ -1212,7 +1212,7 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
 }
 
 /* Input of frame compression : read by chunks into a buffer,
- * or memory-mapped (regular files), so that compression jobs read it in place (stableSrc) */
+ * or memory-mapped (regular files), so that compression jobs read it in place (LZ4F_srcStableUntilFlush) */
 typedef struct {
     FILE* file;
     void* buffer;
@@ -1325,7 +1325,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     if (io_prefs->useMmap && !LZ4IO_customBlockSize(io_prefs) && !LZ4IO_isStdin(srcFileName))
         LZ4IO_mapInput(&input);
     memset(&cOpts, 0, sizeof(cOpts));
-    cOpts.stableSrc = (input.map != NULL);   /* mapping remains until the end of frame */
+    cOpts.stableSrc = input.map ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;   /* mapping remains until the end of frame */
 
     /* Adjust compression parameters */
     prefs = ress->preparedPrefs;

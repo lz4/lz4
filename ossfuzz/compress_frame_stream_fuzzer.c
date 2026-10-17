@@ -184,7 +184,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     unsigned nbOps;
 
     memset(&cOpts, 0, sizeof(cOpts));
-    cOpts.stableSrc = FUZZ_rand32(&seed, 0, 1);
+    cOpts.stableSrc = FUZZ_rand32(&seed, LZ4F_srcUnstable, LZ4F_srcStableUntilFlush);   /* input remains until the end */
 
     memset(&s, 0, sizeof(s));
     s.refPrefs = &refPrefs;

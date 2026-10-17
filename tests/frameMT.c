@@ -29,7 +29,8 @@
  * - output is identical for any nbWorkers >= 1
  * - streaming : same output as one-shot, whatever input slicing and stableSrc ;
  *   flushes, autoFlush and uncompressed segments produce the same output whatever nbWorkers ;
- *   each invocation succeeds with exactly LZ4F_compressBound() ; input isn't read after invocation ;
+ *   each invocation succeeds with exactly LZ4F_compressBound() ;
+ *   input isn't read after invocation, unless LZ4F_srcStableUntilFlush ;
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
  * - serial processing (dstCapacity too small for parallel jobs) produces the same output
@@ -289,7 +290,7 @@ static unsigned nextRand(unsigned* state)
 }
 
 typedef struct {
-    int stableSrc;      /* input remains available until the end of frame */
+    unsigned stableSrc; /* LZ4F_stableSrc_t */
     int flushes;        /* LZ4F_flush() at random positions */
     int uncompressed;   /* some slices sent with LZ4F_uncompressedUpdate() (independent blocks only) */
 } streamMode_t;
@@ -297,7 +298,10 @@ typedef struct {
 /* compresses @src as a stream, slices following @seed :
  * the same @seed produces the same slices, flushes and uncompressed segments, whatever nbWorkers.
  * Each invocation receives exactly LZ4F_compressBound() as dstCapacity.
- * Without stableSrc, slices are provided from @scratch, scrambled after each invocation. */
+ * LZ4F_srcStableUntilFlush : slices are read from @src, which remains available.
+ * Otherwise, slices are provided from @scratch, scrambled after each invocation.
+ * With LZ4F_srcStable and nbWorkers >= 1, this is stricter than its contract (last 64 KB) :
+ * jobs still running after an invocation returns must not read its input. */
 static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
                              const char* src, size_t srcSize,
                              const LZ4F_CDict* cdict, const LZ4F_preferences_t* prefs, unsigned nbWorkers,
@@ -308,10 +312,13 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
     LZ4F_compressOptions_t cOpts;
     size_t const maxSlice = 3 MB;
     size_t pos = 0, consumed = 0;
+    /* LZ4F_srcStable with nbWorkers == 0 : linked blocks reference the last 64 KB, which must remain */
+    int const scrambled = (mode.stableSrc == LZ4F_srcUnstable)
+                       || ((mode.stableSrc == LZ4F_srcStable) && (nbWorkers >= 1));
 
     p.nbWorkers = nbWorkers;
     memset(&cOpts, 0, sizeof(cOpts));
-    cOpts.stableSrc = (unsigned)mode.stableSrc;
+    cOpts.stableSrc = mode.stableSrc;
     {   size_t const h = LZ4F_compressBegin_usingCDict(cctx, dst, LZ4F_HEADER_SIZE_MAX, cdict, &p);
         CHECK_LZ4F(h);
         pos += h;
@@ -322,7 +329,7 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
         const char* in = src + consumed;
         size_t cSize;
         if (slice > srcSize - consumed) slice = srcSize - consumed;
-        if (!mode.stableSrc) {
+        if (scrambled) {
             memcpy(scratch, in, slice);
             in = scratch;
         }
@@ -332,7 +339,7 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
             cSize = LZ4F_compressUpdate(cctx, tmpOut, LZ4F_compressBound(slice, &p), in, slice, &cOpts);
         }
         CHECK_LZ4F(cSize);
-        if (!mode.stableSrc) memset(scratch, 0xA5, slice);   /* input must not be read after invocation */
+        if (scrambled) memset(scratch, 0xA5, slice);   /* input must not be read after invocation */
         memcpy(dst + pos, tmpOut, cSize);
         pos += cSize;
         consumed += slice;
@@ -355,8 +362,10 @@ static int validateStreaming(XXH64_state_t* digest)
 {
     static const int levels[] = { -2, 1, 2, 5, 9, 10 };
     static const unsigned nbWorkersList[] = { 1, 2, 4 };
-    static const streamMode_t copyMode = { 0, 0, 0 };
-    static const streamMode_t stableMode = { 1, 0, 0 };
+    static const streamMode_t copyMode = { LZ4F_srcUnstable, 0, 0 };
+    static const streamMode_t stableMode = { LZ4F_srcStable, 0, 0 };
+    static const streamMode_t untilFlushMode = { LZ4F_srcStableUntilFlush, 0, 0 };
+    static const unsigned flushStability[] = { LZ4F_srcStableUntilFlush, LZ4F_srcUnstable, LZ4F_srcStable };
     size_t const srcSize = 9 MB + 777;
     size_t const dictSize = 64 KB;
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
@@ -438,14 +447,16 @@ static int validateStreaming(XXH64_state_t* digest)
                 c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, copyMode, sliceSeed, tmpOut, scratch);
                 CHECK(c == oneShot && !memcmp(out, ref, c), "stream (copy, %u workers) differs from one-shot", nbWorkers);
                 c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, stableMode, sliceSeed + 1, tmpOut, scratch);
-                CHECK(c == oneShot && !memcmp(out, ref, c), "stream (stableSrc, %u workers) differs from one-shot", nbWorkers);
+                CHECK(c == oneShot && !memcmp(out, ref, c), "stream (srcStable, %u workers) differs from one-shot", nbWorkers);
+                c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, untilFlushMode, sliceSeed + 1, tmpOut, scratch);
+                CHECK(c == oneShot && !memcmp(out, ref, c), "stream (srcStableUntilFlush, %u workers) differs from one-shot", nbWorkers);
 
                 /* with flushes : same output whatever nbWorkers */
                 {   static char step[64];
                     snprintf(step, sizeof(step), "stream with flushes, %u workers", nbWorkers);
                     g_step = step;
                 }
-                {   streamMode_t const flushMode = { (int)(nbWorkers & 1), 1, 0 };
+                {   streamMode_t const flushMode = { flushStability[wi % 3], 1, 0 };
                     c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, flushMode, sliceSeed + 2, tmpOut, scratch);
                     checkRoundTrip(out, c, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
                     if (wi == 0) {
@@ -484,7 +495,7 @@ static int validateStreaming(XXH64_state_t* digest)
                 /* uncompressed segments (independent blocks only) */
                 g_step = "stream with uncompressed segments";
                 if (!linked) {
-                    streamMode_t const uncMode = { 0, 1, 1 };
+                    streamMode_t const uncMode = { LZ4F_srcUnstable, 1, 1 };
                     c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, uncMode, sliceSeed + 4, tmpOut, scratch);
                     checkRoundTrip(out, c, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
                     if (wi == 0) {
@@ -540,7 +551,7 @@ static void* failingAlloc(void* opaque, size_t size)
     return malloc(size);
 }
 
-/* compresses @src : one-shot (mode 0), or streaming, copying input (mode 1), or stableSrc (mode 2), with a flush.
+/* compresses @src : one-shot (mode 0), or streaming, copying input (mode 1), or read in place (mode 2), with a flush.
  * @return : frame size, or the first error */
 static size_t compressScenario(LZ4F_cctx* cctx, int mode, const LZ4F_preferences_t* prefs,
                                char* dst, size_t dstCapacity,
@@ -552,7 +563,7 @@ static size_t compressScenario(LZ4F_cctx* cctx, int mode, const LZ4F_preferences
     int flushed = 0;
     if (mode == 0) return LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity, src, srcSize, NULL, prefs);
     memset(&cOpts, 0, sizeof(cOpts));
-    cOpts.stableSrc = (mode == 2);
+    cOpts.stableSrc = (mode == 2) ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;
     r = LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
     if (LZ4F_isError(r)) return r;
     pos = r;

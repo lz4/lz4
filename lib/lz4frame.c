@@ -567,7 +567,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     }
 
     MEM_INIT(&options, 0, sizeof(options));
-    options.stableSrc = 1;
+    options.stableSrc = LZ4F_srcStableUntilFlush;   /* src remains until LZ4F_compressEnd() below */
 
     { size_t const headerSize = LZ4F_compressBegin_usingCDict(cctx, dstBuffer, dstCapacity, cdict, &prefs);  /* write header */
       FORWARD_IF_ERROR(headerSize);
@@ -612,7 +612,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
 
     MEM_INIT(&cctx, 0, sizeof(cctx));
     cctx.version = LZ4F_VERSION;
-    cctx.tmpBuffCapacity = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc==1 */
+    cctx.tmpBuffCapacity = 5 MB;   /* mess with real buffer size to prevent dynamic allocation; works only because autoflush==1 & stableSrc */
     if ( preferencesPtr == NULL
       || preferencesPtr->compressionLevel < LZ4HC_CLEVEL_MIN ) {
         LZ4_initStream(&lz4ctx, sizeof(lz4ctx));
@@ -1612,7 +1612,7 @@ struct LZ4F_mtCtx_s {
     int filling;             /* the slot following submitted jobs is being filled */
     BYTE* history;           /* last bytes of content, up to LZ4F_MT_PREFIX_SIZE (linked blocks) */
     size_t historySize;
-    const BYTE* stableEnd;   /* end of previous input, when stable (stableSrc) */
+    const BYTE* stableEnd;   /* end of previous input, when stable (LZ4F_srcStableUntilFlush) */
     size_t stableRun;        /* stable input contiguously preceding stableEnd, up to LZ4F_MT_PREFIX_SIZE */
     /* current frame */
     const LZ4F_preferences_t* prefs;
@@ -1935,7 +1935,8 @@ static size_t LZ4F_mt_flush(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity, si
 /*! LZ4F_compressUpdate_MT() :
  *  Input is copied into jobs, submitted once full.
  *  Job content is read in place instead, when it remains available until the job completes :
- *  with stableSrc, or with autoFlush, since all jobs complete within the invocation.
+ *  with stableSrc == LZ4F_srcStableUntilFlush, or with autoFlush, since all jobs complete within the invocation.
+ *  LZ4F_srcStable (historical value 1) only guarantees the last 64 KB : content is copied.
  *  Completed jobs are emitted in order. With autoFlush, all input is compressed and emitted.
  *  Success is guaranteed when @dstCapacity >= LZ4F_compressBound(srcSize, prefs). */
 static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
@@ -1951,10 +1952,10 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
     size_t pos = 0;
     int const checksum = (cctx->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled);
     int const linked = (cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked);
-    int const stableSrc = (cOptPtr != NULL) && cOptPtr->stableSrc;
-    int const inPlace = cctx->prefs.autoFlush || stableSrc;
+    int const stableUntilFlush = (cOptPtr != NULL) && (cOptPtr->stableSrc == LZ4F_srcStableUntilFlush);
+    int const inPlace = cctx->prefs.autoFlush || stableUntilFlush;
     /* stable input remains available : when contiguous with previous input, history can be read in place */
-    size_t const prevRun = (stableSrc && srcSize && (istart == mt->stableEnd)) ? mt->stableRun : 0;
+    size_t const prevRun = (stableUntilFlush && srcSize && (istart == mt->stableEnd)) ? mt->stableRun : 0;
 
     DEBUGLOG(4, "LZ4F_compressUpdate_MT (srcSize=%u)", (unsigned)srcSize);
     RETURN_ERROR_IF(cctx->cStage != 1, compressionState_uninitialized);
@@ -2008,7 +2009,7 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
     }
     cctx->totalInSize += srcSize;
     if (srcSize) {
-        mt->stableEnd = stableSrc ? iend : NULL;
+        mt->stableEnd = stableUntilFlush ? iend : NULL;
         mt->stableRun = MIN(prevRun + srcSize, LZ4F_MT_PREFIX_SIZE);
     }
 

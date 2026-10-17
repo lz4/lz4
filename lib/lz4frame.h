@@ -214,7 +214,9 @@ typedef struct {
  *    covering jobs in flight (~ 2 * nbWorkers jobs of 4 MB) ; LZ4F_compressEnd() emits all of them.
  *    Without autoFlush, the amount emitted by each invocation depends on scheduling :
  *    only the whole frame is deterministic.
- *    Input is copied, unless stableSrc is set, or autoFlush, which completes all jobs within each invocation.
+ *    Input is copied, unless stableSrc == LZ4F_srcStableUntilFlush (jobs still running after an invocation returns
+ *    then read it in place), or autoFlush, which completes all jobs within each invocation.
+ *    LZ4F_srcStable (historical value 1) still only requires the last 64 KB to remain present, as with nbWorkers == 0.
  *  - One-shot (LZ4F_compressFrame()) : success is still guaranteed with LZ4F_compressFrameBound().
  *    Inputs fitting into a single job are compressed by the calling thread.
  *  - Worker threads are created at frame start, and kept within the compression context for next frames.
@@ -274,8 +276,18 @@ LZ4FLIB_API int LZ4F_compressionLevel_max(void);   /* v1.8.0+ */
 typedef struct LZ4F_cctx_s LZ4F_cctx;   /* incomplete type */
 typedef LZ4F_cctx* LZ4F_compressionContext_t;  /* for compatibility with older APIs, prefer using LZ4F_cctx */
 
+/* stableSrc : what remains available after an invocation of LZ4F_compressUpdate() returns */
+typedef enum {
+    LZ4F_srcUnstable = 0,         /* default : src can be modified or released as soon as the invocation returns */
+    LZ4F_srcStable = 1,           /* the last 64 KB of input remain present and unmodified during next invocations :
+                                   * linked blocks reference them directly, instead of copying them */
+    LZ4F_srcStableUntilFlush = 2  /* all of src remains present and unmodified until LZ4F_flush() or LZ4F_compressEnd() returns,
+                                   * or the frame is abandoned (LZ4F_compressBegin*(), LZ4F_freeCompressionContext()) :
+                                   * worker threads (nbWorkers >= 1) read it in place, instead of copying it */  /* v1.10.1+ */
+} LZ4F_stableSrc_t;
+
 typedef struct {
-  unsigned stableSrc;    /* 1 == src content will remain present on future calls to LZ4F_compress(); skip copying src content within tmp buffer */
+  unsigned stableSrc;    /* LZ4F_stableSrc_t value ; 0 (default) == LZ4F_srcUnstable */
   unsigned reserved[3];
 } LZ4F_compressOptions_t;
 
