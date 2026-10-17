@@ -485,7 +485,11 @@ static int LZ4F_mtEligible(const LZ4F_preferences_t* prefs)
 #ifndef LZ4F_MT_SLOTS_PER_THREAD
 #  define LZ4F_MT_SLOTS_PER_THREAD 2
 #endif
-#define LZ4F_MT_NBSLOTS(nbThreads) ((size_t)(nbThreads) * LZ4F_MT_SLOTS_PER_THREAD + 2)
+#define LZ4F_MT_NBSLOTS(nbThreads) ((size_t)(nbThreads) * LZ4F_MT_SLOTS_PER_THREAD + 1)
+#ifndef LZ4F_MT_EXTRA_INBUFFS
+#  define LZ4F_MT_EXTRA_INBUFFS 1
+#endif
+
 
 static size_t LZ4F_mtNbJobSlots(unsigned nbWorkers)
 {
@@ -1316,6 +1320,7 @@ struct LZ4F_pool_s {
     unsigned queueHead;
     unsigned queueSize;
     int shutdown;
+    unsigned nbDone;           /* incremented at each job completion */
     LZ4F_thread_t* threads;
     LZ4F_poolWorker_t* workers;
     unsigned nbThreads;
@@ -1493,6 +1498,7 @@ static void LZ4F_pool_setDone(LZ4F_pool_t* pool, int* doneFlag)
     if (pool == NULL) { *doneFlag = 1; return; }
     LZ4F_mutex_lock(&pool->lock);
     *doneFlag = 1;
+    pool->nbDone++;
     LZ4F_cond_broadcast(&pool->jobDone);
     LZ4F_mutex_unlock(&pool->lock);
 }
@@ -1507,13 +1513,45 @@ static int LZ4F_pool_isDone(LZ4F_pool_t* pool, const int* doneFlag)
     return done;
 }
 
-/* waits for *doneFlag, running queued jobs in the meantime */
-static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag)
+/* waits for *doneFlag, running queued jobs in the meantime,
+ * as long as at least @minQueue jobs are queued :
+ * while running a job, the calling thread can't feed worker threads anymore */
+static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag, unsigned minQueue)
 {
     if (pool == NULL) { assert(*doneFlag); return; }
+    if (minQueue == 0) minQueue = 1;
     LZ4F_mutex_lock(&pool->lock);
     while (!*doneFlag) {
-        if (pool->queueSize > 0) {
+        if (pool->queueSize >= minQueue) {
+            LZ4F_poolJob_t const job = LZ4F_pool_pop(pool);
+            LZ4F_mutex_unlock(&pool->lock);
+            job.fn(job.arg, 0);
+            LZ4F_mutex_lock(&pool->lock);
+        } else {
+            LZ4F_cond_wait(&pool->jobDone, &pool->lock);
+        }
+    }
+    LZ4F_mutex_unlock(&pool->lock);
+}
+
+static unsigned LZ4F_pool_nbDone(LZ4F_pool_t* pool)
+{
+    unsigned nbDone;
+    if (pool == NULL) return 0;
+    LZ4F_mutex_lock(&pool->lock);
+    nbDone = pool->nbDone;
+    LZ4F_mutex_unlock(&pool->lock);
+    return nbDone;
+}
+
+/* waits for any job completion after @nbDone was observed (see LZ4F_pool_waitDone() for @minQueue) */
+static void LZ4F_pool_waitAny(LZ4F_pool_t* pool, unsigned nbDone, unsigned minQueue)
+{
+    if (pool == NULL) return;
+    if (minQueue == 0) minQueue = 1;
+    LZ4F_mutex_lock(&pool->lock);
+    while (pool->nbDone == nbDone) {
+        if (pool->queueSize >= minQueue) {
             LZ4F_poolJob_t const job = LZ4F_pool_pop(pool);
             LZ4F_mutex_unlock(&pool->lock);
             job.fn(job.arg, 0);
@@ -1532,7 +1570,9 @@ static void LZ4F_pool_free(LZ4F_pool_t* pool, LZ4F_CustomMem cmem) { (void)pool;
 static void LZ4F_pool_submit(LZ4F_pool_t* pool, LZ4F_job_f fn, void* arg) { (void)pool; fn(arg, 0); }
 static void LZ4F_pool_setDone(LZ4F_pool_t* pool, int* doneFlag) { (void)pool; *doneFlag = 1; }
 static int  LZ4F_pool_isDone(LZ4F_pool_t* pool, const int* doneFlag) { (void)pool; return *doneFlag; }
-static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag) { (void)pool; (void)doneFlag; assert(*doneFlag); }
+static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag, unsigned minQueue) { (void)pool; (void)doneFlag; (void)minQueue; assert(*doneFlag); }
+static unsigned LZ4F_pool_nbDone(LZ4F_pool_t* pool) { (void)pool; return 0; }
+static void LZ4F_pool_waitAny(LZ4F_pool_t* pool, unsigned nbDone, unsigned minQueue) { (void)pool; (void)nbDone; (void)minQueue; assert(0); }
 
 #endif  /* LZ4F_MULTITHREAD */
 
@@ -1541,7 +1581,7 @@ typedef struct {
     const BYTE* src;     /* job content, right after its prefixSize bytes of history */
     size_t srcSize;
     size_t prefixSize;
-    BYTE* inBuff;        /* LZ4F_MT_PREFIX_SIZE + jobSize : content copied when it can't be read in place */
+    BYTE* inBuff;        /* input buffer (LZ4F_MT_PREFIX_SIZE + jobSize), when content is copied : NULL when read in place */
     BYTE* outBuff;       /* compressed blocks */
     size_t cSize;        /* result : compressed size, or error code */
     int done;            /* result available (protected by pool's lock) */
@@ -1555,13 +1595,21 @@ struct LZ4F_mtCtx_s {
     LZ4F_CtxType_e statesType;
     LZ4F_mtJob_t* jobs;      /* ring buffer of job slots */
     unsigned nbJobSlots;
-    size_t inCapacity;       /* of each inBuff */
+    size_t inCapacity;       /* of each input buffer */
     size_t outCapacity;      /* of each outBuff */
+    /* input buffers are only needed until their job is compressed : they are shared by job slots */
+    BYTE** inBuffs;          /* all allocated input buffers */
+    BYTE** inFree;           /* free input buffers (stack) */
+    unsigned nbInBuffs;
+    unsigned nbInFree;
+    unsigned maxInBuffs;
     unsigned oldest;         /* oldest submitted job, not emitted yet */
     unsigned nbSubmitted;
     int filling;             /* the slot following submitted jobs is being filled */
     BYTE* history;           /* last bytes of content, up to LZ4F_MT_PREFIX_SIZE (linked blocks) */
     size_t historySize;
+    const BYTE* stableEnd;   /* end of previous input, when stable (stableSrc) */
+    size_t stableRun;        /* stable input contiguously preceding stableEnd, up to LZ4F_MT_PREFIX_SIZE */
     /* current frame */
     const LZ4F_preferences_t* prefs;
     const LZ4F_CDict* cdict;
@@ -1612,13 +1660,50 @@ static void LZ4F_mt_submit(LZ4F_mtCtx_t* mt, LZ4F_mtJob_t* job)
         LZ4F_mt_addHistory(mt, job->src, job->srcSize);   /* job content is only read while job runs */
 }
 
-/* emits oldest submitted job into @dst + @pos, waiting for it if needed */
-static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos)
+/* input buffer of a completed job returns to the free stack */
+static void LZ4F_mt_releaseInBuff(LZ4F_mtCtx_t* mt, LZ4F_mtJob_t* job)
+{
+    if (job->inBuff == NULL) return;
+    assert(mt->nbInFree < mt->nbInBuffs);
+    mt->inFree[mt->nbInFree++] = job->inBuff;
+    job->inBuff = NULL;
+}
+
+/*! LZ4F_mt_acquireInBuff() :
+ *  When all input buffers are employed, one is reclaimed from a submitted job,
+ *  the first one to complete (job durations vary).
+ * @return : an input buffer, or NULL if allocation failed */
+static BYTE* LZ4F_mt_acquireInBuff(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
+{
+    if (mt->nbInFree) return mt->inFree[--mt->nbInFree];
+    if (mt->nbInBuffs < mt->maxInBuffs) {
+        BYTE* const buff = (BYTE*)LZ4F_malloc(mt->inCapacity, cmem);
+        if (buff != NULL) mt->inBuffs[mt->nbInBuffs++] = buff;
+        return buff;
+    }
+    for (;;) {
+        unsigned const nbDone = LZ4F_pool_nbDone(mt->pool);
+        unsigned n;
+        for (n = 0; n < mt->nbSubmitted; n++) {
+            LZ4F_mtJob_t* const job = mt->jobs + (mt->oldest + n) % mt->nbJobSlots;
+            if ((job->inBuff != NULL) && LZ4F_pool_isDone(mt->pool, &job->done)) {
+                BYTE* const buff = job->inBuff;
+                job->inBuff = NULL;
+                return buff;
+        }   }
+        /* buffers are held by submitted jobs, still running : wait for one of them */
+        LZ4F_pool_waitAny(mt->pool, nbDone, LZ4F_pool_nbThreads(mt->pool));   /* more input to come */
+    }
+}
+
+/* emits oldest submitted job into @dst + @pos, waiting for it if needed (see LZ4F_pool_waitDone()) */
+static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos, unsigned minQueue)
 {
     LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
     assert(mt->nbSubmitted > 0);
     assert(pos <= dstCapacity);
-    LZ4F_pool_waitDone(mt->pool, &job->done);
+    LZ4F_pool_waitDone(mt->pool, &job->done, minQueue);
+    LZ4F_mt_releaseInBuff(mt, job);
     mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
     mt->nbSubmitted--;
     FORWARD_IF_ERROR(job->cSize);
@@ -1633,7 +1718,7 @@ static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size
     size_t written = 0;
     while (mt->nbSubmitted > 0) {
         if (!all && !LZ4F_pool_isDone(mt->pool, &mt->jobs[mt->oldest].done)) break;
-        {   size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos + written);
+        {   size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos + written, 1);   /* no more input */
             FORWARD_IF_ERROR(r);
             written += r;
     }   }
@@ -1644,11 +1729,14 @@ static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size
 static void LZ4F_mt_abort(LZ4F_mtCtx_t* mt)
 {
     while (mt->nbSubmitted > 0) {
-        LZ4F_pool_waitDone(mt->pool, &mt->jobs[mt->oldest].done);
+        LZ4F_pool_waitDone(mt->pool, &mt->jobs[mt->oldest].done, 1);
+        LZ4F_mt_releaseInBuff(mt, mt->jobs + mt->oldest);
         mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
         mt->nbSubmitted--;
     }
+    if (mt->filling) LZ4F_mt_releaseInBuff(mt, LZ4F_mt_fillingSlot(mt));
     mt->filling = 0;
+    mt->stableEnd = NULL;
 }
 
 /* a failed operation invalidates the frame, and discards its jobs */
@@ -1669,11 +1757,22 @@ static void LZ4F_mt_freeStates(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
     mt->nbStates = 0;
 }
 
+static void LZ4F_mt_freeInBuffs(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
+{
+    unsigned n;
+    assert(mt->nbInFree == mt->nbInBuffs);   /* no job in flight */
+    for (n = 0; n < mt->nbInBuffs; n++) LZ4F_free(mt->inBuffs[n], cmem);
+    LZ4F_free(mt->inBuffs, cmem);
+    LZ4F_free(mt->inFree, cmem);
+    mt->inBuffs = mt->inFree = NULL;
+    mt->nbInBuffs = mt->nbInFree = mt->maxInBuffs = 0;
+}
+
 static void LZ4F_mt_freeJobs(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
 {
     unsigned n;
     for (n = 0; n < mt->nbJobSlots; n++) {
-        LZ4F_free(mt->jobs[n].inBuff, cmem);
+        assert(mt->jobs[n].inBuff == NULL);
         LZ4F_free(mt->jobs[n].outBuff, cmem);
     }
     LZ4F_free(mt->jobs, cmem);
@@ -1688,6 +1787,7 @@ static void LZ4F_mt_free(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
     LZ4F_pool_free(mt->pool, cmem);
     LZ4F_mt_freeStates(mt, cmem);
     LZ4F_mt_freeJobs(mt, cmem);
+    LZ4F_mt_freeInBuffs(mt, cmem);
     LZ4F_free(mt->history, cmem);
     LZ4F_free(mt, cmem);
 }
@@ -1695,14 +1795,12 @@ static void LZ4F_mt_free(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
 static size_t LZ4F_mt_sizeof(const LZ4F_mtCtx_t* mt)
 {
     size_t size;
-    unsigned n;
     if (mt == NULL) return 0;
     size = sizeof(*mt) + LZ4F_MT_PREFIX_SIZE
          + mt->nbStates * sizeof(void*)
-         + mt->nbJobSlots * (sizeof(LZ4F_mtJob_t) + mt->outCapacity);
+         + mt->nbJobSlots * (sizeof(LZ4F_mtJob_t) + mt->outCapacity)
+         + mt->maxInBuffs * 2 * sizeof(BYTE*) + mt->nbInBuffs * mt->inCapacity;
     if (mt->nbStates > 1) size += (mt->nbStates - 1) * LZ4F_sizeofLZ4State(mt->statesType);
-    for (n = 0; n < mt->nbJobSlots; n++)
-        if (mt->jobs[n].inBuff) size += mt->inCapacity;
     return size;
 }
 
@@ -1772,13 +1870,12 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
     mt->states[0] = cctx->lz4CtxPtr;
 
     /* job slots */
-    if ((mt->nbJobSlots != nbJobSlots) || (mt->inCapacity < inCapacity) || (mt->outCapacity < outCapacity)) {
+    if ((mt->nbJobSlots != nbJobSlots) || (mt->outCapacity < outCapacity)) {
         unsigned n;
         LZ4F_mt_freeJobs(mt, cmem);
         mt->jobs = (LZ4F_mtJob_t*)LZ4F_calloc(nbJobSlots * sizeof(LZ4F_mtJob_t), cmem);
         RETURN_ERROR_IF(mt->jobs == NULL, allocation_failed);
         mt->nbJobSlots = nbJobSlots;
-        mt->inCapacity = inCapacity;    /* inBuff are allocated on first need */
         mt->outCapacity = outCapacity;
         for (n = 0; n < nbJobSlots; n++) {
             mt->jobs[n].outBuff = (BYTE*)LZ4F_malloc(outCapacity, cmem);
@@ -1787,6 +1884,19 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
                 RETURN_ERROR(allocation_failed);
             }
     }   }
+
+    /* input buffers : one per worker, including the calling thread (allocated on first need) */
+    if ((mt->maxInBuffs != nbThreads + LZ4F_MT_EXTRA_INBUFFS) || (mt->inCapacity < inCapacity)) {
+        LZ4F_mt_freeInBuffs(mt, cmem);
+        mt->inBuffs = (BYTE**)LZ4F_malloc((nbThreads + LZ4F_MT_EXTRA_INBUFFS) * sizeof(BYTE*), cmem);
+        mt->inFree = (BYTE**)LZ4F_malloc((nbThreads + LZ4F_MT_EXTRA_INBUFFS) * sizeof(BYTE*), cmem);
+        if ((mt->inBuffs == NULL) || (mt->inFree == NULL)) {
+            LZ4F_mt_freeInBuffs(mt, cmem);
+            RETURN_ERROR(allocation_failed);
+        }
+        mt->maxInBuffs = nbThreads + LZ4F_MT_EXTRA_INBUFFS;
+        mt->inCapacity = inCapacity;
+    }
 
     /* current frame */
     {   unsigned n;
@@ -1800,6 +1910,8 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
     mt->nbSubmitted = 0;
     mt->filling = 0;
     mt->historySize = 0;
+    mt->stableEnd = NULL;
+    mt->stableRun = 0;
     cctx->mtActive = 1;
     return 0;
 }
@@ -1834,7 +1946,10 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
     size_t pos = 0;
     int const checksum = (cctx->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled);
     int const linked = (cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked);
-    int const inPlace = cctx->prefs.autoFlush || ((cOptPtr != NULL) && cOptPtr->stableSrc);
+    int const stableSrc = (cOptPtr != NULL) && cOptPtr->stableSrc;
+    int const inPlace = cctx->prefs.autoFlush || stableSrc;
+    /* stable input remains available : when contiguous with previous input, history can be read in place */
+    size_t const prevRun = (stableSrc && srcSize && (istart == mt->stableEnd)) ? mt->stableRun : 0;
 
     DEBUGLOG(4, "LZ4F_compressUpdate_MT (srcSize=%u)", (unsigned)srcSize);
     RETURN_ERROR_IF(cctx->cStage != 1, compressionState_uninitialized);
@@ -1847,7 +1962,7 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
             size_t const prefixSize = linked ? mt->historySize : 0;
             if (mt->nbSubmitted == mt->nbJobSlots) {
                 /* all slots busy : emit oldest job, whose slot is the next one to fill */
-                size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos);
+                size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos, LZ4F_pool_nbThreads(mt->pool));
                 FORWARD_IF_ERROR_MT(r, cctx);
                 pos += r;
                 assert(job == LZ4F_mt_fillingSlot(mt));
@@ -1856,8 +1971,8 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
             job->prefixSize = prefixSize;
             if ( inPlace
               && ((remaining >= mt->jobSize) || cctx->prefs.autoFlush)
-              && ((size_t)(ip - istart) >= prefixSize) ) {
-                /* read in place : whole job and its history are within @srcBuffer */
+              && (prevRun + (size_t)(ip - istart) >= prefixSize) ) {
+                /* read in place : whole job is within @srcBuffer, and its history right before */
                 size_t const jobSize = MIN(remaining, mt->jobSize);
                 job->src = ip;
                 job->srcSize = jobSize;
@@ -1867,12 +1982,12 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
                 continue;
             }
             /* copy : history first, right before content */
+            assert(job->inBuff == NULL);
+            job->inBuff = LZ4F_mt_acquireInBuff(mt, cctx->cmem);
             if (job->inBuff == NULL) {
-                job->inBuff = (BYTE*)LZ4F_malloc(mt->inCapacity, cctx->cmem);
-                if (job->inBuff == NULL) {
-                    mt->filling = 0;
-                    FORWARD_IF_ERROR_MT(LZ4F_returnErrorCode(LZ4F_ERROR_allocation_failed), cctx);
-            }   }
+                mt->filling = 0;
+                FORWARD_IF_ERROR_MT(LZ4F_returnErrorCode(LZ4F_ERROR_allocation_failed), cctx);
+            }
             job->src = job->inBuff + LZ4F_MT_PREFIX_SIZE;
             job->srcSize = 0;
             memcpy(job->inBuff + LZ4F_MT_PREFIX_SIZE - prefixSize, mt->history + mt->historySize - prefixSize, prefixSize);
@@ -1887,6 +2002,10 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
         }
     }
     cctx->totalInSize += srcSize;
+    if (srcSize) {
+        mt->stableEnd = stableSrc ? iend : NULL;
+        mt->stableRun = MIN(prevRun + srcSize, LZ4F_MT_PREFIX_SIZE);
+    }
 
     if (cctx->prefs.autoFlush) {
         size_t const r = LZ4F_mt_flush(cctx, dst, dstCapacity, pos);
@@ -1911,6 +2030,7 @@ static size_t LZ4F_uncompressedUpdate_MT(LZ4F_cctx_t* cctx,
     RETURN_ERROR_IF(cctx->prefs.frameInfo.blockMode != LZ4F_blockIndependent, blockMode_invalid);
     pos = LZ4F_mt_flush(cctx, dst, dstCapacity, 0);
     FORWARD_IF_ERROR(pos);
+    cctx->mt->stableEnd = NULL;   /* next input doesn't follow previous stable input anymore */
     if (cctx->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled)
         (void)XXH32_update(&(cctx->xxh), srcBuffer, srcSize);
     cctx->totalInSize += srcSize;
