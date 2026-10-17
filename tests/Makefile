@@ -191,6 +191,10 @@ TEST_TARGETS := $(filter test%,$(ALL_TARGETS))
 test_targets:
 	@echo TEST_TARGETS = $(TEST_TARGETS)
 
+.PHONY: test-header-modules
+test-header-modules:
+	$(PYTHON) test-header-modules.py
+
 .PHONY: check
 check: test-lz4-essentials
 
