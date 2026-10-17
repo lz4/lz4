@@ -1411,22 +1411,10 @@ static tableType_t LZ4_largeInputTableType(const char* src)
 
 int LZ4_compress_fast_extState(void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int acceleration)
 {
-    LZ4_stream_t_internal* const ctx = & LZ4_initStream(state, sizeof(LZ4_stream_t)) -> internal_donotuse;
-    assert(ctx != NULL);
-    acceleration = LZ4_clampAcceleration(acceleration);
-    if (maxOutputSize >= LZ4_compressBound(inputSize)) {
-        if (inputSize < LZ4_64Klimit) {
-            return LZ4_compress_generic(ctx, source, dest, inputSize, NULL, 0, notLimited, byU16, noDict, noDictIssue, acceleration);
-        } else {
-            return LZ4_compress_generic(ctx, source, dest, inputSize, NULL, 0, notLimited, LZ4_largeInputTableType(source), noDict, noDictIssue, acceleration);
-        }
-    } else {
-        if (inputSize < LZ4_64Klimit) {
-            return LZ4_compress_generic(ctx, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, byU16, noDict, noDictIssue, acceleration);
-        } else {
-            return LZ4_compress_generic(ctx, source, dest, inputSize, NULL, maxOutputSize, limitedOutput, LZ4_largeInputTableType(source), noDict, noDictIssue, acceleration);
-        }
-    }
+    /* a freshly initialized state is valid for _fastReset() */
+    LZ4_stream_t* const s = LZ4_initStream(state, sizeof(LZ4_stream_t));
+    assert(s != NULL);
+    return LZ4_compress_fast_extState_fastReset(s, source, dest, inputSize, maxOutputSize, acceleration);
 }
 
 /**
@@ -1511,7 +1499,7 @@ static int LZ4_compress_destSize_extState_internal(LZ4_stream_t* state, const ch
     acceleration = LZ4_clampAcceleration(acceleration);
 
     if (targetDstSize >= LZ4_compressBound(*srcSizePtr)) {  /* compression success is guaranteed */
-        return LZ4_compress_fast_extState(state, src, dst, *srcSizePtr, targetDstSize, acceleration);
+        return LZ4_compress_fast_extState_fastReset(state, src, dst, *srcSizePtr, targetDstSize, acceleration);
     } else {
         if (*srcSizePtr < LZ4_64Klimit) {
             return LZ4_compress_generic(&state->internal_donotuse, src, dst, *srcSizePtr, srcSizePtr, targetDstSize, fillOutput, byU16, noDict, noDictIssue, acceleration);
