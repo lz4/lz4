@@ -41,6 +41,7 @@ extern "C" {
 
 /* --- Dependency --- */
 #include <stddef.h>   /* size_t */
+#include "lz4_bounds_safety.h"  /* optional -fbounds-safety macros */
 
 
 /**
@@ -205,7 +206,9 @@ LZ4LIB_API int LZ4_compress_default(const char* src, char* dst, int srcSize, int
  *          The implementation is free to send / store / derive this information in whichever way is most beneficial.
  *          If there is a need for a different format which bundles together both compressed data and its metadata, consider looking at lz4frame.h instead.
  */
-LZ4LIB_API int LZ4_decompress_safe (const char* src, char* dst, int compressedSize, int dstCapacity);
+LZ4LIB_API int LZ4_decompress_safe (const char* LZ4_SIZED_BY(compressedSize) src,
+                                    char* LZ4_SIZED_BY(dstCapacity) dst,
+                                    int compressedSize, int dstCapacity);
 
 
 /*-************************************
