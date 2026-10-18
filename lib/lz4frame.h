@@ -188,17 +188,20 @@ typedef struct {
  *  makes it possible to supply advanced compression instructions to streaming interface.
  *  Structure must be first init to 0, using memset() or LZ4F_INIT_PREFERENCES,
  *  setting all parameters to default.
- *  All reserved fields must be set to zero. */
+ *  All reserved fields must be set to zero.
+ *  Note : since v1.10.1, reserved fields are a list of scalar fields (formerly an array, reserved[3]) :
+ *  a future field takes the place of a reserved one, without changing positional initializers. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;    /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
   unsigned autoFlush;           /* 1: always flush; reduces usage of internal buffers */
   unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* v1.8.2+ */
   unsigned nbWorkers;           /* 0: single-threaded (default); >= 1: nb of worker threads, see below (experimental) */  /* v1.10.1+ */
-  unsigned reserved[2];         /* must be zero for forward compatibility */
+  unsigned reserved1;           /* must be zero for forward compatibility */
+  unsigned reserved0;           /* idem */
 } LZ4F_preferences_t;
 
-#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0u, 0u, 0u, { 0u, 0u } }    /* v1.8.3+ */
+#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0u, 0u, 0u, 0u, 0u }    /* v1.8.3+ */
 
 /* nbWorkers : experimental
  *  0 (default) : single-threaded, unchanged behavior.
@@ -281,16 +284,22 @@ typedef LZ4F_cctx* LZ4F_compressionContext_t;  /* for compatibility with older A
 /* stableSrc : what remains available after an invocation of LZ4F_compressUpdate() returns */
 typedef enum {
     LZ4F_srcUnstable = 0,         /* default : src can be modified or released as soon as the invocation returns */
-    LZ4F_srcStable = 1,           /* the last 64 KB of input remain present and unmodified during next invocations :
-                                   * linked blocks reference them directly, instead of copying them */
-    LZ4F_srcStableUntilFlush = 2  /* all of src remains present and unmodified until LZ4F_flush() or LZ4F_compressEnd() returns,
-                                   * or the frame is abandoned (LZ4F_compressBegin*(), LZ4F_freeCompressionContext()) :
+    LZ4F_srcStable = 1,           /* the last 64 KB of input remain present and unmodified during next invocations,
+                                   * including after LZ4F_flush() : linked blocks reference them directly, instead of copying them */
+    LZ4F_srcStableUntilFlush = 2  /* stronger than LZ4F_srcStable : in addition to the last 64 KB of input,
+                                   * all of src remains present and unmodified until LZ4F_flush() or LZ4F_compressEnd() returns
+                                   * (with autoFlush : until the invocation returns), or the frame is abandoned
+                                   * (LZ4F_compressBegin*(), LZ4F_freeCompressionContext()) :
                                    * worker threads (nbWorkers >= 1) read it in place, instead of copying it */  /* v1.10.1+ */
 } LZ4F_stableSrc_t;
 
+/* Note : since v1.10.1, reserved fields are a list of scalar fields (formerly an array, reserved[3]) :
+ * a future field takes the place of a reserved one, without changing positional initializers. */
 typedef struct {
   unsigned stableSrc;    /* LZ4F_stableSrc_t value ; 0 (default) == LZ4F_srcUnstable */
-  unsigned reserved[3];
+  unsigned reserved2;    /* must be set to zero for forward compatibility */
+  unsigned reserved1;    /* idem */
+  unsigned reserved0;    /* idem */
 } LZ4F_compressOptions_t;
 
 /*---   Resource Management   ---*/

@@ -1192,7 +1192,7 @@ static void LZ4F_localSaveDict(LZ4F_cctx_t* cctxPtr)
 
 typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;
 
-static const LZ4F_compressOptions_t k_cOptionsNull = { 0, { 0, 0, 0 } };
+static const LZ4F_compressOptions_t k_cOptionsNull = { 0, 0, 0, 0 };
 
 /* A failed operation leaves the frame in an inconsistent state :
  * it's invalidated, and must be restarted with LZ4F_compressBegin() */

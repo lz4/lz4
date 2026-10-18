@@ -23,7 +23,8 @@ static const LZ4F_preferences_t kPrefs = {
     0,   /* compression level; 0 == default */
     0,   /* autoflush */
     0,   /* favor decompression speed */
-    { 0, 0, 0 },  /* reserved, must be set to 0 */
+    0,   /* nb of worker threads ; 0 == single-threaded */
+    0, 0 /* reserved, must be set to 0 */
 };
 
 

@@ -295,10 +295,29 @@ typedef struct {
     int uncompressed;   /* some slices sent with LZ4F_uncompressedUpdate() (independent blocks only) */
 } streamMode_t;
 
+/* LZ4F_srcStableUntilFlush : once flushed, input can be modified, except its last 64 KB (LZ4F_srcStable guarantee).
+ * It's overwritten with upcoming content : reading it would produce matches that the decoder can't reproduce. */
+static void scrambleFlushed(char* work, size_t* scrambledEnd, size_t consumed, const char* src, size_t srcSize)
+{
+    size_t const keep = 64 KB;
+    size_t const start = *scrambledEnd;
+    size_t const avail = srcSize - consumed;
+    size_t end = (consumed > keep) ? consumed - keep : 0;
+    if (end <= start) return;
+    *scrambledEnd = end;
+    /* filled backwards : upcoming content directly precedes the kept input */
+    while (end > start) {
+        size_t const n = avail ? MIN(end - start, avail) : end - start;
+        if (avail) memcpy(work + end - n, src + consumed, n); else memset(work + end - n, 0xA5, n);
+        end -= n;
+    }
+}
+
 /* compresses @src as a stream, slices following @seed :
  * the same @seed produces the same slices, flushes and uncompressed segments, whatever nbWorkers.
  * Each invocation receives exactly LZ4F_compressBound() as dstCapacity.
- * LZ4F_srcStableUntilFlush : slices are read from @src, which remains available.
+ * LZ4F_srcStableUntilFlush : slices are read from a working copy of @src, in @scratch (>= @srcSize bytes),
+ * scrambled after each flush (each invocation with autoFlush), except its last 64 KB.
  * Otherwise, slices are provided from @scratch, scrambled after each invocation.
  * With LZ4F_srcStable and nbWorkers >= 1, this is stricter than its contract (last 64 KB) :
  * jobs still running after an invocation returns must not read its input. */
@@ -315,10 +334,13 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
     /* LZ4F_srcStable with nbWorkers == 0 : linked blocks reference the last 64 KB, which must remain */
     int const scrambled = (mode.stableSrc == LZ4F_srcUnstable)
                        || ((mode.stableSrc == LZ4F_srcStable) && (nbWorkers >= 1));
+    int const untilFlush = (mode.stableSrc == LZ4F_srcStableUntilFlush);
+    size_t scrambledEnd = 0;
 
     p.nbWorkers = nbWorkers;
     memset(&cOpts, 0, sizeof(cOpts));
     cOpts.stableSrc = mode.stableSrc;
+    if (untilFlush) memcpy(scratch, src, srcSize);
     {   size_t const h = LZ4F_compressBegin_usingCDict(cctx, dst, LZ4F_HEADER_SIZE_MAX, cdict, &p);
         CHECK_LZ4F(h);
         pos += h;
@@ -326,8 +348,9 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
     while (consumed < srcSize) {
         unsigned const r = nextRand(&seed);
         size_t slice = (r & 7) ? (r % maxSlice) + 1 : (r % 100) + 1;   /* sometimes tiny */
-        const char* in = src + consumed;
+        const char* in = (untilFlush ? scratch : src) + consumed;
         size_t cSize;
+        int flushed = p.autoFlush;
         if (slice > srcSize - consumed) slice = srcSize - consumed;
         if (scrambled) {
             memcpy(scratch, in, slice);
@@ -348,7 +371,9 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
             CHECK_LZ4F(fSize);
             memcpy(dst + pos, tmpOut, fSize);
             pos += fSize;
+            flushed = 1;
         }
+        if (untilFlush && flushed) scrambleFlushed(scratch, &scrambledEnd, consumed, src, srcSize);
     }
     {   size_t const eSize = LZ4F_compressEnd(cctx, tmpOut, LZ4F_compressBound(0, &p), NULL);
         CHECK_LZ4F(eSize);
@@ -371,7 +396,7 @@ static int validateStreaming(XXH64_state_t* digest)
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
     char* const src = (char*)malloc(srcSize);
     char* const dict = (char*)malloc(dictSize);
-    char* const scratch = (char*)malloc(3 MB);
+    char* const scratch = (char*)malloc(srcSize);   /* slices, or working copy (LZ4F_srcStableUntilFlush) */
     char* const ref = (char*)malloc(dstCapacity);
     char* const refFlush = (char*)malloc(dstCapacity);
     char* const refAuto = (char*)malloc(dstCapacity);
@@ -463,9 +488,12 @@ static int validateStreaming(XXH64_state_t* digest)
                         flushRef = c;
                         memcpy(refFlush, out, c);
                         XXH64_update(digest, out, c);
-                        if (!linked) {   /* independent blocks : same as single-threaded */
-                            size_t const c0 = streamCompress(cctx, out, src, srcSize, cd, &prefs, 0, flushMode, sliceSeed + 2, tmpOut, scratch);
-                            CHECK(c0 == flushRef && !memcmp(out, refFlush, c0), "stream with flushes differs from single-threaded");
+                        {   size_t const c0 = streamCompress(cctx, out, src, srcSize, cd, &prefs, 0, flushMode, sliceSeed + 2, tmpOut, scratch);
+                            if (!linked) {   /* independent blocks : same as single-threaded */
+                                CHECK(c0 == flushRef && !memcmp(out, refFlush, c0), "stream with flushes differs from single-threaded");
+                            } else {
+                                checkRoundTrip(out, c0, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
+                            }
                         }
                     } else {
                         if (c != flushRef || memcmp(out, refFlush, c)) dumpFrames(refFlush, flushRef, out, c);
@@ -476,15 +504,16 @@ static int validateStreaming(XXH64_state_t* digest)
                 /* autoFlush : same output whatever nbWorkers */
                 g_step = "autoFlush stream";
                 {   LZ4F_preferences_t autoPrefs = prefs;
+                    streamMode_t const autoMode = { flushStability[wi % 3], 0, 0 };
                     autoPrefs.autoFlush = 1;
-                    c = streamCompress(cctx, out, src, srcSize, cd, &autoPrefs, nbWorkers, copyMode, sliceSeed + 3, tmpOut, scratch);
+                    c = streamCompress(cctx, out, src, srcSize, cd, &autoPrefs, nbWorkers, autoMode, sliceSeed + 3, tmpOut, scratch);
                     checkRoundTrip(out, c, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
                     if (wi == 0) {
                         autoRef = c;
                         memcpy(refAuto, out, c);
                         XXH64_update(digest, out, c);
                         if (!linked) {
-                            size_t const c0 = streamCompress(cctx, out, src, srcSize, cd, &autoPrefs, 0, copyMode, sliceSeed + 3, tmpOut, scratch);
+                            size_t const c0 = streamCompress(cctx, out, src, srcSize, cd, &autoPrefs, 0, autoMode, sliceSeed + 3, tmpOut, scratch);
                             CHECK(c0 == autoRef && !memcmp(out, refAuto, c0), "autoFlush stream differs from single-threaded");
                         }
                     } else {
@@ -842,6 +871,70 @@ static int bench(const char* fileName, int level, int bsid, int linked, int chec
 }
 
 
+/* LZ4F_srcStableUntilFlush : once LZ4F_flush() returns, input can be modified, except its last 64 KB.
+ * One buffer, sent in 2 invocations separated by a flush : the second one starts right where the first one ended,
+ * so that, with linked blocks, its first job reads its history in place (multi-threaded),
+ * and its first block references the previous invocation's input (single-threaded). */
+static int validateFlushContract(void)
+{
+    static const unsigned nbWorkersList[] = { 0, 2 };
+    static const int levels[] = { 1, 9 };
+    size_t const part1 = 5 MB, srcSize = 13 MB;
+    char* const src = (char*)malloc(srcSize);
+    char* const work = (char*)malloc(srcSize);
+    char* const decoded = (char*)malloc(srcSize);
+    LZ4F_cctx* cctx = NULL;
+    LZ4F_preferences_t worst = LZ4F_INIT_PREFERENCES;
+    size_t dstCapacity;
+    char* dst;
+    unsigned nbConfigs = 0;
+    size_t wi, li;
+    int autoFlush;
+
+    worst.nbWorkers = 2;
+    worst.frameInfo.blockSizeID = LZ4F_max64KB;
+    worst.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    dstCapacity = 2 * LZ4F_compressBound(srcSize, &worst);
+    dst = (char*)malloc(dstCapacity);
+    g_step = "flush contract";
+    CHECK_LZ4F(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
+    CHECK(src && work && decoded && dst && cctx, "allocation failed");
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 13);
+
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
+    for (li = 0; li < sizeof(levels)/sizeof(levels[0]); li++)
+    for (autoFlush = 0; autoFlush <= 1; autoFlush++) {
+        LZ4F_preferences_t p = worst;
+        LZ4F_compressOptions_t cOpts;
+        size_t pos, r, scrambledEnd = 0;
+        if (g_quick && (levels[li] != 1)) continue;
+        p.compressionLevel = levels[li];
+        p.autoFlush = (unsigned)autoFlush;
+        p.nbWorkers = nbWorkersList[wi];
+        memset(&cOpts, 0, sizeof(cOpts));
+        cOpts.stableSrc = LZ4F_srcStableUntilFlush;
+        memcpy(work, src, srcSize);
+        pos = LZ4F_compressBegin(cctx, dst, dstCapacity, &p);
+        CHECK_LZ4F(pos);
+        r = LZ4F_compressUpdate(cctx, dst + pos, dstCapacity - pos, work, part1, &cOpts);
+        CHECK_LZ4F(r); pos += r;
+        r = LZ4F_flush(cctx, dst + pos, dstCapacity - pos, NULL);
+        CHECK_LZ4F(r); pos += r;
+        scrambleFlushed(work, &scrambledEnd, part1, src, srcSize);
+        r = LZ4F_compressUpdate(cctx, dst + pos, dstCapacity - pos, work + part1, srcSize - part1, &cOpts);
+        CHECK_LZ4F(r); pos += r;
+        r = LZ4F_compressEnd(cctx, dst + pos, dstCapacity - pos, NULL);
+        CHECK_LZ4F(r); pos += r;
+        checkRoundTrip(dst, pos, src, srcSize, NULL, 0, decoded);
+        nbConfigs++;
+    }
+
+    LZ4F_freeCompressionContext(cctx);
+    free(src); free(work); free(decoded); free(dst);
+    DISPLAY("flush contract : %u configurations validated \n", nbConfigs);
+    return 0;
+}
+
 int main(int argc, const char** argv)
 {
     const char* benchFile = NULL;
@@ -871,6 +964,7 @@ int main(int argc, const char** argv)
         XXH64_reset(&digest, 0);
         validate(&digest);
         validateStreaming(&digest);
+        validateFlushContract();
         validateAllocFailures();
         validateFileAPI();
         printf("digest : %016llx \n", (unsigned long long)XXH64_digest(&digest));
