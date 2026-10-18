@@ -2299,11 +2299,11 @@ LZ4_decompress_generic(
 
                 /* The second stage: prepare for match copying, decode full info.
                  * If it doesn't work out, the info won't be wasted. */
-                length = token & ML_MASK; /* match length */
-                DEBUGLOG(7, "blockPos%6u: matchLength token = %u (len=%u)", (unsigned)(op-(BYTE*)dst), (unsigned)length, (unsigned)length + 4);
                 offset = LZ4_readLE16(ip); ip += 2;
                 match = op - offset;
                 assert(match <= op); /* check overflow */
+                length = token & ML_MASK; /* match length */
+                DEBUGLOG(7, "blockPos%6u: matchLength token = %u (len=%u)", (unsigned)(op-(BYTE*)dst), (unsigned)length, (unsigned)length + 4);
 
                 /* Do not deal with overlapping matches. */
                 if ( (length != ML_MASK)
@@ -2317,92 +2317,88 @@ LZ4_decompress_generic(
                     /* Both stages worked, load the next token. */
                     continue;
                 }
+                /* The second stage didn't work out, but the info is ready for the match copy below. */
+            } else {
+                /* decode literal length */
+                if (length == RUN_MASK) {
+                    /* literal length >= RUN_MASK means >= RUN_MASK literal bytes follow the extension bytes,
+                     * so extension bytes cannot reach the last RUN_MASK bytes of input */
+                    size_t const addl = read_variable_length(&ip, iend-RUN_MASK);
+                    if (addl == rvl_error) { goto _output_error; }
+                    length += addl;
+                    if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
+                    if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
+                }
 
-                /* The second stage didn't work out, but the info is ready.
-                 * Propel it right to the point of match copying. */
-                goto _copy_match;
-            }
-
-            /* decode literal length */
-            if (length == RUN_MASK) {
-                /* literal length >= RUN_MASK means >= RUN_MASK literal bytes follow the extension bytes,
-                 * so extension bytes cannot reach the last RUN_MASK bytes of input */
-                size_t const addl = read_variable_length(&ip, iend-RUN_MASK);
-                if (addl == rvl_error) { goto _output_error; }
-                length += addl;
-                if (unlikely((uptrval)(op)+length<(uptrval)(op))) { goto _output_error; } /* overflow detection */
-                if (unlikely((uptrval)(ip)+length<(uptrval)(ip))) { goto _output_error; } /* overflow detection */
-            }
-
-            /* copy literals */
-            cpy = op+length;
-            LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
-            if ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) {
-                /* We've either hit the input parsing restriction or the output parsing restriction.
-                 * In the normal scenario, decoding a full block, it must be the last sequence,
-                 * otherwise it's an error (invalid input or dimensions).
-                 * In partialDecoding scenario, it's necessary to ensure there is no buffer overflow.
-                 */
-                if (partialDecoding) {
-                    /* Since we are partial decoding we may be in this block because of the output parsing
-                     * restriction, which is not valid since the output buffer is allowed to be undersized.
+                /* copy literals */
+                cpy = op+length;
+                LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
+                if ((cpy>oend-MFLIMIT) || (ip+length>iend-(2+1+LASTLITERALS))) {
+                    /* We've either hit the input parsing restriction or the output parsing restriction.
+                     * In the normal scenario, decoding a full block, it must be the last sequence,
+                     * otherwise it's an error (invalid input or dimensions).
+                     * In partialDecoding scenario, it's necessary to ensure there is no buffer overflow.
                      */
-                    DEBUGLOG(7, "partialDecoding: copying literals, close to input or output end")
-                    DEBUGLOG(7, "partialDecoding: literal length = %u", (unsigned)length);
-                    DEBUGLOG(7, "partialDecoding: remaining space in dstBuffer : %i", (int)(oend - op));
-                    DEBUGLOG(7, "partialDecoding: remaining space in srcBuffer : %i", (int)(iend - ip));
-                    /* Finishing in the middle of a literals segment,
-                     * due to lack of input.
-                     */
-                    if (ip+length > iend) {
-                        length = (size_t)(iend-ip);
-                        cpy = op + length;
+                    if (partialDecoding) {
+                        /* Since we are partial decoding we may be in this block because of the output parsing
+                         * restriction, which is not valid since the output buffer is allowed to be undersized.
+                         */
+                        DEBUGLOG(7, "partialDecoding: copying literals, close to input or output end")
+                        DEBUGLOG(7, "partialDecoding: literal length = %u", (unsigned)length);
+                        DEBUGLOG(7, "partialDecoding: remaining space in dstBuffer : %i", (int)(oend - op));
+                        DEBUGLOG(7, "partialDecoding: remaining space in srcBuffer : %i", (int)(iend - ip));
+                        /* Finishing in the middle of a literals segment,
+                         * due to lack of input.
+                         */
+                        if (ip+length > iend) {
+                            length = (size_t)(iend-ip);
+                            cpy = op + length;
+                        }
+                        /* Finishing in the middle of a literals segment,
+                         * due to lack of output space.
+                         */
+                        if (cpy > oend) {
+                            cpy = oend;
+                            assert(op<=oend);
+                            length = (size_t)(oend-op);
+                        }
+                    } else {
+                         /* We must be on the last sequence (or invalid) because of the parsing limitations
+                          * so check that we exactly consume the input and don't overrun the output buffer.
+                          */
+                        if ((ip+length != iend) || (cpy > oend)) {
+                            DEBUGLOG(5, "should have been last run of literals")
+                            DEBUGLOG(5, "ip(%p) + length(%i) = %p != iend (%p)", (void*)ip, (int)length, (void*)(ip+length), (void*)iend);
+                            DEBUGLOG(5, "or cpy(%p) > (oend-MFLIMIT)(%p)", (void*)cpy, (void*)(oend-MFLIMIT));
+                            DEBUGLOG(5, "after writing %u bytes / %i bytes available", (unsigned)(op-(BYTE*)dst), outputSize);
+                            goto _output_error;
+                        }
                     }
-                    /* Finishing in the middle of a literals segment,
-                     * due to lack of output space.
+                    LZ4_memmove(op, ip, length);  /* supports overlapping memory regions, for in-place decompression scenarios */
+                    ip += length;
+                    op += length;
+                    /* Necessarily EOF when !partialDecoding.
+                     * When partialDecoding, it is EOF if we've either
+                     * filled the output buffer or
+                     * can't proceed with reading an offset for following match.
                      */
-                    if (cpy > oend) {
-                        cpy = oend;
-                        assert(op<=oend);
-                        length = (size_t)(oend-op);
+                    if (!partialDecoding || (cpy == oend) || (ip >= (iend-2))) {
+                        break;
                     }
                 } else {
-                     /* We must be on the last sequence (or invalid) because of the parsing limitations
-                      * so check that we exactly consume the input and don't overrun the output buffer.
-                      */
-                    if ((ip+length != iend) || (cpy > oend)) {
-                        DEBUGLOG(5, "should have been last run of literals")
-                        DEBUGLOG(5, "ip(%p) + length(%i) = %p != iend (%p)", (void*)ip, (int)length, (void*)(ip+length), (void*)iend);
-                        DEBUGLOG(5, "or cpy(%p) > (oend-MFLIMIT)(%p)", (void*)cpy, (void*)(oend-MFLIMIT));
-                        DEBUGLOG(5, "after writing %u bytes / %i bytes available", (unsigned)(op-(BYTE*)dst), outputSize);
-                        goto _output_error;
-                    }
+                    LZ4_wildCopy8(op, ip, cpy);   /* can overwrite up to 8 bytes beyond cpy */
+                    ip += length; op = cpy;
                 }
-                LZ4_memmove(op, ip, length);  /* supports overlapping memory regions, for in-place decompression scenarios */
-                ip += length;
-                op += length;
-                /* Necessarily EOF when !partialDecoding.
-                 * When partialDecoding, it is EOF if we've either
-                 * filled the output buffer or
-                 * can't proceed with reading an offset for following match.
-                 */
-                if (!partialDecoding || (cpy == oend) || (ip >= (iend-2))) {
-                    break;
-                }
-            } else {
-                LZ4_wildCopy8(op, ip, cpy);   /* can overwrite up to 8 bytes beyond cpy */
-                ip += length; op = cpy;
+
+                /* get offset */
+                offset = LZ4_readLE16(ip); ip+=2;
+                match = op - offset;
+
+                /* get matchlength */
+                length = token & ML_MASK;
+                DEBUGLOG(7, "blockPos%6u: matchLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
             }
 
-            /* get offset */
-            offset = LZ4_readLE16(ip); ip+=2;
-            match = op - offset;
-
-            /* get matchlength */
-            length = token & ML_MASK;
-            DEBUGLOG(7, "blockPos%6u: matchLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)length);
-
-    _copy_match:
             /* literals copied, offset decoded, length == match length token */
             if (length == ML_MASK) {
                 /* after match length extension bytes, at least 1 token + LASTLITERALS literals must remain */
