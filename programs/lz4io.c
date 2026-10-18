@@ -1344,8 +1344,9 @@ static void LZ4IO_releaseInput(LZ4IO_cInput_t* in, size_t lag)
 
 /* A source file modified during its compression is detected by comparing its size and times
  * before and after (like tar : "file changed as we read it").
- * Memory-mapped input is read several times : the frame can then be inconsistent (error).
- * Otherwise, input is read once : the frame holds the content read, ex: a log file growing meanwhile (warning). */
+ * Input read once : the frame holds the content read, ex: a log file growing meanwhile (warning).
+ * Memory-mapped input is read several times : the frame is consistent only if the mapped content is unchanged
+ * (ex: file only grown), verified with the frame's content checksum (warning) ; otherwise, error. */
 typedef struct {
     int valid;      /* regular file */
     stat_t st;
@@ -1374,6 +1375,20 @@ static int LZ4IO_srcModified(const LZ4IO_srcState_t* before, FILE* srcFile)
         return 1;
 #endif
     return 0;
+}
+
+/* @return : 1 if the mapped content still matches the frame's content checksum (stored in its last 4 bytes),
+ *           0 if it differs, or can't be verified (no checksum, or file shrunk : mapped content can't be read) */
+static int LZ4IO_mappedContentUnchanged(const LZ4IO_cInput_t* in, FILE* srcFile,
+                                        int contentChecksum, const void* frameEnd)
+{
+    stat_t st;
+    if (!contentChecksum || (frameEnd == NULL)) return 0;
+    if (!UTIL_getFDStat(UTIL_fileno(srcFile), &st) || ((unsigned long long)st.st_size < in->mapSize)) return 0;
+    {   const unsigned char* const c = (const unsigned char*)frameEnd - 4;
+        unsigned const frameChecksum = (unsigned)c[0] | ((unsigned)c[1] << 8) | ((unsigned)c[2] << 16) | ((unsigned)c[3] << 24);
+        return XXH32(in->map, in->mapSize, 0) == frameChecksum;
+    }
 }
 
 /*
@@ -1411,6 +1426,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
     LZ4IO_srcState_t srcState;
     int srcModified;
+    const void* frameEnd = NULL;   /* end of frame, within dstBuffer (content checksum) */
     if (srcFile == NULL) return 1;
     srcState = LZ4IO_getSrcState(srcFile);
     dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
@@ -1447,6 +1463,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         size_t const cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, chunk, readSize, ress->cdict, &prefs);
         if (LZ4F_isError(cSize))
             END_PROCESS(41, "Compression failed : %s", LZ4F_getErrorName(cSize));
+        frameEnd = (const char*)dstBuffer + cSize;
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(double)(filesize+!filesize)*100);   /* avoid division by zero */
@@ -1493,6 +1510,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         {   size_t const endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
             if (LZ4F_isError(endSize))
                 END_PROCESS(48, "End of frame error : %s", LZ4F_getErrorName(endSize));
+            frameEnd = (const char*)dstBuffer + endSize;
             if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
                 END_PROCESS(49, "Write error : cannot write end of frame");
             compressedfilesize += endSize;
@@ -1501,13 +1519,15 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 
     /* Release file handlers */
     srcModified = LZ4IO_srcModified(&srcState, srcFile);
-    {   int const mapped = (input.map != NULL);
+    {   int const inconsistent = srcModified && (input.map != NULL)
+                && !LZ4IO_mappedContentUnchanged(&input, srcFile,
+                        prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled, frameEnd);
         LZ4IO_unmapInput(&input);
         fclose (srcFile);
         if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
         if (srcModified) {
             /* source is preserved, even with --rm */
-            if (mapped) {   /* inconsistent output is removed */
+            if (inconsistent) {   /* inconsistent output is removed */
                 if (!LZ4IO_isStdout(dstFileName) && !LZ4IO_isDevNull(dstFileName)) (void)remove(dstFileName);
                 END_PROCESS(54, "%s : file modified during compression (memory-mapped) : output removed ; see --no-mmap", srcFileName);
             }
