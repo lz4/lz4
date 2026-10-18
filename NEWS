@@ -15,6 +15,7 @@ fix  : lz4frame functions check `NULL` arguments, by @louislafosse
 fix  : `LZ4F_readOpen()` accepts files smaller than 19 bytes, by @axiqia
 fix  : `LZ4F_read()` reports truncated files as an error (`ERROR_io_read`), instead of a clean end of file
 fix  : `LZ4F_writeClose()` reports an earlier `LZ4F_write()` failure, instead of success
+fix  : lz4frame levels `INT_MIN` and `INT_MIN+1` overflowed, and compressed at default speed instead of maximum acceleration, by @akashdeshmukh-git
 fix  : lz4frame `skipChecksums` also skips block checksums of compressed blocks (decompression up to +23% faster)
 fix  : C90 compilation of `lz4.c` with `LZ4_HEAPMODE=1` (since v1.10.0)
 perf : faster decompression on aarch64 (up to +19% on Neoverse-V2), by @Nicoshev
@@ -30,11 +31,15 @@ api  : lz4frame output no longer depends on the compression context's history
 api  : new static functions `LZ4F_cctx_size()` and `LZ4F_dctx_size()`, by @felixhandte
 api  : new static function `LZ4F_resumeFrame()` : resume decoding from any block start, for random access within frames
 api  : `lz4file` : new static functions `LZ4F_seek()` and `LZ4F_tell()`, for random access within compressed files
+api  : `LZ4_ACCELERATION_DEFAULT` and `LZ4_ACCELERATION_MAX` are defined in `lz4.h` (static section)
 cli  : multithreaded compression honors custom block sizes
 cli  : `lz4 -l` could hang on Windows with an empty input, as could decoding the resulting legacy stream
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666
 cli  : `lz4 -t -m` no longer writes decoded content to stdout, reported by @tansy
 cli  : `lz4 --list` rejects truncated frames, instead of reporting them as valid, by @jmestwa-coder
+cli  : numeric arguments that overflow are rejected, instead of silently wrapping around, by @akashdeshmukh-git
+cli  : `-b --fast=#` benchmarks a single level, instead of all levels up to -10000 when # > 10000
+cli  : legacy format (`-l`) : `--fast=#` selects the same acceleration as the frame format (`--fast=1` was the same as `-1`)
 cli  : warning when `--content-size` is used with `stdin`, by @jlee303
 cli  : fix benchmark cpu time on Windows with very large files
 build: refactored `make` build, parallel by default

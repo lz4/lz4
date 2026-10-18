@@ -45,18 +45,6 @@
 #  define LZ4_HEAPMODE 0
 #endif
 
-/*
- * LZ4_ACCELERATION_DEFAULT :
- * Select "acceleration" for LZ4_compress_fast() when parameter value <= 0
- */
-#define LZ4_ACCELERATION_DEFAULT 1
-/*
- * LZ4_ACCELERATION_MAX :
- * Any "acceleration" value higher than this threshold
- * get treated as LZ4_ACCELERATION_MAX instead (fix #876)
- */
-#define LZ4_ACCELERATION_MAX 65537
-
 
 /*-************************************
 *  CPU Feature Detection

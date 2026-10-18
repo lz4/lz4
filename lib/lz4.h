@@ -230,8 +230,8 @@ LZ4LIB_API int LZ4_compressBound(int inputSize);
     The larger the acceleration value, the faster the algorithm, but also the lesser the compression.
     It's a trade-off. It can be fine tuned, with each successive value providing roughly +~3% to speed.
     An acceleration value of "1" is the same as regular LZ4_compress_default()
-    Values <= 0 will be replaced by LZ4_ACCELERATION_DEFAULT (currently == 1, see lz4.c).
-    Values > LZ4_ACCELERATION_MAX will be replaced by LZ4_ACCELERATION_MAX (currently == 65537, see lz4.c).
+    Values <= 0 will be replaced by LZ4_ACCELERATION_DEFAULT (currently == 1, see LZ4_STATIC_LINKING_ONLY section).
+    Values > LZ4_ACCELERATION_MAX will be replaced by LZ4_ACCELERATION_MAX (currently == 65537, see LZ4_STATIC_LINKING_ONLY section).
 */
 LZ4LIB_API int LZ4_compress_fast (const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
@@ -600,6 +600,14 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
 #else
 # define LZ4LIB_STATIC_API
 #endif
+
+/*! LZ4_ACCELERATION_DEFAULT, LZ4_ACCELERATION_MAX :
+ *  "acceleration" values <= 0 are replaced by LZ4_ACCELERATION_DEFAULT.
+ *  Values > LZ4_ACCELERATION_MAX are replaced by LZ4_ACCELERATION_MAX :
+ *  higher values make no difference (fix #876).
+ */
+#define LZ4_ACCELERATION_DEFAULT 1
+#define LZ4_ACCELERATION_MAX 65537
 
 
 /*! LZ4_compress_fast_extState_fastReset() :
