@@ -2341,55 +2341,22 @@ LZ4_decompress_generic(
                 cpy = op+ll;
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
                 if ((cpy>oend-MFLIMIT) || (ip+ll>iend-(2+1+LASTLITERALS))) {
-                    /* We've either hit the input parsing restriction or the output parsing restriction.
-                     * In the normal scenario, decoding a full block, it must be the last sequence,
-                     * otherwise it's an error (invalid input or dimensions).
-                     * In partialDecoding scenario, it's necessary to ensure there is no buffer overflow.
-                     */
+                    /* close to input or output end : these must be the last literals of the block,
+                     * except with partialDecoding, which can also stop within them */
                     if (partialDecoding) {
-                        /* Since we are partial decoding we may be in this block because of the output parsing
-                         * restriction, which is not valid since the output buffer is allowed to be undersized.
-                         */
-                        DEBUGLOG(7, "partialDecoding: copying literals, close to input or output end")
-                        DEBUGLOG(7, "partialDecoding: literal length = %u", (unsigned)ll);
-                        DEBUGLOG(7, "partialDecoding: remaining space in dstBuffer : %i", (int)(oend - op));
-                        DEBUGLOG(7, "partialDecoding: remaining space in srcBuffer : %i", (int)(iend - ip));
-                        /* Finishing in the middle of a literals segment,
-                         * due to lack of input.
-                         */
-                        if (ip+ll > iend) {
-                            ll = (size_t)(iend-ip);
-                            cpy = op + ll;
-                        }
-                        /* Finishing in the middle of a literals segment,
-                         * due to lack of output space.
-                         */
-                        if (cpy > oend) {
-                            cpy = oend;
-                            assert(op<=oend);
-                            ll = (size_t)(oend-op);
-                        }
-                    } else {
-                         /* We must be on the last sequence (or invalid) because of the parsing limitations
-                          * so check that we exactly consume the input and don't overrun the output buffer.
-                          */
-                        if ((ip+ll != iend) || (cpy > oend)) {
-                            DEBUGLOG(5, "should have been last run of literals")
-                            DEBUGLOG(5, "ip(%p) + length(%i) = %p != iend (%p)", (void*)ip, (int)ll, (void*)(ip+ll), (void*)iend);
-                            DEBUGLOG(5, "or cpy(%p) > (oend-MFLIMIT)(%p)", (void*)cpy, (void*)(oend-MFLIMIT));
-                            DEBUGLOG(5, "after writing %u bytes / %i bytes available", (unsigned)(op-(BYTE*)dst), outputSize);
-                            goto _output_error;
-                        }
+                        /* stop at input end, or when output is full */
+                        ll = MIN(ll, (size_t)(iend-ip));
+                        ll = MIN(ll, (size_t)(oend-op));
+                    } else if ((ip+ll != iend) || (cpy > oend)) {
+                        /* last literals must end exactly at input end, within output */
+                        DEBUGLOG(5, "invalid last literals : they end at iend%+zi and oend%+zi", (ip+ll)-iend, cpy-oend);
+                        goto _output_error;
                     }
                     LZ4_memmove(op, ip, ll);  /* supports overlapping memory regions, for in-place decompression scenarios */
                     ip += ll;
                     op += ll;
-                    /* Necessarily EOF when !partialDecoding.
-                     * When partialDecoding, it is EOF if we've either
-                     * filled the output buffer or
-                     * can't proceed with reading an offset for following match.
-                     */
-                    if (!partialDecoding || (cpy == oend) || (ip >= (iend-2))) {
+                    /* end of block, unless partialDecoding can go on : output not full, input left for a match */
+                    if (!partialDecoding || (op == oend) || (ip >= (iend-2))) {
                         break;
                     }
                 } else {
