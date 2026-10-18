@@ -146,6 +146,17 @@
 #  endif  /* _MSC_VER */
 #endif /* LZ4_FORCE_INLINE */
 
+/* LZ4_FORCE_NOINLINE : keeps a rarely used function out of its callers' hot loops */
+#ifndef LZ4_FORCE_NOINLINE
+#  if defined(_MSC_VER)
+#    define LZ4_FORCE_NOINLINE static __declspec(noinline)
+#  elif defined(__GNUC__) || defined(__clang__)
+#    define LZ4_FORCE_NOINLINE static __attribute__((noinline))
+#  else
+#    define LZ4_FORCE_NOINLINE static
+#  endif
+#endif
+
 /* LZ4_FORCE_O2 and LZ4_FORCE_INLINE
  * gcc on ppc64le generates an unrolled SIMDized loop for LZ4_wildCopy8,
  * together with a simple 8-byte copy loop as a fall-back path.
@@ -2021,6 +2032,32 @@ read_variable_length(const BYTE** ipPtr, const BYTE* ilimit)
     return length;
 }
 
+/* LZ4_copyMatchExact() :
+ * copy a match of length bytes from match to op (match < op, overlap allowed),
+ * writing nothing beyond op+length. Invalid offset 0 (match == op) produces 0 bytes.
+ * Not inlined : rarely used, its memcpy() calls would burden the decoder's hot loops.
+ * @return : output position after the match */
+LZ4_FORCE_NOINLINE BYTE*
+LZ4_copyMatchExact(BYTE* op, const BYTE* match, size_t length)
+{
+    if (unlikely(match == op)) {   /* invalid offset 0 : clear the match segment, see doc/lz4_Block_format.md */
+        MEM_INIT(op, 0, length);
+        return op + length;
+    }
+    /* bytes from match to op repeat with period (op-match) :
+     * copy all of them, so the distance doubles at each round.
+     * Beyond 2 KB, keep the distance : larger copies of just written data are slower */
+    while (length > (size_t)(op - match)) {
+        size_t const available = (size_t)(op - match);
+        LZ4_memcpy(op, match, available);
+        op += available;
+        length -= available;
+        if (available >= 2048) match += available;
+    }
+    LZ4_memcpy(op, match, length);
+    return op + length;
+}
+
 /* LZ4_copyExtDictMatch() :
  * copy a match starting within the external dictionary (match < lowPrefix),
  * possibly stretching into the current block.
@@ -2036,18 +2073,8 @@ LZ4_copyExtDictMatch(BYTE* op, const BYTE* match, size_t length,
     } else {
         /* match stretches into both external dictionary and current block */
         size_t const copySize = (size_t)(lowPrefix - match);
-        size_t const restSize = length - copySize;
         LZ4_memcpy(op, dictEnd - copySize, copySize);
-        op += copySize;
-        if (restSize > (size_t)(op - lowPrefix)) {  /* overlap copy */
-            BYTE* const endOfMatch = op + restSize;
-            const BYTE* copyFrom = lowPrefix;
-            while (op < endOfMatch) { *op++ = *copyFrom++; }
-        } else {
-            LZ4_memcpy(op, lowPrefix, restSize);
-            op += restSize;
-        }
-        return op;
+        return LZ4_copyMatchExact(op + copySize, lowPrefix, length - copySize);
     }
 }
 
@@ -2391,38 +2418,31 @@ LZ4_decompress_generic(
 #endif
             /* literals copied, match fully decoded (length includes MINMATCH), offset not validated yet */
             if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
+
+            /* end of block : the last LASTLITERALS bytes must be literals */
+            assert(op <= oend);
+            if (unlikely(op+length > oend-LASTLITERALS)) {
+                if (partialDecoding) length = MIN(length, (size_t)(oend-op));   /* partialDecoding : may end anywhere */
+                else goto _output_error;
+            }
+
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
                 assert(dictEnd != NULL);
-                if (unlikely(op+length > oend-LASTLITERALS)) {
-                    if (partialDecoding) length = MIN(length, (size_t)(oend-op));
-                    else goto _output_error;   /* doesn't respect parsing restriction */
-                }
-
                 op = LZ4_copyExtDictMatch(op, match, length, lowPrefix, dictEnd);
                 continue;
             }
             assert(match >= lowPrefix);
 
-            /* copy match within block */
-            cpy = op + length;
-
-            /* partialDecoding : may end anywhere within the block */
-            assert(op<=oend);
-            if (partialDecoding && (cpy > oend-MATCH_SAFEGUARD_DISTANCE)) {
-                size_t const mlen = MIN(length, (size_t)(oend-op));
-                const BYTE* const matchEnd = match + mlen;
-                BYTE* const copyEnd = op + mlen;
-                if (matchEnd > op) {   /* overlap copy */
-                    while (op < copyEnd) { *op++ = *match++; }
-                } else {
-                    LZ4_memcpy(op, match, mlen);
-                }
-                op = copyEnd;
-                if (op == oend) { break; }
+            /* close to block end : no wild copy */
+            if (unlikely(op+length > oend-MATCH_SAFEGUARD_DISTANCE)) {
+                op = LZ4_copyMatchExact(op, match, length);
+                if (op == oend) { break; }   /* partialDecoding : output buffer full */
                 continue;
             }
 
+            /* copy match within block */
+            cpy = op + length;
             if (unlikely(offset<8)) {
                 LZ4_write32(op, 0);   /* silence msan warning when offset==0 */
                 op[0] = match[0];
@@ -2437,20 +2457,8 @@ LZ4_decompress_generic(
                 match += 8;
             }
             op += 8;
-
-            if (unlikely(cpy > oend-MATCH_SAFEGUARD_DISTANCE)) {
-                BYTE* const oCopyLimit = oend - (WILDCOPYLENGTH-1);
-                if (cpy > oend-LASTLITERALS) { goto _output_error; } /* Error : last LASTLITERALS bytes must be literals (uncompressed) */
-                if (op < oCopyLimit) {
-                    LZ4_wildCopy8(op, match, oCopyLimit);
-                    match += oCopyLimit - op;
-                    op = oCopyLimit;
-                }
-                while (op < cpy) { *op++ = *match++; }
-            } else {
-                LZ4_memcpy(op, match, 8);
-                if (length > 16) { LZ4_wildCopy8(op+8, match+8, cpy); }
-            }
+            LZ4_memcpy(op, match, 8);
+            if (length > 16) { LZ4_wildCopy8(op+8, match+8, cpy); }
             op = cpy;   /* wildcopy correction */
         }
 
