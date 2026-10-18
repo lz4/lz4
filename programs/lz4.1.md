@@ -216,7 +216,8 @@ only the latest one will be applied.
 * `--[no-]mmap`:
   Memory-map regular files to compress, so that compression threads read them in place
   (default:enabled when supported)<br/>
-  Note : a file truncated while being compressed then makes `lz4` crash (`SIGBUS`) ;
+  Note : a file truncated while being compressed, or an I/O error while reading it,
+  then interrupts `lz4` with error 53 (instead of compressing the content read up to that point) ;
   use `--no-mmap` when sources may be truncated concurrently, such as active log files.
 
 * `-l`:

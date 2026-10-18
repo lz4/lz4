@@ -76,6 +76,8 @@
 #endif
 #if LZ4IO_MMAP_SUPPORT
 #  include <sys/mman.h>  /* mmap, munmap, madvise */
+#  include <signal.h>    /* sigaction, SIGBUS */
+#  include <unistd.h>    /* write, _exit */
 #endif
 
 
@@ -1220,33 +1222,92 @@ typedef struct {
     size_t mapSize;
     size_t pos;         /* consumed (memory-mapped input) */
     size_t released;    /* memory-mapped input released (memory hint) */
+#if LZ4IO_MMAP_SUPPORT
+    struct sigaction prevBusAction;   /* restored once unmapped */
+#endif
 } LZ4IO_cInput_t;
 
+#if LZ4IO_MMAP_SUPPORT
+/* Reading a memory-mapped file truncated meanwhile, or failing (I/O error), raises SIGBUS,
+ * in the thread accessing it (main thread, or liblz4 worker thread) :
+ * it's reported as an error, instead of a crash. */
+#  define LZ4IO_MMAP_ERROR 53
+static char g_mmapErrorMsg[512];
+static size_t g_mmapErrorMsgSize = 0;
+
+static volatile sig_atomic_t g_mmapFault = 0;
+
+/* several threads can fault simultaneously : only the first one reports */
+static int LZ4IO_firstMmapFault(void)
+{
+#  if defined(__GNUC__)
+    return __sync_lock_test_and_set(&g_mmapFault, 1) == 0;
+#  else
+    int const first = !g_mmapFault;   /* best effort : the message may be repeated */
+    g_mmapFault = 1;
+    return first;
+#  endif
+}
+
+static void LZ4IO_mmapFaultHandler(int sig)
+{
+    /* async-signal-safe functions only */
+    (void)sig;
+    if (!LZ4IO_firstMmapFault()) {
+        for (;;) pause();   /* the first faulting thread terminates the process */
+    }
+    if (g_mmapErrorMsgSize) {
+        ssize_t const r = write(STDERR_FILENO, g_mmapErrorMsg, g_mmapErrorMsgSize);
+        (void)r;
+    }
+    _exit(LZ4IO_MMAP_ERROR);
+}
+#endif
+
 /* maps a regular file ; leaves @in unmapped otherwise, or on failure */
-static void LZ4IO_mapInput(LZ4IO_cInput_t* in)
+static void LZ4IO_mapInput(LZ4IO_cInput_t* in, const char* srcFileName)
 {
 #if LZ4IO_MMAP_SUPPORT
     int const fd = fileno(in->file);
     struct stat st;
+    struct sigaction busAction;
     void* map;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (st.st_size <= 0)) return;
     if ((unsigned long long)st.st_size > (size_t)-1) return;
+
+    /* message prepared beforehand : the handler can't format it */
+    {   int const n = snprintf(g_mmapErrorMsg, sizeof(g_mmapErrorMsg),
+                        "Error %i : %s : file truncated or unreadable during compression (memory-mapped) ; retry with --no-mmap \n",
+                        LZ4IO_MMAP_ERROR, srcFileName);
+        g_mmapErrorMsgSize = ((g_displayLevel >= 1) && (n > 0)) ? MIN((size_t)n, sizeof(g_mmapErrorMsg) - 1) : 0;
+    }
+    memset(&busAction, 0, sizeof(busAction));
+    busAction.sa_handler = LZ4IO_mmapFaultHandler;
+    sigemptyset(&busAction.sa_mask);
+    if (sigaction(SIGBUS, &busAction, &in->prevBusAction)) return;   /* no handler : no mapping */
+
     map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (map == MAP_FAILED) return;
+    if (map == MAP_FAILED) {
+        (void)sigaction(SIGBUS, &in->prevBusAction, NULL);
+        return;
+    }
 #  ifdef MADV_SEQUENTIAL
     (void)madvise(map, (size_t)st.st_size, MADV_SEQUENTIAL);
 #  endif
     in->map = (char*)map;
     in->mapSize = (size_t)st.st_size;
 #else
-    (void)in;
+    (void)in; (void)srcFileName;
 #endif
 }
 
 static void LZ4IO_unmapInput(LZ4IO_cInput_t* in)
 {
 #if LZ4IO_MMAP_SUPPORT
-    if (in->map) munmap(in->map, in->mapSize);
+    if (in->map) {
+        munmap(in->map, in->mapSize);
+        (void)sigaction(SIGBUS, &in->prevBusAction, NULL);
+    }
 #endif
     in->map = NULL;
 }
@@ -1323,7 +1384,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     input.file = srcFile;
     input.buffer = srcBuffer;
     if (io_prefs->useMmap && !LZ4IO_customBlockSize(io_prefs) && !LZ4IO_isStdin(srcFileName))
-        LZ4IO_mapInput(&input);
+        LZ4IO_mapInput(&input, srcFileName);
     memset(&cOpts, 0, sizeof(cOpts));
     cOpts.stableSrc = input.map ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;   /* mapping remains until the end of frame */
 

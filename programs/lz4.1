@@ -203,7 +203,7 @@ Sparse mode support (default:enabled on file, disabled on stdout)
 Memory\-map regular files to compress, so that compression threads read them in place (default:enabled when supported)
 .
 .br
-Note : a file truncated while being compressed then makes \fBlz4\fR crash (\fBSIGBUS\fR) ; use \fB\-\-no\-mmap\fR when sources may be truncated concurrently, such as active log files\.
+Note : a file truncated while being compressed, or an I/O error while reading it, then interrupts \fBlz4\fR with error 53 (instead of compressing the content read up to that point) ; use \fB\-\-no\-mmap\fR when sources may be truncated concurrently, such as active log files\.
 .
 .TP
 \fB\-l\fR

@@ -117,7 +117,8 @@ int LZ4IO_setNotificationLevel(int level);
 int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable);
 
 /* Default setting : 1 == regular files are memory-mapped for compression, when supported.
- * Note : a file truncated during its compression then makes the process crash (SIGBUS) */
+ * Note : a file truncated during its compression, or unreadable (I/O error), raises SIGBUS :
+ * a handler, installed while the file is mapped, reports it and terminates the process (error 53) */
 int LZ4IO_setMmap(LZ4IO_prefs_t* const prefs, int enable);
 
 /* Default setting : 0 == no content size present in frame header */

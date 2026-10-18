@@ -1295,7 +1295,9 @@ typedef struct LZ4F_pool_s LZ4F_pool_t;
 #  define LZ4F_cond_wait(c, m)   pthread_cond_wait((c), (m))
 #  define LZ4F_cond_signal(c)    pthread_cond_signal(c)
 #  define LZ4F_cond_broadcast(c) pthread_cond_broadcast(c)
-   /* worker threads must not receive process-directed signals intended for the application */
+   /* worker threads must not receive process-directed signals intended for the application,
+    * but synchronous signals (faults) remain deliverable : when blocked, a fault kills the process,
+    * bypassing the application's handlers (ex: SIGBUS from a memory-mapped input truncated during compression) */
 #  if defined(SIG_SETMASK) && (!defined(_POSIX_C_SOURCE) || (_POSIX_C_SOURCE >= 199506L))
 #    define LZ4F_MT_BLOCK_SIGNALS 1
 #  else
@@ -1387,6 +1389,10 @@ static unsigned LZ4F_pool_createThreads(LZ4F_pool_t* pool, unsigned nbThreads)
 #  if LZ4F_MT_BLOCK_SIGNALS
     sigset_t allSignals, previousMask;
     sigfillset(&allSignals);
+    sigdelset(&allSignals, SIGBUS);
+    sigdelset(&allSignals, SIGSEGV);
+    sigdelset(&allSignals, SIGFPE);
+    sigdelset(&allSignals, SIGILL);
     pthread_sigmask(SIG_SETMASK, &allSignals, &previousMask);   /* new threads inherit this mask */
 #  endif
     if (attrOK) {

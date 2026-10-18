@@ -174,6 +174,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--list FILE : lists information about .lz4 files (useful for files compressed with --content-size flag)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
     DISPLAY( "--[no-]mmap    : memory-map files to compress (default:enabled when supported)\n");
+    DISPLAY( "                 note : compression fails if the file is truncated meanwhile \n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
     DISPLAY( "--best  : same as -%d\n", LZ4HC_CLEVEL_MAX);

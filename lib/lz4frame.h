@@ -221,6 +221,8 @@ typedef struct {
  *    Inputs fitting into a single job are compressed by the calling thread.
  *  - Worker threads are created at frame start, and kept within the compression context for next frames.
  *    A context with worker threads must not be employed after fork(), in the child process.
+ *    On POSIX systems, worker threads block signals, except synchronous ones (SIGBUS, SIGSEGV, SIGFPE, SIGILL) :
+ *    a fault while reading input (ex: memory-mapped file truncated) invokes the application's handler, in a worker thread.
  *  - LZ4F_compressBegin_usingDict() isn't supported : frames remain single-threaded. Prefer a CDict.
  *  Multi-threading requires lz4frame.c to be compiled with LZ4F_MULTITHREAD=1 (and -pthread on POSIX systems) :
  *  by default, the dynamic library is built with multi-threading support, and the static library without.
