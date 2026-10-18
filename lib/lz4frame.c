@@ -150,10 +150,8 @@ static void LZ4F_free(void* p, LZ4F_CustomMem cmem)
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
 #  define LZ4F_STATIC_ASSERT(c)    static_assert(c, "")
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-#  define LZ4F_STATIC_ASSERT(c)    _Static_assert(c, "")
 #else
-#  define LZ4F_STATIC_ASSERT(c)    { enum { LZ4F_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
+#  define LZ4F_STATIC_ASSERT(c)    (void)sizeof(char[(c) ? 1 : -1])
 #endif
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2) && !defined(DEBUGLOG)

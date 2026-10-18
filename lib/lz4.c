@@ -288,10 +288,8 @@ static const int LZ4_minLength = (MFLIMIT+1);
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
 #  define LZ4_STATIC_ASSERT(c)   static_assert(c, "")
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-#  define LZ4_STATIC_ASSERT(c)   _Static_assert(c, "")
 #else
-#  define LZ4_STATIC_ASSERT(c)   { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
+#  define LZ4_STATIC_ASSERT(c)   (void)sizeof(char[(c) ? 1 : -1])
 #endif
 
 #if defined(LZ4_DEBUG) && (LZ4_DEBUG>=2)

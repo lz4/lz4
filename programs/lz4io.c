@@ -171,10 +171,8 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, double cpuTimeStart, unsign
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
 #  define LZ4IO_STATIC_ASSERT(c)   static_assert(c, "")
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-#  define LZ4IO_STATIC_ASSERT(c)   _Static_assert(c, "")
 #else
-#  define LZ4IO_STATIC_ASSERT(c)   { enum { LZ4IO_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
+#  define LZ4IO_STATIC_ASSERT(c)   (void)sizeof(char[(c) ? 1 : -1])
 #endif
 
 
