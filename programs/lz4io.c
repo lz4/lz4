@@ -56,6 +56,7 @@
 #include <sys/stat.h>  /* stat64 */
 #include "lz4conf.h"   /* compile-time constants */
 #include "lz4io.h"
+#define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
 #include "lz4.h"       /* required for legacy format */
 #include "lz4hc.h"     /* required for legacy format */
 #define LZ4F_STATIC_LINKING_ONLY
@@ -786,6 +787,14 @@ typedef struct {
     int cLevel;
 } CompressLegacyState;
 
+/* same as LZ4F_levelToAcceleration() : capped at LZ4_ACCELERATION_MAX, without overflow */
+static int LZ4IO_levelToAcceleration(int cLevel)
+{
+    if (cLevel >= 0) return 1;
+    if (cLevel < 1 - LZ4_ACCELERATION_MAX) return LZ4_ACCELERATION_MAX;
+    return -cLevel + 1;
+}
+
 static size_t LZ4IO_compressBlockLegacy_fast(
     const void* params,
     void* dst,
@@ -796,7 +805,7 @@ static size_t LZ4IO_compressBlockLegacy_fast(
 )
 {
     const CompressLegacyState* const clevel = (const CompressLegacyState*)params;
-    int const acceleration = (clevel->cLevel < 0) ? -clevel->cLevel : 0;
+    int const acceleration = LZ4IO_levelToAcceleration(clevel->cLevel);
     int const cSize = LZ4_compress_fast((const char*)src, (char*)dst + LZ4IO_LEGACY_BLOCK_HEADER_SIZE, (int)srcSize, (int)dstCapacity, acceleration);
     if (cSize < 0)
         END_PROCESS(51, "fast compression failed");

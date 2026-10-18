@@ -76,6 +76,8 @@ lz4 -BX $FPREFIX-hw -c -q | lz4 -tv   # test block checksum
 test "$(datagen -g20KB | lz4 -c --fast | wc -c)" -lt "$(datagen -g20KB | lz4 -c --fast=9 | wc -c)" # -1 vs -9
 test "$(datagen -g20KB | lz4 -c -1 | wc -c)" -lt "$(datagen -g20KB| lz4 -c --fast=1 | wc -c)" # 1 vs -1
 test "$(datagen -g20KB | lz4 -c --fast=1 | wc -c)" -eq "$(datagen -g20KB| lz4 -c --fast| wc -c)" # checks default fast compression is -1
+test "$(lz4 -c -l -1 $FPREFIX-dg20k | wc -c)" -lt "$(lz4 -c -l --fast=1 $FPREFIX-dg20k | wc -c)" # same with legacy format
+lz4 -c -l --fast=2147483647 $FPREFIX-dg20k > /dev/null  # legacy format : acceleration capped without overflow
 lz4 -c --fast=0 $FPREFIX-dg20k && exit 1  # lz4 should fail when fast=0
 lz4 -c --fast=-1 $FPREFIX-dg20k && exit 1 # lz4 should fail when fast=-1
 # numeric arguments must not silently overflow
