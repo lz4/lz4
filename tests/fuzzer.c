@@ -1489,11 +1489,25 @@ static void FUZ_unitTests(int compressionLevel)
                 "LZ4_saveDict() can't save anything since compression hasn't started");
             }
 
-            /* Invalid negative sizes must fail instead of wrapping to 64 KB. */
-            FUZ_CHECKTEST( LZ4_loadDict(ctx, testInput, 64 KB) <= 0,
-            "LZ4_loadDict() failed to prepare saveDict negative-size test");
-            FUZ_CHECKTEST( LZ4_saveDict(ctx, testVerify, -1) != 0,
-            "LZ4_saveDict() must reject negative dictionary sizes");
+            /* a negative size saves nothing (instead of wrapping to 64 KB),
+             * and the next block no longer references the previous dictionary :
+             * it copies the end of the dictionary, so it would match it */
+            {   char saveBuffer[16];
+                char* const block = (char*)malloc(4 KB);
+                int cSize, dSize;
+                FUZ_CHECKTEST(block == NULL, "allocation failed");
+                memcpy(block, testInput + 60 KB, 4 KB);
+                FUZ_CHECKTEST( LZ4_loadDict(ctx, testInput, 64 KB) <= 0,
+                "LZ4_loadDict() failed to prepare saveDict negative-size test");
+                FUZ_CHECKTEST( LZ4_saveDict(ctx, saveBuffer, -1) != 0,
+                "LZ4_saveDict() must save nothing with a negative size");
+                cSize = LZ4_compress_fast_continue(ctx, block, testCompressed, 4 KB, testCompressedSize, 1);
+                FUZ_CHECKTEST(cSize <= 0, "LZ4_compress_fast_continue() failed");
+                dSize = LZ4_decompress_safe(testCompressed, testVerify, cSize, 4 KB);
+                FUZ_CHECKTEST(dSize != 4 KB || memcmp(testVerify, block, 4 KB),
+                "after LZ4_saveDict() with a negative size, the next block references the previous dictionary");
+                free(block);
+            }
         }
         DISPLAYLEVEL(3, "OK \n");
 
