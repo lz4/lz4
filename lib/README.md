@@ -155,6 +155,9 @@ The following `Makefile` variables can be selected to alter the profile of produ
   `MULTITHREAD=1` (or target `lib-mt`) enables it for both libraries :
   on POSIX systems, programs linking `liblz4.a` must then add `-pthread` (`pkg-config --static` provides it).
   `MULTITHREAD=0` (or target `lib-nomt`) disables it for both libraries.
+  `make install` installs the libraries already built (ex: `make lib-mt && make install`),
+  and only builds them, with current settings, when they are absent.
+  `liblz4.pc` declares `-pthread` (`Libs.private`) when the installed `liblz4.a` requires it.
 
 The same policy applies to other build systems :
 - `cmake` : options `LZ4_SHARED_MULTITHREAD` (default `ON`) and `LZ4_STATIC_MULTITHREAD` (default `OFF`).

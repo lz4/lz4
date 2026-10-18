@@ -81,8 +81,16 @@ else ifeq ($(MULTITHREAD),0)
   MT_STATICLIB := 0
 else
   ifneq (,$(filter -pthread,$(MT_FLAGS)))
+    # probe within a private temporary directory : safe for concurrent invocations, and read-only source trees
     NUM_SYMBOL := \#
-    MT_DYNLIB := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm -f have_pthread.c)
+    MT_DYNLIB := $(shell d=$$(mktemp -d "$${TMPDIR:-/tmp}/lz4_pthread_XXXXXX" 2> $(VOID)) \
+                   && printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > "$$d/probe.c" \
+                   && $(CC) $(ALLFLAGS) -o "$$d/probe$(EXT)" "$$d/probe.c" -pthread 2> $(VOID) \
+                   && echo 1 || echo 0; \
+                   [ -n "$$d" ] && rm -rf "$$d")
+    ifneq ($(MT_DYNLIB),1)
+      MT_PROBE_MSG := (threads not detected)
+    endif
   else
     MT_DYNLIB := 1
   endif
@@ -93,7 +101,7 @@ ifeq ($(MT_DYNLIB),1)
   DYNLIB_MT_FLAGS := $(MT_FLAGS)
   DYNLIB_MT_MSG := with multithreading support
 else
-  DYNLIB_MT_MSG := without multithreading support
+  DYNLIB_MT_MSG := without multithreading support $(MT_PROBE_MSG)
 endif
 ifeq ($(MT_STATICLIB),1)
   STATICLIB_MT_FLAGS := $(MT_FLAGS)
@@ -262,8 +270,24 @@ PKGCONFIGDIR ?= $(libdir)/pkgconfig
   endif
 pkgconfigdir ?= $(PKGCONFIGDIR)
 
+# threads employed by the static library to install, declared in liblz4.pc (Libs.private) ;
+# deduced from its symbols ; when they can't be listed, declared whenever threads are available
+# (an unnecessary -pthread is harmless, while a missing one breaks static linking)
+NM ?= nm
+PC_THREADS_FALLBACK := $(if $(filter 1,$(MT_DYNLIB) $(MT_STATICLIB)),$(filter -pthread,$(MT_FLAGS)))
+PC_THREADS_SH := if $(NM) liblz4.a > $(VOID) 2>&1; then $(NM) liblz4.a 2> $(VOID) | grep -q pthread_create && echo -pthread || true; else echo "$(PC_THREADS_FALLBACK)"; fi
+
+# install : installs the libraries already built (make lib, lib-mt, lib-nomt) ;
+# they're only built, with current settings, when absent (same as zstd)
 .PHONY: install
-install: lib liblz4.pc
+install:
+  ifeq ($(BUILD_STATIC),yes)
+	[ -e liblz4.a ] || $(MAKE) liblz4.a
+  endif
+  ifeq ($(BUILD_SHARED),yes)
+	[ -e $(LIBLZ4) ] || $(MAKE) liblz4
+  endif
+	$(MAKE) liblz4.pc PC_LIBS_PRIVATE="$(if $(filter yes,$(BUILD_STATIC)),$$($(PC_THREADS_SH)))"
 	$(MAKE_DIR) $(DESTDIR)$(pkgconfigdir)/ $(DESTDIR)$(includedir)/ $(DESTDIR)$(libdir)/ $(DESTDIR)$(bindir)/
 	$(INSTALL_DATA) liblz4.pc $(DESTDIR)$(pkgconfigdir)/
 	@echo Installing libraries in $(DESTDIR)$(libdir)

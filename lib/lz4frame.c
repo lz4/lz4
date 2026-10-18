@@ -76,6 +76,10 @@
 #  undef  LZ4F_MULTITHREAD
 #  define LZ4F_MULTITHREAD 0
 #endif
+#if defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)   /* MinGW.org, unlike mingw-w64, lacks Windows Vista API (condition variables) */
+#  undef  LZ4F_MULTITHREAD
+#  define LZ4F_MULTITHREAD 0
+#endif
 
 
 /*-************************************
@@ -1264,8 +1268,11 @@ typedef struct LZ4F_pool_s LZ4F_pool_t;
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  ifndef _WIN32_WINNT
-#    define _WIN32_WINNT 0x0600   /* condition variables require Windows Vista+ */
+   /* condition variables require Windows Vista+ ; _WIN32_WINNT may already be defined lower,
+    * ex: by <_mingw.h> (included by standard headers) on older mingw-w64 (0x502) */
+#  if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
+#    undef  _WIN32_WINNT
+#    define _WIN32_WINNT 0x0600
 #  endif
 #  include <windows.h>
    typedef HANDLE             LZ4F_thread_t;
