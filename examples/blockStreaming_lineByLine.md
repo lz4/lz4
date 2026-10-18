@@ -72,7 +72,7 @@ write `{Out#1}` to the file and shift the ring buffer offset forward.
 ```
 
 Repeat the above for the second line (see (2)). Repeat again for the third line
-(see (3)). However,this time LZ4 can use the dependency on `Line#1` (and then on
+(see (3)). However, this time LZ4 can use the dependency on `Line#1` (and then on
 the third invocation, the dependency on both `Line#2` and `Line#1`) to improve
 the compression ratio. This dependency is called "Prefix mode".
 
@@ -113,8 +113,8 @@ of it. This is called "External Dictionary Mode".
                           Reset
 ```
 
-In `Line#X+2` (see (5)), LZ4 finally clears all lines except `Line#X+1` from the
-ring buffer. This is the same situation as `Line#2`.
+In `Line#X+2` (see (5)), LZ4 finally forgets all previous lines except
+`Line#X+1`. This is the same situation as `Line#2`.
 
 Continue this procedure till the end of the text file.
 
