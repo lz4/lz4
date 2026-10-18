@@ -68,10 +68,9 @@ default: lz4-release
 C_SRCDIRS = $(LIBLZ4DIR) .
 include ../build/make/multiconf.make
 
-# thread detection
-NUM_SYMBOL   := \#
+# thread detection (PTHREAD_PROBE : see build/make/lz4defs.make)
 NO_THREAD_MSG:= ==> no multithread support: built for single-thread mode only
-HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
+HAVE_PTHREAD := $(PTHREAD_PROBE)
 HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
 ifeq ($(HAVE_MULTITHREAD), 1)
   THREAD_MSG := ==> built with multithreading support

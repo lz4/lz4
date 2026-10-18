@@ -81,13 +81,8 @@ else ifeq ($(MULTITHREAD),0)
   MT_STATICLIB := 0
 else
   ifneq (,$(filter -pthread,$(MT_FLAGS)))
-    # probe within a private temporary directory : safe for concurrent invocations, and read-only source trees
-    NUM_SYMBOL := \#
-    MT_DYNLIB := $(shell d=$$(mktemp -d "$${TMPDIR:-/tmp}/lz4_pthread_XXXXXX" 2> $(VOID)) \
-                   && printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > "$$d/probe.c" \
-                   && $(CC) $(ALLFLAGS) -o "$$d/probe$(EXT)" "$$d/probe.c" -pthread 2> $(VOID) \
-                   && echo 1 || echo 0; \
-                   [ -n "$$d" ] && rm -rf "$$d")
+    # PTHREAD_PROBE : see build/make/lz4defs.make
+    MT_DYNLIB := $(PTHREAD_PROBE)
     ifneq ($(MT_DYNLIB),1)
       MT_PROBE_MSG := (threads not detected)
     endif
