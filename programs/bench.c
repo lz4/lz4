@@ -221,12 +221,20 @@ LZ4_compressResetStreamHC(const struct compressionParameters* cparams)
     LZ4_attach_HC_dictionary(cparams->LZ4_streamHC, cparams->LZ4_dictStreamHC);
 }
 
+/* same as LZ4F_levelToAcceleration() : capped at LZ4_ACCELERATION_MAX, without overflow */
+static int BMK_levelToAcceleration(int cLevel)
+{
+    if (cLevel >= 0) return 1;
+    if (cLevel < 1 - LZ4_ACCELERATION_MAX) return LZ4_ACCELERATION_MAX;
+    return -cLevel + 1;
+}
+
 static int
 LZ4_compressBlockNoStream(const struct compressionParameters* cparams,
                           const char* src, char* dst,
                           int srcSize, int dstSize)
 {
-    int const acceleration = (cparams->cLevel < 0) ? -cparams->cLevel + 1 : 1;
+    int const acceleration = BMK_levelToAcceleration(cparams->cLevel);
     return LZ4_compress_fast(src, dst, srcSize, dstSize, acceleration);
 }
 
@@ -243,7 +251,7 @@ LZ4_compressBlockStream(const struct compressionParameters* cparams,
                         const char* src, char* dst,
                         int srcSize, int dstSize)
 {
-    int const acceleration = (cparams->cLevel < 0) ? -cparams->cLevel + 1 : 1;
+    int const acceleration = BMK_levelToAcceleration(cparams->cLevel);
     LZ4_compressResetStream(cparams);
     return LZ4_compress_fast_continue(cparams->LZ4_stream, src, dst, srcSize, dstSize, acceleration);
 }

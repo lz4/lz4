@@ -48,7 +48,7 @@
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4frame.h"
-#define LZ4_STATIC_LINKING_ONLY  /* LZ4_DISTANCE_MAX */
+#define LZ4_STATIC_LINKING_ONLY  /* LZ4_DISTANCE_MAX, LZ4_ACCELERATION_MAX */
 #include "lz4.h"        /* LZ4_VERSION_STRING */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
@@ -2312,10 +2312,11 @@ static int unitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(3, "Compressed %u bytes into a %u bytes frame \n", (U32)testSize, (U32)cSize);
     }
 
-    /* acceleration is capped (LZ4_ACCELERATION_MAX), so all levels <= -65536
-     * must produce the same frame, including INT_MIN and INT_MIN+1 */
-    DISPLAYLEVEL(3, "LZ4F_compressFrame, very negative levels behave like level -65536 : ");
-    {   int const extremeLevels[] = { -65537, INT_MIN + 1, INT_MIN };
+    /* acceleration (-level + 1) is capped at LZ4_ACCELERATION_MAX,
+     * so all levels below the cap must produce the same frame, including INT_MIN and INT_MIN+1 */
+    DISPLAYLEVEL(3, "LZ4F_compressFrame, very negative levels behave like the capped level : ");
+    {   int const cappedLevel = 1 - LZ4_ACCELERATION_MAX;
+        int const extremeLevels[] = { -LZ4_ACCELERATION_MAX, INT_MIN + 1, INT_MIN };   /* cappedLevel - 1 */
         size_t const cBound = LZ4F_compressFrameBound(testSize, NULL);
         void* const refBuffer = malloc(cBound);
         LZ4F_preferences_t fastPrefs;
@@ -2323,7 +2324,7 @@ static int unitTests(U32 seed, double compressibility)
         int n;
         if (refBuffer == NULL) goto _output_error;
         memset(&fastPrefs, 0, sizeof(fastPrefs));
-        fastPrefs.compressionLevel = -65536;
+        fastPrefs.compressionLevel = cappedLevel;
         refSize = LZ4F_compressFrame(refBuffer, cBound, CNBuffer, testSize, &fastPrefs);
         if (LZ4F_isError(refSize)) { free(refBuffer); goto _output_error; }
         for (n = 0; n < (int)(sizeof(extremeLevels) / sizeof(extremeLevels[0])); n++) {

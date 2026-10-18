@@ -963,12 +963,12 @@ static size_t LZ4F_makeBlock(void* dst, size_t dstCapacity,
 
 
 /* Negative compression levels select LZ4 "fast" mode, with acceleration = -level + 1.
- * Computed without signed overflow for very negative levels (INT_MIN, INT_MIN+1);
- * LZ4_compress_fast*() caps acceleration at LZ4_ACCELERATION_MAX anyway. */
+ * Acceleration is capped at LZ4_ACCELERATION_MAX before this computation,
+ * which would overflow for INT_MIN and INT_MIN+1. */
 static int LZ4F_levelToAcceleration(int level)
 {
     if (level >= 0) return 1;
-    if (level < -(INT_MAX - 1)) return INT_MAX;
+    if (level < 1 - LZ4_ACCELERATION_MAX) return LZ4_ACCELERATION_MAX;
     return -level + 1;
 }
 

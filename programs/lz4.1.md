@@ -131,6 +131,7 @@ only the latest one will be applied.
   Switch to ultra-fast compression levels.
   The higher the value, the faster the compression speed, but at the cost of compressed size.
   If `=#` is not present, it defaults to `1`.
+  Values above `65536` make no difference.
   This setting overrides compression level if one was set previously.
   Similarly, if a compression level is set after `--fast`, it overrides it.
 

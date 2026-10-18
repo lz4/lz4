@@ -86,6 +86,11 @@ lz4 -c -4294967305 $FPREFIX-dg20k > /dev/null && exit 1        # > UINT_MAX (wou
 lz4 -c -T4294967297 $FPREFIX-dg20k > /dev/null && exit 1       # > UINT_MAX (would wrap to 1)
 # an overflowing LZ4_CLEVEL is ignored, like other invalid values
 test "$(LZ4_CLEVEL=4294967305 lz4 -c $FPREFIX-dg20k | wc -c)" -eq "$(lz4 -c $FPREFIX-dg20k | wc -c)"
+# acceleration (--fast=# + 1) is capped at LZ4_ACCELERATION_MAX (65537) :
+# the largest --fast value behaves like --fast=65536, without overflow
+lz4 -c --fast=65536 $FPREFIX-dg20k > $FPREFIX-fastmax.lz4
+lz4 -c --fast=2147483647 $FPREFIX-dg20k | cmp - $FPREFIX-fastmax.lz4
+lz4 -bq --fast=2147483647 -i0 $FPREFIX-dg20k
 # Multithreading commands
 datagen -g16M | lz4 -T2 | lz4 -t
 datagen -g16M | lz4 --threads=2 | lz4 -t
