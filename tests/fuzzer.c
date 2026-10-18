@@ -913,6 +913,18 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
                 FUZ_CHECKTEST(decodedBuffer[blockSize-missingBytes], "LZ4_decompress_safe_usingDict overrun specified output buffer size (-%i byte) (blockSize=%i)", missingBytes, blockSize);
         }   }
 
+        /* Test decoding with a negative dictionary size => must fail */
+        FUZ_DISPLAYTEST("LZ4_decompress_*_usingDict() with negative dictionary size");
+        ret = LZ4_decompress_safe_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize, dict, -1);
+        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_usingDict should have failed, due to negative dictionary size");
+        ret = LZ4_decompress_safe_partial_usingDict(compressedBuffer, decodedBuffer, blockContinueCompressedSize, blockSize, blockSize, dict, -1);
+        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_safe_partial_usingDict should have failed, due to negative dictionary size");
+        ret = LZ4_decompress_fast_usingDict(compressedBuffer, decodedBuffer, blockSize, dict, -1);
+        FUZ_CHECKTEST(ret>=0, "LZ4_decompress_fast_usingDict should have failed, due to negative dictionary size");
+        {   LZ4_streamDecode_t sd;
+            FUZ_CHECKTEST(LZ4_setStreamDecode(&sd, dict, -1) != 0, "LZ4_setStreamDecode should have failed, due to negative dictionary size");
+        }
+
         /* Compress using external dictionary stream */
         {   LZ4_stream_t LZ4_stream;
             int expectedSize;
@@ -1025,6 +1037,7 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         dict -= (FUZ_rand(&randState) & 7);    /* even bigger separation */
         if (dict < (char*)CNBuffer) dict = (char*)CNBuffer;
         LZ4_setCompressionLevel (LZ4dictHC, compressionLevel);
+        FUZ_CHECKTEST(LZ4_loadDictHC(LZ4dictHC, dict, -1) != 0, "LZ4_loadDictHC should load nothing, due to negative dictionary size");
         LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
         blockContinueCompressedSize = LZ4_compress_HC_continue(LZ4dictHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue failed");
