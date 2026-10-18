@@ -2204,32 +2204,28 @@ LZ4_decompress_generic(
                     goto _output_error;
                 }
                 ml += addl;
-                ml += MINMATCH;
-                DEBUGLOG(7, "  long match length == %u", (unsigned)ml);
+                DEBUGLOG(7, "  long match length == %u", (unsigned)ml + MINMATCH);
                 if (unlikely((uptrval)(op)+ml<(uptrval)op)) { goto _output_error; } /* overflow detection */
-                if (op + ml >= oend - FASTLOOP_SAFE_DISTANCE) {
-                    goto safe_match_copy;
-                }
-            } else {
-                ml += MINMATCH;
-                if (op + ml >= oend - FASTLOOP_SAFE_DISTANCE) {
-                    DEBUGLOG(7, "moving to safe_match_copy (ml==%u)", (unsigned)ml);
-                    goto safe_match_copy;
-                }
+            }
+            ml += MINMATCH;
 
-                /* Fastpath check: skip LZ4_wildCopy32 when true */
-                if ((dict == withPrefix64k) || (match >= lowPrefix)) {
-                    if (offset >= 8) {
-                        assert(match >= lowPrefix);
-                        assert(match <= op);
-                        assert(op + 18 <= oend);
+            if (op + ml >= oend - FASTLOOP_SAFE_DISTANCE) {
+                DEBUGLOG(7, "moving to safe_match_copy (ml==%u)", (unsigned)ml);
+                goto safe_match_copy;
+            }
 
-                        LZ4_memcpy(op, match, 8);
-                        LZ4_memcpy(op+8, match+8, 8);
-                        LZ4_memcpy(op+16, match+16, 2);
-                        op += ml;
-                        continue;
-            }   }   }
+            /* match length from token only (<= 18), no overlap, within prefix : copy 18 bytes */
+            if ( ((token & ML_MASK) != ML_MASK) && (offset >= 8)
+              && ((dict == withPrefix64k) || (match >= lowPrefix)) ) {
+                assert(match >= lowPrefix);
+                assert(match <= op);
+                assert(op + 18 <= oend);
+                LZ4_memcpy(op, match, 8);
+                LZ4_memcpy(op+8, match+8, 8);
+                LZ4_memcpy(op+16, match+16, 2);
+                op += ml;
+                continue;
+            }
 
             /* match ends far from oend : no end-of-block condition to check */
             assert(op + ml < oend - FASTLOOP_SAFE_DISTANCE);
