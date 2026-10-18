@@ -13,8 +13,8 @@ The following projects are included with the lz4 distribution:
 #### Projects available within VS2022\lz4.sln
 
 The Visual Studio solution file `lz4.sln` contains many projects that will be compiled to the
-`build\VS2010\bin\$(Platform)_$(Configuration)` directory. For example `lz4` set to `x64` and
-`Release` will be compiled to `build\VS2010\bin\x64_Release\lz4.exe`. The solution file contains the
+`build\VS2022\bin\$(Platform)_$(Configuration)` directory. For example `lz4` set to `x64` and
+`Release` will be compiled to `build\VS2022\bin\x64_Release\lz4.exe`. The solution file contains the
 following projects:
 
 - `lz4` : Command Line Utility, supporting gzip-like arguments
@@ -30,7 +30,7 @@ following projects:
 #### Using LZ4 DLL with Microsoft Visual C++ project
 
 The header files `lib\lz4.h`, `lib\lz4hc.h`, `lib\lz4frame.h` and the import library
-`build\VS2010\bin\$(Platform)_$(Configuration)\liblz4.lib` are required to
+`build\VS2022\bin\$(Platform)_$(Configuration)\liblz4.lib` are required to
 compile a project using Visual C++.
 
 1. The path to header files should be added to `Additional Include Directories` that can
@@ -41,4 +41,4 @@ compile a project using Visual C++.
    then the directory has to be added to `Linker\General\Additional Library Directories`.
 
 The compiled executable will require LZ4 DLL which is available at
-`build\VS2010\bin\$(Platform)_$(Configuration)\liblz4.dll`.
+`build\VS2022\bin\$(Platform)_$(Configuration)\liblz4.dll`.
