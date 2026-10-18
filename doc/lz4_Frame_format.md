@@ -386,13 +386,16 @@ Data is always compressed, even when compression is detrimental.
 
 __EndMark__
 
-End of legacy frame is implicit only.
-It must be followed by a standard EOF (End Of File) signal,
+End of legacy frame can be implicit, signaled by a standard EOF (End Of File),
 whether it is a file or a stream.
 
 Alternatively, if the frame is followed by a valid Frame Magic Number,
 it is considered completed.
 This policy makes it possible to concatenate legacy frames.
+
+The Linux kernel extension also accepts a zero Block Compressed Size as an
+explicit end marker. These four zero bytes complete the frame; any following
+frame starts with its own Magic Number.
 
 Any other value will be interpreted as a block size,
 and trigger an error if it does not fit within acceptable range.
