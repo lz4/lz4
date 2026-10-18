@@ -1780,7 +1780,7 @@ typedef struct {
     FILE* f;
     int sparseEnable;
     unsigned* storedSkips;
-    const unsigned long long* totalSize;
+    unsigned long long* totalSize;
 } ChunkToWrite;
 
 static void LZ4IO_writeDecodedChunk(void* arg)
@@ -1790,6 +1790,7 @@ static void LZ4IO_writeDecodedChunk(void* arg)
 
     /* note: works because only 1 thread */
     *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->f, ctw->buffer, ctw->size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
+    *ctw->totalSize += (unsigned long long)ctw->size;
     DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >>20));
 
     /* clean up */
@@ -1814,7 +1815,6 @@ static void LZ4IO_decompressBlockLegacy(void* arg)
 
     decodedSize = LZ4_decompress_safe((const char*)lbi->inBuffer, (char*)lbi->outBuffer, (int)lbi->inSize, LEGACY_BLOCKSIZE);
     if (decodedSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
-    *lbi->totalSize += (unsigned long long)decodedSize; /* note: works because only 1 thread */
 
     /* push to write thread */
     {   ChunkToWrite* const ctw = (ChunkToWrite*)malloc(sizeof(*ctw));
