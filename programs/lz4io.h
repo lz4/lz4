@@ -118,7 +118,9 @@ int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable);
 
 /* Default setting : 1 == regular files are memory-mapped for compression, when supported.
  * Note : a file truncated during its compression, or unreadable (I/O error), raises SIGBUS :
- * a handler, installed while the file is mapped, reports it and terminates the process (error 53) */
+ * a handler, installed while the file is mapped, reports it and terminates the process (error 53).
+ * A file modified during its compression is also detected : memory-mapped input is read several times,
+ * so the output is removed (error 54), while input read once only triggers a warning. */
 int LZ4IO_setMmap(LZ4IO_prefs_t* const prefs, int enable);
 
 /* Default setting : 0 == no content size present in frame header */

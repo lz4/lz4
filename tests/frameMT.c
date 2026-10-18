@@ -698,6 +698,63 @@ static int validateAllocFailures(void)
 *  File API (lz4file.h)
 **************************************/
 /* LZ4F_write() streams through LZ4F_compressUpdate() : same frame as one-shot compression */
+/* A failure while creating worker threads (ex: transient allocation failure) is absorbed :
+ * jobs are processed serially, producing the same output. Worker threads are created again for next frames. */
+static int validatePoolRetry(void)
+{
+    size_t const srcSize = 9 MB;
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_CustomMem const failingMem = { failingAlloc, NULL, countingFree, NULL };
+    char* const src = (char*)malloc(srcSize);
+    size_t dstCapacity, refSize, n;
+    char* ref;
+    char* out;
+    unsigned nbAbsorbed = 0, nbRetried = 0;
+
+    g_step = "pool retry";
+    prefs.nbWorkers = 2;
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    dstCapacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    ref = (char*)malloc(dstCapacity);
+    out = (char*)malloc(dstCapacity);
+    CHECK(src && ref && out, "allocation failed");
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 17);
+    refSize = LZ4F_compressFrame(ref, dstCapacity, src, srcSize, &prefs);
+    CHECK_LZ4F(refSize);
+
+    for (n = 1; ; n++) {
+        LZ4F_cctx* cctx;
+        size_t r;
+        g_failAt = 0;
+        cctx = LZ4F_createCompressionContext_advanced(failingMem, LZ4F_VERSION);
+        CHECK(cctx != NULL, "allocation failed");
+        g_allocNb = 0;
+        g_failAt = n;
+        r = LZ4F_compressFrame_usingCDict(cctx, out, dstCapacity, src, srcSize, NULL, &prefs);
+        g_failAt = 0;
+        if (g_allocNb < n) {   /* the frame needed fewer allocations : all failure points tested */
+            LZ4F_freeCompressionContext(cctx);
+            break;
+        }
+        if (!LZ4F_isError(r)) {   /* failure absorbed */
+            size_t const allocsBefore = g_allocNb;
+            CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u absorbed : output differs", (unsigned)n);
+            nbAbsorbed++;
+            r = LZ4F_compressFrame_usingCDict(cctx, out, dstCapacity, src, srcSize, NULL, &prefs);
+            CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u absorbed : next frame differs", (unsigned)n);
+            if (g_allocNb > allocsBefore) nbRetried++;   /* missing resources created again */
+        }
+        LZ4F_freeCompressionContext(cctx);
+    }
+#if defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD
+    CHECK(nbRetried > 0, "worker threads not created again after %u absorbed failures", nbAbsorbed);
+#endif
+    CHECK(g_nbAllocs == g_nbFrees, "memory leak : %u allocations, %u frees", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
+    free(src); free(ref); free(out);
+    DISPLAY("pool retry : %u absorbed failures, %u retried at next frame \n", nbAbsorbed, nbRetried);
+    return 0;
+}
+
 static int validateFileAPI(void)
 {
     size_t const srcSize = 9 MB + 5;
@@ -966,6 +1023,7 @@ int main(int argc, const char** argv)
         validateStreaming(&digest);
         validateFlushContract();
         validateAllocFailures();
+        validatePoolRetry();
         validateFileAPI();
         printf("digest : %016llx \n", (unsigned long long)XXH64_digest(&digest));
     }

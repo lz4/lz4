@@ -1342,6 +1342,40 @@ static void LZ4IO_releaseInput(LZ4IO_cInput_t* in, size_t lag)
 #endif
 }
 
+/* A source file modified during its compression is detected by comparing its size and times
+ * before and after (like tar : "file changed as we read it").
+ * Memory-mapped input is read several times : the frame can then be inconsistent (error).
+ * Otherwise, input is read once : the frame holds the content read, ex: a log file growing meanwhile (warning). */
+typedef struct {
+    int valid;      /* regular file */
+    stat_t st;
+} LZ4IO_srcState_t;
+
+static LZ4IO_srcState_t LZ4IO_getSrcState(FILE* srcFile)
+{
+    LZ4IO_srcState_t s;
+    memset(&s, 0, sizeof(s));
+    s.valid = UTIL_getFDStat(UTIL_fileno(srcFile), &s.st);
+    return s;
+}
+
+static int LZ4IO_srcModified(const LZ4IO_srcState_t* before, FILE* srcFile)
+{
+    LZ4IO_srcState_t const after = LZ4IO_getSrcState(srcFile);
+    if (!before->valid) return 0;   /* not a regular file : can't tell */
+    if (!after.valid) return 1;
+    if ( (before->st.st_size != after.st.st_size)
+      || (before->st.st_mtime != after.st.st_mtime)
+      || (before->st.st_ctime != after.st.st_ctime) )
+        return 1;
+#if !defined(_WIN32) && (PLATFORM_POSIX_VERSION >= 200809L)
+    if ( (before->st.st_mtim.tv_nsec != after.st.st_mtim.tv_nsec)
+      || (before->st.st_ctim.tv_nsec != after.st.st_ctim.tv_nsec) )
+        return 1;
+#endif
+    return 0;
+}
+
 /*
  * LZ4IO_compressFilename_extRess()
  * result : 0 : compression completed correctly
@@ -1363,8 +1397,9 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     const size_t blockSize = io_prefs->blockSize;
     /* custom block sizes : one block per invocation (see LZ4IO_createCResources()) */
     const size_t chunkSize = LZ4IO_customBlockSize(io_prefs) ? blockSize : ress->srcBufferSize;
-    /* memory-mapped input is released behind jobs in flight (only a memory hint) */
-    const size_t releaseLag = (size_t)(io_prefs->nbWorkers + 2) * ress->srcBufferSize;
+    /* memory-mapped input is released behind jobs in flight (only a memory hint) :
+     * liblz4 keeps up to 2*nbWorkers+1 jobs of at most 4 MB in flight, each reading 64 KB of history before it */
+    const size_t releaseLag = (2 * (size_t)io_prefs->nbWorkers + 1) * (4 MB) + 64 KB;
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
@@ -1374,7 +1409,10 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 
     /* Init */
     FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
+    LZ4IO_srcState_t srcState;
+    int srcModified;
     if (srcFile == NULL) return 1;
+    srcState = LZ4IO_getSrcState(srcFile);
     dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
     if (dstFile == NULL) { fclose(srcFile); return 1; }
     memset(&prefs, 0, sizeof(prefs));
@@ -1462,9 +1500,20 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     }
 
     /* Release file handlers */
-    LZ4IO_unmapInput(&input);
-    fclose (srcFile);
-    if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
+    srcModified = LZ4IO_srcModified(&srcState, srcFile);
+    {   int const mapped = (input.map != NULL);
+        LZ4IO_unmapInput(&input);
+        fclose (srcFile);
+        if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
+        if (srcModified) {
+            /* source is preserved, even with --rm */
+            if (mapped) {   /* inconsistent output is removed */
+                if (!LZ4IO_isStdout(dstFileName) && !LZ4IO_isDevNull(dstFileName)) (void)remove(dstFileName);
+                END_PROCESS(54, "%s : file modified during compression (memory-mapped) : output removed ; see --no-mmap", srcFileName);
+            }
+            DISPLAYLEVEL(2, "\rWarning : %s : file modified during compression : output holds the content read%s \n",
+                            srcFileName, io_prefs->removeSrcFile ? " ; source kept" : "");
+    }   }
 
     /* Copy owner, file permissions and modification time */
     {   stat_t statbuf;
@@ -1475,7 +1524,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
             UTIL_setFileStat(dstFileName, &statbuf);
     }   }
 
-    if (io_prefs->removeSrcFile) {  /* remove source file : --rm */
+    if (io_prefs->removeSrcFile && !srcModified) {  /* remove source file : --rm */
         if (remove(srcFileName))
             END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
     }

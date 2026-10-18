@@ -1333,6 +1333,7 @@ struct LZ4F_pool_s {
     unsigned queueHead;
     unsigned queueSize;
     int shutdown;
+    int cancel;                /* jobs of an abandoned frame : not started yet, they end without running */
     unsigned nbDone;           /* incremented at each job completion */
     LZ4F_thread_t* threads;
     LZ4F_poolWorker_t* workers;
@@ -1520,6 +1521,24 @@ static void LZ4F_pool_setDone(LZ4F_pool_t* pool, int* doneFlag)
     LZ4F_mutex_unlock(&pool->lock);
 }
 
+static void LZ4F_pool_setCancel(LZ4F_pool_t* pool, int cancel)
+{
+    if (pool == NULL) return;
+    LZ4F_mutex_lock(&pool->lock);
+    pool->cancel = cancel;
+    LZ4F_mutex_unlock(&pool->lock);
+}
+
+static int LZ4F_pool_isCancelled(LZ4F_pool_t* pool)
+{
+    int cancel;
+    if (pool == NULL) return 0;
+    LZ4F_mutex_lock(&pool->lock);
+    cancel = pool->cancel;
+    LZ4F_mutex_unlock(&pool->lock);
+    return cancel;
+}
+
 static int LZ4F_pool_isDone(LZ4F_pool_t* pool, const int* doneFlag)
 {
     int done;
@@ -1586,6 +1605,8 @@ static unsigned LZ4F_pool_nbThreads(const LZ4F_pool_t* pool) { (void)pool; retur
 static void LZ4F_pool_free(LZ4F_pool_t* pool, LZ4F_CustomMem cmem) { (void)pool; (void)cmem; }
 static void LZ4F_pool_submit(LZ4F_pool_t* pool, LZ4F_job_f fn, void* arg) { (void)pool; fn(arg, 0); }
 static void LZ4F_pool_setDone(LZ4F_pool_t* pool, int* doneFlag) { (void)pool; *doneFlag = 1; }
+static void LZ4F_pool_setCancel(LZ4F_pool_t* pool, int cancel) { (void)pool; (void)cancel; }
+static int  LZ4F_pool_isCancelled(LZ4F_pool_t* pool) { (void)pool; return 0; }
 static int  LZ4F_pool_isDone(LZ4F_pool_t* pool, const int* doneFlag) { (void)pool; return *doneFlag; }
 static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag, unsigned minQueue) { (void)pool; (void)doneFlag; (void)minQueue; assert(*doneFlag); }
 static unsigned LZ4F_pool_nbDone(LZ4F_pool_t* pool) { (void)pool; return 0; }
@@ -1606,7 +1627,6 @@ typedef struct {
 
 struct LZ4F_mtCtx_s {
     LZ4F_pool_t* pool;       /* NULL : jobs run within the calling thread */
-    unsigned nbThreadsRequested;
     void** states;           /* one LZ4 state per worker; states[0] : cctx's own state, for the calling thread */
     unsigned nbStates;
     LZ4F_CtxType_e statesType;
@@ -1639,9 +1659,13 @@ static void LZ4F_mt_runJob(void* arg, unsigned workerID)
     LZ4F_mtJob_t* const job = (LZ4F_mtJob_t*)arg;
     LZ4F_mtCtx_t* const mt = job->mt;
     assert(workerID < mt->nbStates);
-    job->cSize = LZ4F_compressJob(mt->states[workerID], mt->prefs, mt->cdict, mt->blockSize,
-                                  job->outBuff, mt->outCapacity,
-                                  job->src, job->srcSize, job->prefixSize);
+    if (LZ4F_pool_isCancelled(mt->pool)) {
+        job->cSize = 0;   /* abandoned frame : result discarded */
+    } else {
+        job->cSize = LZ4F_compressJob(mt->states[workerID], mt->prefs, mt->cdict, mt->blockSize,
+                                      job->outBuff, mt->outCapacity,
+                                      job->src, job->srcSize, job->prefixSize);
+    }
     LZ4F_pool_setDone(mt->pool, &job->done);
 }
 
@@ -1742,15 +1766,17 @@ static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size
     return written;
 }
 
-/* discards submitted jobs, once completed */
+/* discards submitted jobs : those not started yet end without running, others are waited for */
 static void LZ4F_mt_abort(LZ4F_mtCtx_t* mt)
 {
+    LZ4F_pool_setCancel(mt->pool, 1);
     while (mt->nbSubmitted > 0) {
         LZ4F_pool_waitDone(mt->pool, &mt->jobs[mt->oldest].done, 1);
         LZ4F_mt_releaseInBuff(mt, mt->jobs + mt->oldest);
         mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
         mt->nbSubmitted--;
     }
+    LZ4F_pool_setCancel(mt->pool, 0);
     if (mt->filling) LZ4F_mt_releaseInBuff(mt, LZ4F_mt_fillingSlot(mt));
     mt->filling = 0;
     mt->stableEnd = NULL;
@@ -1855,10 +1881,11 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
 
     /* worker threads (the calling thread also runs jobs, while waiting for them) */
 #if LZ4F_MULTITHREAD
-    if (mt->nbThreadsRequested != nbWorkers) {
+    /* a missing or incomplete pool (ex: transient allocation failure) is created again for next frames :
+     * meanwhile, jobs are processed by available threads, or serially, producing the same output */
+    if (LZ4F_pool_nbThreads(mt->pool) != nbWorkers) {
         LZ4F_pool_free(mt->pool, cmem);
         mt->pool = LZ4F_pool_create(nbWorkers, (unsigned)LZ4F_mtNbJobSlots(nbWorkers), cmem);
-        mt->nbThreadsRequested = nbWorkers;   /* even if fewer threads could be created */
     }
 #endif
     nbThreads = LZ4F_pool_nbThreads(mt->pool);
