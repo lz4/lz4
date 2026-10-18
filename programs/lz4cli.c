@@ -431,7 +431,7 @@ int main(int argCount, const char** argv)
 {
     int argNb,
         cLevel=init_cLevel(),
-        cLevelLast=-10000,
+        cLevelLast=INT_MIN,   /* unset : benchmark cLevel only */
         legacy_format=0,
         forceStdout=0,
         forceOverwrite=0,
