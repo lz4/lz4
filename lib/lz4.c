@@ -487,29 +487,35 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #  endif
 #endif
 
-#if LZ4_FAST_DEC_LOOP
-
+/* LZ4_memcpy_using_offset_base() :
+ * copy a match of length >= MINMATCH (srcPtr + offset == dstPtr, overlap allowed),
+ * can overwrite up to 12 bytes beyond dstEnd */
 LZ4_FORCE_INLINE void
 LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, const size_t offset)
 {
     assert(srcPtr + offset == dstPtr);
-    if (offset < 8) {
+    if (unlikely(offset < 8)) {
         LZ4_write32(dstPtr, 0);   /* silence an msan warning when offset==0 */
-        assert(offset != 1);   /* offset==0 happens on testing */
-        LZ4_memcpy(dstPtr, srcPtr, 2);
-        LZ4_memcpy(dstPtr + 2, srcPtr + 2, 2);
+        dstPtr[0] = srcPtr[0];
+        dstPtr[1] = srcPtr[1];
+        dstPtr[2] = srcPtr[2];
+        dstPtr[3] = srcPtr[3];
         srcPtr += inc32table[offset];
         LZ4_memcpy(dstPtr+4, srcPtr, 4);
         srcPtr -= dec64table[offset];
-        dstPtr += 8;
     } else {
         LZ4_memcpy(dstPtr, srcPtr, 8);
-        dstPtr += 8;
         srcPtr += 8;
     }
+    dstPtr += 8;
 
-    LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
+    /* srcPtr is now at least 8 bytes behind dstPtr */
+    LZ4_memcpy(dstPtr, srcPtr, 8);
+    if (dstEnd > dstPtr + 8) { LZ4_wildCopy8(dstPtr + 8, srcPtr + 8, dstEnd); }
 }
+
+
+#if LZ4_FAST_DEC_LOOP
 
 /* LZ4_wildCopy64 is faster on aarch64 and x86-64, but not on 32-bit x86 */
 #if defined(__aarch64__) || defined(__x86_64__) || defined(_M_X64)
@@ -2404,22 +2410,7 @@ LZ4_decompress_generic(
 
             /* copy match within block */
             cpy = op + ml;
-            if (unlikely(offset<8)) {
-                LZ4_write32(op, 0);   /* silence msan warning when offset==0 */
-                op[0] = match[0];
-                op[1] = match[1];
-                op[2] = match[2];
-                op[3] = match[3];
-                match += inc32table[offset];
-                LZ4_memcpy(op+4, match, 4);
-                match -= dec64table[offset];
-            } else {
-                LZ4_memcpy(op, match, 8);
-                match += 8;
-            }
-            op += 8;
-            LZ4_memcpy(op, match, 8);
-            if (ml > 16) { LZ4_wildCopy8(op+8, match+8, cpy); }
+            LZ4_memcpy_using_offset_base(op, match, cpy, offset);
             op = cpy;   /* wildcopy correction */
         }
 
