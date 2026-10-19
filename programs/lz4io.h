@@ -79,12 +79,12 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
  *             and no more than the nb of jobs of each file (when its size is known) ;
  *             >= 1 : explicit (within memory budget when it's set, or on 32-bit systems) */
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
+int LZ4IO_defaultNbWorkers(void);
 
 /* memory budget of multi-threaded compression, in bytes : limits the automatic nb of workers,
  * and, when set (> 0), explicit ones too ; 0 : default budget (LZ4IO_defaultMemoryBudget()) */
 unsigned long long LZ4IO_setMemoryBudget(LZ4IO_prefs_t* const prefs, unsigned long long budget);
 unsigned long long LZ4IO_defaultMemoryBudget(void);   /* 4 GB, 1 GB on 32-bit systems */
-int LZ4IO_defaultNbWorkers(void);
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename);
 
@@ -127,7 +127,8 @@ int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable);
 /* Default setting : 1 == regular files are memory-mapped for compression, when supported.
  * Note : a file truncated during its compression, or unreadable (I/O error), raises SIGBUS :
  * a handler, installed while the file is mapped, reports it and terminates the process (error 53).
- * A file modified during its compression is also detected : input read once only triggers a warning ;
+ * A file modified during its compression is also detected (kept with --rm, as a file renamed or replaced) :
+ * input read once only triggers a warning ;
  * memory-mapped input is read several times : when its content can't be verified unchanged
  * (using the frame checksum, ex: file only grown), the output is removed (error 54). */
 int LZ4IO_setMmap(LZ4IO_prefs_t* const prefs, int enable);

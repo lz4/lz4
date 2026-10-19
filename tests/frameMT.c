@@ -35,6 +35,7 @@
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
  * - serial processing (dstCapacity too small for parallel jobs) produces the same output
+ * - destination too small : the frame is invalidated (no truncated frame), and the context remains usable
  * - all allocations happen in the calling thread (custom allocator is not thread-safe : see TSAN)
  * - prints a digest of produced frames, to compare builds with and without LZ4F_MULTITHREAD
  * Bench mode : frameMT -b FILE [-l#] [-B#] [-D] [-c] [-T#]
@@ -697,11 +698,105 @@ static int validateAllocFailures(void)
     return 0;
 }
 
+/* begin, update (whole input), flush, end : from operation @smallFrom onwards (0:update, 1:flush, 2:end ; 3:never),
+ * each operation only receives @capacity, instead of all remaining capacity. @smallFrom == 2 : no flush.
+ * @return : frame size, or the first error, *failedOp being then the failed operation */
+static size_t streamOps(LZ4F_cctx* cctx, const LZ4F_preferences_t* prefs,
+                        char* dst, size_t dstCapacity, const char* src, size_t srcSize,
+                        int smallFrom, size_t capacity, int* failedOp)
+{
+    size_t pos = LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
+    int op;
+    *failedOp = -1;
+    if (LZ4F_isError(pos)) return pos;
+    for (op = 0; op < 3; op++) {
+        size_t const c = (op >= smallFrom) ? capacity : dstCapacity - pos;
+        size_t r;
+        if ((op == 1) && (smallFrom == 2)) continue;
+        if (op == 0) r = LZ4F_compressUpdate(cctx, dst + pos, c, src, srcSize, NULL);
+        else if (op == 1) r = LZ4F_flush(cctx, dst + pos, c, NULL);
+        else r = LZ4F_compressEnd(cctx, dst + pos, c, NULL);
+        if (LZ4F_isError(r)) { *failedOp = op; return r; }
+        pos += r;
+    }
+    return pos;
+}
 
-/*-************************************
-*  File API (lz4file.h)
-**************************************/
-/* LZ4F_write() streams through LZ4F_compressUpdate() : same frame as one-shot compression */
+/* Destination too small : the operation fails with dstCapacity_tooSmall, and invalidates the frame :
+ * next operations fail with compressionState_uninitialized (in particular, no end mark : no truncated frame),
+ * until LZ4F_compressBegin() starts a new frame, identical to the reference. Same contract as nbWorkers == 0.
+ * Without autoFlush, the failing operation depends on scheduling : the first one given too little capacity, or a later one. */
+static int validateDstTooSmall(void)
+{
+    static const unsigned nbWorkersList[] = { 0, 1, 3 };   /* 1 : job slots fill up within LZ4F_compressUpdate() */
+    size_t const srcSize = 13 MB + 50 KB;   /* incomplete last job, and last block */
+    size_t const smallCapacity = 1 KB;
+    size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
+    char* const src = (char*)malloc(srcSize);
+    char* const ref = (char*)malloc(dstCapacity);
+    char* const out = (char*)malloc(dstCapacity);
+    LZ4F_CustomMem const countingMem = { countingAlloc, NULL, countingFree, NULL };
+    unsigned nbConfigs = 0, nbFailures = 0;
+    size_t wi;
+    int linked, autoFlush, smallFrom;
+
+    g_step = "dstCapacity too small";
+    CHECK(src && ref && out, "allocation failed");
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 19);
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
+    for (linked = 0; linked <= 1; linked++)
+    for (autoFlush = 0; autoFlush <= 1; autoFlush++)
+    for (smallFrom = 0; smallFrom <= 2; smallFrom++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        int const mustFail = !autoFlush || (smallFrom == 0);   /* otherwise, only the end mark remains to be written */
+        LZ4F_cctx* cctx;
+        size_t refSize, r;
+        int failedOp;
+        if (g_quick && (smallFrom == 1)) continue;
+        cctx = LZ4F_createCompressionContext_advanced(countingMem, LZ4F_VERSION);
+        CHECK(cctx != NULL, "allocation failed");
+        prefs.compressionLevel = 1;
+        prefs.nbWorkers = nbWorkersList[wi];
+        prefs.autoFlush = (unsigned)autoFlush;
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        refSize = streamOps(cctx, &prefs, ref, dstCapacity, src, srcSize, 3, 0, &failedOp);
+
+        CHECK_LZ4F(refSize);
+
+        r = streamOps(cctx, &prefs, out, dstCapacity, src, srcSize, smallFrom, smallCapacity, &failedOp);
+        if (!LZ4F_isError(r)) {
+            CHECK(!mustFail, "%u workers, smallFrom=%i : should have failed", prefs.nbWorkers, smallFrom);
+            CHECK(r == refSize && !memcmp(out, ref, r), "%u workers : output differs", prefs.nbWorkers);
+        } else {
+            CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_dstCapacity_tooSmall,
+                  "%u workers : unexpected error %s", prefs.nbWorkers, LZ4F_getErrorName(r));
+            CHECK(failedOp >= smallFrom, "%u workers : failed with enough capacity", prefs.nbWorkers);
+            nbFailures++;
+            /* frame invalidated */
+            r = LZ4F_compressUpdate(cctx, out, dstCapacity, src, 1 KB, NULL);
+            CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                  "%u workers : update after failure : %s", prefs.nbWorkers, LZ4F_getErrorName(r));
+            r = LZ4F_flush(cctx, out, dstCapacity, NULL);
+            CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                  "%u workers : flush after failure : %s", prefs.nbWorkers, LZ4F_getErrorName(r));
+            r = LZ4F_compressEnd(cctx, out, dstCapacity, NULL);
+            CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                  "%u workers : end after failure : %s", prefs.nbWorkers, LZ4F_getErrorName(r));
+        }
+        /* context remains usable */
+        r = streamOps(cctx, &prefs, out, dstCapacity, src, srcSize, 3, 0, &failedOp);
+        CHECK(r == refSize && !memcmp(out, ref, r), "%u workers : next frame differs", prefs.nbWorkers);
+        LZ4F_freeCompressionContext(cctx);
+        CHECK(g_nbAllocs == g_nbFrees, "memory leak (%u allocations, %u frees)", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
+        nbConfigs++;
+    }
+    DISPLAY("dstCapacity too small : %u configurations validated, %u failures \n", nbConfigs, nbFailures);
+    free(src); free(ref); free(out);
+    return 0;
+}
+
+
 /* A failure while creating worker threads (ex: transient allocation failure) is absorbed :
  * jobs are processed serially, producing the same output. Worker threads are created again for next frames. */
 static int validatePoolRetry(void)
@@ -759,6 +854,11 @@ static int validatePoolRetry(void)
     return 0;
 }
 
+
+/*-************************************
+*  File API (lz4file.h)
+**************************************/
+/* LZ4F_write() streams through LZ4F_compressUpdate() : same frame as one-shot compression */
 static int validateFileAPI(void)
 {
     size_t const srcSize = 9 MB + 5;
@@ -1027,6 +1127,7 @@ int main(int argc, const char** argv)
         validateStreaming(&digest);
         validateFlushContract();
         validateAllocFailures();
+        validateDstTooSmall();
         validatePoolRetry();
         validateFileAPI();
         printf("digest : %016llx \n", (unsigned long long)XXH64_digest(&digest));

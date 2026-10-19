@@ -30,6 +30,19 @@ echo !BIN!\lz4 -d -f tmp-empty.lz4 tmp-empty.out
      !BIN!\lz4 -d -f tmp-empty.lz4 tmp-empty.out	|| goto :ERROR
 del tmp-empty tmp-empty.lz4 tmp-empty.out
 
+@rem multithreaded compression (liblz4 worker threads) : same output whatever the nb of threads
+echo !BIN!\datagen -g13M ^> tmp-mt
+     !BIN!\datagen -g13M > tmp-mt	|| goto :ERROR
+for %%O in ("-1" "-1 -BD" "-9 -BD -BX") do (
+    echo !BIN!\lz4 %%~O -T1 / -T4 tmp-mt
+    !BIN!\lz4 -q -f %%~O -T1 tmp-mt tmp-mt-T1.lz4	|| goto :ERROR
+    !BIN!\lz4 -q -f %%~O -T4 tmp-mt tmp-mt-T4.lz4	|| goto :ERROR
+    fc /b tmp-mt-T1.lz4 tmp-mt-T4.lz4 > nul	|| goto :ERROR
+    !BIN!\lz4 -q -d -f tmp-mt-T4.lz4 tmp-mt.out	|| goto :ERROR
+    fc /b tmp-mt tmp-mt.out > nul	|| goto :ERROR
+)
+del tmp-mt tmp-mt-T1.lz4 tmp-mt-T4.lz4 tmp-mt.out
+
 echo fullbench
 !BIN!\fullbench.exe --no-prompt -i1 %TEST_FILES%	|| goto :ERROR
 

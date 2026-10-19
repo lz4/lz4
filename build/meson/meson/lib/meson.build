@@ -133,7 +133,8 @@ if internal_lib
 endif
 
 # liblz4 is the shared library when both are built :
-# the threads dependency of a multi-threaded static library must be listed explicitly (pkg-config --static)
+# the threads dependency of a multi-threaded static library must then be listed explicitly (pkg-config --static).
+# A static-only build already lists it (Libs: -pthread).
 pkgconfig.generate(
   liblz4,
   name: 'lz4',

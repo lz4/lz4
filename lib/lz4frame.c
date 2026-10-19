@@ -1753,23 +1753,25 @@ static BYTE* LZ4F_mt_acquireInBuff(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
     }
 }
 
-/* emits oldest submitted job into @dst + @pos, waiting for it if needed (see LZ4F_pool_waitDone()) */
+/* emits oldest submitted job into @dst + @pos, waiting for it if needed (see LZ4F_pool_waitDone()).
+ * On error, the job remains submitted : callers invalidate the frame, discarding its jobs (FORWARD_IF_ERROR_MT) */
 static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos, unsigned minQueue)
 {
     LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
     assert(mt->nbSubmitted > 0);
     assert(pos <= dstCapacity);
     LZ4F_pool_waitDone(mt->pool, &job->done, minQueue);
-    LZ4F_mt_releaseInBuff(mt, job);
-    mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
-    mt->nbSubmitted--;
     FORWARD_IF_ERROR(job->cSize);
     RETURN_ERROR_IF(job->cSize > dstCapacity - pos, dstCapacity_tooSmall);
     memcpy(dst + pos, job->outBuff, job->cSize);
+    LZ4F_mt_releaseInBuff(mt, job);
+    mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
+    mt->nbSubmitted--;
     return job->cSize;
 }
 
-/* emits submitted jobs in order : all of them (@all), or only the already completed ones */
+/* emits submitted jobs in order : all of them (@all), or only the already completed ones.
+ * On error, callers invalidate the frame (FORWARD_IF_ERROR_MT) */
 static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos, int all)
 {
     size_t written = 0;
@@ -1799,7 +1801,9 @@ static void LZ4F_mt_abort(LZ4F_mtCtx_t* mt)
     mt->uncTailSize = 0;
 }
 
-/* a failed operation invalidates the frame, and discards its jobs */
+/* a failed operation invalidates the frame, and discards its jobs :
+ * next operations fail with compressionState_uninitialized, until LZ4F_compressBegin().
+ * Idempotent : also employed to forward errors of functions which already invalidated the frame */
 #define FORWARD_IF_ERROR_MT(r, cctx) do {   \
         size_t const err_code = (r);         \
         if (LZ4F_isError(err_code)) {        \
@@ -2038,7 +2042,7 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
     DEBUGLOG(4, "LZ4F_compressUpdate_MT (srcSize=%u)", (unsigned)srcSize);
     RETURN_ERROR_IF(cctx->cStage != 1, compressionState_uninitialized);
     {   size_t const r = LZ4F_mt_emitUncTail(cctx, dst, dstCapacity, pos);   /* switch from uncompressed blocks */
-        FORWARD_IF_ERROR(r);
+        FORWARD_IF_ERROR_MT(r, cctx);
         pos += r;
     }
 
@@ -2097,7 +2101,7 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
 
     if (cctx->prefs.autoFlush) {
         size_t const r = LZ4F_mt_flush(cctx, dst, dstCapacity, pos);
-        FORWARD_IF_ERROR(r);
+        FORWARD_IF_ERROR_MT(r, cctx);
         return pos + r;
     }
     {   size_t const r = LZ4F_mt_emit(mt, dst, dstCapacity, pos, 0);
@@ -2123,7 +2127,7 @@ static size_t LZ4F_uncompressedUpdate_MT(LZ4F_cctx_t* cctx,
     RETURN_ERROR_IF(cctx->prefs.frameInfo.blockMode != LZ4F_blockIndependent, blockMode_invalid);
     if (mt->nbSubmitted || mt->filling) {   /* switch from compressed blocks */
         pos = LZ4F_mt_flush(cctx, dst, dstCapacity, 0);
-        FORWARD_IF_ERROR(pos);
+        FORWARD_IF_ERROR_MT(pos, cctx);
     }
     mt->stableEnd = NULL;   /* next input doesn't follow previous stable input anymore */
     if (cctx->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled)
@@ -2139,7 +2143,7 @@ static size_t LZ4F_uncompressedUpdate_MT(LZ4F_cctx_t* cctx,
         srcSize -= toCopy;
         if (mt->uncTailSize == blockSize) {
             size_t const r = LZ4F_mt_emitUncTail(cctx, dst, dstCapacity, pos);
-            FORWARD_IF_ERROR(r);
+            FORWARD_IF_ERROR_MT(r, cctx);
             pos += r;
     }   }
 

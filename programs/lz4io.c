@@ -1420,6 +1420,23 @@ static int LZ4IO_srcModified(const LZ4IO_srcState_t* before, FILE* srcFile)
     return 0;
 }
 
+/* @return : 1 if @srcFileName doesn't designate the compressed file anymore (ex: log rotation),
+ *           so that --rm would remove another file */
+static int LZ4IO_srcReplaced(const LZ4IO_srcState_t* s, const char* srcFileName)
+{
+#if defined(_WIN32)
+    /* no inode numbers, and st_dev differs between _stat() and _fstat() :
+     * but an open file can't be renamed nor removed there */
+    (void)s; (void)srcFileName;
+    return 0;
+#else
+    stat_t st;
+    if (!s->valid || LZ4IO_isStdin(srcFileName)) return 0;
+    if (!UTIL_getFileStat(srcFileName, &st)) return 1;   /* removed, or not a regular file anymore */
+    return (st.st_dev != s->st.st_dev) || (st.st_ino != s->st.st_ino);
+#endif
+}
+
 /* @return : 1 if the mapped content still matches the frame's content checksum (stored in its last 4 bytes),
  *           0 if it differs, or can't be verified (no checksum, or file shrunk : mapped content can't be read) */
 static int LZ4IO_mappedContentUnchanged(const LZ4IO_cInput_t* in, FILE* srcFile,
@@ -1466,7 +1483,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     /* Init */
     FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
     LZ4IO_srcState_t srcState;
-    int srcModified;
+    int srcModified, srcReplaced;
     const void* frameEnd = NULL;   /* end of frame, within dstBuffer (content checksum) */
     if (srcFile == NULL) return 1;
     srcState = LZ4IO_getSrcState(srcFile);
@@ -1570,20 +1587,23 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
 
     /* Release file handlers */
     srcModified = LZ4IO_srcModified(&srcState, srcFile);
+    srcReplaced = LZ4IO_srcReplaced(&srcState, srcFileName);
     {   int const inconsistent = srcModified && (input.map != NULL)
                 && !LZ4IO_mappedContentUnchanged(&input, srcFile,
                         prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled, frameEnd);
         LZ4IO_unmapInput(&input);
         fclose (srcFile);
         if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
-        if (srcModified) {
+        if (srcModified || srcReplaced) {
             /* source is preserved, even with --rm */
             if (inconsistent) {   /* inconsistent output is removed */
                 if (!LZ4IO_isStdout(dstFileName) && !LZ4IO_isDevNull(dstFileName)) (void)remove(dstFileName);
                 END_PROCESS(54, "%s : file modified during compression (memory-mapped) : output removed ; see --no-mmap", srcFileName);
             }
-            DISPLAYLEVEL(2, "\rWarning : %s : file modified during compression : output holds the content read%s \n",
-                            srcFileName, io_prefs->removeSrcFile ? " ; source kept" : "");
+            /* --rm not honored : also displayed in modes lowering notifications (stdout, multiple files) */
+            DISPLAYLEVEL((io_prefs->removeSrcFile ? 1 : 2), "\rWarning : %s : file %s during compression : output holds the content read%s \n",
+                            srcFileName, srcReplaced ? "renamed or replaced" : "modified",
+                            io_prefs->removeSrcFile ? " ; source kept" : "");
     }   }
 
     /* Copy owner, file permissions and modification time */
@@ -1591,11 +1611,12 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         if (!LZ4IO_isStdin(srcFileName)
          && !LZ4IO_isStdout(dstFileName)
          && !LZ4IO_isDevNull(dstFileName)
+         && !srcReplaced
          && UTIL_getFileStat(srcFileName, &statbuf)) {
             UTIL_setFileStat(dstFileName, &statbuf);
     }   }
 
-    if (io_prefs->removeSrcFile && !srcModified) {  /* remove source file : --rm */
+    if (io_prefs->removeSrcFile && !srcModified && !srcReplaced) {  /* remove source file : --rm */
         if (remove(srcFileName))
             END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
     }

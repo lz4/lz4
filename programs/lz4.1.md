@@ -226,8 +226,8 @@ only the latest one will be applied.
   Note : a file truncated while being compressed, or an I/O error while reading it,
   then interrupts `lz4` with error 53 (instead of compressing the content read up to that point) ;
   use `--no-mmap` when sources may be truncated or rewritten concurrently.<br/>
-  Note : a source file modified while being compressed (size or times changed) is detected after its compression,
-  and is kept, even with `--rm`. When the output is valid, `lz4` only issues a warning :
+  Note : a source file modified while being compressed (size or times changed), or renamed or replaced (ex: log rotation),
+  is detected after its compression, and is kept, even with `--rm`. When the output is valid, `lz4` only issues a warning :
   with `--no-mmap`, input is read once, so the output holds the content read (ex: up to the end of a log file growing meanwhile) ;
   memory-mapped input is read several times, so its content is verified unchanged, using the frame checksum
   (ex: log file growing meanwhile : the output holds the file as it was when opened).
@@ -258,7 +258,7 @@ only the latest one will be applied.
 
 * `--rm` :
   Delete source files on successful compression or decompression.
-  A source file modified during its compression is kept (see `--[no-]mmap`).
+  A source file modified, renamed or replaced during its compression is kept (see `--[no-]mmap`).
 
 * `--` :
   Treat all subsequent arguments as files

@@ -210,7 +210,7 @@ Memory\-map regular files to compress, so that compression threads read them in 
 Note : a file truncated while being compressed, or an I/O error while reading it, then interrupts \fBlz4\fR with error 53 (instead of compressing the content read up to that point) ; use \fB\-\-no\-mmap\fR when sources may be truncated or rewritten concurrently\.
 .
 .br
-Note : a source file modified while being compressed (size or times changed) is detected after its compression, and is kept, even with \fB\-\-rm\fR\. When the output is valid, \fBlz4\fR only issues a warning : with \fB\-\-no\-mmap\fR, input is read once, so the output holds the content read (ex: up to the end of a log file growing meanwhile) ; memory\-mapped input is read several times, so its content is verified unchanged, using the frame checksum (ex: log file growing meanwhile : the output holds the file as it was when opened)\. Otherwise (content rewritten, \fB\-\-no\-frame\-crc\fR, or file shrunk), the output could be inconsistent : \fBlz4\fR reports error 54 and removes it\.
+Note : a source file modified while being compressed (size or times changed), or renamed or replaced (ex: log rotation), is detected after its compression, and is kept, even with \fB\-\-rm\fR\. When the output is valid, \fBlz4\fR only issues a warning : with \fB\-\-no\-mmap\fR, input is read once, so the output holds the content read (ex: up to the end of a log file growing meanwhile) ; memory\-mapped input is read several times, so its content is verified unchanged, using the frame checksum (ex: log file growing meanwhile : the output holds the file as it was when opened)\. Otherwise (content rewritten, \fB\-\-no\-frame\-crc\fR, or file shrunk), the output could be inconsistent : \fBlz4\fR reports error 54 and removes it\.
 .
 .TP
 \fB\-l\fR
@@ -243,7 +243,7 @@ Preserve source files (default behavior)
 .
 .TP
 \fB\-\-rm\fR
-Delete source files on successful compression or decompression\. A source file modified during its compression is kept (see \fB\-\-[no\-]mmap\fR)\.
+Delete source files on successful compression or decompression\. A source file modified, renamed or replaced during its compression is kept (see \fB\-\-[no\-]mmap\fR)\.
 .
 .TP
 \fB\-\-\fR
