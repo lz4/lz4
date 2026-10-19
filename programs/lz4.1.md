@@ -143,8 +143,15 @@ only the latest one will be applied.
 * `-T#`, `--threads=#`:
   Use `#` worker threads for compression.
   The main thread also compresses while waiting for them, so up to `#+1` cores can be busy.
-  When `0`, or none provided: automatically determined from nb of detected cores.
+  When `0`, or none provided: automatically determined from nb of detected cores,
+  within memory budget (see `--memory`), and no more than the jobs of each file.
+  An explicit `#` is only limited by the memory budget when it's set (`--memory`, `LZ4_MEMORY`), or on 32-bit systems.
   Ignored with a custom block size (see `-B#`).
+
+* `--memory=#`:
+  Memory budget of multi-threaded compression, in bytes, with optional suffixes `K`, `M`, `G` (powers of 1024)
+  (default: 4 GB, 1 GB on 32-bit systems). It limits the number of worker threads.
+  Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller independent blocks.
 
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.
@@ -280,7 +287,10 @@ When set as global environment variables, it can be a way to enforce personalize
   specify a default compression level that `lz4` employs for compression when no other compression level is specified on command line. Executable default is generally `1`.
 
 * `LZ4_NBWORKERS`:
-  specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu. This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
+  specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu, within memory budget. This functionality is only relevant when `lz4` is compiled with multithreading support.
+
+* `LZ4_MEMORY`:
+  specify a memory budget for multi-threaded compression, same as `--memory=#`.
 
 
 BUGS

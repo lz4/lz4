@@ -205,7 +205,7 @@ typedef struct {
 
 /* nbWorkers : experimental
  *  0 (default) : single-threaded, unchanged behavior.
- *  >= 1 : input is cut into jobs, compressed by up to nbWorkers worker threads (capped at 200).
+ *  >= 1 : input is cut into jobs, compressed by up to nbWorkers worker threads (capped at 1024, 200 on 32-bit systems).
  *         The calling thread also processes jobs, while waiting for them :
  *         up to nbWorkers+1 threads can be compressing simultaneously.
  *  - Output only depends on content, parameters and flush points :
@@ -229,7 +229,8 @@ typedef struct {
  *  - LZ4F_compressBegin_usingDict() isn't supported : frames remain single-threaded. Prefer a CDict.
  *  Multi-threading requires lz4frame.c to be compiled with LZ4F_MULTITHREAD=1 (and -pthread on POSIX systems) :
  *  by default, the dynamic library is built with multi-threading support, and the static library without.
- *  Otherwise, jobs are processed serially by the calling thread, producing the same output. */
+ *  Otherwise, independent blocks are compressed in single-threaded mode (same output),
+ *  and jobs of linked blocks are processed serially by the calling thread (same output, slightly slower). */
 
 
 /*-*********************************

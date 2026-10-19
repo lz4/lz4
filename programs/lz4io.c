@@ -228,6 +228,8 @@ struct LZ4IO_prefs_s {
     const char* dictionaryFilename;
     int removeSrcFile;
     int nbWorkers;
+    int autoWorkers;   /* nbWorkers determined automatically */
+    U64 memoryBudget;  /* 0 : default (LZ4IO_MEMORY_BUDGET) */
     int useMmap;
 };
 
@@ -254,16 +256,25 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     prefs->dictionaryFilename = NULL;
     prefs->removeSrcFile = 0;
     prefs->nbWorkers = LZ4IO_defaultNbWorkers();
+    prefs->autoWorkers = 1;
+    prefs->memoryBudget = 0;
     prefs->useMmap = 1;
     return prefs;
 }
 
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers)
 {
+    prefs->autoWorkers = (nbWorkers == 0);
+    if (nbWorkers == 0) nbWorkers = LZ4IO_defaultNbWorkers();
     if (nbWorkers < 1 ) nbWorkers = 1;
-    nbWorkers = MIN(nbWorkers, LZ4_NBWORKERS_MAX);
     prefs->nbWorkers = nbWorkers;
     return nbWorkers;
+}
+
+unsigned long long LZ4IO_setMemoryBudget(LZ4IO_prefs_t* const prefs, unsigned long long budget)
+{
+    prefs->memoryBudget = budget;
+    return budget;
 }
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename)
@@ -1163,6 +1174,50 @@ static int LZ4IO_customBlockSize(const LZ4IO_prefs_t* io_prefs)
     return io_prefs->blockSize != LZ4F_getBlockSize((LZ4F_blockSizeID_t)io_prefs->blockSizeId);
 }
 
+/* Memory budget of frame compression : limits the automatic nb of workers,
+ * and explicit ones on 32-bit systems, where address space is scarce */
+#ifndef LZ4IO_MEMORY_BUDGET
+#  define LZ4IO_MEMORY_BUDGET ((sizeof(size_t) < 8) ? ((U64)1 << 30) : ((U64)4 << 30))
+#endif
+
+/* size of liblz4 compression jobs (see LZ4F_mtJobSize()) */
+static size_t LZ4IO_jobSize(const LZ4F_preferences_t* prefs)
+{
+    size_t const bs = LZ4F_getBlockSize(prefs->frameInfo.blockSizeID);
+    size_t const blockSize = LZ4F_isError(bs) ? 4 MB : bs;
+    size_t const target = (prefs->frameInfo.blockMode == LZ4F_blockLinked) ? 4 MB : 1 MB;
+    if (blockSize >= target) return blockSize;
+    return (target / blockSize) * blockSize;
+}
+
+/* estimated memory of frame compression with @nbWorkers :
+ * liblz4's job slots, input buffers and LZ4 states, plus the CLI's own buffers */
+static U64 LZ4IO_compressionMemory(const LZ4F_preferences_t* prefs, unsigned nbWorkers, size_t srcBufferSize)
+{
+    LZ4F_preferences_t p = *prefs;
+    size_t const jobSize = LZ4IO_jobSize(prefs);
+    U64 const outCapacity = (U64)jobSize + (jobSize / (64 KB) + 1) * 8;   /* + block headers and checksums */
+    p.nbWorkers = nbWorkers;
+    return (2 * (U64)nbWorkers + 1) * outCapacity                 /* job slots */
+         + ((U64)nbWorkers + 1) * (64 KB + jobSize)               /* input buffers */
+         + ((U64)nbWorkers + 1) * (U64)LZ4_sizeofStateHC()        /* one LZ4 state per thread (worst case : HC) */
+         + LZ4F_compressBound(srcBufferSize, &p) + srcBufferSize; /* CLI buffers */
+}
+
+unsigned long long LZ4IO_defaultMemoryBudget(void) { return LZ4IO_MEMORY_BUDGET; }
+
+/* @return : largest nb of workers, up to @nbWorkers, within @budget (at least 1) */
+static unsigned LZ4IO_budgetNbWorkers(const LZ4F_preferences_t* prefs, unsigned nbWorkers, size_t srcBufferSize, U64 budget)
+{
+    unsigned lo = 1, hi = MAX(nbWorkers, 1);   /* memory grows with nbWorkers */
+    while (lo < hi) {
+        unsigned const mid = lo + (hi - lo + 1) / 2;
+        if (LZ4IO_compressionMemory(prefs, mid, srcBufferSize) <= budget) lo = mid;
+        else hi = mid - 1;
+    }
+    return lo;
+}
+
 static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
 {
     const size_t chunkSize = 4 MB;
@@ -1170,6 +1225,11 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     memset(&ress, 0, sizeof(ress));
 
     /* set compression advanced parameters */
+    ress.preparedPrefs.frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
+    ress.preparedPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
+    ress.preparedPrefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
+    ress.preparedPrefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
+    ress.preparedPrefs.favorDecSpeed = io_prefs->favorDecSpeed;
     if (LZ4IO_customBlockSize(io_prefs)) {
         /* LZ4F cuts blocks at standard sizes only :
          * custom sizes require autoFlush, and one LZ4F_compressUpdate() invocation per block,
@@ -1182,13 +1242,24 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     } else {
         /* frames are cut into jobs, compressed by liblz4's worker threads (when available) :
          * output doesn't depend on nbWorkers, nor on multi-threading support */
-        ress.preparedPrefs.nbWorkers = (unsigned)MAX(io_prefs->nbWorkers, 1);
+        unsigned nbWorkers = (unsigned)MAX(io_prefs->nbWorkers, 1);
+        U64 const budget = io_prefs->memoryBudget ? io_prefs->memoryBudget : LZ4IO_MEMORY_BUDGET;
+        if (io_prefs->autoWorkers || io_prefs->memoryBudget || (sizeof(size_t) < 8)) {
+            unsigned const budgeted = LZ4IO_budgetNbWorkers(&ress.preparedPrefs, nbWorkers, chunkSize, budget);
+            if (budgeted < nbWorkers)
+                DISPLAYLEVEL(3, "Memory budget (%u MB) : %u threads instead of %u \n",
+                                (unsigned)(budget >> 20), budgeted, nbWorkers);
+            if (LZ4IO_compressionMemory(&ress.preparedPrefs, budgeted, chunkSize) > budget)
+                DISPLAYLEVEL(2, "Warning : memory budget (%u MB) too small : compression requires ~%u MB \n",
+                                (unsigned)(budget >> 20),
+                                (unsigned)(LZ4IO_compressionMemory(&ress.preparedPrefs, budgeted, chunkSize) >> 20));
+            nbWorkers = budgeted;
+        }
+#if LZ4IO_MULTITHREAD
+        DISPLAYLEVEL(3, "Using %s%u threads for compression \n", io_prefs->autoWorkers ? "up to " : "", nbWorkers);
+#endif
+        ress.preparedPrefs.nbWorkers = nbWorkers;
     }
-    ress.preparedPrefs.frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
-    ress.preparedPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
-    ress.preparedPrefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
-    ress.preparedPrefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
-    ress.preparedPrefs.favorDecSpeed = io_prefs->favorDecSpeed;
 
     /* Allocate compression state */
     {   LZ4F_errorCode_t const errorCode = LZ4F_createCompressionContext(&(ress.ctx), LZ4F_VERSION);
@@ -1412,9 +1483,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     const size_t blockSize = io_prefs->blockSize;
     /* custom block sizes : one block per invocation (see LZ4IO_createCResources()) */
     const size_t chunkSize = LZ4IO_customBlockSize(io_prefs) ? blockSize : ress->srcBufferSize;
-    /* memory-mapped input is released behind jobs in flight (only a memory hint) :
-     * liblz4 keeps up to 2*nbWorkers+1 jobs of at most 4 MB in flight, each reading 64 KB of history before it */
-    const size_t releaseLag = (2 * (size_t)io_prefs->nbWorkers + 1) * (4 MB) + 64 KB;
+    size_t releaseLag;   /* memory-mapped input released behind jobs in flight */
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
     LZ4F_preferences_t prefs;
@@ -1451,6 +1520,16 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
     }
+    /* automatic nb of workers : no more than the jobs of the file (output doesn't depend on nbWorkers) */
+    if (io_prefs->autoWorkers && (prefs.nbWorkers > 1)) {
+        U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown */
+        U64 const jobSize = LZ4IO_jobSize(&prefs);
+        U64 const nbJobs = (fileSize + jobSize - 1) / jobSize;
+        if (fileSize && (nbJobs < prefs.nbWorkers)) prefs.nbWorkers = (unsigned)nbJobs;
+    }
+    /* memory-mapped input is released (only a memory hint) behind jobs in flight :
+     * liblz4 keeps up to 2*nbWorkers+1 jobs of at most 4 MB in flight, each reading 64 KB of history before it */
+    releaseLag = (2 * (size_t)prefs.nbWorkers + 1) * (4 MB) + 64 KB;
 
     /* read first chunk */
     readSize  = LZ4IO_readInput(&input, chunkSize, &chunk);

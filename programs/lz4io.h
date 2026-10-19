@@ -75,7 +75,15 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 /* ****************** Parameters ******************** */
 /* ************************************************** */
 
+/* nbWorkers : 0 == automatic : nb of cores, within memory budget (see LZ4IO_setMemoryBudget()),
+ *             and no more than the nb of jobs of each file (when its size is known) ;
+ *             >= 1 : explicit (within memory budget when it's set, or on 32-bit systems) */
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
+
+/* memory budget of multi-threaded compression, in bytes : limits the automatic nb of workers,
+ * and, when set (> 0), explicit ones too ; 0 : default budget (LZ4IO_defaultMemoryBudget()) */
+unsigned long long LZ4IO_setMemoryBudget(LZ4IO_prefs_t* const prefs, unsigned long long budget);
+unsigned long long LZ4IO_defaultMemoryBudget(void);   /* 4 GB, 1 GB on 32-bit systems */
 int LZ4IO_defaultNbWorkers(void);
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename);

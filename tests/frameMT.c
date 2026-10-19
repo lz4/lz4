@@ -29,6 +29,7 @@
  * - output is identical for any nbWorkers >= 1
  * - streaming : same output as one-shot, whatever input slicing and stableSrc ;
  *   flushes, autoFlush and uncompressed segments produce the same output whatever nbWorkers ;
+ *   with independent blocks, the same output as nbWorkers == 0 ;
  *   each invocation succeeds with exactly LZ4F_compressBound() ;
  *   input isn't read after invocation, unless LZ4F_srcStableUntilFlush ;
  *   abandoned frames (jobs in flight) are handled
@@ -162,7 +163,7 @@ static int validate(XXH64_state_t* digest)
 {
     static const size_t srcSizes[] = { 1 MB + 1, 4 MB - 1, 4 MB + 1, 9 MB + 12345, 17 MB + 3 };
     static const int levels[] = { -3, 0, 1, 2, 4, 9, 10, 12 };
-    static const unsigned nbWorkersList[] = { 2, 3, 8, 1000 /* capped */ };
+    static const unsigned nbWorkersList[] = { 2, 3, 8, 1000 /* capped (tests/Makefile : LZ4F_NBWORKERS_MAX=200) */ };
     size_t const srcSizeMax = 17 MB + 3;
     size_t const dictSize = 64 KB;
     size_t const dstCapacity = LZ4F_compressFrameBound(srcSizeMax, NULL);
@@ -531,6 +532,9 @@ static int validateStreaming(XXH64_state_t* digest)
                         uncRef = c;
                         memcpy(refUnc, out, c);
                         XXH64_update(digest, out, c);
+                        {   size_t const c0 = streamCompress(cctx, out, src, srcSize, cd, &prefs, 0, uncMode, sliceSeed + 4, tmpOut, scratch);
+                            CHECK(c0 == uncRef && !memcmp(out, refUnc, c0), "stream with uncompressed segments differs from single-threaded");
+                        }
                     } else {
                         CHECK(c == uncRef && !memcmp(out, refUnc, c), "stream with uncompressed segments differs with %u workers", nbWorkers);
                     }

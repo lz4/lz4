@@ -31,9 +31,9 @@ On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=
 - `LZ4IO_MULTITHREAD`: enable multithreading support. Default is disabled.
 - `LZ4_NBWORKERS_DEFAULT`: default nb of worker threads used in multithreading mode (can be overridden with command `-T#`).
    Default is `0`, which means "auto-determine" based on local cpu.
-- `LZ4_NBWORKERS_MAX`: absolute maximum nb of workers that can be requested at runtime.
-   Currently set to 200 by default.
-   This is mostly meant to protect the system against unreasonable and likely bogus requests, such as a million threads.
+- `LZ4_NBWORKERS_MAX`: maximum nb of worker threads of the legacy format (`-l`). Currently set to 200 by default.
+   For the frame format, the nb of workers is limited by a memory budget instead (see `--memory`, `LZ4_MEMORY`),
+   and by liblz4 (sanity limit : 1024, 200 on 32-bit systems).
 - `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 7, corresponding to 4 MB block size.
 
 #### Environment Variables
@@ -44,7 +44,9 @@ When set as global environment variables, it can enforce personalized defaults d
 
 `LZ4_CLEVEL` can be used to specify a default compression level that `lz4` employs for compression when no other compression level is specified on command line. Executable default is generally `1`.
 
-`LZ4_NBWORKERS` can be used to specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu. This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
+`LZ4_NBWORKERS` can be used to specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu, within memory budget. This functionality is only relevant when `lz4` is compiled with multithreading support.
+
+`LZ4_MEMORY` can be used to specify a memory budget for multi-threaded compression (default : 4 GB, 1 GB on 32-bit systems), same as `--memory=#`, with optional suffixes `K`, `M`, `G`.
 
 ### Aggregation of parameters
 The `lz4` CLI supports aggregation for short commands. For example, `-d`, `-q`, and `-f` can be joined into `-dqf`.
