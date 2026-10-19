@@ -102,6 +102,8 @@ only the latest one will be applied.
   Decompress.
   `--decompress` is also the default operation when the input filename has an
   `.lz4` extension.
+  `lz4` can also decode Firefox's `mozlz4` files (`.jsonlz4`, `.mozlz4`),
+  for example `lz4cat sessionstore.jsonlz4`.
 
 * `-t` `--test`:
   Test the integrity of compressed `.lz4` files.
