@@ -1228,8 +1228,9 @@ static const LZ4F_compressOptions_t k_cOptionsNull = { 0, 0, 0, 0 };
  * and their outputs are emitted in order by the calling thread.
  * Output only depends on content and flush points :
  * never on nb of workers, scheduling, input slicing, nor stableSrc.
- * Without multi-threading support (LZ4F_MULTITHREAD), or with nbWorkers == 1,
- * the calling thread processes jobs itself, producing the same output. */
+ * nbWorkers == 1 means one worker thread, in addition to the calling thread.
+ * Without multi-threading support (LZ4F_MULTITHREAD), or without worker threads (creation failure),
+ * the calling thread processes jobs alone, producing the same output. */
 
 /*! LZ4F_compressJob() :
  *  compress one job, as a sequence of blocks.

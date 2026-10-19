@@ -223,7 +223,7 @@ static int validate(XXH64_state_t* digest)
             CHECK_LZ4F(c0);
             checkRoundTrip(ref0, c0, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
 
-            /* nbWorkers == 1 : jobs, processed serially */
+            /* nbWorkers == 1 : one worker thread, plus the calling thread (serial without LZ4F_MULTITHREAD) */
             c1 = compressMT(cctx, ref1, dstCapacity, src, srcSize, cd, &prefs, 1);
             CHECK_LZ4F(c1);
             checkRoundTrip(ref1, c1, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
