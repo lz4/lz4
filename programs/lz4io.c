@@ -82,6 +82,8 @@
 #define LZ4IO_SKIPPABLE0    0x184D2A50
 #define LZ4IO_SKIPPABLEMASK 0xFFFFFFF0
 #define LEGACY_MAGICNUMBER  0x184C2102
+#define MOZLZ4_MAGIC        "mozLz40"   /* Firefox format, see LZ4IO_decodeMozLZ4() */
+#define MOZLZ4_MAGIC_SIZE   sizeof(MOZLZ4_MAGIC)   /* 8 bytes, including the terminating '\0' */
 
 #define CACHELINE 64
 #define LEGACY_BLOCKSIZE   (8 MB)
@@ -1978,6 +1980,48 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
 }
 #endif
 
+/* mozlz4 : format of Firefox's .jsonlz4 and .mozlz4 files (decoding only).
+ * MOZLZ4_MAGIC, followed by the decompressed size (4 bytes, little endian),
+ * then a single LZ4 block, extending to the end of input.
+ * Like Firefox, the decompressed size is only used as decoding capacity. */
+static unsigned long long
+LZ4IO_decodeMozLZ4(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
+{
+    unsigned char sizeStore[4];
+    unsigned dstCapacity;
+    size_t srcCapacity, srcSize;
+    char* src;
+    char* dst;
+    int decodedSize;
+
+    if (fread(sizeStore, 1, sizeof(sizeStore), finput) != sizeof(sizeStore))
+        END_PROCESS(62, "Error: cannot read decompressed size in mozlz4 format");
+    dstCapacity = LZ4IO_readLE32(sizeStore);
+    if (dstCapacity > (unsigned)LZ4_MAX_INPUT_SIZE)   /* can't be compressed into a single block */
+        END_PROCESS(62, "Error: mozlz4 decompressed size too large (%u)", dstCapacity);
+    srcCapacity = (size_t)LZ4_COMPRESSBOUND(dstCapacity);   /* no valid block is larger */
+
+    src = (char*)malloc(srcCapacity);
+    dst = (char*)malloc(MAX(dstCapacity, 1));   /* malloc(0) may return NULL */
+    if (!src || !dst) END_PROCESS(61, "Allocation error : not enough memory");
+
+    srcSize = fread(src, 1, srcCapacity, finput);
+    if (ferror(finput)) END_PROCESS(65, "Read error : ferror");
+
+    if (srcSize == 0 && dstCapacity == 0)
+        decodedSize = 0;   /* empty content : Firefox writes no block */
+    else
+        decodedSize = LZ4_decompress_safe(src, dst, (int)srcSize, (int)dstCapacity);
+    if (decodedSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
+    {   unsigned const storedSkips = LZ4IO_fwriteSparse(foutput, dst, (size_t)decodedSize, prefs->sparseFileSupport, 0); /* success or die */
+        LZ4IO_fwriteSparseEnd(foutput, storedSkips);
+    }
+
+    free(src);
+    free(dst);
+    return (unsigned long long)decodedSize;
+}
+
 
 typedef struct {
     void*  srcBuffer;
@@ -2375,21 +2419,21 @@ LZ4IO_decompressLZ4F(dRess_t ress,
 /* LZ4IO_passThrough:
  * just output the same content as input, no decoding.
  * This is a capability of zcat, and by extension lz4cat
- * MNstore : contain the first MAGICNUMBER_SIZE bytes already read from finput
+ * MNstore : contain the first MNsize bytes already read from finput
  */
 #define PTSIZE  (64 KB)
 #define PTSIZET (PTSIZE / sizeof(size_t))
 static unsigned long long
 LZ4IO_passThrough(FILE* finput, FILE* foutput,
-                  unsigned char MNstore[MAGICNUMBER_SIZE],
+                  const unsigned char* MNstore, size_t MNsize,
                   int sparseFileSupport)
 {
 	size_t buffer[PTSIZET];
     size_t readBytes = 1;
-    unsigned long long total = MAGICNUMBER_SIZE;
+    unsigned long long total = MNsize;
     unsigned storedSkips = 0;
 
-    if (fwrite(MNstore, 1, MAGICNUMBER_SIZE, foutput) != MAGICNUMBER_SIZE) {
+    if (fwrite(MNstore, 1, MNsize, foutput) != MNsize) {
         END_PROCESS(50, "Pass-through write error");
     }
     while (readBytes) {
@@ -2446,7 +2490,8 @@ selectDecoder(dRess_t ress,
               FILE* finput, FILE* foutput,
               const LZ4IO_prefs_t* const prefs)
 {
-    unsigned char MNstore[MAGICNUMBER_SIZE];
+    unsigned char MNstore[MOZLZ4_MAGIC_SIZE];   /* large enough for any magic number */
+    size_t MNsize = MAGICNUMBER_SIZE;           /* nb of bytes read into MNstore */
     unsigned magicNumber;
     static unsigned nbFrames = 0;
 
@@ -2466,6 +2511,17 @@ selectDecoder(dRess_t ress,
     }
     if (LZ4IO_isSkippableMagicNumber(magicNumber))
         magicNumber = LZ4IO_SKIPPABLE0;   /* fold skippable magic numbers */
+    if (magicNumber == LZ4IO_readLE32(MOZLZ4_MAGIC)) {
+        /* first half of mozlz4 magic : check the second half */
+        size_t const secondHalfSize = MOZLZ4_MAGIC_SIZE - MAGICNUMBER_SIZE;
+        MNsize += fread(MNstore + MAGICNUMBER_SIZE, 1, secondHalfSize, finput);
+        if ( MNsize == MOZLZ4_MAGIC_SIZE
+          && !memcmp(MNstore + MAGICNUMBER_SIZE, &MOZLZ4_MAGIC[MAGICNUMBER_SIZE], secondHalfSize) ) {
+            DISPLAYLEVEL(4, "Detected : mozlz4 format \n");
+            return LZ4IO_decodeMozLZ4(finput, foutput, prefs);
+        }
+        /* not mozlz4 : undecodable, see default case */
+    }
 
     switch(magicNumber)
     {
@@ -2491,7 +2547,7 @@ selectDecoder(dRess_t ress,
             /* Wrong magic number at the beginning of 1st stream */
             if (!prefs->testMode && prefs->overwrite && prefs->passThrough) {
                 nbFrames = 0;
-                return LZ4IO_passThrough(finput, foutput, MNstore, prefs->sparseFileSupport);
+                return LZ4IO_passThrough(finput, foutput, MNstore, MNsize, prefs->sparseFileSupport);
             }
             END_PROCESS(44,"Unrecognized header : file cannot be decoded");
         }
