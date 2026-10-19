@@ -511,8 +511,14 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
     LZ4_wildCopy8(dstPtr, srcPtr, dstEnd);
 }
 
+/* LZ4_wildCopy64 is faster on aarch64 and x86-64, but not on 32-bit x86 */
+#if defined(__aarch64__) || defined(__x86_64__) || defined(_M_X64)
+#  define LZ4_WILDCOPY64 1
+#else
+#  define LZ4_WILDCOPY64 0
+#endif
 
-#ifdef __aarch64__
+#if LZ4_WILDCOPY64
 /* customized variant of memcpy, which can overwrite up to 64 bytes beyond dstEnd */
 LZ4_FORCE_INLINE void
 LZ4_wildCopy64(void* dstPtr, const void* srcPtr, void* dstEnd)
@@ -2171,7 +2177,7 @@ LZ4_decompress_generic(
                  * nothing is written yet, so the safe loop can restart this sequence */
                 cpy = op+ll;
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
-              #ifdef __aarch64__
+              #if LZ4_WILDCOPY64
                 if ((cpy>oend-64) || (ip+ll>iend-64)) { ip = tokenPos; break; }
                 LZ4_wildCopy64(op, ip, cpy);
               #else
@@ -2247,7 +2253,7 @@ LZ4_decompress_generic(
             assert((op <= oend) && (oend-op >= 64));
             if (unlikely(offset<16)) {
                 LZ4_memcpy_using_offset(op, match, cpy, offset);
-    #ifdef __aarch64__
+    #if LZ4_WILDCOPY64
             } else if (offset >= 64) {
                 LZ4_wildCopy64(op, match, cpy);
     #endif
