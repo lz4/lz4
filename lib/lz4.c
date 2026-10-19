@@ -2145,6 +2145,16 @@ LZ4_decompress_generic(
             DEBUGLOG(6, "move to safe decode loop");
             goto safe_decode;
         }
+        /* Ring buffer restarting at its beginning : the oldest referenced history (max distance behind op)
+         * lies in the external dictionary, ahead of op, always at the same distance.
+         * Rings sized with the former LZ4_DECODER_RING_BUFFER_SIZE() (margin 14, up to v1.10.0)
+         * still work, but leave as little as 16 bytes :
+         * the fast loop's wide copies could overwrite it, the safe loop's can't. */
+        if ( (dict==usingExtDict)
+          && ((uptrval)dictEnd - (uptrval)lowPrefix - LZ4_DISTANCE_ABSOLUTE_MAX < FASTLOOP_SAFE_DISTANCE) ) {
+            DEBUGLOG(6, "history just ahead : move to safe decode loop");
+            goto safe_decode;
+        }
 
         /* Fast loop : decode sequences as long as output < oend-FASTLOOP_SAFE_DISTANCE,
          * and input is not too close to iend.
@@ -2595,8 +2605,10 @@ int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode, const char* dicti
  */
 int LZ4_decoderRingBufferSize(int maxBlockSize)
 {
-    /* the margin must cover the widest write beyond a copy (63 bytes, LZ4_wildCopy64), minus 2 */
-    LZ4_STATIC_ASSERT(LZ4_DECODER_RING_BUFFER_SIZE(0) - 65536 >= 63 - 2);
+    /* the margin must cover the widest write beyond a copy of the safe loop (16 bytes), minus 2 :
+     * LZ4_decompress_generic() avoids the fast loop when history is closer than FASTLOOP_SAFE_DISTANCE,
+     * which the current margin (64) never is. The former margin (14) remains valid. */
+    LZ4_STATIC_ASSERT(LZ4_DECODER_RING_BUFFER_SIZE(0) - 65536 >= 16 - 2);
     if (maxBlockSize < 0) return 0;
     if (maxBlockSize > LZ4_MAX_INPUT_SIZE) return 0;
     if (maxBlockSize < 16) maxBlockSize = 16;
