@@ -1232,26 +1232,6 @@ LZ4HC_InsertAndFindBestMatch(LZ4HC_CCtx_internal* const hc4,   /* Index table wi
  * - maxOutputSize >= 1
  * - dst is valid
  */
-/* LZ4HC_splitOverlap() :
- * m2 (at @*start2) starts less than OPTIMAL_ML bytes after m1 (at @ip).
- * If they overlap, m1 keeps up to OPTIMAL_ML bytes (no extra length byte),
- * and m2 starts right after it, keeping at least MINMATCH bytes.
- * @return : new length of m1 */
-LZ4_FORCE_INLINE int
-LZ4HC_splitOverlap(const BYTE* ip, int ml1, const BYTE** start2, LZ4HC_match_t* m2)
-{
-    int const gap = (int)(*start2 - ip);
-    int newML = MIN(ml1, OPTIMAL_ML);
-    assert(gap < OPTIMAL_ML);
-    if (newML > gap + m2->len - MINMATCH)
-        newML = gap + m2->len - MINMATCH;
-    if (newML > gap) {   /* shift m2 */
-        *start2 += newML - gap;
-        m2->len -= newML - gap;
-    }
-    return newML;
-}
-
 LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     LZ4HC_CCtx_internal* const ctx,
     const char* const src,
@@ -1303,6 +1283,8 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
         start0 = ip; m0 = m1;
 
 _Search2:
+        /* m1 (at ip) is the next match to encode, m0 (at start0 <= ip) its fallback.
+         * Search a longer match m2, starting before the end of m1. */
         DEBUGLOG(7, "_Search2 (currently found match of size %i)", m1.len);
         if (ip+m1.len <= mflimit) {
             start2 = ip + m1.len - 2;
@@ -1314,7 +1296,7 @@ _Search2:
             m2 = nomatch;  /* do not search further */
         }
 
-        if (m2.len <= m1.len) { /* No better match => encode ML1 immediately */
+        if (m2.len <= m1.len) { /* No better match => encode m1 immediately */
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                     m1.len, m1.off,
                     limit, oend) )
@@ -1322,104 +1304,96 @@ _Search2:
             continue;
         }
 
-        if (start0 < ip) {   /* first match was skipped at least once */
-            if (start2 < ip + m0.len) {  /* squeezing ML1 between ML0(original ML1) and ML2 */
-                ip = start0; m1 = m0;  /* restore initial Match1 */
-        }   }
+        if ((start0 < ip) && (start2 < ip + m0.len)) {
+            /* m1 was skipped at least once, and m2 starts early enough : restore m0 */
+            ip = start0; m1 = m0;
+        }
 
-        /* Here, start0==ip */
-        if ((start2 - ip) < 3) {  /* First Match too small : removed */
+        if ((start2 - ip) < 3) {  /* m1 too short before m2 : removed */
             ip = start2;
             m1 = m2;
             goto _Search2;
         }
 
-_Search3:
-        /* m1.len itself is decided when encoding m1 */
-        if ((start2 - ip) < OPTIMAL_ML)
-            (void)LZ4HC_splitOverlap(ip, m1.len, &start2, &m2);
+        /* m2 (at start2) is the candidate after m1.
+         * Search a longer match m3, starting before the end of m2. */
+        while (1) {
+            /* m1 will be cut where m2 starts, but keeps up to OPTIMAL_ML bytes (no extra length byte) :
+             * m2 is shifted after them, as long as it keeps at least MINMATCH bytes. */
+            if ((start2 - ip) < OPTIMAL_ML) {
+                int const gap = (int)(start2 - ip);
+                int newML = MIN(m1.len, OPTIMAL_ML);
+                if (newML > gap + m2.len - MINMATCH)
+                    newML = gap + m2.len - MINMATCH;
+                if (newML > gap) {   /* shift m2 */
+                    start2 += newML - gap;
+                    m2.len -= newML - gap;
+                }
+            }
 
-        if (start2 + m2.len <= mflimit) {
-            start3 = start2 + m2.len - 3;
-            m3 = LZ4HC_InsertAndGetWiderMatch(ctx,
-                            start3, start2, matchlimit, m2.len,
-                            maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
-            start3 += m3.back;
-        } else {
-            m3 = nomatch;  /* do not search further */
-        }
+            if (start2 + m2.len <= mflimit) {
+                start3 = start2 + m2.len - 3;
+                m3 = LZ4HC_InsertAndGetWiderMatch(ctx,
+                                start3, start2, matchlimit, m2.len,
+                                maxNbAttempts, patternAnalysis, 0, dict, favorCompressionRatio);
+                start3 += m3.back;
+            } else {
+                m3 = nomatch;  /* do not search further */
+            }
 
-        if (m3.len <= m2.len) {  /* No better match => encode ML1 and ML2 */
-            /* ip & ref are known; Now for ml */
+            if ((m3.len > m2.len) && (start3 < ip+m1.len+3)) {  /* not enough room for m2 between m1 and m3 */
+                if (start3 >= (ip+m1.len)) {
+                    /* m3 starts after m1 : encode m1, then m3 becomes m1,
+                     * and m2, moved after m1 if needed (replaced by m3 if too short), becomes the fallback m0 */
+                    if (start2 < ip+m1.len) {
+                        int correction = (int)(ip+m1.len - start2);
+                        start2 += correction;
+                        m2.len -= correction;
+                        if (m2.len < MINMATCH) {
+                            start2 = start3;
+                            m2 = m3;
+                        }
+                    }
+
+                    if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
+                            m1.len, m1.off,
+                            limit, oend) )
+                        goto _dest_overflow;
+                    ip  = start3;
+                    m1 = m3;
+
+                    start0 = start2;
+                    m0 = m2;
+                    goto _Search2;
+                }
+
+                /* m3 starts within m1 : m3 replaces m2 */
+                start2 = start3;
+                m2 = m3;
+                continue;
+            }
+
+            /* encode m1, cut where m2 starts */
             if (start2 < ip+m1.len) m1.len = (int)(start2 - ip);
-            /* Now, encode 2 sequences */
             if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                     m1.len, m1.off,
                     limit, oend) )
                 goto _dest_overflow;
-            ip = start2;
-            if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
-                    m2.len, m2.off,
-                    limit, oend) ) {
-                m1 = m2;
-                goto _dest_overflow;
-            }
-            continue;
-        }
 
-        if (start3 < ip+m1.len+3) {  /* Not enough space for match 2 : remove it */
-            if (start3 >= (ip+m1.len)) {  /* can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1 */
-                if (start2 < ip+m1.len) {
-                    int correction = (int)(ip+m1.len - start2);
-                    start2 += correction;
-                    m2.len -= correction;
-                    if (m2.len < MINMATCH) {
-                        start2 = start3;
-                        m2 = m3;
-                    }
-                }
+            /* m2 becomes m1 */
+            ip = start2; m1 = m2;
 
+            if (m3.len <= m1.len) {  /* No better match => encode m1 (former m2) */
                 if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                         m1.len, m1.off,
                         limit, oend) )
                     goto _dest_overflow;
-                ip  = start3;
-                m1 = m3;
-
-                start0 = start2;
-                m0 = m2;
-                goto _Search2;
+                break;
             }
 
-            start2 = start3;
-            m2 = m3;
-            goto _Search3;
+            /* m3 becomes m2 */
+            start2 = start3; m2 = m3;
         }
-
-        /*
-        * OK, now we have 3 ascending matches;
-        * let's write the first one ML1.
-        * ip & ref are known; Now decide ml.
-        */
-        if (start2 < ip+m1.len) {
-            if ((start2 - ip) < OPTIMAL_ML)
-                m1.len = LZ4HC_splitOverlap(ip, m1.len, &start2, &m2);
-            else
-                m1.len = (int)(start2 - ip);
-        }
-        if ( LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
-                m1.len, m1.off,
-                limit, oend) )
-            goto _dest_overflow;
-
-        /* ML2 becomes ML1 */
-        ip = start2; m1 = m2;
-
-        /* ML3 becomes ML2 */
-        start2 = start3; m2 = m3;
-
-        /* let's find a new ML3 */
-        goto _Search3;
     }
 
 _last_literals:
