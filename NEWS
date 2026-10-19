@@ -1,5 +1,5 @@
 v1.10.1
-fix  : `LZ4_decoderRingBufferSize()` could be too small, corrupting decoded data (since v1.9.0); users of `LZ4_DECODER_RING_BUFFER_SIZE()` must recompile
+fix  : decoding into a ring buffer of `LZ4_decoderRingBufferSize()` could corrupt data (since v1.9.0)
 fix  : `LZ4_compress_fast_continue()` produced wrong data when a block overwrote its whole previous block
 fix  : `LZ4_compress_destSize_extState()` corrupted data with `acceleration <= 0`, and could read out of bounds (since v1.10.0)
 fix  : negative sizes crashed `LZ4_decompress_safe_partial()` (since v1.9.3) and `LZ4_decompress_fast()` (since v1.9.4)
