@@ -29,6 +29,7 @@ perf : faster compression of 2-4 KB blocks with `LZ4_attach_dictionary()` (+3% t
 perf : level 2 compresses slightly better (~0.1-0.5%) and faster (~+1-2%)
 perf : faster levels 11 (~+25%) and 12 (~+10%)
 perf : `--favor-decSpeed` : faster decompression (~+2-4% at level 12), with fewer sequences
+perf : `lz4` multithreaded compression relies on liblz4, reading files in place (memory-mapped, `--[no-]mmap`) : faster at fast levels
 api  : lz4frame compression accepts any `dstCapacity`, and fails only if the output doesn't fit
 api  : `LZ4F_ERROR_dstMaxSize_tooSmall` renamed `LZ4F_ERROR_dstCapacity_tooSmall` (former name still supported)
 api  : lz4frame : after an error, and outside of a frame, compression operations fail until `LZ4F_compressBegin()`
@@ -37,9 +38,15 @@ api  : new static functions `LZ4F_cctx_size()` and `LZ4F_dctx_size()`, by @felix
 api  : new static function `LZ4F_resumeFrame()` : resume decoding from any block start, for random access within frames
 api  : `lz4file` : new static functions `LZ4F_seek()` and `LZ4F_tell()`, for random access within compressed files
 api  : `LZ4_ACCELERATION_DEFAULT` and `LZ4_ACCELERATION_MAX` are defined in `lz4.h` (static section)
+api  : new `LZ4F_preferences_t.nbWorkers` (experimental) : multithreaded lz4frame compression, same output whatever the nb of threads
+api  : `LZ4F_compressOptions_t.stableSrc` : new value `LZ4F_srcStableUntilFlush`, letting worker threads read input in place
+api  : reserved fields of `LZ4F_preferences_t` and `LZ4F_compressOptions_t` are now scalars : flatten positional initializers `{ 0, 0, 0 }`
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials
 cli  : decodes legacy frames ended by four zero bytes (Linux kernel end marker), requested by @benjarobin
-cli  : multithreaded compression honors custom block sizes
+cli  : compressed output no longer depends on multithreading support (`lz4` and `lz4-nomt` produce the same frames, also with `-BD`)
+cli  : custom block sizes (`-B#`, # >= 32) are honored, and compressed single-threaded
+cli  : `-T#` : nb of worker threads, beside the main thread ; automatic nb limited by a memory budget (`--memory=#`, `LZ4_MEMORY`) and by file size
+cli  : a source file modified during its compression is detected, and kept with `--rm` ; error 54 when the output can't be verified
 cli  : `lz4 -l` could hang on Windows with an empty input, as could decoding the resulting legacy stream
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666
 cli  : `lz4 -t -m` no longer writes decoded content to stdout, reported by @tansy
@@ -58,6 +65,8 @@ build: `make all install` could fail to link, or install incomplete files, by @h
 build: cmake : `lz4` supports multithreading on pthread platforms
 build: cmake : exported `lz4::lz4` target by @dg0yt, CMake 4 support by @GeorgH93, `CMAKE_POSITION_INDEPENDENT_CODE` by @ds-sloth
 build: reproducible static library, by @rpurdie
+build: dynamic library multithreaded by default, static library single-threaded : `make lib-mt` / `lib-nomt`, cmake and meson options
+build: `make install` installs the libraries already built (ex: `make lib-mt && make install`)
 build: meson fixes, by @grobian, @bgilbert and @eli-schwartz
 build: AIX support, by @shubhamhii
 build: pkg-config `License` field, by @iwamatsu
