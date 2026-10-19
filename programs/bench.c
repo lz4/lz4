@@ -373,7 +373,7 @@ static int BMK_benchMem(const void* srcBuffer, size_t srcSize,
     size_t const blockSize = (g_blockSize>=32 && !g_decodeOnly ? g_blockSize : srcSize) + (!srcSize) /* avoid div by 0 */ ;
     U32 const maxNbBlocks = (U32)((srcSize + (blockSize-1)) / blockSize) + nbFiles;
     blockParam_t* const blockTable = (blockParam_t*) malloc(maxNbBlocks * sizeof(blockParam_t));
-    size_t const maxCompressedSize = (size_t)LZ4_compressBound((int)srcSize) + (maxNbBlocks * 1024);   /* add some room for safety */
+    size_t const maxCompressedSize = (size_t)LZ4_compressBound((int)srcSize) + ((size_t)maxNbBlocks * 16);   /* LZ4_compressBound() adds 16 bytes per block */
     void* const compressedBuffer = malloc(maxCompressedSize);
     size_t const decMultiplier = g_decodeOnly ? 255 : 1;
     size_t const maxInSize = (size_t)LZ4_MAX_INPUT_SIZE / decMultiplier;
