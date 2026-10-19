@@ -1881,6 +1881,7 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
                 END_PROCESS(61, "Error: cannot read block size in Legacy format");
         }
         blockSize = LZ4IO_readLE32(header);       /* Convert to Little Endian */
+        if (blockSize == 0) break;                /* end marker (Linux kernel) */
         if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
             /* Cannot read next block : maybe new stream ? */
             g_magicRead = blockSize;
@@ -1951,6 +1952,7 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
                 END_PROCESS(62, "Error: cannot read block size in Legacy format");
         }
         blockSize = LZ4IO_readLE32(in_buff);       /* Convert to Little Endian */
+        if (blockSize == 0) break;                 /* end marker (Linux kernel) */
         if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
             /* Cannot read next block : maybe new stream ? */
             g_magicRead = blockSize;
@@ -2826,6 +2828,7 @@ static unsigned long long LZ4IO_skipLegacyBlocksData(FILE* finput)
                 return legacyFrameUndecodable;
             }
             totalBlocksSize += LZ4IO_LEGACY_BLOCK_HEADER_SIZE + nextCBlockSize;
+            if (nextCBlockSize == 0) break;   /* end marker (Linux kernel) */
             /* skip to the next block
              * note : this won't fail if nextCBlockSize is too large, skipping past the end of finput */
             if (UTIL_fseek(finput, nextCBlockSize, SEEK_CUR) != 0) {

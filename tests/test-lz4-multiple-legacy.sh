@@ -51,4 +51,11 @@ test -f $FPREFIX-concat2.lz4 # notHere was a non-blocking error, concat2.lz4 sho
 # test multiple legacy files without writing decoded content
 lz4 -tm $FPREFIX-concat1.lz4 $FPREFIX-concat2.lz4 > $FPREFIX-test-output
 test ! -s $FPREFIX-test-output
+# legacy frame ended by a zero block size (Linux kernel), followed by another frame
+cat ${FPREFIX}1.lz4 > $FPREFIX-zero.lz4
+printf '\000\000\000\000' >> $FPREFIX-zero.lz4
+cat ${FPREFIX}2.lz4 >> $FPREFIX-zero.lz4
+lz4 -dc $FPREFIX-zero.lz4 > $FPREFIX-zero
+cat ${FPREFIX}1-orig ${FPREFIX}2-orig | cmp - $FPREFIX-zero
+lz4 --list $FPREFIX-zero.lz4
 true

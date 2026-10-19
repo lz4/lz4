@@ -34,6 +34,7 @@ api  : new static function `LZ4F_resumeFrame()` : resume decoding from any block
 api  : `lz4file` : new static functions `LZ4F_seek()` and `LZ4F_tell()`, for random access within compressed files
 api  : `LZ4_ACCELERATION_DEFAULT` and `LZ4_ACCELERATION_MAX` are defined in `lz4.h` (static section)
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials
+cli  : decodes legacy frames ended by four zero bytes (Linux kernel end marker), requested by @benjarobin
 cli  : multithreaded compression honors custom block sizes
 cli  : `lz4 -l` could hang on Windows with an empty input, as could decoding the resulting legacy stream
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666

@@ -16,7 +16,7 @@ Distribution of this document is unlimited.
 
 ### Version
 
-1.6.4 (28/12/2023)
+1.6.5 (19/10/2026)
 
 
 Introduction
@@ -397,9 +397,16 @@ This policy makes it possible to concatenate legacy frames.
 Any other value will be interpreted as a block size,
 and trigger an error if it does not fit within acceptable range.
 
+Extension : the Linux Kernel also ends a legacy frame
+on a Block Compressed Size of zero (four zero bytes).
+`lz4` accepts it since v1.10.1.
+Encoders should not produce it, since older decoders reject it.
+
 
 Version changes
 ---------------
+
+1.6.5 : legacy frame : documents the Linux Kernel end marker as an extension
 
 1.6.4 : minor clarifications for Dictionaries
 
