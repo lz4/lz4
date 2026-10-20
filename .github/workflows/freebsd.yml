@@ -23,16 +23,15 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Build and test in a FreeBSD VM
       timeout-minutes: 30
-      uses: vmactions/freebsd-vm@83b151f58c6047089f4c80eb5ba2039d158ce093 # v1.5.3
+      uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
       with:
         # Only the leading part of the version is needed, the newest matching
         # release is used, so this tracks 14.4 and 15.1 without an edit here.
         release: ${{ matrix.release }}
-        usesh: true
         copyback: false
         cache-after-prepare: true
         prepare: |
