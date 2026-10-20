@@ -50,7 +50,7 @@ CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 USERCFLAGS:= -O3 $(CFLAGS)
 DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wswitch-enum -Wdeclaration-after-statement \
-             -Wstrict-prototypes -Wmissing-prototypes \
+             -Wstrict-prototypes -Wmissing-prototypes -Wbad-function-cast \
              -Wundef -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)

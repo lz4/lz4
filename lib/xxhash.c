@@ -217,10 +217,10 @@ typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianness;
 
 /* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example on the compiler command line */
 #ifndef XXH_CPU_LITTLE_ENDIAN
-static int XXH_isLittleEndian(void)
+static XXH_endianness XXH_isLittleEndian(void)
 {
     const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental  */
-    return one.c[0];
+    return one.c[0] ? XXH_littleEndian : XXH_bigEndian;
 }
 #   define XXH_CPU_LITTLE_ENDIAN   XXH_isLittleEndian()
 #endif
