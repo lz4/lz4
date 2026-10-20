@@ -89,6 +89,10 @@ jobs:
         make clean
         make -j cxxtest V=1
 
+    - name: C++ modules test
+      if: ${{ startsWith(matrix.cc, 'clang') }}
+      run: make -C tests test-cxx-modules V=1
+
     - name: Freestanding environment test
       if: ${{ matrix.freestanding }}
       run: |

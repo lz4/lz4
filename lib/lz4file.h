@@ -32,15 +32,15 @@
    - LZ4 source repository : https://github.com/lz4/lz4
    - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
-#if defined (__cplusplus)
-extern "C" {
-#endif
-
 #ifndef LZ4FILE_H
 #define LZ4FILE_H
 
 #include <stdio.h>  /* FILE* */
 #include "lz4frame_static.h"
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
 
 typedef struct LZ4_readFile_s LZ4_readFile_t;
 typedef struct LZ4_writeFile_s LZ4_writeFile_t;
@@ -135,8 +135,8 @@ LZ4FLIB_STATIC_API size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeClose(LZ4_writeFile_t* lz4fWrite);
 
-#endif /* LZ4FILE_H */
-
 #if defined (__cplusplus)
 }
 #endif
+
+#endif /* LZ4FILE_H */

@@ -46,13 +46,12 @@
 #ifndef LZ4F_H_09782039843
 #define LZ4F_H_09782039843
 
-#if defined (__cplusplus)
-extern "C" {
-#endif
-
 /* ---   Dependency   --- */
 #include <stddef.h>   /* size_t */
 
+#if defined (__cplusplus)
+extern "C" {
+#endif
 
 /**
  * Introduction
