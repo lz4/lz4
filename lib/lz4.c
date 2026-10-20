@@ -517,11 +517,15 @@ LZ4_memcpy_using_offset_base(BYTE* dstPtr, const BYTE* srcPtr, BYTE* dstEnd, con
 
 #if LZ4_FAST_DEC_LOOP
 
-/* LZ4_wildCopy64 is faster on aarch64 and x86-64, but not on 32-bit x86 */
-#if defined(__aarch64__) || defined(__x86_64__) || defined(_M_X64)
-#  define LZ4_WILDCOPY64 1
-#else
-#  define LZ4_WILDCOPY64 0
+/* LZ4_wildCopy64 is faster on aarch64 and x86-64, but not on 32-bit x86.
+ * On wasm, it depends on the host cpu (faster on Apple silicon, slower on x86-64) :
+ * it's not enabled by default, but can be, with LZ4_FAST_DEC_LOOP, from the build command */
+#ifndef LZ4_WILDCOPY64
+#  if defined(__aarch64__) || defined(__x86_64__) || defined(_M_X64)
+#    define LZ4_WILDCOPY64 1
+#  else
+#    define LZ4_WILDCOPY64 0
+#  endif
 #endif
 
 #if LZ4_WILDCOPY64

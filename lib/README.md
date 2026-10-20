@@ -73,6 +73,11 @@ The following build macro can be selected to adjust source code behavior at comp
   For example, with `gcc` : `-DLZ4_FAST_DEC_LOOP=1`,
   and with `make` : `CPPFLAGS+=-DLZ4_FAST_DEC_LOOP=1 make lz4`.
 
+- `LZ4_WILDCOPY64` : within the fast decompression loop, copy long literals and matches 64 bytes at a time.
+  It's automatically enabled on `x64` and `aarch64` cpus, and can be enabled or disabled manually, like `LZ4_FAST_DEC_LOOP`.
+  On `wasm`, it depends on the host cpu : `-DLZ4_FAST_DEC_LOOP=1 -DLZ4_WILDCOPY64=1` speeds up decompression on Apple silicon,
+  but slows it down on `x64`.
+
 - `LZ4_DISTANCE_MAX` : control the maximum offset that the compressor will allow.
   Set to 65535 by default, which is the maximum value supported by lz4 format.
   Reducing maximum distance will reduce opportunities for LZ4 to find matches,
