@@ -797,10 +797,13 @@ _lz4mid_encode_sequence:
             ip--;  matchLength++;
         };
 
-        /* fill table with beginning of match */
-        ADDPOS8(ip+1, ipIndex+1);
-        ADDPOS8(ip+2, ipIndex+2);
-        ADDPOS4(ip+1, ipIndex+1);
+        /* fill table with beginning of match
+         * note : ip may have moved since ipIndex (longer match at ip+1, catch back) */
+        {   U32 const startMatchIdx = (U32)(ip-prefixPtr) + prefixIdx;
+            ADDPOS8(ip+1, startMatchIdx+1);
+            ADDPOS8(ip+2, startMatchIdx+2);
+            ADDPOS4(ip+1, startMatchIdx+1);
+        }
 
         /* encode */
         if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
