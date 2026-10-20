@@ -529,6 +529,7 @@ int main(int argCount, const char** argv)
                 if (!strcmp(argument,  "--rm")) { LZ4IO_setRemoveSrcFile(prefs, 1); continue; }
 
                 if (longCommandWArg(&argument, "--threads")) {
+                    if (*argument != '=' && *argument != 0) badusage(exeName);  /* ex: --threadsX */
                     NEXT_UINT32(nbWorkers);
                     continue;
                 }
@@ -538,7 +539,7 @@ int main(int argCount, const char** argv)
                         int fastLevel;
                         ++argument;
                         fastLevel = readIntFromChar(&argument);
-                        if (fastLevel) {
+                        if (fastLevel && *argument == 0) {
                             cLevel = -fastLevel;
                         } else {
                             badusage(exeName);
