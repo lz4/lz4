@@ -639,6 +639,28 @@ static LZ4MID_searchIntoDict_f select_searchDict_function(const LZ4HC_CCtx_inter
     return LZ4MID_searchHCDict;
 }
 
+/* Length of the match between @ip and the candidate at index @pos (in prefix or extDict),
+ * or 0 if the candidate is out of reach */
+LZ4_FORCE_INLINE unsigned
+LZ4MID_countMatch(const BYTE* ip, U32 ipIndex, U32 pos, const BYTE* matchlimit,
+                  const BYTE* prefixPtr, U32 prefixIdx,
+                  const BYTE* dictStart, U32 dictIdx)
+{
+    if (ipIndex - pos > LZ4_DISTANCE_MAX) return 0;
+    if (pos >= prefixIdx) {
+        const BYTE* const matchPtr = prefixPtr + (pos - prefixIdx);
+        assert(matchPtr < ip);
+        return LZ4_count(ip, matchPtr, matchlimit);
+    }
+    if (pos >= dictIdx) {
+        /* extDict : the match stops at the end of the dictionary */
+        const BYTE* const matchPtr = dictStart + (pos - dictIdx);
+        size_t const safeLen = MIN(prefixIdx - pos, (size_t)(matchlimit - ip));
+        return LZ4_count(ip, matchPtr, ip + safeLen);
+    }
+    return 0;
+}
+
 /* preconditions:
  * - *srcSizePtr within [1, LZ4_MAX_INPUT_SIZE]
  * - src is valid
@@ -674,8 +696,6 @@ static int LZ4MID_compress (
     const U32 dictIdx = ctx->lowLimit;
     const U32 gDictEndIndex = ctx->lowLimit;
     const LZ4MID_searchIntoDict_f searchIntoDict = (dict == usingDictCtxHc) ? select_searchDict_function(ctx->dictCtx) : NULL;
-    unsigned matchLength;
-    unsigned matchDistance;
 
     DEBUGLOG(5, "LZ4MID_compress (%i bytes)", *srcSizePtr);
 
@@ -693,105 +713,66 @@ static int LZ4MID_compress (
     /* main loop */
     while (ip <= mflimit) {
         const U32 ipIndex = (U32)(ip - prefixPtr) + prefixIdx;
+        unsigned matchLength;
+        unsigned matchDistance;
         /* search long match */
         {   U32 const h8 = LZ4MID_hash8Ptr(ip);
             U32 const pos8 = hash8Table[h8];
             assert(h8 < LZ4MID_HASHTABLESIZE);
             assert(pos8 < ipIndex);
             LZ4MID_addPosition(hash8Table, h8, ipIndex);
-            if (ipIndex - pos8 <= LZ4_DISTANCE_MAX) {
-                /* match candidate found */
-                if (pos8 >= prefixIdx) {
-                    const BYTE* const matchPtr = prefixPtr + pos8 - prefixIdx;
-                    assert(matchPtr < ip);
-                    matchLength = LZ4_count(ip, matchPtr, matchlimit);
-                    if (matchLength >= MINMATCH) {
-                        DEBUGLOG(7, "found long match at pos %u (len=%u)", pos8, matchLength);
-                        matchDistance = ipIndex - pos8;
-                        goto _lz4mid_encode_sequence;
-                    }
-                } else {
-                    if (pos8 >= dictIdx) {
-                        /* extDict match candidate */
-                        const BYTE* const matchPtr = dictStart + (pos8 - dictIdx);
-                        const size_t safeLen = MIN(prefixIdx - pos8, (size_t)(matchlimit - ip));
-                        matchLength = LZ4_count(ip, matchPtr, ip + safeLen);
-                        if (matchLength >= MINMATCH) {
-                            DEBUGLOG(7, "found long match at ExtDict pos %u (len=%u)", pos8, matchLength);
-                            matchDistance = ipIndex - pos8;
-                            goto _lz4mid_encode_sequence;
-                        }
-                    }
-                }
-        }   }
+            matchLength = LZ4MID_countMatch(ip, ipIndex, pos8, matchlimit, prefixPtr, prefixIdx, dictStart, dictIdx);
+            matchDistance = ipIndex - pos8;
+            if (matchLength >= MINMATCH) goto _lz4mid_encode_sequence;
+        }
         /* search short match */
         {   U32 const h4 = LZ4MID_hash4Ptr(ip);
             U32 const pos4 = hash4Table[h4];
             assert(h4 < LZ4MID_HASHTABLESIZE);
             assert(pos4 < ipIndex);
             LZ4MID_addPosition(hash4Table, h4, ipIndex);
-            if (ipIndex - pos4 <= LZ4_DISTANCE_MAX) {
-                /* match candidate found */
-                if (pos4 >= prefixIdx) {
-                /* only search within prefix */
-                    const BYTE* const matchPtr = prefixPtr + (pos4 - prefixIdx);
-                    assert(matchPtr < ip);
-                    assert(matchPtr >= prefixPtr);
-                    matchLength = LZ4_count(ip, matchPtr, matchlimit);
-                    if (matchLength >= MINMATCH) {
-                        /* short match found, let's just check ip+1 for longer */
-                        U32 const h8 = LZ4MID_hash8Ptr(ip+1);
-                        U32 const pos8 = hash8Table[h8];
-                        U32 const m2Distance = ipIndex + 1 - pos8;
-                        matchDistance = ipIndex - pos4;
-                        if ( m2Distance <= LZ4_DISTANCE_MAX
-                        && pos8 >= prefixIdx /* only search within prefix */
-                        && likely(ip < mflimit)
-                        ) {
-                            const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
-                            unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
-                            if (ml2 > matchLength) {
-                                LZ4MID_addPosition(hash8Table, h8, ipIndex+1);
-                                ip++;
-                                matchLength = ml2;
-                                matchDistance = m2Distance;
-                        }   }
-                        goto _lz4mid_encode_sequence;
-                    }
-                } else {
-                    if (pos4 >= dictIdx) {
-                        /* extDict match candidate */
-                        const BYTE* const matchPtr = dictStart + (pos4 - dictIdx);
-                        const size_t safeLen = MIN(prefixIdx - pos4, (size_t)(matchlimit - ip));
-                        matchLength = LZ4_count(ip, matchPtr, ip + safeLen);
-                        if (matchLength >= MINMATCH) {
-                            DEBUGLOG(7, "found match at ExtDict pos %u (len=%u)", pos4, matchLength);
-                            matchDistance = ipIndex - pos4;
-                            goto _lz4mid_encode_sequence;
-                        }
-                    }
-                }
-        }   }
-        /* no match found in prefix */
+            matchLength = LZ4MID_countMatch(ip, ipIndex, pos4, matchlimit, prefixPtr, prefixIdx, dictStart, dictIdx);
+            matchDistance = ipIndex - pos4;
+            if ((matchLength >= MINMATCH) && (pos4 >= prefixIdx)) {
+                /* short match found in prefix, let's just check ip+1 for longer */
+                U32 const h8 = LZ4MID_hash8Ptr(ip+1);
+                U32 const pos8 = hash8Table[h8];
+                U32 const m2Distance = ipIndex + 1 - pos8;
+                if ( m2Distance <= LZ4_DISTANCE_MAX
+                && pos8 >= prefixIdx /* only search within prefix */
+                && likely(ip < mflimit)
+                ) {
+                    const BYTE* const m2Ptr = prefixPtr + (pos8 - prefixIdx);
+                    unsigned ml2 = LZ4_count(ip+1, m2Ptr, matchlimit);
+                    if (ml2 > matchLength) {
+                        LZ4MID_addPosition(hash8Table, h8, ipIndex+1);
+                        ip++;
+                        matchLength = ml2;
+                        matchDistance = m2Distance;
+                }   }
+            }
+            if (matchLength >= MINMATCH) goto _lz4mid_encode_sequence;
+        }
+        /* no match found in prefix nor extDict : search into the attached dictionary */
         if ( (dict == usingDictCtxHc)
           && (ipIndex - gDictEndIndex < LZ4_DISTANCE_MAX - 8) ) {
-            /* search a match into external dictionary */
-            LZ4HC_match_t dMatch = searchIntoDict(ip, ipIndex,
+            LZ4HC_match_t const dMatch = searchIntoDict(ip, ipIndex,
                     matchlimit,
                     ctx->dictCtx, gDictEndIndex);
-            if (dMatch.len >= MINMATCH) {
-                DEBUGLOG(7, "found Dictionary match (offset=%i)", dMatch.off);
-                assert(dMatch.back == 0);
-                matchLength = (unsigned)dMatch.len;
-                matchDistance = (unsigned)dMatch.off;
-                goto _lz4mid_encode_sequence;
-            }
+            assert(dMatch.back == 0);
+            matchLength = (unsigned)dMatch.len;
+            matchDistance = (unsigned)dMatch.off;
+            if (matchLength >= MINMATCH) goto _lz4mid_encode_sequence;
         }
         /* no match found */
         ip += 1 + ((ip-anchor) >> 9);  /* skip faster over incompressible data */
         continue;
 
 _lz4mid_encode_sequence:
+        /* match found at ip : matchLength, matchDistance */
+        DEBUGLOG(7, "found match at pos %u (len=%u, distance=%u)",
+                    (U32)(ip - prefixPtr) + prefixIdx, matchLength, matchDistance);
+
         /* catch back */
         while (((ip > anchor) & ((U32)(ip-prefixPtr) > matchDistance)) && (unlikely(ip[-1] == ip[-(int)matchDistance-1]))) {
             ip--;  matchLength++;
@@ -808,8 +789,12 @@ _lz4mid_encode_sequence:
         /* encode */
         if (LZ4HC_encodeSequence(UPDATABLE(ip, op, anchor),
                 (int)matchLength, (int)matchDistance,
-                limit, oend) )
-            goto _lz4mid_dest_overflow;
+                limit, oend) ) {
+            if (limit != fillOutput) return 0;  /* compression failed */
+            LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor),
+                                (int)matchLength, (int)matchDistance, oend);
+            break;
+        }
 
         /* fill table with end of match */
         {   U32 endMatchIdx = (U32)(ip-prefixPtr) + prefixIdx;
@@ -839,12 +824,6 @@ _lz4mid_last_literals:
     assert((char*)op - dst <= maxOutputSize);
     assert((char*)op - dst < INT_MAX);
     return (int)((char*)op - dst);
-
-_lz4mid_dest_overflow:
-    if (limit != fillOutput) return 0;  /* compression failed */
-    LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor),
-                        (int)matchLength, (int)matchDistance, oend);
-    goto _lz4mid_last_literals;
 }
 
 
