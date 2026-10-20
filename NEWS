@@ -57,6 +57,7 @@ build: meson fixes, by @grobian, @bgilbert and @eli-schwartz
 build: AIX support, by @shubhamhii
 build: pkg-config `License` field, by @iwamatsu
 build: public headers compile with clang C++ modules (`-fmodules`), reported by @doraorak
+build: `xxhash.c` compiles without `-Wbad-function-cast` warnings, by @brainy
 port : RISC-V with `Zicclsm` uses unaligned memory accesses, by @Polaris-911
 doc  : ring buffer conditions of `LZ4_decompress_safe_continue()`
 doc  : frame format : Linux kernel legacy last block, by @Artoria2e5
