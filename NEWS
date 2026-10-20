@@ -6,6 +6,7 @@ fix  : negative sizes crashed `LZ4_decompress_safe_partial()` (since v1.9.3) and
 fix  : `LZ4_saveDict()` with a negative `dictSize` copied up to 64 KB into `safeBuffer`, by @arthuz-th
 fix  : `LZ4_decompress_safe_partial()` could leave previous `dst` content in decoded data with an invalid offset 0 (since v1.8.3)
 fix  : heap overflow with an invalid `blockSizeID` in `LZ4F_compressBegin()` and `LZ4F_writeOpen()`, by @jaypatrickhoward
+fix  : `LZ4F_compressBegin()` failing on allocation left an inconsistent frame in progress : it is now invalidated
 fix  : `LZ4F_uncompressedUpdate()` mixed with `LZ4F_compressUpdate()` could exceed `LZ4F_compressBound()`
 fix  : `LZ4F_compressBegin()` could crash after a previous call failed to allocate its state (custom allocator)
 fix  : single-thread `lz4` could truncate concatenated frames with block checksums (wrong decompression hints)

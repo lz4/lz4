@@ -216,7 +216,8 @@ typedef struct {
  *  - Streaming (LZ4F_compressUpdate()) : output lags behind input, so LZ4F_compressBound() is larger,
  *    covering jobs in flight (~ 2 * nbWorkers jobs of 4 MB) ; LZ4F_compressEnd() emits all of them.
  *    Without autoFlush, the amount emitted by each invocation depends on scheduling :
- *    only the whole frame is deterministic.
+ *    only the whole frame is deterministic. Completed jobs are only emitted if they fit :
+ *    with a smaller dstCapacity, LZ4F_compressUpdate() only fails if output must be emitted (ex: all job slots busy).
  *    Input is copied, unless stableSrc == LZ4F_srcStableUntilFlush (jobs still running after an invocation returns
  *    then read it in place), or autoFlush, which completes all jobs within each invocation.
  *    LZ4F_srcStable (historical value 1) still only requires the last 64 KB to remain present, as with nbWorkers == 0.
@@ -289,9 +290,10 @@ typedef enum {
                                    * including after LZ4F_flush() : linked blocks reference them directly, instead of copying them */
     LZ4F_srcStableUntilFlush = 2  /* stronger than LZ4F_srcStable : in addition to the last 64 KB of input,
                                    * all of src remains present and unmodified until LZ4F_flush() or LZ4F_compressEnd() returns
-                                   * (with autoFlush : until the invocation returns), or the frame is abandoned
-                                   * (LZ4F_compressBegin*(), LZ4F_freeCompressionContext()) :
-                                   * worker threads (nbWorkers >= 1) read it in place, instead of copying it */  /* v1.10.1+ */
+                                   * (with autoFlush : until the invocation returns), or the frame ends otherwise :
+                                   * invalidated by an error, or abandoned (LZ4F_compressBegin*(), LZ4F_freeCompressionContext()).
+                                   * Note : LZ4F_compressBegin*() rejecting its arguments leaves the frame in progress.
+                                   * Worker threads (nbWorkers >= 1) read src in place, instead of copying it */  /* v1.10.1+ */
 } LZ4F_stableSrc_t;
 
 /* Note : since v1.10.1, reserved fields are a list of scalar fields (formerly an array, reserved[3]) :
@@ -348,7 +350,9 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  *  will write the frame header into dstBuffer.
  *  Success is guaranteed when dstCapacity >= LZ4F_HEADER_SIZE_MAX bytes.
  *  Actual header size is between LZ4F_HEADER_SIZE_MIN and LZ4F_HEADER_SIZE_MAX, depending on preferences,
- *  and only this size is required. A failure doesn't modify `cctx`.
+ *  and only this size is required.
+ *  Arguments are validated first : rejecting them (ex: dstCapacity too small) doesn't modify `cctx`,
+ *  so that a frame in progress continues. Other failures (ex: allocation) invalidate it (see LZ4F_compressUpdate()).
  * `prefsPtr` is optional : NULL can be provided to set all preferences to default.
  * @return : number of bytes written into dstBuffer for the header
  *           or an error code (which can be tested using LZ4F_isError())

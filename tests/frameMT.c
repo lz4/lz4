@@ -35,7 +35,10 @@
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
  * - serial processing (dstCapacity too small for parallel jobs) produces the same output
- * - destination too small : the frame is invalidated (no truncated frame), and the context remains usable
+ * - destination too small : the frame is invalidated (no truncated frame), and the context remains usable ;
+ *   completed jobs not fitting yet are emitted later, without failure
+ * - LZ4F_compressBegin() rejecting its arguments leaves the frame in progress (jobs in flight) untouched ;
+ *   its allocation failures invalidate it
  * - all allocations happen in the calling thread (custom allocator is not thread-safe : see TSAN)
  * - prints a digest of produced frames, to compare builds with and without LZ4F_MULTITHREAD
  * Bench mode : frameMT -b FILE [-l#] [-B#] [-D] [-c] [-T#]
@@ -48,6 +51,7 @@
 #include <stdlib.h>     /* malloc, free, exit */
 #include <stdio.h>      /* fprintf, fopen */
 #include <string.h>     /* memcmp, strcmp */
+#include <limits.h>     /* INT_MAX */
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4hc.h"      /* LZ4HC_CLEVEL_MIN */
@@ -796,6 +800,196 @@ static int validateDstTooSmall(void)
     return 0;
 }
 
+/* Without autoFlush, completed jobs are only emitted when they fit :
+ * a dstCapacity too small for them doesn't fail, as long as no job must be emitted (free job slot).
+ * Deterministic without worker threads (jobs complete within LZ4F_compressUpdate()), otherwise depends on scheduling. */
+static int validateDeferredEmission(void)
+{
+    static const unsigned nbWorkersList[] = { 1, 3 };
+    size_t const maxJobSize = 4 MB;   /* jobs : 4 MB with linked blocks, 1 MB with independent ones (64 KB blocks) */
+    size_t const smallCapacity = 1 KB;
+    size_t const dstCapacity = 2 * LZ4F_compressFrameBound(maxJobSize, NULL);
+    char* const src = (char*)malloc(maxJobSize);
+    char* const ref = (char*)malloc(dstCapacity);
+    char* const out = (char*)malloc(dstCapacity);
+    unsigned nbConfigs = 0, nbDeferred = 0;
+    size_t wi;
+    int linked;
+
+    g_step = "deferred emission";
+    CHECK(src && ref && out, "allocation failed");
+    RDG_genBuffer(src, maxJobSize, 0.5, 0.0, 29);
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
+    for (linked = 0; linked <= 1; linked++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t const jobSize = linked ? 4 MB : 1 MB;   /* a single job, submitted once full */
+        LZ4F_cctx* cctx = NULL;
+        size_t refSize, pos, r;
+#if !(defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD)
+        if (!linked) continue;   /* independent blocks : single-threaded mode, writing blocks immediately */
+#endif
+        prefs.nbWorkers = nbWorkersList[wi];
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        CHECK_LZ4F(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
+        refSize = LZ4F_compressBegin(cctx, ref, dstCapacity, &prefs);
+        CHECK_LZ4F(refSize);
+        r = LZ4F_compressUpdate(cctx, ref + refSize, dstCapacity - refSize, src, jobSize, NULL);
+        CHECK_LZ4F(r); refSize += r;
+        r = LZ4F_compressEnd(cctx, ref + refSize, dstCapacity - refSize, NULL);
+        CHECK_LZ4F(r); refSize += r;
+
+        pos = LZ4F_compressBegin(cctx, out, dstCapacity, &prefs);
+        CHECK_LZ4F(pos);
+        r = LZ4F_compressUpdate(cctx, out + pos, smallCapacity, src, jobSize, NULL);
+        CHECK(r == 0, "%u workers, linked=%i : %s", prefs.nbWorkers, linked, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "job emitted");
+        {   TIME_t const start = TIME_getTime();   /* meanwhile, the job completes */
+            while (TIME_clockSpan_ns(start) < 100000000ULL) {
+                r = LZ4F_compressUpdate(cctx, out + pos, smallCapacity, NULL, 0, NULL);
+                CHECK(r == 0, "%u workers, linked=%i : %s", prefs.nbWorkers, linked, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "job emitted");
+        }   }
+        r = LZ4F_compressUpdate(cctx, out + pos, dstCapacity - pos, NULL, 0, NULL);
+        CHECK_LZ4F(r); pos += r;
+        if (r) nbDeferred++;   /* the completed job was deferred */
+        r = LZ4F_compressEnd(cctx, out + pos, dstCapacity - pos, NULL);
+        CHECK_LZ4F(r); pos += r;
+        CHECK(pos == refSize && !memcmp(out, ref, pos), "%u workers, linked=%i : output differs", prefs.nbWorkers, linked);
+        LZ4F_freeCompressionContext(cctx);
+        nbConfigs++;
+    }
+    DISPLAY("deferred emission : %u configurations validated, %u completed jobs deferred \n", nbConfigs, nbDeferred);
+    free(src); free(ref); free(out);
+    return 0;
+}
+
+/* LZ4F_compressBegin*() validates its arguments first : rejecting them leaves a frame in progress untouched,
+ * including its jobs in flight, still reading input in place (LZ4F_srcStableUntilFlush). Same contract as nbWorkers == 0.
+ * Other failures (allocation) invalidate the frame in progress : next operations fail with compressionState_uninitialized. */
+static int validateBeginFailures(void)
+{
+    static const unsigned nbWorkersList[] = { 0, 1, 3 };
+    size_t const srcSize = 6 MB + 123;
+    size_t const firstPart = 2 MB + 5;   /* jobs in flight */
+    size_t const nextSrcSize = 2 MB + 77;
+    size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
+    char* const src = (char*)malloc(srcSize);
+    char* const ref = (char*)malloc(dstCapacity);
+    char* const nextRef = (char*)malloc(dstCapacity);
+    char* const out = (char*)malloc(dstCapacity);
+    char header[LZ4F_HEADER_SIZE_MAX];
+    LZ4F_CustomMem const failingMem = { failingAlloc, NULL, countingFree, NULL };
+    LZ4F_compressOptions_t cOpts;
+    unsigned nbConfigs = 0, nbFailures = 0;
+    size_t wi;
+    int linked;
+
+    g_step = "begin failures";
+    CHECK(src && ref && nextRef && out, "allocation failed");
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 23);
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.stableSrc = LZ4F_srcStableUntilFlush;
+    g_failAt = 0;
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
+    for (linked = 0; linked <= 1; linked++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_preferences_t nextPrefs = LZ4F_INIT_PREFERENCES;   /* HC state, larger blocks : resources are reallocated */
+        LZ4F_preferences_t badPrefs;
+        LZ4F_cctx* cctx;
+        size_t refSize, nextRefSize, pos, r, n;
+        prefs.nbWorkers = nextPrefs.nbWorkers = nbWorkersList[wi];
+        prefs.frameInfo.blockMode = nextPrefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        nextPrefs.compressionLevel = LZ4HC_CLEVEL_MIN;
+        nextPrefs.frameInfo.blockSizeID = LZ4F_max256KB;
+        badPrefs = prefs;
+        badPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)3;
+
+        /* references */
+        cctx = LZ4F_createCompressionContext_advanced(failingMem, LZ4F_VERSION);
+        CHECK(cctx != NULL, "allocation failed");
+        refSize = LZ4F_compressBegin(cctx, ref, dstCapacity, &prefs);
+        CHECK_LZ4F(refSize);
+        r = LZ4F_compressUpdate(cctx, ref + refSize, dstCapacity - refSize, src, firstPart, &cOpts);
+        CHECK_LZ4F(r); refSize += r;
+        r = LZ4F_compressUpdate(cctx, ref + refSize, dstCapacity - refSize, src + firstPart, srcSize - firstPart, &cOpts);
+        CHECK_LZ4F(r); refSize += r;
+        r = LZ4F_compressEnd(cctx, ref + refSize, dstCapacity - refSize, NULL);
+        CHECK_LZ4F(r); refSize += r;
+        nextRefSize = LZ4F_compressBegin(cctx, nextRef, dstCapacity, &nextPrefs);
+        CHECK_LZ4F(nextRefSize);
+        r = LZ4F_compressUpdate(cctx, nextRef + nextRefSize, dstCapacity - nextRefSize, src, nextSrcSize, NULL);
+        CHECK_LZ4F(r); nextRefSize += r;
+        r = LZ4F_compressEnd(cctx, nextRef + nextRefSize, dstCapacity - nextRefSize, NULL);
+        CHECK_LZ4F(r); nextRefSize += r;
+
+        /* rejected arguments : the frame in progress continues */
+        pos = LZ4F_compressBegin(cctx, out, dstCapacity, &prefs);
+        CHECK_LZ4F(pos);
+        r = LZ4F_compressUpdate(cctx, out + pos, dstCapacity - pos, src, firstPart, &cOpts);
+        CHECK_LZ4F(r); pos += r;
+        r = LZ4F_compressBegin(cctx, header, 3, &prefs);
+        CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_dstCapacity_tooSmall, "dstCapacity : %s", LZ4F_getErrorName(r));
+        r = LZ4F_compressBegin(cctx, header, sizeof(header), &badPrefs);
+        CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_maxBlockSize_invalid, "blockSizeID : %s", LZ4F_getErrorName(r));
+        r = LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), src, (size_t)INT_MAX + 1, &prefs);
+        CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_parameter_invalid, "dictSize : %s", LZ4F_getErrorName(r));
+        r = LZ4F_compressUpdate(cctx, out + pos, dstCapacity - pos, src + firstPart, srcSize - firstPart, &cOpts);
+        CHECK_LZ4F(r); pos += r;
+        r = LZ4F_compressEnd(cctx, out + pos, dstCapacity - pos, NULL);
+        CHECK_LZ4F(r); pos += r;
+        CHECK(pos == refSize && !memcmp(out, ref, pos), "%u workers : frame disturbed by a rejected begin", prefs.nbWorkers);
+        LZ4F_freeCompressionContext(cctx);
+
+        /* each allocation of next frame's begin fails in turn, while a frame is in progress */
+        for (n = 1; ; n++) {
+            cctx = LZ4F_createCompressionContext_advanced(failingMem, LZ4F_VERSION);
+            CHECK(cctx != NULL, "allocation failed");
+            pos = LZ4F_compressBegin(cctx, out, dstCapacity, &prefs);
+            CHECK_LZ4F(pos);
+            r = LZ4F_compressUpdate(cctx, out + pos, dstCapacity - pos, src, firstPart, &cOpts);
+            CHECK_LZ4F(r);
+            g_allocNb = 0;
+            g_failAt = n;
+            pos = LZ4F_compressBegin(cctx, out, dstCapacity, &nextPrefs);
+            g_failAt = 0;
+            if (g_allocNb < n) {   /* begin needed fewer allocations : all failure points tested */
+                LZ4F_freeCompressionContext(cctx);
+                break;
+            }
+            if (LZ4F_isError(pos)) {
+                CHECK(LZ4F_getErrorCode(pos) == LZ4F_ERROR_allocation_failed,
+                      "allocation %u : unexpected error %s", (unsigned)n, LZ4F_getErrorName(pos));
+                nbFailures++;
+                r = LZ4F_compressUpdate(cctx, out, dstCapacity, src, 1 KB, &cOpts);
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                      "allocation %u : update after failure : %s", (unsigned)n, LZ4F_getErrorName(r));
+                r = LZ4F_uncompressedUpdate(cctx, out, dstCapacity, src, 1 KB, &cOpts);
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                      "allocation %u : uncompressed update after failure : %s", (unsigned)n, LZ4F_getErrorName(r));
+                r = LZ4F_flush(cctx, out, dstCapacity, NULL);
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                      "allocation %u : flush after failure : %s", (unsigned)n, LZ4F_getErrorName(r));
+                r = LZ4F_compressEnd(cctx, out, dstCapacity, NULL);
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized,
+                      "allocation %u : end after failure : %s", (unsigned)n, LZ4F_getErrorName(r));
+                pos = LZ4F_compressBegin(cctx, out, dstCapacity, &nextPrefs);   /* context remains usable */
+                CHECK_LZ4F(pos);
+            }
+            r = LZ4F_compressUpdate(cctx, out + pos, dstCapacity - pos, src, nextSrcSize, NULL);
+            CHECK_LZ4F(r); pos += r;
+            r = LZ4F_compressEnd(cctx, out + pos, dstCapacity - pos, NULL);
+            CHECK_LZ4F(r); pos += r;
+            CHECK(pos == nextRefSize && !memcmp(out, nextRef, pos), "allocation %u : next frame differs", (unsigned)n);
+            LZ4F_freeCompressionContext(cctx);
+            CHECK(g_nbAllocs == g_nbFrees, "allocation %u : memory leak (%u allocations, %u frees)",
+                  (unsigned)n, (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
+        }
+        nbConfigs++;
+    }
+    DISPLAY("begin failures : %u configurations validated, %u allocation failures \n", nbConfigs, nbFailures);
+    free(src); free(ref); free(nextRef); free(out);
+    return 0;
+}
+
 
 /* A failure while creating worker threads (ex: transient allocation failure) is absorbed :
  * jobs are processed serially, producing the same output. Worker threads are created again for next frames. */
@@ -1128,6 +1322,8 @@ int main(int argc, const char** argv)
         validateFlushContract();
         validateAllocFailures();
         validateDstTooSmall();
+        validateDeferredEmission();
+        validateBeginFailures();
         validatePoolRetry();
         validateFileAPI();
         printf("digest : %016llx \n", (unsigned long long)XXH64_digest(&digest));

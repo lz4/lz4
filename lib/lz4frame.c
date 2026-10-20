@@ -866,15 +866,18 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     BYTE* dstPtr = dstStart;
 
     if (preferencesPtr == NULL) preferencesPtr = &prefNull;
-    /* validate before modifying @cctx */
+    /* validate arguments before modifying @cctx : when they are rejected, a frame in progress continues */
     {   size_t const headerSize = minFHSize
                                 + (preferencesPtr->frameInfo.contentSize ? 8 : 0)
                                 + (preferencesPtr->frameInfo.dictID ? 4 : 0);
         RETURN_ERROR_IF(dstCapacity < headerSize, dstCapacity_tooSmall);
     }
     FORWARD_IF_ERROR( LZ4F_getBlockSize(preferencesPtr->frameInfo.blockSizeID) );
+    RETURN_ERROR_IF(dictSize > INT_MAX, parameter_invalid);
+    /* from now on, a failure (allocation) leaves no frame in progress */
     if (cctx->mt) LZ4F_mt_abort(cctx->mt);   /* jobs of an abandoned frame : must complete before @cctx is modified */
     cctx->mtActive = 0;
+    cctx->cStage = 0;
     cctx->prefs = *preferencesPtr;
     DEBUGLOG(5, "LZ4F_compressBegin_internal: Independent_blocks=%u", cctx->prefs.frameInfo.blockMode);
 
@@ -931,7 +934,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     }
     if (dictBuffer) {
         assert(cdict == NULL);
-        RETURN_ERROR_IF(dictSize > INT_MAX, parameter_invalid);
+        assert(dictSize <= INT_MAX);
         if (cctx->lz4CtxType == ctxFast) {
             /* lz4 fast*/
             LZ4_loadDict((LZ4_stream_t*)cctx->lz4CtxPtr, (const char*)dictBuffer, (int)dictSize);
@@ -1770,13 +1773,18 @@ static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity
     return job->cSize;
 }
 
-/* emits submitted jobs in order : all of them (@all), or only the already completed ones.
+/* emits submitted jobs in order : all of them (@all), or only the already completed ones fitting into @dst
+ * (their emission isn't required yet : the others are emitted later).
  * On error, callers invalidate the frame (FORWARD_IF_ERROR_MT) */
 static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos, int all)
 {
     size_t written = 0;
     while (mt->nbSubmitted > 0) {
-        if (!all && !LZ4F_pool_isDone(mt->pool, &mt->jobs[mt->oldest].done)) break;
+        const LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
+        if (!all) {
+            if (!LZ4F_pool_isDone(mt->pool, &job->done)) break;
+            if (job->cSize > dstCapacity - (pos + written)) break;   /* also defers an error code */
+        }
         {   size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos + written, 1);   /* no more input */
             FORWARD_IF_ERROR(r);
             written += r;
@@ -2019,8 +2027,9 @@ static size_t LZ4F_mt_flush(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity, si
  *  Job content is read in place instead, when it remains available until the job completes :
  *  with stableSrc == LZ4F_srcStableUntilFlush, or with autoFlush, since all jobs complete within the invocation.
  *  LZ4F_srcStable (historical value 1) only guarantees the last 64 KB : content is copied.
- *  Completed jobs are emitted in order. With autoFlush, all input is compressed and emitted.
- *  Success is guaranteed when @dstCapacity >= LZ4F_compressBound(srcSize, prefs). */
+ *  Completed jobs are emitted in order, as long as they fit. With autoFlush, all input is compressed and emitted.
+ *  Success is guaranteed when @dstCapacity >= LZ4F_compressBound(srcSize, prefs).
+ *  Otherwise, it only fails on output which can't be deferred : pending uncompressed block, all job slots busy, autoFlush. */
 static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
                                      void* dstBuffer, size_t dstCapacity,
                                const void* srcBuffer, size_t srcSize,
