@@ -986,8 +986,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     const BYTE* const dictEnd = dictionary ? dictionary + dictSize : dictionary;
     const BYTE* anchor = (const BYTE*) source;
     const BYTE* const iend = ip + inputSize;
-    const BYTE* const mflimitPlusOne = iend - MFLIMIT + 1;
-    const BYTE* const matchlimit = iend - LASTLITERALS;
+    const BYTE* mflimitPlusOne;   /* set after the size check : would precede a small input */
+    const BYTE* matchlimit;
 
     /* the dictCtx currentOffset is indexed on the start of the dictionary,
      * while a dictionary in the current context precedes the currentOffset */
@@ -1026,6 +1026,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     cctx->tableType = (U32)tableType;
 
     if (inputSize<LZ4_minLength) goto _last_literals;        /* Input too small, no compression (all literals) */
+    mflimitPlusOne = iend - MFLIMIT + 1;
+    matchlimit = iend - LASTLITERALS;
 
     /* First Byte */
     LZ4_putPosition(ip, cctx->hashTable, tableType, base);

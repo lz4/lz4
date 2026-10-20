@@ -1332,12 +1332,12 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
 typedef enum {
     dstage_getFrameHeader=0, dstage_storeFrameHeader,
     dstage_init,
-    dstage_getBlockHeader, dstage_storeBlockHeader,
+    dstage_getBlockHeader,
     dstage_copyDirect, dstage_getBlockChecksum,
-    dstage_getCBlock, dstage_storeCBlock,
+    dstage_getCBlock,
     dstage_flushOut,
-    dstage_getSuffix, dstage_storeSuffix,
-    dstage_getSFrameSize, dstage_storeSFrameSize,
+    dstage_getSuffix,
+    dstage_getSFrameSize,
     dstage_skipSkippable
 } dStage_t;
 
@@ -1451,13 +1451,14 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     /* special case : skippable frames */
     if ((LZ4F_readLE32(srcPtr) & 0xFFFFFFF0U) == LZ4F_MAGIC_SKIPPABLE_START) {
         dctx->frameInfo.frameType = LZ4F_skippableFrame;
+        dctx->dStage = dstage_getSFrameSize;
         if (src == (void*)(dctx->header)) {
-            dctx->tmpInSize = srcSize;
-            dctx->tmpInTarget = 8;
-            dctx->dStage = dstage_storeSFrameSize;
+            /* the beginning of the frame size field is already gathered in header+4 */
+            assert(srcSize <= 8);
+            dctx->tmpInSize = srcSize - 4;
             return srcSize;
         } else {
-            dctx->dStage = dstage_getSFrameSize;
+            dctx->tmpInSize = 0;
             return 4;
     }   }
 
@@ -1731,6 +1732,33 @@ static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
 }
 
 
+/* LZ4F_gatherInput() :
+ * Provides @wanted contiguous input bytes : directly from src if they are all available and none is buffered yet,
+ * otherwise accumulated into @buffer, over as many calls as needed (dctx->tmpInSize bytes buffered so far).
+ * @return : pointer to the @wanted bytes (*srcPtrPtr is moved past consumed input),
+ *           or NULL if input is exhausted before (all of it is then buffered).
+ */
+static const BYTE*
+LZ4F_gatherInput(LZ4F_dctx* dctx, BYTE* buffer, size_t wanted,
+                 const BYTE** srcPtrPtr, const BYTE* srcEnd)
+{
+    const BYTE* const srcPtr = *srcPtrPtr;
+    size_t const available = (size_t)(srcEnd - srcPtr);
+    if ((dctx->tmpInSize == 0) && (available >= wanted)) {
+        *srcPtrPtr = srcPtr + wanted;
+        return srcPtr;
+    }
+    {   size_t const sizeToCopy = MIN(wanted - dctx->tmpInSize, available);
+        memcpy(buffer + dctx->tmpInSize, srcPtr, sizeToCopy);
+        dctx->tmpInSize += sizeToCopy;
+        *srcPtrPtr = srcPtr + sizeToCopy;
+    }
+    if (dctx->tmpInSize < wanted) return NULL;
+    dctx->tmpInSize = 0;   /* ready for next gathering */
+    return buffer;
+}
+
+
 /*! LZ4F_decompress() :
  *  Call this function repetitively to regenerate compressed data in srcBuffer.
  *  The function will attempt to decode up to *srcSizePtr bytes from srcBuffer
@@ -1850,33 +1878,14 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             /* fall-through */
 
         case dstage_getBlockHeader:
-            if ((size_t)(srcEnd - srcPtr) >= BHSize) {
-                selectedIn = srcPtr;
-                srcPtr += BHSize;
-            } else {
-                /* not enough input to read cBlockSize field */
-                dctx->tmpInSize = 0;
-                dctx->dStage = dstage_storeBlockHeader;
+            selectedIn = LZ4F_gatherInput(dctx, dctx->tmpIn, BHSize, &srcPtr, srcEnd);
+            if (selectedIn == NULL) {   /* not enough input for cBlockSize */
+                nextSrcSizeHint = BHSize - dctx->tmpInSize;
+                doAnotherStage = 0;
+                break;
             }
 
-            if (dctx->dStage == dstage_storeBlockHeader)   /* can be skipped */
-        case dstage_storeBlockHeader:
-            {   size_t const remainingInput = (size_t)(srcEnd - srcPtr);
-                size_t const wantedData = BHSize - dctx->tmpInSize;
-                size_t const sizeToCopy = MIN(wantedData, remainingInput);
-                memcpy(dctx->tmpIn + dctx->tmpInSize, srcPtr, sizeToCopy);
-                srcPtr += sizeToCopy;
-                dctx->tmpInSize += sizeToCopy;
-
-                if (dctx->tmpInSize < BHSize) {   /* not enough input for cBlockSize */
-                    nextSrcSizeHint = BHSize - dctx->tmpInSize;
-                    doAnotherStage  = 0;
-                    break;
-                }
-                selectedIn = dctx->tmpIn;
-            }   /* if (dctx->dStage == dstage_storeBlockHeader) */
-
-        /* decode block header */
+            /* decode block header */
             {   U32 const blockHeader = LZ4F_readLE32(selectedIn);
                 size_t const nextCBlockSize = blockHeader & 0x7FFFFFFFU;
                 size_t const crcSize = dctx->frameInfo.blockChecksumFlag * BFSize;
@@ -1932,10 +1941,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     dstPtr += sizeToCopy;
                 }
                 if (sizeToCopy == dctx->tmpInTarget) {   /* all done */
-                    if (dctx->frameInfo.blockChecksumFlag) {
-                        dctx->tmpInSize = 0;
+                    if (dctx->frameInfo.blockChecksumFlag)
                         dctx->dStage = dstage_getBlockChecksum;
-                    } else
+                    else
                         dctx->dStage = dstage_getBlockHeader;  /* new block */
                     break;
                 }
@@ -1950,67 +1958,38 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
         /* check block checksum for recently transferred uncompressed block */
         case dstage_getBlockChecksum:
             DEBUGLOG(6, "dstage_getBlockChecksum");
-            {   const void* crcSrc;
-                if ((srcEnd-srcPtr >= 4) && (dctx->tmpInSize==0)) {
-                    crcSrc = srcPtr;
-                    srcPtr += 4;
-                } else {
-                    size_t const stillToCopy = 4 - dctx->tmpInSize;
-                    size_t const sizeToCopy = MIN(stillToCopy, (size_t)(srcEnd-srcPtr));
-                    memcpy(dctx->header + dctx->tmpInSize, srcPtr, sizeToCopy);
-                    dctx->tmpInSize += sizeToCopy;
-                    srcPtr += sizeToCopy;
-                    if (dctx->tmpInSize < 4) {  /* all input consumed */
-                        nextSrcSizeHint = (4 - dctx->tmpInSize) + BHSize /* next header size */;
-                        doAnotherStage = 0;
-                        break;
-                    }
-                    crcSrc = dctx->header;
-                }
-                if (!dctx->skipBlockChecksum) {
-                    U32 const readCRC = LZ4F_readLE32(crcSrc);
-                    U32 const calcCRC = XXH32_digest(&dctx->blockChecksum);
+            selectedIn = LZ4F_gatherInput(dctx, dctx->tmpIn, BFSize, &srcPtr, srcEnd);
+            if (selectedIn == NULL) {   /* all input consumed */
+                nextSrcSizeHint = (BFSize - dctx->tmpInSize) + BHSize /* next header size */;
+                doAnotherStage = 0;
+                break;
+            }
+            if (!dctx->skipBlockChecksum) {
+                U32 const readCRC = LZ4F_readLE32(selectedIn);
+                U32 const calcCRC = XXH32_digest(&dctx->blockChecksum);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-                    DEBUGLOG(6, "compare block checksum");
-                    if (readCRC != calcCRC) {
-                        DEBUGLOG(4, "incorrect block checksum: %08X != %08X",
-                                readCRC, calcCRC);
-                        RETURN_ERROR(blockChecksum_invalid);
-                    }
+                DEBUGLOG(6, "compare block checksum");
+                if (readCRC != calcCRC) {
+                    DEBUGLOG(4, "incorrect block checksum: %08X != %08X",
+                            readCRC, calcCRC);
+                    RETURN_ERROR(blockChecksum_invalid);
+                }
 #else
-                    (void)readCRC;
-                    (void)calcCRC;
+                (void)readCRC;
+                (void)calcCRC;
 #endif
-            }   }
+            }
             dctx->dStage = dstage_getBlockHeader;  /* new block */
             break;
 
         case dstage_getCBlock:
             DEBUGLOG(6, "dstage_getCBlock");
-            if ((size_t)(srcEnd-srcPtr) < dctx->tmpInTarget) {
-                dctx->tmpInSize = 0;
-                dctx->dStage = dstage_storeCBlock;
+            selectedIn = LZ4F_gatherInput(dctx, dctx->tmpIn, dctx->tmpInTarget, &srcPtr, srcEnd);
+            if (selectedIn == NULL) {   /* need more input */
+                nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)   /* block checksum included */
+                                + BHSize /* next header size */;
+                doAnotherStage = 0;
                 break;
-            }
-            /* input large enough to read full block directly */
-            selectedIn = srcPtr;
-            srcPtr += dctx->tmpInTarget;
-
-            if (0)  /* always jump over next block */
-        case dstage_storeCBlock:
-            {   size_t const wantedData = dctx->tmpInTarget - dctx->tmpInSize;
-                size_t const inputLeft = (size_t)(srcEnd-srcPtr);
-                size_t const sizeToCopy = MIN(wantedData, inputLeft);
-                memcpy(dctx->tmpIn + dctx->tmpInSize, srcPtr, sizeToCopy);
-                dctx->tmpInSize += sizeToCopy;
-                srcPtr += sizeToCopy;
-                if (dctx->tmpInSize < dctx->tmpInTarget) { /* need more input */
-                    nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)   /* block checksum included */
-                                    + BHSize /* next header size */;
-                    doAnotherStage = 0;
-                    break;
-                }
-                selectedIn = dctx->tmpIn;
             }
 
             /* At this stage, input is large enough to decode a block */
@@ -2019,7 +1998,6 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             if (dctx->frameInfo.blockChecksumFlag) {
                 assert(dctx->tmpInTarget >= 4);
                 dctx->tmpInTarget -= 4;
-                assert(selectedIn != NULL);  /* selectedIn is defined at this stage (either srcPtr, or dctx->tmpIn) */
                 if (!dctx->skipBlockChecksum) {
                     U32 const readBlockCrc = LZ4F_readLE32(selectedIn + dctx->tmpInTarget);
                     U32 const calcBlockCrc = XXH32(selectedIn, dctx->tmpInTarget, 0);
@@ -2105,31 +2083,12 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 doAnotherStage = 0;
                 break;
             }
-            if ((srcEnd - srcPtr) < 4) {  /* not enough size for entire CRC */
-                dctx->tmpInSize = 0;
-                dctx->dStage = dstage_storeSuffix;
-            } else {
-                selectedIn = srcPtr;
-                srcPtr += 4;
+            selectedIn = LZ4F_gatherInput(dctx, dctx->tmpIn, 4, &srcPtr, srcEnd);
+            if (selectedIn == NULL) {   /* not enough input to read complete suffix */
+                nextSrcSizeHint = 4 - dctx->tmpInSize;
+                doAnotherStage = 0;
+                break;
             }
-
-            if (dctx->dStage == dstage_storeSuffix)   /* can be skipped */
-        case dstage_storeSuffix:
-            {   size_t const remainingInput = (size_t)(srcEnd - srcPtr);
-                size_t const wantedData = 4 - dctx->tmpInSize;
-                size_t const sizeToCopy = MIN(wantedData, remainingInput);
-                memcpy(dctx->tmpIn + dctx->tmpInSize, srcPtr, sizeToCopy);
-                srcPtr += sizeToCopy;
-                dctx->tmpInSize += sizeToCopy;
-                if (dctx->tmpInSize < 4) { /* not enough input to read complete suffix */
-                    nextSrcSizeHint = 4 - dctx->tmpInSize;
-                    doAnotherStage=0;
-                    break;
-                }
-                selectedIn = dctx->tmpIn;
-            }   /* if (dctx->dStage == dstage_storeSuffix) */
-
-        /* case dstage_checkSuffix: */   /* no direct entry, avoid initialization risks */
             if (!dctx->skipContentChecksum) {
                 U32 const readCRC = LZ4F_readLE32(selectedIn);
                 U32 const resultCRC = XXH32_digest(&(dctx->xxh));
@@ -2147,33 +2106,12 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             break;
 
         case dstage_getSFrameSize:
-            if ((srcEnd - srcPtr) >= 4) {
-                selectedIn = srcPtr;
-                srcPtr += 4;
-            } else {
-                /* not enough input to read the skippable frame size */
-                dctx->tmpInSize = 4;
-                dctx->tmpInTarget = 8;
-                dctx->dStage = dstage_storeSFrameSize;
+            selectedIn = LZ4F_gatherInput(dctx, dctx->header + 4, 4, &srcPtr, srcEnd);
+            if (selectedIn == NULL) {   /* not enough input to read the skippable frame size */
+                nextSrcSizeHint = 4 - dctx->tmpInSize;
+                doAnotherStage = 0;
+                break;
             }
-
-            if (dctx->dStage == dstage_storeSFrameSize)
-        case dstage_storeSFrameSize:
-            {   size_t const sizeToCopy = MIN(dctx->tmpInTarget - dctx->tmpInSize,
-                                             (size_t)(srcEnd - srcPtr) );
-                memcpy(dctx->header + dctx->tmpInSize, srcPtr, sizeToCopy);
-                srcPtr += sizeToCopy;
-                dctx->tmpInSize += sizeToCopy;
-                if (dctx->tmpInSize < dctx->tmpInTarget) {
-                    /* not enough input to get full sBlockSize; wait for more */
-                    nextSrcSizeHint = dctx->tmpInTarget - dctx->tmpInSize;
-                    doAnotherStage = 0;
-                    break;
-                }
-                selectedIn = dctx->header + 4;
-            }   /* if (dctx->dStage == dstage_storeSFrameSize) */
-
-        /* case dstage_decodeSFrameSize: */   /* no direct entry */
             {   size_t const SFrameSize = LZ4F_readLE32(selectedIn);
                 dctx->frameInfo.contentSize = SFrameSize;
                 dctx->tmpInTarget = SFrameSize;
