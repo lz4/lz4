@@ -80,6 +80,8 @@ test "$(lz4 -c -l -1 $FPREFIX-dg20k | wc -c)" -lt "$(lz4 -c -l --fast=1 $FPREFIX
 lz4 -c -l --fast=2147483647 $FPREFIX-dg20k > /dev/null  # legacy format : acceleration capped without overflow
 lz4 -c --fast=0 $FPREFIX-dg20k && exit 1  # lz4 should fail when fast=0
 lz4 -c --fast=-1 $FPREFIX-dg20k && exit 1 # lz4 should fail when fast=-1
+lz4 -c --fast=5x $FPREFIX-dg20k && exit 1 # lz4 should fail on trailing garbage
+lz4 -c --threadsX 2 $FPREFIX-dg20k && exit 1 # lz4 should fail on unknown long command
 # numeric arguments must not silently overflow
 lz4 -c --fast=3000000000 $FPREFIX-dg20k > /dev/null && exit 1  # > INT_MAX
 lz4 -c --fast=4294967297 $FPREFIX-dg20k > /dev/null && exit 1  # > UINT_MAX (would wrap to 1)
