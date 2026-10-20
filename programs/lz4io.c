@@ -2466,13 +2466,17 @@ static int skipStream(FILE* f, unsigned offset)
     return 0;
 }
 
-/** Safely handle cases when (unsigned)offset > LONG_MAX */
+/** Safely handle cases when (unsigned)offset > LONG_MAX.
+ *  fseek() succeeds beyond end of file, so the last byte is read instead,
+ *  to detect when fewer than @offset bytes remain (truncated input). */
 static int fseek_u32(FILE *fp, unsigned offset, int where)
 {
     const unsigned stepMax = 1U << 30;
     int errorNb = 0;
 
     if (where != SEEK_CUR) return -1;  /* Only allows SEEK_CUR */
+    if (offset == 0) return 0;
+    offset--;   /* last byte is read below */
     while (offset > 0) {
         unsigned s = offset;
         if (s > stepMax) s = stepMax;
@@ -2481,7 +2485,8 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
         errorNb = skipStream(fp, offset);
         offset = 0;
     }
-    return errorNb;
+    if (errorNb) return errorNb;
+    return (fgetc(fp) == EOF);
 }
 
 
