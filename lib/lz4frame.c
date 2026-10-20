@@ -517,9 +517,16 @@ static int LZ4F_mtEligible(const LZ4F_preferences_t* prefs)
 #endif
 
 
+/* job slots employed for @nbWorkers (see LZ4F_mt_begin()) : they bound the output lag (see LZ4F_mtCompressBound()).
+ * Without multi-threading support, jobs are processed serially, within a single slot */
 static size_t LZ4F_mtNbJobSlots(unsigned nbWorkers)
 {
+#if LZ4F_MULTITHREAD
     return LZ4F_MT_NBSLOTS(MIN(nbWorkers, LZ4F_NBWORKERS_MAX));
+#else
+    (void)nbWorkers;
+    return 1;
+#endif
 }
 
 /*! LZ4F_blocksBound() :
@@ -1344,6 +1351,8 @@ typedef struct LZ4F_pool_s LZ4F_pool_t;
  * Queued jobs are run by worker threads (workerID 1 to nbThreads).
  * While waiting for a job, the calling thread runs queued jobs too (workerID 0).
  * Allocations happen in the calling thread, since @cmem might not be thread-safe.
+ * Exception : at levels >= LZ4HC_CLEVEL_OPT_MIN, lz4hc allocates its own temporary buffer (LZ4HC_HEAPMODE)
+ * with malloc(), or LZ4_malloc() (LZ4_USER_MEMORY_FUNCTIONS, which must then be thread-safe), within worker threads.
  * Note : like any thread, workers don't survive fork() : a forked child must not employ this pool. */
 typedef struct { LZ4F_job_f fn; void* arg; } LZ4F_poolJob_t;
 typedef struct { LZ4F_pool_t* pool; unsigned workerID; } LZ4F_poolWorker_t;

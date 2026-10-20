@@ -1062,6 +1062,7 @@ typedef struct {
     LZ4F_compressionContext_t ctx;
     LZ4F_preferences_t preparedPrefs;
     LZ4F_CDict* cdict;
+    unsigned nbWorkers;   /* automatic nb of workers employed so far : only grows (see LZ4IO_compressFilename_extRess()) */
 } cRess_t;
 
 static void LZ4IO_freeCResources(cRess_t ress)
@@ -1471,7 +1472,7 @@ static int LZ4IO_mappedContentUnchanged(const LZ4IO_cInput_t* in, FILE* srcFile,
  */
 static int
 LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
-                               const cRess_t* ress,
+                               cRess_t* ress,
                                const char* srcFileName, const char* dstFileName,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
@@ -1522,12 +1523,22 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
     }
-    /* automatic nb of workers : no more than the jobs of the file (output doesn't depend on nbWorkers) */
+    /* automatic nb of workers : no more than the jobs of the file (output doesn't depend on nbWorkers),
+     * but never decreasing from one file to the next, so that worker threads and buffers are kept */
     if (io_prefs->autoWorkers && (prefs.nbWorkers > 1)) {
         U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown */
         U64 const jobSize = LZ4IO_jobSize(&prefs);
-        U64 const nbJobs = (fileSize + jobSize - 1) / jobSize;
-        if (fileSize && (nbJobs < prefs.nbWorkers)) prefs.nbWorkers = (unsigned)nbJobs;
+        U64 const nbJobs = MAX((fileSize + jobSize - 1) / jobSize, ress->nbWorkers);
+        if (fileSize) {
+            if (nbJobs < prefs.nbWorkers) prefs.nbWorkers = (unsigned)nbJobs;
+            ress->nbWorkers = prefs.nbWorkers;
+    }   }
+    /* with independent blocks, a file fitting into a single job is compressed by the calling thread,
+     * without job buffers : same output, and worker threads remain available for next files.
+     * Not with linked blocks : single-threaded output can then depend on stableSrc (memory-mapped input) */
+    if (prefs.nbWorkers && (prefs.frameInfo.blockMode == LZ4F_blockIndependent)) {
+        U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown (ex: stdin) */
+        if (fileSize && (fileSize <= LZ4IO_jobSize(&prefs))) prefs.nbWorkers = 0;
     }
     /* memory-mapped input is released (only a memory hint) behind jobs in flight :
      * liblz4 keeps up to 2*nbWorkers+1 jobs of at most 4 MB in flight, each reading 64 KB of history before it */

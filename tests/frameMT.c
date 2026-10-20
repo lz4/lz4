@@ -30,7 +30,7 @@
  * - streaming : same output as one-shot, whatever input slicing and stableSrc ;
  *   flushes, autoFlush and uncompressed segments produce the same output whatever nbWorkers ;
  *   with independent blocks, the same output as nbWorkers == 0 ;
- *   each invocation succeeds with exactly LZ4F_compressBound() ;
+ *   each invocation succeeds with exactly LZ4F_compressBound(), which only covers job slots actually employed ;
  *   input isn't read after invocation, unless LZ4F_srcStableUntilFlush ;
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
@@ -588,6 +588,29 @@ static void validateMaxNbWorkers(void)
 #  endif
 #else
     CHECK(maxWorkers == 0, "%u instead of 0 (no multi-threading support)", maxWorkers);
+#endif
+}
+
+
+/* LZ4F_compressBound() only covers job slots actually employed (2*nbWorkers+1),
+ * a single one without multi-threading support, where jobs are processed serially.
+ * Sufficiency : see streamCompress(), each invocation receiving exactly LZ4F_compressBound() */
+static void validateCompressBound(void)
+{
+    LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
+    size_t const jobSize = 4 MB;   /* linked blocks */
+    size_t b1, b8;
+    g_step = "LZ4F_compressBound";
+    p.frameInfo.blockMode = LZ4F_blockLinked;   /* frames cut into jobs, even without multi-threading support */
+    p.nbWorkers = 1;
+    b1 = LZ4F_compressBound(0, &p);
+    p.nbWorkers = 8;
+    b8 = LZ4F_compressBound(0, &p);
+#if defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD
+    CHECK(b8 >= b1 + 14 * jobSize, "8 workers : bound (%u) doesn't cover their job slots", (unsigned)b8);
+#else
+    CHECK(b8 == b1, "bound covers job slots which aren't employed (%u instead of %u)", (unsigned)b8, (unsigned)b1);
+    CHECK(b1 < 2 * jobSize, "bound (%u) covers more than one job slot", (unsigned)b1);
 #endif
 }
 
@@ -1336,6 +1359,7 @@ int main(int argc, const char** argv)
     {   XXH64_state_t digest;
         XXH64_reset(&digest, 0);
         validateMaxNbWorkers();
+        validateCompressBound();
         validate(&digest);
         validateStreaming(&digest);
         validateFlushContract();

@@ -32,6 +32,25 @@ do
     lz4 -dc $FPREFIX-T1.lz4 | cmp - $FPREFIX-src
 done
 
+# files fitting into a single job (with independent blocks : compressed without worker threads),
+# and files of different sizes (-m : the same nb of threads for all) : same output
+head -c 1300000 $FPREFIX-src > $FPREFIX-s1   # 1 job with linked blocks, 2 with independent 64 KB blocks
+head -c 300000 $FPREFIX-src > $FPREFIX-s2    # 1 job
+for opts in "-1 -B4" "-1 -B4 -BD" "-9 -B4 -BD" "-1 -B5"
+do
+    for f in $FPREFIX-s1 $FPREFIX-s2 $FPREFIX-src
+    do
+        lz4 -f -T1 --no-mmap $opts $f $f-ref.lz4
+        lz4 -f $opts $f $f.lz4
+        cmp $f-ref.lz4 $f.lz4
+    done
+    lz4 -f -m $opts $FPREFIX-s1 $FPREFIX-s2 $FPREFIX-src
+    for f in $FPREFIX-s1 $FPREFIX-s2 $FPREFIX-src
+    do
+        cmp $f-ref.lz4 $f.lz4
+    done
+done
+
 # memory budget : --memory=# and LZ4_MEMORY limit the nb of threads, not the output
 lz4 -f --memory=abc $FPREFIX-src $FPREFIX.lz4 && exit 1  # must fail
 lz4 -f --memory=0 $FPREFIX-src $FPREFIX.lz4 && exit 1    # must fail
