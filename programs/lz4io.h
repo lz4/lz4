@@ -77,7 +77,9 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 
 /* nbWorkers : 0 == automatic : nb of cores, within memory budget (see LZ4IO_setMemoryBudget()),
  *             and no more than the nb of jobs of each file (when its size is known) ;
- *             >= 1 : explicit (within memory budget when it's set, or on 32-bit systems) */
+ *             >= 1 : explicit (within memory budget when it's set, or on 32-bit systems).
+ *  Capped as within liblz4 (LZ4F_getMaxNbWorkers()), for frame and legacy formats : 1 without its multi-threading support.
+ * @return : nb of workers applied */
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
 int LZ4IO_defaultNbWorkers(void);
 

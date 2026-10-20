@@ -30,7 +30,10 @@ echo !BIN!\lz4 -d -f tmp-empty.lz4 tmp-empty.out
      !BIN!\lz4 -d -f tmp-empty.lz4 tmp-empty.out	|| goto :ERROR
 del tmp-empty tmp-empty.lz4 tmp-empty.out
 
-@rem multithreaded compression (liblz4 worker threads) : same output whatever the nb of threads
+@rem multithreaded compression (liblz4 worker threads) : reported by the version line (LZ4F_getMaxNbWorkers()),
+@rem since output is the same whatever the nb of threads
+echo !BIN!\lz4 -V ^| findstr multithread
+     !BIN!\lz4 -V | findstr /c:"multithread"	|| goto :ERROR
 echo !BIN!\datagen -g13M ^> tmp-mt
      !BIN!\datagen -g13M > tmp-mt	|| goto :ERROR
 for %%O in ("-1" "-1 -BD" "-9 -BD -BX") do (

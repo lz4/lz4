@@ -146,6 +146,7 @@ only the latest one will be applied.
   When `0`, or none provided: automatically determined from nb of detected cores,
   within memory budget (see `--memory`), and no more than the jobs of each file.
   An explicit `#` is only limited by the memory budget when it's set (`--memory`, `LZ4_MEMORY`), or on 32-bit systems.
+  At most 1024 threads (128 on 32-bit systems).
   Ignored with a custom block size (see `-B#`).
 
 * `--memory=#`:
@@ -251,7 +252,8 @@ only the latest one will be applied.
   Display help/long help and exit
 
 * `-V` `--version`:
-  Display Version number and exit
+  Display Version number and exit.
+  The version line also tells if compression is multithreaded (`multithread`) or not (`single-thread`)
 
 * `-k` `--keep`:
   Preserve source files (default behavior)

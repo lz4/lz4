@@ -457,7 +457,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 /* see LZ4F_preferences_t.nbWorkers */
 /* sanity limit (ex: uninitialized preferences) ; on 32-bit systems, keeps LZ4F_compressBound() within address space */
 #ifndef LZ4F_NBWORKERS_MAX
-#  define LZ4F_NBWORKERS_MAX ((sizeof(size_t) >= 8) ? 1024u : 200u)
+#  define LZ4F_NBWORKERS_MAX ((sizeof(size_t) >= 8) ? 1024u : 128u)
 #endif
 #define LZ4F_MT_PREFIX_SIZE (64 KB)   /* history employed by linked blocks */
 
@@ -480,6 +480,15 @@ static size_t LZ4F_mtJobSize(LZ4F_blockMode_t blockMode, size_t blockSize)
     size_t const target = (blockMode == LZ4F_blockLinked) ? LZ4F_MT_JOBSIZE_LINKED : LZ4F_MT_JOBSIZE_INDEPENDENT;
     if (blockSize >= target) return blockSize;
     return (target / blockSize) * blockSize;   /* whole nb of blocks */
+}
+
+unsigned LZ4F_getMaxNbWorkers(void)
+{
+#if LZ4F_MULTITHREAD
+    return LZ4F_NBWORKERS_MAX;
+#else
+    return 0;
+#endif
 }
 
 /* frames are cut into jobs only with valid block modes, see LZ4F_mt_begin() */

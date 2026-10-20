@@ -53,16 +53,14 @@
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 #include "lz4hc.h"    /* LZ4HC_CLEVEL_MAX */
 #include "lz4.h"      /* LZ4_VERSION_STRING */
+#define LZ4F_STATIC_LINKING_ONLY
+#include "lz4frame.h" /* LZ4F_getMaxNbWorkers */
 
 
 /*****************************
 *  Constants
 ******************************/
-#if LZ4IO_MULTITHREAD
-# define IO_MT "multithread"
-#else
-# define IO_MT "single-thread"
-#endif
+#define IO_MT (multithreadSupport() ? "multithread" : "single-thread")
 #define COMPRESSOR_NAME "lz4"
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s v%s %i-bit %s, by %s ***\n", COMPRESSOR_NAME, LZ4_versionString(), (int)(sizeof(void*)*8), IO_MT, AUTHOR
@@ -105,6 +103,16 @@ do {                                                              \
 static void errorOut(const char* msg)
 {
     DISPLAYLEVEL(1, "%s \n", msg); exit(1);
+}
+
+/* frames are compressed by liblz4's worker threads : both lz4 and liblz4 must support multi-threading */
+static int multithreadSupport(void)
+{
+#if LZ4IO_MULTITHREAD
+    return LZ4F_getMaxNbWorkers() > 0;
+#else
+    return 0;
+#endif
 }
 
 
@@ -824,11 +832,9 @@ int main(int argCount, const char** argv)
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(5, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
-#if !LZ4IO_MULTITHREAD
-    if (nbWorkers > 1) {
+    if ((nbWorkers > 1) && !multithreadSupport()) {
         DISPLAYLEVEL(2, "warning: this executable doesn't support multithreading \n");
     }
-#endif
     if ((mode == om_compress) || (mode == om_bench)) {
         DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));
     }
@@ -958,7 +964,11 @@ int main(int argCount, const char** argv)
 #if LZ4IO_MULTITHREAD
         /* nbWorkers 0 : automatic (nb of cores, within memory budget, and no more than the jobs of each file).
          * Explicit nb of workers : within memory budget when it's set (--memory, LZ4_MEMORY), or on 32-bit systems */
-        LZ4IO_setNbWorkers(prefs, (nbWorkers > (unsigned)INT_MAX) ? INT_MAX : (int)nbWorkers);   /* liblz4 also caps it (sanity limit) */
+        {   int const requested = (nbWorkers > (unsigned)INT_MAX) ? INT_MAX : (int)nbWorkers;
+            int const applied = LZ4IO_setNbWorkers(prefs, requested);   /* capped as within liblz4 */
+            if (multithreadSupport() && (requested > applied))
+                DISPLAYLEVEL(3, "Requested %u threads too large => automatically reduced to %i \n", nbWorkers, applied);
+        }
         LZ4IO_setMemoryBudget(prefs, memoryBudget);
 #endif
         if (legacy_format) {

@@ -31,9 +31,8 @@ On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=
 - `LZ4IO_MULTITHREAD`: enable multithreading support. Default is disabled.
 - `LZ4_NBWORKERS_DEFAULT`: default nb of worker threads used in multithreading mode (can be overridden with command `-T#`).
    Default is `0`, which means "auto-determine" based on local cpu.
-- `LZ4_NBWORKERS_MAX`: maximum nb of worker threads of the legacy format (`-l`). Currently set to 200 by default.
-   For the frame format, the nb of workers is limited by a memory budget instead (see `--memory`, `LZ4_MEMORY`),
-   and by liblz4 (sanity limit : 1024, 200 on 32-bit systems).
+   The nb of workers is limited by liblz4 (`LZ4F_getMaxNbWorkers()` : 1024, 128 on 32-bit systems, 1 without its multithreading support),
+   and, for the frame format, by a memory budget (see `--memory`, `LZ4_MEMORY`).
 - `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 7, corresponding to 4 MB block size.
 
 #### Environment Variables

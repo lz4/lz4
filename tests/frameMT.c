@@ -39,6 +39,7 @@
  *   completed jobs not fitting yet are emitted later, without failure
  * - LZ4F_compressBegin() rejecting its arguments leaves the frame in progress (jobs in flight) untouched ;
  *   its allocation failures invalidate it
+ * - LZ4F_getMaxNbWorkers() reports multi-threading support
  * - all allocations happen in the calling thread (custom allocator is not thread-safe : see TSAN)
  * - prints a digest of produced frames, to compare builds with and without LZ4F_MULTITHREAD
  * Bench mode : frameMT -b FILE [-l#] [-B#] [-D] [-c] [-T#]
@@ -168,7 +169,7 @@ static int validate(XXH64_state_t* digest)
 {
     static const size_t srcSizes[] = { 1 MB + 1, 4 MB - 1, 4 MB + 1, 9 MB + 12345, 17 MB + 3 };
     static const int levels[] = { -3, 0, 1, 2, 4, 9, 10, 12 };
-    static const unsigned nbWorkersList[] = { 2, 3, 8, 1000 /* capped (tests/Makefile : LZ4F_NBWORKERS_MAX=200) */ };
+    static const unsigned nbWorkersList[] = { 2, 3, 8, 1000 /* capped (tests/Makefile : LZ4F_NBWORKERS_MAX=128) */ };
     size_t const srcSizeMax = 17 MB + 3;
     size_t const dictSize = 64 KB;
     size_t const dstCapacity = LZ4F_compressFrameBound(srcSizeMax, NULL);
@@ -571,6 +572,23 @@ static int validateStreaming(XXH64_state_t* digest)
     DISPLAY("streaming : %u configurations validated \n", nbConfigs);
     free(src); free(dict); free(scratch); free(ref); free(refFlush); free(refAuto); free(refUnc); free(out); free(decoded); free(tmpOut);
     return 0;
+}
+
+
+/* LZ4F_getMaxNbWorkers() reports multi-threading support, and the cap of nbWorkers */
+static void validateMaxNbWorkers(void)
+{
+    unsigned const maxWorkers = LZ4F_getMaxNbWorkers();
+    g_step = "LZ4F_getMaxNbWorkers";
+#if defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD
+#  ifdef LZ4F_NBWORKERS_MAX
+    CHECK(maxWorkers == LZ4F_NBWORKERS_MAX, "%u instead of %u", maxWorkers, (unsigned)LZ4F_NBWORKERS_MAX);
+#  else
+    CHECK(maxWorkers >= 1, "multi-threading support not reported");
+#  endif
+#else
+    CHECK(maxWorkers == 0, "%u instead of 0 (no multi-threading support)", maxWorkers);
+#endif
 }
 
 
@@ -1317,6 +1335,7 @@ int main(int argc, const char** argv)
     if (benchFile) return bench(benchFile, level, bsid, linked, checksum, maxWorkers);
     {   XXH64_state_t digest;
         XXH64_reset(&digest, 0);
+        validateMaxNbWorkers();
         validate(&digest);
         validateStreaming(&digest);
         validateFlushContract();

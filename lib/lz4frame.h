@@ -205,7 +205,7 @@ typedef struct {
 
 /* nbWorkers : experimental
  *  0 (default) : single-threaded, unchanged behavior.
- *  >= 1 : input is cut into jobs, compressed by up to nbWorkers worker threads (capped at 1024, 200 on 32-bit systems).
+ *  >= 1 : input is cut into jobs, compressed by up to nbWorkers worker threads (capped at 1024, 128 on 32-bit systems).
  *         The calling thread also processes jobs, while waiting for them :
  *         up to nbWorkers+1 threads can be compressing simultaneously.
  *  - Output only depends on content, parameters and flush points :
@@ -231,7 +231,8 @@ typedef struct {
  *  Multi-threading requires lz4frame.c to be compiled with LZ4F_MULTITHREAD=1 (and -pthread on POSIX systems) :
  *  by default, the dynamic library is built with multi-threading support, and the static library without.
  *  Otherwise, independent blocks are compressed in single-threaded mode (same output),
- *  and jobs of linked blocks are processed serially by the calling thread (same output, slightly slower). */
+ *  and jobs of linked blocks are processed serially by the calling thread (same output, slightly slower).
+ *  LZ4F_getMaxNbWorkers() (static linking only) tells if multi-threading is supported. */
 
 
 /*-*********************************
@@ -783,6 +784,15 @@ LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
  *          or an error code (can be tested using LZ4F_isError()) if @blockSizeID is invalid.
 **/
 LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
+
+/*! LZ4F_getMaxNbWorkers() : v1.10.1+ (experimental, see LZ4F_preferences_t.nbWorkers)
+ * @return : the maximum nb of worker threads a compression context can employ :
+ *           0 when this library is compiled without multi-threading support (LZ4F_MULTITHREAD),
+ *           otherwise the cap applied to LZ4F_preferences_t.nbWorkers (1024, or 128 on 32-bit systems).
+ *  Even when supported, worker threads can be missing at run time (ex: creation failure) :
+ *  jobs are then compressed by the calling thread, producing the same output.
+**/
+LZ4FLIB_STATIC_API unsigned LZ4F_getMaxNbWorkers(void);
 
 /*! LZ4F_uncompressedUpdate() :
  *  LZ4F_uncompressedUpdate() can be called repetitively to add data stored as uncompressed blocks.

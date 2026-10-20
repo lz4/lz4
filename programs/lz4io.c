@@ -196,6 +196,16 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, double cpuTimeStart, unsign
 /* ****************** Init functions ******************** */
 /* ************************************************** */
 
+/* nb of worker threads, for frame and legacy formats : capped as within liblz4 (LZ4F_getMaxNbWorkers()) ;
+ * 1 when liblz4 doesn't support multi-threading (see lz4 -V) */
+static int LZ4IO_capNbWorkers(int nbWorkers)
+{
+    unsigned const libMax = LZ4F_getMaxNbWorkers();
+    unsigned const maxWorkers = libMax ? libMax : 1;
+    if (nbWorkers < 1) return 1;
+    return ((unsigned)nbWorkers > maxWorkers) ? (int)maxWorkers : nbWorkers;
+}
+
 int LZ4IO_defaultNbWorkers(void)
 {
 #if LZ4IO_MULTITHREAD
@@ -255,7 +265,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     prefs->favorDecSpeed = 0;
     prefs->dictionaryFilename = NULL;
     prefs->removeSrcFile = 0;
-    prefs->nbWorkers = LZ4IO_defaultNbWorkers();
+    prefs->nbWorkers = LZ4IO_capNbWorkers(LZ4IO_defaultNbWorkers());
     prefs->autoWorkers = 1;
     prefs->memoryBudget = 0;
     prefs->useMmap = 1;
@@ -266,9 +276,8 @@ int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers)
 {
     prefs->autoWorkers = (nbWorkers == 0);
     if (nbWorkers == 0) nbWorkers = LZ4IO_defaultNbWorkers();
-    if (nbWorkers < 1 ) nbWorkers = 1;
-    prefs->nbWorkers = nbWorkers;
-    return nbWorkers;
+    prefs->nbWorkers = LZ4IO_capNbWorkers(nbWorkers);
+    return prefs->nbWorkers;
 }
 
 unsigned long long LZ4IO_setMemoryBudget(LZ4IO_prefs_t* const prefs, unsigned long long budget)
@@ -1214,7 +1223,7 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     } else {
         /* frames are cut into jobs, compressed by liblz4's worker threads (when available) :
          * output doesn't depend on nbWorkers, nor on multi-threading support */
-        unsigned nbWorkers = (unsigned)MAX(io_prefs->nbWorkers, 1);
+        unsigned nbWorkers = (unsigned)io_prefs->nbWorkers;   /* >= 1, capped (LZ4IO_capNbWorkers()) */
         U64 const budget = io_prefs->memoryBudget ? io_prefs->memoryBudget : LZ4IO_MEMORY_BUDGET;
         if (io_prefs->autoWorkers || io_prefs->memoryBudget || (sizeof(size_t) < 8)) {
             unsigned const budgeted = LZ4IO_budgetNbWorkers(&ress.preparedPrefs, nbWorkers, chunkSize, budget);
@@ -1228,7 +1237,11 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
             nbWorkers = budgeted;
         }
 #if LZ4IO_MULTITHREAD
-        DISPLAYLEVEL(3, "Using %s%u threads for compression \n", io_prefs->autoWorkers ? "up to " : "", nbWorkers);
+        if (LZ4F_getMaxNbWorkers()) {
+            DISPLAYLEVEL(3, "Using %s%u threads for compression \n", io_prefs->autoWorkers ? "up to " : "", nbWorkers);
+        } else {
+            DISPLAYLEVEL(3, "Note : liblz4 built without multithreading support : single-threaded compression \n");
+        }
 #endif
         ress.preparedPrefs.nbWorkers = nbWorkers;
     }

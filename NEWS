@@ -40,6 +40,7 @@ api  : new static function `LZ4F_resumeFrame()` : resume decoding from any block
 api  : `lz4file` : new static functions `LZ4F_seek()` and `LZ4F_tell()`, for random access within compressed files
 api  : `LZ4_ACCELERATION_DEFAULT` and `LZ4_ACCELERATION_MAX` are defined in `lz4.h` (static section)
 api  : new `LZ4F_preferences_t.nbWorkers` (experimental) : multithreaded lz4frame compression, same output for any `nbWorkers` >= 1
+api  : new static function `LZ4F_getMaxNbWorkers()` : tells if liblz4 supports multithreaded compression
 api  : `LZ4F_compressOptions_t.stableSrc` : new value `LZ4F_srcStableUntilFlush`, letting worker threads read input in place
 api  : reserved fields of `LZ4F_preferences_t` and `LZ4F_compressOptions_t` are now scalars : flatten positional initializers `{ 0, 0, 0 }`
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials
@@ -47,6 +48,7 @@ cli  : decodes legacy frames ended by four zero bytes (Linux kernel end marker),
 cli  : compressed output no longer depends on multithreading support (`lz4` and `lz4-nomt` produce the same frames, also with `-BD`)
 cli  : custom block sizes (`-B#`, # >= 32) are honored, and compressed single-threaded
 cli  : `-T#` : nb of worker threads, beside the main thread ; automatic nb limited by a memory budget (`--memory=#`, `LZ4_MEMORY`) and by file size
+cli  : `-T#` capped by liblz4 (1024 threads, 128 on 32-bit systems), replacing build macro `LZ4_NBWORKERS_MAX` ; `-V` tells if compression is multithreaded
 cli  : a source file modified, renamed or replaced during its compression is detected, and kept with `--rm` ; error 54 when the output can't be verified
 cli  : `lz4 -l` could hang on Windows with an empty input, as could decoding the resulting legacy stream
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666

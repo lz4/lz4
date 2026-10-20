@@ -142,12 +142,12 @@ $(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-p
 # multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
 # (c_program : objects are not shared, since frameMT employs different flags)
 FRAMEMT_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o frameMT.o
-# LZ4F_NBWORKERS_MAX=200 : keeps the capped test case (1000 workers) affordable
-frameMT: CPPFLAGS += -DLZ4F_MULTITHREAD=1 -DLZ4F_NBWORKERS_MAX=200u
+# LZ4F_NBWORKERS_MAX=128 (as on 32-bit systems) : keeps the capped test case (1000 workers) affordable
+frameMT: CPPFLAGS += -DLZ4F_MULTITHREAD=1 -DLZ4F_NBWORKERS_MAX=128u
 frameMT: LDFLAGS += -pthread
 $(eval $(call c_program,frameMT,$(FRAMEMT_OBJS)))
 
-frameMT-nomt: CPPFLAGS += -DLZ4F_NBWORKERS_MAX=200u
+frameMT-nomt: CPPFLAGS += -DLZ4F_NBWORKERS_MAX=128u
 $(eval $(call c_program,frameMT-nomt,$(FRAMEMT_OBJS)))
 
 .PHONY: clean

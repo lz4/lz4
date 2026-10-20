@@ -146,7 +146,6 @@ TPool* TPool_create(int nbWorkers, int queueSize)
 
     /* parameters sanitization */
     if (nbWorkers <= 0 || queueSize <= 0) return NULL;
-    if (nbWorkers>LZ4_NBWORKERS_MAX) nbWorkers=LZ4_NBWORKERS_MAX;
 
     pool = calloc(1, sizeof(TPool));
     if (!pool) return NULL;
