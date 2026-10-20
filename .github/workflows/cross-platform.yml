@@ -86,6 +86,9 @@ jobs:
         make clean
         CFLAGS="-Werror -O0" make default V=1
 
+    - name: C++ modules test
+      run: make -C tests test-cxx-modules CXX=c++ V=1
+
     - name: Run comprehensive tests
       run: |
         make clean

@@ -56,6 +56,7 @@ build: reproducible static library, by @rpurdie
 build: meson fixes, by @grobian, @bgilbert and @eli-schwartz
 build: AIX support, by @shubhamhii
 build: pkg-config `License` field, by @iwamatsu
+build: public headers compile with clang C++ modules (`-fmodules`), reported by @doraorak
 port : RISC-V with `Zicclsm` uses unaligned memory accesses, by @Polaris-911
 doc  : ring buffer conditions of `LZ4_decompress_safe_continue()`
 doc  : frame format : Linux kernel legacy last block, by @Artoria2e5

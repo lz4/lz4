@@ -375,6 +375,16 @@ test-decompress-partial : decompress-partial decompress-partial-usingDict
 	@echo "\n ---- test decompress-partial-usingDict ----"
 	./decompress-partial-usingDict$(EXT)
 
+# public headers must not be included within extern "C" (#1600)
+# requires clang : -fmodules turns such inclusions into errors
+.PHONY: test-cxx-modules
+test-cxx-modules:
+	@echo "\n ---- test public headers with C++ modules ----"
+	echo 'int main(void) { return 0; }' | $(CXX) -x c++ -fsyntax-only -fmodules -fcxx-modules \
+		-fmodules-cache-path=tmp-cxx-modules -I$(LIBDIR) -DLZ4_HC_STATIC_LINKING_ONLY \
+		-include lz4hc.h -include lz4file.h -
+	$(RM) -r tmp-cxx-modules
+
 
 #-----------------------------------------------------------------------------
 # freestanding test only for Linux x86_64
