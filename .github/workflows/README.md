@@ -13,6 +13,7 @@ The CI/CD workflows are organized into focused, maintainable files:
 - **`cross-platform.yml`** - Cross-platform testing using QEMU emulation and native macOS builds
 - **`build-systems.yml`** - Alternative build systems (Visual Studio, Meson)
 - **`cmake-test.yml`** - CMake build system testing
+- **`freebsd.yml`** - FreeBSD testing (14 and 15) in a VM
 
 ## Code Quality & Analysis
 - **`code-quality.yml`** - Static analysis tools (cppcheck, scan-build, valgrind, unicode lint)
