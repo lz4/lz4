@@ -947,6 +947,48 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
     cctx->dictSize = 0;
 }
 
+/* LZ4_resolveCandidate() :
+ * @matchIndex was read from the hash table at @h.
+ * When it precedes the current block (@startIndex), the candidate is within the dictionary :
+ * extDict, or dictCtx, whose own hash table is then read at @h.
+ * Sets *matchPtr to the candidate and, with a dictionary, *lowLimitPtr to the start of its segment
+ * (dictionary or source), used by catch up and by the match length counter.
+ * @return : candidate index, comparable with indexes of current context */
+LZ4_FORCE_INLINE U32 LZ4_resolveCandidate(
+                const BYTE** matchPtr, const BYTE** lowLimitPtr,
+                U32 matchIndex, U32 h,
+                const BYTE* base, const BYTE* source, U32 startIndex,
+                const BYTE* dictionary, const BYTE* dictBase,
+                const LZ4_stream_t_internal* dictCtx, U32 dictDelta,
+                const dict_directive dictDirective)
+{
+    if (dictDirective == usingDictCtx) {
+        if (matchIndex < startIndex) {
+            /* there was no match, try the dictionary */
+            matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
+            *matchPtr = dictBase + matchIndex;
+            matchIndex += dictDelta;   /* make dictCtx index comparable with current context */
+            *lowLimitPtr = dictionary;
+        } else {
+            *matchPtr = base + matchIndex;
+            *lowLimitPtr = source;
+        }
+    } else if (dictDirective == usingExtDict) {
+        if (matchIndex < startIndex) {
+            assert(startIndex - matchIndex >= MINMATCH);
+            assert(dictBase);
+            *matchPtr = dictBase + matchIndex;
+            *lowLimitPtr = dictionary;
+        } else {
+            *matchPtr = base + matchIndex;
+            *lowLimitPtr = source;
+        }
+    } else {   /* single continuous memory segment */
+        *matchPtr = base + matchIndex;
+    }
+    return matchIndex;
+}
+
 /** LZ4_compress_generic_validated() :
  *  inlined, to ensure branches are decided at compilation time.
  *  The following conditions are presumed already validated:
@@ -1006,6 +1048,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     assert(ip != NULL);
     if (tableType == byU16) assert(inputSize<LZ4_64Klimit);  /* Size too large (not within 64K limit) */
     if (tableType == byPtr) assert(dictDirective==noDict);   /* only supported use case with byPtr */
+    if (dictDirective == usingDictCtx) assert(tableType == byU32);
     /* If init conditions are not met, we don't have to mark stream
      * as having dirty context, since no action was taken yet */
     if (outputDirective == fillOutput && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
@@ -1078,32 +1121,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 if (unlikely(forwardIp > mflimitPlusOne)) goto _last_literals;
                 assert(ip < mflimitPlusOne);
 
-                if (dictDirective == usingDictCtx) {
-                    if (matchIndex < startIndex) {
-                        /* there was no match, try the dictionary */
-                        assert(tableType == byU32);
-                        matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
-                        match = dictBase + matchIndex;
-                        matchIndex += dictDelta;   /* make dictCtx index comparable with current context */
-                        lowLimit = dictionary;
-                    } else {
-                        match = base + matchIndex;
-                        lowLimit = (const BYTE*)source;
-                    }
-                } else if (dictDirective == usingExtDict) {
-                    if (matchIndex < startIndex) {
-                        DEBUGLOG(7, "extDict candidate: matchIndex=%5u  <  startIndex=%5u", matchIndex, startIndex);
-                        assert(startIndex - matchIndex >= MINMATCH);
-                        assert(dictBase);
-                        match = dictBase + matchIndex;
-                        lowLimit = dictionary;
-                    } else {
-                        match = base + matchIndex;
-                        lowLimit = (const BYTE*)source;
-                    }
-                } else {   /* single continuous memory segment */
-                    match = base + matchIndex;
-                }
+                matchIndex = LZ4_resolveCandidate(&match, &lowLimit, matchIndex, h,
+                                base, (const BYTE*)source, startIndex,
+                                dictionary, dictBase, dictCtx, dictDelta, dictDirective);
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
                 LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
 
@@ -1162,7 +1182,7 @@ _next_match:
         /* at this stage, the following variables must be correctly set :
          * - ip : at start of LZ operation
          * - match : at start of previous pattern occurrence; can be within current prefix, or within extDict
-         * - offset : if maybe_ext_memSegment==1 (constant)
+         * - offset : if maybe_extMem==1 (constant)
          * - lowLimit : must be == dictionary to mean "match is within extDict"; must be == source otherwise
          * - token and *token : position to write 4-bits for match length; higher 4-bits for literal length supposed already written
          */
@@ -1274,30 +1294,9 @@ _next_match:
             U32 const current = (U32)(ip-base);
             U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
             assert(matchIndex < current);
-            if (dictDirective == usingDictCtx) {
-                if (matchIndex < startIndex) {
-                    /* there was no match, try the dictionary */
-                    assert(tableType == byU32);
-                    matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
-                    match = dictBase + matchIndex;
-                    lowLimit = dictionary;   /* required for match length counter */
-                    matchIndex += dictDelta;
-                } else {
-                    match = base + matchIndex;
-                    lowLimit = (const BYTE*)source;  /* required for match length counter */
-                }
-            } else if (dictDirective==usingExtDict) {
-                if (matchIndex < startIndex) {
-                    assert(dictBase);
-                    match = dictBase + matchIndex;
-                    lowLimit = dictionary;   /* required for match length counter */
-                } else {
-                    match = base + matchIndex;
-                    lowLimit = (const BYTE*)source;   /* required for match length counter */
-                }
-            } else {   /* single memory segment */
-                match = base + matchIndex;
-            }
+            matchIndex = LZ4_resolveCandidate(&match, &lowLimit, matchIndex, h,
+                            base, (const BYTE*)source, startIndex,
+                            dictionary, dictBase, dictCtx, dictDelta, dictDirective);
             LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
             assert(matchIndex < current);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
