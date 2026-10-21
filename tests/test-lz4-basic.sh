@@ -80,6 +80,17 @@ printf '\120\052\115\030\000\000\000\000BAD!' > $FPREFIX-bad.lz4
 cp $FPREFIX-bad.lz4 $FPREFIX-bad-before.lz4
 lz4 -d --rm -f $FPREFIX-bad.lz4 $FPREFIX-bad.out && exit 1
 diff -q $FPREFIX-bad-before.lz4 $FPREFIX-bad.lz4  # --rm keeps source after decoding failure
+echo "rm test" > $FPREFIX-rm
+lz4 $FPREFIX-rm $FPREFIX-rm.lz4
+cp $FPREFIX-rm.lz4 $FPREFIX-rm-before.lz4
+lz4 -t --rm $FPREFIX-rm.lz4
+diff -q $FPREFIX-rm-before.lz4 $FPREFIX-rm.lz4    # -t --rm keeps its input ("No files are created nor removed")
+lz4 -t --rm < $FPREFIX-rm.lz4                     # nothing to remove when reading stdin
+lz4 -c --rm < $FPREFIX-rm | lz4 -t                # idem when compressing
+lz4 -dc --rm < $FPREFIX-rm.lz4 | diff -q - $FPREFIX-rm  # idem when decompressing
+lz4 -d --rm $FPREFIX-rm.lz4 $FPREFIX-rm-out
+test ! -f $FPREFIX-rm.lz4                         # --rm still removes a regular source file
+test   -f $FPREFIX-rm-out
 lz4 -BX $FPREFIX-hw -c -q | lz4 -tv   # test block checksum
 # datagen -g20KB generates the same file every single time
 # cannot save output of datagen -g20KB as input file to lz4 because the following shell commands are run before datagen -g20KB
