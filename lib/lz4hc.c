@@ -682,16 +682,16 @@ static int LZ4MID_compress (
     const BYTE* ip = (const BYTE*)src;
     const BYTE* anchor = ip;
     const BYTE* const iend = ip + *srcSizePtr;
-    const BYTE* const mflimit = iend - MFLIMIT;
-    const BYTE* const matchlimit = (iend - LASTLITERALS);
-    const BYTE* const ilimit = (iend - LZ4MID_HASHSIZE);
+    const BYTE* mflimit;      /* set after the size check : would precede a small input */
+    const BYTE* matchlimit;
+    const BYTE* ilimit;
     BYTE* op = (BYTE*)dst;
     /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
     BYTE* const oend = op + maxOutputSize - ((limit == fillOutput) ? LASTLITERALS : 0);
 
     const BYTE* const prefixPtr = ctx->prefixStart;
     const U32 prefixIdx = ctx->dictLimit;
-    const U32 ilimitIdx = (U32)(ilimit - prefixPtr) + prefixIdx;
+    U32 ilimitIdx;
     const BYTE* const dictStart = ctx->dictStart;
     const U32 dictIdx = ctx->lowLimit;
     const U32 gDictEndIndex = ctx->lowLimit;
@@ -709,6 +709,10 @@ static int LZ4MID_compress (
 
     if (*srcSizePtr < LZ4_minLength)
         goto _lz4mid_last_literals;  /* Input too small, no compression (all literals) */
+    mflimit = iend - MFLIMIT;
+    matchlimit = (iend - LASTLITERALS);
+    ilimit = (iend - LZ4MID_HASHSIZE);
+    ilimitIdx = (U32)(ilimit - prefixPtr) + prefixIdx;
 
     /* main loop */
     while (ip <= mflimit) {
@@ -1231,8 +1235,8 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
     const BYTE* ip = (const BYTE*)src;
     const BYTE* anchor = ip;
     const BYTE* const iend = ip + inputSize;
-    const BYTE* const mflimit = iend - MFLIMIT;
-    const BYTE* const matchlimit = (iend - LASTLITERALS);
+    const BYTE* mflimit;      /* set after the size check : would precede a small input */
+    const BYTE* matchlimit;
 
     BYTE* op = (BYTE*) dst;
     /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
@@ -1255,6 +1259,8 @@ LZ4_FORCE_INLINE int LZ4HC_compress_hashChain (
 
     *srcSizePtr = 0;
     if (inputSize < LZ4_minLength) goto _last_literals;             /* Input too small, no compression (all literals) */
+    mflimit = iend - MFLIMIT;
+    matchlimit = (iend - LASTLITERALS);
 
     /* Main Loop */
     while (ip <= mflimit) {
@@ -1977,9 +1983,10 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
 {
     const BYTE* ip = (const BYTE*) source;
     const BYTE* anchor = ip;
-    const BYTE* const iend = ip + *srcSizePtr;
-    const BYTE* const mflimit = iend - MFLIMIT;
-    const BYTE* const matchlimit = iend - LASTLITERALS;
+    const int inputSize = *srcSizePtr;
+    const BYTE* const iend = ip + inputSize;
+    const BYTE* mflimit;      /* set after the size check : would precede a small input */
+    const BYTE* matchlimit;
     BYTE* op = (BYTE*) dst;
     /* fillOutput : keep room for the final run of literals (LZ4 format restriction) */
     BYTE* const oend = op + dstCapacity - ((limit == fillOutput) ? LASTLITERALS : 0);
@@ -1996,6 +2003,9 @@ LZ4HC_compress_optimal_internal(LZ4HC_CCtx_internal* ctx,
     assert(nbSearchesSeq >= 1);
 
     *srcSizePtr = 0;
+    if (inputSize < LZ4_minLength) goto _last_literals;
+    mflimit = iend - MFLIMIT;
+    matchlimit = iend - LASTLITERALS;
 
     /* Main Loop */
     while (ip <= mflimit) {
