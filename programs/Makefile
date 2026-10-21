@@ -68,9 +68,18 @@ default: lz4-release
 C_SRCDIRS = $(LIBLZ4DIR) .
 include ../build/make/multiconf.make
 
-# thread detection (PTHREAD_PROBE : see build/make/lz4defs.make)
+# thread detection (PTHREAD_PROBE : see build/make/lz4defs.make) : skipped by goals building no multithreaded program,
+# and run once per command : sub-makes inherit its result (as in lib/Makefile)
 NO_THREAD_MSG:= ==> no multithread support: built for single-thread mode only
-HAVE_PTHREAD := $(PTHREAD_PROBE)
+ifeq (,$(filter-out clean clean-man uninstall man lz4.1 preview-man lz4-nomt liblz4,$(or $(MAKECMDGOALS),default)))
+  HAVE_PTHREAD := 0
+else
+  ifeq (,$(LZ4_PTHREAD_PROBED))
+    LZ4_PTHREAD_PROBED := $(PTHREAD_PROBE)
+    export LZ4_PTHREAD_PROBED
+  endif
+  HAVE_PTHREAD := $(LZ4_PTHREAD_PROBED)
+endif
 HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
 ifeq ($(HAVE_MULTITHREAD), 1)
   THREAD_MSG := ==> built with multithreading support

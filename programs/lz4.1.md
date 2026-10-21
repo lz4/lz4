@@ -143,11 +143,12 @@ only the latest one will be applied.
 * `-T#`, `--threads=#`:
   Use `#` worker threads for compression.
   The main thread also compresses while waiting for them, so up to `#+1` cores can be busy.
-  When `0`, or none provided: automatically determined from nb of detected cores,
-  within memory budget (see `--memory`), and no more than the jobs of each file.
-  An explicit `#` is only limited by the memory budget when it's set (`--memory`, `LZ4_MEMORY`), or on 32-bit systems.
+  When `0`, or none provided: automatically determined from nb of detected cores.
+  In both cases, within memory budget (see `--memory`), with a warning when it reduces `#`,
+  and no more threads than the jobs of each file (4 MB, or 1 MB with independent blocks up to 1 MB).
   At most 1024 threads (128 on 32-bit systems).
   Ignored with a custom block size (see `-B#`).
+  Compressed output doesn't depend on `#`, nor on multithreading support.
 
 * `--memory=#`:
   Memory budget of multi-threaded compression, in bytes, with optional suffixes `K`, `M`, `G` (powers of 1024)

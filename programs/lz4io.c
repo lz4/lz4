@@ -238,7 +238,7 @@ struct LZ4IO_prefs_s {
     const char* dictionaryFilename;
     int removeSrcFile;
     int nbWorkers;
-    int autoWorkers;   /* nbWorkers determined automatically */
+    int autoWorkers;   /* nbWorkers determined automatically (otherwise : requested, -T#) */
     U64 memoryBudget;  /* 0 : default (LZ4IO_MEMORY_BUDGET) */
     int useMmap;
 };
@@ -1224,22 +1224,24 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     } else {
         /* frames are cut into jobs, compressed by liblz4's worker threads (when available) :
          * output doesn't depend on nbWorkers, nor on multi-threading support */
-        unsigned nbWorkers = (unsigned)io_prefs->nbWorkers;   /* >= 1, capped (LZ4IO_capNbWorkers()) */
+        unsigned const requested = (unsigned)io_prefs->nbWorkers;   /* >= 1, capped (LZ4IO_capNbWorkers()) */
         U64 const budget = io_prefs->memoryBudget ? io_prefs->memoryBudget : LZ4IO_MEMORY_BUDGET;
-        if (io_prefs->autoWorkers || io_prefs->memoryBudget || (sizeof(size_t) < 8)) {
-            unsigned const budgeted = LZ4IO_budgetNbWorkers(&ress.preparedPrefs, nbWorkers, chunkSize, budget);
-            if (budgeted < nbWorkers)
+        unsigned const nbWorkers = LZ4IO_budgetNbWorkers(&ress.preparedPrefs, requested, chunkSize, budget);
+        if (nbWorkers < requested) {
+            if (io_prefs->autoWorkers) {
                 DISPLAYLEVEL(3, "Memory budget (%u MB) : %u threads instead of %u \n",
-                                (unsigned)(budget >> 20), budgeted, nbWorkers);
-            if (LZ4IO_compressionMemory(&ress.preparedPrefs, budgeted, chunkSize) > budget)
-                DISPLAYLEVEL(2, "Warning : memory budget (%u MB) too small : compression requires ~%u MB \n",
-                                (unsigned)(budget >> 20),
-                                (unsigned)(LZ4IO_compressionMemory(&ress.preparedPrefs, budgeted, chunkSize) >> 20));
-            nbWorkers = budgeted;
-        }
+                                (unsigned)(budget >> 20), nbWorkers, requested);
+            } else {   /* requested nb of threads (-T#) not honored */
+                DISPLAYLEVEL(2, "Warning : memory budget (%u MB) : %u threads instead of %u (see --memory) \n",
+                                (unsigned)(budget >> 20), nbWorkers, requested);
+        }   }
+        if (LZ4IO_compressionMemory(&ress.preparedPrefs, nbWorkers, chunkSize) > budget)
+            DISPLAYLEVEL(2, "Warning : memory budget (%u MB) too small : compression requires ~%u MB \n",
+                            (unsigned)(budget >> 20),
+                            (unsigned)(LZ4IO_compressionMemory(&ress.preparedPrefs, nbWorkers, chunkSize) >> 20));
 #if LZ4IO_MULTITHREAD
         if (LZ4F_getMaxNbWorkers()) {
-            DISPLAYLEVEL(3, "Using %s%u threads for compression \n", io_prefs->autoWorkers ? "up to " : "", nbWorkers);
+            DISPLAYLEVEL(3, "Using up to %u threads for compression \n", nbWorkers);
         } else {
             DISPLAYLEVEL(3, "Note : liblz4 built without multithreading support : single-threaded compression \n");
         }
@@ -1536,9 +1538,9 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
       if (fileSize==0)
           DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
     }
-    /* automatic nb of workers : no more than the jobs of the file (output doesn't depend on nbWorkers),
+    /* no more workers than the jobs of the file (output doesn't depend on nbWorkers),
      * but never decreasing from one file to the next, so that worker threads and buffers are kept */
-    if (io_prefs->autoWorkers && (prefs.nbWorkers > 1)) {
+    if (prefs.nbWorkers > 1) {
         U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown */
         U64 const jobSize = LZ4IO_jobSize(&prefs);
         U64 const nbJobs = MAX((fileSize + jobSize - 1) / jobSize, ress->nbWorkers);

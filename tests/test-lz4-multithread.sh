@@ -58,13 +58,21 @@ lz4 -f --memory=18446744073709551616 $FPREFIX-src $FPREFIX.lz4 && exit 1  # must
 lz4 -f --memory=17179869184G $FPREFIX-src $FPREFIX.lz4 && exit 1          # must fail (overflow)
 lz4 -f -1 $FPREFIX-src $FPREFIX-ref.lz4
 MT=0; if lz4 -V 2>&1 | grep -q "multithread"; then MT=1; fi   # otherwise, -T# and memory budget are ignored
-lz4 -v -f -T64 --memory=50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
+# a requested nb of threads (-T#) reduced by the budget : warning (silenced by -q) ; automatic : only with -v
+lz4 -f -T64 --memory=50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
 cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
-if [ $MT = 1 ]; then grep "Memory budget (50 MB)" $FPREFIX.err; fi
-LZ4_MEMORY=50MB lz4 -v -f -T64 $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
-if [ $MT = 1 ]; then grep "Memory budget (50 MB)" $FPREFIX.err; fi
-LZ4_MEMORY=2GiB lz4 -v -f -T64 --memory 50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # command line wins
-if [ $MT = 1 ]; then grep "Memory budget (50 MB)" $FPREFIX.err; fi
+if [ $MT = 1 ]; then grep "Warning : memory budget (50 MB)" $FPREFIX.err; fi
+lz4 -q -f -T64 --memory=50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
+if grep "memory budget" $FPREFIX.err; then exit 1; fi
+lz4 -f --memory=50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
+if grep -i "memory budget" $FPREFIX.err; then exit 1; fi
+LZ4_MEMORY=50MB lz4 -f -T64 $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
+if [ $MT = 1 ]; then grep "Warning : memory budget (50 MB)" $FPREFIX.err; fi
+LZ4_MEMORY=2GiB lz4 -f -T64 --memory 50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # command line wins
+if [ $MT = 1 ]; then grep "Warning : memory budget (50 MB)" $FPREFIX.err; fi
+lz4 -f -T99999 $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # within liblz4 maximum and default budget
+cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
+if [ $MT = 1 ]; then grep "Warning : requested 99999 threads too large" $FPREFIX.err; grep "Warning : memory budget (" $FPREFIX.err; fi
 LZ4_MEMORY=abc lz4 -f $FPREFIX-src $FPREFIX.lz4 2>&1 | grep "LZ4_MEMORY=abc"   # ignored, with a warning
 cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
 lz4 -f --memory=1M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # warning only

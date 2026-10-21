@@ -125,7 +125,7 @@ Set highest compression level\. Same as \-12\.
 .
 .TP
 \fB\-T#\fR, \fB\-\-threads=#\fR
-Use \fB#\fR worker threads for compression\. The main thread also compresses while waiting for them, so up to \fB#+1\fR cores can be busy\. When \fB0\fR, or none provided: automatically determined from nb of detected cores, within memory budget (see \fB\-\-memory\fR), and no more than the jobs of each file\. An explicit \fB#\fR is only limited by the memory budget when it\'s set (\fB\-\-memory\fR, \fBLZ4_MEMORY\fR), or on 32\-bit systems\. At most 1024 threads (128 on 32\-bit systems)\. Ignored with a custom block size (see \fB\-B#\fR)\.
+Use \fB#\fR worker threads for compression\. The main thread also compresses while waiting for them, so up to \fB#+1\fR cores can be busy\. When \fB0\fR, or none provided: automatically determined from nb of detected cores\. In both cases, within memory budget (see \fB\-\-memory\fR), with a warning when it reduces \fB#\fR, and no more threads than the jobs of each file (4 MB, or 1 MB with independent blocks up to 1 MB)\. At most 1024 threads (128 on 32\-bit systems)\. Ignored with a custom block size (see \fB\-B#\fR)\. Compressed output doesn't depend on \fB#\fR, nor on multithreading support\.
 .
 .TP
 \fB\-\-memory=#\fR

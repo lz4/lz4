@@ -962,12 +962,12 @@ int main(int argCount, const char** argv)
         operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
     } else {   /* compression is default action */
 #if LZ4IO_MULTITHREAD
-        /* nbWorkers 0 : automatic (nb of cores, within memory budget, and no more than the jobs of each file).
-         * Explicit nb of workers : within memory budget when it's set (--memory, LZ4_MEMORY), or on 32-bit systems */
+        /* nbWorkers 0 : automatic (nb of cores) ; both automatic and explicit :
+         * within memory budget (--memory, LZ4_MEMORY), and no more than the jobs of each file */
         {   int const requested = (nbWorkers > (unsigned)INT_MAX) ? INT_MAX : (int)nbWorkers;
             int const applied = LZ4IO_setNbWorkers(prefs, requested);   /* capped as within liblz4 */
-            if (multithreadSupport() && (requested > applied))
-                DISPLAYLEVEL(3, "Requested %u threads too large => automatically reduced to %i \n", nbWorkers, applied);
+            if (multithreadSupport() && (requested > applied))   /* requested (-T#, LZ4_NBWORKERS) : automatic is 0 */
+                DISPLAYLEVEL(2, "Warning : requested %u threads too large => automatically reduced to %i \n", nbWorkers, applied);
         }
         LZ4IO_setMemoryBudget(prefs, memoryBudget);
 #endif

@@ -949,6 +949,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
 
     /* context init */
     cctx->cdict = cdict;
+    cctx->blockCompressMode = LZ4B_COMPRESSED;   /* a frame starts with the LZ4 state just initialized (dictionary included) */
     if (cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) {
         /* frame init only for blockLinked : blockIndependent will be init at each block */
         LZ4F_initStream(cctx->lz4CtxPtr, cdict, cctx->prefs.compressionLevel, LZ4F_blockLinked);
@@ -1384,8 +1385,7 @@ static size_t LZ4F_compressJob(void* lz4ctx, const LZ4F_preferences_t* prefs,
     int const level = prefs->compressionLevel;
     LZ4F_blockMode_t const blockMode = prefs->frameInfo.blockMode;
 
-    if (mode == LZ4B_UNCOMPRESSED) {   /* LZ4F_uncompressedUpdate() : independent blocks only */
-        assert(blockMode == LZ4F_blockIndependent);
+    if (mode == LZ4B_UNCOMPRESSED) {   /* LZ4F_uncompressedUpdate() */
         return LZ4F_compressBlocks_internal(dst, dstCapacity, src, srcSize, blockSize,
                                             LZ4F_doNotCompressBlock, NULL, 0, NULL,
                                             prefs->frameInfo.blockChecksumFlag);
@@ -1427,6 +1427,9 @@ typedef struct LZ4F_pool_s LZ4F_pool_t;
    /* condition variables require Windows Vista+ ; _WIN32_WINNT may already be defined lower,
     * ex: by <_mingw.h> (included by standard headers) on older mingw-w64 (0x502) */
 #  if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
+#    if defined(_WINDOWS_)   /* <windows.h> already included (ex: amalgamated sources), without them */
+#      error "LZ4F_MULTITHREAD requires Windows Vista API : define _WIN32_WINNT >= 0x0600 before including <windows.h>, or disable LZ4F_MULTITHREAD"
+#    endif
 #    undef  _WIN32_WINNT
 #    define _WIN32_WINNT 0x0600
 #  endif
@@ -1546,7 +1549,9 @@ static unsigned LZ4F_pool_createThreads(LZ4F_pool_t* pool, unsigned nbThreads)
     unsigned n;
 #if defined(_WIN32)
     for (n = 0; n < nbThreads; n++) {
-        pool->threads[n] = CreateThread(NULL, LZ4F_MT_STACKSIZE_MIN, LZ4F_pool_thread, &pool->workers[n], 0, NULL);
+        /* stack size : reserved, and committed on demand (otherwise, CreateThread() commits it upfront) */
+        pool->threads[n] = CreateThread(NULL, LZ4F_MT_STACKSIZE_MIN, LZ4F_pool_thread, &pool->workers[n],
+                                        STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
         if (pool->threads[n] == NULL) break;
     }
 #else
@@ -1595,7 +1600,7 @@ static void LZ4F_pool_free(LZ4F_pool_t* pool, LZ4F_CustomMem cmem)
     LZ4F_mutex_unlock(&pool->lock);
     for (n = 0; n < pool->nbThreads; n++) {
 #if defined(_WIN32)
-        WaitForSingleObject(pool->threads[n], INFINITE);
+        WaitForSingleObject(pool->threads[n], INFINITE);   /* never ends under the loader lock (see lz4frame.h) */
         CloseHandle(pool->threads[n]);
 #else
         pthread_join(pool->threads[n], NULL);
@@ -2327,6 +2332,13 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
         FORWARD_IF_ERROR(bytesWritten);   /* note : a failed flush invalidates the frame */
         dstPtr += bytesWritten;
         cctxPtr->blockCompressMode = blockCompression;
+        if ((blockCompression == LZ4B_UNCOMPRESSED) && (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked)) {
+            /* linked blocks : the decoder's history will contain uncompressed data, unknown to the LZ4 state :
+             * history is dropped, blocks compressed next don't reference anything before them */
+            LZ4F_initStream(cctxPtr->lz4CtxPtr, NULL, cctxPtr->prefs.compressionLevel, LZ4F_blockLinked);
+            if (cctxPtr->prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)
+                LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, (int)cctxPtr->prefs.favorDecSpeed);
+        }
     }
 
     if (compressOptionsPtr == NULL) compressOptionsPtr = &k_cOptionsNull;
@@ -2375,8 +2387,7 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
 
     /* preserve dictionary within @tmpBuff whenever necessary */
     if ((cctxPtr->prefs.frameInfo.blockMode==LZ4F_blockLinked) && (lastBlockCompressed==fromSrcBuffer)) {
-        /* linked blocks are only supported in compressed mode, see LZ4F_uncompressedUpdate */
-        assert(blockCompression == LZ4B_COMPRESSED);
+        /* note : after uncompressed blocks, the LZ4 state is empty (history dropped), so is the saved dictionary */
         if (compressOptionsPtr->stableSrc) {
             cctxPtr->tmpIn = cctxPtr->tmpBuff;  /* src is stable : dictionary remains in src across invocations */
         } else {
@@ -2437,7 +2448,8 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
 
 /*! LZ4F_uncompressedUpdate() :
  *  Same as LZ4F_compressUpdate(), but requests blocks to be sent uncompressed.
- *  This symbol is only supported when LZ4F_blockIndependent is used
+ *  With linked blocks, blocks compressed next don't reference data preceding them (single-threaded mode),
+ *  or reference the uncompressed data (multi-threaded mode, see LZ4F_compressJob()).
  *  Success is guaranteed when @dstCapacity >= LZ4F_compressBound(srcSize, preferencesPtr).
  *  Otherwise, the operation fails with dstCapacity_tooSmall if its output doesn't fit.
  * @compressOptionsPtr is optional : provide NULL to mean "default".
@@ -2450,10 +2462,8 @@ size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctxPtr,
                          const void* srcBuffer, size_t srcSize,
                          const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    if (cctxPtr->mtActive) {
-        RETURN_ERROR_IF(cctxPtr->prefs.frameInfo.blockMode != LZ4F_blockIndependent, blockMode_invalid);
+    if (cctxPtr->mtActive)
         return LZ4F_mt_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, LZ4B_UNCOMPRESSED);
-    }
     return LZ4F_compressUpdateImpl(cctxPtr,
                                    dstBuffer, dstCapacity,
                                    srcBuffer, srcSize,

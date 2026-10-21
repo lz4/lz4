@@ -228,6 +228,8 @@ typedef struct {
  *    Inputs fitting into a single job are compressed by the calling thread.
  *  - Worker threads are created at frame start, and kept within the compression context for next frames.
  *    A context with worker threads must not be employed after fork(), in the child process.
+ *    On Windows, it must not be employed, nor freed, while the loader lock is held (within DllMain(),
+ *    or constructors and destructors of a DLL's global objects) : worker threads can neither start nor exit then.
  *    On POSIX systems, worker threads block signals, except synchronous ones (SIGBUS, SIGSEGV, SIGFPE, SIGILL) :
  *    a fault while reading input (ex: memory-mapped file truncated) invokes the application's handler, in a worker thread.
  *  - LZ4F_compressBegin_usingDict() isn't supported : frames remain single-threaded. Prefer a CDict.
@@ -818,7 +820,9 @@ LZ4FLIB_STATIC_API unsigned LZ4F_getMaxNbWorkers(void);
  *  After an error, the frame is invalidated (see LZ4F_compressUpdate()).
  *  If previously a compressed block was written, buffered data is flushed first,
  *  before appending uncompressed data is continued.
- *  This operation is only supported when LZ4F_blockIndependent is used.
+ *  Supported with both block modes (linked blocks : since v1.10.1).
+ *  With linked blocks, in single-threaded mode, blocks compressed after uncompressed data
+ *  don't reference anything before them (compression ratio can be slightly lower).
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())

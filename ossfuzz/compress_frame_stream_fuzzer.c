@@ -238,7 +238,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     if (FUZZ_rand32(&seed, 0, 1)) prefs.nbWorkers = FUZZ_rand32(&seed, 1, 3);
     refPrefs = prefs;
     if (prefs.nbWorkers) refPrefs.nbWorkers = FUZZ_rand32(&seed, 1, 3);   /* output must not depend on nbWorkers */
-    int const allowUncompressed = prefs.frameInfo.blockMode == LZ4F_blockIndependent;
     size_t const blockSize = LZ4F_getBlockSize(prefs.frameInfo.blockSizeID);
     LZ4F_compressOptions_t cOpts;
     state_t s;
@@ -295,7 +294,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         }
         {   uint32_t const t = FUZZ_rand32(&seed, 0, 7);
             opType_e const type = (t == 0) ? op_flush
-                                : ((t == 1) && allowUncompressed) ? op_uncompressedUpdate
+                                : (t == 1) ? op_uncompressedUpdate
                                 : op_update;
             size_t const remaining = size - pos;
             size_t srcSize = 0;

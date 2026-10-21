@@ -301,7 +301,7 @@ static unsigned nextRand(unsigned* state)
 typedef struct {
     unsigned stableSrc; /* LZ4F_stableSrc_t */
     int flushes;        /* LZ4F_flush() at random positions */
-    int uncompressed;   /* some slices sent with LZ4F_uncompressedUpdate() (independent blocks only) */
+    int uncompressed;   /* some slices sent with LZ4F_uncompressedUpdate() */
 } streamMode_t;
 
 /* LZ4F_srcStableUntilFlush : once flushed, input can be modified, except its last 64 KB (LZ4F_srcStable guarantee).
@@ -540,10 +540,10 @@ static int validateStreaming(XXH64_state_t* digest)
                     }
                 }
 
-                /* uncompressed segments (independent blocks only) */
+                /* uncompressed segments : same output whatever nbWorkers.
+                 * Linked blocks : compressed blocks reference preceding uncompressed data in multi-threaded mode only */
                 g_step = "stream with uncompressed segments";
-                if (!linked) {
-                    streamMode_t const uncMode = { LZ4F_srcUnstable, 1, 1 };
+                {   streamMode_t const uncMode = { LZ4F_srcUnstable, 1, 1 };
                     c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, uncMode, sliceSeed + 4, tmpOut, scratch);
                     checkRoundTrip(out, c, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
                     if (wi == 0) {
@@ -551,7 +551,11 @@ static int validateStreaming(XXH64_state_t* digest)
                         memcpy(refUnc, out, c);
                         XXH64_update(digest, out, c);
                         {   size_t const c0 = streamCompress(cctx, out, src, srcSize, cd, &prefs, 0, uncMode, sliceSeed + 4, tmpOut, scratch);
-                            CHECK(c0 == uncRef && !memcmp(out, refUnc, c0), "stream with uncompressed segments differs from single-threaded");
+                            if (!linked) {
+                                CHECK(c0 == uncRef && !memcmp(out, refUnc, c0), "stream with uncompressed segments differs from single-threaded");
+                            } else {
+                                checkRoundTrip(out, c0, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
+                            }
                         }
                     } else {
                         CHECK(c == uncRef && !memcmp(out, refUnc, c), "stream with uncompressed segments differs with %u workers", nbWorkers);
@@ -948,7 +952,6 @@ static int validatePartialFlush(void)
     for (linked = 0; linked <= 1; linked++) {
         LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
         LZ4F_cctx* const cctx = LZ4F_createCompressionContext_advanced(countingMem, LZ4F_VERSION);
-        size_t const unc = linked ? 0 : uncSize;   /* uncompressed blocks : independent blocks only */
         size_t refSize, refFullSize, flushPos, flushSize;
         CHECK(cctx != NULL, "allocation failed");
         p.nbWorkers = nbWorkersList[wi];
@@ -959,7 +962,7 @@ static int validatePartialFlush(void)
             size_t r;
             memset(&refOpts, 0, sizeof(refOpts));
             refOpts.stableSrc = LZ4F_srcStableUntilFlush;   /* single-threaded linked output depends on stableSrc */
-            refSize = partialRef(cctx, &p, &refOpts, ref, src, srcSize, part1, unc, &flushPos, &flushSize);
+            refSize = partialRef(cctx, &p, &refOpts, ref, src, srcSize, part1, uncSize, &flushPos, &flushSize);
             refFullSize = LZ4F_compressBegin(cctx, refFull, LZ4F_HEADER_SIZE_MAX, &p);
             CHECK_LZ4F(refFullSize);
             r = LZ4F_compressUpdate(cctx, refFull + refFullSize, LZ4F_compressBound(srcSize, &p), src, srcSize, NULL);
@@ -1008,26 +1011,21 @@ static int validatePartialFlush(void)
                 /* update before the flush completes : remaining flush output comes first */
                 size_t const flushed = r;
                 CHECK(flushed <= flushRemaining, "flush output beyond reference");
-                if (unc) {
-                    r = LZ4F_uncompressedUpdate(cctx, out + pos + flushed, LZ4F_compressBound(unc, &p), work + part1, unc, &cOpts);
-                    CHECK_LZ4F(r);
-                    r += flushed;
-                    /* uncompressed blocks follow all compressed ones : no more output pending */
-                } else {
-                    r = flushed;
-                }
+                r = LZ4F_uncompressedUpdate(cctx, out + pos + flushed, LZ4F_compressBound(uncSize, &p), work + part1, uncSize, &cOpts);
+                CHECK_LZ4F(r);
+                r += flushed;
+                /* uncompressed blocks follow all compressed ones : no more output pending */
             } else {
                 CHECK(r == flushRemaining && !memcmp(out + pos, ref + pos, r), "%u workers, capacity %u : flush output differs",
                       p.nbWorkers, (unsigned)cap);
-                if (unc) {
-                    size_t const u = LZ4F_uncompressedUpdate(cctx, out + pos + r, LZ4F_compressBound(unc, &p), work + part1, unc, &cOpts);
+                {   size_t const u = LZ4F_uncompressedUpdate(cctx, out + pos + r, LZ4F_compressBound(uncSize, &p), work + part1, uncSize, &cOpts);
                     CHECK_LZ4F(u);
                     r += u;
                 }
             }
             pos += r;
-            r = LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(srcSize - part1 - unc, &p),
-                                    work + part1 + unc, srcSize - part1 - unc, &cOpts);
+            r = LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(srcSize - part1 - uncSize, &p),
+                                    work + part1 + uncSize, srcSize - part1 - uncSize, &cOpts);
             CHECK_LZ4F(r); pos += r;
             if (variant == 3) {
                 /* compressBegin() abandons an incomplete end */

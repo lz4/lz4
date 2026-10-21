@@ -81,8 +81,17 @@ else ifeq ($(MULTITHREAD),0)
   MT_STATICLIB := 0
 else
   ifneq (,$(filter -pthread,$(MT_FLAGS)))
-    # PTHREAD_PROBE : see build/make/lz4defs.make
-    MT_DYNLIB := $(PTHREAD_PROBE)
+    # threads detection (PTHREAD_PROBE : see build/make/lz4defs.make) : skipped by goals building nothing,
+    # and run once per command : sub-makes (ex: install) inherit its result
+    ifeq (,$(filter-out clean uninstall listL120 lib-mt lib-nomt,$(or $(MAKECMDGOALS),default)))
+      MT_DYNLIB := 0
+    else
+      ifeq (,$(LZ4_PTHREAD_PROBED))
+        LZ4_PTHREAD_PROBED := $(PTHREAD_PROBE)
+        export LZ4_PTHREAD_PROBED
+      endif
+      MT_DYNLIB := $(LZ4_PTHREAD_PROBED)
+    endif
     ifneq ($(MT_DYNLIB),1)
       MT_PROBE_MSG := (threads not detected)
     endif
