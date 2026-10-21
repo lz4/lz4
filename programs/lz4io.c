@@ -1465,6 +1465,18 @@ static int LZ4IO_mappedContentUnchanged(const LZ4IO_cInput_t* in, FILE* srcFile,
     }
 }
 
+/* keeps the last 4 bytes of the frame (content checksum, see LZ4IO_mappedContentUnchanged()) */
+static void LZ4IO_keepFrameTail(unsigned char tail[4], const void* out, size_t size)
+{
+    const unsigned char* const o = (const unsigned char*)out;
+    if (size >= 4) {
+        memcpy(tail, o + size - 4, 4);
+    } else {
+        memmove(tail, tail + size, 4 - size);
+        memcpy(tail + 4 - size, o, size);
+    }
+}
+
 /*
  * LZ4IO_compressFilename_extRess()
  * result : 0 : compression completed correctly
@@ -1498,7 +1510,8 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
     LZ4IO_srcState_t srcState;
     int srcModified, srcReplaced;
-    const void* frameEnd = NULL;   /* end of frame, within dstBuffer (content checksum) */
+    unsigned char frameTail[4];    /* last bytes of the frame (content checksum) */
+    const void* frameEnd = NULL;   /* end of frameTail, once the frame is complete */
     if (srcFile == NULL) return 1;
     srcState = LZ4IO_getSrcState(srcFile);
     dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
@@ -1541,10 +1554,8 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         if (fileSize && (fileSize <= LZ4IO_jobSize(&prefs))) prefs.nbWorkers = 0;
     }
     /* memory-mapped input is released (only a memory hint) behind input still read by liblz4 :
-     * jobs in flight, and the 64 KB of history before them.
-     * LZ4F_compressBound(0) bounds the output of LZ4F_compressEnd(), which emits all input retained within cctx :
-     * since incompressible input is stored as is, it also bounds the amount of retained input */
-    releaseLag = LZ4F_compressBound(0, &prefs) + 64 KB;
+     * up to 2*nbWorkers+1 jobs in flight (see LZ4F_MT_NBSLOTS() in lz4frame.c), and the 64 KB of history before them */
+    releaseLag = (2 * (size_t)prefs.nbWorkers + 1) * LZ4IO_jobSize(&prefs) + 64 KB;
 
     /* read first chunk */
     readSize  = LZ4IO_readInput(&input, chunkSize, &chunk);
@@ -1557,7 +1568,8 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         size_t const cSize = LZ4F_compressFrame_usingCDict(ctx, dstBuffer, dstBufferSize, chunk, readSize, ress->cdict, &prefs);
         if (LZ4F_isError(cSize))
             END_PROCESS(41, "Compression failed : %s", LZ4F_getErrorName(cSize));
-        frameEnd = (const char*)dstBuffer + cSize;
+        LZ4IO_keepFrameTail(frameTail, dstBuffer, cSize);
+        frameEnd = frameTail + 4;
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(double)(filesize+!filesize)*100);   /* avoid division by zero */
@@ -1600,14 +1612,18 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         }
         if (ferror(srcFile)) END_PROCESS(47, "Error reading %s ", srcFileName);
 
-        /* End of Frame mark */
-        {   size_t const endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
-            if (LZ4F_isError(endSize))
-                END_PROCESS(48, "End of frame error : %s", LZ4F_getErrorName(endSize));
-            frameEnd = (const char*)dstBuffer + endSize;
-            if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
-                END_PROCESS(49, "Write error : cannot write end of frame");
-            compressedfilesize += endSize;
+        /* End of Frame : jobs in flight, then end mark and checksum, in several pieces when they fill dstBuffer */
+        {   size_t endSize;
+            do {
+                endSize = LZ4F_compressEnd(ctx, dstBuffer, dstBufferSize, NULL);
+                if (LZ4F_isError(endSize))
+                    END_PROCESS(48, "End of frame error : %s", LZ4F_getErrorName(endSize));
+                if (fwrite(dstBuffer, 1, endSize, dstFile) != endSize)
+                    END_PROCESS(49, "Write error : cannot write end of frame");
+                compressedfilesize += endSize;
+                LZ4IO_keepFrameTail(frameTail, dstBuffer, endSize);
+            } while (endSize == dstBufferSize);
+            frameEnd = frameTail + 4;
         }
     }
 

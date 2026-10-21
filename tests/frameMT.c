@@ -376,20 +376,28 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
         pos += cSize;
         consumed += slice;
         if (mode.flushes && ((r >> 16) % 4 == 0)) {
-            size_t const fSize = LZ4F_flush(cctx, tmpOut, LZ4F_compressBound(0, &p), NULL);
-            CHECK_LZ4F(fSize);
-            CHECK(fSize < LZ4F_compressBound(0, &p), "flush fills LZ4F_compressBound(0) : not completed");
-            memcpy(dst + pos, tmpOut, fSize);
-            pos += fSize;
+            size_t const cap = LZ4F_compressBound(0, &p);
+            size_t fSize;
+            do {   /* multi-threaded : at least one job per invocation ; single-threaded : a single invocation */
+                fSize = LZ4F_flush(cctx, tmpOut, cap, NULL);
+                CHECK_LZ4F(fSize);
+                CHECK((fSize < cap) || (nbWorkers && !p.autoFlush), "flush fills LZ4F_compressBound(0) in single-threaded mode");
+                memcpy(dst + pos, tmpOut, fSize);
+                pos += fSize;
+            } while (fSize == cap);
             flushed = 1;
         }
         if (untilFlush && flushed) scrambleFlushed(scratch, &scrambledEnd, consumed, src, srcSize);
     }
-    {   size_t const eSize = LZ4F_compressEnd(cctx, tmpOut, LZ4F_compressBound(0, &p), NULL);
-        CHECK_LZ4F(eSize);
-        CHECK(eSize < LZ4F_compressBound(0, &p), "compressEnd fills LZ4F_compressBound(0) : not completed");
-        memcpy(dst + pos, tmpOut, eSize);
-        pos += eSize;
+    {   size_t const cap = LZ4F_compressBound(0, &p);
+        size_t eSize;
+        do {
+            eSize = LZ4F_compressEnd(cctx, tmpOut, cap, NULL);
+            CHECK_LZ4F(eSize);
+            CHECK((eSize < cap) || (nbWorkers && !p.autoFlush), "compressEnd fills LZ4F_compressBound(0) in single-threaded mode");
+            memcpy(dst + pos, tmpOut, eSize);
+            pos += eSize;
+        } while (eSize == cap);
     }
     return pos;
 }
@@ -596,26 +604,30 @@ static void validateMaxNbWorkers(void)
 }
 
 
-/* LZ4F_compressBound() only covers job slots actually employed (2*nbWorkers+1),
- * a single one without multi-threading support, where jobs are processed serially.
+/* LZ4F_compressBound() : with frames cut into jobs, the job replaces the block as unit :
+ * ceil(srcSize / jobSize) jobs (1 for srcSize == 0), each stored uncompressed in worst case, plus the frame footer,
+ * whatever nbWorkers and multi-threading support : updates defer completed jobs not fitting into dstBuffer,
+ * and flush / end emit jobs in flight in several invocations.
  * Sufficiency : see streamCompress(), each invocation receiving exactly LZ4F_compressBound() */
 static void validateCompressBound(void)
 {
     LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
     size_t const jobSize = 4 MB;   /* linked blocks */
-    size_t b1, b8;
+    unsigned const nbWorkersList[] = { 1, 8 };
+    size_t wi;
     g_step = "LZ4F_compressBound";
     p.frameInfo.blockMode = LZ4F_blockLinked;   /* frames cut into jobs, even without multi-threading support */
-    p.nbWorkers = 1;
-    b1 = LZ4F_compressBound(0, &p);
-    p.nbWorkers = 8;
-    b8 = LZ4F_compressBound(0, &p);
-#if defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD
-    CHECK(b8 >= b1 + 14 * jobSize, "8 workers : bound (%u) doesn't cover their job slots", (unsigned)b8);
-#else
-    CHECK(b8 == b1, "bound covers job slots which aren't employed (%u instead of %u)", (unsigned)b8, (unsigned)b1);
-    CHECK(b1 < 2 * jobSize, "bound (%u) covers more than one job slot", (unsigned)b1);
-#endif
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++) {
+        size_t const b0 = (p.nbWorkers = nbWorkersList[wi], LZ4F_compressBound(0, &p));
+        size_t const b1 = LZ4F_compressBound(1, &p);
+        size_t const bJ = LZ4F_compressBound(jobSize, &p);
+        size_t const bJ1 = LZ4F_compressBound(jobSize + 1, &p);
+        size_t const b2J = LZ4F_compressBound(2 * jobSize, &p);
+        CHECK((b0 == b1) && (b1 == bJ), "%u workers : one job : %u, %u, %u", p.nbWorkers, (unsigned)b0, (unsigned)b1, (unsigned)bJ);
+        CHECK((bJ1 == b2J) && (b2J - bJ == bJ - LZ4F_ENDMARK_SIZE),
+              "%u workers : two jobs : %u, %u", p.nbWorkers, (unsigned)bJ1, (unsigned)b2J);
+        CHECK((bJ > jobSize) && (bJ < jobSize + 64 KB), "%u workers : job bound %u", p.nbWorkers, (unsigned)bJ);
+    }
 }
 
 
@@ -889,7 +901,7 @@ static size_t partialRef(LZ4F_cctx* cctx, const LZ4F_preferences_t* p, const LZ4
     r = LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(part1, p), src, part1, cOpts);
     CHECK_LZ4F(r); pos += r;
     *flushPos = pos;
-    r = LZ4F_flush(cctx, dst + pos, LZ4F_compressBound(0, p), NULL);
+    r = flushPieces(cctx, 0, dst + pos, LZ4F_compressBound(0, p), 0, NULL);
     CHECK_LZ4F(r); pos += r;
     *flushSize = r;
     if (uncSize) {
@@ -899,7 +911,7 @@ static size_t partialRef(LZ4F_cctx* cctx, const LZ4F_preferences_t* p, const LZ4
     r = LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(srcSize - part1 - uncSize, p),
                             src + part1 + uncSize, srcSize - part1 - uncSize, cOpts);
     CHECK_LZ4F(r); pos += r;
-    r = LZ4F_compressEnd(cctx, dst + pos, LZ4F_compressBound(0, p), NULL);
+    r = flushPieces(cctx, 1, dst + pos, LZ4F_compressBound(0, p), 0, NULL);
     CHECK_LZ4F(r);
     return pos + r;
 }
@@ -952,7 +964,7 @@ static int validatePartialFlush(void)
             CHECK_LZ4F(refFullSize);
             r = LZ4F_compressUpdate(cctx, refFull + refFullSize, LZ4F_compressBound(srcSize, &p), src, srcSize, NULL);
             CHECK_LZ4F(r); refFullSize += r;
-            r = LZ4F_compressEnd(cctx, refFull + refFullSize, LZ4F_compressBound(0, &p), NULL);
+            r = flushPieces(cctx, 1, refFull + refFullSize, LZ4F_compressBound(0, &p), 0, NULL);
             CHECK_LZ4F(r); refFullSize += r;
         }
 
@@ -1025,7 +1037,7 @@ static int validatePartialFlush(void)
                 CHECK_LZ4F(pos);
                 r = LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(srcSize, &p), src, srcSize, NULL);
                 CHECK_LZ4F(r); pos += r;
-                r = LZ4F_compressEnd(cctx, out + pos, LZ4F_compressBound(0, &p), NULL);
+                r = flushPieces(cctx, 1, out + pos, LZ4F_compressBound(0, &p), 0, NULL);
                 CHECK_LZ4F(r); pos += r;
                 CHECK(pos == refFullSize && !memcmp(out, refFull, pos), "%u workers : frame after abandoned end differs", p.nbWorkers);
                 nbConfigs++;

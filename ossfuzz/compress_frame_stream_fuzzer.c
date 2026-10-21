@@ -137,12 +137,24 @@ static int runBoth(state_t* s, opType_e type, const uint8_t* src, size_t srcSize
     size_t capacity;
     FUZZ_ASSERT(refBound <= s->refOutCapacity);
 
-    size_t const refSize = runOp(s, s->refCtx, s->refPrefs, type, s->refOut, refBound, src, srcSize);
-    FUZZ_ASSERT_MSG(!LZ4F_isError(refSize), "Operation must succeed with a bound-sized buffer");
-    FUZZ_ASSERT(refSize <= refBound);
-
-    if ((type == op_flush) || (type == op_end)) {
-        FUZZ_ASSERT_MSG(refSize < refBound, "Output must remain strictly below LZ4F_compressBound(0)");
+    size_t refSize;
+    if (s->lagging && ((type == op_flush) || (type == op_end))) {
+        /* multi-threaded : jobs in flight are emitted in several invocations (at least one job each) */
+        size_t r;
+        refSize = 0;
+        do {
+            FUZZ_ASSERT(refSize + refBound <= s->refOutCapacity);
+            r = runOp(s, s->refCtx, s->refPrefs, type, s->refOut + refSize, refBound, src, srcSize);
+            FUZZ_ASSERT_MSG(!LZ4F_isError(r), "Flush and end must succeed with a bound-sized buffer");
+            refSize += r;
+        } while (r == refBound);
+    } else {
+        refSize = runOp(s, s->refCtx, s->refPrefs, type, s->refOut, refBound, src, srcSize);
+        FUZZ_ASSERT_MSG(!LZ4F_isError(refSize), "Operation must succeed with a bound-sized buffer");
+        FUZZ_ASSERT(refSize <= refBound);
+        if ((type == op_flush) || (type == op_end)) {
+            FUZZ_ASSERT_MSG(refSize < refBound, "Single-threaded : output must remain strictly below LZ4F_compressBound(0)");
+        }
     }
 
     if (s->lagging) {
@@ -242,7 +254,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     s.prefs = &prefs;
     s.cOpts = &cOpts;
     s.lagging = (prefs.nbWorkers != 0) && !prefs.autoFlush;
-    s.refOutCapacity = MAX(LZ4F_compressBound(size, &refPrefs), LZ4F_HEADER_SIZE_MAX);
+    /* multi-threaded flush and end : all jobs in flight, in several invocations of LZ4F_compressBound(0) */
+    s.refOutCapacity = LZ4F_compressBound(size, &refPrefs) + LZ4F_compressFrameBound(size, &refPrefs)
+                     + 2 * MAX_OPS * (LZ4F_BLOCK_HEADER_SIZE + LZ4F_BLOCK_CHECKSUM_SIZE) + LZ4F_compressBound(0, &refPrefs);
     s.refOut = (char*)malloc(s.refOutCapacity);
     /* each operation can add up to 2 partial blocks */
     s.frameCapacity = LZ4F_compressFrameBound(size, &prefs)
