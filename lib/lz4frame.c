@@ -708,6 +708,19 @@ static size_t LZ4F_sizeofLZ4State(LZ4F_CtxType_e ctxType)
     return 0;
 }
 
+/* LZ4F_initLZ4State() :
+ * initializes the inner LZ4 state @state for @ctxType (fast or HC), at compression @level */
+static void LZ4F_initLZ4State(void* state, LZ4F_CtxType_e ctxType, int level)
+{
+    if (ctxType == ctxFast) {
+        LZ4_initStream(state, sizeof(LZ4_stream_t));
+    } else {
+        assert(ctxType == ctxHC);
+        LZ4_initStreamHC(state, sizeof(LZ4_streamHC_t));
+        LZ4_setCompressionLevel((LZ4_streamHC_t*)state, level);
+    }
+}
+
 size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
     if (cctx == NULL) {
         return 0;
@@ -744,31 +757,18 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
         size_t const requiredSize = LZ4F_sizeofLZ4State(ctxType);
         size_t const allocatedSize = LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc);
         if (allocatedSize < requiredSize) {
-            /* not enough space allocated */
+            /* not enough space allocated : must take ownership of memory allocation,
+             * in order to respect custom allocator contract */
             LZ4F_free(cctx->lz4CtxPtr, cctx->cmem);
-            if (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
-                /* must take ownership of memory allocation,
-                 * in order to respect custom allocator contract */
-                cctx->lz4CtxPtr = LZ4F_malloc(sizeof(LZ4_stream_t), cctx->cmem);
-                if (cctx->lz4CtxPtr)
-                    LZ4_initStream(cctx->lz4CtxPtr, sizeof(LZ4_stream_t));
-            } else {
-                cctx->lz4CtxPtr = LZ4F_malloc(sizeof(LZ4_streamHC_t), cctx->cmem);
-                if (cctx->lz4CtxPtr)
-                    LZ4_initStreamHC(cctx->lz4CtxPtr, sizeof(LZ4_streamHC_t));
-            }
+            cctx->lz4CtxAlloc = (U16)ctxNone;   /* in case allocation fails */
+            cctx->lz4CtxPtr = LZ4F_malloc(requiredSize, cctx->cmem);
             RETURN_ERROR_IF(cctx->lz4CtxPtr == NULL, allocation_failed);
             cctx->lz4CtxAlloc = (U16)ctxType;
-            cctx->lz4CtxType = (U16)ctxType;
-        } else if (cctx->lz4CtxType != ctxType) {
-            /* otherwise, a sufficient buffer is already allocated,
-             * but we need to reset it to the correct context type */
-            if (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
-                LZ4_initStream((LZ4_stream_t*)cctx->lz4CtxPtr, sizeof(LZ4_stream_t));
-            } else {
-                LZ4_initStreamHC((LZ4_streamHC_t*)cctx->lz4CtxPtr, sizeof(LZ4_streamHC_t));
-                LZ4_setCompressionLevel((LZ4_streamHC_t*)cctx->lz4CtxPtr, cctx->prefs.compressionLevel);
-            }
+            cctx->lz4CtxType = (U16)ctxNone;    /* not initialized yet */
+        }
+        if (cctx->lz4CtxType != ctxType) {
+            /* initialize the state for the correct context type */
+            LZ4F_initLZ4State(cctx->lz4CtxPtr, ctxType, cctx->prefs.compressionLevel);
             cctx->lz4CtxType = (U16)ctxType;
     }   }
 
@@ -921,18 +921,19 @@ typedef int (*compressFunc_t)(void* ctx, const char* src, char* dst, int srcSize
 
 
 /*! LZ4F_makeBlock():
- *  compress a single block, add header and optional checksum.
+ *  compress a single block with @compress, using the state, level, dictionary
+ *  and block checksum setting of @cctx, add header and optional checksum.
  *  The block is stored uncompressed when compression doesn't save space.
  * @return : size of the block written into @dst,
  *           or an error code if it doesn't fit into @dstCapacity.
  *  Note : success is guaranteed when dstCapacity >= BHSize + srcSize + crcSize
  */
-static size_t LZ4F_makeBlock(void* dst, size_t dstCapacity,
-                       const void* src, size_t srcSize,
-                             compressFunc_t compress, void* lz4ctx, int level,
-                       const LZ4F_CDict* cdict,
-                             LZ4F_blockChecksum_t crcFlag)
+static size_t LZ4F_makeBlock(const LZ4F_cctx_t* cctx,
+                             void* dst, size_t dstCapacity,
+                             const void* src, size_t srcSize,
+                             compressFunc_t compress)
 {
+    LZ4F_blockChecksum_t const crcFlag = cctx->prefs.frameInfo.blockChecksumFlag;
     BYTE* const cSizePtr = (BYTE*)dst;
     size_t const overhead = BHSize + (size_t)crcFlag * BFSize;
     int cCapacity = (srcSize > 1) ? (int)srcSize - 1 : 1;
@@ -942,9 +943,9 @@ static size_t LZ4F_makeBlock(void* dst, size_t dstCapacity,
     RETURN_ERROR_IF(dstCapacity <= overhead, dstCapacity_tooSmall);
     if (dstCapacity - overhead < (size_t)cCapacity)
         cCapacity = (int)(dstCapacity - overhead);
-    cSize = (U32)compress(lz4ctx, (const char*)src, (char*)(cSizePtr+BHSize),
+    cSize = (U32)compress(cctx->lz4CtxPtr, (const char*)src, (char*)(cSizePtr+BHSize),
                           (int)srcSize, cCapacity,
-                          level, cdict);
+                          cctx->prefs.compressionLevel, cctx->cdict);
 
     if (cSize == 0 || cSize >= srcSize) {
         RETURN_ERROR_IF(dstCapacity - overhead < srcSize, dstCapacity_tooSmall);
@@ -1107,11 +1108,8 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
             memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, sizeToCopy);
             srcPtr += sizeToCopy;
 
-            bytesWritten = LZ4F_makeBlock(dstPtr, (size_t)(dstEnd - dstPtr),
-                                          cctxPtr->tmpIn, blockSize,
-                                          compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
-                                          cctxPtr->cdict,
-                                          cctxPtr->prefs.frameInfo.blockChecksumFlag);
+            bytesWritten = LZ4F_makeBlock(cctxPtr, dstPtr, (size_t)(dstEnd - dstPtr),
+                                          cctxPtr->tmpIn, blockSize, compress);
             FORWARD_IF_ERROR_INVALIDATE(bytesWritten, cctxPtr);
             dstPtr += bytesWritten;
             if (cctxPtr->prefs.frameInfo.blockMode==LZ4F_blockLinked) cctxPtr->tmpIn += blockSize;
@@ -1121,11 +1119,8 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     while ((size_t)(srcEnd - srcPtr) >= blockSize) {
         /* compress full blocks */
         lastBlockCompressed = fromSrcBuffer;
-        bytesWritten = LZ4F_makeBlock(dstPtr, (size_t)(dstEnd - dstPtr),
-                                      srcPtr, blockSize,
-                                      compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
-                                      cctxPtr->cdict,
-                                      cctxPtr->prefs.frameInfo.blockChecksumFlag);
+        bytesWritten = LZ4F_makeBlock(cctxPtr, dstPtr, (size_t)(dstEnd - dstPtr),
+                                      srcPtr, blockSize, compress);
         FORWARD_IF_ERROR_INVALIDATE(bytesWritten, cctxPtr);
         dstPtr += bytesWritten;
         srcPtr += blockSize;
@@ -1134,11 +1129,8 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
     if ((cctxPtr->prefs.autoFlush) && (srcPtr < srcEnd)) {
         /* autoFlush : remaining input (< blockSize) is compressed */
         lastBlockCompressed = fromSrcBuffer;
-        bytesWritten = LZ4F_makeBlock(dstPtr, (size_t)(dstEnd - dstPtr),
-                                      srcPtr, (size_t)(srcEnd - srcPtr),
-                                      compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
-                                      cctxPtr->cdict,
-                                      cctxPtr->prefs.frameInfo.blockChecksumFlag);
+        bytesWritten = LZ4F_makeBlock(cctxPtr, dstPtr, (size_t)(dstEnd - dstPtr),
+                                      srcPtr, (size_t)(srcEnd - srcPtr), compress);
         FORWARD_IF_ERROR_INVALIDATE(bytesWritten, cctxPtr);
         dstPtr += bytesWritten;
         srcPtr = srcEnd;
@@ -1254,11 +1246,8 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
     compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel, cctxPtr->blockCompressMode);
 
     /* compress tmp buffer */
-    cSize = LZ4F_makeBlock(dstBuffer, dstCapacity,
-                           cctxPtr->tmpIn, cctxPtr->tmpInSize,
-                           compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
-                           cctxPtr->cdict,
-                           cctxPtr->prefs.frameInfo.blockChecksumFlag);
+    cSize = LZ4F_makeBlock(cctxPtr, dstBuffer, dstCapacity,
+                           cctxPtr->tmpIn, cctxPtr->tmpInSize, compress);
     FORWARD_IF_ERROR_INVALIDATE(cSize, cctxPtr);
     assert(((void)"flush overflows dstBuffer!", cSize <= dstCapacity));
 
