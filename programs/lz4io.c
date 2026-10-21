@@ -835,6 +835,40 @@ static size_t LZ4IO_compressBlockLegacy_HC(
     return (size_t) cSize + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
 }
 
+/* LZ4IO_finishCompressedFile() :
+ * Once the compressed file is complete : close files,
+ * copy owner, permissions and modification time of the source file,
+ * remove it with --rm, and display final status */
+static void
+LZ4IO_finishCompressedFile(FILE* srcFile, FILE* dstFile,
+                           const char* srcFileName, const char* dstFileName,
+                           unsigned long long srcSize, unsigned long long cSize,
+                           const LZ4IO_prefs_t* io_prefs)
+{
+    fclose(srcFile);
+    if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
+
+    /* Copy owner, file permissions and modification time */
+    {   stat_t statbuf;
+        if (!LZ4IO_isStdin(srcFileName)
+         && !LZ4IO_isStdout(dstFileName)
+         && !LZ4IO_isDevNull(dstFileName)
+         && UTIL_getFileStat(srcFileName, &statbuf)) {
+            UTIL_setFileStat(dstFileName, &statbuf);
+    }   }
+
+    if (io_prefs->removeSrcFile) {  /* remove source file : --rm */
+        if (remove(srcFileName))
+            END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
+    }
+
+    /* Final Status */
+    DISPLAYLEVEL(2, "\r%79s\r", "");
+    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
+                    srcSize, cSize,
+                    (double)cSize / (double)(srcSize + !srcSize /* avoid division by zero */ ) * 100.);
+}
+
 /* LZ4IO_compressLegacy_internal :
  * Implementation of LZ4IO_compressFilename_Legacy.
  * @return: 0 if success, !0 if error
@@ -863,6 +897,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     foutput = LZ4IO_openDstFile(output_filename, prefs);
     if (foutput == NULL) {
         /* write file error : recoverable */
+        fclose(finput);
         clResult = 1;
         goto _cfl_clean;
     }
@@ -902,21 +937,16 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         TPool_jobsCompleted(tPool);
         TPool_jobsCompleted(wPool);
 
-        /* Status */
-        DISPLAYLEVEL(2, "\r%79s\r", "");    /* blank line */
-        DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%% \n",
-                    rjd.totalReadSize, wr.totalCSize,
-                    (double)wr.totalCSize / (double)(rjd.totalReadSize + !rjd.totalReadSize) * 100.);
+        LZ4IO_finishCompressedFile(finput, foutput, input_filename, output_filename,
+                                   rjd.totalReadSize, wr.totalCSize, prefs);
         *readSize = rjd.totalReadSize;
     }
 
-    /* Close & Free */
+    /* Free */
 _cfl_clean:
     WR_destroy(&wr);
     TPool_free(wPool);
     TPool_free(tPool);
-    if (finput) fclose(finput);
-    if (foutput && !LZ4IO_isStdout(output_filename)) fclose(foutput);  /* do not close stdout */
 
     return clResult;
 }
@@ -1255,21 +1285,17 @@ static size_t LZ4IO_compressFrameChunk(const void* params,
     }
 }
 
-/*
- * LZ4IO_compressFilename_extRess()
- * result : 0 : compression completed correctly
- *          1 : missing or pb opening srcFileName
- */
-int
-LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
-                               cRess_t* ress,
-                               const char* srcFileName, const char* dstFileName,
-                               int compressionLevel,
-                               const LZ4IO_prefs_t* const io_prefs)
+/* LZ4IO_compressFrame_MT() :
+ * Compress @srcFile into @dstFile as one frame, with worker threads.
+ * @return : compressed size, and *srcSizePtr : size of input */
+static unsigned long long
+LZ4IO_compressFrame_MT(unsigned long long* srcSizePtr,
+                       cRess_t* ress, FILE* srcFile, FILE* dstFile,
+                       const char* srcFileName, LZ4F_preferences_t prefs,
+                       const LZ4IO_prefs_t* const io_prefs)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
-    FILE* dstFile;
     void* const srcBuffer = ress->srcBuffer;
     void* const dstBuffer = ress->dstBuffer;
     const size_t dstBufferSize = ress->dstBufferSize;
@@ -1278,23 +1304,6 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
     const size_t chunkSize = (4 MB / blockSize) * blockSize;
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
-    LZ4F_preferences_t prefs;
-
-    /* Init */
-    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
-    if (srcFile == NULL) return 1;
-    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
-    if (dstFile == NULL) { fclose(srcFile); return 1; }
-
-    /* Adjust compression parameters */
-    prefs = ress->preparedPrefs;
-    prefs.compressionLevel = compressionLevel;
-    if (io_prefs->contentSizeFlag) {
-      U64 const fileSize = UTIL_getOpenFileSize(srcFile);
-      prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
-      if (fileSize==0)
-          DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
-    }
 
     /* read first chunk */
     assert(0 < blockSize && blockSize <= chunkSize && chunkSize <= ress->srcBufferSize);
@@ -1436,73 +1445,27 @@ LZ4IO_compressFilename_extRess_MT(unsigned long long* inStreamSize,
         WR_destroy(&wr);
     }
 
-    /* Release file handlers */
-    fclose (srcFile);
-    if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
-
-    /* Copy owner, file permissions and modification time */
-    {   stat_t statbuf;
-        if (!LZ4IO_isStdin(srcFileName)
-         && !LZ4IO_isStdout(dstFileName)
-         && !LZ4IO_isDevNull(dstFileName)
-         && UTIL_getFileStat(srcFileName, &statbuf)) {
-            UTIL_setFileStat(dstFileName, &statbuf);
-    }   }
-
-    if (io_prefs->removeSrcFile) {  /* remove source file : --rm */
-        if (remove(srcFileName))
-            END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
-    }
-
-    /* Final Status */
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-                    filesize, compressedfilesize,
-                    (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
-    *inStreamSize = filesize;
-
-    return 0;
+    *srcSizePtr = filesize;
+    return compressedfilesize;
 }
 
-/*
- * LZ4IO_compressFilename_extRess()
- * result : 0 : compression completed correctly
- *          1 : missing or pb opening srcFileName
- */
-int
-LZ4IO_compressFilename_extRess_ST(unsigned long long* inStreamSize,
-                               const cRess_t* ress,
-                               const char* srcFileName, const char* dstFileName,
-                               int compressionLevel,
-                               const LZ4IO_prefs_t* const io_prefs)
+/* LZ4IO_compressFrame_ST() :
+ * Compress @srcFile into @dstFile as one frame, in a single thread.
+ * @return : compressed size, and *srcSizePtr : size of input */
+static unsigned long long
+LZ4IO_compressFrame_ST(unsigned long long* srcSizePtr,
+                       const cRess_t* ress, FILE* srcFile, FILE* dstFile,
+                       const char* srcFileName, LZ4F_preferences_t prefs,
+                       const LZ4IO_prefs_t* const io_prefs)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
-    FILE* dstFile;
     void* const srcBuffer = ress->srcBuffer;
     void* const dstBuffer = ress->dstBuffer;
     const size_t dstBufferSize = ress->dstBufferSize;
     const size_t blockSize = io_prefs->blockSize;
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
-    LZ4F_preferences_t prefs;
-
-    /* Init */
-    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
-    if (srcFile == NULL) return 1;
-    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
-    if (dstFile == NULL) { fclose(srcFile); return 1; }
-    memset(&prefs, 0, sizeof(prefs));
-
-    /* Adjust compression parameters */
-    prefs = ress->preparedPrefs;
-    prefs.compressionLevel = compressionLevel;
-    if (io_prefs->contentSizeFlag) {
-      U64 const fileSize = UTIL_getOpenFileSize(srcFile);
-      prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
-      if (fileSize==0)
-          DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
-    }
 
     /* read first block */
     readSize  = fread(srcBuffer, (size_t)1, blockSize, srcFile);
@@ -1566,34 +1529,15 @@ LZ4IO_compressFilename_extRess_ST(unsigned long long* inStreamSize,
         }
     }
 
-    /* Release file handlers */
-    fclose (srcFile);
-    if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
-
-    /* Copy owner, file permissions and modification time */
-    {   stat_t statbuf;
-        if (!LZ4IO_isStdin(srcFileName)
-         && !LZ4IO_isStdout(dstFileName)
-         && !LZ4IO_isDevNull(dstFileName)
-         && UTIL_getFileStat(srcFileName, &statbuf)) {
-            UTIL_setFileStat(dstFileName, &statbuf);
-    }   }
-
-    if (io_prefs->removeSrcFile) {  /* remove source file : --rm */
-        if (remove(srcFileName))
-            END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
-    }
-
-    /* Final Status */
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-                    filesize, compressedfilesize,
-                    (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
-    *inStreamSize = filesize;
-
-    return 0;
+    *srcSizePtr = filesize;
+    return compressedfilesize;
 }
 
+/*
+ * LZ4IO_compressFilename_extRess()
+ * result : 0 : compression completed correctly
+ *          1 : missing or pb opening srcFileName
+ */
 static int
 LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                cRess_t* ress,
@@ -1601,10 +1545,33 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                                int compressionLevel,
                                const LZ4IO_prefs_t* const io_prefs)
 {
+    unsigned long long srcSize, cSize;
+    LZ4F_preferences_t prefs;
+    FILE* dstFile;
+    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
+    *inStreamSize = 0;
+    if (srcFile == NULL) return 1;
+    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
+    if (dstFile == NULL) { fclose(srcFile); return 1; }
+
+    /* Adjust compression parameters */
+    prefs = ress->preparedPrefs;
+    prefs.compressionLevel = compressionLevel;
+    if (io_prefs->contentSizeFlag) {
+      U64 const fileSize = UTIL_getOpenFileSize(srcFile);
+      prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
+      if (fileSize==0)
+          DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
+    }
+
     if (LZ4IO_MULTITHREAD)
-        return LZ4IO_compressFilename_extRess_MT(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
-    /* Only single-thread available */
-    return LZ4IO_compressFilename_extRess_ST(inStreamSize, ress, srcFileName, dstFileName, compressionLevel, io_prefs);
+        cSize = LZ4IO_compressFrame_MT(&srcSize, ress, srcFile, dstFile, srcFileName, prefs, io_prefs);
+    else   /* Only single-thread available */
+        cSize = LZ4IO_compressFrame_ST(&srcSize, ress, srcFile, dstFile, srcFileName, prefs, io_prefs);
+
+    LZ4IO_finishCompressedFile(srcFile, dstFile, srcFileName, dstFileName, srcSize, cSize, io_prefs);
+    *inStreamSize = srcSize;
+    return 0;
 }
 
 int LZ4IO_compressFilename(const char* srcFileName, const char* dstFileName, int compressionLevel, const LZ4IO_prefs_t* prefs)

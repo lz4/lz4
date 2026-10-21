@@ -31,6 +31,16 @@ test ! -f $FPREFIX-hw                   # must fail (--rm)
 test   -f $FPREFIX-hw.lz4
 lz4 -d --rm -f $FPREFIX-hw.lz4
 test ! -f $FPREFIX-hw.lz4
+lz4 -l --rm -f $FPREFIX-hw $FPREFIX-hw.lz4   # legacy format
+test ! -f $FPREFIX-hw                   # must fail (--rm)
+lz4 -d --rm -f $FPREFIX-hw.lz4
+test ! -f $FPREFIX-hw.lz4
+touch -t 202001010000 $FPREFIX-hw
+lz4 -f $FPREFIX-hw $FPREFIX-hw.lz4
+test ! $FPREFIX-hw.lz4 -nt $FPREFIX-hw  # keeps modification time
+lz4 -l -f $FPREFIX-hw $FPREFIX-hw.lz4
+test ! $FPREFIX-hw.lz4 -nt $FPREFIX-hw  # same with legacy format
+rm $FPREFIX-hw.lz4
 lz4 --rm -f $FPREFIX-hw > /dev/null
 test   -f $FPREFIX-hw.lz4               # no more implicit stdout
 lz4cat $FPREFIX-hw.lz4 | grep "hello world"

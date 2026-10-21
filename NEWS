@@ -44,6 +44,8 @@ cli  : `lz4 --list` rejects truncated frames, instead of reporting them as valid
 cli  : numeric arguments that overflow are rejected, instead of silently wrapping around, by @akashdeshmukh-git
 cli  : `-b --fast=#` benchmarks a single level, instead of all levels up to -10000 when # > 10000
 cli  : legacy format (`-l`) : `--fast=#` selects the same acceleration as the frame format (`--fast=1` was the same as `-1`)
+cli  : legacy format (`-l`) : honors `--rm`, and keeps the source file's owner, permissions and modification time
+cli  : `-m` : a missing input file no longer distorts the final speed summary of compression
 cli  : warning when `--content-size` is used with `stdin`, by @jlee303
 cli  : fix benchmark cpu time on Windows with very large files
 cli  : `-b` crashed with small block sizes (`-B#`) on large inputs (since v1.7.3)
