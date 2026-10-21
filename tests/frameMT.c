@@ -35,8 +35,9 @@
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
  * - serial processing (dstCapacity too small for parallel jobs) produces the same output
- * - destination too small : the frame is invalidated (no truncated frame), and the context remains usable ;
- *   completed jobs not fitting yet are emitted later, without failure
+ * - destination too small : compressUpdate fails and invalidates the frame (no truncated frame), the context remains usable ;
+ *   completed jobs not fitting yet are emitted later, without failure ; flush and end produce output in pieces
+ * - flush and end in pieces, for any capacity : same output ; flush point, exact fill, update after an incomplete flush
  * - LZ4F_compressBegin() rejecting its arguments leaves the frame in progress (jobs in flight) untouched ;
  *   its allocation failures invalidate it
  * - LZ4F_getMaxNbWorkers() reports multi-threading support
@@ -186,6 +187,7 @@ static int validate(XXH64_state_t* digest)
     unsigned seed = 1;
     size_t si, li;
     int linked;
+    g_step = "one-shot";
 
     CHECK(src && dict && ref0 && ref1 && out && decoded && cctx, "allocation failed");
     RDG_genBuffer(src, srcSizeMax, 0.5, 0.0, 7);
@@ -376,6 +378,7 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
         if (mode.flushes && ((r >> 16) % 4 == 0)) {
             size_t const fSize = LZ4F_flush(cctx, tmpOut, LZ4F_compressBound(0, &p), NULL);
             CHECK_LZ4F(fSize);
+            CHECK(fSize < LZ4F_compressBound(0, &p), "flush fills LZ4F_compressBound(0) : not completed");
             memcpy(dst + pos, tmpOut, fSize);
             pos += fSize;
             flushed = 1;
@@ -384,6 +387,7 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
     }
     {   size_t const eSize = LZ4F_compressEnd(cctx, tmpOut, LZ4F_compressBound(0, &p), NULL);
         CHECK_LZ4F(eSize);
+        CHECK(eSize < LZ4F_compressBound(0, &p), "compressEnd fills LZ4F_compressBound(0) : not completed");
         memcpy(dst + pos, tmpOut, eSize);
         pos += eSize;
     }
@@ -744,7 +748,8 @@ static int validateAllocFailures(void)
 }
 
 /* begin, update (whole input), flush, end : from operation @smallFrom onwards (0:update, 1:flush, 2:end ; 3:never),
- * each operation only receives @capacity, instead of all remaining capacity. @smallFrom == 2 : no flush.
+ * each invocation only receives @capacity, instead of all remaining capacity. @smallFrom == 2 : no flush.
+ * LZ4F_flush() and LZ4F_compressEnd() fill dstBuffer, or complete : they are invoked again while they fill it.
  * @return : frame size, or the first error, *failedOp being then the failed operation */
 static size_t streamOps(LZ4F_cctx* cctx, const LZ4F_preferences_t* prefs,
                         char* dst, size_t dstCapacity, const char* src, size_t srcSize,
@@ -755,22 +760,28 @@ static size_t streamOps(LZ4F_cctx* cctx, const LZ4F_preferences_t* prefs,
     *failedOp = -1;
     if (LZ4F_isError(pos)) return pos;
     for (op = 0; op < 3; op++) {
-        size_t const c = (op >= smallFrom) ? capacity : dstCapacity - pos;
-        size_t r;
+        int again;
         if ((op == 1) && (smallFrom == 2)) continue;
-        if (op == 0) r = LZ4F_compressUpdate(cctx, dst + pos, c, src, srcSize, NULL);
-        else if (op == 1) r = LZ4F_flush(cctx, dst + pos, c, NULL);
-        else r = LZ4F_compressEnd(cctx, dst + pos, c, NULL);
-        if (LZ4F_isError(r)) { *failedOp = op; return r; }
-        pos += r;
+        do {
+            size_t const c = (op >= smallFrom) ? capacity : dstCapacity - pos;
+            size_t r;
+            if (op == 0) r = LZ4F_compressUpdate(cctx, dst + pos, c, src, srcSize, NULL);
+            else if (op == 1) r = LZ4F_flush(cctx, dst + pos, c, NULL);
+            else r = LZ4F_compressEnd(cctx, dst + pos, c, NULL);
+            if (LZ4F_isError(r)) { *failedOp = op; return r; }
+            pos += r;
+            again = (op > 0) && (r == c);
+        } while (again);
     }
     return pos;
 }
 
-/* Destination too small : the operation fails with dstCapacity_tooSmall, and invalidates the frame :
- * next operations fail with compressionState_uninitialized (in particular, no end mark : no truncated frame),
- * until LZ4F_compressBegin() starts a new frame, identical to the reference. Same contract as nbWorkers == 0.
- * Without autoFlush, the failing operation depends on scheduling : the first one given too little capacity, or a later one. */
+/* Destination too small :
+ * - LZ4F_compressUpdate() must ingest all input : it fails with dstCapacity_tooSmall when output must be written
+ *   (with autoFlush, a full job slot ring, or nbWorkers == 0), and invalidates the frame :
+ *   next operations fail with compressionState_uninitialized (in particular, no end mark : no truncated frame),
+ *   until LZ4F_compressBegin() starts a new frame, identical to the reference. Same contract as nbWorkers == 0.
+ * - LZ4F_flush() and LZ4F_compressEnd() fill dstBuffer, or complete : the frame is produced in pieces, identical to the reference. */
 static int validateDstTooSmall(void)
 {
     static const unsigned nbWorkersList[] = { 0, 1, 3 };   /* 1 : job slots fill up within LZ4F_compressUpdate() */
@@ -781,7 +792,7 @@ static int validateDstTooSmall(void)
     char* const ref = (char*)malloc(dstCapacity);
     char* const out = (char*)malloc(dstCapacity);
     LZ4F_CustomMem const countingMem = { countingAlloc, NULL, countingFree, NULL };
-    unsigned nbConfigs = 0, nbFailures = 0;
+    unsigned nbConfigs = 0, nbFailures = 0, nbPartial = 0;
     size_t wi;
     int linked, autoFlush, smallFrom;
 
@@ -793,7 +804,8 @@ static int validateDstTooSmall(void)
     for (autoFlush = 0; autoFlush <= 1; autoFlush++)
     for (smallFrom = 0; smallFrom <= 2; smallFrom++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-        int const mustFail = !autoFlush || (smallFrom == 0);   /* otherwise, only the end mark remains to be written */
+        /* compressUpdate() must write output into too little capacity ; otherwise, it can defer it (jobs) */
+        int const mustFail = (smallFrom == 0) && (autoFlush || (nbWorkersList[wi] == 0));
         LZ4F_cctx* cctx;
         size_t refSize, r;
         int failedOp;
@@ -812,11 +824,13 @@ static int validateDstTooSmall(void)
         r = streamOps(cctx, &prefs, out, dstCapacity, src, srcSize, smallFrom, smallCapacity, &failedOp);
         if (!LZ4F_isError(r)) {
             CHECK(!mustFail, "%u workers, smallFrom=%i : should have failed", prefs.nbWorkers, smallFrom);
-            CHECK(r == refSize && !memcmp(out, ref, r), "%u workers : output differs", prefs.nbWorkers);
+            CHECK(r == refSize && !memcmp(out, ref, r), "%u workers, smallFrom=%i : output differs", prefs.nbWorkers, smallFrom);
+            nbPartial++;
         } else {
             CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_dstCapacity_tooSmall,
                   "%u workers : unexpected error %s", prefs.nbWorkers, LZ4F_getErrorName(r));
-            CHECK(failedOp >= smallFrom, "%u workers : failed with enough capacity", prefs.nbWorkers);
+            CHECK(failedOp == 0, "%u workers : %s failed", prefs.nbWorkers, (failedOp == 1) ? "flush" : "end");
+            CHECK(smallFrom == 0, "%u workers : failed with enough capacity", prefs.nbWorkers);
             nbFailures++;
             /* frame invalidated */
             r = LZ4F_compressUpdate(cctx, out, dstCapacity, src, 1 KB, NULL);
@@ -836,8 +850,217 @@ static int validateDstTooSmall(void)
         CHECK(g_nbAllocs == g_nbFrees, "memory leak (%u allocations, %u frees)", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
         nbConfigs++;
     }
-    DISPLAY("dstCapacity too small : %u configurations validated, %u failures \n", nbConfigs, nbFailures);
+    DISPLAY("dstCapacity too small : %u configurations validated, %u compressUpdate failures, %u frames in pieces \n",
+            nbConfigs, nbFailures, nbPartial);
     free(src); free(ref); free(out);
+    return 0;
+}
+
+/* invokes LZ4F_flush() (@end == 0) or LZ4F_compressEnd() with @capacity, until it doesn't fill it,
+ * or up to @maxCalls invocations (0 : no limit).
+ * @return : nb of bytes written into @dst, or an error code */
+static size_t flushPieces(LZ4F_cctx* cctx, int end, char* dst, size_t capacity, unsigned maxCalls, unsigned* nbCalls)
+{
+    size_t pos = 0;
+    unsigned n = 0;
+    if (nbCalls) *nbCalls = 0;
+    for (;;) {
+        size_t const r = end ? LZ4F_compressEnd(cctx, dst + pos, capacity, NULL)
+                             : LZ4F_flush(cctx, dst + pos, capacity, NULL);
+        if (LZ4F_isError(r)) return r;
+        pos += r;
+        n++;
+        if (r < capacity) break;
+        if (maxCalls && (n >= maxCalls)) break;
+    }
+    if (nbCalls) *nbCalls = n;
+    return pos;
+}
+
+/* reference : begin, update(@part1), flush, then (@uncSize > 0) uncompressedUpdate(@uncSize), update(rest), end,
+ * each invocation receiving its bound. Position and size of flush output are reported. */
+static size_t partialRef(LZ4F_cctx* cctx, const LZ4F_preferences_t* p, const LZ4F_compressOptions_t* cOpts,
+                         char* dst, const char* src, size_t srcSize,
+                         size_t part1, size_t uncSize, size_t* flushPos, size_t* flushSize)
+{
+    size_t pos, r;
+    pos = LZ4F_compressBegin(cctx, dst, LZ4F_HEADER_SIZE_MAX, p);
+    CHECK_LZ4F(pos);
+    r = LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(part1, p), src, part1, cOpts);
+    CHECK_LZ4F(r); pos += r;
+    *flushPos = pos;
+    r = LZ4F_flush(cctx, dst + pos, LZ4F_compressBound(0, p), NULL);
+    CHECK_LZ4F(r); pos += r;
+    *flushSize = r;
+    if (uncSize) {
+        r = LZ4F_uncompressedUpdate(cctx, dst + pos, LZ4F_compressBound(uncSize, p), src + part1, uncSize, cOpts);
+        CHECK_LZ4F(r); pos += r;
+    }
+    r = LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(srcSize - part1 - uncSize, p),
+                            src + part1 + uncSize, srcSize - part1 - uncSize, cOpts);
+    CHECK_LZ4F(r); pos += r;
+    r = LZ4F_compressEnd(cctx, dst + pos, LZ4F_compressBound(0, p), NULL);
+    CHECK_LZ4F(r);
+    return pos + r;
+}
+
+/* LZ4F_flush() and LZ4F_compressEnd() fill dstBuffer, or complete :
+ * output produced in pieces is identical to the reference, for any capacity, even 1 byte.
+ * - the first invocation of a flush sets the flush point : input is no longer read (LZ4F_srcStableUntilFlush) ;
+ * - capacity exactly equal to the remaining output : the next invocation returns 0 ;
+ * - compressUpdate() or uncompressedUpdate() after an incomplete flush first emit the remaining output ;
+ * - compressBegin() abandons an incomplete end ;
+ * - capacity 0 is rejected when output remains, without modifying the frame. */
+static int validatePartialFlush(void)
+{
+    static const unsigned nbWorkersList[] = { 0, 1, 3 };
+    static const size_t capacities[] = { 1, 7, 4 KB + 1, 1 MB - 3 };
+    size_t const srcSize = 9 MB + 123;
+    size_t const part1 = 5 MB + 7;   /* jobs in flight at flush point */
+    size_t const uncSize = 64 KB + 5;
+    size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL) + 64 MB;
+    char* const src = (char*)malloc(srcSize);
+    char* const work = (char*)malloc(srcSize);
+    char* const ref = (char*)malloc(dstCapacity);
+    char* const refFull = (char*)malloc(dstCapacity);
+    char* const out = (char*)malloc(dstCapacity);
+    LZ4F_CustomMem const countingMem = { countingAlloc, NULL, countingFree, NULL };
+    unsigned nbConfigs = 0, nbCalls = 0;
+    size_t wi, ci;
+    int linked, variant;
+
+    g_step = "partial flush";
+    CHECK(src && work && ref && refFull && out, "allocation failed");
+    RDG_genBuffer(src, srcSize, 0.5, 0.0, 31);
+    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
+    for (linked = 0; linked <= 1; linked++) {
+        LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
+        LZ4F_cctx* const cctx = LZ4F_createCompressionContext_advanced(countingMem, LZ4F_VERSION);
+        size_t const unc = linked ? 0 : uncSize;   /* uncompressed blocks : independent blocks only */
+        size_t refSize, refFullSize, flushPos, flushSize;
+        CHECK(cctx != NULL, "allocation failed");
+        p.nbWorkers = nbWorkersList[wi];
+        p.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        p.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)linked;
+        p.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        {   LZ4F_compressOptions_t refOpts;
+            size_t r;
+            memset(&refOpts, 0, sizeof(refOpts));
+            refOpts.stableSrc = LZ4F_srcStableUntilFlush;   /* single-threaded linked output depends on stableSrc */
+            refSize = partialRef(cctx, &p, &refOpts, ref, src, srcSize, part1, unc, &flushPos, &flushSize);
+            refFullSize = LZ4F_compressBegin(cctx, refFull, LZ4F_HEADER_SIZE_MAX, &p);
+            CHECK_LZ4F(refFullSize);
+            r = LZ4F_compressUpdate(cctx, refFull + refFullSize, LZ4F_compressBound(srcSize, &p), src, srcSize, NULL);
+            CHECK_LZ4F(r); refFullSize += r;
+            r = LZ4F_compressEnd(cctx, refFull + refFullSize, LZ4F_compressBound(0, &p), NULL);
+            CHECK_LZ4F(r); refFullSize += r;
+        }
+
+        for (ci = 0; ci < sizeof(capacities)/sizeof(capacities[0]); ci++)
+        for (variant = 0; variant < 5; variant++) {
+            size_t const cap = capacities[ci];
+            LZ4F_compressOptions_t cOpts;
+            size_t pos, r, flushRemaining;
+            unsigned n = 0;
+            if (g_quick && (ci == 1)) continue;
+            if ((variant >= 2) && (ci != 2)) continue;   /* one capacity is enough */
+            memset(&cOpts, 0, sizeof(cOpts));
+            cOpts.stableSrc = LZ4F_srcStableUntilFlush;
+            memcpy(work, src, srcSize);
+            pos = LZ4F_compressBegin(cctx, out, LZ4F_HEADER_SIZE_MAX, &p);
+            CHECK_LZ4F(pos);
+            r = LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(part1, &p), work, part1, &cOpts);
+            CHECK_LZ4F(r); pos += r;
+            /* output split between update and flush depends on scheduling (jobs) */
+            CHECK((pos <= flushPos + flushSize) && !memcmp(out, ref, pos), "update output differs");
+            flushRemaining = flushPos + flushSize - pos;
+            if (variant == 4) {
+                r = LZ4F_flush(cctx, out + pos, 0, NULL);
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_dstCapacity_tooSmall, "flush into 0 byte : %s",
+                      LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should have been rejected");
+            }
+            if (variant == 1) {
+                /* capacity exactly equal to remaining output */
+                r = LZ4F_flush(cctx, out + pos, flushRemaining, NULL);
+                CHECK(r == flushRemaining, "flush into exact capacity : %s", LZ4F_isError(r) ? LZ4F_getErrorName(r) : "wrong size");
+                r = LZ4F_flush(cctx, out + pos + flushRemaining, cap, NULL);
+                CHECK(r == 0, "flush after exact fill : %s", LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should be empty");
+                r = flushRemaining;
+            } else {
+                r = flushPieces(cctx, 0, out + pos, cap, (variant == 2) ? 1 : 0, &n);
+                CHECK_LZ4F(r);
+                nbCalls += n;
+            }
+            memset(work, 0xA5, part1 - 64 KB);   /* flush point passed : input no longer read, except the last 64 KB (history) */
+            if (variant == 2) {
+                /* update before the flush completes : remaining flush output comes first */
+                size_t const flushed = r;
+                CHECK(flushed <= flushRemaining, "flush output beyond reference");
+                if (unc) {
+                    r = LZ4F_uncompressedUpdate(cctx, out + pos + flushed, LZ4F_compressBound(unc, &p), work + part1, unc, &cOpts);
+                    CHECK_LZ4F(r);
+                    r += flushed;
+                    /* uncompressed blocks follow all compressed ones : no more output pending */
+                } else {
+                    r = flushed;
+                }
+            } else {
+                CHECK(r == flushRemaining && !memcmp(out + pos, ref + pos, r), "%u workers, capacity %u : flush output differs",
+                      p.nbWorkers, (unsigned)cap);
+                if (unc) {
+                    size_t const u = LZ4F_uncompressedUpdate(cctx, out + pos + r, LZ4F_compressBound(unc, &p), work + part1, unc, &cOpts);
+                    CHECK_LZ4F(u);
+                    r += u;
+                }
+            }
+            pos += r;
+            r = LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(srcSize - part1 - unc, &p),
+                                    work + part1 + unc, srcSize - part1 - unc, &cOpts);
+            CHECK_LZ4F(r); pos += r;
+            if (variant == 3) {
+                /* compressBegin() abandons an incomplete end */
+                r = flushPieces(cctx, 1, out + pos, cap, 1, NULL);
+                CHECK_LZ4F(r);
+                pos = LZ4F_compressBegin(cctx, out, LZ4F_HEADER_SIZE_MAX, &p);
+                CHECK_LZ4F(pos);
+                r = LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(srcSize, &p), src, srcSize, NULL);
+                CHECK_LZ4F(r); pos += r;
+                r = LZ4F_compressEnd(cctx, out + pos, LZ4F_compressBound(0, &p), NULL);
+                CHECK_LZ4F(r); pos += r;
+                CHECK(pos == refFullSize && !memcmp(out, refFull, pos), "%u workers : frame after abandoned end differs", p.nbWorkers);
+                nbConfigs++;
+                continue;
+            }
+            if (variant == 4) {
+                r = LZ4F_compressEnd(cctx, out + pos, 0, NULL);
+                CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_dstCapacity_tooSmall, "end into 0 byte : %s",
+                      LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should have been rejected");
+            }
+            if (variant == 1) {
+                size_t const endSize = refSize - pos;   /* output split between update and end depends on scheduling */
+                r = LZ4F_compressEnd(cctx, out + pos, endSize, NULL);
+                CHECK(r == endSize, "end into exact capacity : %s", LZ4F_isError(r) ? LZ4F_getErrorName(r) : "wrong size");
+                r = LZ4F_compressEnd(cctx, out + pos + endSize, cap, NULL);
+                CHECK(r == 0, "end after exact fill : %s", LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should be empty");
+                r = endSize;
+            } else {
+                r = flushPieces(cctx, 1, out + pos, cap, 0, &n);
+                CHECK_LZ4F(r);
+                nbCalls += n;
+            }
+            pos += r;
+            CHECK(pos == refSize && !memcmp(out, ref, pos), "%u workers, linked=%i, capacity %u, variant %i : frame differs",
+                  p.nbWorkers, linked, (unsigned)cap, variant);
+            r = LZ4F_compressEnd(cctx, out, cap, NULL);   /* completed : the frame is over */
+            CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_compressionState_uninitialized, "end after completed end : %s",
+                  LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should have failed");
+            nbConfigs++;
+        }
+        LZ4F_freeCompressionContext(cctx);
+        CHECK(g_nbAllocs == g_nbFrees, "memory leak (%u allocations, %u frees)", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
+    }
+    DISPLAY("partial flush : %u configurations validated (%u invocations) \n", nbConfigs, nbCalls);
+    free(src); free(work); free(ref); free(refFull); free(out);
     return 0;
 }
 
@@ -1365,6 +1588,7 @@ int main(int argc, const char** argv)
         validateFlushContract();
         validateAllocFailures();
         validateDstTooSmall();
+        validatePartialFlush();
         validateDeferredEmission();
         validateBeginFailures();
         validatePoolRetry();

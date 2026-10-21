@@ -1,10 +1,12 @@
 /**
  * This fuzz target compresses the fuzzed data with the LZ4F streaming API,
  * using a random sequence of operations, into random output capacities.
- * Capacities may be smaller than LZ4F_compressBound() : each operation must
- * succeed if and only if its output fits, and then produce the same output
+ * Capacities may be smaller than LZ4F_compressBound() : begin and updates must
+ * succeed if and only if their output fits, and then produce the same output
  * as a reference context which always receives a bound-sized buffer.
  * A failed operation invalidates the frame.
+ * Flush and end fill dstBuffer, or complete : they are invoked again while they fill it,
+ * producing the same output in pieces. Capacity 0 is rejected when output remains.
  * Completed frames must round trip correctly.
  * Note : output of linked blocks at fast levels may depend on context history.
  * Hence, after a failure, both contexts restart from a fresh state.
@@ -93,6 +95,39 @@ static void checkInvalidated(LZ4F_cctx* cctx)
                     "A failed operation must invalidate the frame");
 }
 
+/* Flush and end fill dstBuffer, or complete : invoked again, with other capacities, while they fill it.
+ * Each invocation receives exactly its capacity, to detect overflows.
+ * @return : total output, written into @out */
+static size_t runPieces(const state_t* s, opType_e type, char* out, size_t outCapacity, size_t capacity, uint32_t* seed)
+{
+    size_t pos = 0;
+    for (;;) {
+        char* const dst = (char*)malloc(capacity ? capacity : 1);
+        size_t r;
+        FUZZ_ASSERT(dst != NULL);
+        r = runOp(s, s->cctx, s->prefs, type, dst, capacity, NULL, 0);
+        if (capacity == 0) {
+            free(dst);
+            if (!LZ4F_isError(r)) {
+                FUZZ_ASSERT_MSG((type == op_flush) && (r == 0), "Only an empty flush succeeds into 0 byte");
+                return pos;
+            }
+            FUZZ_ASSERT_MSG(LZ4F_getErrorCode(r) == LZ4F_ERROR_dstCapacity_tooSmall,
+                            "Capacity 0 must be rejected when output remains");
+            capacity = FUZZ_rand32(seed, 1, 256);
+            continue;
+        }
+        FUZZ_ASSERT_MSG(!LZ4F_isError(r), "Flush and end must not fail for lack of capacity");
+        FUZZ_ASSERT(r <= capacity);
+        FUZZ_ASSERT(pos + r <= outCapacity);
+        memcpy(out + pos, dst, r);
+        pos += r;
+        free(dst);
+        if (r < capacity) return pos;
+        capacity = FUZZ_rand32(seed, 1, 4096);
+    }
+}
+
 /* Runs @type on both contexts, and appends its output to @s->frame.
  * @return : 1 on success, 0 if the operation failed because capacity was too small */
 static int runBoth(state_t* s, opType_e type, const uint8_t* src, size_t srcSize, uint32_t* seed)
@@ -106,6 +141,10 @@ static int runBoth(state_t* s, opType_e type, const uint8_t* src, size_t srcSize
     FUZZ_ASSERT_MSG(!LZ4F_isError(refSize), "Operation must succeed with a bound-sized buffer");
     FUZZ_ASSERT(refSize <= refBound);
 
+    if ((type == op_flush) || (type == op_end)) {
+        FUZZ_ASSERT_MSG(refSize < refBound, "Output must remain strictly below LZ4F_compressBound(0)");
+    }
+
     if (s->lagging) {
         FUZZ_ASSERT(s->refFrameSize + refSize <= s->frameCapacity);
         memcpy(s->refFrame + s->refFrameSize, s->refOut, refSize);
@@ -115,6 +154,10 @@ static int runBoth(state_t* s, opType_e type, const uint8_t* src, size_t srcSize
         case 1: capacity = bound; break;
         case 2: capacity = FUZZ_rand32(seed, 0, (uint32_t)bound); break;
         default: capacity = FUZZ_rand32(seed, 0, (uint32_t)MIN(bound, 256)); break;
+        }
+        if ((type == op_flush) || (type == op_end)) {
+            s->frameSize += runPieces(s, type, s->frame + s->frameSize, s->frameCapacity - s->frameSize, capacity, seed);
+            return 1;
         }
         char* const dst = (char*)malloc(capacity ? capacity : 1);
         FUZZ_ASSERT(dst != NULL);
@@ -144,6 +187,14 @@ static int runBoth(state_t* s, opType_e type, const uint8_t* src, size_t srcSize
     case 4: capacity = refSize ? refSize - 1 : 0; break;
     case 5: capacity = FUZZ_rand32(seed, 0, (uint32_t)refSize); break;
     default: capacity = FUZZ_rand32(seed, 0, (uint32_t)bound); break;
+    }
+
+    if ((type == op_flush) || (type == op_end)) {
+        size_t const total = runPieces(s, type, s->frame + s->frameSize, s->frameCapacity - s->frameSize, capacity, seed);
+        FUZZ_ASSERT_MSG(total == refSize, "Output in pieces must have the same size");
+        FUZZ_ASSERT_MSG(!memcmp(s->frame + s->frameSize, s->refOut, refSize), "Output must not depend on capacity");
+        s->frameSize += total;
+        return 1;
     }
 
     /* exact size, to detect overflows */

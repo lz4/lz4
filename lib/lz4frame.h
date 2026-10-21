@@ -214,7 +214,8 @@ typedef struct {
  *  - With linked blocks, each 4 MB job restarts with previous 64 KB as dictionary :
  *    output can differ (slightly) from nbWorkers == 0, at fast levels.
  *  - Streaming (LZ4F_compressUpdate()) : output lags behind input, so LZ4F_compressBound() is larger,
- *    covering jobs in flight (~ 2 * nbWorkers jobs of 4 MB) ; LZ4F_compressEnd() emits all of them.
+ *    covering jobs in flight (~ 2 * nbWorkers jobs of 4 MB), emitted by LZ4F_flush() and LZ4F_compressEnd(),
+ *    possibly in several invocations with a smaller dstCapacity.
  *    Without autoFlush, the amount emitted by each invocation depends on scheduling :
  *    only the whole frame is deterministic. Completed jobs are only emitted if they fit :
  *    with a smaller dstCapacity, LZ4F_compressUpdate() only fails if output must be emitted (ex: all job slots busy).
@@ -369,7 +370,8 @@ LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
  *  Provides minimum dstCapacity required to guarantee success of
  *  LZ4F_compressUpdate() or LZ4F_uncompressedUpdate(), given a srcSize and preferences, for a worst case scenario.
  *  Smaller capacities are allowed, but then the operation may fail.
- *  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() instead.
+ *  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() instead :
+ *  their output remains strictly below it, so that a single invocation completes them.
  *  Note that the result is only valid for a single invocation of LZ4F_compressUpdate().
  *  When invoking LZ4F_compressUpdate() multiple times,
  *  if the output buffer is gradually filled up instead of emptied and re-used from its start,
@@ -406,12 +408,15 @@ LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx,
 /*! LZ4F_flush() :
  *  When data must be generated and sent immediately, without waiting for a block to be completely filled,
  *  it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.
+ *  Each invocation fills dstBuffer, or completes the flush (v1.10.1+) :
+ *  while it returns dstCapacity, output may remain : invoke LZ4F_flush() again, with any dstCapacity.
+ *  A single invocation completes the flush when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
+ *  The first invocation compresses buffered input : after it returns, input is no longer read
+ *  (see LZ4F_srcStableUntilFlush). LZ4F_compressUpdate() may follow an incomplete flush : remaining output comes first.
  * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
  * @return : nb of bytes written into dstBuffer (can be zero, when there is no data stored within cctx)
  *           or an error code if it fails (which can be tested using LZ4F_isError())
- *  Note : LZ4F_flush() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
- *  A smaller dstCapacity is allowed : it fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit,
- *  in which case the frame is invalidated (see LZ4F_compressUpdate()).
+ *  dstCapacity == 0 is rejected (LZ4F_ERROR_dstCapacity_tooSmall) when output remains, without modifying the frame.
  *  LZ4F_flush() requires a frame in progress.
  */
 LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
@@ -422,13 +427,15 @@ LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
  *  To properly finish an LZ4 frame, invoke LZ4F_compressEnd().
  *  It will flush whatever data remained within `cctx` (like LZ4_flush())
  *  and properly finalize the frame, with an endMark and a checksum.
+ *  Each invocation fills dstBuffer, or completes the frame (v1.10.1+) :
+ *  while it returns dstCapacity, output may remain : invoke LZ4F_compressEnd() again, with any dstCapacity.
+ *  A single invocation completes the frame when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
+ *  Until completion, only LZ4F_compressEnd() can continue the frame (LZ4F_compressBegin() abandons it).
  * `cOptPtr` is optional : NULL can be provided, in which case all options will be set to default.
- * @return : nb of bytes written into dstBuffer, necessarily >= 4 (endMark),
+ * @return : nb of bytes written into dstBuffer,
  *           or an error code if it fails (which can be tested using LZ4F_isError())
- *  Note : LZ4F_compressEnd() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
- *  A smaller dstCapacity is allowed : it fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit,
- *  in which case the frame is invalidated (see LZ4F_compressUpdate()).
- *  Whether it succeeds or not, LZ4F_compressEnd() makes `cctx` available again for another compression task.
+ *  dstCapacity == 0 is rejected (LZ4F_ERROR_dstCapacity_tooSmall), without modifying the frame.
+ *  Once completed, or after an error, `cctx` is available again for another compression task.
  */
 LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx,
                                     void* dstBuffer, size_t dstCapacity,

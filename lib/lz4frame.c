@@ -289,7 +289,7 @@ typedef struct LZ4F_cctx_s
     LZ4F_CustomMem cmem;
     LZ4F_preferences_t prefs;
     U32    version;
-    U32    cStage;     /* 0 : compression uninitialized ; 1 : initialized, can compress */
+    U32    cStage;     /* 0 : compression uninitialized ; 1 : initialized, can compress ; 2 : frame ending (LZ4F_compressEnd() in progress) */
     const LZ4F_CDict* cdict;
     size_t maxBlockSize;
     size_t tmpBuffCapacity;
@@ -304,6 +304,13 @@ typedef struct LZ4F_cctx_s
     LZ4F_BlockCompressMode_e  blockCompressMode;
     struct LZ4F_mtCtx_s* mt;   /* multi-threading resources, kept across frames; NULL when never needed */
     U32    mtActive;   /* current frame is cut into jobs (prefs.nbWorkers >= 1) */
+    /* LZ4F_flush() and LZ4F_compressEnd() : output not fitting into dstBuffer yet, see LZ4F_emitPending() */
+    U32    flushStage; /* 0 : none ; 1 : flush point set, emitting ; LZ4F_compressEnd() only : 2 : footer ; 3 : completed */
+    const BYTE* pending;   /* remaining output of a block (stageBuff), or of the frame footer */
+    size_t pendingSize;
+    BYTE*  stageBuff;  /* a block not fitting into dstBuffer : allocated on first need */
+    size_t stageCapacity;
+    BYTE   footer[8];  /* endMark + optional content checksum */
 } LZ4F_cctx_t;
 
 /* multi-threaded compression, see LZ4F_preferences_t.nbWorkers */
@@ -609,7 +616,15 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
 
     assert(dstEnd >= dstPtr);
     { size_t const tailSize = LZ4F_compressEnd(cctx, dstPtr, (size_t)(dstEnd-dstPtr), &options);   /* flush last block, and generate suffix */
-      FORWARD_IF_ERROR(tailSize);
+      int const completed = !LZ4F_isError(tailSize) && ((cctx->cStage == 0) || (cctx->flushStage == 3));
+      if (!completed) {
+          /* the frame doesn't fit */
+          if (cctx->mtActive) LZ4F_mt_abort(cctx->mt);
+          cctx->cStage = 0;
+          return LZ4F_isError(tailSize) ? tailSize : LZ4F_returnErrorCode(LZ4F_ERROR_dstCapacity_tooSmall);
+      }
+      cctx->cStage = 0;
+      cctx->flushStage = 0;
       dstPtr += tailSize; }
 
     assert(dstEnd >= dstStart);
@@ -664,6 +679,7 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
         LZ4F_free(cctxPtr->lz4CtxPtr, cctxPtr->cmem);
     }
     LZ4F_mt_free(cctxPtr->mt, cctxPtr->cmem);
+    LZ4F_free(cctxPtr->stageBuff, cctxPtr->cmem);
 #endif
     return result;
 }
@@ -784,6 +800,7 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctxPtr)
        LZ4F_mt_free(cctxPtr->mt, cctxPtr->cmem);   /* first : waits for jobs still in flight */
        LZ4F_free(cctxPtr->lz4CtxPtr, cctxPtr->cmem);  /* note: LZ4_streamHC_t and LZ4_stream_t are simple POD types */
        LZ4F_free(cctxPtr->tmpBuff, cctxPtr->cmem);
+       LZ4F_free(cctxPtr->stageBuff, cctxPtr->cmem);
        LZ4F_free(cctxPtr, cctxPtr->cmem);
     }
     return LZ4F_OK_NoError;
@@ -864,7 +881,7 @@ size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
     if (cctx == NULL) {
         return 0;
     }
-    return sizeof(*cctx) + cctx->tmpBuffCapacity + LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc)
+    return sizeof(*cctx) + cctx->tmpBuffCapacity + cctx->stageCapacity + LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc)
          + LZ4F_mt_sizeof(cctx->mt);
 }
 
@@ -894,6 +911,8 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     if (cctx->mt) LZ4F_mt_abort(cctx->mt);   /* jobs of an abandoned frame : must complete before @cctx is modified */
     cctx->mtActive = 0;
     cctx->cStage = 0;
+    cctx->flushStage = 0;
+    cctx->pendingSize = 0;
     cctx->prefs = *preferencesPtr;
     DEBUGLOG(5, "LZ4F_compressBegin_internal: Independent_blocks=%u", cctx->prefs.frameInfo.blockMode);
 
@@ -1065,7 +1084,9 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
         return LZ4F_mtCompressBound(srcSize, preferencesPtr);
     }
     if (preferencesPtr && preferencesPtr->autoFlush) {
-        return LZ4F_compressBound_internal(srcSize, preferencesPtr, 0);
+        /* + 1 : output of LZ4F_flush() and LZ4F_compressEnd() remains strictly below LZ4F_compressBound(0),
+         * since a filled dstBuffer means more output may remain */
+        return LZ4F_compressBound_internal(srcSize, preferencesPtr, 0) + (srcSize == 0);
     }
     bound = LZ4F_compressBound_internal(srcSize+1, preferencesPtr, (size_t)-1);
     /* A mode switch may emit buffered input as a separate partial block. */
@@ -1237,6 +1258,100 @@ static const LZ4F_compressOptions_t k_cOptionsNull = { 0, 0, 0, 0 };
             return err_code;                       \
         }                                          \
     } while (0)
+
+/*-***************************************************
+*   Output not fitting into dstBuffer yet (LZ4F_flush(), LZ4F_compressEnd())
+*****************************************************/
+
+/* stageBuff holds one block, stored uncompressed in worst case.
+ * @return : 0, or an error code (allocation_failed) */
+static size_t LZ4F_reserveStage(LZ4F_cctx_t* cctx)
+{
+    size_t const needed = cctx->maxBlockSize + BHSize + BFSize;
+    if (cctx->stageCapacity >= needed) return 0;
+    LZ4F_free(cctx->stageBuff, cctx->cmem);
+    cctx->stageCapacity = 0;
+    cctx->stageBuff = (BYTE*)LZ4F_malloc(needed, cctx->cmem);
+    RETURN_ERROR_IF(cctx->stageBuff == NULL, allocation_failed);
+    cctx->stageCapacity = needed;
+    return 0;
+}
+
+/* copies pending output into @dst + @pos, as much as fits.
+ * @return : nb of bytes copied */
+static size_t LZ4F_copyPending(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity, size_t pos)
+{
+    size_t const n = MIN(cctx->pendingSize, dstCapacity - pos);
+    assert(pos <= dstCapacity);
+    if (n) memcpy(dst + pos, cctx->pending, n);
+    cctx->pending += n;
+    cctx->pendingSize -= n;
+    return n;
+}
+
+/* compression operations first emit output left pending by an incomplete LZ4F_flush(),
+ * entirely, since they must succeed : the flush ends there.
+ * @return : nb of bytes written into @dst, or an error code (callers invalidate the frame) */
+static size_t LZ4F_emitPendingWhole(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity)
+{
+    cctx->flushStage = 0;
+    RETURN_ERROR_IF(cctx->pendingSize > dstCapacity, dstCapacity_tooSmall);
+    return LZ4F_copyPending(cctx, dst, dstCapacity, 0);
+}
+
+/*! LZ4F_flushBlock() :
+ *  compresses input buffered within cctx (single-threaded mode), if any, into @dst.
+ * @return : nb of bytes written into @dst, or an error code (the frame is then invalidated) */
+static size_t LZ4F_flushBlock(LZ4F_cctx_t* cctxPtr, void* dstBuffer, size_t dstCapacity)
+{
+    compressFunc_t compress;
+    size_t cSize;
+
+    DEBUGLOG(5, "LZ4F_flushBlock: %zu buffered bytes (saved dict size = %i) (dstCapacity=%u)",
+            cctxPtr->tmpInSize, (int)(cctxPtr->tmpIn - cctxPtr->tmpBuff), (unsigned)dstCapacity);
+    if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
+
+    /* select compression function */
+    compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel, cctxPtr->blockCompressMode);
+
+    /* compress tmp buffer */
+    cSize = LZ4F_makeBlock(dstBuffer, dstCapacity,
+                           cctxPtr->tmpIn, cctxPtr->tmpInSize,
+                           compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
+                           cctxPtr->cdict,
+                           cctxPtr->prefs.frameInfo.blockChecksumFlag);
+    FORWARD_IF_ERROR_INVALIDATE(cSize, cctxPtr);
+    assert(((void)"flush overflows dstBuffer!", cSize <= dstCapacity));
+
+    if (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked)
+        cctxPtr->tmpIn += cctxPtr->tmpInSize;
+    cctxPtr->tmpInSize = 0;
+
+    /* keep tmpIn within limits */
+    if ((cctxPtr->tmpIn + cctxPtr->maxBlockSize) > (cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity)) {
+        assert(cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked);
+        LZ4F_localSaveDict(cctxPtr);
+    }
+
+    return cSize;
+}
+
+/* flush point, single-threaded mode : the buffered block is compressed into @dst when it fits in any case,
+ * otherwise into stageBuff, as pending output. Same output : compression capacity is the same.
+ * @return : nb of bytes written into @dst, or an error code (the frame is then invalidated) */
+static size_t LZ4F_flushBlockPartial(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity)
+{
+    size_t const worstCase = cctx->tmpInSize + BHSize + (size_t)cctx->prefs.frameInfo.blockChecksumFlag * BFSize;
+    size_t cSize;
+    if ((cctx->tmpInSize == 0) || (dstCapacity >= worstCase))
+        return LZ4F_flushBlock(cctx, dst, dstCapacity);
+    FORWARD_IF_ERROR_INVALIDATE(LZ4F_reserveStage(cctx), cctx);
+    cSize = LZ4F_flushBlock(cctx, cctx->stageBuff, cctx->stageCapacity);
+    FORWARD_IF_ERROR(cSize);   /* already invalidated */
+    cctx->pending = cctx->stageBuff;
+    cctx->pendingSize = cSize;
+    return 0;
+}
 
 
 /*-***************************************************
@@ -1674,6 +1789,7 @@ struct LZ4F_mtCtx_s {
     unsigned nbInFree;
     unsigned maxInBuffs;
     unsigned oldest;         /* oldest submitted job, not emitted yet */
+    size_t emitted;          /* part of the oldest job already emitted, see LZ4F_mt_emitPartial() */
     unsigned nbSubmitted;
     int filling;             /* the slot following submitted jobs is being filled */
     BYTE* history;           /* last bytes of content, up to LZ4F_MT_PREFIX_SIZE (linked blocks) */
@@ -1779,16 +1895,19 @@ static BYTE* LZ4F_mt_acquireInBuff(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
 static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos, unsigned minQueue)
 {
     LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
+    size_t toEmit;
     assert(mt->nbSubmitted > 0);
     assert(pos <= dstCapacity);
     LZ4F_pool_waitDone(mt->pool, &job->done, minQueue);
     FORWARD_IF_ERROR(job->cSize);
-    RETURN_ERROR_IF(job->cSize > dstCapacity - pos, dstCapacity_tooSmall);
-    memcpy(dst + pos, job->outBuff, job->cSize);
+    toEmit = job->cSize - mt->emitted;   /* part already emitted by an incomplete LZ4F_flush() */
+    RETURN_ERROR_IF(toEmit > dstCapacity - pos, dstCapacity_tooSmall);
+    memcpy(dst + pos, job->outBuff + mt->emitted, toEmit);
     LZ4F_mt_releaseInBuff(mt, job);
     mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
     mt->nbSubmitted--;
-    return job->cSize;
+    mt->emitted = 0;
+    return toEmit;
 }
 
 /* emits submitted jobs in order : all of them (@all), or only the already completed ones fitting into @dst
@@ -1801,7 +1920,7 @@ static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size
         const LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
         if (!all) {
             if (!LZ4F_pool_isDone(mt->pool, &job->done)) break;
-            if (job->cSize > dstCapacity - (pos + written)) break;   /* also defers an error code */
+            if (job->cSize - mt->emitted > dstCapacity - (pos + written)) break;   /* also defers an error code */
         }
         {   size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos + written, 1);   /* no more input */
             FORWARD_IF_ERROR(r);
@@ -1823,6 +1942,7 @@ static void LZ4F_mt_abort(LZ4F_mtCtx_t* mt)
     LZ4F_pool_setCancel(mt->pool, 0);
     if (mt->filling) LZ4F_mt_releaseInBuff(mt, LZ4F_mt_fillingSlot(mt));
     mt->filling = 0;
+    mt->emitted = 0;
     mt->stableEnd = NULL;
     mt->uncTailSize = 0;
 }
@@ -2001,6 +2121,7 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
     mt->blockSize = blockSize;
     mt->jobSize = jobSize;
     mt->oldest = 0;
+    mt->emitted = 0;
     mt->nbSubmitted = 0;
     mt->filling = 0;
     mt->historySize = 0;
@@ -2040,6 +2161,59 @@ static size_t LZ4F_mt_flush(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity, si
     }
 }
 
+/*! LZ4F_mt_flushPoint() :
+ *  LZ4F_flush() and LZ4F_compressEnd(), multi-threaded mode : input retained within cctx is compressed.
+ *  The incomplete uncompressed block is written into @dst when it fits in any case, otherwise into stageBuff (pending output).
+ *  Otherwise, the job being filled is submitted, and all jobs are waited for : input is no longer read,
+ *  and their output is emitted by LZ4F_mt_emitPartial().
+ * @return : nb of bytes written into @dst, or an error code (the frame is then invalidated) */
+static size_t LZ4F_mt_flushPoint(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity)
+{
+    LZ4F_mtCtx_t* const mt = cctx->mt;
+    if (mt->uncTailSize) {
+        size_t const worstCase = mt->uncTailSize + BHSize + (size_t)cctx->prefs.frameInfo.blockChecksumFlag * BFSize;
+        size_t r;
+        if (dstCapacity >= worstCase) return LZ4F_mt_emitUncTail(cctx, dst, dstCapacity, 0);
+        FORWARD_IF_ERROR_MT(LZ4F_reserveStage(cctx), cctx);
+        r = LZ4F_mt_emitUncTail(cctx, cctx->stageBuff, cctx->stageCapacity, 0);
+        FORWARD_IF_ERROR(r);   /* already invalidated */
+        cctx->pending = cctx->stageBuff;
+        cctx->pendingSize = r;
+        return 0;
+    }
+    if (mt->filling) LZ4F_mt_submit(mt, LZ4F_mt_fillingSlot(mt));
+    {   unsigned n;
+        for (n = 0; n < mt->nbSubmitted; n++)
+            LZ4F_pool_waitDone(mt->pool, &mt->jobs[(mt->oldest + n) % mt->nbJobSlots].done, 1);
+    }
+    return 0;
+}
+
+/*! LZ4F_mt_emitPartial() :
+ *  emits completed jobs in order into @dst + @pos, as much as fits : the oldest one can be emitted partially.
+ *  Requires all submitted jobs completed, see LZ4F_mt_flushPoint().
+ * @return : nb of bytes written, or an error code */
+static size_t LZ4F_mt_emitPartial(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos)
+{
+    size_t const start = pos;
+    while (mt->nbSubmitted > 0) {
+        LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
+        size_t n;
+        assert(LZ4F_pool_isDone(mt->pool, &job->done));
+        FORWARD_IF_ERROR(job->cSize);
+        n = MIN(job->cSize - mt->emitted, dstCapacity - pos);
+        if (n) memcpy(dst + pos, job->outBuff + mt->emitted, n);
+        pos += n;
+        mt->emitted += n;
+        if (mt->emitted < job->cSize) break;   /* dst is full */
+        LZ4F_mt_releaseInBuff(mt, job);
+        mt->oldest = (mt->oldest + 1) % mt->nbJobSlots;
+        mt->nbSubmitted--;
+        mt->emitted = 0;
+    }
+    return pos - start;
+}
+
 /*! LZ4F_compressUpdate_MT() :
  *  Input is copied into jobs, submitted once full.
  *  Job content is read in place instead, when it remains available until the job completes :
@@ -2068,6 +2242,10 @@ static size_t LZ4F_compressUpdate_MT(LZ4F_cctx_t* cctx,
 
     DEBUGLOG(4, "LZ4F_compressUpdate_MT (srcSize=%u)", (unsigned)srcSize);
     RETURN_ERROR_IF(cctx->cStage != 1, compressionState_uninitialized);
+    {   size_t const r = LZ4F_emitPendingWhole(cctx, dst, dstCapacity);   /* left by an incomplete LZ4F_flush() */
+        FORWARD_IF_ERROR_MT(r, cctx);
+        pos += r;
+    }
     {   size_t const r = LZ4F_mt_emitUncTail(cctx, dst, dstCapacity, pos);   /* switch from uncompressed blocks */
         FORWARD_IF_ERROR_MT(r, cctx);
         pos += r;
@@ -2152,9 +2330,12 @@ static size_t LZ4F_uncompressedUpdate_MT(LZ4F_cctx_t* cctx,
     size_t pos = 0;
     RETURN_ERROR_IF(cctx->cStage != 1, compressionState_uninitialized);
     RETURN_ERROR_IF(cctx->prefs.frameInfo.blockMode != LZ4F_blockIndependent, blockMode_invalid);
+    pos = LZ4F_emitPendingWhole(cctx, dst, dstCapacity);   /* left by an incomplete LZ4F_flush() */
+    FORWARD_IF_ERROR_MT(pos, cctx);
     if (mt->nbSubmitted || mt->filling) {   /* switch from compressed blocks */
-        pos = LZ4F_mt_flush(cctx, dst, dstCapacity, 0);
-        FORWARD_IF_ERROR_MT(pos, cctx);
+        size_t const r = LZ4F_mt_flush(cctx, dst, dstCapacity, pos);
+        FORWARD_IF_ERROR_MT(r, cctx);
+        pos += r;
     }
     mt->stableEnd = NULL;   /* next input doesn't follow previous stable input anymore */
     if (cctx->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled)
@@ -2234,9 +2415,14 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
 
     RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);   /* state must be initialized and waiting for next block */
 
+    /* output left pending by an incomplete LZ4F_flush() */
+    bytesWritten = LZ4F_emitPendingWhole(cctxPtr, dstPtr, dstCapacity);
+    FORWARD_IF_ERROR_INVALIDATE(bytesWritten, cctxPtr);
+    dstPtr += bytesWritten;
+
     /* flush currently written block, to continue with new block compression */
     if (cctxPtr->blockCompressMode != blockCompression) {
-        bytesWritten = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
+        bytesWritten = LZ4F_flushBlock(cctxPtr, dstPtr, (size_t)(dstEnd - dstPtr));
         FORWARD_IF_ERROR(bytesWritten);   /* note : a failed flush invalidates the frame */
         dstPtr += bytesWritten;
         cctxPtr->blockCompressMode = blockCompression;
@@ -2372,54 +2558,78 @@ size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctxPtr,
 }
 
 
+/* emits pending output into @dst + @pos, as much as fits : block or footer (pending), then jobs (multi-threaded mode).
+ * @return : new position, or an error code (the frame is then invalidated) */
+static size_t LZ4F_emitPending(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity, size_t pos)
+{
+    pos += LZ4F_copyPending(cctx, dst, dstCapacity, pos);
+    if (cctx->mtActive && (cctx->pendingSize == 0)) {
+        size_t const r = LZ4F_mt_emitPartial(cctx->mt, dst, dstCapacity, pos);
+        FORWARD_IF_ERROR_MT(r, cctx);
+        pos += r;
+    }
+    return pos;
+}
+
+static int LZ4F_outputPending(const LZ4F_cctx_t* cctx)
+{
+    return (cctx->pendingSize > 0) || (cctx->mtActive && (cctx->mt->nbSubmitted > 0));
+}
+
+/* @return : 1 if LZ4F_flush() has output to produce */
+static int LZ4F_somethingToFlush(const LZ4F_cctx_t* cctx)
+{
+    if (LZ4F_outputPending(cctx)) return 1;
+    if (cctx->mtActive) return (cctx->mt->uncTailSize > 0) || cctx->mt->filling;
+    return cctx->tmpInSize > 0;
+}
+
+/* flush point : input retained within cctx is compressed, and no longer read.
+ * @return : nb of bytes written into @dst, or an error code (the frame is then invalidated) */
+static size_t LZ4F_flushPoint(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity)
+{
+    size_t const r = cctx->mtActive ? LZ4F_mt_flushPoint(cctx, dst, dstCapacity)
+                                    : LZ4F_flushBlockPartial(cctx, dst, dstCapacity);
+    if (!LZ4F_isError(r)) cctx->flushStage = 1;
+    return r;
+}
+
 /*! LZ4F_flush() :
  *  When compressed data must be sent immediately, without waiting for a block to be filled,
  *  invoke LZ4F_flush(), which will immediately compress any remaining data stored within LZ4F_cctx.
+ *  The invocation fills @dstBuffer, or completes the flush :
+ *  as long as it returns @dstCapacity, output may remain : invoke LZ4F_flush() again.
+ *  The first invocation sets the flush point : input retained within cctx is compressed (all jobs completed).
  *  The result of the function is the number of bytes written into dstBuffer.
  *  It can be zero, this means there was no data left within LZ4F_cctx.
  *  The function outputs an error code if it fails (can be tested using LZ4F_isError())
- *  Success is guaranteed when dstCapacity >= LZ4F_compressBound(0, preferencesPtr).
- *  Otherwise, it fails with dstCapacity_tooSmall if its output doesn't fit,
- *  in which case the frame is invalidated, and must be restarted with LZ4F_compressBegin().
- *  LZ4F_compressOptions_t* is optional. NULL is a valid argument.
+ *  A single invocation completes the flush when dstCapacity >= LZ4F_compressBound(0, preferencesPtr).
+ *  dstCapacity == 0 is rejected (dstCapacity_tooSmall) when there is something to flush, without modifying the frame.
+ *  LZ4F_compressOptions_t* is optional : NULL is a valid argument.
  */
 size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
                   void* dstBuffer, size_t dstCapacity,
             const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    compressFunc_t compress;
-    size_t cSize;
-
-    DEBUGLOG(5, "LZ4F_flush: %zu buffered bytes (saved dict size = %i) (dstCapacity=%u)",
-            cctxPtr->tmpInSize, (int)(cctxPtr->tmpIn - cctxPtr->tmpBuff), (unsigned)dstCapacity);
-    RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);
-    if (cctxPtr->mtActive) return LZ4F_mt_flush(cctxPtr, (BYTE*)dstBuffer, dstCapacity, 0);
-    if (cctxPtr->tmpInSize == 0) return 0;   /* nothing to flush */
+    BYTE* const dst = (BYTE*)dstBuffer;
+    size_t pos = 0;
+    DEBUGLOG(5, "LZ4F_flush (dstCapacity=%u)", (unsigned)dstCapacity);
     (void)compressOptionsPtr;   /* not useful (yet) */
-
-    /* select compression function */
-    compress = LZ4F_selectCompression(cctxPtr->prefs.frameInfo.blockMode, cctxPtr->prefs.compressionLevel, cctxPtr->blockCompressMode);
-
-    /* compress tmp buffer */
-    cSize = LZ4F_makeBlock(dstBuffer, dstCapacity,
-                           cctxPtr->tmpIn, cctxPtr->tmpInSize,
-                           compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
-                           cctxPtr->cdict,
-                           cctxPtr->prefs.frameInfo.blockChecksumFlag);
-    FORWARD_IF_ERROR_INVALIDATE(cSize, cctxPtr);
-    assert(((void)"flush overflows dstBuffer!", cSize <= dstCapacity));
-
-    if (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked)
-        cctxPtr->tmpIn += cctxPtr->tmpInSize;
-    cctxPtr->tmpInSize = 0;
-
-    /* keep tmpIn within limits */
-    if ((cctxPtr->tmpIn + cctxPtr->maxBlockSize) > (cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity)) {
-        assert(cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked);
-        LZ4F_localSaveDict(cctxPtr);
+    RETURN_ERROR_IF(cctxPtr->cStage != 1, compressionState_uninitialized);
+    if (dstCapacity == 0) {
+        /* no progress possible : rejected, the frame continues */
+        RETURN_ERROR_IF(LZ4F_somethingToFlush(cctxPtr), dstCapacity_tooSmall);
+        cctxPtr->flushStage = 0;
+        return 0;
     }
-
-    return cSize;
+    if (cctxPtr->flushStage == 0) {
+        pos = LZ4F_flushPoint(cctxPtr, dst, dstCapacity);
+        FORWARD_IF_ERROR(pos);   /* already invalidated */
+    }
+    pos = LZ4F_emitPending(cctxPtr, dst, dstCapacity, pos);
+    FORWARD_IF_ERROR(pos);   /* already invalidated */
+    if (pos < dstCapacity) cctxPtr->flushStage = 0;   /* completed */
+    return pos;
 }
 
 
@@ -2427,48 +2637,67 @@ size_t LZ4F_flush(LZ4F_cctx* cctxPtr,
  *  When you want to properly finish the compressed frame, just call LZ4F_compressEnd().
  *  It will flush whatever data remained within compressionContext (like LZ4_flush())
  *  but also properly finalize the frame, with an endMark and an (optional) checksum.
+ *  The invocation fills @dstBuffer, or completes the frame :
+ *  as long as it returns @dstCapacity, output may remain : invoke LZ4F_compressEnd() again.
  *  LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * @return: the number of bytes written into dstBuffer (necessarily >= 4 (endMark size))
+ * @return: the number of bytes written into dstBuffer (the last invocation writes the endMark, unless already written)
  *       or an error code if it fails (can be tested using LZ4F_isError())
- *  The context can then be used again to compress a new frame, starting with LZ4F_compressBegin().
+ *  Once completed, the context can be used again to compress a new frame, starting with LZ4F_compressBegin().
  */
 size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
                         void* dstBuffer, size_t dstCapacity,
                   const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* dstPtr = dstStart;
-
-    size_t const flushSize = LZ4F_flush(cctxPtr, dstBuffer, dstCapacity, compressOptionsPtr);
+    BYTE* const dst = (BYTE*)dstBuffer;
+    size_t pos = 0;
     DEBUGLOG(5,"LZ4F_compressEnd: dstCapacity=%u", (unsigned)dstCapacity);
-    FORWARD_IF_ERROR(flushSize);   /* note : a failed flush invalidates the frame */
-    dstPtr += flushSize;
+    (void)compressOptionsPtr;   /* not useful (yet) */
+    RETURN_ERROR_IF((cctxPtr->cStage != 1) && (cctxPtr->cStage != 2), compressionState_uninitialized);
+    RETURN_ERROR_IF(dstCapacity == 0, dstCapacity_tooSmall);   /* no progress possible : rejected, the frame continues */
 
-    assert(flushSize <= dstCapacity);
-    dstCapacity -= flushSize;
-
-    /* From now on, the frame is either completed, or failed : it can't be continued.
-     * State is re-usable for a new frame (with identical preferences) */
-    cctxPtr->cStage = 0;
-
-    RETURN_ERROR_IF(dstCapacity < 4, dstCapacity_tooSmall);
-    LZ4F_writeLE32(dstPtr, 0);
-    dstPtr += 4;   /* endMark */
-
-    if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
-        U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
-        RETURN_ERROR_IF(dstCapacity < 8, dstCapacity_tooSmall);
-        DEBUGLOG(5,"Writing 32-bit content checksum (0x%0X)", xxh);
-        LZ4F_writeLE32(dstPtr, xxh);
-        dstPtr+=4;   /* content Checksum */
-    }
-
-    if (cctxPtr->prefs.frameInfo.contentSize) {
-        if (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)
+    if (cctxPtr->cStage == 1) {
+        /* end of frame : no more input */
+        if (cctxPtr->prefs.frameInfo.contentSize && (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)) {
+            if (cctxPtr->mtActive) LZ4F_mt_abort(cctxPtr->mt);
+            cctxPtr->cStage = 0;
             RETURN_ERROR(frameSize_wrong);
+        }
+        cctxPtr->cStage = 2;
+        if (cctxPtr->flushStage == 0) {
+            pos = LZ4F_flushPoint(cctxPtr, dst, dstCapacity);
+            FORWARD_IF_ERROR(pos);   /* already invalidated */
+    }   }
+
+    if (cctxPtr->flushStage == 1) {
+        pos = LZ4F_emitPending(cctxPtr, dst, dstCapacity, pos);
+        FORWARD_IF_ERROR(pos);   /* already invalidated */
+        if (LZ4F_outputPending(cctxPtr)) return pos;   /* dstBuffer is full */
+        /* footer : endMark, then optional content checksum */
+        LZ4F_writeLE32(cctxPtr->footer, 0);
+        cctxPtr->pendingSize = 4;
+        if (cctxPtr->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled) {
+            U32 const xxh = XXH32_digest(&(cctxPtr->xxh));
+            DEBUGLOG(5,"Writing 32-bit content checksum (0x%0X)", xxh);
+            LZ4F_writeLE32(cctxPtr->footer + 4, xxh);
+            cctxPtr->pendingSize = 8;
+        }
+        cctxPtr->pending = cctxPtr->footer;
+        cctxPtr->flushStage = 2;
     }
 
-    return (size_t)(dstPtr - dstStart);
+    if (cctxPtr->flushStage == 2) {
+        pos += LZ4F_copyPending(cctxPtr, dst, dstCapacity, pos);
+        if (cctxPtr->pendingSize) return pos;   /* dstBuffer is full */
+        cctxPtr->flushStage = 3;
+    }
+
+    assert(cctxPtr->flushStage == 3);
+    if (pos < dstCapacity) {
+        /* completed : the context is available for a new frame */
+        cctxPtr->cStage = 0;
+        cctxPtr->flushStage = 0;
+    }   /* otherwise, completed, but dstBuffer is full : next invocation returns 0 */
+    return pos;
 }
 
 

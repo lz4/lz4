@@ -1026,6 +1026,59 @@ static int sd_opExactOK(const sd_stream* s, const sd_op* op, BYTE* dst, size_t c
     return 1;
 }
 
+/* sd_partialOpOK() :
+ * LZ4F_flush() and LZ4F_compressEnd() fill dstBuffer, or complete :
+ * runs @op into @capacity (< @refSize), then completes it with various capacities,
+ * sometimes exactly the remaining size (then, a last invocation returns 0).
+ * Concatenated output must be identical to reference. Capacity 0 is rejected, without modifying the frame.
+ * @return 1 if OK, 0 otherwise */
+static int sd_partialOpOK(const sd_stream* s, const sd_op* op, BYTE* dst, size_t capacity,
+                          const BYTE* ref, size_t refSize, U32* rand)
+{
+    size_t pos = 0;
+    unsigned nbCalls;
+    for (nbCalls = 0; nbCalls < 1000; nbCalls++) {
+        size_t r;
+        sd_setCanary(dst + pos + capacity);
+        r = sd_runOp(s, op, dst + pos, capacity);
+        if (!sd_canaryIntact(dst + pos + capacity)) {
+            DISPLAY("%s into capacity %u : write beyond capacity \n", sd_opName(op->type), (unsigned)capacity);
+            return 0;
+        }
+        if (capacity == 0) {
+            if (!sd_isTooSmall(r)) {
+                DISPLAY("%s into capacity 0 : %s \n", sd_opName(op->type),
+                        LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should have been rejected");
+                return 0;
+            }
+        } else {
+            if (LZ4F_isError(r) || (r > capacity)) {
+                DISPLAY("%s into capacity %u : %s \n", sd_opName(op->type), (unsigned)capacity,
+                        LZ4F_isError(r) ? LZ4F_getErrorName(r) : "exceeds capacity");
+                return 0;
+            }
+            pos += r;
+            if (pos > refSize) {
+                DISPLAY("%s : more output than reference (%u > %u) \n", sd_opName(op->type), (unsigned)pos, (unsigned)refSize);
+                return 0;
+            }
+            if (r < capacity) break;   /* completed */
+        }
+        {   size_t const remaining = refSize - pos;
+            switch (FUZ_rand(rand) % 4) {
+            case 0: capacity = remaining; break;
+            case 1: capacity = 1 + FUZ_rand(rand) % (remaining + 1); break;
+            default: capacity = remaining + 1 + FUZ_rand(rand) % 16; break;
+            }
+            if (capacity == 0) capacity = 1;
+    }   }
+    if ((pos != refSize) || memcmp(dst, ref, refSize)) {
+        DISPLAY("%s : partial output differs from reference \n", sd_opName(op->type));
+        return 0;
+    }
+    return 1;
+}
+
 /* sd_runScript() :
  * runs all @ops, each one using its bound as capacity, writing the frame into @frame.
  * @opStarts and @opSizes are optional.
@@ -1052,6 +1105,11 @@ static size_t sd_runScript(const sd_stream* s, const sd_op* ops, size_t nbOps,
         if (r > bound || !sd_canaryIntact(frame + pos + bound)) {
             DISPLAY("op %u (%s, srcSize %u) : exceeds its bound \n",
                     (unsigned)n, sd_opName(ops[n].type), (unsigned)ops[n].srcSize);
+            return (size_t)-1;
+        }
+        if (((ops[n].type == sd_flush) || (ops[n].type == sd_end)) && (r == bound)) {
+            /* filling dstBuffer would mean "invoke again" : output must remain strictly below LZ4F_compressBound(0) */
+            DISPLAY("op %u (%s) : output reaches its bound \n", (unsigned)n, sd_opName(ops[n].type));
             return (size_t)-1;
         }
         if (opStarts) opStarts[n] = pos;
@@ -1166,6 +1224,15 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
             for (n = 0; n < k; n++)
                 SD_CHECK(sd_opExactOK(&s, ops + n, dst, opSizes[n], frame + opStarts[n], opSizes[n]),
                         "config %u, probe %u : replay op %u", configNb, probe, (unsigned)n);
+            if ((ops[k].type == sd_flush) || (ops[k].type == sd_end)) {
+                /* output in several invocations, the frame continues */
+                SD_CHECK(sd_partialOpOK(&s, ops + k, dst, capacity, frame + opStarts[k], opSizes[k], &seed),
+                        "config %u, probe %u : partial op %u", configNb, probe, (unsigned)k);
+                for (n = k + 1; n < nbOps; n++)
+                    SD_CHECK(sd_opExactOK(&s, ops + n, dst, sd_opBound(&s, ops + n), frame + opStarts[n], opSizes[n]),
+                            "config %u, probe %u : op %u after partial op %u", configNb, probe, (unsigned)n, (unsigned)k);
+                continue;
+            }
             sd_setCanary(dst + capacity);
             r = sd_runOp(&s, ops + k, dst, capacity);
             SD_CHECK(sd_canaryIntact(dst + capacity), "config %u : op %u (%s) writes beyond capacity",
@@ -3578,14 +3645,16 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
 
                 {   unsigned const forceFlush = neverFlush ? 0 : ((FUZ_rand(&randState) & 3) == 1);
                     if (forceFlush) {
-                        /* occasionally provide less than the bound : the flush may then fail */
+                        /* occasionally provide less than the bound : the flush then fills dstBuffer,
+                         * and output remains, emitted by next invocations of LZ4F_flush() or LZ4F_compressUpdate() */
                         unsigned const smallDst = (FUZ_rand(&randState) & 31) == 7;
                         size_t const smallCapacity = FUZ_rand(&randState) % (LZ4F_compressBound(0, prefsPtr) + 1);
-                        size_t const flushCapacity = smallDst
+                        size_t flushCapacity = smallDst
                             ? MIN(smallCapacity, (size_t)(oend-op) - 1)
                             : (size_t)(oend-op);
                         BYTE const canaryByte = (BYTE)FUZ_rand(&randState);
                         size_t flushSize;
+                        int flushCompleted;
                         if (smallDst) op[flushCapacity] = canaryByte;
                         flushSize = LZ4F_flush(cCtx, op, flushCapacity, &cOptions);
                         DISPLAYLEVEL(6, "flushing %u bytes \n", (unsigned)flushSize);
@@ -3595,12 +3664,23 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                                 CHECK(LZ4F_getErrorCode(flushSize) != LZ4F_ERROR_dstCapacity_tooSmall,
                                         "Flush into %u bytes : unexpected error %s",
                                         (unsigned)flushCapacity, LZ4F_getErrorName(flushSize));
-                                frameAbandoned = 1;
-                                break;
+                                CHECK(flushCapacity != 0, "Flush into %u bytes must not fail", (unsigned)flushCapacity);
+                                flushSize = 0;   /* 0 byte : rejected, the frame continues */
                         }   }
                         CHECK(LZ4F_isError(flushSize), "Compression failed (error %i)", (int)flushSize);
                         op += flushSize;
-                        if ((FUZ_rand(&randState) % 1024) == 3) {
+                        flushCompleted = (flushSize < flushCapacity);
+                        if (!flushCompleted && (FUZ_rand(&randState) & 1)) {
+                            /* complete the flush ; otherwise, next update emits remaining output first */
+                            do {
+                                flushCapacity = (size_t)(oend-op);
+                                flushSize = LZ4F_flush(cCtx, op, flushCapacity, &cOptions);
+                                CHECK(LZ4F_isError(flushSize), "Flush continuation failed (%s)", LZ4F_getErrorName(flushSize));
+                                op += flushSize;
+                            } while (flushSize == flushCapacity);
+                            flushCompleted = 1;
+                        }
+                        if (flushCompleted && ((FUZ_rand(&randState) % 1024) == 3)) {
                             /* add an empty block (requires uncompressed flag) */
                             op[0] = op[1] = op[2] = 0;
                             op[3] = 0x80; /* 0x80000000U in little-endian format */
@@ -3630,28 +3710,24 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                 size_t const dstEndSize = tooSmallDstEnd ? dstEndTooSmallSize : dstEndSafeSize;
                 BYTE const canaryByte = (BYTE)(FUZ_rand(&randState) & 255);
                 size_t flushedSize;
+                size_t capacity = dstEndSize;
                 DISPLAYLEVEL(7,"canaryByte at pos %u / %u \n",
                             (unsigned)((size_t)(op - (BYTE*)compressedBuffer) + dstEndSize),
                             (unsigned)compressedBufferSize);
+                (void)tooSmallDstEnd;
                 assert(op + dstEndSize < (BYTE*)compressedBuffer + compressedBufferSize);
-                op[dstEndSize] = canaryByte;
-                flushedSize = LZ4F_compressEnd(cCtx, op, dstEndSize, &cOptions);
-                CHECK(op[dstEndSize] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
-                if (LZ4F_isError(flushedSize)) {
-                    CHECK(!tooSmallDstEnd, "Compression completion failed (error %i : %s)",
-                            (int)flushedSize, LZ4F_getErrorName(flushedSize));
-                    /* failure is allowed */
-                    CHECK(LZ4F_getErrorCode(flushedSize) != LZ4F_ERROR_dstCapacity_tooSmall,
-                            "LZ4F_compressEnd into %u bytes : unexpected error %s",
-                            (unsigned)dstEndSize, LZ4F_getErrorName(flushedSize));
-                    /* the frame can't be completed anymore */
-                    flushedSize = LZ4F_compressEnd(cCtx, op, dstEndSafeSize, &cOptions);
-                    CHECK(LZ4F_getErrorCode(flushedSize) != LZ4F_ERROR_compressionState_uninitialized,
-                            "LZ4F_compressEnd after a failed LZ4F_compressEnd : %s",
-                            LZ4F_isError(flushedSize) ? LZ4F_getErrorName(flushedSize) : "should have failed");
-                    continue;
+                for (;;) {
+                    /* LZ4F_compressEnd() fills dstBuffer, or completes the frame */
+                    op[capacity] = canaryByte;
+                    flushedSize = LZ4F_compressEnd(cCtx, op, capacity, &cOptions);
+                    CHECK(op[capacity] != canaryByte, "LZ4F_compressEnd writes beyond dstCapacity !");
+                    CHECK(LZ4F_isError(flushedSize), "Compression completion into %u bytes failed (error %i : %s)",
+                            (unsigned)capacity, (int)flushedSize, LZ4F_getErrorName(flushedSize));
+                    op += flushedSize;
+                    if (flushedSize < capacity) break;
+                    capacity = (FUZ_rand(&randState) % dstEndSafeSize) + 1;
+                    assert(op + capacity < (BYTE*)compressedBuffer + compressedBufferSize);
                 }
-                op += flushedSize;
             }
             cSize = (size_t)(op - (BYTE*)compressedBuffer);
             DISPLAYLEVEL(5, "\nCompressed %u bytes into %u \n", (U32)srcSize, (U32)cSize);

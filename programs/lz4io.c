@@ -1540,9 +1540,11 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown (ex: stdin) */
         if (fileSize && (fileSize <= LZ4IO_jobSize(&prefs))) prefs.nbWorkers = 0;
     }
-    /* memory-mapped input is released (only a memory hint) behind jobs in flight :
-     * liblz4 keeps up to 2*nbWorkers+1 jobs of at most 4 MB in flight, each reading 64 KB of history before it */
-    releaseLag = (2 * (size_t)prefs.nbWorkers + 1) * (4 MB) + 64 KB;
+    /* memory-mapped input is released (only a memory hint) behind input still read by liblz4 :
+     * jobs in flight, and the 64 KB of history before them.
+     * LZ4F_compressBound(0) bounds the output of LZ4F_compressEnd(), which emits all input retained within cctx :
+     * since incompressible input is stored as is, it also bounds the amount of retained input */
+    releaseLag = LZ4F_compressBound(0, &prefs) + 64 KB;
 
     /* read first chunk */
     readSize  = LZ4IO_readInput(&input, chunkSize, &chunk);

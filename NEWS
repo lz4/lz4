@@ -31,7 +31,8 @@ perf : level 2 compresses slightly better (~0.1-0.5%) and faster (~+1-2%)
 perf : faster levels 11 (~+25%) and 12 (~+10%)
 perf : `--favor-decSpeed` : faster decompression (~+2-4% at level 12), with fewer sequences
 perf : `lz4` multithreaded compression relies on liblz4, reading files in place (memory-mapped, `--[no-]mmap`) : faster at fast levels
-api  : lz4frame compression accepts any `dstCapacity`, and fails only if the output doesn't fit
+api  : lz4frame compression accepts any `dstCapacity` : `LZ4F_compressFrame()` and `LZ4F_compressUpdate()` fail only if the output doesn't fit
+api  : `LZ4F_flush()` and `LZ4F_compressEnd()` fill `dstBuffer` or complete : below `LZ4F_compressBound(0)`, invoke them again while they return `dstCapacity`
 api  : `LZ4F_ERROR_dstMaxSize_tooSmall` renamed `LZ4F_ERROR_dstCapacity_tooSmall` (former name still supported)
 api  : lz4frame : after an error, and outside of a frame, compression operations fail until `LZ4F_compressBegin()`
 api  : lz4frame output no longer depends on the compression context's history
