@@ -4,6 +4,7 @@ fix  : `LZ4_compress_fast_continue()` produced wrong data when a block overwrote
 fix  : `LZ4_compress_destSize_extState()` corrupted data with `acceleration <= 0`, and could read out of bounds (since v1.10.0)
 fix  : negative sizes crashed `LZ4_decompress_safe_partial()` (since v1.9.3) and `LZ4_decompress_fast()` (since v1.9.4)
 fix  : `LZ4_saveDict()` with a negative `dictSize` copied up to 64 KB into `safeBuffer`, by @arthuz-th
+fix  : `LZ4_saveDictHC()` before any compression (new or reset stream) corrupted the next compressed block
 fix  : `LZ4_decompress_safe_partial()` could leave previous `dst` content in decoded data with an invalid offset 0 (since v1.8.3)
 fix  : heap overflow with an invalid `blockSizeID` in `LZ4F_compressBegin()` and `LZ4F_writeOpen()`, by @jaypatrickhoward
 fix  : `LZ4F_compressBegin()` failing on allocation left an inconsistent frame in progress : it is now invalidated
