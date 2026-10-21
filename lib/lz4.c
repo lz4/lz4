@@ -1734,6 +1734,11 @@ static int LZ4_isDictSmall(const LZ4_stream_t_internal* streamPtr)
     return (streamPtr->dictSize < 64 KB) && (streamPtr->dictSize < streamPtr->currentOffset);
 }
 
+/* from this input size (2 KB by default, at most 4 KB),
+ * copying the tables of an attached dictionary is faster than looking into both tables.
+ * The copy cost follows the table size. */
+#define LZ4_DICTCTX_COPY_THRESHOLD ((LZ4_HASHTABLESIZE / 8 < 4 KB) ? (LZ4_HASHTABLESIZE / 8) : 4 KB)
+
 
 int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
                                 const char* source, char* dest,
@@ -1794,7 +1799,7 @@ int LZ4_compress_fast_continue (LZ4_stream_t* LZ4_stream,
              * dictCtx->currentOffset - dictCtx->dictSize. This makes it safe
              * to use noDictIssue even when the dict isn't a full 64 KB.
              */
-            if (inputSize > 4 KB) {
+            if (inputSize >= LZ4_DICTCTX_COPY_THRESHOLD) {
                 /* For compressing large blobs, it is faster to pay the setup
                  * cost to copy the dictionary's tables into the active context,
                  * so that the compression loop is only looking into one table.
