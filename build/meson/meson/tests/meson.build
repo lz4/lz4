@@ -68,6 +68,14 @@ test_exes = {
     'args': ['-T@0@s'.format(fuzzer_time)],
     'test': false,
   },
+  'unittest': {
+    'sources': files(
+      lz4_source_root / 'tests/unittest.c',
+      lz4_source_root / 'tests/unittest_lz4frame.c',
+      lz4_source_root / 'tests/datagen.c',
+    ),
+    'include_directories': include_directories(lz4_source_root / 'programs'),
+  },
   'roundTripTest': {
     'sources': files(lz4_source_root / 'tests/roundTripTest.c'),
     'test': false,

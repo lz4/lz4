@@ -57,7 +57,7 @@ jobs:
     - name: ASan - frame test
       run: |
         make clean
-        CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-frametest V=1
+        CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -j -C tests test-frametest test-unittest V=1
 
     - name: ASan - multi-threaded frame compression
       run: |
@@ -84,7 +84,7 @@ jobs:
     - name: MSan - frame test
       run: |
         make clean
-        CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-frametest V=1
+        CC=clang CFLAGS=-fsanitize=memory LDFLAGS=-fsanitize=memory make -j -C tests test-frametest test-unittest V=1
 
     - name: MSan - multi-threaded frame compression
       # build with multi-threading support only : the build without it runs the same code serially

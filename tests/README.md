@@ -6,6 +6,7 @@ This directory contains the following programs and scripts:
 - `frametest` : Test tool that checks lz4frame integrity on target platform
 - `fullbench`  : Precisely measure speed for each lz4 inner functions
 - `fuzzer`  : Test tool, to check lz4 integrity on target platform
+- `unittest` : Unit tests, each one autonomous (see `unittest.h` to add tests)
 - `test-lz4-speed.py` : script for testing lz4 speed difference between commits
 - `test-lz4-versions.py` : compatibility test between lz4 versions stored on Github
 
