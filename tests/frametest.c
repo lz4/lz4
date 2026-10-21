@@ -233,6 +233,11 @@ static const LZ4F_CustomMem lz4f_cmem_test = {
     &g_testAllocState
 };
 
+/* allocation fails while *(int*)state is non-zero */
+static void* failable_malloc(void* state, size_t s) { return *(const int*)state ? NULL : malloc(s); }
+static void* failable_calloc(void* state, size_t s) { return *(const int*)state ? NULL : calloc(1, s); }
+static void failable_free(void* state, void* p) { (void)state; free(p); }
+
 
 static clock_t FUZ_GetClockSpan(clock_t clockStart)
 {
@@ -2766,6 +2771,29 @@ static int unitTests(U32 seed, double compressibility)
         CHECK( LZ4F_freeCompressionContext(cctx) );
         cctx = NULL;
     }
+
+    DISPLAYLEVEL(3, "LZ4F_compressBegin after a failed state allocation : ");
+    {   int failAlloc = 0;
+        LZ4F_CustomMem const failableMem = { failable_malloc, failable_calloc, failable_free, &failAlloc };
+        LZ4F_preferences_t fPrefs;
+        size_t const srcSize = 64 KB;
+        size_t cErr;
+        cctx = LZ4F_createCompressionContext_advanced(failableMem, LZ4F_VERSION);
+        if (cctx==NULL) goto _output_error;
+        memset(&fPrefs, 0, sizeof(fPrefs));
+        fPrefs.compressionLevel = 1;   /* fast state */
+        CHECK_V(cErr, LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, cBuffSize, CNBuffer, srcSize, NULL, &fPrefs));
+        failAlloc = 1;
+        fPrefs.compressionLevel = 9;   /* requires a larger HC state, which can't be allocated */
+        cErr = LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, cBuffSize, CNBuffer, srcSize, NULL, &fPrefs);
+        if (!LZ4F_isError(cErr)) goto _output_error;
+        failAlloc = 0;
+        fPrefs.compressionLevel = 1;   /* the fast state is gone : must be allocated again */
+        CHECK_V(cErr, LZ4F_compressFrame_usingCDict(cctx, compressedBuffer, cBuffSize, CNBuffer, srcSize, NULL, &fPrefs));
+        CHECK( LZ4F_freeCompressionContext(cctx) );
+        cctx = NULL;
+    }
+    DISPLAYLEVEL(3, "OK \n");
 
     /* dictID tests */
     {   size_t cErr;

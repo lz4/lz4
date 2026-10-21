@@ -7,6 +7,7 @@ fix  : `LZ4_saveDict()` with a negative `dictSize` copied up to 64 KB into `safe
 fix  : `LZ4_decompress_safe_partial()` could leave previous `dst` content in decoded data with an invalid offset 0 (since v1.8.3)
 fix  : heap overflow with an invalid `blockSizeID` in `LZ4F_compressBegin()` and `LZ4F_writeOpen()`, by @jaypatrickhoward
 fix  : `LZ4F_uncompressedUpdate()` mixed with `LZ4F_compressUpdate()` could exceed `LZ4F_compressBound()`
+fix  : `LZ4F_compressBegin()` could crash after a previous call failed to allocate its state (custom allocator)
 fix  : single-thread `lz4` could truncate concatenated frames with block checksums (wrong decompression hints)
 fix  : `--favor-decSpeed` lost after the first block with `-BD`, and ignored with a dictionary
 fix  : poor compression by `LZ4_compress_fast_extState_fastReset()` after `LZ4_attach_dictionary()` on a new state
