@@ -858,11 +858,14 @@ static size_t LZ4IO_compressBlockLegacy_HC(
 /* LZ4IO_finishCompressedFile() :
  * Once the compressed file is complete : close files,
  * copy owner, permissions and modification time of the source file,
- * remove it with --rm, and display final status */
+ * remove it with --rm, and display final status.
+ * A source modified (@srcModified) or renamed or replaced (@srcReplaced) during compression is kept,
+ * and a replaced one doesn't give its attributes */
 static void
 LZ4IO_finishCompressedFile(FILE* srcFile, FILE* dstFile,
                            const char* srcFileName, const char* dstFileName,
                            unsigned long long srcSize, unsigned long long cSize,
+                           int srcModified, int srcReplaced,
                            const LZ4IO_prefs_t* io_prefs)
 {
     fclose(srcFile);
@@ -873,11 +876,12 @@ LZ4IO_finishCompressedFile(FILE* srcFile, FILE* dstFile,
         if (!LZ4IO_isStdin(srcFileName)
          && !LZ4IO_isStdout(dstFileName)
          && !LZ4IO_isDevNull(dstFileName)
+         && !srcReplaced
          && UTIL_getFileStat(srcFileName, &statbuf)) {
             UTIL_setFileStat(dstFileName, &statbuf);
     }   }
 
-    if (io_prefs->removeSrcFile) {  /* remove source file : --rm */
+    if (io_prefs->removeSrcFile && !srcModified && !srcReplaced) {  /* remove source file : --rm */
         if (remove(srcFileName))
             END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
     }
@@ -956,7 +960,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         TPool_jobsCompleted(wPool);
 
         LZ4IO_finishCompressedFile(finput, foutput, input_filename, output_filename,
-                                   rjd.totalReadSize, wr.totalCSize, prefs);
+                                   rjd.totalReadSize, wr.totalCSize, 0, 0, prefs);
         *readSize = rjd.totalReadSize;
     }
 
@@ -1479,89 +1483,36 @@ static void LZ4IO_keepFrameTail(unsigned char tail[4], const void* out, size_t s
     }
 }
 
-/*
- * LZ4IO_compressFilename_extRess()
- * result : 0 : compression completed correctly
- *          1 : missing or pb opening srcFileName
- */
-static int
-LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
-                               cRess_t* ress,
-                               const char* srcFileName, const char* dstFileName,
-                               int compressionLevel,
-                               const LZ4IO_prefs_t* const io_prefs)
+/* LZ4IO_compressFrame() :
+ * Compress @input into @dstFile as one frame.
+ * @return : compressed size, *srcSizePtr : size of input, and @frameTail : last 4 bytes of the frame */
+static unsigned long long
+LZ4IO_compressFrame(unsigned long long* srcSizePtr, unsigned char frameTail[4],
+                    const cRess_t* ress, LZ4IO_cInput_t* input, FILE* dstFile,
+                    const char* srcFileName, LZ4F_preferences_t prefs,
+                    const LZ4IO_prefs_t* const io_prefs)
 {
     unsigned long long filesize = 0;
     unsigned long long compressedfilesize = 0;
-    FILE* dstFile;
-    void* const srcBuffer = ress->srcBuffer;
     void* const dstBuffer = ress->dstBuffer;
     const size_t dstBufferSize = ress->dstBufferSize;
     const size_t blockSize = io_prefs->blockSize;
     /* custom block sizes : one block per invocation (see LZ4IO_createCResources()) */
     const size_t chunkSize = LZ4IO_customBlockSize(io_prefs) ? blockSize : ress->srcBufferSize;
-    size_t releaseLag;   /* memory-mapped input released behind jobs in flight */
+    /* memory-mapped input is released (only a memory hint) behind input still read by liblz4 :
+     * up to 2*nbWorkers+1 jobs in flight (see LZ4F_MT_NBSLOTS() in lz4frame.c), and the 64 KB of history before them */
+    size_t const releaseLag = (2 * (size_t)prefs.nbWorkers + 1) * LZ4IO_jobSize(&prefs) + 64 KB;
     size_t readSize;
     LZ4F_compressionContext_t ctx = ress->ctx;   /* just a pointer */
-    LZ4F_preferences_t prefs;
-    LZ4IO_cInput_t input;
     LZ4F_compressOptions_t cOpts;
     const void* chunk;
 
-    /* Init */
-    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
-    LZ4IO_srcState_t srcState;
-    int srcModified, srcReplaced;
-    unsigned char frameTail[4];    /* last bytes of the frame (content checksum) */
-    const void* frameEnd = NULL;   /* end of frameTail, once the frame is complete */
-    if (srcFile == NULL) return 1;
-    srcState = LZ4IO_getSrcState(srcFile);
-    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
-    if (dstFile == NULL) { fclose(srcFile); return 1; }
-    memset(&prefs, 0, sizeof(prefs));
-
-    /* Input : memory-mapped when possible (frames cut into jobs only, so that output doesn't depend on it) */
-    memset(&input, 0, sizeof(input));
-    input.file = srcFile;
-    input.buffer = srcBuffer;
-    if (io_prefs->useMmap && !LZ4IO_customBlockSize(io_prefs) && !LZ4IO_isStdin(srcFileName))
-        LZ4IO_mapInput(&input, srcFileName);
     memset(&cOpts, 0, sizeof(cOpts));
-    cOpts.stableSrc = input.map ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;   /* mapping remains until the end of frame */
-
-    /* Adjust compression parameters */
-    prefs = ress->preparedPrefs;
-    prefs.compressionLevel = compressionLevel;
-    if (io_prefs->contentSizeFlag) {
-      U64 const fileSize = UTIL_getOpenFileSize(srcFile);
-      prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
-      if (fileSize==0)
-          DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
-    }
-    /* no more workers than the jobs of the file (output doesn't depend on nbWorkers),
-     * but never decreasing from one file to the next, so that worker threads and buffers are kept */
-    if (prefs.nbWorkers > 1) {
-        U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown */
-        U64 const jobSize = LZ4IO_jobSize(&prefs);
-        U64 const nbJobs = MAX((fileSize + jobSize - 1) / jobSize, ress->nbWorkers);
-        if (fileSize) {
-            if (nbJobs < prefs.nbWorkers) prefs.nbWorkers = (unsigned)nbJobs;
-            ress->nbWorkers = prefs.nbWorkers;
-    }   }
-    /* with independent blocks, a file fitting into a single job is compressed by the calling thread,
-     * without job buffers : same output, and worker threads remain available for next files.
-     * Not with linked blocks : single-threaded output can then depend on stableSrc (memory-mapped input) */
-    if (prefs.nbWorkers && (prefs.frameInfo.blockMode == LZ4F_blockIndependent)) {
-        U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown (ex: stdin) */
-        if (fileSize && (fileSize <= LZ4IO_jobSize(&prefs))) prefs.nbWorkers = 0;
-    }
-    /* memory-mapped input is released (only a memory hint) behind input still read by liblz4 :
-     * up to 2*nbWorkers+1 jobs in flight (see LZ4F_MT_NBSLOTS() in lz4frame.c), and the 64 KB of history before them */
-    releaseLag = (2 * (size_t)prefs.nbWorkers + 1) * LZ4IO_jobSize(&prefs) + 64 KB;
+    cOpts.stableSrc = input->map ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;   /* mapping remains until the end of frame */
 
     /* read first chunk */
-    readSize  = LZ4IO_readInput(&input, chunkSize, &chunk);
-    if (ferror(srcFile)) END_PROCESS(40, "Error reading %s ", srcFileName);
+    readSize  = LZ4IO_readInput(input, chunkSize, &chunk);
+    if (ferror(input->file)) END_PROCESS(40, "Error reading %s ", srcFileName);
     filesize += readSize;
 
     /* single-block file */
@@ -1571,7 +1522,6 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
         if (LZ4F_isError(cSize))
             END_PROCESS(41, "Compression failed : %s", LZ4F_getErrorName(cSize));
         LZ4IO_keepFrameTail(frameTail, dstBuffer, cSize);
-        frameEnd = frameTail + 4;
         compressedfilesize = cSize;
         DISPLAYUPDATE(2, "\rRead : %u MiB   ==> %.2f%%   ",
                       (unsigned)(filesize>>20), (double)compressedfilesize/(double)(filesize+!filesize)*100);   /* avoid division by zero */
@@ -1608,11 +1558,11 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                 END_PROCESS(46, "Write error : cannot write compressed block");
 
             /* Read next chunk */
-            LZ4IO_releaseInput(&input, releaseLag);
-            readSize  = LZ4IO_readInput(&input, chunkSize, &chunk);
+            LZ4IO_releaseInput(input, releaseLag);
+            readSize  = LZ4IO_readInput(input, chunkSize, &chunk);
             filesize += readSize;
         }
-        if (ferror(srcFile)) END_PROCESS(47, "Error reading %s ", srcFileName);
+        if (ferror(input->file)) END_PROCESS(47, "Error reading %s ", srcFileName);
 
         /* End of Frame : jobs in flight, then end mark and checksum, in several pieces when they fill dstBuffer */
         {   size_t endSize;
@@ -1625,53 +1575,96 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
                 compressedfilesize += endSize;
                 LZ4IO_keepFrameTail(frameTail, dstBuffer, endSize);
             } while (endSize == dstBufferSize);
-            frameEnd = frameTail + 4;
         }
     }
 
-    /* Release file handlers */
+    *srcSizePtr = filesize;
+    return compressedfilesize;
+}
+
+/*
+ * LZ4IO_compressFilename_extRess()
+ * result : 0 : compression completed correctly
+ *          1 : missing or pb opening srcFileName
+ */
+static int
+LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
+                               cRess_t* ress,
+                               const char* srcFileName, const char* dstFileName,
+                               int compressionLevel,
+                               const LZ4IO_prefs_t* const io_prefs)
+{
+    unsigned long long srcSize, cSize;
+    LZ4F_preferences_t prefs;
+    LZ4IO_cInput_t input;
+    LZ4IO_srcState_t srcState;
+    int srcModified, srcReplaced;
+    unsigned char frameTail[4];    /* last bytes of the frame (content checksum) */
+    FILE* dstFile;
+    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
+    *inStreamSize = 0;
+    if (srcFile == NULL) return 1;
+    srcState = LZ4IO_getSrcState(srcFile);
+    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
+    if (dstFile == NULL) { fclose(srcFile); return 1; }
+
+    /* Input : memory-mapped when possible (frames cut into jobs only, so that output doesn't depend on it) */
+    memset(&input, 0, sizeof(input));
+    input.file = srcFile;
+    input.buffer = ress->srcBuffer;
+    if (io_prefs->useMmap && !LZ4IO_customBlockSize(io_prefs) && !LZ4IO_isStdin(srcFileName))
+        LZ4IO_mapInput(&input, srcFileName);
+
+    /* Adjust compression parameters */
+    prefs = ress->preparedPrefs;
+    prefs.compressionLevel = compressionLevel;
+    if (io_prefs->contentSizeFlag) {
+      U64 const fileSize = UTIL_getOpenFileSize(srcFile);
+      prefs.frameInfo.contentSize = fileSize;   /* == 0 if input == stdin */
+      if (fileSize==0)
+          DISPLAYLEVEL(3, "Warning : cannot determine input content size \n");
+    }
+    /* no more workers than the jobs of the file (output doesn't depend on nbWorkers),
+     * but never decreasing from one file to the next, so that worker threads and buffers are kept */
+    if (prefs.nbWorkers > 1) {
+        U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown */
+        U64 const jobSize = LZ4IO_jobSize(&prefs);
+        U64 const nbJobs = MAX((fileSize + jobSize - 1) / jobSize, ress->nbWorkers);
+        if (fileSize) {
+            if (nbJobs < prefs.nbWorkers) prefs.nbWorkers = (unsigned)nbJobs;
+            ress->nbWorkers = prefs.nbWorkers;
+    }   }
+    /* with independent blocks, a file fitting into a single job is compressed by the calling thread,
+     * without job buffers : same output, and worker threads remain available for next files.
+     * Not with linked blocks : single-threaded output can then depend on stableSrc (memory-mapped input) */
+    if (prefs.nbWorkers && (prefs.frameInfo.blockMode == LZ4F_blockIndependent)) {
+        U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown (ex: stdin) */
+        if (fileSize && (fileSize <= LZ4IO_jobSize(&prefs))) prefs.nbWorkers = 0;
+    }
+
+    cSize = LZ4IO_compressFrame(&srcSize, frameTail, ress, &input, dstFile, srcFileName, prefs, io_prefs);
+
+    /* source modified, renamed or replaced during compression : kept, even with --rm */
     srcModified = LZ4IO_srcModified(&srcState, srcFile);
     srcReplaced = LZ4IO_srcReplaced(&srcState, srcFileName);
     {   int const inconsistent = srcModified && (input.map != NULL)
                 && !LZ4IO_mappedContentUnchanged(&input, srcFile,
-                        prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled, frameEnd);
+                        prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled, frameTail + 4);
         LZ4IO_unmapInput(&input);
-        fclose (srcFile);
-        if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);  /* do not close stdout */
-        if (srcModified || srcReplaced) {
-            /* source is preserved, even with --rm */
-            if (inconsistent) {   /* inconsistent output is removed */
-                if (!LZ4IO_isStdout(dstFileName) && !LZ4IO_isDevNull(dstFileName)) (void)remove(dstFileName);
-                END_PROCESS(54, "%s : file modified during compression (memory-mapped) : output removed ; see --no-mmap", srcFileName);
-            }
-            /* --rm not honored : also displayed in modes lowering notifications (stdout, multiple files) */
+        if (inconsistent) {   /* inconsistent output is removed */
+            fclose(srcFile);
+            if (!LZ4IO_isStdout(dstFileName)) fclose(dstFile);
+            if (!LZ4IO_isStdout(dstFileName) && !LZ4IO_isDevNull(dstFileName)) (void)remove(dstFileName);
+            END_PROCESS(54, "%s : file modified during compression (memory-mapped) : output removed ; see --no-mmap", srcFileName);
+        }
+        if (srcModified || srcReplaced)   /* --rm not honored : also displayed in modes lowering notifications (stdout, multiple files) */
             DISPLAYLEVEL((io_prefs->removeSrcFile ? 1 : 2), "\rWarning : %s : file %s during compression : output holds the content read%s \n",
                             srcFileName, srcReplaced ? "renamed or replaced" : "modified",
                             io_prefs->removeSrcFile ? " ; source kept" : "");
-    }   }
-
-    /* Copy owner, file permissions and modification time */
-    {   stat_t statbuf;
-        if (!LZ4IO_isStdin(srcFileName)
-         && !LZ4IO_isStdout(dstFileName)
-         && !LZ4IO_isDevNull(dstFileName)
-         && !srcReplaced
-         && UTIL_getFileStat(srcFileName, &statbuf)) {
-            UTIL_setFileStat(dstFileName, &statbuf);
-    }   }
-
-    if (io_prefs->removeSrcFile && !srcModified && !srcReplaced) {  /* remove source file : --rm */
-        if (remove(srcFileName))
-            END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
     }
 
-    /* Final Status */
-    DISPLAYLEVEL(2, "\r%79s\r", "");
-    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
-                    filesize, compressedfilesize,
-                    (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
-    *inStreamSize = filesize;
-
+    LZ4IO_finishCompressedFile(srcFile, dstFile, srcFileName, dstFileName, srcSize, cSize, srcModified, srcReplaced, io_prefs);
+    *inStreamSize = srcSize;
     return 0;
 }
 

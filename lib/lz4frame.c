@@ -2083,11 +2083,7 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
                 LZ4F_mt_freeStates(mt, cmem);   /* no partially allocated set */
                 RETURN_ERROR(allocation_failed);
             }
-            if (ctxType == ctxFast) {
-                LZ4_initStream(mt->states[n], sizeof(LZ4_stream_t));
-            } else {
-                LZ4_initStreamHC(mt->states[n], sizeof(LZ4_streamHC_t));
-            }
+            LZ4F_initLZ4State(mt->states[n], ctxType, cctx->prefs.compressionLevel);
     }   }
     mt->states[0] = cctx->lz4CtxPtr;
 
