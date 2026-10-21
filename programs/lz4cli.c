@@ -450,7 +450,6 @@ int main(int argCount, const char** argv)
     unsigned ifnIdx=0;
     LZ4IO_prefs_t* const prefs = LZ4IO_defaultPreferences();
     const char nullOutput[] = NULL_OUTPUT;
-    const char extension[] = LZ4_EXTENSION;
     size_t blockSize = LZ4IO_setBlockSizeID(prefs, LZ4_BLOCKSIZEID_DEFAULT);
     const char* const exeName = lastNameFromPath(argv[0]);
     char* fileNamesBuf = NULL;
@@ -837,15 +836,12 @@ int main(int argCount, const char** argv)
         }
         if (mode == om_decompress) {
             /* decompress to file (automatic output name only works if input filename has correct format extension) */
-            size_t outl;
             size_t const inl = strlen(input_filename);
-            dynNameSpace = (char*)calloc(1,inl+1);
+            size_t const extl = strlen(LZ4_EXTENSION);
+            if ((inl <= extl) || strcmp(input_filename + inl - extl, LZ4_EXTENSION)) { DISPLAYLEVEL(1, "Cannot determine an output filename \n"); badusage(exeName); }
+            dynNameSpace = (char*)calloc(1, inl - extl + 1);
             if (dynNameSpace==NULL) { perror(exeName); exit(1); }
-            strcpy(dynNameSpace, input_filename);
-            outl = inl;
-            if (inl>4)
-                while ((outl >= inl-4) && (input_filename[outl] ==  extension[outl-inl+4])) dynNameSpace[outl--]=0;
-            if (outl != inl-5) { DISPLAYLEVEL(1, "Cannot determine an output filename \n"); badusage(exeName); }
+            memcpy(dynNameSpace, input_filename, inl - extl);
             output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Decoding file %s \n", output_filename);
         }
