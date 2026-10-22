@@ -56,11 +56,6 @@
 # define LZ4_NBWORKERS_DEFAULT 0
 #endif
 
-/* Maximum nb of compression threads selectable at runtime */
-#ifndef LZ4_NBWORKERS_MAX
-# define LZ4_NBWORKERS_MAX 200
-#endif
-
 /* Determines default lz4 block size when none provided.
  * Default value is 7, which represents 4 MB.
  * Can be overridden at runtime using -B# command */

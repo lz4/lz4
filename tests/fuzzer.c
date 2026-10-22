@@ -1747,6 +1747,34 @@ static void FUZ_unitTests(int compressionLevel)
             {   char tmp_buffer[240] = { 0 };
                 FUZ_CHECKTEST( LZ4_saveDictHC(ctx, tmp_buffer, sizeof(tmp_buffer)) != 0,
                 "LZ4_saveDictHC() can't save anything since compression hasn't started");
+            }
+
+            /* next block is compressed as the first one of the stream,
+             * without (attach==0) or with (attach==1) an attached dictionary */
+            {   LZ4_streamHC_t* const dictHC = LZ4_createStreamHC();
+                int const levels[] = { LZ4HC_CLEVEL_DEFAULT, 3, LZ4HC_CLEVEL_OPT_MIN, LZ4HC_CLEVEL_MAX };   /* first : level of LZ4_initStreamHC() */
+                int attach, l;
+                FUZ_CHECKTEST(dictHC == NULL, "LZ4_createStreamHC() allocation failed");
+                for (l = 0; l < (int)(sizeof(levels) / sizeof(levels[0])); l++) {
+                    for (attach = 0; attach <= 1; attach++) {
+                        char saveBuffer[240];
+                        int cSize, dSize;
+                        if (l || attach) LZ4_resetStreamHC_fast(ctx, levels[l]);   /* first test : right after init */
+                        if (attach) {
+                            LZ4_resetStreamHC_fast(dictHC, levels[l]);
+                            FUZ_CHECKTEST(LZ4_loadDictHC(dictHC, testInput, 64 KB) != 64 KB, "LZ4_loadDictHC() failed");
+                            LZ4_attach_HC_dictionary(ctx, dictHC);
+                        }
+                        FUZ_CHECKTEST( LZ4_saveDictHC(ctx, saveBuffer, sizeof(saveBuffer)) != 0,
+                        "LZ4_saveDictHC() can't save anything since compression hasn't started");
+                        cSize = LZ4_compress_HC_continue(ctx, testInput + 64 KB, testCompressed, 64 KB, testCompressedSize);
+                        FUZ_CHECKTEST(cSize <= 0, "LZ4_compress_HC_continue() failed");
+                        dSize = LZ4_decompress_safe_usingDict(testCompressed, testVerify, cSize, 64 KB,
+                                                              testInput, attach ? 64 KB : 0);
+                        FUZ_CHECKTEST(dSize != 64 KB || memcmp(testVerify, testInput + 64 KB, 64 KB),
+                        "level %i, dictionary %i : block compressed after LZ4_saveDictHC() is corrupted", levels[l], attach);
+                }   }
+                LZ4_freeStreamHC(dictHC);
         }   }
         DISPLAYLEVEL(3, "OK \n");
 

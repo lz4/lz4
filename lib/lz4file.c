@@ -561,14 +561,20 @@ LZ4F_errorCode_t LZ4F_writeClose(LZ4_writeFile_t* lz4fWrite)
 
   ret = lz4fWrite->errCode;   /* a previous LZ4F_write() failure leaves the frame incomplete */
   if (ret == LZ4F_OK_NoError) {
-    size_t const endSize = LZ4F_compressEnd(lz4fWrite->cctxPtr,
-                                            lz4fWrite->dstBuf, lz4fWrite->dstBufMaxSize,
-                                            NULL);
-    if (LZ4F_isError(endSize)) {
-      ret = endSize;
-    } else if (endSize != fwrite(lz4fWrite->dstBuf, 1, endSize, lz4fWrite->fp)) {
-      ret = returnErrorCode(LZ4F_ERROR_io_write);
-    }
+    size_t endSize;
+    do {   /* dstBuf >= LZ4F_compressBound(0) : a single invocation completes the frame */
+      endSize = LZ4F_compressEnd(lz4fWrite->cctxPtr,
+                                 lz4fWrite->dstBuf, lz4fWrite->dstBufMaxSize,
+                                 NULL);
+      if (LZ4F_isError(endSize)) {
+        ret = endSize;
+        break;
+      }
+      if (endSize != fwrite(lz4fWrite->dstBuf, 1, endSize, lz4fWrite->fp)) {
+        ret = returnErrorCode(LZ4F_ERROR_io_write);
+        break;
+      }
+    } while (endSize == lz4fWrite->dstBufMaxSize);
   }
 
   freeWriteFileResources(lz4fWrite);

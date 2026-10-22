@@ -138,12 +138,31 @@ The following build macro can be selected to adjust source code behavior at comp
 - `LZ4F_HEAPMODE` : selects how `LZ4F_compressFrame()` allocates the compression state,
   either on stack (default, value 0) or using heap memory (value 1).
 
+- `LZ4F_MULTITHREAD` : by setting this build macro to 1, `lz4frame.c` can compress with multiple threads,
+  as requested with experimental field `LZ4F_preferences_t.nbWorkers`.
+  It requires `<pthread.h>` on POSIX systems (compile and link with `-pthread`), or Windows threads.
+  Default is 0 : no threading code is compiled, and requests are served serially, producing the same output.
+  Build systems (`make`, `cmake`, `meson`, Visual Studio) enable it for the dynamic library only (see below).
+
 
 #### Makefile variables
 
 The following `Makefile` variables can be selected to alter the profile of produced binaries :
 - `BUILD_SHARED` : generate `liblz4` dynamic library (enabled by default)
 - `BUILD_STATIC` : generate `liblz4` static library (enabled by default)
+- `MULTITHREAD` : by default, the dynamic library is built with multi-threading support (`LZ4F_MULTITHREAD`),
+  when threads are available, while the static library is not, so that programs linking `liblz4.a` don't need `-pthread`.
+  `MULTITHREAD=1` (or target `lib-mt`) enables it for both libraries :
+  on POSIX systems, programs linking `liblz4.a` must then add `-pthread` (`pkg-config --static` provides it).
+  `MULTITHREAD=0` (or target `lib-nomt`) disables it for both libraries.
+  `make install` installs the libraries already built (ex: `make lib-mt && make install`),
+  and only builds them, with current settings, when they are absent.
+  `liblz4.pc` declares `-pthread` (`Libs.private`) when the installed `liblz4.a` requires it.
+
+The same policy applies to other build systems :
+- `cmake` : options `LZ4_SHARED_MULTITHREAD` (default `ON`) and `LZ4_STATIC_MULTITHREAD` (default `OFF`).
+- `meson` : options `shared-multithread` (default `true`) and `static-multithread` (default `false`).
+- Visual Studio : `liblz4-dll` is built with multi-threading support, `liblz4` (static) without.
 
 
 #### Amalgamation

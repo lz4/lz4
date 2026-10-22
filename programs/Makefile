@@ -68,14 +68,23 @@ default: lz4-release
 C_SRCDIRS = $(LIBLZ4DIR) .
 include ../build/make/multiconf.make
 
-# thread detection
-NUM_SYMBOL   := \#
+# thread detection (PTHREAD_PROBE : see build/make/lz4defs.make) : skipped by goals building no multithreaded program,
+# and run once per command : sub-makes inherit its result (as in lib/Makefile)
 NO_THREAD_MSG:= ==> no multithread support: built for single-thread mode only
-HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
+ifeq (,$(filter-out clean clean-man uninstall man lz4.1 preview-man lz4-nomt liblz4,$(or $(MAKECMDGOALS),default)))
+  HAVE_PTHREAD := 0
+else
+  ifeq (,$(LZ4_PTHREAD_PROBED))
+    LZ4_PTHREAD_PROBED := $(PTHREAD_PROBE)
+    export LZ4_PTHREAD_PROBED
+  endif
+  HAVE_PTHREAD := $(LZ4_PTHREAD_PROBED)
+endif
 HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
 ifeq ($(HAVE_MULTITHREAD), 1)
   THREAD_MSG := ==> built with multithreading support
-  THREAD_CPP := -DLZ4IO_MULTITHREAD
+  # LZ4F_MULTITHREAD : liblz4 sources are compiled into lz4, and compress frames with worker threads
+  THREAD_CPP := -DLZ4IO_MULTITHREAD -DLZ4F_MULTITHREAD=1
   ifeq ($(HAVE_PTHREAD), 1)
     THREAD_LD  := -pthread
   endif

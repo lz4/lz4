@@ -213,7 +213,9 @@
 #elif defined(LZ4_USER_MEMORY_FUNCTIONS)
 /* memory management functions can be customized by user project.
  * Below functions must exist somewhere in the Project
- * and be available at link time */
+ * and be available at link time.
+ * They must be thread-safe when lz4frame compresses with worker threads (LZ4F_MULTITHREAD, nbWorkers >= 1) :
+ * at levels >= LZ4HC_CLEVEL_OPT_MIN, lz4hc allocates a temporary buffer (LZ4HC_HEAPMODE) within each worker thread */
 void* LZ4_malloc(size_t s);
 void* LZ4_calloc(size_t n, size_t s);
 void  LZ4_free(void* p);

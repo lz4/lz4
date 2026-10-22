@@ -91,6 +91,16 @@ VOID  := /dev/null
   endif
 endif
 
+# PTHREAD_PROBE : 1 when a program including <pthread.h> compiles and links with -pthread, 0 otherwise.
+# Evaluated where it's used (with the CC and ALLFLAGS of the invoking Makefile),
+# within a private temporary directory : safe for concurrent invocations, and read-only source trees.
+NUM_SYMBOL := \#
+PTHREAD_PROBE = $(shell d=$$(mktemp -d "$${TMPDIR:-/tmp}/lz4_pthread_XXXXXX" 2> $(VOID)) \
+                  && printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > "$$d/probe.c" \
+                  && $(CC) $(ALLFLAGS) -o "$$d/probe$(EXT)" "$$d/probe.c" -pthread 2> $(VOID) \
+                  && echo 1 || echo 0; \
+                  [ -n "$$d" ] && rm -rf "$$d")
+
 ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS% AIX,$(shell $(UNAME))))
 POSIX_ENV = Yes
 else

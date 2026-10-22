@@ -139,6 +139,17 @@ $(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
 decompress-partial-usingDict:
 $(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
+# multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
+# (c_program : objects are not shared, since frameMT employs different flags)
+FRAMEMT_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o frameMT.o
+# LZ4F_NBWORKERS_MAX=128 (as on 32-bit systems) : keeps the capped test case (1000 workers) affordable
+frameMT: CPPFLAGS += -DLZ4F_MULTITHREAD=1 -DLZ4F_NBWORKERS_MAX=128u
+frameMT: LDFLAGS += -pthread
+$(eval $(call c_program,frameMT,$(FRAMEMT_OBJS)))
+
+frameMT-nomt: CPPFLAGS += -DLZ4F_NBWORKERS_MAX=128u
+$(eval $(call c_program,frameMT-nomt,$(FRAMEMT_OBJS)))
+
 .PHONY: clean
 clean: clean_cache
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
@@ -194,7 +205,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
 
 test32: CFLAGS+=-m32
 test32: test
@@ -265,6 +276,10 @@ test-lz4-blocksize: lz4 datagen checkFrame
 	@echo "\n ---- test lz4 with custom block sizes ----"
 	./test-lz4-blocksize.sh
 
+test-lz4-multithread: lz4 datagen
+	@echo "\n ---- test lz4 multithreaded compression, memory budget, sources modified meanwhile ----"
+	./test-lz4-multithread.sh
+
 test-lz4hc-hugefile: lz4 datagen
 	@echo "\n ---- test HC compression/decompression of huge files ----"
 	./test-lz4hc-hugefile.sh
@@ -286,7 +301,7 @@ test-lz4-opt-parser: lz4 datagen
 test-lz4-essentials : lz4 datagen test-datagen-invalid-input test-lz4-basic test-lz4-multiple \
                       test-lz4-multiple-legacy test-lz4-frame-concatenation \
                       test-lz4-testmode test-lz4-contentSize test-lz4-dict \
-                      test-lz4-blocksize test-lz4-mozlz4
+                      test-lz4-blocksize test-lz4-mozlz4 test-lz4-multithread
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
           test-lz4-sparse test-lz4-hugefile test-lz4-dict \
@@ -340,6 +355,18 @@ test-fuzzer32: test-fuzzer
 
 test-frametest: frametest
 	./frametest -v $(FUZZER_TIME)
+
+# same frames with and without multi-threading support
+.PHONY: test-frameMT test-frameMT-quick
+test-frameMT: frameMT frameMT-nomt
+	./frameMT > tmp-frameMT.digest
+	./frameMT-nomt > tmp-frameMT-nomt.digest
+	cmp tmp-frameMT.digest tmp-frameMT-nomt.digest
+
+test-frameMT-quick: frameMT frameMT-nomt
+	./frameMT -q > tmp-frameMT.digest
+	./frameMT-nomt -q > tmp-frameMT-nomt.digest
+	cmp tmp-frameMT.digest tmp-frameMT-nomt.digest
 
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest

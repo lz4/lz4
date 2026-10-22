@@ -141,8 +141,19 @@ only the latest one will be applied.
   Set highest compression level. Same as -12.
 
 * `-T#`, `--threads=#`:
-  Use `#` threads for compression.
+  Use `#` worker threads for compression.
+  The main thread also compresses while waiting for them, so up to `#+1` cores can be busy.
   When `0`, or none provided: automatically determined from nb of detected cores.
+  In both cases, within memory budget (see `--memory`), with a warning when it reduces `#`,
+  and no more threads than the jobs of each file (4 MB, or 1 MB with independent blocks up to 1 MB).
+  At most 1024 threads (128 on 32-bit systems).
+  Ignored with a custom block size (see `-B#`).
+  Compressed output doesn't depend on `#`, nor on multithreading support.
+
+* `--memory=#`:
+  Memory budget of multi-threaded compression, in bytes, with optional suffixes `K`, `M`, `G` (powers of 1024)
+  (default: 4 GB, 1 GB on 32-bit systems). It limits the number of worker threads.
+  Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller independent blocks.
 
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.
@@ -183,7 +194,9 @@ only the latest one will be applied.
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>
-  `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB
+  `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB<br/>
+  `-B#` with `#` >= 32 : block size in bytes.
+  Sizes other than 64KB, 256KB, 1MB and 4MB are compressed single-threaded (`-T#` is ignored).
 
 * `-BI`:
   Produce independent blocks (default)
@@ -209,6 +222,20 @@ only the latest one will be applied.
 * `--[no-]sparse`:
   Sparse mode support (default:enabled on file, disabled on stdout)
 
+* `--[no-]mmap`:
+  Memory-map regular files to compress, so that compression threads read them in place
+  (default:enabled when supported)<br/>
+  Note : a file truncated while being compressed, or an I/O error while reading it,
+  then interrupts `lz4` with error 53 (instead of compressing the content read up to that point) ;
+  use `--no-mmap` when sources may be truncated or rewritten concurrently.<br/>
+  Note : a source file modified while being compressed (size or times changed), or renamed or replaced (ex: log rotation),
+  is detected after its compression, and is kept, even with `--rm`. When the output is valid, `lz4` only issues a warning :
+  with `--no-mmap`, input is read once, so the output holds the content read (ex: up to the end of a log file growing meanwhile) ;
+  memory-mapped input is read several times, so its content is compared with the frame checksum
+  (ex: log file growing meanwhile : the output holds the file as it was when opened).
+  Otherwise (content rewritten, `--no-frame-crc`, or file shrunk), the output could be inconsistent :
+  `lz4` reports error 54 and removes it.
+
 * `-l`:
   Use Legacy format (typically for Linux Kernel compression)<br/>
   Note : `-l` is not compatible with `-m` (`--multiple`) nor `-r`
@@ -226,13 +253,15 @@ only the latest one will be applied.
   Display help/long help and exit
 
 * `-V` `--version`:
-  Display Version number and exit
+  Display Version number and exit.
+  The version line also tells if compression is multithreaded (`multithread`) or not (`single-thread`)
 
 * `-k` `--keep`:
   Preserve source files (default behavior)
 
 * `--rm` :
-  Delete source files on successful compression or decompression
+  Delete source files on successful compression or decompression.
+  A source file modified, renamed or replaced during its compression is kept (see `--[no-]mmap`).
 
 * `--` :
   Treat all subsequent arguments as files
@@ -261,7 +290,10 @@ When set as global environment variables, it can be a way to enforce personalize
   specify a default compression level that `lz4` employs for compression when no other compression level is specified on command line. Executable default is generally `1`.
 
 * `LZ4_NBWORKERS`:
-  specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu. This functionality is only relevant when `lz4` is compiled with multithreading support. The maximum number of workers is capped at `LZ4_NBWORKERS_MAX` (`200` by default).
+  specify a default number of threads that `lz4` will employ for compression. Executable default is generally `0`, which means auto-determined based on local cpu, within memory budget. This functionality is only relevant when `lz4` is compiled with multithreading support.
+
+* `LZ4_MEMORY`:
+  specify a memory budget for multi-threaded compression, same as `--memory=#`.
 
 
 BUGS

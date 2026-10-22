@@ -53,16 +53,14 @@
 #include "lz4io.h"    /* LZ4IO_compressFilename, LZ4IO_decompressFilename, LZ4IO_compressMultipleFilenames */
 #include "lz4hc.h"    /* LZ4HC_CLEVEL_MAX */
 #include "lz4.h"      /* LZ4_VERSION_STRING */
+#define LZ4F_STATIC_LINKING_ONLY
+#include "lz4frame.h" /* LZ4F_getMaxNbWorkers */
 
 
 /*****************************
 *  Constants
 ******************************/
-#if LZ4IO_MULTITHREAD
-# define IO_MT "multithread"
-#else
-# define IO_MT "single-thread"
-#endif
+#define IO_MT (multithreadSupport() ? "multithread" : "single-thread")
 #define COMPRESSOR_NAME "lz4"
 #define AUTHOR "Yann Collet"
 #define WELCOME_MESSAGE "*** %s v%s %i-bit %s, by %s ***\n", COMPRESSOR_NAME, LZ4_versionString(), (int)(sizeof(void*)*8), IO_MT, AUTHOR
@@ -107,6 +105,16 @@ static void errorOut(const char* msg)
     DISPLAYLEVEL(1, "%s \n", msg); exit(1);
 }
 
+/* frames are compressed by liblz4's worker threads : both lz4 and liblz4 must support multi-threading */
+static int multithreadSupport(void)
+{
+#if LZ4IO_MULTITHREAD
+    return LZ4F_getMaxNbWorkers() > 0;
+#else
+    return 0;
+#endif
+}
+
 
 /*-************************************
 *  Version modifiers
@@ -133,7 +141,7 @@ static int usage(const char* exeName)
     DISPLAY( " -1     : fast compression (default) \n");
     DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
 #if LZ4IO_MULTITHREAD
-    DISPLAY( " -T#    : use # threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
+    DISPLAY( " -T#    : use # worker threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
 #endif
     DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
     DISPLAY( " -f     : overwrite output without prompting \n");
@@ -163,6 +171,9 @@ static int usage_advanced(const char* exeName)
     DISPLAY( " -D FILE: use FILE as dictionary (compression & decompression)\n");
     DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
     DISPLAY( "                     or predefined block size [4-7] (default: %i) \n", LZ4_BLOCKSIZEID_DEFAULT);
+#if LZ4IO_MULTITHREAD
+    DISPLAY( "                     (custom sizes : single-threaded compression) \n");
+#endif
     DISPLAY( " -BI    : Block Independence (default) \n");
     DISPLAY( " -BD    : Block dependency (improves compression ratio) \n");
     DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
@@ -170,6 +181,12 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
     DISPLAY( "--list FILE : lists information about .lz4 files (useful for files compressed with --content-size flag)\n");
     DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
+#if LZ4IO_MULTITHREAD
+    DISPLAY( "--memory=#     : memory budget of multi-threaded compression (default: %u MB) ; suffixes K, M, G \n",
+                (unsigned)(LZ4IO_defaultMemoryBudget() >> 20));
+#endif
+    DISPLAY( "--[no-]mmap    : memory-map files to compress (default:enabled when supported)\n");
+    DISPLAY( "                 note : compression fails if the file is truncated or rewritten meanwhile \n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
     DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
     DISPLAY( "--best  : same as -%d\n", LZ4HC_CLEVEL_MAX);
@@ -338,6 +355,36 @@ static int readIntFromChar(const char** stringPtr)
     return (int)result;
 }
 
+/*! readSizeFromCharChecked() :
+ * @return 0 if success, and store the result (in bytes) in *value.
+ *  allows and interprets K, KB, KiB, M, MB, MiB, G, GB and GiB suffixes (powers of 1024).
+ *  Will also modify `*stringPtr`, advancing it to position where it stopped reading.
+ * @return 1 if an overflow error occurs */
+static int readSizeFromCharChecked(const char** stringPtr, U64* value)
+{
+    U64 const maxValue = (U64)-1;
+    U64 result = 0;
+    unsigned shift = 0;
+    while ((**stringPtr >='0') && (**stringPtr <='9')) {
+        unsigned const digit = (unsigned)(**stringPtr - '0');
+        if (result > (maxValue - digit) / 10) return 1;  /* overflow */
+        result = result * 10 + digit;
+        (*stringPtr)++ ;
+    }
+    if (**stringPtr=='K') shift = 10;
+    if (**stringPtr=='M') shift = 20;
+    if (**stringPtr=='G') shift = 30;
+    if (shift) {
+        if (result > (maxValue >> shift)) return 1;  /* overflow */
+        result <<= shift;
+        (*stringPtr)++ ;
+        if (**stringPtr=='i') (*stringPtr)++;
+        if (**stringPtr=='B') (*stringPtr)++;
+    }
+    *value = result;
+    return 0;
+}
+
 #define CLEAN_RETURN(i) { operationResult = (i); goto _cleanup; }
 
 #define NEXT_FIELD(ptr) {         \
@@ -410,6 +457,21 @@ static unsigned init_nbWorkers(void)
     return LZ4_NBWORKERS_DEFAULT;
 }
 
+#define ENV_MEMORY "LZ4_MEMORY"
+
+/* @return : memory budget of multi-threaded compression set by environment (bytes), or 0 when not set */
+static U64 init_memoryBudget(void)
+{
+    const char* const env = getenv(ENV_MEMORY);
+    if (env != NULL) {
+        const char* ptr = env;
+        U64 budget;
+        if (!readSizeFromCharChecked(&ptr, &budget) && (budget > 0) && (*ptr == 0)) return budget;
+        DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid size \n", ENV_MEMORY, env);
+    }
+    return 0;
+}
+
 #define ENV_CLEVEL "LZ4_CLEVEL"
 
 static int init_cLevel(void)
@@ -441,6 +503,7 @@ int main(int argCount, const char** argv)
         operationResult=0,
         contentSizeFlag=0;
     unsigned nbWorkers = init_nbWorkers();
+    U64 memoryBudget = init_memoryBudget();   /* 0 : default */
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
     const char* output_filename= NULL;
@@ -519,6 +582,8 @@ int main(int argCount, const char** argv)
                 if (!strcmp(argument,  "--list")) { mode = om_list; multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--sparse")) { LZ4IO_setSparseFile(prefs, 2); continue; }
                 if (!strcmp(argument,  "--no-sparse")) { LZ4IO_setSparseFile(prefs, 0); continue; }
+                if (!strcmp(argument,  "--mmap")) { LZ4IO_setMmap(prefs, 1); continue; }
+                if (!strcmp(argument,  "--no-mmap")) { LZ4IO_setMmap(prefs, 0); continue; }
                 if (!strcmp(argument,  "--favor-decSpeed")) { LZ4IO_favorDecSpeed(prefs, 1); continue; }
                 if (!strcmp(argument,  "--verbose")) { displayLevel++; continue; }
                 if (!strcmp(argument,  "--quiet")) { if (displayLevel) displayLevel--; continue; }
@@ -530,6 +595,15 @@ int main(int argCount, const char** argv)
                 if (longCommandWArg(&argument, "--threads")) {
                     if (*argument != '=' && *argument != 0) badusage(exeName);  /* ex: --threadsX */
                     NEXT_UINT32(nbWorkers);
+                    continue;
+                }
+                if (longCommandWArg(&argument, "--memory")) {
+                    const char* sizeStr;
+                    NEXT_FIELD(sizeStr);
+                    if (readSizeFromCharChecked(&sizeStr, &memoryBudget))
+                        errorOut("error: --memory value overflows 64-bit unsigned int");
+                    if ((*sizeStr != 0) || (memoryBudget == 0))
+                        errorOut("error: --memory requires a size, with optional suffixes K, KB, KiB, M, MB, MiB, G, GB, GiB");
                     continue;
                 }
                 if (longCommandWArg(&argument, "--fast")) {
@@ -758,11 +832,9 @@ int main(int argCount, const char** argv)
 #ifdef _FILE_OFFSET_BITS
     DISPLAYLEVEL(5, "_FILE_OFFSET_BITS defined: %ldL\n", (long) _FILE_OFFSET_BITS);
 #endif
-#if !LZ4IO_MULTITHREAD
-    if (nbWorkers > 1) {
+    if ((nbWorkers > 1) && !multithreadSupport()) {
         DISPLAYLEVEL(2, "warning: this executable doesn't support multithreading \n");
     }
-#endif
     if ((mode == om_compress) || (mode == om_bench)) {
         DISPLAYLEVEL(4, "Blocks size : %u KB\n", (U32)(blockSize>>10));
     }
@@ -890,18 +962,14 @@ int main(int argCount, const char** argv)
         operationResult = LZ4IO_displayCompressedFilesInfo(inFileNames, ifnIdx);
     } else {   /* compression is default action */
 #if LZ4IO_MULTITHREAD
-        if (nbWorkers != 1) {
-            if (nbWorkers==0)
-                nbWorkers = (unsigned)LZ4IO_defaultNbWorkers();
-            if (nbWorkers > LZ4_NBWORKERS_MAX) {
-                DISPLAYLEVEL(3, "Requested %u threads too large => automatically reduced to %u \n",
-                            nbWorkers, LZ4_NBWORKERS_MAX);
-                nbWorkers = LZ4_NBWORKERS_MAX;
-            } else {
-                DISPLAYLEVEL(3, "Using %u threads for compression \n", nbWorkers);
-            }
+        /* nbWorkers 0 : automatic (nb of cores) ; both automatic and explicit :
+         * within memory budget (--memory, LZ4_MEMORY), and no more than the jobs of each file */
+        {   int const requested = (nbWorkers > (unsigned)INT_MAX) ? INT_MAX : (int)nbWorkers;
+            int const applied = LZ4IO_setNbWorkers(prefs, requested);   /* capped as within liblz4 */
+            if (multithreadSupport() && (requested > applied))   /* requested (-T#, LZ4_NBWORKERS) : automatic is 0 */
+                DISPLAYLEVEL(2, "Warning : requested %u threads too large => automatically reduced to %i \n", nbWorkers, applied);
         }
-        LZ4IO_setNbWorkers(prefs, (int)nbWorkers);
+        LZ4IO_setMemoryBudget(prefs, memoryBudget);
 #endif
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");

@@ -3,6 +3,8 @@
 datagen
 frametest
 frametest32
+frameMT
+frameMT-nomt
 fullbench
 fullbench32
 fullbench-lib

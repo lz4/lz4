@@ -17,7 +17,8 @@
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
     FUZZ_dataProducer_t* producer = FUZZ_dataProducer_create(data, size);
-    LZ4F_preferences_t const prefs = FUZZ_dataProducer_preferences(producer);
+    LZ4F_preferences_t prefs = FUZZ_dataProducer_preferences(producer);
+    prefs.nbWorkers = FUZZ_dataProducer_range32(producer, 0, 3);
     int const skipChecksums = (FUZZ_dataProducer_range32(producer, 0, 7) == 0);   /* occasionally */
     size = FUZZ_dataProducer_remainingBytes(producer);
 

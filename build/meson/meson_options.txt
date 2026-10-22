@@ -10,6 +10,10 @@
 
 option('enable_multithread', type: 'boolean', value: true,
   description: 'Enable multi-threading support')
+option('shared-multithread', type: 'boolean', value: true,
+  description: 'Enable multi-threading support in shared library (see LZ4F_preferences_t.nbWorkers)')
+option('static-multithread', type: 'boolean', value: false,
+  description: 'Enable multi-threading support in static library (programs linking it must then link threads)')
 option('align-test', type: 'boolean', value: true,
   description: 'See LZ4_ALIGN_TEST')
 option('contrib', type: 'boolean', value: false,

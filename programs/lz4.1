@@ -125,7 +125,11 @@ Set highest compression level\. Same as \-12\.
 .
 .TP
 \fB\-T#\fR, \fB\-\-threads=#\fR
-Use \fB#\fR threads for compression\. When \fB0\fR, or none provided: automatically determined from nb of detected cores\.
+Use \fB#\fR worker threads for compression\. The main thread also compresses while waiting for them, so up to \fB#+1\fR cores can be busy\. When \fB0\fR, or none provided: automatically determined from nb of detected cores\. In both cases, within memory budget (see \fB\-\-memory\fR), with a warning when it reduces \fB#\fR, and no more threads than the jobs of each file (4 MB, or 1 MB with independent blocks up to 1 MB)\. At most 1024 threads (128 on 32\-bit systems)\. Ignored with a custom block size (see \fB\-B#\fR)\. Compressed output doesn't depend on \fB#\fR, nor on multithreading support\.
+.
+.TP
+\fB\-\-memory=#\fR
+Memory budget of multi\-threaded compression, in bytes, with optional suffixes \fBK\fR, \fBM\fR, \fBG\fR (powers of 1024) (default: 4 GB, 1 GB on 32\-bit systems)\. It limits the number of worker threads\. Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller independent blocks\.
 .
 .TP
 \fB\-\-favor\-decSpeed\fR
@@ -164,6 +168,9 @@ Block size [4\-7](default : 7)
 .br
 \fB\-B4\fR= 64KB ; \fB\-B5\fR= 256KB ; \fB\-B6\fR= 1MB ; \fB\-B7\fR= 4MB
 .
+.br
+\fB\-B#\fR with \fB#\fR >= 32 : block size in bytes\. Sizes other than 64KB, 256KB, 1MB and 4MB are compressed single\-threaded (\fB\-T#\fR is ignored)\.
+.
 .TP
 \fB\-BI\fR
 Produce independent blocks (default)
@@ -196,6 +203,16 @@ Note : this option can only be activated when the original size can be determine
 Sparse mode support (default:enabled on file, disabled on stdout)
 .
 .TP
+\fB\-\-[no\-]mmap\fR
+Memory\-map regular files to compress, so that compression threads read them in place (default:enabled when supported)
+.
+.br
+Note : a file truncated while being compressed, or an I/O error while reading it, then interrupts \fBlz4\fR with error 53 (instead of compressing the content read up to that point) ; use \fB\-\-no\-mmap\fR when sources may be truncated or rewritten concurrently\.
+.
+.br
+Note : a source file modified while being compressed (size or times changed), or renamed or replaced (ex: log rotation), is detected after its compression, and is kept, even with \fB\-\-rm\fR\. When the output is valid, \fBlz4\fR only issues a warning : with \fB\-\-no\-mmap\fR, input is read once, so the output holds the content read (ex: up to the end of a log file growing meanwhile) ; memory\-mapped input is read several times, so its content is compared with the frame checksum (ex: log file growing meanwhile : the output holds the file as it was when opened)\. Otherwise (content rewritten, \fB\-\-no\-frame\-crc\fR, or file shrunk), the output could be inconsistent : \fBlz4\fR reports error 54 and removes it\.
+.
+.TP
 \fB\-l\fR
 Use Legacy format (typically for Linux Kernel compression)
 .
@@ -218,7 +235,7 @@ Display help/long help and exit
 .
 .TP
 \fB\-V\fR \fB\-\-version\fR
-Display Version number and exit
+Display Version number and exit\. The version line also tells if compression is multithreaded (\fBmultithread\fR) or not (\fBsingle\-thread\fR)
 .
 .TP
 \fB\-k\fR \fB\-\-keep\fR
@@ -226,7 +243,7 @@ Preserve source files (default behavior)
 .
 .TP
 \fB\-\-rm\fR
-Delete source files on successful compression or decompression
+Delete source files on successful compression or decompression\. A source file modified, renamed or replaced during its compression is kept (see \fB\-\-[no\-]mmap\fR)\.
 .
 .TP
 \fB\-\-\fR
@@ -255,7 +272,11 @@ specify a default compression level that \fBlz4\fR employs for compression when 
 .
 .TP
 \fBLZ4_NBWORKERS\fR
-specify a default number of threads that \fBlz4\fR will employ for compression\. Executable default is generally \fB0\fR, which means auto\-determined based on local cpu\. This functionality is only relevant when \fBlz4\fR is compiled with multithreading support\. The maximum number of workers is capped at \fBLZ4_NBWORKERS_MAX\fR (\fB200\fR by default)\.
+specify a default number of threads that \fBlz4\fR will employ for compression\. Executable default is generally \fB0\fR, which means auto\-determined based on local cpu, within memory budget\. This functionality is only relevant when \fBlz4\fR is compiled with multithreading support\.
+.
+.TP
+\fBLZ4_MEMORY\fR
+specify a memory budget for multi\-threaded compression, same as \fB\-\-memory=#\fR\.
 .
 .SH "BUGS"
 Report bugs at: https://github\.com/lz4/lz4/issues

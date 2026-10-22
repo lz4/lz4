@@ -75,8 +75,18 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
 /* ****************** Parameters ******************** */
 /* ************************************************** */
 
+/* nbWorkers : 0 == automatic : nb of cores ; >= 1 : explicit.
+ *  Frame format : within memory budget (see LZ4IO_setMemoryBudget()),
+ *  and no more than the nb of jobs of each file (when its size is known).
+ *  Capped as within liblz4 (LZ4F_getMaxNbWorkers()), for frame and legacy formats : 1 without its multi-threading support.
+ * @return : nb of workers applied */
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
 int LZ4IO_defaultNbWorkers(void);
+
+/* memory budget of multi-threaded compression, in bytes : limits the nb of workers ;
+ * 0 : default budget (LZ4IO_defaultMemoryBudget()) */
+unsigned long long LZ4IO_setMemoryBudget(LZ4IO_prefs_t* const prefs, unsigned long long budget);
+unsigned long long LZ4IO_defaultMemoryBudget(void);   /* 4 GB, 1 GB on 32-bit systems */
 
 int LZ4IO_setDictionaryFilename(LZ4IO_prefs_t* const prefs, const char* dictionaryFilename);
 
@@ -115,6 +125,15 @@ int LZ4IO_setNotificationLevel(int level);
 
 /* Default setting : 0 (disabled) */
 int LZ4IO_setSparseFile(LZ4IO_prefs_t* const prefs, int enable);
+
+/* Default setting : 1 == regular files are memory-mapped for compression, when supported.
+ * Note : a file truncated during its compression, or unreadable (I/O error), raises SIGBUS :
+ * a handler, installed while the file is mapped, reports it and terminates the process (error 53).
+ * A file modified during its compression is also detected (kept with --rm, as a file renamed or replaced) :
+ * input read once only triggers a warning ;
+ * memory-mapped input is read several times : when its content can't be verified unchanged
+ * (using the frame checksum, ex: file only grown), the output is removed (error 54). */
+int LZ4IO_setMmap(LZ4IO_prefs_t* const prefs, int enable);
 
 /* Default setting : 0 == no content size present in frame header */
 int LZ4IO_setContentSize(LZ4IO_prefs_t* const prefs, int enable);

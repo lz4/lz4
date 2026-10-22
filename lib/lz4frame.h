@@ -188,16 +188,59 @@ typedef struct {
  *  makes it possible to supply advanced compression instructions to streaming interface.
  *  Structure must be first init to 0, using memset() or LZ4F_INIT_PREFERENCES,
  *  setting all parameters to default.
- *  All reserved fields must be set to zero. */
+ *  All reserved fields must be set to zero.
+ *  Note : since v1.10.1, reserved fields are a list of scalar fields (formerly an array, reserved[3]) :
+ *  a future field takes the place of a reserved one, without changing positional initializers. */
 typedef struct {
   LZ4F_frameInfo_t frameInfo;
   int      compressionLevel;    /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
   unsigned autoFlush;           /* 1: always flush; reduces usage of internal buffers */
   unsigned favorDecSpeed;       /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* v1.8.2+ */
-  unsigned reserved[3];         /* must be zero for forward compatibility */
+  unsigned nbWorkers;           /* 0: single-threaded (default); >= 1: nb of worker threads, see below (experimental) */  /* v1.10.1+ */
+  unsigned reserved1;           /* must be zero for forward compatibility */
+  unsigned reserved0;           /* idem */
 } LZ4F_preferences_t;
 
-#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0u, 0u, { 0u, 0u, 0u } }    /* v1.8.3+ */
+#define LZ4F_INIT_PREFERENCES   { LZ4F_INIT_FRAMEINFO, 0, 0u, 0u, 0u, 0u, 0u }    /* v1.8.3+ */
+
+/* nbWorkers : experimental
+ *  0 (default) : single-threaded, unchanged behavior.
+ *  >= 1 : input is cut into jobs, compressed by up to nbWorkers worker threads (capped at 1024, 128 on 32-bit systems).
+ *         The calling thread also processes jobs, while waiting for them :
+ *         up to nbWorkers+1 threads can be compressing simultaneously.
+ *  - Output only depends on content, parameters and flush points :
+ *    never on nbWorkers value (>= 1), scheduling, input slicing, nor stableSrc.
+ *  - With independent blocks, output is identical to nbWorkers == 0.
+ *  - With linked blocks, each 4 MB job restarts with previous 64 KB as dictionary :
+ *    output can differ (slightly) from nbWorkers == 0.
+ *  - Streaming (LZ4F_compressUpdate(), LZ4F_uncompressedUpdate()) : output lags behind input,
+ *    up to ~ 2 * nbWorkers jobs of 4 MB in flight, emitted by LZ4F_flush() and LZ4F_compressEnd() :
+ *    invoke them again while they fill dstBuffer (at least one job per invocation with LZ4F_compressBound(0)).
+ *    LZ4F_compressBound() counts jobs instead of blocks : updates defer completed jobs not fitting into dstBuffer,
+ *    so that output is only required to start a job while all slots are busy.
+ *    Without autoFlush, the amount emitted by each invocation depends on scheduling :
+ *    only the whole frame is deterministic. Completed jobs are only emitted if they fit :
+ *    with a smaller dstCapacity, LZ4F_compressUpdate() only fails if output must be emitted (ex: all job slots busy).
+ *    Input is copied, unless stableSrc == LZ4F_srcStableUntilFlush (jobs still running after an invocation returns
+ *    then read it in place), or autoFlush, which completes all jobs within each invocation.
+ *    LZ4F_srcStable (historical value 1) still only requires the last 64 KB to remain present, as with nbWorkers == 0.
+ *  - One-shot (LZ4F_compressFrame()) : success is still guaranteed with LZ4F_compressFrameBound().
+ *    Inputs fitting into a single job are compressed by the calling thread.
+ *  - Worker threads are created at frame start, and kept within the compression context for next frames.
+ *    A context with worker threads must not be employed after fork(), in the child process.
+ *    On Windows, it must not be employed, nor freed, while the loader lock is held (within DllMain(),
+ *    or constructors and destructors of a DLL's global objects) : worker threads can neither start nor exit then.
+ *    On POSIX systems, worker threads block signals, except synchronous ones (SIGBUS, SIGSEGV, SIGFPE, SIGILL) :
+ *    a fault while reading input (ex: memory-mapped file truncated) invokes the application's handler, in a worker thread.
+ *  - LZ4F_compressBegin_usingDict() isn't supported : frames remain single-threaded. Prefer a CDict.
+ *  - Memory is allocated by the calling thread (LZ4F_CustomMem doesn't need to be thread-safe),
+ *    except lz4hc's temporary buffer at levels >= 10 (LZ4HC_HEAPMODE), allocated within worker threads
+ *    with malloc(), or LZ4_malloc() when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS : it must then be thread-safe.
+ *  Multi-threading requires lz4frame.c to be compiled with LZ4F_MULTITHREAD=1 (and -pthread on POSIX systems) :
+ *  by default, the dynamic library is built with multi-threading support, and the static library without.
+ *  Otherwise, independent blocks are compressed in single-threaded mode (same output),
+ *  and jobs of linked blocks are processed serially by the calling thread (same output, slightly slower).
+ *  LZ4F_getMaxNbWorkers() (static linking only) tells if multi-threading is supported. */
 
 
 /*-*********************************
@@ -215,6 +258,7 @@ typedef struct {
  *  consider compiling `lz4frame.c` with compile-time macro LZ4F_HEAPMODE set to 1 instead.
  *  All state allocations will use the Heap.
  *  It also means each invocation of LZ4F_compressFrame() will trigger several internal alloc/free invocations.
+ *  Multi-threaded compression (preferencesPtr->nbWorkers >= 1) also allocates worker threads, states and job buffers.
  *
  *  Success is guaranteed when @dstCapacity >= LZ4F_compressFrameBound(srcSize, preferencesPtr).
  *  A smaller @dstCapacity is allowed : compression is attempted,
@@ -248,9 +292,26 @@ LZ4FLIB_API int LZ4F_compressionLevel_max(void);   /* v1.8.0+ */
 typedef struct LZ4F_cctx_s LZ4F_cctx;   /* incomplete type */
 typedef LZ4F_cctx* LZ4F_compressionContext_t;  /* for compatibility with older APIs, prefer using LZ4F_cctx */
 
+/* stableSrc : what remains available after an invocation of LZ4F_compressUpdate() returns */
+typedef enum {
+    LZ4F_srcUnstable = 0,         /* default : src can be modified or released as soon as the invocation returns */
+    LZ4F_srcStable = 1,           /* the last 64 KB of input remain present and unmodified during next invocations,
+                                   * including after LZ4F_flush() : linked blocks reference them directly, instead of copying them */
+    LZ4F_srcStableUntilFlush = 2  /* stronger than LZ4F_srcStable : in addition to the last 64 KB of input,
+                                   * all of src remains present and unmodified until LZ4F_flush() or LZ4F_compressEnd() returns
+                                   * (with autoFlush : until the invocation returns), or the frame ends otherwise :
+                                   * invalidated by an error, or abandoned (LZ4F_compressBegin*(), LZ4F_freeCompressionContext()).
+                                   * Note : LZ4F_compressBegin*() rejecting its arguments leaves the frame in progress.
+                                   * Worker threads (nbWorkers >= 1) read src in place, instead of copying it */  /* v1.10.1+ */
+} LZ4F_stableSrc_t;
+
+/* Note : since v1.10.1, reserved fields are a list of scalar fields (formerly an array, reserved[3]) :
+ * a future field takes the place of a reserved one, without changing positional initializers. */
 typedef struct {
-  unsigned stableSrc;    /* 1 == src content will remain present on future calls to LZ4F_compress(); skip copying src content within tmp buffer */
-  unsigned reserved[3];
+  unsigned stableSrc;    /* LZ4F_stableSrc_t value ; 0 (default) == LZ4F_srcUnstable */
+  unsigned reserved2;    /* must be set to zero for forward compatibility */
+  unsigned reserved1;    /* idem */
+  unsigned reserved0;    /* idem */
 } LZ4F_compressOptions_t;
 
 /*---   Resource Management   ---*/
@@ -298,7 +359,9 @@ LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
  *  will write the frame header into dstBuffer.
  *  Success is guaranteed when dstCapacity >= LZ4F_HEADER_SIZE_MAX bytes.
  *  Actual header size is between LZ4F_HEADER_SIZE_MIN and LZ4F_HEADER_SIZE_MAX, depending on preferences,
- *  and only this size is required. A failure doesn't modify `cctx`.
+ *  and only this size is required.
+ *  Arguments are validated first : rejecting them (ex: dstCapacity too small) doesn't modify `cctx`,
+ *  so that a frame in progress continues. Other failures (ex: allocation) invalidate it (see LZ4F_compressUpdate()).
  * `prefsPtr` is optional : NULL can be provided to set all preferences to default.
  * @return : number of bytes written into dstBuffer for the header
  *           or an error code (which can be tested using LZ4F_isError())
@@ -311,7 +374,9 @@ LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
  *  Provides minimum dstCapacity required to guarantee success of
  *  LZ4F_compressUpdate() or LZ4F_uncompressedUpdate(), given a srcSize and preferences, for a worst case scenario.
  *  Smaller capacities are allowed, but then the operation may fail.
- *  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() instead.
+ *  When srcSize==0, LZ4F_compressBound() provides a dstCapacity for LZ4F_flush() and LZ4F_compressEnd() instead :
+ *  in single-threaded mode, their output remains strictly below it, so that a single invocation completes them ;
+ *  with nbWorkers >= 1, each invocation emits at least one job, see LZ4F_preferences_t.nbWorkers.
  *  Note that the result is only valid for a single invocation of LZ4F_compressUpdate().
  *  When invoking LZ4F_compressUpdate() multiple times,
  *  if the output buffer is gradually filled up instead of emptied and re-used from its start,
@@ -319,8 +384,11 @@ LZ4FLIB_API size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
  * @return is always the same for a srcSize and prefsPtr.
  *  prefsPtr is optional : when NULL is provided, preferences will be set to cover worst case scenario.
  *  tech details :
- * @return if automatic flushing is not enabled, includes the possibility that internal buffer might already be filled by up to (blockSize-1) bytes.
- *  With independent blocks, it also covers flushing that buffered input separately when switching between compressed and uncompressed updates.
+ * @return if automatic flushing is not enabled, counts (srcSize / blockSize + 1) blocks, stored uncompressed :
+ *  internal buffer might already be filled by up to (blockSize-1) bytes, emitted as a separate partial block
+ *  when switching between compressed and uncompressed updates, or remaining from an incomplete LZ4F_flush().
+ *  With nbWorkers >= 1 (and no autoFlush), jobs replace blocks : it counts ceil(srcSize / jobSize) jobs (1 job if srcSize == 0),
+ *  see LZ4F_preferences_t.nbWorkers.
  *  It also includes frame footer (ending + checksum), since it might be generated by LZ4F_compressEnd().
  * @return doesn't include frame header, as it was already generated by LZ4F_compressBegin().
  */
@@ -347,12 +415,15 @@ LZ4FLIB_API size_t LZ4F_compressUpdate(LZ4F_cctx* cctx,
 /*! LZ4F_flush() :
  *  When data must be generated and sent immediately, without waiting for a block to be completely filled,
  *  it's possible to call LZ4_flush(). It will immediately compress any data buffered within cctx.
+ *  Each invocation fills dstBuffer, or completes the flush (v1.10.1+) :
+ *  while it returns dstCapacity, output may remain : invoke LZ4F_flush() again, with any dstCapacity.
+ *  In single-threaded mode, a single invocation completes the flush when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
+ *  The first invocation compresses buffered input : after it returns, input is no longer read
+ *  (see LZ4F_srcStableUntilFlush). LZ4F_compressUpdate() may follow an incomplete flush : remaining output comes first.
  * `cOptPtr` is optional : it's possible to provide NULL, all options will be set to default.
  * @return : nb of bytes written into dstBuffer (can be zero, when there is no data stored within cctx)
  *           or an error code if it fails (which can be tested using LZ4F_isError())
- *  Note : LZ4F_flush() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
- *  A smaller dstCapacity is allowed : it fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit,
- *  in which case the frame is invalidated (see LZ4F_compressUpdate()).
+ *  dstCapacity == 0 is rejected (LZ4F_ERROR_dstCapacity_tooSmall) when output remains, without modifying the frame.
  *  LZ4F_flush() requires a frame in progress.
  */
 LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
@@ -363,13 +434,15 @@ LZ4FLIB_API size_t LZ4F_flush(LZ4F_cctx* cctx,
  *  To properly finish an LZ4 frame, invoke LZ4F_compressEnd().
  *  It will flush whatever data remained within `cctx` (like LZ4_flush())
  *  and properly finalize the frame, with an endMark and a checksum.
+ *  Each invocation fills dstBuffer, or completes the frame (v1.10.1+) :
+ *  while it returns dstCapacity, output may remain : invoke LZ4F_compressEnd() again, with any dstCapacity.
+ *  In single-threaded mode, a single invocation completes the frame when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
+ *  Until completion, only LZ4F_compressEnd() can continue the frame (LZ4F_compressBegin() abandons it).
  * `cOptPtr` is optional : NULL can be provided, in which case all options will be set to default.
- * @return : nb of bytes written into dstBuffer, necessarily >= 4 (endMark),
+ * @return : nb of bytes written into dstBuffer,
  *           or an error code if it fails (which can be tested using LZ4F_isError())
- *  Note : LZ4F_compressEnd() is guaranteed to be successful when dstCapacity >= LZ4F_compressBound(0, prefsPtr).
- *  A smaller dstCapacity is allowed : it fails with LZ4F_ERROR_dstCapacity_tooSmall if the output doesn't fit,
- *  in which case the frame is invalidated (see LZ4F_compressUpdate()).
- *  Whether it succeeds or not, LZ4F_compressEnd() makes `cctx` available again for another compression task.
+ *  dstCapacity == 0 is rejected (LZ4F_ERROR_dstCapacity_tooSmall), without modifying the frame.
+ *  Once completed, or after an error, `cctx` is available again for another compression task.
  */
 LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx,
                                     void* dstBuffer, size_t dstCapacity,
@@ -729,6 +802,15 @@ LZ4FLIB_STATIC_API LZ4F_errorCodes LZ4F_getErrorCode(size_t functionResult);
 **/
 LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
 
+/*! LZ4F_getMaxNbWorkers() : v1.10.1+ (experimental, see LZ4F_preferences_t.nbWorkers)
+ * @return : the maximum nb of worker threads a compression context can employ :
+ *           0 when this library is compiled without multi-threading support (LZ4F_MULTITHREAD),
+ *           otherwise the cap applied to LZ4F_preferences_t.nbWorkers (1024, or 128 on 32-bit systems).
+ *  Even when supported, worker threads can be missing at run time (ex: creation failure) :
+ *  jobs are then compressed by the calling thread, producing the same output.
+**/
+LZ4FLIB_STATIC_API unsigned LZ4F_getMaxNbWorkers(void);
+
 /*! LZ4F_uncompressedUpdate() :
  *  LZ4F_uncompressedUpdate() can be called repetitively to add data stored as uncompressed blocks.
  *  Success is guaranteed when dstCapacity >= LZ4F_compressBound(srcSize, prefsPtr).
@@ -738,7 +820,9 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
  *  After an error, the frame is invalidated (see LZ4F_compressUpdate()).
  *  If previously a compressed block was written, buffered data is flushed first,
  *  before appending uncompressed data is continued.
- *  This operation is only supported when LZ4F_blockIndependent is used.
+ *  Supported with both block modes (linked blocks : since v1.10.1).
+ *  With linked blocks, in single-threaded mode, blocks compressed after uncompressed data
+ *  don't reference anything before them (compression ratio can be slightly lower).
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using LZ4F_isError())
