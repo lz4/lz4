@@ -947,6 +947,14 @@ LZ4_prepareTable(LZ4_stream_t_internal* const cctx,
     cctx->dictSize = 0;
 }
 
+/* LZ4_match8() : the 8 bytes at p and q are equal */
+LZ4_FORCE_INLINE int LZ4_match8(const void* p, const void* q)
+{
+    if (sizeof(reg_t) == 8) return LZ4_read_ARCH(p) == LZ4_read_ARCH(q);
+    return (LZ4_read32(p) == LZ4_read32(q))
+        && (LZ4_read32((const BYTE*)p + 4) == LZ4_read32((const BYTE*)q + 4));
+}
+
 /** LZ4_compress_generic_validated() :
  *  inlined, to ensure branches are decided at compilation time.
  *  The following conditions are presumed already validated:
@@ -1255,14 +1263,17 @@ _next_match:
         /* Test end of chunk */
         if (ip >= mflimitPlusOne) break;
 
-        /* Fill table */
-        LZ4_putPosition(ip-2, cctx->hashTable, tableType, base);
-
-        /* Test next position */
+        /* Fill table, and test next position.
+         * First, the position after the previous occurrence of ip-1, if it matches 8+ bytes :
+         * it breaks chains of short matches, which the table alone can produce on periodic data. */
         if (tableType == byPtr) {
 
+            U32 const hPrev = LZ4_hashPosition(ip-1, tableType);
+            const BYTE* const prev = LZ4_getPositionOnHash(hPrev, cctx->hashTable, tableType);
             U32 const h = LZ4_hashPosition(ip, tableType);
+            LZ4_putPositionOnHash(ip-1, hPrev, cctx->hashTable, tableType);
             match = LZ4_getPositionOnHash(h, cctx->hashTable, tableType);
+            if ((prev+1+LZ4_DISTANCE_MAX >= ip) && LZ4_match8(prev+1, ip)) match = prev+1;
             LZ4_putPositionOnHash(ip, h, cctx->hashTable, tableType);
             if ( (match+LZ4_DISTANCE_MAX >= ip)
               && (LZ4_read32(match) == LZ4_read32(ip)) )
@@ -1272,31 +1283,35 @@ _next_match:
 
             U32 const h = LZ4_hashPosition(ip, tableType);
             U32 const current = (U32)(ip-base);
-            U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
+            U32 const hPrev = LZ4_hashPosition(ip-1, tableType);
+            U32 prevIndex = LZ4_getIndexOnHash(hPrev, cctx->hashTable, tableType);
+            U32 matchIndex;
+            LZ4_putIndexOnHash(current-1, hPrev, cctx->hashTable, tableType);
+            if ((dictDirective == usingDictCtx) && (prevIndex < startIndex)) {
+                /* no occurrence in the current context : try the dictionary */
+                prevIndex = LZ4_getIndexOnHash(hPrev, dictCtx->hashTable, byU32) + dictDelta;
+            }
+            {   U32 const ctxIndex = prevIndex + 1;
+                int const inDict = (dictDirective == usingExtDict || dictDirective == usingDictCtx) && (ctxIndex < startIndex);
+                if ( ((dictIssue==dictSmall) ? (ctxIndex >= prefixIdxLimit) : 1)
+                  && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (ctxIndex+LZ4_DISTANCE_MAX >= current))
+                  && (!inDict || (ctxIndex + 8 <= startIndex))   /* the 8 compared bytes are within the dictionary */
+                  && LZ4_match8(inDict ? dictBase + (ctxIndex - dictDelta) : base + ctxIndex, ip) ) {
+                    matchIndex = ctxIndex;
+                } else {
+                    matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
+                    if ((dictDirective == usingDictCtx) && (matchIndex < startIndex))
+                        matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32) + dictDelta;
+                }
+            }
             assert(matchIndex < current);
-            if (dictDirective == usingDictCtx) {
-                if (matchIndex < startIndex) {
-                    /* there was no match, try the dictionary */
-                    assert(tableType == byU32);
-                    matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32);
-                    match = dictBase + matchIndex;
-                    lowLimit = dictionary;   /* required for match length counter */
-                    matchIndex += dictDelta;
-                } else {
-                    match = base + matchIndex;
-                    lowLimit = (const BYTE*)source;  /* required for match length counter */
-                }
-            } else if (dictDirective==usingExtDict) {
-                if (matchIndex < startIndex) {
-                    assert(dictBase);
-                    match = dictBase + matchIndex;
-                    lowLimit = dictionary;   /* required for match length counter */
-                } else {
-                    match = base + matchIndex;
-                    lowLimit = (const BYTE*)source;   /* required for match length counter */
-                }
-            } else {   /* single memory segment */
+            if ((dictDirective == usingExtDict || dictDirective == usingDictCtx) && (matchIndex < startIndex)) {
+                match = dictBase + (matchIndex - dictDelta);
+                lowLimit = dictionary;   /* required for match length counter */
+            } else {
                 match = base + matchIndex;
+                if (dictDirective == usingExtDict || dictDirective == usingDictCtx)
+                    lowLimit = (const BYTE*)source;   /* required for match length counter */
             }
             LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
             assert(matchIndex < current);

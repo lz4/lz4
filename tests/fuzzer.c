@@ -1451,6 +1451,35 @@ static void FUZ_unitTests(int compressionLevel)
         }
         DISPLAYLEVEL(3, "OK \n");
 
+        DISPLAYLEVEL(3, "periodic runs : chains of short matches must not hide the period (#1805) : ");
+        {   static const char dict[8] = { 0, 0, 0, 0, 0, 0, 0, 4 };
+            char page[8 + 4096];   /* dict, then a 4 KB page alternating runs of 16 x 0xFF and 16 x 0x00 */
+            LZ4_stream_t dictState;
+            int r;
+            memcpy(page, dict, sizeof(dict));
+            for (r = 0; r < 32; r++) {   /* several rotations compressed to ~1.5 KB, instead of < 60 bytes */
+                int i, c;
+                for (i = 0; i < 4096; i++)
+                    page[8 + i] = (((i + r) % 4096 + 8) / 16) % 2 == 0 ? (char)0xFF : 0;
+
+                c = LZ4_compress_default(page, testCompressed, (int)sizeof(page), (int)testCompressedSize);
+                FUZ_CHECKTEST(c <= 0 || c > 100, "rotation %i, dictionary bytes in the same block : %i bytes", r, c);
+
+                LZ4_initStream(&streamingState, sizeof(streamingState));
+                LZ4_loadDict(&streamingState, dict, (int)sizeof(dict));
+                c = LZ4_compress_fast_continue(&streamingState, page + 8, testCompressed, 4096, (int)testCompressedSize, 1);
+                FUZ_CHECKTEST(c <= 0 || c > 100, "rotation %i, LZ4_loadDict() : %i bytes", r, c);
+
+                LZ4_initStream(&dictState, sizeof(dictState));
+                LZ4_loadDict(&dictState, dict, (int)sizeof(dict));
+                LZ4_initStream(&streamingState, sizeof(streamingState));
+                LZ4_attach_dictionary(&streamingState, &dictState);
+                c = LZ4_compress_fast_continue(&streamingState, page + 8, testCompressed, 4096, (int)testCompressedSize, 1);
+                FUZ_CHECKTEST(c <= 0 || c > 100, "rotation %i, LZ4_attach_dictionary() : %i bytes", r, c);
+            }
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
         DISPLAYLEVEL(3, "LZ4_loadDict() with a dictionary too small to be used : a large first block gives the same output as a new stream : ");
         {   int const blockSize = 64 KB;   /* beyond the table clearing threshold, whatever LZ4_MEMORY_USAGE */
             char* const block = (char*)malloc((size_t)blockSize);
