@@ -187,11 +187,14 @@ liblz4-dll.o: liblz4-dll.rc
 	$(WINDRES) -i liblz4-dll.rc -o liblz4-dll.o
 
 CLEAN += $(LIBLZ4) $(LIBLZ4_EXP)
-$(LIBLZ4): $(SRCFILES) liblz4-dll.o
-  ifeq ($(BUILD_SHARED),yes)
-	@echo compiling dynamic library $(LIBVER) $(DYNLIB_MT_MSG)
-	$(CC) $(ALLFLAGS) $(DYNLIB_MT_FLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ $(LDLIBS) -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
-  endif
+# multi-threading flags are part of the objects' cache key (last argument), as for other targets ;
+# the import library is the same for both variants (same exports).
+# override : also applied when CPPFLAGS or LDFLAGS are set on the command line
+$(LIBLZ4): override CPPFLAGS += $(DYNLIB_MT_FLAGS) -DLZ4_DLL_EXPORT=1
+$(LIBLZ4): override LDFLAGS += -Wl,--out-implib,$(LIBLZ4_EXP)
+ifeq ($(BUILD_SHARED),yes)
+$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),liblz4-dll.o,echo "$(LIBLZ4) created $(DYNLIB_MT_MSG)",$(DYNLIB_MT_FLAGS)))
+endif
 
 else   # not windows
 
@@ -219,7 +222,7 @@ else
 
 # On Windows, LIBLZ4 is the final DLL target (no symlinks needed)
 .PHONY: liblz4
-liblz4: $(LIBLZ4)
+liblz4: $(if $(filter yes,$(BUILD_SHARED)),$(LIBLZ4))
 
 endif
 

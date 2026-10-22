@@ -205,7 +205,7 @@ $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	$(4)
 
 .PHONY: $(1)
-$(1) : CFLAGS += -fPIC
+$(1) : CFLAGS += $(if $(filter yes,$(WINBASED)),,-fPIC)   # not for Windows DLLs : rejected by some compilers (WINBASED : see lz4defs.make)
 $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
 	$$(LN) -sf $$< $$@
 
