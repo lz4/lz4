@@ -11,6 +11,7 @@ fix  : `LZ4F_compressBegin()` could crash after a previous call failed to alloca
 fix  : single-thread `lz4` could truncate concatenated frames with block checksums (wrong decompression hints)
 fix  : `--favor-decSpeed` lost after the first block with `-BD`, and ignored with a dictionary
 fix  : poor compression by `LZ4_compress_fast_extState_fastReset()` after `LZ4_attach_dictionary()` on a new state
+fix  : fast levels could compress some periodic data 30x worse, notably with a dictionary (other data : ~0.3-0.8% better, ~1-8% slower), reported by @martinus
 fix  : level 12 very slow on short-period data with linked blocks, detected by OSS-Fuzz
 fix  : levels 10+ with `(NULL, 0)` input, reported by @rinsuki
 fix  : lz4frame functions check `NULL` arguments, by @louislafosse
