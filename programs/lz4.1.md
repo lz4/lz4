@@ -231,7 +231,7 @@ only the latest one will be applied.
   Note : a source file modified while being compressed (size or times changed), or renamed or replaced (ex: log rotation),
   is detected after its compression, and is kept, even with `--rm`. When the output is valid, `lz4` only issues a warning :
   with `--no-mmap`, input is read once, so the output holds the content read (ex: up to the end of a log file growing meanwhile) ;
-  memory-mapped input is read several times, so its content is verified unchanged, using the frame checksum
+  memory-mapped input is read several times, so its content is compared with the frame checksum
   (ex: log file growing meanwhile : the output holds the file as it was when opened).
   Otherwise (content rewritten, `--no-frame-crc`, or file shrunk), the output could be inconsistent :
   `lz4` reports error 54 and removes it.
