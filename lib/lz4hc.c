@@ -1483,7 +1483,7 @@ LZ4HC_compress_generic_dictCtx (
     if (position >= 64 KB) {
         ctx->dictCtx = NULL;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
-    } else if (position == 0 && *srcSizePtr > 4 KB && isStateCompatible(ctx, ctx->dictCtx)) {
+    } else if (position == 0 && *srcSizePtr >= 4 KB && isStateCompatible(ctx, ctx->dictCtx)) {
         /* parameters belong to the working context, not to the dictionary */
         LZ4_i8 const favorDecSpeed = ctx->favorDecSpeed;
         LZ4_memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
