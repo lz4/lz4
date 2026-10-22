@@ -1734,6 +1734,17 @@ static void FUZ_unitTests(int compressionLevel)
         }
         DISPLAYLEVEL(3, "OK \n");
 
+        DISPLAYLEVEL(3, "level 2 : the match tested at ip+1 must not be ip itself, inside runs : ");
+        {   char runs[2 + 4096];   /* 0xFF 0x00, then runs of 10 x 0xFF and 10 x 0x00 */
+            int i;
+            runs[0] = (char)0xFF; runs[1] = 0;
+            for (i = 0; i < 4096; i++) runs[2 + i] = (i % 20) < 10 ? (char)0xFF : 0;
+            result = LZ4_compress_HC(runs, testCompressed, (int)sizeof(runs), (int)testCompressedSize, 2);
+            /* ~1.6 KB (one literal and one offset 1 per run), instead of < 50 bytes */
+            FUZ_CHECKTEST(result <= 0 || result > 100, "%i bytes", result);
+        }
+        DISPLAYLEVEL(3, "OK \n");
+
         /* saveDictHC test #926 */
         DISPLAYLEVEL(3, "saveDictHC test #926 : ");
         {   LZ4_streamHC_t* const ctx = LZ4_initStreamHC(&sHC, sizeof(sHC));
