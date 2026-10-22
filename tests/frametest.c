@@ -287,6 +287,20 @@ static void FUZ_fillCompressibleNoiseBuffer(void* buffer, size_t bufferSize, dou
     }   }
 }
 
+/* FUZ_fillNoise() :
+ * incompressible bytes. Not directly from FUZ_rand() : its cycles can be short (31487 values for seed 2145),
+ * which would make them compressible */
+static void FUZ_fillNoise(void* buffer, size_t size, U32* randState)
+{
+    BYTE* const b = (BYTE*)buffer;
+    U32 const key = FUZ_rand(randState);
+    size_t n;
+    for (n = 0; n < size; n++) {
+        U32 const n32 = (U32)n;
+        b[n] = (BYTE)XXH32(&n32, sizeof(n32), key);
+    }
+}
+
 static unsigned FUZ_highbit(U32 v32)
 {
     unsigned nbBits = 0;
@@ -373,12 +387,12 @@ static int testMixedUpdates(U32 seed)
     LZ4F_cctx* cctx = NULL;
     LZ4F_dctx* dctx = NULL;
     unsigned linked, checksums, uncompressedFirst, autoFlush;
-    size_t b, i, pos;
+    size_t b, i;
     int result = 1;
 
     if (src == NULL || frame == NULL || decoded == NULL) goto _output_error;
     /* Incompressible input exercises the largest possible block output. */
-    for (pos = 0; pos < 3 * blockSize; ++pos) src[pos] = (BYTE)FUZ_rand(&seed);
+    FUZ_fillNoise(src, 3 * blockSize, &seed);
     CHECK(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
     CHECK(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
 
@@ -883,9 +897,7 @@ static int testSmallDstFrame(U32 seed)
     SD_CHECK(src != NULL && ref != NULL && dst != NULL && decoded != NULL, "allocation failure");
     memset(src, 0, zeroSize);
     FUZ_fillCompressibleNoiseBuffer(src + zeroSize, noiseSize, 0.5, &seed);
-    {   size_t n;
-        for (n = zeroSize + noiseSize; n < srcBufSize; n++) src[n] = (BYTE)FUZ_rand(&seed);
-    }
+    FUZ_fillNoise(src + zeroSize + noiseSize, srcBufSize - (zeroSize + noiseSize), &seed);
     cdict = LZ4F_createCDict(src + zeroSize + 64 KB, dictSize);
     SD_CHECK(cdict != NULL, "LZ4F_createCDict failure");
     SD_CHECK(!LZ4F_isError(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION)), "cctx creation failure");
@@ -928,7 +940,7 @@ static int testSmallDstFrame(U32 seed)
                               job.cdict ? src + zeroSize + 64 KB : NULL, job.cdict ? dictSize : 0,
                               decoded, srcBufSize), "reference frame is corrupted");
         nbEnds = sd_frameElementEnds(ends, SD_ELTS_MAX, ref, refSize);
-        SD_CHECK(nbEnds > 0, "reference frame is malformed");
+        SD_CHECK(nbEnds > 1, "reference frame is malformed");   /* at least header and end mark */
         DISPLAYLEVEL(4, "%u bytes, %u elements ", (unsigned)refSize, (unsigned)nbEnds);
 
         /* exact size, and anything larger, must succeed */
@@ -1218,8 +1230,8 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
     LZ4F_cctx* cctx = NULL;
     LZ4F_CDict* cdict = NULL;
     sd_op ops[SD_OPS_MAX];
-    size_t opSizes[SD_OPS_MAX];
-    size_t opStarts[SD_OPS_MAX];
+    size_t opSizes[SD_OPS_MAX] = { 0 };    /* written by sd_runScript() : initialized for static analyzers */
+    size_t opStarts[SD_OPS_MAX] = { 0 };
     size_t ends[SD_ELTS_MAX];
     unsigned configNb;
     int result = 1;
@@ -1242,9 +1254,8 @@ static int testSmallDstStream(U32 seed, unsigned nbConfigs)
         for (pos = 0; pos < srcBufSize; pos += 64 KB) {
             size_t const segSize = MIN(64 KB, srcBufSize - pos);
             size_t const noiseSize = MIN(48 KB, segSize);
-            size_t n;
             FUZ_fillCompressibleNoiseBuffer(src + pos, noiseSize, 0.5, &seed);
-            for (n = noiseSize; n < segSize; n++) src[pos + n] = (BYTE)FUZ_rand(&seed);
+            FUZ_fillNoise(src + pos + noiseSize, segSize - noiseSize, &seed);
     }   }
     FUZ_fillCompressibleNoiseBuffer(dictBuf, dictSize, 0.5, &seed);
     cdict = LZ4F_createCDict(dictBuf, dictSize);
@@ -1416,11 +1427,11 @@ static int testFavorDecSpeedAfterRawBlock(U32 seed)
     BYTE* const frame = (BYTE*)malloc(dstCapacity);
     BYTE* const alone = (BYTE*)malloc(dstCapacity);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-    size_t frameSize, aloneSize, cBlockSize, n;
+    size_t frameSize, aloneSize, cBlockSize;
     int result = 1;
 
     SD_CHECK(src != NULL && frame != NULL && alone != NULL, "allocation failure");
-    for (n = 0; n < blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);
+    FUZ_fillNoise(src, blockSize, &seed);
     FUZ_fillCompressibleNoiseBuffer(src + blockSize, blockSize, 0.5, &seed);
     prefs.frameInfo.blockMode = LZ4F_blockIndependent;
     prefs.frameInfo.blockSizeID = LZ4F_max64KB;
@@ -1667,7 +1678,7 @@ static int testSkipChecksums(U32 seed)
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     LZ4F_dctx* dctx = NULL;
     size_t ends[SD_ELTS_MAX];
-    size_t frameCapacity, frameSize, n;
+    size_t frameCapacity, frameSize;
     unsigned corrupted;
     int result = 1;
 
@@ -1678,7 +1689,7 @@ static int testSkipChecksums(U32 seed)
     frame = (BYTE*)malloc(frameCapacity);
     SD_CHECK(src != NULL && decoded != NULL && frame != NULL, "allocation failure");
     FUZ_fillCompressibleNoiseBuffer(src, srcSize, 0.5, &seed);
-    for (n = blockSize; n < 2 * blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);
+    FUZ_fillNoise(src + blockSize, blockSize, &seed);
     frameSize = LZ4F_compressFrame(frame, frameCapacity, src, srcSize, &prefs);
     SD_CHECK(!LZ4F_isError(frameSize), "%s", LZ4F_getErrorName(frameSize));
     SD_CHECK(sd_frameElementEnds(ends, SD_ELTS_MAX, frame, frameSize) == 6, "malformed frame");   /* header, 3 blocks, endMark, checksum */
@@ -1788,7 +1799,6 @@ static int testRandomAccess(U32 seed)
     size_t frameCapacity;
     LZ4F_dctx* dctx = NULL;
     unsigned variant, pass;
-    size_t n;
     int result = 1;
 
     {   LZ4F_preferences_t worstPrefs = LZ4F_INIT_PREFERENCES;
@@ -1800,7 +1810,7 @@ static int testRandomAccess(U32 seed)
     frame = (BYTE*)malloc(frameCapacity);
     SD_CHECK(src != NULL && decoded != NULL && frame != NULL, "allocation failure");
     FUZ_fillCompressibleNoiseBuffer(src, srcSize, 0.5, &seed);
-    for (n = 2 * blockSize; n < 3 * blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);   /* 3rd block is stored uncompressed */
+    FUZ_fillNoise(src + 2 * blockSize, blockSize, &seed);   /* 3rd block is stored uncompressed */
     SD_CHECK(!LZ4F_isError(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION)), "dctx creation failure");
 
     for (variant = 0; variant < 8; variant++) {
@@ -1936,7 +1946,7 @@ static int testResumeFrame(U32 seed)
     BYTE* const decoded = (BYTE*)malloc(srcSize);
     BYTE* const hist = (BYTE*)malloc(64 KB);
     BYTE* frame = NULL;
-    size_t frameCapacity, bStart, n;
+    size_t frameCapacity, bStart;
     LZ4F_cctx* cctx = NULL;
     LZ4F_CDict* cdict = NULL;
     LZ4F_dctx* dctx = NULL;
@@ -1954,7 +1964,7 @@ static int testResumeFrame(U32 seed)
     SD_CHECK(src != NULL && dict != NULL && decoded != NULL && hist != NULL && frame != NULL, "allocation failure");
     FUZ_fillCompressibleNoiseBuffer(dict, dictSize, 0.5, &seed);
     FUZ_fillCompressibleNoiseBuffer(src, srcSize, 0.5, &seed);
-    for (n = firstSize + (rawBlock-1) * blockSize; n < firstSize + rawBlock * blockSize; n++) src[n] = (BYTE)FUZ_rand(&seed);
+    FUZ_fillNoise(src + firstSize + (rawBlock-1) * blockSize, blockSize, &seed);
     /* blocks start with content from the dictionary, so that they depend on it */
     for (bStart = 0; bStart < srcSize; bStart = bStart ? bStart + blockSize : firstSize) {
         if (bStart == firstSize + (rawBlock-1) * blockSize) continue;
@@ -2116,9 +2126,9 @@ static int testFileSeek(U32 seed)
     SD_CHECK(ref != NULL && buf != NULL && f != NULL, "allocation failure");
     FUZ_fillCompressibleNoiseBuffer(ref, totalSize, 0.5, &seed);
     srcPos = sizes[0] + sizes[1] + sizes[2];
-    for (n = srcPos + 64 KB; n < srcPos + 128 KB; n++) ref[n] = (BYTE)FUZ_rand(&seed);   /* uncompressed block in the 4th frame */
+    FUZ_fillNoise(ref + srcPos + 64 KB, 64 KB, &seed);   /* uncompressed block in the 4th frame */
 
-    for (n = 0; n < prefixSize; n++) buf[n] = (BYTE)FUZ_rand(&seed);
+    FUZ_fillNoise(buf, prefixSize, &seed);
     SD_CHECK(fwrite(buf, 1, prefixSize, f) == prefixSize, "write failure");
     for (srcPos = 0, n = 0; n < nbFrames; srcPos += sizes[n], n++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
