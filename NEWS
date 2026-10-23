@@ -29,6 +29,7 @@ perf : `LZ4_FAST_DEC_LOOP` enabled on aarch64 with clang, including Android (up 
 perf : `LZ4_FAST_DEC_LOOP` enabled on riscv64 when unaligned accesses are fast (`-mno-strict-align`, or a `-mcpu` with fast unaligned accesses)
 perf : faster compression with reused contexts, for blocks >= 1 KB : linked frames (up to +69%), `LZ4_resetStream_fast()` (up to +94%)
 perf : faster compression of 2-4 KB blocks with `LZ4_attach_dictionary()` (+3% to +30% on Zen 4)
+perf : 4 KB blocks with `LZ4_attach_HC_dictionary()` : level 2 compresses ~2.5% better, levels 11-12 faster (+12% to +170%), level 10 slower (-3% to -11%)
 perf : level 2 compresses better (~0.2-1.5%), at similar speed (-3% to +1% on Zen 4)
 perf : faster levels 11 (~+25%) and 12 (~+10%)
 perf : `--favor-decSpeed` : faster decompression (~+2-4% at level 12), with fewer sequences
