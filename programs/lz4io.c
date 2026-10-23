@@ -959,7 +959,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
                                   const LZ4IO_prefs_t* prefs)
 {
     int clResult = 0;
-    compress_f const compressionFunction = (compressionlevel < 3) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
+    compress_f const compressionFunction = (compressionlevel < LZ4HC_CLEVEL_MIN) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     FILE* foutput = NULL;
     TPool* const tPool = TPool_create(prefs->nbWorkers, 4);

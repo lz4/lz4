@@ -101,6 +101,8 @@ test "$(datagen -g20KB | lz4 -c -1 | wc -c)" -lt "$(datagen -g20KB| lz4 -c --fas
 test "$(datagen -g20KB | lz4 -c --fast=1 | wc -c)" -eq "$(datagen -g20KB| lz4 -c --fast| wc -c)" # checks default fast compression is -1
 test "$(lz4 -c -l -1 $FPREFIX-dg20k | wc -c)" -lt "$(lz4 -c -l --fast=1 $FPREFIX-dg20k | wc -c)" # same with legacy format
 lz4 -c -l --fast=2147483647 $FPREFIX-dg20k > /dev/null  # legacy format : acceleration capped without overflow
+test "$(lz4 -c -l -2 $FPREFIX-dg20k | wc -c)" -lt "$(lz4 -c -l -1 $FPREFIX-dg20k | wc -c)" # legacy format : -2 is high compression, as in the frame format
+lz4 -c -l -2 $FPREFIX-dg20k | lz4 -d | diff -q - $FPREFIX-dg20k  # and decodes
 lz4 -c --fast=0 $FPREFIX-dg20k && exit 1  # lz4 should fail when fast=0
 lz4 -c --fast=-1 $FPREFIX-dg20k && exit 1 # lz4 should fail when fast=-1
 lz4 -c --fast=5x $FPREFIX-dg20k && exit 1 # lz4 should fail on trailing garbage
