@@ -145,7 +145,7 @@ only the latest one will be applied.
   The main thread also compresses while waiting for them, so up to `#+1` cores can be busy.
   When `0`, or none provided: automatically determined from nb of detected cores.
   In both cases, within memory budget (see `--memory`), with a warning when it reduces `#`,
-  and no more threads than the jobs of each file (4 MB, or 1 MB with independent blocks up to 1 MB).
+  and no more threads than the jobs of each file (1 MB, or a single block when larger).
   At most 1024 threads (128 on 32-bit systems).
   Ignored with a custom block size (see `-B#`).
   Compressed output doesn't depend on `#`, nor on multithreading support.
@@ -153,7 +153,7 @@ only the latest one will be applied.
 * `--memory=#`:
   Memory budget of multi-threaded compression, in bytes, with optional suffixes `K`, `M`, `G` (powers of 1024)
   (default: 4 GB, 1 GB on 32-bit systems). It limits the number of worker threads.
-  Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller independent blocks.
+  Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller blocks.
 
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.

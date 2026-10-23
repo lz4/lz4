@@ -211,10 +211,11 @@ typedef struct {
  *  - Output only depends on content, parameters and flush points :
  *    never on nbWorkers value (>= 1), scheduling, input slicing, nor stableSrc.
  *  - With independent blocks, output is identical to nbWorkers == 0.
- *  - With linked blocks, each 4 MB job restarts with previous 64 KB as dictionary :
+ *  - Jobs are 1 MB (whole nb of blocks), or a single block when larger.
+ *    With linked blocks, each job restarts with previous 64 KB as dictionary :
  *    output can differ (slightly) from nbWorkers == 0.
  *  - Streaming (LZ4F_compressUpdate(), LZ4F_uncompressedUpdate()) : output lags behind input,
- *    up to ~ 2 * nbWorkers jobs of 4 MB in flight, emitted by LZ4F_flush() and LZ4F_compressEnd() :
+ *    up to ~ 2 * nbWorkers jobs in flight, emitted by LZ4F_flush() and LZ4F_compressEnd() :
  *    invoke them again while they fill dstBuffer (at least one job per invocation with LZ4F_compressBound(0)).
  *    LZ4F_compressBound() counts jobs instead of blocks : updates defer completed jobs not fitting into dstBuffer,
  *    so that output is only required to start a job while all slots are busy.

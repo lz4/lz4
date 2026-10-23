@@ -34,7 +34,7 @@ done
 
 # files fitting into a single job (with independent blocks : compressed without worker threads),
 # and files of different sizes (-m : the same nb of threads for all) : same output
-head -c 1300000 $FPREFIX-src > $FPREFIX-s1   # 1 job with linked blocks, 2 with independent 64 KB blocks
+head -c 1300000 $FPREFIX-src > $FPREFIX-s1   # 2 jobs with 64 KB blocks
 head -c 300000 $FPREFIX-src > $FPREFIX-s2    # 1 job
 for opts in "-1 -B4" "-1 -B4 -BD" "-9 -B4 -BD" "-1 -B5"
 do

@@ -468,25 +468,21 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 #endif
 #define LZ4F_MT_PREFIX_SIZE (64 KB)   /* history employed by linked blocks */
 
-/* Job sizes :
- * Input is cut into jobs at fixed positions of the frame's content (restarting after each flush).
+/* Job size :
+ * Input is cut into jobs at fixed positions of the frame's content (restarting after each flush) :
+ * a whole nb of blocks, up to LZ4F_MT_JOBSIZE, or a single block when larger.
  * With linked blocks, each job restarts the stream, using previous 64 KB as dictionary.
  * Job boundaries are therefore part of the output definition : this size must remain frozen.
- * It's also the CLI's chunk size, so that both produce the same frames.
- * With independent blocks, output only depends on block boundaries, not on job boundaries :
- * jobs can be smaller, for better load balancing, and to engage multi-threading on smaller inputs. */
-#ifndef LZ4F_MT_JOBSIZE_LINKED       /* override for testing only : changes output */
-#  define LZ4F_MT_JOBSIZE_LINKED      (4 MB)
-#endif
-#ifndef LZ4F_MT_JOBSIZE_INDEPENDENT
-#  define LZ4F_MT_JOBSIZE_INDEPENDENT (1 MB)
+ * With independent blocks, output only depends on block boundaries, not on job boundaries.
+ * Small jobs balance load among threads, and engage multi-threading on smaller inputs. */
+#ifndef LZ4F_MT_JOBSIZE   /* override for testing only : changes output of linked blocks */
+#  define LZ4F_MT_JOBSIZE (1 MB)
 #endif
 
-static size_t LZ4F_mtJobSize(LZ4F_blockMode_t blockMode, size_t blockSize)
+static size_t LZ4F_mtJobSize(size_t blockSize)
 {
-    size_t const target = (blockMode == LZ4F_blockLinked) ? LZ4F_MT_JOBSIZE_LINKED : LZ4F_MT_JOBSIZE_INDEPENDENT;
-    if (blockSize >= target) return blockSize;
-    return (target / blockSize) * blockSize;   /* whole nb of blocks */
+    if (blockSize >= LZ4F_MT_JOBSIZE) return blockSize;
+    return (LZ4F_MT_JOBSIZE / blockSize) * blockSize;   /* whole nb of blocks */
 }
 
 unsigned LZ4F_getMaxNbWorkers(void)
@@ -543,7 +539,7 @@ static size_t LZ4F_mtCompressBound(size_t srcSize, const LZ4F_preferences_t* pre
 {
     size_t const bs = LZ4F_getBlockSize(prefs->frameInfo.blockSizeID);
     size_t const blockSize = LZ4F_isError(bs) ? 4 MB : bs;
-    size_t const jobSize = LZ4F_mtJobSize(prefs->frameInfo.blockMode, blockSize);
+    size_t const jobSize = LZ4F_mtJobSize(blockSize);
     size_t const nbJobs = srcSize ? (srcSize / jobSize) + ((srcSize % jobSize) != 0) : 1;
     size_t const frameEnd = BHSize + (prefs->frameInfo.contentChecksumFlag*BFSize);
     return nbJobs * LZ4F_blocksBound(jobSize, blockSize, prefs->frameInfo.blockChecksumFlag) + frameEnd;
@@ -587,7 +583,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     if (LZ4F_mtEligible(&prefs)) {
         /* a single job produces the same output as single-threaded compression, without the setup cost */
         size_t const blockSize = LZ4F_getBlockSize(prefs.frameInfo.blockSizeID);
-        if (LZ4F_isError(blockSize) || srcSize <= LZ4F_mtJobSize(prefs.frameInfo.blockMode, blockSize))
+        if (LZ4F_isError(blockSize) || srcSize <= LZ4F_mtJobSize(blockSize))
             prefs.nbWorkers = 0;
     }
 
@@ -2037,7 +2033,7 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
     unsigned const nbWorkers = MIN(cctx->prefs.nbWorkers, LZ4F_NBWORKERS_MAX);
     LZ4F_CtxType_e const ctxType = (LZ4F_CtxType_e)cctx->lz4CtxType;
     size_t const blockSize = cctx->maxBlockSize;
-    size_t const jobSize = LZ4F_mtJobSize(cctx->prefs.frameInfo.blockMode, blockSize);
+    size_t const jobSize = LZ4F_mtJobSize(blockSize);
     size_t const inCapacity = LZ4F_MT_PREFIX_SIZE + jobSize;
     size_t const outCapacity = LZ4F_blocksBound(jobSize, blockSize, LZ4F_blockChecksumEnabled);
     LZ4F_mtCtx_t* mt = cctx->mt;

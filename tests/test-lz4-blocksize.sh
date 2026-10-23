@@ -15,7 +15,7 @@ set -x
 # checkFrame -B# -b# : every block, except the last one of each frame,
 # must contain exactly -B# bytes, and each frame must declare block size ID -b#
 
-datagen -g12345678    > $FPREFIX-src1   # several 4 MB jobs in multi-threaded mode
+datagen -g12345678    > $FPREFIX-src1   # several jobs in multi-threaded mode
 datagen -g12345678 -s2 > $FPREFIX-src2
 datagen -g4194303     > $FPREFIX-4mb    # just below 4 MB
 datagen -g100KB       > $FPREFIX-small  # single job
@@ -50,7 +50,7 @@ done
 lz4 -f -B10485760 $FPREFIX-src1 $FPREFIX.lz4
 checkFrame -B4194304 -b7 $FPREFIX.lz4
 
-# input size just below the 4 MB job size
+# input size just below 4 MB
 lz4 -f -T4 -B65535 $FPREFIX-4mb $FPREFIX.lz4
 checkFrame -B65535 -b4 $FPREFIX.lz4
 lz4 -t $FPREFIX.lz4
