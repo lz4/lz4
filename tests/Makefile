@@ -59,7 +59,7 @@ NB_LOOPS     ?= -i1
 default: all
 
 .PHONY: all
-all: fullbench fuzzer frametest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest unittest roundTripTest datagen checkFrame decompress-partial
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -123,6 +123,9 @@ $(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 
 frametest:
 $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o frametest.o))
+
+unittest:
+$(eval $(call c_program_shared_o,unittest,lz4frame.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4frame.o))
 
 roundTripTest:
 $(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
@@ -205,7 +208,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
 
 test32: CFLAGS+=-m32
 test32: test
@@ -371,9 +374,12 @@ test-frameMT-quick: frameMT frameMT-nomt
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
 
+test-unittest: unittest
+	./unittest
+
 VALGRIND = valgrind --leak-check=yes --error-exitcode=1
 test-mem: FPREFIX = tmp-tvm
-test-mem: lz4 datagen fuzzer frametest fullbench
+test-mem: lz4 datagen fuzzer frametest unittest fullbench
 	@echo "\n ---- valgrind tests : memory analyzer ----"
 	$(VALGRIND) $(DATAGEN) -g50M > $(VOID)
 	$(DATAGEN) -g16KB > $(FPREFIX)dg16K
@@ -392,6 +398,7 @@ test-mem: lz4 datagen fuzzer frametest fullbench
 	$(RM) $(FPREFIX)*
 	$(VALGRIND) ./fuzzer -i64 -t1
 	$(VALGRIND) ./frametest -i256
+	$(VALGRIND) ./unittest
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
