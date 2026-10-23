@@ -2153,8 +2153,8 @@ typedef struct {
 
 typedef struct {
     Buffer buffers[PBUFFERS_NB];
-    int availNext;
-    int usedIdx;
+    unsigned long long availNext;   /* monotonic : used modulo PBUFFERS_NB, must not signed-overflow */
+    unsigned long long usedIdx;
 } BufferPool;
 
 static void LZ4IO_freeBufferPool(BufferPool* bp)
@@ -2199,7 +2199,7 @@ static Buffer BufPool_getBuffer(BufferPool* bp)
     assert(bp->availNext >= bp->usedIdx);
     assert(bp->availNext < bp->usedIdx + PBUFFERS_NB);
 #endif
-    {   int id = bp->availNext++ % PBUFFERS_NB;
+    {   unsigned long long const id = bp->availNext++ % PBUFFERS_NB;
         assert(bp->buffers[id].size == 0);
         return bp->buffers[id];
 }   }
@@ -2211,7 +2211,7 @@ void BufPool_releaseBuffer(BufferPool* bp, Buffer buf)
     /* The following assert() is susceptible to race conditions */
     assert(bp->usedIdx < bp->availNext);
 #endif
-    {   int id = bp->usedIdx++ % PBUFFERS_NB;
+    {   unsigned long long const id = bp->usedIdx++ % PBUFFERS_NB;
         assert(bp->buffers[id].ptr == buf.ptr);
         bp->buffers[id].size = 0;
 }   }
