@@ -24,6 +24,7 @@
 */
 
 #include "unittest.h"
+#include "datagen.h"  /* RDG_genBuffer */
 #include <setjmp.h>   /* setjmp, longjmp */
 #include <stdarg.h>   /* va_list */
 #include <stdio.h>    /* printf, snprintf */
@@ -35,9 +36,13 @@
 /*-************************************
 *  Test suites : one per test file
 **************************************/
+extern const UT_suite UT_suite_lz4;
+extern const UT_suite UT_suite_lz4hc;
 extern const UT_suite UT_suite_lz4frame;
 
 static const UT_suite* const g_suites[] = {
+    &UT_suite_lz4,
+    &UT_suite_lz4hc,
     &UT_suite_lz4frame,
 };
 
@@ -78,6 +83,13 @@ unsigned UT_rand(void)
     g_randState ^= g_randState >> 17;
     g_randState ^= g_randState << 5;
     return g_randState;
+}
+
+void* UT_sample(size_t size)
+{
+    void* const buffer = UT_malloc(size);
+    RDG_genBuffer(buffer, size, 0.5, 0.0, UT_rand());
+    return buffer;
 }
 
 

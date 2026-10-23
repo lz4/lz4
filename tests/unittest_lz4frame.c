@@ -30,12 +30,6 @@
 #include "lz4frame.h"
 #define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
 #include "lz4.h"
-#include "datagen.h"    /* RDG_genBuffer */
-
-#define KB *(1U<<10)
-#define MB *(1U<<20)
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-
 
 /*-************************************
 *  Helpers
@@ -57,14 +51,6 @@ static void checkLZ4FError(size_t r, LZ4F_errorCodes code,
     if (LZ4F_getErrorCode(r) != code)
         UT_fail(file, line, "%s \n  expected : %s \n  result : %s", expr, codeName,
                 LZ4F_isError(r) ? LZ4F_getErrorName(r) : "no error");
-}
-
-/* @return : @size bytes of compressible data, released at the end of the test */
-static void* sample(size_t size)
-{
-    void* const buffer = UT_malloc(size);
-    RDG_genBuffer(buffer, size, 0.5, 0.0, UT_rand());
-    return buffer;
 }
 
 static void freeCctx(void* cctx) { LZ4F_freeCompressionContext((LZ4F_cctx*)cctx); }
@@ -202,7 +188,7 @@ TEST(compressFrame_veryNegativeLevels)
 {
     static const int levels[] = { -LZ4_ACCELERATION_MAX /* cap - 1 */, INT_MIN + 1, INT_MIN };
     size_t const srcSize = 2 MB;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
     void* const ref = UT_malloc(capacity);
     void* const frame = UT_malloc(capacity);
@@ -220,7 +206,7 @@ TEST(compressFrame_veryNegativeLevels)
 TEST(compressFrame_validBlockSizeIDs)
 {
     size_t const srcSize = 256 KB;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     size_t n;
     for (n = 0; n < ARRAY_SIZE(g_validBlockSizeIDs); n++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
@@ -250,7 +236,7 @@ TEST(compressBegin_invalidBlockSizeIDs)
 TEST(compressBegin_failurePreservesFrame)
 {
     size_t const srcSize = 256 KB;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     LZ4F_cctx* const cctx = newCctx();
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     LZ4F_preferences_t invalidPrefs = LZ4F_INIT_PREFERENCES;
@@ -276,7 +262,7 @@ TEST(compressBegin_afterFailedStateAllocation)
     LZ4F_CustomMem const failableMem = { failableMalloc, failableCalloc, failableFree, &failAlloc };
     LZ4F_cctx* const cctx = (LZ4F_cctx*)UT_defer(freeCctx, LZ4F_createCompressionContext_advanced(failableMem, LZ4F_VERSION));
     size_t const srcSize = 64 KB;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
     void* const frame = UT_malloc(capacity);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
@@ -294,7 +280,7 @@ TEST(compressBegin_afterFailedStateAllocation)
 TEST(compressEnd_contentSize)
 {
     size_t const srcSize = 2 MB;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     LZ4F_cctx* const cctx = newCctx();
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     size_t const capacity = LZ4F_compressFrameBound(srcSize, &prefs);
@@ -310,7 +296,7 @@ TEST(compressEnd_contentSize)
 TEST(compressEnd_wrongContentSize)
 {
     size_t const srcSize = 2 MB;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     size_t const capacity = LZ4F_compressFrameBound(srcSize, &prefs);
     void* const frame = UT_malloc(capacity);
@@ -322,7 +308,7 @@ TEST(compressBegin_usingDict)
 {
     size_t const dictSize = 7 KB;   /* small enough for LZ4_MEMORY_USAGE == 10 */
     size_t const srcSize = 66 KB;   /* must be > 64 KB to avoid short-size optimizations */
-    const char* const dict = (const char*)sample(dictSize + srcSize);
+    const char* const dict = (const char*)UT_sample(dictSize + srcSize);
     const char* const src = dict + dictSize;
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);   /* NULL preferences : 64 KB linked blocks */
     void* const frame = UT_malloc(capacity);
@@ -337,7 +323,7 @@ TEST(createCDict_advanced)
     int failAlloc = 1;
     LZ4F_CustomMem const failableMem = { failableMalloc, failableCalloc, failableFree, &failAlloc };
     size_t const dictSize = 7 KB;
-    const void* const dict = sample(dictSize);
+    const void* const dict = UT_sample(dictSize);
     ASSERT(UT_defer(freeCDict, LZ4F_createCDict_advanced(failableMem, dict, dictSize)) == NULL);   /* uses failableMem */
     failAlloc = 0;
     ASSERT(UT_defer(freeCDict, LZ4F_createCDict_advanced(failableMem, dict, dictSize)) != NULL);
@@ -355,7 +341,7 @@ static LZ4F_CDict* newCDict(const void* dict)
 TEST(compressFrame_usingCDict)
 {
     size_t const srcSize = 65 KB;   /* must be > 64 KB to avoid short-size optimizations */
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     LZ4F_CDict* const cdict = newCDict(src);
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
     void* const frame = UT_malloc(capacity);
@@ -369,7 +355,7 @@ TEST(compressFrame_usingCDict_extremeLevels)
 {
     int const levels[] = { -3, LZ4F_compressionLevel_max() };
     size_t const srcSize = CDICT_DICT_SIZE;
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     LZ4F_CDict* const cdict = newCDict(src);
     LZ4F_cctx* const cctx = newCctx();
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
@@ -387,7 +373,7 @@ TEST(compressFrame_usingCDict_extremeLevels)
 TEST(compressFrame_usingCDict_blockModes)
 {
     size_t const srcSize = 3 * 64 KB;   /* a single block would always be independent */
-    const void* const src = sample(srcSize);
+    const void* const src = UT_sample(srcSize);
     LZ4F_CDict* const cdict = newCDict(src);
     LZ4F_cctx* const cctx = newCctx();
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);

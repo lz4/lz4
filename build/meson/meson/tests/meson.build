@@ -71,6 +71,8 @@ test_exes = {
   'unittest': {
     'sources': files(
       lz4_source_root / 'tests/unittest.c',
+      lz4_source_root / 'tests/unittest_lz4.c',
+      lz4_source_root / 'tests/unittest_lz4hc.c',
       lz4_source_root / 'tests/unittest_lz4frame.c',
       lz4_source_root / 'tests/datagen.c',
     ),

@@ -67,6 +67,14 @@
 
 
 /*-************************************
+*  Common definitions
+**************************************/
+#define KB *(1U<<10)
+#define MB *(1U<<20)
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
+
+/*-************************************
 *  Tests
 **************************************/
 typedef struct { const char* name; void (*fn)(void); } UT_test;
@@ -110,6 +118,10 @@ void* UT_defer(void (*release)(void*), void* ptr);
 /* UT_rand() :
  * pseudo-random generator, restarted from the same seed (-s#) for each test */
 unsigned UT_rand(void);
+
+/* UT_sample() :
+ * @return : @size bytes of compressible data, generated from UT_rand(), released at the end of the test */
+void* UT_sample(size_t size);
 
 
 /*-************************************
