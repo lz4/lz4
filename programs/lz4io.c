@@ -423,6 +423,17 @@ static int LZ4IO_isStdout(const char* s)
     return UTIL_sameString(s, stdoutmark);
 }
 
+/* LZ4IO_mustRemoveSrcFile() :
+ * `--rm` only applies to a regular source file :
+ * not in test mode, which removes nothing (see lz4.1.md),
+ * and not when reading from stdin, which is not a file. */
+static int LZ4IO_mustRemoveSrcFile(const LZ4IO_prefs_t* prefs, const char* srcFileName)
+{
+    return prefs->removeSrcFile
+        && !prefs->testMode
+        && !LZ4IO_isStdin(srcFileName);
+}
+
 
 /* ************************************************************************ **
 ** ********************** LZ4 File / Pipe compression ********************* **
@@ -881,7 +892,7 @@ LZ4IO_finishCompressedFile(FILE* srcFile, FILE* dstFile,
             UTIL_setFileStat(dstFileName, &statbuf);
     }   }
 
-    if (io_prefs->removeSrcFile && !srcModified && !srcReplaced) {  /* remove source file : --rm */
+    if (LZ4IO_mustRemoveSrcFile(io_prefs, srcFileName) && !srcModified && !srcReplaced) {  /* remove source file : --rm */
         if (remove(srcFileName))
             END_PROCESS(50, "Remove error : %s: %s", srcFileName, strerror(errno));
     }
@@ -2637,7 +2648,7 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
 
     /* Close input */
     fclose(finput);
-    if (!result && prefs->removeSrcFile) {  /* --rm */
+    if (!result && LZ4IO_mustRemoveSrcFile(prefs, input_filename)) {  /* --rm */
         if (remove(input_filename))
             END_PROCESS(45, "Remove error : %s: %s", input_filename, strerror(errno));
     }
