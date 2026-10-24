@@ -23,11 +23,11 @@ if (NOT LZ4_SHARED_INCLUDE_DIRECTORIES)
 endif()
 
 # Add a test that builds against the installation
-set(LZ4_TESTS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+set(LZ4_TESTS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_executable(decompress-partial "${LZ4_TESTS_SOURCE_DIR}/decompress-partial.c")
 target_link_libraries(decompress-partial LZ4::lz4_shared)
 
 # Add a test that builds against the lz4::lz4 target
-set(LZ4_TESTS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+set(LZ4_TESTS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_executable(decompress-partial-lz4 "${LZ4_TESTS_SOURCE_DIR}/decompress-partial.c")
 target_link_libraries(decompress-partial-lz4 lz4::lz4)

@@ -101,7 +101,7 @@ jobs:
         cmake --build build --target install
         
         # Test find_package with static library
-        cmake -S tests/cmake -B build_test -DCMAKE_PREFIX_PATH=$PWD/install
+        cmake -S tests/compat/cmake -B build_test -DCMAKE_PREFIX_PATH=$PWD/install
         cmake --build build_test
 
     - name: Integration Test
@@ -112,7 +112,7 @@ jobs:
         cmake --build build --target install
         
         # Test find_package
-        cmake -S tests/cmake -B test_build -DCMAKE_PREFIX_PATH=$PWD/install
+        cmake -S tests/compat/cmake -B test_build -DCMAKE_PREFIX_PATH=$PWD/install
         cmake --build test_build
         cd test_build && ctest -V
 

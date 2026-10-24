@@ -1,24 +1,26 @@
 Programs and scripts for automated testing of LZ4
 =======================================================
 
-This directory contains the following programs and scripts:
-- `datagen` : Synthetic and parametrable data generator, for tests
-- `frametest` : Test tool that checks lz4frame integrity on target platform
-- `fullbench`  : Precisely measure speed for each lz4 inner functions
-- `fuzzer`  : Test tool, to check lz4 integrity on target platform
-- `unittest` : Unit tests, each one autonomous (see `unittest.h` to add tests)
-- `test-lz4-speed.py` : script for testing lz4 speed difference between commits
-- `test-lz4-versions.py` : compatibility test between lz4 versions stored on Github
+This directory is organized as follows :
+- `unit/` : unit tests, each one autonomous (see `unit/unittest.h` to add tests)
+- `fuzz/` : randomized tests of the library (`fuzzer`, `frametest`, `frameMT`, `roundTripTest`)
+- `cli/` : tests of the `lz4` command line (`test-lz4-*.sh`, `test-lz4-list.py`)
+- `compat/` : ABI, versions, installation, freestanding and build environment checks
+- `bench/` : `fullbench` (speed of each lz4 function), `test-lz4-speed.py` (speed difference between commits)
+- `tools/` : `datagen` (synthetic data generator), `checkFrame` (frame properties checker)
+- `data/` : sample files
+
+Test programs are built in this directory, by `make <program>`, and run by `make test-<name>` (see `Makefile`).
 
 
-#### `test-lz4-versions.py` - script for testing lz4 interoperability between versions
+#### `compat/test-lz4-versions.py` - script for testing lz4 interoperability between versions
 
 This script creates `versionsTest` directory to which lz4 repository is cloned.
 Then all tagged (released) versions of lz4 are compiled.
 In the following step interoperability between lz4 versions is checked.
 
 
-#### `test-lz4-speed.py` - script for testing lz4 speed difference between commits
+#### `bench/test-lz4-speed.py` - script for testing lz4 speed difference between commits
 
 This script creates `speedTest` directory to which lz4 repository is cloned.
 Then it compiles all branches of lz4 and performs a speed benchmark for a given list of files (the `testFileNames` parameter).
@@ -37,12 +39,12 @@ Additional remarks:
 
 The example usage with two test files, one e-mail address, and with an additional message:
 ```
-./test-lz4-speed.py "silesia.tar calgary.tar" "email@gmail.com" --message "tested on my laptop" --sleepTime 60
+./bench/test-lz4-speed.py "silesia.tar calgary.tar" "email@gmail.com" --message "tested on my laptop" --sleepTime 60
 ```
 
 To run the script in background please use:
 ```
-nohup ./test-lz4-speed.py testFileNames emails &
+nohup ./bench/test-lz4-speed.py testFileNames emails &
 ```
 
 The full list of parameters:

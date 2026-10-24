@@ -5,7 +5,7 @@ for /F "delims=#" %%E in ('"prompt #$E# & for %%E in (1) do rem"') do set "esc=%
 @rem set "Platform=Win32"
 
 set "BIN=.\bin\!Platform!_!Configuration!"
-set "TEST_FILES=..\..\tests\COPYING"
+set "TEST_FILES=..\..\tests\data\COPYING"
 
 echo !BIN!\lz4 -h
      !BIN!\lz4 -h	|| goto :ERROR

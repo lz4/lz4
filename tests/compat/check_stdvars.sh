@@ -5,7 +5,7 @@ set -e   # exit on first command error
 #  check_stdvars.sh  –  verify that user-supplied CC/CFLAGS/CPPFLAGS/LDFLAGS/
 #  LDLIBS reach every compile- and link-command emitted by a recursive Make.
 #
-#  Usage:  tests/check_stdvars.sh build.log
+#  Usage:  tests/compat/check_stdvars.sh build.log
 #   where build.log is produced with:
 #     make -nr V=1 \
 #          CC='cc -DCC_TEST' \
