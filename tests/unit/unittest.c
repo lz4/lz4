@@ -128,6 +128,12 @@ void UT_assertMemEq(const void* a, const void* b, size_t size,
 /*-************************************
 *  Runner
 **************************************/
+/* computed in double : clock_t may be a 32-bit integer counting microseconds */
+static unsigned long UT_elapsedMs(clock_t start)
+{
+    return (unsigned long)((double)(clock() - start) * 1000 / CLOCKS_PER_SEC);
+}
+
 /* @return : 1 if the test fails, 0 otherwise */
 static int UT_invoke(void (*fn)(void))
 {
@@ -149,8 +155,7 @@ static int UT_run(const char* name, void (*fn)(void))
         g_nbResources--;
         g_resources[g_nbResources].release(g_resources[g_nbResources].ptr);
     }
-    printf("[ %s ] %s (%lu ms) \n", failed ? " FAILED " : "      OK", name,
-           (unsigned long)((clock() - start) * 1000 / CLOCKS_PER_SEC));
+    printf("[ %s ] %s (%lu ms) \n", failed ? " FAILED " : "      OK", name, UT_elapsedMs(start));
     return failed;
 }
 
@@ -203,7 +208,6 @@ int main(int argc, const char** argv)
 
     if (nbTests == 0) { printf("no test selected \n"); return 1; }
     if (listOnly) return 0;
-    printf("[==========] %u tests, %u failed (%lu ms) \n", nbTests, nbFailed,
-           (unsigned long)((clock() - start) * 1000 / CLOCKS_PER_SEC));
+    printf("[==========] %u tests, %u failed (%lu ms) \n", nbTests, nbFailed, UT_elapsedMs(start));
     return nbFailed != 0;
 }
