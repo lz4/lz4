@@ -59,6 +59,7 @@ SRCFILES := $(sort $(wildcard *.c))
 OBJFILES = $(SRCFILES:.c=.o)
 
 include ../build/make/lz4defs.make
+CFLAGS += $(USEROPTIONALFLAGS)
 
 # Multi-threaded compression (see LZ4F_preferences_t.nbWorkers) :
 # by default, the dynamic library supports multi-threading, when threads are available,

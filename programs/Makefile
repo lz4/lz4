@@ -54,6 +54,7 @@ CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
 CPPFLAGS += -I$(LIBLZ4DIR) -DXXH_NAMESPACE=LZ4_
 
 include ../build/make/lz4defs.make
+CFLAGS += $(USEROPTIONALFLAGS)
 
 OS_VERSION ?= $(UNAME) -r
 ifeq ($(TARGET_OS)$(shell $(OS_VERSION)),SunOS5.10)
