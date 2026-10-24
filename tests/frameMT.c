@@ -616,7 +616,7 @@ static void validateMaxNbWorkers(void)
 static void validateCompressBound(void)
 {
     LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
-    size_t const jobSize = 4 MB;   /* linked blocks */
+    size_t const jobSize = 1 MB;   /* 64 KB blocks */
     unsigned const nbWorkersList[] = { 1, 8 };
     size_t wi;
     g_step = "LZ4F_compressBound";
@@ -1080,7 +1080,7 @@ static int validatePartialFlush(void)
 static int validateDeferredEmission(void)
 {
     static const unsigned nbWorkersList[] = { 1, 3 };
-    size_t const maxJobSize = 4 MB;   /* jobs : 4 MB with linked blocks, 1 MB with independent ones (64 KB blocks) */
+    size_t const maxJobSize = 1 MB;   /* jobs (64 KB blocks) */
     size_t const smallCapacity = 1 KB;
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(maxJobSize, NULL);
     char* const src = (char*)malloc(maxJobSize);
@@ -1096,7 +1096,7 @@ static int validateDeferredEmission(void)
     for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
     for (linked = 0; linked <= 1; linked++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-        size_t const jobSize = linked ? 4 MB : 1 MB;   /* a single job, submitted once full */
+        size_t const jobSize = maxJobSize;   /* a single job, submitted once full */
         LZ4F_cctx* cctx = NULL;
         size_t refSize, pos, r;
 #if !(defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD)
