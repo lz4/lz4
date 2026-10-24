@@ -1393,8 +1393,64 @@ static int LZ4HC_compress_optimal( LZ4HC_CCtx_internal* ctx,
     int* srcSizePtr, int dstCapacity,
     int const nbSearches, int const nbSearchesSeq, int const targetLength,
     const limitedOutput_directive limit,
-    const dictCtx_directive dict,
-    const HCfavor_e favorDecSpeed);
+            const dictCtx_directive dict,
+            const HCfavor_e favorDecSpeed);
+
+/* fillOutput can stop the compression before the whole input is consumed.
+ * The parsers may nonetheless have inserted positions of the unconsumed tail
+ * into the hash tables.
+ * These references must be cleared, otherwise a following block,
+ * resuming from src + consumed, could match data which was never compressed,
+ * silently corrupting the stream.
+ * Also roll back ctx->end to the consumed amount, and rewind nextToUpdate,
+ * so that these positions are re-inserted when the next block parses them. */
+static void
+LZ4HC_rewindAfterFillOutput (
+        LZ4HC_CCtx_internal* const ctx,
+        const char* const src,
+        int const consumedSize, int const fullSize,
+        lz4hc_strat_e const strat)
+{
+    U32* const hashTable = ctx->hashTable;
+    const BYTE* const prefixPtr = ctx->prefixStart;
+    U32 const prefixIdx = ctx->dictLimit;
+    const BYTE* const tailStart = (const BYTE*)src + consumedSize;
+    const BYTE* const tailEnd = (const BYTE*)src + fullSize;
+    const BYTE* ptr;
+
+    assert(consumedSize >= 0);
+    assert(fullSize >= consumedSize);
+    assert(ctx->end == tailEnd);
+    assert(tailStart >= prefixPtr);
+
+    /* an entry exists only for a position which could be hashed,
+     * which requires a complete read of the hash width at this position */
+    if (strat == lz4mid) {
+        U32* const hash4Table = hashTable;
+        U32* const hash8Table = hash4Table + LZ4MID_HASHTABLESIZE;
+        for (ptr=tailStart; ptr+LZ4MID_HASHSIZE <= tailEnd; ptr++) {
+            U32 const idx = (U32)(ptr - prefixPtr) + prefixIdx;
+            U32 const h8 = LZ4MID_hash8Ptr(ptr);
+            if (hash8Table[h8] == idx) hash8Table[h8] = 0;
+        }
+        for (ptr=tailStart; ptr+LZ4HC_HASHSIZE <= tailEnd; ptr++) {
+            U32 const idx = (U32)(ptr - prefixPtr) + prefixIdx;
+            U32 const h4 = LZ4MID_hash4Ptr(ptr);
+            if (hash4Table[h4] == idx) hash4Table[h4] = 0;
+        }
+    } else {
+        for (ptr=tailStart; ptr+LZ4HC_HASHSIZE <= tailEnd; ptr++) {
+            U32 const idx = (U32)(ptr - prefixPtr) + prefixIdx;
+            U32 const h = LZ4HC_hashPtr(ptr);
+            if (hashTable[h] == idx) hashTable[h] = 0;
+        }
+    }
+    if (strat != lz4mid) {  /* lz4mid doesn't track insertion progress in nextToUpdate */
+        U32 const consumedIdx = (U32)(tailStart - prefixPtr) + prefixIdx;
+        if (ctx->nextToUpdate > consumedIdx) ctx->nextToUpdate = consumedIdx;
+    }
+    ctx->end = tailStart;
+}
 
 static int
 LZ4HC_compress_generic_internal (
@@ -1421,6 +1477,7 @@ LZ4HC_compress_generic_internal (
     ctx->end += *srcSizePtr;
     {   cParams_t const cParam = LZ4HC_getCLevelParams(cLevel);
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
+        int const fullSrcSize = *srcSizePtr;
         int result;
 
         if (cParam.strat == lz4mid) {
@@ -1439,6 +1496,8 @@ LZ4HC_compress_generic_internal (
                                 dict, favor);
         }
         if (result <= 0) ctx->dirty = 1;
+        if ((limit == fillOutput) && (result > 0) && (*srcSizePtr < fullSrcSize))
+            LZ4HC_rewindAfterFillOutput(ctx, src, *srcSizePtr, fullSrcSize, cParam.strat);
         return result;
     }
 }
