@@ -111,7 +111,7 @@ extern "C" {
  *    LZ4_memcpy, LZ4_memmove, LZ4_memset.
  *  - It only enables LZ4/HC functions which don't use heap.
  *    All LZ4F_* functions are not supported.
- *  - See tests/freestanding.c to check its basic setup.
+ *  - See tests/compat/freestanding.c to check its basic setup.
  */
 #if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
 #  define LZ4_HEAPMODE 0

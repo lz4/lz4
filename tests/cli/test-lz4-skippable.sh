@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SKIPFILE="goldenSamples/skip.bin"
+SKIPFILE="data/goldenSamples/skip.bin"
 FPREFIX="tmp-lsk"
 
 set -e

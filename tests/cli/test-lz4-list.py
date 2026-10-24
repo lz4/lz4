@@ -9,9 +9,9 @@ import sys
 
 SIZES = [3, 11]  # Always 2 sizes
 MIB = 1048576
-LZ4 = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + "/../lz4")
+LZ4 = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + "/../../lz4")
 if not os.path.exists(LZ4):
-    LZ4 = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + "/../programs/lz4")
+    LZ4 = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + "/../../programs/lz4")
 TEMP = tempfile.gettempdir()
 
 
