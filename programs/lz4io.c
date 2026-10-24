@@ -2249,11 +2249,18 @@ typedef struct {
     BufferPool* bp;
     unsigned long long* totalSize;
     LZ4F_errorCode_t* lastStatus;
+    int* error;   /* set by the decoding thread on failure, read by the main thread */
     TPool* wPool;
     FILE* foutput;
     int sparseEnable;
     unsigned* storedSkips;
 } LZ4FChunk;
+
+/* decoding errors, stored in LZ4FChunk.error */
+#define LZ4IO_decodeErr_none 0
+#define LZ4IO_decodeErr_decompression 1
+#define LZ4IO_decodeErr_outBuffer 2
+#define LZ4IO_decodeErr_jobDescriptor 3
 
 static void LZ4IO_decompressLZ4FChunk(void* arg)
 {
@@ -2261,11 +2268,13 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
     const char* inPtr = (const char*)lz4fc->inBuffer;
     size_t pos = 0;
 
-    while ((pos < lz4fc->inSize)) {  /* still to read */
+    while ((!*lz4fc->error) && (pos < lz4fc->inSize)) {  /* still to read */
         size_t remainingInSize = lz4fc->inSize - pos;
         Buffer b = BufPool_getBuffer(lz4fc->bp);
-        if (b.capacity != OUTBUFF_SIZE)
-            END_PROCESS(33, "Could not allocate output buffer!");
+        if (b.capacity != OUTBUFF_SIZE) {
+            *lz4fc->error = LZ4IO_decodeErr_outBuffer;
+            break;
+        }
         assert(b.size == 0);
         b.size = b.capacity;
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
@@ -2273,9 +2282,14 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
                                 inPtr + pos, &remainingInSize,
                                 lz4fc->dictBuffer, lz4fc->dictBufferSize,
                                 NULL);
-            if (LZ4F_isError(nextToLoad))
-                END_PROCESS(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
             *lz4fc->lastStatus = nextToLoad;
+            if (LZ4F_isError(nextToLoad)) {
+                /* do not exit() from this worker thread :
+                 * other threads are still using shared resources (output FILE*).
+                 * record the error, stop decoding, and let the main thread exit */
+                *lz4fc->error = LZ4IO_decodeErr_decompression;
+                break;
+            }
         }
         assert(remainingInSize <= lz4fc->inSize - pos);
         pos += remainingInSize;
@@ -2284,7 +2298,8 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         /* push to write thread */
         {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
             if (ctw==NULL) {
-                END_PROCESS(35, "Allocation error : can't describe new write job");
+                *lz4fc->error = LZ4IO_decodeErr_jobDescriptor;
+                break;
             }
             ctw->bufOut = b;
             ctw->fOut = lz4fc->foutput;
@@ -2308,6 +2323,9 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     unsigned long long filesize = 0;
     LZ4F_errorCode_t nextToLoad;
     LZ4F_errorCode_t lastStatus = 1;
+    int decodeError = LZ4IO_decodeErr_none;   /* written by the decoding thread */
+    int readError = 0;                        /* main thread only */
+    int allocError = 0;                       /* main thread only */
     unsigned storedSkips = 0;
     LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, 1, 0, 0 };
     const LZ4F_decompressOptions_t* const dOptPtr =
@@ -2351,12 +2369,11 @@ LZ4IO_decompressLZ4F(dRess_t ress,
 
         /* Read input */
         readSize = fread(inBuffs[bSetNb], 1, INBUFF_SIZE, srcFile);
-        if (ferror(srcFile)) END_PROCESS(26, "Read error");
+        if (ferror(srcFile)) { readError = 1; break; }
 
         /* push to decoding thread */
         {   LZ4FChunk* const lbi = (LZ4FChunk*)malloc(sizeof(*lbi));
-            if (lbi==NULL)
-                END_PROCESS(25, "Allocation error : not enough memory to allocate job descriptor");
+            if (lbi==NULL) { allocError = 1; break; }
             lbi->dctx = ress.dCtx;
             lbi->inBuffer = inBuffs[bSetNb];
             lbi->inSize = readSize;
@@ -2366,6 +2383,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             lbi->wPool = wPool;
             lbi->totalSize = &filesize;
             lbi->lastStatus = &lastStatus;
+            lbi->error = &decodeError;
             lbi->foutput = dstFile;
             lbi->sparseEnable = prefs->sparseFileSupport;
             lbi->storedSkips = &storedSkips;
@@ -2373,16 +2391,33 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         }
         if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
     }
-    assert(feof(srcFile));
+    if (!readError) assert(feof(srcFile));
 
-    /* Wait for all decompression completion */
+    /* Wait for all decompression completion.
+     * Note: both pools must be drained before exiting :
+     * the write thread may still be writing to the output file,
+     * and exit() would otherwise race with it (crash on stdio teardown). */
     TPool_jobsCompleted(tPool);
+    TPool_jobsCompleted(wPool);
+
+    /* report errors, if any (they are only exits at this point : all threads are done) */
+    switch (decodeError) {
+        case LZ4IO_decodeErr_none:
+            break;
+        case LZ4IO_decodeErr_decompression:
+            END_PROCESS(34, "Decompression error : %s", LZ4F_getErrorName(lastStatus));
+        case LZ4IO_decodeErr_outBuffer:
+            END_PROCESS(33, "Could not allocate output buffer!");
+        default: /* LZ4IO_decodeErr_jobDescriptor */
+            END_PROCESS(35, "Allocation error : can't describe new write job");
+    }
+    if (readError) END_PROCESS(26, "Read error");
+    if (allocError) END_PROCESS(25, "Allocation error : not enough memory to allocate job descriptor");
 
     /* flush */
     if (lastStatus != 0) {
         END_PROCESS(26, "LZ4F frame decoding could not complete: invalid frame");
     }
-    TPool_jobsCompleted(wPool);
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
     /* Clean */
