@@ -59,6 +59,7 @@
 #include <sys/stat.h>  /* stat64 */
 #include "lz4conf.h"   /* compile-time constants */
 #include "lz4io.h"
+#include "threadpool.h" /* TPool_* */
 #define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
 #include "lz4.h"       /* required for legacy format */
 #include "lz4hc.h"     /* required for legacy format */
@@ -186,6 +187,7 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, double cpuTimeStart, unsign
     DISPLAYLEVEL(1, __VA_ARGS__);                                 \
     DISPLAYLEVEL(1, " \n");                                       \
     fflush(NULL);                                                 \
+    assert(TPool_allJobsAwaited());  /* no job running */         \
     exit(error);                                                  \
 }
 /* JOB_ERROR() : error met within a job, see TPool_setJobError() */
@@ -533,8 +535,6 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 /***************************************
 *   MT I/O
 ***************************************/
-
-#include "threadpool.h"
 
 /* LZ4IO_waitJobs() :
  * waits for all jobs of both pools, then exits with the first error met by a job, if any */

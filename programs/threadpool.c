@@ -57,9 +57,13 @@ void TPool_free(TPool* ctx) {
     (void)ctx;
 }
 
+static int g_nbRunningJobs = 0;
+
 void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg) {
     (void)ctx;
+    g_nbRunningJobs++;
     job_function(arg);
+    g_nbRunningJobs--;
 }
 
 void TPool_jobsCompleted(TPool* ctx) {
@@ -77,6 +81,11 @@ int TPool_jobError(void) {
     return g_jobError;
 }
 
+/* jobs complete when submitted : only an exit from within a job is detected */
+int TPool_allJobsAwaited(void) {
+    return g_nbRunningJobs == 0;
+}
+
 
 #elif defined(_WIN32)
 
@@ -91,7 +100,23 @@ typedef struct TPool_s {
     LONG nbPendingJobs;
     HANDLE jobSlotAvail;  /* For queue size control */
     HANDLE allJobsCompleted; /* Event */
+    LONG unawaited;       /* jobs submitted since the last TPool_jobsCompleted() */
 } TPool;
+
+static LONG g_nbUnawaitedPools = 0;
+
+static void TPool_setUnawaited(TPool* pool, LONG unawaited)
+{
+    if (InterlockedExchange(&pool->unawaited, unawaited) != unawaited) {
+        if (unawaited) InterlockedIncrement(&g_nbUnawaitedPools);
+        else InterlockedDecrement(&g_nbUnawaitedPools);
+    }
+}
+
+int TPool_allJobsAwaited(void)
+{
+    return InterlockedCompareExchange(&g_nbUnawaitedPools, 0, 0) == 0;
+}
 
 void TPool_free(TPool* pool)
 {
@@ -120,6 +145,7 @@ void TPool_free(TPool* pool)
     CloseHandle(pool->jobSlotAvail);
     CloseHandle(pool->allJobsCompleted);
 
+    TPool_setUnawaited(pool, 0);
     free(pool);
 }
 
@@ -198,6 +224,8 @@ void TPool_submitJob(TPool* pool, void (*job_function)(void*), void* arg)
 {
     assert(pool);
 
+    TPool_setUnawaited(pool, 1);
+
     /* Atomically increment pending jobs and check for overflow */
     WaitForSingleObject(pool->jobSlotAvail, INFINITE);
     ResetEvent(pool->allJobsCompleted);
@@ -218,6 +246,7 @@ void TPool_jobsCompleted(TPool* pool)
     while (InterlockedCompareExchange(&pool->nbPendingJobs, 0, 0) > 0) {
         WaitForSingleObject(pool->allJobsCompleted, INFINITE);
     }
+    TPool_setUnawaited(pool, 0);
 }
 
 static LONG g_jobError = 0;
@@ -268,13 +297,38 @@ struct TPool_s {
     pthread_cond_t queuePopCond;
     /* Indicates if the queue is shutting down */
     int shutdown;
+    /* Jobs were submitted since the last TPool_jobsCompleted() (protected by g_unawaitedMutex) */
+    int unawaited;
 };
+
+static pthread_mutex_t g_unawaitedMutex = PTHREAD_MUTEX_INITIALIZER;
+static int g_nbUnawaitedPools = 0;
+
+static void TPool_setUnawaited(TPool* ctx, int unawaited)
+{
+    pthread_mutex_lock(&g_unawaitedMutex);
+    if (ctx->unawaited != unawaited) {
+        g_nbUnawaitedPools += unawaited ? 1 : -1;
+        ctx->unawaited = unawaited;
+    }
+    pthread_mutex_unlock(&g_unawaitedMutex);
+}
+
+int TPool_allJobsAwaited(void)
+{
+    int nbUnawaitedPools;
+    pthread_mutex_lock(&g_unawaitedMutex);
+    nbUnawaitedPools = g_nbUnawaitedPools;
+    pthread_mutex_unlock(&g_unawaitedMutex);
+    return nbUnawaitedPools == 0;
+}
 
 static void TPool_shutdown(TPool* ctx);
 
 void TPool_free(TPool* ctx) {
     if (!ctx) { return; }
     TPool_shutdown(ctx);
+    TPool_setUnawaited(ctx, 0);
     pthread_mutex_destroy(&ctx->queueMutex);
     pthread_cond_destroy(&ctx->queuePushCond);
     pthread_cond_destroy(&ctx->queuePopCond);
@@ -407,6 +461,7 @@ void TPool_jobsCompleted(TPool* ctx){
     while(!ctx->queueEmpty || ctx->numThreadsBusy > 0) {
         pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
     }
+    TPool_setUnawaited(ctx, 0);
     pthread_mutex_unlock(&ctx->queueMutex);
 }
 
@@ -443,6 +498,7 @@ TPool_submitJob_internal(TPool* ctx, void (*job_function)(void*), void *arg)
 void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg)
 {
     assert(ctx != NULL);
+    TPool_setUnawaited(ctx, 1);
     pthread_mutex_lock(&ctx->queueMutex);
     /* Wait until there is space in the queue for the new job */
     while (isQueueFull(ctx) && (!ctx->shutdown)) {
