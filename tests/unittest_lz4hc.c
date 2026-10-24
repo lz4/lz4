@@ -354,6 +354,48 @@ TEST(compress_HC_destSize_sameAsFast)
     }   }
 }
 
+/* continue_destSize() may consume less input than provided,
+ * in which case the next block resumes from src + consumed.
+ * The unconsumed tail was not compressed :
+ * the stream must not reference it, and decoding must remain exact. */
+TEST(compress_HC_destSize_partialConsumption)
+{
+    int const junkEnd = 5000;
+    int const srcSize = 30000;
+    int const dstBudget1 = 300;
+    char* const src = (char*)UT_malloc((size_t)srcSize);
+    char* const dst = (char*)UT_malloc(LZ4_COMPRESSBOUND((size_t)srcSize));
+    char* const out1 = (char*)UT_malloc((size_t)srcSize);
+    char* const out2 = (char*)UT_malloc((size_t)srcSize);
+    size_t l, j;
+    ASSERT(srcSize > junkEnd + 16);
+    for (j = 0; j < (size_t)junkEnd; j++)
+        src[j] = (char)(UT_rand() & 0xFF);
+    for (j = (size_t)junkEnd; j < (size_t)srcSize; j++)
+        src[j] = "WXYZ"[j & 3];
+    for (l = 0; l < ARRAY_SIZE(g_levels); l++) {
+        LZ4_streamHC_t* const stream = newStreamHC(g_levels[l]);
+        int provided = srcSize;
+        int const c1Size = LZ4_compress_HC_continue_destSize(stream, src, dst, &provided, dstBudget1);
+        int dSize1, dSize2, c2Size, provided2;
+        ASSERT(c1Size > 0);
+        ASSERT(provided > 0 && provided < srcSize);   /* some input was left for the next block */
+        ASSERT(provided < junkEnd);   /* the periodic tail must not be consumed yet */
+        dSize1 = LZ4_decompress_safe(dst, out1, c1Size, srcSize);
+        ASSERT_EQ(dSize1, provided);
+        ASSERT_MEMEQ(out1, src, (size_t)provided);
+        /* next block : resubmit from src + consumed, ending before the previous buffer end,
+         * leaving room for a small match within the leftover window */
+        provided2 = srcSize - provided - 16;
+        c2Size = LZ4_compress_HC_continue_destSize(stream, src + provided, dst + c1Size, &provided2, (int)LZ4_COMPRESSBOUND((size_t)provided2));
+        ASSERT(c2Size > 0);
+        ASSERT(provided2 > 0);
+        dSize2 = LZ4_decompress_safe_usingDict(dst + c1Size, out2, c2Size, srcSize, out1, dSize1);
+        ASSERT_EQ(dSize2, provided2);
+        ASSERT_MEMEQ(out2, src + provided, (size_t)provided2);
+    }
+}
+
 
 static const UT_test tests[] = {
     UT_TEST(compress_HC_nullInput),
@@ -370,5 +412,6 @@ static const UT_test tests[] = {
     UT_TEST(compress_HC_continue_dictionary_twoBlocks),
     UT_TEST(compress_HC_continue_remoteDictionary),
     UT_TEST(compress_HC_destSize_sameAsFast),
+    UT_TEST(compress_HC_destSize_partialConsumption),
 };
 UT_SUITE(lz4hc, tests);
