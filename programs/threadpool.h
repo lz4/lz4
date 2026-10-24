@@ -59,6 +59,14 @@ void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg);
  */
 void TPool_jobsCompleted(TPool* ctx);
 
+/*! TPool_allJobsAwaited() :
+ *  @return 1 if all jobs submitted to any pool were awaited by TPool_jobsCompleted(),
+ *  0 otherwise, notably from within a job.
+ *  The process must only exit when it returns 1 :
+ *  otherwise, exit() races with the other threads (ex: on output streams).
+ */
+int TPool_allJobsAwaited(void);
+
 
 
 #if defined (__cplusplus)
