@@ -305,6 +305,8 @@ static unsigned FUZ_highbit(U32 v32)
 
 /*-*******************************************************
 *  Tests
+*  Note : new unit tests go to tests/unit/ (see tests/unit/unittest.h), not here :
+*  the unit tests of this file are progressively moved there.
 *********************************************************/
 
 #define CONTROL(c) { \
@@ -2328,6 +2330,7 @@ _output_error:
 }
 
 
+/* Note : new unit tests go to tests/unit/, not here */
 static int unitTests(U32 seed, double compressibility)
 {
 #define COMPRESSIBLE_NOISE_LENGTH (2 MB)

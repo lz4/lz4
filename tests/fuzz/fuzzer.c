@@ -1182,6 +1182,8 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
 #define testCompressedSize (130 KB)
 #define ringBufferSize (8 KB)
 
+/* Note : new unit tests go to tests/unit/ (see tests/unit/unittest.h), not here :
+ * the tests of FUZ_unitTests() are progressively moved there. */
 static void FUZ_unitTests(int compressionLevel)
 {
     const unsigned testNb = 0;

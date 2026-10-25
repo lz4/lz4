@@ -13,6 +13,40 @@ This directory is organized as follows :
 Test programs are built in this directory, by `make <program>`, and run by `make test-<name>` (see `Makefile`).
 
 
+#### Running tests
+
+- `make test-unittest` : unit tests.
+  `./unittest -l` lists them, `./unittest <filter>` runs the tests whose name contains `<filter>`,
+  and `-s#` changes the seed of their data.
+- `make test-lz4-essentials` : main tests of the `lz4` command line
+- `make test` : all tests (long)
+
+
+#### Adding tests
+
+Unit tests of the library go to `unit/`, in the file of the corresponding library source
+(`unittest_lz4.c`, `unittest_lz4hc.c`, `unittest_lz4frame.c`) :
+```c
+TEST(getBlockSize_64KB)
+{
+    ASSERT_EQ(LZ4F_getBlockSize(LZ4F_max64KB), 64 KB);
+}
+```
+then add `UT_TEST(getBlockSize_64KB),` to the table at the end of the file.
+Each test runs in its own context : buffers from `UT_malloc()` and `UT_sample()` are released at the end of the test,
+even when it fails, and a failed assertion only ends this test.
+See `unit/unittest.h` for assertions and helpers.
+
+`fuzz/fuzzer.c` and `fuzz/frametest.c` still contain unit tests, which are progressively moved to `unit/` :
+don't add new ones there.
+
+Tests of the command line go to `cli/` : extend an existing script, or create `cli/test-lz4-<name>.sh`,
+with a `test-lz4-<name>` target in `Makefile` and an entry in `build/meson/meson/tests/meson.build`.
+Scripts run from this directory, and find `lz4` and `datagen` in `PATH`.
+Their temporary files start with a prefix unique to the script, itself starting with `tmp`,
+and are removed on success.
+
+
 #### `compat/test-lz4-versions.py` - script for testing lz4 interoperability between versions
 
 This script creates `versionsTest` directory to which lz4 repository is cloned.
