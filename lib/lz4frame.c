@@ -1362,8 +1362,9 @@ static size_t LZ4F_flushBlockPartial(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCap
  * Output only depends on content and flush points :
  * never on nb of workers, scheduling, input slicing, nor stableSrc.
  * nbWorkers is the nb of worker threads compressing jobs : the calling thread only fills and emits them.
- * Without multi-threading support (LZ4F_MULTITHREAD), or without worker threads (creation failure),
- * the calling thread processes jobs alone, producing the same output. */
+ * Without multi-threading support (LZ4F_MULTITHREAD), the calling thread processes jobs alone, producing the same output.
+ * If no worker thread can be created, frame compression fails (allocation_failed) ;
+ * with fewer threads than requested (ex: system limits), it proceeds with them. */
 
 /*! LZ4F_compressJob() :
  *  compress one job, as a sequence of blocks (stored uncompressed when @mode == LZ4B_UNCOMPRESSED).
@@ -1765,6 +1766,7 @@ typedef struct {
 
 struct LZ4F_mtCtx_s {
     LZ4F_pool_t* pool;       /* NULL : jobs run within the calling thread */
+    unsigned poolRequested;  /* nbWorkers requested when pool was created : it can have fewer threads */
     void** states;           /* one LZ4 state per worker; states[0] : cctx's own state, for the calling thread without pool */
     unsigned nbStates;
     LZ4F_CtxType_e statesType;
@@ -2033,11 +2035,13 @@ static size_t LZ4F_mt_begin(LZ4F_cctx_t* cctx)
 
     /* worker threads */
 #if LZ4F_MULTITHREAD
-    /* a missing or incomplete pool (ex: transient allocation failure) is created again for next frames :
-     * meanwhile, jobs are processed by available threads, or serially, producing the same output */
-    if (LZ4F_pool_nbThreads(mt->pool) != nbWorkers) {
+    /* an incomplete pool (fewer threads than requested) is kept ;
+     * without any worker thread, frame compression fails, and next frames try again */
+    if ((mt->pool == NULL) || (mt->poolRequested != nbWorkers)) {
         LZ4F_pool_free(mt->pool, cmem);
         mt->pool = LZ4F_pool_create(nbWorkers, (unsigned)LZ4F_MT_NBSLOTS(nbWorkers), cmem);   /* queue : all job slots */
+        mt->poolRequested = nbWorkers;
+        RETURN_ERROR_IF(mt->pool == NULL, allocation_failed);
     }
 #endif
     nbThreads = LZ4F_pool_nbThreads(mt->pool);
