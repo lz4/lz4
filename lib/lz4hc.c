@@ -589,6 +589,37 @@ static LZ4HC_match_t LZ4MID_searchExtDict(const BYTE* ip, U32 ipIndex,
     }
 }
 
+/* LZ4HC_dropPositions() :
+ * In fillOutput mode, compression can stop at @start, before positions the parser has already referenced.
+ * The next block compresses them : it must not find them as matches.
+ * Remove their references from the hash table, up to @end (excluded).
+ * Costs one pass on these positions, or on the hash table, whichever is shorter. */
+static void
+LZ4HC_dropPositions(LZ4HC_CCtx_internal* ctx, const BYTE* start, const BYTE* end, lz4hc_strat_e strat)
+{
+    U32* const hashTable = ctx->hashTable;
+    U32 const startIdx = ctx->dictLimit + (U32)(start - ctx->prefixStart);
+    if (end - start > LZ4HC_HASHTABLESIZE) {
+        int i;
+        for (i = 0; i < LZ4HC_HASHTABLESIZE; i++) {
+            /* branchless, so that it can be vectorized */
+            hashTable[i] = (hashTable[i] >= startIdx) ? 0 : hashTable[i];
+        }
+    } else {
+        U32 idx = startIdx;
+        const BYTE* p;
+        for (p = start; p < end; p++, idx++) {
+            if (strat == lz4mid) {
+                U32 const h4 = LZ4MID_hash4Ptr(p);
+                U32 const h8 = LZ4MID_HASHTABLESIZE + LZ4MID_hash8Ptr(p);
+                if (hashTable[h4] == idx) hashTable[h4] = 0;
+                if (hashTable[h8] == idx) hashTable[h8] = 0;
+            } else {
+                U32 const h = LZ4HC_hashPtr(p);
+                if (hashTable[h] == idx) hashTable[h] = 0;
+    }   }   }
+}
+
 /**************************************
 *  Mid Compression (level 2)
 **************************************/
@@ -696,6 +727,7 @@ static int LZ4MID_compress (
     const U32 dictIdx = ctx->lowLimit;
     const U32 gDictEndIndex = ctx->lowLimit;
     const LZ4MID_searchIntoDict_f searchIntoDict = (dict == usingDictCtxHc) ? select_searchDict_function(ctx->dictCtx) : NULL;
+    const BYTE* refEnd = ip;   /* fillOutput : the hash tables reference positions before MAX(refEnd, ip) */
 
     DEBUGLOG(5, "LZ4MID_compress (%i bytes)", *srcSizePtr);
 
@@ -786,6 +818,7 @@ _lz4mid_encode_sequence:
                 (int)matchLength, (int)matchDistance,
                 limit, oend) ) {
             if (limit != fillOutput) return 0;  /* compression failed */
+            refEnd = ip + matchLength;
             LZ4HC_encodeLastSequence_fillOutput(UPDATABLE(ip, op, anchor),
                                 (int)matchLength, (int)matchDistance, oend);
             break;
@@ -807,8 +840,11 @@ _lz4mid_encode_sequence:
     }
 
 _lz4mid_last_literals:
+    if (refEnd < ip) refEnd = ip;
     if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend))
         return 0;  /* not enough space in @dst */
+    if (ip < refEnd)   /* fillOutput : the rest of input is left to the next block */
+        LZ4HC_dropPositions(ctx, ip, MIN(refEnd, ilimit), lz4mid);
 
     /* End */
     DEBUGLOG(5, "compressed %i bytes into %i bytes", *srcSizePtr, (int)((char*)op - dst));
@@ -1421,6 +1457,7 @@ LZ4HC_compress_generic_internal (
     ctx->end += *srcSizePtr;
     {   cParams_t const cParam = LZ4HC_getCLevelParams(cLevel);
         HCfavor_e const favor = ctx->favorDecSpeed ? favorDecompressionSpeed : favorCompressionRatio;
+        int const srcSize = *srcSizePtr;
         int result;
 
         if (cParam.strat == lz4mid) {
@@ -1439,6 +1476,20 @@ LZ4HC_compress_generic_internal (
                                 dict, favor);
         }
         if (result <= 0) ctx->dirty = 1;
+        if ((limit == fillOutput) && (result > 0) && (*srcSizePtr < srcSize)) {
+            /* fillOutput : compression stopped before the end of input.
+             * The rest of input is left to the next block : it isn't history yet,
+             * and the positions already inserted into it are dropped (lz4mid drops its own).
+             * Note : a failed compression is different : lz4frame stores its block uncompressed,
+             * and the next block still references it. */
+            const BYTE* const consumedEnd = (const BYTE*)src + *srcSizePtr;
+            U32 const consumedIdx = ctx->dictLimit + (U32)(consumedEnd - ctx->prefixStart);
+            if ((cParam.strat != lz4mid) && (ctx->nextToUpdate > consumedIdx)) {
+                LZ4HC_dropPositions(ctx, consumedEnd, consumedEnd + (ctx->nextToUpdate - consumedIdx), cParam.strat);
+                ctx->nextToUpdate = consumedIdx;
+            }
+            ctx->end = consumedEnd;
+        }
         return result;
     }
 }

@@ -354,6 +354,54 @@ TEST(compress_HC_destSize_sameAsFast)
     }   }
 }
 
+/* LZ4_compress_HC_continue_destSize() can stop before the end of input :
+ * the next block resumes from there, either in place, or from a refilled buffer
+ * after saving history with LZ4_saveDictHC().
+ * Each block is decoded as the continuation of the previous ones. */
+TEST(compress_HC_continue_destSize_resume)
+{
+    static const int levels[] = { LZ4HC_CLEVEL_MIN, LZ4HC_CLEVEL_DEFAULT, LZ4HC_CLEVEL_OPT_MIN };   /* lz4mid, hash chain, optimal parser */
+    int const srcSize = 256 KB;
+    int const bufSize = 64 KB;
+    int const dstBudget = 2 KB;
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const buf = (char*)UT_malloc((size_t)bufSize);
+    char* const dict = (char*)UT_malloc(64 KB);
+    char* const dst = (char*)UT_malloc((size_t)dstBudget);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    size_t l;
+    int refill;
+    for (l = 0; l < ARRAY_SIZE(levels); l++)
+    for (refill = 0; refill <= 1; refill++) {
+        LZ4_streamHC_t* const stream = newStreamHC(levels[l]);
+        LZ4_streamDecode_t dStream;
+        int pos = 0, readPos = 0, bufFill = 0;
+        LZ4_setStreamDecode(&dStream, NULL, 0);
+        while (pos < srcSize) {
+            const char* input = src + pos;
+            int consumed = srcSize - pos;
+            int cSize, dSize;
+            if (refill) {
+                int const toRead = (bufSize - bufFill < srcSize - readPos) ? bufSize - bufFill : srcSize - readPos;
+                memcpy(buf + bufFill, src + readPos, (size_t)toRead);
+                bufFill += toRead;
+                readPos += toRead;
+                input = buf;
+                consumed = bufFill;
+            }
+            cSize = LZ4_compress_HC_continue_destSize(stream, input, dst, &consumed, dstBudget);
+            ASSERT(cSize > 0 && consumed > 0);
+            dSize = LZ4_decompress_safe_continue(&dStream, dst, decoded + pos, cSize, srcSize - pos);
+            ASSERT_MSG(dSize == consumed && !memcmp(decoded + pos, src + pos, (size_t)consumed),
+                       "level %i, refill %i : block at position %i is corrupted", levels[l], refill, pos);
+            pos += consumed;
+            if (refill) {
+                LZ4_saveDictHC(stream, dict, 64 KB);
+                memmove(buf, buf + consumed, (size_t)(bufFill - consumed));
+                bufFill -= consumed;
+    }   }   }
+}
+
 
 static const UT_test tests[] = {
     UT_TEST(compress_HC_nullInput),
@@ -370,5 +418,6 @@ static const UT_test tests[] = {
     UT_TEST(compress_HC_continue_dictionary_twoBlocks),
     UT_TEST(compress_HC_continue_remoteDictionary),
     UT_TEST(compress_HC_destSize_sameAsFast),
+    UT_TEST(compress_HC_continue_destSize_resume),
 };
 UT_SUITE(lz4hc, tests);
