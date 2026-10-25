@@ -59,6 +59,7 @@
 #include <sys/stat.h>  /* stat64 */
 #include "lz4conf.h"   /* compile-time constants */
 #include "lz4io.h"
+#include "threadpool.h" /* TPool_* */
 #define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
 #include "lz4.h"       /* required for legacy format */
 #include "lz4hc.h"     /* required for legacy format */
@@ -186,7 +187,21 @@ static void LZ4IO_finalTimeDisplay(TIME_t timeStart, double cpuTimeStart, unsign
     DISPLAYLEVEL(1, __VA_ARGS__);                                 \
     DISPLAYLEVEL(1, " \n");                                       \
     fflush(NULL);                                                 \
+    assert(TPool_allJobsAwaited());  /* no job running */         \
     exit(error);                                                  \
+}
+/* JOB_ERROR() : error met within a job, see TPool_setJobError() */
+#define JOB_ERROR(error, ...)                                     \
+{                                                                 \
+    DISPLAYLEVEL(1, "Error %i : ", error);                        \
+    DISPLAYLEVEL(1, __VA_ARGS__);                                 \
+    DISPLAYLEVEL(1, " \n");                                       \
+    TPool_setJobError(error);                                     \
+}
+#define END_PROCESS_OR_JOB_ERROR(fromJob, error, ...)             \
+{                                                                 \
+    if (fromJob) JOB_ERROR(error, __VA_ARGS__)                    \
+    else END_PROCESS(error, __VA_ARGS__)                          \
 }
 
 #define LZ4IO_STATIC_ASSERT(c)   { enum { LZ4IO_static_assert = 1/(int)(!!(c)) }; }   /* use after variable declarations */
@@ -521,7 +536,17 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
 *   MT I/O
 ***************************************/
 
-#include "threadpool.h"
+/* LZ4IO_waitJobs() :
+ * waits for all jobs of both pools, then exits with the first error met by a job, if any */
+static void LZ4IO_waitJobs(TPool* tPool, TPool* wPool)
+{
+    TPool_jobsCompleted(tPool);
+    TPool_jobsCompleted(wPool);
+    if (TPool_jobError()) {
+        fflush(NULL);
+        exit(TPool_jobError());
+    }
+}
 
 typedef struct {
     void* buf;
@@ -647,8 +672,9 @@ typedef struct {
 static void LZ4IO_writeBuffer(BufferDesc bufDesc, FILE* out)
 {
     size_t const size = bufDesc.size;
+    if (TPool_jobError()) return;   /* nothing more to write */
     if (fwrite(bufDesc.buf, 1, size, out) != size) {
-        END_PROCESS(38, "Write error : cannot write compressed block");
+        JOB_ERROR(38, "Write error : cannot write compressed block");
     }
 }
 
@@ -719,14 +745,18 @@ static void LZ4IO_compressChunk(void* arg)
     CompressJobDesc* const cjd = (CompressJobDesc*)arg;
     size_t const outCapacity = cjd->maxCBlockSize;
     void* const out_buff = malloc(outCapacity);
-    if (!out_buff)
-        END_PROCESS(33, "Allocation error : can't allocate output buffer to compress new chunk");
+    if (!out_buff) {
+        JOB_ERROR(33, "Allocation error : can't allocate output buffer to compress new chunk");
+        return;
+    }
     {   size_t const cSize = cjd->compress(cjd->compressParameters, out_buff, outCapacity, cjd->buffer, cjd->inSize);
 
         /* check for write */
         {   WriteJobDesc* const wjd = (WriteJobDesc*)malloc(sizeof(*wjd));
             if (wjd == NULL) {
-                END_PROCESS(35, "Allocation error : can't describe new write job");
+                JOB_ERROR(35, "Allocation error : can't describe new write job");
+                free(out_buff);
+                return;
             }
             wjd->cBuf = out_buff;
             wjd->cSize = (size_t)cSize;
@@ -740,7 +770,7 @@ static void LZ4IO_compressChunk(void* arg)
 static void LZ4IO_compressAndFreeChunk(void* arg)
 {
     CompressJobDesc* const cjd = (CompressJobDesc*)arg;
-    LZ4IO_compressChunk(arg);
+    if (!TPool_jobError()) LZ4IO_compressChunk(arg);
     /* clean up */
     free(cjd->buffer);
     free(cjd); /* because cjd is pod */
@@ -766,11 +796,15 @@ static void LZ4IO_readAndProcess(void* arg)
     ReadTracker* const rjd = (ReadTracker*)arg;
     size_t const chunkSize = rjd->chunkSize;
     void* const buffer = malloc(chunkSize);
-    if (!buffer)
-        END_PROCESS(31, "Allocation error : can't allocate buffer to read new chunk");
+    if (!buffer) {
+        JOB_ERROR(31, "Allocation error : can't allocate buffer to read new chunk");
+        return;
+    }
     {   size_t const inSize = fread(buffer, (size_t)1, chunkSize, rjd->fin);
         if (inSize > chunkSize) {
-            END_PROCESS(32, "Read error (read %u > %u [chunk size])", (unsigned)inSize, (unsigned)chunkSize);
+            JOB_ERROR(32, "Read error (read %u > %u [chunk size])", (unsigned)inSize, (unsigned)chunkSize);
+            free(buffer);
+            return;
         }
         rjd->totalReadSize += inSize;
         /* special case: nothing left: stop read operation */
@@ -781,7 +815,9 @@ static void LZ4IO_readAndProcess(void* arg)
         /* process read input */
         {   CompressJobDesc* const cjd = (CompressJobDesc*)malloc(sizeof(*cjd));
             if (cjd==NULL) {
-                END_PROCESS(33, "Allocation error : can't describe new compression job");
+                JOB_ERROR(33, "Allocation error : can't describe new compression job");
+                free(buffer);
+                return;
             }
             cjd->wpool = rjd->wpool;
             cjd->buffer = buffer; /* transfer ownership */
@@ -793,7 +829,7 @@ static void LZ4IO_readAndProcess(void* arg)
             cjd->wr = rjd->wr;
             cjd->maxCBlockSize = rjd->maxCBlockSize;
             TPool_submitJob(rjd->tPool, LZ4IO_compressAndFreeChunk, cjd);
-            if (inSize == chunkSize) {
+            if ((inSize == chunkSize) && !TPool_jobError()) {
                 /* likely more => read another chunk */
                 rjd->blockNb++;
                 TPool_submitJob(rjd->tPool, LZ4IO_readAndProcess, rjd);
@@ -966,9 +1002,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         rjd.maxCBlockSize = (size_t)LZ4_compressBound(LEGACY_BLOCKSIZE) + LZ4IO_LEGACY_BLOCK_HEADER_SIZE;
         /* Ignite the job chain */
         TPool_submitJob(tPool, LZ4IO_readAndProcess, &rjd);
-        /* Wait for all completion */
-        TPool_jobsCompleted(tPool);
-        TPool_jobsCompleted(wPool);
+        LZ4IO_waitJobs(tPool, wPool);
 
         LZ4IO_finishCompressedFile(finput, foutput, input_filename, output_filename,
                                    rjd.totalReadSize, wr.totalCSize, 0, 0, prefs);
@@ -1754,7 +1788,8 @@ static unsigned
 LZ4IO_fwriteSparse(FILE* file,
                    const void* buffer, size_t bufferSize,
                    int sparseFileSupport,
-                   unsigned storedSkips)
+                   unsigned storedSkips,
+                   int fromJob)
 {
     const size_t sizeT = sizeof(size_t);
     const size_t maskT = sizeT -1 ;
@@ -1767,14 +1802,14 @@ LZ4IO_fwriteSparse(FILE* file,
 
     if (!sparseMode) {  /* normal write */
         size_t const sizeCheck = fwrite(buffer, 1, bufferSize, file);
-        if (sizeCheck != bufferSize) END_PROCESS(70, "Write error : cannot write decoded block");
+        if (sizeCheck != bufferSize) END_PROCESS_OR_JOB_ERROR(fromJob, 70, "Write error : cannot write decoded block");
         return 0;
     }
 
     /* avoid int overflow */
     if (storedSkips > 1 GB) {
         int const seekResult = UTIL_fseek(file, 1 GB, SEEK_CUR);
-        if (seekResult != 0) END_PROCESS(71, "1 GB skip error (sparse file support)");
+        if (seekResult != 0) { END_PROCESS_OR_JOB_ERROR(fromJob, 71, "1 GB skip error (sparse file support)"); return 0; }
         storedSkips -= 1 GB;
     }
 
@@ -1791,13 +1826,13 @@ LZ4IO_fwriteSparse(FILE* file,
         if (nb0T != seg0SizeT) {   /* not all 0s */
             errno = 0;
             {   int const seekResult = UTIL_fseek(file, storedSkips, SEEK_CUR);
-                if (seekResult) END_PROCESS(72, "Sparse skip error(%d): %s ; try --no-sparse", (int)errno, strerror(errno));
+                if (seekResult) { END_PROCESS_OR_JOB_ERROR(fromJob, 72, "Sparse skip error(%d): %s ; try --no-sparse", (int)errno, strerror(errno)); return 0; }
             }
             storedSkips = 0;
             seg0SizeT -= nb0T;
             ptrT += nb0T;
             {   size_t const sizeCheck = fwrite(ptrT, sizeT, seg0SizeT, file);
-                if (sizeCheck != seg0SizeT) END_PROCESS(73, "Write error : cannot write decoded block");
+                if (sizeCheck != seg0SizeT) { END_PROCESS_OR_JOB_ERROR(fromJob, 73, "Write error : cannot write decoded block"); return 0; }
         }   }
         ptrT += seg0SizeT;
     }
@@ -1811,10 +1846,10 @@ LZ4IO_fwriteSparse(FILE* file,
         storedSkips += (unsigned) (restPtr - restStart);
         if (restPtr != restEnd) {
             int const seekResult = UTIL_fseek(file, storedSkips, SEEK_CUR);
-            if (seekResult) END_PROCESS(74, "Sparse skip error ; try --no-sparse");
+            if (seekResult) { END_PROCESS_OR_JOB_ERROR(fromJob, 74, "Sparse skip error ; try --no-sparse"); return 0; }
             storedSkips = 0;
             {   size_t const sizeCheck = fwrite(restPtr, 1, (size_t)(restEnd - restPtr), file);
-                if (sizeCheck != (size_t)(restEnd - restPtr)) END_PROCESS(75, "Write error : cannot write decoded end of block");
+                if (sizeCheck != (size_t)(restEnd - restPtr)) { END_PROCESS_OR_JOB_ERROR(fromJob, 75, "Write error : cannot write decoded end of block"); return 0; }
         }   }
     }
 
@@ -1851,10 +1886,12 @@ static void LZ4IO_writeDecodedChunk(void* arg)
     ChunkToWrite* const ctw = (ChunkToWrite*)arg;
     assert(ctw != NULL);
 
-    /* note: works because only 1 thread */
-    *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->f, ctw->buffer, ctw->size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
-    *ctw->totalSize += (unsigned long long)ctw->size;
-    DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >>20));
+    if (!TPool_jobError()) {   /* otherwise, nothing more to write */
+        /* note: works because only 1 thread */
+        *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->f, ctw->buffer, ctw->size, ctw->sparseEnable, *ctw->storedSkips, 1);
+        *ctw->totalSize += (unsigned long long)ctw->size;
+        DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >>20));
+    }
 
     /* clean up */
     free(ctw);
@@ -1876,13 +1913,20 @@ static void LZ4IO_decompressBlockLegacy(void* arg)
     int decodedSize;
     LegacyBlockInput* const lbi = (LegacyBlockInput*)arg;
 
+    if (TPool_jobError()) { free(lbi); return; }   /* stop decoding */
     decodedSize = LZ4_decompress_safe((const char*)lbi->inBuffer, (char*)lbi->outBuffer, (int)lbi->inSize, LEGACY_BLOCKSIZE);
-    if (decodedSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
+    if (decodedSize < 0) {
+        JOB_ERROR(64, "Decoding Failed ! Corrupted input detected !");
+        free(lbi);
+        return;
+    }
 
     /* push to write thread */
     {   ChunkToWrite* const ctw = (ChunkToWrite*)malloc(sizeof(*ctw));
         if (ctw==NULL) {
-            END_PROCESS(33, "Allocation error : can't describe new write job");
+            JOB_ERROR(33, "Allocation error : can't describe new write job");
+            free(lbi);
+            return;
         }
         ctw->buffer = lbi->outBuffer;
         ctw->size = (size_t)decodedSize;
@@ -1926,12 +1970,15 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
         char header[LZ4IO_LEGACY_BLOCK_HEADER_SIZE];
         unsigned int blockSize;
 
+        if (TPool_jobError()) break;
+
         /* Block Size */
         {   size_t const sizeCheck = fread(header, 1, LZ4IO_LEGACY_BLOCK_HEADER_SIZE, finput);
             if (sizeCheck == 0) break;                   /* Nothing to read : file read is completed */
-            if (sizeCheck != LZ4IO_LEGACY_BLOCK_HEADER_SIZE)
+            if (sizeCheck != LZ4IO_LEGACY_BLOCK_HEADER_SIZE) {
+                LZ4IO_waitJobs(tPool, wPool);
                 END_PROCESS(61, "Error: cannot read block size in Legacy format");
-        }
+        }   }
         blockSize = LZ4IO_readLE32(header);       /* Convert to Little Endian */
         if (blockSize == 0) break;                /* end marker (Linux kernel) */
         if (blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
@@ -1942,12 +1989,16 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
 
         /* Read Block */
         {   size_t const sizeCheck = fread(inBuffs[bSetNb], 1, blockSize, finput);
-            if (sizeCheck != blockSize)
+            if (sizeCheck != blockSize) {
+                LZ4IO_waitJobs(tPool, wPool);
                 END_PROCESS(63, "Read error : cannot access compressed block !");
+            }
             /* push to decoding thread */
             {   LegacyBlockInput* const lbi = (LegacyBlockInput*)malloc(sizeof(*lbi));
-                if (lbi==NULL)
+                if (lbi==NULL) {
+                    LZ4IO_waitJobs(tPool, wPool);
                     END_PROCESS(64, "Allocation error : not enough memory to allocate job descriptor");
+                }
                 lbi->inBuffer = inBuffs[bSetNb];
                 lbi->inSize = blockSize;
                 lbi->outBuffer = outBuffs[bSetNb];
@@ -1960,11 +2011,8 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
             }
         }
     }
+    LZ4IO_waitJobs(tPool, wPool);
     if (ferror(finput)) END_PROCESS(65, "Read error : ferror");
-
-    /* Wait for all completion */
-    TPool_jobsCompleted(tPool);
-    TPool_jobsCompleted(wPool);
 
     /* flush last zeroes */
     LZ4IO_fwriteSparseEnd(foutput, storedSkips);
@@ -2020,7 +2068,7 @@ LZ4IO_decodeLegacyStream(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs
             if (decodeSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
             streamSize += (unsigned long long)decodeSize;
             /* Write Block */
-            storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, (size_t)decodeSize, prefs->sparseFileSupport, storedSkips); /* success or die */
+            storedSkips = LZ4IO_fwriteSparse(foutput, out_buff, (size_t)decodeSize, prefs->sparseFileSupport, storedSkips, 0); /* success or die */
     }   }
     if (ferror(finput)) END_PROCESS(65, "Read error : ferror");
 
@@ -2067,7 +2115,7 @@ LZ4IO_decodeMozLZ4(FILE* finput, FILE* foutput, const LZ4IO_prefs_t* prefs)
     else
         decodedSize = LZ4_decompress_safe(src, dst, (int)srcSize, (int)dstCapacity);
     if (decodedSize < 0) END_PROCESS(64, "Decoding Failed ! Corrupted input detected !");
-    {   unsigned const storedSkips = LZ4IO_fwriteSparse(foutput, dst, (size_t)decodedSize, prefs->sparseFileSupport, 0); /* success or die */
+    {   unsigned const storedSkips = LZ4IO_fwriteSparse(foutput, dst, (size_t)decodedSize, prefs->sparseFileSupport, 0, 0); /* success or die */
         LZ4IO_fwriteSparseEnd(foutput, storedSkips);
     }
 
@@ -2229,10 +2277,12 @@ static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
     LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)arg;
     assert(ctw != NULL);
 
-    /* note: works because only 1 thread */
-    *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->fOut, ctw->bufOut.ptr, ctw->bufOut.size, ctw->sparseEnable, *ctw->storedSkips); /* success or die */
-    *ctw->totalSize += (unsigned long long)ctw->bufOut.size; /* note: works because only 1 thread */
-    DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >> 20));
+    if (!TPool_jobError()) {   /* otherwise, nothing more to write */
+        /* note: works because only 1 thread */
+        *ctw->storedSkips = LZ4IO_fwriteSparse(ctw->fOut, ctw->bufOut.ptr, ctw->bufOut.size, ctw->sparseEnable, *ctw->storedSkips, 1);
+        *ctw->totalSize += (unsigned long long)ctw->bufOut.size; /* note: works because only 1 thread */
+        DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(ctw->totalSize[0] >> 20));
+    }
 
     /* clean up */
     BufPool_releaseBuffer(ctw->bp, ctw->bufOut);
@@ -2260,11 +2310,13 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
     const char* inPtr = (const char*)lz4fc->inBuffer;
     size_t pos = 0;
 
-    while ((pos < lz4fc->inSize)) {  /* still to read */
+    while ((pos < lz4fc->inSize) && !TPool_jobError()) {  /* still to read */
         size_t remainingInSize = lz4fc->inSize - pos;
         Buffer b = BufPool_getBuffer(lz4fc->bp);
-        if (b.capacity != OUTBUFF_SIZE)
-            END_PROCESS(33, "Could not allocate output buffer!");
+        if (b.capacity != OUTBUFF_SIZE) {
+            JOB_ERROR(33, "Could not allocate output buffer!");
+            break;
+        }
         assert(b.size == 0);
         b.size = b.capacity;
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
@@ -2272,8 +2324,10 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
                                 inPtr + pos, &remainingInSize,
                                 lz4fc->dictBuffer, lz4fc->dictBufferSize,
                                 NULL);
-            if (LZ4F_isError(nextToLoad))
-                END_PROCESS(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
+            if (LZ4F_isError(nextToLoad)) {
+                JOB_ERROR(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
+                break;
+            }
             *lz4fc->lastStatus = nextToLoad;
         }
         assert(remainingInSize <= lz4fc->inSize - pos);
@@ -2283,7 +2337,8 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         /* push to write thread */
         {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
             if (ctw==NULL) {
-                END_PROCESS(35, "Allocation error : can't describe new write job");
+                JOB_ERROR(35, "Allocation error : can't describe new write job");
+                break;
             }
             ctw->bufOut = b;
             ctw->fOut = lz4fc->foutput;
@@ -2348,14 +2403,21 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     for (bSetNb = 0; ; bSetNb = (bSetNb+1) % NB_BUFFSETS) {
         size_t readSize;
 
+        if (TPool_jobError()) break;
+
         /* Read input */
         readSize = fread(inBuffs[bSetNb], 1, INBUFF_SIZE, srcFile);
-        if (ferror(srcFile)) END_PROCESS(26, "Read error");
+        if (ferror(srcFile)) {
+            LZ4IO_waitJobs(tPool, wPool);
+            END_PROCESS(26, "Read error");
+        }
 
         /* push to decoding thread */
         {   LZ4FChunk* const lbi = (LZ4FChunk*)malloc(sizeof(*lbi));
-            if (lbi==NULL)
+            if (lbi==NULL) {
+                LZ4IO_waitJobs(tPool, wPool);
                 END_PROCESS(25, "Allocation error : not enough memory to allocate job descriptor");
+            }
             lbi->dctx = ress.dCtx;
             lbi->inBuffer = inBuffs[bSetNb];
             lbi->inSize = readSize;
@@ -2372,16 +2434,13 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         }
         if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
     }
+    LZ4IO_waitJobs(tPool, wPool);
     assert(feof(srcFile));
-
-    /* Wait for all decompression completion */
-    TPool_jobsCompleted(tPool);
 
     /* flush */
     if (lastStatus != 0) {
         END_PROCESS(26, "LZ4F frame decoding could not complete: invalid frame");
     }
-    TPool_jobsCompleted(wPool);
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
     /* Clean */
@@ -2450,7 +2509,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             /* Write Block */
             if (decodedBytes) {
                 if (!prefs->testMode)
-                    storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, prefs->sparseFileSupport, storedSkips);
+                    storedSkips = LZ4IO_fwriteSparse(dstFile, ress.dstBuffer, decodedBytes, prefs->sparseFileSupport, storedSkips, 0);
                 filesize += decodedBytes;
                 DISPLAYUPDATE(2, "\rDecompressed : %u MiB  ", (unsigned)(filesize>>20));
             }
@@ -2493,7 +2552,7 @@ LZ4IO_passThrough(FILE* finput, FILE* foutput,
     while (readBytes) {
         readBytes = fread(buffer, 1, sizeof(buffer), finput);
         total += readBytes;
-        storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, sparseFileSupport, storedSkips);
+        storedSkips = LZ4IO_fwriteSparse(foutput, buffer, readBytes, sparseFileSupport, storedSkips, 0);
     }
     if (ferror(finput)) END_PROCESS(51, "Read Error");
 
