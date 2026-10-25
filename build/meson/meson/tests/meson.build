@@ -33,12 +33,6 @@ test_exes = {
         ),
     'include_directories': include_directories(lz4_source_root / 'programs'),
   },
-  'decompress-partial-usingDict.c': {
-    'sources': files(lz4_source_root / 'tests/decompress-partial-usingDict.c'),
-  },
-  'decompress-partial.c': {
-    'sources': files(lz4_source_root / 'tests/decompress-partial.c'),
-  },
   'frametest': {
     'sources': files(
       lz4_source_root / 'tests/fuzz/frametest.c',
@@ -75,6 +69,7 @@ test_exes = {
       lz4_source_root / 'tests/unit/unittest_lz4hc.c',
       lz4_source_root / 'tests/unit/unittest_lz4frame.c',
       lz4_source_root / 'tests/tools/datagen.c',
+      lz4_source_root / 'lib/lz4file.c',
     ),
     'include_directories': include_directories(lz4_source_root / 'programs', lz4_source_root / 'tests/tools'),
   },
