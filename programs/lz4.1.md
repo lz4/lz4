@@ -142,7 +142,7 @@ only the latest one will be applied.
 
 * `-T#`, `--threads=#`:
   Use `#` worker threads for compression.
-  The main thread also compresses while waiting for them, so up to `#+1` cores can be busy.
+  The main thread reads and writes files meanwhile.
   When `0`, or none provided: automatically determined from nb of detected cores.
   In both cases, within memory budget (see `--memory`), with a warning when it reduces `#`,
   and no more threads than the jobs of each file (1 MB, or a single block when larger).

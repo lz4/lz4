@@ -51,7 +51,7 @@ cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @Unit
 cli  : decodes legacy frames ended by four zero bytes (Linux kernel end marker), requested by @benjarobin
 cli  : compressed output no longer depends on multithreading support (`lz4` and `lz4-nomt` produce the same frames, also with `-BD`)
 cli  : custom block sizes (`-B#`, # >= 32) are honored, and compressed single-threaded
-cli  : `-T#` : nb of worker threads, beside the main thread, limited by file size and by a memory budget (`--memory=#`, `LZ4_MEMORY`), with a warning when it reduces `#`
+cli  : `-T#` : nb of compression threads (the main thread reads and writes files), limited by file size and by a memory budget (`--memory=#`, `LZ4_MEMORY`), with a warning when it reduces `#`
 cli  : `-T#` capped by liblz4 (1024 threads, 128 on 32-bit systems), replacing build macro `LZ4_NBWORKERS_MAX` ; `-V` tells if compression is multithreaded
 cli  : output buffer no longer grows with the nb of threads : more threads within a memory budget (ex: 22 instead of 13 with `--memory=300M`)
 cli  : a source file modified, renamed or replaced during its compression is detected, and kept with `--rm` ; error 54 when the output can't be verified
