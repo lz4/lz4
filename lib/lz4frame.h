@@ -226,9 +226,10 @@ typedef struct {
  *    LZ4F_srcStable (historical value 1) still only requires the last 64 KB to remain present, as with nbWorkers == 0.
  *  - One-shot (LZ4F_compressFrame()) : success is still guaranteed with LZ4F_compressFrameBound().
  *    Inputs fitting into a single job are compressed by the calling thread.
- *  - Worker threads are created at frame start, and kept within the compression context for next frames.
- *    If none can be created, LZ4F_compressBegin*() and LZ4F_compressFrame*() fail (LZ4F_ERROR_allocation_failed) ;
- *    with fewer than requested (ex: system limits), compression proceeds with them.
+ *  - Worker threads are started on demand, when jobs wait for them (up to nbWorkers), with their buffers :
+ *    small inputs employ few threads and little memory. They are kept within the compression context for next frames.
+ *    If no worker thread can be created at frame start, LZ4F_compressBegin*() and LZ4F_compressFrame*() fail
+ *    (LZ4F_ERROR_allocation_failed) ; failing to start more (ex: system limits), compression proceeds with current ones.
  *    A context with worker threads must not be employed after fork(), in the child process.
  *    On Windows, it must not be employed, nor freed, while the loader lock is held (within DllMain(),
  *    or constructors and destructors of a DLL's global objects) : worker threads can neither start nor exit then.
