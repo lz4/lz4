@@ -92,6 +92,14 @@ void* UT_sample(size_t size)
     return buffer;
 }
 
+void* UT_noise(size_t size)
+{
+    unsigned char* const buffer = (unsigned char*)UT_malloc(size);
+    size_t n;
+    for (n = 0; n < size; n++) buffer[n] = (unsigned char)UT_rand();
+    return buffer;
+}
+
 
 /*-************************************
 *  Assertions
