@@ -67,6 +67,16 @@ void TPool_jobsCompleted(TPool* ctx) {
     (void)ctx;
 }
 
+static int g_jobError = 0;
+
+void TPool_setJobError(int error) {
+    if (!g_jobError) g_jobError = error;
+}
+
+int TPool_jobError(void) {
+    return g_jobError;
+}
+
 
 #elif defined(_WIN32)
 
@@ -208,6 +218,18 @@ void TPool_jobsCompleted(TPool* pool)
     while (InterlockedCompareExchange(&pool->nbPendingJobs, 0, 0) > 0) {
         WaitForSingleObject(pool->allJobsCompleted, INFINITE);
     }
+}
+
+static LONG g_jobError = 0;
+
+void TPool_setJobError(int error)
+{
+    InterlockedCompareExchange(&g_jobError, (LONG)error, 0);
+}
+
+int TPool_jobError(void)
+{
+    return (int)InterlockedCompareExchange(&g_jobError, 0, 0);
 }
 
 #else
@@ -428,6 +450,25 @@ void TPool_submitJob(TPool* ctx, void (*job_function)(void*), void* arg)
     }
     TPool_submitJob_internal(ctx, job_function, arg);
     pthread_mutex_unlock(&ctx->queueMutex);
+}
+
+static pthread_mutex_t g_jobErrorMutex = PTHREAD_MUTEX_INITIALIZER;
+static int g_jobError = 0;
+
+void TPool_setJobError(int error)
+{
+    pthread_mutex_lock(&g_jobErrorMutex);
+    if (!g_jobError) g_jobError = error;
+    pthread_mutex_unlock(&g_jobErrorMutex);
+}
+
+int TPool_jobError(void)
+{
+    int error;
+    pthread_mutex_lock(&g_jobErrorMutex);
+    error = g_jobError;
+    pthread_mutex_unlock(&g_jobErrorMutex);
+    return error;
 }
 
 #endif  /* LZ4IO_NO_MT */
