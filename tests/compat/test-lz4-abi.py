@@ -149,7 +149,7 @@ if __name__ == '__main__':
             else:
                 run_env["LD_LIBRARY_PATH"] = 'abiTests/{}/lib'.format(tag)
             # check we are linking to the right library version at run time
-            proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
+            proc(['./compat/check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
             # now run with mismatched library version
             proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
 
@@ -177,7 +177,7 @@ if __name__ == '__main__':
             run_env = os.environ.copy()
             run_env["LD_LIBRARY_PATH"] = '../lib'
             # check we are linking to the right library version at run time
-            proc(['./check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
+            proc(['./compat/check_liblz4_version.sh'] + ['./abiTest'], pipe=False, env=run_env)
             # now run with mismatched library version
             proc(['./abiTest'] + test_dat_src, pipe=False, env=run_env)
 

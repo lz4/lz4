@@ -36,7 +36,7 @@ build_script:
       make -j -C lib lib V=1 LDFLAGS="-static-libgcc" &&
       echo "Packaging GCC build..." &&
       mkdir bin\dll bin\static bin\example bin\include &&
-      copy tests\fullbench.c bin\example\ &&
+      copy tests\bench\fullbench.c bin\example\ &&
       copy lib\xxhash.* bin\example\ &&
       copy lib\lz4*.h bin\include\ &&
       copy lib\liblz4.a bin\static\liblz4_static.lib &&

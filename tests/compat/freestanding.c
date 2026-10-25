@@ -46,8 +46,8 @@ EXTERN_C int memcmp(const void *s1, const void *s2, size_t n);
 #define LZ4_memcpy(dst, src, size)  memcpy((dst),(src),(size))
 #define LZ4_memset(p,v,s)           memset((p),(v),(s))
 
-#include "../lib/lz4.c"
-#include "../lib/lz4hc.c"
+#include "../../lib/lz4.c"
+#include "../../lib/lz4hc.c"
 
 // Test for LZ4
 static void test_lz4(const uint8_t* srcData, int srcSize) {
