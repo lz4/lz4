@@ -106,7 +106,7 @@ static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
     { lz4opt,16384,LZ4_OPT_NUM, 64 },  /* 12==LZ4HC_CLEVEL_MAX */
 };
 
-static cParams_t LZ4HC_getCLevelParams(int cLevel)
+LZ4_FORCE_INLINE cParams_t LZ4HC_getCLevelParams(int cLevel)
 {
     /* note : clevel convention is a bit different from lz4frame,
      * possibly something worth revisiting for consistency */
@@ -120,19 +120,19 @@ static cParams_t LZ4HC_getCLevelParams(int cLevel)
 /*===   Hashing   ===*/
 #define LZ4HC_HASHSIZE 4
 #define HASH_FUNCTION(i)      (((i) * 2654435761U) >> ((MINMATCH*8)-LZ4HC_HASH_LOG))
-static U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
+LZ4_FORCE_INLINE U32 LZ4HC_hashPtr(const void* ptr) { return HASH_FUNCTION(LZ4_read32(ptr)); }
 
 #if defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==2)
 /* lie to the compiler about data alignment; use with caution */
-static U64 LZ4_read64(const void* memPtr) { return *(const U64*) memPtr; }
+LZ4_FORCE_INLINE U64 LZ4_read64(const void* memPtr) { return *(const U64*) memPtr; }
 
 #elif defined(LZ4_FORCE_MEMORY_ACCESS) && (LZ4_FORCE_MEMORY_ACCESS==1)
 /* __pack instructions are safer, but compiler specific */
 LZ4_PACK(typedef struct { U64 u64; }) LZ4_unalign64;
-static U64 LZ4_read64(const void* ptr) { return ((const LZ4_unalign64*)ptr)->u64; }
+LZ4_FORCE_INLINE U64 LZ4_read64(const void* ptr) { return ((const LZ4_unalign64*)ptr)->u64; }
 
 #else  /* safe and portable access using memcpy() */
-static U64 LZ4_read64(const void* memPtr)
+LZ4_FORCE_INLINE U64 LZ4_read64(const void* memPtr)
 {
     U64 val; LZ4_memcpy(&val, memPtr, sizeof(val)); return val;
 }
@@ -143,15 +143,15 @@ static U64 LZ4_read64(const void* memPtr)
 #define LZ4MID_HASHLOG (LZ4HC_HASH_LOG-1)
 #define LZ4MID_HASHTABLESIZE (1 << LZ4MID_HASHLOG)
 
-static U32 LZ4MID_hash4(U32 v) { return (v * 2654435761U) >> (32-LZ4MID_HASHLOG); }
-static U32 LZ4MID_hash4Ptr(const void* ptr) { return LZ4MID_hash4(LZ4_read32(ptr)); }
+LZ4_FORCE_INLINE U32 LZ4MID_hash4(U32 v) { return (v * 2654435761U) >> (32-LZ4MID_HASHLOG); }
+LZ4_FORCE_INLINE U32 LZ4MID_hash4Ptr(const void* ptr) { return LZ4MID_hash4(LZ4_read32(ptr)); }
 /* note: hash7 hashes the lower 56-bits.
  * It presumes input was read using little endian.*/
-static U32 LZ4MID_hash7(U64 v) { return (U32)(((v  << (64-56)) * 58295818150454627ULL) >> (64-LZ4MID_HASHLOG)) ; }
-static U64 LZ4_readLE64(const void* memPtr);
-static U32 LZ4MID_hash8Ptr(const void* ptr) { return LZ4MID_hash7(LZ4_readLE64(ptr)); }
+LZ4_FORCE_INLINE U32 LZ4MID_hash7(U64 v) { return (U32)(((v  << (64-56)) * 58295818150454627ULL) >> (64-LZ4MID_HASHLOG)) ; }
+LZ4_FORCE_INLINE U64 LZ4_readLE64(const void* memPtr);
+LZ4_FORCE_INLINE U32 LZ4MID_hash8Ptr(const void* ptr) { return LZ4MID_hash7(LZ4_readLE64(ptr)); }
 
-static U64 LZ4_readLE64(const void* memPtr)
+LZ4_FORCE_INLINE U64 LZ4_readLE64(const void* memPtr)
 {
     if (LZ4_isLittleEndian()) {
         return LZ4_read64(memPtr);
@@ -234,13 +234,13 @@ int LZ4HC_countBack(const BYTE* const ip, const BYTE* const match,
 /**************************************
 *  Init
 **************************************/
-static void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
+LZ4_FORCE_INLINE void LZ4HC_clearTables (LZ4HC_CCtx_internal* hc4)
 {
     MEM_INIT(hc4->hashTable, 0, sizeof(hc4->hashTable));
     MEM_INIT(hc4->chainTable, 0xFF, sizeof(hc4->chainTable));
 }
 
-static void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
+LZ4_FORCE_INLINE void LZ4HC_init_internal (LZ4HC_CCtx_internal* hc4, const BYTE* start)
 {
     size_t const bufferSize = (size_t)(hc4->end - hc4->prefixStart);
     size_t newStartingOffset = bufferSize + hc4->dictLimit;
@@ -662,7 +662,7 @@ LZ4MID_fillHTable (LZ4HC_CCtx_internal* cctx, const void* dict, size_t size)
     cctx->nextToUpdate = target;
 }
 
-static LZ4MID_searchIntoDict_f select_searchDict_function(const LZ4HC_CCtx_internal* dictCtx)
+LZ4_FORCE_INLINE LZ4MID_searchIntoDict_f select_searchDict_function(const LZ4HC_CCtx_internal* dictCtx)
 {
     if (dictCtx == NULL) return NULL;
     if (LZ4HC_getCLevelParams(dictCtx->compressionLevel).strat == lz4mid)
@@ -893,7 +893,7 @@ LZ4_FORCE_INLINE void LZ4HC_Insert (LZ4HC_CCtx_internal* hc4, const BYTE* ip)
 #endif
 
 
-static U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
+LZ4_FORCE_INLINE U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
 {
     size_t const bitsToRotate = (rotate & (sizeof(pattern) - 1)) << 3;
     if (bitsToRotate == 0) return pattern;
@@ -902,7 +902,7 @@ static U32 LZ4HC_rotatePattern(size_t const rotate, U32 const pattern)
 
 /* LZ4HC_countPattern() :
  * pattern32 must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!) */
-static unsigned
+LZ4_FORCE_INLINE unsigned
 LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 {
     const BYTE* const iStart = ip;
@@ -935,7 +935,7 @@ LZ4HC_countPattern(const BYTE* ip, const BYTE* const iEnd, U32 const pattern32)
 /* LZ4HC_reverseCountPattern() :
  * pattern must be a sample of repetitive pattern of length 1, 2 or 4 (but not 3!)
  * read using natural platform endianness */
-static unsigned
+LZ4_FORCE_INLINE unsigned
 LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
 {
     const BYTE* const iStart = ip;
@@ -957,7 +957,7 @@ LZ4HC_reverseCountPattern(const BYTE* ip, const BYTE* const iLow, U32 pattern)
  * 4 byte MINMATCH would overflow.
  * @returns true if the match index is okay.
  */
-static int LZ4HC_protectDictEnd(U32 const dictLimit, U32 const matchIndex)
+LZ4_FORCE_INLINE int LZ4HC_protectDictEnd(U32 const dictLimit, U32 const matchIndex)
 {
     return ((U32)((dictLimit - 1) - matchIndex) >= 3);
 }
