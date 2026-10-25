@@ -60,7 +60,7 @@ NB_LOOPS     ?= -i1
 default: all
 
 .PHONY: all
-all: fullbench fuzzer frametest unittest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest unittest roundTripTest datagen checkFrame
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -126,7 +126,7 @@ frametest:
 $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o frametest.o))
 
 unittest:
-$(eval $(call c_program_shared_o,unittest,lz4frame.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o))
+$(eval $(call c_program_shared_o,unittest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o))
 
 roundTripTest:
 $(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
@@ -136,12 +136,6 @@ $(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
 
 checkFrame:
 $(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
-
-decompress-partial:
-$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
-
-decompress-partial-usingDict:
-$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
 # multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
 # (c_program : objects are not shared, since frameMT employs different flags)
@@ -209,7 +203,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest
 
 test32: CFLAGS+=-m32
 test32: test
@@ -403,12 +397,6 @@ test-mem: lz4 datagen fuzzer frametest unittest fullbench
 
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
-
-test-decompress-partial : decompress-partial decompress-partial-usingDict
-	@echo "\n ---- test decompress-partial ----"
-	./decompress-partial$(EXT)
-	@echo "\n ---- test decompress-partial-usingDict ----"
-	./decompress-partial-usingDict$(EXT)
 
 # public headers must not be included within extern "C" (#1600)
 # requires clang : -fmodules turns such inclusions into errors
