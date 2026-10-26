@@ -71,6 +71,8 @@
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 
 /*-************************************
@@ -152,16 +154,23 @@ void* UT_malloc(size_t size);
  * @return : @ptr */
 void* UT_defer(void (*release)(void*), void* ptr);
 
+/* UT_release() :
+ * releases @ptr, obtained from UT_malloc() or registered with UT_defer(), before the end of the test.
+ * Useful within loops : a test can't hold more than 64 resources at once. */
+void UT_release(void* ptr);
+
 /* UT_rand() :
  * pseudo-random generator, restarted from the same seed (-s#) for each test */
 unsigned UT_rand(void);
 
-/* UT_sample() :
- * @return : @size bytes of compressible data, generated from UT_rand(), released at the end of the test */
-void* UT_sample(size_t size);
+/* UT_fillSample(), UT_fillNoise() :
+ * fill @buffer with @size bytes of compressible, or incompressible, data, generated from UT_rand() */
+void UT_fillSample(void* buffer, size_t size);
+void UT_fillNoise(void* buffer, size_t size);
 
-/* UT_noise() :
- * @return : @size bytes of incompressible data, generated from UT_rand(), released at the end of the test */
+/* UT_sample(), UT_noise() :
+ * @return : @size bytes of compressible, or incompressible, data, released at the end of the test */
+void* UT_sample(size_t size);
 void* UT_noise(size_t size);
 
 
