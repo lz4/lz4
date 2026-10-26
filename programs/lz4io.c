@@ -3014,14 +3014,16 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
             if (cfinfo->frameSummary.frameType != lz4Frame) cfinfo->eqFrameTypes = 0;
             /* Get frame info */
             {   const size_t readBytes = fread(buffer + MAGICNUMBER_SIZE, 1, LZ4F_HEADER_SIZE_MIN - MAGICNUMBER_SIZE, finput);
-                if (!readBytes || ferror(finput)) END_PROCESS(71, "Error reading %s", input_filename);
+                if (ferror(finput)) END_PROCESS(71, "Error reading %s", input_filename);
+                if (readBytes != LZ4F_HEADER_SIZE_MIN - MAGICNUMBER_SIZE) break;   /* truncated frame header */
             }
             {   size_t hSize = LZ4F_headerSize(&buffer, LZ4F_HEADER_SIZE_MIN);
                 if (LZ4F_isError(hSize)) break;
                 if (hSize > LZ4F_HEADER_SIZE_MIN) {
                     /* We've already read LZ4F_HEADER_SIZE_MIN so read any extra until hSize*/
                     const size_t readBytes = fread(buffer + LZ4F_HEADER_SIZE_MIN, 1, hSize - LZ4F_HEADER_SIZE_MIN, finput);
-                    if (!readBytes || ferror(finput)) END_PROCESS(72, "Error reading %s", input_filename);
+                    if (ferror(finput)) END_PROCESS(72, "Error reading %s", input_filename);
+                    if (readBytes != hSize - LZ4F_HEADER_SIZE_MIN) break;   /* truncated frame header */
                 }
                 /* Create decompression context */
                 {   LZ4F_dctx* dctx;

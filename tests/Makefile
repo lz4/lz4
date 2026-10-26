@@ -390,6 +390,12 @@ test-mem: lz4 datagen fuzzer frametest unittest fullbench
 	$(VALGRIND) $(LZ4) -B4D -f -vq $(FPREFIX)dg7M $(VOID)
 	$(VALGRIND) $(LZ4) --list -m $(FPREFIX)*.lz4
 	$(VALGRIND) $(LZ4) --list -m -v $(FPREFIX)*.lz4
+	# truncated frame headers : not recognized, without reading uninitialized bytes (valgrind error : 99)
+	$(LZ4) -f --content-size $(FPREFIX)dg16K $(FPREFIX)cs
+	head -c 5 $(FPREFIX)dg16K.lz4 > $(FPREFIX)hdr5
+	head -c 10 $(FPREFIX)cs > $(FPREFIX)hdr10
+	$(VALGRIND) --error-exitcode=99 $(LZ4) --list $(FPREFIX)hdr5; test $$? -eq 1
+	$(VALGRIND) --error-exitcode=99 $(LZ4) --list $(FPREFIX)hdr10; test $$? -eq 1
 	$(RM) $(FPREFIX)*
 	$(VALGRIND) ./fuzzer -i64 -t1
 	$(VALGRIND) ./frametest -i256
