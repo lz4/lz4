@@ -452,7 +452,8 @@ static unsigned init_nbWorkers(int* requested)
     if (env != NULL) {
         const char* ptr = env;
         unsigned nbWorkers;
-        if ((*ptr>='0') && (*ptr<='9') && !readU32FromCharChecked(&ptr, &nbWorkers)) {
+        if ((*ptr>='0') && (*ptr<='9') && !readU32FromCharChecked(&ptr, &nbWorkers)
+          && (*ptr == 0)) {
             *requested = 1;
             return nbWorkers;
         }
@@ -485,7 +486,7 @@ static int init_cLevel(void)
         const char* ptr = env;
         unsigned cLevel;
         if ((*ptr>='0') && (*ptr<='9') && !readU32FromCharChecked(&ptr, &cLevel)
-          && (cLevel <= (unsigned)INT_MAX)) {
+          && (*ptr == 0) && (cLevel <= (unsigned)INT_MAX)) {
             return (int)cLevel;
         }
         DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid unsigned value \n", ENV_CLEVEL, env);
