@@ -150,6 +150,11 @@ only the latest one will be applied.
   Ignored with a custom block size (see `-B#`).
   Compressed output doesn't depend on `#`, nor on multithreading support.
 
+* `--single-thread`:
+  Compress frames with the main thread alone, without cutting them into jobs (liblz4's single-threaded mode).
+  Different from `-T1`, which compresses jobs within one worker thread, while the main thread reads and writes files :
+  with linked blocks (`-BD`), compressed output can differ slightly.
+
 * `--memory=#`:
   Memory budget of multi-threaded compression, in bytes, with optional suffixes `K`, `M`, `G` (powers of 1024)
   (default: 4 GB, 1 GB on 32-bit systems). It limits the number of worker threads.
@@ -270,7 +275,11 @@ only the latest one will be applied.
 ### Benchmark mode
 
 * `-b#`:
-  Benchmark file(s), using # compression level
+  Benchmark file(s), using # compression level.
+  Each file is compressed into a frame, as `lz4` would with the same options
+  (`-B#`, `-BD`, `-BX`, `--content-size`, `--favor-decSpeed`, `-D`),
+  except the content checksum, disabled unless `--frame-crc`.
+  With one compression thread (as `-T1`), unless `-T#` or `--single-thread` is provided.
 
 * `-e#`:
   Benchmark multiple compression levels, from b# to e# (included)

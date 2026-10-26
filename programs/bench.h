@@ -24,6 +24,7 @@
 #define BENCH_H_125623623633
 
 #include <stddef.h>
+#include "lz4frame.h"   /* LZ4F_preferences_t */
 
 /* BMK_benchFiles() :
  * Benchmark all files provided through array @fileNamesTable.
@@ -43,7 +44,11 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
 
 /* Set Parameters */
 void BMK_setNbSeconds(unsigned nbSeconds);  /* minimum benchmark duration, in seconds, for both compression and decompression */
-void BMK_setBlockSize(size_t blockSize);    /* Internally cut input file(s) into independent blocks of specified size */
+/* BMK_setFramePreferences() :
+ * each file is compressed into a frame with @prefs (compression level excepted),
+ * as lz4 compresses files (see LZ4IO_framePreferences()) : prefs->frameInfo.contentSize != 0 sets each file's size.
+ * @customBlockSize : 0, or blocks of this size, one LZ4F_compressUpdate() invocation per block (single-threaded) */
+void BMK_setFramePreferences(const LZ4F_preferences_t* prefs, size_t customBlockSize);
 void BMK_setNotificationLevel(unsigned level);  /* Influence verbosity level */
 void BMK_setBenchSeparately(int separate);  /* When providing multiple files, output one result per file */
 void BMK_setDecodeOnlyMode(int set);        /* v1.9.4+: set benchmark mode to decode only */

@@ -51,6 +51,8 @@ api  : reserved fields of `LZ4F_preferences_t` and `LZ4F_compressOptions_t` are 
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials
 cli  : decodes legacy frames ended by four zero bytes (Linux kernel end marker), requested by @benjarobin
 cli  : compressed output no longer depends on multithreading support (`lz4` and `lz4-nomt` produce the same frames, also with `-BD`)
+cli  : benchmark (`-b`) measures frames, compressed as `lz4` does with the same options (`-B#`, `-BD`, `-BX`, `-D`, `-T#`, etc.)
+cli  : new option `--single-thread` : frames compressed by the main thread alone, in liblz4's single-threaded mode (output can differ from `-T1` with `-BD`)
 cli  : custom block sizes (`-B#`, # >= 32) are honored, and compressed single-threaded
 cli  : `-T#` : nb of compression threads (the main thread reads and writes files), limited by file size and by a memory budget (`--memory=#`, `LZ4_MEMORY`), with a warning when it reduces `#`
 cli  : `-T#` capped by liblz4 (1024 threads, 128 on 32-bit systems), replacing build macro `LZ4_NBWORKERS_MAX` ; `-V` tells if compression is multithreaded
