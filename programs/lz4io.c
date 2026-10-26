@@ -2789,7 +2789,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     unsigned long long processed = 0;
 
     int const errStat = LZ4IO_decompressDstFile(&processed, ress, input_filename, output_filename, prefs);
-    if (errStat)
+    if (!errStat)
         LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
     LZ4IO_freeDResources(ress);
     return errStat;
