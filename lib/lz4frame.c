@@ -2289,10 +2289,10 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
         {   size_t const toCopy = MIN(mt->jobSize - job->srcSize, (size_t)(iend - ip));
             assert(job->src == job->inBuff + LZ4F_MT_PREFIX_SIZE);
             memcpy(job->inBuff + LZ4F_MT_PREFIX_SIZE + job->srcSize, ip, toCopy);
+            job->srcSize += toCopy;
+            if (job->srcSize == mt->jobSize) LZ4F_mt_submit(mt, job);   /* before checksum : workers start sooner */
             if (checksum) (void)XXH32_update(&(cctx->xxh), ip, toCopy);
             ip += toCopy;
-            job->srcSize += toCopy;
-            if (job->srcSize == mt->jobSize) LZ4F_mt_submit(mt, job);
         }
     }
     cctx->totalInSize += srcSize;
