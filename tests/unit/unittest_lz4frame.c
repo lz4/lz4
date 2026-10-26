@@ -1667,6 +1667,16 @@ static size_t sd_runScript(const sd_stream* s, const sd_op* ops, size_t nbOps,
     return pos;
 }
 
+/* sd_newContext() :
+ * each pass starts from a new context, so that replayed operations produce the same output :
+ * the output of independent blocks < LZ4_CLEAR_TABLE_THRESHOLD depends on the context's history,
+ * since their hash table is reused rather than cleared */
+static void sd_newContext(sd_stream* s)
+{
+    if (s->cctx != NULL) UT_release(s->cctx);
+    s->cctx = newCctx();
+}
+
 #define SD_OPS_MAX 16
 #define SD_NB_CONFIGS 24
 
@@ -1681,7 +1691,6 @@ TEST(streaming_smallDst)
     BYTE* frame;
     BYTE* dst;
     LZ4F_CDict* const cdict = newCDict(dictBuf, dictSize);
-    LZ4F_cctx* const cctx = newCctx();
     sd_op ops[SD_OPS_MAX];
     size_t opSizes[SD_OPS_MAX] = { 0 };    /* written by sd_runScript() : initialized for static analyzers */
     size_t opStarts[SD_OPS_MAX] = { 0 };
@@ -1736,7 +1745,7 @@ TEST(streaming_smallDst)
         if (UT_rand() & 1) prefs.frameInfo.contentSize = totalSrcSize;
 
         /* reference pass, each operation using its bound */
-        s.cctx = cctx;
+        sd_newContext(&s);
         refSize = sd_runScript(&s, ops, nbOps, frame, frameCapacity, opStarts, opSizes);
         ASSERT_MSG(!LZ4F_isError(refSize), "config %u : reference pass", configNb);
         assertDecodesTo(frame, refSize, s.beginMode ? dictBuf : NULL, s.beginMode ? dictSize : 0, src, totalSrcSize);
@@ -1749,6 +1758,7 @@ TEST(streaming_smallDst)
             size_t capacity, r;
             while (opSizes[k] == 0) k = (k + 1) % nbOps;   /* begin and end always produce output */
             capacity = sd_pickSmallCapacity(ends, nbEnds, opStarts[k], opSizes[k]);
+            sd_newContext(&s);
             for (n = 0; n < k; n++)
                 ASSERT_MSG(sd_opExactOK(&s, ops + n, dst, opSizes[n], frame + opStarts[n], opSizes[n]),
                            "config %u, probe %u : replay op %u", configNb, probe, (unsigned)n);
@@ -1779,7 +1789,7 @@ TEST(streaming_smallDst)
                            configNb, sd_opName(next.type), (unsigned)k, sd_opName(ops[k].type),
                            LZ4F_isError(r) ? LZ4F_getErrorName(r) : "should have failed");
             }
-            /* the context remains usable for a new frame */
+            /* the failed context remains usable for a new frame */
             if (probe == 0) {
                 r = sd_runScript(&s, ops, nbOps, dst, frameCapacity, NULL, NULL);
                 ASSERT_MSG(!LZ4F_isError(r), "config %u : new frame after failed op %u", configNb, (unsigned)k);
@@ -1787,6 +1797,7 @@ TEST(streaming_smallDst)
         }   }
 
         /* exact pass : each operation into exactly its output size, sometimes more */
+        sd_newContext(&s);
         for (n = 0; n < nbOps; n++) {
             size_t const bound = sd_opBound(&s, ops + n);
             size_t capacity = opSizes[n];
@@ -1795,6 +1806,7 @@ TEST(streaming_smallDst)
             ASSERT_MSG(sd_opExactOK(&s, ops + n, dst, capacity, frame + opStarts[n], opSizes[n]),
                        "config %u : exact pass, op %u", configNb, (unsigned)n);
         }
+        UT_release(s.cctx);
     }
 }
 
