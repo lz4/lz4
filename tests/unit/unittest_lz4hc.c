@@ -402,3 +402,155 @@ TEST(compress_HC_continue_destSize_resume)
     }   }   }
 }
 
+
+
+/*-************************************
+*  Dictionaries and ring buffers
+**************************************/
+#define HC_INPUT_SIZE (196 KB)
+#define HC_RING_SIZE (8 KB)
+
+/* successive segments, each one using the previous one as dictionary, at another place */
+TEST(compress_HC_continue_successiveDictionaries)
+{
+    const char* const src = (const char*)UT_sample(HC_INPUT_SIZE);
+    char* const decoded = (char*)UT_malloc(HC_INPUT_SIZE + HC_INPUT_SIZE / 16);   /* segments separated by 1 byte */
+    char* const dst = (char*)UT_malloc((size_t)LZ4_COMPRESSBOUND(8 KB));
+    size_t l;
+    for (l = 0; l < ARRAY_SIZE(g_levels); l++) {
+        LZ4_streamHC_t* const stream = newStreamHC(g_levels[l]);
+        const char* dict = src + 3;
+        size_t dictSize = UT_rand() & 8191;
+        char* out = decoded;
+        size_t segStart = dictSize + 7;
+        size_t segSize = UT_rand() & 8191;
+        int segNb = 1;
+        LZ4_loadDictHC(stream, dict, (int)dictSize);
+        while (segStart + segSize < HC_INPUT_SIZE) {
+            int const cSize = LZ4_compress_HC_continue(stream, src + segStart, dst, (int)segSize, LZ4_compressBound((int)segSize));
+            ASSERT_MSG(cSize > 0, "level %i, segment %i : compression failed", g_levels[l], segNb);
+            ASSERT_CLEAN(stream);
+            ASSERT_MSG(LZ4_decompress_safe_usingDict(dst, out, cSize, (int)segSize, dict, (int)dictSize) == (int)segSize,
+                       "level %i, segment %i : decompression failed", g_levels[l], segNb);
+            ASSERT_MEMEQ(out, src + segStart, segSize);
+            dict = out;
+            dictSize = segSize;
+            out += segSize + 1;
+            segNb++;
+            segStart += segSize + (UT_rand() & 0xF) + 1;
+            segSize = UT_rand() & 8191;
+            ASSERT((size_t)(out - decoded) + segSize <= HC_INPUT_SIZE + HC_INPUT_SIZE / 16);
+    }   }
+}
+
+/* the encoder's ring buffer is also used by the decoders */
+TEST(compress_HC_continue_ringBuffer)
+{
+    unsigned const maxMessageSizeMask = (1 << 10) - 1;
+    unsigned const srcSize = 130 KB;
+    unsigned const dBufferSize = HC_RING_SIZE + maxMessageSizeMask;
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const ring = (char*)UT_malloc(HC_RING_SIZE);
+    int const capacity = LZ4_COMPRESSBOUND(1 KB);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    char* const dSafe = (char*)UT_malloc(dBufferSize);
+    char* const dFast = (char*)UT_malloc(dBufferSize);
+    size_t l;
+    for (l = 0; l < ARRAY_SIZE(g_levels); l++) {
+        LZ4_streamHC_t* const stream = newStreamHC(g_levels[l]);
+        LZ4_streamDecode_t sdSafe, sdFast;
+        unsigned messageSize = (UT_rand() & maxMessageSizeMask) + 1;
+        unsigned iNext = 0, rNext = 0, dNext = 0;
+        LZ4_setStreamDecode(&sdSafe, NULL, 0);
+        LZ4_setStreamDecode(&sdFast, NULL, 0);
+        while (iNext + messageSize < srcSize) {
+            int cSize;
+            memcpy(ring + rNext, src + iNext, messageSize);
+            cSize = LZ4_compress_HC_continue(stream, ring + rNext, cBuffer, (int)messageSize, capacity);
+            ASSERT(cSize > 0);
+            ASSERT_CLEAN(stream);
+            ASSERT_EQ(LZ4_decompress_safe_continue(&sdSafe, cBuffer, dSafe + dNext, cSize, (int)messageSize), messageSize);
+            ASSERT_MEMEQ(dSafe + dNext, src + iNext, messageSize);
+            ASSERT_EQ(LZ4_decompress_fast_continue(&sdFast, cBuffer, dFast + dNext, (int)messageSize), cSize);
+            ASSERT_MEMEQ(dFast + dNext, src + iNext, messageSize);
+
+            /* prepare next message */
+            iNext += messageSize;
+            rNext += messageSize;
+            dNext += messageSize;
+            messageSize = (UT_rand() & maxMessageSizeMask) + 1;
+            if (rNext + messageSize > HC_RING_SIZE) rNext = 0;
+            if (dNext + messageSize > dBufferSize) dNext = 0;
+        }
+        UT_release(stream);
+    }
+}
+
+/* Ring buffer test : non synchronized decoder.
+ * This test uses the minimum amount of memory required to setup a decoding ring buffer
+ * while being unsynchronized with the encoder
+ * (no assumption done on how the data is encoded, it just follows the LZ4 format specification).
+ * This size is documented in lz4.h, and is LZ4_decoderRingBufferSize(maxBlockSize). */
+TEST(decompress_continue_unsynchronizedRing)
+{
+    int const maxMessageSize = 1 << 12;
+    int const maxMessageSizeMask = maxMessageSize - 1;
+    int const dBufferSize = LZ4_decoderRingBufferSize(maxMessageSize);
+    int const firstSize = dBufferSize - (maxMessageSize-1);   /* fills the decoding ring buffer once ; larger than maxMessageSize */
+    char* const src = (char*)UT_sample(HC_INPUT_SIZE);
+    char* const ringSafe = (char*)UT_malloc((size_t)dBufferSize);
+    char* const ringFast = (char*)UT_malloc((size_t)dBufferSize);   /* used by LZ4_decompress_fast_continue() */
+    int const capacity = LZ4_COMPRESSBOUND(firstSize);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    size_t l;
+    ASSERT(firstSize >= 65535);
+    ASSERT((size_t)(firstSize + 1 + maxMessageSize) <= HC_INPUT_SIZE);
+    for (l = 0; l < ARRAY_SIZE(g_levels); l++) {
+        LZ4_streamHC_t* const stream = newStreamHC(g_levels[l]);
+        LZ4_streamDecode_t sdSafe, sdFast;
+        int messageSize = firstSize, iNext = 0, dNext = 0, cSize;
+        unsigned totalMessageSize = 0;
+        LZ4_setStreamDecode(&sdSafe, NULL, 0);
+        LZ4_setStreamDecode(&sdFast, NULL, 0);
+
+        /* first block */
+        cSize = LZ4_compress_HC_continue(stream, src + iNext, cBuffer, messageSize, capacity);
+        ASSERT(cSize > 0);
+        ASSERT_CLEAN(stream);
+        ASSERT_EQ(LZ4_decompress_safe_continue(&sdSafe, cBuffer, ringSafe + dNext, cSize, messageSize), messageSize);
+        ASSERT_MEMEQ(ringSafe + dNext, src + iNext, (size_t)messageSize);
+        ASSERT_EQ(LZ4_decompress_fast_continue(&sdFast, cBuffer, ringFast + dNext, messageSize), cSize);
+        ASSERT_MEMEQ(ringFast + dNext, src + iNext, (size_t)messageSize);
+
+        /* second message : restarts from the beginning of the ring */
+        dNext += messageSize;
+        totalMessageSize += (unsigned)messageSize;
+        messageSize = maxMessageSize;
+        iNext = firstSize + 1;
+        memcpy(src + iNext, src + (firstSize - 65535), (size_t)messageSize);  /* will generate a match at max distance == 65535 */
+        ASSERT(dNext + messageSize > dBufferSize);
+        dNext = 0;
+
+        while (totalMessageSize < 9 MB) {
+            cSize = LZ4_compress_HC_continue(stream, src + iNext, cBuffer, messageSize, capacity);
+            ASSERT(cSize > 0);
+            ASSERT_CLEAN(stream);
+
+            /* decoding works without knowing messageSize, under assumption that messageSize <= maxMessageSize */
+            ASSERT(dBufferSize - dNext >= maxMessageSize);
+            ASSERT_EQ(LZ4_decompress_safe_continue(&sdSafe, cBuffer, ringSafe + dNext, cSize, dBufferSize - dNext), messageSize);
+            ASSERT_MEMEQ(ringSafe + dNext, src + iNext, (size_t)messageSize);
+            /* LZ4_decompress_fast_continue(), in its own ring buffer */
+            ASSERT_EQ(LZ4_decompress_fast_continue(&sdFast, cBuffer, ringFast + dNext, messageSize), cSize);
+            ASSERT_MEMEQ(ringFast + dNext, src + iNext, (size_t)messageSize);
+
+            /* prepare next message */
+            dNext += messageSize;
+            totalMessageSize += (unsigned)messageSize;
+            messageSize = (int)(UT_rand() & (unsigned)maxMessageSizeMask) + 1;
+            iNext = (int)(UT_rand() & 65535);
+            if (dNext + maxMessageSize > dBufferSize) dNext = 0;
+        }
+        UT_release(stream);
+    }
+}

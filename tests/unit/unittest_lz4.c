@@ -25,7 +25,10 @@
 
 #include "unittest.h"
 #include <limits.h>     /* INT_MIN, INT_MAX */
+#include <stdint.h>     /* uintptr_t */
+#include <stdlib.h>     /* malloc, calloc, free */
 #include <string.h>     /* memset, memcpy */
+#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast_continue */
 #define LZ4_STATIC_LINKING_ONLY   /* LZ4_compress_destSize_extState, LZ4_attach_dictionary */
 #include "lz4.h"
 #include "lz4hc.h"
@@ -460,3 +463,266 @@ TEST(compress_continue_inputOverwritesPreviousBlock)
     }
 }
 
+
+
+/*-************************************
+*  Address space overflow (32-bit)
+**************************************/
+#define AO_NB_BUFFERS_MAX 150
+#define AO_BUFFER_SIZE (32 MB)
+typedef struct { char* buffers[AO_NB_BUFFERS_MAX]; int nb; } ao_buffers;
+static void ao_free(void* p)
+{
+    ao_buffers* const b = (ao_buffers*)p;
+    if (b == NULL) return;
+    while (b->nb) free(b->buffers[--b->nb]);
+    free(b);
+}
+
+/* Aggressively pushes memory allocation limits,
+ * and generates patterns which create address space overflow.
+ * Only possible in 32-bit mode */
+TEST(decompress_safe_addressSpaceOverflow)
+{
+    ao_buffers* b;
+    int n;
+    if (sizeof(void*) == 8) return;   /* 64-bit : no overflow */
+    b = (ao_buffers*)UT_defer(ao_free, calloc(1, sizeof(ao_buffers)));   /* all buffers released at the end */
+    ASSERT(b != NULL);
+    for (n = 0; n < AO_NB_BUFFERS_MAX; n++) {
+        b->buffers[n] = (char*)malloc(AO_BUFFER_SIZE);
+        if (b->buffers[n] == NULL) return;   /* no more memory : end of test */
+        b->nb++;
+        if (n < 2) continue;
+        {   size_t const sizeToGenerateOverflow = (size_t)(- ((uintptr_t)b->buffers[n-1]) + 512);
+            int const nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
+            char* const input = b->buffers[n-1];
+            int u;
+            input[0] = (char)0xF0;   /* Literal length overflow */
+            input[1] = (char)0xFF;
+            input[2] = (char)0xFF;
+            input[3] = (char)0xFF;
+            for (u = 4; u <= nbOf255+4; u++) input[u] = (char)0xff;
+            ASSERT(LZ4_decompress_safe(input, b->buffers[n], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+            input[0] = (char)0x1F;   /* Match length overflow */
+            input[1] = (char)0x01;
+            input[2] = (char)0x01;
+            input[3] = (char)0x00;
+            ASSERT(LZ4_decompress_safe(input, b->buffers[n], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+
+            /* reverse in/out pointer order */
+            input[0] = (char)0xF0;   /* Literal length overflow */
+            input[1] = (char)0xFF;
+            input[2] = (char)0xFF;
+            input[3] = (char)0xFF;
+            ASSERT(LZ4_decompress_safe(input, b->buffers[n-2], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+            input[0] = (char)0x1F;   /* Match length overflow */
+            input[1] = (char)0x01;
+            input[2] = (char)0x01;
+            input[3] = (char)0x00;
+            ASSERT(LZ4_decompress_safe(input, b->buffers[n-2], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+    }   }
+}
+
+
+/*-************************************
+*  In-place decompression
+**************************************/
+/* worst case : compressed size == original size - 1 */
+TEST(decompress_safe_inPlace_limitCase)
+{
+    int const srcSize = 65 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    int const bufferSize = LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(srcSize);
+    char* const src = (char*)UT_malloc((size_t)srcSize);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    char* const buffer = (char*)UT_malloc((size_t)bufferSize);
+    int cSize = 0, attempt, nbZeroes;
+    /* incompressible data, starting with zeroes : each zero shrinks the compressed size by about 1 byte */
+    for (attempt = 0; attempt < 16 && cSize != srcSize - 1; attempt++) {
+        UT_fillNoise(src, (size_t)srcSize);
+        for (nbZeroes = 0; nbZeroes < 2000; nbZeroes++) {
+            src[nbZeroes] = 0;
+            cSize = LZ4_compress_default(src, cBuffer, srcSize, capacity);
+            if (cSize <= srcSize - 1) break;
+    }   }
+    ASSERT_EQ(cSize, srcSize - 1);
+
+    /* compressed data at the end of the buffer, decoded from its beginning */
+    memcpy(buffer + bufferSize - cSize, cBuffer, (size_t)cSize);
+    ASSERT_EQ(LZ4_decompress_safe(buffer + bufferSize - cSize, buffer, cSize, srcSize), srcSize);
+    ASSERT_MEMEQ(buffer, src, (size_t)srcSize);
+}
+
+
+/*-************************************
+*  Ring buffers
+**************************************/
+#define RB_INPUT_SIZE (196 KB)
+#define RB_RING_SIZE (8 KB)
+
+/* the encoder's ring buffer is also used by the decoders */
+TEST(compress_fast_continue_ringBuffer)
+{
+    unsigned const maxMessageSizeMask = (1 << 10) - 1;
+    unsigned const srcSize = 130 KB;
+    unsigned const dBufferSize = RB_RING_SIZE + maxMessageSizeMask;
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const ring = (char*)UT_malloc(RB_RING_SIZE);
+    int const capacity = LZ4_COMPRESSBOUND(1 KB);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    char* const dSafe = (char*)UT_malloc(dBufferSize);
+    char* const dFast = (char*)UT_malloc(dBufferSize);
+    LZ4_stream_t* const stream = newStream();
+    LZ4_streamDecode_t sdSafe, sdFast;
+    unsigned messageSize = (UT_rand() & maxMessageSizeMask) + 1;
+    unsigned iNext = 0, rNext = 0, dNext = 0;
+    LZ4_setStreamDecode(&sdSafe, NULL, 0);
+    LZ4_setStreamDecode(&sdFast, NULL, 0);
+
+    while (iNext + messageSize < srcSize) {
+        int cSize;
+        memcpy(ring + rNext, src + iNext, messageSize);
+        cSize = LZ4_compress_fast_continue(stream, ring + rNext, cBuffer, (int)messageSize, capacity, 1);
+        ASSERT(cSize > 0);
+        ASSERT_EQ(LZ4_decompress_safe_continue(&sdSafe, cBuffer, dSafe + dNext, cSize, (int)messageSize), messageSize);
+        ASSERT_MEMEQ(dSafe + dNext, src + iNext, messageSize);
+        ASSERT_EQ(LZ4_decompress_fast_continue(&sdFast, cBuffer, dFast + dNext, (int)messageSize), cSize);
+        ASSERT_MEMEQ(dFast + dNext, src + iNext, messageSize);
+
+        /* prepare next message */
+        iNext += messageSize;
+        rNext += messageSize;
+        dNext += messageSize;
+        messageSize = (UT_rand() & maxMessageSizeMask) + 1;
+        if (rNext + messageSize > RB_RING_SIZE) rNext = 0;
+        if (dNext + messageSize > dBufferSize) dNext = 0;
+    }
+}
+
+/* writeSequence() :
+ * writes a sequence of @litLength literals, followed by a match,
+ * or only literals if @matchLength == 0 (last sequence).
+ * @return : nb of bytes written */
+static size_t writeSequence(unsigned char* op, const unsigned char* literals, size_t litLength, unsigned offset, size_t matchLength)
+{
+    unsigned char* const ostart = op;
+    size_t const mlCode = matchLength ? matchLength - 4 : 0;   /* minimum match length is 4 */
+    size_t len;
+    *op++ = (unsigned char)(((litLength < 15 ? litLength : 15) << 4) | (mlCode < 15 ? mlCode : 15));
+    if (litLength >= 15) {
+        for (len = litLength - 15; len >= 255; len -= 255) *op++ = 255;
+        *op++ = (unsigned char)len;
+    }
+    memcpy(op, literals, litLength); op += litLength;
+    if (matchLength == 0) return (size_t)(op - ostart);
+    *op++ = (unsigned char)offset; *op++ = (unsigned char)(offset >> 8);
+    if (mlCode >= 15) {
+        for (len = mlCode - 15; len >= 255; len -= 255) *op++ = 255;
+        *op++ = (unsigned char)len;
+    }
+    return (size_t)(op - ostart);
+}
+
+/* Ring buffer of LZ4_decoderRingBufferSize(), or of the former LZ4_DECODER_RING_BUFFER_SIZE() (still supported) :
+ * any valid block must decode correctly.
+ * Worst case : decoding restarts at the beginning of the ring with maxBlockSize-1 bytes left at its end,
+ * then a wide copy (long literals or long match) is followed by a match at maximum distance */
+#define FORMER_DECODER_RING_BUFFER_SIZE(maxBlockSize) (65536 + 14 + (maxBlockSize))   /* up to v1.10.0 */
+TEST(decompress_safe_continue_decoderRingBufferSize)
+{
+    const char* const src = (const char*)UT_sample(RB_INPUT_SIZE);
+    const unsigned char* const literals = (const unsigned char*)src + 100 KB;   /* must differ from the ring's content */
+    int const capacity = LZ4_COMPRESSBOUND(RB_INPUT_SIZE);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    char* const work = (char*)UT_malloc(RB_INPUT_SIZE);
+    int former;
+    for (former = 0; former < 2; former++) {
+        int const maxBlockSize = 1 KB;
+        int const ringSize = former ? FORMER_DECODER_RING_BUFFER_SIZE(maxBlockSize) : LZ4_decoderRingBufferSize(maxBlockSize);
+        int const firstPassSize = ringSize - (maxBlockSize - 1);   /* next block restarts at the beginning */
+        char* const ring = work;
+        char* const dict = work + ringSize;   /* copy of the last 64 KB of the first pass */
+        int const cSize = LZ4_compress_default(src, cBuffer, firstPassSize, capacity);
+        size_t len;
+        int pattern;
+        ASSERT(cSize > 0);
+        ASSERT((size_t)ringSize + 64 KB <= RB_INPUT_SIZE);
+        for (pattern = 0; pattern < 2; pattern++)
+        for (len = 0; len < 80; len++) {
+            LZ4_streamDecode_t sd;
+            unsigned char block[256];
+            char expected[256];
+            size_t n = 0;
+            int outSize;
+            LZ4_setStreamDecode(&sd, NULL, 0);
+            ASSERT_EQ(LZ4_decompress_safe_continue(&sd, cBuffer, ring, cSize, firstPassSize), firstPassSize);
+            memcpy(dict, ring + firstPassSize - 64 KB, 64 KB);
+            if (pattern == 0) {   /* long literals */
+                n += writeSequence(block + n, literals, len, 65535, 4);
+                outSize = (int)len + 4;
+            } else {   /* long match */
+                n += writeSequence(block + n, literals, 16, 16, 4 + len);
+                n += writeSequence(block + n, literals, 0, 65535, 4);
+                outSize = 16 + 4 + (int)len + 4;
+            }
+            n += writeSequence(block + n, literals, 100, 0, 0);   /* the fast loop needs input margin */
+            outSize += 100;
+            ASSERT_EQ(LZ4_decompress_safe_usingDict((const char*)block, expected, (int)n, outSize, dict, 64 KB), outSize);   /* reference */
+            ASSERT_MSG(LZ4_decompress_safe_continue(&sd, (const char*)block, ring, (int)n, maxBlockSize) == outSize
+                       && !memcmp(ring, expected, (size_t)outSize),
+                       "former size %i, pattern %i, length %u : decoding failed or corrupted", former, pattern, (unsigned)len);
+    }   }
+}
+
+/* Ring buffer larger than the encoder's ring by maxBlockSize + 64 bytes, decoded with dstCapacity = maxBlockSize.
+ * Worst case : decoding restarts at the beginning of the ring, a block ends with a wide copy writing beyond its end,
+ * a 1-byte block follows, then a block references the oldest byte allowed by the encoder's ring */
+TEST(decompress_safe_continue_ringLargerThanEncoders)
+{
+    int const maxBlockSize = 1 KB;
+    int const encRingSize = 4 KB;
+    int const ringSize = encRingSize + maxBlockSize + 64;
+    int const firstPassSize = ringSize - (maxBlockSize - 1);   /* next block restarts at the beginning */
+    int const dist = encRingSize - 13;   /* max distance, from the start of a 13-byte block */
+    const unsigned char* const literals = (const unsigned char*)UT_sample((size_t)firstPassSize + 2 KB);
+    char* const ring = (char*)UT_malloc((size_t)ringSize);
+    char* const stream = (char*)UT_malloc((size_t)firstPassSize + 2 KB);   /* contiguous copy of decoded data */
+    unsigned char* const cBuffer = (unsigned char*)UT_malloc((size_t)LZ4_COMPRESSBOUND(maxBlockSize));
+    unsigned offset;
+    size_t ml;
+    for (offset = 32; offset <= 64; offset += 32)
+    for (ml = 100; ml < 164; ml++) {
+        LZ4_streamDecode_t sd;
+        unsigned char block[64];
+        int dpos = 0, spos = 0, n, r;
+        LZ4_setStreamDecode(&sd, NULL, 0);
+        while (dpos < firstPassSize) {   /* first pass : literals only */
+            int const bs = MIN(maxBlockSize, firstPassSize - dpos);
+            n = (int)writeSequence(cBuffer, literals + dpos, (size_t)bs, 0, 0);
+            ASSERT_EQ(LZ4_decompress_safe_continue(&sd, (const char*)cBuffer, ring + dpos, n, maxBlockSize), bs);
+            memcpy(stream + spos, ring + dpos, (size_t)bs);
+            spos += bs; dpos += bs;
+        }
+        dpos = 0;   /* less than maxBlockSize left : restart at the beginning */
+        /* block A : ends with a wide copy (offset, ml), then 14 literals */
+        n = (int)writeSequence(block, literals, 14, 14, 70);
+        n += (int)writeSequence(block + n, literals, 0, offset, ml);
+        n += (int)writeSequence(block + n, literals + 14, 14, 0, 0);
+        r = LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize);
+        ASSERT_EQ(r, 14 + 70 + (int)ml + 14);
+        memcpy(stream + spos, ring + dpos, (size_t)r);
+        spos += r; dpos += r;
+        /* block B : 1 literal */
+        n = (int)writeSequence(block, literals, 1, 0, 0);
+        r = LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize);
+        ASSERT_EQ(r, 1);
+        memcpy(stream + spos, ring + dpos, (size_t)r);
+        spos += r; dpos += r;
+        /* block C : match at maximum distance, 9 literals */
+        n = (int)writeSequence(block, literals, 0, (unsigned)dist, 4);
+        n += (int)writeSequence(block + n, literals, 9, 0, 0);
+        ASSERT_EQ(LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize), 13);
+        ASSERT_MSG(!memcmp(ring + dpos, stream + spos - dist, 4), "offset %u, length %u : corrupted output", offset, (unsigned)ml);
+    }
+}
