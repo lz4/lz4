@@ -60,6 +60,7 @@ cli  : `--rm` keeps the source file after a decompression failure, by @Furan666
 cli  : `lz4 -t --rm` no longer removes the tested file, and `--rm` with `stdin` no longer fails nor removes a file named `stdin`, by @Nexory
 cli  : `lz4 -t -m` no longer writes decoded content to stdout, reported by @tansy
 cli  : `lz4 --list` rejects truncated frames, instead of reporting them as valid, by @jmestwa-coder
+cli  : `lz4 --list` no longer reads uninitialized bytes on truncated frame headers, now reported as not recognized, by @akashdeshmukh-git
 cli  : numeric arguments that overflow are rejected, instead of silently wrapping around, by @akashdeshmukh-git
 cli  : `-b --fast=#` benchmarks a single level, instead of all levels up to -10000 when # > 10000
 cli  : legacy format (`-l`) : `--fast=#` selects the same acceleration as the frame format (`--fast=1` was the same as `-1`)
