@@ -25,6 +25,7 @@
 
 #include "unittest.h"
 #include "datagen.h"  /* RDG_genBuffer */
+#include "xxhash.h"   /* XXH32 */
 #include <setjmp.h>   /* setjmp, longjmp */
 #include <stdarg.h>   /* va_list */
 #include <stdio.h>    /* printf, snprintf */
@@ -239,7 +240,10 @@ int main(int argc, const char** argv)
         if (arg[0] != '-') continue;   /* filter */
         if (!strcmp(arg, "-l")) listOnly = 1;
         else if (arg[1] == 's' && arg[2] != 0) g_seed = (unsigned)strtoul(arg + 2, NULL, 10);
-        else if (!strcmp(arg, "-r")) g_seed = (unsigned)(time(NULL) % 100000);
+        else if (!strcmp(arg, "-r")) {   /* hashed : successive runs get unrelated seeds */
+            time_t const t = time(NULL);
+            g_seed = XXH32(&t, sizeof(t), 1) % 100000;
+        }
         else return UT_usage(argv[0]);
     }
 
