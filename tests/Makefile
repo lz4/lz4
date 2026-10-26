@@ -40,18 +40,19 @@ WFLAGS    = -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
 CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(USERCFLAGS)
-CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -Itools -DXXH_NAMESPACE=LZ4_
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 include ../build/make/lz4defs.make
 
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
-C_SRCDIRS = $(LIBDIR) $(PRGDIR) .
+# test sources : see README.md
+C_SRCDIRS = $(LIBDIR) $(PRGDIR) . unit fuzz compat bench tools
 include ../build/make/multiconf.make
 
 # Default test parameters
-TEST_FILES   := COPYING
+TEST_FILES   := data/COPYING
 FUZZER_TIME  := -T90s
 NB_LOOPS     ?= -i1
 
@@ -59,7 +60,7 @@ NB_LOOPS     ?= -i1
 default: all
 
 .PHONY: all
-all: fullbench fuzzer frametest unittest roundTripTest datagen checkFrame decompress-partial
+all: fullbench fuzzer frametest unittest roundTripTest datagen checkFrame
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -99,7 +100,7 @@ $(LIBDIR)/liblz4.a:
 CLEAN += fullbench-lib
 fullbench-lib : DEBUGLEVEL=0
 fullbench-lib : CPPFLAGS += -DNDEBUG
-fullbench-lib: fullbench.c $(LIBDIR)/liblz4.a
+fullbench-lib: bench/fullbench.c $(LIBDIR)/liblz4.a
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 
 # Note: Windows only
@@ -108,7 +109,7 @@ CLEAN += fullbench-dll
 fullbench-dll : DEBUGLEVEL=0
 fullbench-dll : CPPFLAGS += -DNDEBUG
 fullbench-dll : MAKEFLAGS=
-fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
+fullbench-dll: bench/fullbench.c $(LIBDIR)/xxhash.c
 	$(MAKE) -C $(LIBDIR) liblz4
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT) -DLZ4_DLL_IMPORT=1 $(LIBDIR)/dll/$(LIBLZ4).dll
 endif
@@ -125,7 +126,7 @@ frametest:
 $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o frametest.o))
 
 unittest:
-$(eval $(call c_program_shared_o,unittest,lz4frame.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o))
+$(eval $(call c_program_shared_o,unittest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o))
 
 roundTripTest:
 $(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
@@ -135,12 +136,6 @@ $(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
 
 checkFrame:
 $(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
-
-decompress-partial:
-$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
-
-decompress-partial-usingDict:
-$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
 # multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
 # (c_program : objects are not shared, since frameMT employs different flags)
@@ -163,11 +158,11 @@ clean: clean_cache
 
 .PHONY: versionsTest
 versionsTest:
-	$(PYTHON) test-lz4-versions.py
+	$(PYTHON) compat/test-lz4-versions.py
 
 .PHONY: listTest
 listTest: lz4
-	QEMU_SYS=$(QEMU_SYS) $(PYTHON) test-lz4-list.py
+	QEMU_SYS=$(QEMU_SYS) $(PYTHON) cli/test-lz4-list.py
 
 # Note: requires liblz4 installed
 CLEAN += abiTest
@@ -175,7 +170,7 @@ abiTest: LDLIBS += -llz4
 
 .PHONY: abiTests
 abiTests:
-	$(PYTHON) test-lz4-abi.py
+	$(PYTHON) compat/test-lz4-abi.py
 
 checkTag:
 $(eval $(call c_program_shared_o,checkTag,checkTag.o))
@@ -208,7 +203,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest test-decompress-partial
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest
 
 test32: CFLAGS+=-m32
 test32: test
@@ -222,7 +217,7 @@ lz4_all.c: $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
 	$(CAT) $^ > $@
 
 test-install: lz4 lib liblz4.pc
-	lz4_root=.. ./test_install.sh
+	lz4_root=.. ./compat/test_install.sh
 
 test-compile-with-lz4-memory-usage:
 	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MIN' $(MAKE) all
@@ -237,31 +232,31 @@ test-compile-with-lz4-memory-usage:
 # and only their test files : do not employ sweeping statements such `rm tmp*` or `rm *.lz4`
 test-lz4-sparse: lz4 datagen
 	@echo "\n ---- test sparse file support ----"
-	./test-lz4-sparse.sh
+	./cli/test-lz4-sparse.sh
 
 test-lz4-contentSize: lz4 datagen
 	@echo "\n ---- test original size support ----"
-	./test-lz4-contentSize.sh
+	./cli/test-lz4-contentSize.sh
 
 test-lz4-frame-concatenation: lz4 datagen
 	@echo "\n ---- test frame concatenation ----"
-	./test-lz4-frame-concatenation.sh
+	./cli/test-lz4-frame-concatenation.sh
 
 test-lz4-multiple: lz4 datagen
 	@echo "\n ---- test multiple files ----"
-	./test-lz4-multiple.sh
+	./cli/test-lz4-multiple.sh
 
 test-lz4-multiple-legacy: lz4 datagen
 	@echo "\n ---- test multiple files (Legacy format) ----"
-	./test-lz4-multiple-legacy.sh
+	./cli/test-lz4-multiple-legacy.sh
 
 test-lz4-skippable: lz4
 	@echo "\n ---- test lz4 with skippable frames ----"
-	./test-lz4-skippable.sh
+	./cli/test-lz4-skippable.sh
 
 test-lz4-mozlz4: lz4 datagen lz4cat
 	@echo "\n ---- test lz4 decoding Firefox mozlz4 files ----"
-	./test-lz4-mozlz4.sh
+	./cli/test-lz4-mozlz4.sh
 
 test-datagen-invalid-input: datagen
 	@echo "\n ---- test datagen fails correctly on invalid input ----"
@@ -269,37 +264,37 @@ test-datagen-invalid-input: datagen
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"
-	./test-lz4-basic.sh
+	./cli/test-lz4-basic.sh
 
 test-lz4-dict: lz4 datagen
 	@echo "\n ---- test lz4 compression/decompression with dictionary ----"
-	./test-lz4-dict.sh
+	./cli/test-lz4-dict.sh
 
 test-lz4-blocksize: lz4 datagen checkFrame
 	@echo "\n ---- test lz4 with custom block sizes ----"
-	./test-lz4-blocksize.sh
+	./cli/test-lz4-blocksize.sh
 
 test-lz4-multithread: lz4 datagen
 	@echo "\n ---- test lz4 multithreaded compression, memory budget, sources modified meanwhile ----"
-	./test-lz4-multithread.sh
+	./cli/test-lz4-multithread.sh
 
 test-lz4hc-hugefile: lz4 datagen
 	@echo "\n ---- test HC compression/decompression of huge files ----"
-	./test-lz4hc-hugefile.sh
+	./cli/test-lz4hc-hugefile.sh
 
 test-lz4-fast-hugefile: lz4 datagen
 	@echo "\n ---- test huge files compression/decompression ----"
-	./test-lz4-fast-hugefile.sh
+	./cli/test-lz4-fast-hugefile.sh
 
 test-lz4-hugefile: test-lz4-fast-hugefile test-lz4hc-hugefile
 
 test-lz4-testmode: lz4 datagen
 	@echo "\n ---- bench mode ----"
-	./test-lz4-testmode.sh
+	./cli/test-lz4-testmode.sh
 
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
-	./test-lz4-opt-parser.sh
+	./cli/test-lz4-opt-parser.sh
 
 test-lz4-essentials : lz4 datagen test-datagen-invalid-input test-lz4-basic test-lz4-multiple \
                       test-lz4-multiple-legacy test-lz4-frame-concatenation \
@@ -409,12 +404,6 @@ test-mem: lz4 datagen fuzzer frametest unittest fullbench
 test-mem32: lz4c32 datagen
 # unfortunately, valgrind doesn't seem to work with non-native binary...
 
-test-decompress-partial : decompress-partial decompress-partial-usingDict
-	@echo "\n ---- test decompress-partial ----"
-	./decompress-partial$(EXT)
-	@echo "\n ---- test decompress-partial-usingDict ----"
-	./decompress-partial-usingDict$(EXT)
-
 # public headers must not be included within extern "C" (#1600)
 # requires clang : -fmodules turns such inclusions into errors
 .PHONY: test-cxx-modules
@@ -441,7 +430,7 @@ ifeq ($(FREESTANDING_TARGET), yes)
 endif
 
 CLEAN += freestanding
-freestanding: freestanding.c
+freestanding: compat/freestanding.c
 	$(CC) $(FREESTANDING_CFLAGS) $^ -o $@$(EXT)
 
 test-freestanding: freestanding

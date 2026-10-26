@@ -170,7 +170,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\lib\xxhash.c" />
-    <ClCompile Include="..\..\..\tests\fullbench.c" />
+    <ClCompile Include="..\..\..\tests\bench\fullbench.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\lz4.h" />

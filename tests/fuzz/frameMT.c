@@ -41,6 +41,7 @@
  * - LZ4F_compressBegin() rejecting its arguments leaves the frame in progress (jobs in flight) untouched ;
  *   its allocation failures invalidate it
  * - LZ4F_getMaxNbWorkers() reports multi-threading support
+ * - allocation failures are reported (allocation_failed), except those preventing additional worker threads : context remains usable
  * - all allocations happen in the calling thread (custom allocator is not thread-safe : see TSAN)
  * - prints a digest of produced frames, to compare builds with and without LZ4F_MULTITHREAD
  * Bench mode : frameMT -b FILE [-l#] [-B#] [-D] [-c] [-T#]
@@ -231,7 +232,7 @@ static int validate(XXH64_state_t* digest)
             CHECK_LZ4F(c0);
             checkRoundTrip(ref0, c0, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
 
-            /* nbWorkers == 1 : one worker thread, plus the calling thread (serial without LZ4F_MULTITHREAD) */
+            /* nbWorkers == 1 : one worker thread (serial, within the calling thread, without LZ4F_MULTITHREAD) */
             c1 = compressMT(cctx, ref1, dstCapacity, src, srcSize, cd, &prefs, 1);
             CHECK_LZ4F(c1);
             checkRoundTrip(ref1, c1, src, srcSize, cd ? dict : NULL, cd ? dictSize : 0, decoded);
@@ -616,7 +617,7 @@ static void validateMaxNbWorkers(void)
 static void validateCompressBound(void)
 {
     LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
-    size_t const jobSize = 4 MB;   /* linked blocks */
+    size_t const jobSize = 1 MB;   /* 64 KB blocks */
     unsigned const nbWorkersList[] = { 1, 8 };
     size_t wi;
     g_step = "LZ4F_compressBound";
@@ -686,8 +687,9 @@ static size_t compressScenario(LZ4F_cctx* cctx, int mode, const LZ4F_preferences
     return pos + r;
 }
 
-/* Each allocation fails in turn : the operation must either succeed with the reference output,
- * or fail with allocation_failed. In both cases, the context must remain usable, and nothing must leak. */
+/* Each allocation fails in turn : the operation must fail with allocation_failed,
+ * except failures preventing additional worker threads, which only reduce their nb (same output).
+ * The context must remain usable, and nothing must leak. */
 static int validateAllocFailures(void)
 {
     static const unsigned nbWorkersList[] = { 1, 4 };
@@ -699,7 +701,7 @@ static int validateAllocFailures(void)
     char* const ref = (char*)malloc(dstCapacity);
     char* const out = (char*)malloc(dstCapacity);
     LZ4F_CustomMem const failingMem = { failingAlloc, NULL, countingFree, NULL };
-    unsigned nbScenarios = 0, nbFailures = 0, nbRecovered = 0;
+    unsigned nbScenarios = 0, nbFailures = 0, nbAbsorbed = 0;
     size_t wi, li;
     int linked, mode;
 
@@ -743,9 +745,9 @@ static int validateAllocFailures(void)
                 CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_allocation_failed,
                       "allocation %u : unexpected error %s", (unsigned)n, LZ4F_getErrorName(r));
                 nbFailures++;
-            } else {
+            } else {   /* additional worker thread not started, or this run needed fewer allocations (scheduling) */
                 CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u : output differs", (unsigned)n);
-                if (g_allocNb >= n) nbRecovered++;   /* failure absorbed, ex: fewer worker threads */
+                if (g_allocNb >= n) nbAbsorbed++;
             }
             /* context remains usable */
             g_failAt = 0;
@@ -758,7 +760,7 @@ static int validateAllocFailures(void)
         }
     }
     g_failAt = 0;
-    DISPLAY("allocation failures : %u scenarios, %u failures reported, %u absorbed \n", nbScenarios, nbFailures, nbRecovered);
+    DISPLAY("allocation failures : %u scenarios, %u failures reported, %u fewer worker threads \n", nbScenarios, nbFailures, nbAbsorbed);
     free(src); free(scratch); free(ref); free(out);
     return 0;
 }
@@ -1080,7 +1082,7 @@ static int validatePartialFlush(void)
 static int validateDeferredEmission(void)
 {
     static const unsigned nbWorkersList[] = { 1, 3 };
-    size_t const maxJobSize = 4 MB;   /* jobs : 4 MB with linked blocks, 1 MB with independent ones (64 KB blocks) */
+    size_t const maxJobSize = 1 MB;   /* jobs (64 KB blocks) */
     size_t const smallCapacity = 1 KB;
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(maxJobSize, NULL);
     char* const src = (char*)malloc(maxJobSize);
@@ -1096,7 +1098,7 @@ static int validateDeferredEmission(void)
     for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++)
     for (linked = 0; linked <= 1; linked++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-        size_t const jobSize = linked ? 4 MB : 1 MB;   /* a single job, submitted once full */
+        size_t const jobSize = maxJobSize;   /* a single job, submitted once full */
         LZ4F_cctx* cctx = NULL;
         size_t refSize, pos, r;
 #if !(defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD)
@@ -1265,8 +1267,9 @@ static int validateBeginFailures(void)
 }
 
 
-/* A failure while creating worker threads (ex: transient allocation failure) is absorbed :
- * jobs are processed serially, producing the same output. Worker threads are created again for next frames. */
+/* An allocation failure preventing the first worker thread fails the frame (allocation_failed) :
+ * jobs are not processed serially instead. Failures preventing additional worker threads only reduce their nb.
+ * The context remains usable : next frames create resources again. */
 static int validatePoolRetry(void)
 {
     size_t const srcSize = 9 MB;
@@ -1276,7 +1279,7 @@ static int validatePoolRetry(void)
     size_t dstCapacity, refSize, n;
     char* ref;
     char* out;
-    unsigned nbAbsorbed = 0, nbRetried = 0;
+    unsigned nbFailures = 0, nbAbsorbed = 0;
 
     g_step = "pool retry";
     prefs.nbWorkers = 2;
@@ -1303,22 +1306,21 @@ static int validatePoolRetry(void)
             LZ4F_freeCompressionContext(cctx);
             break;
         }
-        if (!LZ4F_isError(r)) {   /* failure absorbed */
-            size_t const allocsBefore = g_allocNb;
+        if (LZ4F_isError(r)) {
+            CHECK(LZ4F_getErrorCode(r) == LZ4F_ERROR_allocation_failed, "allocation %u : %s", (unsigned)n, LZ4F_getErrorName(r));
+            nbFailures++;
+        } else {   /* additional worker thread not started */
             CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u absorbed : output differs", (unsigned)n);
             nbAbsorbed++;
-            r = LZ4F_compressFrame_usingCDict(cctx, out, dstCapacity, src, srcSize, NULL, &prefs);
-            CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u absorbed : next frame differs", (unsigned)n);
-            if (g_allocNb > allocsBefore) nbRetried++;   /* missing resources created again */
         }
+        r = LZ4F_compressFrame_usingCDict(cctx, out, dstCapacity, src, srcSize, NULL, &prefs);
+        CHECK(r == refSize && !memcmp(out, ref, r), "allocation %u : next frame differs", (unsigned)n);
         LZ4F_freeCompressionContext(cctx);
     }
-#if defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD
-    CHECK(nbRetried > 0, "worker threads not created again after %u absorbed failures", nbAbsorbed);
-#endif
+    CHECK(nbFailures > 0, "no allocation failure reported");
     CHECK(g_nbAllocs == g_nbFrees, "memory leak : %u allocations, %u frees", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
     free(src); free(ref); free(out);
-    DISPLAY("pool retry : %u absorbed failures, %u retried at next frame \n", nbAbsorbed, nbRetried);
+    DISPLAY("pool retry : %u allocation failures reported, %u fewer worker threads, next frames succeed \n", nbFailures, nbAbsorbed);
     return 0;
 }
 

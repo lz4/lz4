@@ -254,7 +254,7 @@ test_stdvars:  ## CI helper – verifies CC/CFLAGS/CPPFLAGS/LDFLAGS/LDLIBS propa
 	    LDLIBS='-DLDLIBS_TEST' \
 	  | tee .stdvars.log >/dev/null
 
-	@tests/check_stdvars.sh .stdvars.log
+	@tests/compat/check_stdvars.sh .stdvars.log
 	@$(RM) .stdvars.log
 
 endif   # MSYS POSIX

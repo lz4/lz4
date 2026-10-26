@@ -34,7 +34,7 @@ done
 
 # files fitting into a single job (with independent blocks : compressed without worker threads),
 # and files of different sizes (-m : the same nb of threads for all) : same output
-head -c 1300000 $FPREFIX-src > $FPREFIX-s1   # 1 job with linked blocks, 2 with independent 64 KB blocks
+head -c 1300000 $FPREFIX-src > $FPREFIX-s1   # 2 jobs with 64 KB blocks
 head -c 300000 $FPREFIX-src > $FPREFIX-s2    # 1 job
 for opts in "-1 -B4" "-1 -B4 -BD" "-9 -B4 -BD" "-1 -B5"
 do
@@ -78,6 +78,28 @@ cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
 lz4 -f --memory=1M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # warning only
 cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
 if [ $MT = 1 ]; then grep "too small" $FPREFIX.err; fi
+
+
+# errors met while jobs are running : reported once all jobs are done, not from a job
+# (END_PROCESS() asserts it), which would race with the other threads
+isErrorCode() { test "$1" -gt 0 && test "$1" -lt 128; }   # not a crash (signal, assert)
+lz4 -f -1 $FPREFIX-src $FPREFIX.lz4
+head -c 2000000 $FPREFIX.lz4 > $FPREFIX-trunc.lz4
+rc=0; lz4 -d -f $FPREFIX-trunc.lz4 $FPREFIX.out || rc=$?
+isErrorCode $rc   # truncated frame
+{ head -c 1000000 $FPREFIX.lz4; printf 'corrupted'; tail -c +1000010 $FPREFIX.lz4; } > $FPREFIX-bad.lz4
+rc=0; lz4 -d -f $FPREFIX-bad.lz4 $FPREFIX.out || rc=$?
+isErrorCode $rc   # decoding error
+lz4 -f -l $FPREFIX-src $FPREFIX-legacy.lz4
+head -c $(( $(wc -c < $FPREFIX-legacy.lz4) - 1000 )) $FPREFIX-legacy.lz4 > $FPREFIX-trunc.lz4
+rc=0; lz4 -d -f $FPREFIX-trunc.lz4 $FPREFIX.out || rc=$?
+isErrorCode $rc   # truncated legacy frame
+if [ "$(uname)" = Linux ]; then   # write errors
+    rc=0; lz4 -d -f $FPREFIX.lz4 /dev/full || rc=$?
+    isErrorCode $rc
+    rc=0; lz4 -f -l $FPREFIX-src /dev/full || rc=$?
+    isErrorCode $rc
+fi
 
 
 # Source modified during its compression (see --[no-]mmap) :

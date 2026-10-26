@@ -1,24 +1,60 @@
 Programs and scripts for automated testing of LZ4
 =======================================================
 
-This directory contains the following programs and scripts:
-- `datagen` : Synthetic and parametrable data generator, for tests
-- `frametest` : Test tool that checks lz4frame integrity on target platform
-- `fullbench`  : Precisely measure speed for each lz4 inner functions
-- `fuzzer`  : Test tool, to check lz4 integrity on target platform
-- `unittest` : Unit tests, each one autonomous (see `unittest.h` to add tests)
-- `test-lz4-speed.py` : script for testing lz4 speed difference between commits
-- `test-lz4-versions.py` : compatibility test between lz4 versions stored on Github
+This directory is organized as follows :
+- `unit/` : unit tests, each one autonomous (see `unit/unittest.h` to add tests)
+- `fuzz/` : randomized tests of the library (`fuzzer`, `frametest`, `frameMT`, `roundTripTest`)
+- `cli/` : tests of the `lz4` command line (`test-lz4-*.sh`, `test-lz4-list.py`)
+- `compat/` : ABI, versions, installation, freestanding and build environment checks
+- `bench/` : `fullbench` (speed of each lz4 function), `test-lz4-speed.py` (speed difference between commits)
+- `tools/` : `datagen` (synthetic data generator), `checkFrame` (frame properties checker)
+- `data/` : sample files
+
+Test programs are built in this directory, by `make <program>`, and run by `make test-<name>` (see `Makefile`).
 
 
-#### `test-lz4-versions.py` - script for testing lz4 interoperability between versions
+#### Running tests
+
+- `make test-unittest` : unit tests.
+  `./unittest -l` lists them, `./unittest <filter>` runs the tests whose name contains `<filter>`,
+  and `-s#` changes the seed of their data.
+- `make test-lz4-essentials` : main tests of the `lz4` command line
+- `make test` : all tests (long)
+
+
+#### Adding tests
+
+Unit tests of the library go to `unit/`, in the file of the corresponding library source
+(`unittest_lz4.c`, `unittest_lz4hc.c`, `unittest_lz4frame.c`) :
+```c
+TEST(getBlockSize_64KB)
+{
+    ASSERT_EQ(LZ4F_getBlockSize(LZ4F_max64KB), 64 KB);
+}
+```
+then add `UT_TEST(getBlockSize_64KB),` to the table at the end of the file.
+Each test runs in its own context : buffers from `UT_malloc()` and `UT_sample()` are released at the end of the test,
+even when it fails, and a failed assertion only ends this test.
+See `unit/unittest.h` for assertions and helpers.
+
+`fuzz/fuzzer.c` and `fuzz/frametest.c` still contain unit tests, which are progressively moved to `unit/` :
+don't add new ones there.
+
+Tests of the command line go to `cli/` : extend an existing script, or create `cli/test-lz4-<name>.sh`,
+with a `test-lz4-<name>` target in `Makefile` and an entry in `build/meson/meson/tests/meson.build`.
+Scripts run from this directory, and find `lz4` and `datagen` in `PATH`.
+Their temporary files start with a prefix unique to the script, itself starting with `tmp`,
+and are removed on success.
+
+
+#### `compat/test-lz4-versions.py` - script for testing lz4 interoperability between versions
 
 This script creates `versionsTest` directory to which lz4 repository is cloned.
 Then all tagged (released) versions of lz4 are compiled.
 In the following step interoperability between lz4 versions is checked.
 
 
-#### `test-lz4-speed.py` - script for testing lz4 speed difference between commits
+#### `bench/test-lz4-speed.py` - script for testing lz4 speed difference between commits
 
 This script creates `speedTest` directory to which lz4 repository is cloned.
 Then it compiles all branches of lz4 and performs a speed benchmark for a given list of files (the `testFileNames` parameter).
@@ -37,12 +73,12 @@ Additional remarks:
 
 The example usage with two test files, one e-mail address, and with an additional message:
 ```
-./test-lz4-speed.py "silesia.tar calgary.tar" "email@gmail.com" --message "tested on my laptop" --sleepTime 60
+./bench/test-lz4-speed.py "silesia.tar calgary.tar" "email@gmail.com" --message "tested on my laptop" --sleepTime 60
 ```
 
 To run the script in background please use:
 ```
-nohup ./test-lz4-speed.py testFileNames emails &
+nohup ./bench/test-lz4-speed.py testFileNames emails &
 ```
 
 The full list of parameters:

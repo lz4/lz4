@@ -13,35 +13,29 @@ lz4_source_root = '../../../..'
 fuzzer_time = 90
 test_exes = {
   'abiTest': {
-    'sources': files(lz4_source_root / 'tests/abiTest.c'),
+    'sources': files(lz4_source_root / 'tests/compat/abiTest.c'),
     'test': false,
   },
   'checkFrame': {
-    'sources': files(lz4_source_root / 'tests/checkFrame.c'),
+    'sources': files(lz4_source_root / 'tests/tools/checkFrame.c'),
     'include_directories': include_directories(lz4_source_root / 'programs'),
   },
   'checkTag': {
-    'sources': files(lz4_source_root / 'tests/checkTag.c'),
+    'sources': files(lz4_source_root / 'tests/compat/checkTag.c'),
     'test': false,
   },
   'datagen': {
     'sources': files(
         lz4_source_root / 'programs/lorem.c',
-        lz4_source_root / 'tests/datagencli.c',
-        lz4_source_root / 'tests/datagen.c',
-        lz4_source_root / 'tests/loremOut.c',
+        lz4_source_root / 'tests/tools/datagencli.c',
+        lz4_source_root / 'tests/tools/datagen.c',
+        lz4_source_root / 'tests/tools/loremOut.c',
         ),
     'include_directories': include_directories(lz4_source_root / 'programs'),
   },
-  'decompress-partial-usingDict.c': {
-    'sources': files(lz4_source_root / 'tests/decompress-partial-usingDict.c'),
-  },
-  'decompress-partial.c': {
-    'sources': files(lz4_source_root / 'tests/decompress-partial.c'),
-  },
   'frametest': {
     'sources': files(
-      lz4_source_root / 'tests/frametest.c',
+      lz4_source_root / 'tests/fuzz/frametest.c',
       lz4_source_root / 'lib/lz4file.c',
     ),
     'include_directories': include_directories(lz4_source_root / 'programs'),
@@ -49,7 +43,7 @@ test_exes = {
     'test': false,
   },
   'freestanding': {
-    'sources': files(lz4_source_root / 'tests/freestanding.c'),
+    'sources': files(lz4_source_root / 'tests/compat/freestanding.c'),
     'c_args': ['-ffreestanding', '-fno-stack-protector', '-Wno-unused-parameter', '-Wno-declaration-after-statement', '-DLZ4_DEBUG=0'],
     'link_args': ['-nostdlib'],
     'build': cc.get_id() in ['gcc', 'clang'] and
@@ -57,29 +51,30 @@ test_exes = {
     'override_options': ['optimization=1'],
   },
   'fullbench': {
-    'sources': files(lz4_source_root / 'tests/fullbench.c'),
+    'sources': files(lz4_source_root / 'tests/bench/fullbench.c'),
     'include_directories': include_directories(lz4_source_root / 'programs'),
-    'args': ['--no-prompt', '-i1', files(lz4_source_root / 'tests/COPYING')],
+    'args': ['--no-prompt', '-i1', files(lz4_source_root / 'tests/data/COPYING')],
     'test': false,
   },
   'fuzzer': {
-    'sources': files(lz4_source_root / 'tests/fuzzer.c'),
+    'sources': files(lz4_source_root / 'tests/fuzz/fuzzer.c'),
     'include_directories': include_directories(lz4_source_root / 'programs'),
     'args': ['-T@0@s'.format(fuzzer_time)],
     'test': false,
   },
   'unittest': {
     'sources': files(
-      lz4_source_root / 'tests/unittest.c',
-      lz4_source_root / 'tests/unittest_lz4.c',
-      lz4_source_root / 'tests/unittest_lz4hc.c',
-      lz4_source_root / 'tests/unittest_lz4frame.c',
-      lz4_source_root / 'tests/datagen.c',
+      lz4_source_root / 'tests/unit/unittest.c',
+      lz4_source_root / 'tests/unit/unittest_lz4.c',
+      lz4_source_root / 'tests/unit/unittest_lz4hc.c',
+      lz4_source_root / 'tests/unit/unittest_lz4frame.c',
+      lz4_source_root / 'tests/tools/datagen.c',
+      lz4_source_root / 'lib/lz4file.c',
     ),
-    'include_directories': include_directories(lz4_source_root / 'programs'),
+    'include_directories': include_directories(lz4_source_root / 'programs', lz4_source_root / 'tests/tools'),
   },
   'roundTripTest': {
-    'sources': files(lz4_source_root / 'tests/roundTripTest.c'),
+    'sources': files(lz4_source_root / 'tests/fuzz/roundTripTest.c'),
     'test': false,
   },
 }
@@ -162,13 +157,13 @@ test_scripts = {
 }
 
 foreach s, attrs : test_scripts
-  script = find_program(lz4_source_root / 'tests/test-@0@.sh'.format(s))
+  script = find_program(lz4_source_root / 'tests/cli/test-@0@.sh'.format(s))
 
   test(
     '@0@'.format(s),
     script,
     depends: attrs.get('depends', []),
-    workdir: fs.parent(script.full_path()),
+    workdir: fs.parent(fs.parent(script.full_path())),   # tests/, as with tests/Makefile
     env: run_env,
     timeout: 360
   )

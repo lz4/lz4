@@ -143,6 +143,66 @@ TEST(decompress_safe_partial_offset0)
 }
 
 
+/* srcSize can be larger than the block's compressed size,
+ * provided targetOutputSize is <= the block's decompressed size */
+#define PARTIAL_SRC_SIZE 1500
+#define PARTIAL_EXTRA_MAX 10
+
+/* @return : compressed size of @src, followed by PARTIAL_EXTRA_MAX bytes of padding */
+static int compressPadded(const char* src, char* dst)
+{
+    int const capacity = LZ4_COMPRESSBOUND(PARTIAL_SRC_SIZE) + PARTIAL_EXTRA_MAX;
+    int cSize;
+    memset(dst, 0, (size_t)capacity);
+    cSize = LZ4_compress_default(src, dst, PARTIAL_SRC_SIZE, capacity - PARTIAL_EXTRA_MAX);
+    ASSERT(cSize > 0);
+    return cSize;
+}
+
+TEST(decompress_safe_partial_srcSizeBeyondBlock)
+{
+    const char* const src = (const char*)UT_sample(PARTIAL_SRC_SIZE);
+    char* const cBuffer = (char*)UT_malloc(LZ4_COMPRESSBOUND(PARTIAL_SRC_SIZE) + PARTIAL_EXTRA_MAX);
+    char decoded[2 KB];
+    int const cSize = compressPadded(src, cBuffer);
+    int extra;
+    for (extra = 0; extra < PARTIAL_EXTRA_MAX; extra++) {
+        int const r = LZ4_decompress_safe_partial(cBuffer, decoded, cSize + extra, PARTIAL_SRC_SIZE, sizeof(decoded));
+        ASSERT_MSG(r == PARTIAL_SRC_SIZE && !memcmp(decoded, src, PARTIAL_SRC_SIZE),
+                   "srcSize = compressed size + %i : %i bytes decoded", extra, r);
+    }
+}
+
+TEST(decompress_safe_partial_usingDict_srcSizeBeyondBlock)
+{
+    int const smallSize = 1 KB;
+    int const largeSize = 64 KB - 1;
+    const char* const src = (const char*)UT_sample(PARTIAL_SRC_SIZE);
+    char* const cBuffer = (char*)UT_malloc(LZ4_COMPRESSBOUND(PARTIAL_SRC_SIZE) + PARTIAL_EXTRA_MAX);
+    char* const buffer = (char*)UT_malloc((size_t)largeSize + 2 KB);   /* prefix, then decoded data */
+    char* const decoded = buffer + largeSize;
+    char* const extDict = (char*)UT_malloc((size_t)largeSize);
+    struct { const char* name; const char* start; int size; } const dicts[] = {
+        { "no dictionary",       NULL,                                0 },
+        { "small prefix",        decoded - smallSize,                 smallSize },
+        { "large prefix",        buffer,                              largeSize },
+        { "small external dict", extDict + largeSize - smallSize,     smallSize },
+        { "large external dict", extDict,                             largeSize } };
+    int const cSize = compressPadded(src, cBuffer);
+    size_t d;
+    int extra;
+    memset(buffer, 0, (size_t)largeSize);
+    memset(extDict, 0, (size_t)largeSize);
+    for (d = 0; d < ARRAY_SIZE(dicts); d++)
+    for (extra = 0; extra < PARTIAL_EXTRA_MAX; extra++) {
+        int const r = LZ4_decompress_safe_partial_usingDict(cBuffer, decoded, cSize + extra, PARTIAL_SRC_SIZE, 2 KB,
+                                                            dicts[d].start, dicts[d].size);
+        ASSERT_MSG(r == PARTIAL_SRC_SIZE && !memcmp(decoded, src, PARTIAL_SRC_SIZE),
+                   "%s, srcSize = compressed size + %i : %i bytes decoded", dicts[d].name, extra, r);
+    }
+}
+
+
 /*-************************************
 *  One-shot compression
 **************************************/
@@ -408,6 +468,8 @@ static const UT_test tests[] = {
     UT_TEST(decompress_safe_all0xFF),
     UT_TEST(decompress_safe_ipAtIend),
     UT_TEST(decompress_safe_partial_offset0),
+    UT_TEST(decompress_safe_partial_srcSizeBeyondBlock),
+    UT_TEST(decompress_safe_partial_usingDict_srcSizeBeyondBlock),
     UT_TEST(compress_default_nullInput),
     UT_TEST(compress_default_nullInputAndOutput),
     UT_TEST(compress_destSize_extState_outOfRangeAcceleration),

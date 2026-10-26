@@ -58,6 +58,10 @@ extern "C" {
  *  Compression is guaranteed to succeed if `dstCapacity >= LZ4_compressBound(srcSize)` (see "lz4.h")
  *  Max supported `srcSize` value is LZ4_MAX_INPUT_SIZE (see "lz4.h")
  * `compressionLevel` : any value between 1 and LZ4HC_CLEVEL_MAX will work.
+ *                      Levels 1 and 2 are identical : the fastest HC mode (since v1.10.0).
+ *                      Levels 3 to 9 trade speed for ratio (LZ4HC_CLEVEL_DEFAULT is 9).
+ *                      Levels from LZ4HC_CLEVEL_OPT_MIN (10) use the optimal parser, the slowest.
+ *                      Values < 1 select LZ4HC_CLEVEL_DEFAULT.
  *                      Values > LZ4HC_CLEVEL_MAX behave the same as LZ4HC_CLEVEL_MAX.
  * @return : the number of bytes written into 'dst'
  *           or 0 if compression fails.

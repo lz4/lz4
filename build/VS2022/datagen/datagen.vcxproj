@@ -162,14 +162,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\programs\lorem.c" />
-    <ClCompile Include="..\..\..\tests\datagen.c" />
-    <ClCompile Include="..\..\..\tests\datagencli.c" />
-    <ClCompile Include="..\..\..\tests\loremOut.c" />
+    <ClCompile Include="..\..\..\tests\tools\datagen.c" />
+    <ClCompile Include="..\..\..\tests\tools\datagencli.c" />
+    <ClCompile Include="..\..\..\tests\tools\loremOut.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\programs\lorem.h" />
-    <ClInclude Include="..\..\..\tests\datagen.h" />
-    <ClInclude Include="..\..\..\tests\loremOut.h" />
+    <ClInclude Include="..\..\..\tests\tools\datagen.h" />
+    <ClInclude Include="..\..\..\tests\tools\loremOut.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

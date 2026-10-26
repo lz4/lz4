@@ -205,16 +205,16 @@ typedef struct {
 
 /* nbWorkers : experimental
  *  0 (default) : single-threaded, unchanged behavior.
- *  >= 1 : input is cut into jobs, compressed by up to nbWorkers worker threads (capped at 1024, 128 on 32-bit systems).
- *         The calling thread also processes jobs, while waiting for them :
- *         up to nbWorkers+1 threads can be compressing simultaneously.
+ *  >= 1 : input is cut into jobs, compressed by nbWorkers worker threads (capped at 1024, 128 on 32-bit systems),
+ *         while the calling thread fills and emits them.
  *  - Output only depends on content, parameters and flush points :
  *    never on nbWorkers value (>= 1), scheduling, input slicing, nor stableSrc.
  *  - With independent blocks, output is identical to nbWorkers == 0.
- *  - With linked blocks, each 4 MB job restarts with previous 64 KB as dictionary :
+ *  - Jobs are 1 MB (whole nb of blocks), or a single block when larger.
+ *    With linked blocks, each job restarts with previous 64 KB as dictionary :
  *    output can differ (slightly) from nbWorkers == 0.
  *  - Streaming (LZ4F_compressUpdate(), LZ4F_uncompressedUpdate()) : output lags behind input,
- *    up to ~ 2 * nbWorkers jobs of 4 MB in flight, emitted by LZ4F_flush() and LZ4F_compressEnd() :
+ *    up to ~ 2 * nbWorkers jobs in flight, emitted by LZ4F_flush() and LZ4F_compressEnd() :
  *    invoke them again while they fill dstBuffer (at least one job per invocation with LZ4F_compressBound(0)).
  *    LZ4F_compressBound() counts jobs instead of blocks : updates defer completed jobs not fitting into dstBuffer,
  *    so that output is only required to start a job while all slots are busy.
@@ -226,7 +226,10 @@ typedef struct {
  *    LZ4F_srcStable (historical value 1) still only requires the last 64 KB to remain present, as with nbWorkers == 0.
  *  - One-shot (LZ4F_compressFrame()) : success is still guaranteed with LZ4F_compressFrameBound().
  *    Inputs fitting into a single job are compressed by the calling thread.
- *  - Worker threads are created at frame start, and kept within the compression context for next frames.
+ *  - Worker threads are started on demand, when jobs wait for them (up to nbWorkers), with their buffers :
+ *    small inputs employ few threads and little memory. They are kept within the compression context for next frames.
+ *    If no worker thread can be created at frame start, LZ4F_compressBegin*() and LZ4F_compressFrame*() fail
+ *    (LZ4F_ERROR_allocation_failed) ; failing to start more (ex: system limits), compression proceeds with current ones.
  *    A context with worker threads must not be employed after fork(), in the child process.
  *    On Windows, it must not be employed, nor freed, while the loader lock is held (within DllMain(),
  *    or constructors and destructors of a DLL's global objects) : worker threads can neither start nor exit then.
@@ -806,8 +809,6 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
  * @return : the maximum nb of worker threads a compression context can employ :
  *           0 when this library is compiled without multi-threading support (LZ4F_MULTITHREAD),
  *           otherwise the cap applied to LZ4F_preferences_t.nbWorkers (1024, or 128 on 32-bit systems).
- *  Even when supported, worker threads can be missing at run time (ex: creation failure) :
- *  jobs are then compressed by the calling thread, producing the same output.
 **/
 LZ4FLIB_STATIC_API unsigned LZ4F_getMaxNbWorkers(void);
 

@@ -123,6 +123,10 @@ unsigned UT_rand(void);
  * @return : @size bytes of compressible data, generated from UT_rand(), released at the end of the test */
 void* UT_sample(size_t size);
 
+/* UT_noise() :
+ * @return : @size bytes of incompressible data, generated from UT_rand(), released at the end of the test */
+void* UT_noise(size_t size);
+
 
 /*-************************************
 *  Implementation of assertions

@@ -16,8 +16,6 @@ fasttest
 roundTripTest
 checkTag
 checkFrame
-decompress-partial
-decompress-partial-usingDict
 abiTest
 freestanding
 
