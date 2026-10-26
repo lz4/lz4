@@ -847,8 +847,8 @@ _lz4mid_last_literals:
     if (refEnd < ip) refEnd = ip;
     if (LZ4HC_encodeLastLiterals(UPDATABLE(ip, op, anchor), iend, limit, oend))
         return 0;  /* not enough space in @dst */
-    if (ip < refEnd)   /* fillOutput : the rest of input is left to the next block */
-        LZ4HC_dropPositions(ctx, ip, MIN(refEnd, ilimit), lz4mid);
+    if (ip < refEnd)   /* fillOutput : the rest of input is left to the next block (input >= LZ4_minLength) */
+        LZ4HC_dropPositions(ctx, ip, MIN(refEnd, iend - LZ4MID_HASHSIZE), lz4mid);
 
     /* End */
     DEBUGLOG(5, "compressed %i bytes into %i bytes", *srcSizePtr, (int)((char*)op - dst));
