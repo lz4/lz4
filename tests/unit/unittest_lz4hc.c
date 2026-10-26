@@ -138,13 +138,13 @@ TEST(compressHC2_continue_roundTrip)
 /* level 2 : the match tested at ip+1 must not be ip itself, inside runs */
 TEST(compress_HC_level2_runs)
 {
-    char runs[2 + 4096];   /* 0xFF 0x00, then runs of 10 x 0xFF and 10 x 0x00 */
+    unsigned char runs[2 + 4096];   /* 0xFF 0x00, then runs of 10 x 0xFF and 10 x 0x00 */
     int const capacity = LZ4_COMPRESSBOUND(sizeof(runs));
     char* const dst = (char*)UT_malloc((size_t)capacity);
     int i, cSize;
-    runs[0] = (char)0xFF; runs[1] = 0;
-    for (i = 0; i < 4096; i++) runs[2 + i] = (i % 20) < 10 ? (char)0xFF : 0;
-    cSize = LZ4_compress_HC(runs, dst, (int)sizeof(runs), capacity, 2);
+    runs[0] = 0xFF; runs[1] = 0;
+    for (i = 0; i < 4096; i++) runs[2 + i] = (i % 20) < 10 ? 0xFF : 0;
+    cSize = LZ4_compress_HC((const char*)runs, dst, (int)sizeof(runs), capacity, 2);
     /* ~1.6 KB (one literal and one offset 1 per run), instead of < 50 bytes */
     ASSERT_MSG(cSize > 0 && cSize <= 100, "%i bytes", cSize);
 }
@@ -315,7 +315,7 @@ TEST(compress_HC_destSize_sameAsFast)
     int const dstStep = 43;
     int const dstMinLen = 33 + (int)(UT_rand() % (unsigned)dstStep);
     int const dstMaxLen = 5000;
-    char const endMark = (char)0x88;
+    char const endMark = 0x5A;
     char* const src1 = (char*)UT_malloc((size_t)srcCapacity + 1);
     char* const src2 = (char*)UT_malloc((size_t)srcCapacity + 1);
     char* const dst1 = (char*)UT_malloc((size_t)dstCapacity + 1);
