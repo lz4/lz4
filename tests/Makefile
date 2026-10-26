@@ -369,8 +369,9 @@ test-frameMT-quick: frameMT frameMT-nomt
 test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
 
+# random seed : explores more data ; a failure reports its seed
 test-unittest: unittest
-	./unittest
+	./unittest -r
 
 VALGRIND = valgrind --leak-check=yes --error-exitcode=1
 test-mem: FPREFIX = tmp-tvm

@@ -25,12 +25,13 @@
 
 #include "unittest.h"
 #include "datagen.h"  /* RDG_genBuffer */
+#include "xxhash.h"   /* XXH32 */
 #include <setjmp.h>   /* setjmp, longjmp */
 #include <stdarg.h>   /* va_list */
 #include <stdio.h>    /* printf, snprintf */
 #include <stdlib.h>   /* malloc, free, strtoul */
 #include <string.h>   /* strcmp, strncmp, strstr, strcspn, memcmp */
-#include <time.h>     /* clock */
+#include <time.h>     /* clock, time */
 
 
 /*-************************************
@@ -219,10 +220,11 @@ static int UT_isSelected(const char* name, int argc, const char** argv)
 
 static int UT_usage(const char* exeName)
 {
-    printf("Usage : %s [-l] [-s#] [filter...] \n", exeName);
+    printf("Usage : %s [-l] [-s#] [-r] [filter...] \n", exeName);
     printf("Runs the tests whose name (suite.test) contains one of the filters, or all tests \n");
     printf(" -l  : list tests, without running them \n");
     printf(" -s# : seed of UT_rand() (default : %u) \n", g_seed);
+    printf(" -r  : random seed, reported at the end \n");
     return 1;
 }
 
@@ -238,6 +240,10 @@ int main(int argc, const char** argv)
         if (arg[0] != '-') continue;   /* filter */
         if (!strcmp(arg, "-l")) listOnly = 1;
         else if (arg[1] == 's' && arg[2] != 0) g_seed = (unsigned)strtoul(arg + 2, NULL, 10);
+        else if (!strcmp(arg, "-r")) {   /* hashed : successive runs get unrelated seeds */
+            time_t const t = time(NULL);
+            g_seed = XXH32(&t, sizeof(t), 1) % 100000;
+        }
         else return UT_usage(argv[0]);
     }
 
@@ -252,6 +258,7 @@ int main(int argc, const char** argv)
 
     if (nbTests == 0) { printf("no test selected \n"); return 1; }
     if (listOnly) return 0;
-    printf("[==========] %u tests, %u failed (%lu ms) \n", nbTests, nbFailed, UT_elapsedMs(start));
+    printf("[==========] %u tests, %u failed (%lu ms), seed %u \n", nbTests, nbFailed, UT_elapsedMs(start), g_seed);
+    if (nbFailed) printf("failures are reproduced with -s%u \n", g_seed);
     return nbFailed != 0;
 }

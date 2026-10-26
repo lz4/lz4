@@ -17,7 +17,8 @@ Test programs are built in this directory, by `make <program>`, and run by `make
 
 - `make test-unittest` : unit tests.
   `./unittest -l` lists them, `./unittest <filter>` runs the tests whose name contains `<filter>`,
-  and `-s#` changes the seed of their data.
+  `-s#` changes the seed of their data, `-r` selects a random one, reported at the end.
+  `make test-unittest` uses a random seed.
 - `make test-lz4-essentials` : main tests of the `lz4` command line
 - `make test` : all tests (long)
 

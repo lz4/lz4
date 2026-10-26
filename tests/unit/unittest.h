@@ -160,7 +160,7 @@ void* UT_defer(void (*release)(void*), void* ptr);
 void UT_release(void* ptr);
 
 /* UT_rand() :
- * pseudo-random generator, restarted from the same seed (-s#) for each test */
+ * pseudo-random generator, restarted from the same seed (-s#, or random with -r) for each test */
 unsigned UT_rand(void);
 
 /* UT_fillSample(), UT_fillNoise() :
