@@ -113,6 +113,9 @@ lz4 -c -4294967305 $FPREFIX-dg20k > /dev/null && exit 1        # > UINT_MAX (wou
 lz4 -c -T4294967297 $FPREFIX-dg20k > /dev/null && exit 1       # > UINT_MAX (would wrap to 1)
 # an overflowing LZ4_CLEVEL is ignored, like other invalid values
 test "$(LZ4_CLEVEL=4294967305 lz4 -c $FPREFIX-dg20k | wc -c)" -eq "$(lz4 -c $FPREFIX-dg20k | wc -c)"
+# a value followed by trailing garbage is ignored, like other invalid values
+test "$(LZ4_CLEVEL=9x lz4 -c $FPREFIX-dg20k | wc -c)" -eq "$(lz4 -c $FPREFIX-dg20k | wc -c)"
+LZ4_NBWORKERS=2x lz4 -c $FPREFIX-dg20k 2>&1 >/dev/null | grep "Ignore environment variable setting LZ4_NBWORKERS"
 # acceleration (--fast=# + 1) is capped at LZ4_ACCELERATION_MAX (65537) :
 # the largest --fast value behaves like --fast=65536, without overflow
 lz4 -c --fast=65536 $FPREFIX-dg20k > $FPREFIX-fastmax.lz4
