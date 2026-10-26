@@ -133,10 +133,15 @@ jobs:
         --vsenv
         -Ddefault_library=shared
         -Dossfuzz=false
+        -Dtests=true
         build/meson builddir
 
     - name: Build
       run: meson compile -C builddir
+
+    - name: Unit tests
+      # only unittest : the other tests require the command line tool, or a POSIX shell
+      run: meson test -C builddir unittest --print-errorlogs
 
     - name: Test installation
       # MSVC only generates the import library lz4.lib if the DLL exports symbols,
