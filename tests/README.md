@@ -32,7 +32,7 @@ TEST(getBlockSize_64KB)
     ASSERT_EQ(LZ4F_getBlockSize(LZ4F_max64KB), 64 KB);
 }
 ```
-then add `UT_TEST(getBlockSize_64KB),` to the table at the end of the file.
+Tests register themselves, and run in the order of the source.
 Each test runs in its own context : buffers from `UT_malloc()` and `UT_sample()` are released at the end of the test,
 even when it fails, and a failed assertion only ends this test.
 See `unit/unittest.h` for assertions and helpers.

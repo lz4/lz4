@@ -38,13 +38,12 @@
  *     {
  *         ASSERT_EQ(LZ4F_getBlockSize(LZ4F_max64KB), 64 KB);
  *     }
- * then add it to the table at the end of the file :
- *     UT_TEST(myTest),
- * The compiler warns about an unused function when a test is missing from the table.
+ * Tests register themselves before main(), and run in the order of the source.
+ * Their suite is the name of their file, without "unittest_" (unittest_lz4frame.c : lz4frame).
  *
  * Adding a test file :
- * end it with UT_SUITE(name, tests), add the suite to the list in unittest.c,
- * and the file to the build (tests/Makefile, build/meson/meson/tests/meson.build).
+ * add it to the build (tests/Makefile, build/meson/meson/tests/meson.build),
+ * as an object file : linked from a static library, it could be dropped, since nothing references it.
  *
  * Running tests : see `unittest -h`
  */
@@ -77,14 +76,52 @@
 /*-************************************
 *  Tests
 **************************************/
-typedef struct { const char* name; void (*fn)(void); } UT_test;
-typedef struct { const char* name; const UT_test* tests; size_t nbTests; } UT_suite;
+typedef struct UT_test_s {
+    const char* name;
+    const char* file;
+    int line;
+    void (*fn)(void);
+    struct UT_test_s* next;
+} UT_test;
 
-#define TEST(name) static void UT_test_##name(void)
-#define UT_TEST(name) { #name, UT_test_##name }
-#define UT_SUITE(name, tests)                                 \
-    extern const UT_suite UT_suite_##name;  /* C++ : const objects have internal linkage by default */ \
-    const UT_suite UT_suite_##name = { #name, tests, sizeof(tests) / sizeof((tests)[0]) }
+void UT_register(UT_test* test);
+
+#define TEST(name)                                                                         \
+    static void UT_test_##name(void);                                                      \
+    static UT_test UT_node_##name = { #name, __FILE__, __LINE__, UT_test_##name, NULL };   \
+    UT_CONSTRUCTOR(UT_register_##name) { UT_register(&UT_node_##name); }                  \
+    static void UT_test_##name(void)
+
+/* UT_CONSTRUCTOR(f) { ... } : defines f(), invoked before main() */
+#if defined(__cplusplus)   /* initialization of a static object */
+#  define UT_CONSTRUCTOR(f)                                                \
+    static void f(void);                                                   \
+    namespace { struct f##_caller { f##_caller() { f(); } } f##_instance; } \
+    static void f(void)
+#elif defined(__GNUC__)    /* gcc, clang */
+#  define UT_CONSTRUCTOR(f) static void f(void) __attribute__((constructor)); static void f(void)
+#elif defined(_MSC_VER)    /* pointer in the table of initializers of the C runtime */
+#  pragma section(".CRT$XCU", read)
+#  if defined(_M_IX86)
+#    define UT_SYMBOL_PREFIX "_"
+#  else
+#    define UT_SYMBOL_PREFIX ""
+#  endif
+#  define UT_CAT_(a, b) a##b
+#  define UT_CAT(a, b) UT_CAT_(a, b)
+#  define UT_STR_(a) #a
+#  define UT_STR(a) UT_STR_(a)   /* expands a first */
+   /* ptr has external linkage, and is named after __LINE__, to be unique,
+    * so that the linker can be told to keep it (/include) */
+#  define UT_CONSTRUCTOR(f) UT_CONSTRUCTOR_(f, UT_CAT(f##_ptr, __LINE__))
+#  define UT_CONSTRUCTOR_(f, ptr)                                          \
+    static void __cdecl f(void);                                           \
+    __declspec(allocate(".CRT$XCU")) void (__cdecl* ptr)(void) = f;        \
+    __pragma(comment(linker, "/include:" UT_SYMBOL_PREFIX UT_STR(ptr)))    \
+    static void __cdecl f(void)
+#else
+#  error "unittest.h : registration of tests before main() is not supported by this compiler"
+#endif
 
 
 /*-************************************

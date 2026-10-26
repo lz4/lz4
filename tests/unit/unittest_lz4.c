@@ -460,28 +460,3 @@ TEST(compress_continue_inputOverwritesPreviousBlock)
     }
 }
 
-
-static const UT_test tests[] = {
-    UT_TEST(decompress_safe_emptyInput),
-    UT_TEST(decompress_safe_oneByteInput),
-    UT_TEST(decompress_safe_shortcutEdgeCase),
-    UT_TEST(decompress_safe_all0xFF),
-    UT_TEST(decompress_safe_ipAtIend),
-    UT_TEST(decompress_safe_partial_offset0),
-    UT_TEST(decompress_safe_partial_srcSizeBeyondBlock),
-    UT_TEST(decompress_safe_partial_usingDict_srcSizeBeyondBlock),
-    UT_TEST(compress_default_nullInput),
-    UT_TEST(compress_default_nullInputAndOutput),
-    UT_TEST(compress_destSize_extState_outOfRangeAcceleration),
-    UT_TEST(compress_default_inPlace),
-    UT_TEST(initStream_alignment),
-    UT_TEST(createStream),
-    UT_TEST(compress_fast_continue_roundTrip),
-    UT_TEST(resetStream_fast_largeFirstBlock),
-    UT_TEST(loadDict_tooSmall),
-    UT_TEST(saveDict_afterInit),
-    UT_TEST(saveDict_negativeSize),
-    UT_TEST(compress_periodicRuns),
-    UT_TEST(compress_continue_inputOverwritesPreviousBlock),
-};
-UT_SUITE(lz4, tests);

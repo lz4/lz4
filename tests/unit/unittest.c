@@ -29,22 +29,39 @@
 #include <stdarg.h>   /* va_list */
 #include <stdio.h>    /* printf, snprintf */
 #include <stdlib.h>   /* malloc, free, strtoul */
-#include <string.h>   /* strcmp, strstr, memcmp */
+#include <string.h>   /* strcmp, strncmp, strstr, strcspn, memcmp */
 #include <time.h>     /* clock */
 
 
 /*-************************************
-*  Test suites : one per test file
+*  Registered tests
 **************************************/
-extern const UT_suite UT_suite_lz4;
-extern const UT_suite UT_suite_lz4hc;
-extern const UT_suite UT_suite_lz4frame;
+static UT_test* g_tests = NULL;
 
-static const UT_suite* const g_suites[] = {
-    &UT_suite_lz4,
-    &UT_suite_lz4hc,
-    &UT_suite_lz4frame,
-};
+static int UT_compare(const UT_test* a, const UT_test* b)
+{
+    int const c = strcmp(a->file, b->file);
+    return c ? c : a->line - b->line;
+}
+
+/* keeps tests sorted by file, then by line : the order of the source, whatever the order of registration */
+void UT_register(UT_test* test)
+{
+    UT_test** p = &g_tests;
+    while (*p != NULL && UT_compare(*p, test) < 0) p = &(*p)->next;
+    test->next = *p;
+    *p = test;
+}
+
+/* @return : suite.test, the suite being the name of the file, without "unittest_" and extension */
+static void UT_fullName(char* dst, size_t dstSize, const UT_test* test)
+{
+    const char* suite = test->file;
+    const char* p;
+    for (p = test->file; *p; p++) if (*p == '/' || *p == '\\') suite = p + 1;
+    if (!strncmp(suite, "unittest_", 9)) suite += 9;
+    snprintf(dst, dstSize, "%.*s.%s", (int)strcspn(suite, "."), suite, test->name);
+}
 
 
 /*-************************************
@@ -193,7 +210,7 @@ int main(int argc, const char** argv)
     clock_t const start = clock();
     unsigned nbTests = 0, nbFailed = 0;
     int listOnly = 0, i;
-    size_t s, t;
+    const UT_test* test;
 
     for (i = 1; i < argc; i++) {
         const char* const arg = argv[i];
@@ -203,16 +220,14 @@ int main(int argc, const char** argv)
         else return UT_usage(argv[0]);
     }
 
-    for (s = 0; s < sizeof(g_suites) / sizeof(g_suites[0]); s++) {
-        for (t = 0; t < g_suites[s]->nbTests; t++) {
-            const UT_test* const test = g_suites[s]->tests + t;
-            char name[256];
-            snprintf(name, sizeof(name), "%s.%s", g_suites[s]->name, test->name);
-            if (!UT_isSelected(name, argc, argv)) continue;
-            nbTests++;
-            if (listOnly) printf("%s \n", name);
-            else nbFailed += (unsigned)UT_run(name, test->fn);
-    }   }
+    for (test = g_tests; test != NULL; test = test->next) {
+        char name[256];
+        UT_fullName(name, sizeof(name), test);
+        if (!UT_isSelected(name, argc, argv)) continue;
+        nbTests++;
+        if (listOnly) printf("%s \n", name);
+        else nbFailed += (unsigned)UT_run(name, test->fn);
+    }
 
     if (nbTests == 0) { printf("no test selected \n"); return 1; }
     if (listOnly) return 0;
