@@ -121,6 +121,12 @@ LZ4_NBWORKERS=2x lz4 -c $FPREFIX-dg20k 2>&1 >/dev/null | grep "Ignore environmen
 lz4 -c --fast=65536 $FPREFIX-dg20k > $FPREFIX-fastmax.lz4
 lz4 -c --fast=2147483647 $FPREFIX-dg20k | cmp - $FPREFIX-fastmax.lz4
 lz4 -bq --fast=2147483647 -i0 $FPREFIX-dg20k
+# -v reports the processing speed after a successful decompression, like after compression,
+# but not after a failed one (it isn't reported on systems where MT time measurements are unsupported)
+if lz4 -vf $FPREFIX-dg20k $FPREFIX-v.lz4 2>&1 | grep -q "Done in"; then
+    lz4 -vdf $FPREFIX-v.lz4 $FPREFIX-v 2>&1 | grep "Done in"
+fi
+if lz4 -vdf $FPREFIX-missing.lz4 $FPREFIX-v 2>&1 | grep "Done in"; then exit 1; fi
 # Multithreading commands
 datagen -g16M | lz4 -T2 | lz4 -t
 datagen -g16M | lz4 --threads=2 | lz4 -t
