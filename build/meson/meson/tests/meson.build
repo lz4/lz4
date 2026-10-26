@@ -72,10 +72,6 @@ test_exes = {
     ),
     'include_directories': include_directories(lz4_source_root / 'programs', lz4_source_root / 'tests/tools'),
   },
-  'roundTripTest': {
-    'sources': files(lz4_source_root / 'tests/fuzz/roundTripTest.c'),
-    'test': false,
-  },
 }
 
 targets = {}

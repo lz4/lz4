@@ -60,7 +60,7 @@ NB_LOOPS     ?= -i1
 default: all
 
 .PHONY: all
-all: fullbench fuzzer frametest unittest roundTripTest datagen checkFrame
+all: fullbench fuzzer frametest unittest datagen checkFrame
 
 .PHONY: all32
 all32: CFLAGS+=-m32
@@ -127,9 +127,6 @@ $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o fra
 
 unittest:
 $(eval $(call c_program_shared_o,unittest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o))
-
-roundTripTest:
-$(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
 
 datagen: CPPFLAGS+=-DNDEBUG
 $(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))

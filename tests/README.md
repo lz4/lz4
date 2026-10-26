@@ -3,7 +3,7 @@ Programs and scripts for automated testing of LZ4
 
 This directory is organized as follows :
 - `unit/` : unit tests, each one autonomous (see `unit/unittest.h` to add tests)
-- `fuzz/` : randomized tests of the library (`fuzzer`, `frametest`, `frameMT`, `roundTripTest`)
+- `fuzz/` : randomized tests of the library (`fuzzer`, `frametest`, `frameMT`)
 - `cli/` : tests of the `lz4` command line (`test-lz4-*.sh`, `test-lz4-list.py`)
 - `compat/` : ABI, versions, installation, freestanding and build environment checks
 - `bench/` : `fullbench` (speed of each lz4 function), `test-lz4-speed.py` (speed difference between commits)

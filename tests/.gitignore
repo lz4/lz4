@@ -13,7 +13,6 @@ fullbench-dll
 fuzzer
 fuzzer32
 fasttest
-roundTripTest
 checkTag
 checkFrame
 abiTest
