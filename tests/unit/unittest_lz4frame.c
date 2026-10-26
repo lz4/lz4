@@ -28,6 +28,7 @@
 #include <stdio.h>      /* FILE, tmpfile, fopen, fclose */
 #include <string.h>     /* memcpy, memset */
 #include <limits.h>     /* INT_MIN */
+#include <time.h>       /* clock */
 #define LZ4F_STATIC_LINKING_ONLY
 #include "lz4frame.h"
 #include "lz4file.h"
@@ -80,17 +81,20 @@ static void* failableMalloc(void* state, size_t s) { return *(const int*)state ?
 static void* failableCalloc(void* state, size_t s) { return *(const int*)state ? NULL : calloc(1, s); }
 static void failableFree(void* state, void* p) { (void)state; free(p); }
 
-/* compresses @src into a frame, with LZ4F_compressBegin(), or LZ4F_compressBegin_usingDict() when @dict != NULL,
+/* compresses @src into a frame, with LZ4F_compressBegin_usingCDict() when @cdict != NULL,
+ * LZ4F_compressBegin_usingDict() when @dict != NULL, or LZ4F_compressBegin(),
  * followed by LZ4F_compressUpdate() and LZ4F_compressEnd().
  * @return : frame size, or an error code */
 static size_t streamFrame(LZ4F_cctx* cctx, void* dst, size_t dstCapacity,
                           const void* src, size_t srcSize,
-                          const void* dict, size_t dictSize, const LZ4F_preferences_t* prefs)
+                          const void* dict, size_t dictSize, const LZ4F_CDict* cdict,
+                          const LZ4F_preferences_t* prefs)
 {
     char* const ostart = (char*)dst;
     size_t pos, r;
-    pos = dict ? LZ4F_compressBegin_usingDict(cctx, dst, dstCapacity, dict, dictSize, prefs)
-               : LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
+    pos = cdict ? LZ4F_compressBegin_usingCDict(cctx, dst, dstCapacity, cdict, prefs)
+        : dict ? LZ4F_compressBegin_usingDict(cctx, dst, dstCapacity, dict, dictSize, prefs)
+        : LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
     if (LZ4F_isError(pos)) return pos;
     r = LZ4F_compressUpdate(cctx, ostart + pos, dstCapacity - pos, src, srcSize, NULL);
     if (LZ4F_isError(r)) return r;
@@ -147,6 +151,46 @@ static size_t decompressBySegments(LZ4F_dctx* dctx, void* dst, size_t dstCapacit
     }
     ASSERT_EQ(r, 0);   /* end of frame */
     return pos;
+}
+
+static unsigned readLE32(const void* src)
+{
+    const unsigned char* const p = (const unsigned char*)src;
+    return (unsigned)p[0] + ((unsigned)p[1] << 8) + ((unsigned)p[2] << 16) + ((unsigned)p[3] << 24);
+}
+
+/* frameElementEnds() :
+ * lists the end positions of the elements of @frame :
+ * header, then each block, then endMark, then optional content checksum.
+ * @return : nb of elements, or 0 if @frame is not a well-formed frame */
+static size_t frameElementEnds(size_t* ends, size_t maxEnds, const unsigned char* frame, size_t frameSize)
+{
+    size_t nb = 0;
+    size_t pos;
+    unsigned blockChecksum, contentChecksum;
+    if (frameSize < LZ4F_HEADER_SIZE_MIN || maxEnds == 0) return 0;
+    pos = LZ4F_headerSize(frame, frameSize);
+    if (LZ4F_isError(pos) || pos > frameSize) return 0;
+    blockChecksum = (frame[4] >> 4) & 1;
+    contentChecksum = (frame[4] >> 2) & 1;
+    ends[nb++] = pos;
+    for (;;) {
+        unsigned header;
+        if (pos + 4 > frameSize || nb == maxEnds) return 0;
+        header = readLE32(frame + pos);
+        pos += 4;
+        if (header == 0) {   /* endMark */
+            ends[nb++] = pos;
+            if (contentChecksum) {
+                if (nb == maxEnds) return 0;
+                pos += 4;
+                ends[nb++] = pos;
+            }
+            return (pos == frameSize) ? nb : 0;
+        }
+        pos += (header & 0x7FFFFFFFU) + 4 * blockChecksum;
+        ends[nb++] = pos;
+    }
 }
 
 static void writeLE32(void* dst, unsigned value)
@@ -359,10 +403,10 @@ TEST(compressEnd_contentSize)
     size_t const capacity = LZ4F_compressFrameBound(srcSize, &prefs);
     void* const frame = UT_malloc(capacity);
     size_t frameSize;
-    frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, NULL, 0, &prefs));
+    frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, NULL, 0, NULL, &prefs));
     assertDecodesTo(frame, frameSize, NULL, 0, src, srcSize);
     prefs.frameInfo.contentSize = srcSize;
-    frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, NULL, 0, &prefs));
+    frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, NULL, 0, NULL, &prefs));
     assertDecodesTo(frame, frameSize, NULL, 0, src, srcSize);
 }
 
@@ -374,7 +418,7 @@ TEST(compressEnd_wrongContentSize)
     size_t const capacity = LZ4F_compressFrameBound(srcSize, &prefs);
     void* const frame = UT_malloc(capacity);
     prefs.frameInfo.contentSize = srcSize + 1;
-    ASSERT_LZ4F_ERROR(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, &prefs), LZ4F_ERROR_frameSize_wrong);
+    ASSERT_LZ4F_ERROR(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, NULL, &prefs), LZ4F_ERROR_frameSize_wrong);
 }
 
 TEST(compressBegin_usingDict)
@@ -386,7 +430,7 @@ TEST(compressBegin_usingDict)
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);   /* NULL preferences : 64 KB linked blocks */
     void* const frame = UT_malloc(capacity);
     size_t const sizeNoDict = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, NULL));
-    size_t const sizeWithDict = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, dict, dictSize, NULL));
+    size_t const sizeWithDict = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, dict, dictSize, NULL, NULL));
     ASSERT_MSG(sizeWithDict < sizeNoDict, "with dictionary : %u bytes, without : %u bytes", (unsigned)sizeWithDict, (unsigned)sizeNoDict);
     assertDecodesTo(frame, sizeWithDict, dict, dictSize, src, srcSize);
 }
@@ -776,12 +820,340 @@ TEST(cctx_dctx_sizes)
         prefs.frameInfo.blockSizeID = frames[f].bsid;
         prefs.frameInfo.blockMode = frames[f].mode;
         prefs.compressionLevel = frames[f].level;
-        frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, 1 KB, NULL, 0, &prefs));
+        frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, 1 KB, NULL, 0, NULL, &prefs));
         dSize = 1 KB;
         ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &frameSize, NULL)), 0);
         ASSERT_EQ(dSize, 1 KB);
         ASSERT_CTX_SIZES(cctx, dctx);
     }
+}
+
+
+/* LZ4F_flush() and LZ4F_compressEnd() require a frame in progress */
+TEST(flush_outsideFrame)
+{
+    char src[100];
+    char dst[LZ4F_HEADER_SIZE_MAX + 200];
+    LZ4F_cctx* const cctx = newCctx();
+    memset(src, 'a', sizeof(src));
+    /* fresh context */
+    ASSERT_LZ4F_ERROR(LZ4F_flush(cctx, dst, sizeof(dst), NULL), LZ4F_ERROR_compressionState_uninitialized);
+    ASSERT_LZ4F_ERROR(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL), LZ4F_ERROR_compressionState_uninitialized);
+
+    LZ4F_OK(LZ4F_compressBegin(cctx, dst, sizeof(dst), NULL));
+    LZ4F_OK(LZ4F_compressUpdate(cctx, dst, sizeof(dst), src, sizeof(src), NULL));
+    LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL));
+
+    /* after the end of the frame */
+    ASSERT_LZ4F_ERROR(LZ4F_flush(cctx, dst, sizeof(dst), NULL), LZ4F_ERROR_compressionState_uninitialized);
+    ASSERT_LZ4F_ERROR(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL), LZ4F_ERROR_compressionState_uninitialized);
+}
+
+/* LZ4F_compressUpdate() and LZ4F_uncompressedUpdate(), mixed, respect LZ4F_compressBound() */
+TEST(compressUpdate_mixedWithUncompressed)
+{
+    size_t const blockSize = 64 KB;
+    static const size_t bufferedSizes[] = { 1, 1 KB, (64 KB) - 1 };
+    static const size_t inputSizes[] = { 0, 1, (64 KB) - 1, 64 KB, (64 KB) + 1, 128 KB };
+    size_t const frameCapacity = 4 * blockSize + 64;
+    size_t const dstCapacity = 2 * frameCapacity;
+    const unsigned char* const src = (const unsigned char*)UT_noise(3 * blockSize);   /* largest possible block output */
+    unsigned char* const frame = (unsigned char*)UT_malloc(frameCapacity);
+    unsigned char* const dst = (unsigned char*)UT_malloc(dstCapacity + 1);
+    unsigned char* const decoded = (unsigned char*)UT_malloc(3 * blockSize);
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_dctx* const dctx = newDctx();
+    unsigned linked, checksums, uncompressedFirst, autoFlush;
+    size_t b, i;
+
+    for (linked = 0; linked < 2; ++linked)
+    for (checksums = 0; checksums < 4; ++checksums)
+    for (uncompressedFirst = 0; uncompressedFirst < 2; ++uncompressedFirst)
+    for (autoFlush = 0; autoFlush < 2; ++autoFlush)
+    for (b = 0; b < ARRAY_SIZE(bufferedSizes); ++b)
+    for (i = 0; i < ARRAY_SIZE(inputSizes); ++i) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t const firstSize = bufferedSizes[b];
+        size_t const secondSize = inputSizes[i];
+        size_t const srcSize = firstSize + secondSize;
+        size_t frameSize, cSize, bound;
+        unsigned update;
+
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)(checksums & 1);
+        prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)(checksums >> 1);
+        prefs.frameInfo.contentSize = srcSize;
+        prefs.autoFlush = autoFlush;
+        frameSize = LZ4F_OK(LZ4F_compressBegin(cctx, frame, frameCapacity, &prefs));
+
+        for (update = 0; update < 2; ++update) {
+            size_t const inputSize = update ? secondSize : firstSize;
+            const unsigned char* const input = src + (update ? firstSize : 0);
+            unsigned const uncompressed = uncompressedFirst ^ update;
+            bound = LZ4F_compressBound(inputSize, &prefs);
+            ASSERT(bound <= dstCapacity);
+            dst[bound] = 0xA5;
+            cSize = uncompressed
+                  ? LZ4F_uncompressedUpdate(cctx, dst, bound, input, inputSize, NULL)
+                  : LZ4F_compressUpdate(cctx, dst, bound, input, inputSize, NULL);
+            ASSERT_MSG(!LZ4F_isError(cSize) && cSize <= bound && dst[bound] == 0xA5,
+                       "mixed update exceeds its bound or fails : first=%u, second=%u, "
+                       "uncompressed=%u, linked=%u, checksums=%u, autoFlush=%u",
+                       (unsigned)firstSize, (unsigned)secondSize, uncompressed, linked, checksums, autoFlush);
+            if (update == 0 && !autoFlush) ASSERT_EQ(cSize, 0);
+            ASSERT(cSize <= frameCapacity - frameSize);
+            memcpy(frame + frameSize, dst, cSize);
+            frameSize += cSize;
+        }
+
+        bound = LZ4F_compressBound(0, &prefs);
+        ASSERT(bound < frameCapacity - frameSize);
+        frame[frameSize + bound] = 0xA5;
+        cSize = LZ4F_OK(LZ4F_compressEnd(cctx, frame + frameSize, bound, NULL));
+        ASSERT(cSize <= bound && frame[frameSize + bound] == 0xA5);
+        frameSize += cSize;
+        {   size_t consumed = frameSize;
+            size_t decodedSize = 3 * blockSize;
+            ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded, &decodedSize, frame, &consumed, NULL)), 0);
+            ASSERT_EQ(consumed, frameSize);
+            ASSERT_EQ(decodedSize, srcSize);
+            ASSERT_MEMEQ(decoded, src, srcSize);
+        }
+
+        /* A mode switch writes 2 blocks : the flushed one, then the new one.
+         * Capacity is only required for what is actually written.
+         * Insufficient capacity fails without writing beyond it, and invalidates the frame. */
+        if (!autoFlush && firstSize == blockSize - 1 && secondSize == blockSize) {
+            size_t const blockOverhead = 4 + 4 * prefs.frameInfo.blockChecksumFlag;
+            size_t const flushSize = firstSize + blockOverhead;   /* incompressible => raw */
+            size_t const exactSize = flushSize + secondSize + blockOverhead;
+            size_t const capacities[] = { 0, flushSize - 1, flushSize, exactSize - 1, exactSize };
+            size_t s;
+            for (s = 0; s < ARRAY_SIZE(capacities); ++s) {
+                size_t const capacity = capacities[s];
+                LZ4F_OK(LZ4F_compressBegin(cctx, frame, frameCapacity, &prefs));
+                bound = LZ4F_compressBound(firstSize, &prefs);
+                ASSERT_EQ(LZ4F_OK(uncompressedFirst
+                                  ? LZ4F_uncompressedUpdate(cctx, frame, bound, src, firstSize, NULL)
+                                  : LZ4F_compressUpdate(cctx, frame, bound, src, firstSize, NULL)), 0);
+                dst[capacity] = 0xA5;
+                cSize = uncompressedFirst
+                      ? LZ4F_compressUpdate(cctx, dst, capacity, src + firstSize, secondSize, NULL)
+                      : LZ4F_uncompressedUpdate(cctx, dst, capacity, src + firstSize, secondSize, NULL);
+                ASSERT_EQ(dst[capacity], 0xA5);
+                if (capacity >= exactSize) {
+                    ASSERT_EQ(cSize, exactSize);
+                } else {
+                    ASSERT_LZ4F_ERROR(cSize, LZ4F_ERROR_dstCapacity_tooSmall);
+                    ASSERT_LZ4F_ERROR(LZ4F_compressEnd(cctx, frame, frameCapacity, NULL), LZ4F_ERROR_compressionState_uninitialized);
+                }
+            }
+        }
+    }
+}
+
+/* LZ4F_uncompressedUpdate() with linked blocks : the decoder's history contains uncompressed data,
+ * which blocks compressed next must not mistake for previous content (nor for the dictionary).
+ * Compressible input (copies within 32 KB), and a dictionary made of input, so that they would reference it.
+ * Frames ending with uncompressed data are followed by frames starting with uncompressed data (same cctx). */
+TEST(uncompressedUpdate_linkedBlocks)
+{
+    static const int levels[] = { 1, 9, 12 };
+    /* segments : C compressed, U uncompressed ; lowercase : small segment */
+    static const char* const scripts[] = { "UC", "uC", "CUC", "CuC", "CUUC", "UCUC", "CUCuC", "uCu", "UCU" };
+    size_t const segSize = 150 KB, smallSize = 1000, dictSize = 64 KB;
+    size_t const srcSize = 5 * segSize;
+    size_t const frameCapacity = LZ4F_compressFrameBound(srcSize, NULL) + 5 * LZ4F_compressBound(0, NULL);
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const dict = (char*)UT_malloc(dictSize);
+    char* const frame = (char*)UT_malloc(frameCapacity);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_dctx* const dctx = newDctx();
+    LZ4F_CDict* cdict;
+    size_t l, sc;
+    unsigned useDict, stable;
+    memcpy(dict, src, dictSize);
+    cdict = (LZ4F_CDict*)UT_defer(freeCDict, LZ4F_createCDict(dict, dictSize));
+    ASSERT(cdict != NULL);
+
+    for (l = 0; l < ARRAY_SIZE(levels); l++)
+    for (sc = 0; sc < ARRAY_SIZE(scripts); sc++)
+    for (useDict = 0; useDict < 2; useDict++)
+    for (stable = 0; stable < 2; stable++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_compressOptions_t cOpts;
+        const char* op;
+        size_t pos, consumed = 0;
+        memset(&cOpts, 0, sizeof(cOpts));
+        cOpts.stableSrc = stable;
+        prefs.compressionLevel = levels[l];
+        prefs.frameInfo.blockMode = LZ4F_blockLinked;
+        prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+        pos = LZ4F_OK(LZ4F_compressBegin_usingCDict(cctx, frame, frameCapacity, useDict ? cdict : NULL, &prefs));
+        for (op = scripts[sc]; *op; op++) {
+            size_t const size = (*op == 'u' || *op == 'c') ? smallSize : segSize;
+            pos += LZ4F_OK((*op == 'U' || *op == 'u')
+                           ? LZ4F_uncompressedUpdate(cctx, frame + pos, frameCapacity - pos, src + consumed, size, &cOpts)
+                           : LZ4F_compressUpdate(cctx, frame + pos, frameCapacity - pos, src + consumed, size, &cOpts));
+            consumed += size;
+        }
+        pos += LZ4F_OK(LZ4F_compressEnd(cctx, frame + pos, frameCapacity - pos, &cOpts));
+        {   size_t consumedFrame = pos, decodedSize = srcSize;
+            size_t const dResult = LZ4F_decompress_usingDict(dctx, decoded, &decodedSize, frame, &consumedFrame,
+                                                             useDict ? dict : NULL, useDict ? dictSize : 0, NULL);
+            ASSERT_MSG(!LZ4F_isError(dResult) && dResult == 0 && consumedFrame == pos
+                       && decodedSize == consumed && !memcmp(src, decoded, consumed),
+                       "segments %s, level %i, dict %u, stableSrc %u : round trip failed (%s)",
+                       scripts[sc], levels[l], useDict, stable,
+                       LZ4F_isError(dResult) ? LZ4F_getErrorName(dResult) : "content differs");
+    }   }
+}
+
+/* favorDecSpeed applies to all blocks of a frame, including after an incompressible block :
+ * with independent blocks, a block doesn't depend on the previous ones */
+TEST(favorDecSpeed_afterRawBlock)
+{
+    size_t const blockSize = 64 KB;
+    size_t const headerSize = 7;   /* no content size, no dictID */
+    char* const src = (char*)UT_noise(2 * blockSize);   /* incompressible block, then compressible block */
+    size_t const capacity = LZ4F_compressFrameBound(2 * blockSize, NULL);
+    char* const frame = (char*)UT_malloc(capacity);
+    char* const alone = (char*)UT_malloc(capacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t frameSize, aloneSize, cBlockSize;
+    memcpy(src + blockSize, UT_sample(blockSize), blockSize);
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.compressionLevel = 10;   /* optimal parser : favorDecSpeed only applies there */
+
+    /* this test is only meaningful if favorDecSpeed changes the compressible block */
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src + blockSize, blockSize, &prefs));
+    prefs.favorDecSpeed = 1;
+    aloneSize = LZ4F_OK(LZ4F_compressFrame(alone, capacity, src + blockSize, blockSize, &prefs));
+    ASSERT_MSG(frameSize != aloneSize || memcmp(frame, alone, aloneSize),
+               "favorDecSpeed doesn't change the output of this test input");
+
+    /* the same block, after an incompressible one, must be identical */
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, 2 * blockSize, &prefs));
+    ASSERT_MSG(readLE32(frame + headerSize) == (0x80000000U | (unsigned)blockSize), "first block should be stored raw");
+    cBlockSize = 4 + (readLE32(alone + headerSize) & 0x7FFFFFFFU);   /* block header included */
+    ASSERT_EQ(frameSize, headerSize + (4 + blockSize) + cBlockSize + 4);
+    ASSERT_MEMEQ(frame + headerSize + 4 + blockSize, alone + headerSize, cBlockSize);   /* favorDecSpeed lost ? */
+}
+
+/* favorDecSpeed applies to frames started with a dictionary :
+ * neither loading a dictionary (LZ4F_compressBegin_usingDict())
+ * nor attaching a CDict (LZ4F_compressBegin_usingCDict()) may reset it */
+TEST(favorDecSpeed_withDict)
+{
+    size_t const dictSize = 64 KB;
+    size_t const srcSize = 64 KB;
+    const char* const dict = (const char*)UT_sample(dictSize);
+    const char* const src = (const char*)UT_sample(srcSize);
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL) + LZ4F_HEADER_SIZE_MAX;
+    char* const ref = (char*)UT_malloc(capacity);
+    char* const fds = (char*)UT_malloc(capacity);
+    LZ4F_CDict* const cdict = (LZ4F_CDict*)UT_defer(freeCDict, LZ4F_createCDict(dict, dictSize));
+    LZ4F_cctx* const cctx = newCctx();
+    unsigned blockMode, beginMode;
+    ASSERT(cdict != NULL);
+
+    /* beginMode : 0 = no dictionary (checks this test input is sensitive to favorDecSpeed), 1 = dict, 2 = CDict */
+    for (blockMode = 0; blockMode < 2; blockMode++)
+    for (beginMode = 0; beginMode < 3; beginMode++) {
+        const char* const d = (beginMode == 1) ? dict : NULL;
+        const LZ4F_CDict* const cd = (beginMode == 2) ? cdict : NULL;
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t refSize, fdsSize;
+        prefs.frameInfo.blockMode = blockMode ? LZ4F_blockIndependent : LZ4F_blockLinked;
+        prefs.compressionLevel = 10;   /* optimal parser : favorDecSpeed only applies there */
+        refSize = LZ4F_OK(streamFrame(cctx, ref, capacity, src, srcSize, d, dictSize, cd, &prefs));
+        prefs.favorDecSpeed = 1;
+        fdsSize = LZ4F_OK(streamFrame(cctx, fds, capacity, src, srcSize, d, dictSize, cd, &prefs));
+        ASSERT_MSG(refSize != fdsSize || memcmp(ref, fds, fdsSize),
+                   "blockMode=%u, beginMode=%u : favorDecSpeed doesn't change the output (lost ?)", blockMode, beginMode);
+        assertDecodesTo(fds, fdsSize, beginMode ? dict : NULL, beginMode ? dictSize : 0, src, srcSize);
+    }
+}
+
+/* skipChecksums disables verification of all checksums :
+ * block checksums, of compressed and uncompressed blocks, and content checksum */
+TEST(decompress_skipChecksums)
+{
+    size_t const blockSize = 64 KB;
+    size_t const srcSize = 3 * blockSize;   /* 2nd block is stored uncompressed */
+    char* const src = (char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_dctx* const dctx = newDctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t ends[8] = { 0 };
+    size_t capacity, frameSize;
+    unsigned char* frame;
+    unsigned corrupted;
+    memcpy(src + blockSize, UT_noise(blockSize), blockSize);
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    frame = (unsigned char*)UT_malloc(capacity);
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+    ASSERT_EQ(frameElementEnds(ends, ARRAY_SIZE(ends), frame, frameSize), 6);   /* header, 3 blocks, endMark, checksum */
+    ASSERT_MSG(!(readLE32(frame + ends[0]) & 0x80000000U) && (readLE32(frame + ends[1]) & 0x80000000U),
+               "1st block should be compressed, and 2nd block uncompressed");
+
+    for (corrupted = 0; corrupted < 3; corrupted++) {   /* checksum of : compressed block, uncompressed block, content */
+        size_t const crcPos = (corrupted == 2) ? frameSize - 1 : ends[corrupted + 1] - 1;
+        LZ4F_errorCodes const expected = (corrupted == 2) ? LZ4F_ERROR_contentChecksum_invalid : LZ4F_ERROR_blockChecksum_invalid;
+        LZ4F_decompressOptions_t dOpt;
+        size_t srcLen = frameSize, dstLen = srcSize, r;
+        frame[crcPos] = (unsigned char)(frame[crcPos] ^ 1);
+        LZ4F_resetDecompressionContext(dctx);
+        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, NULL);
+        ASSERT_MSG(LZ4F_getErrorCode(r) == expected, "checksum %u : %s", corrupted,
+                   LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
+        memset(&dOpt, 0, sizeof(dOpt));
+        dOpt.skipChecksums = 1;
+        srcLen = frameSize;
+        dstLen = srcSize;
+        LZ4F_resetDecompressionContext(dctx);
+        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, &dOpt);
+        ASSERT_MSG(r == 0 && srcLen == frameSize && dstLen == srcSize && !memcmp(decoded, src, srcSize),
+                   "checksum %u : %s", corrupted, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "not skipped");
+        frame[crcPos] = (unsigned char)(frame[crcPos] ^ 1);
+    }
+}
+
+/* Level 12 with linked blocks, on short-period data (ABAB...) :
+ * all candidates in the 64 KB history match up to the end of the block.
+ * Comparing each of them in full (up to 16384 x 64 KB per block)
+ * makes it ~40x slower than level 12 on regular data.
+ * CPU time is compared to a reference of the same size,
+ * so that the test doesn't depend on platform speed (valgrind, qemu, sanitizers). */
+TEST(compressFrame_level12_periodicLinked)
+{
+    size_t const srcSize = 1 MB;
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const periodic = (char*)UT_malloc(srcSize);
+    const char* const regular = (const char*)UT_sample(srcSize);
+    char* const dst = (char*)UT_malloc(capacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    clock_t start, refTime, periodicTime;
+    size_t n;
+    for (n = 0; n < srcSize; n++) periodic[n] = (n & 1) ? 'B' : 'A';
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockMode = LZ4F_blockLinked;
+    prefs.compressionLevel = 12;
+
+    start = clock();
+    LZ4F_OK(LZ4F_compressFrame(dst, capacity, regular, srcSize, &prefs));
+    refTime = clock() - start;
+    start = clock();
+    LZ4F_OK(LZ4F_compressFrame(dst, capacity, periodic, srcSize, &prefs));
+    periodicTime = clock() - start;
+    ASSERT_MSG(periodicTime <= refTime, "periodic data : %.3f s, reference : %.3f s",
+               (double)periodicTime / CLOCKS_PER_SEC, (double)refTime / CLOCKS_PER_SEC);
 }
 
 
@@ -819,5 +1191,12 @@ static const UT_test tests[] = {
     UT_TEST(writeOpen_blockSizeIDs),
     UT_TEST(lz4file_errors),
     UT_TEST(cctx_dctx_sizes),
+    UT_TEST(flush_outsideFrame),
+    UT_TEST(compressUpdate_mixedWithUncompressed),
+    UT_TEST(uncompressedUpdate_linkedBlocks),
+    UT_TEST(favorDecSpeed_afterRawBlock),
+    UT_TEST(favorDecSpeed_withDict),
+    UT_TEST(decompress_skipChecksums),
+    UT_TEST(compressFrame_level12_periodicLinked),
 };
 UT_SUITE(lz4frame, tests);
