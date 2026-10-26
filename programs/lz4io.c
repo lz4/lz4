@@ -254,6 +254,7 @@ struct LZ4IO_prefs_s {
     int removeSrcFile;
     int nbWorkers;
     int autoWorkers;   /* nbWorkers determined automatically (otherwise : requested, -T#) */
+    int singleThread;  /* frames compressed in liblz4's single-threaded mode (nbWorkers == 0) */
     U64 memoryBudget;  /* 0 : default (LZ4IO_MEMORY_BUDGET) */
     int useMmap;
 };
@@ -282,6 +283,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     prefs->removeSrcFile = 0;
     prefs->nbWorkers = LZ4IO_capNbWorkers(LZ4IO_defaultNbWorkers());
     prefs->autoWorkers = 1;
+    prefs->singleThread = 0;
     prefs->memoryBudget = 0;
     prefs->useMmap = 1;
     return prefs;
@@ -293,6 +295,12 @@ int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers)
     if (nbWorkers == 0) nbWorkers = LZ4IO_defaultNbWorkers();
     prefs->nbWorkers = LZ4IO_capNbWorkers(nbWorkers);
     return prefs->nbWorkers;
+}
+
+int LZ4IO_setSingleThread(LZ4IO_prefs_t* const prefs, int enable)
+{
+    prefs->singleThread = (enable != 0);
+    return prefs->singleThread;
 }
 
 unsigned long long LZ4IO_setMemoryBudget(LZ4IO_prefs_t* const prefs, unsigned long long budget)
@@ -1205,6 +1213,20 @@ static int LZ4IO_customBlockSize(const LZ4IO_prefs_t* io_prefs)
     return io_prefs->blockSize != LZ4F_getBlockSize((LZ4F_blockSizeID_t)io_prefs->blockSizeId);
 }
 
+size_t LZ4IO_framePreferences(const LZ4IO_prefs_t* io_prefs, LZ4F_preferences_t* framePrefs)
+{
+    memset(framePrefs, 0, sizeof(*framePrefs));
+    framePrefs->frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
+    framePrefs->frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
+    framePrefs->frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
+    framePrefs->frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
+    framePrefs->frameInfo.contentSize = (unsigned long long)(io_prefs->contentSizeFlag != 0);
+    framePrefs->favorDecSpeed = io_prefs->favorDecSpeed;
+    if (!LZ4IO_customBlockSize(io_prefs)) return 0;
+    framePrefs->autoFlush = 1;
+    return io_prefs->blockSize;
+}
+
 /* Memory budget of frame compression : limits the automatic nb of workers,
  * and explicit ones on 32-bit systems, where address space is scarce */
 #ifndef LZ4IO_MEMORY_BUDGET
@@ -1255,20 +1277,18 @@ static cRess_t LZ4IO_createCResources(const LZ4IO_prefs_t* io_prefs)
     memset(&ress, 0, sizeof(ress));
 
     /* set compression advanced parameters */
-    ress.preparedPrefs.frameInfo.blockMode = (LZ4F_blockMode_t)io_prefs->blockIndependence;
-    ress.preparedPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)io_prefs->blockSizeId;
-    ress.preparedPrefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)io_prefs->blockChecksum;
-    ress.preparedPrefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)io_prefs->streamChecksum;
-    ress.preparedPrefs.favorDecSpeed = io_prefs->favorDecSpeed;
+    LZ4IO_framePreferences(io_prefs, &ress.preparedPrefs);
+    ress.preparedPrefs.frameInfo.contentSize = 0;   /* set for each file */
     if (LZ4IO_customBlockSize(io_prefs)) {
         /* LZ4F cuts blocks at standard sizes only :
          * custom sizes require autoFlush, and one LZ4F_compressUpdate() invocation per block,
          * so compression is single-threaded */
-        ress.preparedPrefs.autoFlush = 1;
 #if LZ4IO_MULTITHREAD
         DISPLAYLEVEL(3, "Note : custom block size (%u bytes) : single-threaded compression (-T# ignored) \n",
                         (unsigned)io_prefs->blockSize);
 #endif
+    } else if (io_prefs->singleThread) {
+        DISPLAYLEVEL(3, "Single-threaded compression (frames not cut into jobs) \n");
     } else {
         /* frames are cut into jobs, compressed by liblz4's worker threads (when available) :
          * output doesn't depend on nbWorkers, nor on multi-threading support */
@@ -1552,7 +1572,9 @@ LZ4IO_compressFrame(unsigned long long* srcSizePtr, unsigned char frameTail[4],
     const void* chunk;
 
     memset(&cOpts, 0, sizeof(cOpts));
-    cOpts.stableSrc = input->map ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;   /* mapping remains until the end of frame */
+    /* mapping remains until the end of frame : worker threads read it in place.
+     * Not in single-threaded mode, where output of linked blocks depends on stableSrc : same output as input read with fread() */
+    cOpts.stableSrc = (input->map && prefs.nbWorkers) ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;
 
     /* read first chunk */
     readSize  = LZ4IO_readInput(input, chunkSize, &chunk);

@@ -34,6 +34,7 @@
 
 /*---   Dependency   ---*/
 #include <stddef.h>   /* size_t */
+#include "lz4frame.h"  /* LZ4F_preferences_t */
 
 
 /* ************************************************** */
@@ -81,6 +82,11 @@ int LZ4IO_decompressMultipleFilenames(const char** inFileNamesTable, int ifntSiz
  *  Capped as within liblz4 (LZ4F_getMaxNbWorkers()), for frame and legacy formats : 1 without its multi-threading support.
  * @return : nb of workers applied */
 int LZ4IO_setNbWorkers(LZ4IO_prefs_t* const prefs, int nbWorkers);
+
+/* Default setting : 0 == frames cut into jobs, compressed by nbWorkers worker threads and the main thread.
+ * 1 == frames compressed by the main thread alone, in liblz4's single-threaded mode (nbWorkers == 0) :
+ * with linked blocks, output can differ (slightly) */
+int LZ4IO_setSingleThread(LZ4IO_prefs_t* const prefs, int enable);
 int LZ4IO_defaultNbWorkers(void);
 
 /* memory budget of multi-threaded compression, in bytes : limits the nb of workers ;
@@ -144,6 +150,12 @@ void LZ4IO_setRemoveSrcFile(LZ4IO_prefs_t* const prefs, unsigned flag);
 /* Default setting : 0 == favor compression ratio
  * Note : 1 only works for high compression levels (10+) */
 void LZ4IO_favorDecSpeed(LZ4IO_prefs_t* const prefs, int favor);
+
+/* LZ4IO_framePreferences() :
+ * frame parameters of compressed files, excluding compression level and nb of workers :
+ * frameInfo.contentSize != 0 means that it's set to each file's size (--content-size).
+ * @return : 0, or custom block size (blocks of this size, one LZ4F_compressUpdate() invocation per block, with autoFlush) */
+size_t LZ4IO_framePreferences(const LZ4IO_prefs_t* prefs, LZ4F_preferences_t* framePrefs);
 
 
 /* implement --list

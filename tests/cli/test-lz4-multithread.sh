@@ -79,6 +79,23 @@ lz4 -f --memory=1M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # warning only
 cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
 if [ $MT = 1 ]; then grep "too small" $FPREFIX.err; fi
 
+# --single-thread : liblz4's single-threaded mode, same output whatever the input (memory-mapped, read, stdin) ;
+# can differ from -T1 with linked blocks ; -T# after it restores multi-threaded compression
+for opts in "-1" "-1 -BD" "-9 -B5 -BD"
+do
+    lz4 -f --single-thread $opts $FPREFIX-src $FPREFIX-st.lz4
+    lz4 -f --single-thread --no-mmap $opts $FPREFIX-src $FPREFIX.lz4
+    cmp $FPREFIX-st.lz4 $FPREFIX.lz4
+    lz4 --single-thread $opts < $FPREFIX-src > $FPREFIX.lz4
+    cmp $FPREFIX-st.lz4 $FPREFIX.lz4
+    lz4 -dc $FPREFIX-st.lz4 | cmp - $FPREFIX-src
+    lz4 -f -T1 $opts $FPREFIX-src $FPREFIX-T1.lz4
+    lz4 -f --single-thread -T1 $opts $FPREFIX-src $FPREFIX.lz4
+    cmp $FPREFIX-T1.lz4 $FPREFIX.lz4
+done
+lz4 -f --single-thread -1 $FPREFIX-src $FPREFIX.lz4   # independent blocks : same output as multi-threaded
+cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
+
 
 # errors met while jobs are running : reported once all jobs are done, not from a job
 # (END_PROCESS() asserts it), which would race with the other threads

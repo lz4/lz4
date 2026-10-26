@@ -185,6 +185,7 @@ static int usage_advanced(const char* exeName)
     DISPLAY( "--memory=#     : memory budget of multi-threaded compression (default: %u MB) ; suffixes K, M, G \n",
                 (unsigned)(LZ4IO_defaultMemoryBudget() >> 20));
 #endif
+    DISPLAY( "--single-thread: compress frames with the main thread alone, not cut into jobs (output can differ from -T1 with -BD)\n");
     DISPLAY( "--[no-]mmap    : memory-map files to compress (default:enabled when supported)\n");
     DISPLAY( "                 note : compression fails if the file is truncated or rewritten meanwhile \n");
     DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
@@ -443,13 +444,16 @@ static operationMode_e determineOpMode(const char* inputFilename)
 
 #define ENV_NBTHREADS "LZ4_NBWORKERS"
 
-static unsigned init_nbWorkers(void)
+/* @requested : set to 1 when provided by environment */
+static unsigned init_nbWorkers(int* requested)
 {
     const char* const env = getenv(ENV_NBTHREADS);
+    *requested = 0;
     if (env != NULL) {
         const char* ptr = env;
         unsigned nbWorkers;
         if ((*ptr>='0') && (*ptr<='9') && !readU32FromCharChecked(&ptr, &nbWorkers)) {
+            *requested = 1;
             return nbWorkers;
         }
         DISPLAYLEVEL(2, "Ignore environment variable setting %s=%s: not a valid unsigned value \n", ENV_NBTHREADS, env);
@@ -501,8 +505,11 @@ int main(int argCount, const char** argv)
         multiple_inputs=0,
         all_arguments_are_files=0,
         operationResult=0,
-        contentSizeFlag=0;
-    unsigned nbWorkers = init_nbWorkers();
+        contentSizeFlag=0,
+        nbWorkersRequested=0,   /* -T#, or LZ4_NBWORKERS */
+        singleThread=0,         /* --single-thread */
+        frameCrcRequested=0;    /* --frame-crc */
+    unsigned nbWorkers = init_nbWorkers(&nbWorkersRequested);
     U64 memoryBudget = init_memoryBudget();   /* 0 : default */
     operationMode_e mode = om_auto;
     const char* input_filename = NULL;
@@ -574,7 +581,7 @@ int main(int argCount, const char** argv)
                 if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(prefs, 0); continue; }
                 if ((!strcmp(argument, "--stdout"))
                     || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; continue; }
-                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); BMK_skipChecksums(0); continue; }
+                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); BMK_skipChecksums(0); frameCrcRequested=1; continue; }
                 if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
                 if (!strcmp(argument,  "--no-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_setBlockChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
                 if (!strcmp(argument,  "--content-size")) { contentSizeFlag = 1; LZ4IO_setContentSize(prefs, 1); continue;}
@@ -595,6 +602,12 @@ int main(int argCount, const char** argv)
                 if (longCommandWArg(&argument, "--threads")) {
                     if (*argument != '=' && *argument != 0) badusage(exeName);  /* ex: --threadsX */
                     NEXT_UINT32(nbWorkers);
+                    nbWorkersRequested = 1;
+                    singleThread = 0;
+                    continue;
+                }
+                if (!strcmp(argument, "--single-thread")) {
+                    singleThread = 1;
                     continue;
                 }
                 if (longCommandWArg(&argument, "--memory")) {
@@ -669,6 +682,8 @@ int main(int argCount, const char** argv)
                 case 'T':
                     {   argument++;
                         nbWorkers = readU32FromChar(&argument);
+                        nbWorkersRequested = 1;
+                        singleThread = 0;
                         argument--;
                     }
                     break;
@@ -741,12 +756,10 @@ int main(int argCount, const char** argv)
                                 if (B < 4) badusage(exeName);
                                 if (B <= 7) {
                                     blockSize = LZ4IO_setBlockSizeID(prefs, B);
-                                    BMK_setBlockSize(blockSize);
                                     DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
                                 } else {
                                     if (B < 32) badusage(exeName);
                                     blockSize = LZ4IO_setBlockSize(prefs, B);
-                                    BMK_setBlockSize(blockSize);
                                     if (blockSize >= 1024) {
                                         DISPLAYLEVEL(2, "using blocks of size %u KB \n", (U32)(blockSize>>10));
                                     } else {
@@ -864,6 +877,20 @@ int main(int argCount, const char** argv)
 
     /* benchmark and test modes */
     if (mode == om_bench) {
+        /* frames compressed as lz4 does with the same options, except the content checksum (disabled unless --frame-crc) :
+         * one worker thread (-T1) unless -T# (or LZ4_NBWORKERS), or --single-thread */
+        LZ4F_preferences_t framePrefs;
+        size_t const customBlockSize = LZ4IO_framePreferences(prefs, &framePrefs);
+        if (!frameCrcRequested) framePrefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
+        framePrefs.nbWorkers = singleThread ? 0 : 1;
+        if (nbWorkersRequested && !singleThread) {
+            int const requested = (nbWorkers > (unsigned)INT_MAX) ? INT_MAX : (int)nbWorkers;
+            int const applied = LZ4IO_setNbWorkers(prefs, requested);   /* 0 : automatic ; capped as within liblz4 */
+            if (multithreadSupport() && (requested > applied))
+                DISPLAYLEVEL(2, "Warning : requested %u threads too large => automatically reduced to %i \n", nbWorkers, applied);
+            framePrefs.nbWorkers = (unsigned)applied;
+        }
+        BMK_setFramePreferences(&framePrefs, customBlockSize);
         BMK_setNotificationLevel(displayLevel);
         operationResult = BMK_benchFiles(inFileNames, ifnIdx, cLevel, cLevelLast, dictionary_filename);
         goto _cleanup;
@@ -971,6 +998,7 @@ int main(int argCount, const char** argv)
         }
         LZ4IO_setMemoryBudget(prefs, memoryBudget);
 #endif
+        LZ4IO_setSingleThread(prefs, singleThread);
         if (legacy_format) {
             DISPLAYLEVEL(3, "! Generating LZ4 Legacy format (deprecated) ! \n");
             if(multiple_inputs){
