@@ -402,22 +402,3 @@ TEST(compress_HC_continue_destSize_resume)
     }   }   }
 }
 
-
-static const UT_test tests[] = {
-    UT_TEST(compress_HC_nullInput),
-    UT_TEST(compress_HC_nullInputAndOutput),
-    UT_TEST(initStreamHC_alignment),
-    UT_TEST(createStreamHC),
-    UT_TEST(compress_HC_continue_roundTrip),
-    UT_TEST(compressHC2_continue_roundTrip),
-    UT_TEST(compress_HC_level2_runs),
-    UT_TEST(saveDictHC_beforeCompression),
-    UT_TEST(compress_HC_destSize_longSequence),
-    UT_TEST(favorDecompressionSpeed_afterFailedCompression),
-    UT_TEST(compress_HC_continue_dictionary),
-    UT_TEST(compress_HC_continue_dictionary_twoBlocks),
-    UT_TEST(compress_HC_continue_remoteDictionary),
-    UT_TEST(compress_HC_destSize_sameAsFast),
-    UT_TEST(compress_HC_continue_destSize_resume),
-};
-UT_SUITE(lz4hc, tests);
