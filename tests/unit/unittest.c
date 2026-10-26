@@ -86,6 +86,16 @@ void* UT_defer(void (*release)(void*), void* ptr)
     return ptr;
 }
 
+void UT_release(void* ptr)
+{
+    size_t n = g_nbResources;
+    while (n > 0 && g_resources[n-1].ptr != ptr) n--;
+    if (n == 0) UT_fail(__FILE__, __LINE__, "UT_release() : unknown resource");
+    g_resources[n-1].release(ptr);
+    for ( ; n < g_nbResources; n++) g_resources[n-1] = g_resources[n];
+    g_nbResources--;
+}
+
 void* UT_malloc(size_t size)
 {
     void* const ptr = UT_defer(free, malloc(size ? size : 1));
@@ -102,18 +112,29 @@ unsigned UT_rand(void)
     return g_randState;
 }
 
+void UT_fillSample(void* buffer, size_t size)
+{
+    RDG_genBuffer(buffer, size, 0.5, 0.0, UT_rand());
+}
+
+void UT_fillNoise(void* buffer, size_t size)
+{
+    unsigned char* const p = (unsigned char*)buffer;
+    size_t n;
+    for (n = 0; n < size; n++) p[n] = (unsigned char)UT_rand();
+}
+
 void* UT_sample(size_t size)
 {
     void* const buffer = UT_malloc(size);
-    RDG_genBuffer(buffer, size, 0.5, 0.0, UT_rand());
+    UT_fillSample(buffer, size);
     return buffer;
 }
 
 void* UT_noise(size_t size)
 {
-    unsigned char* const buffer = (unsigned char*)UT_malloc(size);
-    size_t n;
-    for (n = 0; n < size; n++) buffer[n] = (unsigned char)UT_rand();
+    void* const buffer = UT_malloc(size);
+    UT_fillNoise(buffer, size);
     return buffer;
 }
 

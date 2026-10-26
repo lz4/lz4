@@ -37,7 +37,7 @@ Each test runs in its own context : buffers from `UT_malloc()` and `UT_sample()`
 even when it fails, and a failed assertion only ends this test.
 See `unit/unittest.h` for assertions and helpers.
 
-`fuzz/fuzzer.c` and `fuzz/frametest.c` still contain unit tests, which are progressively moved to `unit/` :
+`fuzz/fuzzer.c` still contains unit tests, which are progressively moved to `unit/` :
 don't add new ones there.
 
 Tests of the command line go to `cli/` : extend an existing script, or create `cli/test-lz4-<name>.sh`,
