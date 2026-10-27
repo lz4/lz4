@@ -42,7 +42,9 @@
 #include <string.h>      /* strcmp */
 #include <time.h>        /* clock_t, clock(), CLOCKS_PER_SEC */
 
-#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
+#ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
+#endif
 #include "lz4.h"
 #include "lz4hc.h"
 #include "lz4frame.h"

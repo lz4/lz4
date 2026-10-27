@@ -397,6 +397,7 @@ size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID)
 /*-************************************
 *  Private functions
 **************************************/
+#undef MIN
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
 
 static BYTE LZ4F_headerChecksum (const void* header, size_t length)

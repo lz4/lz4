@@ -55,7 +55,9 @@
 #  include <sys/mman.h>   /* mmap */
 #endif
 
-#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
+#ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
+#endif
 #define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
@@ -88,6 +90,7 @@
 #define DISPLAYLEVEL(l, ...) do { if (g_displayLevel>=l) DISPLAY(__VA_ARGS__); } while (0)
 static int g_displayLevel = 2;
 
+#undef MIN
 #define MIN(a,b)   ( (a) < (b) ? (a) : (b) )
 
 

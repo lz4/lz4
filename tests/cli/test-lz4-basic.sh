@@ -16,9 +16,9 @@ datagen -g0       | lz4 -v     | lz4 -t
 datagen -g16KB    | lz4 -9     | lz4 -t
 datagen -g20KB > $FPREFIX-dg20k
 lz4 < $FPREFIX-dg20k | lz4 -d > $FPREFIX-dec
-diff -q $FPREFIX-dg20k $FPREFIX-dec
+cmp $FPREFIX-dg20k $FPREFIX-dec
 lz4 --no-frame-crc < $FPREFIX-dg20k | lz4 -d > $FPREFIX-dec
-diff -q $FPREFIX-dg20k $FPREFIX-dec
+cmp $FPREFIX-dg20k $FPREFIX-dec
 datagen           | lz4 -BI    | lz4 -t
 datagen           | lz4 --no-crc | lz4 -t
 datagen -g6M -P99 | lz4 -9BD   | lz4 -t
@@ -53,9 +53,9 @@ test   -f $FPREFIX-hw
 test ! -f $FPREFIX-hw.lz4               # must fail (lz4cat)
 lz4 $FPREFIX-hw $FPREFIX-hw.lz4         # creates $FPREFIX-hw.lz4
 lz4cat < $FPREFIX-hw.lz4 > ${FPREFIX}3  # checks lz4cat works with stdin (#285)
-diff -q $FPREFIX-hw ${FPREFIX}3
+cmp $FPREFIX-hw ${FPREFIX}3
 lz4cat < $FPREFIX-hw > ${FPREFIX}2      # checks lz4cat works in pass-through mode
-diff -q $FPREFIX-hw ${FPREFIX}2
+cmp $FPREFIX-hw ${FPREFIX}2
 cp $FPREFIX-hw ./-d
 lz4 --rm -- -d -d.lz4                   # compresses ./d into ./-d.lz4
 test   -f ./-d.lz4
@@ -63,7 +63,7 @@ test ! -f ./-d
 mv ./-d.lz4 ./-z
 lz4 -d --rm -- -z ${FPREFIX}4           # uncompresses ./-z into $FPREFIX4
 test ! -f ./-z
-diff -q $FPREFIX-hw ${FPREFIX}4
+cmp $FPREFIX-hw ${FPREFIX}4
 lz4 ${FPREFIX}2 ${FPREFIX}3 ${FPREFIX}4 && exit 1  # must fail: refuse to handle 3+ file names
 mkdir -p ${FPREFIX}-dir
 lz4 ${FPREFIX}-dir && exit 1          # must fail: refuse to compress directory
@@ -81,15 +81,15 @@ lz4 -f $FPREFIX-hw.lz4 && exit 1      # uncompress valid frame followed by inval
 printf '\120\052\115\030\000\000\000\000BAD!' > $FPREFIX-bad.lz4
 cp $FPREFIX-bad.lz4 $FPREFIX-bad-before.lz4
 lz4 -d --rm -f $FPREFIX-bad.lz4 $FPREFIX-bad.out && exit 1
-diff -q $FPREFIX-bad-before.lz4 $FPREFIX-bad.lz4  # --rm keeps source after decoding failure
+cmp $FPREFIX-bad-before.lz4 $FPREFIX-bad.lz4  # --rm keeps source after decoding failure
 echo "rm test" > $FPREFIX-rm
 lz4 $FPREFIX-rm $FPREFIX-rm.lz4
 cp $FPREFIX-rm.lz4 $FPREFIX-rm-before.lz4
 lz4 -t --rm $FPREFIX-rm.lz4
-diff -q $FPREFIX-rm-before.lz4 $FPREFIX-rm.lz4    # -t --rm keeps its input ("No files are created nor removed")
+cmp $FPREFIX-rm-before.lz4 $FPREFIX-rm.lz4    # -t --rm keeps its input ("No files are created nor removed")
 lz4 -t --rm < $FPREFIX-rm.lz4                     # nothing to remove when reading stdin
 lz4 -c --rm < $FPREFIX-rm | lz4 -t                # idem when compressing
-lz4 -dc --rm < $FPREFIX-rm.lz4 | diff -q - $FPREFIX-rm  # idem when decompressing
+lz4 -dc --rm < $FPREFIX-rm.lz4 | cmp - $FPREFIX-rm  # idem when decompressing
 lz4 -d --rm $FPREFIX-rm.lz4 $FPREFIX-rm-out
 test ! -f $FPREFIX-rm.lz4                         # --rm still removes a regular source file
 test   -f $FPREFIX-rm-out
@@ -136,6 +136,6 @@ datagen -g1M | lz4 -c --fast=999999999 > $FPREFIX-trash
 echo "TEST" > $FPREFIX-test
 lz4 -m $FPREFIX-test
 lz4 $FPREFIX-test.lz4 $FPREFIX-test2
-diff -q $FPREFIX-test $FPREFIX-test2
+cmp $FPREFIX-test $FPREFIX-test2
 # bug #1374
 datagen -g4194302 | lz4 -B4 -c > $FPREFIX-test3

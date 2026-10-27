@@ -55,6 +55,7 @@ typedef BYTE litDistribTable[LTSIZE];
 /*********************************************************
 *  Local Functions
 *********************************************************/
+#undef MIN
 #define MIN(a,b)   ( (a) < (b) ? (a) :(b) )
 #define RDG_rotl32(x,r) ((x << r) | (x >> (32 - r)))
 static unsigned int RDG_rand(U32* src)
