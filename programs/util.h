@@ -459,8 +459,14 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
         path[pathLength] = 0;
 
         if (UTIL_isDirectory(path)) {
-            nbFiles += UTIL_prepareFileList(path, bufStart, pos, bufEnd);  /* Recursively call "UTIL_prepareFileList" with the new path. */
-            if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
+            struct stat linkStat;
+            if (lstat(path, &linkStat) == 0 && S_ISLNK(linkStat.st_mode)) {
+                /* not followed : it may lead back to a directory being listed */
+                fprintf(stderr, "Warning : %s is a symbolic link to a directory, ignoring\n", path);
+            } else {
+                nbFiles += UTIL_prepareFileList(path, bufStart, pos, bufEnd);  /* Recursively call "UTIL_prepareFileList" with the new path. */
+                if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
+            }
         } else {
             if (*bufStart + *pos + pathLength >= *bufEnd) {
                 size_t const newListSize = (size_t)(*bufEnd - *bufStart) + LIST_SIZE_INCREASE;

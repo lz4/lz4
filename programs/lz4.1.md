@@ -196,6 +196,7 @@ only the latest one will be applied.
 * `-r` :
   operate recursively on directories.
   This mode also sets `-m` (multiple input files).
+  Symbolic links to directories found within them are not followed.
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>
