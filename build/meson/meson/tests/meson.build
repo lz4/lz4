@@ -64,12 +64,16 @@ test_exes = {
   'unittest': {
     'sources': files(
       lz4_source_root / 'tests/unit/unittest.c',
+      lz4_source_root / 'tests/unit/lz4frame_helpers.c',
       lz4_source_root / 'tests/unit/unittest_lz4.c',
       lz4_source_root / 'tests/unit/unittest_lz4hc.c',
       lz4_source_root / 'tests/unit/unittest_lz4frame.c',
+      lz4_source_root / 'tests/unit/unittest_lz4frameMT.c',
       lz4_source_root / 'tests/tools/datagen.c',
       lz4_source_root / 'lib/lz4file.c',
     ),
+    # tells unittest_lz4frameMT.c if liblz4 supports multi-threading (see lib/meson.build)
+    'c_args': internal_mt ? ['-DLZ4F_MULTITHREAD=1'] : [],
     'include_directories': include_directories(lz4_source_root / 'programs', lz4_source_root / 'tests/tools'),
   },
 }

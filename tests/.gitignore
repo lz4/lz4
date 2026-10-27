@@ -6,6 +6,7 @@ frametest32
 frameMT
 frameMT-nomt
 unittest
+unittest-mt
 fullbench
 fullbench32
 fullbench-lib
