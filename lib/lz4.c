@@ -1101,16 +1101,10 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                         lowLimit = (const BYTE*)source;
                     }
                 } else if (dictDirective == usingExtDict) {
-                    if (matchIndex < startIndex) {
-                        DEBUGLOG(7, "extDict candidate: matchIndex=%5u  <  startIndex=%5u", matchIndex, startIndex);
-                        assert(startIndex - matchIndex >= MINMATCH);
-                        assert(dictBase);
-                        match = dictBase + matchIndex;
-                        lowLimit = dictionary;
-                    } else {
-                        match = base + matchIndex;
-                        lowLimit = (const BYTE*)source;
-                    }
+                    /* select without branch : dictionary and prefix candidates alternate unpredictably.
+                     * relative to dictEnd or source, within their buffers (base can be NULL) */
+                    ptrdiff_t const relIdx = (ptrdiff_t)matchIndex - (ptrdiff_t)startIndex;   /* < 0 : within dictionary */
+                    match = ((relIdx < 0) ? dictEnd : (const BYTE*)source) + relIdx;
                 } else {   /* single continuous memory segment */
                     match = base + matchIndex;
                 }
@@ -1137,6 +1131,8 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                     } /* too far */
                     assert((current - matchIndex) <= LZ4_DISTANCE_MAX);  /* match now expected within distance */
                     if (maybe_extMem) offset = current - matchIndex;
+                    if (dictDirective == usingExtDict)   /* lowLimit : only needed once a match is found */
+                        lowLimit = (matchIndex < startIndex) ? dictionary : (const BYTE*)source;
                     break;   /* match found */
                 }
 
@@ -1316,12 +1312,15 @@ _next_match:
                 }
             }
             assert(matchIndex < current);
-            if ((dictDirective == usingExtDict || dictDirective == usingDictCtx) && (matchIndex < startIndex)) {
+            if (dictDirective == usingExtDict) {   /* select without branch */
+                ptrdiff_t const relIdx = (ptrdiff_t)matchIndex - (ptrdiff_t)startIndex;   /* < 0 : within dictionary */
+                match = ((relIdx < 0) ? dictEnd : (const BYTE*)source) + relIdx;
+            } else if ((dictDirective == usingDictCtx) && (matchIndex < startIndex)) {
                 match = dictBase + (matchIndex - dictDelta);
                 lowLimit = dictionary;   /* required for match length counter */
             } else {
                 match = base + matchIndex;
-                if (dictDirective == usingExtDict || dictDirective == usingDictCtx)
+                if (dictDirective == usingDictCtx)
                     lowLimit = (const BYTE*)source;   /* required for match length counter */
             }
             LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
@@ -1332,6 +1331,8 @@ _next_match:
                 token=op++;
                 *token=0;
                 if (maybe_extMem) offset = current - matchIndex;
+                if (dictDirective == usingExtDict)
+                    lowLimit = (matchIndex < startIndex) ? dictionary : (const BYTE*)source;   /* required for match length counter */
                 DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i",
                             (int)(anchor-(const BYTE*)source), 0, (int)(ip-(const BYTE*)source));
                 goto _next_match;
