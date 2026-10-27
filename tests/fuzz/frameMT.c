@@ -34,7 +34,7 @@
  *   input isn't read after invocation, unless LZ4F_srcStableUntilFlush ;
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
- * - raw dictionary (LZ4F_compressBegin_usingDict()) : same output whatever nbWorkers, the same as its CDict at HC levels
+ * - raw dictionary (LZ4F_compressBegin_usingDict()) : same output whatever nbWorkers, the same as its CDict at levels >= 3
  * - serial processing (dstCapacity too small for parallel jobs) produces the same output
  * - destination too small : compressUpdate fails and invalidates the frame (no truncated frame), the context remains usable ;
  *   completed jobs not fitting yet are emitted later, without failure ; flush and end produce output in pieces
@@ -517,7 +517,7 @@ static int validateStreaming(XXH64_state_t* digest)
                 c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, untilFlushMode, sliceSeed + 1, tmpOut, scratch);
                 CHECK(c == oneShot && !memcmp(out, ref, c), "stream (srcStableUntilFlush, %u workers) differs from one-shot", nbWorkers);
 
-                /* raw dictionary : same output whatever nbWorkers ; HC levels : same frame as its CDict */
+                /* raw dictionary : same output whatever nbWorkers ; HC levels >= 3 : same frame as its CDict */
                 if (cd) {
                     c = compressRawDict(cctx, out, dstCapacity, src, srcSize, dict, dictSize, &prefs, nbWorkers);
                     CHECK_LZ4F(c);
@@ -526,7 +526,7 @@ static int validateStreaming(XXH64_state_t* digest)
                         memcpy(refRaw, out, c);
                         XXH64_update(digest, out, c);
                         checkRoundTrip(out, c, src, srcSize, dict, dictSize, decoded);
-                        if (prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)
+                        if (prefs.compressionLevel > LZ4HC_CLEVEL_MIN)   /* level 2 : digested in its own format */
                             CHECK(c == oneShot && !memcmp(out, ref, c), "raw dictionary differs from CDict");
                         if (!linked) {   /* independent blocks : same as single-threaded */
                             size_t const c0 = compressRawDict(cctx, out, dstCapacity, src, srcSize, dict, dictSize, &prefs, 0);

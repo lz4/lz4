@@ -882,6 +882,8 @@ size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
  * digests @dictBuffer within states owned by @cctx, without copying it (it must outlive the compression session),
  * for the compression level of current frame, which then employs it as a CDict.
  * Since it's done for each frame, fast levels employ LZ4_loadDict(), faster than LZ4F_createCDict()'s LZ4_loadDictSlow().
+ * HC levels digest it for the frame's level : level 2 (lz4mid) has its own format,
+ * which a CDict (digested at default level) lacks.
  * @return : CDict, or NULL if allocation failed */
 static const LZ4F_CDict* LZ4F_digestRawDict(LZ4F_cctx_t* cctx, const void* dictBuffer, size_t dictSize)
 {
@@ -904,7 +906,7 @@ static const LZ4F_CDict* LZ4F_digestRawDict(LZ4F_cctx_t* cctx, const void* dictB
         if (cctx->rawDictHC == NULL) cctx->rawDictHC = (LZ4_streamHC_t*)LZ4F_malloc(sizeof(LZ4_streamHC_t), cctx->cmem);
         if (cctx->rawDictHC == NULL) return NULL;
         LZ4_initStreamHC(cctx->rawDictHC, sizeof(LZ4_streamHC_t));
-        LZ4_setCompressionLevel(cctx->rawDictHC, LZ4HC_CLEVEL_DEFAULT);
+        LZ4_setCompressionLevel(cctx->rawDictHC, cctx->prefs.compressionLevel);
         LZ4_loadDictHC(cctx->rawDictHC, dictStart, (int)dictSize);
         cctx->rawDict.HCCtx = cctx->rawDictHC;
     }

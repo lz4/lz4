@@ -556,11 +556,12 @@ TEST(compressBegin_usingDict_eachBlock)
     }   }   }
 }
 
-/* LZ4F_compressBegin_usingDict() : with HC levels, same frame as with a CDict of this dictionary,
- * with independent blocks, or nbWorkers >= 1 (fast levels digest the dictionary faster than a CDict) */
+/* LZ4F_compressBegin_usingDict() : with HC levels >= 3, same frame as with a CDict of this dictionary,
+ * with independent blocks, or nbWorkers >= 1. Fast levels digest the dictionary faster than a CDict,
+ * level 2 in its own format (a CDict is digested at default level) */
 TEST(compressBegin_usingDict_sameAsCDict_HC)
 {
-    static const int levels[] = { 2, 9 };
+    static const int levels[] = { 3, 9 };
     static const size_t dictSizes[] = { CDICT_DICT_SIZE, 64 KB + 5 KB };   /* larger : only its last 64 KB */
     size_t const srcSize = 3 * 64 KB;   /* a single block would always be independent */
     const char* const sample = (const char*)UT_sample(64 KB + 5 KB + srcSize);
