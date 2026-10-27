@@ -23,6 +23,10 @@
     - LZ4 source repository : https://github.com/lz4/lz4
 */
 
+#ifdef _MSC_VER    /* Visual Studio */
+#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
+#endif
+
 #include "unittest.h"
 #include <limits.h>     /* INT_MIN, INT_MAX */
 #include <stdint.h>     /* uintptr_t */
@@ -76,22 +80,22 @@ TEST(decompress_safe_emptyInput)
 
 TEST(decompress_safe_oneByteInput)
 {
-    char const src[1] = { (char)0xFF };
+    unsigned char const src[1] = { 0xFF };
     char* const decoded = (char*)UT_malloc(DECODED_CAPACITY);
-    ASSERT(LZ4_decompress_safe(src, decoded, 1, DECODED_CAPACITY) < 0);
+    ASSERT(LZ4_decompress_safe((const char*)src, decoded, 1, DECODED_CAPACITY) < 0);
 }
 
 /* 14 bytes of literals, followed by a 14 byte match :
  * must not read beyond the end of the input (#508) */
 TEST(decompress_safe_shortcutEdgeCase)
 {
-    char block[17];
+    unsigned char block[17];
     char* const decoded = (char*)UT_malloc(DECODED_CAPACITY);
-    block[0] = (char)0xEE;
+    block[0] = 0xEE;
     memset(block + 1, 0, 14);
     block[15] = 14;
     block[16] = 0;
-    ASSERT(LZ4_decompress_safe(block, decoded, sizeof(block), DECODED_CAPACITY) < 0);
+    ASSERT(LZ4_decompress_safe((const char*)block, decoded, sizeof(block), DECODED_CAPACITY) < 0);
 }
 
 /* out-of-bounds read regression test */
@@ -115,15 +119,15 @@ TEST(decompress_safe_all0xFF)
 TEST(decompress_safe_ipAtIend)
 {
     static const int dstCapacities[] = { 65, 40 };
-    char block[18];
+    unsigned char block[18];
     char decoded[65];
     size_t n;
-    block[0] = (char)0xEF;          /* 14 literals, ML_MASK match */
+    block[0] = 0xEF;                /* 14 literals, ML_MASK match */
     memset(block + 1, 'A', 14);     /* 14 literal bytes */
     block[15] = 0x0E; block[16] = 0x00;  /* offset = 14 */
     block[17] = 0x00;               /* match length extension = 0 */
     for (n = 0; n < ARRAY_SIZE(dstCapacities); n++)
-        ASSERT(LZ4_decompress_safe(block, decoded, sizeof(block), dstCapacities[n]) < 0);
+        ASSERT(LZ4_decompress_safe((const char*)block, decoded, sizeof(block), dstCapacities[n]) < 0);
 }
 
 /* Invalid offset 0 must not leave previous output buffer content in decoded data
@@ -132,7 +136,7 @@ TEST(decompress_safe_ipAtIend)
 TEST(decompress_safe_partial_offset0)
 {
     char block[32];
-    char decoded[20];
+    unsigned char decoded[20];
     int r, i;
     memset(block, 0, sizeof(block));
     block[0] = 0x1F;                /* 1 literal, ML_MASK match */
@@ -140,9 +144,9 @@ TEST(decompress_safe_partial_offset0)
     block[2] = 0x00; block[3] = 0x00;  /* offset = 0 (invalid) */
     block[4] = 64;                  /* match length extension */
     memset(decoded, 0xAA, sizeof(decoded));
-    r = LZ4_decompress_safe_partial(block, decoded, sizeof(block), sizeof(decoded), sizeof(decoded));
+    r = LZ4_decompress_safe_partial(block, (char*)decoded, sizeof(block), sizeof(decoded), sizeof(decoded));
     for (i = 1; i < r; i++)
-        ASSERT_MSG(decoded[i] != (char)0xAA, "previous content kept at position %i", i);
+        ASSERT_MSG(decoded[i] != 0xAA, "previous content kept at position %i", i);
 }
 
 
@@ -388,7 +392,7 @@ TEST(saveDict_negativeSize)
 TEST(compress_periodicRuns)
 {
     static const char dict[8] = { 0, 0, 0, 0, 0, 0, 0, 4 };
-    char page[8 + 4096];   /* dict, then a 4 KB page alternating runs of 16 x 0xFF and 16 x 0x00 */
+    unsigned char page[8 + 4096];   /* dict, then a 4 KB page alternating runs of 16 x 0xFF and 16 x 0x00 */
     int const capacity = LZ4_COMPRESSBOUND(sizeof(page));
     char* const dst = (char*)UT_malloc((size_t)capacity);
     LZ4_stream_t* const stream = newStream();
@@ -398,21 +402,21 @@ TEST(compress_periodicRuns)
     for (r = 0; r < 32; r++) {   /* several rotations compressed to ~1.5 KB, instead of < 60 bytes */
         int i, c;
         for (i = 0; i < 4096; i++)
-            page[8 + i] = (((i + r) % 4096 + 8) / 16) % 2 == 0 ? (char)0xFF : 0;
+            page[8 + i] = (((i + r) % 4096 + 8) / 16) % 2 == 0 ? 0xFF : 0;
 
-        c = LZ4_compress_default(page, dst, (int)sizeof(page), capacity);
+        c = LZ4_compress_default((const char*)page, dst, (int)sizeof(page), capacity);
         ASSERT_MSG(c > 0 && c <= 100, "rotation %i, dictionary bytes in the same block : %i bytes", r, c);
 
         LZ4_initStream(stream, sizeof(*stream));
         LZ4_loadDict(stream, dict, (int)sizeof(dict));
-        c = LZ4_compress_fast_continue(stream, page + 8, dst, 4096, capacity, 1);
+        c = LZ4_compress_fast_continue(stream, (const char*)page + 8, dst, 4096, capacity, 1);
         ASSERT_MSG(c > 0 && c <= 100, "rotation %i, LZ4_loadDict() : %i bytes", r, c);
 
         LZ4_initStream(dictStream, sizeof(*dictStream));
         LZ4_loadDict(dictStream, dict, (int)sizeof(dict));
         LZ4_initStream(stream, sizeof(*stream));
         LZ4_attach_dictionary(stream, dictStream);
-        c = LZ4_compress_fast_continue(stream, page + 8, dst, 4096, capacity, 1);
+        c = LZ4_compress_fast_continue(stream, (const char*)page + 8, dst, 4096, capacity, 1);
         ASSERT_MSG(c > 0 && c <= 100, "rotation %i, LZ4_attach_dictionary() : %i bytes", r, c);
     }
 }
@@ -494,33 +498,33 @@ TEST(decompress_safe_addressSpaceOverflow)
         if (b->buffers[n] == NULL) return;   /* no more memory : end of test */
         b->nb++;
         if (n < 2) continue;
-        {   size_t const sizeToGenerateOverflow = (size_t)(- ((uintptr_t)b->buffers[n-1]) + 512);
+        {   size_t const sizeToGenerateOverflow = (size_t)(0 - (uintptr_t)b->buffers[n-1] + 512);
             int const nbOf255 = (int)((sizeToGenerateOverflow / 255) + 1);
-            char* const input = b->buffers[n-1];
+            unsigned char* const input = (unsigned char*)b->buffers[n-1];
             int u;
-            input[0] = (char)0xF0;   /* Literal length overflow */
-            input[1] = (char)0xFF;
-            input[2] = (char)0xFF;
-            input[3] = (char)0xFF;
-            for (u = 4; u <= nbOf255+4; u++) input[u] = (char)0xff;
-            ASSERT(LZ4_decompress_safe(input, b->buffers[n], nbOf255+64, AO_BUFFER_SIZE) <= 0);
-            input[0] = (char)0x1F;   /* Match length overflow */
-            input[1] = (char)0x01;
-            input[2] = (char)0x01;
-            input[3] = (char)0x00;
-            ASSERT(LZ4_decompress_safe(input, b->buffers[n], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+            input[0] = 0xF0;   /* Literal length overflow */
+            input[1] = 0xFF;
+            input[2] = 0xFF;
+            input[3] = 0xFF;
+            for (u = 4; u <= nbOf255+4; u++) input[u] = 0xFF;
+            ASSERT(LZ4_decompress_safe((const char*)input, b->buffers[n], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+            input[0] = 0x1F;   /* Match length overflow */
+            input[1] = 0x01;
+            input[2] = 0x01;
+            input[3] = 0x00;
+            ASSERT(LZ4_decompress_safe((const char*)input, b->buffers[n], nbOf255+64, AO_BUFFER_SIZE) <= 0);
 
             /* reverse in/out pointer order */
-            input[0] = (char)0xF0;   /* Literal length overflow */
-            input[1] = (char)0xFF;
-            input[2] = (char)0xFF;
-            input[3] = (char)0xFF;
-            ASSERT(LZ4_decompress_safe(input, b->buffers[n-2], nbOf255+64, AO_BUFFER_SIZE) <= 0);
-            input[0] = (char)0x1F;   /* Match length overflow */
-            input[1] = (char)0x01;
-            input[2] = (char)0x01;
-            input[3] = (char)0x00;
-            ASSERT(LZ4_decompress_safe(input, b->buffers[n-2], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+            input[0] = 0xF0;   /* Literal length overflow */
+            input[1] = 0xFF;
+            input[2] = 0xFF;
+            input[3] = 0xFF;
+            ASSERT(LZ4_decompress_safe((const char*)input, b->buffers[n-2], nbOf255+64, AO_BUFFER_SIZE) <= 0);
+            input[0] = 0x1F;   /* Match length overflow */
+            input[1] = 0x01;
+            input[2] = 0x01;
+            input[3] = 0x00;
+            ASSERT(LZ4_decompress_safe((const char*)input, b->buffers[n-2], nbOf255+64, AO_BUFFER_SIZE) <= 0);
     }   }
 }
 
