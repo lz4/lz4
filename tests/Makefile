@@ -39,7 +39,7 @@ USERCFLAGS:= -O3 $(CFLAGS) # appended for higher priority
 WFLAGS    = -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(USERCFLAGS)
+CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(JCC_FLAGS) $(USERCFLAGS)   # JCC_FLAGS : see build/make/lz4defs.make
 CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -Itools -DXXH_NAMESPACE=LZ4_
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 

@@ -68,6 +68,20 @@ if get_option('force-sw-bitcount')
   add_project_arguments('-DLZ4_FORCE_SW_BITCOUNT', language: 'c')
 endif
 
+# On x86 and x86-64, keep branches within 32-byte boundaries,
+# which mitigates the JCC erratum of Intel cpus of the Skylake family : see build/make/lz4defs.make.
+# The option depends on the compiler : MSVC, clang, or gcc (assembler option, binutils >= 2.34).
+if get_option('jcc-erratum') and host_machine.cpu_family() in ['x86', 'x86_64']
+  add_project_arguments(
+    cc.first_supported_argument(
+      '/QIntel-jcc-erratum',
+      '-mbranches-within-32B-boundaries',
+      '-Wa,-mbranches-within-32B-boundaries'
+    ),
+    language: 'c'
+  )
+endif
+
 if get_option('freestanding')
   add_project_arguments('-DLZ4_FREESTANDING=1', language: 'c')
   compile_args += '-DLZ4_FREESTANDING=1'
