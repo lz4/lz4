@@ -70,6 +70,7 @@ test_exes = {
       lz4_source_root / 'tests/unit/unittest_lz4frame.c',
       lz4_source_root / 'tests/unit/unittest_lz4frameMT.c',
       lz4_source_root / 'tests/tools/datagen.c',
+      lz4_source_root / 'programs/timefn.c',
       lz4_source_root / 'lib/lz4file.c',
     ),
     # tells unittest_lz4frameMT.c if liblz4 supports multi-threading (see lib/meson.build)
