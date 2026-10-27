@@ -76,6 +76,7 @@ test_exes = {
     # tells unittest_lz4frameMT.c if liblz4 supports multi-threading (see lib/meson.build)
     'c_args': internal_mt ? ['-DLZ4F_MULTITHREAD=1'] : [],
     'include_directories': include_directories(lz4_source_root / 'programs', lz4_source_root / 'tests/tools'),
+    'timeout': 360,   # buildtype=debug (-O0) : about 1 minute on CI runners, sometimes more than twice
   },
 }
 
@@ -109,7 +110,7 @@ foreach e, attrs : test_exes
     e,
     t,
     args: attrs.get('params', []),
-    timeout: 120
+    timeout: attrs.get('timeout', 120)
   )
 endforeach
 
