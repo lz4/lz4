@@ -34,6 +34,7 @@
  *   input isn't read after invocation, unless LZ4F_srcStableUntilFlush ;
  *   abandoned frames (jobs in flight) are handled
  * - with independent blocks, output is identical to nbWorkers == 0
+ * - raw dictionary (LZ4F_compressBegin_usingDict()) : same output whatever nbWorkers, the same as its CDict at HC levels
  * - serial processing (dstCapacity too small for parallel jobs) produces the same output
  * - destination too small : compressUpdate fails and invalidates the frame (no truncated frame), the context remains usable ;
  *   completed jobs not fitting yet are emitted later, without failure ; flush and end produce output in pieces
@@ -123,6 +124,25 @@ static size_t compressMT(LZ4F_cctx* cctx, void* dst, size_t dstCapacity,
     LZ4F_preferences_t mtPrefs = *prefs;
     mtPrefs.nbWorkers = nbWorkers;
     return LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity, src, srcSize, cdict, &mtPrefs);
+}
+
+/* begins a frame with raw dictionary @dict, then compresses @src in a single invocation */
+static size_t compressRawDict(LZ4F_cctx* cctx, char* dst, size_t dstCapacity,
+                              const char* src, size_t srcSize,
+                              const void* dict, size_t dictSize, const LZ4F_preferences_t* prefs,
+                              unsigned nbWorkers)
+{
+    LZ4F_preferences_t p = *prefs;
+    size_t pos, r;
+    p.nbWorkers = nbWorkers;
+    pos = LZ4F_compressBegin_usingDict(cctx, dst, dstCapacity, dict, dictSize, &p);
+    if (LZ4F_isError(pos)) return pos;
+    r = LZ4F_compressUpdate(cctx, dst + pos, dstCapacity - pos, src, srcSize, NULL);
+    if (LZ4F_isError(r)) return r;
+    pos += r;
+    r = LZ4F_compressEnd(cctx, dst + pos, dstCapacity - pos, NULL);
+    if (LZ4F_isError(r)) return r;
+    return pos + r;
 }
 
 /* when environment variable FRAMEMT_DUMP is set, writes @buffer to FRAMEMT_DUMP@suffix */
@@ -421,6 +441,7 @@ static int validateStreaming(XXH64_state_t* digest)
     char* const refFlush = (char*)malloc(dstCapacity);
     char* const refAuto = (char*)malloc(dstCapacity);
     char* const refUnc = (char*)malloc(dstCapacity);
+    char* const refRaw = (char*)malloc(dstCapacity);
     char* const out = (char*)malloc(dstCapacity);
     char* const decoded = (char*)malloc(srcSize);
     char* tmpOut;
@@ -447,7 +468,7 @@ static int validateStreaming(XXH64_state_t* digest)
         }
         tmpOut = (char*)malloc(tmpOutCapacity);
     }
-    CHECK(src && dict && scratch && ref && refFlush && refAuto && refUnc && out && decoded && tmpOut && cctx, "allocation failed");
+    CHECK(src && dict && scratch && ref && refFlush && refAuto && refUnc && refRaw && out && decoded && tmpOut && cctx, "allocation failed");
     RDG_genBuffer(src, srcSize, 0.5, 0.0, 9);
     RDG_genBuffer(dict, dictSize, 0.5, 0.0, 8);
     cdict = LZ4F_createCDict(dict, dictSize);
@@ -457,7 +478,7 @@ static int validateStreaming(XXH64_state_t* digest)
         for (linked = 0; linked <= 1; linked++) {
             LZ4F_preferences_t prefs;
             const LZ4F_CDict* cd;
-            size_t oneShot, flushRef = 0, autoRef = 0, uncRef = 0;
+            size_t oneShot, flushRef = 0, autoRef = 0, uncRef = 0, rawRef = 0;
             unsigned const sliceSeed = nextRand(&seed);
             size_t wi;
 
@@ -495,6 +516,26 @@ static int validateStreaming(XXH64_state_t* digest)
                 CHECK(c == oneShot && !memcmp(out, ref, c), "stream (srcStable, %u workers) differs from one-shot", nbWorkers);
                 c = streamCompress(cctx, out, src, srcSize, cd, &prefs, nbWorkers, untilFlushMode, sliceSeed + 1, tmpOut, scratch);
                 CHECK(c == oneShot && !memcmp(out, ref, c), "stream (srcStableUntilFlush, %u workers) differs from one-shot", nbWorkers);
+
+                /* raw dictionary : same output whatever nbWorkers ; HC levels : same frame as its CDict */
+                if (cd) {
+                    c = compressRawDict(cctx, out, dstCapacity, src, srcSize, dict, dictSize, &prefs, nbWorkers);
+                    CHECK_LZ4F(c);
+                    if (wi == 0) {
+                        rawRef = c;
+                        memcpy(refRaw, out, c);
+                        XXH64_update(digest, out, c);
+                        checkRoundTrip(out, c, src, srcSize, dict, dictSize, decoded);
+                        if (prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)
+                            CHECK(c == oneShot && !memcmp(out, ref, c), "raw dictionary differs from CDict");
+                        if (!linked) {   /* independent blocks : same as single-threaded */
+                            size_t const c0 = compressRawDict(cctx, out, dstCapacity, src, srcSize, dict, dictSize, &prefs, 0);
+                            CHECK(c0 == rawRef && !memcmp(out, refRaw, c0), "raw dictionary differs from single-threaded");
+                        }
+                    } else {
+                        CHECK(c == rawRef && !memcmp(out, refRaw, c), "raw dictionary differs with %u workers", nbWorkers);
+                    }
+                }
 
                 /* with flushes : same output whatever nbWorkers */
                 {   static char step[64];
@@ -587,7 +628,7 @@ static int validateStreaming(XXH64_state_t* digest)
     LZ4F_freeCDict(cdict);
     CHECK(g_nbAllocs == g_nbFrees, "memory leak : %u allocations, %u frees", (unsigned)g_nbAllocs, (unsigned)g_nbFrees);
     DISPLAY("streaming : %u configurations validated \n", nbConfigs);
-    free(src); free(dict); free(scratch); free(ref); free(refFlush); free(refAuto); free(refUnc); free(out); free(decoded); free(tmpOut);
+    free(src); free(dict); free(scratch); free(ref); free(refFlush); free(refAuto); free(refUnc); free(refRaw); free(out); free(decoded); free(tmpOut);
     return 0;
 }
 

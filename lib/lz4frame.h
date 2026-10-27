@@ -235,7 +235,6 @@ typedef struct {
  *    or constructors and destructors of a DLL's global objects) : worker threads can neither start nor exit then.
  *    On POSIX systems, worker threads block signals, except synchronous ones (SIGBUS, SIGSEGV, SIGFPE, SIGILL) :
  *    a fault while reading input (ex: memory-mapped file truncated) invokes the application's handler, in a worker thread.
- *  - LZ4F_compressBegin_usingDict() isn't supported : frames remain single-threaded. Prefer a CDict.
  *  - Memory is allocated by the calling thread (LZ4F_CustomMem doesn't need to be thread-safe),
  *    except lz4hc's temporary buffer at levels >= 10 (LZ4HC_HEAPMODE), allocated within worker threads
  *    with malloc(), or LZ4_malloc() when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS : it must then be thread-safe.
@@ -643,10 +642,11 @@ LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always su
  * @dictBuffer must outlive the compression session.
  * @return : number of bytes written into dstBuffer for the header,
  *           or an error code (which can be tested using LZ4F_isError())
- *  NOTE: The LZ4Frame spec allows each independent block to be compressed with the dictionary,
- *        but this entry supports a more limited scenario, where only the first block uses the dictionary.
- *        This is still useful for small data, which only need one block anyway.
- *        For larger inputs, one may be more interested in LZ4F_compressFrame_usingCDict() below.
+ *  With independent blocks, each block uses the dictionary, as with a CDict (LZ4F_compressBegin_usingCDict()),
+ *  also with linked blocks when nbWorkers >= 1 (multi-threaded compression).
+ *  Linked blocks with nbWorkers == 0 employ the dictionary as history of the first block.
+ *  The dictionary is digested at each frame start, faster than LZ4F_createCDict() but less thoroughly at fast levels
+ *  (frames can be slightly larger than with a CDict) : to compress multiple frames, prefer a CDict.
  */
 LZ4FLIB_API size_t
 LZ4F_compressBegin_usingDict(LZ4F_cctx* cctx,

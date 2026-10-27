@@ -284,6 +284,13 @@ static const size_t BFSize = LZ4F_BLOCK_CHECKSUM_SIZE;  /* block footer : checks
 typedef enum { LZ4B_COMPRESSED, LZ4B_UNCOMPRESSED} LZ4F_BlockCompressMode_e;
 typedef enum { ctxNone, ctxFast, ctxHC } LZ4F_CtxType_e;
 
+struct LZ4F_CDict_s {
+    LZ4F_CustomMem cmem;
+    void* dictContent;
+    LZ4_stream_t* fastCtx;
+    LZ4_streamHC_t* HCCtx;
+}; /* typedef'd to LZ4F_CDict within lz4frame_static.h */
+
 typedef struct LZ4F_cctx_s
 {
     LZ4F_CustomMem cmem;
@@ -311,6 +318,10 @@ typedef struct LZ4F_cctx_s
     BYTE*  stageBuff;  /* a block not fitting into dstBuffer : allocated on first need */
     size_t stageCapacity;
     BYTE   footer[8];  /* endMark + optional content checksum */
+    /* raw dictionary (LZ4F_compressBegin_usingDict()) digested for current frame, then employed as a CDict */
+    struct LZ4F_CDict_s rawDict;   /* fastCtx or HCCtx, the other one NULL ; no dictContent : not owned */
+    LZ4_stream_t*   rawDictFast;   /* allocated on first need */
+    LZ4_streamHC_t* rawDictHC;     /* allocated on first need */
 } LZ4F_cctx_t;
 
 /* multi-threaded compression, see LZ4F_preferences_t.nbWorkers */
@@ -674,13 +685,6 @@ size_t LZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
 *   Dictionary compression
 *****************************************************/
 
-struct LZ4F_CDict_s {
-    LZ4F_CustomMem cmem;
-    void* dictContent;
-    LZ4_stream_t* fastCtx;
-    LZ4_streamHC_t* HCCtx;
-}; /* typedef'd to LZ4F_CDict within lz4frame_static.h */
-
 LZ4F_CDict*
 LZ4F_createCDict_advanced(LZ4F_CustomMem cmem, const void* dictBuffer, size_t dictSize)
 {
@@ -786,6 +790,8 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctxPtr)
        LZ4F_free(cctxPtr->lz4CtxPtr, cctxPtr->cmem);  /* note: LZ4_streamHC_t and LZ4_stream_t are simple POD types */
        LZ4F_free(cctxPtr->tmpBuff, cctxPtr->cmem);
        LZ4F_free(cctxPtr->stageBuff, cctxPtr->cmem);
+       LZ4F_free(cctxPtr->rawDictFast, cctxPtr->cmem);
+       LZ4F_free(cctxPtr->rawDictHC, cctxPtr->cmem);
        LZ4F_free(cctxPtr, cctxPtr->cmem);
     }
     return LZ4F_OK_NoError;
@@ -867,7 +873,41 @@ size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
         return 0;
     }
     return sizeof(*cctx) + cctx->tmpBuffCapacity + cctx->stageCapacity + LZ4F_sizeofLZ4State((LZ4F_CtxType_e)cctx->lz4CtxAlloc)
+         + (cctx->rawDictFast ? sizeof(LZ4_stream_t) : 0) + (cctx->rawDictHC ? sizeof(LZ4_streamHC_t) : 0)
          + LZ4F_mt_sizeof(cctx->mt);
+}
+
+/* LZ4F_digestRawDict() :
+ * digests @dictBuffer within states owned by @cctx, without copying it (it must outlive the compression session),
+ * for the compression level of current frame, which then employs it as a CDict.
+ * Since it's done for each frame, fast levels employ LZ4_loadDict(), faster than LZ4F_createCDict()'s LZ4_loadDictSlow().
+ * @return : CDict, or NULL if allocation failed */
+static const LZ4F_CDict* LZ4F_digestRawDict(LZ4F_cctx_t* cctx, const void* dictBuffer, size_t dictSize)
+{
+    const char* dictStart = (const char*)dictBuffer;
+    if (dictSize > 64 KB) {
+        dictStart += dictSize - 64 KB;
+        dictSize = 64 KB;
+    }
+    cctx->rawDict.cmem = cctx->cmem;
+    cctx->rawDict.dictContent = NULL;
+    cctx->rawDict.fastCtx = NULL;
+    cctx->rawDict.HCCtx = NULL;
+    if (cctx->prefs.compressionLevel < LZ4HC_CLEVEL_MIN) {
+        if (cctx->rawDictFast == NULL) cctx->rawDictFast = (LZ4_stream_t*)LZ4F_malloc(sizeof(LZ4_stream_t), cctx->cmem);
+        if (cctx->rawDictFast == NULL) return NULL;
+        LZ4_initStream(cctx->rawDictFast, sizeof(LZ4_stream_t));
+        LZ4_loadDict(cctx->rawDictFast, dictStart, (int)dictSize);
+        cctx->rawDict.fastCtx = cctx->rawDictFast;
+    } else {
+        if (cctx->rawDictHC == NULL) cctx->rawDictHC = (LZ4_streamHC_t*)LZ4F_malloc(sizeof(LZ4_streamHC_t), cctx->cmem);
+        if (cctx->rawDictHC == NULL) return NULL;
+        LZ4_initStreamHC(cctx->rawDictHC, sizeof(LZ4_streamHC_t));
+        LZ4_setCompressionLevel(cctx->rawDictHC, LZ4HC_CLEVEL_DEFAULT);
+        LZ4_loadDictHC(cctx->rawDictHC, dictStart, (int)dictSize);
+        cctx->rawDict.HCCtx = cctx->rawDictHC;
+    }
+    return &cctx->rawDict;
 }
 
 /* LZ4F_compressBegin_internal()
@@ -921,12 +961,23 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
             cctx->lz4CtxType = (U16)ctxType;
     }   }
 
+    /* raw dictionary : employed by each block as a CDict (independent blocks, or jobs of multi-threaded frames) ;
+     * single-threaded linked blocks keep the historical behavior : dictionary loaded as history of the first block */
+    if ( dictBuffer
+      && ((cctx->prefs.frameInfo.blockMode == LZ4F_blockIndependent) || LZ4F_mtEligible(&cctx->prefs)) ) {
+        assert(cdict == NULL);
+        cdict = LZ4F_digestRawDict(cctx, dictBuffer, dictSize);
+        RETURN_ERROR_IF(cdict == NULL, allocation_failed);
+        dictBuffer = NULL;
+        dictSize = 0;
+    }
+
     /* Buffer Management */
     if (cctx->prefs.frameInfo.blockSizeID == 0)
         cctx->prefs.frameInfo.blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
     cctx->maxBlockSize = LZ4F_getBlockSize(cctx->prefs.frameInfo.blockSizeID);
 
-    {   int const mtFrame = LZ4F_mtEligible(&cctx->prefs) && (dictBuffer == NULL);   /* employs its own job buffers */
+    {   int const mtFrame = LZ4F_mtEligible(&cctx->prefs);   /* employs its own job buffers */
         size_t const requiredBuffSize = mtFrame ? 0 :
                 preferencesPtr->autoFlush ?
                 ((cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 64 KB : 0) :  /* only needs past data up to window size */
@@ -998,8 +1049,9 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
         dstPtr++;
     }
 
-    /* multi-threading : frame cut into jobs (not supported with a raw dictionary : use a CDict) */
-    if (LZ4F_mtEligible(&cctx->prefs) && (dictBuffer == NULL)) {
+    /* multi-threading : frame cut into jobs */
+    if (LZ4F_mtEligible(&cctx->prefs)) {
+        assert(dictBuffer == NULL);
         FORWARD_IF_ERROR( LZ4F_mt_begin(cctx) );
     }
 
@@ -1016,11 +1068,7 @@ size_t LZ4F_compressBegin(LZ4F_cctx* cctx,
                                         NULL, preferencesPtr);
 }
 
-/* LZ4F_compressBegin_usingDictOnce:
- * Hidden implementation,
- * employed for multi-threaded compression
- * when frame defines linked blocks */
-static size_t LZ4F_compressBegin_usingDictOnce(LZ4F_cctx* cctx,
+size_t LZ4F_compressBegin_usingDict(LZ4F_cctx* cctx,
                           void* dstBuffer, size_t dstCapacity,
                           const void* dict, size_t dictSize,
                           const LZ4F_preferences_t* preferencesPtr)
@@ -1028,19 +1076,6 @@ static size_t LZ4F_compressBegin_usingDictOnce(LZ4F_cctx* cctx,
     return LZ4F_compressBegin_internal(cctx, dstBuffer, dstCapacity,
                                         dict, dictSize,
                                         NULL, preferencesPtr);
-}
-
-size_t LZ4F_compressBegin_usingDict(LZ4F_cctx* cctx,
-                          void* dstBuffer, size_t dstCapacity,
-                          const void* dict, size_t dictSize,
-                          const LZ4F_preferences_t* preferencesPtr)
-{
-    /* note : incorrect implementation :
-     * this will only use the dictionary once,
-     * instead of once *per* block when frames defines independent blocks */
-    return LZ4F_compressBegin_usingDictOnce(cctx, dstBuffer, dstCapacity,
-                                        dict, dictSize,
-                                        preferencesPtr);
 }
 
 size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctx,
