@@ -15,7 +15,7 @@ Test programs are built in this directory, by `make <program>`, and run by `make
 
 #### Running tests
 
-- `make test-unittest` : unit tests.
+- `make test-unittest` : unit tests, built twice : `unittest`, and `unittest-mt` with multi-threading support.
   `./unittest -l` lists them, `./unittest <filter>` runs the tests whose name contains `<filter>`,
   `-s#` changes the seed of their data, `-r` selects a random one, reported at the end.
   `make test-unittest` uses a random seed.
@@ -26,7 +26,7 @@ Test programs are built in this directory, by `make <program>`, and run by `make
 #### Adding tests
 
 Unit tests of the library go to `unit/`, in the file of the corresponding library source
-(`unittest_lz4.c`, `unittest_lz4hc.c`, `unittest_lz4frame.c`) :
+(`unittest_lz4.c`, `unittest_lz4hc.c`, `unittest_lz4frame.c`, `unittest_lz4frameMT.c` for multi-threaded compression) :
 ```c
 TEST(getBlockSize_64KB)
 {
@@ -36,7 +36,7 @@ TEST(getBlockSize_64KB)
 Tests register themselves, and run in the order of the source.
 Each test runs in its own context : buffers from `UT_malloc()` and `UT_sample()` are released at the end of the test,
 even when it fails, and a failed assertion only ends this test.
-See `unit/unittest.h` for assertions and helpers.
+See `unit/unittest.h` for assertions and helpers, and `unit/lz4frame_helpers.h` for lz4frame.
 
 Tests of the command line go to `cli/` : extend an existing script, or create `cli/test-lz4-<name>.sh`,
 with a `test-lz4-<name>` target in `Makefile` and an entry in `build/meson/meson/tests/meson.build`.

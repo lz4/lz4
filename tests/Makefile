@@ -125,8 +125,10 @@ $(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 frametest:
 $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
 
+UNITTEST_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o \
+                 unittest.o lz4frame_helpers.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o unittest_lz4frameMT.o
 unittest:
-$(eval $(call c_program_shared_o,unittest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o unittest.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o))
+$(eval $(call c_program_shared_o,unittest,$(UNITTEST_OBJS)))
 
 datagen: CPPFLAGS+=-DNDEBUG
 $(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
@@ -136,7 +138,7 @@ $(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o ch
 
 # multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
 # (c_program : objects are not shared, since frameMT employs different flags)
-FRAMEMT_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o frameMT.o
+FRAMEMT_OBJS := lz4frame.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o frameMT.o
 # LZ4F_NBWORKERS_MAX=128 (as on 32-bit systems) : keeps the capped test case (1000 workers) affordable
 frameMT: CPPFLAGS += -DLZ4F_MULTITHREAD=1 -DLZ4F_NBWORKERS_MAX=128u
 frameMT: LDFLAGS += -pthread
@@ -144,6 +146,11 @@ $(eval $(call c_program,frameMT,$(FRAMEMT_OBJS)))
 
 frameMT-nomt: CPPFLAGS += -DLZ4F_NBWORKERS_MAX=128u
 $(eval $(call c_program,frameMT-nomt,$(FRAMEMT_OBJS)))
+
+# unit tests, with multi-threading support
+unittest-mt: CPPFLAGS += -DLZ4F_MULTITHREAD=1
+unittest-mt: LDFLAGS += -pthread
+$(eval $(call c_program,unittest-mt,$(UNITTEST_OBJS)))
 
 .PHONY: clean
 clean: clean_cache
@@ -367,8 +374,9 @@ test-frametest32: CFLAGS += -m32
 test-frametest32: test-frametest
 
 # random seed : explores more data ; a failure reports its seed
-test-unittest: unittest
+test-unittest: unittest unittest-mt
 	./unittest -r
+	./unittest-mt -r
 
 VALGRIND = valgrind --leak-check=yes --error-exitcode=1
 test-mem: FPREFIX = tmp-tvm

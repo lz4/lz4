@@ -21,8 +21,8 @@ Pull requests target the `dev` branch.
 - sanitizers : `make usan`, or `CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address make -C tests test-unittest`
 
 ## Adding tests
-- Library behavior : add a `TEST()` to `tests/unit/unittest_<file>.c` (`lz4`, `lz4hc`, `lz4frame`) :
-  it registers itself (see `tests/unit/unittest.h`).
+- Library behavior : add a `TEST()` to `tests/unit/unittest_<file>.c` (`lz4`, `lz4hc`, `lz4frame`,
+  `lz4frameMT` for multi-threaded compression) : it registers itself (see `tests/unit/unittest.h`).
 - Command line behavior : extend a script of `tests/cli/`, or add `tests/cli/test-lz4-<name>.sh`,
   with its target in `tests/Makefile` and its entry in `build/meson/meson/tests/meson.build`.
 

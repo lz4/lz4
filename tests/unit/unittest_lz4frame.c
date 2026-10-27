@@ -24,13 +24,12 @@
 */
 
 #include "unittest.h"
+#include "lz4frame_helpers.h"   /* lz4frame.h, LZ4F_OK, newCctx, assertDecodesTo */
 #include <stdlib.h>     /* malloc, calloc, free */
-#include <stdio.h>      /* FILE, tmpfile, fopen, fclose */
+#include <stdio.h>      /* FILE, fopen */
 #include <string.h>     /* memcpy, memset */
 #include <limits.h>     /* INT_MIN */
 #include <time.h>       /* clock */
-#define LZ4F_STATIC_LINKING_ONLY
-#include "lz4frame.h"
 #include "lz4file.h"
 #define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
 #include "lz4.h"
@@ -38,52 +37,7 @@
 /*-************************************
 *  Helpers
 **************************************/
-/* LZ4F_OK() : fails the test if @r is an error code
- * @return : @r */
 typedef unsigned char BYTE;
-
-#define LZ4F_OK(r) checkLZ4F((r), #r, __FILE__, __LINE__)
-static size_t checkLZ4F(size_t r, const char* expr, const char* file, int line)
-{
-    if (LZ4F_isError(r)) UT_fail(file, line, "%s \n  error : %s", expr, LZ4F_getErrorName(r));
-    return r;
-}
-
-/* ASSERT_LZ4F_ERROR() : fails the test unless @r is the error code @code */
-#define ASSERT_LZ4F_ERROR(r, code) checkLZ4FError((r), code, #r, #code, __FILE__, __LINE__)
-static void checkLZ4FError(size_t r, LZ4F_errorCodes code,
-                           const char* expr, const char* codeName, const char* file, int line)
-{
-    if (LZ4F_getErrorCode(r) != code)
-        UT_fail(file, line, "%s \n  expected : %s \n  result : %s", expr, codeName,
-                LZ4F_isError(r) ? LZ4F_getErrorName(r) : "no error");
-}
-
-static void freeCctx(void* cctx) { LZ4F_freeCompressionContext((LZ4F_cctx*)cctx); }
-static void freeDctx(void* dctx) { LZ4F_freeDecompressionContext((LZ4F_dctx*)dctx); }
-static void freeCDict(void* cdict) { LZ4F_freeCDict((LZ4F_CDict*)cdict); }
-
-/* contexts, released at the end of the test */
-static LZ4F_cctx* newCctx(void)
-{
-    LZ4F_cctx* cctx = NULL;
-    LZ4F_OK(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
-    return (LZ4F_cctx*)UT_defer(freeCctx, cctx);
-}
-
-static LZ4F_dctx* newDctx(void)
-{
-    LZ4F_dctx* dctx = NULL;
-    LZ4F_OK(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
-    return (LZ4F_dctx*)UT_defer(freeDctx, dctx);
-}
-
-static LZ4F_CDict* newCDict(const void* dict, size_t dictSize)
-{
-    LZ4F_CDict* const cdict = (LZ4F_CDict*)UT_defer(freeCDict, LZ4F_createCDict(dict, dictSize));
-    ASSERT(cdict != NULL);
-    return cdict;
-}
 
 /* allocator which fails while *state != 0 */
 static void* failableMalloc(void* state, size_t s) { return *(const int*)state ? NULL : malloc(s); }
@@ -111,23 +65,6 @@ static size_t streamFrame(LZ4F_cctx* cctx, void* dst, size_t dstCapacity,
     r = LZ4F_compressEnd(cctx, ostart + pos, dstCapacity - pos, NULL);
     if (LZ4F_isError(r)) return r;
     return pos + r;
-}
-
-/* fails the test unless @frame decodes entirely into @expected, using @dict */
-static void assertDecodesTo(const void* frame, size_t frameSize,
-                            const void* dict, size_t dictSize,
-                            const void* expected, size_t expectedSize)
-{
-    void* const decoded = UT_malloc(expectedSize);
-    LZ4F_dctx* const dctx = newDctx();
-    size_t dSize = expectedSize;
-    size_t cSize = frameSize;
-    ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, dict, dictSize, NULL)), 0);
-    ASSERT_EQ(cSize, frameSize);
-    ASSERT_EQ(dSize, expectedSize);
-    ASSERT_MEMEQ(decoded, expected, expectedSize);
-    UT_release(dctx);
-    UT_release(decoded);
 }
 
 /* fails the test unless decoding @frame requires a dictionary */
@@ -215,16 +152,6 @@ static void writeLE32(void* dst, unsigned value)
     p[1] = (unsigned char)(value >> 8);
     p[2] = (unsigned char)(value >> 16);
     p[3] = (unsigned char)(value >> 24);
-}
-
-static void closeFile(void* file) { if (file != NULL) fclose((FILE*)file); }
-
-/* @return : a temporary file, closed at the end of the test */
-static FILE* newTmpFile(void)
-{
-    FILE* const file = (FILE*)UT_defer(closeFile, tmpfile());
-    ASSERT(file != NULL);
-    return file;
 }
 
 /* allocator counting the bytes currently allocated, in *(size_t*)state */

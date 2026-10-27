@@ -41,10 +41,10 @@
  * - flush and end in pieces, for any capacity : same output ; flush point, exact fill, update after an incomplete flush
  * - LZ4F_compressBegin() rejecting its arguments leaves the frame in progress (jobs in flight) untouched ;
  *   its allocation failures invalidate it
- * - LZ4F_getMaxNbWorkers() reports multi-threading support
  * - allocation failures are reported (allocation_failed), except those preventing additional worker threads : context remains usable
  * - all allocations happen in the calling thread (custom allocator is not thread-safe : see TSAN)
  * - prints a digest of produced frames, to compare builds with and without LZ4F_MULTITHREAD
+ * Unit tests of multi-threaded compression : see tests/unit/unittest_lz4frameMT.c
  * Bench mode : frameMT -b FILE [-l#] [-B#] [-D] [-c] [-T#]
  * Compress once with # workers : frameMT -b FILE -o OUTFILE [-l#] [-B#] [-D] [-c] [-T#]
  */
@@ -61,7 +61,6 @@
 #include "lz4hc.h"      /* LZ4HC_CLEVEL_MIN */
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
-#include "lz4file.h"    /* LZ4F_writeOpen, LZ4F_readOpen */
 #include "datagen.h"
 #include "timefn.h"
 
@@ -630,50 +629,6 @@ static int validateStreaming(XXH64_state_t* digest)
     DISPLAY("streaming : %u configurations validated \n", nbConfigs);
     free(src); free(dict); free(scratch); free(ref); free(refFlush); free(refAuto); free(refUnc); free(refRaw); free(out); free(decoded); free(tmpOut);
     return 0;
-}
-
-
-/* LZ4F_getMaxNbWorkers() reports multi-threading support, and the cap of nbWorkers */
-static void validateMaxNbWorkers(void)
-{
-    unsigned const maxWorkers = LZ4F_getMaxNbWorkers();
-    g_step = "LZ4F_getMaxNbWorkers";
-#if defined(LZ4F_MULTITHREAD) && LZ4F_MULTITHREAD
-#  ifdef LZ4F_NBWORKERS_MAX
-    CHECK(maxWorkers == LZ4F_NBWORKERS_MAX, "%u instead of %u", maxWorkers, (unsigned)LZ4F_NBWORKERS_MAX);
-#  else
-    CHECK(maxWorkers >= 1, "multi-threading support not reported");
-#  endif
-#else
-    CHECK(maxWorkers == 0, "%u instead of 0 (no multi-threading support)", maxWorkers);
-#endif
-}
-
-
-/* LZ4F_compressBound() : with frames cut into jobs, the job replaces the block as unit :
- * ceil(srcSize / jobSize) jobs (1 for srcSize == 0), each stored uncompressed in worst case, plus the frame footer,
- * whatever nbWorkers and multi-threading support : updates defer completed jobs not fitting into dstBuffer,
- * and flush / end emit jobs in flight in several invocations.
- * Sufficiency : see streamCompress(), each invocation receiving exactly LZ4F_compressBound() */
-static void validateCompressBound(void)
-{
-    LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
-    size_t const jobSize = 1 MB;   /* 64 KB blocks */
-    unsigned const nbWorkersList[] = { 1, 8 };
-    size_t wi;
-    g_step = "LZ4F_compressBound";
-    p.frameInfo.blockMode = LZ4F_blockLinked;   /* frames cut into jobs, even without multi-threading support */
-    for (wi = 0; wi < sizeof(nbWorkersList)/sizeof(nbWorkersList[0]); wi++) {
-        size_t const b0 = (p.nbWorkers = nbWorkersList[wi], LZ4F_compressBound(0, &p));
-        size_t const b1 = LZ4F_compressBound(1, &p);
-        size_t const bJ = LZ4F_compressBound(jobSize, &p);
-        size_t const bJ1 = LZ4F_compressBound(jobSize + 1, &p);
-        size_t const b2J = LZ4F_compressBound(2 * jobSize, &p);
-        CHECK((b0 == b1) && (b1 == bJ), "%u workers : one job : %u, %u, %u", p.nbWorkers, (unsigned)b0, (unsigned)b1, (unsigned)bJ);
-        CHECK((bJ1 == b2J) && (b2J - bJ == bJ - LZ4F_ENDMARK_SIZE),
-              "%u workers : two jobs : %u, %u", p.nbWorkers, (unsigned)bJ1, (unsigned)b2J);
-        CHECK((bJ > jobSize) && (bJ < jobSize + 64 KB), "%u workers : job bound %u", p.nbWorkers, (unsigned)bJ);
-    }
 }
 
 
@@ -1367,76 +1322,6 @@ static int validatePoolRetry(void)
 
 
 /*-************************************
-*  File API (lz4file.h)
-**************************************/
-/* LZ4F_write() streams through LZ4F_compressUpdate() : same frame as one-shot compression */
-static int validateFileAPI(void)
-{
-    size_t const srcSize = 9 MB + 5;
-    size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
-    char* const src = (char*)malloc(srcSize);
-    char* const ref = (char*)malloc(dstCapacity);
-    char* const out = (char*)malloc(dstCapacity);
-    char* const decoded = (char*)malloc(srcSize);
-    LZ4F_cctx* cctx;
-    unsigned seed = 5;
-    int linked;
-
-    CHECK(src && ref && out && decoded, "allocation failed");
-    CHECK_LZ4F(LZ4F_createCompressionContext(&cctx, LZ4F_VERSION));
-    RDG_genBuffer(src, srcSize, 0.5, 0.0, 12);
-    for (linked = 0; linked <= 1; linked++) {
-        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-        LZ4_writeFile_t* wf;
-        LZ4_readFile_t* rf;
-        FILE* const f = tmpfile();
-        size_t refSize, fileSize, pos;
-        CHECK(f != NULL, "tmpfile() failed");
-        prefs.compressionLevel = 1;
-        prefs.nbWorkers = 3;
-        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
-        prefs.frameInfo.blockSizeID = LZ4F_max256KB;
-        prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
-        refSize = compressMT(cctx, ref, dstCapacity, src, srcSize, NULL, &prefs, 3);
-        CHECK_LZ4F(refSize);
-
-        CHECK_LZ4F(LZ4F_writeOpen(&wf, f, &prefs));
-        for (pos = 0; pos < srcSize; ) {
-            size_t const size = MIN((size_t)(nextRand(&seed) % (2 MB)) + 1, srcSize - pos);
-            size_t const w = LZ4F_write(wf, src + pos, size);
-            CHECK_LZ4F(w);
-            CHECK(w == size, "LZ4F_write() : incomplete write");
-            pos += size;
-        }
-        CHECK_LZ4F(LZ4F_writeClose(wf));
-
-        fileSize = (size_t)ftell(f);
-        CHECK(fileSize == refSize, "LZ4F_write() : frame size differs from one-shot (%u != %u)", (unsigned)fileSize, (unsigned)refSize);
-        rewind(f);
-        CHECK(fread(out, 1, fileSize, f) == fileSize, "read error");
-        CHECK(!memcmp(out, ref, refSize), "LZ4F_write() : frame differs from one-shot");
-
-        rewind(f);
-        CHECK_LZ4F(LZ4F_readOpen(&rf, f));
-        for (pos = 0; ; ) {
-            size_t const r = LZ4F_read(rf, decoded + pos, MIN(1 MB + 3, srcSize - pos + 1));
-            CHECK_LZ4F(r);
-            if (r == 0) break;
-            pos += r;
-            CHECK(pos <= srcSize, "LZ4F_read() : too much data");
-        }
-        CHECK(pos == srcSize && !memcmp(decoded, src, srcSize), "LZ4F_read() : content differs");
-        CHECK_LZ4F(LZ4F_readClose(rf));
-        fclose(f);
-    }
-    LZ4F_freeCompressionContext(cctx);
-    DISPLAY("file API : LZ4F_write() with workers matches one-shot \n");
-    free(src); free(ref); free(out); free(decoded);
-    return 0;
-}
-
-
-/*-************************************
 *  Benchmark
 **************************************/
 static void* loadFile(const char* fileName, size_t* sizePtr)
@@ -1634,8 +1519,6 @@ int main(int argc, const char** argv)
     if (benchFile) return bench(benchFile, level, bsid, linked, checksum, maxWorkers);
     {   XXH64_state_t digest;
         XXH64_reset(&digest, 0);
-        validateMaxNbWorkers();
-        validateCompressBound();
         validate(&digest);
         validateStreaming(&digest);
         validateFlushContract();
@@ -1645,7 +1528,6 @@ int main(int argc, const char** argv)
         validateDeferredEmission();
         validateBeginFailures();
         validatePoolRetry();
-        validateFileAPI();
         printf("digest : %016llx \n", (unsigned long long)XXH64_digest(&digest));
     }
     return 0;
