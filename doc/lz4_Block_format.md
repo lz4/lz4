@@ -1,6 +1,6 @@
 LZ4 Block Format Description
 ============================
-Last revised: 2026-10-13 .
+Last revised: 2026-10-26 .
 Author : Yann Collet
 
 
@@ -116,6 +116,8 @@ There are specific restrictions required to terminate an LZ4 block.
 
 1. The last sequence contains only literals.
    The block ends right after the literals (no `offset` field).
+   The low 4 bits of its `token` (the `matchlength` field) are unused :
+   encoders should set them to 0, and decoders ignore them.
 2. The last 5 bytes of input are always literals.
    Therefore, the last sequence contains at least 5 bytes.
    - Special : if input is smaller than 5 bytes,
