@@ -1120,13 +1120,22 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                 DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
                 if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) { continue; }    /* match outside of valid area */
                 assert(matchIndex < current);
-                if ( ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
+                /* noDict : the candidate is within input, so it is compared before checking its distance :
+                 * this order is faster (better branch prediction) */
+                assert((dictDirective != noDict) || (match >= (const BYTE*)source));
+                if ( (dictDirective != noDict)
+                  && ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
                   && (matchIndex+LZ4_DISTANCE_MAX < current)) {
                     continue;
                 } /* too far */
-                assert((current - matchIndex) <= LZ4_DISTANCE_MAX);  /* match now expected within distance */
 
                 if (LZ4_read32(match) == LZ4_read32(ip)) {
+                    if ( (dictDirective == noDict)
+                      && ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
+                      && (matchIndex+LZ4_DISTANCE_MAX < current)) {
+                        continue;
+                    } /* too far */
+                    assert((current - matchIndex) <= LZ4_DISTANCE_MAX);  /* match now expected within distance */
                     if (maybe_extMem) offset = current - matchIndex;
                     break;   /* match found */
                 }
