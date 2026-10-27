@@ -63,6 +63,7 @@ cli  : output buffer no longer grows with the nb of threads : more threads withi
 cli  : a source file modified, renamed or replaced during its compression is detected, and kept with `--rm` ; error 54 when the output can't be verified
 cli  : `lz4 -l` could hang on Windows with an empty input, as could decoding the resulting legacy stream
 cli  : `--rm` keeps the source file after a decompression failure, by @Furan666
+cli  : a new output file is only readable by its owner until the source's permissions are copied, once it is complete
 cli  : `lz4 -t --rm` no longer removes the tested file, and `--rm` with `stdin` no longer fails nor removes a file named `stdin`, by @Nexory
 cli  : `lz4 -t -m` no longer writes decoded content to stdout, reported by @tansy
 cli  : `lz4 --list` rejects truncated frames, instead of reporting them as valid, by @jmestwa-coder

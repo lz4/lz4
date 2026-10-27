@@ -80,6 +80,10 @@
 #  include <signal.h>    /* sigaction, SIGBUS */
 #  include <unistd.h>    /* write, _exit */
 #endif
+#if PLATFORM_POSIX_VERSION >= 1
+#  include <fcntl.h>     /* open, O_* */
+#  include <unistd.h>    /* close */
+#endif
 
 
 /*****************************
@@ -494,9 +498,10 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 /** FIO_openDstFile() :
  *  prefs is writable, because sparseFileSupport might be updated.
  *  condition : `dstFileName` must be non-NULL.
+ * @srcFileName : source whose attributes are copied once `dstFileName` is complete, or NULL
  * @result : FILE* to `dstFileName`, or NULL if it fails */
 static FILE*
-LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
+LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, const char* srcFileName)
 {
     FILE* f;
     assert(dstFileName != NULL);
@@ -527,6 +532,15 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs)
                     }
                     while ((ch!=EOF) && (ch!='\n')) ch = getchar();  /* flush rest of input line */
         }   }   }
+#if PLATFORM_POSIX_VERSION >= 1
+        /* a new file stays private until the source's permissions are copied, once it is complete */
+        if (srcFileName != NULL && !LZ4IO_isStdin(srcFileName) && !LZ4IO_isDevNull(dstFileName)
+          && UTIL_isRegFile(srcFileName)) {
+            int const fd = open(dstFileName, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+            f = (fd < 0) ? NULL : fdopen(fd, "wb");
+            if (f == NULL && fd >= 0) close(fd);
+        } else
+#endif
         f = fopen( dstFileName, "wb" );
         if (f==NULL) DISPLAYLEVEL(1, "%s: %s\n", dstFileName, strerror(errno));
     }
@@ -973,7 +987,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         clResult = 1;
         goto _cfl_clean;
     }
-    foutput = LZ4IO_openDstFile(output_filename, prefs);
+    foutput = LZ4IO_openDstFile(output_filename, prefs, input_filename);
     if (foutput == NULL) {
         /* write file error : recoverable */
         fclose(finput);
@@ -1671,7 +1685,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     *inStreamSize = 0;
     if (srcFile == NULL) return 1;
     srcState = LZ4IO_getSrcState(srcFile);
-    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs);
+    dstFile = LZ4IO_openDstFile(dstFileName, io_prefs, srcFileName);
     if (dstFile == NULL) { fclose(srcFile); return 1; }
 
     /* Input : memory-mapped when possible (frames cut into jobs only, so that output doesn't depend on it) */
@@ -2753,7 +2767,7 @@ LZ4IO_decompressDstFile(unsigned long long* outGenSize,
     int result;
     stat_t statbuf;
     int stat_result = 0;
-    FILE* const foutput = LZ4IO_openDstFile(output_filename, prefs);
+    FILE* const foutput = LZ4IO_openDstFile(output_filename, prefs, input_filename);
     if (foutput==NULL) return 1;   /* failure */
 
     if ( !LZ4IO_isStdin(input_filename)
@@ -2817,7 +2831,7 @@ int LZ4IO_decompressMultipleFilenames(
     }
     /* stdout and /dev/null (test mode) are destinations shared by all input files */
     if (LZ4IO_isStdout(suffix) || LZ4IO_isDevNull(suffix)) {
-        ress.dstFile = LZ4IO_openDstFile(suffix, prefs);
+        ress.dstFile = LZ4IO_openDstFile(suffix, prefs, NULL);
         if (ress.dstFile == NULL) END_PROCESS(76, "Cannot open destination %s", suffix);
     }
 

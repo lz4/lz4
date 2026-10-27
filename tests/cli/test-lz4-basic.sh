@@ -41,6 +41,17 @@ test ! $FPREFIX-hw.lz4 -nt $FPREFIX-hw  # keeps modification time
 lz4 -l -f $FPREFIX-hw $FPREFIX-hw.lz4
 test ! $FPREFIX-hw.lz4 -nt $FPREFIX-hw  # same with legacy format
 rm $FPREFIX-hw.lz4
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
+    # output of a private source stays private while it is written :
+    # a stream interrupted by truncated input leaves it before its permissions are copied
+    datagen -g200KB > $FPREFIX-priv
+    chmod 600 $FPREFIX-priv
+    lz4 -l -f $FPREFIX-priv $FPREFIX-priv.lz4
+    head -c 1000 $FPREFIX-priv.lz4 > $FPREFIX-trunc.lz4
+    ( umask 022; ! lz4 -d -f $FPREFIX-trunc.lz4 $FPREFIX-priv2 )
+    ls -l $FPREFIX-priv2 | grep '^-rw-------'
+    ;;
+esac
 lz4 --rm -f $FPREFIX-hw > /dev/null
 test   -f $FPREFIX-hw.lz4               # no more implicit stdout
 lz4cat $FPREFIX-hw.lz4 | grep "hello world"
