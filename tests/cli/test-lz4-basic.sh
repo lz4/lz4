@@ -139,3 +139,11 @@ lz4 $FPREFIX-test.lz4 $FPREFIX-test2
 cmp $FPREFIX-test $FPREFIX-test2
 # bug #1374
 datagen -g4194302 | lz4 -B4 -c > $FPREFIX-test3
+# -r doesn't follow symbolic links to directories : this one leads back to the listed directory
+mkdir $FPREFIX-rdir
+echo "hello world" > $FPREFIX-rdir/file
+if ln -s . $FPREFIX-rdir/loop 2>/dev/null && test -L $FPREFIX-rdir/loop; then
+    lz4 -r $FPREFIX-rdir 2> $FPREFIX-rdir.err
+    grep "symbolic link" $FPREFIX-rdir.err
+    lz4 -t $FPREFIX-rdir/file.lz4
+fi
