@@ -12,6 +12,7 @@ fix  : `LZ4F_compressBegin()` failing on allocation left an inconsistent frame i
 fix  : `LZ4F_uncompressedUpdate()` mixed with `LZ4F_compressUpdate()` could exceed `LZ4F_compressBound()`
 fix  : `LZ4F_compressBegin()` could crash after a previous call failed to allocate its state (custom allocator)
 fix  : `LZ4F_uncompressedUpdate()` supports linked blocks (it could produce corrupted frames, without error)
+fix  : `LZ4F_compressBegin_usingDict()` ignored the dictionary with independent blocks : each block now uses it, as with a CDict (also multithreaded)
 fix  : single-thread `lz4` could truncate concatenated frames with block checksums (wrong decompression hints)
 fix  : `--favor-decSpeed` lost after the first block with `-BD`, and ignored with a dictionary
 fix  : poor compression by `LZ4_compress_fast_extState_fastReset()` after `LZ4_attach_dictionary()` on a new state

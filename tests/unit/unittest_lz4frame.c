@@ -516,6 +516,114 @@ TEST(compressFrame_usingCDict_blockModes)
     }
 }
 
+/* LZ4F_compressBegin_usingDict() : with independent blocks, each block uses the dictionary, also when nbWorkers >= 1.
+ * Each block starts with the end of the dictionary (noise) : it can't be decoded without the dictionary */
+TEST(compressBegin_usingDict_eachBlock)
+{
+    static const int levels[] = { -3, 1, 2, 9 };   /* fast, then HC states, reused */
+    size_t const blockSize = 64 KB;
+    size_t const nbBlocks = 3;
+    size_t const srcSize = nbBlocks * blockSize;
+    size_t const tailSize = 512;   /* most recent positions : kept by small hash tables (LZ4_MEMORY_USAGE == 10) */
+    const char* const dict = (const char*)UT_noise(CDICT_DICT_SIZE);
+    char* const src = (char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(blockSize);
+    LZ4F_cctx* const cctx = newCctx();
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const frame = (char*)UT_malloc(capacity);
+    size_t n, l;
+
+    for (n = 0; n < nbBlocks; n++) memcpy(src + n * blockSize, dict + CDICT_DICT_SIZE - tailSize, tailSize);
+    for (l = 0; l < ARRAY_SIZE(levels); l++) {
+        unsigned nbWorkers;
+        for (nbWorkers = 0; nbWorkers <= 1; nbWorkers++) {
+            LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+            size_t pos = 7;   /* frame header : no content size, no dictID */
+            size_t frameSize;
+            prefs.compressionLevel = levels[l];
+            prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+            prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+            prefs.nbWorkers = nbWorkers;
+            frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, dict, CDICT_DICT_SIZE, NULL, &prefs));
+            assertDecodesTo(frame, frameSize, dict, CDICT_DICT_SIZE, src, srcSize);
+            for (n = 0; n < nbBlocks; n++) {
+                unsigned const blockHeader = readLE32(frame + pos);
+                int const cSize = (int)(blockHeader & 0x7FFFFFFFU);
+                ASSERT_MSG(!(blockHeader >> 31), "level=%i, block %u : not compressed", levels[l], (unsigned)n);
+                ASSERT_MSG(LZ4_decompress_safe(frame + pos + 4, decoded, cSize, (int)blockSize) < 0,
+                           "level=%i, nbWorkers=%u, block %u : decodes without dictionary", levels[l], nbWorkers, (unsigned)n);
+                pos += 4 + (size_t)cSize;
+    }   }   }
+}
+
+/* LZ4F_compressBegin_usingDict() : with HC levels, same frame as with a CDict of this dictionary,
+ * with independent blocks, or nbWorkers >= 1 (fast levels digest the dictionary faster than a CDict) */
+TEST(compressBegin_usingDict_sameAsCDict_HC)
+{
+    static const int levels[] = { 2, 9 };
+    static const size_t dictSizes[] = { CDICT_DICT_SIZE, 64 KB + 5 KB };   /* larger : only its last 64 KB */
+    size_t const srcSize = 3 * 64 KB;   /* a single block would always be independent */
+    const char* const sample = (const char*)UT_sample(64 KB + 5 KB + srcSize);
+    const char* const src = sample + 64 KB + 5 KB;
+    LZ4F_cctx* const cctx = newCctx();
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const ref = (char*)UT_malloc(capacity);
+    char* const frame = (char*)UT_malloc(capacity);
+    size_t d, l;
+
+    for (d = 0; d < ARRAY_SIZE(dictSizes); d++) {
+        const char* const dict = src - dictSizes[d];
+        LZ4F_CDict* const cdict = newCDict(dict, dictSizes[d]);
+        for (l = 0; l < ARRAY_SIZE(levels); l++) {
+            unsigned nbWorkers;
+            int mode;
+            for (nbWorkers = 0; nbWorkers <= 1; nbWorkers++)
+            for (mode = LZ4F_blockLinked; mode <= LZ4F_blockIndependent; mode++) {
+                LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+                size_t refSize, frameSize;
+                if ((nbWorkers == 0) && (mode == LZ4F_blockLinked)) continue;   /* history of the first block */
+                prefs.compressionLevel = levels[l];
+                prefs.frameInfo.blockMode = (LZ4F_blockMode_t)mode;
+                prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+                prefs.nbWorkers = nbWorkers;
+                refSize = LZ4F_OK(streamFrame(cctx, ref, capacity, src, srcSize, NULL, 0, cdict, &prefs));
+                frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, dict, dictSizes[d], NULL, &prefs));
+                ASSERT_MSG(frameSize == refSize && !memcmp(frame, ref, refSize),
+                           "dictSize=%u, level=%i, %s blocks, nbWorkers=%u : differs from CDict",
+                           (unsigned)dictSizes[d], levels[l], mode == LZ4F_blockLinked ? "linked" : "independent", nbWorkers);
+        }   }
+        UT_release(cdict);
+    }
+}
+
+TEST(compressBegin_usingDict_allocationFailure)
+{
+    int failAlloc = 0;
+    LZ4F_CustomMem const failableMem = { failableMalloc, failableCalloc, failableFree, &failAlloc };
+    LZ4F_cctx* const cctx = (LZ4F_cctx*)UT_defer(freeCctx, LZ4F_createCompressionContext_advanced(failableMem, LZ4F_VERSION));
+    size_t const srcSize = 2 * 64 KB;
+    const char* const dict = (const char*)UT_sample(CDICT_DICT_SIZE + srcSize);
+    const char* const src = dict + CDICT_DICT_SIZE;
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const frame = (char*)UT_malloc(capacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    int level;
+    ASSERT(cctx != NULL);
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    for (level = 1; level <= 9; level += 8) {
+        size_t frameSize;
+        prefs.compressionLevel = level;
+        LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, NULL, 0, NULL, &prefs));   /* state and buffers */
+        failAlloc = 1;   /* the dictionary requires its own state */
+        ASSERT_LZ4F_ERROR(LZ4F_compressBegin_usingDict(cctx, frame, capacity, dict, CDICT_DICT_SIZE, &prefs),
+                          LZ4F_ERROR_allocation_failed);
+        failAlloc = 0;
+        frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize, dict, CDICT_DICT_SIZE, NULL, &prefs));
+        assertDecodesTo(frame, frameSize, dict, CDICT_DICT_SIZE, src, srcSize);
+    }
+}
+
 
 TEST(compressFrame_defaultPreferences)
 {
