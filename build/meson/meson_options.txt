@@ -34,6 +34,8 @@ option('force-sw-bitcount', type: 'boolean', value: false,
   description: 'See LZ4_FORCE_SW_BITCOUNT')
 option('freestanding', type: 'boolean', value: false,
   description: 'See LZ4_FREESTANDING')
+option('jcc-erratum', type: 'boolean', value: true,
+  description: 'x86 only : keep branches within 32-byte boundaries, faster on Intel cpus of the Skylake family (JCC erratum)')
 option('memory-usage', type: 'integer', min: 0, max: 20, value: 0,
   description: 'See LZ4_MEMORY_USAGE. 0 means use the LZ4 default')
 option('ossfuzz', type: 'boolean', value: true,

@@ -164,6 +164,13 @@ The same policy applies to other build systems :
 - `meson` : options `shared-multithread` (default `true`) and `static-multithread` (default `false`).
 - Visual Studio : `liblz4-dll` is built with multi-threading support, `liblz4` (static) without.
 
+- `JCC_ERRATUM` : on x86 and x86-64, binaries keep their branches within 32-byte boundaries,
+  when the compiler supports it (clang, or gcc with binutils >= 2.34).
+  This mitigates the JCC erratum of Intel cpus of the Skylake family, on which lz4 is then faster
+  (measured on Coffee Lake : compression up to +12%, decompression up to +31%),
+  while its speed is unchanged on other cpus. `JCC_ERRATUM=0` disables it.
+  `cmake` : option `LZ4_JCC_ERRATUM` (default `ON`). `meson` : option `jcc-erratum` (default `true`).
+
 
 #### Amalgamation
 

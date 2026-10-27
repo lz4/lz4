@@ -52,7 +52,7 @@ DEBUGFLAGS:= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
              -Wswitch-enum -Wdeclaration-after-statement \
              -Wstrict-prototypes -Wmissing-prototypes -Wbad-function-cast \
              -Wundef -Wpointer-arith -Wstrict-aliasing=1
-CFLAGS   = $(DEBUGFLAGS) $(USERCFLAGS)
+CFLAGS   = $(DEBUGFLAGS) $(JCC_FLAGS) $(USERCFLAGS)   # JCC_FLAGS : see build/make/lz4defs.make
 ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
 SRCFILES := $(sort $(wildcard *.c))

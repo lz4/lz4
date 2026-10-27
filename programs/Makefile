@@ -50,7 +50,7 @@ DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
             -Wpointer-arith -Wstrict-aliasing=1
 USERCFLAGS:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
-CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
+CFLAGS    = $(DEBUGFLAGS) $(JCC_FLAGS) $(USERCFLAGS)   # JCC_FLAGS : see build/make/lz4defs.make
 CPPFLAGS += -I$(LIBLZ4DIR) -DXXH_NAMESPACE=LZ4_
 
 include ../build/make/lz4defs.make

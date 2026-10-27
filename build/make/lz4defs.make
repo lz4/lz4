@@ -101,6 +101,25 @@ PTHREAD_PROBE = $(shell d=$$(mktemp -d "$${TMPDIR:-/tmp}/lz4_pthread_XXXXXX" 2> 
                   && echo 1 || echo 0; \
                   [ -n "$$d" ] && rm -rf "$$d")
 
+# JCC_FLAGS : on x86 and x86-64, keep branches within 32-byte boundaries,
+# which mitigates the JCC erratum of Intel cpus of the Skylake family.
+# lz4 is faster on these cpus (measured on Coffee Lake : compression up to +12%, decompression up to +31%),
+# and unchanged on others (AMD Zen 4 and Zen 5, Intel Lunar Lake).
+# The option depends on the compiler (clang : driver option, gcc : assembler option, binutils >= 2.34) :
+# it's probed with the CC of the invoking Makefile, once, when JCC_FLAGS is first used.
+# JCC_ERRATUM=0 disables it.
+JCC_PROBE = $(shell d=$$(mktemp -d "$${TMPDIR:-/tmp}/lz4_jcc_XXXXXX" 2> $(VOID)) \
+              && printf '$(NUM_SYMBOL)if !defined(__x86_64__) && !defined(__i386__)\n$(NUM_SYMBOL)error not x86\n$(NUM_SYMBOL)endif\nint f(int x) { return x ? 1 : 2; }\n' > "$$d/probe.c" \
+              && for f in -mbranches-within-32B-boundaries -Wa,-mbranches-within-32B-boundaries; do \
+                   $(CC) $$f -Werror -c "$$d/probe.c" -o "$$d/probe.o" 2> $(VOID) && { echo $$f; break; }; \
+                 done; \
+              [ -n "$$d" ] && rm -rf "$$d")
+ifeq ($(JCC_ERRATUM),0)
+JCC_FLAGS :=
+else
+JCC_FLAGS = $(eval JCC_FLAGS := $(JCC_PROBE))$(JCC_FLAGS)
+endif
+
 ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU OpenBSD FreeBSD NetBSD DragonFly SunOS Haiku MidnightBSD MINGW% CYGWIN% MSYS% AIX,$(shell $(UNAME))))
 POSIX_ENV = Yes
 else

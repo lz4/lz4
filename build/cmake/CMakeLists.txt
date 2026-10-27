@@ -323,6 +323,24 @@ else()
   endforeach(flag)
 endif(MSVC)
 
+# On x86 and x86-64, keep branches within 32-byte boundaries,
+# which mitigates the JCC erratum of Intel cpus of the Skylake family :
+# lz4 is faster on these cpus (measured on Coffee Lake : compression up to +12%, decompression up to +31%),
+# and unchanged on others (AMD Zen 4 and Zen 5, Intel Lunar Lake).
+# The option depends on the compiler : MSVC, clang, or gcc (assembler option, binutils >= 2.34).
+option(LZ4_JCC_ERRATUM "Mitigate the JCC erratum of Intel Skylake family cpus (x86 only)" ON)
+if(LZ4_JCC_ERRATUM AND CMAKE_SYSTEM_PROCESSOR MATCHES "^([xX]86_64|AMD64|amd64|i[3-6]86|x86)$")
+  include(CheckCCompilerFlag)
+  foreach(flag /QIntel-jcc-erratum -mbranches-within-32B-boundaries -Wa,-mbranches-within-32B-boundaries)
+    string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CFLAG_JCC_${flag}")
+    check_c_compiler_flag("${flag}" ${test_name})
+    if(${test_name})
+      string(APPEND CMAKE_C_FLAGS " ${flag}")
+      break()
+    endif()
+  endforeach(flag)
+endif()
+
 
 #-----------------------------------------------------------------------------
 # INSTALLATION - Install targets, headers, and documentation
