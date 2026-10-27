@@ -32,7 +32,9 @@
 #include <stdint.h>     /* uintptr_t */
 #include <stdlib.h>     /* malloc, calloc, free */
 #include <string.h>     /* memset, memcpy */
-#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast_continue */
+#ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast_continue */
+#endif
 #define LZ4_STATIC_LINKING_ONLY   /* LZ4_compress_destSize_extState, LZ4_attach_dictionary */
 #include "lz4.h"
 #include "lz4hc.h"

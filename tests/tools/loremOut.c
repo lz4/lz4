@@ -37,6 +37,7 @@
 #include <assert.h>
 
 
+#undef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LOREM_BLOCKSIZE (2 << 10)
 void LOREM_genOut(unsigned long long size, unsigned seed)

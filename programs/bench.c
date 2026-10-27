@@ -78,7 +78,9 @@
 
 #define LZ4_MAX_DICT_SIZE (64 KB)
 
+#undef MIN
 #define MIN(a,b) ((a)<(b) ? (a) : (b))
+#undef MAX
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
 static const size_t maxMemory = (sizeof(size_t)==4)  ?  (2 GB - 64 MB) : (size_t)(1ULL << ((sizeof(size_t)*8)-31));

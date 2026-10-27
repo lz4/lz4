@@ -25,7 +25,9 @@
 
 #include "unittest.h"
 #include <string.h>     /* memset, memcpy, memcmp */
-#define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_createHC, LZ4_compressHC2_continue */
+#ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_createHC, LZ4_compressHC2_continue */
+#endif
 #define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY   /* LZ4_favorDecompressionSpeed */

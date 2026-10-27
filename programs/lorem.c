@@ -254,6 +254,7 @@ static void generateLastWord(const char* word, size_t wordLen, int upCase)
     writeLastCharacters();
 }
 
+#undef MAX
 #define MAX(a,b)  ((a)<(b)?(b):(a))
 static void generateWord(const char* word, size_t wordLen, const char* separator, size_t sepLen, int upCase)
 {

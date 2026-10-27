@@ -71,7 +71,9 @@
 #define KB *(1U<<10)
 #define MB *(1U<<20)
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#undef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#undef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 
