@@ -87,10 +87,12 @@ jobs:
         type meson && which meson && meson --version
 
     - name: Configure build
+      # debug build (assertions), with some optimization : at -O0, test processing would dominate the job
       run: >
         meson setup
         --fatal-meson-warnings
         --buildtype=debug
+        -Doptimization=1
         -Db_lundef=false
         -Dauto_features=enabled
         -Dprograms=true
