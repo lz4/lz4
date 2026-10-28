@@ -136,12 +136,16 @@ $(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
 checkFrame:
 $(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
 
+# POSIX threads, except on MinGW and Windows : Windows threads, as in lib/Makefile
+# (clang rejects an unused -pthread with -Werror)
+PTHREAD_LDFLAGS := $(if $(filter MINGW% Windows%,$(TARGET_OS)),,-pthread)
+
 # multi-threaded frame compression : same test, built with and without LZ4F_MULTITHREAD
 # (c_program : objects are not shared, since frameMT employs different flags)
 FRAMEMT_OBJS := lz4frame.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o frameMT.o
 # LZ4F_NBWORKERS_MAX=128 (as on 32-bit systems) : keeps the capped test case (1000 workers) affordable
 frameMT: CPPFLAGS += -DLZ4F_MULTITHREAD=1 -DLZ4F_NBWORKERS_MAX=128u
-frameMT: LDFLAGS += -pthread
+frameMT: LDFLAGS += $(PTHREAD_LDFLAGS)
 $(eval $(call c_program,frameMT,$(FRAMEMT_OBJS)))
 
 frameMT-nomt: CPPFLAGS += -DLZ4F_NBWORKERS_MAX=128u
@@ -149,7 +153,7 @@ $(eval $(call c_program,frameMT-nomt,$(FRAMEMT_OBJS)))
 
 # unit tests, with multi-threading support
 unittest-mt: CPPFLAGS += -DLZ4F_MULTITHREAD=1
-unittest-mt: LDFLAGS += -pthread
+unittest-mt: LDFLAGS += $(PTHREAD_LDFLAGS)
 $(eval $(call c_program,unittest-mt,$(UNITTEST_OBJS)))
 
 .PHONY: clean

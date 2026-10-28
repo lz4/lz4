@@ -72,6 +72,7 @@ static void UT_fullName(char* dst, size_t dstSize, const UT_test* test)
 static struct { void (*release)(void*); void* ptr; } g_resources[UT_RESOURCES_MAX];
 static size_t g_nbResources = 0;
 static unsigned g_seed = 1;
+static const char* g_testName = "";   /* current test, for failure messages */
 static unsigned g_randState;
 static jmp_buf g_testEnd;
 
@@ -143,14 +144,16 @@ void* UT_noise(size_t size)
 /*-************************************
 *  Assertions
 **************************************/
+/* failures are written to stderr : visible even when stdout is discarded (ex: CI step `make test > /dev/null`) */
 void UT_fail(const char* file, int line, const char* format, ...)
 {
     va_list args;
-    printf("%s:%i: Failure \n  ", file, line);
+    fflush(stdout);
+    fprintf(stderr, "%s:%i: %s : Failure \n  ", file, line, g_testName);
     va_start(args, format);
-    vprintf(format, args);
+    vfprintf(stderr, format, args);
     va_end(args);
-    printf(" \n");
+    fprintf(stderr, " \n");
     longjmp(g_testEnd, 1);
 }
 
@@ -196,6 +199,7 @@ static int UT_run(const char* name, void (*fn)(void))
     int failed;
     printf("[ RUN      ] %s \n", name);
     fflush(stdout);   /* in case the test crashes */
+    g_testName = name;
     g_randState = (g_seed * 2654435761U) | 1;   /* xorshift32 requires a non-zero state */
     failed = UT_invoke(fn);
     while (g_nbResources) {
@@ -259,6 +263,6 @@ int main(int argc, const char** argv)
     if (nbTests == 0) { printf("no test selected \n"); return 1; }
     if (listOnly) return 0;
     printf("[==========] %u tests, %u failed (%lu ms), seed %u \n", nbTests, nbFailed, UT_elapsedMs(start), g_seed);
-    if (nbFailed) printf("failures are reproduced with -s%u \n", g_seed);
+    if (nbFailed) fprintf(stderr, "failures are reproduced with -s%u \n", g_seed);
     return nbFailed != 0;
 }

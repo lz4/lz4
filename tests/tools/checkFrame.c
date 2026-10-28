@@ -86,9 +86,7 @@ do {                                                                      \
 /*-***************************************
 *  Local Parameters
 *****************************************/
-static U32 no_prompt = 0;
 static U32 displayLevel = 2;
-static U32 use_pause = 0;
 
 
 /*-*******************************************************
@@ -239,11 +237,6 @@ int main(int argc, const char** argv)
 
         /* Decode command (note : aggregated short commands are allowed) */
         if (argument[0]=='-') {
-            if (!strcmp(argument, "--no-prompt")) {
-                no_prompt=1;
-                displayLevel=1;
-                continue;
-            }
             argument++;
 
             while (*argument!=0) {
@@ -259,11 +252,6 @@ int main(int argc, const char** argv)
                     argument++;
                     displayLevel--;
                     break;
-                case 'p': /* pause at the end */
-                    argument++;
-                    use_pause = 1;
-                    break;
-
                 case 'b':
                     argument++;
                     bsid=0;

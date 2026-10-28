@@ -98,3 +98,43 @@ jobs:
       # Ensure `make test` doesn't depend on the status of the console
       # See issue #990 for detailed explanations
       run: make -j test > /dev/null
+
+  mingw:
+    # recent MinGW-w64 toolchains (AppVeyor's are much older)
+    name: MinGW ${{ matrix.msystem }} ${{ matrix.cc }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { msystem: MINGW64, cc: gcc }
+          - { msystem: MINGW64, cc: clang }
+          - { msystem: MINGW32, cc: gcc }
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Install MSYS2
+      uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+      with:
+        msystem: ${{ matrix.msystem }}
+        update: true
+        install: make diffutils
+        pacboy: ${{ matrix.cc }}:p
+
+    - name: Display environment info
+      run: |
+        ${{ matrix.cc }} --version | head -1
+        as --version | head -1
+        make --version | head -1
+
+    - name: Build with strict flags
+      run: CC=${{ matrix.cc }} CFLAGS="-Werror -O0" make default V=1
+
+    - name: Run tests
+      run: |
+        make clean
+        CC=${{ matrix.cc }} CFLAGS="-O3 -Werror" make -C tests test-unittest test-lz4-essentials test-frametest test-fuzzer FUZZER_TIME=-T30s
