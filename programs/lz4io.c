@@ -505,6 +505,7 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, con
 {
     FILE* f;
     assert(dstFileName != NULL);
+    (void)srcFileName;   /* only used on POSIX systems */
 
     if (LZ4IO_isStdout(dstFileName)) {
         DISPLAYLEVEL(4, "Using stdout for output \n");
