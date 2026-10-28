@@ -206,22 +206,31 @@ static size_t BMK_compressFrame(LZ4F_cctx* cctx, const LZ4F_CDict* cdict, const 
 
 static LZ4F_dctx* g_dctx = NULL;
 
-/* @return : decompressed size, or an error code (LZ4F_isError()) */
+/* decodes all frames of @src (a single one, except in decode-only mode, where input can be any lz4 file),
+ * including skippable ones
+ * @return : decompressed size, or an error code (LZ4F_isError()) */
 static size_t BMK_decompressFrame(char* dst, size_t dstCapacity, const char* src, size_t srcSize,
                                   const char* dict, size_t dictSize)
 {
-    size_t dstSize = dstCapacity;
-    size_t readSize = srcSize;
-    size_t status;
+    size_t dstPos = 0;
+    size_t srcPos = 0;
+    size_t status = 0;
     LZ4F_decompressOptions_t dOpt;
     memset(&dOpt, 0, sizeof(dOpt));
     dOpt.stableDst = 1;
     dOpt.skipChecksums = g_skipChecksums;
     LZ4F_resetDecompressionContext(g_dctx);
-    status = LZ4F_decompress_usingDict(g_dctx, dst, &dstSize, src, &readSize, dict, dictSize, &dOpt);
-    if (LZ4F_isError(status)) return status;
-    if ((status != 0) || (readSize != srcSize)) return (size_t)-1;   /* incomplete frame, or input beyond it */
-    return dstSize;
+    do {   /* a completed frame resets the context : the next invocation starts the next frame */
+        size_t dstSize = dstCapacity - dstPos;
+        size_t readSize = srcSize - srcPos;
+        status = LZ4F_decompress_usingDict(g_dctx, dst + dstPos, &dstSize, src + srcPos, &readSize, dict, dictSize, &dOpt);
+        if (LZ4F_isError(status)) return status;
+        dstPos += dstSize;
+        srcPos += readSize;
+        if ((status != 0) && (readSize == 0) && (dstSize == 0)) break;   /* no progress : dst is full */
+    } while (srcPos < srcSize);
+    if (status != 0) return (size_t)-1;   /* incomplete frame */
+    return dstPos;
 }
 
 

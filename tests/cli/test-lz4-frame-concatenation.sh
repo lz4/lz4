@@ -30,3 +30,10 @@ lz4 -zq -B5 -BX --no-frame-crc $FPREFIX-big2 -c > $FPREFIX-big2.lz4
 cat $FPREFIX-big1.lz4 $FPREFIX-big2.lz4 > $FPREFIX-bigconcat.lz4
 lz4 -d $FPREFIX-bigconcat.lz4 -c > $FPREFIX-bigresult
 cmp $FPREFIX-bigsrc $FPREFIX-bigresult
+
+# the decompression benchmark (-b -d) decodes all frames of a file, skippable ones included
+lz4 -b -d -q -i0 $FPREFIX-concat.lz4
+lz4 -b -d -q -i0 $FPREFIX-bigconcat.lz4
+printf '\120\052\115\030\004\000\000\000abcd' > $FPREFIX-skippable
+cat $FPREFIX-skippable $FPREFIX-big1.lz4 > $FPREFIX-skipconcat.lz4
+lz4 -b -d -q -i0 $FPREFIX-skipconcat.lz4
