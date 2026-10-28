@@ -231,14 +231,90 @@ TEST(getFrameInfo_emptyFrame)
 
 TEST(frameHeader_dictID)
 {
-    char header[LZ4F_HEADER_SIZE_MAX];
+    static const unsigned dictIDs[] = { 1, 0x99, 0xFFFFFFFFU };
+    size_t i;
+    for (i = 0; i < ARRAY_SIZE(dictIDs); i++) {
+        char header[LZ4F_HEADER_SIZE_MAX];
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_frameInfo_t frameInfo;
+        size_t headerSize;
+        prefs.frameInfo.dictID = dictIDs[i];
+        headerSize = LZ4F_OK(LZ4F_compressBegin(newCctx(), header, sizeof(header), &prefs));
+        LZ4F_OK(LZ4F_getFrameInfo(newDctx(), &frameInfo, header, &headerSize));
+        ASSERT_EQ(frameInfo.dictID, dictIDs[i]);
+    }
+}
+
+/* reference frame : the header checksum is the second byte of XXH32(descriptor), as specified,
+ * here computed independently of the library */
+TEST(compressFrame_referenceEmptyFrame)
+{
+    static const BYTE expected[] = { 0x04, 0x22, 0x4D, 0x18,   /* magic number */
+                                     0x60, 0x40, 0x82,         /* FLG (version 1, independent blocks), BD (64 KB), header checksum */
+                                     0x00, 0x00, 0x00, 0x00 }; /* endMark */
+    size_t const capacity = LZ4F_compressFrameBound(0, NULL);
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressFrame(frame, capacity, NULL, 0, NULL)), sizeof(expected));
+    ASSERT_MEMEQ(frame, expected, sizeof(expected));
+}
+
+/* the content size is a 64-bit little-endian field, written and read back entirely */
+TEST(frameHeader_contentSize64)
+{
+    static const BYTE expected[] = { 0x04, 0x22, 0x4D, 0x18,
+                                     0x48, 0x40,   /* FLG (version 1, linked blocks, content size), BD (64 KB) */
+                                     0xEF, 0xCD, 0xAB, 0x89, 0x67, 0x45, 0x23, 0x01,
+                                     0xA4 };       /* header checksum */
+    unsigned long long const contentSize = ((unsigned long long)0x01234567 << 32) | 0x89ABCDEF;
+    BYTE header[LZ4F_HEADER_SIZE_MAX];
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     LZ4F_frameInfo_t frameInfo;
     size_t headerSize;
-    prefs.frameInfo.dictID = 0x99;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.contentSize = contentSize;
     headerSize = LZ4F_OK(LZ4F_compressBegin(newCctx(), header, sizeof(header), &prefs));
+    ASSERT_EQ(headerSize, sizeof(expected));
+    ASSERT_MEMEQ(header, expected, sizeof(expected));
     LZ4F_OK(LZ4F_getFrameInfo(newDctx(), &frameInfo, header, &headerSize));
-    ASSERT_EQ(frameInfo.dictID, 0x99);
+    ASSERT_EQ(frameInfo.contentSize, contentSize);
+}
+
+/* LZ4F_headerSize() : skippable frames have an 8-byte header ; errors */
+TEST(headerSize_errors)
+{
+    BYTE header[LZ4F_HEADER_SIZE_MAX];
+    size_t const headerSize = LZ4F_OK(LZ4F_compressBegin(newCctx(), header, sizeof(header), NULL));
+    ASSERT_EQ(LZ4F_OK(LZ4F_headerSize(header, headerSize)), headerSize);
+    ASSERT_LZ4F_ERROR(LZ4F_headerSize(NULL, headerSize), LZ4F_ERROR_srcPtr_wrong);
+    ASSERT_LZ4F_ERROR(LZ4F_headerSize(header, LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH - 1), LZ4F_ERROR_frameHeader_incomplete);
+    header[0] ^= 1;   /* unknown magic number */
+    ASSERT_LZ4F_ERROR(LZ4F_headerSize(header, headerSize), LZ4F_ERROR_frameType_unknown);
+    writeLE32(header, LZ4F_MAGIC_SKIPPABLE_START + 5);
+    ASSERT_EQ(LZ4F_OK(LZ4F_headerSize(header, LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH)), 8);
+}
+
+/* the decoder rejects an unknown magic number, a reserved block size ID, and a wrong header checksum */
+static void assertRejectsHeader(const BYTE* frame, size_t frameSize, size_t pos, BYTE value, LZ4F_errorCodes error)
+{
+    BYTE* const corrupted = (BYTE*)UT_malloc(frameSize);
+    char decoded[64];
+    size_t dSize = sizeof(decoded), cSize = frameSize;
+    memcpy(corrupted, frame, frameSize);
+    corrupted[pos] = value;
+    ASSERT_LZ4F_ERROR(LZ4F_decompress(newDctx(), decoded, &dSize, corrupted, &cSize, NULL), error);
+    UT_release(corrupted);
+}
+
+TEST(decompress_invalidHeader)
+{
+    size_t const capacity = LZ4F_compressFrameBound(64, NULL);
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, UT_sample(64), 64, NULL));
+    ASSERT_EQ(frame[5], 0x40);   /* BD : 64 KB blocks, header checksum in frame[6] */
+    assertRejectsHeader(frame, frameSize, 0, (BYTE)(frame[0] ^ 1), LZ4F_ERROR_frameType_unknown);
+    assertRejectsHeader(frame, frameSize, 5, 3 << 4, LZ4F_ERROR_maxBlockSize_invalid);   /* checked before the header checksum */
+    assertRejectsHeader(frame, frameSize, 5, 0, LZ4F_ERROR_maxBlockSize_invalid);
+    assertRejectsHeader(frame, frameSize, 6, (BYTE)(frame[6] ^ 1), LZ4F_ERROR_headerChecksum_invalid);
 }
 
 /* acceleration (-level + 1) is capped at LZ4_ACCELERATION_MAX,
@@ -664,8 +740,13 @@ TEST(decompress_missingBytes)
 TEST(decompress_emptyInput)
 {
     char const src[1] = { 0 };
+    char dst[16];
     size_t dSize = 0, cSize = 0;
     ASSERT(LZ4F_OK(LZ4F_decompress(newDctx(), NULL, &dSize, src, &cSize, NULL)) > 0);
+    dSize = sizeof(dst);   /* nothing produced, nothing consumed */
+    ASSERT(LZ4F_OK(LZ4F_decompress(newDctx(), dst, &dSize, src, &cSize, NULL)) > 0);
+    ASSERT_EQ(dSize, 0);
+    ASSERT_EQ(cSize, 0);
 }
 
 TEST(getFrameInfo_incompleteHeader)
@@ -681,8 +762,59 @@ TEST(getFrameInfo_incompleteHeader)
     ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size), LZ4F_ERROR_frameHeader_incomplete);
     size = 6;
     ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size), LZ4F_ERROR_frameHeader_incomplete);
+    ASSERT_EQ(size, 0);   /* nothing consumed */
     size = LZ4F_OK(LZ4F_headerSize(frame, LZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH));
     LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size));
+}
+
+/* LZ4F_getFrameInfo() : arguments, header partially decoded, header already decoded */
+TEST(getFrameInfo_states)
+{
+    size_t const srcSize = 1 KB;
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL) + 8;
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    char decoded[16];
+    LZ4F_frameInfo_t frameInfo;
+    LZ4F_dctx* dctx;
+    size_t frameSize, size, dSize;
+    prefs.frameInfo.contentSize = srcSize;
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, UT_sample(srcSize), srcSize, &prefs));
+
+    size = frameSize;
+    ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(newDctx(), NULL, frame, &size), LZ4F_ERROR_parameter_null);
+    ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(newDctx(), &frameInfo, frame, NULL), LZ4F_ERROR_parameter_null);
+    frame[0] ^= 1;
+    ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(newDctx(), &frameInfo, frame, &size), LZ4F_ERROR_frameType_unknown);
+    ASSERT_EQ(size, 0);
+    frame[0] ^= 1;
+    size = frameSize;
+    frame[14] ^= 1;   /* header checksum (content size field present) */
+    ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(newDctx(), &frameInfo, frame, &size), LZ4F_ERROR_headerChecksum_invalid);
+    ASSERT_EQ(size, 0);
+    frame[14] ^= 1;
+
+    /* header partially decoded by LZ4F_decompress() */
+    dctx = newDctx();
+    size = 3;
+    dSize = 0;
+    LZ4F_OK(LZ4F_decompress(dctx, NULL, &dSize, frame, &size, NULL));
+    ASSERT_EQ(size, 3);
+    size = frameSize;
+    ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(dctx, &frameInfo, frame + 3, &size), LZ4F_ERROR_frameDecoding_alreadyStarted);
+    ASSERT_EQ(size, 0);
+
+    /* header already decoded : no input read, frame information still available */
+    dctx = newDctx();
+    size = frameSize;
+    dSize = sizeof(decoded);
+    LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &size, NULL));
+    ASSERT(size < frameSize);   /* decoding in progress */
+    memset(&frameInfo, 0, sizeof(frameInfo));
+    size = frameSize;
+    ASSERT(LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size)) > 0);
+    ASSERT_EQ(size, 0);
+    ASSERT_EQ(frameInfo.contentSize, srcSize);
 }
 
 /* after a decoding error, LZ4F_resetDecompressionContext() makes the context usable again */
@@ -764,6 +896,100 @@ TEST(decompress_skippableFrames)
     writeLE32(frame, LZ4F_MAGIC_SKIPPABLE_START + 2);
     writeLE32(frame + 4, 10);
     ASSERT_EQ(decompressBySegments(dctx, decoded, 10, frame, 18, 10), 0);
+}
+
+/* skippable frame : LZ4F_getFrameInfo() reports its type, then its content size once known */
+TEST(getFrameInfo_skippableFrame)
+{
+    BYTE frame[8 + 100];
+    char dst[16];
+    LZ4F_dctx* const dctx = newDctx();
+    LZ4F_frameInfo_t frameInfo;
+    size_t size = sizeof(frame), dSize = sizeof(dst);
+    memset(frame, 0, sizeof(frame));
+    writeLE32(frame, LZ4F_MAGIC_SKIPPABLE_START + 3);
+    writeLE32(frame + 4, 100);
+    LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size));
+    ASSERT_EQ(frameInfo.frameType, LZ4F_skippableFrame);
+    ASSERT_EQ(size, 4);   /* the size field is read by LZ4F_decompress() */
+    size = 4;
+    LZ4F_OK(LZ4F_decompress(dctx, dst, &dSize, frame + 4, &size, NULL));
+    ASSERT_EQ(size, 4);
+    size = sizeof(frame);
+    LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size));
+    ASSERT_EQ(size, 0);
+    ASSERT_EQ(frameInfo.frameType, LZ4F_skippableFrame);
+    ASSERT_EQ(frameInfo.contentSize, 100);
+}
+
+/* a skippable frame decoded in a single invocation, after a reset in the middle of a frame header */
+TEST(decompress_skippableAfterReset)
+{
+    BYTE frame[8 + 20];
+    char dst[16];
+    LZ4F_dctx* const dctx = newDctx();
+    size_t size = 3, dSize = sizeof(dst);
+    writeLE32(frame, LZ4F_MAGICNUMBER);
+    LZ4F_OK(LZ4F_decompress(dctx, dst, &dSize, frame, &size, NULL));   /* header partially gathered */
+    LZ4F_resetDecompressionContext(dctx);
+    memset(frame, 0, sizeof(frame));
+    writeLE32(frame, LZ4F_MAGIC_SKIPPABLE_START);
+    writeLE32(frame + 4, 20);
+    size = sizeof(frame);   /* >= LZ4F_HEADER_SIZE_MAX : header decoded directly from input */
+    dSize = sizeof(dst);
+    ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, dst, &dSize, frame, &size, NULL)), 0);
+    ASSERT_EQ(size, sizeof(frame));
+    ASSERT_EQ(dSize, 0);
+}
+
+/* a frame header delivered byte after byte, with its optional fields (content size, dictID) */
+TEST(decompress_headerByteAfterByte)
+{
+    size_t const srcSize = 1 KB;
+    const void* const src = UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t capacity, frameSize;
+    char* frame;
+    prefs.frameInfo.contentSize = srcSize;
+    prefs.frameInfo.dictID = 7;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    frame = (char*)UT_malloc(capacity);
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+    ASSERT_EQ(decompressBySegments(newDctx(), decoded, srcSize, frame, frameSize, 1), srcSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
+}
+
+/* LZ4F_freeDecompressionContext() reports an unfinished frame */
+TEST(freeDecompressionContext_unfinishedFrame)
+{
+    size_t const capacity = LZ4F_compressFrameBound(64, NULL);
+    char* const frame = (char*)UT_malloc(capacity);
+    char decoded[64];
+    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, UT_sample(64), 64, NULL));
+    size_t size, dSize;
+    LZ4F_errorCode_t unfinished, finished;
+    LZ4F_dctx* dctx;
+    LZ4F_OK(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
+    size = frameSize - 1;
+    dSize = sizeof(decoded);
+    (void)LZ4F_decompress(dctx, decoded, &dSize, frame, &size, NULL);
+    unfinished = LZ4F_freeDecompressionContext(dctx);
+    LZ4F_OK(LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION));
+    size = frameSize;
+    dSize = sizeof(decoded);
+    (void)LZ4F_decompress(dctx, decoded, &dSize, frame, &size, NULL);
+    finished = LZ4F_freeDecompressionContext(dctx);
+    ASSERT(unfinished != 0);
+    ASSERT_EQ(finished, 0);
+}
+
+/* results which are not error codes share the same name, distinct from error names */
+TEST(getErrorName_notAnError)
+{
+    const char* const name = LZ4F_getErrorName(0);
+    ASSERT(!strcmp(name, LZ4F_getErrorName(1000)));
+    ASSERT(strcmp(name, LZ4F_getErrorName(LZ4F_getBlockSize((LZ4F_blockSizeID_t)3))) != 0);
 }
 
 /* LZ4F_compressBound() is enough for LZ4F_write(), even without checksums */
@@ -2257,6 +2483,58 @@ TEST(resumeFrame)
         fi.blockMode = (LZ4F_blockMode_t)2;
         ASSERT_LZ4F_ERROR(LZ4F_resumeFrame(dctx, &fi, 0, NULL, 0), LZ4F_ERROR_blockMode_invalid);
     }
+}
+
+/* LZ4F_resumeFrame() validates the frame information, and prepares a new context */
+TEST(resumeFrame_arguments)
+{
+    size_t const srcSize = 100 KB;
+    const BYTE* const src = (const BYTE*)UT_sample(srcSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_frameInfo_t fi, bad;
+    size_t capacity, frameSize, headerSize, srcLen, dstLen;
+    LZ4F_dctx* dctx;
+    BYTE* frame;
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.blockSizeID = LZ4F_max4MB;
+    prefs.frameInfo.contentSize = srcSize;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    frame = (BYTE*)UT_malloc(capacity);
+    frameSize = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, NULL, &prefs));
+    headerSize = frameSize;
+    LZ4F_OK(LZ4F_getFrameInfo(newDctx(), &fi, frame, &headerSize));
+    ASSERT_EQ(fi.blockSizeID, LZ4F_max4MB);
+
+    /* a new context resumes at the first block */
+    dctx = newDctx();
+    ASSERT_EQ(LZ4F_resumeFrame(dctx, &fi, 0, NULL, 0), 0);
+    srcLen = frameSize - headerSize;
+    dstLen = srcSize;
+    ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded, &dstLen, frame + headerSize, &srcLen, NULL)), 0);
+    ASSERT_EQ(dstLen, srcSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
+
+    /* at the end of the content, only the end mark remains */
+    dctx = newDctx();
+    ASSERT_EQ(LZ4F_resumeFrame(dctx, &fi, srcSize, NULL, 0), 0);
+    srcLen = 4;
+    dstLen = srcSize;
+    ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded, &dstLen, frame + frameSize - 4, &srcLen, NULL)), 0);
+    ASSERT_EQ(dstLen, 0);
+    ASSERT_LZ4F_ERROR(LZ4F_resumeFrame(newDctx(), &fi, srcSize + 1, NULL, 0), LZ4F_ERROR_frameSize_wrong);
+
+    bad = fi;
+    bad.blockSizeID = (LZ4F_blockSizeID_t)3;
+    ASSERT_LZ4F_ERROR(LZ4F_resumeFrame(newDctx(), &bad, 0, NULL, 0), LZ4F_ERROR_maxBlockSize_invalid);
+    bad.blockSizeID = (LZ4F_blockSizeID_t)8;
+    ASSERT_LZ4F_ERROR(LZ4F_resumeFrame(newDctx(), &bad, 0, NULL, 0), LZ4F_ERROR_maxBlockSize_invalid);
+    bad = fi;
+    bad.blockChecksumFlag = (LZ4F_blockChecksum_t)2;
+    ASSERT_LZ4F_ERROR(LZ4F_resumeFrame(newDctx(), &bad, 0, NULL, 0), LZ4F_ERROR_parameter_invalid);
+    bad = fi;
+    bad.contentChecksumFlag = (LZ4F_contentChecksum_t)2;
+    ASSERT_LZ4F_ERROR(LZ4F_resumeFrame(newDctx(), &bad, 0, NULL, 0), LZ4F_ERROR_parameter_invalid);
 }
 
 
