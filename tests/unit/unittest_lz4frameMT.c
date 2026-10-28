@@ -131,6 +131,47 @@ TEST(compressBound_jobs)
     }
 }
 
+/* autoFlush : each invocation compresses and emits all its input, whatever nbWorkers :
+ * the output so far decodes into all input so far */
+TEST(autoFlush_emitsAllInput)
+{
+    static const unsigned nbWorkersList[] = { 0, 2 };
+    size_t const srcSize = 3 MB + 77;
+    size_t const sliceSize = 300 KB + 5;   /* jobs (1 MB) are not completed by a single invocation */
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
+    char* const dst = (char*)UT_malloc(dstCapacity);
+    size_t wi;
+    int linked;
+    for (wi = 0; wi < ARRAY_SIZE(nbWorkersList); wi++)
+    for (linked = 0; linked <= 1; linked++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_cctx* const cctx = newCctx();
+        size_t pos, consumed;
+        prefs.autoFlush = 1;
+        prefs.nbWorkers = nbWorkersList[wi];
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, dstCapacity, &prefs));
+        for (consumed = 0; consumed < srcSize; ) {
+            size_t const slice = MIN(sliceSize, srcSize - consumed);
+            LZ4F_dctx* const dctx = newDctx();
+            size_t dSize = srcSize, cSize;
+            pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(slice, &prefs), src + consumed, slice, NULL));
+            consumed += slice;
+            cSize = pos;
+            LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, dst, &cSize, NULL));
+            ASSERT_MSG((cSize == pos) && (dSize == consumed) && !memcmp(decoded, src, consumed),
+                       "%u workers, linked=%i : %u bytes decoded after %u bytes of input",
+                       prefs.nbWorkers, linked, (unsigned)dSize, (unsigned)consumed);
+            UT_release(dctx);
+        }
+        pos += LZ4F_OK(LZ4F_compressEnd(cctx, dst + pos, LZ4F_compressBound(0, &prefs), NULL));
+        assertDecodesTo(dst, pos, NULL, 0, src, srcSize);
+        UT_release(cctx);
+    }
+}
+
 /* with linked blocks, each job starts from the last 64 KB of preceding content (see LZ4F_compressJob()) :
  * a pattern repeated over several jobs is only stored once */
 TEST(linkedJobs_history)
