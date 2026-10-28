@@ -774,3 +774,36 @@ TEST(decompress_safe_continue_ringLargerThanEncoders)
         ASSERT_MSG(!memcmp(ring + dpos, stream + spos - dist, 4), "offset %u, length %u : corrupted output", offset, (unsigned)ml);
     }
 }
+
+/* beyond 64 KB of output, offsets can't reach before the block : decoding continues without offset checks.
+ * Just before, an offset reaching before the block must still be detected ; just after, the maximum offset is valid.
+ * The last literals leave input margin for the fast loop */
+TEST(decompress_safe_offsetsAround64KB)
+{
+    size_t const litSize = 65530;
+    const unsigned char* const literals = (const unsigned char*)UT_sample(litSize);
+    unsigned char* const block = (unsigned char*)UT_malloc(litSize + 1 KB);   /* + literal length bytes */
+    char* const expected = (char*)UT_malloc(litSize + 256);
+    char* const decoded = (char*)UT_malloc(litSize + 256);
+    int const decodedSize = (int)litSize + 4 + 4 + 4 + 100;
+    size_t n;
+
+    /* invalid : at position 65534, offset 65535 */
+    n = writeSequence(block, literals, litSize, 65530, 4);
+    n += writeSequence(block + n, literals, 0, 65535, 4);
+    n += writeSequence(block + n, literals, 100, 0, 0);
+    ASSERT(LZ4_decompress_safe((const char*)block, decoded, (int)n, decodedSize) < 0);
+
+    /* valid : at position 65534, offset 65534, then at position 65538, offset 65535 */
+    n = writeSequence(block, literals, litSize, 65530, 4);
+    n += writeSequence(block + n, literals, 0, 65534, 4);
+    n += writeSequence(block + n, literals, 0, 65535, 4);
+    n += writeSequence(block + n, literals, 100, 0, 0);
+    memcpy(expected, literals, litSize);
+    memcpy(expected + litSize, expected, 4);
+    memcpy(expected + litSize + 4, expected, 4);
+    memcpy(expected + litSize + 8, expected + 3, 4);
+    memcpy(expected + litSize + 12, literals, 100);
+    ASSERT_EQ(LZ4_decompress_safe((const char*)block, decoded, (int)n, decodedSize), decodedSize);
+    ASSERT_MEMEQ(decoded, expected, (size_t)decodedSize);
+}

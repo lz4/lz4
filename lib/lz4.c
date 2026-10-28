@@ -2172,6 +2172,9 @@ LZ4_copyExtDictMatch(BYTE* op, const BYTE* match, size_t length,
     }
 }
 
+/* noDict and usingExtDict decoding resume in prefix mode beyond 64 KB of output (see LZ4_decompress_generic()) */
+LZ4_FORCE_O2 static int LZ4_decompress_safe_partial_withPrefix64k(const char* source, char* dest, int compressedSize, int targetOutputSize, int dstCapacity);
+
 /*! LZ4_decompress_generic() :
  *  This generic decompression function covers all use cases.
  *  It shall be instantiated several times, using different sets of directives.
@@ -2204,6 +2207,13 @@ LZ4_decompress_generic(
 
         /* withPrefix64k : offset <= 65535 can't reach beyond the 64 KB prefix */
         const int checkOffset = (dict != withPrefix64k) && (dictSize < (int)(64 KB));
+
+        /* noDict, usingExtDict : once a match ends 64 KB beyond lowPrefix, offsets can't reach beyond it either :
+         * decoding resumes in prefix mode (withPrefix64k), which skips offset checks.
+         * Tested along the end of block conditions, at no extra cost per sequence */
+        const BYTE* const oprefix = ((dict != withPrefix64k) && (oend - lowPrefix > (ptrdiff_t)(64 KB))) ? lowPrefix + 64 KB : oend;
+        const BYTE* const omatchLimit = (dict == withPrefix64k) ? oend - MATCH_SAFEGUARD_DISTANCE :
+                                        MIN(oend - MATCH_SAFEGUARD_DISTANCE, oprefix - 1);   /* safe loop */
 
 
         /* Set up the "end" pointers for the shortcut. */
@@ -2322,9 +2332,9 @@ LZ4_decompress_generic(
             }
             ml += MINMATCH;
 
-            if (op + ml >= oend - FASTLOOP_SAFE_DISTANCE) {
+            if (op + ml >= ((dict == withPrefix64k) ? oend - FASTLOOP_SAFE_DISTANCE : MIN(oend - FASTLOOP_SAFE_DISTANCE, oprefix))) {
                 DEBUGLOG(7, "moving to safe_match_copy (ml==%u)", (unsigned)ml);
-                goto safe_match_copy;
+                goto safe_match_copy;   /* close to output end, or resumes in prefix mode (omatchLimit) */
             }
 
             /* match length from token only (<= 18), no overlap, within prefix : copy 18 bytes */
@@ -2503,10 +2513,17 @@ LZ4_decompress_generic(
             assert(match >= lowPrefix);
 
             /* close to block end : no wild copy */
-            if (unlikely(op+ml > oend-MATCH_SAFEGUARD_DISTANCE)) {
-                op = LZ4_copyMatchExact(op, match, ml);
-                if (op == oend) { break; }   /* partialDecoding : output buffer full */
-                continue;
+            if (unlikely(op+ml > omatchLimit)) {
+                if (op+ml > oend-MATCH_SAFEGUARD_DISTANCE) {
+                    op = LZ4_copyMatchExact(op, match, ml);
+                    if (op == oend) { break; }   /* partialDecoding : output buffer full */
+                    continue;
+                }
+                /* this match ends 64 KB beyond lowPrefix : resume in prefix mode after it */
+                cpy = op + ml;
+                LZ4_memcpy_using_offset_base(op, match, cpy, offset);
+                op = cpy;
+                goto _resume_with_prefix;
             }
 
             /* copy match within block */
@@ -2518,6 +2535,16 @@ LZ4_decompress_generic(
         /* end of decoding */
         DEBUGLOG(5, "decoded %i bytes", (int) (((char*)op)-dst));
         return (int) (((char*)op)-dst);     /* Nb of output bytes decoded */
+
+    _resume_with_prefix:
+        assert(dict != withPrefix64k);
+        assert(op >= lowPrefix + 64 KB);
+        {   int const r = partialDecoding ?
+                LZ4_decompress_safe_partial_withPrefix64k((const char*)ip, (char*)op, (int)(iend-ip), (int)(oend-op), (int)(oend-op)) :
+                LZ4_decompress_safe_withPrefix64k((const char*)ip, (char*)op, (int)(iend-ip), (int)(oend-op));
+            if (r < 0) return r - (int)(ip - (const BYTE*)src);   /* error position, from src */
+            return (int)(((char*)op)-dst) + r;
+        }
 
         /* Overflow error detected */
     _output_error:
