@@ -918,3 +918,34 @@ TEST(workers_allocFailures)
     ASSERT(nbFailures > 0);
     ASSERT_EQ(mem->live, 0);
 }
+
+/* after an allocation failure, the context can be freed right away, whatever resources remain (ex: no pool) */
+TEST(workers_allocFailures_free)
+{
+    size_t const srcSize = 3 MB;
+    const char* const src = (const char*)UT_sample(srcSize);
+    allocState_t* const mem = newAllocState();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t dstCapacity, n;
+    char* dst;
+
+    prefs.nbWorkers = 2;
+    dstCapacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    dst = (char*)UT_malloc(dstCapacity);
+    for (n = 1; ; n++) {
+        LZ4F_cctx* cctx;
+        size_t r;
+        mem->failAt = 0;
+        cctx = createCctx(mem);
+        ASSERT(cctx != NULL);
+        mem->nbAllocs = 0;
+        mem->failAt = n;
+        r = LZ4F_compressFrame_usingCDict(cctx, dst, dstCapacity, src, srcSize, NULL, &prefs);
+        mem->failAt = 0;
+        UT_release(cctx);   /* right after the failure */
+        ASSERT_MSG(mem->live == 0, "allocation %u : memory leak (%u allocations)", (unsigned)n, (unsigned)mem->live);
+        if (mem->nbAllocs < n) break;   /* the frame needed fewer allocations : all failure points tested */
+        ASSERT_MSG(!LZ4F_isError(r) || (LZ4F_getErrorCode(r) == LZ4F_ERROR_allocation_failed),
+                   "allocation %u : %s", (unsigned)n, LZ4F_getErrorName(r));
+    }
+}

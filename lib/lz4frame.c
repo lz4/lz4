@@ -1701,17 +1701,20 @@ static LZ4F_pool_t* LZ4F_pool_create(unsigned maxThreads, unsigned queueCapacity
     return pool;
 }
 
+/* A frame cut into jobs has a pool : its creation failure fails the frame (see LZ4F_mt_begin()).
+ * Only LZ4F_pool_free() and LZ4F_pool_setCancel() accept a NULL pool, left by such a failure (see LZ4F_mt_free()). */
+
 static unsigned LZ4F_pool_nbThreads(const LZ4F_pool_t* pool)
 {
-    return pool ? pool->nbThreads : 0;
+    assert(pool != NULL);
+    return pool->nbThreads;
 }
 
-/* A NULL pool runs jobs immediately, within the calling thread.
- * @return : 1 when queued jobs outnumber idle threads, and more threads can be started (see LZ4F_pool_startThreads()) */
+/* @return : 1 when queued jobs outnumber idle threads, and more threads can be started (see LZ4F_pool_startThreads()) */
 static int LZ4F_pool_submit(LZ4F_pool_t* pool, LZ4F_job_f fn, void* arg)
 {
     int moreThreads;
-    if (pool == NULL) { fn(arg, 0); return 0; }
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     assert(pool->queueSize < pool->queueCapacity);
     {   LZ4F_poolJob_t* const job = pool->queue + (pool->queueHead + pool->queueSize) % pool->queueCapacity;
@@ -1727,7 +1730,7 @@ static int LZ4F_pool_submit(LZ4F_pool_t* pool, LZ4F_job_f fn, void* arg)
 
 static void LZ4F_pool_setDone(LZ4F_pool_t* pool, int* doneFlag)
 {
-    if (pool == NULL) { *doneFlag = 1; return; }
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     *doneFlag = 1;
     pool->nbDone++;
@@ -1746,7 +1749,7 @@ static void LZ4F_pool_setCancel(LZ4F_pool_t* pool, int cancel)
 static int LZ4F_pool_isCancelled(LZ4F_pool_t* pool)
 {
     int cancel;
-    if (pool == NULL) return 0;
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     cancel = pool->cancel;
     LZ4F_mutex_unlock(&pool->lock);
@@ -1756,7 +1759,7 @@ static int LZ4F_pool_isCancelled(LZ4F_pool_t* pool)
 static int LZ4F_pool_isDone(LZ4F_pool_t* pool, const int* doneFlag)
 {
     int done;
-    if (pool == NULL) return *doneFlag;
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     done = *doneFlag;
     LZ4F_mutex_unlock(&pool->lock);
@@ -1766,7 +1769,7 @@ static int LZ4F_pool_isDone(LZ4F_pool_t* pool, const int* doneFlag)
 /* waits for *doneFlag */
 static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag)
 {
-    if (pool == NULL) { assert(*doneFlag); return; }
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     while (!*doneFlag) LZ4F_cond_wait(&pool->jobDone, &pool->lock);
     LZ4F_mutex_unlock(&pool->lock);
@@ -1775,7 +1778,7 @@ static void LZ4F_pool_waitDone(LZ4F_pool_t* pool, const int* doneFlag)
 static unsigned LZ4F_pool_nbDone(LZ4F_pool_t* pool)
 {
     unsigned nbDone;
-    if (pool == NULL) return 0;
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     nbDone = pool->nbDone;
     LZ4F_mutex_unlock(&pool->lock);
@@ -1785,7 +1788,7 @@ static unsigned LZ4F_pool_nbDone(LZ4F_pool_t* pool)
 /* waits for any job completion after @nbDone was observed */
 static void LZ4F_pool_waitAny(LZ4F_pool_t* pool, unsigned nbDone)
 {
-    if (pool == NULL) return;
+    assert(pool != NULL);
     LZ4F_mutex_lock(&pool->lock);
     while (pool->nbDone == nbDone) LZ4F_cond_wait(&pool->jobDone, &pool->lock);
     LZ4F_mutex_unlock(&pool->lock);
@@ -1821,7 +1824,7 @@ typedef struct {
 
 struct LZ4F_mtCtx_s {
     LZ4F_CustomMem cmem;
-    LZ4F_pool_t* pool;       /* NULL : jobs run within the calling thread */
+    LZ4F_pool_t* pool;       /* NULL without multi-threading support (jobs run within the calling thread), or after a failed creation */
     unsigned poolRequested;  /* nbWorkers requested when pool was created : threads are started on demand, up to it */
     void** states;           /* one LZ4 state per worker (allocated when it starts) ; states[0] : cctx's own state, without pool */
     unsigned nbStates;       /* capacity of states[] */
