@@ -35,15 +35,10 @@ build_script:
       make -j -C tests fuzzer V=1 &&
       make -j -C lib lib V=1 LDFLAGS="-static-libgcc" &&
       echo "Packaging GCC build..." &&
-      mkdir bin\dll bin\static bin\example bin\include &&
-      copy tests\bench\fullbench.c bin\example\ &&
-      copy lib\xxhash.* bin\example\ &&
-      copy lib\lz4*.h bin\include\ &&
-      copy lib\liblz4.a bin\static\liblz4_static.lib &&
-      copy lib\liblz4.dll.a bin\dll\ >nul 2>&1 &&
-      (copy lib\liblz4.dll bin\dll\ 2>nul || copy lib\msys-lz4-1.dll bin\dll\liblz4.dll 2>nul || copy lib\cyglz4-1.dll bin\dll\liblz4.dll 2>nul || echo DLL copy warning) &&
-      copy contrib\windows-package\* bin\example\ >nul 2>&1 &&
       copy programs\lz4.exe bin\lz4.exe &&
+      copy contrib\windows-package\README.md bin\README.md &&
+      copy programs\COPYING bin\COPYING &&
+      copy lib\LICENSE bin\LICENSE-lib &&
       copy tests\*.exe programs\
     )
 
@@ -61,9 +56,9 @@ build_script:
     )
 
   # Create release archives (GCC only)
-  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] 7z.exe a -bb1 bin\lz4_x64.zip NEWS .\bin\lz4.exe README.md .\bin\example .\bin\dll .\bin\static .\bin\include
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] 7z.exe a -bb1 bin\lz4_x64.zip .\bin\lz4.exe .\bin\README.md NEWS .\bin\COPYING .\bin\LICENSE-lib
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] appveyor PushArtifact bin\lz4_x64.zip
-  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] 7z.exe a -bb1 bin\lz4_x86.zip NEWS .\bin\lz4.exe README.md .\bin\example .\bin\dll .\bin\static .\bin\include
+  - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] 7z.exe a -bb1 bin\lz4_x86.zip .\bin\lz4.exe .\bin\README.md NEWS .\bin\COPYING .\bin\LICENSE-lib
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] appveyor PushArtifact bin\lz4_x86.zip
 
 test_script:
