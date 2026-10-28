@@ -92,7 +92,6 @@ static clock_t g_clockTime = 0;
 /*-***************************************
 *  Local Parameters
 *****************************************/
-static U32 no_prompt = 0;
 static U32 displayLevel = 2;
 static U32 use_pause = 0;
 
@@ -673,7 +672,6 @@ int main(int argc, const char** argv)
         /* Decode command (note : aggregated short commands are allowed) */
         if (argument[0]=='-') {
             if (!strcmp(argument, "--no-prompt")) {
-                no_prompt=1;
                 seedset=1;
                 displayLevel=1;
                 continue;
