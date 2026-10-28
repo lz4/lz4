@@ -957,6 +957,13 @@ LZ4_FORCE_INLINE int LZ4_match8(const void* p, const void* q)
         && (LZ4_read32((const BYTE*)p + 4) == LZ4_read32((const BYTE*)q + 4));
 }
 
+/* state of an extDict compression which resumes in prefix mode (see LZ4_compress_generic()) */
+typedef struct {
+    const BYTE* ip;   /* end of a match : resumes at the test of the next position */
+    BYTE* op;
+    U32 startIndex;
+} LZ4_resume_t;
+
 /** LZ4_compress_generic_validated() :
  *  inlined, to ensure branches are decided at compilation time.
  *  The following conditions are presumed already validated:
@@ -974,12 +981,14 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                  const tableType_t tableType,
                  const dict_directive dictDirective,
                  const dictIssue_directive dictIssue,
-                 const int acceleration)
+                 const int acceleration,
+                 LZ4_resume_t* const suspend,      /* usingExtDict : stops when the dictionary is out of reach, saving its state */
+                 const LZ4_resume_t* const resume) /* withPrefix64k : resumes such a compression */
 {
     int result;
-    const BYTE* ip = (const BYTE*)source;
+    const BYTE* ip = resume ? resume->ip : (const BYTE*)source;
 
-    U32 const startIndex = cctx->currentOffset;
+    U32 const startIndex = resume ? resume->startIndex : cctx->currentOffset;
     const BYTE* base = (const BYTE*)source - startIndex;
     const BYTE* lowLimit;
 
@@ -994,10 +1003,11 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     int const maybe_extMem = (dictDirective == usingExtDict) || (dictDirective == usingDictCtx);
     U32 const prefixIdxLimit = startIndex - dictSize;   /* used when dictDirective == dictSmall */
     const BYTE* const dictEnd = dictionary ? dictionary + dictSize : dictionary;
-    const BYTE* anchor = (const BYTE*) source;
-    const BYTE* const iend = ip + inputSize;
+    const BYTE* anchor = resume ? resume->ip : (const BYTE*)source;
+    const BYTE* const iend = (const BYTE*)source + inputSize;
     const BYTE* mflimitPlusOne;   /* set after the size check : would precede a small input */
     const BYTE* matchlimit;
+    const BYTE* seqLimit;   /* suspend : mflimitPlusOne, or earlier, where the dictionary gets out of reach */
 
     /* the dictCtx currentOffset is indexed on the start of the dictionary,
      * while a dictionary in the current context precedes the currentOffset */
@@ -1006,11 +1016,12 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                             dictionary + dictSize - dictCtx->currentOffset :
                             dictionary + dictSize - startIndex;
 
-    BYTE* op = (BYTE*) dest;
-    BYTE* const olimit = op + maxOutputSize;
+    BYTE* op = resume ? resume->op : (BYTE*)dest;
+    BYTE* const olimit = (BYTE*)dest + maxOutputSize;
 
     U32 offset = 0;
     U32 forwardH;
+    const BYTE* filledIp = NULL;   /* fillOutput only ; set by catch up (resume : never with fillOutput) */
 
     DEBUGLOG(5, "LZ4_compress_generic_validated: srcSize=%i, tableType=%u", inputSize, tableType);
     assert(ip != NULL);
@@ -1021,23 +1032,31 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     if (outputDirective == fillOutput && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
     assert(acceleration >= 1);
 
-    lowLimit = (const BYTE*)source - (dictDirective == withPrefix64k ? dictSize : 0);
+    /* resume : candidates are within source (see LZ4_compress_generic()) */
+    lowLimit = (const BYTE*)source - ((dictDirective == withPrefix64k) && !resume ? dictSize : 0);
 
-    /* Update context state */
-    if (dictDirective == usingDictCtx) {
-        /* Subsequent linked blocks can't use the dictionary. */
-        /* Instead, they use the block we just compressed. */
-        cctx->dictCtx = NULL;
-        cctx->dictSize = (U32)inputSize;
-    } else {
-        cctx->dictSize += (U32)inputSize;
+    if (!resume) {   /* resume : context state already updated */
+        /* Update context state */
+        if (dictDirective == usingDictCtx) {
+            /* Subsequent linked blocks can't use the dictionary. */
+            /* Instead, they use the block we just compressed. */
+            cctx->dictCtx = NULL;
+            cctx->dictSize = (U32)inputSize;
+        } else {
+            cctx->dictSize += (U32)inputSize;
+        }
+        cctx->currentOffset += (U32)inputSize;
+        cctx->tableType = (U32)tableType;
+
+        if (inputSize<LZ4_minLength) goto _last_literals;        /* Input too small, no compression (all literals) */
     }
-    cctx->currentOffset += (U32)inputSize;
-    cctx->tableType = (U32)tableType;
-
-    if (inputSize<LZ4_minLength) goto _last_literals;        /* Input too small, no compression (all literals) */
     mflimitPlusOne = iend - MFLIMIT + 1;
     matchlimit = iend - LASTLITERALS;
+    seqLimit = mflimitPlusOne;
+    if ((suspend != NULL) && (inputSize > LZ4_DISTANCE_MAX + MFLIMIT - 1))   /* source + LZ4_DISTANCE_MAX < mflimitPlusOne */
+        seqLimit = (const BYTE*)source + LZ4_DISTANCE_MAX;
+
+    if (resume) goto _resume;
 
     /* First Byte */
     LZ4_putPosition(ip, cctx->hashTable, tableType, base);
@@ -1047,7 +1066,6 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     for ( ; ; ) {
         const BYTE* match;
         BYTE* token;
-        const BYTE* filledIp;
 
         /* Find a match */
         if (tableType == byPtr) {
@@ -1268,8 +1286,17 @@ _next_match:
         anchor = ip;
 
         /* Test end of chunk */
-        if (ip >= mflimitPlusOne) break;
+        if (ip >= seqLimit) {
+            if ((suspend == NULL) || (ip >= mflimitPlusOne)) break;
+            /* extDict : from ip, all candidates (and catch up) are beyond reach of the dictionary :
+             * stop, to resume in prefix mode, which is faster */
+            suspend->ip = ip;
+            suspend->op = op;
+            suspend->startIndex = startIndex;
+            return 0;
+        }
 
+_resume:
         /* Fill table, and test next position.
          * First, the position after the previous occurrence of ip-1, if it matches 8+ bytes :
          * it breaks chains of short matches, which the table alone can produce on periodic data. */
@@ -1382,6 +1409,16 @@ _last_literals:
     return result;
 }
 
+/* second part of an extDict compression, in prefix mode (see LZ4_compress_generic()).
+ * not inlined : a single instance serves all invocations */
+LZ4_FORCE_NOINLINE int LZ4_compress_resumeWithPrefix(LZ4_stream_t_internal* cctx,
+                 const char* src, char* dst, int srcSize, int dstCapacity, int acceleration,
+                 const LZ4_resume_t* state)
+{
+    return LZ4_compress_generic_validated(cctx, src, dst, srcSize, NULL, dstCapacity, limitedOutput,
+                byU32, withPrefix64k, noDictIssue, acceleration, NULL, state);
+}
+
 /** LZ4_compress_generic() :
  *  inlined, to ensure branches are decided at compilation time;
  *  takes care of src == (NULL, 0)
@@ -1417,10 +1454,26 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
     }
     assert(src != NULL);
 
+    if ((dictDirective == usingExtDict) && (dictIssue == noDictIssue)) {
+        /* beyond LZ4_DISTANCE_MAX, the dictionary is out of reach : the rest of the input is compressed in prefix mode */
+        LZ4_resume_t state;
+        int result;
+        assert(tableType == byU32);
+        assert(outputDirective != fillOutput);
+        state.ip = NULL;
+        result = LZ4_compress_generic_validated(cctx, src, dst, srcSize, inputConsumed, dstCapacity, outputDirective,
+                    tableType, usingExtDict, noDictIssue, acceleration, &state, NULL);
+        if (state.ip == NULL) return result;   /* completed (or failed) in extDict mode */
+        /* notLimited : dst is presumed large enough for LZ4_compressBound() */
+        return LZ4_compress_resumeWithPrefix(cctx, src, dst, srcSize,
+                    (outputDirective == notLimited) ? LZ4_COMPRESSBOUND(srcSize) : dstCapacity,
+                    acceleration, &state);
+    }
+
     return LZ4_compress_generic_validated(cctx, src, dst, srcSize,
                 inputConsumed, /* only written into if outputDirective == fillOutput */
                 dstCapacity, outputDirective,
-                tableType, dictDirective, dictIssue, acceleration);
+                tableType, dictDirective, dictIssue, acceleration, NULL, NULL);
 }
 
 

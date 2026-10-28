@@ -311,6 +311,48 @@ TEST(compress_fast_continue_roundTrip)
     ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
 }
 
+/* external dictionary, blocks larger than 64 KB : compression continues in prefix mode,
+ * once the dictionary is out of reach. The block starts with a copy of a part of the dictionary,
+ * and contains another one beyond reach. */
+TEST(compress_fast_continue_extDictLargeBlock)
+{
+    static const int sizes[] = { 64 KB + 12, 64 KB + 100, 200 KB };
+    int const maxSize = 200 KB;
+    const char* const dict = (const char*)UT_sample(64 KB);
+    char* const block = (char*)UT_sample((size_t)maxSize);
+    int const capacity = LZ4_COMPRESSBOUND(maxSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)maxSize);
+    LZ4_stream_t* const stream = newStream();
+    LZ4_stream_t* const dictStream = newStream();
+    size_t i;
+    memcpy(block, dict + 32 KB, 1 KB);
+    memcpy(block + 100 KB, dict + 48 KB, 1 KB);
+    LZ4_loadDict(dictStream, dict, 64 KB);
+
+    for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+        int const srcSize = sizes[i];
+        int refSize;
+        LZ4_loadDict(stream, dict, 64 KB);
+        refSize = LZ4_compress_fast_continue(stream, block, ref, srcSize, capacity, 1);
+        ASSERT(refSize > 0);
+        ASSERT_EQ(LZ4_decompress_safe_usingDict(ref, decoded, refSize, srcSize, dict, 64 KB), srcSize);
+        ASSERT_MEMEQ(decoded, block, (size_t)srcSize);
+        ASSERT(LZ4_decompress_safe(ref, decoded, refSize, srcSize) < 0);   /* the dictionary is used */
+
+        /* attached dictionary (tables copied for large inputs) : same output */
+        LZ4_resetStream_fast(stream);
+        LZ4_attach_dictionary(stream, dictStream);
+        ASSERT_EQ(LZ4_compress_fast_continue(stream, block, dst, srcSize, capacity, 1), refSize);
+        ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+
+        /* output buffer one byte too small */
+        LZ4_loadDict(stream, dict, 64 KB);
+        ASSERT_EQ(LZ4_compress_fast_continue(stream, block, dst, srcSize, refSize - 1, 1), 0);
+    }
+}
+
 TEST(resetStream_fast_largeFirstBlock)   /* a large first block gives the same output as a new stream */
 {
     const char* const block = clearedTableBlock();
