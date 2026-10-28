@@ -28,63 +28,16 @@
  * `make test-unittest` runs both, `unittest` and `unittest-mt`.
  * Without multi-threading support, multi-threaded requests are served serially, with the same results.
  * tests/fuzz/frameMT.c checks that both builds produce the same frames.
- * Assertions are only used in the calling thread : all allocations happen there too (see failingAlloc()). */
+ * Assertions are only used in the calling thread : all allocations happen there too (see failingAlloc() in lz4frame_helpers.c). */
 
 #include "unittest.h"
-#include "lz4frame_helpers.h"   /* lz4frame.h, LZ4F_OK, newCctx, newTmpFile, assertDecodesTo */
+#include "lz4frame_helpers.h"   /* lz4frame.h, LZ4F_OK, newCctx, createCctx, newTmpFile, assertDecodesTo */
 #include <stdio.h>      /* FILE, ftell, fseek, fread */
-#include <stdlib.h>     /* malloc, free */
 #include <string.h>     /* memcpy, memset, memcmp */
 #include <limits.h>     /* INT_MAX */
 #include "lz4file.h"
 #include "lz4hc.h"      /* LZ4HC_CLEVEL_MIN */
 #include "timefn.h"     /* TIME_getTime */
-
-
-/*-************************************
-*  Helpers
-**************************************/
-/* allocator failing its N-th allocation (failAt, counting from 1 ; 0 : never),
- * and counting allocations not yet freed (live).
- * Counters are deliberately unprotected : an allocation from a worker thread would be reported by ThreadSanitizer. */
-typedef struct {
-    size_t failAt;
-    size_t nbAllocs;   /* allocations requested */
-    size_t live;
-} allocState_t;
-
-static void* failingAlloc(void* state, size_t size)
-{
-    allocState_t* const s = (allocState_t*)state;
-    if (++s->nbAllocs == s->failAt) return NULL;
-    s->live++;
-    return malloc(size);
-}
-
-static void countingFree(void* state, void* address)
-{
-    if (address == NULL) return;
-    ((allocState_t*)state)->live--;
-    free(address);
-}
-
-/* @return : allocator state, released at the end of the test :
- * after the contexts employing it, provided they are created afterwards (resources are released in reverse order) */
-static allocState_t* newAllocState(void)
-{
-    allocState_t* const s = (allocState_t*)UT_malloc(sizeof(*s));
-    memset(s, 0, sizeof(*s));
-    return s;
-}
-
-/* @return : compression context employing the allocator of @mem, released at the end of the test,
- *           or NULL if its creation fails */
-static LZ4F_cctx* createCctx(allocState_t* mem)
-{
-    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
-    LZ4F_cctx* const cctx = LZ4F_createCompressionContext_advanced(cmem, LZ4F_VERSION);
-    return cctx ? (LZ4F_cctx*)UT_defer(freeCctx, cctx) : NULL;
-}
 
 
 /* LZ4F_getMaxNbWorkers() reports multi-threading support */
