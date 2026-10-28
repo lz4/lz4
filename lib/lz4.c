@@ -360,11 +360,17 @@ typedef enum {
 #  endif
 #endif
 
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define LZ4_isLittleEndian() 1
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define LZ4_isLittleEndian() 0
+#else
 static unsigned LZ4_isLittleEndian(void)
 {
     const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental */
     return one.c[0];
 }
+#endif
 
 #if defined(__GNUC__) || defined(__INTEL_COMPILER)
 #define LZ4_PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))

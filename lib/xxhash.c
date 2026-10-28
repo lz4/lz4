@@ -217,12 +217,18 @@ typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianness;
 
 /* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example on the compiler command line */
 #ifndef XXH_CPU_LITTLE_ENDIAN
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#   define XXH_CPU_LITTLE_ENDIAN   1
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#   define XXH_CPU_LITTLE_ENDIAN   0
+#else
 static XXH_endianness XXH_isLittleEndian(void)
 {
     const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental  */
     return one.c[0] ? XXH_littleEndian : XXH_bigEndian;
 }
 #   define XXH_CPU_LITTLE_ENDIAN   XXH_isLittleEndian()
+#endif
 #endif
 
 
