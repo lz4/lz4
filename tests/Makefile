@@ -125,7 +125,7 @@ $(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 frametest:
 $(eval $(call c_program_shared_o,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
 
-UNITTEST_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o \
+UNITTEST_OBJS := lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o datagen.o timefn.o \
                  unittest.o lz4frame_helpers.o unittest_lz4.o unittest_lz4hc.o unittest_lz4frame.o unittest_lz4frameMT.o
 unittest:
 $(eval $(call c_program_shared_o,unittest,$(UNITTEST_OBJS)))
