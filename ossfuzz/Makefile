@@ -47,7 +47,8 @@ FUZZERS := \
 	compress_frame_stream_fuzzer \
 	round_trip_frame_fuzzer \
 	round_trip_frame_uncompressed_fuzzer \
-	decompress_frame_fuzzer
+	decompress_frame_fuzzer \
+	file_fuzzer
 
 .PHONY: all
 all: $(FUZZERS)
