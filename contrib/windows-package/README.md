@@ -1,69 +1,34 @@
 LZ4 Windows binary package
-====================================
+==========================
 
-#### The package contents
-
-- `lz4.exe`                  : Command Line Utility, supporting gzip-like arguments
-- `dll\msys-lz4-1.dll`       : The DLL of LZ4 library, compiled by msys
-- `dll\liblz4.dll.a`         : The import library of LZ4 library for Visual C++
-- `example\`                 : The example of usage of LZ4 library
-- `include\`                 : Header files required with LZ4 library
-- `static\liblz4_static.lib` : The static LZ4 library
+This package contains `lz4.exe`, the LZ4 command line utility for Windows.
+It is standalone : no DLL is needed.
 
 
-#### Usage of Command Line Interface
+#### Contents
 
-Command Line Interface (CLI) supports gzip-like arguments.
-By default CLI takes an input file and compresses it to an output file:
-```
-    Usage: lz4 [arg] [input] [output]
-```
-The full list of commands for CLI can be obtained with `-h` or `-H`. The ratio can
-be improved with commands from `-3` to `-16` but higher levels also have slower
-compression. CLI includes in-memory compression benchmark module with compression
-levels starting from `-b` and ending with `-e` with iteration time of `-i` seconds.
-CLI supports aggregation of parameters i.e. `-b1`, `-e18`, and `-i1` can be joined
-into `-b1e18i1`.
+- `lz4.exe`     : the command line utility
+- `README.md`   : this file
+- `NEWS`        : changes in each version
+- `COPYING`     : license of `lz4.exe` (GPL-2.0-or-later)
+- `LICENSE-lib` : license of the LZ4 library included in `lz4.exe` (BSD 2-Clause)
 
 
-#### The example of usage of static and dynamic LZ4 libraries with gcc/MinGW
+#### Usage
 
-Use `cd example` and `make` to build `fullbench-dll` and `fullbench-lib`.
-`fullbench-dll` uses a dynamic LZ4 library from the `dll` directory.
-`fullbench-lib` uses a static LZ4 library from the `lib` directory.
+    lz4 file          compresses file into file.lz4
+    lz4 -d file.lz4   decompresses file.lz4 into file
 
-
-#### Using LZ4 DLL with gcc/MinGW
-
-The header files from `include\` and the dynamic library `dll\msys-lz4-1.dll`
-are required to compile a project using gcc/MinGW.
-The dynamic library has to be added to linking options.
-It means that if a project that uses LZ4 consists of a single `test-dll.c`
-file it should be linked with `dll\msys-lz4-1.dll`. For example:
-```
-    gcc $(CFLAGS) -Iinclude\ test-dll.c -o test-dll dll\msys-lz4-1.dll
-```
-The compiled executable will require LZ4 DLL which is available at `dll\msys-lz4-1.dll`.
+Source files are kept.
+Compression levels range from `-1` (fastest, default) to `-12` (slowest, strongest).
+`lz4 -h` lists the main options, `lz4 -H` all of them,
+and `lz4 -b` benchmarks a file in memory.
+Full manual : https://github.com/lz4/lz4/blob/release/programs/lz4.1.md
 
 
-#### The example of usage of static and dynamic LZ4 libraries with Visual C++
+#### Library
 
-Open `example\fullbench-dll.sln` to compile `fullbench-dll` that uses a
-dynamic LZ4 library from the `dll` directory. The solution works with Visual C++
-2010 or newer. When one will open the solution with Visual C++ newer than 2010
-then the solution will be upgraded to the current version.
-
-
-#### Using LZ4 DLL with Visual C++
-
-The header files from `include\` and the import library `dll\liblz4.dll.a`
-are required to compile a project using Visual C++.
-
-1. The header files should be added to `Additional Include Directories` that can
-   be found in project properties `C/C++` then `General`.
-2. The import library has to be added to `Additional Dependencies` that can
-   be found in project properties `Linker` then `Input`.
-   If one will provide only the name `liblz4.dll.a` without a full path to the library
-   the directory has to be added to `Linker\General\Additional Library Directories`.
-
-The compiled executable will require LZ4 DLL which is available at `dll\msys-lz4-1.dll`.
+This package doesn't contain the LZ4 library for development.
+To use it in a program, build it from the sources (https://github.com/lz4/lz4)
+with the provided CMake, Meson, Visual Studio or make builds,
+or get it from a package manager, such as vcpkg or conan.

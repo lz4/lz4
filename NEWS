@@ -92,6 +92,7 @@ build: pkg-config `License` field, by @iwamatsu
 build: public headers compile with clang C++ modules (`-fmodules`), reported by @doraorak
 build: new build macro `LZ4_WILDCOPY64`, to tune decompression on targets like wasm, proposed by @JCash
 build: `xxhash.c` compiles without `-Wbad-function-cast` warnings, by @brainy
+build: Windows release package : standalone `lz4.exe` with README, NEWS and license texts ; its unusable development files are removed
 port : RISC-V with `Zicclsm` uses unaligned memory accesses, by @Polaris-911
 doc  : ring buffer conditions of `LZ4_decompress_safe_continue()`
 doc  : frame format : Linux kernel legacy last block, by @Artoria2e5
