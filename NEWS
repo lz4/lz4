@@ -33,7 +33,7 @@ perf : faster compression with reused contexts, for blocks >= 1 KB : linked fram
 perf : faster compression at fast levels without dictionary (+1% to +7%), proposed by @BiplabRaut
 perf : faster compression of 2-4 KB blocks with `LZ4_attach_dictionary()` (+3% to +30% on Zen 4)
 perf : fast levels with an external dictionary (CDict, `LZ4_attach_dictionary()`, `LZ4_loadDict()`, ring buffers) : faster 4-16 KB blocks with gcc (+29% to +35%), 64 KB blocks with gcc (+12%), 256 KB to 4 MB blocks (+4% with gcc, +10% with clang) on Zen 4
-perf : 4 KB blocks with `LZ4_attach_HC_dictionary()` : level 2 compresses ~2.5% better, levels 11-12 faster (+12% to +170%), level 10 slower (-3% to -11%)
+perf : `LZ4_attach_HC_dictionary()` copies the dictionary's tables from 4 KB blocks (2 KB at level 11, 1 KB at level 12) : level 2 compresses ~2.5% better at 4 KB, levels 11-12 up to 2x faster with a useful dictionary, level 10 slower at 4 KB (-3% to -11%)
 perf : level 2 compresses better (~0.2-1.5%), at similar speed (-3% to +1% on Zen 4)
 perf : faster levels 11 (~+25%) and 12 (~+10%)
 perf : `--favor-decSpeed` : faster decompression (~+2-4% at level 12), with fewer sequences
