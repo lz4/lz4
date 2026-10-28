@@ -1710,6 +1710,14 @@ static unsigned LZ4F_pool_nbThreads(const LZ4F_pool_t* pool)
     return pool->nbThreads;
 }
 
+/* memory allocated with the custom allocator (thread stacks excluded) */
+static size_t LZ4F_pool_sizeof(const LZ4F_pool_t* pool)
+{
+    assert(pool != NULL);
+    return sizeof(*pool) + pool->queueCapacity * sizeof(*pool->queue)
+         + pool->maxThreads * (sizeof(*pool->threads) + sizeof(*pool->workers));
+}
+
 /* @return : 1 when queued jobs outnumber idle threads, and more threads can be started (see LZ4F_pool_startThreads()) */
 static int LZ4F_pool_submit(LZ4F_pool_t* pool, LZ4F_job_f fn, void* arg)
 {
@@ -1797,6 +1805,7 @@ static void LZ4F_pool_waitAny(LZ4F_pool_t* pool, unsigned nbDone)
 #else  /* !LZ4F_MULTITHREAD : no pool is ever created, jobs run within the calling thread */
 
 static unsigned LZ4F_pool_nbThreads(const LZ4F_pool_t* pool) { (void)pool; return 0; }
+static size_t LZ4F_pool_sizeof(const LZ4F_pool_t* pool) { (void)pool; return 0; }
 static void LZ4F_pool_free(LZ4F_pool_t* pool, LZ4F_CustomMem cmem) { (void)pool; (void)cmem; }
 static int  LZ4F_pool_submit(LZ4F_pool_t* pool, LZ4F_job_f fn, void* arg) { (void)pool; fn(arg, 0); return 0; }
 static unsigned LZ4F_pool_startThreads(LZ4F_pool_t* pool, unsigned nbThreads) { (void)pool; (void)nbThreads; return 0; }
@@ -2088,7 +2097,8 @@ static size_t LZ4F_mt_sizeof(const LZ4F_mtCtx_t* mt)
     size = sizeof(*mt) + LZ4F_MT_PREFIX_SIZE
          + mt->nbStates * sizeof(void*)
          + mt->nbJobSlots * sizeof(LZ4F_mtJob_t)
-         + mt->maxInBuffs * 2 * sizeof(BYTE*) + mt->nbInBuffs * mt->inCapacity;
+         + mt->maxInBuffs * 2 * sizeof(BYTE*) + mt->nbInBuffs * mt->inCapacity
+         + (mt->pool ? LZ4F_pool_sizeof(mt->pool) : 0);
     for (n = 1; n < mt->nbStates; n++) if (mt->states[n] != NULL) size += LZ4F_sizeofLZ4State(mt->statesType);
     for (n = 0; n < mt->nbJobSlots; n++) if (mt->jobs[n].outBuff != NULL) size += mt->outCapacity;
     return size;

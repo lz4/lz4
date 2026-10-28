@@ -1064,13 +1064,16 @@ TEST(cctx_dctx_sizes)
 {
     /* sizes remain accurate when contexts are reused with different parameters,
      * since buffers are only reallocated when too small */
-    static const struct { LZ4F_blockSizeID_t bsid; LZ4F_blockMode_t mode; int level; } frames[] = {
-        { LZ4F_max4MB,   LZ4F_blockIndependent, 1 },
-        { LZ4F_max64KB,  LZ4F_blockIndependent, 1 },   /* smaller blocks : buffers are reused */
-        { LZ4F_max256KB, LZ4F_blockLinked,      9 },
-        { LZ4F_max64KB,  LZ4F_blockLinked,      1 },
-        { LZ4F_max1MB,   LZ4F_blockIndependent, 9 },
-        { LZ4F_max64KB,  LZ4F_blockIndependent, 1 } };
+    static const struct { LZ4F_blockSizeID_t bsid; LZ4F_blockMode_t mode; int level; unsigned nbWorkers; } frames[] = {
+        { LZ4F_max4MB,   LZ4F_blockIndependent, 1, 0 },
+        { LZ4F_max64KB,  LZ4F_blockIndependent, 1, 0 },   /* smaller blocks : buffers are reused */
+        { LZ4F_max256KB, LZ4F_blockLinked,      9, 0 },
+        { LZ4F_max64KB,  LZ4F_blockLinked,      1, 0 },
+        { LZ4F_max1MB,   LZ4F_blockIndependent, 9, 0 },
+        { LZ4F_max64KB,  LZ4F_blockIndependent, 1, 0 },
+        { LZ4F_max64KB,  LZ4F_blockLinked,      1, 3 },   /* jobs : multi-threading resources */
+        { LZ4F_max1MB,   LZ4F_blockIndependent, 9, 2 },   /* HC states, larger jobs */
+        { LZ4F_max64KB,  LZ4F_blockIndependent, 1, 0 } };
     LZ4F_CustomMem const cMem = { countedMalloc, countedCalloc, countedFree, &g_cctxAllocated };
     LZ4F_CustomMem const dMem = { countedMalloc, countedCalloc, countedFree, &g_dctxAllocated };
     LZ4F_cctx* cctx;
@@ -1100,6 +1103,7 @@ TEST(cctx_dctx_sizes)
         prefs.frameInfo.blockSizeID = frames[f].bsid;
         prefs.frameInfo.blockMode = frames[f].mode;
         prefs.compressionLevel = frames[f].level;
+        prefs.nbWorkers = frames[f].nbWorkers;
         frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, 1 KB, NULL, 0, NULL, &prefs));
         dSize = 1 KB;
         ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &frameSize, NULL)), 0);
