@@ -42,7 +42,7 @@ build_script:
       copy lib\liblz4.a bin\static\liblz4_static.lib &&
       copy lib\liblz4.dll.a bin\dll\ >nul 2>&1 &&
       (copy lib\liblz4.dll bin\dll\ 2>nul || copy lib\msys-lz4-1.dll bin\dll\liblz4.dll 2>nul || copy lib\cyglz4-1.dll bin\dll\liblz4.dll 2>nul || echo DLL copy warning) &&
-      copy lib\dll\example\* bin\example\ >nul 2>&1 &&
+      copy contrib\windows-package\* bin\example\ >nul 2>&1 &&
       copy programs\lz4.exe bin\lz4.exe &&
       copy tests\*.exe programs\
     )
