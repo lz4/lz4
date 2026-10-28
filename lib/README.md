@@ -170,6 +170,7 @@ The same policy applies to other build systems :
   (measured on Coffee Lake : compression up to +12%, decompression up to +31%),
   while its speed is unchanged on other cpus. `JCC_ERRATUM=0` disables it.
   `cmake` : option `LZ4_JCC_ERRATUM` (default `ON`). `meson` : option `jcc-erratum` (default `true`).
+  Visual Studio projects (`build/VS2022`) : always, for Win32 and x64 (`Directory.Build.targets`).
 
 
 #### Amalgamation

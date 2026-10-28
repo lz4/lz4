@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- x86 and x64 : keep branches within 32-byte boundaries,
+       which mitigates the JCC erratum of Intel cpus of the Skylake family (see build/make/lz4defs.make) -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32' Or '$(Platform)'=='x64'">
+    <ClCompile>
+      <AdditionalOptions>%(AdditionalOptions) /QIntel-jcc-erratum</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
