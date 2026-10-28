@@ -131,6 +131,33 @@ TEST(compressBound_jobs)
     }
 }
 
+/* with linked blocks, each job starts from the last 64 KB of preceding content (see LZ4F_compressJob()) :
+ * a pattern repeated over several jobs is only stored once */
+TEST(linkedJobs_history)
+{
+    static const int levels[] = { 1, 9 };
+    size_t const patternSize = 48 KB;
+    size_t const srcSize = 4 MB;   /* 4 jobs of 64 KB blocks */
+    const char* const pattern = (const char*)UT_noise(patternSize);
+    char* const src = (char*)UT_malloc(srcSize);
+    size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const dst = (char*)UT_malloc(dstCapacity);
+    size_t pos, li;
+    for (pos = 0; pos < srcSize; pos += MIN(patternSize, srcSize - pos))
+        memcpy(src + pos, pattern, MIN(patternSize, srcSize - pos));
+    for (li = 0; li < ARRAY_SIZE(levels); li++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t cSize;
+        prefs.compressionLevel = levels[li];
+        prefs.nbWorkers = 2;
+        prefs.frameInfo.blockMode = LZ4F_blockLinked;
+        prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        cSize = LZ4F_OK(LZ4F_compressFrame(dst, dstCapacity, src, srcSize, &prefs));
+        ASSERT_MSG(cSize < 2 * patternSize, "level %i : %u bytes : jobs ignore history", levels[li], (unsigned)cSize);
+        assertDecodesTo(dst, cSize, NULL, 0, src, srcSize);
+    }
+}
+
 /* LZ4F_write() with workers, invoked with random sizes, produces the same frame as one-shot compression,
  * and LZ4F_read() decodes it */
 static void checkWriteMatchesOneShot(LZ4F_blockMode_t blockMode)

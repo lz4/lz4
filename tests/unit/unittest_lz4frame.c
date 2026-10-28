@@ -363,18 +363,27 @@ TEST(compressEnd_wrongContentSize)
     ASSERT_LZ4F_ERROR(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, NULL, &prefs), LZ4F_ERROR_frameSize_wrong);
 }
 
+/* linked blocks reference the dictionary, at fast and HC levels */
 TEST(compressBegin_usingDict)
 {
+    static const int levels[] = { 0, 9 };
     size_t const dictSize = 7 KB;   /* small enough for LZ4_MEMORY_USAGE == 10 */
     size_t const srcSize = 66 KB;   /* must be > 64 KB to avoid short-size optimizations */
     const char* const dict = (const char*)UT_sample(dictSize + srcSize);
     const char* const src = dict + dictSize;
-    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);   /* NULL preferences : 64 KB linked blocks */
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
     void* const frame = UT_malloc(capacity);
-    size_t const sizeNoDict = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, NULL));
-    size_t const sizeWithDict = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, dict, dictSize, NULL, NULL));
-    ASSERT_MSG(sizeWithDict < sizeNoDict, "with dictionary : %u bytes, without : %u bytes", (unsigned)sizeWithDict, (unsigned)sizeNoDict);
-    assertDecodesTo(frame, sizeWithDict, dict, dictSize, src, srcSize);
+    size_t li;
+    for (li = 0; li < ARRAY_SIZE(levels); li++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* 64 KB linked blocks */
+        size_t sizeNoDict, sizeWithDict;
+        prefs.compressionLevel = levels[li];
+        sizeNoDict = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+        sizeWithDict = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, dict, dictSize, NULL, &prefs));
+        ASSERT_MSG(sizeWithDict < sizeNoDict, "level %i : with dictionary : %u bytes, without : %u bytes",
+                   levels[li], (unsigned)sizeWithDict, (unsigned)sizeNoDict);
+        assertDecodesTo(frame, sizeWithDict, dict, dictSize, src, srcSize);
+    }
 }
 
 TEST(createCDict_advanced)

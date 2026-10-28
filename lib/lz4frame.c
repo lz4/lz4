@@ -379,6 +379,23 @@ static LZ4F_errorCode_t LZ4F_returnErrorCode(LZ4F_errorCodes code)
         if (LZ4F_isError(err_code)) return err_code; \
     } while (0)
 
+/* a failed operation invalidates the frame, and discards its jobs (multi-threaded mode) :
+ * next operations fail with compressionState_uninitialized, until LZ4F_compressBegin().
+ * Idempotent : also employed to forward errors of functions which already invalidated the frame */
+static void LZ4F_invalidateFrame(LZ4F_cctx_t* cctx)
+{
+    if (cctx->mtActive) LZ4F_mt_abort(cctx->mt);
+    cctx->cStage = 0;
+}
+
+#define FORWARD_IF_ERROR_INVALIDATE(r, cctx) do { \
+        size_t const err_code = (r);               \
+        if (LZ4F_isError(err_code)) {              \
+            LZ4F_invalidateFrame(cctx);            \
+            return err_code;                       \
+        }                                          \
+    } while (0)
+
 unsigned LZ4F_getVersion(void) { return LZ4F_VERSION; }
 
 int LZ4F_compressionLevel_max(void) { return LZ4HC_CLEVEL_MAX; }
@@ -616,8 +633,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
       int const completed = !LZ4F_isError(tailSize) && ((cctx->cStage == 0) || (cctx->flushStage == 3));
       if (!completed) {
           /* the frame doesn't fit */
-          if (cctx->mtActive) LZ4F_mt_abort(cctx->mt);
-          cctx->cStage = 0;
+          LZ4F_invalidateFrame(cctx);
           return LZ4F_isError(tailSize) ? tailSize : LZ4F_returnErrorCode(LZ4F_ERROR_dstCapacity_tooSmall);
       }
       cctx->cStage = 0;
@@ -839,6 +855,30 @@ static void LZ4F_initStream(void* ctx,
     }
 }
 
+/* LZ4F_startStream() :
+ * starts the LZ4 stream @ctx at the compression level of @prefs : for a frame, a job, or after uncompressed blocks.
+ * With linked blocks, the stream starts from dictionary @cdict, or from history @dict (@dictSize bytes) ;
+ * independent blocks start their own stream (see LZ4F_compressBlock()). */
+static void LZ4F_startStream(void* ctx, const LZ4F_preferences_t* prefs,
+                             const LZ4F_CDict* cdict, const void* dict, size_t dictSize)
+{
+    int const level = prefs->compressionLevel;
+    if (prefs->frameInfo.blockMode == LZ4F_blockLinked)
+        LZ4F_initStream(ctx, cdict, level, LZ4F_blockLinked);
+    if (level >= LZ4HC_CLEVEL_MIN)
+        LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)ctx, (int)prefs->favorDecSpeed);
+    if (dict) {
+        assert(cdict == NULL);
+        assert(prefs->frameInfo.blockMode == LZ4F_blockLinked);
+        assert(dictSize <= INT_MAX);
+        if (level < LZ4HC_CLEVEL_MIN) {
+            LZ4_loadDict((LZ4_stream_t*)ctx, (const char*)dict, (int)dictSize);
+        } else {
+            LZ4_loadDictHC((LZ4_streamHC_t*)ctx, (const char*)dict, (int)dictSize);
+        }
+    }
+}
+
 /* LZ4F_sizeofLZ4State() :
  * @return the size of the inner LZ4 state (pointed by lz4CtxPtr) for @ctxType :
  *  LZ4_stream_t for fast levels, LZ4_streamHC_t for HC levels.
@@ -936,9 +976,8 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     FORWARD_IF_ERROR( LZ4F_getBlockSize(preferencesPtr->frameInfo.blockSizeID) );
     RETURN_ERROR_IF(dictSize > INT_MAX, parameter_invalid);
     /* from now on, a failure (allocation) leaves no frame in progress */
-    if (cctx->mt) LZ4F_mt_abort(cctx->mt);   /* jobs of an abandoned frame : must complete before @cctx is modified */
+    LZ4F_invalidateFrame(cctx);   /* jobs of an abandoned frame : must complete before @cctx is modified */
     cctx->mtActive = 0;
-    cctx->cStage = 0;
     cctx->flushStage = 0;
     cctx->pendingSize = 0;
     cctx->prefs = *preferencesPtr;
@@ -1000,25 +1039,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     /* context init */
     cctx->cdict = cdict;
     cctx->blockCompressMode = LZ4B_COMPRESSED;   /* a frame starts with the LZ4 state just initialized (dictionary included) */
-    if (cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) {
-        /* frame init only for blockLinked : blockIndependent will be init at each block */
-        LZ4F_initStream(cctx->lz4CtxPtr, cdict, cctx->prefs.compressionLevel, LZ4F_blockLinked);
-    }
-    if (preferencesPtr->compressionLevel >= LZ4HC_CLEVEL_MIN) {
-        LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)cctx->lz4CtxPtr, (int)preferencesPtr->favorDecSpeed);
-    }
-    if (dictBuffer) {
-        assert(cdict == NULL);
-        assert(dictSize <= INT_MAX);
-        if (cctx->lz4CtxType == ctxFast) {
-            /* lz4 fast*/
-            LZ4_loadDict((LZ4_stream_t*)cctx->lz4CtxPtr, (const char*)dictBuffer, (int)dictSize);
-        } else {
-            /* lz4hc */
-            assert(cctx->lz4CtxType == ctxHC);
-            LZ4_loadDictHC((LZ4_streamHC_t*)cctx->lz4CtxPtr, (const char*)dictBuffer, (int)dictSize);
-        }
-    }
+    LZ4F_startStream(cctx->lz4CtxPtr, &cctx->prefs, cdict, dictBuffer, dictSize);
 
     /* Stage 2 : Write Frame Header */
 
@@ -1286,16 +1307,6 @@ typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;
 
 static const LZ4F_compressOptions_t k_cOptionsNull = { 0, 0, 0, 0 };
 
-/* A failed operation leaves the frame in an inconsistent state :
- * it's invalidated, and must be restarted with LZ4F_compressBegin() */
-#define FORWARD_IF_ERROR_INVALIDATE(r, cctx) do { \
-        size_t const err_code = (r);               \
-        if (LZ4F_isError(err_code)) {              \
-            (cctx)->cStage = 0;                    \
-            return err_code;                       \
-        }                                          \
-    } while (0)
-
 /*-***************************************************
 *   Output not fitting into dstBuffer yet (LZ4F_flush(), LZ4F_compressEnd())
 *****************************************************/
@@ -1426,21 +1437,11 @@ static size_t LZ4F_compressJob(void* lz4ctx, const LZ4F_preferences_t* prefs,
                                             prefs->frameInfo.blockChecksumFlag);
     }
 
-    /* same initialization sequence as LZ4F_compressBegin_internal() */
-    if (blockMode == LZ4F_blockLinked) {
-        LZ4F_initStream(lz4ctx, prefixSize ? NULL : cdict, level, LZ4F_blockLinked);
-    }
-    if (level >= LZ4HC_CLEVEL_MIN) {
-        LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)lz4ctx, (int)prefs->favorDecSpeed);
-    }
+    assert(prefixSize <= LZ4F_MT_PREFIX_SIZE);
     if (prefixSize) {
-        assert(blockMode == LZ4F_blockLinked);
-        assert(prefixSize <= LZ4F_MT_PREFIX_SIZE);
-        if (level < LZ4HC_CLEVEL_MIN) {
-            LZ4_loadDict((LZ4_stream_t*)lz4ctx, (const char*)src - prefixSize, (int)prefixSize);
-        } else {
-            LZ4_loadDictHC((LZ4_streamHC_t*)lz4ctx, (const char*)src - prefixSize, (int)prefixSize);
-        }
+        LZ4F_startStream(lz4ctx, prefs, NULL, src - prefixSize, prefixSize);
+    } else {
+        LZ4F_startStream(lz4ctx, prefs, cdict, NULL, 0);
     }
 
     return LZ4F_compressBlocks_internal(dst, dstCapacity,
@@ -1958,7 +1959,7 @@ static BYTE* LZ4F_mt_acquireInBuff(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
 }
 
 /* emits oldest submitted job into @dst + @pos, waiting for it if needed.
- * On error, the job remains submitted : callers invalidate the frame, discarding its jobs (FORWARD_IF_ERROR_MT) */
+ * On error, the job remains submitted : callers invalidate the frame, discarding its jobs (FORWARD_IF_ERROR_INVALIDATE) */
 static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos)
 {
     LZ4F_mtJob_t* const job = mt->jobs + mt->oldest;
@@ -1979,7 +1980,7 @@ static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity
 
 /* emits submitted jobs in order : all of them (@all), or only the already completed ones fitting into @dst
  * (their emission isn't required yet : the others are emitted later).
- * On error, callers invalidate the frame (FORWARD_IF_ERROR_MT) */
+ * On error, callers invalidate the frame (FORWARD_IF_ERROR_INVALIDATE) */
 static size_t LZ4F_mt_emit(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity, size_t pos, int all)
 {
     size_t written = 0;
@@ -2012,18 +2013,6 @@ static void LZ4F_mt_abort(LZ4F_mtCtx_t* mt)
     mt->emitted = 0;
     mt->stableEnd = NULL;
 }
-
-/* a failed operation invalidates the frame, and discards its jobs :
- * next operations fail with compressionState_uninitialized, until LZ4F_compressBegin().
- * Idempotent : also employed to forward errors of functions which already invalidated the frame */
-#define FORWARD_IF_ERROR_MT(r, cctx) do {   \
-        size_t const err_code = (r);         \
-        if (LZ4F_isError(err_code)) {        \
-            LZ4F_mt_abort((cctx)->mt);       \
-            (cctx)->cStage = 0;              \
-            return err_code;                 \
-        }                                    \
-    } while (0)
 
 static void LZ4F_mt_freeStates(LZ4F_mtCtx_t* mt, LZ4F_CustomMem cmem)
 {
@@ -2203,7 +2192,7 @@ static size_t LZ4F_mt_flush(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity, si
     LZ4F_mtCtx_t* const mt = cctx->mt;
     if (mt->filling) LZ4F_mt_submit(mt, LZ4F_mt_fillingSlot(mt));
     {   size_t const r = LZ4F_mt_emit(mt, dst, dstCapacity, pos, 1);
-        FORWARD_IF_ERROR_MT(r, cctx);
+        FORWARD_IF_ERROR_INVALIDATE(r, cctx);
         return r;
     }
 }
@@ -2290,13 +2279,16 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
             if (mt->nbSubmitted >= LZ4F_mt_nbUsableSlots(mt)) {
                 /* all slots busy : emit oldest job, to free a slot */
                 size_t const r = LZ4F_mt_emitOldest(mt, dst, dstCapacity, pos);
-                FORWARD_IF_ERROR_MT(r, cctx);
+                FORWARD_IF_ERROR_INVALIDATE(r, cctx);
                 pos += r;
                 assert(job == LZ4F_mt_fillingSlot(mt));
             }
             if (job->outBuff == NULL) {   /* first use of this slot */
                 job->outBuff = (BYTE*)LZ4F_malloc(mt->outCapacity, cctx->cmem);
-                if (job->outBuff == NULL) FORWARD_IF_ERROR_MT(LZ4F_returnErrorCode(LZ4F_ERROR_allocation_failed), cctx);
+                if (job->outBuff == NULL) {
+                    LZ4F_invalidateFrame(cctx);
+                    RETURN_ERROR(allocation_failed);
+                }
             }
             mt->filling = 1;
             job->mode = mode;
@@ -2318,7 +2310,8 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
             job->inBuff = LZ4F_mt_acquireInBuff(mt, cctx->cmem);
             if (job->inBuff == NULL) {
                 mt->filling = 0;
-                FORWARD_IF_ERROR_MT(LZ4F_returnErrorCode(LZ4F_ERROR_allocation_failed), cctx);
+                LZ4F_invalidateFrame(cctx);
+                RETURN_ERROR(allocation_failed);
             }
             job->src = job->inBuff + LZ4F_MT_PREFIX_SIZE;
             job->srcSize = 0;
@@ -2341,11 +2334,11 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
 
     if (cctx->prefs.autoFlush) {
         size_t const r = LZ4F_mt_flush(cctx, dst, dstCapacity, pos);
-        FORWARD_IF_ERROR_MT(r, cctx);
+        FORWARD_IF_ERROR_INVALIDATE(r, cctx);
         return pos + r;
     }
     {   size_t const r = LZ4F_mt_emit(mt, dst, dstCapacity, pos, 0);
-        FORWARD_IF_ERROR_MT(r, cctx);
+        FORWARD_IF_ERROR_INVALIDATE(r, cctx);
         return pos + r;
     }
 }
@@ -2397,9 +2390,7 @@ static size_t LZ4F_compressUpdateImpl(LZ4F_cctx* cctxPtr,
         if ((blockCompression == LZ4B_UNCOMPRESSED) && (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked)) {
             /* linked blocks : the decoder's history will contain uncompressed data, unknown to the LZ4 state :
              * history is dropped, blocks compressed next don't reference anything before them */
-            LZ4F_initStream(cctxPtr->lz4CtxPtr, NULL, cctxPtr->prefs.compressionLevel, LZ4F_blockLinked);
-            if (cctxPtr->prefs.compressionLevel >= LZ4HC_CLEVEL_MIN)
-                LZ4_favorDecompressionSpeed((LZ4_streamHC_t*)cctxPtr->lz4CtxPtr, (int)cctxPtr->prefs.favorDecSpeed);
+            LZ4F_startStream(cctxPtr->lz4CtxPtr, &cctxPtr->prefs, NULL, NULL, 0);
         }
     }
 
@@ -2540,7 +2531,7 @@ static size_t LZ4F_emitPending(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity,
     pos += LZ4F_copyPending(cctx, dst, dstCapacity, pos);
     if (cctx->mtActive && (cctx->pendingSize == 0)) {
         size_t const r = LZ4F_mt_emitPartial(cctx->mt, dst, dstCapacity, pos);
-        FORWARD_IF_ERROR_MT(r, cctx);
+        FORWARD_IF_ERROR_INVALIDATE(r, cctx);
         pos += r;
     }
     return pos;
@@ -2637,8 +2628,7 @@ size_t LZ4F_compressEnd(LZ4F_cctx* cctxPtr,
     if (cctxPtr->cStage == 1) {
         /* end of frame : no more input */
         if (cctxPtr->prefs.frameInfo.contentSize && (cctxPtr->prefs.frameInfo.contentSize != cctxPtr->totalInSize)) {
-            if (cctxPtr->mtActive) LZ4F_mt_abort(cctxPtr->mt);
-            cctxPtr->cStage = 0;
+            LZ4F_invalidateFrame(cctxPtr);
             RETURN_ERROR(frameSize_wrong);
         }
         cctxPtr->cStage = 2;
