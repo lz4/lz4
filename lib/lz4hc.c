@@ -91,21 +91,23 @@ typedef struct {
     int nbSearches;
     U32 targetLength;
     int nbSearchesSeq;   /* lz4opt with favorDecSpeed only : budget at positions only worth searching to save a sequence */
+    int dictCopyMin;     /* attached dictionary : from this input size, its tables (256 KB) are copied rather than referenced (dictCtx),
+                          * which compresses as well or better, and pays off sooner at levels which search more */
 } cParams_t;
 static const cParams_t k_clTable[LZ4HC_CLEVEL_MAX+1] = {
-    { lz4mid,    2, 16,  0 },  /* 0, unused */
-    { lz4mid,    2, 16,  0 },  /* 1, unused */
-    { lz4mid,    2, 16,  0 },  /* 2 */
-    { lz4hc,     4, 16,  0 },  /* 3 */
-    { lz4hc,     8, 16,  0 },  /* 4 */
-    { lz4hc,    16, 16,  0 },  /* 5 */
-    { lz4hc,    32, 16,  0 },  /* 6 */
-    { lz4hc,    64, 16,  0 },  /* 7 */
-    { lz4hc,   128, 16,  0 },  /* 8 */
-    { lz4hc,   256, 16,  0 },  /* 9 */
-    { lz4opt,   96, 64,  1 },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
-    { lz4opt,  512,128,  2 },  /*11 */
-    { lz4opt,16384,LZ4_OPT_NUM, 64 },  /* 12==LZ4HC_CLEVEL_MAX */
+    { lz4mid,    2, 16,  0, 4 KB },  /* 0, unused */
+    { lz4mid,    2, 16,  0, 4 KB },  /* 1, unused */
+    { lz4mid,    2, 16,  0, 4 KB },  /* 2 */
+    { lz4hc,     4, 16,  0, 4 KB },  /* 3 */
+    { lz4hc,     8, 16,  0, 4 KB },  /* 4 */
+    { lz4hc,    16, 16,  0, 4 KB },  /* 5 */
+    { lz4hc,    32, 16,  0, 4 KB },  /* 6 */
+    { lz4hc,    64, 16,  0, 4 KB },  /* 7 */
+    { lz4hc,   128, 16,  0, 4 KB },  /* 8 */
+    { lz4hc,   256, 16,  0, 4 KB },  /* 9 */
+    { lz4opt,   96, 64,  1, 4 KB },  /*10==LZ4HC_CLEVEL_OPT_MIN*/
+    { lz4opt,  512,128,  2, 2 KB },  /*11 */
+    { lz4opt,16384,LZ4_OPT_NUM, 64, 1 KB },  /* 12==LZ4HC_CLEVEL_MAX */
 };
 
 static cParams_t LZ4HC_getCLevelParams(int cLevel)
@@ -1542,7 +1544,7 @@ LZ4HC_compress_generic_dictCtx (
     if (position >= 64 KB) {
         ctx->dictCtx = NULL;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
-    } else if (position == 0 && *srcSizePtr >= 4 KB && isStateCompatible(ctx, ctx->dictCtx)) {
+    } else if (position == 0 && *srcSizePtr >= LZ4HC_getCLevelParams(cLevel).dictCopyMin && isStateCompatible(ctx, ctx->dictCtx)) {
         /* parameters belong to the working context, not to the dictionary */
         LZ4_i8 const favorDecSpeed = ctx->favorDecSpeed;
         LZ4_memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
