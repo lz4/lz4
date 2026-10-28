@@ -85,7 +85,8 @@ ifeq ($(HAVE_MULTITHREAD), 1)
   THREAD_MSG := ==> built with multithreading support
   # LZ4F_MULTITHREAD : liblz4 sources are compiled into lz4, and compress frames with worker threads
   THREAD_CPP := -DLZ4IO_MULTITHREAD -DLZ4F_MULTITHREAD=1
-  ifeq ($(HAVE_PTHREAD), 1)
+  # MinGW and Windows : Windows threads, as in lib/Makefile (clang warns that -pthread is unused)
+  ifeq ($(HAVE_PTHREAD)$(filter MINGW% Windows%,$(TARGET_OS)), 1)
     THREAD_LD  := -pthread
   endif
 else
