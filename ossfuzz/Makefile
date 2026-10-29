@@ -47,7 +47,8 @@ FUZZERS := \
 	compress_frame_stream_fuzzer \
 	round_trip_frame_fuzzer \
 	round_trip_frame_uncompressed_fuzzer \
-	decompress_frame_fuzzer
+	decompress_frame_fuzzer \
+	file_fuzzer
 
 .PHONY: all
 all: $(FUZZERS)
@@ -84,6 +85,7 @@ fuzz_data_producer_test: fuzz_data_producer_test.o fuzz_data_producer.o
 clean: compress_fuzzer_clean decompress_fuzzer_clean \
 	compress_frame_fuzzer_clean compress_frame_stream_fuzzer_clean compress_hc_fuzzer_clean \
 	decompress_frame_fuzzer_clean round_trip_frame_fuzzer_clean \
-	round_trip_fuzzer_clean round_trip_hc_fuzzer_clean round_trip_stream_fuzzer_clean
+	round_trip_fuzzer_clean round_trip_hc_fuzzer_clean round_trip_stream_fuzzer_clean \
+	file_fuzzer_clean
 	$(RM) fuzz_data_producer_test fuzz_data_producer_test.o fuzz_data_producer.o
 	$(MAKE) -C $(LZ4DIR) clean

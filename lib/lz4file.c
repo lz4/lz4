@@ -79,7 +79,11 @@ static LZ4F_errorCode_t returnErrorCode(LZ4F_errorCodes code)
  * frame starts, and block starts within frames using independent blocks.
  * They are spaced by at least LZ4F_RESUME_SPAN bytes of decoded data, to bound memory usage.
  * The start of file is an implicit resume point. */
-#define LZ4F_RESUME_SPAN (1 << 20)
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+#  define LZ4F_RESUME_SPAN 64           /* resume points within small fuzzing inputs */
+#else
+#  define LZ4F_RESUME_SPAN (1 << 20)
+#endif
 #define LZ4F_SKIP_BUFFER_SIZE (64 << 10)
 
 typedef struct {
