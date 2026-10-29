@@ -87,6 +87,12 @@ TEST(decompress_safe_oneByteInput)
     ASSERT(LZ4_decompress_safe((const char*)src, decoded, 1, DECODED_CAPACITY) < 0);
 }
 
+TEST(decompress_safe_nullInput)
+{
+    char* const decoded = (char*)UT_malloc(DECODED_CAPACITY);
+    ASSERT(LZ4_decompress_safe(NULL, decoded, 1, DECODED_CAPACITY) < 0);
+}
+
 /* 14 bytes of literals, followed by a 14 byte match :
  * must not read beyond the end of the input (#508) */
 TEST(decompress_safe_shortcutEdgeCase)
@@ -213,6 +219,48 @@ TEST(decompress_safe_partial_usingDict_srcSizeBeyondBlock)
 
 
 /*-************************************
+*  Decoding edge cases
+**************************************/
+/* zero capacity : only an empty block (a single token 0) succeeds, or partial decoding of nothing */
+TEST(decompress_safe_zeroCapacity)
+{
+    static const char empty[2] = { 0, 0 };
+    static const char literal[2] = { 0x10, 'a' };
+    int const srcSize = 1 KB;
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const cBlock = (char*)UT_malloc(LZ4_COMPRESSBOUND(srcSize));
+    int const cSize = LZ4_compress_default(src, cBlock, srcSize, LZ4_COMPRESSBOUND(srcSize));
+    char dst[1];
+    ASSERT(cSize > 0);
+    ASSERT_EQ(LZ4_decompress_safe(empty, dst, 1, 0), 0);
+    ASSERT(LZ4_decompress_safe(empty, dst, 2, 0) < 0);   /* trailing byte */
+    ASSERT(LZ4_decompress_safe(literal, dst, 2, 0) < 0);
+    ASSERT_EQ(LZ4_decompress_safe_partial(cBlock, dst, cSize, 0, 0), 0);
+    ASSERT(LZ4_decompress_safe(cBlock, dst, cSize, -1) < 0);
+}
+
+/* LZ4_decompress_fast() reads the single token of an empty block */
+TEST(decompress_fast_emptyBlock)
+{
+    static const char empty[1] = { 0 };
+    char dst[1];
+    ASSERT_EQ(LZ4_decompress_fast(empty, dst, 0), 1);
+}
+
+TEST(decompress_fast_usingDict_noDict)
+{
+    int const srcSize = 4 KB;
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const cBlock = (char*)UT_malloc(LZ4_COMPRESSBOUND(srcSize));
+    char* const decoded = (char*)UT_malloc(srcSize);
+    int const cSize = LZ4_compress_default(src, cBlock, srcSize, LZ4_COMPRESSBOUND(srcSize));
+    ASSERT(cSize > 0);
+    ASSERT_EQ(LZ4_decompress_fast_usingDict(cBlock, decoded, srcSize, NULL, 0), cSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
+}
+
+
+/*-************************************
 *  One-shot compression
 **************************************/
 /* to be tested with UBSan */
@@ -227,6 +275,73 @@ TEST(compress_default_nullInput)
 TEST(compress_default_nullInputAndOutput)
 {
     ASSERT_EQ(LZ4_compress_default(NULL, NULL, 0, 0), 0);
+}
+
+/* rejected without being read */
+TEST(compress_default_tooLargeInput)
+{
+    char const src[1] = { 0 };
+    char dst[16];
+    ASSERT_EQ(LZ4_compress_default(src, dst, LZ4_MAX_INPUT_SIZE + 1, (int)sizeof(dst)), 0);
+}
+
+/* an empty block takes 1 byte ; nothing fits into 0 byte */
+TEST(compress_smallCapacity)
+{
+    const char* const src = (const char*)UT_sample(1 KB);
+    char dst[1];
+    int srcSize = 0;
+    ASSERT_EQ(LZ4_compress_default(src, dst, 0, 1), 1);
+    ASSERT_EQ(LZ4_compress_destSize(src, dst, &srcSize, 1), 1);
+    ASSERT_EQ(srcSize, 0);
+    srcSize = 1 KB;
+    ASSERT_EQ(LZ4_compress_destSize(src, dst, &srcSize, 1), 1);   /* empty block, no input consumed */
+    ASSERT_EQ(srcSize, 0);
+    srcSize = 1 KB;
+    ASSERT_EQ(LZ4_compress_destSize(src, dst, &srcSize, 0), 0);
+}
+
+/* LZ4_compress_destSize_extState() initializes its state */
+TEST(compress_destSize_extState_dirtyState)
+{
+    int const srcSize = 64 KB, targetDstSize = 16 KB;
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)targetDstSize);
+    char* const dst = (char*)UT_malloc((size_t)targetDstSize);
+    LZ4_stream_t* const state = (LZ4_stream_t*)UT_malloc(sizeof(LZ4_stream_t));
+    int refConsumed = srcSize, consumed = srcSize;
+    int refSize, cSize;
+    LZ4_initStream(state, sizeof(*state));
+    refSize = LZ4_compress_destSize_extState(state, src, ref, &refConsumed, targetDstSize, 1);
+    ASSERT(refSize > 0);
+    memset(state, 0xA5, sizeof(*state));
+    cSize = LZ4_compress_destSize_extState(state, src, dst, &consumed, targetDstSize, 1);
+    ASSERT(cSize == refSize && consumed == refConsumed && !memcmp(dst, ref, (size_t)cSize));
+}
+
+/* deprecated functions give the same output as their replacements */
+TEST(compress_deprecatedFunctions)
+{
+    int const srcSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_stream_t* const stream = newStream();
+    int refSize = LZ4_compress_default(src, ref, srcSize, capacity);
+    ASSERT(refSize > 0);
+    ASSERT(LZ4_compress_withState(stream, src, dst, srcSize) == refSize && !memcmp(dst, ref, (size_t)refSize));
+    ASSERT(LZ4_compress_limitedOutput_withState(stream, src, dst, srcSize, capacity) == refSize && !memcmp(dst, ref, (size_t)refSize));
+
+    LZ4_initStream(stream, sizeof(*stream));
+    refSize = LZ4_compress_fast_continue(stream, src, ref, srcSize, capacity, 1);
+    ASSERT(refSize > 0);
+    LZ4_initStream(stream, sizeof(*stream));
+    ASSERT(LZ4_compress_continue(stream, src, dst, srcSize) == refSize && !memcmp(dst, ref, (size_t)refSize));
+    LZ4_initStream(stream, sizeof(*stream));
+    ASSERT(LZ4_compress_limitedOutput_continue(stream, src, dst, srcSize, capacity) == refSize && !memcmp(dst, ref, (size_t)refSize));
+    ASSERT_EQ(LZ4_resetStreamState(stream, dst), 0);   /* the stream had a history */
+    ASSERT(LZ4_compress_fast_continue(stream, src, dst, srcSize, capacity, 1) == refSize && !memcmp(dst, ref, (size_t)refSize));
 }
 
 /* acceleration < 1 is replaced by the default acceleration, 1 */
@@ -297,6 +412,63 @@ TEST(initStream_alignment)
 TEST(createStream)
 {
     newStream();
+}
+
+TEST(stream_returnValues)
+{
+    LZ4_streamDecode_t sd;
+    char dict[16] = { 0 };
+    ASSERT_EQ(LZ4_freeStream(NULL), 0);
+    ASSERT_EQ(LZ4_freeStream(LZ4_createStream()), 0);
+    ASSERT_EQ(LZ4_freeStreamDecode(NULL), 0);
+    ASSERT_EQ(LZ4_freeStreamDecode(LZ4_createStreamDecode()), 0);   /* released : checked by LeakSanitizer */
+    ASSERT_EQ(LZ4_setStreamDecode(&sd, dict, (int)sizeof(dict)), 1);
+    ASSERT_EQ(LZ4_setStreamDecode(&sd, NULL, 0), 1);
+}
+
+/* LZ4_loadDict() returns the loaded size : 0 below HASH_UNIT, at most 64 KB */
+TEST(loadDict_returnedSize)
+{
+    static const int sizes[][2] = { { 3, 0 }, { 8, 8 }, { 1 KB, 1 KB }, { 63 KB + 512, 63 KB + 512 },
+                                    { 64 KB + 512, 64 KB }, { 100 KB, 64 KB } };
+    const char* const dict = (const char*)UT_sample(100 KB);
+    LZ4_stream_t* const stream = newStream();
+    size_t i;
+    for (i = 0; i < ARRAY_SIZE(sizes); i++) {
+        int const loaded = LZ4_loadDict(stream, dict, sizes[i][0]);
+        ASSERT_MSG(loaded == sizes[i][1], "dictionary of %i bytes : %i loaded, instead of %i", sizes[i][0], loaded, sizes[i][1]);
+    }
+}
+
+/* acceleration < 1 is replaced by 1, > LZ4_ACCELERATION_MAX by LZ4_ACCELERATION_MAX,
+ * by streaming and fastReset compression too */
+TEST(compress_fast_continue_outOfRangeAcceleration)
+{
+    static const int accels[][2] = { { 0, 1 }, { -1, 1 }, { INT_MIN, 1 },
+                                     { LZ4_ACCELERATION_MAX + 1, LZ4_ACCELERATION_MAX }, { INT_MAX, LZ4_ACCELERATION_MAX } };
+    int const srcSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_stream_t* const stream = newStream();
+    size_t i;
+    for (i = 0; i < ARRAY_SIZE(accels); i++) {
+        int refSize, cSize;
+        LZ4_initStream(stream, sizeof(*stream));
+        refSize = LZ4_compress_fast_continue(stream, src, ref, srcSize, capacity, accels[i][1]);
+        LZ4_initStream(stream, sizeof(*stream));
+        cSize = LZ4_compress_fast_continue(stream, src, dst, srcSize, capacity, accels[i][0]);
+        ASSERT_MSG(refSize > 0 && cSize == refSize && !memcmp(dst, ref, (size_t)cSize),
+                   "LZ4_compress_fast_continue(), acceleration %i : output differs from acceleration %i", accels[i][0], accels[i][1]);
+
+        LZ4_initStream(stream, sizeof(*stream));
+        refSize = LZ4_compress_fast_extState_fastReset(stream, src, ref, srcSize, capacity, accels[i][1]);
+        LZ4_initStream(stream, sizeof(*stream));
+        cSize = LZ4_compress_fast_extState_fastReset(stream, src, dst, srcSize, capacity, accels[i][0]);
+        ASSERT_MSG(refSize > 0 && cSize == refSize && !memcmp(dst, ref, (size_t)cSize),
+                   "LZ4_compress_fast_extState_fastReset(), acceleration %i : output differs from acceleration %i", accels[i][0], accels[i][1]);
+    }
 }
 
 TEST(compress_fast_continue_roundTrip)
@@ -845,6 +1017,18 @@ static size_t writeSequence(unsigned char* op, const unsigned char* literals, si
  * Worst case : decoding restarts at the beginning of the ring with maxBlockSize-1 bytes left at its end,
  * then a wide copy (long literals or long match) is followed by a match at maximum distance */
 #define FORMER_DECODER_RING_BUFFER_SIZE(maxBlockSize) (65536 + 14 + (maxBlockSize))   /* up to v1.10.0 */
+/* 0 for invalid sizes, at least LZ4_DECODER_RING_BUFFER_SIZE(16) */
+TEST(decoderRingBufferSize_values)
+{
+    ASSERT_EQ(LZ4_decoderRingBufferSize(-1), 0);
+    ASSERT_EQ(LZ4_decoderRingBufferSize(LZ4_MAX_INPUT_SIZE + 1), 0);
+    ASSERT_EQ(LZ4_decoderRingBufferSize(0), LZ4_DECODER_RING_BUFFER_SIZE(16));
+    ASSERT_EQ(LZ4_decoderRingBufferSize(15), LZ4_DECODER_RING_BUFFER_SIZE(16));
+    ASSERT_EQ(LZ4_decoderRingBufferSize(16), LZ4_DECODER_RING_BUFFER_SIZE(16));
+    ASSERT_EQ(LZ4_decoderRingBufferSize(17), LZ4_DECODER_RING_BUFFER_SIZE(17));
+    ASSERT_EQ(LZ4_decoderRingBufferSize(LZ4_MAX_INPUT_SIZE), LZ4_DECODER_RING_BUFFER_SIZE(LZ4_MAX_INPUT_SIZE));
+}
+
 TEST(decompress_safe_continue_decoderRingBufferSize)
 {
     const char* const src = (const char*)UT_sample(RB_INPUT_SIZE);
