@@ -26,6 +26,8 @@
 #include "unittest.h"
 #include "lz4frame_helpers.h"
 #include <stdio.h>    /* tmpfile, fclose */
+#include <stdlib.h>   /* malloc, free */
+#include <string.h>   /* memset */
 
 size_t checkLZ4F(size_t r, const char* expr, const char* file, int line)
 {
@@ -72,6 +74,42 @@ FILE* newTmpFile(void)
     FILE* const file = (FILE*)UT_defer(closeFile, tmpfile());
     ASSERT(file != NULL);
     return file;
+}
+
+void* failingAlloc(void* state, size_t size)
+{
+    allocState_t* const s = (allocState_t*)state;
+    if (++s->nbAllocs == s->failAt) return NULL;
+    s->live++;
+    return malloc(size);
+}
+
+void countingFree(void* state, void* address)
+{
+    if (address == NULL) return;
+    ((allocState_t*)state)->live--;
+    free(address);
+}
+
+allocState_t* newAllocState(void)
+{
+    allocState_t* const s = (allocState_t*)UT_malloc(sizeof(*s));
+    memset(s, 0, sizeof(*s));
+    return s;
+}
+
+LZ4F_cctx* createCctx(allocState_t* mem)
+{
+    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
+    LZ4F_cctx* const cctx = LZ4F_createCompressionContext_advanced(cmem, LZ4F_VERSION);
+    return cctx ? (LZ4F_cctx*)UT_defer(freeCctx, cctx) : NULL;
+}
+
+LZ4F_dctx* createDctx(allocState_t* mem)
+{
+    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
+    LZ4F_dctx* const dctx = LZ4F_createDecompressionContext_advanced(cmem, LZ4F_VERSION);
+    return dctx ? (LZ4F_dctx*)UT_defer(freeDctx, dctx) : NULL;
 }
 
 void assertDecodesTo(const void* frame, size_t frameSize,

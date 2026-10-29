@@ -1042,6 +1042,350 @@ TEST(decompress_headerByteAfterByte)
     ASSERT_MEMEQ(decoded, src, srcSize);
 }
 
+/* decodes @frame with all remaining input available, into outputs of @sizes[0], @sizes[1], ... bytes (cycling) :
+ * contiguous outputs (@reuse == 0), or a single output buffer, copied into @dst then overwritten after each invocation
+ * @return : decoded size */
+static size_t decompressIntoOutputs(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapacity,
+                                    const BYTE* frame, size_t frameSize, const void* dict, size_t dictSize,
+                                    const size_t* sizes, size_t nbSizes, int reuse)
+{
+    size_t maxSize = 0, pos = 0, dPos = 0, r = 1, k;
+    BYTE* out;
+    for (k = 0; k < nbSizes; k++) maxSize = MAX(maxSize, sizes[k]);
+    out = reuse ? (BYTE*)UT_malloc(maxSize) : NULL;
+    for (k = 0; r != 0; k++) {
+        size_t cSize = frameSize - pos;
+        size_t dSize = MIN(sizes[k % nbSizes], dstCapacity - dPos);
+        r = LZ4F_OK(LZ4F_decompress_usingDict(dctx, reuse ? out : dst + dPos, &dSize, frame + pos, &cSize, dict, dictSize, NULL));
+        ASSERT_MSG(cSize > 0 || dSize > 0 || r == 0, "no progress at position %u", (unsigned)pos);
+        if (reuse) {
+            memcpy(dst + dPos, out, dSize);
+            memset(out, 0xA5, maxSize);   /* previous output is no longer available */
+        }
+        pos += cSize;
+        dPos += dSize;
+    }
+    ASSERT_EQ(pos, frameSize);
+    if (reuse) UT_release(out);
+    return dPos;
+}
+
+static size_t decompressIntoChunks(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapacity,
+                                   const BYTE* frame, size_t frameSize,
+                                   const void* dict, size_t dictSize, size_t chunk, int reuse)
+{
+    return decompressIntoOutputs(dctx, dst, dstCapacity, frame, frameSize, dict, dictSize, &chunk, 1, reuse);
+}
+
+/* decoding into outputs of various sizes, contiguous or not (dstBuffer can change between invocations) :
+ * the decoder keeps the 64 KB of history needed by linked blocks, including matches at the maximum distance (65535),
+ * across several small blocks, and into the dictionary */
+TEST(decompress_historyIntoSmallOutputs)
+{
+    static const size_t s1[] = { 1 }, s2[] = { 7 }, s3[] = { 1000 }, s4[] = { 10 KB - 1 }, s5[] = { 64 KB + 1 },
+                        s6[] = { 1000, 200 KB }, s7[] = { 200 KB, 1, 33 KB };
+    static const struct { const size_t* sizes; size_t nb; } outputs[] = {
+        { s1, 1 }, { s2, 1 }, { s3, 1 }, { s4, 1 }, { s5, 1 }, { s6, 2 }, { s7, 3 } };
+    size_t const period = 65535;   /* maximum match distance */
+    size_t const dictSize = 64 KB;
+    size_t const srcSize = 300 KB + 7;
+    static const size_t blockSizes[] = { 10 KB, 500, 64 KB - 100 };   /* small blocks : history spans several blocks */
+    BYTE* const dict = (BYTE*)UT_noise(dictSize);
+    BYTE* const src = (BYTE*)UT_malloc(srcSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
+    size_t capacity, i, withDict, bi;
+    BYTE* frame;
+    /* each period repeats the previous one, with a byte changed every 1000 :
+     * matches at the maximum distance, which can't be found anywhere else */
+    memcpy(src, dict + dictSize - period, period);   /* first period : the end of the dictionary */
+    for (i = period; i < srcSize; i++) src[i] = (i % 1000) ? src[i - period] : (BYTE)UT_rand();
+    capacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
+    frame = (BYTE*)UT_malloc(capacity);
+    for (bi = 0; bi < ARRAY_SIZE(blockSizes); bi++)
+    for (withDict = 0; withDict <= 1; withDict++) {
+        size_t const blockSize = blockSizes[bi];
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+        LZ4F_compressOptions_t stable;
+        LZ4F_cctx* const cctx = newCctx();
+        const void* const d = withDict ? dict : NULL;
+        size_t const dSize = withDict ? dictSize : 0;
+        size_t frameSize, oi, consumed;
+        prefs.compressionLevel = 9;   /* finds matches at the maximum distance */
+        prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        prefs.autoFlush = 1;          /* a block per invocation */
+        memset(&stable, 0, sizeof(stable));
+        stable.stableSrc = LZ4F_srcStable;   /* history remains within @src */
+        frameSize = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, frame, capacity, d, dSize, &prefs));
+        for (consumed = 0; consumed < srcSize; consumed += blockSize) {
+            size_t const size = MIN(blockSize, srcSize - consumed);
+            frameSize += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + frameSize, capacity - frameSize, src + consumed, size, &stable));
+        }
+        frameSize += LZ4F_OK(LZ4F_compressEnd(cctx, frame + frameSize, capacity - frameSize, NULL));
+        ASSERT_MSG(frameSize < 2 * period, "%u bytes : long distance matches not found", (unsigned)frameSize);
+        for (oi = 0; oi < ARRAY_SIZE(outputs); oi++) {
+            int reuse;
+            for (reuse = 0; reuse <= 1; reuse++) {
+                LZ4F_dctx* const dctx = newDctx();
+                memset(decoded, 0, srcSize);
+                ASSERT_EQ(decompressIntoOutputs(dctx, decoded, srcSize, frame, frameSize, d, dSize,
+                                                outputs[oi].sizes, outputs[oi].nb, reuse), srcSize);
+                ASSERT_MSG(!memcmp(decoded, src, srcSize), "blocks of %u bytes, dictionary %u, outputs %u, reused output %i : corrupted",
+                           (unsigned)blockSize, (unsigned)withDict, (unsigned)oi, reuse);
+                UT_release(dctx);
+            }
+        }
+    }
+}
+
+/* feeding exactly the hinted nb of bytes : each invocation consumes all of them,
+ * frames end exactly where the hint becomes 0, and each block is decoded by a single invocation */
+TEST(decompress_followingHints)
+{
+    size_t const payloadSize = 100;
+    size_t const srcSize = 200 KB;
+    const void* const src = UT_sample(srcSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_dctx* const dctx = newDctx();
+    size_t ends[16] = { 0 };   /* header, 4 blocks, endMark, checksum */
+    size_t capacity, frameSize, nbBlocks, total, pos, dPos, f;
+    BYTE* buffer;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.contentSize = srcSize;   /* header of 15 bytes */
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    capacity = 8 + payloadSize + LZ4F_compressFrameBound(srcSize, &prefs);
+    buffer = (BYTE*)UT_malloc(capacity);
+    memset(buffer, 0, 8 + payloadSize);   /* skippable frame, then a frame */
+    writeLE32(buffer, LZ4F_MAGIC_SKIPPABLE_START);
+    writeLE32(buffer + 4, (unsigned)payloadSize);
+    frameSize = LZ4F_OK(LZ4F_compressFrame(buffer + 8 + payloadSize, capacity - 8 - payloadSize, src, srcSize, &prefs));
+    nbBlocks = frameElementEnds(ends, ARRAY_SIZE(ends), buffer + 8 + payloadSize, frameSize) - 3;   /* minus header, endMark, checksum */
+    total = 8 + payloadSize + frameSize;
+
+    for (pos = dPos = f = 0; f < 2; f++) {
+        size_t const frameEnd = f ? total : 8 + payloadSize;
+        size_t const expectedCalls = f ? 2 + nbBlocks + 1 : 3;   /* header in 2 parts (minimum, then rest), blocks, checksum */
+        size_t zero = 0, calls = 0;
+        size_t hint = LZ4F_OK(LZ4F_decompress(dctx, NULL, &zero, NULL, &zero, NULL));   /* start of a frame */
+        while (pos < frameEnd) {
+            size_t const given = hint;
+            size_t cSize = given, dSize = srcSize - dPos;
+            ASSERT_MSG(hint > 0 && pos + hint <= frameEnd, "frame %u, position %u : hint %u", (unsigned)f, (unsigned)pos, (unsigned)hint);
+            hint = LZ4F_OK(LZ4F_decompress(dctx, decoded + dPos, &dSize, buffer + pos, &cSize, NULL));
+            ASSERT_EQ(cSize, given);
+            pos += cSize;
+            dPos += dSize;
+            calls++;
+        }
+        ASSERT_EQ(pos, frameEnd);
+        ASSERT_EQ(hint, 0);
+        ASSERT_MSG(calls == expectedCalls, "frame %u : %u invocations instead of %u", (unsigned)f, (unsigned)calls, (unsigned)expectedCalls);
+    }
+    ASSERT_EQ(dPos, srcSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
+}
+
+/* skippable frame : while its size field is incomplete, the hint is the nb of missing bytes */
+TEST(decompress_skippableSizeHints)
+{
+    BYTE frame[8 + 10];
+    char dst[16];
+    LZ4F_dctx* const dctx = newDctx();
+    LZ4F_frameInfo_t frameInfo;
+    size_t size = sizeof(frame), k;
+    memset(frame, 0, sizeof(frame));
+    writeLE32(frame, LZ4F_MAGIC_SKIPPABLE_START);
+    writeLE32(frame + 4, 10);
+    LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, frame, &size));
+    ASSERT_EQ(size, 4);   /* magic number */
+    for (k = 0; k < 4; k++) {   /* size field, byte after byte */
+        size_t cSize = 1, dSize = sizeof(dst);
+        size_t const hint = LZ4F_OK(LZ4F_decompress(dctx, dst, &dSize, frame + 4 + k, &cSize, NULL));
+        ASSERT_EQ(cSize, 1);
+        ASSERT_MSG(hint == ((k < 3) ? 3 - k : 10), "after %u bytes of the size field : hint %u", (unsigned)k + 1, (unsigned)hint);
+    }
+}
+
+/* frame of 64 KB blocks, without checksums, containing @block : header (7 bytes), block, endMark */
+static size_t craftFrame(BYTE* frame, const BYTE* block, size_t blockSize, unsigned uncompressed)
+{
+    size_t const headerSize = LZ4F_OK(LZ4F_compressBegin(newCctx(), frame, LZ4F_HEADER_SIZE_MAX, NULL));
+    ASSERT_EQ(headerSize, 7);
+    writeLE32(frame + 7, (unsigned)blockSize | (uncompressed ? 0x80000000U : 0));
+    memcpy(frame + 11, block, blockSize);
+    writeLE32(frame + 11 + blockSize, 0);
+    return 15 + blockSize;
+}
+
+/* an invalid block is reported, whether it's decoded directly into dstBuffer or into an internal buffer (small dstBuffer) ;
+ * a compressed block decoding into 0 byte is valid */
+TEST(decompress_invalidAndEmptyBlocks)
+{
+    static const BYTE invalid[] = { 0x00, 0xFF, 0xFF };   /* match at distance 65535, before the frame's content */
+    static const BYTE empty[] = { 0x00 };                  /* no literal, no match */
+    static const size_t capacities[] = { 64 KB, 10 };
+    BYTE frame[32];
+    BYTE* const decoded = (BYTE*)UT_malloc(64 KB);
+    size_t frameSize, i;
+    frameSize = craftFrame(frame, invalid, sizeof(invalid), 0);
+    for (i = 0; i < ARRAY_SIZE(capacities); i++) {
+        size_t dSize = capacities[i], cSize = frameSize;
+        ASSERT_LZ4F_ERROR(LZ4F_decompress(newDctx(), decoded, &dSize, frame, &cSize, NULL), LZ4F_ERROR_decompressionFailed);
+    }
+    frameSize = craftFrame(frame, empty, sizeof(empty), 0);
+    for (i = 0; i < ARRAY_SIZE(capacities); i++) {
+        size_t dSize = capacities[i], cSize = frameSize;
+        ASSERT_EQ(LZ4F_OK(LZ4F_decompress(newDctx(), decoded, &dSize, frame, &cSize, NULL)), 0);
+        ASSERT_EQ(dSize, 0);
+        ASSERT_EQ(cSize, frameSize);
+    }
+}
+
+/* a frame abandoned in the middle of a block (output pending within the context), then a reset :
+ * the next frame doesn't output anything from the abandoned one */
+TEST(decompress_resetPendingOutput)
+{
+    size_t const srcSize = 100 KB;
+    const char* const src = (const char*)UT_sample(srcSize);
+    const char* const other = (const char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const frame = (char*)UT_malloc(capacity);
+    char* const frame2 = (char*)UT_malloc(capacity);
+    LZ4F_dctx* const dctx = newDctx();
+    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, NULL));
+    size_t const frameSize2 = LZ4F_OK(LZ4F_compressFrame(frame2, capacity, other, srcSize, NULL));
+    size_t cSize = frameSize, dSize = 1000;
+    LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL));   /* output pending */
+    ASSERT_EQ(dSize, 1000);
+    LZ4F_resetDecompressionContext(dctx);
+    ASSERT_EQ(decompressIntoChunks(dctx, (BYTE*)decoded, srcSize, (const BYTE*)frame2, frameSize2, NULL, 0, 777, 1), srcSize);
+    ASSERT_MEMEQ(decoded, other, srcSize);
+}
+
+/* allocation failures of the decoder's internal buffers are reported, and leave the context usable */
+TEST(decompress_allocFailures)
+{
+    size_t const srcSize = 300 KB;
+    const BYTE* const src = (const BYTE*)UT_sample(srcSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
+    allocState_t* const mem = newAllocState();
+    LZ4F_preferences_t small = LZ4F_INIT_PREFERENCES, large = LZ4F_INIT_PREFERENCES;
+    size_t capacity, smallSize, largeSize, n;
+    BYTE* smallFrame;
+    BYTE* largeFrame;
+    small.frameInfo.blockSizeID = LZ4F_max64KB;
+    large.frameInfo.blockSizeID = LZ4F_max4MB;   /* larger internal buffers */
+    capacity = LZ4F_compressFrameBound(srcSize, &large);
+    smallFrame = (BYTE*)UT_malloc(capacity);
+    largeFrame = (BYTE*)UT_malloc(capacity);
+    smallSize = LZ4F_OK(streamFrame(newCctx(), smallFrame, capacity, src, srcSize, NULL, 0, NULL, &small));
+    largeSize = LZ4F_OK(streamFrame(newCctx(), largeFrame, capacity, src, srcSize, NULL, 0, NULL, &large));
+    for (n = 1; ; n++) {
+        LZ4F_dctx* dctx;
+        size_t pos = 0, r = 1;
+        mem->failAt = 0;
+        dctx = createDctx(mem);
+        ASSERT(dctx != NULL);
+        ASSERT_EQ(decompressIntoChunks(dctx, decoded, srcSize, smallFrame, smallSize, NULL, 0, 1000, 1), srcSize);
+        mem->nbAllocs = 0;
+        mem->failAt = n;
+        while (r != 0) {   /* larger frame : internal buffers are reallocated */
+            size_t cSize = largeSize - pos, dSize = 1000;
+            r = LZ4F_decompress(dctx, decoded, &dSize, largeFrame + pos, &cSize, NULL);
+            if (LZ4F_isError(r)) break;
+            pos += cSize;
+        }
+        mem->failAt = 0;
+        if (mem->nbAllocs < n) {   /* decoding needed fewer allocations : all failure points tested */
+            ASSERT_EQ(r, 0);
+            UT_release(dctx);
+            break;
+        }
+        ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_allocation_failed);
+        /* context remains usable : small frame, by segments, into small outputs (internal buffers) */
+        LZ4F_resetDecompressionContext(dctx);
+        {   size_t sPos = 0, dPos = 0;
+            r = 1;
+            while (r != 0) {
+                size_t cSize = MIN(5000, smallSize - sPos), dSize = MIN(1000, srcSize - dPos);
+                r = LZ4F_OK(LZ4F_decompress(dctx, decoded + dPos, &dSize, smallFrame + sPos, &cSize, NULL));
+                sPos += cSize;
+                dPos += dSize;
+            }
+            ASSERT_EQ(dPos, srcSize);
+            ASSERT_MEMEQ(decoded, src, srcSize);
+        }
+        UT_release(dctx);
+        ASSERT_MSG(mem->live == 0, "allocation %u : memory leak", (unsigned)n);
+    }
+}
+
+/* LZ4F_createCDict_advanced() : each allocation failure is reported, without leak */
+TEST(createCDict_allocFailures)
+{
+    size_t const dictSize = 64 KB;
+    const void* const dict = UT_sample(dictSize);
+    allocState_t* const mem = newAllocState();
+    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
+    size_t n;
+    for (n = 1; ; n++) {
+        LZ4F_CDict* cdict;
+        mem->nbAllocs = 0;
+        mem->failAt = n;
+        cdict = LZ4F_createCDict_advanced(cmem, dict, dictSize);
+        mem->failAt = 0;
+        if (mem->nbAllocs < n) {   /* all failure points tested */
+            ASSERT(cdict != NULL);
+            LZ4F_freeCDict(cdict);
+            break;
+        }
+        ASSERT_MSG(cdict == NULL, "allocation %u : failure not reported", (unsigned)n);
+        ASSERT_MSG(mem->live == 0, "allocation %u : memory leak", (unsigned)n);
+    }
+    ASSERT_EQ(mem->live, 0);
+}
+
+/* allocation failures of flush and end, when a block doesn't fit into dstBuffer (stage buffer), are reported,
+ * and leave the context usable */
+TEST(flushAndEnd_allocFailures)
+{
+    size_t const srcSize = 50 KB;   /* buffered : less than a block */
+    const void* const src = UT_sample(srcSize);
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const dst = (char*)UT_malloc(capacity);
+    allocState_t* const mem = newAllocState();
+    int end;
+    for (end = 0; end <= 1; end++) {
+        size_t n;
+        for (n = 1; ; n++) {
+            LZ4F_cctx* cctx;
+            size_t pos, r;
+            mem->failAt = 0;
+            cctx = createCctx(mem);
+            ASSERT(cctx != NULL);
+            pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, capacity, NULL));
+            pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, capacity - pos, src, srcSize, NULL));
+            mem->nbAllocs = 0;
+            mem->failAt = n;
+            r = end ? LZ4F_compressEnd(cctx, dst + pos, 100, NULL) : LZ4F_flush(cctx, dst + pos, 100, NULL);
+            mem->failAt = 0;
+            if (mem->nbAllocs < n) {   /* all failure points tested */
+                ASSERT_EQ(LZ4F_OK(r), 100);
+                UT_release(cctx);
+                break;
+            }
+            ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_allocation_failed);
+            ASSERT_LZ4F_ERROR(LZ4F_compressUpdate(cctx, dst, capacity, src, 10, NULL), LZ4F_ERROR_compressionState_uninitialized);
+            /* context remains usable */
+            assertDecodesTo(dst, LZ4F_OK(streamFrame(cctx, dst, capacity, src, srcSize, NULL, 0, NULL, NULL)), NULL, 0, src, srcSize);
+            UT_release(cctx);
+            ASSERT_MSG(mem->live == 0, "%s, allocation %u : memory leak", end ? "end" : "flush", (unsigned)n);
+        }
+    }
+}
+
 /* LZ4F_freeDecompressionContext() reports an unfinished frame */
 TEST(freeDecompressionContext_unfinishedFrame)
 {

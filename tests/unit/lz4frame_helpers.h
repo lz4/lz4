@@ -60,6 +60,26 @@ LZ4F_CDict* newCDict(const void* dict, size_t dictSize);
 /* @return : a temporary file, closed at the end of the test */
 FILE* newTmpFile(void);
 
+/* allocator failing its N-th allocation (failAt, counting from 1 ; 0 : never),
+ * and counting allocations not yet freed (live).
+ * Counters are deliberately unprotected : an allocation from a worker thread would be reported by ThreadSanitizer. */
+typedef struct {
+    size_t failAt;
+    size_t nbAllocs;   /* allocations requested */
+    size_t live;
+} allocState_t;
+void* failingAlloc(void* state, size_t size);
+void countingFree(void* state, void* address);
+
+/* @return : allocator state, released at the end of the test :
+ * after the contexts employing it, provided they are created afterwards (resources are released in reverse order) */
+allocState_t* newAllocState(void);
+
+/* @return : context employing the allocator of @mem, released at the end of the test,
+ *           or NULL if its creation fails */
+LZ4F_cctx* createCctx(allocState_t* mem);
+LZ4F_dctx* createDctx(allocState_t* mem);
+
 /* fails the test unless @frame decodes entirely into @expected, using @dict */
 void assertDecodesTo(const void* frame, size_t frameSize,
                      const void* dict, size_t dictSize,
