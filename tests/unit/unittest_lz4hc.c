@@ -137,6 +137,42 @@ TEST(compressHC2_continue_roundTrip)
     }
 }
 
+/* deprecated streaming API : LZ4_slideInputBufferHC() returns the beginning of the input buffer,
+ * where the next block is compressed without history */
+TEST(slideInputBufferHC)
+{
+    int const blockSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(blockSize);
+    const char* const src = (const char*)UT_sample((size_t)(3 * blockSize));
+    char* const buffer = (char*)UT_malloc((size_t)(2 * blockSize));
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)(2 * blockSize));
+    size_t l;
+    for (l = 0; l < ARRAY_SIZE(g_levels); l++) {
+        LZ4_streamHC_t* const ctx = (LZ4_streamHC_t*)UT_defer(freeStreamHC, LZ4_createHC(buffer));
+        LZ4_streamDecode_t sd;
+        int b, cSize, refSize;
+        ASSERT(ctx != NULL);
+        LZ4_setStreamDecode(&sd, NULL, 0);
+        memcpy(buffer, src, (size_t)(2 * blockSize));
+        for (b = 0; b < 2; b++) {   /* the second block references the first one */
+            cSize = LZ4_compressHC2_continue(ctx, buffer + b * blockSize, dst, blockSize, g_levels[l]);
+            ASSERT(cSize > 0);
+            ASSERT_EQ(LZ4_decompress_safe_continue(&sd, dst, decoded + b * blockSize, cSize, blockSize), blockSize);
+        }
+        ASSERT_MEMEQ(decoded, src, (size_t)(2 * blockSize));
+
+        ASSERT(LZ4_slideInputBufferHC(ctx) == buffer);
+        memcpy(buffer, src + 2 * blockSize, (size_t)blockSize);
+        refSize = LZ4_compress_HC(buffer, ref, blockSize, capacity, g_levels[l]);
+        ASSERT(refSize > 0);
+        ASSERT_EQ(LZ4_compressHC2_continue(ctx, buffer, dst, blockSize, g_levels[l]), refSize);
+        ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+        UT_release(ctx);
+    }
+}
+
 /* level 2 : the match tested at ip+1 must not be ip itself, inside runs */
 TEST(compress_HC_level2_runs)
 {
