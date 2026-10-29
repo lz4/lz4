@@ -521,26 +521,33 @@ TEST(compressEnd_wrongContentSize)
     ASSERT_LZ4F_ERROR(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, NULL, &prefs), LZ4F_ERROR_frameSize_wrong);
 }
 
-/* linked blocks reference the dictionary, at fast and HC levels */
+/* linked blocks reference the dictionary, at fast and HC levels.
+ * The input starts with the end of the dictionary (noise) : the first block can't be decoded without the dictionary.
+ * (A size comparison with and without dictionary depends on the data at fast levels : the dictionary enlarges indexes,
+ *  hence halves the hash table of 64 KB blocks) */
 TEST(compressBegin_usingDict)
 {
     static const int levels[] = { 0, 9 };
     size_t const dictSize = 7 KB;   /* small enough for LZ4_MEMORY_USAGE == 10 */
     size_t const srcSize = 66 KB;   /* must be > 64 KB to avoid short-size optimizations */
-    const char* const dict = (const char*)UT_sample(dictSize + srcSize);
-    const char* const src = dict + dictSize;
+    size_t const tailSize = 512;    /* most recent positions : kept by small hash tables (LZ4_MEMORY_USAGE == 10) */
+    const char* const dict = (const char*)UT_noise(dictSize);
+    char* const src = (char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(64 KB);
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
-    void* const frame = UT_malloc(capacity);
+    char* const frame = (char*)UT_malloc(capacity);
     size_t li;
+    memcpy(src, dict + dictSize - tailSize, tailSize);
     for (li = 0; li < ARRAY_SIZE(levels); li++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* 64 KB linked blocks */
-        size_t sizeNoDict, sizeWithDict;
+        size_t frameSize;
+        unsigned blockHeader;
         prefs.compressionLevel = levels[li];
-        sizeNoDict = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
-        sizeWithDict = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, dict, dictSize, NULL, &prefs));
-        ASSERT_MSG(sizeWithDict < sizeNoDict, "level %i : with dictionary : %u bytes, without : %u bytes",
-                   levels[li], (unsigned)sizeWithDict, (unsigned)sizeNoDict);
-        assertDecodesTo(frame, sizeWithDict, dict, dictSize, src, srcSize);
+        frameSize = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, dict, dictSize, NULL, &prefs));
+        assertDecodesTo(frame, frameSize, dict, dictSize, src, srcSize);
+        blockHeader = readLE32(frame + 7);   /* frame header : no content size, no dictID */
+        ASSERT_MSG(LZ4_decompress_safe(frame + 7 + 4, decoded, (int)(blockHeader & 0x7FFFFFFFU), 64 KB) < 0,
+                   "level %i : the first block decodes without dictionary", levels[li]);
     }
 }
 
