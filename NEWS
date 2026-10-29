@@ -52,6 +52,7 @@ api  : `LZ4_ACCELERATION_DEFAULT` and `LZ4_ACCELERATION_MAX` are defined in `lz4
 api  : new `LZ4F_preferences_t.nbWorkers` (experimental) : multithreaded lz4frame compression, same output for any `nbWorkers` >= 1 ; `LZ4F_compressBound()` counts jobs instead of blocks, independently of `nbWorkers`
 api  : new static function `LZ4F_getMaxNbWorkers()` : tells if liblz4 supports multithreaded compression
 api  : `LZ4F_compressOptions_t.stableSrc` : new value `LZ4F_srcStableUntilFlush`, letting worker threads read input in place
+api  : new `LZ4F_compressOptions_t.uncompressed` : `LZ4F_compressUpdate()` stores input as uncompressed blocks ; `LZ4F_uncompressedUpdate()` is deprecated ; `LZ4F_compressOptions_t` must be initialized to zero (`memset()`)
 api  : reserved fields of `LZ4F_preferences_t` and `LZ4F_compressOptions_t` are now scalars : flatten positional initializers `{ 0, 0, 0 }`
 api  : new static macro `LZ4_STREAMHC_EXTSIZE` : HC states initialized on this size include the temporary buffer of levels >= 10, which then allocate nothing ; `LZ4_createStreamHC()`, `LZ4_compress_HC()` and lz4frame employ it (+64 KB per state) : lz4frame worker threads no longer allocate memory
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials

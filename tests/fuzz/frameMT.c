@@ -314,7 +314,7 @@ static unsigned nextRand(unsigned* state)
 typedef struct {
     unsigned stableSrc; /* LZ4F_stableSrc_t */
     int flushes;        /* LZ4F_flush() at random positions */
-    int uncompressed;   /* some slices sent with LZ4F_uncompressedUpdate() */
+    int uncompressed;   /* some slices sent as uncompressed input (LZ4F_compressOptions_t.uncompressed) */
 } streamMode_t;
 
 /* LZ4F_srcStableUntilFlush : once flushed, input can be modified, except its last 64 KB (LZ4F_srcStable guarantee).
@@ -378,11 +378,8 @@ static size_t streamCompress(LZ4F_cctx* cctx, char* dst,
             memcpy(scratch, in, slice);
             in = scratch;
         }
-        if (mode.uncompressed && ((r >> 20) % 5 == 0)) {
-            cSize = LZ4F_uncompressedUpdate(cctx, tmpOut, LZ4F_compressBound(slice, &p), in, slice, &cOpts);
-        } else {
-            cSize = LZ4F_compressUpdate(cctx, tmpOut, LZ4F_compressBound(slice, &p), in, slice, &cOpts);
-        }
+        cOpts.uncompressed = mode.uncompressed && ((r >> 20) % 5 == 0);
+        cSize = LZ4F_compressUpdate(cctx, tmpOut, LZ4F_compressBound(slice, &p), in, slice, &cOpts);
         CHECK_LZ4F(cSize);
         if (scrambled) memset(scratch, 0xA5, slice);   /* input must not be read after invocation */
         memcpy(dst + pos, tmpOut, cSize);

@@ -98,15 +98,18 @@ compress_file_internal(FILE* f_in, FILE* f_out,
       /* input data is at uncompressed data offset */
       if (bytesToOffset <= 0 && uncOffset >= 0 && f_unc) {
         size_t const readSize = fread(inBuff, 1, inSize, f_unc);
+        LZ4F_compressOptions_t uncOpts;
         if (readSize == 0) {
           uncOffset = -1;
           continue;
         }
         count_in += readSize;
-        compressedSize = LZ4F_uncompressedUpdate(ctx,
+        memset(&uncOpts, 0, sizeof(uncOpts));
+        uncOpts.uncompressed = 1;   /* stored as uncompressed blocks */
+        compressedSize = LZ4F_compressUpdate(ctx,
                                              outBuff, outCapacity,
                                              inBuff, readSize,
-                                             NULL);
+                                             &uncOpts);
       } else {
         size_t const readSize = fread(inBuff, 1, inSize, f_in);
         if (readSize == 0) break; /* nothing left to read from input file */

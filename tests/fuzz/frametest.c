@@ -455,6 +455,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                     sampleMax = edge == 3 ? 2 * blockSize : blockSize + edge - 1;
                 }
                 cOptions.stableSrc = ((FUZ_rand(&randState) & 3) == 1);
+                cOptions.uncompressed = uncompressed;
 
                 {   size_t const iSize = MIN(sampleMax, (size_t)(iend-ip));
                     size_t const oSize = LZ4F_compressBound(iSize, prefsPtr);
@@ -468,9 +469,7 @@ int fuzzerTests(U32 seed, unsigned nbTests, unsigned startTest, double compressi
                     dst[dstCapacity] = canaryByte;
                     DISPLAYLEVEL(6, "Sending %u bytes (uncompressed:%u, stableSrc:%u, capacity:%u) \n",
                                     (unsigned)iSize, uncompressed, cOptions.stableSrc, (unsigned)dstCapacity);
-                    flushedSize = uncompressed
-                        ? LZ4F_uncompressedUpdate(cCtx, dst, dstCapacity, ip, iSize, &cOptions)
-                        : LZ4F_compressUpdate(cCtx, dst, dstCapacity, ip, iSize, &cOptions);
+                    flushedSize = LZ4F_compressUpdate(cCtx, dst, dstCapacity, ip, iSize, &cOptions);
                     CHECK(dst[dstCapacity] != canaryByte, "Update writes beyond dstCapacity (uncompressed:%u)", uncompressed);
                     if (smallDst && LZ4F_isError(flushedSize)) {
                         CHECK(LZ4F_getErrorCode(flushedSize) != LZ4F_ERROR_dstCapacity_tooSmall,

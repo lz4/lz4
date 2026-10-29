@@ -552,7 +552,7 @@ static size_t LZ4F_blocksBound(size_t srcSize, size_t blockSize, LZ4F_blockCheck
 
 /*! LZ4F_mtCompressBound() :
  *  LZ4F_compressBound() for frames cut into jobs, without autoFlush : the job is the unit, instead of the block.
- *  LZ4F_compressUpdate() and LZ4F_uncompressedUpdate() defer completed jobs not fitting into dstBuffer :
+ *  LZ4F_compressUpdate() defers completed jobs not fitting into dstBuffer :
  *  output is only required to start a job while all slots are busy (the oldest one),
  *  and an invocation starts at most ceil(srcSize / jobSize) jobs, since the job being filled holds < jobSize bytes.
  *  @srcSize == 0 : LZ4F_flush() and LZ4F_compressEnd() emit at least one whole job per invocation, then the frame footer.
@@ -1424,7 +1424,7 @@ static size_t LZ4F_compressJob(void* lz4ctx, const LZ4F_preferences_t* prefs,
     int const level = prefs->compressionLevel;
     LZ4F_blockMode_t const blockMode = prefs->frameInfo.blockMode;
 
-    if (mode == LZ4B_UNCOMPRESSED) {   /* LZ4F_uncompressedUpdate() */
+    if (mode == LZ4B_UNCOMPRESSED) {   /* LZ4F_compressOptions_t.uncompressed */
         return LZ4F_compressBlocks_internal(dst, dstCapacity, src, srcSize, blockSize,
                                             LZ4F_doNotCompressBlock, NULL, 0, NULL,
                                             prefs->frameInfo.blockChecksumFlag);
@@ -1818,7 +1818,7 @@ typedef struct {
     size_t prefixSize;
     BYTE* inBuff;        /* input buffer (LZ4F_MT_PREFIX_SIZE + jobSize), when content is copied : NULL when read in place */
     BYTE* outBuff;       /* compressed blocks */
-    LZ4F_BlockCompressMode_e mode;   /* LZ4B_UNCOMPRESSED : LZ4F_uncompressedUpdate() segment */
+    LZ4F_BlockCompressMode_e mode;   /* LZ4B_UNCOMPRESSED : uncompressed input (LZ4F_compressOptions_t.uncompressed) */
     size_t cSize;        /* result : compressed size, or error code */
     int done;            /* result available (protected by pool's lock) */
 } LZ4F_mtJob_t;
@@ -2241,7 +2241,7 @@ static size_t LZ4F_mt_emitPartial(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacit
 }
 
 /*! LZ4F_mt_update() :
- *  LZ4F_compressUpdate() and LZ4F_uncompressedUpdate() (@mode), multi-threaded mode.
+ *  LZ4F_compressUpdate(), multi-threaded mode (@mode : compressed or uncompressed input ; @cOptPtr : not NULL).
  *  Input is copied into jobs, submitted once full.
  *  Job content is read in place instead, when it remains available until the job completes :
  *  with stableSrc == LZ4F_srcStableUntilFlush, or with autoFlush, since all jobs complete within the invocation.
@@ -2265,7 +2265,7 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
     size_t pos = 0;
     int const checksum = (cctx->prefs.frameInfo.contentChecksumFlag == LZ4F_contentChecksumEnabled);
     int const linked = (cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked);
-    int const stableUntilFlush = (cOptPtr != NULL) && (cOptPtr->stableSrc == LZ4F_srcStableUntilFlush);
+    int const stableUntilFlush = (cOptPtr->stableSrc == LZ4F_srcStableUntilFlush);
     int const inPlace = cctx->prefs.autoFlush || stableUntilFlush;
     /* stable input remains available : when contiguous with previous input, history can be read in place */
     size_t const prevRun = (stableUntilFlush && srcSize && (istart == mt->stableEnd)) ? mt->stableRun : 0;
@@ -2349,7 +2349,8 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
 
 
 /*! LZ4F_st_update() :
- *  LZ4F_compressUpdate() and LZ4F_uncompressedUpdate() (@blockCompression), single-threaded mode.
+ *  LZ4F_compressUpdate(), single-threaded mode (@blockCompression : compressed or uncompressed input ;
+ *  @compressOptionsPtr : not NULL).
  *  Input first completes the block buffered within cctx, then full blocks are compressed directly from @srcBuffer
  *  (all remaining input with autoFlush), and the remainder is buffered.
  *  A change of @blockCompression first flushes the buffered block. */
@@ -2389,8 +2390,6 @@ static size_t LZ4F_st_update(LZ4F_cctx* cctxPtr,
             LZ4F_startStream(cctxPtr->lz4CtxPtr, &cctxPtr->prefs, NULL, NULL, 0);
         }
     }
-
-    if (compressOptionsPtr == NULL) compressOptionsPtr = &k_cOptionsNull;
 
     /* complete tmp buffer */
     if (cctxPtr->tmpInSize > 0) {   /* some data already within tmp buffer */
@@ -2495,8 +2494,10 @@ static size_t LZ4F_st_update(LZ4F_cctx* cctxPtr,
  *  LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
  *  When successful, the function always entirely consumes @srcBuffer.
  *  src data is either buffered or compressed into @dstBuffer.
- *  If previously an uncompressed block was written, buffered data is flushed
- *  before appending compressed data is continued.
+ *  With @compressOptionsPtr->uncompressed == 1, src data is stored as uncompressed blocks instead.
+ *  With linked blocks, blocks compressed next don't reference data preceding them (single-threaded mode),
+ *  or reference the uncompressed data (multi-threaded mode, see LZ4F_compressJob()).
+ *  A switch between compressed and uncompressed input first flushes buffered data.
  *  Success is guaranteed when @dstCapacity >= LZ4F_compressBound(srcSize, preferencesPtr).
  *  Otherwise, the operation fails with dstCapacity_tooSmall if its output doesn't fit.
  * @compressOptionsPtr is optional : provide NULL to mean "default".
@@ -2509,30 +2510,26 @@ size_t LZ4F_compressUpdate(LZ4F_cctx* cctxPtr,
                      const void* srcBuffer, size_t srcSize,
                      const LZ4F_compressOptions_t* compressOptionsPtr)
 {
+    LZ4F_BlockCompressMode_e mode;
+    if (compressOptionsPtr == NULL) compressOptionsPtr = &k_cOptionsNull;
+    mode = (compressOptionsPtr->uncompressed == 1) ? LZ4B_UNCOMPRESSED : LZ4B_COMPRESSED;
     if (cctxPtr->mtActive)
-        return LZ4F_mt_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, LZ4B_COMPRESSED);
-    return LZ4F_st_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, LZ4B_COMPRESSED);
+        return LZ4F_mt_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, mode);
+    return LZ4F_st_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, mode);
 }
 
-/*! LZ4F_uncompressedUpdate() :
- *  Same as LZ4F_compressUpdate(), but requests blocks to be sent uncompressed.
- *  With linked blocks, blocks compressed next don't reference data preceding them (single-threaded mode),
- *  or reference the uncompressed data (multi-threaded mode, see LZ4F_compressJob()).
- *  Success is guaranteed when @dstCapacity >= LZ4F_compressBound(srcSize, preferencesPtr).
- *  Otherwise, the operation fails with dstCapacity_tooSmall if its output doesn't fit.
- * @compressOptionsPtr is optional : provide NULL to mean "default".
- * @return : the number of bytes written into dstBuffer. It can be zero, meaning input data was just buffered.
- *           or an error code if it fails (which can be tested using LZ4F_isError())
- *  After an error, the frame is invalidated, and must be restarted with LZ4F_compressBegin().
+/*! LZ4F_uncompressedUpdate() : deprecated
+ *  LZ4F_compressUpdate() with option uncompressed.
  */
 size_t LZ4F_uncompressedUpdate(LZ4F_cctx* cctxPtr,
                                void* dstBuffer, size_t dstCapacity,
                          const void* srcBuffer, size_t srcSize,
                          const LZ4F_compressOptions_t* compressOptionsPtr)
 {
-    if (cctxPtr->mtActive)
-        return LZ4F_mt_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, LZ4B_UNCOMPRESSED);
-    return LZ4F_st_update(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, compressOptionsPtr, LZ4B_UNCOMPRESSED);
+    LZ4F_compressOptions_t cOpts = k_cOptionsNull;
+    if (compressOptionsPtr != NULL) cOpts = *compressOptionsPtr;
+    cOpts.uncompressed = 1;
+    return LZ4F_compressUpdate(cctxPtr, dstBuffer, dstCapacity, srcBuffer, srcSize, &cOpts);
 }
 
 
