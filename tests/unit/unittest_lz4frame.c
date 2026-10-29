@@ -1822,16 +1822,18 @@ static size_t autoFlushFrame(LZ4F_cctx* cctx, char* dst, size_t capacity, const 
 }
 
 /* autoFlush, linked blocks, input buffer reused by each update :
- * history remains whole (64 KB), including with updates smaller than the history window */
+ * history remains whole (64 KB) with updates smaller than the history window.
+ * (larger updates are compressed from the buffer, in external dictionary mode,
+ * whose ratio differs slightly from input in place : see compressUpdate_reusedInputBuffer) */
 TEST(compressUpdate_autoFlushReusedBuffer)
 {
     static const int levels[] = { 1, 9 };
-    static const size_t updateSizes[] = { 1 KB, 10 KB, 64 KB - 1, 100 KB };
+    static const size_t updateSizes[] = { 1 KB, 10 KB, 64 KB - 1 };
     size_t const period = 50 KB;   /* noise repeated, with a modified byte every 1000 :
                                     * matches are within previous updates, at distance @period */
     size_t const srcSize = 8 * period;
     char* const src = (char*)UT_malloc(srcSize);
-    char* const buffer = (char*)UT_malloc(100 KB);
+    char* const buffer = (char*)UT_malloc(64 KB);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     size_t capacity, n;
     char* dst;
