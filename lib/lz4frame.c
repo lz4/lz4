@@ -898,7 +898,7 @@ static size_t LZ4F_sizeofLZ4State(LZ4F_CtxType_e ctxType)
     switch (ctxType) {
     case ctxNone: return 0;
     case ctxFast: return sizeof(LZ4_stream_t);
-    case ctxHC:   return sizeof(LZ4_streamHC_t);
+    case ctxHC:   return LZ4_STREAMHC_EXTSIZE;   /* extended : levels >= 10 allocate nothing */
     }
     assert(0);   /* invalid ctxType */
     return 0;
@@ -912,7 +912,7 @@ static void LZ4F_initLZ4State(void* state, LZ4F_CtxType_e ctxType, int level)
         LZ4_initStream(state, sizeof(LZ4_stream_t));
     } else {
         assert(ctxType == ctxHC);
-        LZ4_initStreamHC(state, sizeof(LZ4_streamHC_t));
+        LZ4_initStreamHC(state, LZ4_STREAMHC_EXTSIZE);
         LZ4_setCompressionLevel((LZ4_streamHC_t*)state, level);
     }
 }
@@ -1522,9 +1522,8 @@ typedef struct LZ4F_pool_s LZ4F_pool_t;
 /* Persistent pool of worker threads, started on demand (see LZ4F_pool_submit()), up to maxThreads.
  * Queued jobs are run by worker threads (workerID 1 to nbThreads) :
  * the calling thread only submits jobs and waits for them (without pool, it runs jobs itself : workerID 0).
- * Allocations happen in the calling thread, since @cmem might not be thread-safe.
- * Exception : at levels >= LZ4HC_CLEVEL_OPT_MIN, lz4hc allocates its own temporary buffer (LZ4HC_HEAPMODE)
- * with malloc(), or LZ4_malloc() (LZ4_USER_MEMORY_FUNCTIONS, which must then be thread-safe), within worker threads.
+ * Allocations happen in the calling thread, since @cmem might not be thread-safe :
+ * HC states are extended (LZ4_STREAMHC_EXTSIZE), so lz4hc allocates nothing within worker threads.
  * Note : like any thread, workers don't survive fork() : a forked child must not employ this pool. */
 typedef struct { LZ4F_job_f fn; void* arg; } LZ4F_poolJob_t;
 typedef struct { LZ4F_pool_t* pool; unsigned workerID; } LZ4F_poolWorker_t;

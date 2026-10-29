@@ -556,3 +556,72 @@ TEST(decompress_continue_unsynchronizedRing)
         UT_release(stream);
     }
 }
+
+/* extended states (LZ4_STREAMHC_EXTSIZE) include the temporary buffer of levels >= LZ4HC_CLEVEL_OPT_MIN : same output.
+ * The extension is preserved by resets and dictionary loading, and never taken from an attached dictionary.
+ * @ext : the bytes beyond sizeof(LZ4_streamHC_t), poisoned to detect their use */
+#define EXT_BYTES (LZ4_STREAMHC_EXTSIZE - sizeof(LZ4_streamHC_t))
+static int extEmployed(const char* state) { size_t i; for (i = 0; i < EXT_BYTES; i++) if (state[sizeof(LZ4_streamHC_t) + i] != 0x5A) return 1; return 0; }
+static void extPoison(char* state) { memset(state + sizeof(LZ4_streamHC_t), 0x5A, EXT_BYTES); }
+
+TEST(compress_HC_extendedState)
+{
+    int const srcSize = 130 KB;
+    int const capacity = LZ4_compressBound(srcSize);
+    int const level = LZ4HC_CLEVEL_MAX;
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const ext = (char*)UT_malloc(LZ4_STREAMHC_EXTSIZE);
+    char* const extDict = (char*)UT_malloc(LZ4_STREAMHC_EXTSIZE);
+    char* const plain = (char*)UT_malloc(sizeof(LZ4_streamHC_t));   /* nothing beyond : ASan detects any use of an extension */
+    LZ4_streamHC_t* const s = LZ4_initStreamHC(ext, LZ4_STREAMHC_EXTSIZE);
+    int refSize;
+    ASSERT(s != NULL);
+    refSize = LZ4_compress_HC_extStateHC(plain, src, ref, srcSize, capacity, level);
+    ASSERT(refSize > 0);
+
+    /* employed at optimal levels only */
+    extPoison(ext);
+    ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(s, src, dst, srcSize, capacity, level), refSize);
+    ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+    ASSERT(extEmployed(ext));
+    extPoison(ext);
+    ASSERT(LZ4_compress_HC_extStateHC_fastReset(s, src, dst, srcSize, capacity, LZ4HC_CLEVEL_DEFAULT) > 0);
+    ASSERT(!extEmployed(ext));
+
+    /* preserved by LZ4_loadDictHC(), and by the full reset after a failed compression */
+    LZ4_resetStreamHC_fast(s, level);
+    ASSERT_EQ(LZ4_loadDictHC(s, src, 64 KB), 64 KB);
+    extPoison(ext);
+    ASSERT(LZ4_compress_HC_continue(s, src + 64 KB, dst, srcSize - 64 KB, capacity) > 0);
+    ASSERT(extEmployed(ext));
+    ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, 1), 0);   /* failure : dirty */
+    LZ4_resetStreamHC_fast(s, level);
+    extPoison(ext);
+    ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, capacity), refSize);
+    ASSERT(extEmployed(ext));
+
+    /* attached dictionary, copied at the first block : the extension belongs to the working state */
+    {   LZ4_streamHC_t* const d = LZ4_initStreamHC(extDict, LZ4_STREAMHC_EXTSIZE);
+        LZ4_streamHC_t* const p = LZ4_initStreamHC(plain, sizeof(LZ4_streamHC_t));
+        int dSize;
+        LZ4_setCompressionLevel(d, level);
+        ASSERT_EQ(LZ4_loadDictHC(d, src + 32 KB, 64 KB), 64 KB);
+        LZ4_resetStreamHC_fast(p, level);
+        LZ4_attach_HC_dictionary(p, d);
+        dSize = LZ4_compress_HC_continue(p, src, ref, srcSize, capacity);   /* plain working state */
+        ASSERT(dSize > 0);
+        LZ4_resetStreamHC_fast(s, level);
+        LZ4_attach_HC_dictionary(s, d);
+        extPoison(ext);
+        ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, capacity), dSize);   /* extended working state */
+        ASSERT_MEMEQ(dst, ref, (size_t)dSize);
+        ASSERT(extEmployed(ext));
+    }
+
+    /* LZ4_compress_HC_extStateHC() initializes a state of LZ4_sizeofStateHC() bytes */
+    extPoison(ext);
+    ASSERT(LZ4_compress_HC_extStateHC(ext, src, dst, srcSize, capacity, level) > 0);
+    ASSERT(!extEmployed(ext));
+}

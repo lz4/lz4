@@ -1545,12 +1545,14 @@ LZ4HC_compress_generic_dictCtx (
         ctx->dictCtx = NULL;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else if (position == 0 && *srcSizePtr >= LZ4HC_getCLevelParams(cLevel).dictCopyMin && isStateCompatible(ctx, ctx->dictCtx)) {
-        /* parameters belong to the working context, not to the dictionary */
+        /* parameters and extension belong to the working context, not to the dictionary */
         LZ4_i8 const favorDecSpeed = ctx->favorDecSpeed;
+        LZ4_i8 const hasWorkspace = ctx->hasWorkspace;
         LZ4_memcpy(ctx, ctx->dictCtx, sizeof(LZ4HC_CCtx_internal));
         LZ4HC_setExternalDict(ctx, (const BYTE *)src);
         ctx->compressionLevel = (short)cLevel;
         ctx->favorDecSpeed = favorDecSpeed;
+        ctx->hasWorkspace = hasWorkspace;
         return LZ4HC_compress_generic_noDictCtx(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit);
     } else {
         return LZ4HC_compress_generic_internal(ctx, src, dst, srcSizePtr, dstCapacity, cLevel, limit, usingDictCtxHc);
@@ -1612,17 +1614,18 @@ int LZ4_compress_HC_extStateHC (void* state, const char* src, char* dst, int src
 int LZ4_compress_HC(const char* src, char* dst, int srcSize, int dstCapacity, int compressionLevel)
 {
     int cSize;
-#if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    LZ4_streamHC_t* const statePtr = (LZ4_streamHC_t*)ALLOC(sizeof(LZ4_streamHC_t));
-    if (statePtr==NULL) return 0;
-#else
-    LZ4_streamHC_t state;
-    LZ4_streamHC_t* const statePtr = &state;
-#endif
     DEBUGLOG(5, "LZ4_compress_HC")
-    cSize = LZ4_compress_HC_extStateHC(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
-    FREEMEM(statePtr);
+    {   /* extended state : a single allocation, including the temporary buffer of levels >= 10 */
+        LZ4_streamHC_t* const statePtr = LZ4_initStreamHC(ALLOC(LZ4_STREAMHC_EXTSIZE), LZ4_STREAMHC_EXTSIZE);
+        if (statePtr==NULL) return 0;
+        cSize = LZ4_compress_HC_extStateHC_fastReset(statePtr, src, dst, srcSize, dstCapacity, compressionLevel);
+        FREEMEM(statePtr);
+    }
+#else
+    {   LZ4_streamHC_t state;
+        cSize = LZ4_compress_HC_extStateHC(&state, src, dst, srcSize, dstCapacity, compressionLevel);
+    }
 #endif
     return cSize;
 }
@@ -1647,8 +1650,9 @@ int LZ4_compress_HC_destSize(void* state, const char* source, char* dest, int* s
 LZ4_streamHC_t* LZ4_createStreamHC(void)
 {
     LZ4_streamHC_t* const state =
-        (LZ4_streamHC_t*)ALLOC_AND_ZERO(sizeof(LZ4_streamHC_t));
+        (LZ4_streamHC_t*)ALLOC_AND_ZERO(LZ4_STREAMHC_EXTSIZE);   /* zeroed : initialized */
     if (state == NULL) return NULL;
+    state->internal_donotuse.hasWorkspace = 1;
     LZ4_setCompressionLevel(state, LZ4HC_CLEVEL_DEFAULT);
     return state;
 }
@@ -1673,15 +1677,22 @@ LZ4_streamHC_t* LZ4_initStreamHC (void* buffer, size_t size)
     if (!LZ4_isAligned(buffer, LZ4_streamHC_t_alignment())) return NULL;
     /* init */
     { LZ4HC_CCtx_internal* const hcstate = &(LZ4_streamHCPtr->internal_donotuse);
-      MEM_INIT(hcstate, 0, sizeof(*hcstate)); }
+      MEM_INIT(hcstate, 0, sizeof(*hcstate));
+      hcstate->hasWorkspace = (size >= LZ4_STREAMHC_EXTSIZE); }
     LZ4_setCompressionLevel(LZ4_streamHCPtr, LZ4HC_CLEVEL_DEFAULT);
     return LZ4_streamHCPtr;
+}
+
+/* size of an initialized state, to initialize it again : extended states are followed by their buffer */
+static size_t LZ4HC_sizeofState(const LZ4_streamHC_t* s)
+{
+    return s->internal_donotuse.hasWorkspace ? LZ4_STREAMHC_EXTSIZE : sizeof(*s);
 }
 
 /* just a stub */
 void LZ4_resetStreamHC (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel)
 {
-    LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+    LZ4_initStreamHC(LZ4_streamHCPtr, LZ4HC_sizeofState(LZ4_streamHCPtr));
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
@@ -1693,7 +1704,7 @@ void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
         /* a failed compression left the tables in an undefined state : start from scratch,
          * but preserve parameters, as a reset without prior failure would */
         LZ4_i8 const favorDecSpeed = s->favorDecSpeed;
-        LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+        LZ4_initStreamHC(LZ4_streamHCPtr, LZ4HC_sizeofState(LZ4_streamHCPtr));
         s->favorDecSpeed = favorDecSpeed;
     } else {
         assert(s->end >= s->prefixStart);
@@ -1736,7 +1747,7 @@ int LZ4_loadDictHC (LZ4_streamHC_t* LZ4_streamHCPtr,
      * but preserve parameters */
     {   int const cLevel = ctxPtr->compressionLevel;
         LZ4_i8 const favorDecSpeed = ctxPtr->favorDecSpeed;
-        LZ4_initStreamHC(LZ4_streamHCPtr, sizeof(*LZ4_streamHCPtr));
+        LZ4_initStreamHC(LZ4_streamHCPtr, LZ4HC_sizeofState(LZ4_streamHCPtr));
         LZ4_setCompressionLevel(LZ4_streamHCPtr, cLevel);
         ctxPtr->favorDecSpeed = favorDecSpeed;
         cp = LZ4HC_getCLevelParams(cLevel);
@@ -2181,6 +2192,13 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
                                     const dictCtx_directive dict,
                                     const HCfavor_e favorDecSpeed)
 {
+    LZ4_STATIC_ASSERT(LZ4_STREAMHC_EXTSIZE == sizeof(LZ4_streamHC_t) + sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
+    if (ctx->hasWorkspace) {   /* extended state : the buffer follows it */
+        LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)(void*)((BYTE*)ctx + sizeof(LZ4_streamHC_t));
+        return LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
+                    nbSearches, nbSearchesSeq, targetLength, limit, dict, favorDecSpeed, opt);
+    }
+  { /* plain state */
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
     int result;
@@ -2194,6 +2212,7 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
     return LZ4HC_compress_optimal_internal(ctx, source, dst, srcSizePtr, dstCapacity,
                     nbSearches, nbSearchesSeq, targetLength, limit, dict, favorDecSpeed, opt);
 #endif
+  }
 }
 
 
