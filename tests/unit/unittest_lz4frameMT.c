@@ -126,7 +126,8 @@ TEST(autoFlush_emitsAllInput)
 }
 
 /* with linked blocks, each job starts from the last 64 KB of preceding content (see LZ4F_compressJob()) :
- * a pattern repeated over several jobs is only stored once */
+ * a pattern repeated over several jobs isn't stored again by each job, compared to single-threaded compression
+ * (not to a fixed size : depending on content and hash, level 1 can miss the pattern at some block starts) */
 TEST(linkedJobs_history)
 {
     static const int levels[] = { 1, 9 };
@@ -141,13 +142,15 @@ TEST(linkedJobs_history)
         memcpy(src + pos, pattern, MIN(patternSize, srcSize - pos));
     for (li = 0; li < ARRAY_SIZE(levels); li++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-        size_t cSize;
+        size_t cSize, stSize;
         prefs.compressionLevel = levels[li];
-        prefs.nbWorkers = 2;
         prefs.frameInfo.blockMode = LZ4F_blockLinked;
         prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+        stSize = LZ4F_OK(LZ4F_compressFrame(dst, dstCapacity, src, srcSize, &prefs));
+        prefs.nbWorkers = 2;
         cSize = LZ4F_OK(LZ4F_compressFrame(dst, dstCapacity, src, srcSize, &prefs));
-        ASSERT_MSG(cSize < 2 * patternSize, "level %i : %u bytes : jobs ignore history", levels[li], (unsigned)cSize);
+        ASSERT_MSG(cSize < stSize + patternSize, "level %i : %u bytes, %u bytes single-threaded : jobs ignore history",
+                   levels[li], (unsigned)cSize, (unsigned)stSize);
         assertDecodesTo(dst, cSize, NULL, 0, src, srcSize);
     }
 }
