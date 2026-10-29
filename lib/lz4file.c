@@ -31,11 +31,27 @@
  * - LZ4 homepage : http://www.lz4.org
  * - LZ4 source repository : https://github.com/lz4/lz4
  */
-#include <stdlib.h>  /* malloc, free */
 #include <string.h>
 #include <assert.h>
 #include "lz4.h"
 #include "lz4file.h"
+
+/* =====   Memory routines   ===== */
+/* malloc(), calloc() and free(), or LZ4_malloc(), LZ4_calloc() and LZ4_free()
+ * when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS (see lz4.c) */
+#if defined(LZ4_USER_MEMORY_FUNCTIONS)
+void* LZ4_malloc(size_t s);
+void* LZ4_calloc(size_t n, size_t s);
+void  LZ4_free(void* p);
+#  define LZ4FILE_MALLOC(s)    LZ4_malloc(s)
+#  define LZ4FILE_CALLOC(n,s)  LZ4_calloc((n),(s))
+#  define LZ4FILE_FREE(p)      LZ4_free(p)
+#else
+#  include <stdlib.h>   /* malloc, calloc, free */
+#  define LZ4FILE_MALLOC(s)    malloc(s)
+#  define LZ4FILE_CALLOC(n,s)  calloc((n),(s))
+#  define LZ4FILE_FREE(p)      free(p)
+#endif
 
 /* =====   Error Handling   ===== */
 static LZ4F_errorCode_t returnErrorCode(LZ4F_errorCodes code)
@@ -87,10 +103,10 @@ static void freeReadFileResources(LZ4_readFile_t* lz4fRead)
 {
   if (lz4fRead==NULL) return;
   LZ4F_freeDecompressionContext(lz4fRead->dctxPtr);
-  free(lz4fRead->srcBuf);
-  free(lz4fRead->points);
-  free(lz4fRead->skipBuf);
-  free(lz4fRead);
+  LZ4FILE_FREE(lz4fRead->srcBuf);
+  LZ4FILE_FREE(lz4fRead->points);
+  LZ4FILE_FREE(lz4fRead->skipBuf);
+  LZ4FILE_FREE(lz4fRead);
 }
 
 static void freeAndNullReadFile(LZ4_readFile_t** statePtr)
@@ -131,7 +147,7 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
 
     /* Allocate source buffer */
     assert(readFile->srcBuf == NULL); /* Should be NULL from calloc */
-    readFile->srcBuf = (LZ4_byte*)malloc(readFile->srcBufMaxSize);
+    readFile->srcBuf = (LZ4_byte*)LZ4FILE_MALLOC(readFile->srcBufMaxSize);
     if (readFile->srcBuf == NULL) {
         RETURN_ERROR(allocation_failed);
     }
@@ -161,7 +177,7 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
     }
 
     /* Allocate read file structure */
-    readFile = (LZ4_readFile_t*)calloc(1, sizeof(LZ4_readFile_t));
+    readFile = (LZ4_readFile_t*)LZ4FILE_CALLOC(1, sizeof(LZ4_readFile_t));
     if (readFile == NULL) {
         RETURN_ERROR(allocation_failed);
     }
@@ -198,8 +214,10 @@ static void addResumePoint(LZ4_readFile_t* lz4fRead, unsigned long long cPos, co
   if (lz4fRead->decodedPos < lastDPos + LZ4F_RESUME_SPAN) return;
   if (lz4fRead->nbPoints == lz4fRead->pointsCapacity) {
     size_t const newCapacity = lz4fRead->pointsCapacity ? 2 * lz4fRead->pointsCapacity : 64;
-    LZ4F_resumePoint* const newPoints = (LZ4F_resumePoint*)realloc(lz4fRead->points, newCapacity * sizeof(*newPoints));
+    LZ4F_resumePoint* const newPoints = (LZ4F_resumePoint*)LZ4FILE_MALLOC(newCapacity * sizeof(*newPoints));   /* no realloc() among user functions */
     if (newPoints == NULL) return;
+    if (lz4fRead->nbPoints) memcpy(newPoints, lz4fRead->points, lz4fRead->nbPoints * sizeof(*newPoints));
+    LZ4FILE_FREE(lz4fRead->points);
     lz4fRead->points = newPoints;
     lz4fRead->pointsCapacity = newCapacity;
   }
@@ -390,7 +408,7 @@ LZ4F_errorCode_t LZ4F_seek(LZ4_readFile_t* lz4fRead, long long offset, int origi
 
   /* decode and discard up to target */
   if (lz4fRead->decodedPos < target && lz4fRead->skipBuf == NULL) {
-    lz4fRead->skipBuf = (LZ4_byte*)malloc(LZ4F_SKIP_BUFFER_SIZE);
+    lz4fRead->skipBuf = (LZ4_byte*)LZ4FILE_MALLOC(LZ4F_SKIP_BUFFER_SIZE);
     if (lz4fRead->skipBuf == NULL) RETURN_ERROR(allocation_failed);
   }
   while (lz4fRead->decodedPos < target) {
@@ -431,8 +449,8 @@ static void freeWriteFileResources(LZ4_writeFile_t* state)
 {
   if (state == NULL) return;
   LZ4F_freeCompressionContext(state->cctxPtr);
-  free(state->dstBuf);
-  free(state);
+  LZ4FILE_FREE(state->dstBuf);
+  LZ4FILE_FREE(state);
 }
 
 static void freeAndNullWriteFile(LZ4_writeFile_t** statePtr)
@@ -482,7 +500,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
   } }
 
   /* Allocate write file structure */
-  writeFile = (LZ4_writeFile_t*)calloc(1, sizeof(LZ4_writeFile_t));
+  writeFile = (LZ4_writeFile_t*)LZ4FILE_CALLOC(1, sizeof(LZ4_writeFile_t));
   if (writeFile == NULL) {
     RETURN_ERROR(allocation_failed);
   }
@@ -492,7 +510,7 @@ LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4
 
   /* Calculate and allocate destination buffer */
   writeFile->dstBufMaxSize = LZ4F_compressBound(blockSize, prefsPtr);
-  writeFile->dstBuf = (LZ4_byte*)malloc(writeFile->dstBufMaxSize);
+  writeFile->dstBuf = (LZ4_byte*)LZ4FILE_MALLOC(writeFile->dstBufMaxSize);
   if (writeFile->dstBuf == NULL) {
     freeAndNullWriteFile(&writeFile);
     RETURN_ERROR(allocation_failed);
