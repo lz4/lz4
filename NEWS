@@ -52,6 +52,7 @@ api  : new `LZ4F_preferences_t.nbWorkers` (experimental) : multithreaded lz4fram
 api  : new static function `LZ4F_getMaxNbWorkers()` : tells if liblz4 supports multithreaded compression
 api  : `LZ4F_compressOptions_t.stableSrc` : new value `LZ4F_srcStableUntilFlush`, letting worker threads read input in place
 api  : reserved fields of `LZ4F_preferences_t` and `LZ4F_compressOptions_t` are now scalars : flatten positional initializers `{ 0, 0, 0 }`
+api  : new static macro `LZ4_STREAMHC_EXTSIZE` : HC states initialized on this size include the temporary buffer of levels >= 10, which then allocate nothing ; `LZ4_createStreamHC()`, `LZ4_compress_HC()` and lz4frame employ it (+64 KB per state) : lz4frame worker threads no longer allocate memory
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials
 cli  : decodes legacy frames ended by four zero bytes (Linux kernel end marker), requested by @benjarobin
 cli  : compressed output no longer depends on multithreading support (`lz4` and `lz4-nomt` produce the same frames, also with `-BD`)

@@ -235,9 +235,7 @@ typedef struct {
  *    or constructors and destructors of a DLL's global objects) : worker threads can neither start nor exit then.
  *    On POSIX systems, worker threads block signals, except synchronous ones (SIGBUS, SIGSEGV, SIGFPE, SIGILL) :
  *    a fault while reading input (ex: memory-mapped file truncated) invokes the application's handler, in a worker thread.
- *  - Memory is allocated by the calling thread (LZ4F_CustomMem doesn't need to be thread-safe),
- *    except lz4hc's temporary buffer at levels >= 10 (LZ4HC_HEAPMODE), allocated within worker threads
- *    with malloc(), or LZ4_malloc() when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS : it must then be thread-safe.
+ *  - Memory is allocated by the calling thread (LZ4F_CustomMem doesn't need to be thread-safe).
  *  Multi-threading requires lz4frame.c to be compiled with LZ4F_MULTITHREAD=1 (and -pthread on POSIX systems) :
  *  by default, the dynamic library is built with multi-threading support, and the static library without.
  *  Otherwise, independent blocks are compressed in single-threaded mode (same output),
