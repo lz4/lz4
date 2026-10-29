@@ -33,6 +33,10 @@
 #include <string.h>     /* memcpy, memset */
 #include <limits.h>     /* INT_MIN */
 #include <time.h>       /* clock */
+#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200112L) && !defined(_WIN32)   /* glibc defines it, except in strict ISO C mode */
+#  include <unistd.h>   /* pipe, write, close */
+#  define PIPE_AVAILABLE 1
+#endif
 #include "lz4file.h"
 #define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
 #include "lz4.h"
@@ -1578,6 +1582,77 @@ TEST(lz4file_allocFailures)
     }
     ASSERT(n - 1 > 3);   /* more allocations than the handle and its 2 buffers : the decompression context employs cmem */
 }
+
+/* NULL arguments are reported, instead of dereferenced */
+TEST(lz4file_nullArguments)
+{
+    FILE* const file = newTmpFile();
+    char buf[16];
+    LZ4_writeFile_t* writeCtx;
+    LZ4_readFile_t* readCtx;
+    ASSERT_LZ4F_ERROR(LZ4F_writeOpen(NULL, file, NULL), LZ4F_ERROR_parameter_null);
+    LZ4F_OK(LZ4F_writeOpen(&writeCtx, file, NULL));
+    ASSERT_LZ4F_ERROR(LZ4F_write(NULL, buf, sizeof(buf)), LZ4F_ERROR_parameter_null);
+    ASSERT_LZ4F_ERROR(LZ4F_write(writeCtx, NULL, sizeof(buf)), LZ4F_ERROR_parameter_null);
+    LZ4F_OK(LZ4F_writeClose(writeCtx));   /* not a write failure */
+    ASSERT_LZ4F_ERROR(LZ4F_writeClose(NULL), LZ4F_ERROR_parameter_null);
+
+    rewind(file);
+    ASSERT_LZ4F_ERROR(LZ4F_readOpen(NULL, file), LZ4F_ERROR_parameter_null);
+    LZ4F_OK(LZ4F_readOpen(&readCtx, file));
+    ASSERT_LZ4F_ERROR(LZ4F_read(NULL, buf, sizeof(buf)), LZ4F_ERROR_parameter_null);
+    ASSERT_LZ4F_ERROR(LZ4F_read(readCtx, NULL, sizeof(buf)), LZ4F_ERROR_parameter_null);
+    ASSERT_EQ(LZ4F_read(readCtx, buf, sizeof(buf)), 0);   /* not a decoding error : empty frame */
+    LZ4F_OK(LZ4F_readClose(readCtx));
+    ASSERT_LZ4F_ERROR(LZ4F_readClose(NULL), LZ4F_ERROR_parameter_null);
+    ASSERT_EQ(LZ4F_tell(NULL), 0);
+}
+
+/* LZ4F_readOpen() requires a frame header and an end mark (11 bytes) : shorter files are reported as truncated */
+TEST(lz4file_readOpen_shortFiles)
+{
+    void* const stale = UT_malloc(1);   /* initial value of the handle */
+    BYTE frame[LZ4F_HEADER_SIZE_MAX + 8];
+    char buf[1] = { 0 };
+    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, sizeof(frame), buf, 0, NULL));
+    size_t n;
+    ASSERT_EQ(frameSize, LZ4F_HEADER_SIZE_MIN + 4);
+    for (n = 0; n <= frameSize; n++) {
+        FILE* const file = newTmpFile();
+        LZ4_readFile_t* readCtx = (LZ4_readFile_t*)stale;
+        ASSERT_EQ(fwrite(frame, 1, n, file), n);
+        rewind(file);
+        if (n < frameSize) {
+            ASSERT_LZ4F_ERROR(LZ4F_readOpen(&readCtx, file), LZ4F_ERROR_io_read);
+            ASSERT(readCtx == NULL);
+        } else {
+            LZ4F_OK(LZ4F_readOpen(&readCtx, file));
+            ASSERT_EQ(LZ4F_read(readCtx, buf, sizeof(buf)), 0);
+            LZ4F_OK(LZ4F_readClose(readCtx));
+        }
+        UT_release(file);
+    }
+}
+
+#if defined(__linux__)
+/* write failures are reported by the function writing : LZ4F_writeOpen() for the header,
+ * LZ4F_writeClose() for the end of frame */
+TEST(lz4file_writeFailures)
+{
+    FILE* fullFile = (FILE*)UT_defer(closeFile, fopen("/dev/full", "wb"));
+    LZ4_writeFile_t* writeCtx = NULL;
+    if (fullFile == NULL) return;
+    ASSERT_EQ(setvbuf(fullFile, NULL, _IONBF, 0), 0);   /* each fwrite() fails */
+    ASSERT_LZ4F_ERROR(LZ4F_writeOpen(&writeCtx, fullFile, NULL), LZ4F_ERROR_io_write);
+    ASSERT(writeCtx == NULL);
+
+    fullFile = (FILE*)UT_defer(closeFile, fopen("/dev/full", "wb"));
+    ASSERT(fullFile != NULL);
+    LZ4F_OK(LZ4F_writeOpen(&writeCtx, fullFile, NULL));   /* header remains buffered */
+    LZ4F_OK(LZ4F_write(writeCtx, UT_fixedNoise(60 KB), 60 KB));   /* less than a block : remains within the compression context */
+    ASSERT_LZ4F_ERROR(LZ4F_writeClose(writeCtx), LZ4F_ERROR_io_write);   /* last block exceeds the FILE buffer */
+}
+#endif
 
 /* LZ4F_cctx_size() and LZ4F_dctx_size() report the allocated memory */
 static size_t g_cctxAllocated, g_dctxAllocated;   /* not on the stack : contexts are released after the test */
@@ -3507,3 +3582,185 @@ TEST(lz4file_readAfterError)
     UT_release(rf);
     UT_release(f);
 }
+
+/* seeks to @pos, then checks the next @size bytes against @ref */
+static void fs_checkSeekRead(LZ4_readFile_t* rf, const BYTE* ref, size_t pos, size_t size)
+{
+    size_t const bufSize = 64 KB;
+    BYTE* const buf = (BYTE*)UT_malloc(bufSize);
+    size_t r = LZ4F_seek(rf, (long long)pos, SEEK_SET);
+    ASSERT_MSG(!LZ4F_isError(r), "seek to %u : %s", (unsigned)pos, LZ4F_getErrorName(r));
+    while (size > 0) {
+        size_t const chunk = MIN(size, bufSize);
+        r = LZ4F_read(rf, buf, chunk);
+        ASSERT_MSG(r == chunk, "read at %u : %s", (unsigned)pos, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "wrong size");
+        ASSERT_MSG(!memcmp(buf, ref + pos, chunk), "wrong data at %u", (unsigned)pos);
+        pos += chunk;
+        size -= chunk;
+    }
+    UT_release(buf);
+}
+
+/* flips the byte at @pos of @f, then restores the position of @f, employed by a read handle */
+static void fs_flipByte(FILE* f, long pos)
+{
+    long const current = ftell(f);
+    int c;
+    ASSERT(current >= 0);
+    ASSERT_EQ(fseek(f, pos, SEEK_SET), 0);
+    c = fgetc(f);
+    ASSERT(c != EOF);
+    ASSERT_EQ(fseek(f, pos, SEEK_SET), 0);
+    ASSERT_EQ(fputc(c ^ 0xFF, f), c ^ 0xFF);
+    ASSERT_EQ(fseek(f, current, SEEK_SET), 0);
+}
+
+/* LZ4F_seek() restarts from the closest preceding resume point (LZ4F_RESUME_SPAN : 1 MB) :
+ * data before it is not decoded again, which is verified by corrupting it after a first pass.
+ * Frames : A (1 MB, linked blocks), B (2 MB, independent blocks), C (1.5 MB, linked blocks).
+ * Resume points : start of B (1 MB), block of B (2 MB), start of C (3 MB), end of file. */
+TEST(lz4file_seek_closestResumePoint)
+{
+    size_t const sizeA = 1 MB, sizeB = 2 MB, sizeC = 1536 KB;
+    size_t const totalSize = sizeA + sizeB + sizeC;
+    const BYTE* const ref = (const BYTE*)UT_fixedSample(totalSize);
+    BYTE buf[100];
+    FILE* const f = newTmpFile();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    long startB, endB;
+    LZ4_readFile_t* rf;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;   /* detects corruptions */
+    fs_writeFrame(f, ref, sizeA, &prefs);
+    startB = ftell(f);
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    fs_writeFrame(f, ref + sizeA, sizeB, &prefs);
+    endB = ftell(f);
+    prefs.frameInfo.blockMode = LZ4F_blockLinked;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum;   /* C can't be decoded with the parameters of B */
+    fs_writeFrame(f, ref + sizeA + sizeB, sizeC, &prefs);
+    rewind(f);
+    rf = newReadFile(f);
+    LZ4F_OK(LZ4F_seek(rf, (long long)totalSize, SEEK_SET));   /* records resume points */
+
+    /* corrupts the 1st block of A, and the first and last blocks of B (7-byte headers) */
+    fs_flipByte(f, LZ4F_HEADER_SIZE_MIN + 4 + 10);
+    fs_flipByte(f, startB + LZ4F_HEADER_SIZE_MIN + 4 + 10);
+    fs_flipByte(f, endB - 4 - 4 - 1);   /* before its checksum and the end mark */
+    LZ4F_OK(LZ4F_seek(rf, 0, SEEK_SET));
+    ASSERT_LZ4F_ERROR(LZ4F_read(rf, buf, sizeof(buf)), LZ4F_ERROR_blockChecksum_invalid);
+
+    fs_checkSeekRead(rf, ref, 2 MB, 64 KB);            /* block of B : clears the decoding error */
+    fs_checkSeekRead(rf, ref, 3 MB + 100 KB, 64 KB);   /* forward : restarts from start of C, instead of decoding the end of B */
+    fs_checkSeekRead(rf, ref, 4 MB + 200 KB, 64 KB);   /* forward : continues, without resume point at blocks of C */
+    fs_checkSeekRead(rf, ref, 3 MB, 64 KB);            /* backward : start of C */
+    LZ4F_OK(LZ4F_seek(rf, (long long)totalSize, SEEK_SET));
+    ASSERT_EQ(LZ4F_read(rf, buf, 1), 0);
+
+    /* corruptions are detected : seeks above didn't decode them */
+    ASSERT_LZ4F_ERROR(LZ4F_seek(rf, 1 MB + 1, SEEK_SET), LZ4F_ERROR_blockChecksum_invalid);
+    ASSERT_LZ4F_ERROR(LZ4F_seek(rf, 3 MB - 1, SEEK_SET), LZ4F_ERROR_blockChecksum_invalid);
+}
+
+/* resume points recorded after restarting from another frame employ the parameters of their own frame.
+ * Frames : F1 (2 MB, independent blocks with checksums), F2 (3 MB, independent blocks, content size).
+ * The index is extended in steps, each one restarting from F2 after decoding F1 :
+ * resume points at 1 MB (block of F1) and 2 MB (start of F2), then 3 MB, then 4 MB. */
+TEST(lz4file_seek_restartInAnotherFrame)
+{
+    size_t const size1 = 2 MB, size2 = 3 MB;
+    size_t const totalSize = size1 + size2;
+    const BYTE* const ref = (const BYTE*)UT_fixedSample(totalSize);
+    BYTE buf[1];
+    FILE* const f = newTmpFile();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4_readFile_t* rf;
+    size_t pos;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+    fs_writeFrame(f, ref, size1, &prefs);
+    prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum;   /* F2 can't be decoded with the parameters of F1 */
+    prefs.frameInfo.contentSize = size2;
+    fs_writeFrame(f, ref + size1, size2, &prefs);
+    rewind(f);
+    rf = newReadFile(f);
+
+    LZ4F_OK(LZ4F_seek(rf, 2560 KB, SEEK_SET));
+    fs_checkSeekRead(rf, ref, 1 MB, 100);        /* restarts from block of F1 */
+    LZ4F_OK(LZ4F_seek(rf, 3584 KB, SEEK_SET));   /* restarts from start of F2 */
+    fs_checkSeekRead(rf, ref, 0, 100);           /* restarts from start of file */
+    LZ4F_OK(LZ4F_seek(rf, 4608 KB, SEEK_SET));   /* restarts from block of F2 at 3 MB */
+    for (pos = 4 MB; pos >= 1 MB; pos -= 1 MB) {   /* each resume point decodes up to end of file */
+        fs_checkSeekRead(rf, ref, pos, totalSize - pos);
+        ASSERT_EQ(LZ4F_read(rf, buf, 1), 0);
+    }
+}
+
+/* the index of resume points grows beyond its initial capacity (64 points), with the custom allocator */
+TEST(lz4file_seek_manyResumePoints)
+{
+    size_t const blockSize = 1 MB;   /* a resume point per block */
+    unsigned const nbBlocks = 70;
+    BYTE* const block = (BYTE*)UT_malloc(blockSize);
+    BYTE buf[4];
+    FILE* const f = newTmpFile();
+    allocState_t* const mem = newAllocState();
+    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4_writeFile_t* wf;
+    LZ4_readFile_t* rf;
+    unsigned n;
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.blockSizeID = LZ4F_max1MB;
+    memset(block, 0, blockSize);
+    LZ4F_OK(LZ4F_writeOpen(&wf, f, &prefs));
+    for (n = 0; n < nbBlocks; n++) {   /* blocks start with their index */
+        writeLE32(block, n);
+        LZ4F_OK(LZ4F_write(wf, block, blockSize));
+    }
+    LZ4F_OK(LZ4F_writeClose(wf));
+
+    rewind(f);
+    LZ4F_OK(LZ4F_readOpen_advanced(&rf, f, cmem));
+    LZ4F_OK(LZ4F_seek(rf, (long long)nbBlocks * (long long)blockSize, SEEK_SET));   /* records resume points */
+    for (n = nbBlocks; n-- > 0; ) {
+        LZ4F_OK(LZ4F_seek(rf, (long long)n * (long long)blockSize, SEEK_SET));
+        ASSERT_EQ(LZ4F_OK(LZ4F_read(rf, buf, sizeof(buf))), sizeof(buf));
+        ASSERT_EQ(readLE32(buf), n);
+    }
+    LZ4F_OK(LZ4F_readClose(rf));
+    ASSERT_EQ(mem->live, 0);
+}
+
+#ifdef PIPE_AVAILABLE
+/* without file positions (pipe), LZ4F_seek() moves forward by decoding, but can't move backward */
+TEST(lz4file_seek_pipe)
+{
+    size_t const srcSize = 8 KB;   /* the frame fits within the pipe buffer */
+    const BYTE* const src = (const BYTE*)UT_fixedSample(srcSize);
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, NULL));
+    BYTE buf[100];
+    int fds[2];
+    FILE* f;
+    LZ4_readFile_t* rf;
+    ASSERT_EQ(pipe(fds), 0);
+    ASSERT_EQ(write(fds[1], frame, frameSize), (long)frameSize);
+    ASSERT_EQ(close(fds[1]), 0);
+    f = (FILE*)UT_defer(closeFile, fdopen(fds[0], "rb"));
+    ASSERT(f != NULL);
+    rf = newReadFile(f);
+
+    LZ4F_OK(LZ4F_seek(rf, 1000, SEEK_SET));
+    LZ4F_OK(LZ4F_seek(rf, 0, SEEK_CUR));
+    ASSERT_EQ(LZ4F_OK(LZ4F_read(rf, buf, sizeof(buf))), sizeof(buf));
+    ASSERT_MEMEQ(buf, src + 1000, sizeof(buf));
+    ASSERT_LZ4F_ERROR(LZ4F_seek(rf, 0, SEEK_SET), LZ4F_ERROR_io_read);
+    ASSERT_EQ(LZ4F_tell(rf), 1100);
+    LZ4F_OK(LZ4F_seek(rf, 2000, SEEK_CUR));
+    ASSERT_EQ(LZ4F_OK(LZ4F_read(rf, buf, sizeof(buf))), sizeof(buf));
+    ASSERT_MEMEQ(buf, src + 3100, sizeof(buf));
+}
+#endif
