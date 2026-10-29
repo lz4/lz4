@@ -2636,7 +2636,7 @@ TEST(lz4file_seek)
     ASSERT_LZ4F_ERROR(LZ4F_seek(rf, -1, SEEK_SET), LZ4F_ERROR_parameter_invalid);   /* negative position */
     ASSERT_LZ4F_ERROR(LZ4F_seek(rf, -(long long)pos - 1, SEEK_CUR), LZ4F_ERROR_parameter_invalid);   /* before start */
     ASSERT_EQ(LZ4F_tell(rf), pos);
-    /* Large SEEK_CUR past EOF: decode-forward hits end → parameter_invalid; tell stays at end. */
+    /* Large SEEK_CUR past EOF: decode-forward hits end -> parameter_invalid; tell stays at end. */
     ASSERT_LZ4F_ERROR(LZ4F_seek(rf, (long long)(((unsigned long long)-1) / 2), SEEK_CUR), LZ4F_ERROR_parameter_invalid);
     ASSERT_EQ(LZ4F_tell(rf), totalSize);
 
