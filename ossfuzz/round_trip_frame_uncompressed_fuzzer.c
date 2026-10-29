@@ -83,8 +83,11 @@ static void compress_round_trip(const uint8_t *data, size_t size,
     compressedSize += lz4Return;
 
     /* Add uncompressed data */
-    lz4Return = LZ4F_uncompressedUpdate(ctx, dst + compressedSize, dstCapacity - compressedSize,
-                                        uncompressedData, uncompressedSize, NULL);
+    LZ4F_compressOptions_t uncOpts;
+    memset(&uncOpts, 0, sizeof(uncOpts));
+    uncOpts.uncompressed = 1;
+    lz4Return = LZ4F_compressUpdate(ctx, dst + compressedSize, dstCapacity - compressedSize,
+                                    uncompressedData, uncompressedSize, &uncOpts);
     FUZZ_ASSERT(!LZ4F_isError(lz4Return));
     compressedSize += lz4Return;
 

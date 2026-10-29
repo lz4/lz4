@@ -549,20 +549,22 @@ static size_t flushPieces(LZ4F_cctx* cctx, int end, char* dst, size_t capacity, 
     return pos;
 }
 
-/* reference : begin, update(@part1), flush, then (@uncSize > 0) uncompressedUpdate(@uncSize), update(rest), end,
+/* reference : begin, update(@part1), flush, then (@uncSize > 0) uncompressed update(@uncSize), update(rest), end,
  * each invocation receiving its bound. Position and size of flush output are reported. */
 static size_t partialRef(LZ4F_cctx* cctx, const LZ4F_preferences_t* p, const LZ4F_compressOptions_t* cOpts,
                          char* dst, const char* src, size_t srcSize,
                          size_t part1, size_t uncSize, size_t* flushPos, size_t* flushSize)
 {
+    LZ4F_compressOptions_t uncOpts = *cOpts;
     size_t pos;
+    uncOpts.uncompressed = 1;
     pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, LZ4F_HEADER_SIZE_MAX, p));
     pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(part1, p), src, part1, cOpts));
     *flushPos = pos;
     *flushSize = LZ4F_OK(flushPieces(cctx, 0, dst + pos, LZ4F_compressBound(0, p), 0));
     pos += *flushSize;
     if (uncSize)
-        pos += LZ4F_OK(LZ4F_uncompressedUpdate(cctx, dst + pos, LZ4F_compressBound(uncSize, p), src + part1, uncSize, cOpts));
+        pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(uncSize, p), src + part1, uncSize, &uncOpts));
     pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, LZ4F_compressBound(srcSize - part1 - uncSize, p),
                                        src + part1 + uncSize, srcSize - part1 - uncSize, cOpts));
     return pos + LZ4F_OK(flushPieces(cctx, 1, dst + pos, LZ4F_compressBound(0, p), 0));
@@ -580,7 +582,7 @@ enum { PF_PIECES,            /* flush and end in pieces of a given capacity */
  * output produced in pieces is identical to the reference, for any capacity, even 1 byte.
  * - the first invocation of a flush sets the flush point : input is no longer read (LZ4F_srcStableUntilFlush) ;
  * - capacity exactly equal to the remaining output : the next invocation returns 0 ;
- * - compressUpdate() or uncompressedUpdate() after an incomplete flush first emit the remaining output ;
+ * - compressUpdate(), with compressed or uncompressed input, after an incomplete flush first emits the remaining output ;
  * - compressBegin() abandons an incomplete end ;
  * - capacity 0 is rejected when output remains, without modifying the frame. */
 TEST(flush_partial)
@@ -622,11 +624,13 @@ TEST(flush_partial)
         for (ci = 0; ci < ARRAY_SIZE(capacities); ci++)
         for (variant = 0; variant < PF_NB_VARIANTS; variant++) {
             size_t const cap = capacities[ci];
-            LZ4F_compressOptions_t cOpts;
+            LZ4F_compressOptions_t cOpts, uncOpts;
             size_t pos, r, flushRemaining;
             if ((variant >= PF_UPDATE_BEFORE_END) && (cap != 4 KB + 1)) continue;   /* one capacity is enough */
             memset(&cOpts, 0, sizeof(cOpts));
             cOpts.stableSrc = LZ4F_srcStableUntilFlush;
+            uncOpts = cOpts;
+            uncOpts.uncompressed = 1;
             memcpy(work, src, srcSize);
             pos = LZ4F_OK(LZ4F_compressBegin(cctx, out, LZ4F_HEADER_SIZE_MAX, &p));
             pos += LZ4F_OK(LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(part1, &p), work, part1, &cOpts));
@@ -647,13 +651,13 @@ TEST(flush_partial)
                 /* remaining flush output comes first */
                 size_t const flushed = r;
                 ASSERT_MSG(flushed <= flushRemaining, "flush output beyond reference");
-                r = flushed + LZ4F_OK(LZ4F_uncompressedUpdate(cctx, out + pos + flushed, LZ4F_compressBound(uncSize, &p),
-                                                              work + part1, uncSize, &cOpts));
+                r = flushed + LZ4F_OK(LZ4F_compressUpdate(cctx, out + pos + flushed, LZ4F_compressBound(uncSize, &p),
+                                                          work + part1, uncSize, &uncOpts));
                 /* uncompressed blocks follow all compressed ones : no more output pending */
             } else {
                 ASSERT_MSG(r == flushRemaining && !memcmp(out + pos, ref + pos, r), "%u workers, capacity %u : flush output differs",
                            p.nbWorkers, (unsigned)cap);
-                r += LZ4F_OK(LZ4F_uncompressedUpdate(cctx, out + pos + r, LZ4F_compressBound(uncSize, &p), work + part1, uncSize, &cOpts));
+                r += LZ4F_OK(LZ4F_compressUpdate(cctx, out + pos + r, LZ4F_compressBound(uncSize, &p), work + part1, uncSize, &uncOpts));
             }
             pos += r;
             pos += LZ4F_OK(LZ4F_compressUpdate(cctx, out + pos, LZ4F_compressBound(srcSize - part1 - uncSize, &p),
@@ -794,13 +798,15 @@ TEST(compressBegin_allocFailures)
     char* const nextRef = (char*)UT_malloc(dstCapacity);
     char* const out = (char*)UT_malloc(dstCapacity);
     allocState_t* const mem = newAllocState();
-    LZ4F_compressOptions_t cOpts;
+    LZ4F_compressOptions_t cOpts, uncOpts;
     unsigned nbFailures = 0;
     size_t wi;
     int linked;
 
     memset(&cOpts, 0, sizeof(cOpts));
     cOpts.stableSrc = LZ4F_srcStableUntilFlush;
+    uncOpts = cOpts;
+    uncOpts.uncompressed = 1;
     for (wi = 0; wi < ARRAY_SIZE(nbWorkersList); wi++)
     for (linked = 0; linked <= 1; linked++) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
@@ -840,7 +846,7 @@ TEST(compressBegin_allocFailures)
                            "allocation %u : unexpected error %s", (unsigned)n, LZ4F_getErrorName(pos));
                 nbFailures++;
                 ASSERT_LZ4F_ERROR(LZ4F_compressUpdate(cctx, out, dstCapacity, src, 1 KB, &cOpts), LZ4F_ERROR_compressionState_uninitialized);
-                ASSERT_LZ4F_ERROR(LZ4F_uncompressedUpdate(cctx, out, dstCapacity, src, 1 KB, &cOpts), LZ4F_ERROR_compressionState_uninitialized);
+                ASSERT_LZ4F_ERROR(LZ4F_compressUpdate(cctx, out, dstCapacity, src, 1 KB, &uncOpts), LZ4F_ERROR_compressionState_uninitialized);
                 ASSERT_LZ4F_ERROR(LZ4F_flush(cctx, out, dstCapacity, NULL), LZ4F_ERROR_compressionState_uninitialized);
                 ASSERT_LZ4F_ERROR(LZ4F_compressEnd(cctx, out, dstCapacity, NULL), LZ4F_ERROR_compressionState_uninitialized);
                 pos = LZ4F_OK(LZ4F_compressBegin(cctx, out, dstCapacity, &nextPrefs));   /* context remains usable */

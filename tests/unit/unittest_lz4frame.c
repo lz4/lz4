@@ -24,6 +24,9 @@
 */
 
 #include "unittest.h"
+#ifndef LZ4F_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4F_DISABLE_DEPRECATE_WARNINGS   /* LZ4F_uncompressedUpdate */
+#endif
 #include "lz4frame_helpers.h"   /* lz4frame.h, LZ4F_OK, newCctx, assertDecodesTo */
 #include <stdlib.h>     /* malloc, calloc, free */
 #include <stdio.h>      /* FILE, fopen */
@@ -1688,7 +1691,7 @@ TEST(compressUpdate_afterIncompleteFlush)
     ASSERT_LZ4F_ERROR(LZ4F_compressUpdate(cctx, dst, capacity, src, 10, NULL), LZ4F_ERROR_compressionState_uninitialized);
 }
 
-/* LZ4F_compressUpdate() and LZ4F_uncompressedUpdate(), mixed, respect LZ4F_compressBound() */
+/* LZ4F_compressUpdate(), with compressed and uncompressed input mixed, respects LZ4F_compressBound() */
 TEST(compressUpdate_mixedWithUncompressed)
 {
     size_t const blockSize = 64 KB;
@@ -1712,12 +1715,14 @@ TEST(compressUpdate_mixedWithUncompressed)
     for (b = 0; b < ARRAY_SIZE(bufferedSizes); ++b)
     for (i = 0; i < ARRAY_SIZE(inputSizes); ++i) {
         LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_compressOptions_t cOpts;
         size_t const firstSize = bufferedSizes[b];
         size_t const secondSize = inputSizes[i];
         size_t const srcSize = firstSize + secondSize;
         size_t frameSize, cSize, bound;
         unsigned update;
 
+        memset(&cOpts, 0, sizeof(cOpts));
         prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
         prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)(checksums & 1);
         prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)(checksums >> 1);
@@ -1732,9 +1737,8 @@ TEST(compressUpdate_mixedWithUncompressed)
             bound = LZ4F_compressBound(inputSize, &prefs);
             ASSERT(bound <= dstCapacity);
             dst[bound] = 0xA5;
-            cSize = uncompressed
-                  ? LZ4F_uncompressedUpdate(cctx, dst, bound, input, inputSize, NULL)
-                  : LZ4F_compressUpdate(cctx, dst, bound, input, inputSize, NULL);
+            cOpts.uncompressed = uncompressed;
+            cSize = LZ4F_compressUpdate(cctx, dst, bound, input, inputSize, &cOpts);
             ASSERT_MSG(!LZ4F_isError(cSize) && cSize <= bound && dst[bound] == 0xA5,
                        "mixed update exceeds its bound or fails : first=%u, second=%u, "
                        "uncompressed=%u, linked=%u, checksums=%u, autoFlush=%u",
@@ -1772,13 +1776,11 @@ TEST(compressUpdate_mixedWithUncompressed)
                 size_t const capacity = capacities[s];
                 LZ4F_OK(LZ4F_compressBegin(cctx, frame, frameCapacity, &prefs));
                 bound = LZ4F_compressBound(firstSize, &prefs);
-                ASSERT_EQ(LZ4F_OK(uncompressedFirst
-                                  ? LZ4F_uncompressedUpdate(cctx, frame, bound, src, firstSize, NULL)
-                                  : LZ4F_compressUpdate(cctx, frame, bound, src, firstSize, NULL)), 0);
+                cOpts.uncompressed = uncompressedFirst;
+                ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, frame, bound, src, firstSize, &cOpts)), 0);
                 dst[capacity] = 0xA5;
-                cSize = uncompressedFirst
-                      ? LZ4F_compressUpdate(cctx, dst, capacity, src + firstSize, secondSize, NULL)
-                      : LZ4F_uncompressedUpdate(cctx, dst, capacity, src + firstSize, secondSize, NULL);
+                cOpts.uncompressed = !uncompressedFirst;
+                cSize = LZ4F_compressUpdate(cctx, dst, capacity, src + firstSize, secondSize, &cOpts);
                 ASSERT_EQ(dst[capacity], 0xA5);
                 if (capacity >= exactSize) {
                     ASSERT_EQ(cSize, exactSize);
@@ -1791,11 +1793,11 @@ TEST(compressUpdate_mixedWithUncompressed)
     }
 }
 
-/* LZ4F_uncompressedUpdate() with linked blocks : the decoder's history contains uncompressed data,
+/* uncompressed input (LZ4F_compressOptions_t.uncompressed) with linked blocks : the decoder's history contains uncompressed data,
  * which blocks compressed next must not mistake for previous content (nor for the dictionary).
  * Compressible input (copies within 32 KB), and a dictionary made of input, so that they would reference it.
  * Frames ending with uncompressed data are followed by frames starting with uncompressed data (same cctx). */
-TEST(uncompressedUpdate_linkedBlocks)
+TEST(compressUpdate_uncompressedLinkedBlocks)
 {
     static const int levels[] = { 1, 9, 12 };
     /* segments : C compressed, U uncompressed ; lowercase : small segment */
@@ -1832,9 +1834,8 @@ TEST(uncompressedUpdate_linkedBlocks)
         pos = LZ4F_OK(LZ4F_compressBegin_usingCDict(cctx, frame, frameCapacity, useDict ? cdict : NULL, &prefs));
         for (op = scripts[sc]; *op; op++) {
             size_t const size = (*op == 'u' || *op == 'c') ? smallSize : segSize;
-            pos += LZ4F_OK((*op == 'U' || *op == 'u')
-                           ? LZ4F_uncompressedUpdate(cctx, frame + pos, frameCapacity - pos, src + consumed, size, &cOpts)
-                           : LZ4F_compressUpdate(cctx, frame + pos, frameCapacity - pos, src + consumed, size, &cOpts));
+            cOpts.uncompressed = (*op == 'U' || *op == 'u');
+            pos += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + pos, frameCapacity - pos, src + consumed, size, &cOpts));
             consumed += size;
         }
         pos += LZ4F_OK(LZ4F_compressEnd(cctx, frame + pos, frameCapacity - pos, &cOpts));
@@ -1847,6 +1848,84 @@ TEST(uncompressedUpdate_linkedBlocks)
                        scripts[sc], levels[l], useDict, stable,
                        LZ4F_isError(dResult) ? LZ4F_getErrorName(dResult) : "content differs");
     }   }
+}
+
+/* LZ4F_uncompressedUpdate() (deprecated) : same frame as LZ4F_compressUpdate() with option uncompressed,
+ * with default options (NULL) or not */
+TEST(uncompressedUpdate_deprecated)
+{
+    size_t const segSize = 100 KB;
+    size_t const frameCapacity = LZ4F_compressFrameBound(3 * segSize, NULL) + 3 * LZ4F_compressBound(0, NULL);
+    char* const src = (char*)UT_malloc(3 * segSize);
+    char* const ref = (char*)UT_malloc(frameCapacity);
+    char* const frame = (char*)UT_malloc(frameCapacity);
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_compressOptions_t cOpts, uncOpts;
+    unsigned withOptions;
+    memset(src, 'a', 3 * segSize);   /* compressed segments : a few hundred bytes */
+    prefs.frameInfo.blockMode = LZ4F_blockLinked;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+
+    for (withOptions = 0; withOptions < 2; withOptions++) {
+        size_t refSize, frameSize;
+        memset(&cOpts, 0, sizeof(cOpts));
+        cOpts.stableSrc = withOptions ? LZ4F_srcStable : LZ4F_srcUnstable;
+        uncOpts = cOpts;
+        uncOpts.uncompressed = 1;
+
+        refSize = LZ4F_OK(LZ4F_compressBegin(cctx, ref, frameCapacity, &prefs));
+        refSize += LZ4F_OK(LZ4F_compressUpdate(cctx, ref + refSize, frameCapacity - refSize, src, segSize, &cOpts));
+        refSize += LZ4F_OK(LZ4F_compressUpdate(cctx, ref + refSize, frameCapacity - refSize, src + segSize, segSize, &uncOpts));
+        refSize += LZ4F_OK(LZ4F_compressUpdate(cctx, ref + refSize, frameCapacity - refSize, src + 2 * segSize, segSize, &cOpts));
+        refSize += LZ4F_OK(LZ4F_compressEnd(cctx, ref + refSize, frameCapacity - refSize, NULL));
+
+        frameSize = LZ4F_OK(LZ4F_compressBegin(cctx, frame, frameCapacity, &prefs));
+        frameSize += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + frameSize, frameCapacity - frameSize, src, segSize, &cOpts));
+        frameSize += LZ4F_OK(LZ4F_uncompressedUpdate(cctx, frame + frameSize, frameCapacity - frameSize, src + segSize, segSize,
+                                                     withOptions ? &cOpts : NULL));
+        frameSize += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + frameSize, frameCapacity - frameSize, src + 2 * segSize, segSize, &cOpts));
+        frameSize += LZ4F_OK(LZ4F_compressEnd(cctx, frame + frameSize, frameCapacity - frameSize, NULL));
+
+        ASSERT_EQ(frameSize, refSize);
+        ASSERT_MEMEQ(frame, ref, refSize);
+        ASSERT(refSize > segSize);   /* the middle segment is stored uncompressed */
+    }
+}
+
+static size_t frameWithOptions(LZ4F_cctx* cctx, char* dst, size_t dstCapacity, const char* src, size_t srcSize,
+                               const LZ4F_compressOptions_t* cOpts)
+{
+    size_t pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, dstCapacity, NULL));
+    pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, dstCapacity - pos, src, srcSize, cOpts));
+    return pos + LZ4F_OK(LZ4F_compressEnd(cctx, dst + pos, dstCapacity - pos, NULL));
+}
+
+/* LZ4F_compressOptions_t.uncompressed : only 1 stores input as uncompressed blocks ;
+ * other values (reserved, or left uninitialized) compress, as 0 */
+TEST(compressUpdate_uncompressedValues)
+{
+    static const unsigned values[] = { 2, 0xA5A5A5A5u };
+    size_t const srcSize = 100 KB;
+    size_t const frameCapacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const src = (char*)UT_malloc(srcSize);
+    char* const ref = (char*)UT_malloc(frameCapacity);
+    char* const frame = (char*)UT_malloc(frameCapacity);
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_compressOptions_t cOpts;
+    size_t refSize, v;
+    memset(src, 'a', srcSize);   /* compressed : a few hundred bytes */
+    memset(&cOpts, 0, sizeof(cOpts));
+
+    refSize = frameWithOptions(cctx, ref, frameCapacity, src, srcSize, &cOpts);
+    for (v = 0; v < ARRAY_SIZE(values); v++) {
+        cOpts.uncompressed = values[v];
+        ASSERT_EQ(frameWithOptions(cctx, frame, frameCapacity, src, srcSize, &cOpts), refSize);
+        ASSERT_MEMEQ(frame, ref, refSize);
+    }
+    cOpts.uncompressed = 1;
+    ASSERT(frameWithOptions(cctx, frame, frameCapacity, src, srcSize, &cOpts) > srcSize);
+    ASSERT(refSize < srcSize / 10);
 }
 
 /* linked blocks, with an input buffer reused between invocations (LZ4F_srcUnstable) :
@@ -2375,8 +2454,8 @@ TEST(compressFrame_smallDst)
 }
 
 
-/* Streaming : LZ4F_compressBegin*(), LZ4F_compressUpdate(),
- *             LZ4F_uncompressedUpdate(), LZ4F_flush(), LZ4F_compressEnd() */
+/* Streaming : LZ4F_compressBegin*(), LZ4F_compressUpdate() (compressed or uncompressed input),
+ *             LZ4F_flush(), LZ4F_compressEnd() */
 
 typedef enum { sd_begin, sd_update, sd_uncompressedUpdate, sd_flush, sd_end } sd_opType_e;
 
@@ -2407,9 +2486,11 @@ static size_t sd_runOp(const sd_stream* s, const sd_op* op, void* dst, size_t ds
             return LZ4F_compressBegin_usingCDict(s->cctx, dst, dstCapacity, s->cdict, s->prefs);
         return LZ4F_compressBegin(s->cctx, dst, dstCapacity, s->prefs);
     case sd_update:
-        return LZ4F_compressUpdate(s->cctx, dst, dstCapacity, s->src + op->srcPos, op->srcSize, &s->cOpts);
     case sd_uncompressedUpdate:
-        return LZ4F_uncompressedUpdate(s->cctx, dst, dstCapacity, s->src + op->srcPos, op->srcSize, &s->cOpts);
+        {   LZ4F_compressOptions_t cOpts = s->cOpts;
+            if (op->type == sd_uncompressedUpdate) cOpts.uncompressed = 1;
+            return LZ4F_compressUpdate(s->cctx, dst, dstCapacity, s->src + op->srcPos, op->srcSize, &cOpts);
+        }
     case sd_flush:
         return LZ4F_flush(s->cctx, dst, dstCapacity, &s->cOpts);
     case sd_end:

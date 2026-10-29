@@ -53,9 +53,11 @@ static size_t runOp(const state_t* s, LZ4F_cctx* cctx, const LZ4F_preferences_t*
     case op_begin:
         return LZ4F_compressBegin(cctx, dst, dstCapacity, prefs);
     case op_update:
-        return LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, s->cOpts);
-    case op_uncompressedUpdate:
-        return LZ4F_uncompressedUpdate(cctx, dst, dstCapacity, src, srcSize, s->cOpts);
+    case op_uncompressedUpdate: {
+        LZ4F_compressOptions_t cOpts = *s->cOpts;
+        if (type == op_uncompressedUpdate) cOpts.uncompressed = 1;
+        return LZ4F_compressUpdate(cctx, dst, dstCapacity, src, srcSize, &cOpts);
+    }
     case op_flush:
         return LZ4F_flush(cctx, dst, dstCapacity, s->cOpts);
     case op_end:
