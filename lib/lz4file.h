@@ -64,6 +64,12 @@ typedef struct LZ4_writeFile_s LZ4_writeFile_t;
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp);
 
+/*! LZ4F_readOpen_advanced() : v1.10.1+
+ *  Same as LZ4F_readOpen(), with all allocations performed by @customMem :
+ *  the handle, its buffers, and its decompression context, up to LZ4F_readClose().
+ */
+LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen_advanced(LZ4_readFile_t** lz4fRead, FILE* fp, LZ4F_CustomMem customMem);
+
 /*! LZ4F_read() :
  * Read lz4file content to buffer.
  * `lz4f` must use LZ4_readOpen to set first.
@@ -117,6 +123,13 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead);
  * @note Must be closed with LZ4F_writeClose() when done.
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4F_preferences_t* prefsPtr);
+
+/*! LZ4F_writeOpen_advanced() : v1.10.1+
+ *  Same as LZ4F_writeOpen(), with all allocations performed by @customMem :
+ *  the handle, its buffer, and its compression context, up to LZ4F_writeClose().
+ */
+LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeOpen_advanced(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4F_preferences_t* prefsPtr,
+                                                            LZ4F_CustomMem customMem);
 
 /*! LZ4F_write() :
  * Write buffer to lz4file.

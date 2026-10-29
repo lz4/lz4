@@ -1487,6 +1487,95 @@ TEST(lz4file_errors)
 #endif
 }
 
+/* LZ4F_writeOpen_advanced(), LZ4F_readOpen_advanced() : allocations employ the custom allocator,
+ * including the index of resume points, and are all released on closing */
+TEST(lz4file_customMem)
+{
+    size_t const srcSize = 3 MB;   /* a resume point per MB */
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    FILE* const file = newTmpFile();
+    allocState_t* const mem = newAllocState();
+    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4_writeFile_t* writeCtx;
+    LZ4_readFile_t* readCtx;
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;   /* resume points at block starts */
+    LZ4F_OK(LZ4F_writeOpen_advanced(&writeCtx, file, &prefs, cmem));
+    ASSERT(mem->live > 0);
+    LZ4F_OK(LZ4F_write(writeCtx, src, srcSize));
+    LZ4F_OK(LZ4F_writeClose(writeCtx));
+    ASSERT_EQ(mem->live, 0);
+
+    rewind(file);
+    LZ4F_OK(LZ4F_readOpen_advanced(&readCtx, file, cmem));
+    ASSERT(mem->live > 0);
+    ASSERT_EQ(LZ4F_OK(LZ4F_read(readCtx, decoded, srcSize)), srcSize);
+    LZ4F_OK(LZ4F_seek(readCtx, 1500 KB, SEEK_SET));   /* restarts from a resume point, then skips */
+    ASSERT_EQ(LZ4F_OK(LZ4F_read(readCtx, decoded, 100 KB)), 100 KB);
+    ASSERT_MEMEQ(decoded, src + 1500 KB, 100 KB);
+    LZ4F_OK(LZ4F_readClose(readCtx));
+    ASSERT_EQ(mem->live, 0);
+}
+
+/* each allocation failure, while writing then reading a file, is reported, without leak */
+TEST(lz4file_allocFailures)
+{
+    size_t const srcSize = 200 KB;   /* no resume point : the index is optional, its allocation failures are not reported */
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    FILE* const file = newTmpFile();
+    allocState_t* const mem = newAllocState();
+    LZ4F_CustomMem const cmem = { failingAlloc, NULL, countingFree, mem };
+    size_t n;
+    for (n = 1; ; n++) {   /* writing : open, write, close */
+        LZ4_writeFile_t* writeCtx = NULL;
+        size_t r;
+        rewind(file);
+        mem->nbAllocs = 0;
+        mem->failAt = n;
+        r = LZ4F_writeOpen_advanced(&writeCtx, file, NULL, cmem);
+        if (LZ4F_isError(r)) {
+            ASSERT(writeCtx == NULL);
+        } else {
+            LZ4F_write(writeCtx, src, srcSize);   /* a failure is also reported by LZ4F_writeClose() */
+            r = LZ4F_writeClose(writeCtx);
+        }
+        mem->failAt = 0;
+        ASSERT_MSG(mem->live == 0, "writing, allocation %u : memory leak", (unsigned)n);
+        if (mem->nbAllocs < n) {   /* all failure points tested */
+            LZ4F_OK(r);
+            break;
+        }
+        ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_allocation_failed);
+    }
+    ASSERT(n - 1 > 2);   /* more allocations than the handle and its buffer : the compression context employs cmem */
+    for (n = 1; ; n++) {   /* reading : open, seek (skip buffer), read, close */
+        LZ4_readFile_t* readCtx = NULL;
+        size_t r;
+        rewind(file);
+        mem->nbAllocs = 0;
+        mem->failAt = n;
+        r = LZ4F_readOpen_advanced(&readCtx, file, cmem);
+        if (LZ4F_isError(r)) {
+            ASSERT(readCtx == NULL);
+        } else {
+            r = LZ4F_seek(readCtx, srcSize / 2, SEEK_SET);
+            if (!LZ4F_isError(r)) r = LZ4F_read(readCtx, decoded, srcSize);
+            LZ4F_OK(LZ4F_readClose(readCtx));
+        }
+        mem->failAt = 0;
+        ASSERT_MSG(mem->live == 0, "reading, allocation %u : memory leak", (unsigned)n);
+        if (mem->nbAllocs < n) {   /* all failure points tested */
+            ASSERT_EQ(LZ4F_OK(r), srcSize - srcSize / 2);
+            ASSERT_MEMEQ(decoded, src + srcSize / 2, srcSize - srcSize / 2);
+            break;
+        }
+        ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_allocation_failed);
+    }
+    ASSERT(n - 1 > 3);   /* more allocations than the handle and its 2 buffers : the decompression context employs cmem */
+}
+
 /* LZ4F_cctx_size() and LZ4F_dctx_size() report the allocated memory */
 static size_t g_cctxAllocated, g_dctxAllocated;   /* not on the stack : contexts are released after the test */
 #define ASSERT_CTX_SIZES(cctx, dctx) do {                          \
