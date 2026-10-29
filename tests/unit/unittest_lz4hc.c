@@ -24,6 +24,7 @@
 */
 
 #include "unittest.h"
+#include <limits.h>     /* INT_MIN, INT_MAX */
 #include <string.h>     /* memset, memcpy, memcmp */
 #ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_createHC, LZ4_compressHC2_continue */
@@ -95,6 +96,130 @@ TEST(initStreamHC_alignment)
 TEST(createStreamHC)
 {
     newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+}
+
+TEST(streamHC_returnValues)
+{
+    char buffer[16] = { 0 };
+    ASSERT_EQ(LZ4_freeStreamHC(NULL), 0);
+    ASSERT_EQ(LZ4_freeStreamHC(LZ4_createStreamHC()), 0);   /* released : checked by LeakSanitizer */
+    ASSERT_EQ(LZ4_freeHC(NULL), 0);
+    ASSERT_EQ(LZ4_freeHC(LZ4_createHC(buffer)), 0);
+}
+
+/* functions initializing a state refuse a misaligned one */
+TEST(compress_HC_misalignedState)
+{
+    int const srcSize = 1 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const state = (char*)UT_malloc(sizeof(LZ4_streamHC_t) + 1);
+    int consumed = srcSize;
+    ASSERT_EQ(LZ4_compress_HC_extStateHC(state + 1, src, dst, srcSize, capacity, LZ4HC_CLEVEL_DEFAULT), 0);
+    ASSERT_EQ(LZ4_compress_HC_destSize(state + 1, src, dst, &consumed, capacity, LZ4HC_CLEVEL_DEFAULT), 0);
+    ASSERT_EQ(LZ4_resetStreamStateHC(state + 1, (char*)dst), 1);
+    ASSERT_EQ(LZ4_resetStreamStateHC(state, (char*)dst), 0);
+}
+
+/* levels < 1 are replaced by LZ4HC_CLEVEL_DEFAULT, levels > LZ4HC_CLEVEL_MAX by LZ4HC_CLEVEL_MAX */
+TEST(compress_HC_outOfRangeLevels)
+{
+    static const int levels[][2] = { { 0, LZ4HC_CLEVEL_DEFAULT }, { -1, LZ4HC_CLEVEL_DEFAULT }, { INT_MIN, LZ4HC_CLEVEL_DEFAULT },
+                                     { LZ4HC_CLEVEL_MAX + 1, LZ4HC_CLEVEL_MAX }, { INT_MAX, LZ4HC_CLEVEL_MAX } };
+    int const srcSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    size_t i;
+    for (i = 0; i < ARRAY_SIZE(levels); i++) {
+        int const refSize = LZ4_compress_HC(src, ref, srcSize, capacity, levels[i][1]);
+        int cSize = LZ4_compress_HC(src, dst, srcSize, capacity, levels[i][0]);
+        ASSERT(refSize > 0);
+        ASSERT_MSG(cSize == refSize && !memcmp(dst, ref, (size_t)cSize),
+                   "LZ4_compress_HC(), level %i : output differs from level %i", levels[i][0], levels[i][1]);
+        LZ4_resetStreamHC_fast(stream, levels[i][0]);
+        cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, capacity);
+        ASSERT_MSG(cSize == refSize && !memcmp(dst, ref, (size_t)cSize),
+                   "LZ4_compress_HC_continue(), level %i : output differs from level %i", levels[i][0], levels[i][1]);
+    }
+}
+
+/* a stream compresses its first block as LZ4_compress_HC() does at its level,
+ * set by LZ4_resetStreamHC_fast(), LZ4_setCompressionLevel(), or LZ4_resetStreamHC(), which also forgets the history */
+TEST(compress_HC_continue_levels)
+{
+    int const srcSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const copy = (char*)UT_malloc((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    LZ4_streamHC_t* const state = (LZ4_streamHC_t*)UT_malloc(sizeof(LZ4_streamHC_t));
+    int level;
+    memcpy(copy, src, (size_t)srcSize);
+    for (level = 1; level <= LZ4HC_CLEVEL_MAX; level++) {
+        int const refSize = LZ4_compress_HC(src, ref, srcSize, capacity, level);
+        ASSERT(refSize > 0);
+        LZ4_resetStreamHC_fast(stream, level);
+        ASSERT_MSG(LZ4_compress_HC_continue(stream, src, dst, srcSize, capacity) == refSize && !memcmp(dst, ref, (size_t)refSize),
+                   "level %i, LZ4_resetStreamHC_fast() : output differs from LZ4_compress_HC()", level);
+        LZ4_resetStreamHC(stream, level);   /* the stream has a history : the same content, at another place */
+        ASSERT_MSG(LZ4_compress_HC_continue(stream, copy, dst, srcSize, capacity) == refSize && !memcmp(dst, ref, (size_t)refSize),
+                   "level %i, LZ4_resetStreamHC() : output differs from LZ4_compress_HC()", level);
+        ASSERT(LZ4_initStreamHC(state, sizeof(*state)) != NULL);
+        LZ4_setCompressionLevel(state, level);
+        ASSERT_MSG(LZ4_compress_HC_continue(state, src, dst, srcSize, capacity) == refSize && !memcmp(dst, ref, (size_t)refSize),
+                   "level %i, LZ4_setCompressionLevel() : output differs from LZ4_compress_HC()", level);
+    }
+}
+
+/* LZ4_compress_HC_extStateHC_fastReset() starts a new stream :
+ * it ignores the history, the level, the attached dictionary of the state, and a previous failure */
+TEST(compress_HC_extStateHC_fastReset_newStream)
+{
+    int const srcSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    int const level = LZ4HC_CLEVEL_DEFAULT;
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_streamHC_t* const state = newStreamHC(LZ4HC_CLEVEL_MAX);
+    LZ4_streamHC_t* const dictStream = newStreamHC(level);
+    int const refSize = LZ4_compress_HC(src, ref, srcSize, capacity, level);
+    ASSERT(refSize > 0);
+    ASSERT(LZ4_compress_HC_continue(state, src, dst, srcSize, capacity) > 0);
+    ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(state, src, dst, srcSize, capacity, level), refSize);
+    ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+
+    ASSERT_EQ(LZ4_loadDictHC(dictStream, src, srcSize), srcSize);
+    LZ4_attach_HC_dictionary(state, dictStream);
+    ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(state, src, dst, srcSize, capacity, level), refSize);
+    ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+
+    ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(state, src, dst, srcSize, refSize - 1, level), 0);
+    ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(state, src, dst, srcSize, capacity, level), refSize);
+    ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+}
+
+/* LZ4_resetStreamStateHC() starts a stream at @inputBuffer */
+TEST(resetStreamStateHC_compressHC2_continue)
+{
+    int const srcSize = 32 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    int const level = LZ4HC_CLEVEL_OPT_MIN;
+    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_streamHC_t* const state = (LZ4_streamHC_t*)UT_malloc(sizeof(LZ4_streamHC_t));
+    int const refSize = LZ4_compress_HC(src, ref, srcSize, capacity, level);
+    ASSERT(refSize > 0);
+    ASSERT_EQ(LZ4_resetStreamStateHC(state, (char*)(size_t)src), 0);
+    ASSERT_EQ(LZ4_compressHC2_continue(state, src, dst, srcSize, level), refSize);
+    ASSERT_MEMEQ(dst, ref, (size_t)refSize);
 }
 
 TEST(compress_HC_continue_roundTrip)
@@ -345,6 +470,80 @@ TEST(compress_HC_continue_remoteDictionary)
     }
 }
 
+/* LZ4_loadDictHC() loads the last 64 KB at most, and returns their size.
+ * The next block copies the end of the dictionary : it's decoded with the expected bytes as dictionary */
+TEST(loadDictHC_returnedSize)
+{
+    static const int sizes[][2] = { { -1, 0 }, { 0, 0 }, { 4, 4 }, { 1 KB, 1 KB }, { 63 KB + 512, 63 KB + 512 },
+                                    { 64 KB, 64 KB }, { 64 KB + 512, 64 KB }, { 100 KB, 64 KB } };
+    static const int levels[] = { LZ4HC_CLEVEL_MIN, LZ4HC_CLEVEL_DEFAULT };   /* lz4mid, hash chain */
+    int const srcSize = 16 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const dict = (const char*)UT_sample(100 KB);
+    char* const src = (char*)UT_malloc((size_t)srcSize);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    size_t l, i;
+    for (l = 0; l < ARRAY_SIZE(levels); l++)
+    for (i = 0; i < ARRAY_SIZE(sizes); i++) {
+        int const dictEnd = MAX(sizes[i][0], 0);
+        int loaded, cSize;
+        memcpy(src, dict + MAX(dictEnd - srcSize, 0), (size_t)srcSize);
+        LZ4_resetStreamHC_fast(stream, levels[l]);
+        loaded = LZ4_loadDictHC(stream, dict, sizes[i][0]);
+        ASSERT_MSG(loaded == sizes[i][1], "level %i, dictionary of %i bytes : %i loaded, instead of %i",
+                   levels[l], sizes[i][0], loaded, sizes[i][1]);
+        cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, capacity);
+        ASSERT(cSize > 0);
+        ASSERT_MSG(LZ4_decompress_safe_usingDict(dst, decoded, cSize, srcSize, dict + dictEnd - loaded, loaded) == srcSize
+                   && !memcmp(decoded, src, (size_t)srcSize),
+                   "level %i, dictionary of %i bytes : corrupted block", levels[l], sizes[i][0]);
+    }
+}
+
+/* LZ4_saveDictHC() saves the last 64 KB of history at most, into a buffer of the requested size, and returns the saved size.
+ * The next block, following the saved history or not, uses it as dictionary */
+TEST(saveDictHC_sizes)
+{
+    static const int sizes[][2] = { { 3, 0 }, { 4, 4 }, { 1 KB, 1 KB }, { 63 KB + 512, 63 KB + 512 },
+                                    { 64 KB, 64 KB }, { 64 KB + 512, 64 KB } };
+    static const int levels[] = { LZ4HC_CLEVEL_MIN, LZ4HC_CLEVEL_DEFAULT, LZ4HC_CLEVEL_OPT_MIN };   /* lz4mid, hash chain, optimal parser */
+    int const histSize = 100 KB;
+    int const srcSize = 16 KB;
+    int const capacity = LZ4_COMPRESSBOUND(histSize);
+    const char* const input = (const char*)UT_sample((size_t)(histSize + srcSize));   /* history, then next block */
+    char* const hist = (char*)UT_malloc((size_t)histSize);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    size_t l, i;
+    int contiguous;
+    for (l = 0; l < ARRAY_SIZE(levels); l++)
+    for (i = 0; i < ARRAY_SIZE(sizes); i++)
+    for (contiguous = 0; contiguous <= 1; contiguous++) {
+        /* saved history, followed by the next block if contiguous */
+        char* const buffer = (char*)UT_malloc((size_t)(sizes[i][0] + (contiguous ? srcSize : 0)));
+        char* src;
+        int saved, cSize;
+        memcpy(hist, input, (size_t)histSize);
+        LZ4_resetStreamHC_fast(stream, levels[l]);
+        ASSERT(LZ4_compress_HC_continue(stream, hist, dst, histSize, capacity) > 0);
+        saved = LZ4_saveDictHC(stream, buffer, sizes[i][0]);
+        ASSERT_MSG(saved == sizes[i][1], "level %i : %i bytes saved instead of %i, for %i requested",
+                   levels[l], saved, sizes[i][1], sizes[i][0]);
+        ASSERT_MEMEQ(buffer, input + histSize - saved, (size_t)saved);
+        memset(hist, 0, (size_t)histSize);   /* former history is gone */
+        src = contiguous ? buffer + saved : (char*)UT_malloc((size_t)srcSize);
+        memcpy(src, input + histSize, (size_t)srcSize);
+        cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, capacity);
+        ASSERT(cSize > 0);
+        ASSERT_MSG(LZ4_decompress_safe_usingDict(dst, decoded, cSize, srcSize, input + histSize - saved, saved) == srcSize
+                   && !memcmp(decoded, input + histSize, (size_t)srcSize),
+                   "level %i, %i bytes saved, contiguous %i : corrupted block", levels[l], saved, contiguous);
+    }
+}
+
 /* on long sequences of zeros, LZ4_compress_HC_destSize() and LZ4_compress_destSize() produce the same output */
 TEST(compress_HC_destSize_sameAsFast)
 {
@@ -440,6 +639,101 @@ TEST(compress_HC_continue_destSize_resume)
     }   }   }
 }
 
+/* same, stopping within a long match (zeros) : the positions it referenced beyond the stop are dropped,
+ * the next block doesn't find them as matches */
+TEST(compress_HC_continue_destSize_resumeInLongMatch)
+{
+    static const int levels[] = { LZ4HC_CLEVEL_MIN, LZ4HC_CLEVEL_DEFAULT, LZ4HC_CLEVEL_OPT_MIN };   /* lz4mid, hash chain, optimal parser */
+    int const srcSize = 1 MB;
+    int const dstBudget = 2 KB;   /* a match of 1 MB takes ~4 KB */
+    char* const src = (char*)UT_sample((size_t)srcSize);
+    char* const dst = (char*)UT_malloc((size_t)dstBudget);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    size_t l;
+    memset(src + 4 KB, 0, (size_t)srcSize - 8 KB);
+    for (l = 0; l < ARRAY_SIZE(levels); l++) {
+        LZ4_streamHC_t* const stream = newStreamHC(levels[l]);
+        LZ4_streamDecode_t dStream;
+        int pos = 0;
+        LZ4_setStreamDecode(&dStream, NULL, 0);
+        while (pos < srcSize) {
+            int consumed = srcSize - pos;
+            int const cSize = LZ4_compress_HC_continue_destSize(stream, src + pos, dst, &consumed, dstBudget);
+            ASSERT(cSize > 0 && consumed > 0);
+            ASSERT_MSG(LZ4_decompress_safe_continue(&dStream, dst, decoded + pos, cSize, srcSize - pos) == consumed
+                       && !memcmp(decoded + pos, src + pos, (size_t)consumed),
+                       "level %i : block at position %i is corrupted", levels[l], pos);
+            pos += consumed;
+    }   }
+}
+
+/* a stream reset after more than 1 GB clears its tables : the next stream compresses as a new one */
+TEST(resetStreamHC_fast_beyond1GB)
+{
+    enum { blockSize = 64 KB, ringSize = 16 };
+    int const nbBlocks = (int)((1U << 30) / blockSize) + 1;
+    int const capacity = LZ4_COMPRESSBOUND(blockSize);
+    int const level = LZ4HC_CLEVEL_MIN + 1;   /* hash chain */
+    char* const ring = (char*)UT_malloc((size_t)ringSize * blockSize);
+    char* const src = (char*)UT_sample(blockSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_MIN);   /* lz4mid : fast on zeros */
+    int n, refSize;
+    memset(ring, 0, (size_t)ringSize * blockSize);
+    for (n = 0; n < nbBlocks; n++)
+        ASSERT(LZ4_compress_HC_continue(stream, ring + (n % ringSize) * blockSize, dst, blockSize, capacity) > 0);
+    memset(src + 16 KB, 0, 16 KB);   /* zeros were referenced before the reset */
+    refSize = LZ4_compress_HC(src, ref, blockSize, capacity, level);
+    ASSERT(refSize > 0);
+    LZ4_resetStreamHC_fast(stream, level);
+    ASSERT_EQ(LZ4_compress_HC_continue(stream, src, dst, blockSize, capacity), refSize);
+    ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+}
+
+/* beyond 2 GB, a stream reloads its last 64 KB of history as dictionary, and its indexes restart.
+ * Separate blocks only reference the previous block (63.5 KB) : each one starts with the end of the one before,
+ * which must not be referenced (decoding fails).
+ * Zero blocks at level lz4mid (fast), then blocks of text at a hash chain level, from shortly before 2 GB */
+TEST(compress_HC_continue_beyond2GB)
+{
+    enum { blockSize = 63 KB + 512, ringSize = 16, copySize = 500 };
+    int const nbBlocks = (int)((2U << 30) / blockSize) + 4;
+    int const firstSample = nbBlocks - 8;
+    int const capacity = LZ4_COMPRESSBOUND(blockSize);
+    char* const ring = (char*)UT_malloc((size_t)ringSize * (blockSize + 1));   /* separate blocks : 1 byte apart */
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const history = (char*)UT_malloc(3 * blockSize);   /* contents of the 2 previous blocks, then of the current one */
+    char* const decoded = (char*)UT_malloc(blockSize);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_MIN);
+    unsigned seed = 1;
+    int n, i;
+    memset(ring, 0, (size_t)ringSize * (blockSize + 1));
+    memset(history, 0, 3 * blockSize);
+    for (n = 0; n < nbBlocks; n++) {
+        char* const block = ring + (n % ringSize) * (blockSize + 1);
+        char* const current = history + 2 * blockSize;
+        int cSize;
+        if (n == firstSample) LZ4_setCompressionLevel(stream, LZ4HC_CLEVEL_MIN + 1);
+        if (n >= firstSample) {   /* end of the block before the previous one, then text with 1 byte in 8 random */
+            memcpy(current, history + blockSize - copySize, copySize);
+            for (i = copySize; i < blockSize; i++) {
+                seed = seed * 1103515245u + 12345u;
+                current[i] = ((seed >> 16) % 8 == 0) ? (char)(seed >> 8) : "lorem ipsum dolor sit amet "[i % 27];
+            }
+            memcpy(block, current, blockSize);
+        }
+        cSize = LZ4_compress_HC_continue(stream, block, dst, blockSize, capacity);
+        ASSERT(cSize > 0);
+        if (n >= firstSample) {
+            int const r = LZ4_decompress_safe_usingDict(dst, decoded, cSize, blockSize, history + blockSize, blockSize);
+            ASSERT_MSG(r == blockSize && !memcmp(decoded, current, blockSize),
+                       "block %i (%u MB) : corrupted", n, (unsigned)((size_t)n * blockSize >> 20));
+            memmove(history, history + blockSize, 2 * blockSize);
+        }
+    }
+}
+
 
 
 /*-************************************
@@ -447,6 +741,88 @@ TEST(compress_HC_continue_destSize_resume)
 **************************************/
 #define HC_INPUT_SIZE (196 KB)
 #define HC_RING_SIZE (8 KB)
+
+/* attached dictionary, with a first block smaller than its copy threshold : the dictionary is referenced.
+ * Next blocks, smaller or larger than this threshold :
+ * contiguous blocks reference the dictionary and the previous blocks (until 64 KB of input),
+ * separate blocks only reference the previous block.
+ * The dictionary is prepared at the level of the stream, or at a level of the other kind (lz4mid / hash chain) */
+TEST(attach_HC_dictionary_smallBlocks)
+{
+    static const int levels[][2] = { { 2, 2 }, { 2, 9 }, { 9, 9 }, { 9, 2 }, { 10, 10 }, { 12, 12 } };   /* stream, dictionary */
+    int const dictSize = 64 KB;
+    int const smallSize = 1000;   /* smaller than the copy threshold of all levels */
+    int const largeSize = 5000;   /* larger */
+    int const nbBlocks = 40;   /* beyond 64 KB */
+    int const capacity = LZ4_COMPRESSBOUND(largeSize);
+    const char* const dict = (const char*)UT_sample((size_t)dictSize);
+    char* const blocks = (char*)UT_malloc((size_t)(nbBlocks * (largeSize + 1)));   /* separate blocks : 1 byte apart */
+    char* const decoded = (char*)UT_malloc((size_t)(nbBlocks * (largeSize + 1)));
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    LZ4_streamHC_t* const dictStream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    size_t l;
+    int separate, b, p, pos;
+    for (l = 0; l < ARRAY_SIZE(levels); l++)
+    for (separate = 0; separate <= 1; separate++) {
+        LZ4_streamDecode_t sd;
+        LZ4_resetStreamHC_fast(dictStream, levels[l][1]);
+        ASSERT_EQ(LZ4_loadDictHC(dictStream, dict, dictSize), dictSize);
+        LZ4_resetStreamHC_fast(stream, levels[l][0]);
+        LZ4_attach_HC_dictionary(stream, dictStream);
+        LZ4_setStreamDecode(&sd, dict, dictSize);
+        for (b = 0, pos = 0; b < nbBlocks; b++) {
+            int const blockSize = (b % 4 == 3) ? largeSize : smallSize;
+            int const pieceSize = blockSize / 4;
+            char* const block = blocks + pos;
+            int cSize;
+            for (p = 0; p < 4; p++)   /* pieces of the dictionary */
+                memcpy(block + p * pieceSize, dict + ((b * 4 + p) * 7919) % (dictSize - pieceSize), (size_t)pieceSize);
+            cSize = LZ4_compress_HC_continue(stream, block, dst, blockSize, capacity);
+            ASSERT(cSize > 0);
+            ASSERT_MSG(LZ4_decompress_safe_continue(&sd, dst, decoded + pos, cSize, blockSize) == blockSize
+                       && !memcmp(decoded + pos, block, (size_t)blockSize),
+                       "level %i, dictionary level %i, separate %i : block %i is corrupted", levels[l][0], levels[l][1], separate, b);
+            pos += blockSize + separate;
+    }   }
+}
+
+/* runs of a byte, measured by the pattern analysis of levels >= 9, at the boundary between dictionary and input :
+ * runs of the dictionary, one of them continuing into the input, and runs of the input, one of them continuing back into the dictionary.
+ * The input follows the dictionary (prefix), or not (external dictionary) */
+TEST(compress_HC_continue_runsAcrossDictionary)
+{
+    static const int levels[] = { LZ4HC_CLEVEL_DEFAULT, LZ4HC_CLEVEL_OPT_MIN, LZ4HC_CLEVEL_MAX };
+    static const int dictRuns[][2] = { { 30 KB, 6000 }, { 56 KB, 8 KB } };   /* position, length */
+    static const int srcRuns[][2] = { { 0, 3000 }, { 8000, 7000 }, { 20000, 300 }, { 24300, 12000 }, { 40000, 5000 } };
+    int const dictSize = 64 KB;
+    int const srcSize = 64 KB;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const sample = (const char*)UT_sample((size_t)(dictSize + srcSize));
+    char* const buffer = (char*)UT_malloc((size_t)(dictSize + srcSize));   /* dictionary, then input if it's a prefix */
+    char* const separateSrc = (char*)UT_malloc((size_t)srcSize);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    LZ4_streamHC_t* const stream = newStreamHC(LZ4HC_CLEVEL_DEFAULT);
+    size_t l, r;
+    int prefix;
+    memcpy(buffer, sample, (size_t)(dictSize + srcSize));
+    for (r = 0; r < ARRAY_SIZE(dictRuns); r++) memset(buffer + dictRuns[r][0], 'a', (size_t)dictRuns[r][1]);
+    for (r = 0; r < ARRAY_SIZE(srcRuns); r++) memset(buffer + dictSize + srcRuns[r][0], 'a', (size_t)srcRuns[r][1]);
+    memcpy(separateSrc, buffer + dictSize, (size_t)srcSize);
+    for (l = 0; l < ARRAY_SIZE(levels); l++)
+    for (prefix = 0; prefix <= 1; prefix++) {
+        const char* const src = prefix ? buffer + dictSize : separateSrc;
+        int cSize;
+        LZ4_resetStreamHC_fast(stream, levels[l]);
+        ASSERT_EQ(LZ4_loadDictHC(stream, buffer, dictSize), dictSize);
+        cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, capacity);
+        ASSERT(cSize > 0);
+        ASSERT_MSG(LZ4_decompress_safe_usingDict(dst, decoded, cSize, srcSize, buffer, dictSize) == srcSize
+                   && !memcmp(decoded, src, (size_t)srcSize),
+                   "level %i, prefix %i : corrupted block", levels[l], prefix);
+    }
+}
 
 /* successive segments, each one using the previous one as dictionary, at another place */
 TEST(compress_HC_continue_successiveDictionaries)
