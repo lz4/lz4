@@ -2636,6 +2636,10 @@ TEST(lz4file_seek)
     ASSERT_LZ4F_ERROR(LZ4F_seek(rf, -1, SEEK_SET), LZ4F_ERROR_parameter_invalid);   /* negative position */
     ASSERT_LZ4F_ERROR(LZ4F_seek(rf, -(long long)pos - 1, SEEK_CUR), LZ4F_ERROR_parameter_invalid);   /* before start */
     ASSERT_EQ(LZ4F_tell(rf), pos);
+    /* Large positive SEEK_CUR is rejected. Oversized seeks that decode forward stop at end. */
+    ASSERT_LZ4F_ERROR(LZ4F_seek(rf, (long long)(((unsigned long long)-1) / 2), SEEK_CUR), LZ4F_ERROR_parameter_invalid);
+    ASSERT_EQ(LZ4F_tell(rf), totalSize);
+    pos = totalSize;
 
     /* end of data */
     LZ4F_OK(LZ4F_seek(rf, (long long)totalSize, SEEK_SET));
