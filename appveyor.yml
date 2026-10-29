@@ -13,11 +13,10 @@ environment:
 install:
   - echo Installing %COMPILER% %PLATFORM%
   - mkdir bin
-  # Setup MinGW environment
-  - set "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin"
+  # Setup MinGW environment : MinGW-w64 toolchains of MSYS2
+  # (MinGW.org lacks the Windows Vista API used by multi-threaded compression)
+  - set "PATH_MINGW32=c:\msys64\mingw32\bin;c:\msys64\usr\bin"
   - set "PATH_MINGW64=c:\msys64\mingw64\bin;c:\msys64\usr\bin"
-  - copy C:\MinGW\bin\mingw32-make.exe C:\MinGW\bin\make.exe >nul 2>&1
-  - copy C:\MinGW\bin\gcc.exe C:\MinGW\bin\cc.exe >nul 2>&1
 
 build_script:
   - echo "*** Building %COMPILER% %PLATFORM% ***"
