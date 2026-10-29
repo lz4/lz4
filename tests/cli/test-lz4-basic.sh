@@ -52,6 +52,30 @@ case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
     ls -l $FPREFIX-priv2 | grep '^-rw-------'
     ;;
 esac
+# an output which is the input itself is refused, instead of truncating the input before it is read
+datagen -g200KB > $FPREFIX-same
+cp $FPREFIX-same $FPREFIX-same.orig
+lz4 -f $FPREFIX-same $FPREFIX-same && exit 1
+cmp $FPREFIX-same $FPREFIX-same.orig
+lz4 -l -f $FPREFIX-same $FPREFIX-same && exit 1
+cmp $FPREFIX-same $FPREFIX-same.orig
+lz4 -f $FPREFIX-same $FPREFIX-same.lz4
+cp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
+lz4 -d -f $FPREFIX-same.lz4 $FPREFIX-same.lz4 && exit 1
+cmp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
+    # idem through a link
+    ln $FPREFIX-same $FPREFIX-same.hard
+    lz4 -f $FPREFIX-same $FPREFIX-same.hard && exit 1
+    cmp $FPREFIX-same $FPREFIX-same.orig
+    ln -s $FPREFIX-same $FPREFIX-same.sym
+    lz4 -f $FPREFIX-same $FPREFIX-same.sym && exit 1
+    cmp $FPREFIX-same $FPREFIX-same.orig
+    ln -s $FPREFIX-same.lz4 $FPREFIX-same.lz4.sym
+    lz4 -d -f $FPREFIX-same.lz4 $FPREFIX-same.lz4.sym && exit 1
+    cmp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
+    ;;
+esac
 lz4 --rm -f $FPREFIX-hw > /dev/null
 test   -f $FPREFIX-hw.lz4               # no more implicit stdout
 lz4cat $FPREFIX-hw.lz4 | grep "hello world"

@@ -495,17 +495,31 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
     return f;
 }
 
+/* @return : 1 if @dstFileName designates the file @srcFileName (same name, link, ...) :
+ *           opening it for writing would truncate the source before it is read */
+static int LZ4IO_isSameFile(const char* srcFileName, const char* dstFileName)
+{
+#if defined(_WIN32)
+    return UTIL_sameString(srcFileName, dstFileName);   /* no inode numbers */
+#else
+    stat_t srcStat, dstStat;
+    return UTIL_getFileStat(srcFileName, &srcStat)
+        && UTIL_getFileStat(dstFileName, &dstStat)
+        && (srcStat.st_dev == dstStat.st_dev) && (srcStat.st_ino == dstStat.st_ino);
+#endif
+}
+
 /** FIO_openDstFile() :
  *  prefs is writable, because sparseFileSupport might be updated.
  *  condition : `dstFileName` must be non-NULL.
  * @srcFileName : source whose attributes are copied once `dstFileName` is complete, or NULL
+ *                it can't be the destination itself : it would be truncated
  * @result : FILE* to `dstFileName`, or NULL if it fails */
 static FILE*
 LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, const char* srcFileName)
 {
     FILE* f;
     assert(dstFileName != NULL);
-    (void)srcFileName;   /* only used on POSIX systems */
 
     if (LZ4IO_isStdout(dstFileName)) {
         DISPLAYLEVEL(4, "Using stdout for output \n");
@@ -516,6 +530,10 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, con
                             " to force-enable it, add --sparse command \n");
         }
     } else {
+        if (srcFileName != NULL && !LZ4IO_isStdin(srcFileName) && LZ4IO_isSameFile(srcFileName, dstFileName)) {
+            DISPLAYLEVEL(1, "%s: input and output are the same file; not overwritten \n", dstFileName);
+            return NULL;
+        }
         if (!prefs->overwrite && !LZ4IO_isDevNull(dstFileName)) {
             /* Check if destination file already exists */
             FILE* const testf = fopen( dstFileName, "rb" );
