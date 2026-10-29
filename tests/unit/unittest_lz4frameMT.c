@@ -316,6 +316,36 @@ TEST(flush_srcStableUntilFlush)
     }
 }
 
+/* LZ4F_srcStableUntilFlush with inputs which are not contiguous : a job reads its history in place
+ * only when the previous input ends right before it ; otherwise, the history is copied */
+TEST(flush_srcStableUntilFlush_nonContiguous)
+{
+    size_t const partSize = 2 MB;   /* whole jobs (64 KB blocks) */
+    size_t const srcSize = 2 * partSize;
+    const char* const src = (const char*)UT_sample(srcSize);
+    char* const second = (char*)UT_malloc(64 KB + partSize);
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_compressOptions_t cOpts;
+    size_t capacity, pos;
+    char* dst;
+    /* the 64 KB preceding the second part look like a history, but differ from the actual one */
+    memcpy(second, src + partSize, 64 KB);
+    memcpy(second + 64 KB, src + partSize, partSize);
+    prefs.nbWorkers = 2;
+    prefs.frameInfo.blockMode = LZ4F_blockLinked;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    dst = (char*)UT_malloc(capacity);
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.stableSrc = LZ4F_srcStableUntilFlush;
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, capacity, &prefs));
+    pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, capacity - pos, src, partSize, &cOpts));
+    pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, capacity - pos, second + 64 KB, partSize, &cOpts));
+    pos += LZ4F_OK(LZ4F_compressEnd(cctx, dst + pos, capacity - pos, NULL));
+    assertDecodesTo(dst, pos, NULL, 0, src, srcSize);
+}
+
 /* abandoned frames : jobs in flight when a new frame starts, or when the context is freed */
 TEST(abandonedFrames)
 {
