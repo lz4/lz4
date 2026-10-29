@@ -103,6 +103,7 @@ struct LZ4_readFile_s {
   LZ4F_frameInfo_t frameInfo;     /* parameters of current frame, if frameInfoKnown */
   int frameInfoKnown;
   size_t hint;                    /* input expected by the decoder, up to the end of next block header : 0 between frames */
+  LZ4F_errorCode_t error;         /* decoding error : the decoder can't continue, until restartFrom() */
   int seekable;
   LZ4F_resumePoint* points;
   size_t nbPoints;
@@ -297,6 +298,8 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
 
   if (lz4fRead == NULL || buf == NULL)
     RETURN_ERROR(parameter_null);
+  if (LZ4F_isError(lz4fRead->error))
+    return lz4fRead->error;
 
   while (totalBytesRead < size) {
     size_t srcBytes = lz4fRead->srcBufSize - lz4fRead->srcBufNext;
@@ -331,6 +334,7 @@ size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
                           &srcBytes,
                           NULL);
       if (LZ4F_isError(decStatus)) {
+          lz4fRead->error = decStatus;   /* the dctx can't be used again before a reset */
           return decStatus;
       }
       lz4fRead->srcBufNext += srcBytes;
@@ -391,6 +395,7 @@ static LZ4F_errorCode_t restartFrom(LZ4_readFile_t* lz4fRead, const LZ4F_resumeP
     lz4fRead->frameDPos = lz4fRead->decodedPos;
     lz4fRead->frameInfoKnown = 0;
   }
+  lz4fRead->error = LZ4F_OK_NoError;
   return LZ4F_OK_NoError;
 }
 
