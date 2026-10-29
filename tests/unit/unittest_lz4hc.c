@@ -214,7 +214,7 @@ TEST(favorDecompressionSpeed_afterFailedCompression)
     int const srcSize = 64 KB;
     int const capacity = LZ4_COMPRESSBOUND(srcSize);
     int const level = LZ4HC_CLEVEL_OPT_MIN;
-    const char* const src = (const char*)UT_sample((size_t)srcSize);
+    const char* const src = (const char*)UT_fixedSample((size_t)srcSize);   /* favorDecSpeed must change the output */
     char* const ref = (char*)UT_malloc((size_t)capacity);
     char* const dst = (char*)UT_malloc((size_t)capacity);
     LZ4_streamHC_t* const stream = newStreamHC(level);

@@ -132,7 +132,7 @@ TEST(linkedJobs_history)
     static const int levels[] = { 1, 9 };
     size_t const patternSize = 48 KB;
     size_t const srcSize = 4 MB;   /* 4 jobs of 64 KB blocks */
-    const char* const pattern = (const char*)UT_noise(patternSize);
+    const char* const pattern = (const char*)UT_fixedNoise(patternSize);   /* ratio check */
     char* const src = (char*)UT_malloc(srcSize);
     size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
     char* const dst = (char*)UT_malloc(dstCapacity);

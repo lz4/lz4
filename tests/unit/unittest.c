@@ -140,6 +140,25 @@ void* UT_noise(size_t size)
     return buffer;
 }
 
+void* UT_fixedSample(size_t size)
+{
+    void* const buffer = UT_malloc(size);
+    RDG_genBuffer(buffer, size, 0.5, 0.0, 1);
+    return buffer;
+}
+
+void* UT_fixedNoise(size_t size)
+{
+    unsigned char* const buffer = (unsigned char*)UT_malloc(size);
+    unsigned state = 1;
+    size_t n;
+    for (n = 0; n < size; n++) {
+        state = state * 1103515245u + 12345u;
+        buffer[n] = (unsigned char)(state >> 16);
+    }
+    return buffer;
+}
+
 
 /*-************************************
 *  Assertions
