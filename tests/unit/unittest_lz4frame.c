@@ -3389,3 +3389,40 @@ TEST(lz4file_truncated)
         UT_release(f);
     }
 }
+
+/* after a decoding error, LZ4F_read() keeps returning it, until a backward LZ4F_seek() restarts decoding.
+ * The corrupted block is tiny : decoding it twice used to trip an assert within lz4frame.c */
+TEST(lz4file_readAfterError)
+{
+    static const BYTE src[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    static const BYTE corrupted[] = { 1, 0, 0, 0,               /* compressed block of 1 byte */
+                                      0x00,                     /* token : no literal, no match */
+                                      0xAA, 0xAA, 0xAA, 0xAA,   /* wrong block checksum */
+                                      0, 0, 0, 0 };             /* endMark */
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_cctx* const cctx = newCctx();
+    BYTE frame[128];
+    BYTE decoded[64];
+    size_t size;
+    FILE* f;
+    LZ4_readFile_t* rf;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+    size = LZ4F_OK(LZ4F_compressBegin(cctx, frame, sizeof(frame), &prefs));
+    size += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + size, sizeof(frame) - size, src, sizeof(src), NULL));
+    size += LZ4F_OK(LZ4F_flush(cctx, frame + size, sizeof(frame) - size, NULL));   /* first block : valid */
+    memcpy(frame + size, corrupted, sizeof(corrupted));
+    size += sizeof(corrupted);
+
+    f = newTmpFile();
+    ASSERT_EQ(fwrite(frame, 1, size, f), size);
+    rewind(f);
+    rf = newReadFile(f);
+    ASSERT(LZ4F_getErrorCode(LZ4F_read(rf, decoded, sizeof(decoded))) == LZ4F_ERROR_blockChecksum_invalid);
+    ASSERT(LZ4F_getErrorCode(LZ4F_read(rf, decoded, sizeof(decoded))) == LZ4F_ERROR_blockChecksum_invalid);
+    LZ4F_OK(LZ4F_seek(rf, 0, SEEK_SET));
+    ASSERT_EQ(LZ4F_OK(LZ4F_read(rf, decoded, sizeof(src))), sizeof(src));
+    ASSERT_MEMEQ(decoded, src, sizeof(src));
+    ASSERT(LZ4F_getErrorCode(LZ4F_read(rf, decoded, 1)) == LZ4F_ERROR_blockChecksum_invalid);
+    UT_release(rf);
+    UT_release(f);
+}
