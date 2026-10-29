@@ -449,37 +449,22 @@ static LZ4F_blockSizeID_t LZ4F_optimalBSID(const LZ4F_blockSizeID_t requestedBSI
     return requestedBSID;
 }
 
-/*! LZ4F_compressBound_internal() :
- *  Provides dstCapacity given a srcSize to guarantee operation success in worst case situations.
- *  prefsPtr is optional : if NULL is provided, preferences will be set to cover worst case scenario.
- * @return is always the same for a srcSize and prefsPtr, so it can be relied upon to size reusable buffers.
- *  When srcSize==0, LZ4F_compressBound() provides an upper bound for LZ4F_flush() and LZ4F_compressEnd() operations.
+/*! LZ4F_compressBound_autoFlush() :
+ *  worst case : @srcSize as blocks stored uncompressed, the last one partial, then the frame footer.
+ *  Also bounds one-shot compression (LZ4F_compressFrameBound()), which compresses all its input at once.
+ *  When srcSize==0, it bounds LZ4F_flush() and LZ4F_compressEnd() operations.
  */
-static size_t LZ4F_compressBound_internal(size_t srcSize,
-                                    const LZ4F_preferences_t* preferencesPtr,
-                                          size_t alreadyBuffered)
+static size_t LZ4F_compressBound_autoFlush(size_t srcSize, const LZ4F_preferences_t* prefsPtr)
 {
-    LZ4F_preferences_t prefsNull = LZ4F_INIT_PREFERENCES;
-    prefsNull.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;   /* worst case */
-    prefsNull.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;   /* worst case */
-    {   const LZ4F_preferences_t* const prefsPtr = (preferencesPtr==NULL) ? &prefsNull : preferencesPtr;
-        U32 const flush = prefsPtr->autoFlush | (srcSize==0);
-        LZ4F_blockSizeID_t const blockID = prefsPtr->frameInfo.blockSizeID;
-        size_t const blockSize = LZ4F_getBlockSize(blockID);
-        size_t const maxBuffered = blockSize - 1;
-        size_t const bufferedSize = MIN(alreadyBuffered, maxBuffered);
-        size_t const maxSrcSize = srcSize + bufferedSize;
-        unsigned const nbFullBlocks = (unsigned)(maxSrcSize / blockSize);
-        size_t const partialBlockSize = maxSrcSize & (blockSize-1);
-        size_t const lastBlockSize = flush ? partialBlockSize : 0;
-        unsigned const nbBlocks = nbFullBlocks + (lastBlockSize>0);
-
-        size_t const blockCRCSize = BFSize * prefsPtr->frameInfo.blockChecksumFlag;
-        size_t const frameEnd = BHSize + (prefsPtr->frameInfo.contentChecksumFlag*BFSize);
-
-        return ((BHSize + blockCRCSize) * nbBlocks) +
-               (blockSize * nbFullBlocks) + lastBlockSize + frameEnd;
-    }
+    size_t const blockSize = LZ4F_getBlockSize(prefsPtr->frameInfo.blockSizeID);
+    size_t const nbFullBlocks = srcSize / blockSize;
+    size_t const lastBlockSize = srcSize & (blockSize-1);
+    size_t const nbBlocks = nbFullBlocks + (lastBlockSize>0);
+    size_t const blockCRCSize = BFSize * prefsPtr->frameInfo.blockChecksumFlag;
+    size_t const frameEnd = BHSize + (prefsPtr->frameInfo.contentChecksumFlag*BFSize);
+    assert(prefsPtr->autoFlush);
+    return ((BHSize + blockCRCSize) * nbBlocks) +
+           (blockSize * nbFullBlocks) + lastBlockSize + frameEnd;
 }
 
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
@@ -491,7 +476,7 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
     else MEM_INIT(&prefs, 0, sizeof(prefs));
     prefs.autoFlush = 1;
 
-    return headerSize + LZ4F_compressBound_internal(srcSize, &prefs, 0);;
+    return headerSize + LZ4F_compressBound_autoFlush(srcSize, &prefs);
 }
 
 
@@ -1139,7 +1124,7 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
     if (preferencesPtr && preferencesPtr->autoFlush) {
         /* + 1 : output of LZ4F_flush() and LZ4F_compressEnd() remains strictly below LZ4F_compressBound(0),
          * since a filled dstBuffer means more output may remain */
-        return LZ4F_compressBound_internal(srcSize, preferencesPtr, 0) + (srcSize == 0);
+        return LZ4F_compressBound_autoFlush(srcSize, preferencesPtr) + (srcSize == 0);
     }
     /* single-threaded : full blocks only, each one stored uncompressed in worst case.
      * Up to (blockSize-1) bytes can already be buffered : srcSize completes at most srcSize/blockSize + 1 blocks.
@@ -2803,10 +2788,9 @@ void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
 
 
 /*! LZ4F_decodeHeader() :
- *  input   : `src` points at the **beginning of the frame**
+ *  input   : `src` points at the **beginning of the frame**, srcSize >= minFHSize
  *  output  : set internal values of dctx, such as
  *            dctx->frameInfo and dctx->dStage.
- *            Also allocates internal buffers.
  *  @return : nb Bytes read from src (necessarily <= srcSize)
  *            or an error code (testable with LZ4F_isError())
  */
@@ -2817,8 +2801,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     const BYTE* srcPtr = (const BYTE*)src;
 
     DEBUGLOG(5, "LZ4F_decodeHeader");
-    /* need to decode header to get frameInfo */
-    RETURN_ERROR_IF(srcSize < minFHSize, frameHeader_incomplete);   /* minimal frame header size */
+    assert(srcSize >= minFHSize);   /* minimal frame header size */
     MEM_INIT(&(dctx->frameInfo), 0, sizeof(dctx->frameInfo));
 
     /* special case : skippable frames */
@@ -2862,12 +2845,11 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     frameHeaderSize = minFHSize + (contentSizeFlag?8:0) + (dictIDFlag?4:0);
 
     if (srcSize < frameHeaderSize) {
-        /* not enough input to fully decode frame header */
-        if (srcPtr != dctx->header)
-            memcpy(dctx->header, srcPtr, srcSize);
-        dctx->tmpInSize = srcSize;
+        /* only the minimal header is gathered into dctx->header : gather the rest */
+        assert(srcPtr == dctx->header);
+        assert(dctx->dStage == dstage_storeFrameHeader);
+        assert(dctx->tmpInSize == srcSize);
         dctx->tmpInTarget = frameHeaderSize;
-        dctx->dStage = dstage_storeFrameHeader;
         return srcSize;
     }
 
