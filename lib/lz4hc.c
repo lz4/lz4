@@ -2265,14 +2265,17 @@ int LZ4_freeHC (void* LZ4HC_Data)
 }
 #endif
 
+/* LZ4_compress_HC_continue() at level @cLevel : notably, restarts the stream after LZ4_slideInputBufferHC() */
 int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int cLevel)
 {
-    return LZ4HC_compress_generic (&((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse, src, dst, &srcSize, LZ4_compressBound(srcSize), cLevel, notLimited);
+    LZ4_setCompressionLevel((LZ4_streamHC_t*)LZ4HC_Data, cLevel);
+    return LZ4_compress_HC_continue((LZ4_streamHC_t*)LZ4HC_Data, src, dst, srcSize, LZ4_compressBound(srcSize));
 }
 
 int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* src, char* dst, int srcSize, int dstCapacity, int cLevel)
 {
-    return LZ4HC_compress_generic (&((LZ4_streamHC_t*)LZ4HC_Data)->internal_donotuse, src, dst, &srcSize, dstCapacity, cLevel, limitedOutput);
+    LZ4_setCompressionLevel((LZ4_streamHC_t*)LZ4HC_Data, cLevel);
+    return LZ4_compress_HC_continue((LZ4_streamHC_t*)LZ4HC_Data, src, dst, srcSize, dstCapacity);
 }
 
 char* LZ4_slideInputBufferHC(void* LZ4HC_Data)
