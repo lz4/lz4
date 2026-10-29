@@ -1822,22 +1822,28 @@ static size_t autoFlushFrame(LZ4F_cctx* cctx, char* dst, size_t capacity, const 
 }
 
 /* autoFlush, linked blocks, input buffer reused by each update :
- * history remains whole (64 KB), including with updates smaller than the history window */
+ * history remains whole (64 KB) with updates smaller than the history window.
+ * (larger updates are compressed from the buffer, in external dictionary mode,
+ * whose ratio differs slightly from input in place : see compressUpdate_reusedInputBuffer).
+ * Fixed content : the ratio doesn't depend on the seed */
 TEST(compressUpdate_autoFlushReusedBuffer)
 {
     static const int levels[] = { 1, 9 };
-    static const size_t updateSizes[] = { 1 KB, 10 KB, 64 KB - 1, 100 KB };
+    static const size_t updateSizes[] = { 1 KB, 10 KB, 64 KB - 1 };
     size_t const period = 50 KB;   /* noise repeated, with a modified byte every 1000 :
                                     * matches are within previous updates, at distance @period */
     size_t const srcSize = 8 * period;
     char* const src = (char*)UT_malloc(srcSize);
-    char* const buffer = (char*)UT_malloc(100 KB);
+    char* const buffer = (char*)UT_malloc(64 KB);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     size_t capacity, n;
     char* dst;
     LZ4F_cctx* const cctx = newCctx();
-    UT_fillNoise(src, period);
-    for (n = period; n < srcSize; n++) src[n] = (n % 1000) ? src[n - period] : (char)UT_rand();
+    unsigned seed = 1;
+    for (n = 0; n < srcSize; n++) {
+        seed = seed * 1103515245u + 12345u;
+        src[n] = (n < period || n % 1000 == 0) ? (char)(seed >> 16) : src[n - period];
+    }
     prefs.autoFlush = 1;
     prefs.frameInfo.blockMode = LZ4F_blockLinked;
     prefs.frameInfo.blockSizeID = LZ4F_max64KB;
