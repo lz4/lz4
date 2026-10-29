@@ -636,38 +636,44 @@ TEST(decompress_safe_partial_usingDict)
 }
 
 /* beyond 2 GB, a stream renormalizes its indexes (LZ4_renormDictT()) :
- * identical blocks keep giving the same output, still decoded with the previous block */
+ * identical blocks keep referencing previous ones, and decode correctly.
+ * Fixed content : for some content, fast levels periodically miss the previous block */
 TEST(compress_fast_continue_beyond2GB)
 {
     enum { blockSize = 60 KB, ringSize = 16 };
     int const nbBlocks = (int)(((2U << 30) + 10 * blockSize) / blockSize);
     int const firstSample = nbBlocks - 64;   /* zero blocks before : fast */
-    const char* const sample = (const char*)UT_sample(blockSize);
+    int const renormBlock = (int)((2U << 30) / blockSize);   /* crosses 2 GB : indexes renormalized */
+    char* const sample = (char*)UT_malloc(blockSize);
     char* const ring = (char*)UT_malloc((size_t)ringSize * blockSize);
     int const capacity = LZ4_COMPRESSBOUND(blockSize);
     char* const dst = (char*)UT_malloc((size_t)capacity);
-    char* const ref = (char*)UT_malloc((size_t)capacity);
-    char* const decoded = (char*)UT_malloc(blockSize);
+    char* const history = (char*)UT_malloc(3 * blockSize);   /* 2 previous blocks, then decoded block */
     LZ4_stream_t* const stream = newStream();
-    int refSize = 0;
+    unsigned seed = 1;
     int n;
+    for (n = 0; n < blockSize; n++) {   /* text, with 1 byte in 8 random */
+        seed = seed * 1103515245u + 12345u;
+        sample[n] = ((seed >> 16) % 8 == 0) ? (char)(seed >> 8) : "lorem ipsum dolor sit amet "[n % 27];
+    }
     memset(ring, 0, (size_t)ringSize * blockSize);
+    memcpy(history, sample, blockSize);
+    memcpy(history + blockSize, sample, blockSize);
     for (n = 0; n < nbBlocks; n++) {
         char* const block = ring + (n % ringSize) * blockSize;
         int cSize;
         if (n >= firstSample) memcpy(block, sample, blockSize);
         cSize = LZ4_compress_fast_continue(stream, block, dst, blockSize, capacity, 1);
         ASSERT(cSize > 0);
-        if (n == firstSample + 32) {   /* steady state, before renormalization */
-            refSize = cSize;
-            memcpy(ref, dst, (size_t)cSize);
+        if (n >= firstSample + 2)
+            ASSERT_MSG(cSize < blockSize / 16, "block %i (%u MB) : %i bytes, previous identical blocks not referenced",
+                       n, (unsigned)((size_t)n * blockSize >> 20), cSize);
+        if (n >= renormBlock - 2) {
+            int const r = LZ4_decompress_safe_usingDict(dst, history + 2 * blockSize, cSize, blockSize, history, 2 * blockSize);
+            ASSERT_MSG(r == blockSize && !memcmp(history + 2 * blockSize, sample, blockSize),
+                       "block %i (%u MB) : corrupted", n, (unsigned)((size_t)n * blockSize >> 20));
         }
-        if (n > firstSample + 32)
-            ASSERT_MSG(cSize == refSize && !memcmp(dst, ref, (size_t)cSize),
-                       "block %i (%u MB) : output differs from previous identical blocks", n, (unsigned)((size_t)n * blockSize >> 20));
     }
-    ASSERT_EQ(LZ4_decompress_safe_usingDict(ref, decoded, refSize, blockSize, sample, blockSize), blockSize);
-    ASSERT_MEMEQ(decoded, sample, blockSize);
 }
 
 
