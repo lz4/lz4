@@ -75,10 +75,40 @@ static void readFileOps(FILE* fp, const file_op_t* ops, unsigned nbOps)
     FUZZ_ASSERT(!LZ4F_isError(LZ4F_readClose(rf)));
 }
 
+/* runs the op script on a valid frame of known content @data :
+ * seeks land within it, and every read must return the original bytes */
+static void checkFileOps(LZ4_readFile_t* rf, const uint8_t* data, size_t size,
+                         const file_op_t* ops, unsigned nbOps)
+{
+    uint8_t* const buf = (uint8_t*)malloc(FILE_FUZZ_BUF_CAP);
+    unsigned long long pos = LZ4F_tell(rf);
+    unsigned op;
+
+    FUZZ_ASSERT(buf);
+    for (op = 0; op < nbOps; op++) {
+        if (ops[op].kind == 0) {
+            size_t const expected = MIN(ops[op].want, (size_t)(size - pos));
+            FUZZ_ASSERT(LZ4F_read(rf, buf, ops[op].want) == expected);
+            FUZZ_ASSERT(memcmp(buf, data + pos, expected) == 0);
+            pos += expected;
+        } else if (ops[op].kind == 1) {
+            long long const magnitude = (ops[op].offset < 0) ? -ops[op].offset : ops[op].offset;
+            unsigned long long const target = (unsigned long long)magnitude % (size + 1);
+            long long const offset = (ops[op].origin == SEEK_SET) ? (long long)target
+                                                                  : (long long)target - (long long)pos;
+            FUZZ_ASSERT(!LZ4F_isError(LZ4F_seek(rf, offset, ops[op].origin)));
+            pos = target;
+        }
+        FUZZ_ASSERT(LZ4F_tell(rf) == pos);
+    }
+    free(buf);
+}
+
 /* writes @data through the lz4file write API and reads it back through the
  * read API; the round trip must reproduce the original bytes exactly */
 static void writeReadRoundTrip(const LZ4F_preferences_t* prefs,
-                               const uint8_t* data, size_t size)
+                               const uint8_t* data, size_t size,
+                               const file_op_t* ops, unsigned nbOps)
 {
     char* compressed = NULL;
     size_t compressedSize = 0;
@@ -122,6 +152,7 @@ static void writeReadRoundTrip(const LZ4F_preferences_t* prefs,
     FUZZ_ASSERT_MSG(total == size, "lz4file round trip truncated the data");
     FUZZ_ASSERT_MSG(memcmp(back, data, size) == 0,
                     "lz4file round trip corrupted the data");
+    checkFileOps(rf, data, size, ops, nbOps);
     free(back);
     FUZZ_ASSERT(!LZ4F_isError(LZ4F_readClose(rf)));
 
@@ -164,7 +195,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         readFileOps(fp, ops, nbOps);
         fclose(fp);
 
-        writeReadRoundTrip(&prefs, data, size);
+        writeReadRoundTrip(&prefs, data, size, ops, nbOps);
     }
 
     FUZZ_dataProducer_free(producer);
