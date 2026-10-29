@@ -353,6 +353,53 @@ TEST(compress_fast_continue_extDictLargeBlock)
     }
 }
 
+/* attached dictionary, then small blocks : the first one employs the dictionary's tables in place
+ * (below LZ4_DICTCTX_COPY_THRESHOLD), next ones reference the dictionary and previous blocks,
+ * which are contiguous (prefix mode) or separate (external dictionary mode) */
+TEST(attach_dictionary_smallBlocks)
+{
+    enum { blockSize = 1 KB, nbBlocks = 8 };
+    const char* const dict = (const char*)UT_sample(64 KB);
+    char* const src = (char*)UT_noise(nbBlocks * blockSize);
+    char* const separate = (char*)UT_malloc(2 * nbBlocks * blockSize);   /* blocks at even positions */
+    int const capacity = LZ4_COMPRESSBOUND(blockSize);
+    char* const dst = (char*)UT_malloc((size_t)(nbBlocks * capacity));
+    char* const decoded = (char*)UT_malloc(nbBlocks * blockSize);
+    LZ4_stream_t* const stream = newStream();
+    LZ4_stream_t* const dictStream = newStream();
+    int n, contiguous;
+    for (n = 0; n < nbBlocks; n++) {
+        char* const block = src + n * blockSize;
+        memcpy(block, dict + n * 7 KB, 300);   /* consecutive matches within the dictionary */
+        memcpy(block + 300, dict + 60 KB - n * 3 KB, 200);
+        if (n) memcpy(block + 600, block - blockSize + 100, 300);   /* match within the previous block */
+    }
+    /* first block, from position 600 : a match within the block, immediately followed by a match reaching the end of the dictionary,
+     * which continues at the beginning of the block */
+    memcpy(src + 600, src, 100);
+    memcpy(src + 700, dict + 64 KB - 100, 100);   /* position indexed by LZ4_loadDict() */
+    memcpy(src + 800, src, 200);
+    for (n = 0; n < nbBlocks; n++) memcpy(separate + 2 * n * blockSize, src + n * blockSize, blockSize);
+    LZ4_loadDict(dictStream, dict, 64 KB);
+    for (contiguous = 0; contiguous < 2; contiguous++) {
+        LZ4_streamDecode_t sd;
+        int cSizes[nbBlocks];
+        LZ4_resetStream_fast(stream);
+        LZ4_attach_dictionary(stream, dictStream);
+        for (n = 0; n < nbBlocks; n++) {
+            const char* const block = contiguous ? src + n * blockSize : separate + 2 * n * blockSize;
+            cSizes[n] = LZ4_compress_fast_continue(stream, block, dst + n * capacity, blockSize, capacity, 1);
+            ASSERT(cSizes[n] > 0);
+        }
+        LZ4_setStreamDecode(&sd, dict, 64 KB);
+        for (n = 0; n < nbBlocks; n++) {
+            int const r = LZ4_decompress_safe_continue(&sd, dst + n * capacity, decoded + n * blockSize, cSizes[n], blockSize);
+            ASSERT_MSG(r == blockSize && !memcmp(decoded + n * blockSize, src + n * blockSize, blockSize),
+                       "%s blocks : block %i corrupted", contiguous ? "contiguous" : "separate", n);
+        }
+    }
+}
+
 TEST(resetStream_fast_largeFirstBlock)   /* a large first block gives the same output as a new stream */
 {
     const char* const block = clearedTableBlock();
@@ -432,6 +479,48 @@ TEST(saveDict_negativeSize)
     ASSERT_MEMEQ(decoded, block, 4 KB);
 }
 
+/* LZ4_saveDict() saves up to 64 KB, or less when asked, into a buffer of that size :
+ * next blocks only reference the saved part, though the hash table still points further back */
+TEST(saveDict_partial)
+{
+    static const int saveSizes[] = { 1 KB, 63 KB + 512, 64 KB };
+    int const firstSize = 100 KB, blockSize = 16 KB;
+    char* const first = (char*)UT_sample((size_t)firstSize);
+    char* const tail = first + firstSize - 64 KB;   /* within reach of next block */
+    char* const block = (char*)UT_noise((size_t)blockSize);
+    int const capacity = LZ4_COMPRESSBOUND(firstSize);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)blockSize);
+    LZ4_stream_t* const stream = newStream();
+    size_t i;
+    UT_fillNoise(tail, 1 KB);   /* unique content : its positions are the only candidates */
+    memcpy(block, tail + 100, 400);   /* only saved within 64 KB */
+    memcpy(block + 1 KB, tail + 64 KB - 900, 800);   /* always saved */
+    for (i = 0; i < ARRAY_SIZE(saveSizes); i++) {
+        int const saveSize = saveSizes[i];
+        char* const saved = (char*)UT_malloc((size_t)saveSize);
+        int cSize;
+        LZ4_resetStream_fast(stream);
+        ASSERT(LZ4_compress_fast_continue(stream, first, dst, firstSize, capacity, 1) > 0);
+        ASSERT_EQ(LZ4_saveDict(stream, saved, saveSize), saveSize);
+        cSize = LZ4_compress_fast_continue(stream, block, dst, blockSize, capacity, 1);
+        ASSERT(cSize > 0);
+        ASSERT_MSG(LZ4_decompress_safe_usingDict(dst, decoded, cSize, blockSize, saved, saveSize) == blockSize
+                   && !memcmp(decoded, block, (size_t)blockSize),
+                   "%i bytes saved : the block references data beyond them", saveSize);
+        UT_release(saved);
+    }
+
+    /* larger sizes save 64 KB */
+    {   char* const saved = (char*)UT_malloc((size_t)firstSize);
+        LZ4_resetStream_fast(stream);
+        ASSERT(LZ4_compress_fast_continue(stream, first, dst, firstSize, capacity, 1) > 0);
+        ASSERT_EQ(LZ4_saveDict(stream, saved, 64 KB + 512), 64 KB);
+        ASSERT_EQ(LZ4_saveDict(stream, saved, firstSize), 64 KB);
+        ASSERT_MEMEQ(saved, tail, 64 KB);
+    }
+}
+
 /* chains of short matches must not hide the period (#1805) */
 TEST(compress_periodicRuns)
 {
@@ -509,6 +598,76 @@ TEST(compress_continue_inputOverwritesPreviousBlock)
                    "%s : corrupted output, block 2 (position %i, size %i) overwrites block 1 (position %i, size %i)",
                    hc ? "LZ4_compress_HC_continue()" : "LZ4_compress_fast_continue()", pos2, size2, pos1, size1);
     }
+}
+
+/* partial decoding of a block referencing its dictionary, located before dst (prefix) or elsewhere (external) */
+TEST(decompress_safe_partial_usingDict)
+{
+    static const int dictSizes[] = { 1 KB, 64 KB };
+    int const srcSize = 8 KB, target = 5 KB;
+    char* const src = (char*)UT_noise((size_t)srcSize);
+    const char* const dict = (const char*)UT_sample(64 KB);
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    char* const cBlock = (char*)UT_malloc((size_t)capacity);
+    char* const buffer = (char*)UT_malloc(64 KB + (size_t)srcSize);   /* prefix, then decoded data */
+    char* const decoded = buffer + 64 KB;
+    LZ4_stream_t* const stream = newStream();
+    size_t i;
+    int pos;
+    for (pos = 0; pos < srcSize; pos += 1 KB)   /* the block references the end of the dictionary */
+        memcpy(src + pos, dict + 64 KB - 1 KB + pos / 16, 200);
+    for (i = 0; i < ARRAY_SIZE(dictSizes); i++) {
+        int const dictSize = dictSizes[i];
+        const char* const dictStart = dict + 64 KB - dictSize;
+        int cSize, prefix;
+        LZ4_loadDict(stream, dictStart, dictSize);
+        cSize = LZ4_compress_fast_continue(stream, src, cBlock, srcSize, capacity, 1);
+        ASSERT(cSize > 0);
+        for (prefix = 0; prefix < 2; prefix++) {
+            int r;
+            if (prefix) memcpy(decoded - dictSize, dictStart, (size_t)dictSize);
+            else memset(buffer, 0, 64 KB);
+            r = LZ4_decompress_safe_partial_usingDict(cBlock, decoded, cSize, target, srcSize,
+                                                      prefix ? decoded - dictSize : dictStart, dictSize);
+            ASSERT_MSG(r == target && !memcmp(decoded, src, (size_t)target),
+                       "%s dictionary of %i bytes : %i bytes decoded", prefix ? "prefix" : "external", dictSize, r);
+        }
+    }
+}
+
+/* beyond 2 GB, a stream renormalizes its indexes (LZ4_renormDictT()) :
+ * identical blocks keep giving the same output, still decoded with the previous block */
+TEST(compress_fast_continue_beyond2GB)
+{
+    enum { blockSize = 60 KB, ringSize = 16 };
+    int const nbBlocks = (int)(((2U << 30) + 10 * blockSize) / blockSize);
+    int const firstSample = nbBlocks - 64;   /* zero blocks before : fast */
+    const char* const sample = (const char*)UT_sample(blockSize);
+    char* const ring = (char*)UT_malloc((size_t)ringSize * blockSize);
+    int const capacity = LZ4_COMPRESSBOUND(blockSize);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc(blockSize);
+    LZ4_stream_t* const stream = newStream();
+    int refSize = 0;
+    int n;
+    memset(ring, 0, (size_t)ringSize * blockSize);
+    for (n = 0; n < nbBlocks; n++) {
+        char* const block = ring + (n % ringSize) * blockSize;
+        int cSize;
+        if (n >= firstSample) memcpy(block, sample, blockSize);
+        cSize = LZ4_compress_fast_continue(stream, block, dst, blockSize, capacity, 1);
+        ASSERT(cSize > 0);
+        if (n == firstSample + 32) {   /* steady state, before renormalization */
+            refSize = cSize;
+            memcpy(ref, dst, (size_t)cSize);
+        }
+        if (n > firstSample + 32)
+            ASSERT_MSG(cSize == refSize && !memcmp(dst, ref, (size_t)cSize),
+                       "block %i (%u MB) : output differs from previous identical blocks", n, (unsigned)((size_t)n * blockSize >> 20));
+    }
+    ASSERT_EQ(LZ4_decompress_safe_usingDict(ref, decoded, refSize, blockSize, sample, blockSize), blockSize);
+    ASSERT_MEMEQ(decoded, sample, blockSize);
 }
 
 
