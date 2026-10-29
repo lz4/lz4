@@ -1791,6 +1791,63 @@ TEST(compressUpdate_reusedInputBuffer)
     }
 }
 
+/* compresses @src with autoFlush, by updates of @updateSize bytes,
+ * copied into @buffer when it's not NULL (LZ4F_srcUnstable), which is then overwritten,
+ * or read in place otherwise (LZ4F_srcStable)
+ * @return : frame size */
+static size_t autoFlushFrame(LZ4F_cctx* cctx, char* dst, size_t capacity, const char* src, size_t srcSize,
+                             size_t updateSize, char* buffer, const LZ4F_preferences_t* prefs)
+{
+    LZ4F_compressOptions_t cOpts;
+    size_t pos, consumed;
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.stableSrc = (buffer == NULL);
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, capacity, prefs));
+    for (consumed = 0; consumed < srcSize; consumed += updateSize) {
+        size_t const size = MIN(updateSize, srcSize - consumed);
+        const char* const in = buffer ? (const char*)memcpy(buffer, src + consumed, size) : src + consumed;
+        pos += LZ4F_OK(LZ4F_compressUpdate(cctx, dst + pos, capacity - pos, in, size, &cOpts));
+        if (buffer) memset(buffer, 0, size);
+    }
+    pos += LZ4F_OK(LZ4F_compressEnd(cctx, dst + pos, capacity - pos, NULL));
+    assertDecodesTo(dst, pos, NULL, 0, src, srcSize);
+    return pos;
+}
+
+/* autoFlush, linked blocks, input buffer reused by each update :
+ * history remains whole (64 KB), including with updates smaller than the history window */
+TEST(compressUpdate_autoFlushReusedBuffer)
+{
+    static const int levels[] = { 1, 9 };
+    static const size_t updateSizes[] = { 1 KB, 10 KB, 64 KB - 1, 100 KB };
+    size_t const period = 50 KB;   /* noise repeated, with a modified byte every 1000 :
+                                    * matches are within previous updates, at distance @period */
+    size_t const srcSize = 8 * period;
+    char* const src = (char*)UT_malloc(srcSize);
+    char* const buffer = (char*)UT_malloc(100 KB);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t capacity, n;
+    char* dst;
+    LZ4F_cctx* const cctx = newCctx();
+    UT_fillNoise(src, period);
+    for (n = period; n < srcSize; n++) src[n] = (n % 1000) ? src[n - period] : (char)UT_rand();
+    prefs.autoFlush = 1;
+    prefs.frameInfo.blockMode = LZ4F_blockLinked;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs) + srcSize / 64;   /* updates of 1 KB : one block per update */
+    dst = (char*)UT_malloc(capacity);
+    for (n = 0; n < ARRAY_SIZE(levels) * ARRAY_SIZE(updateSizes); n++) {
+        size_t const updateSize = updateSizes[n % ARRAY_SIZE(updateSizes)];
+        size_t stableSize, unstableSize;
+        prefs.compressionLevel = levels[n / ARRAY_SIZE(updateSizes)];
+        stableSize = autoFlushFrame(cctx, dst, capacity, src, srcSize, updateSize, NULL, &prefs);
+        unstableSize = autoFlushFrame(cctx, dst, capacity, src, srcSize, updateSize, buffer, &prefs);
+        ASSERT_MSG(unstableSize <= stableSize + stableSize / 100,
+                   "level %i, updates of %u bytes : %u bytes, %u bytes with input in place : history lost",
+                   prefs.compressionLevel, (unsigned)updateSize, (unsigned)unstableSize, (unsigned)stableSize);
+    }
+}
+
 /* favorDecSpeed applies to all blocks of a frame, including after an incompressible block :
  * with independent blocks, a block doesn't depend on the previous ones */
 TEST(favorDecSpeed_afterRawBlock)

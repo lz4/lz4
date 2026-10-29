@@ -1031,7 +1031,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
 
     {   size_t const requiredBuffSize = mtFrame ? 0 :   /* jobs employ their own buffers */
                 preferencesPtr->autoFlush ?
-                ((cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 64 KB : 0) :  /* only needs past data up to window size */
+                ((cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 128 KB : 0) :  /* history, then inputs < 64 KB (see LZ4F_st_update()) */
                 cctx->maxBlockSize + ((cctx->prefs.frameInfo.blockMode == LZ4F_blockLinked) ? 128 KB : 0);
 
         if (cctx->tmpBuffCapacity < requiredBuffSize) {
@@ -2438,7 +2438,29 @@ static size_t LZ4F_st_update(LZ4F_cctx* cctxPtr,
     /* compress full blocks; with autoFlush, remaining input (< blockSize) is compressed too */
     {   size_t const remaining = (size_t)(srcEnd - srcPtr);
         size_t const toCompress = cctxPtr->prefs.autoFlush ? remaining : remaining - (remaining % blockSize);
-        if (toCompress) {
+        /* autoFlush, linked blocks, unstable input smaller than the history window (64 KB) :
+         * compressed from @srcBuffer, it would become the only history of next blocks.
+         * It's compressed from tmpBuff instead, right after the history, which remains whole. */
+        int const viaTmp = cctxPtr->prefs.autoFlush
+                        && (cctxPtr->prefs.frameInfo.blockMode == LZ4F_blockLinked)
+                        && !compressOptionsPtr->stableSrc
+                        && (blockCompression == LZ4B_COMPRESSED)
+                        && (toCompress > 0) && (toCompress < 64 KB);
+        if (viaTmp) {
+            if (cctxPtr->tmpIn + toCompress > cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity)
+                LZ4F_localSaveDict(cctxPtr);   /* tmpBuff >= 128 KB : room after the history */
+            memcpy(cctxPtr->tmpIn, srcPtr, toCompress);
+            lastBlockCompressed = fromTmpBuffer;
+            bytesWritten = LZ4F_makeBlock(dstPtr, (size_t)(dstEnd - dstPtr),
+                                          cctxPtr->tmpIn, toCompress,
+                                          compress, cctxPtr->lz4CtxPtr, cctxPtr->prefs.compressionLevel,
+                                          cctxPtr->cdict,
+                                          cctxPtr->prefs.frameInfo.blockChecksumFlag);
+            FORWARD_IF_ERROR_INVALIDATE(bytesWritten, cctxPtr);
+            dstPtr += bytesWritten;
+            srcPtr += toCompress;
+            cctxPtr->tmpIn += toCompress;
+        } else if (toCompress) {
             lastBlockCompressed = fromSrcBuffer;
             bytesWritten = LZ4F_compressBlocks_internal(dstPtr, (size_t)(dstEnd - dstPtr),
                                           srcPtr, toCompress, blockSize,
