@@ -99,10 +99,9 @@
 *  Memory routines
 **************************************/
 /*
- * User may redirect invocations of
- * malloc(), calloc() and free()
- * towards another library or solution of their choice
- * by modifying below section.
+ * Default allocation functions, employed when LZ4F_CustomMem doesn't define them :
+ * malloc(), calloc() and free(), or LZ4_malloc(), LZ4_calloc() and LZ4_free()
+ * when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS (see lz4.c).
 **/
 
 #include <string.h>   /* memset, memcpy, memmove */
@@ -111,10 +110,19 @@
 #endif
 
 #ifndef LZ4_SRC_INCLUDED   /* avoid redefinition when sources are coalesced */
-#  include <stdlib.h>   /* malloc, calloc, free */
-#  define ALLOC(s)          malloc(s)
-#  define ALLOC_AND_ZERO(s) calloc(1,(s))
-#  define FREEMEM(p)        free(p)
+#  if defined(LZ4_USER_MEMORY_FUNCTIONS)
+     void* LZ4_malloc(size_t s);
+     void* LZ4_calloc(size_t n, size_t s);
+     void  LZ4_free(void* p);
+#    define ALLOC(s)          LZ4_malloc(s)
+#    define ALLOC_AND_ZERO(s) LZ4_calloc(1,(s))
+#    define FREEMEM(p)        LZ4_free(p)
+#  else
+#    include <stdlib.h>   /* malloc, calloc, free */
+#    define ALLOC(s)          malloc(s)
+#    define ALLOC_AND_ZERO(s) calloc(1,(s))
+#    define FREEMEM(p)        free(p)
+#  endif
 #endif
 
 static void* LZ4F_calloc(size_t s, LZ4F_CustomMem cmem)
