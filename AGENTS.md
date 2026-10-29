@@ -25,6 +25,8 @@ Pull requests target the `dev` branch.
   `lz4frameMT` for multi-threaded compression) : it registers itself (see `tests/unit/unittest.h`).
 - Command line behavior : extend a script of `tests/cli/`, or add `tests/cli/test-lz4-<name>.sh`,
   with its target in `tests/Makefile` and its entry in `build/meson/meson/tests/meson.build`.
+- A test must succeed for any seed (`make test-unittest` uses a random one) : checks depending on content
+  (ratio, matches found, effect of a parameter) use `UT_fixedSample()` / `UT_fixedNoise()`, not `UT_sample()` / `UT_noise()`.
 
 ## Rules
 - `lib/` and `programs/` are C90 (`/* */` comments, declarations at the top of blocks), with `long long`,

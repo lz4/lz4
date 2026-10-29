@@ -171,9 +171,17 @@ void UT_fillSample(void* buffer, size_t size);
 void UT_fillNoise(void* buffer, size_t size);
 
 /* UT_sample(), UT_noise() :
- * @return : @size bytes of compressible, or incompressible, data, released at the end of the test */
+ * @return : @size bytes of compressible, or incompressible, data, released at the end of the test.
+ * Content changes with the seed : only for checks valid with any content (round trips, returned values). */
 void* UT_sample(size_t size);
 void* UT_noise(size_t size);
+
+/* UT_fixedSample(), UT_fixedNoise() :
+ * same, with a content independent of the seed :
+ * for checks depending on content (ratio, matches found, effect of a parameter on the output),
+ * which must not depend on the seed. */
+void* UT_fixedSample(size_t size);
+void* UT_fixedNoise(size_t size);
 
 
 /*-************************************

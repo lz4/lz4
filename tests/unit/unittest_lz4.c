@@ -318,8 +318,9 @@ TEST(compress_fast_continue_extDictLargeBlock)
 {
     static const int sizes[] = { 64 KB + 12, 64 KB + 100, 200 KB };
     int const maxSize = 200 KB;
-    const char* const dict = (const char*)UT_sample(64 KB);
-    char* const block = (char*)UT_sample((size_t)maxSize);
+    const char* const content = (const char*)UT_fixedSample(64 KB + (size_t)maxSize);   /* the dictionary must be used */
+    char* const dict = (char*)UT_malloc(64 KB);
+    char* const block = (char*)UT_malloc((size_t)maxSize);
     int const capacity = LZ4_COMPRESSBOUND(maxSize);
     char* const ref = (char*)UT_malloc((size_t)capacity);
     char* const dst = (char*)UT_malloc((size_t)capacity);
@@ -327,6 +328,8 @@ TEST(compress_fast_continue_extDictLargeBlock)
     LZ4_stream_t* const stream = newStream();
     LZ4_stream_t* const dictStream = newStream();
     size_t i;
+    memcpy(dict, content, 64 KB);
+    memcpy(block, content + 64 KB, (size_t)maxSize);
     memcpy(block, dict + 32 KB, 1 KB);
     memcpy(block + 100 KB, dict + 48 KB, 1 KB);
     LZ4_loadDict(dictStream, dict, 64 KB);

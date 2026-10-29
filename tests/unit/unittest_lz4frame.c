@@ -600,7 +600,7 @@ TEST(compressFrame_usingCDict_extremeLevels)
 TEST(compressFrame_usingCDict_blockModes)
 {
     size_t const srcSize = 3 * 64 KB;   /* a single block would always be independent */
-    const void* const src = UT_sample(srcSize);
+    const void* const src = UT_fixedSample(srcSize);   /* the dictionary must be used */
     LZ4F_CDict* const cdict = newCDict(src, CDICT_DICT_SIZE);
     LZ4F_cctx* const cctx = newCctx();
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
@@ -1767,7 +1767,7 @@ TEST(compressUpdate_reusedInputBuffer)
     static const int levels[] = { 1, 9 };
     size_t const blockSize = 64 KB;
     size_t const srcSize = 8 * blockSize;
-    const char* const src = (const char*)UT_sample(srcSize);
+    const char* const src = (const char*)UT_fixedSample(srcSize);   /* ratio check */
     char* const buffer = (char*)UT_malloc(blockSize);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     size_t capacity;
@@ -1867,13 +1867,13 @@ TEST(favorDecSpeed_afterRawBlock)
 {
     size_t const blockSize = 64 KB;
     size_t const headerSize = 7;   /* no content size, no dictID */
-    char* const src = (char*)UT_noise(2 * blockSize);   /* incompressible block, then compressible block */
+    char* const src = (char*)UT_fixedNoise(2 * blockSize);   /* incompressible block, then compressible block */
     size_t const capacity = LZ4F_compressFrameBound(2 * blockSize, NULL);
     char* const frame = (char*)UT_malloc(capacity);
     char* const alone = (char*)UT_malloc(capacity);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     size_t frameSize, aloneSize, cBlockSize;
-    UT_fillSample(src + blockSize, blockSize);
+    memcpy(src + blockSize, UT_fixedSample(blockSize), blockSize);   /* favorDecSpeed must change its output */
     prefs.frameInfo.blockMode = LZ4F_blockIndependent;
     prefs.frameInfo.blockSizeID = LZ4F_max64KB;
     prefs.compressionLevel = 10;   /* optimal parser : favorDecSpeed only applies there */
@@ -1900,14 +1900,18 @@ TEST(favorDecSpeed_withDict)
 {
     size_t const dictSize = 64 KB;
     size_t const srcSize = 64 KB;
-    const char* const dict = (const char*)UT_sample(dictSize);
-    const char* const src = (const char*)UT_sample(srcSize);
+    const char* const content = (const char*)UT_fixedSample(dictSize + srcSize);   /* favorDecSpeed must change the output */
+    char* const dict = (char*)UT_malloc(dictSize);
+    char* const src = (char*)UT_malloc(srcSize);
     size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL) + LZ4F_HEADER_SIZE_MAX;
     char* const ref = (char*)UT_malloc(capacity);
     char* const fds = (char*)UT_malloc(capacity);
-    LZ4F_CDict* const cdict = newCDict(dict, dictSize);
     LZ4F_cctx* const cctx = newCctx();
+    LZ4F_CDict* cdict;
     unsigned blockMode, beginMode;
+    memcpy(dict, content, dictSize);
+    memcpy(src, content + dictSize, srcSize);
+    cdict = newCDict(dict, dictSize);
 
     /* beginMode : 0 = no dictionary (checks this test input is sensitive to favorDecSpeed), 1 = dict, 2 = CDict */
     for (blockMode = 0; blockMode < 2; blockMode++)
