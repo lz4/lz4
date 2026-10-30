@@ -104,8 +104,6 @@ struct LZ4_readFile_s {
   unsigned long long srcBufPos;   /* position of srcBuf within compressed data */
   unsigned long long decodedPos;  /* reading position within decoded data */
   unsigned long long frameDPos;   /* position of current frame within decoded data */
-  LZ4F_frameInfo_t frameInfo;     /* parameters of current frame, if frameInfoKnown */
-  int frameInfoKnown;
   size_t hint;                    /* input expected by the decoder, up to the end of next block header : 0 between frames */
   LZ4F_errorCode_t error;         /* decoding error : the decoder can't continue, until restartFrom() */
   int seekable;
@@ -126,16 +124,10 @@ static void freeReadFileResources(LZ4_readFile_t* lz4fRead)
   fileFree(lz4fRead, lz4fRead->cmem);
 }
 
-static void freeAndNullReadFile(LZ4_readFile_t** statePtr)
-{
-  assert(statePtr != NULL);
-  freeReadFileResources(*statePtr);
-  *statePtr = NULL;
-}
-
 static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
 {
     char headerBuf[LZ4F_HEADER_SIZE_MAX];
+    LZ4F_frameInfo_t frameInfo;
     size_t consumedSize;
 
     /* Read the header from file */
@@ -146,16 +138,15 @@ static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
 
     /* Parse frame information */
     consumedSize = bytesRead;
-    { const size_t result = LZ4F_getFrameInfo(readFile->dctxPtr, &readFile->frameInfo, headerBuf, &consumedSize);
+    { const size_t result = LZ4F_getFrameInfo(readFile->dctxPtr, &frameInfo, headerBuf, &consumedSize);
       if (LZ4F_isError(result)) {
           return result;
       }
       readFile->hint = result;
-      readFile->frameInfoKnown = 1;
     }
 
     /* Determine buffer size based on block size */
-    { const size_t blockSize = LZ4F_getBlockSize(readFile->frameInfo.blockSizeID);
+    { const size_t blockSize = LZ4F_getBlockSize(frameInfo.blockSizeID);
       if (LZ4F_isError(blockSize)) {
           RETURN_ERROR(maxBlockSize_invalid);
       }
@@ -207,14 +198,14 @@ LZ4F_errorCode_t LZ4F_readOpen_advanced(LZ4_readFile_t** lz4fRead, FILE* fp, LZ4
     /* Initialize decompression context */
     readFile->dctxPtr = LZ4F_createDecompressionContext_advanced(customMem, LZ4F_VERSION);
     if (readFile->dctxPtr == NULL) {
-        freeAndNullReadFile(&readFile);
+        freeReadFileResources(readFile);
         RETURN_ERROR(allocation_failed);
     }
 
     /* Read and parse the header */
     { LZ4F_errorCode_t const result = readAndParseHeader(readFile, fp);
       if (LZ4F_isError(result)) {
-          freeAndNullReadFile(&readFile);
+          freeReadFileResources(readFile);
           return result;
     } }
 
@@ -275,22 +266,19 @@ static void trackPosition(LZ4_readFile_t* lz4fRead, size_t decStatus, size_t pro
   if (decStatus == 0) {   /* end of frame : next frame starts here */
     lz4fRead->hint = 0;
     lz4fRead->frameDPos = lz4fRead->decodedPos;
-    lz4fRead->frameInfoKnown = 0;
     addResumePoint(lz4fRead, cPos, NULL);
     return;
   }
   /* exactly the hinted input was consumed, and next hint covers a block :
    * decoding stopped right after a block header */
   if (consumed == provided && provided == inputLimit(lz4fRead) && decStatus > LZ4F_BLOCK_HEADER_SIZE) {
-    if (!lz4fRead->frameInfoKnown || lz4fRead->frameInfo.frameType != LZ4F_frame) {
-      /* fails within a frame header, which isn't followed by a block header yet */
-      size_t noInput = 0;
-      lz4fRead->frameInfoKnown = !LZ4F_isError(LZ4F_getFrameInfo(lz4fRead->dctxPtr, &lz4fRead->frameInfo, NULL, &noInput));
-    }
-    if (lz4fRead->frameInfoKnown
-      && lz4fRead->frameInfo.frameType == LZ4F_frame
-      && lz4fRead->frameInfo.blockMode == LZ4F_blockIndependent)
-      addResumePoint(lz4fRead, cPos - LZ4F_BLOCK_HEADER_SIZE, &lz4fRead->frameInfo);
+    LZ4F_frameInfo_t frameInfo;
+    size_t noInput = 0;
+    /* fails within a frame header, which isn't followed by a block header yet */
+    if (!LZ4F_isError(LZ4F_getFrameInfo(lz4fRead->dctxPtr, &frameInfo, NULL, &noInput))
+      && frameInfo.frameType == LZ4F_frame
+      && frameInfo.blockMode == LZ4F_blockIndependent)
+      addResumePoint(lz4fRead, cPos - LZ4F_BLOCK_HEADER_SIZE, &frameInfo);
   }
   lz4fRead->hint = decStatus;
 }
@@ -391,13 +379,10 @@ static LZ4F_errorCode_t restartFrom(LZ4_readFile_t* lz4fRead, const LZ4F_resumeP
     if (LZ4F_isError(result)) return result;
     lz4fRead->hint = LZ4F_BLOCK_HEADER_SIZE;
     lz4fRead->frameDPos = p->frameDPos;
-    lz4fRead->frameInfo = p->frameInfo;
-    lz4fRead->frameInfoKnown = 1;
   } else {
     LZ4F_resetDecompressionContext(lz4fRead->dctxPtr);
     lz4fRead->hint = 0;
     lz4fRead->frameDPos = lz4fRead->decodedPos;
-    lz4fRead->frameInfoKnown = 0;
   }
   lz4fRead->error = LZ4F_OK_NoError;
   return LZ4F_OK_NoError;
@@ -482,13 +467,6 @@ static void freeWriteFileResources(LZ4_writeFile_t* state)
   fileFree(state, state->cmem);
 }
 
-static void freeAndNullWriteFile(LZ4_writeFile_t** statePtr)
-{
-  assert(statePtr != NULL);
-  freeWriteFileResources(*statePtr);
-  *statePtr = NULL;
-}
-
 static LZ4F_errorCode_t writeHeader(LZ4_writeFile_t* writeFile,
                   FILE* fp,
             const LZ4F_preferences_t* prefsPtr)
@@ -544,21 +522,21 @@ LZ4F_errorCode_t LZ4F_writeOpen_advanced(LZ4_writeFile_t** lz4fWrite, FILE* fp, 
   writeFile->dstBufMaxSize = LZ4F_compressBound(blockSize, prefsPtr);
   writeFile->dstBuf = (LZ4_byte*)fileMalloc(writeFile->dstBufMaxSize, customMem);
   if (writeFile->dstBuf == NULL) {
-    freeAndNullWriteFile(&writeFile);
+    freeWriteFileResources(writeFile);
     RETURN_ERROR(allocation_failed);
   }
 
   /* Initialize compression context */
   writeFile->cctxPtr = LZ4F_createCompressionContext_advanced(customMem, LZ4F_VERSION);
   if (writeFile->cctxPtr == NULL) {
-    freeAndNullWriteFile(&writeFile);
+    freeWriteFileResources(writeFile);
     RETURN_ERROR(allocation_failed);
   }
 
     /* Write header to file */
   { LZ4F_errorCode_t const writeStatus = writeHeader(writeFile, fp, prefsPtr);
     if (LZ4F_isError(writeStatus)) {
-        freeAndNullWriteFile(&writeFile);
+        freeWriteFileResources(writeFile);
         return writeStatus;
   } }
 
