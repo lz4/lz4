@@ -1485,7 +1485,6 @@ LZ4HC_compress_generic_internal (
                                 cParam.nbSearches, cParam.nbSearchesSeq, (int)cParam.targetLength, limit,
                                 dict, favor);
         }
-        if (result <= 0) ctx->dirty = 1;
         if ((limit == fillOutput) && (result > 0) && (*srcSizePtr < srcSize)) {
             /* fillOutput : compression stopped before the end of input.
              * The rest of input is left to the next block : it isn't history yet,
@@ -1700,19 +1699,12 @@ void LZ4_resetStreamHC_fast (LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLev
 {
     LZ4HC_CCtx_internal* const s = &LZ4_streamHCPtr->internal_donotuse;
     DEBUGLOG(5, "LZ4_resetStreamHC_fast(%p, %d)", LZ4_streamHCPtr, compressionLevel);
-    if (s->dirty) {
-        /* a failed compression left the tables in an undefined state : start from scratch,
-         * but preserve parameters, as a reset without prior failure would */
-        LZ4_i8 const favorDecSpeed = s->favorDecSpeed;
-        LZ4_initStreamHC(LZ4_streamHCPtr, LZ4HC_sizeofState(LZ4_streamHCPtr));
-        s->favorDecSpeed = favorDecSpeed;
-    } else {
-        assert(s->end >= s->prefixStart);
-        s->dictLimit += (U32)(s->end - s->prefixStart);
-        s->prefixStart = NULL;
-        s->end = NULL;
-        s->dictCtx = NULL;
-    }
+    /* also after a failed compression : its positions are below @end, hence out of reach of the next stream */
+    assert(s->end >= s->prefixStart);
+    s->dictLimit += (U32)(s->end - s->prefixStart);
+    s->prefixStart = NULL;
+    s->end = NULL;
+    s->dictCtx = NULL;
     LZ4_setCompressionLevel(LZ4_streamHCPtr, compressionLevel);
 }
 
