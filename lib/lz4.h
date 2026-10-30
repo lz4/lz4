@@ -198,9 +198,12 @@ LZ4LIB_API int LZ4_compress_default(const char* src, char* dst, int srcSize, int
  * @compressedSize : is the exact complete size of the compressed block.
  * @dstCapacity : is the size of destination buffer (which must be already allocated),
  *                presumed an upper bound of decompressed size.
- * @return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
- *           If destination buffer is not large enough, decoding will stop and output an error code (negative value).
- *           If the source stream is detected malformed, the function will stop decoding and return a negative result.
+ * @return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity),
+ *           or a negative error code (v1.10.1+) :
+ *           -1 : generic error : malformed or truncated input, or invalid parameters
+ *           -2 : decoded data doesn't fit into dstCapacity : buffer too small, or corrupted input
+ *           -3 : data references bytes before the start of output : missing or wrong dictionary, or corrupted input
+ *           Any negative value is an error : more specific codes may be added in future versions.
  * Note 1 : This function is protected against malicious data packets :
  *          it will never writes outside 'dst' buffer, nor read outside 'source' buffer,
  *          even if the compressed block is maliciously modified to order the decoder to do these actions.
@@ -286,7 +289,7 @@ LZ4LIB_API int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr
  *  whenever only the beginning of a block is required.
  *
  * @return : the number of bytes decoded in `dst` (necessarily <= targetOutputSize)
- *           If source stream is detected malformed, function returns a negative result.
+ *           or a negative error code (see LZ4_decompress_safe()), never -2.
  *
  *  Note 1 : @return can be < targetOutputSize, if compressed block contains less data.
  *
@@ -509,8 +512,7 @@ LZ4LIB_API int LZ4_decoderRingBufferSize(int maxBlockSize);
  * @dstCapacity : size of destination buffer (which must be already allocated),
  *                must be an upper bound of decompressed size.
  * @return : number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
- *           If destination buffer is not large enough, decoding will stop and output an error code (negative value).
- *           If the source stream is detected malformed, the function will stop decoding and return a negative result.
+ *           or a negative error code (see LZ4_decompress_safe()).
  *
  *  The last 64KB of previously decoded data *must* remain available and unmodified
  *  at the memory position where they were previously decoded.

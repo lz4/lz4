@@ -41,6 +41,7 @@ perf : `--favor-decSpeed` : faster decompression (~+2-4% at level 12), with fewe
 perf : `lz4` multithreaded compression relies on liblz4, reading files in place (memory-mapped, `--[no-]mmap`) : faster at fast levels
 perf : lz4frame `autoFlush` with linked blocks keeps 64 KB of history across updates < 64 KB of unstable input : compresses as stable input does (1 KB updates of silesia.tar : -13% and +50% speed at level 1, -25% at level 9)
 perf : lz4frame decompression of small frames with a dictionary and linked blocks no longer saves the history of the last block (4 KB frames : 2x faster, 16 KB : +28% on Zen 4)
+api  : `LZ4_decompress_safe()` and its variants return distinct error codes : `-1` generic error (malformed input), `-2` `dstCapacity` too small, `-3` missing dictionary, instead of an undocumented input position
 api  : lz4frame compression accepts any `dstCapacity` : `LZ4F_compressFrame()` and `LZ4F_compressUpdate()` fail only if the output doesn't fit
 api  : `LZ4F_flush()` and `LZ4F_compressEnd()` fill `dstBuffer` or complete : below `LZ4F_compressBound(0)`, invoke them again while they return `dstCapacity`
 api  : `LZ4F_ERROR_dstMaxSize_tooSmall` renamed `LZ4F_ERROR_dstCapacity_tooSmall` (former name still supported)

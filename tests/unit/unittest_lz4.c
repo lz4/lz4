@@ -138,6 +138,40 @@ TEST(decompress_safe_ipAtIend)
         ASSERT(LZ4_decompress_safe((const char*)block, decoded, sizeof(block), dstCapacities[n]) < 0);
 }
 
+/* error codes : -1 malformed input, -2 decoded data larger than dstCapacity,
+ * -3 reference before the start of output (missing dictionary).
+ * Fixed content : the block must reference the dictionary */
+TEST(decompress_safe_errorCodes)
+{
+    int const srcSize = 8 KB;
+    const char* const sample = (const char*)UT_sample((size_t)srcSize);
+    char* const src = (char*)UT_fixedNoise((size_t)srcSize);
+    const char* const dict = (const char*)UT_fixedSample(64 KB);
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    char* const cBlock = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    LZ4_stream_t* const stream = newStream();
+    int cSize, dstCapacity, pos;
+
+    /* without dictionary : buffer too small, truncated input */
+    cSize = LZ4_compress_default(sample, cBlock, srcSize, capacity);
+    ASSERT(cSize > 0);
+    for (dstCapacity = 0; dstCapacity < srcSize; dstCapacity += 61)
+        ASSERT_EQ(LZ4_decompress_safe(cBlock, decoded, cSize, dstCapacity), -2);
+    ASSERT_EQ(LZ4_decompress_safe(cBlock, decoded, cSize, srcSize - 1), -2);
+    ASSERT_EQ(LZ4_decompress_safe(cBlock, decoded, cSize - 1, srcSize), -1);
+    ASSERT_EQ(LZ4_decompress_safe(cBlock, decoded, cSize, srcSize), srcSize);
+
+    /* block referencing a dictionary, decoded without it */
+    for (pos = 0; pos < srcSize; pos += 1 KB)
+        memcpy(src + pos, dict + 64 KB - 1 KB + pos / 16, 200);
+    LZ4_loadDict(stream, dict, 64 KB);
+    cSize = LZ4_compress_fast_continue(stream, src, cBlock, srcSize, capacity, 1);
+    ASSERT(cSize > 0);
+    ASSERT_EQ(LZ4_decompress_safe(cBlock, decoded, cSize, srcSize), -3);
+    ASSERT_EQ(LZ4_decompress_safe_usingDict(cBlock, decoded, cSize, srcSize, dict, 64 KB), srcSize);
+}
+
 /* Invalid offset 0 must not leave previous output buffer content in decoded data
  * (see doc/lz4_Block_format.md). 1 literal, then a match at offset 0,
  * partially decoded into a 20-byte target which ends within the match. */
