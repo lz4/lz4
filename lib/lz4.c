@@ -2221,7 +2221,8 @@ LZ4_decompress_generic(
         if (unlikely(outputSize==0)) {
             /* Empty output buffer */
             if (partialDecoding) return 0;
-            return ((srcSize==1) && (*ip==0)) ? 0 : -1;
+            if ((srcSize==1) && (*ip==0)) return 0;   /* empty block */
+            return (srcSize > 1) ? -2 : -1;   /* -2 : output buffer too small */
         }
         if (unlikely(srcSize<=0)) { return -1; }
 
@@ -2343,7 +2344,7 @@ LZ4_decompress_generic(
 
             if ( checkOffset && (unlikely(match + dictSize < lowPrefix)) ) {
                 DEBUGLOG(5, "Error : pos=%zi, offset=%zi => outside buffers", op-lowPrefix, op-match);
-                goto _output_error;
+                goto _offset_error;
             }
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
@@ -2446,6 +2447,7 @@ LZ4_decompress_generic(
                     } else if ((ip+ll != iend) || (cpy > oend)) {
                         /* last literals must end exactly at input end, within output */
                         DEBUGLOG(5, "invalid last literals : they end at iend%+zi and oend%+zi", (ip+ll)-iend, cpy-oend);
+                        if ((ip+ll <= iend) && (cpy > oend-MFLIMIT)) goto _dst_too_small;   /* output full, input left */
                         goto _output_error;
                     }
                     LZ4_memmove(op, ip, ll);  /* supports overlapping memory regions, for in-place decompression scenarios */
@@ -2483,13 +2485,13 @@ LZ4_decompress_generic(
         safe_match_copy:
 #endif
             /* literals copied, match fully decoded (ml includes MINMATCH), offset not validated yet */
-            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _output_error;   /* Error : offset outside buffers */
+            if ((checkOffset) && (unlikely(match + dictSize < lowPrefix))) goto _offset_error;   /* Error : offset outside buffers */
 
             /* end of block : the last LASTLITERALS bytes must be literals */
             assert(op <= oend);
             if (unlikely(op+ml > oend-LASTLITERALS)) {
                 if (partialDecoding) ml = MIN(ml, (size_t)(oend-op));   /* partialDecoding : may end anywhere */
-                else goto _output_error;
+                else goto _dst_too_small;
             }
 
             /* match starting within external dictionary */
@@ -2517,9 +2519,13 @@ LZ4_decompress_generic(
         DEBUGLOG(5, "decoded %i bytes", (int) (((char*)op)-dst));
         return (int) (((char*)op)-dst);     /* Nb of output bytes decoded */
 
-        /* Overflow error detected */
+        /* errors : see LZ4_decompress_safe() in lz4.h */
     _output_error:
-        return (int) (-(((const char*)ip)-src))-1;
+        return -1;
+    _dst_too_small:
+        return -2;
+    _offset_error:
+        return -3;
     }
 }
 
