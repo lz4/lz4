@@ -999,7 +999,8 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     }   }
 
     /* raw dictionary : employed by each block as a CDict (independent blocks, or jobs of multi-threaded frames) ;
-     * single-threaded linked blocks keep the historical behavior : dictionary loaded as history of the first block */
+     * single-threaded linked blocks keep the historical behavior : dictionary loaded as history, preceding the first block,
+     * from a copy within @tmpBuff (see below) */
     if ( dictBuffer
       && ((cctx->prefs.frameInfo.blockMode == LZ4F_blockIndependent) || mtFrame) ) {
         assert(cdict == NULL);
@@ -1028,6 +1029,19 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
     }   }
     cctx->tmpIn = cctx->tmpBuff;
     cctx->tmpInSize = 0;
+    if (dictBuffer) {
+        /* single-threaded linked blocks : the dictionary is copied into @tmpBuff, as saved history :
+         * buffered input follows it, and references it in prefix mode
+         * (faster than an external dictionary, which fast levels also lose after the first block) */
+        if (dictSize > 64 KB) {
+            dictBuffer = (const BYTE*)dictBuffer + dictSize - 64 KB;
+            dictSize = 64 KB;
+        }
+        assert(cctx->tmpBuffCapacity >= 128 KB);
+        memcpy(cctx->tmpBuff, dictBuffer, dictSize);
+        dictBuffer = cctx->tmpBuff;
+        cctx->tmpIn = cctx->tmpBuff + dictSize;
+    }
     (void)XXH32_reset(&(cctx->xxh), 0);
 
     /* context init */

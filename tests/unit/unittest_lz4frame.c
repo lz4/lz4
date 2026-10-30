@@ -664,6 +664,53 @@ TEST(compressBegin_usingDict_eachBlock)
     }   }   }
 }
 
+/* single-threaded linked blocks : each block can reference the dictionary, not only the first one
+ * (fast levels used to lose it after the first block : after a block compressed with an external dictionary,
+ *  lz4.c keeps only this block as history).
+ * The first block is too short to index any position, the second one is the end of the dictionary (noise). */
+TEST(compressBegin_usingDict_linkedBlocks)
+{
+    static const int levels[] = { -3, 1, 2, 9 };
+    size_t const dictSize = CDICT_DICT_SIZE;
+    size_t const firstSize = 8;
+    size_t const tailSize = 512;    /* most recent positions : kept by small hash tables (LZ4_MEMORY_USAGE == 10) */
+    size_t const srcSize = firstSize + tailSize;
+    const char* const dict = (const char*)UT_fixedNoise(dictSize);
+    char* const src = (char*)UT_malloc(srcSize);
+    char* const decoded = (char*)UT_malloc(tailSize);
+    LZ4F_cctx* const cctx = newCctx();
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    char* const frame = (char*)UT_malloc(capacity);
+    size_t l;
+    unsigned autoFlush;
+
+    memset(src, 'a', firstSize);
+    memcpy(src + firstSize, dict + dictSize - tailSize, tailSize);
+    for (l = 0; l < ARRAY_SIZE(levels); l++) {
+        for (autoFlush = 0; autoFlush <= 1; autoFlush++) {
+            LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+            size_t ends[4];
+            size_t pos;
+            unsigned blockHeader;
+            int cSize;
+            prefs.compressionLevel = levels[l];
+            prefs.autoFlush = autoFlush;
+            pos = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, frame, capacity, dict, dictSize, &prefs));
+            pos += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + pos, capacity - pos, src, firstSize, NULL));
+            pos += LZ4F_OK(LZ4F_flush(cctx, frame + pos, capacity - pos, NULL));
+            pos += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + pos, capacity - pos, src + firstSize, tailSize, NULL));
+            pos += LZ4F_OK(LZ4F_compressEnd(cctx, frame + pos, capacity - pos, NULL));
+            assertDecodesTo(frame, pos, dict, dictSize, src, srcSize);
+            ASSERT_EQ(frameElementEnds(ends, ARRAY_SIZE(ends), (const unsigned char*)frame, pos), 4);   /* header, 2 blocks, endMark */
+            blockHeader = readLE32(frame + ends[1]);
+            cSize = (int)(blockHeader & 0x7FFFFFFFU);
+            ASSERT_MSG(!(blockHeader >> 31), "level %i, autoFlush=%u : second block not compressed", levels[l], autoFlush);
+            ASSERT_MSG(LZ4_decompress_safe_usingDict(frame + ends[1] + LZ4F_BLOCK_HEADER_SIZE, decoded, cSize, (int)tailSize,
+                                                     src, (int)firstSize) < 0,
+                       "level %i, autoFlush=%u : second block decodes without dictionary", levels[l], autoFlush);
+    }   }
+}
+
 /* LZ4F_compressBegin_usingDict() : with HC levels >= 3, same frame as with a CDict of this dictionary,
  * with independent blocks, or nbWorkers >= 1. Fast levels digest the dictionary faster than a CDict,
  * level 2 in its own format (a CDict is digested at default level) */
