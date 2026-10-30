@@ -647,7 +647,7 @@ LZ4FLIB_API void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx);   /* always su
  *           or an error code (which can be tested using LZ4F_isError())
  *  With independent blocks, each block uses the dictionary, as with a CDict (LZ4F_compressBegin_usingCDict()),
  *  also with linked blocks when nbWorkers >= 1 (multi-threaded compression).
- *  Linked blocks with nbWorkers == 0 employ the dictionary as history of the first block.
+ *  Linked blocks with nbWorkers == 0 employ the dictionary as history, preceding the first block.
  *  The dictionary is digested at each frame start, for its compression level : faster than LZ4F_createCDict(),
  *  but less thoroughly at fast levels (frames can be slightly larger than with a CDict, or smaller at level 2).
  *  To compress multiple frames, prefer a CDict.
