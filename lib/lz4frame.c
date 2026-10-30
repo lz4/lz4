@@ -1324,8 +1324,10 @@ static size_t LZ4F_copyPending(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity,
 {
     size_t const n = MIN(cctx->pendingSize, dstCapacity - pos);
     assert(pos <= dstCapacity);
-    if (n) memcpy(dst + pos, cctx->pending, n);
-    cctx->pending += n;
+    if (n) {
+        memcpy(dst + pos, cctx->pending, n);
+        cctx->pending += n;
+    }
     cctx->pendingSize -= n;
     return n;
 }
