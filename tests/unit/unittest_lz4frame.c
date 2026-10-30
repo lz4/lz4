@@ -37,8 +37,9 @@
 #  define PIPE_AVAILABLE 1
 #endif
 #include "lz4file.h"
-#define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX */
+#define LZ4_STATIC_LINKING_ONLY  /* LZ4_ACCELERATION_MAX, LZ4_DISTANCE_MAX */
 #include "lz4.h"
+#include "lz4hc.h"      /* LZ4_streamHC_t */
 
 /*-************************************
 *  Helpers
@@ -479,8 +480,11 @@ TEST(compressBegin_failurePreservesFrame)
     assertDecodesTo(frame, pos, NULL, 0, src, srcSize);
 }
 
+/* the 2nd level requires a larger state (HC, or fast beyond LZ4_MEMORY_USAGE 18) : its allocation fails */
 TEST(compressBegin_afterFailedStateAllocation)
 {
+    int const smallLevel = (sizeof(LZ4_stream_t) < sizeof(LZ4_streamHC_t)) ? 1 : 9;
+    int const largeLevel = (smallLevel == 1) ? 9 : 1;
     int failAlloc = 0;
     LZ4F_CustomMem const failableMem = { failableMalloc, failableCalloc, failableFree, &failAlloc };
     LZ4F_cctx* const cctx = (LZ4F_cctx*)UT_defer(freeCctx, LZ4F_createCompressionContext_advanced(failableMem, LZ4F_VERSION));
@@ -490,13 +494,13 @@ TEST(compressBegin_afterFailedStateAllocation)
     void* const frame = UT_malloc(capacity);
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     ASSERT(cctx != NULL);
-    prefs.compressionLevel = 1;   /* fast state */
+    prefs.compressionLevel = smallLevel;
     LZ4F_OK(LZ4F_compressFrame_usingCDict(cctx, frame, capacity, src, srcSize, NULL, &prefs));
     failAlloc = 1;
-    prefs.compressionLevel = 9;   /* requires a larger HC state, which can't be allocated */
+    prefs.compressionLevel = largeLevel;   /* requires a larger state, which can't be allocated */
     ASSERT(LZ4F_isError(LZ4F_compressFrame_usingCDict(cctx, frame, capacity, src, srcSize, NULL, &prefs)));
     failAlloc = 0;
-    prefs.compressionLevel = 1;   /* the fast state is gone : must be allocated again */
+    prefs.compressionLevel = smallLevel;   /* the first state is gone : must be allocated again */
     LZ4F_OK(LZ4F_compressFrame_usingCDict(cctx, frame, capacity, src, srcSize, NULL, &prefs));
 }
 
@@ -1138,7 +1142,7 @@ static size_t decompressIntoChunks(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapacit
 }
 
 /* decoding into outputs of various sizes, contiguous or not (dstBuffer can change between invocations) :
- * the decoder keeps the 64 KB of history needed by linked blocks, including matches at the maximum distance (65535),
+ * the decoder keeps the 64 KB of history needed by linked blocks, including matches at the maximum distance (LZ4_DISTANCE_MAX),
  * across several small blocks, and into the dictionary */
 TEST(decompress_historyIntoSmallOutputs)
 {
@@ -1146,11 +1150,11 @@ TEST(decompress_historyIntoSmallOutputs)
                         s6[] = { 1000, 200 KB }, s7[] = { 200 KB, 1, 33 KB };
     static const struct { const size_t* sizes; size_t nb; } outputs[] = {
         { s1, 1 }, { s2, 1 }, { s3, 1 }, { s4, 1 }, { s5, 1 }, { s6, 2 }, { s7, 3 } };
-    size_t const period = 65535;   /* maximum match distance */
+    size_t const period = LZ4_DISTANCE_MAX;   /* maximum match distance : 65535 by default */
     size_t const dictSize = 64 KB;
     size_t const srcSize = 300 KB + 7;
     static const size_t blockSizes[] = { 10 KB, 500, 64 KB - 100 };   /* small blocks : history spans several blocks */
-    BYTE* const dict = (BYTE*)UT_noise(dictSize);
+    BYTE* const dict = (BYTE*)UT_fixedNoise(dictSize);   /* ratio check */
     BYTE* const src = (BYTE*)UT_malloc(srcSize);
     BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
     size_t capacity, i, withDict, bi;
@@ -1158,7 +1162,7 @@ TEST(decompress_historyIntoSmallOutputs)
     /* each period repeats the previous one, with a byte changed every 1000 :
      * matches at the maximum distance, which can't be found anywhere else */
     memcpy(src, dict + dictSize - period, period);   /* first period : the end of the dictionary */
-    for (i = period; i < srcSize; i++) src[i] = (i % 1000) ? src[i - period] : (BYTE)UT_rand();
+    for (i = period; i < srcSize; i++) src[i] = (BYTE)((i % 1000) ? src[i - period] : src[i - period] ^ 1);
     capacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
     frame = (BYTE*)UT_malloc(capacity);
     for (bi = 0; bi < ARRAY_SIZE(blockSizes); bi++)
@@ -1181,7 +1185,7 @@ TEST(decompress_historyIntoSmallOutputs)
             frameSize += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + frameSize, capacity - frameSize, src + consumed, size, &stable));
         }
         frameSize += LZ4F_OK(LZ4F_compressEnd(cctx, frame + frameSize, capacity - frameSize, NULL));
-        ASSERT_MSG(frameSize < 2 * period, "%u bytes : long distance matches not found", (unsigned)frameSize);
+        ASSERT_MSG(frameSize < period + srcSize / 4, "%u bytes : long distance matches not found", (unsigned)frameSize);
         for (oi = 0; oi < ARRAY_SIZE(outputs); oi++) {
             int reuse;
             for (reuse = 0; reuse <= 1; reuse++) {
@@ -2120,7 +2124,8 @@ TEST(compressUpdate_uncompressedValues)
 }
 
 /* linked blocks, with an input buffer reused between invocations (LZ4F_srcUnstable) :
- * the history needed by next blocks is saved within cctx, so that they compress better than independent blocks */
+ * the history needed by next blocks is saved within cctx, so that they compress as well as from the input in place
+ * (as dictionary instead of prefix : a few bytes of difference) */
 TEST(compressUpdate_reusedInputBuffer)
 {
     static const int levels[] = { 1, 9 };
@@ -2128,7 +2133,7 @@ TEST(compressUpdate_reusedInputBuffer)
     size_t const srcSize = 8 * blockSize;
     const char* const src = (const char*)UT_fixedSample(srcSize);   /* ratio check */
     char* const buffer = (char*)UT_malloc(blockSize);
-    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
     size_t capacity;
     char* dst;
     size_t li;
@@ -2137,12 +2142,10 @@ TEST(compressUpdate_reusedInputBuffer)
     dst = (char*)UT_malloc(capacity);
     for (li = 0; li < ARRAY_SIZE(levels); li++) {
         LZ4F_cctx* const cctx = newCctx();
-        size_t independentSize, pos, consumed;
+        size_t inPlaceSize, pos, consumed;
         prefs.compressionLevel = levels[li];
-        prefs.frameInfo.blockMode = LZ4F_blockIndependent;
-        independentSize = LZ4F_OK(streamFrame(cctx, dst, capacity, src, srcSize, NULL, 0, NULL, &prefs));
+        inPlaceSize = LZ4F_OK(streamFrame(cctx, dst, capacity, src, srcSize, NULL, 0, NULL, &prefs));
 
-        prefs.frameInfo.blockMode = LZ4F_blockLinked;
         pos = LZ4F_OK(LZ4F_compressBegin(cctx, dst, capacity, &prefs));
         for (consumed = 0; consumed < srcSize; consumed += blockSize) {   /* full blocks, compressed from @buffer */
             memcpy(buffer, src + consumed, blockSize);
@@ -2151,8 +2154,8 @@ TEST(compressUpdate_reusedInputBuffer)
         memset(buffer, 0, blockSize);
         pos += LZ4F_OK(LZ4F_compressEnd(cctx, dst + pos, capacity - pos, NULL));
         assertDecodesTo(dst, pos, NULL, 0, src, srcSize);
-        ASSERT_MSG(pos < independentSize, "level %i : linked blocks %u bytes, independent blocks %u bytes : history lost",
-                   levels[li], (unsigned)pos, (unsigned)independentSize);
+        ASSERT_MSG(pos <= inPlaceSize + inPlaceSize / 100, "level %i : %u bytes, %u bytes with input in place : history lost",
+                   levels[li], (unsigned)pos, (unsigned)inPlaceSize);
         UT_release(cctx);
     }
 }
