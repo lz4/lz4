@@ -8,7 +8,6 @@ fix  : `LZ4_saveDictHC()` before any compression (new or reset stream) corrupted
 fix  : deprecated `LZ4_compressHC2_continue()` crashed after `LZ4_slideInputBufferHC()` (since v1.8.2)
 fix  : `LZ4_compress_HC_continue_destSize()` corrupted the next block after a call which didn't consume its whole input (since v1.8.0), reported by @freedom-winds
 fix  : `LZ4_decompress_safe_partial()` could leave previous `dst` content in decoded data with an invalid offset 0 (since v1.8.3)
-fix  : `LZ4F_compressFrame()` and the first call of a new frame applied a zero pointer offset on an empty pending buffer (since v1.10.1)
 fix  : heap overflow with an invalid `blockSizeID` in `LZ4F_compressBegin()` and `LZ4F_writeOpen()`, by @jaypatrickhoward
 fix  : `LZ4F_compressBegin()` failing on allocation left an inconsistent frame in progress : it is now invalidated
 fix  : `LZ4F_uncompressedUpdate()` mixed with `LZ4F_compressUpdate()` could exceed `LZ4F_compressBound()`
