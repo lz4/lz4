@@ -1151,6 +1151,76 @@ TEST(decompress_historyIntoSmallOutputs)
     }
 }
 
+/* linked blocks with a dictionary : the history isn't saved after the last block, when the endMark follows it within input,
+ * but it must be whenever a block follows : compressed, or stored uncompressed (containing zeros, like an endMark),
+ * with or without block checksums, decoded directly into the output, into outputs smaller than a block,
+ * or with input ending right before the endMark */
+TEST(decompress_endMarkAfterLastBlock)
+{
+    static const size_t dictSizes[] = { 64 KB, 1000 };   /* small dictionary : history shorter than 64 KB */
+    size_t const partSize = 3000;
+    size_t const decodedCapacity = 64 KB + 3 * 3000;   /* >= block size : blocks are decoded directly into it */
+    static const size_t outSizes[] = { 1, 7, 64 KB + 3 * 3000 };
+    BYTE* const dictBuffer = (BYTE*)UT_noise(64 KB);
+    BYTE* const smallDict = (BYTE*)UT_malloc(1000);   /* end of dictBuffer, allocated apart : sanitizers detect reads before it */
+    BYTE* const src = (BYTE*)UT_malloc(3 * partSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(decodedCapacity);
+    size_t const capacity = LZ4F_compressFrameBound(3 * partSize, NULL) + 3 * (LZ4F_BLOCK_HEADER_SIZE + LZ4F_BLOCK_CHECKSUM_SIZE);
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    LZ4F_cctx* const cctx = newCctx();
+    size_t i, di, nbParts, crc;
+    /* part 1 : last 1000 bytes of the dictionary, repeated, modified ;
+     * part 2 : noise containing 4 zero bytes every 600 bytes : stored uncompressed, it remains history ;
+     * part 3 : end of part 1 and beginning of part 2, modified : references both */
+    for (i = 0; i < partSize; i++) src[i] = (i % 100) ? dictBuffer[64 KB - 1000 + i % 1000] : (BYTE)UT_rand();
+    for (i = 0; i < partSize; i++) src[partSize + i] = (i % 600 < 4) ? 0 : (BYTE)UT_rand();
+    for (i = 0; i < partSize; i++) src[2 * partSize + i] = (i % 100) ? src[partSize / 2 + i] : (BYTE)UT_rand();
+    memcpy(smallDict, dictBuffer + 64 KB - 1000, 1000);
+    for (di = 0; di < ARRAY_SIZE(dictSizes); di++)
+    for (nbParts = 1; nbParts <= 3; nbParts++)
+    for (crc = 0; crc <= 1; crc++) {
+        size_t const dictSize = dictSizes[di];
+        const BYTE* const dict = (dictSize == 1000) ? smallDict : dictBuffer;
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+        size_t const srcSize = nbParts * partSize;
+        size_t ends[8];
+        size_t frameSize, p, oi;
+        prefs.autoFlush = 1;   /* a block per part */
+        prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)crc;
+        frameSize = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, frame, capacity, dict, dictSize, &prefs));
+        for (p = 0; p < nbParts; p++)
+            frameSize += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + frameSize, capacity - frameSize, src + p * partSize, partSize, NULL));
+        frameSize += LZ4F_OK(LZ4F_compressEnd(cctx, frame + frameSize, capacity - frameSize, NULL));
+        ASSERT_EQ(frameElementEnds(ends, ARRAY_SIZE(ends), frame, frameSize), nbParts + 2);   /* header, blocks, endMark */
+        for (p = 0; p < nbParts; p++)   /* part 2 is stored uncompressed, the others are compressed */
+            ASSERT_EQ(readLE32(frame + ends[p]) >> 31, (unsigned)(p == 1));
+        assertRequiresDict(frame, frameSize, srcSize);
+        for (oi = 0; oi < ARRAY_SIZE(outSizes); oi++) {
+            LZ4F_dctx* const dctx = newDctx();
+            memset(decoded, 0, srcSize);
+            ASSERT_EQ(decompressIntoChunks(dctx, decoded, decodedCapacity, frame, frameSize, dict, dictSize, outSizes[oi], 0), srcSize);
+            ASSERT_MSG(!memcmp(decoded, src, srcSize), "dictionary of %u bytes, %u parts, block checksums %u, outputs of %u bytes : corrupted",
+                       (unsigned)dictSize, (unsigned)nbParts, (unsigned)crc, (unsigned)outSizes[oi]);
+            UT_release(dctx);
+        }
+        {   /* input ends right before the endMark : the history of the last block is saved, as before */
+            LZ4F_dctx* const dctx = newDctx();
+            size_t const endMarkPos = frameSize - LZ4F_BLOCK_HEADER_SIZE;
+            size_t cSize = endMarkPos, dSize = decodedCapacity;
+            memset(decoded, 0, srcSize);
+            ASSERT(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, dict, dictSize, NULL)) != 0);
+            ASSERT_EQ(cSize, endMarkPos);
+            ASSERT_EQ(dSize, srcSize);
+            cSize = LZ4F_BLOCK_HEADER_SIZE;
+            dSize = decodedCapacity - srcSize;
+            ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded + srcSize, &dSize, frame + endMarkPos, &cSize, dict, dictSize, NULL)), 0);
+            ASSERT_EQ(dSize, 0);
+            ASSERT(!memcmp(decoded, src, srcSize));
+            UT_release(dctx);
+        }
+    }
+}
+
 /* feeding exactly the hinted nb of bytes : each invocation consumes all of them,
  * frames end exactly where the hint becomes 0, and each block is decoded by a single invocation */
 TEST(decompress_followingHints)
