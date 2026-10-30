@@ -3054,6 +3054,15 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
 }
 
 
+/* LZ4F_endMarkFollows() :
+ * the frame's endMark is within input, right after the block just output (after @skip bytes : its block checksum, if not consumed yet) :
+ * no block follows, so the history of linked blocks is no longer needed (saving it can cost as much as decoding a small block).
+ * Only valid once the block is entirely output : the same invocation then reads the endMark, which ends the frame. */
+static int LZ4F_endMarkFollows(const BYTE* srcPtr, const BYTE* srcEnd, size_t skip)
+{
+    return ((size_t)(srcEnd - srcPtr) >= skip + BHSize) && (LZ4F_readLE32(srcPtr + skip) == 0);
+}
+
 /* LZ4F_decodeBlock() :
  * Decode compressed block @src (block checksum excluded) into @dst (capacity >= maxBlockSize),
  * using current dictionary, and update content checksum and remaining frame size.
@@ -3284,8 +3293,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     if (dctx->frameInfo.contentSize)
                         dctx->frameRemainingSize -= sizeToCopy;
 
-                    /* history management (linked blocks only)*/
-                    if (dctx->frameInfo.blockMode == LZ4F_blockLinked) {
+                    /* history management (linked blocks only), unless the frame ends with this block */
+                    if ( (dctx->frameInfo.blockMode == LZ4F_blockLinked)
+                      && !( (sizeToCopy == dctx->tmpInTarget)
+                         && LZ4F_endMarkFollows(srcPtr + sizeToCopy, srcEnd, dctx->frameInfo.blockChecksumFlag * BFSize) ) ) {
                         LZ4F_updateDict(dctx, dstPtr, sizeToCopy, dstStart, 0);
                     }
                     srcPtr += sizeToCopy;
@@ -3369,8 +3380,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             {   size_t const decodedSize = LZ4F_decodeBlock(dctx, selectedIn, dctx->tmpInTarget, dstPtr);
                 FORWARD_IF_ERROR(decodedSize);
 
-                /* dictionary management */
-                if (dctx->frameInfo.blockMode==LZ4F_blockLinked) {
+                /* dictionary management, unless the frame ends with this block */
+                if ( (dctx->frameInfo.blockMode==LZ4F_blockLinked)
+                  && !LZ4F_endMarkFollows(srcPtr, srcEnd, 0) ) {
                     LZ4F_updateDict(dctx, dstPtr, decodedSize, dstStart, 0);
                 }
 
@@ -3410,8 +3422,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 size_t const sizeToCopy = MIN(dctx->tmpOutSize - dctx->tmpOutStart, (size_t)(dstEnd-dstPtr));
                 memcpy(dstPtr, dctx->tmpOut + dctx->tmpOutStart, sizeToCopy);
 
-                /* dictionary management */
-                if (dctx->frameInfo.blockMode == LZ4F_blockLinked)
+                /* dictionary management, unless the frame ends with this block */
+                if ( (dctx->frameInfo.blockMode == LZ4F_blockLinked)
+                  && !( (dctx->tmpOutStart + sizeToCopy == dctx->tmpOutSize)
+                     && LZ4F_endMarkFollows(srcPtr, srcEnd, 0) ) )
                     LZ4F_updateDict(dctx, dstPtr, sizeToCopy, dstStart, 1 /*withinTmp*/);
 
                 dctx->tmpOutStart += sizeToCopy;
