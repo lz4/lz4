@@ -52,9 +52,6 @@ static LZ4_streamHC_t* newStreamHC(int level)
     return stream;
 }
 
-/* a successful compression leaves the stream clean */
-#define ASSERT_CLEAN(stream) ASSERT(!(stream)->internal_donotuse.dirty)
-
 
 /*-************************************
 *  Tests
@@ -236,7 +233,6 @@ TEST(compress_HC_continue_roundTrip)
         LZ4_setCompressionLevel(stream, g_levels[l]);
         cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, srcSize - 1);
         ASSERT(cSize > 0);
-        ASSERT_CLEAN(stream);
         ASSERT_EQ(LZ4_decompress_safe(dst, decoded, cSize, srcSize), srcSize);
         ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
     }
@@ -369,7 +365,7 @@ TEST(compress_HC_destSize_longSequence)
     ASSERT_MSG(readSize >= 1045000, "doesn't compress enough (%i -> %i)", readSize, cSize);
 }
 
-/* a failed compression marks the state as dirty, which is fully re-initialized at next reset */
+/* a failed compression doesn't lose parameters */
 TEST(favorDecompressionSpeed_afterFailedCompression)
 {
     int const srcSize = 64 KB;
@@ -403,6 +399,42 @@ TEST(favorDecompressionSpeed_afterFailedCompression)
     ASSERT_MEMEQ(dst, ref, (size_t)refSize);
 }
 
+/* after a failed compression, the next stream compresses as from a new state */
+TEST(resetStreamHC_fast_afterFailedCompression)
+{
+    static const int levels[] = { 2, LZ4HC_CLEVEL_DEFAULT, LZ4HC_CLEVEL_OPT_MIN, LZ4HC_CLEVEL_MAX };
+    int const srcSize = 128 KB;
+    int const half = srcSize / 2;
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    const char* const src = (const char*)UT_fixedSample((size_t)srcSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    size_t l;
+    for (l = 0; l < ARRAY_SIZE(levels); l++) {
+        int const level = levels[l];
+        LZ4_streamHC_t* const stream = newStreamHC(level);
+        LZ4_streamHC_t* const twoBlocks = newStreamHC(level);
+        int const refSize = LZ4_compress_HC(src, ref, srcSize, capacity, level);
+        int secondSize;
+        ASSERT(refSize > 0);
+        ASSERT(LZ4_compress_HC_continue(twoBlocks, src, dst, half, capacity) > 0);
+        secondSize = LZ4_compress_HC_continue(twoBlocks, src + half, dst, half, capacity);
+        ASSERT(secondSize > 0);
+
+        /* the second block of a stream fails at its end : its positions are inserted */
+        ASSERT(LZ4_compress_HC_continue(stream, src, dst, half, capacity) > 0);
+        ASSERT_EQ(LZ4_compress_HC_continue(stream, src + half, dst, half, secondSize - 1), 0);
+        LZ4_resetStreamHC_fast(stream, level);
+        ASSERT_EQ(LZ4_compress_HC_continue(stream, src, dst, srcSize, capacity), refSize);
+        ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+
+        /* one-shot */
+        ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(stream, src, dst, srcSize, refSize - 1, level), 0);
+        ASSERT_EQ(LZ4_compress_HC_extStateHC_fastReset(stream, src, dst, srcSize, capacity, level), refSize);
+        ASSERT_MEMEQ(dst, ref, (size_t)refSize);
+    }
+}
+
 TEST(compress_HC_continue_dictionary)
 {
     int const dictSize = 64 KB;
@@ -418,7 +450,6 @@ TEST(compress_HC_continue_dictionary)
         LZ4_loadDictHC(stream, dict, dictSize);
         cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, srcSize - 1);
         ASSERT(cSize > 0);
-        ASSERT_CLEAN(stream);
         ASSERT_EQ(LZ4_decompress_safe_usingDict(dst, decoded, cSize, srcSize, dict, dictSize), srcSize);
         ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
     }
@@ -438,10 +469,8 @@ TEST(compress_HC_continue_dictionary_twoBlocks)
         LZ4_loadDictHC(stream, input, segSize);
         c1 = LZ4_compress_HC_continue(stream, input + segSize, dst, segSize, segSize - 1);
         ASSERT(c1 > 0);
-        ASSERT_CLEAN(stream);
         c2 = LZ4_compress_HC_continue(stream, input + 2 * segSize, dst + c1, segSize, segSize - 1);
         ASSERT(c2 > 0);
-        ASSERT_CLEAN(stream);
         ASSERT_EQ(LZ4_decompress_safe_usingDict(dst, decoded, c1, segSize, input, segSize), segSize);
         ASSERT_EQ(LZ4_decompress_safe_usingDict(dst + c1, decoded + segSize, c2, segSize, input, 2 * segSize), segSize);
         ASSERT_MEMEQ(decoded, input + segSize, (size_t)(2 * segSize));
@@ -464,7 +493,6 @@ TEST(compress_HC_continue_remoteDictionary)
         LZ4_loadDictHC(stream, dict, dictSize);
         cSize = LZ4_compress_HC_continue(stream, src, dst, srcSize, srcSize - 1);
         ASSERT(cSize > 0);
-        ASSERT_CLEAN(stream);
         ASSERT_EQ(LZ4_decompress_safe_usingDict(dst, decoded, cSize, srcSize, dict, dictSize), srcSize);
         ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
     }
@@ -843,7 +871,6 @@ TEST(compress_HC_continue_successiveDictionaries)
         while (segStart + segSize < HC_INPUT_SIZE) {
             int const cSize = LZ4_compress_HC_continue(stream, src + segStart, dst, (int)segSize, LZ4_compressBound((int)segSize));
             ASSERT_MSG(cSize > 0, "level %i, segment %i : compression failed", g_levels[l], segNb);
-            ASSERT_CLEAN(stream);
             ASSERT_MSG(LZ4_decompress_safe_usingDict(dst, out, cSize, (int)segSize, dict, (int)dictSize) == (int)segSize,
                        "level %i, segment %i : decompression failed", g_levels[l], segNb);
             ASSERT_MEMEQ(out, src + segStart, segSize);
@@ -882,7 +909,6 @@ TEST(compress_HC_continue_ringBuffer)
             memcpy(ring + rNext, src + iNext, messageSize);
             cSize = LZ4_compress_HC_continue(stream, ring + rNext, cBuffer, (int)messageSize, capacity);
             ASSERT(cSize > 0);
-            ASSERT_CLEAN(stream);
             ASSERT_EQ(LZ4_decompress_safe_continue(&sdSafe, cBuffer, dSafe + dNext, cSize, (int)messageSize), messageSize);
             ASSERT_MEMEQ(dSafe + dNext, src + iNext, messageSize);
             ASSERT_EQ(LZ4_decompress_fast_continue(&sdFast, cBuffer, dFast + dNext, (int)messageSize), cSize);
@@ -930,7 +956,6 @@ TEST(decompress_continue_unsynchronizedRing)
         /* first block */
         cSize = LZ4_compress_HC_continue(stream, src + iNext, cBuffer, messageSize, capacity);
         ASSERT(cSize > 0);
-        ASSERT_CLEAN(stream);
         ASSERT_EQ(LZ4_decompress_safe_continue(&sdSafe, cBuffer, ringSafe + dNext, cSize, messageSize), messageSize);
         ASSERT_MEMEQ(ringSafe + dNext, src + iNext, (size_t)messageSize);
         ASSERT_EQ(LZ4_decompress_fast_continue(&sdFast, cBuffer, ringFast + dNext, messageSize), cSize);
@@ -948,7 +973,6 @@ TEST(decompress_continue_unsynchronizedRing)
         while (totalMessageSize < 9 MB) {
             cSize = LZ4_compress_HC_continue(stream, src + iNext, cBuffer, messageSize, capacity);
             ASSERT(cSize > 0);
-            ASSERT_CLEAN(stream);
 
             /* decoding works without knowing messageSize, under assumption that messageSize <= maxMessageSize */
             ASSERT(dBufferSize - dNext >= maxMessageSize);
@@ -1002,13 +1026,13 @@ TEST(compress_HC_extendedState)
     ASSERT(LZ4_compress_HC_extStateHC_fastReset(s, src, dst, srcSize, capacity, LZ4HC_CLEVEL_DEFAULT) > 0);
     ASSERT(!extEmployed(ext));
 
-    /* preserved by LZ4_loadDictHC(), and by the full reset after a failed compression */
+    /* preserved by LZ4_loadDictHC(), and by the reset after a failed compression */
     LZ4_resetStreamHC_fast(s, level);
     ASSERT_EQ(LZ4_loadDictHC(s, src, 64 KB), 64 KB);
     extPoison(ext);
     ASSERT(LZ4_compress_HC_continue(s, src + 64 KB, dst, srcSize - 64 KB, capacity) > 0);
     ASSERT(extEmployed(ext));
-    ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, 1), 0);   /* failure : dirty */
+    ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, 1), 0);   /* failure */
     LZ4_resetStreamHC_fast(s, level);
     extPoison(ext);
     ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, capacity), refSize);

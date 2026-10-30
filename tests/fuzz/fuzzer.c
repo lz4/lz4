@@ -923,7 +923,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
         blockContinueCompressedSize = LZ4_compress_HC_continue(LZ4dictHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
         FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue failed");
-        FUZ_CHECKTEST(LZ4dictHC->internal_donotuse.dirty, "Context should be clean");
 
         FUZ_DISPLAYTEST("LZ4_compress_HC_continue with same external dictionary, but output buffer 1 byte too short");
         LZ4_loadDictHC(LZ4dictHC, dict, dictSize);
@@ -937,7 +936,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         ret = LZ4_compress_HC_continue(LZ4dictHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
         FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue size is different : ret(%i) != expected(%i)", ret, blockContinueCompressedSize);
         FUZ_CHECKTEST(ret<=0, "LZ4_compress_HC_continue should work : enough size available within output buffer");
-        FUZ_CHECKTEST(LZ4dictHC->internal_donotuse.dirty, "Context should be clean");
 
         FUZ_DISPLAYTEST();
         decodedBuffer[blockSize] = 0;
@@ -959,7 +957,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             LZ4_setCompressionLevel (LZ4_streamHC, compressionLevel);
             blockContinueCompressedSize = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, (int)compressedBufferSize);
             FUZ_CHECKTEST(blockContinueCompressedSize==0, "LZ4_compress_HC_continue with ExtDictCtx failed");
-            FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
 
             FUZ_DISPLAYTEST();
             LZ4_resetStreamHC_fast (LZ4_streamHC, compressionLevel);
@@ -975,7 +972,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             ret = LZ4_compress_HC_continue(LZ4_streamHC, block, compressedBuffer, blockSize, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue using ExtDictCtx size is different (%i != %i)", ret, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_HC_continue using ExtDictCtx should work : enough size available within output buffer");
-            FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
 
             FUZ_DISPLAYTEST();
             LZ4_resetStreamHC_fast (LZ4_streamHC, compressionLevel);
@@ -984,7 +980,6 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
             FUZ_CHECKTEST(ret!=blockContinueCompressedSize, "LZ4_compress_HC_continue using ExtDictCtx and fast reset size is different (%i != %i)",
                         ret, blockContinueCompressedSize);
             FUZ_CHECKTEST(ret<=0, "LZ4_compress_HC_continue using ExtDictCtx and fast reset should work : enough size available within output buffer");
-            FUZ_CHECKTEST(LZ4_streamHC->internal_donotuse.dirty, "Context should be clean");
 
             LZ4_freeStreamHC(LZ4_streamHC);
         }

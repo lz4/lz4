@@ -255,7 +255,6 @@ struct LZ4HC_CCtx_internal
     short   compressionLevel;
     LZ4_i8  favorDecSpeed;   /* favor decompression speed if this flag set,
                                 otherwise, favor compression ratio */
-    LZ4_i8  dirty;           /* stream has to be fully reset if this flag is set */
     const LZ4HC_CCtx_internal* dictCtx;
     LZ4_i8  hasWorkspace;    /* the state is followed by the temporary buffer of levels >= 10 (LZ4_STREAMHC_EXTSIZE) */
 };
@@ -378,26 +377,20 @@ LZ4LIB_STATIC_API void LZ4_favorDecompressionSpeed(
 
 /*! LZ4_resetStreamHC_fast() : v1.9.0+
  *  When an LZ4_streamHC_t is known to be in a internally coherent state,
- *  it can often be prepared for a new compression with almost no work, only
- *  sometimes falling back to the full, expensive reset that is always required
- *  when the stream is in an indeterminate state (i.e., the reset performed by
- *  LZ4_resetStreamHC()).
+ *  it can be prepared for a new compression with almost no work, instead of
+ *  the full, expensive reset that is required when the stream is in an
+ *  indeterminate state (i.e., the reset performed by LZ4_resetStreamHC()).
  *
  *  LZ4_streamHCs are guaranteed to be in a valid state when:
  *  - returned from LZ4_createStreamHC()
  *  - reset by LZ4_resetStreamHC()
  *  - memset(stream, 0, sizeof(LZ4_streamHC_t))
  *  - the stream was in a valid state and was reset by LZ4_resetStreamHC_fast()
- *  - the stream was in a valid state and was then used in any compression call
- *    that returned success
+ *  - the stream was in a valid state and was then used in any compression call,
+ *    successful or not
  *  - the stream was in an indeterminate state and was used in a compression
  *    call that fully reset the state (LZ4_compress_HC_extStateHC()) and that
  *    returned success
- *
- *  Note:
- *  A stream that was last used in a compression call that returned an error
- *  may be passed to this function. However, it will be fully reset, which will
- *  clear any existing history and settings from the context.
  */
 LZ4LIB_STATIC_API void LZ4_resetStreamHC_fast(
     LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
