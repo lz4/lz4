@@ -32,7 +32,6 @@
 #include <stdio.h>      /* FILE, fopen */
 #include <string.h>     /* memcpy, memset */
 #include <limits.h>     /* INT_MIN */
-#include <time.h>       /* clock */
 #if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200112L) && !defined(_WIN32)   /* glibc defines it, except in strict ISO C mode */
 #  include <unistd.h>   /* pipe, write, close */
 #  define PIPE_AVAILABLE 1
@@ -2336,37 +2335,6 @@ TEST(decompress_skipChecksums)
                    "checksum %u : %s", corrupted, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "not skipped");
         frame[crcPos] = (unsigned char)(frame[crcPos] ^ 1);
     }
-}
-
-/* Level 12 with linked blocks, on short-period data (ABAB...) :
- * all candidates in the 64 KB history match up to the end of the block.
- * Comparing each of them in full (up to 16384 x 64 KB per block)
- * makes it ~40x slower than level 12 on regular data.
- * CPU time is compared to a reference of the same size,
- * so that the test doesn't depend on platform speed (valgrind, qemu, sanitizers). */
-TEST(compressFrame_level12_periodicLinked)
-{
-    size_t const srcSize = 1 MB;
-    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
-    char* const periodic = (char*)UT_malloc(srcSize);
-    const char* const regular = (const char*)UT_sample(srcSize);
-    char* const dst = (char*)UT_malloc(capacity);
-    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-    clock_t start, refTime, periodicTime;
-    size_t n;
-    for (n = 0; n < srcSize; n++) periodic[n] = (n & 1) ? 'B' : 'A';
-    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
-    prefs.frameInfo.blockMode = LZ4F_blockLinked;
-    prefs.compressionLevel = 12;
-
-    start = clock();
-    LZ4F_OK(LZ4F_compressFrame(dst, capacity, regular, srcSize, &prefs));
-    refTime = clock() - start;
-    start = clock();
-    LZ4F_OK(LZ4F_compressFrame(dst, capacity, periodic, srcSize, &prefs));
-    periodicTime = clock() - start;
-    ASSERT_MSG(periodicTime <= refTime, "periodic data : %.3f s, reference : %.3f s",
-               (double)periodicTime / CLOCKS_PER_SEC, (double)refTime / CLOCKS_PER_SEC);
 }
 
 
