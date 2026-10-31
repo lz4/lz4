@@ -59,6 +59,7 @@ api  : `LZ4F_compressOptions_t.stableSrc` : new value `LZ4F_srcStableUntilFlush`
 api  : new `LZ4F_compressOptions_t.uncompressed` : `LZ4F_compressUpdate()` stores input as uncompressed blocks ; `LZ4F_uncompressedUpdate()` is deprecated ; `LZ4F_compressOptions_t` must be initialized to zero (`memset()`)
 api  : `LZ4_resetStream()` and `LZ4_resetStreamHC()` are deprecated (compilation warning) : use `LZ4_initStream()` and `LZ4_initStreamHC()`, or `LZ4_resetStream_fast()` and `LZ4_resetStreamHC_fast()` to start a new stream
 api  : removed from `lz4.h` and `lz4hc.h` : the 31 functions deprecated since v1.7.x and v1.8.0 (`LZ4_compress()`, `LZ4_compressHC()`, `LZ4_uncompress()`...) ; liblz4 still exports them, for programs linked to previous versions
+api  : removed the unprefixed lz4frame enums (`LZ4F_ENABLE_OBSOLETE_ENUMS`)
 api  : reserved fields of `LZ4F_preferences_t` and `LZ4F_compressOptions_t` are now scalars : flatten positional initializers `{ 0, 0, 0 }`
 api  : new static macro `LZ4_STREAMHC_EXTSIZE` : HC states initialized on this size include the temporary buffer of levels >= 10, which then allocate nothing ; `LZ4_createStreamHC()`, `LZ4_compress_HC()` and lz4frame employ it (+64 KB per state) : lz4frame worker threads no longer allocate memory
 cli  : decodes Firefox's mozlz4 files (`.jsonlz4`, `.mozlz4`), proposed by @UnitedMarsupials
