@@ -623,7 +623,7 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
  *  (see above comment on LZ4_resetStream_fast() for a definition of "correctly initialized").
  *  From a high level, the difference is that
  *  this function initializes the provided state with a call to something like LZ4_resetStream_fast()
- *  while LZ4_compress_fast_extState() starts with a call to LZ4_resetStream().
+ *  while LZ4_compress_fast_extState() starts with a call to LZ4_initStream().
  */
 LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const char* src, char* dst, int srcSize, int dstCapacity, int acceleration);
 
@@ -842,7 +842,7 @@ LZ4_DEPRECATED("use LZ4_decompress_safe() instead") LZ4LIB_API int LZ4_uncompres
  */
 LZ4_DEPRECATED("Use LZ4_createStream() instead") LZ4LIB_API void* LZ4_create (char* inputBuffer);
 LZ4_DEPRECATED("Use LZ4_createStream() instead") LZ4LIB_API int   LZ4_sizeofStreamState(void);
-LZ4_DEPRECATED("Use LZ4_resetStream() instead")  LZ4LIB_API int   LZ4_resetStreamState(void* state, char* inputBuffer);
+LZ4_DEPRECATED("Use LZ4_initStream() instead")   LZ4LIB_API int   LZ4_resetStreamState(void* state, char* inputBuffer);
 LZ4_DEPRECATED("Use LZ4_saveDict() instead")     LZ4LIB_API char* LZ4_slideInputBuffer (void* state);
 
 /*! Obsolete streaming decoding functions (since v1.7.0) */
@@ -883,13 +883,11 @@ LZ4LIB_API int LZ4_decompress_fast_continue (LZ4_streamDecode_t* LZ4_streamDecod
 LZ4_DEPRECATED("This function is deprecated and unsafe. Consider using LZ4_decompress_safe_partial_usingDict() instead")
 LZ4LIB_API int LZ4_decompress_fast_usingDict (const char* src, char* dst, int originalSize, const char* dictStart, int dictSize);
 
-/*! LZ4_resetStream() :
- *  An LZ4_stream_t structure must be initialized at least once.
- *  This is done with LZ4_initStream(), or LZ4_resetStream().
- *  Consider switching to LZ4_initStream(),
- *  invoking LZ4_resetStream() will trigger deprecation warnings in the future.
+/*! LZ4_resetStream() : deprecated (v1.11.0)
+ *  Same as LZ4_initStream(streamPtr, sizeof(LZ4_stream_t)) : prefer LZ4_initStream().
+ *  To start a new stream with an initialized state, LZ4_resetStream_fast() is faster.
  */
-LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
+LZ4_DEPRECATED("use LZ4_initStream() instead") LZ4LIB_API void LZ4_resetStream (LZ4_stream_t* streamPtr);
 
 
 #endif /* LZ4_H_98237428734687 */

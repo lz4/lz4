@@ -84,8 +84,11 @@ extern "C" {
 #  define LZ4FLIB_API LZ4FLIB_VISIBILITY
 #endif
 
+/* LZ4F_DEPRECATE(x) : deprecated enumerator x
+ * LZ4F_DEPRECATED(message) : precedes the declaration of a deprecated function */
 #ifdef LZ4F_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4F_DEPRECATE(x) x
+#  define LZ4F_DEPRECATED(message)
 #else
 #  if defined(_MSC_VER)
 #    define LZ4F_DEPRECATE(x) x   /* __declspec(deprecated) x - only works with C++ */
@@ -93,6 +96,17 @@ extern "C" {
 #    define LZ4F_DEPRECATE(x) x __attribute__((deprecated))
 #  else
 #    define LZ4F_DEPRECATE(x) x   /* no deprecation warning for this compiler */
+#  endif
+#  if defined (__cplusplus) && (__cplusplus >= 201402) /* C++14 or greater */
+#    define LZ4F_DEPRECATED(message) [[deprecated(message)]]
+#  elif defined(_MSC_VER)
+#    define LZ4F_DEPRECATED(message) __declspec(deprecated(message))
+#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 45))
+#    define LZ4F_DEPRECATED(message) __attribute__((deprecated(message)))
+#  elif defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 31)
+#    define LZ4F_DEPRECATED(message) __attribute__((deprecated))
+#  else
+#    define LZ4F_DEPRECATED(message)   /* no deprecation warning for this compiler */
 #  endif
 #endif
 
@@ -820,11 +834,12 @@ LZ4FLIB_STATIC_API unsigned LZ4F_getMaxNbWorkers(void);
  *  Same as LZ4F_compressUpdate() with LZ4F_compressOptions_t.uncompressed == 1 : prefer this option.
  * `cOptPtr` is optional : NULL can be provided, in which case all other options are set to default.
  */
-LZ4F_DEPRECATE(LZ4FLIB_STATIC_API size_t
+LZ4F_DEPRECATED("use LZ4F_compressUpdate() with LZ4F_compressOptions_t.uncompressed instead")
+LZ4FLIB_STATIC_API size_t
 LZ4F_uncompressedUpdate(LZ4F_cctx* cctx,
                         void* dstBuffer, size_t dstCapacity,
                   const void* srcBuffer, size_t srcSize,
-                  const LZ4F_compressOptions_t* cOptPtr));
+                  const LZ4F_compressOptions_t* cOptPtr);
 
 /**********************************
  *  Advanced decompression operations
