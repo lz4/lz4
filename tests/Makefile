@@ -227,9 +227,16 @@ lz4_all.c: $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./compat/test_install.sh
 
-test-compile-with-lz4-memory-usage:
-	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MIN' $(MAKE) all
-	$(MAKE) clean; CFLAGS=-O0 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MAX' $(MAKE) all
+# unit tests in non-default configurations
+.PHONY: test-unittest-configs
+test-unittest-configs:
+	$(MAKE) clean; CFLAGS=-O2 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MIN' $(MAKE) all && ./unittest -r
+	$(MAKE) clean; CFLAGS=-O2 CPPFLAGS=-D'LZ4_MEMORY_USAGE=LZ4_MEMORY_USAGE_MAX' $(MAKE) all && ./unittest -r
+	$(MAKE) clean; CFLAGS=-O2 CPPFLAGS=-D'LZ4_DISTANCE_MAX=8000' $(MAKE) unittest && ./unittest -r
+
+# called by CI (job memory-usage)
+.PHONY: test-compile-with-lz4-memory-usage
+test-compile-with-lz4-memory-usage: test-unittest-configs
 
 # Rules regarding Temporary test files :
 # Each test must use its own unique set of names during execution.
