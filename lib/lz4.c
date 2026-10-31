@@ -797,6 +797,34 @@ int LZ4_decompress_safe_partial_forceExtDict(const char* source, char* dest,
 }
 #endif
 
+
+/*-****************************************
+*  Obsolete functions, removed from lz4.h (v1.11.0)
+*  still exported, for programs linked to previous versions
+*******************************************/
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
+LZ4LIB_API int LZ4_compress (const char* src, char* dest, int srcSize);
+LZ4LIB_API int LZ4_compress_limitedOutput (const char* src, char* dest, int srcSize, int maxOutputSize);
+LZ4LIB_API int LZ4_compress_withState (void* state, const char* source, char* dest, int inputSize);
+LZ4LIB_API int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API int LZ4_compress_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
+LZ4LIB_API int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API int LZ4_uncompress (const char* source, char* dest, int outputSize);
+LZ4LIB_API int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
+LZ4LIB_API void* LZ4_create (char* inputBuffer);
+LZ4LIB_API int   LZ4_sizeofStreamState(void);
+LZ4LIB_API int   LZ4_resetStreamState(void* state, char* inputBuffer);
+LZ4LIB_API char* LZ4_slideInputBuffer (void* state);
+LZ4LIB_API int LZ4_decompress_safe_withPrefix64k (const char* src, char* dst, int compressedSize, int maxDstSize);
+LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
+
+#if defined (__cplusplus)
+}
+#endif
+
 /*-******************************
 *  Compression functions
 ********************************/
