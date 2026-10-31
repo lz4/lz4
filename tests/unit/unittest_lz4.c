@@ -35,7 +35,7 @@
 #ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast_continue */
 #endif
-#define LZ4_STATIC_LINKING_ONLY   /* LZ4_compress_destSize_extState, LZ4_attach_dictionary */
+#define LZ4_STATIC_LINKING_ONLY   /* LZ4_compress_destSize_extState, LZ4_attach_dictionary, LZ4_DISTANCE_MAX */
 #include "lz4.h"
 #include "lz4hc.h"
 
@@ -518,7 +518,7 @@ TEST(compress_fast_continue_roundTrip)
 }
 
 /* external dictionary, blocks larger than 64 KB : compression continues in prefix mode,
- * once the dictionary is out of reach. The block starts with a copy of a part of the dictionary,
+ * once the dictionary is out of reach. The block starts with copies of parts of the dictionary,
  * and contains another one beyond reach. */
 TEST(compress_fast_continue_extDictLargeBlock)
 {
@@ -536,7 +536,8 @@ TEST(compress_fast_continue_extDictLargeBlock)
     size_t i;
     memcpy(dict, content, 64 KB);
     memcpy(block, content + 64 KB, (size_t)maxSize);
-    memcpy(block, dict + 32 KB, 1 KB);
+    memcpy(block, dict + 64 KB - 256, 256);   /* most recent positions : found even with small hash tables or windows */
+    memcpy(block + 256, dict + 32 KB, 1 KB);
     memcpy(block + 100 KB, dict + 48 KB, 1 KB);
     LZ4_loadDict(dictStream, dict, 64 KB);
 
@@ -846,10 +847,12 @@ TEST(decompress_safe_partial_usingDict)
 
 /* beyond 2 GB, a stream renormalizes its indexes (LZ4_renormDictT()) :
  * identical blocks keep referencing previous ones, and decode correctly.
- * Fixed content : for some content, fast levels periodically miss the previous block */
+ * Fixed content : for some content, fast levels periodically miss the previous block.
+ * The previous block must be within reach, and its positions kept by the hash table (default size or larger) */
 TEST(compress_fast_continue_beyond2GB)
 {
     enum { blockSize = 60 KB, ringSize = 16 };
+    int const referenced = (blockSize <= LZ4_DISTANCE_MAX) && (LZ4_MEMORY_USAGE >= LZ4_MEMORY_USAGE_DEFAULT);
     int const nbBlocks = (int)(((2U << 30) + 10 * blockSize) / blockSize);
     int const firstSample = nbBlocks - 64;   /* zero blocks before : fast */
     int const renormBlock = (int)((2U << 30) / blockSize);   /* crosses 2 GB : indexes renormalized */
@@ -874,7 +877,7 @@ TEST(compress_fast_continue_beyond2GB)
         if (n >= firstSample) memcpy(block, sample, blockSize);
         cSize = LZ4_compress_fast_continue(stream, block, dst, blockSize, capacity, 1);
         ASSERT(cSize > 0);
-        if (n >= firstSample + 2)
+        if (referenced && n >= firstSample + 2)
             ASSERT_MSG(cSize < blockSize / 16, "block %i (%u MB) : %i bytes, previous identical blocks not referenced",
                        n, (unsigned)((size_t)n * blockSize >> 20), cSize);
         if (n >= renormBlock - 2) {
