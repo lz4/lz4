@@ -2209,10 +2209,34 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 
 
 /***************************************************
-*  Deprecated Functions
+*  Obsolete functions, removed from lz4hc.h (v1.11.0)
+*  still exported, for programs linked to previous versions
 ***************************************************/
+#if defined (__cplusplus)
+extern "C" {
+#endif
 
-/* These functions currently generate deprecation warnings */
+LZ4LIB_API int LZ4_compressHC (const char* source, char* dest, int inputSize);
+LZ4LIB_API int LZ4_compressHC_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API int LZ4_compressHC2 (const char* source, char* dest, int inputSize, int compressionLevel);
+LZ4LIB_API int LZ4_compressHC2_limitedOutput (const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+LZ4LIB_API int LZ4_compressHC_withStateHC (void* state, const char* source, char* dest, int inputSize);
+LZ4LIB_API int LZ4_compressHC_limitedOutput_withStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API int LZ4_compressHC2_withStateHC (void* state, const char* source, char* dest, int inputSize, int compressionLevel);
+LZ4LIB_API int LZ4_compressHC2_limitedOutput_withStateHC (void* state, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+LZ4LIB_API int LZ4_compressHC_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize);
+LZ4LIB_API int LZ4_compressHC_limitedOutput_continue (LZ4_streamHC_t* LZ4_streamHCPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
+LZ4LIB_API void* LZ4_createHC (const char* inputBuffer);
+LZ4LIB_API int   LZ4_freeHC (void* LZ4HC_Data);
+LZ4LIB_API char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
+LZ4LIB_API int LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
+LZ4LIB_API int LZ4_compressHC2_limitedOutput_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
+LZ4LIB_API int   LZ4_sizeofStreamStateHC(void);
+LZ4LIB_API int   LZ4_resetStreamStateHC(void* state, char* inputBuffer);
+
+#if defined (__cplusplus)
+}
+#endif
 
 /* Wrappers for deprecated compression functions */
 int LZ4_compressHC(const char* src, char* dst, int srcSize) { return LZ4_compress_HC (src, dst, srcSize, LZ4_compressBound(srcSize), 0); }
