@@ -49,6 +49,15 @@
 #include "lz4hc.h"
 #include "lz4frame.h"
 
+/* removed from lz4.h (v1.11.0), still exported by liblz4 */
+#if defined (__cplusplus)
+extern "C" {
+#endif
+int LZ4_decompress_safe_withPrefix64k (const char* src, char* dst, int compressedSize, int maxDstSize);
+#if defined (__cplusplus)
+}
+#endif
+
 #include "xxhash.h"
 
 

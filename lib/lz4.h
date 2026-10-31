@@ -818,36 +818,9 @@ union LZ4_streamDecode_u {
 #  endif
 #endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */
 
-/*! Obsolete compression functions (since v1.7.3) */
-LZ4_DEPRECATED("use LZ4_compress_default() instead")       LZ4LIB_API int LZ4_compress               (const char* src, char* dest, int srcSize);
-LZ4_DEPRECATED("use LZ4_compress_default() instead")       LZ4LIB_API int LZ4_compress_limitedOutput (const char* src, char* dest, int srcSize, int maxOutputSize);
-LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead") LZ4LIB_API int LZ4_compress_withState               (void* state, const char* source, char* dest, int inputSize);
-LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead") LZ4LIB_API int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
-LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_compress_continue                (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
-LZ4_DEPRECATED("use LZ4_compress_fast_continue() instead") LZ4LIB_API int LZ4_compress_limitedOutput_continue  (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
-
-/*! Obsolete decompression functions (since v1.8.0) */
-LZ4_DEPRECATED("use LZ4_decompress_fast() instead") LZ4LIB_API int LZ4_uncompress (const char* source, char* dest, int outputSize);
-LZ4_DEPRECATED("use LZ4_decompress_safe() instead") LZ4LIB_API int LZ4_uncompress_unknownOutputSize (const char* source, char* dest, int isize, int maxOutputSize);
-
-/* Obsolete streaming functions (since v1.7.0)
- * degraded functionality; do not use!
- *
- * In order to perform streaming compression, these functions depended on data
- * that is no longer tracked in the state. They have been preserved as well as
- * possible: using them will still produce a correct output. However, they don't
- * actually retain any history between compression calls. The compression ratio
- * achieved will therefore be no better than compressing each chunk
- * independently.
- */
-LZ4_DEPRECATED("Use LZ4_createStream() instead") LZ4LIB_API void* LZ4_create (char* inputBuffer);
-LZ4_DEPRECATED("Use LZ4_createStream() instead") LZ4LIB_API int   LZ4_sizeofStreamState(void);
-LZ4_DEPRECATED("Use LZ4_initStream() instead")   LZ4LIB_API int   LZ4_resetStreamState(void* state, char* inputBuffer);
-LZ4_DEPRECATED("Use LZ4_saveDict() instead")     LZ4LIB_API char* LZ4_slideInputBuffer (void* state);
-
-/*! Obsolete streaming decoding functions (since v1.7.0) */
-LZ4_DEPRECATED("use LZ4_decompress_safe_usingDict() instead") LZ4LIB_API int LZ4_decompress_safe_withPrefix64k (const char* src, char* dst, int compressedSize, int maxDstSize);
-LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") LZ4LIB_API int LZ4_decompress_fast_withPrefix64k (const char* src, char* dst, int originalSize);
+/*! Removed in v1.11.0, deprecated since v1.7.x - v1.8.0 (liblz4 still exports them, for linked programs) :
+ *  LZ4_compress*(), LZ4_uncompress*(), LZ4_create(), LZ4_sizeofStreamState(), LZ4_resetStreamState(),
+ *  LZ4_slideInputBuffer(), LZ4_decompress_safe_withPrefix64k(), LZ4_decompress_fast_withPrefix64k() */
 
 /*! Obsolete LZ4_decompress_fast variants (since v1.9.0) :
  *  These functions used to be faster than LZ4_decompress_safe(),

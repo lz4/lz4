@@ -39,6 +39,19 @@
 #include "lz4.h"
 #include "lz4hc.h"
 
+/* removed from lz4.h (v1.11.0), still exported by liblz4 */
+#if defined (__cplusplus)
+extern "C" {
+#endif
+int LZ4_compress_withState (void* state, const char* source, char* dest, int inputSize);
+int LZ4_compress_limitedOutput_withState (void* state, const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_compress_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize);
+int LZ4_compress_limitedOutput_continue (LZ4_stream_t* LZ4_streamPtr, const char* source, char* dest, int inputSize, int maxOutputSize);
+int LZ4_resetStreamState(void* state, char* inputBuffer);
+#if defined (__cplusplus)
+}
+#endif
+
 
 /*-************************************
 *  Helpers

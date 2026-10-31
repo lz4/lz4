@@ -27,12 +27,25 @@
 #include <limits.h>     /* INT_MIN, INT_MAX */
 #include <string.h>     /* memset, memcpy, memcmp */
 #ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
-#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_createHC, LZ4_compressHC2_continue */
+#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_resetStreamHC */
 #endif
 #define LZ4_STATIC_LINKING_ONLY
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY   /* LZ4_favorDecompressionSpeed */
 #include "lz4hc.h"
+
+/* removed from lz4hc.h (v1.11.0), still exported by liblz4 */
+#if defined (__cplusplus)
+extern "C" {
+#endif
+void* LZ4_createHC (const char* inputBuffer);
+int   LZ4_freeHC (void* LZ4HC_Data);
+char* LZ4_slideInputBufferHC (void* LZ4HC_Data);
+int   LZ4_compressHC2_continue (void* LZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
+int   LZ4_resetStreamStateHC(void* state, char* inputBuffer);
+#if defined (__cplusplus)
+}
+#endif
 
 
 /*-************************************

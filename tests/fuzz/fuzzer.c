@@ -343,13 +343,13 @@ static int FUZ_test(U32 seed, U32 nbCycles, const U32 startCycle, const double c
         {   int cSize, srcSize = blockSize;
             int const targetSize = srcSize * (int)((FUZ_rand(&randState) & 127)+1) >> 7;
             char const endCheck = (char)(FUZ_rand(&randState) & 255);
-            void* const ctx = LZ4_createHC(block);
-            FUZ_CHECKTEST(ctx==NULL, "LZ4_createHC() allocation failed");
+            LZ4_streamHC_t* const ctx = LZ4_createStreamHC();
+            FUZ_CHECKTEST(ctx==NULL, "LZ4_createStreamHC() allocation failed");
             compressedBuffer[targetSize] = endCheck;
             cSize = LZ4_compress_HC_destSize(ctx, block, compressedBuffer, &srcSize, targetSize, compressionLevel);
             DISPLAYLEVEL(5, "LZ4_compress_HC_destSize(%i): destSize : %7i/%7i; content%7i/%7i ",
                             compressionLevel, cSize, targetSize, srcSize, blockSize);
-            LZ4_freeHC(ctx);
+            LZ4_freeStreamHC(ctx);
             FUZ_CHECKTEST(cSize > targetSize, "LZ4_compress_HC_destSize() result larger than dst buffer !");
             FUZ_CHECKTEST(compressedBuffer[targetSize] != endCheck, "LZ4_compress_HC_destSize() overwrite dst buffer !");
             FUZ_CHECKTEST(srcSize > blockSize, "LZ4_compress_HC_destSize() fed more than src buffer !");
