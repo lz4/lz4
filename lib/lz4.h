@@ -133,8 +133,8 @@ extern "C" {
 
 /*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
-#define LZ4_VERSION_MINOR   10    /* for new (non-breaking) interface capabilities */
-#define LZ4_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define LZ4_VERSION_MINOR   11    /* for new (non-breaking) interface capabilities */
+#define LZ4_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
 #define LZ4_VERSION_NUMBER (LZ4_VERSION_MAJOR *100*100 + LZ4_VERSION_MINOR *100 + LZ4_VERSION_RELEASE)
 
@@ -199,7 +199,7 @@ LZ4LIB_API int LZ4_compress_default(const char* src, char* dst, int srcSize, int
  * @dstCapacity : is the size of destination buffer (which must be already allocated),
  *                presumed an upper bound of decompressed size.
  * @return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity),
- *           or a negative error code (v1.10.1+) :
+ *           or a negative error code (v1.11.0+) :
  *           -1 : generic error : malformed or truncated input, or invalid parameters
  *           -2 : decoded data doesn't fit into dstCapacity : buffer too small, or corrupted input
  *           -3 : data references bytes before the start of output : missing or wrong dictionary, or corrupted input

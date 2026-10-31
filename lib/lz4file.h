@@ -64,7 +64,7 @@ typedef struct LZ4_writeFile_s LZ4_writeFile_t;
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp);
 
-/*! LZ4F_readOpen_advanced() : v1.10.1+
+/*! LZ4F_readOpen_advanced() : v1.11.0+
  *  Same as LZ4F_readOpen(), with all allocations performed by @customMem :
  *  the handle, its buffers, and its decompression context, up to LZ4F_readClose().
  */
@@ -81,7 +81,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen_advanced(LZ4_readFile_t** lz4f
  */
 LZ4FLIB_STATIC_API size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size);
 
-/*! LZ4F_seek() : v1.10.1+
+/*! LZ4F_seek() : v1.11.0+
  *  Moves the reading position within decoded data, like fseek().
  * @origin : SEEK_SET (from the beginning) or SEEK_CUR (from current position).
  *           SEEK_END is not supported.
@@ -95,7 +95,7 @@ LZ4FLIB_STATIC_API size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t 
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_seek(LZ4_readFile_t* lz4fRead, long long offset, int origin);
 
-/*! LZ4F_tell() : v1.10.1+
+/*! LZ4F_tell() : v1.11.0+
  * @return : current reading position within decoded data.
  */
 LZ4FLIB_STATIC_API unsigned long long LZ4F_tell(const LZ4_readFile_t* lz4fRead);
@@ -125,7 +125,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead);
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4F_preferences_t* prefsPtr);
 
-/*! LZ4F_writeOpen_advanced() : v1.10.1+
+/*! LZ4F_writeOpen_advanced() : v1.11.0+
  *  Same as LZ4F_writeOpen(), with all allocations performed by @customMem :
  *  the handle, its buffer, and its compression context, up to LZ4F_writeClose().
  */

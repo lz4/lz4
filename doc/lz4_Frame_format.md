@@ -399,7 +399,7 @@ and trigger an error if it does not fit within acceptable range.
 
 Extension : the Linux Kernel also ends a legacy frame
 on a Block Compressed Size of zero (four zero bytes).
-`lz4` accepts it since v1.10.1.
+`lz4` accepts it since v1.11.0.
 Encoders should not produce it, since older decoders reject it.
 
 

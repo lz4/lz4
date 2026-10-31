@@ -392,7 +392,7 @@ LZ4LIB_STATIC_API void LZ4_favorDecompressionSpeed(
 LZ4LIB_STATIC_API void LZ4_resetStreamHC_fast(
     LZ4_streamHC_t* LZ4_streamHCPtr, int compressionLevel);
 
-/*! LZ4_STREAMHC_EXTSIZE : v1.10.1+ (experimental)
+/*! LZ4_STREAMHC_EXTSIZE : v1.11.0+ (experimental)
  *  Levels >= LZ4HC_CLEVEL_OPT_MIN employ a temporary buffer (~64 KB), allocated at each compression
  *  (or on stack, when lz4hc.c is compiled with LZ4HC_HEAPMODE=0).
  *  A state initialized by LZ4_initStreamHC() on a buffer of LZ4_STREAMHC_EXTSIZE bytes includes this buffer :
