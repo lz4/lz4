@@ -14,6 +14,16 @@ cmake_minimum_required(VERSION 3.5...4.0.2)
 
 set(LZ4_TOP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
+# Determine if lz4 is built as a subproject (using add_subdirectory) or if it
+# is the master project.
+if (NOT DEFINED LZ4_MASTER_PROJECT)
+    set(LZ4_MASTER_PROJECT OFF)
+    # Checking project name is more reliable than checking source directories.
+    if (NOT DEFINED PROJECT_NAME)
+        set(LZ4_MASTER_PROJECT ON)
+    endif(NOT DEFINED PROJECT_NAME)
+endif(NOT DEFINED LZ4_MASTER_PROJECT)
+
 #-----------------------------------------------------------------------------
 # VERSION EXTRACTION - Parse version information from header file
 #-----------------------------------------------------------------------------
@@ -49,7 +59,7 @@ endif()
 #-----------------------------------------------------------------------------
 # BUILD OPTIONS - Configure build targets and features
 #-----------------------------------------------------------------------------
-option(LZ4_BUILD_CLI "Build lz4 program" ON)
+option(LZ4_BUILD_CLI "Build lz4 program" ${LZ4_MASTER_PROJECT})
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
 option(LZ4_BUILD_MULTITHREAD "Enable multithreading in lz4 programs" ON)
 # By default, the shared library supports multithreaded compression (see LZ4F_preferences_t.nbWorkers),
