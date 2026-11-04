@@ -2390,6 +2390,9 @@ TEST(decompress_skipChecksums)
         r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, NULL);
         ASSERT_MSG(LZ4F_getErrorCode(r) == expected, "checksum %u : %s", corrupted,
                    LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
+        ASSERT_EQ(srcLen, crcPos + 1);
+        ASSERT_EQ(dstLen, (corrupted == 0) ? 0 : (corrupted == 1) ? 2 * blockSize : srcSize);
+        ASSERT_MEMEQ(decoded, src, dstLen);   /* produced, but not checksum-validated */
         memset(&dOpt, 0, sizeof(dOpt));
         dOpt.skipChecksums = 1;
         srcLen = frameSize;
