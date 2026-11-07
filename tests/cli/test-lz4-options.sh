@@ -54,7 +54,8 @@ blockSizeID() { lz4 -q -f $1 ${3:-$BIG} $OUT; test "$(od -An -tx1 -j5 -N1 $OUT |
 # warns WORD COMMAND, warnsNot WORD COMMAND, silent COMMAND : messages of COMMAND (in a file : a pipe can cut them)
 warns()    { sh -c "$2" > $ERR 2>&1; if ! grep -q "$1" $ERR; then cat $ERR; return 1; fi; }
 warnsNot() { sh -c "$2" > $ERR 2>&1; if grep -q "$1" $ERR; then cat $ERR; return 1; fi; }
-silent()   { sh -c "$1" 2> $ERR; if [ -s $ERR ]; then cat $ERR; return 1; fi; }
+# (silent ignores reports of sanitizers that let the program continue : pointer overflows, tolerated by make usan32)
+silent()   { sh -c "$1" 2> $ERR; if grep -v "runtime error:\|SUMMARY: UndefinedBehaviorSanitizer" $ERR | grep -q .; then cat $ERR; return 1; fi; }
 
 
 # frame header
