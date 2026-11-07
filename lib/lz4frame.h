@@ -599,12 +599,14 @@ LZ4F_getFrameInfo(LZ4F_dctx* dctx,
  *             (see LZ4F_resumeFrame() in the static section).
  * @retval 0   The current frame is fully decoded. If *srcSizePtr is less than the provided value, 
  *             the unconsumed tail is the start of another frame (if any).
- * @retval error  An error code; test with LZ4F_isError(ret). After an error, dctx is not
- *                resumable: call LZ4F_resetDecompressionContext() before reusing it.
+ * @retval error  An error code; test with LZ4F_isError(ret). The size pointers still report
+ *                the bytes consumed and produced before the error, but produced bytes may be invalid.
+ *                After an error, dctx is not resumable: call LZ4F_resetDecompressionContext() before reusing it.
  *
  * @pre  @p dctx is a valid state created by LZ4F_createDecompressionContext().
  * @post *srcSizePtr and *dstSizePtr are updated with the actual bytes consumed/produced.
- *       @p dstBuffer contents in [0, *dstSizePtr) are valid decompressed data.
+ *       @p dstBuffer contents in [0, *dstSizePtr) are decompressed data.
+ *       The content checksum, if present, is only verified at the end of the frame (return 0).
  *
  * @note  The function may not consume all provided input on each call. Always check *srcSizePtr.
  *        Present any unconsumed source bytes again on the next call.
