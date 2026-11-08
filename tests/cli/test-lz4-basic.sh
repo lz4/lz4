@@ -132,6 +132,11 @@ lz4 --list $FPREFIX-hw.lz4            # test --list on valid single-frame file
 lz4 --list < $FPREFIX-hw.lz4 > $FPREFIX-list  # test --list from stdin (file only)
 grep -q LZ4Frame $FPREFIX-list
 cat $FPREFIX-hw.lz4 | lz4 --list && exit 1   # must fail: stdin is not a file
+cp $FPREFIX-hw.lz4 $FPREFIX-unreadable.lz4; chmod 000 $FPREFIX-unreadable.lz4
+if [ ! -r $FPREFIX-unreadable.lz4 ]; then  # (not as root)
+    lz4 --list $FPREFIX-unreadable.lz4 && exit 1 || test $? -eq 1  # must fail cleanly
+fi
+chmod 644 $FPREFIX-unreadable.lz4
 lz4 --list data/goldenSamples/dictID.bin  # test --list on a frame carrying a dictID (11-byte header)
 head -c $(( $(wc -c < $FPREFIX-hw.lz4) - 4 )) $FPREFIX-hw.lz4 > $FPREFIX-trunc.lz4
 lz4 --list $FPREFIX-trunc.lz4 && exit 1  # must fail: truncated frame (content checksum missing)

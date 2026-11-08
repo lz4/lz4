@@ -3206,8 +3206,8 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         }
         {   LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx], g_displayLevel >= 3);
             if (op_result != LZ4IO_LZ4F_OK) {
-                assert(op_result == LZ4IO_format_not_known);
-                DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
+                if (op_result == LZ4IO_format_not_known)   /* otherwise, the file couldn't be opened : already reported */
+                    DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
                 return 1;
         }   }
         if (g_displayLevel >= 3) {
