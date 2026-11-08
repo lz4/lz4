@@ -2677,18 +2677,16 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
 
 #define ENDOFSTREAM ((unsigned long long)-1)
 #define DECODING_ERROR ((unsigned long long)-2)
+/* @firstFrame : at the beginning of the input file */
 static unsigned long long
 selectDecoder(dRess_t ress,
               FILE* finput, FILE* foutput,
+              int firstFrame,
               const LZ4IO_prefs_t* const prefs)
 {
     unsigned char MNstore[MOZLZ4_MAGIC_SIZE];   /* large enough for any magic number */
     size_t MNsize = MAGICNUMBER_SIZE;           /* nb of bytes read into MNstore */
     unsigned magicNumber;
-    static unsigned nbFrames = 0;
-
-    /* init */
-    nbFrames++;
 
     /* Check Archive Header */
     if (g_magicRead) {  /* magic number already read from finput (see legacy frame)*/
@@ -2696,7 +2694,7 @@ selectDecoder(dRess_t ress,
         g_magicRead = 0;
     } else {
         size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
-        if (nbReadBytes==0) { nbFrames = 0; return ENDOFSTREAM; }   /* EOF */
+        if (nbReadBytes==0) return ENDOFSTREAM;   /* EOF */
         if (nbReadBytes != MAGICNUMBER_SIZE)
           END_PROCESS(40, "Unrecognized header : Magic Number unreadable");
         magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
@@ -2735,10 +2733,9 @@ selectDecoder(dRess_t ress,
         }
         return 0;
     default:
-        if (nbFrames == 1) {  /* just started */
+        if (firstFrame) {
             /* Wrong magic number at the beginning of 1st stream */
             if (!prefs->testMode && prefs->overwrite && prefs->passThrough) {
-                nbFrames = 0;
                 return LZ4IO_passThrough(finput, foutput, MNstore, MNsize, prefs->sparseFileSupport);
             }
             END_PROCESS(44,"Unrecognized header : file cannot be decoded");
@@ -2766,6 +2763,7 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
     FILE* const foutput = ress.dstFile;
     unsigned long long filesize = 0;
     int result = 0;
+    int firstFrame = 1;
     LZ4IO_srcState_t srcState;
 
     /* Init */
@@ -2778,9 +2776,9 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
     srcState = LZ4IO_getSrcState(finput);
 
     /* Loop over multiple streams */
-    for ( ; ; ) {  /* endless loop, see break condition */
+    for ( ; ; firstFrame = 0) {  /* endless loop, see break condition */
         unsigned long long const decodedSize =
-                        selectDecoder(ress, finput, foutput, prefs);
+                        selectDecoder(ress, finput, foutput, firstFrame, prefs);
         if (decodedSize == ENDOFSTREAM) break;
         if (decodedSize == DECODING_ERROR) { result=1; break; }
         filesize += decodedSize;
