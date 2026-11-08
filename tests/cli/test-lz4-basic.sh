@@ -129,7 +129,9 @@ lz4 ${FPREFIX}-dir && exit 1          # must fail: refuse to compress directory
 test ! -f ${FPREFIX}-dir.lz4          # must not create artifact (#1211)
 lz4 -f $FPREFIX-hw                    # create $FPREFIX-hw.lz4, for next tests
 lz4 --list $FPREFIX-hw.lz4            # test --list on valid single-frame file
-lz4 --list < $FPREFIX-hw.lz4          # test --list from stdin (file only)
+lz4 --list < $FPREFIX-hw.lz4 > $FPREFIX-list  # test --list from stdin (file only)
+grep -q LZ4Frame $FPREFIX-list
+cat $FPREFIX-hw.lz4 | lz4 --list && exit 1   # must fail: stdin is not a file
 lz4 --list data/goldenSamples/dictID.bin  # test --list on a frame carrying a dictID (11-byte header)
 head -c $(( $(wc -c < $FPREFIX-hw.lz4) - 4 )) $FPREFIX-hw.lz4 > $FPREFIX-trunc.lz4
 lz4 --list $FPREFIX-trunc.lz4 && exit 1  # must fail: truncated frame (content checksum missing)
