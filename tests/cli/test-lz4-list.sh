@@ -3,16 +3,36 @@
 # --list : frames, types, blocks and sizes of each file, summarized, or detailed with -v
 # compressed sizes depend on the platform : expected sizes are those of the files
 
-FPREFIX="tmp-tll"
-
 set -e
 unset LZ4_CLEVEL LZ4_NBWORKERS LZ4_MEMORY   # set by the tests only
 
+# Keep fixtures private, including when two invocations share a working directory.
+# Resolve relative PATH entries before changing directory (the Makefile uses one).
+ORIGINAL_DIR=$PWD
+OLD_PATH=$PATH
+PATH=""
+while :; do
+    ENTRY=${OLD_PATH%%:*}
+    case "$ENTRY" in
+        /*) ;;
+        *) ENTRY=$ORIGINAL_DIR/$ENTRY ;;
+    esac
+    PATH=${PATH:+$PATH:}$ENTRY
+    case "$OLD_PATH" in
+        *:*) OLD_PATH=${OLD_PATH#*:} ;;
+        *) break ;;
+    esac
+done
+export PATH
+TEST_DIR=$(mktemp -d "$ORIGINAL_DIR/tmp-tll.XXXXXX")
+FPREFIX="tmp-tll"
+
 remove () {
-    rm -rf $FPREFIX*
+    rm -rf "$TEST_DIR"
 }
 
 trap remove EXIT
+cd "$TEST_DIR"
 
 set -x
 
