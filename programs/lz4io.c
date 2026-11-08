@@ -1064,7 +1064,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     compress_f const compressionFunction = (compressionlevel < LZ4HC_CLEVEL_MIN) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     FILE* foutput = NULL;
-    TPool* const tPool = TPool_create(prefs->nbWorkers, 4);
+    TPool* tPool = NULL;
     TPool* const wPool = TPool_create(1, 4);
     WriteRegister wr = WR_init(LEGACY_BLOCKSIZE);
     LZ4IO_srcState_t srcState;
@@ -1083,6 +1083,12 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         fclose(finput);
         clResult = 1;
         goto _cfl_clean;
+    }
+    /* no more workers than the blocks of the file (output doesn't depend on nbWorkers) */
+    {   U64 const fileSize = UTIL_getOpenFileSize(finput);   /* 0 : unknown (ex: stdin) */
+        U64 const nbBlocks = (fileSize + LEGACY_BLOCKSIZE - 1) / LEGACY_BLOCKSIZE;
+        int const nbWorkers = (fileSize && (nbBlocks < (U64)prefs->nbWorkers)) ? (int)nbBlocks : prefs->nbWorkers;
+        tPool = TPool_create(nbWorkers, 4);
     }
     if (tPool == NULL || wPool == NULL)
         END_PROCESS(21, "threadpool creation error ");
