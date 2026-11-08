@@ -235,6 +235,11 @@ lz4_all.c: $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./compat/test_install.sh
 
+# BUILD_STATIC=no and BUILD_SHARED=no in lib/ ; leaves lib/ clean
+.PHONY: test-build-options
+test-build-options:
+	lz4_root=.. ./compat/test_build_options.sh
+
 # unit tests in non-default configurations
 .PHONY: test-unittest-configs
 test-unittest-configs:

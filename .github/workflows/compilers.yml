@@ -62,6 +62,9 @@ jobs:
     - name: Installation test
       run: make -C tests test-install V=1
 
+    - name: Library build options test
+      run: make -C tests test-build-options V=1
+
     - name: Build all with strict flags
       run: |
         make clean
