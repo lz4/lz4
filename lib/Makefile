@@ -222,7 +222,7 @@ liblz4.$(SHARED_EXT): liblz4.$(SHARED_EXT_MAJOR)
 	$(LN_SF) $< $@
 
 .PHONY: liblz4
-liblz4: $(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT)
+liblz4: $(if $(filter yes,$(BUILD_SHARED)),$(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT))
 
 else
 

@@ -5,6 +5,7 @@ perf : faster decompression on ppc64 (+12% to +24% on silesia), `LZ4_FAST_DEC_LO
 api  : restored the unprefixed lz4frame enums and types (`LZ4F_ENABLE_OBSOLETE_ENUMS`), employed by zstd, now deprecated (compilation warning), reported by @diizzyy
 cli  : help (`-h`, `-H`, `--help`) outputs to stdout, requested by @tansy
 build: MinGW builds with clang and lld (since v1.11.0), reported by @tansy
+build: `make` with `BUILD_STATIC=no` or `BUILD_SHARED=no` (since v1.11.0), by @xry111
 
 v1.11.0
 fix  : data corruption in valid usage : ring buffer decoding (`LZ4_decoderRingBufferSize()`, since v1.9.0), rare cases of streaming or `destSize` compression, one reported by @freedom-winds
