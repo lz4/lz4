@@ -159,6 +159,8 @@ lz4 -q -f $SRC null   # "null" : no output file
 test ! -e null
 lz4 -q -f $SRC $OUT $FPREFIX-extra   # unused 3rd name : ignored with -f, error otherwise
 fails "lz4 -q $SRC $FPREFIX-out3 $FPREFIX-extra"
+lz4 -q --force $SRC $OUT $FPREFIX-extra   # --force is -f : same
+fails "lz4 -q -f --no-force $SRC $FPREFIX-out3 $FPREFIX-extra"   # --no-force undoes it
 cp $SRC $FPREFIX-dict   # the source itself : its frame refers to the dictionary
 lz4 -q -f -D $FPREFIX-dict $SRC $OUT
 lz4 -dc -D$FPREFIX-dict $OUT | cmp - $SRC
