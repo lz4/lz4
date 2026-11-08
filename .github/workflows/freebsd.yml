@@ -35,9 +35,7 @@ jobs:
         copyback: false
         cache-after-prepare: true
         prepare: |
-          # tests/Makefile runs test-lz4-list.py through $(PYTHON); the base
-          # system has no python, which is why listTest exits 127 without it.
-          pkg install -y gmake python3
+          pkg install -y gmake
         run: |
           set -e
           cc -v

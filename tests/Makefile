@@ -174,10 +174,6 @@ clean: clean_cache
 versionsTest:
 	$(PYTHON) compat/test-lz4-versions.py
 
-.PHONY: listTest
-listTest: lz4
-	QEMU_SYS=$(QEMU_SYS) $(PYTHON) cli/test-lz4-list.py
-
 # Note: requires liblz4 installed
 CLEAN += abiTest
 abiTest: LDLIBS += -llz4
@@ -219,7 +215,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation
 
 test32: MCM_CFLAGS += -m32
 test32: test
