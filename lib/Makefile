@@ -151,7 +151,10 @@ lib-release: DEBUGFLAGS :=
 lib-release: lib liblz4.pc
 
 .PHONY: lib
-lib: liblz4.a liblz4
+lib: liblz4
+ifeq ($(BUILD_STATIC),yes)
+lib: liblz4.a
+endif
 
 .PHONY: lib-mt
 lib-mt:
