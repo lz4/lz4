@@ -134,6 +134,9 @@ test_scripts = {
   'lz4-frame-concatenation': {
     'depends': [lz4, targets['datagen']],
   },
+  'lz4-list': {
+    'depends': [lz4, targets['datagen']],
+  },
   'lz4-multiple': {
     'depends': [lz4, targets['datagen']],
   },
