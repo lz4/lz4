@@ -129,8 +129,11 @@ lz4 ${FPREFIX}-dir && exit 1          # must fail: refuse to compress directory
 test ! -f ${FPREFIX}-dir.lz4          # must not create artifact (#1211)
 lz4 -f $FPREFIX-hw                    # create $FPREFIX-hw.lz4, for next tests
 lz4 --list $FPREFIX-hw.lz4            # test --list on valid single-frame file
-lz4 --list < $FPREFIX-hw.lz4 > $FPREFIX-list  # test --list from stdin (file only)
-grep -q LZ4Frame $FPREFIX-list
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)   # (on Windows, stdin is never a regular file)
+    lz4 --list < $FPREFIX-hw.lz4 > $FPREFIX-list  # test --list from stdin (file only)
+    grep -q LZ4Frame $FPREFIX-list
+    ;;
+esac
 cat $FPREFIX-hw.lz4 | lz4 --list && exit 1   # must fail: stdin is not a file
 cp $FPREFIX-hw.lz4 $FPREFIX-unreadable.lz4; chmod 000 $FPREFIX-unreadable.lz4
 if [ ! -r $FPREFIX-unreadable.lz4 ]; then  # (not as root)
