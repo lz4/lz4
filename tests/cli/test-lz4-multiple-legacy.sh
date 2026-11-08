@@ -66,4 +66,11 @@ lz4 --list $FPREFIX-noise.lz4
 head -c $(( $(wc -c < ${FPREFIX}2.lz4) - 1 )) ${FPREFIX}2.lz4 > $FPREFIX-trunc.lz4
 lz4 -t $FPREFIX-trunc.lz4 && exit 1
 lz4 --list $FPREFIX-trunc.lz4 && exit 1
+# --list : an empty input is compressed into a frame without block
+datagen -g0 | lz4 -l -c > $FPREFIX-empty.lz4
+cat $FPREFIX-empty.lz4 ${FPREFIX}1.lz4 > $FPREFIX-empty2.lz4
+lz4 -t $FPREFIX-empty.lz4
+lz4 -t $FPREFIX-empty2.lz4
+lz4 --list $FPREFIX-empty.lz4
+lz4 --list $FPREFIX-empty2.lz4
 true

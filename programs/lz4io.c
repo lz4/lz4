@@ -3138,15 +3138,15 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                     result = LZ4IO_format_not_known;
                     break;
                 }
-                if (totalBlocksSize) {
-                    if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
-                                 cfinfo->frameCount + 1,
-                                 LZ4IO_frameTypeNames[frameInfo.frameType],
-                                 "-", "-",
-                                 totalBlocksSize + 4,
-                                 "-", "-");
-                    result = LZ4IO_LZ4F_OK;
-            }   }
+                /* no block : empty input, as compressed by lz4 -l */
+                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
+                             cfinfo->frameCount + 1,
+                             LZ4IO_frameTypeNames[frameInfo.frameType],
+                             "-", "-",
+                             totalBlocksSize + 4,
+                             "-", "-");
+                result = LZ4IO_LZ4F_OK;
+            }
             break;
         case LZ4IO_SKIPPABLE0:
             frameInfo.frameType = skippableFrame;
@@ -3212,8 +3212,8 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         }
         {   LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx], g_displayLevel >= 3);
             if (op_result != LZ4IO_LZ4F_OK) {
-                assert(op_result == LZ4IO_format_not_known);
-                DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
+                if (op_result == LZ4IO_format_not_known)   /* otherwise, the file couldn't be opened : already reported */
+                    DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
                 return 1;
         }   }
         if (g_displayLevel >= 3) {

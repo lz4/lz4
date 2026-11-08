@@ -951,7 +951,8 @@ int main(int argCount, const char** argv)
     }
 
     if (mode == om_list) {
-        if (!multiple_inputs) inFileNames[ifnIdx++] = input_filename;
+        /* no FILE, or - : standard input */
+        if ((ifnIdx == 0) && !strcmp(input_filename, stdinmark)) inFileNames[ifnIdx++] = stdinmark;
     } else {
         if (!multiple_inputs) assert(output_filename != NULL);
     }
