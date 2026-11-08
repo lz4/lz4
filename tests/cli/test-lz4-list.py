@@ -12,7 +12,7 @@ MIB = 1048576
 LZ4 = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + "/../../lz4")
 if not os.path.exists(LZ4):
     LZ4 = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + "/../../programs/lz4")
-TEMP = tempfile.gettempdir()
+TEMP = None
 
 
 class NVerboseFileInfo:
@@ -204,13 +204,6 @@ def execute(command, print_command=True, print_output=False, print_error=True):
     return (stdout_lines).splitlines()
 
 
-def cleanup(silent=False):
-    for f in sorted_list(f"{TEMP}/test_list*"):
-        if not silent:
-            log(f"Deleting {f}")
-        os.unlink(f)
-
-
 def datagen(file_name, size):
     non_sparse_size = size // 2
     sparse_size = size - non_sparse_size
@@ -255,9 +248,14 @@ def generate_files():
                 outfile.write(infile.read())
 
 
+def main():
+    global TEMP
+    # Each invocation owns its files, including cleanup after an early failure.
+    with tempfile.TemporaryDirectory(prefix="lz4-list-") as TEMP:
+        generate_files()
+        ret = unittest.main(verbosity=2, exit=False)
+        return not ret.result.wasSuccessful()
+
+
 if __name__ == '__main__':
-    cleanup()
-    generate_files()
-    ret = unittest.main(verbosity=2, exit=False)
-    cleanup(silent=True)
-    sys.exit(not ret.result.wasSuccessful())
+    sys.exit(main())
