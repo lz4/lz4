@@ -3132,15 +3132,15 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                     result = LZ4IO_format_not_known;
                     break;
                 }
-                if (totalBlocksSize) {
-                    if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
-                                 cfinfo->frameCount + 1,
-                                 LZ4IO_frameTypeNames[frameInfo.frameType],
-                                 "-", "-",
-                                 totalBlocksSize + 4,
-                                 "-", "-");
-                    result = LZ4IO_LZ4F_OK;
-            }   }
+                /* no block : empty input, as compressed by lz4 -l */
+                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
+                             cfinfo->frameCount + 1,
+                             LZ4IO_frameTypeNames[frameInfo.frameType],
+                             "-", "-",
+                             totalBlocksSize + 4,
+                             "-", "-");
+                result = LZ4IO_LZ4F_OK;
+            }
             break;
         case LZ4IO_SKIPPABLE0:
             frameInfo.frameType = skippableFrame;
