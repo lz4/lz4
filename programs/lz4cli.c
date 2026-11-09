@@ -579,8 +579,8 @@ int main(int argCount, const char** argv)
                   }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
-                if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(prefs, 1); continue; }
-                if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(prefs, 0); continue; }
+                if (!strcmp(argument,  "--force")) { forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); continue; }
+                if (!strcmp(argument,  "--no-force")) { forceOverwrite=0; LZ4IO_setOverwrite(prefs, 0); continue; }
                 if ((!strcmp(argument, "--stdout"))
                     || (!strcmp(argument, "--to-stdout"))) {
                     forceStdout=1;
