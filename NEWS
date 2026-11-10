@@ -1,11 +1,12 @@
 v1.11.1
-cli  : output creation without overwrite authorization is atomic on POSIX
 fix  : `LZ4_resetStreamHC()` could write out of bounds at levels >= 10, on a state containing garbage (since v1.11.0)
 perf : faster decompression on ppc64 (+12% to +24% on silesia), `LZ4_FAST_DEC_LOOP` enabled, by @runlevel5
 perf : `lz4 -l` compresses small files up to 10x faster : no more threads than blocks
 api  : restored the unprefixed lz4frame enums and types (`LZ4F_ENABLE_OBSOLETE_ENUMS`), employed by zstd, now deprecated (compilation warning), reported by @diizzyy
 cli  : help (`-h`, `-H`, `--help`) outputs to stdout, requested by @tansy
-cli  : `--list` reads standard input again (since v1.10.0), accepts empty legacy frames, and fails cleanly on unreadable files
+cli  : `--list` reads standard input again (since v1.10.0)
+cli  : various fixes (`--list`, `--stdout`, `--force`, multiple inputs, Windows pipes, modification time, output creation), by @lee3Q, @immanuwell and @rudycelekli
+build: `lz4file.h` usable from cmake (since v1.10.0) and meson installations, reported by @rudycelekli
 build: MinGW builds with clang and lld (since v1.11.0), reported by @tansy
 build: `make` with `BUILD_STATIC=no` or `BUILD_SHARED=no` (since v1.11.0), by @xry111
 
