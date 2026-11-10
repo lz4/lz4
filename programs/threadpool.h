@@ -32,7 +32,8 @@ extern "C" {
 typedef struct TPool_s TPool;
 
 /*! TPool_create() :
- *  Create a thread pool with at most @nbThreads.
+ *  Create a thread pool with at most @nbThreads,
+ *  started on demand : when queued jobs outnumber idle threads.
  * @nbThreads must be at least 1.
  * @queueSize is the maximum number of pending jobs before blocking.
  * @return : TPool* pointer on success, else NULL.
