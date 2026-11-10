@@ -101,8 +101,11 @@ if [ $MT = 1 ]; then
     done
     budget $FPREFIX-b49 "lz4 --memory=49M"
     budget $FPREFIX-b "lz4 --memory=51380224";  cmp $FPREFIX-b $FPREFIX-b49
+    warns "budget (1 MB) too small" "lz4 -f --memory=1M $SRC $OUT"   # even for a single thread
+    silent "lz4 -q -f --memory=1M $SRC $OUT"
 fi
 warnsNot "budget" "lz4 -f $SRC $OUT"   # the default budget is not reported
+warnsNot "budget" "lz4 -f -T2 $SRC $OUT"   # nor requested threads within it
 
 # environment variables : invalid values are ignored, with a warning ; the command line wins
 for v in LZ4_MEMORY=0 LZ4_MEMORY=10Q LZ4_NBWORKERS=9x LZ4_CLEVEL=9x; do warns "Ignore" "$v lz4 -f $SRC $OUT"; done
@@ -116,7 +119,12 @@ same $SRC "lz4 -1" "LZ4_CLEVEL=9 lz4 -1"
 if [ $MT = 1 ]; then
     warns "reduced" "lz4 -f -T4294967295 $SRC $OUT"
     warns "reduced" "lz4 -b1 -i0 -T4294967295 $SRC"
+    silent "lz4 -q -f -T4294967295 $SRC $OUT"
     warnsNot "multithreading" "lz4 -f -T2 $SRC $OUT"
+    # -v : threads employed
+    warns "Using up to" "lz4 -v -f $SRC $OUT"
+    warns "custom block size" "lz4 -v -f -B32768 $SRC $OUT"
+    warnsNot "Using up to" "lz4 -f $SRC $OUT"
 else
     warns "multithreading" "lz4 -f -T2 $SRC $OUT"   # not supported
 fi
@@ -125,6 +133,8 @@ warnsNot "reduced" "lz4 -b1 -i0 -T1 $SRC"
 same $BIG "lz4 -BD -T1" "lz4 -BD" "lz4 -BD --threads 2"
 lz4 -q -f -BD --single-thread $BIG $OUT
 lz4 -dc $OUT | cmp - $BIG
+warns "Single-threaded" "lz4 -v -f --single-thread $SRC $OUT"
+warnsNot "Single-threaded" "lz4 -f --single-thread $SRC $OUT"
 
 # compression levels : --best, and lz4c's legacy commands
 same $BIG "lz4 -0" "$LZ4C -c0"
@@ -194,6 +204,19 @@ silent "cat $SRC | lz4 > $OUT"
 silent "lz4 -f -m $SRC $HDR"
 warns  "Compressed" "lz4 -v -f -m $SRC $HDR"
 warns  "content-size" "cat $SRC | lz4 --content-size > $OUT"   # size unknown
+warns  "Legacy" "lz4 -v -l -f $SRC $OUT"   # deprecated format
+warnsNot "Legacy" "lz4 -l -f $SRC $OUT"
+# sizes OPTIONS INPUT : the summary displays the sizes of INPUT and of its compressed output
+sizes() {
+    lz4 -f $1 $2 $OUT 2> $ERR
+    grep -q "Compressed $(($(wc -c < $2))) bytes into $(($(wc -c < $OUT))) bytes" $ERR
+}
+sizes "" $SRC   # a single block
+sizes "" $BIG   # several blocks
+head -c 4194305 $BIG > $FPREFIX-odd   # 4 MB and 1 byte
+sizes "" $FPREFIX-odd
+lz4 -dc $OUT | cmp - $FPREFIX-odd
+sizes "-l" $SRC   # legacy format
 lz4 -V > /dev/null   # version and help succeed
 lz4 -h > /dev/null
 
