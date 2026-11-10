@@ -307,6 +307,18 @@ UTIL_STATIC int UTIL_isRegFile(const char* infilename)
     return UTIL_getFileStat(infilename, &statbuf); /* Only need to know whether it is a regular file */
 }
 
+/* @return : 1 if @f can be repositioned :
+ * on Windows, fseek() can report success on a pipe, without moving */
+UTIL_STATIC int UTIL_isSeekable(FILE* f)
+{
+#if defined(_WIN32)
+    return GetFileType((HANDLE)_get_osfhandle(_fileno(f))) == FILE_TYPE_DISK;
+#else
+    (void)f;   /* fseek() fails when @f can't be repositioned */
+    return 1;
+#endif
+}
+
 UTIL_STATIC int UTIL_isDirectory(const char* infilename)
 {
     stat_t statbuf;

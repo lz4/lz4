@@ -115,6 +115,9 @@ lz4cat < $FPREFIX-hw.lz4 > ${FPREFIX}3  # checks lz4cat works with stdin (#285)
 cmp $FPREFIX-hw ${FPREFIX}3
 lz4cat < $FPREFIX-hw > ${FPREFIX}2      # checks lz4cat works in pass-through mode
 cmp $FPREFIX-hw ${FPREFIX}2
+printf '\120\052\115\030\000\000\000\000BAD!' > $FPREFIX-skipbad.lz4   # skippable frame, then undecodable data
+lz4cat $FPREFIX-skipbad.lz4 $FPREFIX-hw > ${FPREFIX}2 && exit 1  # must fail,
+cmp $FPREFIX-hw ${FPREFIX}2                                      # but the next file is still passed through
 cp $FPREFIX-hw ./-d
 lz4 --rm -- -d -d.lz4                   # compresses ./d into ./-d.lz4
 test   -f ./-d.lz4
