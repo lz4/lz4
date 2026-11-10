@@ -74,8 +74,10 @@ endif
 
 ifeq ($(WINBASED),yes)
 EXT        = .exe
-WINDRES ?= windres
-MCM_LDFLAGS += -Wl,--force-exe-suffix
+# windres of the compiler's toolchain when there is one (x86_64-w64-mingw32-clang : x86_64-w64-mingw32-windres),
+# so that resources target the same architecture
+CC_TOOL_PREFIX = $(patsubst %clang,%,$(patsubst %gcc,%,$(firstword $(filter %-gcc %-clang,$(CC)))))
+WINDRES ?= $(or $(if $(CC_TOOL_PREFIX),$(shell command -v $(CC_TOOL_PREFIX)windres 2>$(VOID))),windres)
 endif
 # executable suffix of multiconf.make, which detects only native Windows itself
 EXE = $(EXT)

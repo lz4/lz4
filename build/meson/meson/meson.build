@@ -45,7 +45,7 @@ if get_option('disable-memory-allocation')
     error('Memory allocation can only be disabled in static builds')
   endif
 
-  add_project_arguments('-DLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION')
+  add_project_arguments('-DLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION', language: 'c')
   compile_args += '-DLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION'
 endif
 
@@ -100,7 +100,7 @@ if get_option('endianness-independent-output')
     error('Endianness-independent output can only be enabled in static builds')
   endif
 
-  add_project_arguments('-DLZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT')
+  add_project_arguments('-DLZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT', language: 'c')
   compile_args += '-DLZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT'
 endif
 

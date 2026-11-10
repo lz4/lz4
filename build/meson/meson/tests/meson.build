@@ -122,6 +122,9 @@ test_scripts = {
   'lz4-basic': {
     'depends': [lz4, lz4cat, unlz4, targets['datagen']],
   },
+  'lz4-decompress': {
+    'depends': [lz4, lz4cat, targets['datagen']],
+  },
   'lz4-dict': {
     'depends': [lz4, targets['datagen']],
   },
@@ -134,6 +137,9 @@ test_scripts = {
   'lz4-frame-concatenation': {
     'depends': [lz4, targets['datagen']],
   },
+  'lz4-list': {
+    'depends': [lz4, targets['datagen']],
+  },
   'lz4-multiple': {
     'depends': [lz4, targets['datagen']],
   },
@@ -142,6 +148,9 @@ test_scripts = {
   },
   'lz4-opt-parser': {
     'depends': [lz4, targets['datagen']],
+  },
+  'lz4-options': {
+    'depends': [lz4, lz4cat, targets['datagen']],
   },
   'lz4-rm': {
     'depends': [lz4, targets['datagen']],

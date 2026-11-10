@@ -130,77 +130,77 @@ int LZ4IO_compressMultipleFilenames_Legacy(
 /*-***************************
 *  Functions
 *****************************/
-static int usage(const char* exeName)
+static int usage(FILE* f, const char* exeName)
 {
-    DISPLAY( "Usage : \n");
-    DISPLAY( "      %s [arg] [input] [output] \n", exeName);
-    DISPLAY( "\n");
-    DISPLAY( "input   : a filename \n");
-    DISPLAY( "          with no FILE, or when FILE is - or %s, read standard input\n", stdinmark);
-    DISPLAY( "Arguments : \n");
-    DISPLAY( " -1     : fast compression (default) \n");
-    DISPLAY( " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
+    fprintf(f, "Usage : \n");
+    fprintf(f, "      %s [arg] [input] [output] \n", exeName);
+    fprintf(f, "\n");
+    fprintf(f, "input   : a filename \n");
+    fprintf(f, "          with no FILE, or when FILE is - or %s, read standard input\n", stdinmark);
+    fprintf(f, "Arguments : \n");
+    fprintf(f, " -1     : fast compression (default) \n");
+    fprintf(f, " -%2d    : slowest compression level \n", LZ4HC_CLEVEL_MAX);
 #if LZ4IO_MULTITHREAD
-    DISPLAY( " -T#    : use # worker threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
+    fprintf(f, " -T#    : use # worker threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
 #endif
-    DISPLAY( " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
-    DISPLAY( " -f     : overwrite output without prompting \n");
-    DISPLAY( " -k     : preserve source files(s)  (default) \n");
-    DISPLAY( "--rm    : remove source file(s) after successful de/compression \n");
-    DISPLAY( " -h/-H  : display help/long help and exit \n");
+    fprintf(f, " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
+    fprintf(f, " -f     : overwrite output without prompting \n");
+    fprintf(f, " -k     : preserve source files(s)  (default) \n");
+    fprintf(f, "--rm    : remove source file(s) after successful de/compression \n");
+    fprintf(f, " -h/-H  : display help/long help and exit \n");
     return 0;
 }
 
 static int usage_advanced(const char* exeName)
 {
-    DISPLAY(WELCOME_MESSAGE);
-    usage(exeName);
-    DISPLAY( "\n");
-    DISPLAY( "Advanced arguments :\n");
-    DISPLAY( " -V     : display Version number and exit \n");
-    DISPLAY( " -v     : verbose mode \n");
-    DISPLAY( " -q     : suppress warnings; specify twice to suppress errors too\n");
-    DISPLAY( " -c     : force write to standard output, even if it is the console\n");
-    DISPLAY( " -t     : test compressed file integrity\n");
-    DISPLAY( " -m     : multiple input files (implies automatic output filenames)\n");
+    DISPLAYOUT(WELCOME_MESSAGE);
+    usage(stdout, exeName);
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "Advanced arguments :\n");
+    DISPLAYOUT( " -V     : display Version number and exit \n");
+    DISPLAYOUT( " -v     : verbose mode \n");
+    DISPLAYOUT( " -q     : suppress warnings; specify twice to suppress errors too\n");
+    DISPLAYOUT( " -c     : force write to standard output, even if it is the console\n");
+    DISPLAYOUT( " -t     : test compressed file integrity\n");
+    DISPLAYOUT( " -m     : multiple input files (implies automatic output filenames)\n");
 #ifdef UTIL_HAS_CREATEFILELIST
-    DISPLAY( " -r     : operate recursively on directories (sets also -m) \n");
+    DISPLAYOUT( " -r     : operate recursively on directories (sets also -m) \n");
 #endif
-    DISPLAY( " -l     : compress using Legacy format (Linux kernel compression)\n");
-    DISPLAY( " -z     : force compression \n");
-    DISPLAY( " -D FILE: use FILE as dictionary (compression & decompression)\n");
-    DISPLAY( " -B#    : cut file into blocks of size # bytes [32+] \n");
-    DISPLAY( "                     or predefined block size [4-7] (default: %i) \n", LZ4_BLOCKSIZEID_DEFAULT);
+    DISPLAYOUT( " -l     : compress using Legacy format (Linux kernel compression)\n");
+    DISPLAYOUT( " -z     : force compression \n");
+    DISPLAYOUT( " -D FILE: use FILE as dictionary (compression & decompression)\n");
+    DISPLAYOUT( " -B#    : cut file into blocks of size # bytes [32+] \n");
+    DISPLAYOUT( "                     or predefined block size [4-7] (default: %i) \n", LZ4_BLOCKSIZEID_DEFAULT);
 #if LZ4IO_MULTITHREAD
-    DISPLAY( "                     (custom sizes : single-threaded compression) \n");
+    DISPLAYOUT( "                     (custom sizes : single-threaded compression) \n");
 #endif
-    DISPLAY( " -BI    : Block Independence (default) \n");
-    DISPLAY( " -BD    : Block dependency (improves compression ratio) \n");
-    DISPLAY( " -BX    : enable block checksum (default:disabled) \n");
-    DISPLAY( "--no-frame-crc : disable stream checksum (default:enabled) \n");
-    DISPLAY( "--content-size : compressed frame includes original size (default:not present)\n");
-    DISPLAY( "--list FILE : lists information about .lz4 files (useful for files compressed with --content-size flag)\n");
-    DISPLAY( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
+    DISPLAYOUT( " -BI    : Block Independence (default) \n");
+    DISPLAYOUT( " -BD    : Block dependency (improves compression ratio) \n");
+    DISPLAYOUT( " -BX    : enable block checksum (default:disabled) \n");
+    DISPLAYOUT( "--no-frame-crc : disable stream checksum (default:enabled) \n");
+    DISPLAYOUT( "--content-size : compressed frame includes original size (default:not present)\n");
+    DISPLAYOUT( "--list FILE : lists information about .lz4 files (useful for files compressed with --content-size flag)\n");
+    DISPLAYOUT( "--[no-]sparse  : sparse mode (default:enabled on file, disabled on stdout)\n");
 #if LZ4IO_MULTITHREAD
-    DISPLAY( "--memory=#     : memory budget of multi-threaded compression (default: %u MB) ; suffixes K, M, G \n",
+    DISPLAYOUT( "--memory=#     : memory budget of multi-threaded compression (default: %u MB) ; suffixes K, M, G \n",
                 (unsigned)(LZ4IO_defaultMemoryBudget() >> 20));
 #endif
-    DISPLAY( "--single-thread: compress frames with the main thread alone, not cut into jobs (output can differ from -T1 with -BD)\n");
-    DISPLAY( "--[no-]mmap    : memory-map files to compress (default:enabled when supported)\n");
-    DISPLAY( "                 note : compression fails if the file is truncated or rewritten meanwhile \n");
-    DISPLAY( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
-    DISPLAY( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
-    DISPLAY( "--best  : same as -%d\n", LZ4HC_CLEVEL_MAX);
-    DISPLAY( "Benchmark arguments : \n");
-    DISPLAY( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
-    DISPLAY( " -e#    : test all compression levels from -bX to # (default : 1)\n");
-    DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s) \n");
+    DISPLAYOUT( "--single-thread: compress frames with the main thread alone, not cut into jobs (output can differ from -T1 with -BD)\n");
+    DISPLAYOUT( "--[no-]mmap    : memory-map files to compress (default:enabled when supported)\n");
+    DISPLAYOUT( "                 note : compression fails if the file is truncated or rewritten meanwhile \n");
+    DISPLAYOUT( "--favor-decSpeed: compressed files decompress faster, but are less compressed \n");
+    DISPLAYOUT( "--fast[=#]: switch to ultra fast compression level (default: %i)\n", 1);
+    DISPLAYOUT( "--best  : same as -%d\n", LZ4HC_CLEVEL_MAX);
+    DISPLAYOUT( "Benchmark arguments : \n");
+    DISPLAYOUT( " -b#    : benchmark file(s), using # compression level (default : 1) \n");
+    DISPLAYOUT( " -e#    : test all compression levels from -bX to # (default : 1)\n");
+    DISPLAYOUT( " -i#    : minimum evaluation time in seconds (default : 3s) \n");
     if (g_lz4c_legacy_commands) {
-        DISPLAY( "Legacy arguments : \n");
-        DISPLAY( " -c0    : fast compression \n");
-        DISPLAY( " -c1    : high compression \n");
-        DISPLAY( " -c2,-hc: very high compression \n");
-        DISPLAY( " -y     : overwrite output without prompting \n");
+        DISPLAYOUT( "Legacy arguments : \n");
+        DISPLAYOUT( " -c0    : fast compression \n");
+        DISPLAYOUT( " -c1    : high compression \n");
+        DISPLAYOUT( " -c2,-hc: very high compression \n");
+        DISPLAYOUT( " -y     : overwrite output without prompting \n");
     }
     return 0;
 }
@@ -208,63 +208,63 @@ static int usage_advanced(const char* exeName)
 static int usage_longhelp(const char* exeName)
 {
     usage_advanced(exeName);
-    DISPLAY( "\n");
-    DISPLAY( "****************************\n");
-    DISPLAY( "***** Advanced comment *****\n");
-    DISPLAY( "****************************\n");
-    DISPLAY( "\n");
-    DISPLAY( "Which values can [output] have ? \n");
-    DISPLAY( "---------------------------------\n");
-    DISPLAY( "[output] : a filename \n");
-    DISPLAY( "          '%s', or '-' for standard output (pipe mode)\n", stdoutmark);
-    DISPLAY( "          '%s' to discard output (test mode) \n", NULL_OUTPUT);
-    DISPLAY( "[output] can be left empty. In this case, it receives the following value :\n");
-    DISPLAY( "          - if stdout is not the console, then [output] = stdout \n");
-    DISPLAY( "          - if stdout is console : \n");
-    DISPLAY( "               + for compression, output to filename%s \n", LZ4_EXTENSION);
-    DISPLAY( "               + for decompression, output to filename without '%s'\n", LZ4_EXTENSION);
-    DISPLAY( "                    > if input filename has no '%s' extension : error \n", LZ4_EXTENSION);
-    DISPLAY( "\n");
-    DISPLAY( "Compression levels : \n");
-    DISPLAY( "---------------------\n");
-    DISPLAY( "-0  => Default level, identical to -%u \n", LZ4_CLEVEL_DEFAULT);
-    DISPLAY( "-1  => Fast compression \n");
-    DISPLAY( "-2 .. -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
-    DISPLAY( "--best    => Highest available compression level (-%d) \n", LZ4HC_CLEVEL_MAX);
-    DISPLAY( "--fast=#  => Faster compression; higher number == faster but compress less\n");
-    DISPLAY( "\n");
-    DISPLAY( "stdin, stdout and the console : \n");
-    DISPLAY( "--------------------------------\n");
-    DISPLAY( "To protect the console from binary flooding (bad argument mistake)\n");
-    DISPLAY( "%s will refuse to read from console, or write to console \n", exeName);
-    DISPLAY( "except if '-c' command is specified, to force output to console \n");
-    DISPLAY( "\n");
-    DISPLAY( "Simple example :\n");
-    DISPLAY( "----------------\n");
-    DISPLAY( "1 : compress 'filename' fast, using default output name 'filename.lz4'\n");
-    DISPLAY( "          %s filename\n", exeName);
-    DISPLAY( "\n");
-    DISPLAY( "Short arguments can be aggregated. For example :\n");
-    DISPLAY( "----------------------------------\n");
-    DISPLAY( "2 : compress 'filename' in high compression mode, overwrite output if exists\n");
-    DISPLAY( "          %s -9 -f filename \n", exeName);
-    DISPLAY( "    is equivalent to :\n");
-    DISPLAY( "          %s -9f filename \n", exeName);
-    DISPLAY( "\n");
-    DISPLAY( "%s can be used in 'pure pipe mode'. For example :\n", exeName);
-    DISPLAY( "-------------------------------------\n");
-    DISPLAY( "3 : compress data stream from 'generator', send result to 'consumer'\n");
-    DISPLAY( "          generator | %s | consumer \n", exeName);
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "****************************\n");
+    DISPLAYOUT( "***** Advanced comment *****\n");
+    DISPLAYOUT( "****************************\n");
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "Which values can [output] have ? \n");
+    DISPLAYOUT( "---------------------------------\n");
+    DISPLAYOUT( "[output] : a filename \n");
+    DISPLAYOUT( "          '%s', or '-' for standard output (pipe mode)\n", stdoutmark);
+    DISPLAYOUT( "          '%s' to discard output (test mode) \n", NULL_OUTPUT);
+    DISPLAYOUT( "[output] can be left empty. In this case, it receives the following value :\n");
+    DISPLAYOUT( "          - if stdout is not the console, then [output] = stdout \n");
+    DISPLAYOUT( "          - if stdout is console : \n");
+    DISPLAYOUT( "               + for compression, output to filename%s \n", LZ4_EXTENSION);
+    DISPLAYOUT( "               + for decompression, output to filename without '%s'\n", LZ4_EXTENSION);
+    DISPLAYOUT( "                    > if input filename has no '%s' extension : error \n", LZ4_EXTENSION);
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "Compression levels : \n");
+    DISPLAYOUT( "---------------------\n");
+    DISPLAYOUT( "-0  => Default level, identical to -%u \n", LZ4_CLEVEL_DEFAULT);
+    DISPLAYOUT( "-1  => Fast compression \n");
+    DISPLAYOUT( "-2 .. -%d => High compression; higher number == more compression but slower\n", LZ4HC_CLEVEL_MAX);
+    DISPLAYOUT( "--best    => Highest available compression level (-%d) \n", LZ4HC_CLEVEL_MAX);
+    DISPLAYOUT( "--fast=#  => Faster compression; higher number == faster but compress less\n");
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "stdin, stdout and the console : \n");
+    DISPLAYOUT( "--------------------------------\n");
+    DISPLAYOUT( "To protect the console from binary flooding (bad argument mistake)\n");
+    DISPLAYOUT( "%s will refuse to read from console, or write to console \n", exeName);
+    DISPLAYOUT( "except if '-c' command is specified, to force output to console \n");
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "Simple example :\n");
+    DISPLAYOUT( "----------------\n");
+    DISPLAYOUT( "1 : compress 'filename' fast, using default output name 'filename.lz4'\n");
+    DISPLAYOUT( "          %s filename\n", exeName);
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "Short arguments can be aggregated. For example :\n");
+    DISPLAYOUT( "----------------------------------\n");
+    DISPLAYOUT( "2 : compress 'filename' in high compression mode, overwrite output if exists\n");
+    DISPLAYOUT( "          %s -9 -f filename \n", exeName);
+    DISPLAYOUT( "    is equivalent to :\n");
+    DISPLAYOUT( "          %s -9f filename \n", exeName);
+    DISPLAYOUT( "\n");
+    DISPLAYOUT( "%s can be used in 'pure pipe mode'. For example :\n", exeName);
+    DISPLAYOUT( "-------------------------------------\n");
+    DISPLAYOUT( "3 : compress data stream from 'generator', send result to 'consumer'\n");
+    DISPLAYOUT( "          generator | %s | consumer \n", exeName);
     if (g_lz4c_legacy_commands) {
-        DISPLAY( "\n");
-        DISPLAY( "***** Warning  ***** \n");
-        DISPLAY( "Legacy arguments take precedence. Therefore : \n");
-        DISPLAY( "--------------------------------- \n");
-        DISPLAY( "          %s -hc filename \n", exeName);
-        DISPLAY( "means 'compress filename in high compression mode' \n");
-        DISPLAY( "It is not equivalent to : \n");
-        DISPLAY( "          %s -h -c filename \n", exeName);
-        DISPLAY( "which displays help text and exits \n");
+        DISPLAYOUT( "\n");
+        DISPLAYOUT( "***** Warning  ***** \n");
+        DISPLAYOUT( "Legacy arguments take precedence. Therefore : \n");
+        DISPLAYOUT( "--------------------------------- \n");
+        DISPLAYOUT( "          %s -hc filename \n", exeName);
+        DISPLAYOUT( "means 'compress filename in high compression mode' \n");
+        DISPLAYOUT( "It is not equivalent to : \n");
+        DISPLAYOUT( "          %s -h -c filename \n", exeName);
+        DISPLAYOUT( "which displays help text and exits \n");
     }
     return 0;
 }
@@ -272,7 +272,7 @@ static int usage_longhelp(const char* exeName)
 static int badusage(const char* exeName)
 {
     DISPLAYLEVEL(1, "Incorrect parameters\n");
-    if (displayLevel >= 1) usage(exeName);
+    if (displayLevel >= 1) usage(stderr, exeName);
     exit(1);
 }
 
@@ -579,10 +579,15 @@ int main(int argCount, const char** argv)
                   }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
-                if (!strcmp(argument,  "--force")) { LZ4IO_setOverwrite(prefs, 1); continue; }
-                if (!strcmp(argument,  "--no-force")) { LZ4IO_setOverwrite(prefs, 0); continue; }
+                if (!strcmp(argument,  "--force")) { forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); continue; }
+                if (!strcmp(argument,  "--no-force")) { forceOverwrite=0; LZ4IO_setOverwrite(prefs, 0); continue; }
                 if ((!strcmp(argument, "--stdout"))
-                    || (!strcmp(argument, "--to-stdout"))) { forceStdout=1; output_filename=stdoutmark; continue; }
+                    || (!strcmp(argument, "--to-stdout"))) {
+                    forceStdout=1;
+                    output_filename=stdoutmark;
+                    LZ4IO_setPassThrough(prefs, 1);
+                    continue;
+                }
                 if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); BMK_skipChecksums(0); frameCrcRequested=1; continue; }
                 if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
                 if (!strcmp(argument,  "--no-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_setBlockChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
@@ -906,6 +911,7 @@ int main(int argCount, const char** argv)
     /* Refuse to use the console as input */
     if (!strcmp(input_filename, stdinmark) && IS_CONSOLE(stdin) ) {
         DISPLAYLEVEL(1, "refusing to read from a console\n");
+        DISPLAYLEVEL(1, "For help, type: %s -h\n", exeName);
         exit(1);
     }
 
@@ -945,7 +951,8 @@ int main(int argCount, const char** argv)
     }
 
     if (mode == om_list) {
-        if (!multiple_inputs) inFileNames[ifnIdx++] = input_filename;
+        /* no FILE, or - : standard input */
+        if ((ifnIdx == 0) && !strcmp(input_filename, stdinmark)) inFileNames[ifnIdx++] = stdinmark;
     } else {
         if (!multiple_inputs) assert(output_filename != NULL);
     }

@@ -151,7 +151,10 @@ lib-release: DEBUGFLAGS :=
 lib-release: lib liblz4.pc
 
 .PHONY: lib
-lib: liblz4.a liblz4
+lib: liblz4
+ifeq ($(BUILD_STATIC),yes)
+lib: liblz4.a
+endif
 
 .PHONY: lib-mt
 lib-mt:
@@ -219,7 +222,7 @@ liblz4.$(SHARED_EXT): liblz4.$(SHARED_EXT_MAJOR)
 	$(LN_SF) $< $@
 
 .PHONY: liblz4
-liblz4: $(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT)
+liblz4: $(if $(filter yes,$(BUILD_SHARED)),$(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT))
 
 else
 

@@ -40,6 +40,11 @@ lz4 -f $FPREFIX-hw $FPREFIX-hw.lz4
 test ! $FPREFIX-hw.lz4 -nt $FPREFIX-hw  # keeps modification time
 lz4 -l -f $FPREFIX-hw $FPREFIX-hw.lz4
 test ! $FPREFIX-hw.lz4 -nt $FPREFIX-hw  # same with legacy format
+if [ "$(uname)" = Linux ]; then   # sub-second precision
+    touch -d @1600000000.123456789 $FPREFIX-hw
+    lz4 -f $FPREFIX-hw $FPREFIX-hw.lz4
+    test "$(stat -c %y $FPREFIX-hw.lz4)" = "$(stat -c %y $FPREFIX-hw)"
+fi
 rm $FPREFIX-hw.lz4
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
     # output of a private source stays private while it is written :
@@ -64,6 +69,25 @@ cp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
 lz4 -d -f $FPREFIX-same.lz4 $FPREFIX-same.lz4 && exit 1
 cmp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
+    # An unreadable destination still exists; checking by opening it for reading misses it.
+    echo "keep this output" > $FPREFIX-writeonly
+    cp $FPREFIX-writeonly $FPREFIX-writeonly.orig
+    chmod 200 $FPREFIX-writeonly
+    if [ ! -r $FPREFIX-writeonly ]; then   # root can read it anyway
+        lz4 -q $FPREFIX-same $FPREFIX-writeonly && exit 1
+    fi
+    chmod 600 $FPREFIX-writeonly
+    cmp $FPREFIX-writeonly $FPREFIX-writeonly.orig
+    # A dangling output link must not create its target without overwrite authorization.
+    ln -s $FPREFIX-absent $FPREFIX-dangling
+    lz4 -q $FPREFIX-same $FPREFIX-dangling && exit 1
+    test ! -f $FPREFIX-absent
+    lz4 -f $FPREFIX-same $FPREFIX-dangling
+    lz4 -d -c $FPREFIX-absent | cmp $FPREFIX-same -
+    printf 'n\n' | lz4 $FPREFIX-same $FPREFIX-writeonly && exit 1
+    cmp $FPREFIX-writeonly $FPREFIX-writeonly.orig
+    printf 'y\n' | lz4 $FPREFIX-same $FPREFIX-writeonly
+    lz4 -d -c $FPREFIX-writeonly | cmp $FPREFIX-same -
     # idem through a link
     ln $FPREFIX-same $FPREFIX-same.hard
     lz4 -f $FPREFIX-same $FPREFIX-same.hard && exit 1
@@ -91,6 +115,9 @@ lz4cat < $FPREFIX-hw.lz4 > ${FPREFIX}3  # checks lz4cat works with stdin (#285)
 cmp $FPREFIX-hw ${FPREFIX}3
 lz4cat < $FPREFIX-hw > ${FPREFIX}2      # checks lz4cat works in pass-through mode
 cmp $FPREFIX-hw ${FPREFIX}2
+printf '\120\052\115\030\000\000\000\000BAD!' > $FPREFIX-skipbad.lz4   # skippable frame, then undecodable data
+lz4cat $FPREFIX-skipbad.lz4 $FPREFIX-hw > ${FPREFIX}2 && exit 1  # must fail,
+cmp $FPREFIX-hw ${FPREFIX}2                                      # but the next file is still passed through
 cp $FPREFIX-hw ./-d
 lz4 --rm -- -d -d.lz4                   # compresses ./d into ./-d.lz4
 test   -f ./-d.lz4
@@ -105,12 +132,31 @@ lz4 ${FPREFIX}-dir && exit 1          # must fail: refuse to compress directory
 test ! -f ${FPREFIX}-dir.lz4          # must not create artifact (#1211)
 lz4 -f $FPREFIX-hw                    # create $FPREFIX-hw.lz4, for next tests
 lz4 --list $FPREFIX-hw.lz4            # test --list on valid single-frame file
-lz4 --list < $FPREFIX-hw.lz4          # test --list from stdin (file only)
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)   # (on Windows, stdin is never a regular file)
+    lz4 --list < $FPREFIX-hw.lz4 > $FPREFIX-list  # test --list from stdin (file only)
+    grep -q LZ4Frame $FPREFIX-list
+    ;;
+esac
+cat $FPREFIX-hw.lz4 | lz4 --list && exit 1   # must fail: stdin is not a file
+cp $FPREFIX-hw.lz4 $FPREFIX-unreadable.lz4; chmod 000 $FPREFIX-unreadable.lz4
+if [ ! -r $FPREFIX-unreadable.lz4 ]; then  # (not as root)
+    lz4 --list $FPREFIX-unreadable.lz4 && exit 1 || test $? -eq 1  # must fail cleanly
+fi
+chmod 644 $FPREFIX-unreadable.lz4
 lz4 --list data/goldenSamples/dictID.bin  # test --list on a frame carrying a dictID (11-byte header)
 head -c $(( $(wc -c < $FPREFIX-hw.lz4) - 4 )) $FPREFIX-hw.lz4 > $FPREFIX-trunc.lz4
 lz4 --list $FPREFIX-trunc.lz4 && exit 1  # must fail: truncated frame (content checksum missing)
 head -c 5 $FPREFIX-hw.lz4 > $FPREFIX-trunc.lz4
 lz4 --list $FPREFIX-trunc.lz4 && exit 1  # must fail: truncated frame header
+datagen -g0 | lz4 -c -B4 --no-frame-crc | head -c 7 > $FPREFIX-hdr  # frame header with 64 KB blocks
+{ cat $FPREFIX-hdr; printf '\001\000\001\200'; datagen -g65537; printf '\000\000\000\000'; } > $FPREFIX-bigblock.lz4
+lz4 -t $FPREFIX-bigblock.lz4 && exit 1      # must fail: block larger than the frame's block size
+lz4 --list $FPREFIX-bigblock.lz4 && exit 1  # must fail, like -t
+{ cat $FPREFIX-hdr; printf '\377\377\377\177'; } > $FPREFIX-bigblock.lz4
+lz4 --list $FPREFIX-bigblock.lz4 && exit 1 || test $? -eq 1  # must fail cleanly: 2 GB block, beyond LONG_MAX of a 32-bit long
+{ cat $FPREFIX-hdr; printf '\000\000\000\200\005\000\000\200hello\000\000\000\000'; } > $FPREFIX-empty.lz4
+lz4 -t $FPREFIX-empty.lz4
+lz4 --list $FPREFIX-empty.lz4  # empty uncompressed block (0x80000000) : not an EndMark
 cat $FPREFIX-hw >> $FPREFIX-hw.lz4
 lz4 -f $FPREFIX-hw.lz4 && exit 1      # uncompress valid frame followed by invalid data (must fail now)
 printf '\120\052\115\030\000\000\000\000BAD!' > $FPREFIX-bad.lz4
@@ -160,6 +206,9 @@ LZ4_NBWORKERS=2x lz4 -c $FPREFIX-dg20k 2>&1 >/dev/null | grep "Ignore environmen
 lz4 -c --fast=65536 $FPREFIX-dg20k > $FPREFIX-fastmax.lz4
 lz4 -c --fast=2147483647 $FPREFIX-dg20k | cmp - $FPREFIX-fastmax.lz4
 lz4 -bq --fast=2147483647 -i0 $FPREFIX-dg20k
+# requested help goes to stdout (can be paged), help after an incorrect argument goes to stderr
+lz4 -h 2>/dev/null | grep -q "Usage"
+lz4 -B3 $FPREFIX-dg20k 2>/dev/null | grep -q "Usage" && exit 1
 # -v reports the processing speed after a successful decompression, like after compression,
 # but not after a failed one (it isn't reported on systems where MT time measurements are unsupported)
 if lz4 -vf $FPREFIX-dg20k $FPREFIX-v.lz4 2>&1 | grep -q "Done in"; then

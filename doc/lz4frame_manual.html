@@ -1,10 +1,10 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.11.0 Manual</title>
+<title>1.11.1 Manual</title>
 </head>
 <body>
-<h1>1.11.0 Manual</h1>
+<h1>1.11.1 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
@@ -49,16 +49,24 @@
     LZ4F_max256KB=5,
     LZ4F_max1MB=6,
     LZ4F_max4MB=7
+    LZ4F_OBSOLETE_ENUM(max64KB)
+    LZ4F_OBSOLETE_ENUM(max256KB)
+    LZ4F_OBSOLETE_ENUM(max1MB)
+    LZ4F_OBSOLETE_ENUM(max4MB)
 } LZ4F_blockSizeID_t;
 </b></pre><BR>
 <pre><b>typedef enum {
     LZ4F_blockLinked=0,
     LZ4F_blockIndependent
+    LZ4F_OBSOLETE_ENUM(blockLinked)
+    LZ4F_OBSOLETE_ENUM(blockIndependent)
 } LZ4F_blockMode_t;
 </b></pre><BR>
 <pre><b>typedef enum {
     LZ4F_noContentChecksum=0,
     LZ4F_contentChecksumEnabled
+    LZ4F_OBSOLETE_ENUM(noContentChecksum)
+    LZ4F_OBSOLETE_ENUM(contentChecksumEnabled)
 } LZ4F_contentChecksum_t;
 </b></pre><BR>
 <pre><b>typedef enum {
@@ -69,6 +77,7 @@
 <pre><b>typedef enum {
     LZ4F_frame=0,
     LZ4F_skippableFrame
+    LZ4F_OBSOLETE_ENUM(skippableFrame)
 } LZ4F_frameType_t;
 </b></pre><BR>
 <pre><b>typedef struct {
@@ -399,12 +408,14 @@ LZ4F_getFrameInfo(LZ4F_dctx* dctx,
              (see LZ4F_resumeFrame() in the static section).
  @retval 0   The current frame is fully decoded. If *srcSizePtr is less than the provided value, 
              the unconsumed tail is the start of another frame (if any).
- @retval error  An error code; test with LZ4F_isError(ret). After an error, dctx is not
-                resumable: call LZ4F_resetDecompressionContext() before reusing it.
+ @retval error  An error code; test with LZ4F_isError(ret). The size pointers still report
+                the bytes consumed and produced before the error, but produced bytes may be invalid.
+                After an error, dctx is not resumable: call LZ4F_resetDecompressionContext() before reusing it.
 
  @pre  @p dctx is a valid state created by LZ4F_createDecompressionContext().
  @post *srcSizePtr and *dstSizePtr are updated with the actual bytes consumed/produced.
-       @p dstBuffer contents in [0, *dstSizePtr) are valid decompressed data.
+       @p dstBuffer contents in [0, *dstSizePtr) are decompressed data.
+       The content checksum, if present, is only verified at the end of the frame (return 0).
 
  @note  The function may not consume all provided input on each call. Always check *srcSizePtr.
         Present any unconsumed source bytes again on the next call.

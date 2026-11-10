@@ -99,6 +99,13 @@ jobs:
         -Dexamples=true
         build/meson builddir
 
+    - name: Configure static feature options
+      run: |
+        meson setup build/meson build-noalloc -Ddefault_library=static -Dossfuzz=false -Ddisable-memory-allocation=true
+        meson setup build/meson build-independent -Ddefault_library=static -Dossfuzz=false -Dendianness-independent-output=true
+        meson compile -C build-independent
+        meson compile -C build-noalloc
+
     - name: Run tests
       run: meson test -C builddir
 

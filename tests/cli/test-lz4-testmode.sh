@@ -39,6 +39,14 @@ datagen | lz4 -df > $FPREFIX-trash && exit 1
 datagen | lz4 -dcf > $FPREFIX-trash
 echo "Hello World !" > ${FPREFIX}1
 lz4 -dcf ${FPREFIX}1
+for stdout_flag in -c --stdout --to-stdout
+do
+    lz4 -d -f "$stdout_flag" ${FPREFIX}1 > $FPREFIX-trash
+    cmp ${FPREFIX}1 $FPREFIX-trash
+    lz4 -d "$stdout_flag" ${FPREFIX}1 > $FPREFIX-trash && exit 1
+    lz4 -t -f "$stdout_flag" ${FPREFIX}1 > $FPREFIX-trash && exit 1
+    test ! -s $FPREFIX-trash
+done
 echo "from underground..." > ${FPREFIX}2
 lz4 -dcfm ${FPREFIX}1 ${FPREFIX}2
 echo "---- non-existing source (must fail cleanly) ----"

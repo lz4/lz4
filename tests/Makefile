@@ -174,10 +174,6 @@ clean: clean_cache
 versionsTest:
 	$(PYTHON) compat/test-lz4-versions.py
 
-.PHONY: listTest
-listTest: lz4
-	QEMU_SYS=$(QEMU_SYS) $(PYTHON) cli/test-lz4-list.py
-
 # Note: requires liblz4 installed
 CLEAN += abiTest
 abiTest: LDLIBS += -llz4
@@ -219,7 +215,7 @@ test_targets:
 .PHONY: check
 check: test-lz4-essentials
 
-test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation listTest
+test: test-lz4 test-lz4c test-frametest test-frameMT-quick test-unittest test-fullbench test-fuzzer test-amalgamation
 
 test32: MCM_CFLAGS += -m32
 test32: test
@@ -234,6 +230,11 @@ lz4_all.c: $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
 
 test-install: lz4 lib liblz4.pc
 	lz4_root=.. ./compat/test_install.sh
+
+# BUILD_STATIC=no and BUILD_SHARED=no in lib/ ; leaves lib/ clean
+.PHONY: test-build-options
+test-build-options:
+	lz4_root=.. ./compat/test_build_options.sh
 
 # unit tests in non-default configurations
 .PHONY: test-unittest-configs
@@ -319,6 +320,18 @@ test-lz4-rm: lz4 datagen
 	@echo "\n ---- test --rm : source removed only once its output is complete ----"
 	./cli/test-lz4-rm.sh
 
+test-lz4-options: lz4 lz4cat datagen
+	@echo "\n ---- test command line options ----"
+	./cli/test-lz4-options.sh
+
+test-lz4-list: lz4 datagen
+	@echo "\n ---- test --list ----"
+	./cli/test-lz4-list.sh
+
+test-lz4-decompress: lz4 lz4cat datagen
+	@echo "\n ---- test decompression ----"
+	./cli/test-lz4-decompress.sh
+
 test-lz4-opt-parser: lz4 datagen
 	@echo "\n ---- test opt-parser ----"
 	./cli/test-lz4-opt-parser.sh
@@ -326,7 +339,8 @@ test-lz4-opt-parser: lz4 datagen
 test-lz4-essentials : lz4 datagen test-datagen-invalid-input test-lz4-basic test-lz4-multiple \
                       test-lz4-multiple-legacy test-lz4-frame-concatenation \
                       test-lz4-testmode test-lz4-contentSize test-lz4-dict \
-                      test-lz4-blocksize test-lz4-mozlz4 test-lz4-multithread test-lz4-rm
+                      test-lz4-blocksize test-lz4-mozlz4 test-lz4-multithread test-lz4-rm \
+                      test-lz4-options test-lz4-list test-lz4-decompress
 
 test-lz4: lz4 datagen test-lz4-essentials test-lz4-opt-parser \
           test-lz4-sparse test-lz4-hugefile test-lz4-dict \

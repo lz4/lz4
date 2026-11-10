@@ -1388,6 +1388,32 @@ TEST(decompress_invalidAndEmptyBlocks)
     }
 }
 
+/* a block larger than the frame's maximum block size is rejected as soon as its size is read, compressed or not ;
+ * a block of exactly the maximum size is accepted, and waits for its content */
+TEST(decompress_blockSizeLimit)
+{
+    static const LZ4F_blockSizeID_t ids[] = { LZ4F_max64KB, LZ4F_max256KB, LZ4F_max1MB, LZ4F_max4MB };
+    size_t i, extra, raw;
+    for (i = 0; i < ARRAY_SIZE(ids); i++)
+    for (extra = 0; extra <= 1; extra++)
+    for (raw = 0; raw <= 1; raw++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        BYTE frame[LZ4F_HEADER_SIZE_MAX + 4];
+        BYTE decoded[16];
+        size_t frameSize, dSize = sizeof(decoded), r;
+        prefs.frameInfo.blockSizeID = ids[i];
+        frameSize = LZ4F_OK(LZ4F_compressBegin(newCctx(), frame, LZ4F_HEADER_SIZE_MAX, &prefs));
+        writeLE32(frame + frameSize, (unsigned)(LZ4F_getBlockSize(ids[i]) + extra) | (raw ? 0x80000000U : 0));
+        frameSize += 4;
+        r = LZ4F_decompress(newDctx(), decoded, &dSize, frame, &frameSize, NULL);
+        if (extra) {
+            ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_maxBlockSize_invalid);
+        } else {
+            ASSERT(LZ4F_OK(r) > 0);
+        }
+    }
+}
+
 /* a frame abandoned in the middle of a block (output pending within the context), then a reset :
  * the next frame doesn't output anything from the abandoned one */
 TEST(decompress_resetPendingOutput)
@@ -1762,6 +1788,30 @@ TEST(lz4file_readOpen_shortFiles)
             ASSERT_EQ(LZ4F_read(readCtx, buf, sizeof(buf)), 0);
             LZ4F_OK(LZ4F_readClose(readCtx));
         }
+        UT_release(file);
+    }
+}
+
+/* A complete skippable frame can be only 8, 9 or 10 bytes long. */
+TEST(lz4file_readOpen_shortSkippable)
+{
+    unsigned payloadSize, magic;
+    for (magic = 0; magic < 16; magic++)
+    for (payloadSize = 0; payloadSize < 4; payloadSize++) {
+        BYTE frame[11] = { 0x50, 0x2a, 0x4d, 0x18, 0, 0, 0, 0, 1, 2, 3 };
+        FILE* const file = newTmpFile();
+        LZ4_readFile_t* readCtx = NULL;
+        char decoded[1];
+        frame[0] += (BYTE)magic;
+        frame[4] = (BYTE)payloadSize;
+        ASSERT_EQ(fwrite(frame, 1, 8 + payloadSize, file), 8 + payloadSize);
+        rewind(file);
+        LZ4F_OK(LZ4F_readOpen(&readCtx, file));
+        ASSERT_EQ(LZ4F_read(readCtx, decoded, sizeof(decoded)), 0);
+        ASSERT_EQ(LZ4F_tell(readCtx), 0);
+        LZ4F_OK(LZ4F_seek(readCtx, 0, SEEK_SET));
+        ASSERT_EQ(LZ4F_read(readCtx, decoded, sizeof(decoded)), 0);
+        LZ4F_OK(LZ4F_readClose(readCtx));
         UT_release(file);
     }
 }
@@ -2340,6 +2390,9 @@ TEST(decompress_skipChecksums)
         r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, NULL);
         ASSERT_MSG(LZ4F_getErrorCode(r) == expected, "checksum %u : %s", corrupted,
                    LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
+        ASSERT_EQ(srcLen, crcPos + 1);
+        ASSERT_EQ(dstLen, (corrupted == 0) ? 0 : (corrupted == 1) ? 2 * blockSize : srcSize);
+        ASSERT_MEMEQ(decoded, src, dstLen);   /* produced, but not checksum-validated */
         memset(&dOpt, 0, sizeof(dOpt));
         dOpt.skipChecksums = 1;
         srcLen = frameSize;

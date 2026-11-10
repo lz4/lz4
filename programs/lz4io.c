@@ -519,6 +519,7 @@ static FILE*
 LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, const char* srcFileName)
 {
     FILE* f;
+    int overwrite = prefs->overwrite;
     assert(dstFileName != NULL);
 
     if (LZ4IO_isStdout(dstFileName)) {
@@ -549,18 +550,25 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, con
                         DISPLAY("    not overwritten  \n");
                         return NULL;
                     }
+                    overwrite = 1;
                     while ((ch!=EOF) && (ch!='\n')) ch = getchar();  /* flush rest of input line */
         }   }   }
 #if PLATFORM_POSIX_VERSION >= 1
-        /* a new file stays private until the source's permissions are copied, once it is complete */
-        if (srcFileName != NULL && !LZ4IO_isStdin(srcFileName) && !LZ4IO_isDevNull(dstFileName)
-          && UTIL_isRegFile(srcFileName)) {
-            int const fd = open(dstFileName, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+        {
+            int const flags = O_WRONLY | O_CREAT
+                            | ((overwrite || LZ4IO_isDevNull(dstFileName)) ? O_TRUNC : O_EXCL);
+            /* a new file stays private until the source's permissions are copied, once it is complete */
+            int const mode = (srcFileName != NULL && !LZ4IO_isStdin(srcFileName)
+                           && !LZ4IO_isDevNull(dstFileName) && UTIL_isRegFile(srcFileName))
+                           ? (S_IRUSR | S_IWUSR) : 0666;
+            int const fd = open(dstFileName, flags, mode);
             f = (fd < 0) ? NULL : fdopen(fd, "wb");
             if (f == NULL && fd >= 0) close(fd);
-        } else
-#endif
+        }
+#else
+        (void)overwrite;
         f = fopen( dstFileName, "wb" );
+#endif
         if (f==NULL) DISPLAYLEVEL(1, "%s: %s\n", dstFileName, strerror(errno));
     }
 
@@ -884,7 +892,6 @@ static void LZ4IO_readAndProcess(void* arg)
 
 /* Size in bytes of a legacy block header in little-endian format */
 #define LZ4IO_LEGACY_BLOCK_HEADER_SIZE 4
-#define LZ4IO_LEGACY_BLOCK_SIZE_MAX  (8 MB)
 
 /* unoptimized version; solves endianness & alignment issues */
 static void LZ4IO_writeLE32 (void* p, unsigned value32)
@@ -1057,7 +1064,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
     compress_f const compressionFunction = (compressionlevel < LZ4HC_CLEVEL_MIN) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
     FILE* foutput = NULL;
-    TPool* const tPool = TPool_create(prefs->nbWorkers, 4);
+    TPool* tPool = NULL;
     TPool* const wPool = TPool_create(1, 4);
     WriteRegister wr = WR_init(LEGACY_BLOCKSIZE);
     LZ4IO_srcState_t srcState;
@@ -1076,6 +1083,12 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
         fclose(finput);
         clResult = 1;
         goto _cfl_clean;
+    }
+    /* no more workers than the blocks of the file (output doesn't depend on nbWorkers) */
+    {   U64 const fileSize = UTIL_getOpenFileSize(finput);   /* 0 : unknown (ex: stdin) */
+        U64 const nbBlocks = (fileSize + LEGACY_BLOCKSIZE - 1) / LEGACY_BLOCKSIZE;
+        int const nbWorkers = (fileSize && (nbBlocks < (U64)prefs->nbWorkers)) ? (int)nbBlocks : prefs->nbWorkers;
+        tPool = TPool_create(nbWorkers, 4);
     }
     if (tPool == NULL || wPool == NULL)
         END_PROCESS(21, "threadpool creation error ");
@@ -2644,6 +2657,7 @@ static int skipStream(FILE* f, unsigned offset)
 static int fseek_u32(FILE *fp, unsigned offset, int where)
 {
     const unsigned stepMax = 1U << 30;
+    int const seekable = UTIL_isSeekable(fp);
     int errorNb = 0;
 
     if (where != SEEK_CUR) return -1;  /* Only allows SEEK_CUR */
@@ -2652,8 +2666,7 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
     while (offset > 0) {
         unsigned s = offset;
         if (s > stepMax) s = stepMax;
-        errorNb = UTIL_fseek(fp, (long)s, SEEK_CUR);
-        if (errorNb==0) { offset -= s; continue; }
+        if (seekable && (UTIL_fseek(fp, (long)s, SEEK_CUR) == 0)) { offset -= s; continue; }
         errorNb = skipStream(fp, offset);
         offset = 0;
     }
@@ -2664,18 +2677,16 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
 
 #define ENDOFSTREAM ((unsigned long long)-1)
 #define DECODING_ERROR ((unsigned long long)-2)
+/* @firstFrame : at the beginning of the input file */
 static unsigned long long
 selectDecoder(dRess_t ress,
               FILE* finput, FILE* foutput,
+              int firstFrame,
               const LZ4IO_prefs_t* const prefs)
 {
     unsigned char MNstore[MOZLZ4_MAGIC_SIZE];   /* large enough for any magic number */
     size_t MNsize = MAGICNUMBER_SIZE;           /* nb of bytes read into MNstore */
     unsigned magicNumber;
-    static unsigned nbFrames = 0;
-
-    /* init */
-    nbFrames++;
 
     /* Check Archive Header */
     if (g_magicRead) {  /* magic number already read from finput (see legacy frame)*/
@@ -2683,7 +2694,7 @@ selectDecoder(dRess_t ress,
         g_magicRead = 0;
     } else {
         size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
-        if (nbReadBytes==0) { nbFrames = 0; return ENDOFSTREAM; }   /* EOF */
+        if (nbReadBytes==0) return ENDOFSTREAM;   /* EOF */
         if (nbReadBytes != MAGICNUMBER_SIZE)
           END_PROCESS(40, "Unrecognized header : Magic Number unreadable");
         magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
@@ -2722,10 +2733,9 @@ selectDecoder(dRess_t ress,
         }
         return 0;
     default:
-        if (nbFrames == 1) {  /* just started */
+        if (firstFrame) {
             /* Wrong magic number at the beginning of 1st stream */
             if (!prefs->testMode && prefs->overwrite && prefs->passThrough) {
-                nbFrames = 0;
                 return LZ4IO_passThrough(finput, foutput, MNstore, MNsize, prefs->sparseFileSupport);
             }
             END_PROCESS(44,"Unrecognized header : file cannot be decoded");
@@ -2753,6 +2763,7 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
     FILE* const foutput = ress.dstFile;
     unsigned long long filesize = 0;
     int result = 0;
+    int firstFrame = 1;
     LZ4IO_srcState_t srcState;
 
     /* Init */
@@ -2765,9 +2776,9 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
     srcState = LZ4IO_getSrcState(finput);
 
     /* Loop over multiple streams */
-    for ( ; ; ) {  /* endless loop, see break condition */
+    for ( ; ; firstFrame = 0) {  /* endless loop, see break condition */
         unsigned long long const decodedSize =
-                        selectDecoder(ress, finput, foutput, prefs);
+                        selectDecoder(ress, finput, foutput, firstFrame, prefs);
         if (decodedSize == ENDOFSTREAM) break;
         if (decodedSize == DECODING_ERROR) { result=1; break; }
         filesize += decodedSize;
@@ -2913,14 +2924,17 @@ static const char * LZ4IO_frameTypeNames[] = {"LZ4Frame", "LegacyFrame", "Skippa
 /* Read block headers and skip block data
    Return total blocks size for this frame including block headers,
    block checksums and content checksums.
-   returns 0 in case it can't successfully skip block data.
+   returns 0 in case it can't successfully skip block data,
+   or a block is larger than the frame's maximum block size (rejected by the decoder too).
    Assumes SEEK_CUR after frame header.
  */
 static unsigned long long
 LZ4IO_skipBlocksData(FILE* finput,
+               const LZ4F_blockSizeID_t blockSizeID,
                const LZ4F_blockChecksum_t blockChecksumFlag,
                const LZ4F_contentChecksum_t contentChecksumFlag)
 {
+    size_t const maxBlockSize = LZ4F_getBlockSize(blockSizeID);   /* blockSizeID already validated by LZ4F_getFrameInfo() */
     unsigned char blockInfo[LZ4F_BLOCK_HEADER_SIZE];
     unsigned long long totalBlocksSize = 0;
     for (;;) {
@@ -2928,10 +2942,11 @@ LZ4IO_skipBlocksData(FILE* finput,
             return 0;
         }
         totalBlocksSize += LZ4F_BLOCK_HEADER_SIZE;
-        {   const unsigned long nextCBlockSize = LZ4IO_readLE32(&blockInfo) & 0x7FFFFFFFU;
+        {   const unsigned long blockHeader = LZ4IO_readLE32(&blockInfo);
+            const unsigned long nextCBlockSize = blockHeader & 0x7FFFFFFFU;
             const unsigned long nextBlock = nextCBlockSize + (blockChecksumFlag * LZ4F_BLOCK_CHECKSUM_SIZE);
-            if (nextCBlockSize == 0) {
-                /* Reached EndMark */
+            if (blockHeader == 0) {
+                /* Reached EndMark (0x80000000 is an empty uncompressed block instead) */
                 if (contentChecksumFlag) {
                     /* Skip content checksum */
                     if (fread(blockInfo, 1, LZ4F_CONTENT_CHECKSUM_SIZE, finput) != LZ4F_CONTENT_CHECKSUM_SIZE) {
@@ -2941,6 +2956,7 @@ LZ4IO_skipBlocksData(FILE* finput,
                 }
                 break;
             }
+            if (nextCBlockSize > maxBlockSize) return 0;   /* also keeps nextBlock within LONG_MAX */
             totalBlocksSize += nextBlock;
             /* skip to the next block */
             assert(nextBlock < LONG_MAX);
@@ -2981,15 +2997,14 @@ static unsigned long long LZ4IO_skipLegacyBlocksData(FILE* finput)
                 }
                 break;
             }
-            if (nextCBlockSize > LZ4IO_LEGACY_BLOCK_SIZE_MAX) {
+            if (nextCBlockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {   /* same limit as the decoder : incompressible blocks are larger than LEGACY_BLOCKSIZE */
                 DISPLAYLEVEL(4, "Error : block in legacy frame is too large \n");
                 return legacyFrameUndecodable;
             }
             totalBlocksSize += LZ4IO_LEGACY_BLOCK_HEADER_SIZE + nextCBlockSize;
             if (nextCBlockSize == 0) break;   /* end marker (Linux kernel) */
-            /* skip to the next block
-             * note : this won't fail if nextCBlockSize is too large, skipping past the end of finput */
-            if (UTIL_fseek(finput, nextCBlockSize, SEEK_CUR) != 0) {
+            /* skip to the next block : fseek_u32() fails when the block is truncated */
+            if (fseek_u32(finput, nextCBlockSize, SEEK_CUR) != 0) {
                 return legacyFrameUndecodable;
     }   }   }
     return totalBlocksSize;
@@ -3083,6 +3098,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                                 && cfinfo->frameCount != 0)
                             cfinfo->eqBlockTypes = 0;
                         {   const unsigned long long totalBlocksSize = LZ4IO_skipBlocksData(finput,
+                                    frameInfo.lz4FrameInfo.blockSizeID,
                                     frameInfo.lz4FrameInfo.blockChecksumFlag,
                                     frameInfo.lz4FrameInfo.contentChecksumFlag);
                             if (totalBlocksSize) {
@@ -3120,15 +3136,15 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                     result = LZ4IO_format_not_known;
                     break;
                 }
-                if (totalBlocksSize) {
-                    if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
-                                 cfinfo->frameCount + 1,
-                                 LZ4IO_frameTypeNames[frameInfo.frameType],
-                                 "-", "-",
-                                 totalBlocksSize + 4,
-                                 "-", "-");
-                    result = LZ4IO_LZ4F_OK;
-            }   }
+                /* no block : empty input, as compressed by lz4 -l */
+                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
+                             cfinfo->frameCount + 1,
+                             LZ4IO_frameTypeNames[frameInfo.frameType],
+                             "-", "-",
+                             totalBlocksSize + 4,
+                             "-", "-");
+                result = LZ4IO_LZ4F_OK;
+            }
             break;
         case LZ4IO_SKIPPABLE0:
             frameInfo.frameType = skippableFrame;
@@ -3143,10 +3159,10 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
                 int const errorNb = fseek_u32(finput, size, SEEK_CUR);
                 if (errorNb != 0)
                     END_PROCESS(43, "Stream error : cannot skip skippable area");
-                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20u %20s %9s\n",
+                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
                              cfinfo->frameCount + 1,
                              "SkippableFrame",
-                             "-", "-", size + 8, "-", "-");
+                             "-", "-", (unsigned long long)size + 8, "-", "-");
 
                 result = LZ4IO_LZ4F_OK;
             }
@@ -3194,8 +3210,8 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         }
         {   LZ4IO_infoResult const op_result = LZ4IO_getCompressedFileInfo(&cfinfo, inFileNames[idx], g_displayLevel >= 3);
             if (op_result != LZ4IO_LZ4F_OK) {
-                assert(op_result == LZ4IO_format_not_known);
-                DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
+                if (op_result == LZ4IO_format_not_known)   /* otherwise, the file couldn't be opened : already reported */
+                    DISPLAYLEVEL(1, "lz4: %s: File format not recognized \n", inFileNames[idx]);
                 return 1;
         }   }
         if (g_displayLevel >= 3) {

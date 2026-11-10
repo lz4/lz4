@@ -1007,7 +1007,7 @@ TEST(decompress_continue_unsynchronizedRing)
 }
 
 /* extended states (LZ4_STREAMHC_EXTSIZE) include the temporary buffer of levels >= LZ4HC_CLEVEL_OPT_MIN : same output.
- * The extension is preserved by resets and dictionary loading, and never taken from an attached dictionary.
+ * The extension is preserved by fast resets and dictionary loading, and never taken from an attached dictionary.
  * @ext : the bytes beyond sizeof(LZ4_streamHC_t), poisoned to detect their use */
 #define EXT_BYTES (LZ4_STREAMHC_EXTSIZE - sizeof(LZ4_streamHC_t))
 static int extEmployed(const char* state) { size_t i; for (i = 0; i < EXT_BYTES; i++) if (state[sizeof(LZ4_streamHC_t) + i] != 0x5A) return 1; return 0; }
@@ -1072,5 +1072,12 @@ TEST(compress_HC_extendedState)
     /* LZ4_compress_HC_extStateHC() initializes a state of LZ4_sizeofStateHC() bytes */
     extPoison(ext);
     ASSERT(LZ4_compress_HC_extStateHC(ext, src, dst, srcSize, capacity, level) > 0);
+    ASSERT(!extEmployed(ext));
+
+    /* LZ4_resetStreamHC() initializes a state of sizeof(LZ4_streamHC_t) bytes, which may contain garbage */
+    memset(s, 0xA5, sizeof(*s));
+    extPoison(ext);
+    LZ4_resetStreamHC(s, level);
+    ASSERT_EQ(LZ4_compress_HC_continue(s, src, dst, srcSize, capacity), refSize);
     ASSERT(!extEmployed(ext));
 }

@@ -153,7 +153,9 @@ install_headers(
 
 if get_option('default_library') != 'shared'
   install_headers(lz4_source_root / 'lib/lz4frame_static.h')
-  if get_option('unstable')
-    install_headers(lz4_source_root / 'lib/lz4file.h')
-  endif
+endif
+
+# -Dunstable=true compiles the file API, and exports it from the shared library
+if get_option('unstable')
+  install_headers(lz4_source_root / 'lib/lz4file.h')
 endif

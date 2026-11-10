@@ -58,4 +58,19 @@ cat ${FPREFIX}2.lz4 >> $FPREFIX-zero.lz4
 lz4 -dc $FPREFIX-zero.lz4 > $FPREFIX-zero
 cat ${FPREFIX}1-orig ${FPREFIX}2-orig | cmp - $FPREFIX-zero
 lz4 --list $FPREFIX-zero.lz4
+# --list : a block of incompressible data is larger than 8 MB, as accepted by the decoder
+datagen -g9M -P0 | lz4 -l -c > $FPREFIX-noise.lz4
+lz4 -t $FPREFIX-noise.lz4
+lz4 --list $FPREFIX-noise.lz4
+# --list : a truncated block is invalid, as for -t
+head -c $(( $(wc -c < ${FPREFIX}2.lz4) - 1 )) ${FPREFIX}2.lz4 > $FPREFIX-trunc.lz4
+lz4 -t $FPREFIX-trunc.lz4 && exit 1
+lz4 --list $FPREFIX-trunc.lz4 && exit 1
+# --list : an empty input is compressed into a frame without block
+datagen -g0 | lz4 -l -c > $FPREFIX-empty.lz4
+cat $FPREFIX-empty.lz4 ${FPREFIX}1.lz4 > $FPREFIX-empty2.lz4
+lz4 -t $FPREFIX-empty.lz4
+lz4 -t $FPREFIX-empty2.lz4
+lz4 --list $FPREFIX-empty.lz4
+lz4 --list $FPREFIX-empty2.lz4
 true

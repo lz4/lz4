@@ -36,7 +36,8 @@
 #define LZ4FILE_H
 
 #include <stdio.h>  /* FILE* */
-#include "lz4frame_static.h"
+#define LZ4F_STATIC_LINKING_ONLY   /* LZ4F_CustomMem, LZ4FLIB_STATIC_API */
+#include "lz4frame.h"
 
 #if defined (__cplusplus)
 extern "C" {
