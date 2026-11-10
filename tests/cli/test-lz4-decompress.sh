@@ -27,7 +27,7 @@ ERR=$FPREFIX-err
 
 # le32 N : N as 4 bytes, little endian ; skip SIZE : skippable frame of SIZE bytes
 le32() { printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $(($1 & 255)) $(($1 >> 8 & 255)) $(($1 >> 16 & 255)) $(($1 >> 24 & 255)))"; }
-skip() { printf '\120\052\115\030'; le32 $1; head -c $1 $SRC; }
+skip() { printf '\120\052\115\030'; le32 $1; if [ $1 -gt 0 ]; then head -c $1 $SRC; fi; }   # (BSD head : no -c 0)
 # fails COMMAND MESSAGE : COMMAND fails with an error code, not a crash, and displays MESSAGE ("" : nothing)
 fails() {
     rc=0; sh -c "$1" > /dev/null 2> $ERR || rc=$?
