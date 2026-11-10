@@ -95,7 +95,9 @@ int TPool_allJobsAwaited(void) {
 typedef struct TPool_s {
     HANDLE completionPort;
     HANDLE* workerThreads;
-    int nbWorkers;
+    int nbWorkers;        /* started on demand, up to maxWorkers (see TPool_submitJob()) */
+    int maxWorkers;
+    CRITICAL_SECTION startLock;   /* protects nbWorkers and workerThreads */
     int queueSize;
     LONG nbPendingJobs;
     HANDLE jobSlotAvail;  /* For queue size control */
@@ -129,12 +131,11 @@ void TPool_free(TPool* pool)
         }
     }
 
-    /* Wait for worker threads to finish */
-    WaitForMultipleObjects(pool->nbWorkers, pool->workerThreads, TRUE, INFINITE);
-
-    /* Close thread handles and completion port */
+    /* Wait for worker threads to finish, one by one (WaitForMultipleObjects() : up to MAXIMUM_WAIT_OBJECTS),
+     * and close their handles */
     {   int i;
         for (i = 0; i < pool->nbWorkers; i++) {
+            WaitForSingleObject(pool->workerThreads[i], INFINITE);
             CloseHandle(pool->workerThreads[i]);
         }
     }
@@ -144,6 +145,7 @@ void TPool_free(TPool* pool)
     /* Clean up synchronization objects */
     CloseHandle(pool->jobSlotAvail);
     CloseHandle(pool->allJobsCompleted);
+    DeleteCriticalSection(&pool->startLock);
 
     TPool_setUnawaited(pool, 0);
     free(pool);
@@ -176,6 +178,15 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter)
     return 0;
 }
 
+/* starts one more worker thread ; @return : 0 on failure */
+static int TPool_startWorker(TPool* pool)
+{
+    HANDLE const thread = CreateThread(NULL, 0, WorkerThread, pool, 0, NULL);
+    if (thread == NULL) return 0;
+    pool->workerThreads[pool->nbWorkers++] = thread;
+    return 1;
+}
+
 TPool* TPool_create(int nbWorkers, int queueSize)
 {
     TPool* pool;
@@ -185,22 +196,11 @@ TPool* TPool_create(int nbWorkers, int queueSize)
 
     pool = calloc(1, sizeof(TPool));
     if (!pool) return NULL;
+    InitializeCriticalSection(&pool->startLock);
 
     /* Create completion port */
     pool->completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, nbWorkers);
     if (!pool->completionPort) { goto _cleanup; }
-
-    /* Create worker threads */
-    pool->nbWorkers = nbWorkers;
-    pool->workerThreads = (HANDLE*)malloc(sizeof(HANDLE) * nbWorkers);
-    if (pool->workerThreads == NULL) { goto _cleanup; }
-
-    {   int i;
-        for (i = 0; i < nbWorkers; i++) {
-            pool->workerThreads[i] = CreateThread(NULL, 0, WorkerThread, pool, 0, NULL);
-            if (!pool->workerThreads[i]) { goto _cleanup; }
-        }
-    }
 
     /* Initialize sync objects members */
     pool->queueSize = queueSize;
@@ -211,6 +211,12 @@ TPool* TPool_create(int nbWorkers, int queueSize)
 
     pool->allJobsCompleted = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (!pool->allJobsCompleted) { goto _cleanup; }
+
+    /* Worker threads : the first one now, so that jobs always progress, the others on demand */
+    pool->maxWorkers = nbWorkers;
+    pool->workerThreads = (HANDLE*)malloc(sizeof(HANDLE) * nbWorkers);
+    if (pool->workerThreads == NULL) { goto _cleanup; }
+    if (!TPool_startWorker(pool)) { goto _cleanup; }
 
     return pool;
 
@@ -230,6 +236,14 @@ void TPool_submitJob(TPool* pool, void (*job_function)(void*), void* arg)
     WaitForSingleObject(pool->jobSlotAvail, INFINITE);
     ResetEvent(pool->allJobsCompleted);
     InterlockedIncrement(&pool->nbPendingJobs);
+
+    /* one more worker thread when pending jobs (running or queued) outnumber them ;
+     * on failure, pending jobs wait for running threads */
+    EnterCriticalSection(&pool->startLock);
+    if ( (InterlockedCompareExchange(&pool->nbPendingJobs, 0, 0) > pool->nbWorkers)
+      && (pool->nbWorkers < pool->maxWorkers) )
+        (void)TPool_startWorker(pool);
+    LeaveCriticalSection(&pool->startLock);
 
     /* Post the job directly to the completion port */
     PostQueuedCompletionStatus(pool->completionPort,
@@ -275,8 +289,8 @@ typedef struct TPool_job_s {
 
 struct TPool_s {
     pthread_t* threads;
-    size_t threadCapacity;
-    size_t threadLimit;
+    size_t nbThreads;    /* started on demand, up to maxThreads (see TPool_submitJob_internal()) */
+    size_t maxThreads;
 
     /* The queue is a circular buffer */
     TPool_job* queue;
@@ -339,6 +353,14 @@ void TPool_free(TPool* ctx) {
 
 static void* TPool_thread(void* opaque);
 
+/* starts one more thread (queueMutex locked, or pool not shared yet) ; @return : 0 on failure */
+static int TPool_startThread(TPool* ctx)
+{
+    if (pthread_create(&ctx->threads[ctx->nbThreads], NULL, &TPool_thread, ctx)) return 0;
+    ctx->nbThreads++;
+    return 1;
+}
+
 TPool* TPool_create(int nbThreads, int queueSize)
 {
     TPool* ctx;
@@ -375,17 +397,11 @@ TPool* TPool_create(int nbThreads, int queueSize)
         TPool_free(ctx);
         return NULL;
     }
-    ctx->threadCapacity = 0;
-    /* Initialize the threads */
-    {   int i;
-        for (i = 0; i < nbThreads; ++i) {
-            if (pthread_create(&ctx->threads[i], NULL, &TPool_thread, ctx)) {
-                ctx->threadCapacity = (size_t)i;
-                TPool_free(ctx);
-                return NULL;
-        }   }
-        ctx->threadCapacity = (size_t)nbThreads;
-        ctx->threadLimit = (size_t)nbThreads;
+    ctx->maxThreads = (size_t)nbThreads;
+    /* the first thread now, so that jobs always progress, the others on demand */
+    if (!TPool_startThread(ctx)) {
+        TPool_free(ctx);
+        return NULL;
     }
     return ctx;
 }
@@ -402,12 +418,8 @@ static void* TPool_thread(void* opaque) {
         /* Lock the mutex and wait for a non-empty queue or until shutdown */
         pthread_mutex_lock(&ctx->queueMutex);
 
-        while ( ctx->queueEmpty
-            || (ctx->numThreadsBusy >= ctx->threadLimit) ) {
+        while (ctx->queueEmpty) {
             if (ctx->shutdown) {
-                /* even if !queueEmpty, (possible if numThreadsBusy >= threadLimit),
-                 * a few threads will be shutdown while !queueEmpty,
-                 * but enough threads will remain active to finish the queue */
                 pthread_mutex_unlock(&ctx->queueMutex);
                 return opaque;
             }
@@ -447,7 +459,7 @@ static void TPool_shutdown(TPool* ctx) {
     pthread_cond_broadcast(&ctx->queuePopCond);
     /* Join all of the threads */
     {   size_t i;
-        for (i = 0; i < ctx->threadCapacity; ++i) {
+        for (i = 0; i < ctx->nbThreads; ++i) {
             pthread_join(ctx->threads[i], NULL);  /* note : could fail */
     }   }
 }
@@ -465,19 +477,9 @@ void TPool_jobsCompleted(TPool* ctx){
     pthread_mutex_unlock(&ctx->queueMutex);
 }
 
-/**
- * Returns 1 if the queue is full and 0 otherwise.
- *
- * When queueSize is 1 (pool was created with an intended queueSize of 0),
- * then a queue is empty if there is a thread free _and_ no job is waiting.
- */
+/* Returns 1 if the queue is full and 0 otherwise. */
 static int isQueueFull(TPool const* ctx) {
-    if (ctx->queueSize > 1) {
-        return ctx->queueHead == ((ctx->queueTail + 1) % ctx->queueSize);
-    } else {
-        return (ctx->numThreadsBusy == ctx->threadLimit) ||
-               !ctx->queueEmpty;
-    }
+    return ctx->queueHead == ((ctx->queueTail + 1) % ctx->queueSize);
 }
 
 static void
@@ -492,6 +494,12 @@ TPool_submitJob_internal(TPool* ctx, void (*job_function)(void*), void *arg)
     ctx->queueEmpty = 0;
     ctx->queue[ctx->queueTail] = job;
     ctx->queueTail = (ctx->queueTail + 1) % ctx->queueSize;
+    /* one more thread when queued jobs outnumber idle threads ;
+     * on failure, queued jobs wait for running threads */
+    {   size_t const nbQueued = (ctx->queueTail + ctx->queueSize - ctx->queueHead) % ctx->queueSize;
+        if ((nbQueued > ctx->nbThreads - ctx->numThreadsBusy) && (ctx->nbThreads < ctx->maxThreads))
+            (void)TPool_startThread(ctx);
+    }
     pthread_cond_signal(&ctx->queuePopCond);
 }
 
