@@ -51,6 +51,22 @@ do
     done
 done
 
+# legacy format : blocks of 8 MB, compressed by several threads, written in order :
+# same output whatever the nb of threads, file or stdin, last block full or not ; the summary displays both sizes
+datagen -g16M -s2 > $FPREFIX-l16   # 2 full blocks
+for f in $FPREFIX-src $FPREFIX-l16
+do
+    lz4 -f -l -T1 $f $f-T1.lz4
+    lz4 -f -l -T4 $f $f.lz4 2> $FPREFIX.err
+    cmp $f-T1.lz4 $f.lz4
+    grep "Compressed $(($(wc -c < $f))) bytes into $(($(wc -c < $f.lz4))) bytes" $FPREFIX.err
+    lz4 -f -l -T0 $f $f.lz4
+    cmp $f-T1.lz4 $f.lz4
+    lz4 -l -T3 < $f > $f.lz4
+    cmp $f-T1.lz4 $f.lz4
+    lz4 -dc $f-T1.lz4 | cmp - $f
+done
+
 # memory budget : --memory=# and LZ4_MEMORY limit the nb of threads, not the output
 lz4 -f --memory=abc $FPREFIX-src $FPREFIX.lz4 && exit 1  # must fail
 lz4 -f --memory=0 $FPREFIX-src $FPREFIX.lz4 && exit 1    # must fail
@@ -114,8 +130,9 @@ isErrorCode $rc   # truncated legacy frame
 if [ "$(uname)" = Linux ]; then   # write errors
     rc=0; lz4 -d -f $FPREFIX.lz4 /dev/full || rc=$?
     isErrorCode $rc
-    rc=0; lz4 -f -l $FPREFIX-src /dev/full || rc=$?
+    rc=0; lz4 -f -l $FPREFIX-src /dev/full 2> $FPREFIX.err || rc=$?
     isErrorCode $rc
+    test "$(grep -c "Error" $FPREFIX.err)" = 1   # reported once : next blocks are not written
     # write errors may only be reported when buffered output is flushed :
     # --rm must not remove the source when the output could not be written
     echo "small content" > $FPREFIX-small

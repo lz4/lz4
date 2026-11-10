@@ -227,6 +227,12 @@ lz4 $FPREFIX-test.lz4 $FPREFIX-test2
 cmp $FPREFIX-test $FPREFIX-test2
 # bug #1374
 datagen -g4194302 | lz4 -B4 -c > $FPREFIX-test3
+# -r : files of the directory and of its subdirectories
+mkdir -p $FPREFIX-rtree/sub
+echo "one" > $FPREFIX-rtree/f1
+echo "two" > $FPREFIX-rtree/sub/f2
+lz4 -q -r $FPREFIX-rtree
+lz4 -q -t -m $FPREFIX-rtree/f1.lz4 $FPREFIX-rtree/sub/f2.lz4
 # -r doesn't follow symbolic links to directories : this one leads back to the listed directory
 mkdir $FPREFIX-rdir
 echo "hello world" > $FPREFIX-rdir/file
