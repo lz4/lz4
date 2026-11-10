@@ -1002,6 +1002,151 @@ TEST(decompress_resetAfterError)
     ASSERT_MEMEQ(decoded, src, srcSize);
 }
 
+/* makeTwoBlockFrame() :
+ * @return : frame declaring @declared bytes of content, made of two independent blocks of @blockSize bytes each,
+ *           the second one read from @src + @blockSize (the content is therefore 2*blockSize bytes).
+ *           LZ4F_compressEnd() refuses a content size mismatch : the end mark, if any, is written directly. */
+static size_t makeTwoBlockFrame(void* frame, size_t capacity, const void* src, size_t blockSize,
+                                unsigned long long declared, int withEndMark)
+{
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    char* const out = (char*)frame;
+    size_t pos;
+    unsigned block;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs.frameInfo.contentSize = declared;
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, out, capacity, &prefs));
+    for (block = 0; block < 2; ++block) {
+        pos += LZ4F_OK(LZ4F_compressUpdate(cctx, out + pos, capacity - pos, (const char*)src + block * blockSize, blockSize, NULL));
+        pos += LZ4F_OK(LZ4F_flush(cctx, out + pos, capacity - pos, NULL));
+    }
+    if (withEndMark) {
+        ASSERT(capacity - pos >= 4);
+        memset(out + pos, 0, 4);
+        pos += 4;
+    }
+    return pos;
+}
+
+#define TWO_BLOCK_HEADER_SIZE 15   /* with content size */
+#define TWO_BLOCK_SIZE 600
+#define TWO_BLOCK_CAPACITY (2 * (TWO_BLOCK_SIZE + 8) + TWO_BLOCK_HEADER_SIZE + 4)
+
+/* @return : whether the first block of a frame made by makeTwoBlockFrame() is stored uncompressed */
+static int firstBlockIsRaw(const void* frame)
+{
+    return (readLE32((const char*)frame + TWO_BLOCK_HEADER_SIZE) >> 31) != 0;
+}
+
+/* reject a decoded block or raw copy chunk that exceeds the remaining declared content,
+ * without waiting for the end mark (the frame below is cut before it) */
+static void checkBlockExceedsContentSize(const void* src, int isRaw)
+{
+    char* const frame = (char*)UT_malloc(TWO_BLOCK_CAPACITY);
+    char* const decoded = (char*)UT_malloc(2 * TWO_BLOCK_SIZE);
+    LZ4F_dctx* const dctx = newDctx();
+    size_t const frameSize = makeTwoBlockFrame(frame, TWO_BLOCK_CAPACITY, src, TWO_BLOCK_SIZE, 800, 0);
+    size_t dSize = 2 * TWO_BLOCK_SIZE, cSize = frameSize, pos = 0, outPos = 0, r = 0;
+    ASSERT(firstBlockIsRaw(frame) == isRaw);   /* both block kinds are covered */
+
+    ASSERT_LZ4F_ERROR(LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL), LZ4F_ERROR_frameSize_wrong);
+
+    LZ4F_resetDecompressionContext(dctx);
+    while (pos < frameSize) {
+        size_t oSize = 2 * TWO_BLOCK_SIZE - outPos, iSize = 1;
+        r = LZ4F_decompress(dctx, decoded + outPos, &oSize, frame + pos, &iSize, NULL);
+        if (LZ4F_isError(r)) break;
+        pos += iSize;
+        outPos += oSize;
+    }
+    ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_frameSize_wrong);
+    ASSERT(pos < frameSize);   /* reported before the input is exhausted */
+}
+
+TEST(decompress_compressedBlockExceedsContentSize)
+{
+    char* const zeros = (char*)UT_malloc(2 * TWO_BLOCK_SIZE);
+    memset(zeros, 0, 2 * TWO_BLOCK_SIZE);
+    checkBlockExceedsContentSize(zeros, 0);
+}
+
+TEST(decompress_rawBlockExceedsContentSize)
+{
+    checkBlockExceedsContentSize(UT_fixedNoise(2 * TWO_BLOCK_SIZE), 1);
+}
+
+/* an uncompressed block larger than the remaining declared content size is rejected before it is copied :
+ * dst receives nothing beyond the declared size.
+ * (a compressed block is decoded into dst before its size is known : no such guarantee) */
+TEST(decompress_rawBlockExceedsContentSize_dstUntouched)
+{
+    size_t const declared = 800;
+    size_t const capacity = 2 * TWO_BLOCK_SIZE + 64;
+    const char* const src = (const char*)UT_fixedNoise(2 * TWO_BLOCK_SIZE);
+    char* const frame = (char*)UT_malloc(TWO_BLOCK_CAPACITY);
+    char* const decoded = (char*)UT_malloc(capacity);
+    LZ4F_dctx* const dctx = newDctx();
+    size_t const frameSize = makeTwoBlockFrame(frame, TWO_BLOCK_CAPACITY, src, TWO_BLOCK_SIZE, declared, 0);
+    size_t dSize = capacity, cSize = frameSize, pos = 0, outPos = 0, r = 0, n;
+    ASSERT(firstBlockIsRaw(frame));
+
+    memset(decoded, 0xA5, capacity);
+    r = LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL);
+    ASSERT(dSize <= declared);   /* the progress reported with the error stays within the declared size */
+    for (n = declared; n < capacity; ++n)
+        ASSERT_MSG((unsigned char)decoded[n] == 0xA5, "dst[%u] written beyond the declared content size (whole input)", (unsigned)n);
+    ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_frameSize_wrong);
+
+    LZ4F_resetDecompressionContext(dctx);
+    memset(decoded, 0xA5, capacity);
+    while (pos < frameSize) {
+        size_t oSize = capacity - outPos, iSize = 1;
+        r = LZ4F_decompress(dctx, decoded + outPos, &oSize, frame + pos, &iSize, NULL);
+        if (LZ4F_isError(r)) break;
+        pos += iSize;
+        outPos += oSize;
+    }
+    for (n = declared; n < capacity; ++n)
+        ASSERT_MSG((unsigned char)decoded[n] == 0xA5, "dst[%u] written beyond the declared content size (byte by byte)", (unsigned)n);
+    ASSERT_LZ4F_ERROR(r, LZ4F_ERROR_frameSize_wrong);
+}
+
+/* controls : content size exactly matching the blocks is accepted at any granularity (the check is `>`, not `>=`),
+ * and a mismatch which is only visible at the end mark is still reported */
+TEST(decompress_contentSizeMatchesBlocks)
+{
+    size_t const contentSize = 2 * TWO_BLOCK_SIZE;
+    char* const zeros = (char*)UT_malloc(contentSize);
+    const void* sources[2];
+    char* const frame = (char*)UT_malloc(TWO_BLOCK_CAPACITY);
+    char* const decoded = (char*)UT_malloc(contentSize);
+    unsigned i;
+    memset(zeros, 0, contentSize);
+    sources[0] = zeros;
+    sources[1] = UT_fixedNoise(contentSize);
+    for (i = 0; i < ARRAY_SIZE(sources); ++i) {
+        LZ4F_dctx* const dctx = newDctx();
+        size_t frameSize = makeTwoBlockFrame(frame, TWO_BLOCK_CAPACITY, sources[i], TWO_BLOCK_SIZE, contentSize, 1);
+        size_t dSize = contentSize, cSize = frameSize;
+        ASSERT(firstBlockIsRaw(frame) == (i == 1));
+        ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL)), 0);
+        ASSERT_EQ(dSize, contentSize);
+        ASSERT_MEMEQ(decoded, sources[i], contentSize);
+        LZ4F_resetDecompressionContext(dctx);
+        ASSERT_EQ(decompressBySegments(dctx, decoded, contentSize, frame, frameSize, 1), contentSize);
+        ASSERT_MEMEQ(decoded, sources[i], contentSize);
+
+        /* declared 800 < 1200 decoded : seen at the end mark by any version */
+        frameSize = makeTwoBlockFrame(frame, TWO_BLOCK_CAPACITY, sources[i], TWO_BLOCK_SIZE, 800, 1);
+        LZ4F_resetDecompressionContext(dctx);
+        dSize = contentSize;
+        cSize = frameSize;
+        ASSERT_LZ4F_ERROR(LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL), LZ4F_ERROR_frameSize_wrong);
+    }
+}
+
 /* #1227 : after a reset, an unfinished session doesn't affect the next frame */
 TEST(decompress_resetUnfinishedFrame)
 {

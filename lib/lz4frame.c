@@ -3114,6 +3114,8 @@ static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
             (int)srcSize, (int)dctx->maxBlockSize,
             dict, (int)dictSize);
     RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
+    /* a block larger than the declared content left would wrap frameRemainingSize */
+    RETURN_ERROR_IF(dctx->frameInfo.contentSize && (U64)decodedSize > dctx->frameRemainingSize, frameSize_wrong);
     if (dctx->frameInfo.contentChecksumFlag && !dctx->skipContentChecksum)
         XXH32_update(&(dctx->xxh), dst, (size_t)decodedSize);
     if (dctx->frameInfo.contentSize)
@@ -3324,6 +3326,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 } else {
                     size_t const minBuffSize = MIN((size_t)(srcEnd-srcPtr), (size_t)(dstEnd-dstPtr));
                     sizeToCopy = MIN(dctx->tmpInTarget, minBuffSize);
+                    /* check each copy chunk before writing beyond the remaining declared content */
+                    if (dctx->frameInfo.contentSize && (U64)sizeToCopy > dctx->frameRemainingSize) {
+                        nextSrcSizeHint = LZ4F_returnErrorCode(LZ4F_ERROR_frameSize_wrong);
+                        goto _output;
+                    }
                     memcpy(dstPtr, srcPtr, sizeToCopy);
                     if (dctx->frameInfo.blockChecksumFlag && !dctx->skipBlockChecksum)
                         (void)XXH32_update(&dctx->blockChecksum, srcPtr, sizeToCopy);
