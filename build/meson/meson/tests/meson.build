@@ -122,6 +122,9 @@ test_scripts = {
   'lz4-basic': {
     'depends': [lz4, lz4cat, unlz4, targets['datagen']],
   },
+  'lz4-decompress': {
+    'depends': [lz4, lz4cat, targets['datagen']],
+  },
   'lz4-dict': {
     'depends': [lz4, targets['datagen']],
   },
