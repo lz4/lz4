@@ -2657,6 +2657,7 @@ static int skipStream(FILE* f, unsigned offset)
 static int fseek_u32(FILE *fp, unsigned offset, int where)
 {
     const unsigned stepMax = 1U << 30;
+    int const seekable = UTIL_isSeekable(fp);
     int errorNb = 0;
 
     if (where != SEEK_CUR) return -1;  /* Only allows SEEK_CUR */
@@ -2665,8 +2666,7 @@ static int fseek_u32(FILE *fp, unsigned offset, int where)
     while (offset > 0) {
         unsigned s = offset;
         if (s > stepMax) s = stepMax;
-        errorNb = UTIL_fseek(fp, (long)s, SEEK_CUR);
-        if (errorNb==0) { offset -= s; continue; }
+        if (seekable && (UTIL_fseek(fp, (long)s, SEEK_CUR) == 0)) { offset -= s; continue; }
         errorNb = skipStream(fp, offset);
         offset = 0;
     }
