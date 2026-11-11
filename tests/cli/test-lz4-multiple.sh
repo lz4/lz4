@@ -56,20 +56,10 @@ test ! -f $FPREFIX-concat1  # must not create file artefact
 test ! -f $FPREFIX-concat2  # must not create file artefact
 # test multiple lz4 files, one of which is absent (must fail)
 lz4 -tm $FPREFIX-concat1.lz4 notHere.lz4 $FPREFIX-concat2.lz4 && exit 1
-# a failure count divisible by 256 must still report failure
-(
-    test ! -e "$FPREFIX-missing"
-    set --
-    n=0
-    while [ "$n" -lt 256 ]; do
-        set -- "$@" "$FPREFIX-missing"
-        n=$((n + 1))
-    done
-    for mode in -m -lm -dm; do
-        if lz4 -qq "$mode" -c "$@" > /dev/null 2>&1; then
-            echo "multiple-file failure reported success: $mode" >&2
-            exit 1
-        fi
-    done
-)
+# 256 failed files : exit status is 1, not the number of failures, which would exit with 0
+notHere256=$(yes notHere.lz4 | head -n 256)
+for mode in -m -lm -dm; do
+    rc=0; lz4 -qq $mode -c $notHere256 > /dev/null || rc=$?
+    test $rc -eq 1
+done
 true
