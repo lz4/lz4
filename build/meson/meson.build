@@ -14,7 +14,7 @@
 project(
   'lz4',
   'c',
-  license: 'BSD-2-Clause-Patent AND GPL-2.0-or-later',
+  license: 'BSD-2-Clause AND GPL-2.0-or-later',
   default_options: [
     'buildtype=release',
     'warning_level=3'

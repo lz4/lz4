@@ -110,6 +110,6 @@ Benchmark arguments :
 
 #### License
 
-All files in this directory are licensed under GPL-v2.
+All files in this directory are licensed under GPL-2.0-or-later.
 See [COPYING](COPYING) for details.
 The text of the license is also included at the top of each source file.

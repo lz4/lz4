@@ -2,7 +2,7 @@
 # multiconf.make
 # Copyright (C) Yann Collet
 #
-# GPL v2 License
+# GPL-2.0-or-later License
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

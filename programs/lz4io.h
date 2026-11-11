@@ -1,7 +1,7 @@
 /*
   LZ4io.h - LZ4 File/Stream Interface
   Copyright (c) Yann Collet. All rights reserved.
-  GPL v2 License
+  GPL-2.0-or-later License
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
   It is not part of LZ4 compression library, it is a user code of the LZ4 library.
   - The license of LZ4 library is BSD.
   - The license of xxHash library is BSD.
-  - The license of this source file is GPLv2.
+  - The license of this source file is GPL-2.0-or-later.
 */
 
 #ifndef LZ4IO_H_237902873
