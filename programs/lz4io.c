@@ -3028,8 +3028,8 @@ static const char* LZ4IO_toHuman(long double size, char* buf)
 {
     const char units[] = {"\0KMGTPEZY"};
     size_t i = 0;
-    for (; size >= 1024; i++) size /= 1024;
-    sprintf(buf, "%.2Lf%c", size, units[i]);
+    for (; size >= 1024 && i < sizeof(units) - 2; i++) size /= 1024;
+    snprintf(buf, 10, "%.2Lf%c", size, units[i]);
     return buf;
 }
 

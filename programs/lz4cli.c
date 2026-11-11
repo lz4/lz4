@@ -930,10 +930,11 @@ int main(int argCount, const char** argv)
         }
         if (mode == om_compress) {   /* compression to file */
             size_t const l = strlen(input_filename);
-            dynNameSpace = (char*)calloc(1,l+5);
+            size_t const extl = strlen(LZ4_EXTENSION);
+            dynNameSpace = (char*)calloc(1, l + extl + 1);
             if (dynNameSpace==NULL) { perror(exeName); exit(1); }
-            strcpy(dynNameSpace, input_filename);
-            strcat(dynNameSpace, LZ4_EXTENSION);
+            memcpy(dynNameSpace, input_filename, l);
+            memcpy(dynNameSpace + l, LZ4_EXTENSION, extl + 1);
             output_filename = dynNameSpace;
             DISPLAYLEVEL(2, "Compressed filename will be : %s \n", output_filename);
         }
