@@ -1028,5 +1028,5 @@ _cleanup:
     free(fileNamesBuf);
     LZ4IO_freePreferences(prefs);
     free((void*)inFileNames);
-    return operationResult;
+    return operationResult ? 1 : 0;
 }
