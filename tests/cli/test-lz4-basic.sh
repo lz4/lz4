@@ -233,6 +233,21 @@ echo "one" > $FPREFIX-rtree/f1
 echo "two" > $FPREFIX-rtree/sub/f2
 lz4 -q -r $FPREFIX-rtree
 lz4 -q -t -m $FPREFIX-rtree/f1.lz4 $FPREFIX-rtree/sub/f2.lz4
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*)
+    # Readable files without the archive attribute must also be included by -r.
+    mkdir $FPREFIX-rattrs
+    for attr in R H S; do
+        cp $FPREFIX-hw $FPREFIX-rattrs/$attr
+        attrib.exe -A +$attr $FPREFIX-rattrs/$attr
+    done
+    rc=0; lz4 -q -r $FPREFIX-rattrs || rc=$?
+    attrib.exe -R -H -S "$FPREFIX-rattrs/*"
+    test "$rc" -eq 0
+    for attr in R H S; do
+        lz4 -dc $FPREFIX-rattrs/$attr.lz4 | cmp - $FPREFIX-rattrs/$attr
+    done
+    ;;
+esac
 # -r doesn't follow symbolic links to directories : this one leads back to the listed directory
 mkdir $FPREFIX-rdir
 echo "hello world" > $FPREFIX-rdir/file
