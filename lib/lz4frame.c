@@ -3114,6 +3114,7 @@ static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
             (int)srcSize, (int)dctx->maxBlockSize,
             dict, (int)dictSize);
     RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
+    RETURN_ERROR_IF(dctx->frameInfo.contentSize && (U64)decodedSize > dctx->frameRemainingSize, frameSize_wrong);
     if (dctx->frameInfo.contentChecksumFlag && !dctx->skipContentChecksum)
         XXH32_update(&(dctx->xxh), dst, (size_t)decodedSize);
     if (dctx->frameInfo.contentSize)
@@ -3298,6 +3299,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
                 if (blockHeader & LZ4F_BLOCKUNCOMPRESSED_FLAG) {
                     /* next block is uncompressed */
+                    if (dctx->frameInfo.contentSize && nextCBlockSize > dctx->frameRemainingSize) {
+                        nextSrcSizeHint = LZ4F_returnErrorCode(LZ4F_ERROR_frameSize_wrong);
+                        goto _output;
+                    }
                     dctx->tmpInTarget = nextCBlockSize;
                     DEBUGLOG(5, "next block is uncompressed (size %u)", (U32)nextCBlockSize);
                     if (dctx->frameInfo.blockChecksumFlag) {
