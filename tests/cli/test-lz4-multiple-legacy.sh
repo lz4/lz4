@@ -73,4 +73,12 @@ lz4 -t $FPREFIX-empty.lz4
 lz4 -t $FPREFIX-empty2.lz4
 lz4 --list $FPREFIX-empty.lz4
 lz4 --list $FPREFIX-empty2.lz4
+# input read errors must fail, rather than being treated as EOF
+if [ "$(uname)" = Linux ]; then
+    rc=0
+    lz4 -lc 0>/dev/null > /dev/null 2> $FPREFIX-read-error || rc=$?
+    test "$rc" -gt 0
+    test "$rc" -lt 128
+    grep -q "Read error" $FPREFIX-read-error
+fi
 true
