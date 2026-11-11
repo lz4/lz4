@@ -1002,6 +1002,37 @@ TEST(decompress_resetAfterError)
     ASSERT_MEMEQ(decoded, src, srcSize);
 }
 
+/* a frame declaring less content than its blocks hold is rejected at the first block exceeding it,
+ * without waiting for the end mark (the frames below are cut before it) */
+TEST(decompress_blockExceedsContentSize)
+{
+    size_t const blockSize = 600;
+    size_t const capacity = 4 KB;
+    char* const zeros = (char*)UT_malloc(2 * blockSize);
+    const char* sources[2];
+    char* const frame = (char*)UT_malloc(capacity);
+    char* const decoded = (char*)UT_malloc(2 * blockSize);
+    int isRaw;
+    memset(zeros, 0, 2 * blockSize);
+    sources[0] = zeros;                                       /* compressed blocks */
+    sources[1] = (const char*)UT_fixedNoise(2 * blockSize);   /* uncompressed blocks */
+    for (isRaw = 0; isRaw < 2; isRaw++) {
+        LZ4F_cctx* const cctx = newCctx();
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        size_t pos, dSize = 2 * blockSize;
+        unsigned b;
+        prefs.frameInfo.contentSize = blockSize + blockSize / 2;
+        pos = LZ4F_OK(LZ4F_compressBegin(cctx, frame, capacity, &prefs));
+        for (b = 0; b < 2; b++) {
+            pos += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + pos, capacity - pos, sources[isRaw] + b * blockSize, blockSize, NULL));
+            pos += LZ4F_OK(LZ4F_flush(cctx, frame + pos, capacity - pos, NULL));
+        }
+        ASSERT((readLE32(frame + 15) >> 31) == (unsigned)isRaw);   /* header with content size : 15 bytes */
+        ASSERT_LZ4F_ERROR(LZ4F_decompress(newDctx(), decoded, &dSize, frame, &pos, NULL), LZ4F_ERROR_frameSize_wrong);
+        if (isRaw) ASSERT_EQ(dSize, blockSize);   /* 2nd block rejected before being copied */
+    }
+}
+
 /* #1227 : after a reset, an unfinished session doesn't affect the next frame */
 TEST(decompress_resetUnfinishedFrame)
 {
