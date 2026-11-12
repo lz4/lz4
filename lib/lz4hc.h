@@ -374,8 +374,14 @@ LZ4LIB_STATIC_API void LZ4_resetStreamHC_fast(
  *  its compressions allocate nothing. States created by LZ4_createStreamHC() include it.
  *  It is preserved by LZ4_resetStreamHC_fast() and LZ4_loadDictHC(), but not by LZ4_compress_HC_extStateHC(),
  *  which initializes @state as a state of LZ4_sizeofStateHC() bytes : use LZ4_compress_HC_extStateHC_fastReset() instead.
+ *
+ *  Sized from sizeof(LZ4_streamHC_t), not LZ4_STREAMHC_MINSIZE, so implicit
+ *  alignment padding in LZ4HC_CCtx_internal (e.g. after hasWorkspace on
+ *  platforms with 16-byte pointers) is included. Using MINSIZE left the
+ *  workspace short on those platforms and failed the static assert in
+ *  lz4hc.c (OS400 ILE C, issue #2091).
  */
-#define LZ4_STREAMHC_EXTSIZE (LZ4_STREAMHC_MINSIZE + 65584)
+#define LZ4_STREAMHC_EXTSIZE (sizeof(LZ4_streamHC_t) + 65584)
 
 /*! LZ4_compress_HC_extStateHC_fastReset() :
  *  A variant of LZ4_compress_HC_extStateHC().

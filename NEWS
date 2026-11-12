@@ -1,4 +1,5 @@
 v1.11.2
+build: OS400 ILE C failed a static assert in lz4hc.c; LZ4_STREAMHC_EXTSIZE now follows sizeof(LZ4_streamHC_t) so alignment padding is included (since v1.11.0)
 fix  : `lz4 -l` started a thread per core at once, and could fail under a limit of processes, notably from standard input (since v1.10.0)
 perf : faster decompression with a dictionary (up to +38% on small blocks)
 
