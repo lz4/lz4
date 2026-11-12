@@ -117,6 +117,15 @@ fi
 # (compression : see test-lz4-multithread.sh)
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 command -v mkfifo > /dev/null || exit 0
+
+# --rm applies to a regular source only : a non-regular source (fifo, device, ...) is kept
+rm -f $FPREFIX-fifo $FPREFIX-fifo.lz4
+mkfifo $FPREFIX-fifo
+printf 'fifo content' > $FPREFIX-fifo &
+lz4 -q --rm -f $FPREFIX-fifo $FPREFIX-fifo.lz4
+test -p $FPREFIX-fifo   # the fifo source is kept
+rm -f $FPREFIX-fifo
+
 lz4 -q -f $FPREFIX-big $FPREFIX-big.lz4
 # decompressChanged MODIFICATION : decompresses $FPREFIX-rot.lz4 into $FPREFIX-rot with --rm
 decompressChanged() {

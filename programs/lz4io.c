@@ -1036,7 +1036,7 @@ LZ4IO_finishFile(FILE* srcFile, const LZ4IO_srcState_t* srcState,
         UTIL_setFileStat(dstFileName, &statbuf);
     }
 
-    if (LZ4IO_mustRemoveSrcFile(io_prefs, srcFileName) && !srcModified && !srcReplaced) {  /* --rm */
+    if (LZ4IO_mustRemoveSrcFile(io_prefs, srcFileName) && srcState->valid && !srcModified && !srcReplaced) {  /* --rm : regular source file only */
         if (remove(srcFileName))
             END_PROCESS(45, "Remove error : %s: %s", srcFileName, strerror(errno));
     }
