@@ -35,7 +35,8 @@ jobs:
 
   scan-build:
     name: Clang Static Analyzer
-    runs-on: ubuntu-latest
+    # clang 21 of ubuntu-26.04 reports issues not fixed yet, mostly in examples/
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
