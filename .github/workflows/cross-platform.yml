@@ -28,7 +28,8 @@ jobs:
           - { arch: RISC-V,   pkgs: 'qemu-system-riscv64 gcc-riscv64-linux-gnu',   xcc: riscv64-linux-gnu-gcc,     xemu: qemu-riscv64-static, makevar: "" }
           - { arch: SPARC,    pkgs: 'qemu-system-sparc gcc-sparc64-linux-gnu',     xcc: sparc64-linux-gnu-gcc,     xemu: qemu-sparc64-static, makevar: "" }
 
-    runs-on: ubuntu-latest
+    # ubuntu-26.04 has neither qemu-user-static nor MIPS cross-compilers
+    runs-on: ubuntu-24.04
     env:
       XCC: ${{ matrix.xcc }}
       XEMU: ${{ matrix.xemu }}
