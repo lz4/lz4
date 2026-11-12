@@ -241,6 +241,17 @@ echo "one" > $FPREFIX-rtree/f1
 echo "two" > $FPREFIX-rtree/sub/f2
 lz4 -q -r $FPREFIX-rtree
 lz4 -q -t -m $FPREFIX-rtree/f1.lz4 $FPREFIX-rtree/sub/f2.lz4
+# Windows : also read-only, hidden and system files without the archive attribute
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*)
+    mkdir $FPREFIX-rattr
+    for a in R H S; do
+        echo "$a" > $FPREFIX-rattr/f$a
+        (cd $FPREFIX-rattr && attrib.exe -A +$a f$a)   # names without '/', which attrib may take for an option
+    done
+    lz4 -q -r $FPREFIX-rattr
+    lz4 -q -t -m $FPREFIX-rattr/fR.lz4 $FPREFIX-rattr/fH.lz4 $FPREFIX-rattr/fS.lz4
+    ;;
+esac
 # -r doesn't follow symbolic links to directories : this one leads back to the listed directory
 mkdir $FPREFIX-rdir
 echo "hello world" > $FPREFIX-rdir/file
