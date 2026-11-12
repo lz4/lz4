@@ -85,6 +85,11 @@ fails "lz4 -t $FPREFIX-bad.lz4" "too large"
 { skip 4; printf 'garbage!'; } > $FPREFIX-bad.lz4
 fails "lz4 -t $FPREFIX-bad.lz4" "undecodable data at position [0-9]* *$"
 fails "lz4 -q -t $FPREFIX-bad.lz4" ""
+# input read errors (stdin opened for writing) : not an empty input
+if [ "$(uname)" = Linux ]; then
+    fails "lz4 -dc 0>/dev/null" "Read error"
+    fails "lz4 -t 0>/dev/null" "Read error"
+fi
 
 
 # several inputs : each one decoded from its beginning, whatever the end of the previous one

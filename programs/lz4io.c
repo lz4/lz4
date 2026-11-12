@@ -2694,6 +2694,7 @@ selectDecoder(dRess_t ress,
         g_magicRead = 0;
     } else {
         size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
+        if (ferror(finput)) END_PROCESS(41, "Read error : ferror");
         if (nbReadBytes==0) return ENDOFSTREAM;   /* EOF */
         if (nbReadBytes != MAGICNUMBER_SIZE)
           END_PROCESS(40, "Unrecognized header : Magic Number unreadable");
@@ -3062,6 +3063,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
         unsigned magicNumber;
         /* Get MagicNumber */
         {   size_t const nbReadBytes = fread(buffer, 1, MAGICNUMBER_SIZE, finput);
+            if (ferror(finput)) END_PROCESS(73, "Error reading %s", input_filename);
             if (nbReadBytes == 0) { break; } /* EOF */
             result = LZ4IO_format_not_known;  /* default result (error) */
             if (nbReadBytes != MAGICNUMBER_SIZE) {
