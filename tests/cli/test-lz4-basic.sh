@@ -19,6 +19,14 @@ lz4 < $FPREFIX-dg20k | lz4 -d > $FPREFIX-dec
 cmp $FPREFIX-dg20k $FPREFIX-dec
 lz4 --no-frame-crc < $FPREFIX-dg20k | lz4 -d > $FPREFIX-dec
 cmp $FPREFIX-dg20k $FPREFIX-dec
+# input read errors must fail, rather than being treated as EOF (legacy format : see test-lz4-multiple-legacy.sh)
+if [ "$(uname)" = Linux ]; then
+    rc=0
+    lz4 -c 0>/dev/null > /dev/null 2> $FPREFIX-read-error || rc=$?
+    test "$rc" -gt 0
+    test "$rc" -lt 128
+    grep -q "Error reading" $FPREFIX-read-error
+fi
 datagen           | lz4 -BI    | lz4 -t
 datagen           | lz4 --no-crc | lz4 -t
 datagen -g6M -P99 | lz4 -9BD   | lz4 -t
