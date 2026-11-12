@@ -556,6 +556,18 @@ LZ4_wildCopy32(void* dstPtr, const void* srcPtr, void* dstEnd)
     do { LZ4_memcpy(d,s,16); LZ4_memcpy(d+16,s+16,16); d+=32; s+=32; } while (d<e);
 }
 
+/* customized variant of memcpy, which can overwrite up to 16 bytes beyond dstEnd,
+ * for non-overlapping buffers */
+LZ4_FORCE_INLINE void
+LZ4_wildCopy16(void* dstPtr, const void* srcPtr, void* dstEnd)
+{
+    BYTE* d = (BYTE*)dstPtr;
+    const BYTE* s = (const BYTE*)srcPtr;
+    BYTE* const e = (BYTE*)dstEnd;
+
+    do { LZ4_memcpy(d,s,16); d+=16; s+=16; } while (d<e);
+}
+
 /* LZ4_memcpy_using_offset()  presumes :
  * - dstEnd >= dstPtr + MINMATCH
  * - there is at least 12 bytes available to write after dstEnd */
@@ -2381,7 +2393,14 @@ LZ4_decompress_generic(
             }
             /* match starting within external dictionary */
             if ((dict==usingExtDict) && (match < lowPrefix)) {
+                size_t const inDict = (size_t)(lowPrefix - match);
                 assert(dictEnd != NULL);
+                if (ml + 16 <= inDict) {
+                    /* match within dictionary, followed by 16 more bytes of dictionary : wild copy */
+                    LZ4_wildCopy16(op, dictEnd - inDict, op + ml);
+                    op += ml;
+                    continue;
+                }
                 op = LZ4_copyExtDictMatch(op, match, ml, lowPrefix, dictEnd);
                 continue;
             }
