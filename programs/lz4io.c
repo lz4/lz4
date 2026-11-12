@@ -850,8 +850,8 @@ static void LZ4IO_readAndProcess(void* arg)
         return;
     }
     {   size_t const inSize = fread(buffer, (size_t)1, chunkSize, rjd->fin);
-        if (inSize > chunkSize) {
-            JOB_ERROR(32, "Read error (read %u > %u [chunk size])", (unsigned)inSize, (unsigned)chunkSize);
+        if (ferror(rjd->fin)) {
+            JOB_ERROR(32, "Read error");
             free(buffer);
             return;
         }
