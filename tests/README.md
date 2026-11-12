@@ -101,6 +101,6 @@ optional arguments:
 
 #### License
 
-All files in this directory are licensed under GPL-v2.
-See [COPYING](COPYING) for details.
+All files in this directory are licensed under GPL-2.0-or-later, unless a file states otherwise.
+See [COPYING](data/COPYING) for details.
 The text of the license is also included at the top of each source file.

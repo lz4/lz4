@@ -1,6 +1,6 @@
 # LZ4 examples
 
-All examples are GPL-v2 licensed.
+All examples are GPL-2.0-or-later licensed.
 
 ## Documents
 
