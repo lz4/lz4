@@ -267,6 +267,7 @@ only the latest one will be applied.
 
 * `--rm` :
   Delete source files on successful compression or decompression.
+  Only regular files are deleted : a fifo or a device is kept, as is standard input.
   A source file modified, renamed or replaced during its compression is kept (see `--[no-]mmap`).
 
 * `--` :
