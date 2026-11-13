@@ -1,6 +1,7 @@
 v1.11.2
 fix  : `lz4 -l` started a thread per core at once, and could fail under a limit of processes, notably from standard input (since v1.10.0)
 perf : faster decompression with a dictionary (up to +38% on small blocks)
+build: OS400 builds (since v1.11.0), reported by @jonrumsey
 
 v1.11.1
 fix  : `LZ4_resetStreamHC()` could write out of bounds at levels >= 10, on a state containing garbage (since v1.11.0)
