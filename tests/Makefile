@@ -203,10 +203,7 @@ PATH:=../programs:$(shell pwd):$(PATH)
 list:
 	$(GREP) '^[^#[:space:]].*:' Makefile | sed 's/:.*//' | sort | uniq
 
-ifneq ($(TARGETSEARCH),NO)
-ALL_TARGETS := $(shell $(MAKE) list TARGETSEARCH=NO)
-endif
-TEST_TARGETS := $(filter test%,$(ALL_TARGETS))
+TEST_TARGETS := $(sort $(filter test%,$(shell sed -n 's/^\(test[^:]*\):.*/\1/p' Makefile)))
 .PHONY: $(TEST_TARGETS) # all targets starting by `test` are now .PHONY
 
 test_targets:
