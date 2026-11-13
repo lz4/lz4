@@ -44,3 +44,15 @@ for l in 0 1 4 128 32767 32768 32769 65535 65536 65537 98303 98304 98305 131071 
     < $FPREFIX-$l      lz4 -D stdin $FPREFIX-data-128KB -c | lz4 -dD $FPREFIX-$l-tail | diff - $FPREFIX-data-128KB; \
     < $FPREFIX-$l-tail lz4 -D stdin $FPREFIX-data-128KB -c | lz4 -dD $FPREFIX-$l      | diff - $FPREFIX-data-128KB; \
 done
+
+# dictionary read errors (stdin opened for writing) : not an empty dictionary
+if [ "$(uname)" = Linux ]; then
+    lz4 -q -D $FPREFIX $FPREFIX-sample-32k $FPREFIX-sample-32k.lz4
+    for args in "$FPREFIX-sample-32k" "-d $FPREFIX-sample-32k.lz4"; do
+        rc=0
+        lz4 -D stdin -c $args 0>/dev/null > /dev/null 2> $FPREFIX-read-error || rc=$?
+        test "$rc" -gt 0
+        test "$rc" -lt 128
+        grep -q "Dictionary error" $FPREFIX-read-error
+    done
+fi

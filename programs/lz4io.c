@@ -1276,6 +1276,7 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* dictFilename)
         dictEnd = (dictEnd + readSize) % circularBufSize;
         dictLen += readSize;
     } while (readSize>0);
+    if (ferror(dictFile)) END_PROCESS(24, "Dictionary error : could not read %s", dictFilename);
 
     if (dictLen > LZ4_MAX_DICT_SIZE) {
         dictLen = LZ4_MAX_DICT_SIZE;
