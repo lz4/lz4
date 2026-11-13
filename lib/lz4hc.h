@@ -255,8 +255,8 @@ struct LZ4HC_CCtx_internal
     short   compressionLevel;
     LZ4_i8  favorDecSpeed;   /* favor decompression speed if this flag set,
                                 otherwise, favor compression ratio */
-    const LZ4HC_CCtx_internal* dictCtx;
     LZ4_i8  hasWorkspace;    /* the state is followed by the temporary buffer of levels >= 10 (LZ4_STREAMHC_EXTSIZE) */
+    const LZ4HC_CCtx_internal* dictCtx;
 };
 
 #define LZ4_STREAMHC_MINSIZE  262200  /* static size, for inter-version compatibility */
@@ -375,7 +375,7 @@ LZ4LIB_STATIC_API void LZ4_resetStreamHC_fast(
  *  It is preserved by LZ4_resetStreamHC_fast() and LZ4_loadDictHC(), but not by LZ4_compress_HC_extStateHC(),
  *  which initializes @state as a state of LZ4_sizeofStateHC() bytes : use LZ4_compress_HC_extStateHC_fastReset() instead.
  */
-#define LZ4_STREAMHC_EXTSIZE (LZ4_STREAMHC_MINSIZE + 65584)
+#define LZ4_STREAMHC_EXTSIZE (sizeof(LZ4_streamHC_t) + 65584)   /* LZ4_streamHC_t exceeds LZ4_STREAMHC_MINSIZE with 16-byte pointers */
 
 /*! LZ4_compress_HC_extStateHC_fastReset() :
  *  A variant of LZ4_compress_HC_extStateHC().
