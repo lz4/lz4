@@ -2258,6 +2258,13 @@ LZ4_decompress_generic(
         size_t offset;
         size_t ml;   /* match length */
 
+#if LZ4_FAST_DEC_LOOP
+        /* In-place decompression : input lies at the end of the output buffer (LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE()),
+         * as little as 32 bytes ahead of op. The fast loop writes below the start of input,
+         * so that its wide copies can't overwrite input not read yet : the safe loop decodes the rest. */
+        BYTE* const oendFast = ((uptrval)src >= (uptrval)dst) && ((uptrval)src < (uptrval)oend) ?
+                               (BYTE*)dst + (src - dst) : oend;
+#endif
 
         DEBUGLOG(5, "LZ4_decompress_generic (srcSize:%i, dstSize:%i)", srcSize, outputSize);
 
@@ -2276,7 +2283,7 @@ LZ4_decompress_generic(
      * where copying reliably 32-bytes is preferable to an unpredictable branch.
      * note : fast loop may show a regression for some client arm chips. */
 #if LZ4_FAST_DEC_LOOP
-        if ((oend - op) < FASTLOOP_SAFE_DISTANCE) {
+        if ((oendFast - op) < FASTLOOP_SAFE_DISTANCE) {
             DEBUGLOG(6, "move to safe decode loop");
             goto safe_decode;
         }
@@ -2301,7 +2308,7 @@ LZ4_decompress_generic(
             size_t ll;   /* literal length */
             BYTE* cpy;
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
-            assert(oend - op >= FASTLOOP_SAFE_DISTANCE);
+            assert(oendFast - op >= FASTLOOP_SAFE_DISTANCE);
             assert(ip < iend);
             token = *ip++;
             ll = token >> ML_BITS;
@@ -2329,10 +2336,10 @@ LZ4_decompress_generic(
                 cpy = op+ll;
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
               #if LZ4_WILDCOPY64
-                if ((cpy>oend-64) || (ip+ll>iend-64)) { ip = tokenPos; break; }
+                if ((cpy>oendFast-64) || (ip+ll>iend-64)) { ip = tokenPos; break; }
                 LZ4_wildCopy64(op, ip, cpy);
               #else
-                if ((cpy>oend-32) || (ip+ll>iend-32)) { ip = tokenPos; break; }
+                if ((cpy>oendFast-32) || (ip+ll>iend-32)) { ip = tokenPos; break; }
                 LZ4_wildCopy32(op, ip, cpy);
               #endif
                 ip += ll; op = cpy;
@@ -2366,7 +2373,7 @@ LZ4_decompress_generic(
             }
             ml += MINMATCH;
 
-            if (op + ml >= oend - FASTLOOP_SAFE_DISTANCE) {
+            if (op + ml >= oendFast - FASTLOOP_SAFE_DISTANCE) {
                 DEBUGLOG(7, "moving to safe_match_copy (ml==%u)", (unsigned)ml);
                 goto safe_match_copy;
             }
@@ -2385,7 +2392,7 @@ LZ4_decompress_generic(
             }
 
             /* match ends far from oend : no end-of-block condition to check */
-            assert(op + ml < oend - FASTLOOP_SAFE_DISTANCE);
+            assert(op + ml < oendFast - FASTLOOP_SAFE_DISTANCE);
 
             if ( checkOffset && (unlikely(match + dictSize < lowPrefix)) ) {
                 DEBUGLOG(5, "Error : pos=%zi, offset=%zi => outside buffers", op-lowPrefix, op-match);

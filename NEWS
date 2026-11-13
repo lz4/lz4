@@ -1,4 +1,5 @@
 v1.11.2
+fix  : data corruption in valid usage : in-place decompression (`LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE()`), frequent on small blocks since v1.11.0
 fix  : `lz4 -l` started a thread per core at once, and could fail under a limit of processes, notably from standard input (since v1.10.0)
 perf : faster decompression with a dictionary (up to +38% on small blocks)
 
