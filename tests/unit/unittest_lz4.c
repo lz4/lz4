@@ -1021,6 +1021,32 @@ TEST(decompress_safe_inPlace_limitCase)
     ASSERT_MEMEQ(buffer, src, (size_t)srcSize);
 }
 
+/* small blocks : input is only (srcSize >> 8) + 32 bytes ahead of output, less than the fast loop's wide copies */
+TEST(decompress_safe_inPlace_smallBlocks)
+{
+    int const maxSrcSize = 4 KB;
+    int const capacity = LZ4_COMPRESSBOUND(maxSrcSize);
+    const char* const noise = (const char*)UT_fixedNoise((size_t)maxSrcSize);
+    char* const src = (char*)UT_malloc((size_t)maxSrcSize);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    char* const buffer = (char*)UT_malloc((size_t)LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(maxSrcSize));
+    int srcSize, matchPos;
+    for (srcSize = 300; srcSize <= maxSrcSize; srcSize += 379) {
+        int const bufferSize = LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(srcSize);
+        for (matchPos = 64; matchPos < 256; matchPos += 23) {
+            int cSize;
+            /* noise, with one match after a long literal run */
+            memcpy(src, noise, (size_t)srcSize);
+            memcpy(src + matchPos, src, (size_t)(16 + srcSize / 128));   /* no overlap : matchPos >= 64 */
+            cSize = LZ4_compress_default(src, cBuffer, srcSize, capacity);
+            ASSERT(cSize > 0 && cSize < srcSize);
+
+            memcpy(buffer + bufferSize - cSize, cBuffer, (size_t)cSize);
+            ASSERT_EQ(LZ4_decompress_safe(buffer + bufferSize - cSize, buffer, cSize, srcSize), srcSize);
+            ASSERT_MEMEQ(buffer, src, (size_t)srcSize);
+    }   }
+}
+
 
 /*-************************************
 *  Ring buffers
