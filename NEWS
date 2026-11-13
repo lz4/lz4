@@ -1,6 +1,5 @@
 v1.11.2
 fix  : `lz4 -l` started a thread per core at once, and could fail under a limit of processes, notably from standard input (since v1.10.0)
-fix  : `--rm` could delete a non-regular source file (fifo, device, ...), though it is documented for regular files only
 perf : faster decompression with a dictionary (up to +38% on small blocks)
 
 v1.11.1

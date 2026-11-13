@@ -450,17 +450,6 @@ static int LZ4IO_isStdout(const char* s)
     return UTIL_sameString(s, stdoutmark);
 }
 
-/* LZ4IO_mustRemoveSrcFile() :
- * `--rm` only applies to a regular source file :
- * not in test mode, which removes nothing (see lz4.1.md),
- * and not when reading from stdin, which is not a file. */
-static int LZ4IO_mustRemoveSrcFile(const LZ4IO_prefs_t* prefs, const char* srcFileName)
-{
-    return prefs->removeSrcFile
-        && !prefs->testMode
-        && !LZ4IO_isStdin(srcFileName);
-}
-
 
 /* ************************************************************************ **
 ** ********************** LZ4 File / Pipe compression ********************* **
@@ -1002,6 +991,18 @@ static int LZ4IO_srcReplaced(const LZ4IO_srcState_t* s, const char* srcFileName)
 #endif
 }
 
+/* LZ4IO_mustRemoveSrcFile() :
+ * `--rm` only applies to a regular source file (not a fifo, a device, ...) :
+ * not in test mode, which removes nothing (see lz4.1.md),
+ * and not when reading from stdin, even redirected from a regular file. */
+static int LZ4IO_mustRemoveSrcFile(const LZ4IO_prefs_t* prefs, const LZ4IO_srcState_t* srcState, const char* srcFileName)
+{
+    return prefs->removeSrcFile
+        && srcState->valid
+        && !prefs->testMode
+        && !LZ4IO_isStdin(srcFileName);
+}
+
 /* LZ4IO_finishFile() :
  * Ends the processing of a source file, compression or decompression, @srcFile being still open :
  * - the output is closed, or only flushed when shared (@dstShared : stdout, or /dev/null for several inputs) :
@@ -1036,7 +1037,7 @@ LZ4IO_finishFile(FILE* srcFile, const LZ4IO_srcState_t* srcState,
         UTIL_setFileStat(dstFileName, &statbuf);
     }
 
-    if (LZ4IO_mustRemoveSrcFile(io_prefs, srcFileName) && srcState->valid && !srcModified && !srcReplaced) {  /* --rm : regular source file only */
+    if (LZ4IO_mustRemoveSrcFile(io_prefs, srcState, srcFileName) && !srcModified && !srcReplaced) {  /* --rm */
         if (remove(srcFileName))
             END_PROCESS(45, "Remove error : %s: %s", srcFileName, strerror(errno));
     }
