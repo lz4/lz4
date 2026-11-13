@@ -204,7 +204,7 @@ list:
 	$(GREP) '^[^#[:space:]].*:' Makefile | sed 's/:.*//' | sort | uniq
 
 ifneq ($(TARGETSEARCH),NO)
-ALL_TARGETS := $(shell make list TARGETSEARCH=NO)
+ALL_TARGETS := $(shell $(MAKE) list TARGETSEARCH=NO)
 endif
 TEST_TARGETS := $(filter test%,$(ALL_TARGETS))
 .PHONY: $(TEST_TARGETS) # all targets starting by `test` are now .PHONY
