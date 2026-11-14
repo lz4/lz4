@@ -684,7 +684,9 @@ int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int*
  * so it's possible to reduce memory requirements by playing with them.
  */
 
-#define LZ4_DECOMPRESS_INPLACE_MARGIN(compressedSize)          (((compressedSize) >> 8) + 32)
+/* The distance between input and output shrinks by the expansion of incompressible data, up to (compressedSize >> 8) + 2 bytes,
+ * and must stay larger than the 63 bytes the decoder can write beyond a copy : margin = (compressedSize >> 8) + 2 + 63 (+32 up to v1.11.1) */
+#define LZ4_DECOMPRESS_INPLACE_MARGIN(compressedSize)          (((compressedSize) >> 8) + 65)
 #define LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(decompressedSize)   ((decompressedSize) + LZ4_DECOMPRESS_INPLACE_MARGIN(decompressedSize))  /**< note: presumes that compressedSize < decompressedSize. note2: margin is overestimated a bit, since it could use compressedSize instead */
 
 #ifndef LZ4_DISTANCE_MAX   /* history window size; can be user-defined at compile time */
