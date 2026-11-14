@@ -1150,16 +1150,17 @@ TEST(decompress_headerByteAfterByte)
 }
 
 /* decodes @frame with all remaining input available, into outputs of @sizes[0], @sizes[1], ... bytes (cycling) :
- * contiguous outputs (@reuse == 0), or a single output buffer, copied into @dst then overwritten after each invocation
+ * contiguous outputs (@reuse == 0), or a single output buffer (@out, or allocated if NULL),
+ * copied into @dst then overwritten after each invocation
  * @return : decoded size */
 static size_t decompressIntoOutputs(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapacity,
                                     const BYTE* frame, size_t frameSize, const void* dict, size_t dictSize,
-                                    const size_t* sizes, size_t nbSizes, int reuse)
+                                    const size_t* sizes, size_t nbSizes, int reuse, BYTE* out)
 {
     size_t maxSize = 0, pos = 0, dPos = 0, r = 1, k;
-    BYTE* out;
+    int const allocated = reuse && (out == NULL);
     for (k = 0; k < nbSizes; k++) maxSize = MAX(maxSize, sizes[k]);
-    out = reuse ? (BYTE*)UT_malloc(maxSize) : NULL;
+    if (allocated) out = (BYTE*)UT_malloc(maxSize);
     for (k = 0; r != 0; k++) {
         size_t cSize = frameSize - pos;
         size_t dSize = MIN(sizes[k % nbSizes], dstCapacity - dPos);
@@ -1173,7 +1174,7 @@ static size_t decompressIntoOutputs(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapaci
         dPos += dSize;
     }
     ASSERT_EQ(pos, frameSize);
-    if (reuse) UT_release(out);
+    if (allocated) UT_release(out);
     return dPos;
 }
 
@@ -1181,7 +1182,7 @@ static size_t decompressIntoChunks(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapacit
                                    const BYTE* frame, size_t frameSize,
                                    const void* dict, size_t dictSize, size_t chunk, int reuse)
 {
-    return decompressIntoOutputs(dctx, dst, dstCapacity, frame, frameSize, dict, dictSize, &chunk, 1, reuse);
+    return decompressIntoOutputs(dctx, dst, dstCapacity, frame, frameSize, dict, dictSize, &chunk, 1, reuse, NULL);
 }
 
 /* decoding into outputs of various sizes, contiguous or not (dstBuffer can change between invocations) :
@@ -1235,13 +1236,64 @@ TEST(decompress_historyIntoSmallOutputs)
                 LZ4F_dctx* const dctx = newDctx();
                 memset(decoded, 0, srcSize);
                 ASSERT_EQ(decompressIntoOutputs(dctx, decoded, srcSize, frame, frameSize, d, dSize,
-                                                outputs[oi].sizes, outputs[oi].nb, reuse), srcSize);
+                                                outputs[oi].sizes, outputs[oi].nb, reuse, NULL), srcSize);
                 ASSERT_MSG(!memcmp(decoded, src, srcSize), "blocks of %u bytes, dictionary %u, outputs %u, reused output %i : corrupted",
                            (unsigned)blockSize, (unsigned)withDict, (unsigned)oi, reuse);
                 UT_release(dctx);
             }
         }
     }
+}
+
+/* allocator placing the allocation of @size bytes at @region */
+typedef struct { BYTE* region; size_t size; } placedAlloc_t;
+static void* placingMalloc(void* state, size_t s)
+{
+    const placedAlloc_t* const p = (const placedAlloc_t*)state;
+    return (s == p->size) ? p->region : malloc(s);
+}
+static void placingFree(void* state, void* ptr)
+{
+    if (ptr != ((const placedAlloc_t*)state)->region) free(ptr);
+}
+
+/* linked blocks decoded into a single output buffer, overwritten after each invocation,
+ * which starts right where tmpOutBuffer ends (allocators can place buffers side by side) :
+ * the history kept within tmpOutBuffer must not continue into the output buffer */
+TEST(decompress_historyBeforeAdjacentOutput)
+{
+    size_t const blockSize = 8 KB;
+    size_t const tmpOutSize = 64 KB + 128 KB;   /* tmpOutBuffer : linked blocks of 64 KB max */
+    size_t const nbStored = tmpOutSize / blockSize + 1;   /* the last one starts the history right after tmpOutBuffer */
+    size_t const srcSize = (nbStored + 1) * blockSize;
+    BYTE* const src = (BYTE*)UT_malloc(srcSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
+    size_t const capacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    BYTE* const region = (BYTE*)UT_malloc(tmpOutSize + blockSize);   /* tmpOutBuffer, then the output buffer */
+    placedAlloc_t* const placed = (placedAlloc_t*)UT_malloc(sizeof(*placed));   /* outlives dctx */
+    LZ4F_CustomMem const placingMem = { placingMalloc, NULL, placingFree, placed };
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_dctx* dctx;
+    size_t frameSize, consumed;
+    placed->region = region;
+    placed->size = tmpOutSize;
+    dctx = (LZ4F_dctx*)UT_defer(freeDctx, LZ4F_createDecompressionContext_advanced(placingMem, LZ4F_VERSION));
+    ASSERT(dctx != NULL);
+
+    /* stored blocks (noise), then a compressed block repeating the last one */
+    memcpy(src, UT_fixedNoise(nbStored * blockSize), nbStored * blockSize);
+    memcpy(src + nbStored * blockSize, src + (nbStored - 1) * blockSize, blockSize);
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.autoFlush = 1;   /* a block per invocation */
+    frameSize = LZ4F_OK(LZ4F_compressBegin(cctx, frame, capacity, &prefs));
+    for (consumed = 0; consumed < srcSize; consumed += blockSize)
+        frameSize += LZ4F_OK(LZ4F_compressUpdate(cctx, frame + frameSize, capacity - frameSize, src + consumed, blockSize, NULL));
+    frameSize += LZ4F_OK(LZ4F_compressEnd(cctx, frame + frameSize, capacity - frameSize, NULL));
+
+    ASSERT_EQ(decompressIntoOutputs(dctx, decoded, srcSize, frame, frameSize, NULL, 0, &blockSize, 1, 1, region + tmpOutSize), srcSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
 }
 
 /* linked blocks with a dictionary : the history isn't saved after the last block, when the endMark follows it within input,

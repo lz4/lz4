@@ -3033,7 +3033,8 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     if (dctx->dictSize==0) dctx->dict = (const BYTE*)dstPtr;  /* will lead to prefix mode */
     assert(dctx->dict != NULL);
 
-    if (dctx->dict + dctx->dictSize == dstPtr) {  /* prefix mode, everything within dstBuffer */
+    if ( (dctx->dict + dctx->dictSize == dstPtr)   /* prefix mode, everything within dstBuffer */
+      && (dctx->dict != dctx->tmpOutBuffer) ) {    /* unless dstBuffer merely starts where tmpOutBuffer ends */
         dctx->dictSize += dstSize;
         return;
     }
@@ -3551,6 +3552,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }
         }   /* switch (dctx->dStage) */
     }   /* while (doAnotherStage) */
+
+    /* history within tmpOutBuffer never extends beyond it */
+    assert(dctx->dict != dctx->tmpOutBuffer || dctx->dictSize <= dctx->tmpOutBufferCapacity);
 
     /* preserve history within tmpOut whenever necessary */
     LZ4F_STATIC_ASSERT((unsigned)dstage_init == 2);
