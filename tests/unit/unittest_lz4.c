@@ -1021,6 +1021,32 @@ TEST(decompress_safe_inPlace_limitCase)
     ASSERT_MEMEQ(buffer, src, (size_t)srcSize);
 }
 
+/* worst case : incompressible data, with one match of 65 bytes, at offset 65 :
+ * the decoder copies it with 63 bytes of overshoot (64-byte copies),
+ * then the literals up to the end bring input closer to output by up to (srcSize >> 8) + 2 bytes */
+TEST(decompress_safe_inPlace_worstCase)
+{
+    int const maxSrcSize = 4 KB;
+    int const capacity = LZ4_COMPRESSBOUND(maxSrcSize);
+    const char* const noise = (const char*)UT_fixedNoise((size_t)maxSrcSize);
+    char* const src = (char*)UT_malloc((size_t)maxSrcSize);
+    char* const cBuffer = (char*)UT_malloc((size_t)capacity);
+    char* const buffer = (char*)UT_malloc((size_t)LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(maxSrcSize));
+    int srcSize;
+    for (srcSize = 300; srcSize <= maxSrcSize; srcSize++) {
+        int const bufferSize = LZ4_DECOMPRESS_INPLACE_BUFFER_SIZE(srcSize);
+        int cSize;
+        memcpy(src, noise, (size_t)srcSize);
+        memcpy(src + 65, src, 65);
+        cSize = LZ4_compress_default(src, cBuffer, srcSize, capacity);
+        ASSERT(cSize > 0 && cSize < srcSize);
+
+        memcpy(buffer + bufferSize - cSize, cBuffer, (size_t)cSize);
+        ASSERT_EQ(LZ4_decompress_safe(buffer + bufferSize - cSize, buffer, cSize, srcSize), srcSize);
+        ASSERT_MEMEQ(buffer, src, (size_t)srcSize);
+    }
+}
+
 
 /*-************************************
 *  Ring buffers
