@@ -99,10 +99,10 @@ Benchmark evaluates the compression of reference [Silesia Corpus](https://sun.ae
     <div id="tab-1" class="tab-pane container-fluid active">
       <div class="row">
         <div class="col-md-4 text-justify">
-          <h2>Transfer + Decompression Time @1000Mbit/s <small>(without I/O overwrapping, multithreading)</small></h2>
+          <h2>Transfer + Decompression Time @1000Mbit/s <small>(without I/O overlapping, multithreading)</small></h2>
           <p>
           This benchmark simulates simple "static content transfer" scenario such as OS Kernel compression
-          or video game's static assets (text/images/tables/scripts/etc) which loading from Flash Memory / HDD / SSD.
+          or video game's static assets (text/images/tables/scripts/etc) loaded from Flash Memory / HDD / SSD.
           </p>
           <p>
           In this case, compression time is completely ignored.
@@ -131,7 +131,7 @@ Benchmark evaluates the compression of reference [Silesia Corpus](https://sun.ae
     <div id="tab-2" class="tab-pane container-fluid">
       <div class="row">
         <div class="col-md-4 text-justify">
-          <h2>Compression + Transfer + Decompression Time @1000Mbit/s <small>(without I/O overwrapping, multithreading)</small></h2>
+          <h2>Compression + Transfer + Decompression Time @1000Mbit/s <small>(without I/O overlapping, multithreading)</small></h2>
           <p>
           This benchmark simulates "dynamic content transfer" scenario such as filesystems, caches, network packets, IPC/RPCs, and databases.
           </p>
@@ -161,10 +161,10 @@ Benchmark evaluates the compression of reference [Silesia Corpus](https://sun.ae
 
 ## Documentation
 
-The LZ4 block compression format is detailed within [lz4_Block_format](https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md).
+The LZ4 block compression format is detailed within [lz4_Block_format](https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md).
 
 For streaming arbitrarily large amount of data, or compress files of any size,
-a frame format has been established, detailed within the file [lz4_Frame_format](https://github.com/lz4/lz4/blob/master/doc/lz4_Frame_format.md).
+a frame format has been established, detailed within the file [lz4_Frame_format](https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md).
 
 
 
@@ -202,8 +202,8 @@ They are in conformance with the LZ4 [block] and [frame] specifications, and are
 |__Z80 assembly__ decoder | Piotr Drapich       | http://www.union.org.pl/download/z80/LZ4_Z80.asm
 |__8086 assembly__ decoder| E. C. Masloch       | https://hg.pushbx.org/ecm/inicomp/
 
-[block]:https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md
-[frame]:https://github.com/lz4/lz4/blob/master/doc/lz4_Frame_format.md
+[block]:https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md
+[frame]:https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md
 
 
 <br/>
@@ -222,7 +222,7 @@ Here are a few compatible alternatives to lz4 command line utility :
 
 <br/>
 <a name="customs-lz4"></a>
-## Customs LZ4 implementations
+## Custom LZ4 implementations
 The following versions compress data blocks with the LZ4 compression algorithm in various programming languages.
 They use the [block] compression format, and deal with metadata (like `compressed_size`) in various custom ways (or none at all, letting the caller deal with it).
 Consequently, they are not interoperable with LZ4 command line utility, nor (generally) between themselves.
