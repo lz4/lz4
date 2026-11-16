@@ -152,7 +152,6 @@ COMPRESSORS=(
     "zstd -1|zstd|-1 -c|-d -c|read transfer"
     "zstd -1 -T1|zstd|-1 -T1 -c|-d -c|transfer"
     "lzop -1|lzop|-1 -c|-d -c|read transfer"
-    "snzip|snzip|-c|-d -c|read transfer"
     "gzip -1|gzip|-1 -c|-d -c|read transfer"
     "gzip -6|gzip|-6 -c|-d -c|read transfer"
     "pigz -1|pigz|-1 -c|-d -c|read transfer"
