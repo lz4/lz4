@@ -2763,19 +2763,24 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
                         int dstShared,
                         const LZ4IO_prefs_t* const prefs)
 {
-    FILE* const foutput = ress.dstFile;
+    FILE* foutput;
     unsigned long long filesize = 0;
     int result = 0;
     int firstFrame = 1;
     LZ4IO_srcState_t srcState;
 
-    /* Init */
+    /* Open the source first : a source that can't be opened must leave the
+     * destination untouched, as compression does (LZ4IO_compressFilename_extRess) */
     FILE* const finput = LZ4IO_openSrcFile(input_filename);
-    assert(foutput != NULL);
-    if (finput==NULL) {
-        if (!dstShared) fclose(foutput);
-        return 1;
+    if (finput==NULL) return 1;
+    if (dstShared) {
+        foutput = ress.dstFile;   /* shared destination (stdout, /dev/null) : already open */
+    } else {
+        foutput = LZ4IO_openDstFile(output_filename, prefs, input_filename);
+        if (foutput==NULL) { fclose(finput); return 1; }
+        ress.dstFile = foutput;
     }
+    assert(foutput != NULL);
     srcState = LZ4IO_getSrcState(finput);
 
     /* Loop over multiple streams */
@@ -2798,20 +2803,6 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
 }
 
 
-static int
-LZ4IO_decompressDstFile(unsigned long long* outGenSize,
-                        dRess_t ress,
-                        const char* input_filename,
-                        const char* output_filename,
-                        const LZ4IO_prefs_t* const prefs)
-{
-    FILE* const foutput = LZ4IO_openDstFile(output_filename, prefs, input_filename);
-    if (foutput==NULL) return 1;   /* failure */
-    ress.dstFile = foutput;
-    return LZ4IO_decompressSrcFile(outGenSize, ress, input_filename, output_filename, 0, prefs);
-}
-
-
 /* Note : LZ4IO_decompressFilename()
  * can provide total decompression time for the specified fileName.
  * This information is not available with LZ4IO_decompressMultipleFilenames().
@@ -2823,7 +2814,7 @@ int LZ4IO_decompressFilename(const char* input_filename, const char* output_file
     double const cpuStart = cpuTime_sec();
     unsigned long long processed = 0;
 
-    int const errStat = LZ4IO_decompressDstFile(&processed, ress, input_filename, output_filename, prefs);
+    int const errStat = LZ4IO_decompressSrcFile(&processed, ress, input_filename, output_filename, 0, prefs);
     if (!errStat)
         LZ4IO_finalTimeDisplay(timeStart, cpuStart, processed);
     LZ4IO_freeDResources(ress);
@@ -2874,7 +2865,7 @@ int LZ4IO_decompressMultipleFilenames(
             END_PROCESS(71, "Memory allocation error");
         memcpy(outFileName, inFileNamesTable[i], ifnSize - suffixSize);
         outFileName[ifnSize-suffixSize] = '\0';
-        missingFiles += LZ4IO_decompressDstFile(&processed, ress, inFileNamesTable[i], outFileName, prefs);
+        missingFiles += LZ4IO_decompressSrcFile(&processed, ress, inFileNamesTable[i], outFileName, 0, prefs);
         totalProcessed += processed;
     }
 
