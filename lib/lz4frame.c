@@ -2740,6 +2740,7 @@ struct LZ4F_dctx_s {
     BYTE*  tmpOutBuffer;
     const BYTE* dict;
     size_t dictSize;
+    int    dictInDst;
     BYTE*  tmpOut;
     size_t tmpOutSize;
     size_t tmpOutStart;
@@ -2807,6 +2808,7 @@ void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
     dctx->dStage = dstage_getFrameHeader;
     dctx->dict = NULL;
     dctx->dictSize = 0;
+    dctx->dictInDst = 0;
     dctx->skipBlockChecksum = 0;
     dctx->skipContentChecksum = 0;
     dctx->frameRemainingSize = 0;
@@ -3035,6 +3037,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
 
     if (dctx->dict + dctx->dictSize == dstPtr) {  /* prefix mode, everything within dstBuffer */
         dctx->dictSize += dstSize;
+        dctx->dictInDst = 1;
         return;
     }
 
@@ -3042,6 +3045,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     if ((size_t)(dstPtr - dstBufferStart) + dstSize >= 64 KB) {  /* history in dstBuffer becomes large enough to become dictionary */
         dctx->dict = (const BYTE*)dstBufferStart;
         dctx->dictSize = (size_t)(dstPtr - dstBufferStart) + dstSize;
+        dctx->dictInDst = 1;
         return;
     }
 
@@ -3054,11 +3058,13 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
         /* withinTmp expectation : content of [dstPtr,dstSize] is same as [dict+dictSize,dstSize], so we just extend it */
         assert(dctx->dict + dctx->dictSize == dctx->tmpOut + dctx->tmpOutStart);
         dctx->dictSize += dstSize;
+        dctx->dictInDst = 0;
         return;
     }
 
     if (withinTmp) { /* copy relevant dict portion in front of tmpOut within tmpOutBuffer */
         LZ4F_moveDictBeforeTmpOut(dctx, dstSize);
+        dctx->dictInDst = 0;
         return;
     }
 
@@ -3070,6 +3076,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
         }
         memcpy(dctx->tmpOutBuffer + dctx->dictSize, dstPtr, dstSize);
         dctx->dictSize += dstSize;
+        dctx->dictInDst = 0;
         return;
     }
 
@@ -3080,6 +3087,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
         memcpy(dctx->tmpOutBuffer + preserveSize, dstPtr, dstSize);
         dctx->dict = dctx->tmpOutBuffer;
         dctx->dictSize = preserveSize + dstSize;
+        dctx->dictInDst = 0;
     }
 }
 
@@ -3196,6 +3204,12 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     *srcSizePtr = 0;
     *dstSizePtr = 0;
     assert(dctx != NULL);
+    if (decompressOptionsPtr->stableDst && dctx->dictInDst
+        && dctx->dictSize > 0 && dstStart != NULL) {
+        size_t const hist = MIN(dctx->dictSize, 64 KB);
+        dctx->dict = dstStart - hist;
+        dctx->dictSize = hist;
+    }
     if (decompressOptionsPtr->skipChecksums) {   /* once set, disable for the remainder of the frame */
         dctx->skipBlockChecksum = 1;
         dctx->skipContentChecksum = 1;
@@ -3572,6 +3586,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             dctx->dictSize = newDictSize;
             dctx->tmpOut = dctx->tmpOutBuffer + newDictSize;
         }
+        dctx->dictInDst = 0;
     }
 
 _output:   /* also on error : report progress, but do not preserve history for reuse */
