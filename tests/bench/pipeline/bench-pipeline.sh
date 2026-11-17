@@ -8,7 +8,8 @@
 # and with a single compression thread (lz4 -T1, zstd -T1, pigz -p 1).
 #
 # Programs come from the PATH, or from -b NAME=PATH, missing ones are skipped. Their versions are reported.
-# throttle.c, next to this script, simulates the link. Results : directory given by -o, summary on stdout.
+# throttle.c, next to this script, simulates the link : for transfers, with a 4 MB buffer on each side, like TCP.
+# Results : directory given by -o, summary on stdout.
 
 set -u
 set -o pipefail
@@ -97,7 +98,7 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/bench-pipeline.XXXXXX") || die "cannot create 
 trap '[ "$KEEP" = 1 ] || rm -rf "$WORK"' EXIT
 LOG=$WORK/log.txt
 
-$CC -O2 -o "$WORK/throttle" "$SCRIPT_DIR/throttle.c" 2>>"$LOG" || die "cannot build throttle, see $LOG"
+$CC -O2 -pthread -o "$WORK/throttle" "$SCRIPT_DIR/throttle.c" 2>>"$LOG" || die "cannot build throttle, see $LOG"
 THROTTLE=$WORK/throttle
 
 LZ4=$(bin lz4) || die "lz4 not found : $INSTALL lz4, or pass a program with -l"
@@ -259,12 +260,13 @@ fi
 # pipelines through a link
 echo "scenario,link,link_MBps,compressor,runs,seconds,effective_MBps,version" > "$OUTDIR/pipeline.csv"
 run_scenario() {   # run_scenario NAME LINKS
-    local scenario=$1 link name speed entry cname prog comp decomp scenarios ver file cmd eff
+    local scenario=$1 link name speed entry cname prog comp decomp scenarios ver file cmd eff buffer=""
+    [ "$scenario" = transfer ] && buffer="-b 4"   # network : 4 MB buffers, like the socket buffers of TCP
     for link in $2; do
         name=${link%:*}; name=${name//_/ }; speed=${link##*:}
         msg "$scenario, $name ($speed MB/s) ..."
         # no compression : a process reads the data, like a decompressor
-        measure "\"$THROTTLE\" $speed < \"$INPUT\" | cat > /dev/null" || die "throttle failed, see $LOG"
+        measure "\"$THROTTLE\" $buffer $speed < \"$INPUT\" | cat > /dev/null" || die "throttle failed, see $LOG"
         eff=$(speed "$MEDIAN")
         [ "$(calc "$eff < 0.95 * $speed" 0)" = 1 ] && warn "throttle reaches only $eff MB/s out of $speed : results limited by this machine"
         echo "$scenario,$name,$speed,no compression,$NRUNS,$MEDIAN,$eff," >> "$OUTDIR/pipeline.csv"
@@ -273,9 +275,9 @@ run_scenario() {   # run_scenario NAME LINKS
             case " $scenarios " in *" $scenario "*) ;; *) continue ;; esac
             file=$WORK/$(echo "$cname" | tr ' ' '_').cmp
             if [ "$scenario" = read ]; then
-                cmd="\"$THROTTLE\" $speed < \"$file\" | $decomp > /dev/null"
+                cmd="\"$THROTTLE\" $buffer $speed < \"$file\" | $decomp > /dev/null"
             else
-                cmd="$comp < \"$INPUT\" | \"$THROTTLE\" $speed | $decomp > /dev/null"
+                cmd="$comp < \"$INPUT\" | \"$THROTTLE\" $buffer $speed | $decomp > /dev/null"
             fi
             measure "$cmd" || { warn "$scenario, $name, $cname : failed"; continue; }
             echo "$scenario,$name,$speed,$cname,$NRUNS,$MEDIAN,$(speed "$MEDIAN"),$ver" >> "$OUTDIR/pipeline.csv"
