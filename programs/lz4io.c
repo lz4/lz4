@@ -2754,7 +2754,8 @@ selectDecoder(dRess_t ress,
 }
 
 
-/* decodes @input_filename into ress.dstFile, shared by several inputs (@dstShared) or not, see LZ4IO_finishFile()
+/* decodes @input_filename into ress.dstFile when shared by several inputs (@dstShared), see LZ4IO_finishFile(),
+ * otherwise into @output_filename, opened here
  * @return : 0 on success, 1 on failure */
 static int
 LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
@@ -2778,7 +2779,6 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
     } else {
         foutput = LZ4IO_openDstFile(output_filename, prefs, input_filename);
         if (foutput==NULL) { fclose(finput); return 1; }
-        ress.dstFile = foutput;
     }
     assert(foutput != NULL);
     srcState = LZ4IO_getSrcState(finput);
