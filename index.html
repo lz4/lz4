@@ -23,6 +23,9 @@
       .list-inline li a img {
         height: 50px;
       }
+      .bench-section code {
+        white-space: nowrap;
+      }
     </style>
   </head>
   <body style="padding-top:0; padding-bottom:0; ">
@@ -47,6 +50,7 @@
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Index<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 <li><a href="#benchmarks">Benchmarks</a></li>
+                <li><a href="#pipelines">Command line pipelines</a></li>
                 <li><a href="#interoperable-lz4">Interoperable LZ4 ports and bindings</a></li>
                 <li><a href="#lz4-clis">Compatible CLI versions</a></li>
                 <li><a href="#customs-lz4">Custom LZ4 ports and bindings</a></li>
@@ -89,72 +93,93 @@ compiled with GCC v13.3.0 on Linux 64-bits (Ubuntu 24.04).
 The reference system uses a Core i7-9700K CPU.
 Benchmark evaluates the compression of reference [Silesia Corpus](https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia) in single-thread mode.
 
-<div>
-  <ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
-    <li class="active"><a href="#tab-1" data-toggle="tab">Transfer + Decompression Time<br/>@1000Mbit/s</a></li>
-    <li               ><a href="#tab-2" data-toggle="tab">Compression + Transfer + Decompression Time<br/>@1000Mbit/s</a></li>
+<div class="bench-section">
+  <ul class="nav nav-tabs" data-tabs="tabs">
+    <li class="active"><a href="#lzbench-1" data-toggle="tab">Ratio vs speed</a></li>
+    <li               ><a href="#lzbench-2" data-toggle="tab">Speeds and ratio</a></li>
   </ul>
-  <div id="my-tab-content" class="tab-content">
-    <div id="tab-1" class="tab-pane container-fluid active">
+  <div class="tab-content">
+    <div id="lzbench-1" class="tab-pane container-fluid active">
       <div class="row">
-        <div class="col-md-4 text-justify">
-          <h2>Transfer + Decompression Time @1000Mbit/s <small>(without I/O overlapping, multithreading)</small></h2>
-          <p>
-          This benchmark simulates simple "static content transfer" scenario such as OS Kernel compression
-          or video game's static assets (text/images/tables/scripts/etc) loaded from Flash Memory / HDD / SSD.
-          </p>
-          <p>
-          In this case, compression time is completely ignored.
-          Because only content developers compress the data at once and usually they don't care about its computational cost.
-          But they always care enduser's experience a.k.a. "loading time" and bandwidth.
-          </p>
-          <p>
-          Please pay attention to "LZ4HC -9" which is quite faster than other methods.
-          </p>
-        </div>
-        <div class="col-md-8"
-             style="height:34em;"
-             data-csv-props='{
-               "csvSrc": "csv/benchmark-silesia-1000mbps-offline-compression.csv",
-               "csvGvType": "google.visualization.ColumnChart",
-               "csvGvPackage": "corechart",
-               "chartArea": {"width": "80%", "height": "30em"},
-               "legend": {"position": "top"},
-               "isStacked": "true",
-               "vAxis": {"title": "Seconds" },
-               "title": "Transfer + Decompression Time\nSMALLER IS BETTER"
-             }'
-        ></div>
+        <div class="col-md-6"><div class="bench-chart" data-chart="scatter-decompression" style="height:28em;"></div></div>
+        <div class="col-md-6"><div class="bench-chart" data-chart="scatter-compression" style="height:28em;"></div></div>
       </div>
     </div>
-    <div id="tab-2" class="tab-pane container-fluid">
+    <div id="lzbench-2" class="tab-pane container-fluid">
       <div class="row">
-        <div class="col-md-4 text-justify">
-          <h2>Compression + Transfer + Decompression Time @1000Mbit/s <small>(without I/O overlapping, multithreading)</small></h2>
-          <p>
-          This benchmark simulates "dynamic content transfer" scenario such as filesystems, caches, network packets, IPC/RPCs, and databases.
-          </p>
-          <p>
-          In this case, both compression and decompression times are important.
-          You can observe "Fast compression algorithms" are better than traditional algorithms such as DEFLATE (zlib).
-          </p>
-        </div>
-        <div class="col-md-8"
-             style="height:34em;"
-             data-csv-props='{
-               "csvSrc": "csv/benchmark-silesia-1000mbps.csv",
-               "csvGvType": "google.visualization.ColumnChart",
-               "csvGvPackage": "corechart",
-               "chartArea": {"width": "80%", "height": "30em"},
-               "legend": {"position": "top"},
-               "isStacked": "true",
-               "vAxis": {"title": "Seconds" },
-               "title": "Compression + Transfer + Decompression Time\nSMALLER IS BETTER"
-             }'
-        ></div>
+        <div class="col-md-4"><div class="bench-chart" data-chart="bars-decompression" style="height:26em;"></div></div>
+        <div class="col-md-4"><div class="bench-chart" data-chart="bars-compression" style="height:26em;"></div></div>
+        <div class="col-md-4"><div class="bench-chart" data-chart="bars-ratio" style="height:26em;"></div></div>
       </div>
     </div>
   </div>
+</div>
+
+<a name="pipelines"></a>
+### Command line pipelines
+
+These benchmarks measure the command lines themselves, on the same system,
+in pipelines where a link of limited speed, a storage device or a network, separates stages running at the same time.
+
+<div class="bench-section">
+<ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
+  <li class="active"><a href="#tab-1" data-toggle="tab">Reading static content<br/>from storage</a></li>
+  <li               ><a href="#tab-2" data-toggle="tab">Transferring dynamic content<br/>over the network</a></li>
+</ul>
+<div id="my-tab-content" class="tab-content">
+  <div id="tab-1" class="tab-pane container-fluid active">
+    <div class="row">
+      <div class="col-md-4 text-justify">
+        <h2>Reading static content</h2>
+        <p>
+        Static content, such as an OS kernel or video game assets, is compressed once, then read from storage,
+        and decompressed while it is read.
+        </p>
+        <p>Each bar measures, for instance for <code>lz4 -9</code> :</p>
+<pre>lz4 -9 -c silesia.tar &gt; f.lz4
+LINK &lt; f.lz4 | lz4 -d -c &gt; /dev/null</pre>
+        <p>
+        where <code>LINK</code> limits the speed of the storage device
+        (see <a href="https://github.com/lz4/lz4/blob/gh-pages/bench/bench-pipeline.sh">bench-pipeline.sh</a>).
+        </p>
+        <p class="benchmark-versions" data-scenario="read"></p>
+      </div>
+      <div class="col-md-8">
+        <div class="benchmark-links" data-scenario="read"></div>
+        <div class="benchmark-chart" data-scenario="read" style="height:26em;"></div>
+      </div>
+    </div>
+  </div>
+  <div id="tab-2" class="tab-pane container-fluid">
+    <div class="row">
+      <div class="col-md-4 text-justify">
+        <h2>Transferring dynamic content</h2>
+        <p>
+        Dynamic content, such as network packets, RPCs or database replication, is compressed, sent over the network,
+        and decompressed, the three at the same time.
+        </p>
+        <p>
+        <strong>Default settings, or a single compression thread.</strong>
+        By default, on this system, <code>lz4</code> compresses with 6 threads, <code>pigz</code> with 8, <code>zstd</code> with 2,
+        <code>gzip</code> and <code>lzop</code> with 1.
+        A single thread : <code>lz4 -T1</code>, <code>zstd -T1</code>, <code>pigz -p 1</code>.
+        </p>
+        <p>Each bar measures, for instance for <code>lz4 -1</code> :</p>
+<pre>lz4 -1 -c &lt; silesia.tar | LINK |
+lz4 -d -c &gt; /dev/null</pre>
+        <p>
+        where <code>LINK</code> limits the speed of the network
+        (see <a href="https://github.com/lz4/lz4/blob/gh-pages/bench/bench-pipeline.sh">bench-pipeline.sh</a>).
+        </p>
+        <p class="benchmark-versions" data-scenario="transfer"></p>
+      </div>
+      <div class="col-md-8">
+        <div class="benchmark-links" data-scenario="transfer"></div>
+        <div class="benchmark-chart" data-scenario="transfer" style="height:26em;"></div>
+      </div>
+    </div>
+  </div>
+</div>
 </div>
 
 
@@ -442,7 +467,7 @@ who greatly contributed to the creation of this LZ4 webpage
     <script src="strapdown/v/0.2/strapdown.js"></script>
 
     <!-- Chart -->
-    <script src="https://www.google.com/jsapi"></script>
-    <script src="js/rendercharts.js"></script>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="js/benchmarks.js"></script>
   </body>
 </html>

@@ -1,0 +1,98 @@
+scenario,link,link_MBps,compressor,effective_MBps,version
+read,HDD,200,no compression,199,
+read,HDD,200,lz4 -1,408,v1.11.1
+read,HDD,200,lz4 -9,527,v1.11.1
+read,HDD,200,zstd -1,575,v1.5.7
+read,HDD,200,lzop -1,408,1.04
+read,HDD,200,gzip -1,205,1.12
+read,HDD,200,gzip -6,226,1.12
+read,HDD,200,pigz -1,372,2.8
+read,HDD,200,pigz -6,400,2.8
+read,SATA SSD,550,no compression,543,
+read,SATA SSD,550,lz4 -1,1119,v1.11.1
+read,SATA SSD,550,lz4 -9,1418,v1.11.1
+read,SATA SSD,550,zstd -1,1240,v1.5.7
+read,SATA SSD,550,lzop -1,538,1.04
+read,SATA SSD,550,gzip -1,206,1.12
+read,SATA SSD,550,gzip -6,226,1.12
+read,SATA SSD,550,pigz -1,377,2.8
+read,SATA SSD,550,pigz -6,406,2.8
+read,NVMe PCIe 3.0 x4,3500,no compression,3446,
+read,NVMe PCIe 3.0 x4,3500,lz4 -1,1964,v1.11.1
+read,NVMe PCIe 3.0 x4,3500,lz4 -9,1960,v1.11.1
+read,NVMe PCIe 3.0 x4,3500,zstd -1,1310,v1.5.7
+read,NVMe PCIe 3.0 x4,3500,lzop -1,559,1.04
+read,NVMe PCIe 3.0 x4,3500,gzip -1,206,1.12
+read,NVMe PCIe 3.0 x4,3500,gzip -6,226,1.12
+read,NVMe PCIe 3.0 x4,3500,pigz -1,377,2.8
+read,NVMe PCIe 3.0 x4,3500,pigz -6,404,2.8
+transfer,Internet 100 Mbit/s,11.7,no compression,12,
+transfer,Internet 100 Mbit/s,11.7,lz4 -1,25,v1.11.1
+transfer,Internet 100 Mbit/s,11.7,lz4 -1 -T1,25,v1.11.1
+transfer,Internet 100 Mbit/s,11.7,lz4 -9,31,v1.11.1
+transfer,Internet 100 Mbit/s,11.7,lz4 -9 -T1,31,v1.11.1
+transfer,Internet 100 Mbit/s,11.7,zstd -1,34,v1.5.7
+transfer,Internet 100 Mbit/s,11.7,zstd -1 -T1,34,v1.5.7
+transfer,Internet 100 Mbit/s,11.7,lzop -1,24,1.04
+transfer,Internet 100 Mbit/s,11.7,gzip -1,32,1.12
+transfer,Internet 100 Mbit/s,11.7,gzip -6,32,1.12
+transfer,Internet 100 Mbit/s,11.7,pigz -1,32,2.8
+transfer,Internet 100 Mbit/s,11.7,pigz -1 -p 1,32,2.8
+transfer,Internet 100 Mbit/s,11.7,pigz -6,36,2.8
+transfer,Internet 100 Mbit/s,11.7,pigz -6 -p 1,35,2.8
+transfer,1 GbE,117,no compression,116,
+transfer,1 GbE,117,lz4 -1,227,v1.11.1
+transfer,1 GbE,117,lz4 -1 -T1,225,v1.11.1
+transfer,1 GbE,117,lz4 -9,180,v1.11.1
+transfer,1 GbE,117,lz4 -9 -T1,38,v1.11.1
+transfer,1 GbE,117,zstd -1,324,v1.5.7
+transfer,1 GbE,117,zstd -1 -T1,318,v1.5.7
+transfer,1 GbE,117,lzop -1,238,1.04
+transfer,1 GbE,117,gzip -1,91,1.12
+transfer,1 GbE,117,gzip -6,34,1.12
+transfer,1 GbE,117,pigz -1,272,2.8
+transfer,1 GbE,117,pigz -1 -p 1,106,2.8
+transfer,1 GbE,117,pigz -6,225,2.8
+transfer,1 GbE,117,pigz -6 -p 1,36,2.8
+transfer,2.5 GbE,295,no compression,290,
+transfer,2.5 GbE,295,lz4 -1,577,v1.11.1
+transfer,2.5 GbE,295,lz4 -1 -T1,578,v1.11.1
+transfer,2.5 GbE,295,lz4 -9,202,v1.11.1
+transfer,2.5 GbE,295,lz4 -9 -T1,37,v1.11.1
+transfer,2.5 GbE,295,zstd -1,786,v1.5.7
+transfer,2.5 GbE,295,zstd -1 -T1,442,v1.5.7
+transfer,2.5 GbE,295,lzop -1,453,1.04
+transfer,2.5 GbE,295,gzip -1,91,1.12
+transfer,2.5 GbE,295,gzip -6,33,1.12
+transfer,2.5 GbE,295,pigz -1,263,2.8
+transfer,2.5 GbE,295,pigz -1 -p 1,107,2.8
+transfer,2.5 GbE,295,pigz -6,220,2.8
+transfer,2.5 GbE,295,pigz -6 -p 1,36,2.8
+transfer,5 GbE,590,no compression,571,
+transfer,5 GbE,590,lz4 -1,1054,v1.11.1
+transfer,5 GbE,590,lz4 -1 -T1,675,v1.11.1
+transfer,5 GbE,590,lz4 -9,206,v1.11.1
+transfer,5 GbE,590,lz4 -9 -T1,39,v1.11.1
+transfer,5 GbE,590,zstd -1,841,v1.5.7
+transfer,5 GbE,590,zstd -1 -T1,448,v1.5.7
+transfer,5 GbE,590,lzop -1,470,1.04
+transfer,5 GbE,590,gzip -1,91,1.12
+transfer,5 GbE,590,gzip -6,34,1.12
+transfer,5 GbE,590,pigz -1,265,2.8
+transfer,5 GbE,590,pigz -1 -p 1,107,2.8
+transfer,5 GbE,590,pigz -6,233,2.8
+transfer,5 GbE,590,pigz -6 -p 1,37,2.8
+transfer,10 GbE,1170,no compression,1128,
+transfer,10 GbE,1170,lz4 -1,1242,v1.11.1
+transfer,10 GbE,1170,lz4 -1 -T1,691,v1.11.1
+transfer,10 GbE,1170,lz4 -9,207,v1.11.1
+transfer,10 GbE,1170,lz4 -9 -T1,38,v1.11.1
+transfer,10 GbE,1170,zstd -1,855,v1.5.7
+transfer,10 GbE,1170,zstd -1 -T1,449,v1.5.7
+transfer,10 GbE,1170,lzop -1,481,1.04
+transfer,10 GbE,1170,gzip -1,91,1.12
+transfer,10 GbE,1170,gzip -6,34,1.12
+transfer,10 GbE,1170,pigz -1,266,2.8
+transfer,10 GbE,1170,pigz -1 -p 1,107,2.8
+transfer,10 GbE,1170,pigz -6,228,2.8
+transfer,10 GbE,1170,pigz -6 -p 1,37,2.8
