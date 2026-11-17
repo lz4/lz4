@@ -222,7 +222,6 @@ size_t test_lz4f_decompression_wBuffers(
     size_t moreToFlush = 0;
     XXH64_state_t xxh64;
     XXH64_reset(&xxh64, extCrcSeed);
-    o_scenario = o_contiguous;
     assert(ip < iend);
     while (ip < iend) {
         unsigned const nbBitsI = (FUZ_rand(randState) % (maxBits-1)) + 1;
