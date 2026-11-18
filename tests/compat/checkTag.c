@@ -25,10 +25,8 @@
 
 /* checkTag command :
  * $ ./checkTag tag
- * checkTag validates tags of following format : v[0-9].[0-9].[0-9]{any}
- * The tag is then compared to LZ4 version number.
- * They are compatible if first 3 digits are identical.
- * Anything beyond that is free, and doesn't impact validation.
+ * A compatible tag starts with 'v' and matches the LZ4 major, minor,
+ * and patch numbers. An optional suffix must start with a non-digit.
  * Example : tag v1.8.1.2 is compatible with version 1.8.1
  * When tag and version are not compatible, program exits with error code 1.
  * When they are compatible, it exists with a code 0.
@@ -47,12 +45,14 @@ static int validate(const char* const tag)
 {
     size_t const tagLength = strlen(tag);
     size_t const verLength = strlen(LZ4_VERSION_STRING);
+    size_t const versionEnd = verLength + 1;  /* Include the leading 'v'. */
 
     if (tagLength < 2) return 0;
     if (tag[0] != 'v') return 0;
-    if (tagLength <= verLength) return 0;
+    if (tagLength < versionEnd) return 0;
 
     if (strncmp(LZ4_VERSION_STRING, tag+1, verLength)) return 0;
+    if (tag[versionEnd] >= '0' && tag[versionEnd] <= '9') return 0;
 
     return 1;
 }
