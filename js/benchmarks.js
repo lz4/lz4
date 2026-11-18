@@ -126,11 +126,15 @@
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "tooltip" });
     data.addRows(rows);
-    new google.visualization.BarChart($(".benchmark-chart[data-scenario=" + scenarioName + "]")[0]).draw(data, {
-      title: scenario.selected + " (" + formatSpeed(linkSpeed) + ") : measured speed, MB/s of original data\nHIGHER IS BETTER",
+    var el = $(".benchmark-chart[data-scenario=" + scenarioName + "]")[0];
+    var link = scenario.selected + " (" + formatSpeed(linkSpeed) + ")", unit = "measured speed, MB/s of original data";
+    var narrow = el.offsetWidth < 500;   /* the title has 2 lines at most : on small screens, the unit goes below the axis */
+    new google.visualization.BarChart(el).draw(data, {
+      title: (narrow ? link : link + " : " + unit) + "\nHIGHER IS BETTER",
       legend: { position: "none" },
       chartArea: { left: "22%", width: "62%", height: "82%" },
-      hAxis: { minValue: 0, ticks: linearSpeedTicks(maxOf(rows), 6) },
+      hAxis: { minValue: 0, ticks: linearSpeedTicks(maxOf(rows), Math.max(3, Math.floor(el.offsetWidth * 0.62 / 75))),
+               title: narrow ? unit : null },
       annotations: { alwaysOutside: true, textStyle: { fontSize: 11 } }
     });
   };
@@ -185,7 +189,7 @@
     });
   };
 
-  var setup = function () {
+  var drawAll = function () {
     drawScatter("dSpeed", "Decompression speed",
                 { title: "Decompression speed (log scale)", logScale: true, ticks: speedTicks([300, 500, 1000, 2000, 5000, 10000]) });
     drawScatter("cSpeed", "Compression speed",
@@ -193,9 +197,26 @@
     drawBars("bars-decompression", "dSpeed", "Decompression speed", formatSpeed);
     drawBars("bars-compression", "cSpeed", "Compression speed", formatSpeed);
     drawBars("bars-ratio", "ratio", "Compression ratio", function (r) { return r.toFixed(3); });
-    setupPipeline();
     drawPipeline("read");
     drawPipeline("transfer");
+  };
+
+  /* charts are drawn at the width of their container : redraw them when the width changes.
+   * Not the height : mobile browsers change it when the address bar hides, while scrolling. */
+  var redrawOnResize = function () {
+    var width = $(window).width(), timer;
+    $(window).on("resize", function () {
+      if ($(window).width() === width) return;
+      width = $(window).width();
+      clearTimeout(timer);
+      timer = setTimeout(drawAll, 200);
+    });
+  };
+
+  var setup = function () {
+    setupPipeline();
+    drawAll();
+    redrawOnResize();
   };
 
   google.charts.load("current", { packages: ["corechart"] });
