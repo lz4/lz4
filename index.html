@@ -19,9 +19,26 @@
       .bench-section code {
         white-space: nowrap;
       }
+      .bench-section h2 {
+        text-align: left;
+      }
+      /* small screens : strapdown loads Bootstrap 2 responsive CSS,
+         which adds a padding to body (set to 0 below) and removes the one of .container-fluid */
+      @media (max-width: 767px) {
+        body .container-fluid {
+          padding-left: 15px;
+          padding-right: 15px;
+        }
+        #content td a {
+          overflow-wrap: anywhere;
+        }
+        .jumbotron.text-justify {
+          text-align: left;
+        }
+      }
     </style>
   </head>
-  <body style="padding-top:0; padding-bottom:0; ">
+  <body style="padding:0;">
     <nav class="navbar navbar-default">
       <div class="container-fluid">
         <!-- Brand and toggle get grouped for better mobile display -->
