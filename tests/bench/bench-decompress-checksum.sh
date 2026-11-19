@@ -5,6 +5,7 @@
 # Effective speed = decompressed size / elapsed time (1 MB = 1000000 bytes), median of runs interleaved between programs.
 # Scenarios : towards /dev/null, a pipe, a file (in TMPDIR, tmpfs preferably), from a pipe, and test mode (-t).
 # -C : compression speed instead (content checksum of the source, hashed by the main thread), same speed definition.
+# -S : other scenarios, notably towards a file : without sparse mode, into a new file, and the write limit of the system (dd).
 
 set -u
 set -o pipefail
@@ -17,6 +18,7 @@ SEGMENTS=""      # KB
 QUEUES="1 2 3"
 EXTRAS="pr=origin/decompress-checksum"
 CPUS=""
+SCEN=""
 CACHE_DIR=${XDG_CACHE_HOME:-$HOME/.cache}/lz4-bench-pipeline
 
 usage() {
@@ -29,6 +31,9 @@ usage : $0 [options]
   -q LIST   OUTBUFF_QUEUE depths, variants of HEAD named qN (default : "$QUEUES")
   -x N=REV  program N built from REV, repeatable (default : "$EXTRAS")
   -c CPUS   run pinned to CPUS (taskset -c), ex: 0-7 (default : not pinned)
+  -S LIST   scenarios (default : "devnull pipe file stdin test", with -C : "devnull file stdin T1 fast9"), also :
+            nosparse (file, --no-sparse), newfile (file, removed before each run), dd (dd bs=4M of the source into
+            the same file : write limit, independent of programs) ; files are written in TMPDIR (default : /dev/shm)
   -C        compression instead, no variant of HEAD : -1 towards /dev/null (devnull), a file (file), from a pipe (stdin),
             -1 -T1 (T1), --fast=9 (fast9) ; threads : LZ4_NBWORKERS, or automatic (one per core)
   -h        this help
@@ -38,7 +43,7 @@ EOF
 die() { printf 'error : %s\n' "$*" >&2; exit 1; }
 
 XSET=0
-while getopts "i:n:r:s:q:x:c:Ch" opt; do
+while getopts "i:n:r:s:q:x:c:S:Ch" opt; do
     case $opt in
         i) INPUT=$OPTARG ;;
         n) RUNS=$OPTARG ;;
@@ -47,6 +52,7 @@ while getopts "i:n:r:s:q:x:c:Ch" opt; do
         q) QUEUES=$OPTARG ;;
         x) [ $XSET = 1 ] || EXTRAS=""; XSET=1; EXTRAS="$EXTRAS $OPTARG" ;;
         c) CPUS=$OPTARG ;;
+        S) SCEN=$OPTARG ;;
         C) MODE=compress ;;
         h) usage; exit 0 ;;
         *) usage; exit 1 ;;
@@ -110,6 +116,7 @@ else
     CRC_IN=$INPUT;  NOCRC_IN=$INPUT;  NOCRC_OPT=--no-frame-crc
     SCENARIOS="devnull file stdin T1 fast9"
 fi
+[ -z "$SCEN" ] || SCENARIOS=$SCEN
 
 run() {   # run SCENARIO PROGRAM FILE OPTIONS
     local p=$WORK/bin/$2
@@ -119,11 +126,15 @@ run() {   # run SCENARIO PROGRAM FILE OPTIONS
         decompress,file)    $PIN "$p" -q -d -f "$3" "$OUT" ;;
         decompress,stdin)   $PIN cat "$3" | $PIN "$p" -q -d -c > /dev/null ;;
         decompress,test)    $PIN "$p" -q -t "$3" ;;
+        decompress,nosparse) $PIN "$p" -q -d -f --no-sparse "$3" "$OUT" ;;
+        decompress,newfile) $PIN "$p" -q -d -f "$3" "$OUT" ;;
         compress,devnull)   $PIN "$p" -q -1 $4 -c "$3" > /dev/null ;;
         compress,file)      $PIN "$p" -q -1 $4 -f "$3" "$OUT" ;;
         compress,stdin)     $PIN cat "$3" | $PIN "$p" -q -1 $4 -c > /dev/null ;;
         compress,T1)        $PIN "$p" -q -1 -T1 $4 -c "$3" > /dev/null ;;
         compress,fast9)     $PIN "$p" -q --fast=9 $4 -c "$3" > /dev/null ;;
+        *,dd)               $PIN dd if="$INPUT" of="$OUT" bs=4M 2> /dev/null ;;
+        *)                  die "$1 : unknown scenario" ;;
     esac
 }
 
@@ -136,6 +147,7 @@ measure() {   # measure FILE OPTIONS PROGRAMS... : table of MB/s
     for s in $SCENARIOS; do
         for r in $(seq "$RUNS"); do
             for p in "$@"; do
+                [ "$s" != newfile ] || rm -f "$OUT"
                 t0=$EPOCHREALTIME
                 run "$s" "$p" "$f" "$o" || die "$p failed ($s)"
                 t1=$EPOCHREALTIME
