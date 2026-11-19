@@ -57,27 +57,36 @@ printf 'building %s and HEAD ...\n' "$REF" >&2
 build ref "$REF"
 build head HEAD
 
-# XXH32 of lz4 (lib/xxhash.c of HEAD), compiled with the options of programs/Makefile
+# XXH32 of lz4 (lib/xxhash.c of HEAD), compiled with the options of programs/Makefile, and without vectorization :
+# single pass (XXH32()), and streaming by 4 MB pieces (XXH32_update(), as lz4frame.c)
 cat > "$WORK/xxb.c" <<'EOF'
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include "xxhash.h"
 static double now(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (double)t.tv_sec + (double)t.tv_nsec * 1e-9; }
+#define N (4 << 20)
+#define LOOPS 256
 int main(void)
 {
-    size_t const n = 4 << 20;
-    unsigned char* const b = (unsigned char*)malloc(n);
-    unsigned h = 0; int i; double t;
-    if (b == NULL) return 1;
-    for (i = 0; i < (int)n; i++) b[i] = (unsigned char)(i * 2654435761u >> 13);
-    t = now(); for (i = 0; i < 256; i++) h += XXH32(b, n, (unsigned)i); t = now() - t;
-    printf("XXH32 of lz4 (lib/xxhash.c, %s -O3), 4 MB buffer : %.1f GB/s (%08X)\n", CCNAME, 256.0 * (double)n / t / 1e9, h);
+    unsigned char* const b = (unsigned char*)malloc(N);
+    XXH32_state_t* const st = XXH32_createState();
+    unsigned h = 0; int i; double t1, t2;
+    if (b == NULL || st == NULL) return 1;
+    for (i = 0; i < N; i++) b[i] = (unsigned char)(i * 2654435761u >> 13);
+    t1 = now(); for (i = 0; i < LOOPS; i++) h += XXH32(b, N, (unsigned)i); t1 = now() - t1;
+    XXH32_reset(st, 0);
+    t2 = now(); for (i = 0; i < LOOPS; i++) XXH32_update(st, b, N); t2 = now() - t2;
+    h += XXH32_digest(st);
+    printf("XXH32 of lz4 (lib/xxhash.c, %-34s), 4 MB : single pass %5.1f GB/s, streaming %5.1f GB/s (%08X)\n",
+           FLAGS, (double)LOOPS * N / t1 / 1e9, (double)LOOPS * N / t2 / 1e9, h);
     return 0;
 }
 EOF
-"$CC" -O3 -DXXH_NAMESPACE=LZ4_ -DCCNAME="\"$CC\"" -I"$WORK/src-head/lib" "$WORK/xxb.c" "$WORK/src-head/lib/xxhash.c" -o "$WORK/bin/xxb" \
-    || die "cannot build the XXH32 benchmark"
+for f in "-O3" "-O3 -fno-tree-vectorize"; do
+    "$CC" $f -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC $f\"" -I"$WORK/src-head/lib" "$WORK/xxb.c" "$WORK/src-head/lib/xxhash.c" -o "$WORK/bin/xxb$([ "$f" = "-O3" ] || echo -novec)" \
+        || die "cannot build the XXH32 benchmark"
+done
 
 "$WORK/bin/ref" -q -1 -T1 "$INPUT" -c > "$WORK/crc.lz4" || die "compression failed"
 "$WORK/bin/ref" -q -1 -T1 --no-frame-crc "$INPUT" -c > "$WORK/nocrc.lz4" || die "compression failed"
@@ -99,6 +108,7 @@ speed() {   # speed PROGRAM FILE : MB/s of `lz4 -t`, median of 7
     echo "ref = $REF ($(git -C "$REPO" rev-parse --short "$REF")), head = HEAD ($(git -C "$REPO" rev-parse --short HEAD)), input : $INPUT"
     echo
     "$WORK/bin/xxb"
+    "$WORK/bin/xxb-novec"
     echo
     for p in ref head; do
         echo "$p -t : with content checksum $(speed $p "$WORK/crc.lz4"), without $(speed $p "$WORK/nocrc.lz4")"
