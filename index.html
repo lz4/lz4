@@ -10,7 +10,6 @@
 
     <!-- Bootstrap -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.3.0/css/font-awesome.min.css" integrity="sha384-yNuQMX46Gcak2eQsUzmBYgJ3eBeWYNKhnjyiBqLd1vvtE9kuMtgw6bjwN8J0JauQ" crossorigin="anonymous">
 
     <link rel="stylesheet" href="js/bootstrap-patch.css">
     <style>
@@ -22,6 +21,71 @@
       }
       .bench-section h2 {
         text-align: left;
+      }
+      .gh-icon {
+        width: 1.15em;
+        height: 1.15em;
+        fill: currentColor;
+        vertical-align: -0.2em;
+      }
+      /* GitHub star button, styled like the former ghbtns.com widget ;
+         the count is added by the script at the end of the page, only once known */
+      .star-btn {
+        display: inline-block;
+        overflow: hidden; /* baseline at the bottom edge, like the former iframe */
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 22px;
+        white-space: nowrap;
+      }
+      .star-btn:hover, .star-btn:focus {
+        text-decoration: none;
+      }
+      .star-btn > span {
+        display: inline-block;
+        padding: 3px 10px 3px 8px;
+        color: #333;
+        border-radius: 4px;
+      }
+      .star-face {
+        background: linear-gradient(#fcfcfc, #eee);
+        border: 1px solid #d5d5d5;
+      }
+      .star-btn:hover .star-face {
+        background: linear-gradient(#eee, #ddd);
+        border-color: #ccc;
+      }
+      .star-face svg {
+        width: 20px;
+        height: 20px;
+        margin-right: 4px;
+        fill: #333;
+        vertical-align: top;
+      }
+      .star-count {
+        position: relative;
+        margin-left: 6px;
+        background: #fafafa;
+        border: 1px solid #d4d4d4;
+      }
+      .star-count::before, .star-count::after {
+        position: absolute;
+        top: 50%;
+        content: "";
+        border-style: solid;
+        border-color: transparent;
+      }
+      .star-count::before {
+        left: -6px;
+        margin-top: -7px;
+        border-width: 7px 7px 7px 0;
+        border-right-color: #d4d4d4;
+      }
+      .star-count::after {
+        left: -5px;
+        margin-top: -6px;
+        border-width: 6px 6px 6px 0;
+        border-right-color: #fafafa;
       }
       /* small screens : strapdown loads Bootstrap 2 responsive CSS,
          which adds a padding to body (set to 0 below) and removes the one of .container-fluid */
@@ -40,6 +104,10 @@
     </style>
   </head>
   <body style="padding:0;">
+    <svg style="display:none">
+      <!-- @primer/octicons, MIT -->
+      <symbol id="gh" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></symbol>
+    </svg>
     <nav class="navbar navbar-default">
       <div class="container-fluid">
         <!-- Brand and toggle get grouped for better mobile display -->
@@ -73,7 +141,7 @@
             <li><a href="https://github.com/lz4/lz4/releases/latest">Latest Release</a></li>
             <li><a href="https://github.com/lz4/lz4/tree/release/doc">Documentation</a></li>
             <li><a href="https://github.com/lz4/lz4/issues">Issue Tracker</a></li>
-            <li><a href="https://github.com/lz4/lz4"><i class="fa fa-lg fa-github"></i> GitHub</a></li>
+            <li><a href="https://github.com/lz4/lz4"><svg class="gh-icon" aria-hidden="true"><use href="#gh"/></svg> GitHub</a></li>
           </ul>
         </div><!-- /.navbar-collapse -->
       </div><!-- /.container-fluid -->
@@ -83,7 +151,7 @@
     <div class="container">
       <div class="page-header jumbotron text-justify" style="padding-top:1em;padding-bottom:2em;">
         <h1>LZ4</h1>
-        <iframe src="https://ghbtns.com/github-btn.html?user=lz4&repo=lz4&type=star&count=true&size=large&v=2" frameborder="0" scrolling="0" width="160px" height="30px"></iframe>
+        <a class="star-btn" href="https://github.com/lz4/lz4"><span class="star-face"><svg aria-hidden="true"><use href="#gh"/></svg>Star</span></a>
         <p>
         LZ4 is a lossless compression algorithm, providing compression speed > 500 MB/s per core (>0.15 Bytes/cycle).
         It features an extremely fast decoder, with speed in multiple GB/s per core (~1 Byte/cycle).
@@ -478,5 +546,35 @@ who greatly contributed to the creation of this LZ4 webpage
     <!-- Chart -->
     <script src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="js/benchmarks.js"></script>
+
+    <!-- GitHub star count, asked directly to the GitHub API.
+         The API allows 60 calls per hour per IP, often spent behind a shared address :
+         the count is kept 6 hours in localStorage, and an expired one is shown if the call fails. -->
+    <script>
+    (function () {
+      var btn = document.querySelector(".star-btn");
+      if (!btn || !window.fetch) return;
+      var KEY = "lz4-stars", TTL = 6 * 60 * 60 * 1000;
+
+      function paint(n) {
+        var span = btn.querySelector(".star-count") || btn.appendChild(document.createElement("span"));
+        span.className = "star-count";
+        span.textContent = Number(n).toLocaleString("en-US");
+      }
+
+      var cached = null;
+      try { cached = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* private mode */ }
+      if (cached && Date.now() - cached.at < TTL) { paint(cached.n); return; }
+
+      fetch("https://api.github.com/repos/lz4/lz4")
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (d) {
+          if (typeof d.stargazers_count !== "number") throw new Error("unexpected reply");
+          paint(d.stargazers_count);
+          try { localStorage.setItem(KEY, JSON.stringify({ n: d.stargazers_count, at: Date.now() })); } catch (e) { /* storage blocked */ }
+        })
+        .catch(function () { if (cached) paint(cached.n); });
+    })();
+    </script>
   </body>
 </html>
