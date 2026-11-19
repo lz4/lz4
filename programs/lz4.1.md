@@ -143,7 +143,8 @@ only the latest one will be applied.
 * `-T#`, `--threads=#`:
   Use `#` worker threads for compression.
   The main thread reads and writes files meanwhile.
-  When `0`, or none provided: automatically determined from nb of detected cores.
+  When `0`, or none provided: automatically determined from nb of detected cores,
+  leaving 1 + a quarter of them to the rest of the system.
   In both cases, within memory budget (see `--memory`), with a warning when it reduces `#`,
   and no more threads than the jobs of each file (1 MB, or a single block when larger).
   At most 1024 threads (128 on 32-bit systems).
