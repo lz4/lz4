@@ -3,9 +3,9 @@
 # other revisions (-x), and variants of HEAD (-s : LZ4IO_HASH_SEGMENT sizes, -q : OUTBUFF_QUEUE depths).
 # Builds every program from the git repository of this script, in a temporary directory. Results : on stdout, and in a file.
 # Effective speed = decompressed size / elapsed time (1 MB = 1000000 bytes), median of runs interleaved between programs.
-# Scenarios : towards /dev/null, a pipe, a file (in TMPDIR, tmpfs preferably), from a pipe, and test mode (-t).
+# Scenarios : towards /dev/null, a pipe, a new file (in TMPDIR, tmpfs preferably), from a pipe, and test mode (-t).
 # -C : compression speed instead (content checksum of the source, hashed by the main thread), same speed definition.
-# -S : other scenarios, notably towards a file : without sparse mode, into a new file, and the write limit of the system (dd).
+# -S : other scenarios : towards a new file without sparse mode, or over the existing file (its release is then measured too).
 
 set -u
 set -o pipefail
@@ -32,8 +32,8 @@ usage : $0 [options]
   -x N=REV  program N built from REV, repeatable (default : "$EXTRAS")
   -c CPUS   run pinned to CPUS (taskset -c), ex: 0-7 (default : not pinned)
   -S LIST   scenarios (default : "devnull pipe file stdin test", with -C : "devnull file stdin T1 fast9"), also :
-            nosparse (file, --no-sparse), newfile (file, removed before each run), dd (dd bs=4M of the source into
-            the same file : write limit, independent of programs) ; files are written in TMPDIR (default : /dev/shm)
+            nosparse (file, --no-sparse), overwrite (file, over the existing one) ; files : in TMPDIR (default : /dev/shm),
+            removed before each run, except with overwrite
   -C        compression instead, no variant of HEAD : -1 towards /dev/null (devnull), a file (file), from a pipe (stdin),
             -1 -T1 (T1), --fast=9 (fast9) ; threads : LZ4_NBWORKERS, or automatic (one per core)
   -h        this help
@@ -127,13 +127,13 @@ run() {   # run SCENARIO PROGRAM FILE OPTIONS
         decompress,stdin)   $PIN cat "$3" | $PIN "$p" -q -d -c > /dev/null ;;
         decompress,test)    $PIN "$p" -q -t "$3" ;;
         decompress,nosparse) $PIN "$p" -q -d -f --no-sparse "$3" "$OUT" ;;
-        decompress,newfile) $PIN "$p" -q -d -f "$3" "$OUT" ;;
+        decompress,overwrite) $PIN "$p" -q -d -f "$3" "$OUT" ;;
         compress,devnull)   $PIN "$p" -q -1 $4 -c "$3" > /dev/null ;;
         compress,file)      $PIN "$p" -q -1 $4 -f "$3" "$OUT" ;;
         compress,stdin)     $PIN cat "$3" | $PIN "$p" -q -1 $4 -c > /dev/null ;;
         compress,T1)        $PIN "$p" -q -1 -T1 $4 -c "$3" > /dev/null ;;
         compress,fast9)     $PIN "$p" -q --fast=9 $4 -c "$3" > /dev/null ;;
-        *,dd)               $PIN dd if="$INPUT" of="$OUT" bs=4M 2> /dev/null ;;
+        compress,overwrite) $PIN "$p" -q -1 $4 -f "$3" "$OUT" ;;
         *)                  die "$1 : unknown scenario" ;;
     esac
 }
@@ -147,7 +147,7 @@ measure() {   # measure FILE OPTIONS PROGRAMS... : table of MB/s
     for s in $SCENARIOS; do
         for r in $(seq "$RUNS"); do
             for p in "$@"; do
-                [ "$s" != newfile ] || rm -f "$OUT"
+                [ "$s" = overwrite ] || rm -f "$OUT"
                 t0=$EPOCHREALTIME
                 run "$s" "$p" "$f" "$o" || die "$p failed ($s)"
                 t1=$EPOCHREALTIME
