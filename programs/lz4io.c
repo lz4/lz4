@@ -1871,7 +1871,7 @@ LZ4IO_fwriteSparse(FILE* file,
     const size_t maskT = sizeT -1 ;
     const size_t* const bufferT = (const size_t*)buffer;   /* Buffer is supposed malloc'ed, hence aligned on size_t */
     const size_t* ptrT = bufferT;
-    size_t bufferSizeT = bufferSize / sizeT;
+    size_t const bufferSizeT = bufferSize / sizeT;
     const size_t* const bufferTEnd = bufferT + bufferSizeT;
     const size_t segmentSizeT = (32 KB) / sizeT;
     int const sparseMode = (sparseFileSupport - (file==stdout)) > 0;
@@ -1889,28 +1889,39 @@ LZ4IO_fwriteSparse(FILE* file,
         storedSkips -= 1 GB;
     }
 
-    while (ptrT < bufferTEnd) {
-        size_t seg0SizeT = segmentSizeT;
-        size_t nb0T;
-
-        /* count leading zeros */
-        if (seg0SizeT > bufferSizeT) seg0SizeT = bufferSizeT;
-        bufferSizeT -= seg0SizeT;
-        for (nb0T=0; (nb0T < seg0SizeT) && (ptrT[nb0T] == 0); nb0T++) ;
-        storedSkips += (unsigned)(nb0T * sizeT);
-
-        if (nb0T != seg0SizeT) {   /* not all 0s */
-            errno = 0;
-            {   int const seekResult = UTIL_fseek(file, storedSkips, SEEK_CUR);
-                if (seekResult) { END_PROCESS_OR_JOB_ERROR(fromJob, 72, "Sparse skip error(%d): %s ; try --no-sparse", (int)errno, strerror(errno)); return 0; }
+    /* segments entirely made of zeros are skipped, other ones are written at once, zeros included */
+    {   const size_t* dataT = ptrT;   /* data not written yet, from dataT to ptrT */
+        while (dataT < bufferTEnd) {
+            size_t segSizeT = segmentSizeT;
+            size_t nb0T = 0;
+            if (ptrT < bufferTEnd) {
+                if (segSizeT > (size_t)(bufferTEnd - ptrT)) segSizeT = (size_t)(bufferTEnd - ptrT);
+                for (nb0T=0; (nb0T < segSizeT) && (ptrT[nb0T] == 0); nb0T++) ;
+                if (nb0T != segSizeT) {   /* not all 0s */
+                    if ((ptrT == dataT) && storedSkips) {   /* after zeros skipped : its leading zeros too */
+                        storedSkips += (unsigned)(nb0T * sizeT);
+                        dataT = ptrT + nb0T;
+                    }
+                    ptrT += segSizeT;
+                    continue;
+                }
             }
-            storedSkips = 0;
-            seg0SizeT -= nb0T;
+            /* segment of zeros, or end of buffer : data written, after the zeros skipped before it */
+            if (ptrT > dataT) {
+                if (storedSkips) {
+                    errno = 0;
+                    {   int const seekResult = UTIL_fseek(file, storedSkips, SEEK_CUR);
+                        if (seekResult) { END_PROCESS_OR_JOB_ERROR(fromJob, 72, "Sparse skip error(%d): %s ; try --no-sparse", (int)errno, strerror(errno)); return 0; }
+                    }
+                    storedSkips = 0;
+                }
+                {   size_t const sizeCheck = fwrite(dataT, sizeT, (size_t)(ptrT - dataT), file);
+                    if (sizeCheck != (size_t)(ptrT - dataT)) { END_PROCESS_OR_JOB_ERROR(fromJob, 73, "Write error : cannot write decoded block"); return 0; }
+            }   }
+            storedSkips += (unsigned)(nb0T * sizeT);
             ptrT += nb0T;
-            {   size_t const sizeCheck = fwrite(ptrT, sizeT, seg0SizeT, file);
-                if (sizeCheck != seg0SizeT) { END_PROCESS_OR_JOB_ERROR(fromJob, 73, "Write error : cannot write decoded block"); return 0; }
-        }   }
-        ptrT += seg0SizeT;
+            dataT = ptrT;
+        }
     }
 
     if (bufferSize & maskT) {  /* size not multiple of sizeT : implies end of block */
