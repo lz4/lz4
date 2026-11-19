@@ -79,7 +79,8 @@ build() {   # build NAME REV CPPFLAGS : program $WORK/bin/NAME
     local dir=$WORK/src-$1
     mkdir -p "$dir" "$WORK/bin"
     git -C "$REPO" archive "$2" | tar -x -C "$dir" || die "git archive $2 failed"
-    make -s -j"$NBJOBS" -C "$dir/programs" lz4 CPPFLAGS="$3" >"$WORK/build.log" 2>&1 \
+    # CPPFLAGS only for variants : releases up to v1.10.0 set -I and multithreading in CPPFLAGS
+    make -s -j"$NBJOBS" -C "$dir/programs" lz4 ${3:+"CPPFLAGS=$3"} >"$WORK/build.log" 2>&1 \
         || { tail -20 "$WORK/build.log" >&2; die "build of $1 failed"; }
     cp -L "$dir/programs/lz4" "$WORK/bin/$1"
     rm -rf "$dir"
@@ -155,12 +156,12 @@ measure() {   # measure FILE OPTIONS PROGRAMS... : table of MB/s
             done
         done
     done
-    printf '%-10s' ""; for s in $SCENARIOS; do printf '%9s' "$s"; done; echo
+    printf '%-10s' ""; for s in $SCENARIOS; do printf '%10s' "$s"; done; echo
     for p in "$@"; do
         printf '%-10s' "$p"
         for s in $SCENARIOS; do
             printf '%s' "${T[$s,$p]}" | tr ';' '\n' | awk 'NF == 2 { print $2 - $1 }' | sort -n \
-                | awk -v size="$SIZE" '{ d[NR] = $1 } END { printf "%9.0f", size / d[int((NR + 1) / 2)] / 1e6 }'
+                | awk -v size="$SIZE" '{ d[NR] = $1 } END { printf "%10.0f", size / d[int((NR + 1) / 2)] / 1e6 }'
         done
         echo
     done
