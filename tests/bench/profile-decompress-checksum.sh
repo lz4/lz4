@@ -87,6 +87,13 @@ for f in "-O3" "-O3 -fno-tree-vectorize"; do
     "$CC" $f -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC $f\"" -I"$WORK/src-head/lib" "$WORK/xxb.c" "$WORK/src-head/lib/xxhash.c" -o "$WORK/bin/xxb$([ "$f" = "-O3" ] || echo -novec)" \
         || die "cannot build the XXH32 benchmark"
 done
+# with the guard of xxHash >= v0.7 in XXH32_round() : no auto-vectorization when SSE4.1 is enabled
+mkdir "$WORK/guard" && cp "$WORK/src-head/lib/xxhash.h" "$WORK/guard/"
+awk '{ print } /^    seed \*= PRIME32_1;$/ { print "#if defined(__GNUC__) && (defined(__SSE4_1__) || defined(__aarch64__))"; print "    __asm__ (\"\" : \"+r\" (seed));"; print "#endif" }' \
+    "$WORK/src-head/lib/xxhash.c" > "$WORK/guard/xxhash.c"
+grep -q '__asm__' "$WORK/guard/xxhash.c" || die "cannot add the guard to XXH32_round()"
+"$CC" -O3 -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC -O3, guard of xxHash >= v0.7\"" -I"$WORK/guard" "$WORK/xxb.c" "$WORK/guard/xxhash.c" -o "$WORK/bin/xxb-guard" \
+    || die "cannot build the XXH32 benchmark (guard)"
 
 "$WORK/bin/ref" -q -1 -T1 "$INPUT" -c > "$WORK/crc.lz4" || die "compression failed"
 "$WORK/bin/ref" -q -1 -T1 --no-frame-crc "$INPUT" -c > "$WORK/nocrc.lz4" || die "compression failed"
@@ -104,11 +111,12 @@ speed() {   # speed PROGRAM FILE : MB/s of `lz4 -t`, median of 7
 
 {
     echo "host : $(uname -n), $(uname -sr), $(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/.*: //')"
-    echo "$($CC --version | head -1)"
+    echo "$($CC --version | head -1), enabled by default : $($CC -dM -E -x c /dev/null | grep -oE '__(SSE4_1|AVX2|AVX512F)__' | tr '\n' ' ')"
     echo "ref = $REF ($(git -C "$REPO" rev-parse --short "$REF")), head = HEAD ($(git -C "$REPO" rev-parse --short HEAD)), input : $INPUT"
     echo
     "$WORK/bin/xxb"
     "$WORK/bin/xxb-novec"
+    "$WORK/bin/xxb-guard"
     echo
     for p in ref head; do
         echo "$p -t : with content checksum $(speed $p "$WORK/crc.lz4"), without $(speed $p "$WORK/nocrc.lz4")"
