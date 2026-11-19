@@ -83,7 +83,7 @@ lz4 -q -B4 $R $R.lz4
 test "$(wc -c < $R.lz4)" -eq 4194310
 lz4 -dc $R.lz4 > $OUT;  cmp $R $OUT
 # wrong checksums : detected
-flip() { b=$(od -An -tu1 -j$2 -N1 $1); printf "$(printf '\\%03o' $((b ^ 255)))" | dd of=$1 bs=1 seek=$2 conv=notrunc 2> /dev/null; }   # flip FILE OFFSET
+flip() { b=$(od -An -tu1 -j$2 -N1 $1 | tr -d ' \n'); printf "$(printf '\\%03o' $((b ^ 255)))" | dd of=$1 bs=1 seek=$2 conv=notrunc 2> /dev/null; }   # flip FILE OFFSET
 for o in 4194306 4194307 4194308 4194309; do
     cp $R.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $o
     fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
