@@ -105,6 +105,10 @@ cmp $SRC $OUT
 cp $SRC $FPREFIX-exists
 fails "lz4 -q -d $L $FPREFIX-exists" "not overwritten"
 cmp $SRC $FPREFIX-exists
+# an existing output is kept when the source can't be opened (the source is opened first)
+cp $SRC $FPREFIX-keep
+fails "lz4 -q -d -f $FPREFIX-absent.lz4 $FPREFIX-keep" "absent.lz4"
+cmp $SRC $FPREFIX-keep
 # output modification time : that of the source
 touch -t 200001010000 $FPREFIX-1.lz4
 lz4 -q -d -f $FPREFIX-1.lz4
