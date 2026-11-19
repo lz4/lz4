@@ -162,8 +162,8 @@ static DWORD WINAPI WorkerThread(LPVOID lpParameter)
                                     &bytesTransferred, &completionKey,
                                     &overlapped, INFINITE)) {
 
-        /* End signal */
-        if (overlapped == NULL) { break; }
+        /* End signal (see TPool_free()) : no job function (a job's argument can be NULL) */
+        if (completionKey == 0) { break; }
 
         /* Execute job */
         ((void (*)(void*))completionKey)(overlapped);
