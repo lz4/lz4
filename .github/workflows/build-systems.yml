@@ -45,12 +45,6 @@ jobs:
         .\\generate_vs2022.cmd
         popd
 
-    - name: Upload generated VS2022 directory
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-      with:
-        name: VS2022-Build-Dir
-        path: "build/visual/Visual Studio 17 2022"
-
     - name: Build executable with generated solution
       run: cmake --build "build/visual/Visual Studio 17 2022" --config Debug
 
@@ -68,20 +62,15 @@ jobs:
     - name: Checkout
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Setup Python
-      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-      with:
-        python-version: '3.x'
-
     - name: Install build tools
       run: |
         sudo apt-get update
-        sudo apt-get install tree ninja-build meson
+        sudo apt-get install ninja-build meson
 
     - name: Display environment info
       run: |
         type clang && which clang && clang --version
-        type python && which python && python --version
+        type python3 && which python3 && python3 --version
         type meson && which meson && meson --version
 
     - name: Configure build
@@ -113,7 +102,7 @@ jobs:
       run: |
         cd builddir
         DESTDIR=./staging ninja install
-        tree ./staging
+        find ./staging
 
   meson-msvc:
     name: Meson + Ninja (MSVC, shared library)
@@ -121,11 +110,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-    - name: Setup Python
-      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-      with:
-        python-version: '3.x'
 
     - name: Install build tools
       run: python -m pip install meson ninja
