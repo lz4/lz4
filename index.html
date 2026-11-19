@@ -552,11 +552,6 @@ who greatly contributed to the creation of this LZ4 webpage
 ---
 </xmp>
 
-    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
-    <!-- Include all compiled plugins (below), or include individual files as needed -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
-
     <!-- Markdown : the <xmp> block, converted by marked -->
     <script src="js/marked.js"></script>
     <script>
@@ -569,6 +564,43 @@ who greatly contributed to the creation of this LZ4 webpage
       xmp.parentNode.replaceChild(content, xmp);
       var tables = content.getElementsByTagName("table");
       for (var i = 0; i < tables.length; i++) tables[i].className = "table table-striped table-bordered";
+    })();
+    </script>
+
+    <!-- Mobile menu, Index menu and tabs : Bootstrap's classes, set by our own code (data-toggle attributes) -->
+    <script>
+    (function () {
+      var closeMenus = function () {
+        Array.prototype.forEach.call(document.querySelectorAll(".dropdown.open"), function (m) {
+          m.classList.remove("open");
+          m.querySelector("[data-toggle]").setAttribute("aria-expanded", "false");
+        });
+      };
+      document.addEventListener("click", function (e) {
+        var toggle = e.target.closest("[data-toggle]");
+        var kind = toggle ? toggle.getAttribute("data-toggle") : "";
+        if (kind === "dropdown") {
+          e.preventDefault();
+          var wasOpen = toggle.parentNode.classList.contains("open");
+          closeMenus();
+          if (!wasOpen) { toggle.parentNode.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); }
+          return;
+        }
+        closeMenus();
+        if (kind === "collapse") {
+          var open = document.querySelector(toggle.getAttribute("data-target")).classList.toggle("in");
+          toggle.classList.toggle("collapsed", !open);
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        } else if (kind === "tab") {
+          e.preventDefault();
+          var tab = toggle.parentNode, pane = document.querySelector(toggle.getAttribute("href"));
+          [ tab, pane ].forEach(function (el) {
+            Array.prototype.forEach.call(el.parentNode.children, function (sibling) { sibling.classList.remove("active"); });
+            el.classList.add("active");
+          });
+        }
+      });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenus(); });
     })();
     </script>
 

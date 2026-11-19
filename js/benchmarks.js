@@ -3,7 +3,7 @@
  * pipelines  : effective speeds of command lines through a link of limited speed,
  *              measured by bench/bench-pipeline.sh (csv/pipeline-i7-9700k.csv)
  */
-(function ($) {
+(function () {
   var codecs = [];     /* { name, ratio, cSpeed, dSpeed } */
   var pipeline = [];   /* { scenario, link, linkSpeed, compressor, speed } */
 
@@ -25,11 +25,11 @@
     return rows;
   };
 
-  var chartEl = function (name) { return $(".bench-chart[data-chart=" + name + "]")[0]; };
+  var chartEl = function (name) { return document.querySelector(".bench-chart[data-chart=" + name + "]"); };
 
   /* lzbench : ratio vs speed */
   var speedTicks = function (values) {
-    return $.map(values, function (v) { return { v: v, f: formatSpeed(v) }; });
+    return values.map(function (v) { return { v: v, f: formatSpeed(v) }; });
   };
 
   /* ticks from 0 to beyond max, at most n steps of a round size (1, 2, 2.5 or 5 x 10^k), labelled with units */
@@ -40,12 +40,12 @@
       if (max / (base * multipliers[i]) <= n) step = base * multipliers[i];
     }
     while (values[values.length - 1] < max) values.push(values[values.length - 1] + step);
-    return $.map(speedTicks(values), function (t) { if (t.v === 0) t.f = "0"; return t; });
+    return speedTicks(values).map(function (t) { if (t.v === 0) t.f = "0"; return t; });
   };
 
   var maxOf = function (rows) {
     var max = 0;
-    $.each(rows, function (i, r) { if (r[1] > max) max = r[1]; });
+    rows.forEach(function (r) { if (r[1] > max) max = r[1]; });
     return max;
   };
 
@@ -56,7 +56,7 @@
     data.addColumn({ type: "string", role: "style" });
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "tooltip" });
-    $.each(codecs, function (i, c) {
+    codecs.forEach(function (c) {
       data.addRow([ c[key], c.ratio,
                     "point { size: " + (isLZ4(c.name) ? 9 : 6) + "; fill-color: " + barColor(c.name) + "; }",
                     shortName(c.name),
@@ -75,7 +75,7 @@
   /* lzbench : one chart per measurement */
   var drawBars = function (chart, key, title, format) {
     var rows = [];
-    $.each(codecs, function (i, c) { rows.push([ shortName(c.name), c[key], "color: " + barColor(c.name), format(c[key]), c.name ]); });
+    codecs.forEach(function (c) { rows.push([ shortName(c.name), c[key], "color: " + barColor(c.name), format(c[key]), c.name ]); });
     rows.sort(function (a, b) { return b[1] - a[1]; });
     var data = new google.visualization.DataTable();
     data.addColumn("string", "Compressor");
@@ -101,7 +101,7 @@
 
   var hasSingleThreadVariant = function (command) {
     var found = false;
-    $.each(pipeline, function (i, p) {
+    pipeline.forEach(function (p) {
       if (isSingleThreadVariant(p.compressor) && p.compressor.replace(/ (-T1|-p 1)$/, "") === command) found = true;
     });
     return found;
@@ -110,7 +110,7 @@
   var drawPipeline = function (scenarioName) {
     var scenario = scenarios[scenarioName];
     var rows = [], linkSpeed = 0;
-    $.each(pipeline, function (i, p) {
+    pipeline.forEach(function (p) {
       if (p.scenario !== scenarioName || p.link !== scenario.selected) return;
       if (scenario.singleThread ? (!isSingleThreadVariant(p.compressor) && hasSingleThreadVariant(p.compressor))
                                 : isSingleThreadVariant(p.compressor)) return;
@@ -126,7 +126,7 @@
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "tooltip" });
     data.addRows(rows);
-    var el = $(".benchmark-chart[data-scenario=" + scenarioName + "]")[0];
+    var el = document.querySelector(".benchmark-chart[data-scenario=" + scenarioName + "]");
     var link = scenario.selected + " (" + formatSpeed(linkSpeed) + ")", unit = "measured speed, MB/s of original data";
     var narrow = el.offsetWidth < 500;   /* the title has 2 lines at most : on small screens, the unit goes below the axis */
     new google.visualization.BarChart(el).draw(data, {
@@ -142,50 +142,50 @@
   /* versions of the programs, as measured : "lz4 v1.11.1, zstd v1.5.7, ..." */
   var showVersions = function (scenarioName) {
     var versions = {}, list = [];
-    $.each(pipeline, function (i, p) {
+    pipeline.forEach(function (p) {
       if (p.scenario === scenarioName && p.version) versions[p.compressor.split(" ")[0]] = p.version.replace(/^v/, "");
     });
-    $.each(versions, function (prog, version) { list.push(prog + " " + version); });
-    if (list.length) $(".benchmark-versions[data-scenario=" + scenarioName + "]").html("Versions : " + list.join(", ") + ".");
+    Object.keys(versions).forEach(function (prog) { list.push(prog + " " + versions[prog]); });
+    if (list.length) document.querySelector(".benchmark-versions[data-scenario=" + scenarioName + "]").innerHTML = "Versions : " + list.join(", ") + ".";
+  };
+
+  /* a group of buttons, one selected : onSelect(i) is called when button i is clicked */
+  var buttonGroup = function (labels, selected, onSelect) {
+    var group = document.createElement("div");
+    group.className = "btn-group btn-group-sm";
+    group.setAttribute("role", "group");
+    labels.forEach(function (label, i) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn " + (i === selected ? "btn-primary" : "btn-default");
+      button.innerHTML = label;
+      button.addEventListener("click", function () {
+        Array.prototype.forEach.call(group.children, function (b) { b.className = "btn btn-default"; });
+        button.className = "btn btn-primary";
+        onSelect(i);
+      });
+      group.appendChild(button);
+    });
+    return group;
   };
 
   var setupPipeline = function () {
-    $.each(scenarios, function (scenarioName, scenario) {
+    Object.keys(scenarios).forEach(function (scenarioName) {
+      var scenario = scenarios[scenarioName];
+      var place = document.querySelector(".benchmark-links[data-scenario=" + scenarioName + "]");
       showVersions(scenarioName);
-      var group = $('<div class="btn-group btn-group-sm" role="group"></div>');
-      var links = [];
-      $.each(pipeline, function (i, p) {
-        if (p.scenario === scenarioName && p.compressor === "no compression") links.push(p);
-      });
+      var links = pipeline.filter(function (p) { return p.scenario === scenarioName && p.compressor === "no compression"; });
       scenario.selected = scenario.defaultLink;
-      $.each(links, function (i, link) {
-        var button = $('<button type="button" class="btn"></button>')
-          .html(link.link + "<br/><small>" + formatSpeed(link.linkSpeed) + "</small>")
-          .addClass(link.link === scenario.selected ? "btn-primary" : "btn-default")
-          .click(function () {
-            scenario.selected = link.link;
-            group.children().removeClass("btn-primary").addClass("btn-default");
-            button.removeClass("btn-default").addClass("btn-primary");
-            drawPipeline(scenarioName);
-          });
-        group.append(button);
-      });
-      $(".benchmark-links[data-scenario=" + scenarioName + "]").append(group);
+      place.appendChild(buttonGroup(
+        links.map(function (link) { return link.link + "<br/><small>" + formatSpeed(link.linkSpeed) + "</small>"; }),
+        links.map(function (link) { return link.link; }).indexOf(scenario.selected),
+        function (i) { scenario.selected = links[i].link; drawPipeline(scenarioName); }));
       if (scenario.singleThread === undefined) return;
-      var modes = $('<div class="btn-group btn-group-sm" role="group" style="margin-left:1em;"></div>');
-      $.each([ [ false, "Default settings" ], [ true, "Single thread" ] ], function (i, mode) {
-        var button = $('<button type="button" class="btn"></button>')
-          .html(mode[1] + "<br/><small>compression</small>")
-          .addClass(mode[0] === scenario.singleThread ? "btn-primary" : "btn-default")
-          .click(function () {
-            scenario.singleThread = mode[0];
-            modes.children().removeClass("btn-primary").addClass("btn-default");
-            button.removeClass("btn-default").addClass("btn-primary");
-            drawPipeline(scenarioName);
-          });
-        modes.append(button);
-      });
-      $(".benchmark-links[data-scenario=" + scenarioName + "]").append(modes);
+      var modes = buttonGroup([ "Default settings<br/><small>compression</small>", "Single thread<br/><small>compression</small>" ],
+                              scenario.singleThread ? 1 : 0,
+                              function (i) { scenario.singleThread = i === 1; drawPipeline(scenarioName); });
+      modes.style.marginLeft = "1em";
+      place.appendChild(modes);
     });
   };
 
@@ -204,10 +204,10 @@
   /* charts are drawn at the width of their container : redraw them when the width changes.
    * Not the height : mobile browsers change it when the address bar hides, while scrolling. */
   var redrawOnResize = function () {
-    var width = $(window).width(), timer;
-    $(window).on("resize", function () {
-      if ($(window).width() === width) return;
-      width = $(window).width();
+    var width = document.documentElement.clientWidth, timer;
+    window.addEventListener("resize", function () {
+      if (document.documentElement.clientWidth === width) return;
+      width = document.documentElement.clientWidth;
       clearTimeout(timer);
       timer = setTimeout(drawAll, 200);
     });
@@ -221,15 +221,18 @@
 
   google.charts.load("current", { packages: ["corechart"] });
   google.charts.setOnLoadCallback(function () {
-    $.when($.get("csv/benchmark-silesia.csv", null, null, "text"), $.get("csv/pipeline-i7-9700k.csv", null, null, "text"))
-      .done(function (codecsReply, pipelineReply) {
-        $.each(parseCsv(codecsReply[0]), function (i, f) {
+    var getText = function (url) {
+      return fetch(url).then(function (r) { if (!r.ok) throw new Error(url + " : " + r.status); return r.text(); });
+    };
+    Promise.all([ getText("csv/benchmark-silesia.csv"), getText("csv/pipeline-i7-9700k.csv") ])
+      .then(function (replies) {
+        parseCsv(replies[0]).forEach(function (f) {
           codecs.push({ name: f[0], ratio: Number(f[1]), cSpeed: Number(f[2]), dSpeed: Number(f[3]) });
         });
         /* pipeline.csv, as written by bench-pipeline.sh : columns found by name */
-        var header = pipelineReply[0].split("\n")[0].trim().split(",");
-        var col = function (name) { return $.inArray(name, header); };
-        $.each(parseCsv(pipelineReply[0]), function (i, f) {
+        var header = replies[1].split("\n")[0].trim().split(",");
+        var col = function (name) { return header.indexOf(name); };
+        parseCsv(replies[1]).forEach(function (f) {
           pipeline.push({ scenario: f[col("scenario")], link: f[col("link")], linkSpeed: Number(f[col("link_MBps")]),
                           compressor: f[col("compressor")], speed: Number(f[col("effective_MBps")]),
                           version: col("version") >= 0 ? f[col("version")] : "" });
@@ -237,4 +240,4 @@
         setup();
       });
   });
-})(jQuery);
+})();
