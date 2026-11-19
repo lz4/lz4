@@ -1,0 +1,98 @@
+# Files attached to each GitHub release : Windows packages, source tarball and its checksum.
+# They are workflow artifacts (gh run download), attached to the release by hand.
+name: Release Assets
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release-assets.yml'
+      - 'contrib/windows-package/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or commit to package (default : the branch selected above)'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  windows-package:
+    name: Windows package (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - { arch: win32, msystem: MINGW32 }
+          - { arch: win64, msystem: MINGW64 }
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ inputs.ref }}
+
+    - name: Install MSYS2
+      uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+      with:
+        msystem: ${{ matrix.msystem }}
+        update: true
+        install: make zip
+        pacboy: gcc:p
+
+    - name: Build lz4.exe
+      run: |
+        gcc --version | head -1
+        make -C programs lz4 V=1
+
+    - name: Check lz4.exe
+      run: |
+        set -e
+        programs/lz4.exe -V
+        # standalone, as contrib/windows-package/README.md states : no DLL besides Windows' own
+        objdump -p programs/lz4.exe | grep 'DLL Name'
+        if objdump -p programs/lz4.exe | grep 'DLL Name' | grep -v -i -E 'KERNEL32\.dll|msvcrt\.dll'; then
+            echo "unexpected DLL dependency"; exit 1
+        fi
+
+    - name: Package
+      run: |
+        set -e
+        v=$(awk '/#define LZ4_VERSION_(MAJOR|MINOR|RELEASE) /{printf "%s%s", s, $3; s="_"}' lib/lz4.h)
+        mkdir pkg
+        cp programs/lz4.exe NEWS contrib/windows-package/README.md programs/COPYING pkg/
+        cp lib/LICENSE pkg/LICENSE-lib
+        cd pkg
+        zip -X ../lz4_${{ matrix.arch }}_v$v.zip lz4.exe README.md NEWS COPYING LICENSE-lib
+
+    - name: Upload
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: lz4_${{ matrix.arch }}
+        path: lz4_${{ matrix.arch }}_v*.zip
+        if-no-files-found: error
+
+  source-tarball:
+    name: Source tarball
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ inputs.ref }}
+
+    - name: Tarball and checksum
+      run: |
+        v=$(awk '/#define LZ4_VERSION_(MAJOR|MINOR|RELEASE) /{printf "%s%s", s, $3; s="."}' lib/lz4.h)
+        git archive --format=tar --prefix=lz4-$v/ HEAD | gzip -cn > lz4-$v.tar.gz
+        sha256sum lz4-$v.tar.gz | tee lz4-$v.tar.gz.sha256
+
+    - name: Upload
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: lz4_source
+        path: lz4-*.tar.gz*
+        if-no-files-found: error
