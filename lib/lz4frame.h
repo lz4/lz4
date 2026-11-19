@@ -221,6 +221,7 @@ typedef struct {
  *  0 (default) : single-threaded, unchanged behavior.
  *  >= 1 : input is cut into jobs, compressed by nbWorkers worker threads (capped at 1024, 128 on 32-bit systems),
  *         while the calling thread fills and emits them (it compresses a flushed job itself when no other job is running).
+ *         With a content checksum, one more thread hashes content.
  *  - Output only depends on content, parameters and flush points :
  *    never on nbWorkers value (>= 1), scheduling, input slicing, nor stableSrc.
  *  - With independent blocks, output is identical to nbWorkers == 0.
