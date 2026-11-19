@@ -8,11 +8,31 @@
     <title>LZ4 - Extremely fast compression</title>
     <meta name="description" content="LZ4 is a lossless compression algorithm, with compression speed &gt; 500 MB/s per core and a decoder at multiple GB/s per core. Open source library, BSD license.">
 
-    <!-- Bootstrap 3, sandstone theme (strapdown loads it too) -->
-    <link rel="stylesheet" href="strapdown/v/0.2/themes/sandstone.min.css">
+    <!-- Bootstrap 3, sandstone theme -->
+    <link rel="stylesheet" href="css/sandstone.min.css">
 
     <link rel="stylesheet" href="js/bootstrap-patch.css">
     <style>
+      /* markdown output (formerly strapdown.css) */
+      body {
+        font-size: 15px;
+        line-height: 150%;
+      }
+      h1, h2, h3, h4 {
+        margin: 15px 0;
+      }
+      pre {
+        margin: 20px 0;
+      }
+      img {
+        margin: 10px 0;
+      }
+      .navbar {
+        z-index: 1;
+      }
+      .table {
+        width: auto;
+      }
       .list-inline li a img {
         height: 50px;
       }
@@ -87,13 +107,8 @@
         border-width: 6px 6px 6px 0;
         border-right-color: #fafafa;
       }
-      /* small screens : strapdown loads Bootstrap 2 responsive CSS,
-         which adds a padding to body (set to 0 below) and removes the one of .container-fluid */
+      /* small screens */
       @media (max-width: 767px) {
-        body .container-fluid {
-          padding-left: 15px;
-          padding-right: 15px;
-        }
         #content td a {
           overflow-wrap: anywhere;
         }
@@ -103,7 +118,7 @@
       }
     </style>
   </head>
-  <body style="padding:0;">
+  <body>
     <svg style="display:none">
       <!-- @primer/octicons, MIT -->
       <symbol id="gh" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></symbol>
@@ -162,7 +177,7 @@
 
 
 
-<xmp theme="sandstone" style="display:none;">
+<xmp style="display:none;">
 <a name="benchmarks"></a>
 Benchmarks
 ----------
@@ -541,7 +556,21 @@ who greatly contributed to the creation of this LZ4 webpage
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
     <!-- Include all compiled plugins (below), or include individual files as needed -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
-    <script src="strapdown/v/0.2/strapdown.js"></script>
+
+    <!-- Markdown : the <xmp> block, converted by marked -->
+    <script src="js/marked.js"></script>
+    <script>
+    (function () {
+      var xmp = document.getElementsByTagName("xmp")[0];
+      var content = document.createElement("div");
+      content.className = "container";
+      content.id = "content";
+      content.innerHTML = marked(xmp.textContent);
+      xmp.parentNode.replaceChild(content, xmp);
+      var tables = content.getElementsByTagName("table");
+      for (var i = 0; i < tables.length; i++) tables[i].className = "table table-striped table-bordered";
+    })();
+    </script>
 
     <!-- Chart -->
     <script src="https://www.gstatic.com/charts/loader.js"></script>
