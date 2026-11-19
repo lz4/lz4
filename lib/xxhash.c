@@ -271,6 +271,11 @@ static U32 XXH32_round(U32 seed, U32 input)
     seed += input * PRIME32_2;
     seed  = XXH_rotl32(seed, 13);
     seed *= PRIME32_1;
+#if defined(__GNUC__) && (defined(__SSE2__) || defined(__aarch64__) || defined(__wasm_simd128__))
+    /* prevents autovectorization (slower), notably of XXH32_update() :
+     * up to 6x slower on x86-64 without SSE4.1, where 32-bit vector multiplies are emulated */
+    __asm__ ("" : "+r" (seed));
+#endif
     return seed;
 }
 
