@@ -40,15 +40,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up MSVC (Windows)
-      if: runner.os == 'Windows'
-      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
-
-    - name: Set up CMake
-      uses: jwlawson/actions-setup-cmake@0d6a7d60b009d01c9e7523be22153ff8f19460d3 # v2.2.0
-      with:
-        cmake-version: latest
-
     - name: Configure and Build
       shell: bash
       run: |
@@ -81,10 +72,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up CMake
+    - name: Set up CMake 3.10
+      if: matrix.test_type == 'cmake_versions'
       uses: jwlawson/actions-setup-cmake@0d6a7d60b009d01c9e7523be22153ff8f19460d3 # v2.2.0
       with:
-        cmake-version: ${{ matrix.test_type == 'cmake_versions' && '3.10.0' || 'latest' }}
+        cmake-version: '3.10.0'
 
     - name: CMake Version Compatibility Test
       if: matrix.test_type == 'cmake_versions'
