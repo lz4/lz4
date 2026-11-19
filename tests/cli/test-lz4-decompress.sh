@@ -68,6 +68,34 @@ for z in $FPREFIX-z1 $FPREFIX-z2; do
     lz4 -q -d -c -f --sparse $z > $OUT;  cmp $z $OUT   # not lz4 : pass-through (-c -f)
 done
 
+# content checksums : verified as decoded data is written (multi-threaded decompression), by liblz4 otherwise
+# (block checksums, -t, frames decoded at once) ; frames of each kind, one after the other
+B=$FPREFIX-big;  datagen -g9MB > $B   # several 4 MB blocks
+lz4 -q $B $B-c.lz4
+lz4 -q --no-frame-crc $B $B-n.lz4
+lz4 -q -BX $B $B-x.lz4
+{ cat $B-c.lz4 $B-n.lz4; skip 20000; cat $B-x.lz4 $F $B-c.lz4; } | lz4 -dc > $OUT
+cat $B $B $B $SRC $B | cmp - $OUT
+# input is read by 4 MB pieces (INBUFF_SIZE) : a frame of 4194310 bytes (64 stored blocks of 64 KB)
+# ends with its checksum across offset 4 + 4 MB
+R=$FPREFIX-rnd;  datagen -g4194039 -P0 > $R
+lz4 -q -B4 $R $R.lz4
+test "$(wc -c < $R.lz4)" -eq 4194310
+lz4 -dc $R.lz4 > $OUT;  cmp $R $OUT
+# wrong checksums : detected
+flip() { b=$(od -An -tu1 -j$2 -N1 $1 | tr -d ' \n'); printf "$(printf '\\%03o' $((b ^ 255)))" | dd of=$1 bs=1 seek=$2 conv=notrunc 2> /dev/null; }   # flip FILE OFFSET
+for o in 4194306 4194307 4194308 4194309; do
+    cp $R.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $o
+    fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
+done
+cp $B-c.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-c.lz4) - 1))
+fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
+fails "lz4 -t $FPREFIX-bad.lz4" "contentChecksum_invalid"
+fails "cat $B-c.lz4 $B-n.lz4 $FPREFIX-bad.lz4 | lz4 -dc" "contentChecksum_invalid"
+lz4 -q -dc --no-frame-crc $FPREFIX-bad.lz4 > $OUT;  cmp $B $OUT   # not verified, on request
+cp $B-x.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-x.lz4) - 9))   # last block checksum
+fails "lz4 -dc $FPREFIX-bad.lz4" "blockChecksum_invalid"
+
 
 # errors
 fails "lz4 -t $SRC" "Unrecognized header : file cannot be decoded"

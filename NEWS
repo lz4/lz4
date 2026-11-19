@@ -4,6 +4,7 @@ fix  : in-place decompression: wrong margin since v1.11.0 due to larger stripes:
 fix  : `lz4 -l` started a thread per core at once, and could fail under a limit of processes, notably from standard input (since v1.10.0)
 perf : faster decompression with a dictionary (up to +38% on small blocks)
 perf : faster content checksums in gcc builds for x86-64 without SSE4.1, the default of most distributions (compression and decompression up to +133%)
+perf : faster `lz4 -d` and `lz4 -t` on frames with a content checksum (the default) : verified by a dedicated thread, up to +39% on silesia
 build: OS400 builds (since v1.11.0), reported by @jonrumsey
 
 v1.11.1

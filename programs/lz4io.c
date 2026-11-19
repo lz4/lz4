@@ -1596,7 +1596,7 @@ static int LZ4IO_mappedContentUnchanged(const LZ4IO_cInput_t* in, FILE* srcFile,
     }
 }
 
-/* keeps the last 4 bytes of the frame (content checksum, see LZ4IO_mappedContentUnchanged()) */
+/* keeps the last 4 bytes of a frame written or read by pieces (content checksum, see LZ4IO_mappedContentUnchanged(), LZ4IO_frameCheck_t) */
 static void LZ4IO_keepFrameTail(unsigned char tail[4], const void* out, size_t size)
 {
     const unsigned char* const o = (const unsigned char*)out;
@@ -2271,8 +2271,10 @@ static void LZ4IO_freeDResources(dRess_t ress)
 
 #define INBUFF_SIZE (4 MB)
 #define OUTBUFF_SIZE (1 * INBUFF_SIZE)
-#define OUTBUFF_QUEUE 1
-#define PBUFFERS_NB (1 /* being decompressed */ + OUTBUFF_QUEUE + 1 /* being written to io */)
+#define OUTBUFF_QUEUE 1   /* decoded buffers waiting for the writing thread, and for the hashing thread */
+/* BufPool_getBuffer() doesn't wait : the decoding thread only takes buffer N + PBUFFERS_NB
+ * once buffer N + PBUFFERS_NB - 1 is accepted into both queues, so buffer N is written and hashed */
+#define PBUFFERS_NB (1 /* being decompressed */ + OUTBUFF_QUEUE + 1 /* being written to io, and hashed */)
 
 typedef struct {
     void* ptr;
@@ -2377,6 +2379,68 @@ static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
 }
 
 typedef struct {
+    const void* ptr;
+    size_t size;
+    int frameStart;
+    int frameEnd;
+    unsigned storedChecksum;   /* frameEnd only */
+    XXH32_state_t* xxh;
+} LZ4FChunkToHash;
+
+/* hashing thread : content checksum of decoded buffers, while the writing thread writes them ;
+ * @arg == NULL : buffer of a frame not hashed (see PBUFFERS_NB) */
+static void LZ4IO_hashDecodedLZ4FChunk(void* arg)
+{
+    LZ4FChunkToHash* const cth = (LZ4FChunkToHash*)arg;
+    if (cth == NULL) return;
+    if (!TPool_jobError()) {
+        if (cth->frameStart) XXH32_reset(cth->xxh, 0);
+        XXH32_update(cth->xxh, cth->ptr, cth->size);
+        if (cth->frameEnd && (XXH32_digest(cth->xxh) != cth->storedChecksum))
+            JOB_ERROR(34, "Decompression error : ERROR_contentChecksum_invalid");   /* as when verified by liblz4 */
+    }
+    free(cth);
+}
+
+/* Content checksums are verified by a hashing thread, in parallel with the writing thread, instead of liblz4.
+ * A frame is only known once its header is decoded, by its first LZ4F_decompress() invocation :
+ * when the frame continues, with a content checksum and without block checksums (verified by liblz4 only),
+ * next invocations skip checksums, and all output of the frame is hashed (the first one also by liblz4).
+ * An invocation never goes beyond the end of a frame : each output buffer belongs to a single frame.
+ * State of the decoding thread, kept from one input buffer to the next. */
+typedef struct {
+    int hashAllowed;        /* 0 : checksums skipped (--no-frame-crc) */
+    int frameKnown;         /* header of current frame decoded */
+    int hashing;            /* current frame is hashed by hPool : liblz4 skips checksums */
+    int hashStart;          /* next hashed buffer is the first one of the frame */
+    unsigned char tail[4];  /* last 4 bytes consumed : content checksum, at end of frame */
+    TPool* hPool;           /* hashing thread, created for the first hashed frame, then receives every buffer */
+    XXH32_state_t* xxh;     /* employed by the hashing thread */
+} LZ4IO_frameCheck_t;
+
+/* once the header of current frame is decoded : is the frame hashed by hPool ? */
+static void LZ4IO_checkFrame(LZ4IO_frameCheck_t* fc, LZ4F_dctx* dctx)
+{
+    LZ4F_frameInfo_t info;
+    size_t noInput = 0;
+    if (LZ4F_isError(LZ4F_getFrameInfo(dctx, &info, NULL, &noInput))) return;   /* header not decoded yet */
+    fc->frameKnown = 1;
+    if ( !fc->hashAllowed
+      || (info.frameType != LZ4F_frame)   /* skippable frame */
+      || (info.contentChecksumFlag != LZ4F_contentChecksumEnabled)
+      || (info.blockChecksumFlag != LZ4F_noBlockChecksum) )
+        return;
+    if (fc->hPool == NULL) {
+        if (fc->xxh == NULL) fc->xxh = XXH32_createState();
+        if (fc->xxh == NULL) return;   /* checksums verified by liblz4 */
+        fc->hPool = TPool_create(1, OUTBUFF_QUEUE);
+        if (fc->hPool == NULL) return;
+    }
+    fc->hashing = 1;
+    fc->hashStart = 1;
+}
+
+typedef struct {
     LZ4F_dctx* dctx;
     const void* inBuffer;
     size_t inSize;
@@ -2389,44 +2453,65 @@ typedef struct {
     FILE* foutput;
     int sparseEnable;
     unsigned* storedSkips;
+    LZ4IO_frameCheck_t* fc;
 } LZ4FChunk;
 
 static void LZ4IO_decompressLZ4FChunk(void* arg)
 {
     LZ4FChunk* const lz4fc = (LZ4FChunk*)arg;
+    LZ4IO_frameCheck_t* const fc = lz4fc->fc;
     const char* inPtr = (const char*)lz4fc->inBuffer;
     size_t pos = 0;
 
     while ((pos < lz4fc->inSize) && !TPool_jobError()) {  /* still to read */
         size_t remainingInSize = lz4fc->inSize - pos;
         Buffer b = BufPool_getBuffer(lz4fc->bp);
+        LZ4F_decompressOptions_t dOpt;
+        int frameEnd;
         if (b.capacity != OUTBUFF_SIZE) {
             JOB_ERROR(33, "Could not allocate output buffer!");
             break;
         }
         assert(b.size == 0);
         b.size = b.capacity;
+        memset(&dOpt, 0, sizeof(dOpt));
+        dOpt.skipChecksums = (unsigned)fc->hashing;   /* remains set until the end of frame */
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
                                 b.ptr, &b.size,
                                 inPtr + pos, &remainingInSize,
                                 lz4fc->dictBuffer, lz4fc->dictBufferSize,
-                                NULL);
+                                &dOpt);
             if (LZ4F_isError(nextToLoad)) {
                 JOB_ERROR(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
                 break;
             }
             *lz4fc->lastStatus = nextToLoad;
+            frameEnd = (nextToLoad == 0);
         }
         assert(remainingInSize <= lz4fc->inSize - pos);
+        LZ4IO_keepFrameTail(fc->tail, inPtr + pos, remainingInSize);
         pos += remainingInSize;
         assert(b.size <= b.capacity);
+        if (!fc->frameKnown && !frameEnd) LZ4IO_checkFrame(fc, lz4fc->dctx);
 
-        /* push to write thread */
+        /* push to hashing and write threads */
         {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
-            if (ctw==NULL) {
+            LZ4FChunkToHash* const cth = fc->hashing ? (LZ4FChunkToHash*)malloc(sizeof(*cth)) : NULL;
+            if (ctw==NULL || (fc->hashing && cth==NULL)) {
+                free(ctw); free(cth);
                 JOB_ERROR(35, "Allocation error : can't describe new write job");
                 break;
             }
+            if (cth) {
+                cth->ptr = b.ptr;
+                cth->size = b.size;
+                cth->frameStart = fc->hashStart;
+                cth->frameEnd = frameEnd;
+                cth->storedChecksum = frameEnd ? LZ4IO_readLE32(fc->tail) : 0;
+                cth->xxh = fc->xxh;
+            }
+            assert(cth == NULL || fc->hPool != NULL);   /* hashed frames : hPool created by LZ4IO_checkFrame() */
+            if (fc->hPool) TPool_submitJob(fc->hPool, LZ4IO_hashDecodedLZ4FChunk, cth);   /* every buffer : see PBUFFERS_NB */
             ctw->bufOut = b;
             ctw->fOut = lz4fc->foutput;
             ctw->bp = lz4fc->bp;
@@ -2435,10 +2520,23 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
             ctw->totalSize = lz4fc->totalSize;
             TPool_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
         }
+        fc->hashStart = 0;
+        if (frameEnd) {
+            fc->frameKnown = 0;
+            fc->hashing = 0;
+        }
     }
 
     /* clean up */
     free(lz4fc);
+}
+
+/* waits for decoding jobs, which submit hashing and writing jobs, then for them : see LZ4IO_waitJobs() */
+static void LZ4IO_waitLZ4FJobs(TPool* tPool, const LZ4IO_frameCheck_t* fc, TPool* wPool)
+{
+    TPool_jobsCompleted(tPool);
+    if (fc->hPool) TPool_jobsCompleted(fc->hPool);
+    LZ4IO_waitJobs(tPool, wPool);
 }
 
 static unsigned long long
@@ -2455,8 +2553,9 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
         &dOpt_skipCrc : NULL;
     TPool* const tPool = TPool_create(1, 1);
-    TPool* const wPool = TPool_create(1, 1);
+    TPool* const wPool = TPool_create(1, OUTBUFF_QUEUE);
     BufferPool* const bp = LZ4IO_createBufferPool(OUTBUFF_SIZE);
+    LZ4IO_frameCheck_t fc;
 #define NB_BUFFSETS 4 /* 1 being read, 1 being processed, 1 being written, 1 being queued */
     void* inBuffs[NB_BUFFSETS];
     int bSetNb;
@@ -2464,6 +2563,9 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     /* checks */
     if (tPool == NULL || wPool == NULL || bp==NULL)
         END_PROCESS(22, "threadpool creation error ");
+
+    memset(&fc, 0, sizeof(fc));
+    fc.hashAllowed = (dOptPtr == NULL);
 
     /* allocate buffers up front */
     for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
@@ -2495,14 +2597,14 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         /* Read input */
         readSize = fread(inBuffs[bSetNb], 1, INBUFF_SIZE, srcFile);
         if (ferror(srcFile)) {
-            LZ4IO_waitJobs(tPool, wPool);
+            LZ4IO_waitLZ4FJobs(tPool, &fc, wPool);
             END_PROCESS(26, "Read error");
         }
 
         /* push to decoding thread */
         {   LZ4FChunk* const lbi = (LZ4FChunk*)malloc(sizeof(*lbi));
             if (lbi==NULL) {
-                LZ4IO_waitJobs(tPool, wPool);
+                LZ4IO_waitLZ4FJobs(tPool, &fc, wPool);
                 END_PROCESS(25, "Allocation error : not enough memory to allocate job descriptor");
             }
             lbi->dctx = ress.dCtx;
@@ -2517,11 +2619,12 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             lbi->foutput = dstFile;
             lbi->sparseEnable = prefs->sparseFileSupport;
             lbi->storedSkips = &storedSkips;
+            lbi->fc = &fc;
             TPool_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
         }
         if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
     }
-    LZ4IO_waitJobs(tPool, wPool);
+    LZ4IO_waitLZ4FJobs(tPool, &fc, wPool);
     assert(feof(srcFile));
 
     /* flush */
@@ -2535,6 +2638,8 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         free(inBuffs[bSetNb]);
     }
     LZ4IO_freeBufferPool(bp);
+    TPool_free(fc.hPool);
+    XXH32_freeState(fc.xxh);
     TPool_free(wPool);
     TPool_free(tPool);
 
