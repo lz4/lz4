@@ -72,7 +72,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up CMake 3.10 (oldest supported version)
+    - name: Set up CMake 3.10
       if: matrix.test_type == 'cmake_versions'
       uses: jwlawson/actions-setup-cmake@0d6a7d60b009d01c9e7523be22153ff8f19460d3 # v2.2.0
       with:
