@@ -83,7 +83,7 @@ int main(void)
     return 0;
 }
 EOF
-XXB=""   # benchmarks built : compiler options of each one, and the guard of xxHash >= v0.7 in XXH32_round()
+XXB=""   # benchmarks built : compiler options of each one, and the guard of xxHash dev (cd33964) in XXH32_round()
 i=0
 while IFS= read -r f; do
     i=$((i + 1))
@@ -99,10 +99,10 @@ done <<EOF
 EOF
 [ -n "$XXB" ] || die "cannot build the XXH32 benchmark"
 mkdir "$WORK/guard" && cp "$WORK/src-head/lib/xxhash.h" "$WORK/guard/"
-awk '{ print } /^    seed \*= PRIME32_1;$/ { print "#if defined(__GNUC__) && (defined(__SSE4_1__) || defined(__aarch64__))"; print "    __asm__ (\"\" : \"+r\" (seed));"; print "#endif" }' \
+awk '{ print } /^    seed \*= PRIME32_1;$/ { print "#if defined(__GNUC__) && (defined(__SSE2__) || defined(__aarch64__) || defined(__wasm_simd128__))"; print "    __asm__ (\"\" : \"+r\" (seed));"; print "#endif" }' \
     "$WORK/src-head/lib/xxhash.c" > "$WORK/guard/xxhash.c"
 grep -q '__asm__' "$WORK/guard/xxhash.c" || die "cannot add the guard to XXH32_round()"
-"$CC" -O3 -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC -O3, guard of xxHash >= v0.7\"" -I"$WORK/guard" "$WORK/xxb.c" "$WORK/guard/xxhash.c" -o "$WORK/bin/xxb-guard" \
+"$CC" -O3 -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC -O3, guard of xxHash dev (SSE2)\"" -I"$WORK/guard" "$WORK/xxb.c" "$WORK/guard/xxhash.c" -o "$WORK/bin/xxb-guard" \
     && XXB="$XXB xxb-guard"
 # assembly of XXH32_update(), as compiled into lz4
 ASM="xxh32-update-$(uname -n).s"
