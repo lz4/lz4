@@ -78,22 +78,36 @@ int main(void)
     XXH32_reset(st, 0);
     t2 = now(); for (i = 0; i < LOOPS; i++) XXH32_update(st, b, N); t2 = now() - t2;
     h += XXH32_digest(st);
-    printf("XXH32 of lz4 (lib/xxhash.c, %-34s), 4 MB : single pass %5.1f GB/s, streaming %5.1f GB/s (%08X)\n",
+    printf("XXH32 of lz4 (lib/xxhash.c, %-38s), 4 MB : single pass %5.1f GB/s, streaming %5.1f GB/s (%08X)\n",
            FLAGS, (double)LOOPS * N / t1 / 1e9, (double)LOOPS * N / t2 / 1e9, h);
     return 0;
 }
 EOF
-for f in "-O3" "-O3 -fno-tree-vectorize"; do
-    "$CC" $f -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC $f\"" -I"$WORK/src-head/lib" "$WORK/xxb.c" "$WORK/src-head/lib/xxhash.c" -o "$WORK/bin/xxb$([ "$f" = "-O3" ] || echo -novec)" \
-        || die "cannot build the XXH32 benchmark"
-done
-# with the guard of xxHash >= v0.7 in XXH32_round() : no auto-vectorization when SSE4.1 is enabled
+XXB=""   # benchmarks built : compiler options of each one, and the guard of xxHash >= v0.7 in XXH32_round()
+i=0
+while IFS= read -r f; do
+    i=$((i + 1))
+    "$CC" $f -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC $f\"" -I"$WORK/src-head/lib" "$WORK/xxb.c" "$WORK/src-head/lib/xxhash.c" \
+        -o "$WORK/bin/xxb$i" 2>/dev/null && XXB="$XXB xxb$i"
+done <<EOF
+-O3
+-O3 -fno-tree-vectorize
+-O3 -fno-tree-slp-vectorize
+-O3 -fno-tree-loop-vectorize
+-O3 -mprefer-vector-width=128
+-O3 -march=x86-64-v2
+EOF
+[ -n "$XXB" ] || die "cannot build the XXH32 benchmark"
 mkdir "$WORK/guard" && cp "$WORK/src-head/lib/xxhash.h" "$WORK/guard/"
 awk '{ print } /^    seed \*= PRIME32_1;$/ { print "#if defined(__GNUC__) && (defined(__SSE4_1__) || defined(__aarch64__))"; print "    __asm__ (\"\" : \"+r\" (seed));"; print "#endif" }' \
     "$WORK/src-head/lib/xxhash.c" > "$WORK/guard/xxhash.c"
 grep -q '__asm__' "$WORK/guard/xxhash.c" || die "cannot add the guard to XXH32_round()"
 "$CC" -O3 -DXXH_NAMESPACE=LZ4_ -DFLAGS="\"$CC -O3, guard of xxHash >= v0.7\"" -I"$WORK/guard" "$WORK/xxb.c" "$WORK/guard/xxhash.c" -o "$WORK/bin/xxb-guard" \
-    || die "cannot build the XXH32 benchmark (guard)"
+    && XXB="$XXB xxb-guard"
+# assembly of XXH32_update(), as compiled into lz4
+ASM="xxh32-update-$(uname -n).s"
+"$CC" -O3 -S -DXXH_NAMESPACE=LZ4_ -I"$WORK/src-head/lib" "$WORK/src-head/lib/xxhash.c" -o "$WORK/xxhash.s" \
+    && awk '/^LZ4_XXH32_update:/, /\.size[ \t]+LZ4_XXH32_update/' "$WORK/xxhash.s" > "$ASM"
 
 "$WORK/bin/ref" -q -1 -T1 "$INPUT" -c > "$WORK/crc.lz4" || die "compression failed"
 "$WORK/bin/ref" -q -1 -T1 --no-frame-crc "$INPUT" -c > "$WORK/nocrc.lz4" || die "compression failed"
@@ -114,9 +128,8 @@ speed() {   # speed PROGRAM FILE : MB/s of `lz4 -t`, median of 7
     echo "$($CC --version | head -1), enabled by default : $($CC -dM -E -x c /dev/null | grep -oE '__(SSE4_1|AVX2|AVX512F)__' | tr '\n' ' ')"
     echo "ref = $REF ($(git -C "$REPO" rev-parse --short "$REF")), head = HEAD ($(git -C "$REPO" rev-parse --short HEAD)), input : $INPUT"
     echo
-    "$WORK/bin/xxb"
-    "$WORK/bin/xxb-novec"
-    "$WORK/bin/xxb-guard"
+    for x in $XXB; do "$WORK/bin/$x"; done
+    [ -s "$ASM" ] && echo "assembly of XXH32_update() (lz4's options) : $ASM"
     echo
     for p in ref head; do
         echo "$p -t : with content checksum $(speed $p "$WORK/crc.lz4"), without $(speed $p "$WORK/nocrc.lz4")"
