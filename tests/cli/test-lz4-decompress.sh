@@ -68,8 +68,8 @@ for z in $FPREFIX-z1 $FPREFIX-z2; do
     lz4 -q -d -c -f --sparse $z > $OUT;  cmp $z $OUT   # not lz4 : pass-through (-c -f)
 done
 
-# content checksums : verified as decoded data is written (multi-threaded decompression), by liblz4 otherwise
-# (block checksums, -t, frames decoded at once) ; frames of each kind, one after the other
+# content checksums : verified by a hashing thread (multi-threaded decompression), by liblz4 otherwise
+# (block checksums, frames decoded at once) ; frames of each kind, one after the other
 B=$FPREFIX-big;  datagen -g9MB > $B   # several 4 MB blocks
 lz4 -q $B $B-c.lz4
 lz4 -q --no-frame-crc $B $B-n.lz4
