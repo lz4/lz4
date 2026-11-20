@@ -2,6 +2,7 @@
 name: FreeBSD
 on:
   push:
+    branches: ['dev', 'release']   # other branches : through pull_request only (not twice)
   pull_request:
 
 permissions:
