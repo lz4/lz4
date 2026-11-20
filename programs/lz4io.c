@@ -2243,6 +2243,9 @@ static dRess_t LZ4IO_createDResources(const LZ4IO_prefs_t* const prefs)
     /* init */
     LZ4F_errorCode_t const errorCode = LZ4F_createDecompressionContext(&ress.dCtx, LZ4F_VERSION);
     if (LZ4F_isError(errorCode)) END_PROCESS(60, "Can't create LZ4F context : %s", LZ4F_getErrorName(errorCode));
+#if LZ4IO_MULTITHREAD
+    LZ4F_setProgressiveDecoding(ress.dCtx, 1);   /* first block decoded as it arrives : see INBUFF_FIRST_READS */
+#endif
 
     /* Allocate Memory */
     ress.srcBufferSize = LZ4IO_dBufferSize;
@@ -2270,6 +2273,8 @@ static void LZ4IO_freeDResources(dRess_t ress)
 #if LZ4IO_MULTITHREAD
 
 #define INBUFF_SIZE (4 MB)
+#define INBUFF_FIRST_READS (256 KB)   /* the first INBUFF_SIZE of input is read by smaller pieces :
+                                       * liblz4 decodes the first block of a frame as it arrives (LZ4F_setProgressiveDecoding()) */
 #define OUTBUFF_SIZE (1 * INBUFF_SIZE)
 #define OUTBUFF_QUEUE 1   /* decoded buffers waiting for the writing thread, and for the hashing thread */
 /* BufPool_getBuffer() doesn't wait : the decoding thread only takes buffer N + PBUFFERS_NB
@@ -2560,6 +2565,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
 #define NB_BUFFSETS 4 /* 1 being read, 1 being processed, 1 being written, 1 being queued */
     void* inBuffs[NB_BUFFSETS];
     int bSetNb;
+    size_t firstReads = 0;   /* input read so far, up to INBUFF_SIZE : see INBUFF_FIRST_READS */
 
     /* checks */
     if (tPool == NULL || wPool == NULL || bp==NULL)
@@ -2591,12 +2597,14 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     /* Main Loop */
     assert(nextToLoad);
     for (bSetNb = 0; ; bSetNb = (bSetNb+1) % NB_BUFFSETS) {
+        size_t const toRead = (firstReads < INBUFF_SIZE) ? INBUFF_FIRST_READS : INBUFF_SIZE;
         size_t readSize;
 
         if (TPool_jobError()) break;
 
         /* Read input */
-        readSize = fread(inBuffs[bSetNb], 1, INBUFF_SIZE, srcFile);
+        readSize = fread(inBuffs[bSetNb], 1, toRead, srcFile);
+        if (firstReads < INBUFF_SIZE) firstReads += readSize;
         if (ferror(srcFile)) {
             LZ4IO_waitLZ4FJobs(tPool, &fc, wPool);
             END_PROCESS(26, "Read error");
@@ -2623,7 +2631,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
             lbi->fc = &fc;
             TPool_submitJob(tPool, LZ4IO_decompressLZ4FChunk, lbi);
         }
-        if (readSize < INBUFF_SIZE) break;   /* likely reached end of stream */
+        if (readSize < toRead) break;   /* likely reached end of stream */
     }
     LZ4IO_waitLZ4FJobs(tPool, &fc, wPool);
     assert(feof(srcFile));
