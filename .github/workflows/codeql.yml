@@ -1,0 +1,37 @@
+# CodeQL static analysis of the library, the command line tool and the workflows.
+# Default query suite : security-extended only adds path-injection reports on files lz4 opens by design.
+name: CodeQL
+on:
+  push:
+    branches: ['dev', 'release']   # other branches : through pull_request only (not twice)
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+
+jobs:
+  analyze:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # uploads results to code scanning (Security tab, PR annotations)
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      with:
+        languages: c-cpp, actions
+
+    - name: Build library and lz4
+      # only lib/ and programs/ are compiled, so only they are analyzed
+      run: make -j4 lib lz4
+
+    - name: Analyze
+      uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
