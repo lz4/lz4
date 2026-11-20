@@ -142,7 +142,8 @@ only the latest one will be applied.
 
 * `-T#`, `--threads=#`:
   Use `#` worker threads for compression.
-  The main thread reads and writes files meanwhile.
+  The main thread reads and writes files meanwhile,
+  and one more thread hashes content for the frame checksum (default, see `--no-frame-crc`).
   When `0`, or none provided: automatically determined from nb of detected cores,
   leaving 1 + a quarter of them to the rest of the system.
   In both cases, within memory budget (see `--memory`), with a warning when it reduces `#`,
