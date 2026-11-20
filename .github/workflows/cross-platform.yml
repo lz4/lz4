@@ -102,7 +102,7 @@ jobs:
       run: make -j test > /dev/null
 
   mingw:
-    # recent MinGW-w64 toolchains (AppVeyor's are much older)
+    # recent MinGW-w64 toolchains. clang adds -Wconversion : on Windows, long is 32-bit
     name: MinGW ${{ matrix.msystem }} ${{ matrix.cc }}
     runs-on: windows-latest
     strategy:
@@ -110,7 +110,7 @@ jobs:
       matrix:
         include:
           - { msystem: MINGW64, cc: gcc }
-          - { msystem: MINGW64, cc: clang }
+          - { msystem: MINGW64, cc: clang, cflags: -Wconversion -Wno-sign-conversion }
           - { msystem: MINGW32, cc: gcc }
     defaults:
       run:
@@ -134,7 +134,7 @@ jobs:
         make --version | head -1
 
     - name: Build with strict flags
-      run: CC=${{ matrix.cc }} CFLAGS="-Werror -O0" make default V=1
+      run: CC=${{ matrix.cc }} CFLAGS="-Werror -O0 ${{ matrix.cflags }}" make default V=1
 
     - name: Run tests
       run: |
