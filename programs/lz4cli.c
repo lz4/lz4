@@ -578,7 +578,7 @@ int main(int argCount, const char** argv)
                       continue;
                   }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
-                if (!strcmp(argument,  "--test")) { mode = om_test; continue; }
+                if (!strcmp(argument,  "--test")) { mode = om_test; multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--force")) { forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); continue; }
                 if (!strcmp(argument,  "--no-force")) { forceOverwrite=0; LZ4IO_setOverwrite(prefs, 0); continue; }
                 if ((!strcmp(argument, "--stdout"))
@@ -724,7 +724,7 @@ int main(int argCount, const char** argv)
                   break;
 
                     /* Test integrity */
-                case 't': mode = om_test; break;
+                case 't': mode = om_test; multiple_inputs=1; break;
 
                     /* Overwrite */
                 case 'f': forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); break;
