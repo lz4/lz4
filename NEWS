@@ -1,4 +1,5 @@
 v1.11.2
+cli  : `lz4 -t` tests every file argument, not only the first, by @immanuwell
 cli  : decompression keeps an existing output file when the source can't be opened, by @immanuwell
 cli  : automatic nb of compression threads (default) leaves more cores to the rest of the system : 1 + 1/4 of them (was 1 + 1/8)
 fix  : in-place decompression: wrong margin since v1.11.0 due to larger stripes: recompile with the enlarged `LZ4_DECOMPRESS_INPLACE_MARGIN()`, reported by @arshsmith1
