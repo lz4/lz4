@@ -74,6 +74,12 @@ lz4 -f --memory=18446744073709551616 $FPREFIX-src $FPREFIX.lz4 && exit 1  # must
 lz4 -f --memory=17179869184G $FPREFIX-src $FPREFIX.lz4 && exit 1          # must fail (overflow)
 lz4 -f -1 $FPREFIX-src $FPREFIX-ref.lz4
 MT=0; if lz4 -V 2>&1 | grep -q "multithread"; then MT=1; fi   # otherwise, -T# and memory budget are ignored
+# automatic nb of threads : nb of cores (Linux : online CPUs), minus 1 + a quarter of them, left to the rest of the system
+if [ $MT = 1 ] && [ "$(uname -s)" = Linux ]; then
+    NBCORES=$(getconf _NPROCESSORS_ONLN)
+    NBAUTO=$((NBCORES - 1 - NBCORES / 4)); if [ $NBAUTO -lt 1 ]; then NBAUTO=1; fi
+    env -u LZ4_NBWORKERS lz4 -v -f $FPREFIX-src $FPREFIX.lz4 2>&1 | grep -E "Using up to $NBAUTO threads|threads instead of $NBAUTO "   # or reduced by the memory budget
+fi
 # a requested nb of threads (-T#) reduced by the budget : warning (silenced by -q) ; automatic : only with -v
 lz4 -f -T64 --memory=50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
 cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
