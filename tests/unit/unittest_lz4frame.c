@@ -112,6 +112,38 @@ static size_t decompressBySegments(LZ4F_dctx* dctx, void* dst, size_t dstCapacit
     return pos;
 }
 
+/* same as decompressBySegments(), using @dict,
+ * into outputs of random capacities (1 byte to 1 MB) when @randomCapacity */
+static size_t decompressBySegments_usingDict(LZ4F_dctx* dctx, void* dst, size_t dstCapacity,
+                                             const void* src, size_t srcSize, size_t segmentSize,
+                                             const void* dict, size_t dictSize, int randomCapacity)
+{
+    char* const ostart = (char*)dst;
+    const char* ip = (const char*)src;
+    const char* const iend = ip + srcSize;
+    size_t pos = 0, r = 1;
+    while (r != 0) {   /* until the end of the frame */
+        size_t iSize = segmentSize;
+        size_t oSize = dstCapacity - pos;
+        if (iSize == 0) {
+            unsigned const nbBits = UT_rand() % 22;
+            iSize = (UT_rand() & ((1U << nbBits) - 1)) + 1;
+        }
+        if (iSize > (size_t)(iend - ip)) iSize = (size_t)(iend - ip);
+        if (randomCapacity) {
+            unsigned const nbBits = UT_rand() % 21;
+            size_t const capacity = (UT_rand() & ((1U << nbBits) - 1)) + 1;
+            oSize = MIN(oSize, capacity);
+        }
+        r = LZ4F_OK(LZ4F_decompress_usingDict(dctx, ostart + pos, &oSize, ip, &iSize, dict, dictSize, NULL));
+        ASSERT_MSG(iSize || oSize || !r, "no progress at input position %u", (unsigned)(ip - (const char*)src));
+        ip += iSize;
+        pos += oSize;
+    }
+    ASSERT(ip == iend);
+    return pos;
+}
+
 static unsigned readLE32(const void* src)
 {
     const unsigned char* const p = (const unsigned char*)src;
@@ -869,6 +901,147 @@ TEST(decompress_randomSegments)
     frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
     ASSERT_EQ(decompressBySegments(newDctx(), decoded, srcSize, frame, frameSize, 0), srcSize);
     ASSERT_MEMEQ(decoded, src, srcSize);
+}
+
+/* LZ4F_setProgressiveDecoding() : the first block of a frame is decoded as it arrives,
+ * unless its block checksum must be verified first ; next blocks are decoded once complete.
+ * Default : blocks are decoded once complete. */
+TEST(decompress_firstBlockProgressively)
+{
+    size_t const srcSize = 1 MB;
+    const void* const src = UT_fixedSample(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t capacity, frameSize, cSize, dSize, pos;
+    char* frame;
+    int progressive, blockChecksum;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;   /* largest bound : 64 KB blocks, with checksums */
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    frame = (char*)UT_malloc(capacity);
+    prefs.frameInfo.blockSizeID = LZ4F_max4MB;   /* a single block */
+    for (progressive = 0; progressive <= 1; progressive++)
+    for (blockChecksum = 0; blockChecksum <= 1; blockChecksum++) {
+        LZ4F_dctx* const dctx = newDctx();
+        if (progressive) LZ4F_setProgressiveDecoding(dctx, 1);
+        prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)blockChecksum;
+        frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+        cSize = frameSize / 2;
+        dSize = srcSize;
+        LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL));
+        ASSERT_EQ(cSize, frameSize / 2);
+        if (progressive && !blockChecksum) {
+            ASSERT(dSize > srcSize / 4);
+            ASSERT_MEMEQ(decoded, src, dSize);
+        } else {
+            ASSERT_EQ(dSize, 0);
+        }
+        pos = dSize;
+        cSize = frameSize - frameSize / 2;
+        dSize = srcSize - pos;
+        ASSERT_EQ(LZ4F_OK(LZ4F_decompress(dctx, decoded + pos, &dSize, frame + frameSize / 2, &cSize, NULL)), 0);
+        ASSERT_EQ(pos + dSize, srcSize);
+        ASSERT_MEMEQ(decoded, src, srcSize);
+        UT_release(dctx);
+    }
+    /* second block : decoded once complete */
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum;
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+    {   size_t const headerSize = LZ4F_OK(LZ4F_headerSize(frame, frameSize));
+        size_t const firstBlockEnd = headerSize + 4 + (readLE32(frame + headerSize) & 0x7FFFFFFF);
+        size_t const secondBlockEnd = firstBlockEnd + 4 + (readLE32(frame + firstBlockEnd) & 0x7FFFFFFF);
+        LZ4F_dctx* const dctx = newDctx();
+        LZ4F_setProgressiveDecoding(dctx, 1);
+        cSize = (firstBlockEnd + secondBlockEnd) / 2;
+        dSize = srcSize;
+        LZ4F_OK(LZ4F_decompress(dctx, decoded, &dSize, frame, &cSize, NULL));
+        ASSERT_EQ(dSize, 64 KB);
+    }
+}
+
+/* first block decoded progressively : once the output is full of its complete sequences,
+ * the decoder can still read the next literal length, which must be there
+ * (here : after a sequence decoded by its shortcut, or a match within the dictionary) */
+TEST(decompress_progressive_nextLiteralLength)
+{
+    /* first sequence : 14 literals and a match of 18 bytes at offset 8 (shortcut),
+     * or a match of 4 bytes at offset 10, within the dictionary ;
+     * then last literals : 1045 bytes (literal length 15 + 4 * 255 + 10) */
+    static const char seq1[2][17] = { { (char)0xEE, 'a','b','c','d','e','f','g','h','i','j','k','l','m','n', 8, 0 },
+                                      { 0x00, 10, 0 } };
+    size_t const seq1Size[2] = { 17, 3 };
+    static const char lastLL[6] = { (char)0xF0, (char)255, (char)255, (char)255, (char)255, 10 };
+    size_t const nbLiterals = 1045;
+    static const char dict[16] = "abcdefghijklmno";
+    size_t const capacity = 2 KB;
+    char* const frame = (char*)UT_malloc(capacity);
+    char* const decoded = (char*)UT_malloc(capacity);
+    char* const expected = (char*)UT_malloc(capacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t headerSize, c;
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    headerSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, NULL, 0, &prefs)) - 4;   /* header, then endMark */
+    for (c = 0; c < 2; c++) {
+        size_t const blockSize = seq1Size[c] + sizeof(lastLL) + nbLiterals;
+        size_t const frameSize = headerSize + 4 + blockSize + 4;
+        size_t dSize, cSize = frameSize;
+        LZ4F_dctx* const dctx = newDctx();
+        writeLE32(frame + headerSize, (unsigned)blockSize);
+        memcpy(frame + headerSize + 4, seq1[c], seq1Size[c]);
+        memcpy(frame + headerSize + 4 + seq1Size[c], lastLL, sizeof(lastLL));
+        memcpy(frame + headerSize + 4 + seq1Size[c] + sizeof(lastLL), UT_fixedNoise(nbLiterals), nbLiterals);
+        writeLE32(frame + headerSize + 4 + blockSize, 0);
+        dSize = capacity;
+        ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, expected, &dSize, frame, &cSize, dict, sizeof(dict), NULL)), 0);
+        ASSERT_EQ(dSize, (c ? 4 : 32) + nbLiterals);
+        LZ4F_setProgressiveDecoding(dctx, 1);
+        ASSERT_EQ(decompressBySegments_usingDict(dctx, decoded, capacity, frame, frameSize, 1, dict, sizeof(dict), 0), dSize);
+        ASSERT_MEMEQ(decoded, expected, dSize);
+        UT_release(dctx);
+    }
+}
+
+/* frames fed by segments of any size, into outputs of any capacity, with LZ4F_setProgressiveDecoding() :
+ * the first block, decoded progressively, then the next ones, with or without dictionary */
+TEST(decompress_progressive_segments)
+{
+    size_t const srcSize = 100 KB;
+    const char* const src = (const char*)UT_sample(srcSize);
+    const char* const dict = src + srcSize - 32 KB;   /* resembles the content */
+    char* const decoded = (char*)UT_malloc(srcSize);
+    size_t const segmentSizes[] = { 1, 7, 100, 4096, 65539, 0 /* random */ };
+    LZ4F_blockSizeID_t const blockSizes[] = { LZ4F_max64KB, LZ4F_max4MB };
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t capacity, b, s;
+    char* frame;
+    int linked, withDict, randomCapacity;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs);   /* largest bound : 64 KB blocks */
+    frame = (char*)UT_malloc(capacity);
+    for (b = 0; b < ARRAY_SIZE(blockSizes); b++)
+    for (linked = 0; linked <= 1; linked++)
+    for (withDict = 0; withDict <= 1; withDict++) {
+        LZ4F_cctx* const cctx = newCctx();
+        size_t frameSize;
+        prefs.frameInfo.blockSizeID = blockSizes[b];
+        prefs.frameInfo.blockMode = linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+        frameSize = LZ4F_OK(streamFrame(cctx, frame, capacity, src, srcSize,
+                                        withDict ? dict : NULL, withDict ? 32 KB : 0, NULL, &prefs));
+        UT_release(cctx);
+        for (s = 0; s < ARRAY_SIZE(segmentSizes); s++)
+        for (randomCapacity = 0; randomCapacity <= 1; randomCapacity++) {
+            LZ4F_dctx* const dctx = newDctx();
+            size_t dSize;
+            LZ4F_setProgressiveDecoding(dctx, 1);
+            dSize = decompressBySegments_usingDict(dctx, decoded, srcSize, frame, frameSize, segmentSizes[s],
+                                                                withDict ? dict : NULL, withDict ? 32 KB : 0, randomCapacity);
+            ASSERT_MSG(dSize == srcSize && !memcmp(decoded, src, srcSize),
+                       "block size ID %u, %s blocks, %s dictionary, segments of %u bytes, %s capacity : %u bytes decoded",
+                       (unsigned)blockSizes[b], linked ? "linked" : "independent", withDict ? "with" : "no",
+                       (unsigned)segmentSizes[s], randomCapacity ? "random" : "full", (unsigned)dSize);
+            UT_release(dctx);
+        }
+    }
 }
 
 /* when the end of the frame is missing, LZ4F_decompress() requests exactly the missing bytes */
