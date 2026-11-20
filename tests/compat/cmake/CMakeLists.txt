@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5...4.0.2)
+cmake_minimum_required(VERSION 3.10...4.0.2)
 
 project(cmake_install_test LANGUAGES C)
 
