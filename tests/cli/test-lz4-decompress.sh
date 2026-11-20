@@ -93,8 +93,10 @@ fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
 fails "lz4 -t $FPREFIX-bad.lz4" "contentChecksum_invalid"
 fails "cat $B-c.lz4 $B-n.lz4 $FPREFIX-bad.lz4 | lz4 -dc" "contentChecksum_invalid"
 lz4 -q -dc --no-frame-crc $FPREFIX-bad.lz4 > $OUT;  cmp $B $OUT   # not verified, on request
+cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-frame-crc > $OUT;  cat $B $B | cmp - $OUT   # in every frame
 cp $B-x.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-x.lz4) - 9))   # last block checksum
 fails "lz4 -dc $FPREFIX-bad.lz4" "blockChecksum_invalid"
+cat $B-x.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-frame-crc > $OUT;  cat $B $B | cmp - $OUT
 
 
 # errors
