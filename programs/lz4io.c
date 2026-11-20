@@ -2475,7 +2475,8 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         assert(b.size == 0);
         b.size = b.capacity;
         memset(&dOpt, 0, sizeof(dOpt));
-        dOpt.skipChecksums = (unsigned)fc->hashing;   /* remains set until the end of frame */
+        /* liblz4 forgets it at each new frame : set it at every invocation */
+        dOpt.skipChecksums = (unsigned)(fc->hashing || !fc->hashAllowed);   /* hashed by hPool, or --no-frame-crc */
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
                                 b.ptr, &b.size,
                                 inPtr + pos, &remainingInSize,
@@ -2582,7 +2583,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
                             ress.dstBuffer, &outSize,
                             ress.srcBuffer, &inSize,
                             ress.dictBuffer, ress.dictBufferSize,
-                            dOptPtr);  /* set it once, it's enough */
+                            dOptPtr);  /* also set at every invocation, see LZ4IO_decompressLZ4FChunk() */
         if (LZ4F_isError(nextToLoad))
             END_PROCESS(23, "Header error : %s", LZ4F_getErrorName(nextToLoad));
     }
