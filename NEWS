@@ -8,6 +8,7 @@ perf : faster content checksums in gcc builds for x86-64 without SSE4.1, the def
 perf : faster `lz4 -d` and `lz4 -t` on frames with a content checksum (the default) : verified by a dedicated thread, up to +39% on silesia
 perf : faster multi-threaded compression with a content checksum (the default) : hashed by a dedicated thread, up to +40% at fast levels
 build: OS400 builds (since v1.11.0), reported by @jonrumsey
+build: cmake 3.10 or later (was 3.5)
 
 v1.11.1
 fix  : `LZ4_resetStreamHC()` could write out of bounds at levels >= 10, on a state containing garbage (since v1.11.0)
