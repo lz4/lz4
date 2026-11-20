@@ -1,4 +1,5 @@
-# Files attached to each GitHub release : Windows packages, source tarball and its checksum.
+# Files attached to each GitHub release : Windows packages, source tarball and its checksum,
+# and their attestation (signed build provenance), on tags and on request only.
 # They are workflow artifacts (gh run download), attached to the release by hand.
 name: Release Assets
 on:
@@ -95,4 +96,43 @@ jobs:
       with:
         name: lz4_source
         path: lz4-*.tar.gz*
+        if-no-files-found: error
+
+  attestation:
+    name: Attestation
+    if: github.event_name != 'pull_request'
+    needs: [windows-package, source-tarball]
+    runs-on: ubuntu-latest
+    # only this job can sign : the build jobs above stay read-only
+    permissions:
+      contents: read
+      id-token: write       # OIDC token for the Sigstore signing certificate
+      attestations: write   # stores the attestation at github.com/lz4/lz4/attestations
+    steps:
+    - name: Download files
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        path: files
+        merge-multiple: true
+
+    - name: Attest
+      id: attest
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      with:
+        subject-path: 'files/*'
+
+    - name: Name the bundle
+      # lz4-X.Y.Z.sigstore.json, verified by : gh attestation verify FILE --repo lz4/lz4 --bundle lz4-X.Y.Z.sigstore.json
+      env:
+        BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+      run: |
+        t=$(cd files && ls lz4-*.tar.gz)
+        cp "$BUNDLE" "${t%.tar.gz}.sigstore.json"
+        ls -l files *.sigstore.json
+
+    - name: Upload
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: lz4_attestation
+        path: lz4-*.sigstore.json
         if-no-files-found: error
