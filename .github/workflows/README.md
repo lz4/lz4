@@ -17,10 +17,12 @@ The CI/CD workflows are organized into focused, maintainable files:
 
 ## Code Quality & Analysis
 - **`code-quality.yml`** - Static analysis tools (cppcheck, scan-build, valgrind, unicode lint)
+- **`codeql.yml`** - CodeQL static analysis of the library, the command line tool and the workflows
 - **`oss-fuzz.yml`** - OSS-Fuzz integration for continuous fuzzing
 
 ## Utilities & Environment
 - **`release-environment.yml`** - Release validation and environment information gathering
+- **`release-assets.yml`** - Files attached to each release (Windows packages, source tarball, attestation)
 - **`scorecard.yml`** - Security scorecard analysis
 
 This organization provides:
