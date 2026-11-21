@@ -475,12 +475,22 @@ LZ4FLIB_API size_t LZ4F_compressEnd(LZ4F_cctx* cctx,
 typedef struct LZ4F_dctx_s LZ4F_dctx;   /* incomplete type */
 typedef LZ4F_dctx* LZ4F_decompressionContext_t;   /* compatibility with previous API versions */
 
+/* values of LZ4F_decompressOptions_t.skipChecksums
+ * Note : libraries before v1.11.2 read any non-zero value as LZ4F_skipAllChecksums */
+typedef enum {
+    LZ4F_verifyChecksums = 0,      /* default : verify all checksums present in the frame */
+    LZ4F_skipAllChecksums = 1,     /* skip block checksums and content checksum */
+    LZ4F_skipContentChecksum = 2,  /* v1.11.2+ : skip only the content checksum, still verify block checksums */
+    LZ4F_skipBlockChecksums = 3    /* v1.11.2+ : skip only block checksums, still verify the content checksum */
+} LZ4F_skipChecksums_t;
+
 typedef struct {
   unsigned stableDst;     /* pledges that the last 64 KB of decompressed data remain present and unmodified where they were decoded,
                            * whether @dstBuffer follows them or not. This optimization skips internal storage operations.
                            * Once set, this pledge must remain valid up to the end of current frame. */
-  unsigned skipChecksums; /* disable checksum calculation and verification, even when one is present in frame, to save CPU time.
-                           * Setting this option to 1 once disables all checksums for the rest of the frame. */
+  unsigned skipChecksums; /* a value of LZ4F_skipChecksums_t : disables calculation and verification of checksums present in frame, to save CPU time.
+                           * Once set, a checksum remains skipped for the rest of the frame : successive values add up.
+                           * Any other value is an error (parameter_invalid). */
   unsigned reserved1;     /* must be set to zero for forward compatibility */
   unsigned reserved0;     /* idem */
 } LZ4F_decompressOptions_t;

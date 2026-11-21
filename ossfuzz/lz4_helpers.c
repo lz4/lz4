@@ -27,14 +27,21 @@ LZ4F_preferences_t FUZZ_randomPreferences(uint32_t* seed)
     return prefs;
 }
 
+LZ4F_skipChecksums_t FUZZ_skipChecksums(uint32_t r)
+{
+    static const LZ4F_skipChecksums_t skips[] = { LZ4F_skipAllChecksums, LZ4F_skipContentChecksum, LZ4F_skipBlockChecksums };
+    uint32_t const n = r % (8 * 3);   /* 1 time out of 8 */
+    return (n < 3) ? skips[n] : LZ4F_verifyChecksums;
+}
+
 size_t FUZZ_decompressFrame(void* dst, const size_t dstCapacity,
                             const void* src, const size_t srcSize,
-                            int skipChecksums)
+                            LZ4F_skipChecksums_t skipChecksums)
 {
     LZ4F_decompressOptions_t opts;
     memset(&opts, 0, sizeof(opts));
     opts.stableDst = 1;
-    opts.skipChecksums = (unsigned)skipChecksums;
+    opts.skipChecksums = skipChecksums;
     LZ4F_dctx* dctx;
     LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
     FUZZ_ASSERT(dctx);

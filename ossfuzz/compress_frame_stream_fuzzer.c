@@ -286,7 +286,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
                                     "Frame must not depend on nbWorkers, capacities, nor scheduling");
                 }
                 size_t const rtSize = FUZZ_decompressFrame(rt, size, s.frame, s.frameSize,
-                                                           FUZZ_rand32(&seed, 0, 7) == 0 /* occasionally skip checksums */);
+                                                           FUZZ_skipChecksums(FUZZ_rand(&seed)));
                 FUZZ_ASSERT_MSG(rtSize == pos - frameStart, "Incorrect regenerated size");
                 FUZZ_ASSERT_MSG(!memcmp(data + frameStart, rt, rtSize), "Corruption!");
             }

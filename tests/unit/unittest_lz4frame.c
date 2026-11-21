@@ -2559,54 +2559,134 @@ TEST(favorDecSpeed_withDict)
     }
 }
 
-/* skipChecksums disables verification of all checksums :
- * block checksums, of compressed and uncompressed blocks, and content checksum */
-TEST(decompress_skipChecksums)
+/* skipChecksumsFrame() :
+ * fills @src (3 blocks of 64 KB) with a sample, its 2nd block being incompressible
+ * @return : its frame, with block checksums and content checksum, the 2nd block being stored uncompressed ;
+ *           ends[] receives the end of its elements : header, 3 blocks, endMark, content checksum */
+static unsigned char* skipChecksumsFrame(char* src, size_t* frameSizePtr, size_t ends[8])
 {
-    size_t const blockSize = 64 KB;
-    size_t const srcSize = 3 * blockSize;   /* 2nd block is stored uncompressed */
-    char* const src = (char*)UT_sample(srcSize);
-    char* const decoded = (char*)UT_malloc(srcSize);
-    LZ4F_dctx* const dctx = newDctx();
+    size_t const srcSize = 3 * 64 KB;
     LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
-    size_t ends[8] = { 0 };
-    size_t capacity, frameSize;
+    size_t capacity;
     unsigned char* frame;
-    unsigned corrupted;
-    UT_fillNoise(src + blockSize, blockSize);
+    UT_fillSample(src, srcSize);
+    UT_fillNoise(src + 64 KB, 64 KB);
     prefs.frameInfo.blockSizeID = LZ4F_max64KB;
     prefs.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
     prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
     capacity = LZ4F_compressFrameBound(srcSize, &prefs);
     frame = (unsigned char*)UT_malloc(capacity);
-    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
-    ASSERT_EQ(frameElementEnds(ends, ARRAY_SIZE(ends), frame, frameSize), 6);   /* header, 3 blocks, endMark, checksum */
+    *frameSizePtr = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+    ASSERT_EQ(frameElementEnds(ends, 8, frame, *frameSizePtr), 6);
     ASSERT_MSG(!(readLE32(frame + ends[0]) & 0x80000000U) && (readLE32(frame + ends[1]) & 0x80000000U),
                "1st block should be compressed, and 2nd block uncompressed");
+    return frame;
+}
+
+/* skipChecksums selects the checksums which are not verified :
+ * block checksums, of compressed and uncompressed blocks, and/or content checksum */
+TEST(decompress_skipChecksums)
+{
+    size_t const blockSize = 64 KB;
+    size_t const srcSize = 3 * blockSize;   /* 2nd block is stored uncompressed */
+    char* const src = (char*)UT_malloc(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_dctx* const dctx = newDctx();
+    size_t ends[8] = { 0 };
+    size_t frameSize;
+    unsigned char* const frame = skipChecksumsFrame(src, &frameSize, ends);
+    unsigned corrupted, skip;
 
     for (corrupted = 0; corrupted < 3; corrupted++) {   /* checksum of : compressed block, uncompressed block, content */
-        size_t const crcPos = (corrupted == 2) ? frameSize - 1 : ends[corrupted + 1] - 1;
-        LZ4F_errorCodes const expected = (corrupted == 2) ? LZ4F_ERROR_contentChecksum_invalid : LZ4F_ERROR_blockChecksum_invalid;
-        LZ4F_decompressOptions_t dOpt;
-        size_t srcLen = frameSize, dstLen = srcSize, r;
+        int const isContent = (corrupted == 2);
+        size_t const crcPos = isContent ? frameSize - 1 : ends[corrupted + 1] - 1;
         frame[crcPos] = (unsigned char)(frame[crcPos] ^ 1);
-        LZ4F_resetDecompressionContext(dctx);
-        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, NULL);
-        ASSERT_MSG(LZ4F_getErrorCode(r) == expected, "checksum %u : %s", corrupted,
-                   LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
-        ASSERT_EQ(srcLen, crcPos + 1);
-        ASSERT_EQ(dstLen, (corrupted == 0) ? 0 : (corrupted == 1) ? 2 * blockSize : srcSize);
-        ASSERT_MEMEQ(decoded, src, dstLen);   /* produced, but not checksum-validated */
-        memset(&dOpt, 0, sizeof(dOpt));
-        dOpt.skipChecksums = 1;
-        srcLen = frameSize;
-        dstLen = srcSize;
-        LZ4F_resetDecompressionContext(dctx);
-        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, &dOpt);
-        ASSERT_MSG(r == 0 && srcLen == frameSize && dstLen == srcSize && !memcmp(decoded, src, srcSize),
-                   "checksum %u : %s", corrupted, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "not skipped");
+        for (skip = LZ4F_verifyChecksums; skip <= LZ4F_skipBlockChecksums; skip++) {
+            int const skipped = (skip == LZ4F_skipAllChecksums)
+                             || (skip == (isContent ? LZ4F_skipContentChecksum : LZ4F_skipBlockChecksums));
+            LZ4F_decompressOptions_t dOpt;
+            size_t srcLen = frameSize, dstLen = srcSize, r;
+            memset(&dOpt, 0, sizeof(dOpt));
+            dOpt.skipChecksums = skip;
+            LZ4F_resetDecompressionContext(dctx);
+            r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, &dOpt);
+            if (skipped) {
+                ASSERT_MSG(r == 0 && srcLen == frameSize && dstLen == srcSize && !memcmp(decoded, src, srcSize),
+                           "checksum %u, skipChecksums %u : %s", corrupted, skip,
+                           LZ4F_isError(r) ? LZ4F_getErrorName(r) : "not skipped");
+            } else {
+                LZ4F_errorCodes const expected = isContent ? LZ4F_ERROR_contentChecksum_invalid : LZ4F_ERROR_blockChecksum_invalid;
+                ASSERT_MSG(LZ4F_getErrorCode(r) == expected, "checksum %u, skipChecksums %u : %s", corrupted, skip,
+                           LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
+                ASSERT_EQ(srcLen, crcPos + 1);
+                ASSERT_EQ(dstLen, (corrupted == 0) ? 0 : (corrupted == 1) ? 2 * blockSize : srcSize);
+                ASSERT_MEMEQ(decoded, src, dstLen);   /* produced, but not checksum-validated */
+            }
+        }
         frame[crcPos] = (unsigned char)(frame[crcPos] ^ 1);
     }
+}
+
+/* successive values of skipChecksums add up, up to the end of frame */
+TEST(decompress_skipChecksums_addUp)
+{
+    size_t const srcSize = 3 * 64 KB;
+    char* const src = (char*)UT_malloc(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_dctx* const dctx = newDctx();
+    size_t ends[8] = { 0 };
+    size_t frameSize, r;
+    unsigned char* const frame = skipChecksumsFrame(src, &frameSize, ends);
+    unsigned order;
+    frame[ends[1] - 1] = (unsigned char)(frame[ends[1] - 1] ^ 1);   /* checksum of 1st block */
+    frame[frameSize - 1] = (unsigned char)(frame[frameSize - 1] ^ 1);   /* content checksum */
+
+    for (order = 0; order < 2; order++) {
+        LZ4F_skipChecksums_t const first = order ? LZ4F_skipBlockChecksums : LZ4F_skipContentChecksum;
+        LZ4F_skipChecksums_t const second = order ? LZ4F_skipContentChecksum : LZ4F_skipBlockChecksums;
+        LZ4F_decompressOptions_t dOpt;
+        size_t srcLen = ends[0], dstLen = srcSize, pos;
+        memset(&dOpt, 0, sizeof(dOpt));
+        LZ4F_resetDecompressionContext(dctx);
+        dOpt.skipChecksums = first;
+        LZ4F_OK(LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, &dOpt));   /* header */
+        ASSERT_EQ(srcLen, ends[0]);
+        pos = srcLen;
+        srcLen = frameSize - pos;
+        dstLen = srcSize;
+        dOpt.skipChecksums = second;
+        r = LZ4F_decompress(dctx, decoded, &dstLen, frame + pos, &srcLen, &dOpt);
+        ASSERT_MSG(r == 0 && pos + srcLen == frameSize && dstLen == srcSize && !memcmp(decoded, src, srcSize),
+                   "order %u : %s", order, LZ4F_isError(r) ? LZ4F_getErrorName(r) : "not skipped");
+
+        /* skipping ends with the frame */
+        srcLen = frameSize;
+        dstLen = srcSize;
+        r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, NULL);
+        ASSERT_MSG(LZ4F_getErrorCode(r) == LZ4F_ERROR_blockChecksum_invalid, "order %u, next frame : %s", order,
+                   LZ4F_isError(r) ? LZ4F_getErrorName(r) : "corruption not detected");
+    }
+}
+
+/* skipChecksums only accepts values of LZ4F_skipChecksums_t */
+TEST(decompress_skipChecksums_invalid)
+{
+    size_t const srcSize = 3 * 64 KB;
+    char* const src = (char*)UT_malloc(srcSize);
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_dctx* const dctx = newDctx();
+    size_t ends[8] = { 0 };
+    size_t frameSize, srcLen, dstLen, r;
+    unsigned char* const frame = skipChecksumsFrame(src, &frameSize, ends);
+    LZ4F_decompressOptions_t dOpt;
+    memset(&dOpt, 0, sizeof(dOpt));
+    dOpt.skipChecksums = LZ4F_skipBlockChecksums + 1;
+    srcLen = frameSize;
+    dstLen = srcSize;
+    r = LZ4F_decompress(dctx, decoded, &dstLen, frame, &srcLen, &dOpt);
+    ASSERT_EQ(LZ4F_getErrorCode(r), LZ4F_ERROR_parameter_invalid);
+    ASSERT_EQ(srcLen, 0);
+    ASSERT_EQ(dstLen, 0);
 }
 
 
