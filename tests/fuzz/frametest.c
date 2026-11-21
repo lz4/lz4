@@ -195,6 +195,9 @@ static LZ4F_errorCode_t LZ4F_returnErrorCode(LZ4F_errorCodes code)
 #define RETURN_ERROR(e) return LZ4F_returnErrorCode(LZ4F_ERROR_ ## e)
 
 
+static const LZ4F_skipChecksums_t k_skipChecksums[4] = { LZ4F_verifyChecksums, LZ4F_skipAllChecksums,
+                                                        LZ4F_skipContentChecksum, LZ4F_skipBlockChecksums };
+
 /* @o_scenario: output behavior: contiguous, non-contiguous, or overwrite
  * @crcOrig: xxh64 of original data using extCrcSeed
  * @return : 0 on success, or LZ4F_ErrorCode
@@ -238,7 +241,7 @@ size_t test_lz4f_decompression_wBuffers(
         memset(&dOptions, 0, sizeof(dOptions));
         dOptions.stableDst = RAND_BITS(1);
         if (o_scenario == o_overwrite) dOptions.stableDst = 0;  /* overwrite mode */
-        dOptions.skipChecksums = RAND_BITS(1);
+        dOptions.skipChecksums = k_skipChecksums[RAND_BITS(2)];
         if (sentinelTest) op[oSizeMax] = mark;
 
         DISPLAYLEVEL(7, "dstCapacity=%u,  presentedInput=%u \n", (unsigned)oSize, (unsigned)iSize);

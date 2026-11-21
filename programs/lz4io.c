@@ -2481,7 +2481,7 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         b.size = b.capacity;
         memset(&dOpt, 0, sizeof(dOpt));
         /* liblz4 forgets it at each new frame : set it at every invocation */
-        dOpt.skipChecksums = (unsigned)(fc->hashing || !fc->hashAllowed);   /* hashed by hPool, or --no-frame-crc */
+        dOpt.skipChecksums = (fc->hashing || !fc->hashAllowed) ? LZ4F_skipAllChecksums : LZ4F_verifyChecksums;   /* hashed by hPool, or --no-frame-crc */
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
                                 b.ptr, &b.size,
                                 inPtr + pos, &remainingInSize,
@@ -2554,7 +2554,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     LZ4F_errorCode_t nextToLoad;
     LZ4F_errorCode_t lastStatus = 1;
     unsigned storedSkips = 0;
-    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, 1, 0, 0 };
+    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, LZ4F_skipAllChecksums, 0, 0 };
     const LZ4F_decompressOptions_t* const dOptPtr =
         ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
         &dOpt_skipCrc : NULL;
@@ -2665,7 +2665,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     unsigned long long filesize = 0;
     LZ4F_errorCode_t nextToLoad;
     unsigned storedSkips = 0;
-    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, 1, 0, 0 };
+    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, LZ4F_skipAllChecksums, 0, 0 };
     const LZ4F_decompressOptions_t* const dOptPtr =
         ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
         &dOpt_skipCrc : NULL;

@@ -3332,9 +3332,12 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
     *srcSizePtr = 0;
     *dstSizePtr = 0;
     assert(dctx != NULL);
-    if (decompressOptionsPtr->skipChecksums) {   /* once set, disable for the remainder of the frame */
-        dctx->skipBlockChecksum = 1;
-        dctx->skipContentChecksum = 1;
+    switch (decompressOptionsPtr->skipChecksums) {   /* once set, disable for the remainder of the frame */
+    case LZ4F_verifyChecksums: break;
+    case LZ4F_skipAllChecksums: dctx->skipBlockChecksum = 1; dctx->skipContentChecksum = 1; break;
+    case LZ4F_skipContentChecksum: dctx->skipContentChecksum = 1; break;
+    case LZ4F_skipBlockChecksums: dctx->skipBlockChecksum = 1; break;
+    default: RETURN_ERROR(parameter_invalid);
     }
 
     /* behaves as a state machine */
