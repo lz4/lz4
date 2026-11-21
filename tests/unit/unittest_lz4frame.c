@@ -959,9 +959,8 @@ TEST(decompress_firstBlockProgressively)
     }
 }
 
-/* first block decoded progressively : once the output is full of its complete sequences,
- * the decoder can still read the next literal length, which must be there
- * (here : after a sequence decoded by its shortcut, or a match within the dictionary) */
+/* first block decoded progressively, its input ending within the literal length after a sequence
+ * (here : a sequence decoded by its shortcut, or a match within the dictionary) */
 TEST(decompress_progressive_nextLiteralLength)
 {
     /* first sequence : 14 literals and a match of 18 bytes at offset 8 (shortcut),

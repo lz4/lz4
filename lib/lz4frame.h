@@ -893,7 +893,7 @@ LZ4F_resumeFrame(LZ4F_dctx* dctx, const LZ4F_frameInfo_t* frameInfo,
  *  @enable != 0 : LZ4F_decompress() outputs the first block of each frame as it arrives,
  *  instead of once received entirely : lower latency when input arrives slowly by segments (pipe, network).
  *  Next blocks, and blocks with a checksum (verified before output), are output once received entirely.
- *  Cost : a second pass on the first block, nearly as long as decoding it, when it arrives by segments ;
+ *  Cost : about 5% more instructions to decode the first block, when it arrives by segments ;
  *         128 KB more memory with independent blocks.
  *  Default : disabled. The setting remains for next frames ; it takes effect at the start of a frame.
  */
