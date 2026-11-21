@@ -27,7 +27,7 @@ The `lz4` command line utility is provided under the GPL-2.0-or-later license.
 Benchmarks
 -------------------------
 
-The benchmark uses [lzbench] v2.4.1, from @inikep
+The benchmark uses [lzbench] v2.4.2, from @inikep
 compiled with GCC v13.3.0 on Linux 64-bits (Ubuntu 24.04).
 The reference system uses a Core i7-9700K CPU.
 Benchmark evaluates the compression of reference [Silesia Corpus]
@@ -36,19 +36,21 @@ in single-thread mode.
 [lzbench]: https://github.com/inikep/lzbench
 [Silesia Corpus]: https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 
-|  Compressor             | Factor  | Compression | Decompression |
-|  ----------             | -----   | ----------- | ------------- |
-|  memcpy                 |  1.000  | 13700 MB/s  |  13700 MB/s   |
-|**LZ4 default (v1.11.0)**|**2.112**| **770 MB/s**| **4950 MB/s** |
-|  LZO 2.10 -1            |  2.108  |   660 MB/s  |    800 MB/s   |
-|  QuickLZ 1.5.1b7 -1     |  2.238  |   580 MB/s  |    780 MB/s   |
-|  Snappy 1.3.1           |  2.090  |   520 MB/s  |   1350 MB/s   |
-| [Zstandard] 1.5.7 -1    |  2.896  |   510 MB/s  |   1570 MB/s   |
-|  LZF v3.6               |  2.073  |   375 MB/s  |    920 MB/s   |
-|  zlib-ng 2.3.3 -1       |  2.252  |   250 MB/s  |    555 MB/s   |     
-| [zlib] deflate 1.3.2 -1 |  2.743  |   110 MB/s  |    410 MB/s   |
-|**LZ4 HC -9 (v1.11.0)**  |**2.717**|    40 MB/s  | **4800 MB/s** |
-| [zlib] deflate 1.3.2 -6 |  3.106  |    36 MB/s  |    430 MB/s   |
+| Compressor                |    Factor |  Compression | Decompression |
+| ----------                | --------- | ------------ | ------------- |
+| memcpy                    |     1.000 |   17100 MB/s |    17500 MB/s |
+| **LZ4 default (v1.11.1)** | **2.113** | **780 MB/s** | **5060 MB/s** |
+| LZO 2.10 -1               |     2.108 |     603 MB/s |      808 MB/s |
+| QuickLZ 1.5.1b7 -1        |     2.238 |     599 MB/s |      710 MB/s |
+| Snappy 1.3.1              |     2.090 |     529 MB/s |     1370 MB/s |
+| [Zstandard] 1.5.7 -1      |     2.896 |     512 MB/s |     1570 MB/s |
+| LZF v3.6                  |     2.077 |     431 MB/s |      781 MB/s |
+| zlib-ng 2.3.3 -1          |     2.252 |     249 MB/s |      577 MB/s |
+| [zlib] deflate 1.4 -1     |     2.743 |     108 MB/s |      385 MB/s |
+| **LZ4 HC -9 (v1.11.1)**   | **2.721** |      42 MB/s | **4970 MB/s** |
+| [zlib] deflate 1.4 -6     |     3.107 |      36 MB/s |      413 MB/s |
+
+All levels of these compressors, and the `lz4` command line in pipelines, are charted on [lz4.org](https://lz4.org/#benchmarks).
 
 [zlib]: https://www.zlib.net/
 [Zstandard]: https://facebook.github.io/zstd/
