@@ -283,12 +283,12 @@ awk -F, '
     label != "" {
         r = $6; c = sig3($7) " MB/s"; d = sig3($8) " MB/s"
         if (bold == 1) { r = "**" r "**"; c = "**" c "**"; d = "**" d "**" }
-        if (bold == 2) { d = "**" d "**" }
+        if (bold == 2) { r = "**" r "**"; d = "**" d "**" }
         printf "%s|%s|%s|%s|%s\n", ($2 == "memcpy") ? 1e9 : $7, label, r, c, d
     }' "$OUTDIR/lzbench.csv" | sort -t'|' -k1,1gr |
-awk -F'|' 'BEGIN { print "|  Compressor             | Factor  | Compression | Decompression |"
-                   print "|  ----------             | -----   | ----------- | ------------- |" }
-           { printf "| %-23s | %7s | %11s | %13s |\n", $2, $3, $4, $5 }' > "$OUTDIR/readme-table.md"
+awk -F'|' 'BEGIN { print "| Compressor                |    Factor |  Compression | Decompression |"
+                   print "| ----------                | --------- | ------------ | ------------- |" }
+           { printf "| %-25s | %9s | %12s | %13s |\n", $2, $3, $4, $5 }' > "$OUTDIR/readme-table.md"
 
 echo
 column -s, -t < "$OUTDIR/lzbench.csv" 2>/dev/null || cat "$OUTDIR/lzbench.csv"
