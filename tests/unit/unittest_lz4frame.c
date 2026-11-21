@@ -1148,6 +1148,114 @@ TEST(getFrameInfo_states)
     ASSERT_EQ(frameInfo.contentSize, srcSize);
 }
 
+/* fails the test unless LZ4F_getFrameInfo(), without input, provides @expected and returns 0 */
+static void assertFrameInfoAfterFrame(LZ4F_dctx* dctx, const LZ4F_frameInfo_t* expected)
+{
+    LZ4F_frameInfo_t frameInfo;
+    size_t size = 0;
+    memset(&frameInfo, 0xFF, sizeof(frameInfo));
+    ASSERT_EQ(LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, NULL, &size)), 0);
+    ASSERT_EQ(size, 0);
+    ASSERT_EQ(frameInfo.frameType, expected->frameType);
+    ASSERT_EQ(frameInfo.blockSizeID, expected->blockSizeID);
+    ASSERT_EQ(frameInfo.blockMode, expected->blockMode);
+    ASSERT_EQ(frameInfo.blockChecksumFlag, expected->blockChecksumFlag);
+    ASSERT_EQ(frameInfo.contentChecksumFlag, expected->contentChecksumFlag);
+    ASSERT_EQ(frameInfo.contentSize, expected->contentSize);
+    ASSERT_EQ(frameInfo.dictID, expected->dictID);
+}
+
+/* LZ4F_getFrameInfo() without input, after the end of a frame : parameters of this frame,
+ * whichever way the frame ends (content checksum, no content checksum, skippable frame) */
+TEST(getFrameInfo_afterFrame)
+{
+    size_t const srcSize = 100 KB;
+    const void* const src = UT_sample(srcSize);
+    LZ4F_preferences_t prefs1 = LZ4F_INIT_PREFERENCES;
+    LZ4F_preferences_t prefs2 = LZ4F_INIT_PREFERENCES;
+    LZ4F_frameInfo_t info1, info2, skippableInfo, frameInfo;
+    BYTE skippable[8 + 10];
+    char* const decoded = (char*)UT_malloc(srcSize);
+    LZ4F_dctx* const dctx = newDctx();
+    BYTE *frame1, *frame2;
+    size_t capacity, size1, size2, size, dSize;
+
+    prefs1.frameInfo.blockSizeID = LZ4F_max256KB;
+    prefs1.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    prefs1.frameInfo.contentSize = srcSize;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs1);
+    frame1 = (BYTE*)UT_malloc(capacity);
+    size1 = LZ4F_OK(LZ4F_compressFrame(frame1, capacity, src, srcSize, &prefs1));
+    prefs2.frameInfo.blockSizeID = LZ4F_max64KB;
+    prefs2.frameInfo.blockMode = LZ4F_blockIndependent;
+    prefs2.frameInfo.blockChecksumFlag = LZ4F_blockChecksumEnabled;
+    capacity = LZ4F_compressFrameBound(srcSize, &prefs2);
+    frame2 = (BYTE*)UT_malloc(capacity);
+    size2 = LZ4F_OK(LZ4F_compressFrame(frame2, capacity, src, srcSize, &prefs2));
+    size = size1;   /* parameters, as decoded at the start of each frame */
+    LZ4F_OK(LZ4F_getFrameInfo(newDctx(), &info1, frame1, &size));
+    size = size2;
+    LZ4F_OK(LZ4F_getFrameInfo(newDctx(), &info2, frame2, &size));
+    ASSERT(info1.contentChecksumFlag && info1.contentSize);
+    ASSERT(info2.blockChecksumFlag && !info2.contentChecksumFlag);
+    memset(skippable, 0, sizeof(skippable));
+    writeLE32(skippable, LZ4F_MAGIC_SKIPPABLE_START + 5);
+    writeLE32(skippable + 4, 10);
+    memset(&skippableInfo, 0, sizeof(skippableInfo));
+    skippableInfo.frameType = LZ4F_skippableFrame;
+    skippableInfo.contentSize = 10;
+
+    /* no frame yet */
+    size = 0;
+    ASSERT(LZ4F_isError(LZ4F_getFrameInfo(dctx, &frameInfo, NULL, &size)));
+
+    /* the 3 ways a frame ends */
+    ASSERT_EQ(decompressBySegments(dctx, decoded, srcSize, frame1, size1, 0), srcSize);
+    assertFrameInfoAfterFrame(dctx, &info1);
+    ASSERT_EQ(decompressBySegments(dctx, decoded, srcSize, frame2, size2, 0), srcSize);
+    assertFrameInfoAfterFrame(dctx, &info2);
+    ASSERT_EQ(decompressBySegments(dctx, decoded, srcSize, skippable, sizeof(skippable), 0), 0);
+    assertFrameInfoAfterFrame(dctx, &skippableInfo);
+
+    /* LZ4F_decompress() without input doesn't start the next frame */
+    size = 0;
+    dSize = 0;
+    LZ4F_OK(LZ4F_decompress(dctx, NULL, &dSize, NULL, &size, NULL));
+    assertFrameInfoAfterFrame(dctx, &skippableInfo);
+
+    /* next frame started : its header, partially read, can't be decoded yet */
+    size = 3;
+    LZ4F_OK(LZ4F_decompress(dctx, NULL, &dSize, frame1, &size, NULL));
+    ASSERT_EQ(size, 3);
+    size = 0;
+    ASSERT_LZ4F_ERROR(LZ4F_getFrameInfo(dctx, &frameInfo, NULL, &size), LZ4F_ERROR_frameDecoding_alreadyStarted);
+
+    /* after LZ4F_resetDecompressionContext() : no frame */
+    LZ4F_resetDecompressionContext(dctx);
+    ASSERT_EQ(decompressBySegments(dctx, decoded, srcSize, frame1, size1, 0), srcSize);
+    LZ4F_resetDecompressionContext(dctx);
+    size = 0;
+    ASSERT(LZ4F_isError(LZ4F_getFrameInfo(dctx, &frameInfo, NULL, &size)));
+
+    /* with input : decodes the header of the next frame */
+    ASSERT_EQ(decompressBySegments(dctx, decoded, srcSize, frame2, size2, 0), srcSize);
+    size = size1;
+    ASSERT(LZ4F_OK(LZ4F_getFrameInfo(dctx, &frameInfo, frame1, &size)) > 0);
+    ASSERT_EQ(size, LZ4F_OK(LZ4F_headerSize(frame1, size1)));
+    ASSERT_EQ(frameInfo.blockSizeID, LZ4F_max256KB);
+    ASSERT_EQ(frameInfo.contentSize, srcSize);
+
+    /* after an invalid header : no frame */
+    LZ4F_resetDecompressionContext(dctx);
+    ASSERT_EQ(decompressBySegments(dctx, decoded, srcSize, frame2, size2, 0), srcSize);
+    frame1[0] ^= 1;   /* magic number */
+    size = size1;
+    dSize = srcSize;
+    ASSERT_LZ4F_ERROR(LZ4F_decompress(dctx, decoded, &dSize, frame1, &size, NULL), LZ4F_ERROR_frameType_unknown);
+    size = 0;
+    ASSERT(LZ4F_isError(LZ4F_getFrameInfo(dctx, &frameInfo, NULL, &size)));
+}
+
 /* after a decoding error, LZ4F_resetDecompressionContext() makes the context usable again */
 TEST(decompress_resetAfterError)
 {
