@@ -215,7 +215,8 @@
                 <li><a href="#pipelines">Command line pipelines</a></li>
                 <li><a href="#interoperable-lz4">Interoperable LZ4 ports and bindings</a></li>
                 <li><a href="#lz4-clis">Compatible CLI versions</a></li>
-                <li><a href="#customs-lz4">Custom LZ4 ports and bindings</a></li>
+                <li><a href="#customs-lz4">Custom LZ4 implementations</a></li>
+                <li><a href="#decoders">Compact decoders</a></li>
                 <li><a href="#references">Reference usages</a></li>
               </ul>
             </li>
@@ -342,31 +343,25 @@ They are in conformance with the LZ4 [block] and [frame] specifications, and are
 
 |Language                 |Author               |URL           |
 |----                     |----                 |----          |
-|__Python__ multi-threadable | Iotic Labs       | https://pypi.org/project/py-lz4framed/
-|__Python__ standard handlers | Jonathan Underwood | https://pypi.org/project/lz4/
-|__Python__               | Christopher Jackson | https://github.com/darkdragn/lz4tools
-|__Java__                 | Jonas Konrad        | https://github.com/yawkat/lz4-java
-|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/lz4/package-summary.html
-|__Javascript__ (binding) | Pierre Curto        | https://github.com/pierrec/node-lz4
-|__Javascript__ (port)    | Benzinga            | https://github.com/Benzinga/lz4js
 |__C#__                   | Milosz Krajewski    | https://github.com/MiloszKrajewski/K4os.Compression.LZ4
-|__Go__ (port)            | Pierre Curto        | https://github.com/pierrec/lz4
-|__Go__ (cgo)             | Sean Cunningham     | https://github.com/prequel-dev/plz4
-|__Delphi__               | Hanno Hugenberg     | https://github.com/Hugie/lz4-delphi
-|__Rust__                 | Artem Navrotskiy    | https://github.com/bozaro/lz4-rs
-|__Rust__                 | picoHz              | https://github.com/picoHz/lzzzz
-|__Rust__                 | Pascal Seitz        | https://github.com/PSeitz/lz4_flex
-|__Perl__                 | Felix Bytow         | https://metacpan.org/release/Compress-LZ4Frame
-|__Delphi__               | Xelitan             | https://github.com/Xelitan/LZ4-Compression-Decompression-for-Delphi-Lazarus
 |__Dart__                 | Instantiations      | https://pub.dev/documentation/es_compression/latest/lz4/
 |__Dart__ (port)          | jxoesneon           | https://pub.dev/packages/dart_lz4
-|__Lua__                  | Witchu Promjunyakul | https://github.com/witchu/lua-lz4
+|__Delphi__               | Hanno Hugenberg     | https://github.com/Hugie/lz4-delphi
+|__Delphi__               | Xelitan             | https://github.com/Xelitan/LZ4-Compression-Decompression-for-Delphi-Lazarus
+|__Go__ (port)            | Pierre Curto        | https://github.com/pierrec/lz4
+|__Go__ (cgo)             | Sean Cunningham     | https://github.com/prequel-dev/plz4
 |__Haskell__              | Niklas Hambüchen    | https://hackage.haskell.org/package/lz4-frame-conduit
+|__Java__                 | Jonas Konrad        | https://github.com/yawkat/lz4-java
+|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/lz4/package-summary.html
+|__JavaScript__ (Node.js) | Antonio Musolino    | https://github.com/antoniomuso/lz4-napi
+|__JavaScript__ (port)    | Benzinga            | https://github.com/Benzinga/lz4js
+|__Lua__                  | Witchu Promjunyakul | https://github.com/witchu/lua-lz4
+|__Perl__                 | Felix Bytow         | https://metacpan.org/release/Compress-LZ4Frame
+|__Python__               | Jonathan Underwood  | https://pypi.org/project/lz4/
+|__Rust__ (port)          | Pascal Seitz        | https://github.com/PSeitz/lz4_flex
+|__Rust__ (binding)       | 10x Genomics        | https://github.com/10xGenomics/lz4-rs
+|__Rust__ (binding)       | picoHz              | https://github.com/picoHz/lzzzz
 |__VA Smalltalk__         | Instantiations      | https://www.instantiations.com/vast-support/documentation/91/pr/compression2.html#pID0E0LB0FA
-|__WASM__                 | Syu Kato            | https://github.com/ukyo/lz4.js
-|__Tcl__ decoder          | D. Bohdan           | https://wiki.tcl-lang.org/page/LZ4
-|__Z80 assembly__ decoder | Piotr Drapich       | https://web.archive.org/web/20260815055553/http://www.union.org.pl/download/z80/LZ4_Z80.asm
-|__8086 assembly__ decoder| E. C. Masloch       | https://hg.pushbx.org/ecm/inicomp/
 
 [block]:https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md
 [frame]:https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md
@@ -379,7 +374,6 @@ Here are a few compatible alternatives to lz4 command line utility :
 
 |Name                    |Author               |URL  |
 |----                    |----                 |---- |
-|__C++11 multi-threads__ | Takayuki Matsuoka   |https://github.com/t-mat/lz4mt |
 |__smalLZ4__             | Stephan Brumme      |https://create.stephan-brumme.com/smallz4/ |
 |__briefLZ4__            | Jørgen Ibsen        |https://github.com/jibsen/blz4 |
 |__7Zip with LZ4__       | Tino Reichardt      |https://github.com/mcmilk/7-Zip-zstd |
@@ -396,34 +390,34 @@ Consequently, they are not interoperable with LZ4 command line utility, nor (gen
 |Language             |Author               |URL                              |
 |--                   |--                   |--                               |
 |__C#__ streaming     | Phill Djonov        | https://github.com/pdjonov/Lz4Stream
-|__Go__               | Branimir Karadzic   | https://github.com/bkaradzic/go-lz4
-|__PHP__              | Kamijo              | https://github.com/kjdev/php-ext-lz4
-|__PHP__ decoder (port) | Stephan J. Müller | https://heap.ch/blog/2019/05/18/lz4-decompression/
-|__Rust__             | Alex Crichton       | https://github.com/rusty-shell/rust-compress/blob/master/src/lz4.rs
-|__Ruby__             | Komiya Atsushi      | https://rubygems.org/gems/lz4-ruby
-|__Perl__             | Gray                | https://metacpan.org/release/Compress-LZ4
-|__D__                | Jude Young          | https://code.dlang.org/packages/lz4-d
-|__Lua__              | Christophe Delord   | https://codeberg.org/cdsoft/bonaluna
-|__Haskell__          | Mark Wotton         | https://hackage.haskell.org/package/lz4
-|__Haskell__ (streaming) | Sven Mattsen     | https://hackage.haskell.org/package/lz4-conduit
-|__Visual Basic 6__   | Tanner_H            | https://www.vbforums.com/showthread.php?840413-Compression-in-VB6-modern-solutions
-|__Erlang__           | Tetsuya Suzuki      | https://github.com/szktty/erlang-lz4
-|__OCaml__            | Peter Zotov         | https://github.com/whitequark/ocaml-lz4
 |__Cuda__             | NVidia              | https://docs.nvidia.com/cuda/nvcomp/lz4.html
-|__WASM__             | Raymond Hill        | https://github.com/gorhill/lz4-wasm
-|__C__ decoder (tiny) | Justine Tunney      | https://github.com/jart/cosmopolitan/blob/467504308a103865c058f9a0ac858cc22e72240e/libc/nexgen32e/lz4cpy.c
-|__ARM Cortex assembly__ decoder | Jens Bauer | https://developer.arm.com/community/developer/ip-products/processors/b/processors-ip-blog/posts/lz4-decompression-routine-for-cortex-m0-and-later
-|__arm64 assembly__ decoder | Siguza        | https://github.com/Siguza/lz4dec
-|__Risc-V assembly__ decoder | Martin Wendt | https://github.com/enthusi/lz4_rv32i_decode
-|__8088 assembly__ decoder | Jim Leonard    | http://www.oldskool.org/pc/lz4_8088
-|__6502 & 65C02 assembly__ decoder | Peter Ferrie | https://github.com/pararaum/lz4-6502
-|__65c816 assembly__ decoder | Olivier Zardini | http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
-|__68k assembly__ decoder | Arnaud Carre    | https://github.com/arnaud-carre/lz4-68k
-|__Z80 assembly__ decoder | Edouard Berge   | https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8
-|__Atari XL/XE assembly__ decoder | xxl     | http://xxl.atari.pl/lz4-decompressor/
-|__v810 assembly__ decoder | Martin Wendt   | https://github.com/enthusi/lz4_v810_decode
-|__Lua__ decoder      | Scott Lembcke       | https://github.com/slembcke/mini-lz4
-|__jsonlz4__ decoder  | Avi Halachmi        | https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format
+|__PHP__              | Kamijo              | https://github.com/kjdev/php-ext-lz4
+
+
+<br/>
+<a name="decoders"></a>
+## Compact decoders
+Decoders only, often written in assembly, for small or old processors and other environments.
+
+|Target               |Author               |URL                              |
+|--                   |--                   |--                               |
+|__6502 & 65C02__ assembly | Peter Ferrie   | https://github.com/pararaum/lz4-6502
+|__Atari XL/XE__ assembly | xxl             | http://xxl.atari.pl/lz4-decompressor/
+|__65c816__ assembly  | Olivier Zardini     | http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
+|__Z80__ assembly     | Piotr Drapich       | https://web.archive.org/web/20260815055553/http://www.union.org.pl/download/z80/LZ4_Z80.asm
+|__Z80__ assembly     | Edouard Berge       | https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8
+|__8086__ assembly    | E. C. Masloch       | https://hg.pushbx.org/ecm/inicomp/
+|__8088__ assembly    | Jim Leonard         | http://www.oldskool.org/pc/lz4_8088
+|__68k__ assembly     | Arnaud Carre        | https://github.com/arnaud-carre/lz4-68k
+|__v810__ assembly    | Martin Wendt        | https://github.com/enthusi/lz4_v810_decode
+|__ARM Cortex__ assembly | Jens Bauer       | https://developer.arm.com/community/developer/ip-products/processors/b/processors-ip-blog/posts/lz4-decompression-routine-for-cortex-m0-and-later
+|__arm64__ assembly   | Siguza              | https://github.com/Siguza/lz4dec
+|__Risc-V__ assembly  | Martin Wendt        | https://github.com/enthusi/lz4_rv32i_decode
+|__C__ (tiny)         | Justine Tunney      | https://github.com/jart/cosmopolitan/blob/467504308a103865c058f9a0ac858cc22e72240e/libc/nexgen32e/lz4cpy.c
+|__Lua__              | Scott Lembcke       | https://github.com/slembcke/mini-lz4
+|__PHP__ (port)       | Stephan J. Müller   | https://heap.ch/blog/2019/05/18/lz4-decompression/
+|__Tcl__              | D. Bohdan           | https://wiki.tcl-lang.org/page/LZ4
+|__jsonlz4__          | Avi Halachmi        | https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format
 
 
 <br/>
