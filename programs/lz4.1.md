@@ -216,10 +216,11 @@ only the latest one will be applied.
   Generate block checksums (default:disabled)
 
 * `--[no-]frame-crc`:
-  Select frame checksum (default:enabled)
+  Select frame checksum (default:enabled).
+  On decompression, `--no-frame-crc` skips the verification of frame checksums : block checksums are still verified
 
 * `--no-crc`:
-  Disable both frame and block checksums
+  Disable both frame and block checksums (on decompression : skips the verification of both)
 
 * `--[no-]content-size`:
   Header includes original size (default:not present)<br/>

@@ -588,9 +588,9 @@ int main(int argCount, const char** argv)
                     LZ4IO_setPassThrough(prefs, 1);
                     continue;
                 }
-                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); BMK_skipChecksums(0); frameCrcRequested=1; continue; }
-                if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
-                if (!strcmp(argument,  "--no-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_setBlockChecksumMode(prefs, 0); BMK_skipChecksums(1); continue; }
+                if (!strcmp(argument,  "--frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 1); LZ4IO_skipChecksums(prefs, LZ4F_verifyChecksums); BMK_skipChecksums(LZ4F_verifyChecksums); frameCrcRequested=1; continue; }
+                if (!strcmp(argument,  "--no-frame-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_skipChecksums(prefs, LZ4F_skipContentChecksum); BMK_skipChecksums(LZ4F_skipContentChecksum); continue; }
+                if (!strcmp(argument,  "--no-crc")) { LZ4IO_setStreamChecksumMode(prefs, 0); LZ4IO_setBlockChecksumMode(prefs, 0); LZ4IO_skipChecksums(prefs, LZ4F_skipAllChecksums); BMK_skipChecksums(LZ4F_skipAllChecksums); continue; }
                 if (!strcmp(argument,  "--content-size")) { contentSizeFlag = 1; LZ4IO_setContentSize(prefs, 1); continue;}
                 if (!strcmp(argument,  "--no-content-size")) { LZ4IO_setContentSize(prefs, 0); continue; }
                 if (!strcmp(argument,  "--list")) { mode = om_list; multiple_inputs = 1; continue; }

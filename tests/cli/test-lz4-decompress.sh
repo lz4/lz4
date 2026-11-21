@@ -94,11 +94,17 @@ fails "lz4 -t $FPREFIX-bad.lz4" "contentChecksum_invalid"
 fails "cat $B-c.lz4 $B-n.lz4 $FPREFIX-bad.lz4 | lz4 -dc" "contentChecksum_invalid"
 lz4 -q -dc --no-frame-crc $FPREFIX-bad.lz4 > $OUT;  cmp $B $OUT   # not verified, on request
 cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-frame-crc > $OUT;  cat $B $B | cmp - $OUT   # in every frame
+cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-crc > $OUT;  cat $B $B | cmp - $OUT
+fails "lz4 -dc --no-crc --frame-crc $FPREFIX-bad.lz4" "contentChecksum_invalid"   # last option prevails
 cp $B-x.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-x.lz4) - 9))   # last block checksum
 fails "lz4 -dc $FPREFIX-bad.lz4" "blockChecksum_invalid"
-cat $B-x.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-frame-crc > $OUT;  cat $B $B | cmp - $OUT
+fails "cat $B-x.lz4 $FPREFIX-bad.lz4 | lz4 -dc --no-frame-crc" "blockChecksum_invalid"   # frame checksums only
+cat $B-x.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-crc > $OUT;  cat $B $B | cmp - $OUT
+fails "lz4 -bdi0 --no-frame-crc $FPREFIX-bad.lz4" "blockChecksum_invalid"   # decompression benchmark : same
+lz4 -q -bdi0 --no-crc $FPREFIX-bad.lz4
 cp $B-x.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-x.lz4) - 1))   # with block checksums
 fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
+lz4 -q -dc --no-frame-crc $FPREFIX-bad.lz4 > $OUT;  cmp $B $OUT   # block checksums verified, frame checksum skipped
 cp $F $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $F) - 1))   # frame decoded at once
 fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
 fails "cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -dc" "contentChecksum_invalid"
@@ -119,7 +125,7 @@ fails "lz4 -t $SRC" "Unrecognized header : file cannot be decoded"
 printf '\004\042\115\030' > $FPREFIX-bad.lz4                 # frame : magic number only
 fails "lz4 -t $FPREFIX-bad.lz4" "Error"
 { cat $F; head -c 7 $F; } > $FPREFIX-bad.lz4               # frame, then header of the next one only
-fails "lz4 -t $FPREFIX-bad.lz4" "could not complete"
+fails "lz4 -t $FPREFIX-bad.lz4" "Error"
 printf '\002\041\114\030\001\000\000\000\360' > $FPREFIX-bad.lz4   # legacy block : invalid
 fails "lz4 -t $FPREFIX-bad.lz4" "Corrupted input"
 { skip 4; printf 'ab'; } > $FPREFIX-bad.lz4

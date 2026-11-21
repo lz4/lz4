@@ -126,6 +126,10 @@ int LZ4IO_setBlockChecksumMode(LZ4IO_prefs_t* const prefs, int xxhash);
 /* Default setting : stream checksum enabled */
 int LZ4IO_setStreamChecksumMode(LZ4IO_prefs_t* const prefs, int xxhash);
 
+/* decompression : checksums not verified
+ * Default setting : LZ4F_verifyChecksums */
+void LZ4IO_skipChecksums(LZ4IO_prefs_t* const prefs, LZ4F_skipChecksums_t skip);
+
 /* Default setting : 0 (no notification) */
 int LZ4IO_setNotificationLevel(int level);
 
