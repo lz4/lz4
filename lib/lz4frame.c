@@ -2766,6 +2766,13 @@ struct LZ4F_dctx_s {
     size_t tmpInCapacity;
     size_t tmpInSize;
     size_t tmpInTarget;
+    unsigned progressive;    /* see LZ4F_setProgressiveDecoding() */
+    unsigned progressiveFrame;   /* progressive decoding of the current frame : set at its start (tmpOutBuffer sized for it) */
+    size_t tmpInDecoded;     /* first block, incomplete : bytes of tmpIn already decoded (see LZ4F_decodeProgressive()) */
+    size_t blockDecoded;     /* first block, incomplete : its decoded size so far */
+    const BYTE* blockDict;   /* dictionary before the first block : restored after it (independent blocks) */
+    size_t blockDictSize;
+    unsigned blockNb;        /* blocks of the frame started so far, up to 2 */
     BYTE*  tmpOutBuffer;
     const BYTE* dict;
     size_t dictSize;
@@ -2830,6 +2837,11 @@ size_t LZ4F_dctx_size(const LZ4F_dctx* dctx) {
 
 
 /*==---   Streaming Decompression operations   ---==*/
+void LZ4F_setProgressiveDecoding(LZ4F_dctx* dctx, unsigned enable)
+{
+    dctx->progressive = (enable != 0);
+}
+
 void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
 {
     DEBUGLOG(5, "LZ4F_resetDecompressionContext");
@@ -3051,7 +3063,7 @@ static void LZ4F_moveDictBeforeTmpOut(LZ4F_dctx* dctx, size_t flushSize)
 }
 
 /* LZ4F_updateDict() :
- * only used for LZ4F_blockLinked mode
+ * only used for LZ4F_blockLinked mode, and for the first block decoded progressively (see LZ4F_decodeProgressive())
  * Condition : @dstPtr != NULL
  */
 static void LZ4F_updateDict(LZ4F_dctx* dctx,
@@ -3123,11 +3135,14 @@ static int LZ4F_endMarkFollows(const BYTE* srcPtr, const BYTE* srcEnd, size_t sk
 }
 
 /* LZ4F_decodeBlock() :
- * Decode compressed block @src (block checksum excluded) into @dst (capacity >= maxBlockSize),
+ * Decode compressed block @src (block checksum excluded) into @dst (capacity >= @dstCapacity),
  * using current dictionary, and update content checksum and remaining frame size.
+ * @partialSize > 0 : the block is incomplete : decode exactly @partialSize bytes,
+ *                   from its complete sequences (see LZ4F_scanSequences()).
  * @return : decoded size, or an error code (testable with LZ4F_isError())
  */
-static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize, BYTE* dst)
+static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
+                               BYTE* dst, size_t dstCapacity, size_t partialSize)
 {
     const char* dict = (const char*)dctx->dict;
     size_t dictSize = dctx->dictSize;
@@ -3138,10 +3153,18 @@ static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
         dict += dictSize - 64 KB;
         dictSize = 64 KB;
     }
-    decodedSize = LZ4_decompress_safe_usingDict(
-            (const char*)src, (char*)dst,
-            (int)srcSize, (int)dctx->maxBlockSize,
-            dict, (int)dictSize);
+    if (partialSize) {
+        decodedSize = LZ4_decompress_safe_partial_usingDict(
+                (const char*)src, (char*)dst,
+                (int)srcSize, (int)partialSize, (int)partialSize,
+                dict, (int)dictSize);
+        RETURN_ERROR_IF(decodedSize != (int)partialSize, decompressionFailed);
+    } else {
+        decodedSize = LZ4_decompress_safe_usingDict(
+                (const char*)src, (char*)dst,
+                (int)srcSize, (int)dstCapacity,
+                dict, (int)dictSize);
+    }
     RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
     RETURN_ERROR_IF(dctx->frameInfo.contentSize && (U64)decodedSize > dctx->frameRemainingSize, frameSize_wrong);
     if (dctx->frameInfo.contentChecksumFlag && !dctx->skipContentChecksum)
@@ -3149,6 +3172,90 @@ static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
     if (dctx->frameInfo.contentSize)
         dctx->frameRemainingSize -= (size_t)decodedSize;
     return (size_t)decodedSize;
+}
+
+/* LZ4F_scanSequences() :
+ * @src : beginning of an incomplete compressed block (@srcSize bytes available).
+ * Finds its complete sequences (literals, offset, match length), decoding to at most @maxDecodedSize bytes,
+ * followed by enough input for LZ4_decompress_safe_partial_usingDict() to stop after them (see below).
+ * Note : the block is parsed twice, here and while decoding.
+ * @return : size of these sequences ; *decodedSizePtr : their decoded size */
+static size_t LZ4F_scanSequences(const BYTE* src, size_t srcSize, size_t maxDecodedSize, size_t* decodedSizePtr)
+{
+    const BYTE* ip = src;
+    const BYTE* const iend = src + srcSize;
+    const BYTE* seqEnd = src;   /* end of the last complete sequence */
+    size_t decodedSize = 0;
+    while (ip < iend) {
+        unsigned const token = *ip++;
+        size_t ll = token >> 4;            /* literal length */
+        size_t ml = (token & 15) + 4;      /* match length (minimum : 4) */
+        unsigned b;
+        if (ll == 15) {
+            do { if (ip == iend) goto _end; b = *ip++; ll += b; } while (b == 255);
+        }
+        if ((size_t)(iend - ip) < ll + 2) break;   /* literals, offset */
+        ip += ll + 2;
+        if (ml == 15 + 4) {
+            do { if (ip == iend) goto _end; b = *ip++; ml += b; } while (b == 255);
+        }
+        /* the decoder stops after this sequence, but can read the next literal length first :
+         * the next token, its extension, then 15 bytes (RUN_MASK) must be there
+         * (more than the 1 + LASTLITERALS bytes it requires after a match length extension) */
+        if (ip == iend) break;
+        {   const BYTE* p = ip + 1;
+            if ((*ip >> 4) == 15) {
+                do { if (p == iend) goto _end; b = *p++; } while (b == 255);
+            }
+            if ((size_t)(iend - p) < 15) break;
+        }
+        if (ll + ml > maxDecodedSize - decodedSize) break;
+        decodedSize += ll + ml;
+        seqEnd = ip;
+    }
+_end:
+    *decodedSizePtr = decodedSize;
+    return (size_t)(seqEnd - src);
+}
+
+/* LZ4F_decodeProgressive() :
+ * The frame's first block is incomplete (dctx->tmpInSize bytes gathered so far into tmpIn) :
+ * decode its complete sequences into @dst, up to @dstCapacity bytes, without waiting for the rest.
+ * The rest is decoded once the block is complete, with this output as history.
+ * @return : decoded size, or an error code */
+static size_t LZ4F_decodeProgressive(LZ4F_dctx* dctx, BYTE* dst, size_t dstCapacity, const BYTE* dstStart)
+{
+    const BYTE* const src = dctx->tmpIn + dctx->tmpInDecoded;
+    size_t const srcSize = dctx->tmpInSize - dctx->tmpInDecoded;
+    size_t decodedSize;
+    size_t const seqSize = LZ4F_scanSequences(src, srcSize,
+                                MIN(dstCapacity, dctx->maxBlockSize - dctx->blockDecoded), &decodedSize);
+    if (decodedSize == 0) return 0;
+    if (dctx->blockDecoded == 0) {
+        dctx->blockDict = dctx->dict;
+        dctx->blockDictSize = dctx->dictSize;
+    }
+    {   size_t const r = LZ4F_decodeBlock(dctx, src, srcSize, dst, decodedSize, decodedSize);
+        if (LZ4F_isError(r)) return r;
+    }
+    /* history : the block's dictionary, then its output (independent blocks : not the previous blocks) */
+    LZ4F_updateDict(dctx, dst, decodedSize,
+                    (dctx->frameInfo.blockMode == LZ4F_blockLinked) ? dstStart : dst, 0);
+    dctx->tmpInDecoded += seqSize;
+    dctx->blockDecoded += decodedSize;
+    return decodedSize;
+}
+
+/* LZ4F_endBlock() :
+ * after a compressed block : the beginning of a block decoded progressively is no longer history (independent blocks) */
+static void LZ4F_endBlock(LZ4F_dctx* dctx)
+{
+    if (dctx->blockDecoded && (dctx->frameInfo.blockMode == LZ4F_blockIndependent)) {
+        dctx->dict = dctx->blockDict;
+        dctx->dictSize = dctx->blockDictSize;
+    }
+    dctx->tmpInDecoded = 0;
+    dctx->blockDecoded = 0;
 }
 
 
@@ -3273,8 +3380,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             if (dctx->frameInfo.contentChecksumFlag) (void)XXH32_reset(&(dctx->xxh), 0);
             /* internal buffers allocation */
             {   size_t const tmpInNeeded = dctx->maxBlockSize + BFSize /* block checksum */;
-                size_t const tmpOutNeeded = dctx->maxBlockSize
-                    + ((dctx->frameInfo.blockMode==LZ4F_blockLinked) ? 128 KB : 0);
+                size_t const tmpOutNeeded = dctx->maxBlockSize   /* + history : linked blocks, or first block decoded progressively */
+                    + (((dctx->frameInfo.blockMode==LZ4F_blockLinked) || dctx->progressive) ? 128 KB : 0);
                 if ( (tmpInNeeded > dctx->tmpInCapacity)
                   || (tmpOutNeeded > dctx->tmpOutBufferCapacity) ) {   /* tmp buffers too small */
                     /* capacities remain 0 until allocation succeeds,
@@ -3298,6 +3405,10 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   }
             dctx->tmpInSize = 0;
             dctx->tmpInTarget = 0;
+            dctx->progressiveFrame = dctx->progressive;
+            dctx->tmpInDecoded = 0;
+            dctx->blockDecoded = 0;
+            dctx->blockNb = 0;
             dctx->tmpOut = dctx->tmpOutBuffer;
             dctx->tmpOutStart = 0;
             dctx->tmpOutSize = 0;
@@ -3322,6 +3433,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                     dctx->dStage = dstage_getSuffix;
                     break;
                 }
+                if (dctx->blockNb < 2) dctx->blockNb++;
                 if (nextCBlockSize > dctx->maxBlockSize) {
                     nextSrcSizeHint = LZ4F_returnErrorCode(LZ4F_ERROR_maxBlockSize_invalid);
                     goto _output;
@@ -3342,6 +3454,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
                 /* next block is a compressed block */
                 dctx->tmpInTarget = nextCBlockSize + crcSize;
+                assert(dctx->tmpInDecoded == 0 && dctx->blockDecoded == 0);   /* see LZ4F_endBlock() */
                 dctx->dStage = dstage_getCBlock;
                 if (dstPtr==dstEnd || srcPtr==srcEnd) {
                     nextSrcSizeHint = BHSize + nextCBlockSize + crcSize;
@@ -3422,6 +3535,14 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             DEBUGLOG(6, "dstage_getCBlock");
             selectedIn = LZ4F_gatherInput(dctx, dctx->tmpIn, dctx->tmpInTarget, &srcPtr, srcEnd);
             if (selectedIn == NULL) {   /* need more input */
+                /* first block of the frame : output what can be decoded already (see LZ4F_setProgressiveDecoding()),
+                 * unless a block checksum must be verified first */
+                if ( dctx->progressiveFrame && (dctx->blockNb == 1)
+                  && !dctx->frameInfo.blockChecksumFlag && (dstPtr != NULL) ) {
+                    size_t const decodedSize = LZ4F_decodeProgressive(dctx, dstPtr, (size_t)(dstEnd - dstPtr), dstStart);
+                    if (LZ4F_isError(decodedSize)) { nextSrcSizeHint = decodedSize; goto _output; }
+                    dstPtr += decodedSize;
+                }
                 nextSrcSizeHint = (dctx->tmpInTarget - dctx->tmpInSize)   /* block checksum included */
                                 + BHSize /* next header size */;
                 doAnotherStage = 0;
@@ -3429,6 +3550,9 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }
 
             /* At this stage, input is large enough to decode a block */
+            /* (or the rest of a block decoded progressively : dctx->tmpInDecoded bytes already decoded, never with block checksum) */
+            assert((dctx->tmpInDecoded == 0) || (selectedIn == dctx->tmpIn));
+            assert((dctx->tmpInDecoded == 0) || !dctx->frameInfo.blockChecksumFlag);
 
             /* First, decode and control block checksum if it exists */
             if (dctx->frameInfo.blockChecksumFlag) {
@@ -3449,12 +3573,15 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   }
 
             /* decode directly into destination buffer if there is enough room */
-            if ( ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize)
+            if ( ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize - dctx->blockDecoded)
                  /* unless the dictionary is stored in tmpOut:
                   * in which case it's faster to decode within tmpOut
-                  * to benefit from prefix speedup */
-              && !(dctx->dict!= NULL && (const BYTE*)dctx->dict + dctx->dictSize == dctx->tmpOut) )
-            {   size_t const decodedSize = LZ4F_decodeBlock(dctx, selectedIn, dctx->tmpInTarget, dstPtr);
+                  * to benefit from prefix speedup (but the rest of a block decoded progressively would be copied) */
+              && ( dctx->blockDecoded
+                || !(dctx->dict!= NULL && (const BYTE*)dctx->dict + dctx->dictSize == dctx->tmpOut) ) )
+            {   size_t const decodedSize = LZ4F_decodeBlock(dctx,
+                                selectedIn + dctx->tmpInDecoded, dctx->tmpInTarget - dctx->tmpInDecoded,
+                                dstPtr, dctx->maxBlockSize - dctx->blockDecoded, 0);
                 if (LZ4F_isError(decodedSize)) { nextSrcSizeHint = decodedSize; goto _output; }
 
                 /* dictionary management, unless the frame ends with this block */
@@ -3464,14 +3591,15 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 }
 
                 dstPtr += decodedSize;
+                LZ4F_endBlock(dctx);
                 dctx->dStage = dstage_getBlockHeader;  /* end of block, let's get another one */
                 break;
             }
 
             /* not enough place into dst : decode into tmpOut */
 
-            /* manage dictionary */
-            if (dctx->frameInfo.blockMode == LZ4F_blockLinked) {
+            /* manage dictionary : history of linked blocks, or beginning of a block decoded progressively */
+            if ((dctx->frameInfo.blockMode == LZ4F_blockLinked) || dctx->blockDecoded) {
                 if (dctx->dict == dctx->tmpOutBuffer) {
                     /* truncate dictionary to 64 KB if too big */
                     if (dctx->dictSize > 128 KB) {
@@ -3485,8 +3613,11 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   }
 
             /* Decode block into tmpOut */
-            {   size_t const decodedSize = LZ4F_decodeBlock(dctx, selectedIn, dctx->tmpInTarget, dctx->tmpOut);
+            {   size_t const decodedSize = LZ4F_decodeBlock(dctx,
+                                selectedIn + dctx->tmpInDecoded, dctx->tmpInTarget - dctx->tmpInDecoded,
+                                dctx->tmpOut, dctx->maxBlockSize - dctx->blockDecoded, 0);
                 if (LZ4F_isError(decodedSize)) { nextSrcSizeHint = decodedSize; goto _output; }
+                LZ4F_endBlock(dctx);
                 dctx->tmpOutSize = decodedSize;
                 dctx->tmpOutStart = 0;
                 dctx->dStage = dstage_flushOut;
@@ -3583,7 +3714,8 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 
     /* preserve history within tmpOut whenever necessary */
     LZ4F_STATIC_ASSERT((unsigned)dstage_init == 2);
-    if ( (dctx->frameInfo.blockMode==LZ4F_blockLinked)  /* next block will use up to 64KB from previous ones */
+    if ( ( (dctx->frameInfo.blockMode==LZ4F_blockLinked)  /* next block will use up to 64KB from previous ones */
+        || (dctx->blockDecoded && (dctx->dStage == dstage_getCBlock)) )  /* rest of the block decoded progressively too */
       && (dctx->dict != dctx->tmpOutBuffer)             /* dictionary is not already within tmp */
       && (dctx->dict != NULL)                           /* dictionary exists */
       && (!decompressOptionsPtr->stableDst)             /* cannot rely on dst data to remain there for next call */

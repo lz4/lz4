@@ -76,8 +76,8 @@ lz4 -q --no-frame-crc $B $B-n.lz4
 lz4 -q -BX $B $B-x.lz4
 { cat $B-c.lz4 $B-n.lz4; skip 20000; cat $B-x.lz4 $F $B-c.lz4; } | lz4 -dc > $OUT
 cat $B $B $B $SRC $B | cmp - $OUT
-# input is read by 4 MB pieces (INBUFF_SIZE) : a frame of 4194310 bytes (64 stored blocks of 64 KB)
-# ends with its checksum across offset 4 + 4 MB
+# input is read by pieces (INBUFF_FIRST_READS, then INBUFF_SIZE), one ending at offset 4 + 4 MB :
+# a frame of 4194310 bytes (64 stored blocks of 64 KB) ends with its checksum across it
 R=$FPREFIX-rnd;  datagen -g4194039 -P0 > $R
 lz4 -q -B4 $R $R.lz4
 test "$(wc -c < $R.lz4)" -eq 4194310
