@@ -2004,6 +2004,7 @@ int LZ4_saveDict (LZ4_stream_t* LZ4_dict, char* safeBuffer, int dictSize)
  ********************************/
 
 typedef enum { decode_full_block = 0, partial_decode = 1 } earlyEnd_directive;
+typedef enum { complete_input = 0, incomplete_input = 1 } inputEnd_directive;
 
 #undef MIN
 #define MIN(a,b)    ( (a) < (b) ? (a) : (b) )
@@ -2232,7 +2233,9 @@ LZ4_decompress_generic(
                  dict_directive dict,                 /* noDict, withPrefix64k, usingExtDict */
                  const BYTE* const lowPrefix,  /* always <= dst, == dst when no prefix */
                  const BYTE* const dictStart,  /* only if dict==usingExtDict */
-                 const size_t dictSize         /* note : = 0 if noDict */
+                 const size_t dictSize,        /* note : = 0 if noDict */
+                 inputEnd_directive incompleteInput,  /* incomplete_input : the block goes on beyond srcSize (see LZ4_decompress_incomplete()) */
+                 const char** srcEndPtr        /* incomplete_input only : receives the end of the decoded sequences */
                  )
 {
     if ((src == NULL) || (outputSize < 0)) { return -1; }
@@ -2258,6 +2261,9 @@ LZ4_decompress_generic(
         size_t offset;
         size_t ml;   /* match length */
 
+        /* incompleteInput : start of the current sequence, where decoding stops if it can't be completed */
+        const BYTE* seqIp = NULL;
+        BYTE* seqOp = NULL;
 
         DEBUGLOG(5, "LZ4_decompress_generic (srcSize:%i, dstSize:%i)", srcSize, outputSize);
 
@@ -2303,6 +2309,7 @@ LZ4_decompress_generic(
             /* Main fastloop assertion: We can always wildcopy FASTLOOP_SAFE_DISTANCE */
             assert(oend - op >= FASTLOOP_SAFE_DISTANCE);
             assert(ip < iend);
+            seqIp = ip; seqOp = op;
             token = *ip++;
             ll = token >> ML_BITS;
             DEBUGLOG(7, "blockPos%6u: litLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)ll);
@@ -2434,6 +2441,7 @@ LZ4_decompress_generic(
             size_t ll;   /* literal length */
             BYTE* cpy;
             assert(ip < iend);
+            seqIp = ip; seqOp = op;
             token = *ip++;
             ll = token >> ML_BITS;
             DEBUGLOG(7, "blockPos%6u: litLength token = %u", (unsigned)(op-(BYTE*)dst), (unsigned)ll);
@@ -2491,7 +2499,9 @@ LZ4_decompress_generic(
                 LZ4_STATIC_ASSERT(MFLIMIT >= WILDCOPYLENGTH);
                 if ((cpy>oend-MFLIMIT) || (ip+ll>iend-(2+1+LASTLITERALS))) {
                     /* close to input or output end : these must be the last literals of the block,
-                     * except with partialDecoding, which can also stop within them */
+                     * except with partialDecoding, which can also stop within them,
+                     * and incompleteInput, which stops before them : the block goes on */
+                    if (incompleteInput) goto _incomplete;
                     if (partialDecoding) {
                         /* stop at input end, or when output is full */
                         ll = MIN(ll, (size_t)(iend-ip));
@@ -2568,15 +2578,26 @@ LZ4_decompress_generic(
         }
 
         /* end of decoding */
+        assert(!incompleteInput);   /* never ends the block : stops before its last literals */
         DEBUGLOG(5, "decoded %i bytes", (int) (((char*)op)-dst));
         return (int) (((char*)op)-dst);     /* Nb of output bytes decoded */
 
-        /* errors : see LZ4_decompress_safe() in lz4.h */
+    _incomplete:   /* incompleteInput : stop before the current sequence, which can't be decoded yet */
+        DEBUGLOG(5, "incomplete input : decoded %i bytes", (int)(seqOp - (BYTE*)dst));
+        *srcEndPtr = (const char*)seqIp;
+        return (int)(seqOp - (BYTE*)dst);
+
+        /* errors : see LZ4_decompress_safe() in lz4.h
+         * incompleteInput : input ends within the current sequence, or output is full,
+         * or the sequence is invalid (reported once the block is complete) : stop before it */
     _output_error:
+        if (incompleteInput) goto _incomplete;
         return -1;
     _dst_too_small:
+        if (incompleteInput) goto _incomplete;
         return -2;
     _offset_error:
+        if (incompleteInput) goto _incomplete;
         return -3;
     }
 }
@@ -2589,7 +2610,8 @@ int LZ4_decompress_safe(const char* source, char* dest, int compressedSize, int 
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxDecompressedSize,
                                   decode_full_block, noDict,
-                                  (BYTE*)dest, NULL, 0);
+                                  (BYTE*)dest, NULL, 0,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2598,7 +2620,8 @@ int LZ4_decompress_safe_partial(const char* src, char* dst, int compressedSize, 
     dstCapacity = MIN(targetOutputSize, dstCapacity);
     return LZ4_decompress_generic(src, dst, compressedSize, dstCapacity,
                                   partial_decode,
-                                  noDict, (BYTE*)dst, NULL, 0);
+                                  noDict, (BYTE*)dst, NULL, 0,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2617,7 +2640,8 @@ int LZ4_decompress_safe_withPrefix64k(const char* source, char* dest, int compre
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize,
                                   decode_full_block, withPrefix64k,
-                                  (BYTE*)dest - 64 KB, NULL, 0);
+                                  (BYTE*)dest - 64 KB, NULL, 0,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2626,7 +2650,8 @@ static int LZ4_decompress_safe_partial_withPrefix64k(const char* source, char* d
     dstCapacity = MIN(targetOutputSize, dstCapacity);
     return LZ4_decompress_generic(source, dest, compressedSize, dstCapacity,
                                   partial_decode, withPrefix64k,
-                                  (BYTE*)dest - 64 KB, NULL, 0);
+                                  (BYTE*)dest - 64 KB, NULL, 0,
+                                  complete_input, NULL);
 }
 
 /* Another obsolete API function, paired with the previous one. */
@@ -2643,7 +2668,8 @@ static int LZ4_decompress_safe_withSmallPrefix(const char* source, char* dest, i
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize,
                                   decode_full_block, noDict,
-                                  (BYTE*)dest-prefixSize, NULL, 0);
+                                  (BYTE*)dest-prefixSize, NULL, 0,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2653,7 +2679,8 @@ static int LZ4_decompress_safe_partial_withSmallPrefix(const char* source, char*
     dstCapacity = MIN(targetOutputSize, dstCapacity);
     return LZ4_decompress_generic(source, dest, compressedSize, dstCapacity,
                                   partial_decode, noDict,
-                                  (BYTE*)dest-prefixSize, NULL, 0);
+                                  (BYTE*)dest-prefixSize, NULL, 0,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2664,7 +2691,8 @@ int LZ4_decompress_safe_forceExtDict(const char* source, char* dest,
     DEBUGLOG(5, "LZ4_decompress_safe_forceExtDict");
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize,
                                   decode_full_block, usingExtDict,
-                                  (BYTE*)dest, (const BYTE*)dictStart, dictSize);
+                                  (BYTE*)dest, (const BYTE*)dictStart, dictSize,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2675,7 +2703,8 @@ int LZ4_decompress_safe_partial_forceExtDict(const char* source, char* dest,
     dstCapacity = MIN(targetOutputSize, dstCapacity);
     return LZ4_decompress_generic(source, dest, compressedSize, dstCapacity,
                                   partial_decode, usingExtDict,
-                                  (BYTE*)dest, (const BYTE*)dictStart, dictSize);
+                                  (BYTE*)dest, (const BYTE*)dictStart, dictSize,
+                                  complete_input, NULL);
 }
 
 LZ4_FORCE_O2
@@ -2697,7 +2726,27 @@ int LZ4_decompress_safe_doubleDict(const char* source, char* dest, int compresse
 {
     return LZ4_decompress_generic(source, dest, compressedSize, maxOutputSize,
                                   decode_full_block, usingExtDict,
-                                  (BYTE*)dest-prefixSize, (const BYTE*)dictStart, dictSize);
+                                  (BYTE*)dest-prefixSize, (const BYTE*)dictStart, dictSize,
+                                  complete_input, NULL);
+}
+
+/* incomplete block : a single instantiation, history being a prefix or an external dictionary */
+LZ4_FORCE_O2
+int LZ4_decompress_incomplete(const char* src, char* dst, int* srcSizePtr, int dstCapacity,
+                              const char* dictStart, int dictSize)
+{
+    const char* srcEnd = src;
+    int const isPrefix = (dictSize > 0) && (dictStart + dictSize == dst);
+    int decodedSize;
+    if ((srcSizePtr == NULL) || (*srcSizePtr < 0) || (dictSize < 0)) return -1;
+    if ((*srcSizePtr == 0) || (dstCapacity == 0)) { *srcSizePtr = 0; return 0; }   /* nothing to decode yet */
+    decodedSize = LZ4_decompress_generic(src, dst, *srcSizePtr, dstCapacity,
+                                  decode_full_block, usingExtDict,
+                                  (BYTE*)dst - (isPrefix ? dictSize : 0),
+                                  isPrefix ? NULL : (const BYTE*)dictStart, isPrefix ? 0 : (size_t)dictSize,
+                                  incomplete_input, &srcEnd);
+    if (decodedSize >= 0) *srcSizePtr = (int)(srcEnd - src);
+    return decodedSize;
 }
 
 /*===== streaming decompression functions =====*/

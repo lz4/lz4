@@ -35,7 +35,7 @@
 #ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast_continue */
 #endif
-#define LZ4_STATIC_LINKING_ONLY   /* LZ4_compress_destSize_extState, LZ4_attach_dictionary, LZ4_DISTANCE_MAX */
+#define LZ4_STATIC_LINKING_ONLY   /* LZ4_compress_destSize_extState, LZ4_attach_dictionary, LZ4_DISTANCE_MAX, LZ4_decompress_incomplete */
 #include "lz4.h"
 #include "lz4hc.h"
 
@@ -1230,4 +1230,146 @@ TEST(decompress_safe_continue_ringLargerThanEncoders)
         ASSERT_EQ(LZ4_decompress_safe_continue(&sd, (const char*)block, ring + dpos, n, maxBlockSize), 13);
         ASSERT_MSG(!memcmp(ring + dpos, stream + spos - dist, 4), "offset %u, length %u : corrupted output", offset, (unsigned)ml);
     }
+}
+
+
+/*-************************************
+*  Decoding of incomplete blocks (LZ4_decompress_incomplete())
+**************************************/
+
+/* 16 KB of fixed content, with a long literal run (noise), and a long match (repeated content) */
+#define INCOMPLETE_SRC_SIZE (16 KB)
+static char* incompleteSample(void)
+{
+    char* const src = (char*)UT_fixedSample(INCOMPLETE_SRC_SIZE);
+    memcpy(src + 4 KB, UT_fixedNoise(1 KB), 1 KB);
+    memcpy(src + 8 KB, src, 3 KB);
+    return src;
+}
+
+/* input truncated anywhere : the sequences decoded so far, then the rest of the block with a regular decoder,
+ * give the block's content ; more input never decodes less */
+TEST(decompress_incomplete_anyTruncation)
+{
+    int const srcSize = (int)INCOMPLETE_SRC_SIZE;
+    const char* const src = incompleteSample();
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    char* const cBlock = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize);
+    int const cSize = LZ4_compress_default(src, cBlock, srcSize, capacity);
+    int prevDecoded = 0, prevConsumed = 0;
+    int avail;
+    ASSERT(cSize > 0);
+    for (avail = 0; avail <= cSize; avail++) {
+        int consumed = avail;
+        int const r = LZ4_decompress_incomplete(cBlock, decoded, &consumed, srcSize, NULL, 0);
+        ASSERT_MSG(r >= prevDecoded && consumed >= prevConsumed && consumed <= avail,
+                   "%i bytes of input : %i bytes decoded from %i (before : %i from %i)",
+                   avail, r, consumed, prevDecoded, prevConsumed);
+        ASSERT_MEMEQ(decoded, src, (size_t)r);
+        ASSERT_EQ(LZ4_decompress_safe_usingDict(cBlock + consumed, decoded + r, cSize - consumed, srcSize - r, decoded, r),
+                  srcSize - r);
+        ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
+        prevDecoded = r; prevConsumed = consumed;
+    }
+    ASSERT(prevDecoded >= srcSize - 64);   /* whole block : all but its end */
+}
+
+/* output smaller than the block : decoding stops before the first sequence that doesn't fit,
+ * without writing beyond dstCapacity */
+TEST(decompress_incomplete_smallCapacity)
+{
+    int const srcSize = (int)INCOMPLETE_SRC_SIZE;
+    const char* const src = incompleteSample();
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    char* const cBlock = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc((size_t)srcSize + 64);
+    int const cSize = LZ4_compress_default(src, cBlock, srcSize, capacity);
+    int prevDecoded = 0;
+    int dstCapacity;
+    ASSERT(cSize > 0);
+    for (dstCapacity = 0; dstCapacity <= srcSize; dstCapacity += 1 + (int)(UT_rand() % 200)) {
+        int consumed = cSize;
+        int r, i;
+        memset(decoded, 0xA5, (size_t)srcSize + 64);
+        r = LZ4_decompress_incomplete(cBlock, decoded, &consumed, dstCapacity, NULL, 0);
+        ASSERT_MSG(r >= prevDecoded && r <= dstCapacity, "capacity %i : %i bytes decoded (before : %i)", dstCapacity, r, prevDecoded);
+        for (i = dstCapacity; i < srcSize + 64; i++)
+            ASSERT_MSG(decoded[i] == (char)0xA5, "capacity %i : byte %i overwritten", dstCapacity, i);
+        ASSERT_MEMEQ(decoded, src, (size_t)r);
+        ASSERT_EQ(LZ4_decompress_safe_usingDict(cBlock + consumed, decoded + r, cSize - consumed, srcSize - r, decoded, r),
+                  srcSize - r);
+        ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
+        prevDecoded = r;
+    }
+}
+
+/* input arriving by pieces : each piece decoded as far as possible, the block's end by a regular decoder ;
+ * history : a dictionary then the decoded bytes, as a prefix, or as an external dictionary (copy of the last 64 KB) */
+TEST(decompress_incomplete_byPieces)
+{
+    int const srcSize = (int)INCOMPLETE_SRC_SIZE;
+    const char* const src = incompleteSample();
+    const char* const dict = (const char*)UT_fixedSample(64 KB);   /* the block references it */
+    int const capacity = LZ4_COMPRESSBOUND(srcSize);
+    char* const cBlock = (char*)UT_malloc((size_t)capacity);
+    char* const buffer = (char*)UT_malloc(64 KB + (size_t)srcSize);   /* dictionary, then decoded data */
+    char* const decoded = buffer + 64 KB;
+    char* const history = (char*)UT_malloc(64 KB);
+    LZ4_stream_t* const stream = newStream();
+    int cSize, ext;
+    LZ4_loadDict(stream, dict, 64 KB);
+    cSize = LZ4_compress_fast_continue(stream, src, cBlock, srcSize, capacity, 1);
+    ASSERT(cSize > 0);
+    memcpy(buffer, dict, 64 KB);
+    for (ext = 0; ext < 2; ext++) {
+        int avail = 0, consumed = 0, dSize = 0;
+        const char* hist;
+        memset(decoded, 0, (size_t)srcSize);
+        while (avail < cSize) {
+            int const step = 1 + (int)(UT_rand() % 500);
+            int n, r;
+            avail = MIN(cSize, avail + step);
+            n = avail - consumed;
+            hist = buffer + dSize;   /* the 64 KB before the next decoded byte */
+            if (ext) { memcpy(history, hist, 64 KB); hist = history; }
+            r = LZ4_decompress_incomplete(cBlock + consumed, decoded + dSize, &n, srcSize - dSize, hist, 64 KB);
+            ASSERT_MSG(r >= 0, "%s dictionary : error %i", ext ? "external" : "prefix", r);
+            consumed += n; dSize += r;
+            ASSERT_MEMEQ(decoded, src, (size_t)dSize);
+        }
+        hist = buffer + dSize;
+        if (ext) { memcpy(history, hist, 64 KB); hist = history; }
+        ASSERT_EQ(LZ4_decompress_safe_usingDict(cBlock + consumed, decoded + dSize, cSize - consumed, srcSize - dSize, hist, 64 KB),
+                  srcSize - dSize);
+        ASSERT_MEMEQ(decoded, src, (size_t)srcSize);
+    }
+}
+
+/* an invalid sequence is not decoded : the regular decoder reports it once the block is complete ;
+ * invalid parameters */
+TEST(decompress_incomplete_errors)
+{
+    const unsigned char* const literals = (const unsigned char*)UT_fixedNoise(64);
+    unsigned char block[200];
+    char* const decoded = (char*)UT_malloc(DECODED_CAPACITY);
+    size_t const n1 = writeSequence(block, literals, 20, 4, 10);   /* valid */
+    size_t n = n1 + writeSequence(block + n1, literals, 5, 1000, 10);   /* offset beyond the 35 bytes decoded */
+    int size;
+    n += writeSequence(block + n, literals + 5, 30, 0, 0);   /* last literals */
+    size = (int)n;
+    ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, decoded, &size, DECODED_CAPACITY, NULL, 0), 30);
+    ASSERT_EQ(size, (int)n1);
+    ASSERT_EQ(LZ4_decompress_safe((const char*)block, decoded, (int)n, DECODED_CAPACITY), -3);
+
+    ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, decoded, NULL, DECODED_CAPACITY, NULL, 0), -1);
+    size = -1;
+    ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, decoded, &size, DECODED_CAPACITY, NULL, 0), -1);
+    ASSERT_EQ(size, -1);
+    size = (int)n;
+    ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, decoded, &size, -1, NULL, 0), -1);
+    ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, decoded, &size, DECODED_CAPACITY, decoded, -1), -1);
+    ASSERT_EQ(size, (int)n);
+    ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, decoded, &size, 0, NULL, 0), 0);
+    ASSERT_EQ(size, 0);
 }

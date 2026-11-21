@@ -10,6 +10,7 @@ perf : faster `lz4 -d` and `lz4 -t` on frames with a content checksum (the defau
 perf : lower latency of `lz4 -d` on slow inputs : the first block of a frame is decoded as it arrives (first byte at 1 Gb/s : 40 ms -> 3 ms)
 perf : faster multi-threaded compression with a content checksum (the default) : hashed by a dedicated thread, up to +40% at fast levels
 api  : `LZ4F_setProgressiveDecoding()` (static) : `LZ4F_decompress()` outputs the first block of each frame as it arrives
+api  : `LZ4_decompress_incomplete()` (static) : decodes the beginning of a block, before the rest is available
 api  : `LZ4F_decompressOptions_t.skipChecksums` can skip only block checksums, or only the content checksum (`LZ4F_skipChecksums_t`)
 api  : `LZ4F_getFrameInfo()` invoked without input after the end of a frame provides the parameters of this frame
 build: OS400 builds (since v1.11.0), reported by @jonrumsey
