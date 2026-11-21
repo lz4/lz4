@@ -2393,7 +2393,8 @@ typedef struct {
 } LZ4FChunkToHash;
 
 /* hashing thread : content checksum of decoded buffers, while the writing thread writes them ;
- * @arg == NULL : buffer of a frame not hashed (see PBUFFERS_NB) */
+ * @arg == NULL : buffer of a frame not hashed (see PBUFFERS_NB).
+ * Also invoked by the decoding thread, while there is no hashing thread (see LZ4IO_frameCheck_t) */
 static void LZ4IO_hashDecodedLZ4FChunk(void* arg)
 {
     LZ4FChunkToHash* const cth = (LZ4FChunkToHash*)arg;
@@ -2407,23 +2408,26 @@ static void LZ4IO_hashDecodedLZ4FChunk(void* arg)
     free(cth);
 }
 
-/* Content checksums are verified by a hashing thread, in parallel with the writing thread, instead of liblz4.
- * A frame is only known once its header is decoded, by its first LZ4F_decompress() invocation :
- * when the frame continues, with a content checksum and without block checksums (verified by liblz4 only),
- * next invocations skip checksums, and all output of the frame is hashed (the first one also by liblz4).
+/* Content checksums are verified by lz4 itself, instead of liblz4, which skips them (LZ4F_skipContentChecksum)
+ * and still verifies block checksums.
+ * A frame is known after the LZ4F_decompress() invocation which decodes its header, even if this invocation
+ * outputs data, or ends the frame (LZ4F_getFrameInfo() still provides its parameters) : all its output is hashed once.
+ * The hashing thread, in parallel with the writing thread, is created for the first frame
+ * which doesn't end within its first output buffer : until then, the decoding thread hashes small frames itself,
+ * so that small files don't each create a thread.
  * An invocation never goes beyond the end of a frame : each output buffer belongs to a single frame.
  * State of the decoding thread, kept from one input buffer to the next. */
 typedef struct {
-    int hashAllowed;        /* 0 : checksums skipped (--no-frame-crc) */
+    int hashAllowed;        /* 0 : checksums skipped (--no-crc) */
     int frameKnown;         /* header of current frame decoded */
-    int hashing;            /* current frame is hashed by hPool : liblz4 skips checksums */
+    int hashing;            /* current frame is hashed by lz4 */
     int hashStart;          /* next hashed buffer is the first one of the frame */
     unsigned char tail[4];  /* last 4 bytes consumed : content checksum, at end of frame */
-    TPool* hPool;           /* hashing thread, created for the first hashed frame, then receives every buffer */
-    XXH32_state_t* xxh;     /* employed by the hashing thread */
+    TPool* hPool;           /* hashing thread, created for the first hashed frame of more than 1 buffer, then receives every buffer */
+    XXH32_state_t* xxh;     /* employed by the hashing thread, or by the decoding thread while there is none */
 } LZ4IO_frameCheck_t;
 
-/* once the header of current frame is decoded : is the frame hashed by hPool ? */
+/* once the header of current frame is decoded : is the frame hashed ? */
 static void LZ4IO_checkFrame(LZ4IO_frameCheck_t* fc, LZ4F_dctx* dctx)
 {
     LZ4F_frameInfo_t info;
@@ -2432,15 +2436,8 @@ static void LZ4IO_checkFrame(LZ4IO_frameCheck_t* fc, LZ4F_dctx* dctx)
     fc->frameKnown = 1;
     if ( !fc->hashAllowed
       || (info.frameType != LZ4F_frame)   /* skippable frame */
-      || (info.contentChecksumFlag != LZ4F_contentChecksumEnabled)
-      || (info.blockChecksumFlag != LZ4F_noBlockChecksum) )
+      || (info.contentChecksumFlag != LZ4F_contentChecksumEnabled) )
         return;
-    if (fc->hPool == NULL) {
-        if (fc->xxh == NULL) fc->xxh = XXH32_createState();
-        if (fc->xxh == NULL) return;   /* checksums verified by liblz4 */
-        fc->hPool = TPool_create(1, OUTBUFF_QUEUE);
-        if (fc->hPool == NULL) return;
-    }
     fc->hashing = 1;
     fc->hashStart = 1;
 }
@@ -2481,7 +2478,8 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         b.size = b.capacity;
         memset(&dOpt, 0, sizeof(dOpt));
         /* liblz4 forgets it at each new frame : set it at every invocation */
-        dOpt.skipChecksums = (fc->hashing || !fc->hashAllowed) ? LZ4F_skipAllChecksums : LZ4F_verifyChecksums;   /* hashed by hPool, or --no-frame-crc */
+        dOpt.skipChecksums = fc->hashAllowed ? LZ4F_skipContentChecksum   /* verified by lz4 : see LZ4IO_frameCheck_t */
+                                             : LZ4F_skipAllChecksums;    /* --no-crc */
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
                                 b.ptr, &b.size,
                                 inPtr + pos, &remainingInSize,
@@ -2498,7 +2496,8 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         LZ4IO_keepFrameTail(fc->tail, inPtr + pos, remainingInSize);
         pos += remainingInSize;
         assert(b.size <= b.capacity);
-        if (!fc->frameKnown && !frameEnd) LZ4IO_checkFrame(fc, lz4fc->dctx);
+        if (!fc->frameKnown) LZ4IO_checkFrame(fc, lz4fc->dctx);
+        assert(fc->frameKnown || b.size == 0);   /* no output before the header is decoded */
 
         /* push to hashing and write threads */
         {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
@@ -2516,8 +2515,13 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
                 cth->storedChecksum = frameEnd ? LZ4IO_readLE32(fc->tail) : 0;
                 cth->xxh = fc->xxh;
             }
-            assert(cth == NULL || fc->hPool != NULL);   /* hashed frames : hPool created by LZ4IO_checkFrame() */
-            if (fc->hPool) TPool_submitJob(fc->hPool, LZ4IO_hashDecodedLZ4FChunk, cth);   /* every buffer : see PBUFFERS_NB */
+            if (cth && (fc->hPool == NULL) && !(cth->frameStart && cth->frameEnd))
+                fc->hPool = TPool_create(1, OUTBUFF_QUEUE);   /* if it fails : hashed by the decoding thread */
+            if (fc->hPool) {
+                TPool_submitJob(fc->hPool, LZ4IO_hashDecodedLZ4FChunk, cth);   /* every buffer : see PBUFFERS_NB */
+            } else {
+                LZ4IO_hashDecodedLZ4FChunk(cth);
+            }
             ctw->bufOut = b;
             ctw->fOut = lz4fc->foutput;
             ctw->bp = lz4fc->bp;
@@ -2573,6 +2577,10 @@ LZ4IO_decompressLZ4F(dRess_t ress,
 
     memset(&fc, 0, sizeof(fc));
     fc.hashAllowed = (dOptPtr == NULL);
+    if (fc.hashAllowed) {
+        fc.xxh = XXH32_createState();
+        if (fc.xxh == NULL) END_PROCESS(23, "Allocation error : can't allocate checksum state");
+    }
 
     /* allocate buffers up front */
     for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
