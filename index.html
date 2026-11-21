@@ -107,6 +107,74 @@
         border-width: 6px 6px 6px 0;
         border-right-color: #fafafa;
       }
+      /* charts (js/charts.js) */
+      .chart-box, .benchmark-chart {
+        position: relative;
+        margin-bottom: 10px;
+      }
+      .chart-box svg, .benchmark-chart svg {
+        display: block;
+        font-size: 12px;
+      }
+      .chart-title {
+        margin: 18px 0 6px;
+        font-size: 16px;
+      }
+      .chart-title small {
+        display: inline-block;
+        font-size: 13px;
+      }
+      .chart-grid line { stroke: #e1e0d9; stroke-width: 1; }
+      .chart-axis { stroke: #c3c2b7; stroke-width: 1; }
+      .chart-tick { fill: #6b6a65; }
+      .chart-axis-title, .chart-label, .chart-value { fill: #3e3f3a; }
+      .chart-axis-title { font-size: 13px; }
+      .chart-label, .chart-value { font-size: 13px; }
+      .chart-ref { stroke: #898781; stroke-width: 1; stroke-dasharray: 4 3; }
+      .chart-ref-label { fill: #6b6a65; }
+      .chart-ring { fill: none; stroke: #3e3f3a; stroke-width: 1.5; pointer-events: none; }
+      .chart-tip {
+        display: none;
+        position: absolute;
+        z-index: 2;
+        padding: 6px 9px;
+        font-size: 13px;
+        line-height: 1.45;
+        white-space: nowrap;
+        background: #fff;
+        border: 1px solid rgba(11, 11, 11, 0.15);
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        pointer-events: none;
+      }
+      .chart-tip-version { color: #6b6a65; }
+      .chart-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 14px;
+        margin-top: 10px;
+      }
+      .chart-machine select { width: auto; }
+      .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+      .chart-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px 2px 4px;
+        font-size: 13px;
+        color: #3e3f3a;
+        background: none;
+        border: 1px solid transparent;
+        border-radius: 4px;
+      }
+      .chart-legend-item:hover { border-color: #dfd7ca; }
+      .chart-legend-item.off { color: #b0aea6; text-decoration: line-through; }
+      .chart-legend-item.off svg { opacity: 0.3; }
+      .chart-env { font-size: 13px; color: #6b6a65; }
+      .bench-section summary { display: list-item; cursor: pointer; }
+      .chart-table { font-size: 13px; }
+      .chart-table td:nth-child(n+3), .chart-table th:nth-child(n+3) { text-align: right; }
       /* small screens */
       @media (max-width: 767px) {
         #content td a {
@@ -182,32 +250,10 @@
 Benchmarks
 ----------
 
-The benchmark uses [lzbench](https://github.com/inikep/lzbench) v2.4.1, from @inikep,
-compiled with GCC v13.3.0 on Linux 64-bits (Ubuntu 24.04).
-The reference system uses a Core i7-9700K CPU.
-Benchmark evaluates the compression of reference [Silesia Corpus](https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia) in single-thread mode.
+The library, in memory, measured by [lzbench](https://github.com/inikep/lzbench) from @inikep,
+with other compressors, at their levels.
 
-<div class="bench-section">
-  <ul class="nav nav-tabs" data-tabs="tabs">
-    <li class="active"><a href="#lzbench-1" data-toggle="tab">Ratio vs speed</a></li>
-    <li               ><a href="#lzbench-2" data-toggle="tab">Speeds and ratio</a></li>
-  </ul>
-  <div class="tab-content">
-    <div id="lzbench-1" class="tab-pane container-fluid active">
-      <div class="row">
-        <div class="col-md-6"><div class="bench-chart" data-chart="scatter-decompression" style="height:28em;"></div></div>
-        <div class="col-md-6"><div class="bench-chart" data-chart="scatter-compression" style="height:28em;"></div></div>
-      </div>
-    </div>
-    <div id="lzbench-2" class="tab-pane container-fluid">
-      <div class="row">
-        <div class="col-md-4"><div class="bench-chart" data-chart="bars-decompression" style="height:26em;"></div></div>
-        <div class="col-md-4"><div class="bench-chart" data-chart="bars-compression" style="height:26em;"></div></div>
-        <div class="col-md-4"><div class="bench-chart" data-chart="bars-ratio" style="height:26em;"></div></div>
-      </div>
-    </div>
-  </div>
-</div>
+<div id="lzbench-charts" class="bench-section"></div>
 
 <a name="pipelines"></a>
 ### Command line pipelines
@@ -240,7 +286,8 @@ LINK &lt; f.lz4 | lz4 -d -c &gt; /dev/null</pre>
       </div>
       <div class="col-md-8">
         <div class="benchmark-links" data-scenario="read"></div>
-        <div class="benchmark-chart" data-scenario="read" style="height:26em;"></div>
+        <h4 class="chart-title benchmark-title" data-scenario="read"></h4>
+        <div class="benchmark-chart" data-scenario="read"></div>
       </div>
     </div>
   </div>
@@ -269,7 +316,8 @@ lz4 -d -c &gt; /dev/null</pre>
       </div>
       <div class="col-md-8">
         <div class="benchmark-links" data-scenario="transfer"></div>
-        <div class="benchmark-chart" data-scenario="transfer" style="height:26em;"></div>
+        <h4 class="chart-title benchmark-title" data-scenario="transfer"></h4>
+        <div class="benchmark-chart" data-scenario="transfer"></div>
       </div>
     </div>
   </div>
@@ -604,9 +652,8 @@ who greatly contributed to the creation of this LZ4 webpage
     })();
     </script>
 
-    <!-- Chart -->
-    <script src="https://www.gstatic.com/charts/loader.js"></script>
-    <script src="js/benchmarks.js"></script>
+    <!-- Charts -->
+    <script src="js/charts.js"></script>
 
     <!-- GitHub star count, asked directly to the GitHub API.
          The API allows 60 calls per hour per IP, often spent behind a shared address :
