@@ -240,13 +240,18 @@ for entry in "${ENTRIES[@]}"; do
 $entry
 EOF
     # lzbench -o4 row : name with version and level, compression MB/s, decompression MB/s, original size, compressed size, ...
-    row=$("$LZBENCH" -q -o4 -t"$TIMES" -e"$codec${lzlevel:+,$lzlevel}" "$INPUT" 2>>"$LOG" | sed -n 2p)
+    row=$("$LZBENCH" -q -o4 -t"$TIMES" -e"$codec${lzlevel:+,$lzlevel}" "$INPUT" 2>"$WORK/err" | sed -n 2p)
+    cat "$WORK/err" >> "$LOG"
     IFS=, read -r lzname cspeed dspeed orig csize rest <<EOF
 $row
 EOF
-    if [ -z "$row" ] || [ "${orig:-0}" != "$SIZE" ] || [ "${csize:-0}" -le 0 ] 2>/dev/null; then
-        warn "$name : no result, skipped (see log.txt)"; echo "$name : $row" >> "$LOG"; continue
+    err=$(tr '\r' '\n' < "$WORK/err" | grep . | head -1)   # lzbench -q is silent, unless something goes wrong
+    if grep -q ERROR "$WORK/err" || [ -z "$row" ] || [ "${orig:-0}" != "$SIZE" ] || [ "${csize:-0}" -le 0 ] 2>/dev/null; then
+        # for instance "ERROR in zstd: decompressed bytes common=..." : the decompressed data differ from the input
+        warn "$name : skipped${err:+ : $err}"
+        echo "$name : $row" >> "$LOG"; continue
     fi
+    [ -z "$err" ] || warn "$name : $err"
     if [ "$family" = LZ4 ]; then version=$LZ4_VERSION
     else version=$(printf '%s\n' "$lzname" | sed -E 's/^[^ ]+ ?//; s/ (--fast )?-+[0-9]+$//')
     fi
