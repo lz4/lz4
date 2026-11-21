@@ -2783,6 +2783,7 @@ struct LZ4F_dctx_s {
     XXH32_state_t blockChecksum;
     int    skipBlockChecksum;
     int    skipContentChecksum;
+    unsigned frameEnded;     /* a frame just ended : frameInfo still describes it (see LZ4F_getFrameInfo()) */
     BYTE   header[LZ4F_HEADER_SIZE_MAX];
 };  /* typedef'd to LZ4F_dctx in lz4frame.h */
 
@@ -2851,6 +2852,15 @@ void LZ4F_resetDecompressionContext(LZ4F_dctx* dctx)
     dctx->skipBlockChecksum = 0;
     dctx->skipContentChecksum = 0;
     dctx->frameRemainingSize = 0;
+    dctx->frameEnded = 0;
+}
+
+/* LZ4F_endFrame() :
+ * prepares dctx for a new frame, keeping the parameters of the frame that just ended (see LZ4F_getFrameInfo()) */
+static void LZ4F_endFrame(LZ4F_dctx* dctx)
+{
+    LZ4F_resetDecompressionContext(dctx);
+    dctx->frameEnded = 1;
 }
 
 
@@ -2870,6 +2880,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx* dctx, const void* src, size_t srcSize
     DEBUGLOG(5, "LZ4F_decodeHeader");
     assert(srcSize >= minFHSize);   /* minimal frame header size */
     MEM_INIT(&(dctx->frameInfo), 0, sizeof(dctx->frameInfo));
+    dctx->frameEnded = 0;
 
     /* special case : skippable frames */
     if ((LZ4F_readLE32(srcPtr) & 0xFFFFFFF0U) == LZ4F_MAGIC_SKIPPABLE_START) {
@@ -2992,6 +3003,7 @@ size_t LZ4F_headerSize(const void* src, size_t srcSize)
  *     Amount of input data provided must be large enough to successfully decode the frame header.
  *     A header size is variable, but is guaranteed to be <= LZ4F_HEADER_SIZE_MAX bytes. It's possible to provide more input data than this minimum.
  *   - After decoding has been started. In which case, no input is read, frame parameters are extracted from dctx.
+ *   - After the end of a frame, with no input (*srcSizePtr == 0) : parameters of this frame are extracted from dctx, and the function returns 0.
  *  The number of bytes consumed from srcBuffer will be updated within *srcSizePtr (necessarily <= original value).
  *  Decompression must resume from (srcBuffer + *srcSizePtr).
  * @return : an hint about how many srcSize bytes LZ4F_decompress() expects for next call,
@@ -3020,6 +3032,10 @@ LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_dctx* dctx,
             /* frame decoding already started, in the middle of header => automatic fail */
             *srcSizePtr = 0;
             RETURN_ERROR(frameDecoding_alreadyStarted);
+        } else if (dctx->frameEnded && (*srcSizePtr == 0)) {
+            /* no input, after the end of a frame : parameters of this frame */
+            *frameInfoPtr = dctx->frameInfo;
+            return 0;
         } else {
             size_t const hSize = LZ4F_headerSize(srcBuffer, *srcSizePtr);
             if (LZ4F_isError(hSize)) { *srcSizePtr=0; return hSize; }
@@ -3658,7 +3674,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }
             if (!dctx->frameInfo.contentChecksumFlag) {  /* no checksum, frame is completed */
                 nextSrcSizeHint = 0;
-                LZ4F_resetDecompressionContext(dctx);
+                LZ4F_endFrame(dctx);
                 doAnotherStage = 0;
                 break;
             }
@@ -3683,7 +3699,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
 #endif
             }
             nextSrcSizeHint = 0;
-            LZ4F_resetDecompressionContext(dctx);
+            LZ4F_endFrame(dctx);
             doAnotherStage = 0;
             break;
 
@@ -3709,7 +3725,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 nextSrcSizeHint = dctx->tmpInTarget;
                 if (nextSrcSizeHint) break;  /* still more to skip */
                 /* frame fully skipped : prepare context for a new frame */
-                LZ4F_resetDecompressionContext(dctx);
+                LZ4F_endFrame(dctx);
                 break;
             }
         }   /* switch (dctx->dStage) */

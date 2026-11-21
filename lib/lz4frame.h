@@ -564,12 +564,19 @@ LZ4FLIB_API size_t LZ4F_headerSize(const void* src, size_t srcSize);
  *     and not yet read enough information to decode the header,
  *     LZ4F_getFrameInfo() will fail.
  *
+ *  3) After a frame has ended, with no input (*srcSizePtr == 0) (v1.11.2+) :
+ *     it provides the parameters of the frame that just ended, and returns 0.
+ *     This lasts until LZ4F_decompress() starts reading the next frame,
+ *     or until LZ4F_resetDecompressionContext().
+ *     With input, it decodes the header of the next frame, as in 1).
+ *
  *  The number of bytes consumed from srcBuffer will be updated in *srcSizePtr (necessarily <= original value).
  *  LZ4F_getFrameInfo() only consumes bytes when decoding has not yet started,
  *  and when decoding the header has been successful.
  *  Decompression must then resume from (srcBuffer + *srcSizePtr).
  *
  * @return : a hint about how many srcSize bytes LZ4F_decompress() expects for next call,
+ *           0 after the end of a frame (situation 3),
  *           or an error code which can be tested using LZ4F_isError().
  *  note 1 : in case of error, dctx is not modified. Decoding operation can resume from beginning safely.
  *  note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
