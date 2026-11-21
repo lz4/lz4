@@ -249,15 +249,21 @@
            " Script : <a href=\"https://github.com/lz4/lz4/blob/gh-pages/bench/bench-lzbench.sh\">bench-lzbench.sh</a>.";
   };
 
-  var drawTable = function (place) {
-    var rows = lzbench.rows.filter(function (r) { return r.family !== "memcpy"; });
-    var t = "<table class=\"table table-condensed chart-table\"><thead><tr><th>Compressor</th><th>Version</th><th>Ratio</th>" +
+  /* a selection, the rows of lz4's README table (see readme-table.md in bench-lzbench.sh), by compression speed */
+  var selection = [ "lz4 -1", "lzo1x -1", "quicklz -1", "snappy", "zstd -1", "lzf -1", "zlib-ng -1", "zlib -1", "lz4 -9", "zlib -6" ];
+  var drawTable = function (place, run) {
+    var rows = lzbench.rows.filter(function (r) { return selection.indexOf(r.name) >= 0; })
+                           .sort(function (a, b) { return b.cSpeed - a.cSpeed; });
+    rows = lzbench.rows.filter(function (r) { return r.family === "memcpy"; }).concat(rows);
+    var t = "<table class=\"table table-condensed chart-table\"><thead><tr><th>Compressor</th><th></th><th>Ratio</th>" +
             "<th>Compression</th><th>Decompression</th></tr></thead><tbody>";
     rows.forEach(function (r) {
-      t += "<tr><td><code>" + r.name + "</code></td><td>" + r.version + "</td><td>" + r.ratio.toFixed(3) + "</td><td>" +
+      t += "<tr" + (r.family === "LZ4" ? " class=\"chart-table-lz4\"" : "") + "><td>" + r.name + "</td><td>" +
+           (r.version ? r.family + " " + r.version : "") + "</td><td>" + r.ratio.toFixed(3) + "</td><td>" +
            formatSpeed(r.cSpeed) + "</td><td>" + formatSpeed(r.dSpeed) + "</td></tr>";
     });
-    place.innerHTML = t + "</tbody></table>";
+    place.innerHTML = t + "</tbody></table>" +
+      "<p class=\"chart-env\">All measurements : <a href=\"" + run.dir + "/lzbench.csv\">lzbench.csv</a>, system : <a href=\"" + run.dir + "/env.txt\">env.txt</a>.</p>";
   };
 
   var drawLzbench = function () {
@@ -282,7 +288,7 @@
     drawLegend(root.querySelector(".chart-legend"));
     drawLzbench();
     root.querySelector(".chart-env").innerHTML = run.env ? describeRun(run.env) : "";
-    drawTable(root.querySelector(".chart-table-place"));
+    drawTable(root.querySelector(".chart-table-place"), run);
   };
 
   var setupLzbench = function (root) {
@@ -295,7 +301,7 @@
       "<div class=\"chart-box\" data-metric=\"compression\"></div></div>" +
       "</div>" +
       "<p class=\"chart-env\"></p>" +
-      "<details><summary>All results</summary><div class=\"chart-table-place\"></div></details>";
+      "<div class=\"chart-table-place\"></div>";
     var onHover = function (row, from) {
       lzbench.charts.forEach(function (c) { c.highlight(row, c === from); });
     };
