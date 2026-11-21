@@ -76,15 +76,15 @@ lz4 -q --no-frame-crc $B $B-n.lz4
 lz4 -q -BX $B $B-x.lz4
 { cat $B-c.lz4 $B-n.lz4; skip 20000; cat $B-x.lz4 $F $B-c.lz4; } | lz4 -dc > $OUT
 cat $B $B $B $SRC $B | cmp - $OUT
-# input is read by pieces (INBUFF_FIRST_READS, then INBUFF_SIZE), one ending at offset 4 + 4 MB :
-# a frame of 4194310 bytes (64 stored blocks of 64 KB) ends with its checksum across it
-R=$FPREFIX-rnd;  datagen -g4194039 -P0 > $R
+# input is read by pieces (INBUFF_FIRST_READS, then INBUFF_SIZE), ending at multiples of their size :
+# a frame of 4194306 bytes (64 stored blocks of 64 KB) ends with its checksum across offset 4 MB
+R=$FPREFIX-rnd;  datagen -g4194035 -P0 > $R
 lz4 -q -B4 $R $R.lz4
-test "$(wc -c < $R.lz4)" -eq 4194310
+test "$(wc -c < $R.lz4)" -eq 4194306
 lz4 -dc $R.lz4 > $OUT;  cmp $R $OUT
 # wrong checksums : detected
 flip() { b=$(od -An -tu1 -j$2 -N1 $1 | tr -d ' \n'); printf "$(printf '\\%03o' $((b ^ 255)))" | dd of=$1 bs=1 seek=$2 conv=notrunc 2> /dev/null; }   # flip FILE OFFSET
-for o in 4194306 4194307 4194308 4194309; do
+for o in 4194302 4194303 4194304 4194305; do
     cp $R.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $o
     fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
 done
@@ -108,8 +108,8 @@ lz4 -q -dc --no-frame-crc $FPREFIX-bad.lz4 > $OUT;  cmp $B $OUT   # block checks
 cp $F $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $F) - 1))   # frame decoded at once
 fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
 fails "cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -dc" "contentChecksum_invalid"
-# frame header split across reads (the first one ends at offset 4 + 256 KB) : large frame, then frame decoded at once
-N=$((4 + 262144 - 3 - $(wc -c < $F) - 8));  test $N -gt 0   # skippable frame : next header starts 3 bytes before
+# frame header split across reads (the first one ends at offset 256 KB) : large frame, then frame decoded at once
+N=$((262144 - 3 - $(wc -c < $F) - 8));  test $N -gt 0   # skippable frame : next header starts 3 bytes before
 { cat $F; skip $N; cat $B-c.lz4; } > $FPREFIX-split.lz4
 lz4 -dc $FPREFIX-split.lz4 > $OUT;  cat $SRC $B | cmp - $OUT
 flip $FPREFIX-split.lz4 $(($(wc -c < $FPREFIX-split.lz4) - 1))
