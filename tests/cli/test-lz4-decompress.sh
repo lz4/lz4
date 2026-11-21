@@ -68,8 +68,8 @@ for z in $FPREFIX-z1 $FPREFIX-z2; do
     lz4 -q -d -c -f --sparse $z > $OUT;  cmp $z $OUT   # not lz4 : pass-through (-c -f)
 done
 
-# content checksums : verified by a hashing thread (multi-threaded decompression), by liblz4 otherwise
-# (block checksums, frames decoded at once) ; frames of each kind, one after the other
+# checksums : content checksums verified by lz4 itself in multi-threaded decompression (see LZ4IO_frameCheck_t),
+# by liblz4 otherwise ; block checksums verified by liblz4 ; frames of each kind, one after the other
 B=$FPREFIX-big;  datagen -g9MB > $B   # several 4 MB blocks
 lz4 -q $B $B-c.lz4
 lz4 -q --no-frame-crc $B $B-n.lz4
@@ -97,12 +97,29 @@ cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-frame-crc > $OUT;  cat $B $B | c
 cp $B-x.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-x.lz4) - 9))   # last block checksum
 fails "lz4 -dc $FPREFIX-bad.lz4" "blockChecksum_invalid"
 cat $B-x.lz4 $FPREFIX-bad.lz4 | lz4 -q -dc --no-frame-crc > $OUT;  cat $B $B | cmp - $OUT
+cp $B-x.lz4 $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $B-x.lz4) - 1))   # with block checksums
+fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
+cp $F $FPREFIX-bad.lz4;  flip $FPREFIX-bad.lz4 $(($(wc -c < $F) - 1))   # frame decoded at once
+fails "lz4 -dc $FPREFIX-bad.lz4" "contentChecksum_invalid"
+fails "cat $B-c.lz4 $FPREFIX-bad.lz4 | lz4 -dc" "contentChecksum_invalid"
+# frame header split across reads (the first one ends at offset 4 + 256 KB) : large frame, then frame decoded at once
+N=$((4 + 262144 - 3 - $(wc -c < $F) - 8));  test $N -gt 0   # skippable frame : next header starts 3 bytes before
+{ cat $F; skip $N; cat $B-c.lz4; } > $FPREFIX-split.lz4
+lz4 -dc $FPREFIX-split.lz4 > $OUT;  cat $SRC $B | cmp - $OUT
+flip $FPREFIX-split.lz4 $(($(wc -c < $FPREFIX-split.lz4) - 1))
+fails "lz4 -dc $FPREFIX-split.lz4" "contentChecksum_invalid"
+{ cat $F; skip $N; cat $F; } > $FPREFIX-split.lz4
+lz4 -dc $FPREFIX-split.lz4 > $OUT;  cat $SRC $SRC | cmp - $OUT
+flip $FPREFIX-split.lz4 $(($(wc -c < $FPREFIX-split.lz4) - 1))
+fails "lz4 -dc $FPREFIX-split.lz4" "contentChecksum_invalid"
 
 
 # errors
 fails "lz4 -t $SRC" "Unrecognized header : file cannot be decoded"
 printf '\004\042\115\030' > $FPREFIX-bad.lz4                 # frame : magic number only
 fails "lz4 -t $FPREFIX-bad.lz4" "Error"
+{ cat $F; head -c 7 $F; } > $FPREFIX-bad.lz4               # frame, then header of the next one only
+fails "lz4 -t $FPREFIX-bad.lz4" "could not complete"
 printf '\002\041\114\030\001\000\000\000\360' > $FPREFIX-bad.lz4   # legacy block : invalid
 fails "lz4 -t $FPREFIX-bad.lz4" "Corrupted input"
 { skip 4; printf 'ab'; } > $FPREFIX-bad.lz4
