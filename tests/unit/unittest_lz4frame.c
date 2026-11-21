@@ -256,6 +256,60 @@ TEST(compressBound_nullPreferences)
         ASSERT_MSG(LZ4F_compressBound(srcSizes[i], NULL) >= LZ4F_compressBound(srcSizes[i], &prefs), "srcSize %u", (unsigned)srcSizes[i]);
 }
 
+TEST(compressBound_overflowAndInvalidParams)
+{
+    static const size_t hugeSizes[] = { (size_t)-1, (size_t)-16, (size_t)-65536 };
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(hugeSizes); i++) {
+        size_t const sz = hugeSizes[i];
+        ASSERT_LZ4F_ERROR(LZ4F_compressFrameBound(sz, NULL), LZ4F_ERROR_srcSize_tooLarge);
+        ASSERT_LZ4F_ERROR(LZ4F_compressBound(sz, NULL), LZ4F_ERROR_srcSize_tooLarge);
+        prefs.autoFlush = 1;
+        ASSERT_LZ4F_ERROR(LZ4F_compressBound(sz, &prefs), LZ4F_ERROR_srcSize_tooLarge);
+        prefs.autoFlush = 0;
+        prefs.nbWorkers = 2;
+        ASSERT_LZ4F_ERROR(LZ4F_compressBound(sz, &prefs), LZ4F_ERROR_srcSize_tooLarge);
+        prefs.nbWorkers = 0;
+    }
+
+    /* invalid blockSizeID and non-0/1 checksum flags must not under-estimate bounds */
+    memset(&prefs, 0, sizeof(prefs));
+    prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)99;
+    prefs.frameInfo.blockChecksumFlag = (LZ4F_blockChecksum_t)42;
+    prefs.frameInfo.contentChecksumFlag = (LZ4F_contentChecksum_t)42;
+    ASSERT(LZ4F_OK(LZ4F_compressFrameBound(100002, &prefs)) >= 100002);
+    prefs.autoFlush = 1;
+    ASSERT(LZ4F_OK(LZ4F_compressBound(100002, &prefs)) >= 100002);
+    prefs.autoFlush = 0;
+    ASSERT(LZ4F_OK(LZ4F_compressBound(100002, &prefs)) >= 100002);
+}
+
+TEST(compressFrame_rejectsInvalidBlockSizeID)
+{
+    static const LZ4F_blockSizeID_t badIDs[] = {
+        (LZ4F_blockSizeID_t)1,
+        (LZ4F_blockSizeID_t)3,
+        (LZ4F_blockSizeID_t)8,
+        (LZ4F_blockSizeID_t)99,
+        (LZ4F_blockSizeID_t)0x7FFFFFFF
+    };
+    char const smallSrc[100] = { 0 };
+    const void* const bigSrc = UT_sample(5 MB);
+    char dst[256];
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(badIDs); i++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        prefs.frameInfo.blockSizeID = badIDs[i];
+        ASSERT_LZ4F_ERROR(LZ4F_compressFrame(dst, sizeof(dst), smallSrc, sizeof(smallSrc), &prefs),
+                          LZ4F_ERROR_maxBlockSize_invalid);
+        ASSERT_LZ4F_ERROR(LZ4F_compressFrame(dst, sizeof(dst), bigSrc, 5 MB, &prefs),
+                          LZ4F_ERROR_maxBlockSize_invalid);
+    }
+}
+
 TEST(getBlockSize)
 {
     unsigned id;

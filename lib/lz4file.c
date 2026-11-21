@@ -232,10 +232,15 @@ static void addResumePoint(LZ4_readFile_t* lz4fRead, unsigned long long cPos, co
 {
   unsigned long long const lastDPos = lz4fRead->nbPoints ? lz4fRead->points[lz4fRead->nbPoints-1].dPos : 0;
   LZ4F_resumePoint* p;
-  if (lz4fRead->decodedPos < lastDPos + LZ4F_RESUME_SPAN) return;
+  if (lz4fRead->decodedPos < lastDPos || lz4fRead->decodedPos - lastDPos < LZ4F_RESUME_SPAN) return;
   if (lz4fRead->nbPoints == lz4fRead->pointsCapacity) {
-    size_t const newCapacity = lz4fRead->pointsCapacity ? 2 * lz4fRead->pointsCapacity : 64;
-    LZ4F_resumePoint* const newPoints = (LZ4F_resumePoint*)fileMalloc(newCapacity * sizeof(*newPoints), lz4fRead->cmem);   /* no realloc() among user functions */
+    size_t const maxCapacity = ((size_t)-1) / sizeof(*p);
+    size_t newCapacity;
+    LZ4F_resumePoint* newPoints;
+    if (lz4fRead->pointsCapacity > maxCapacity / 2) return;
+    newCapacity = lz4fRead->pointsCapacity ? 2 * lz4fRead->pointsCapacity : 64;
+    if (newCapacity > maxCapacity) return;
+    newPoints = (LZ4F_resumePoint*)fileMalloc(newCapacity * sizeof(*newPoints), lz4fRead->cmem);   /* no realloc() among user functions */
     if (newPoints == NULL) return;
     if (lz4fRead->nbPoints) memcpy(newPoints, lz4fRead->points, lz4fRead->nbPoints * sizeof(*newPoints));
     fileFree(lz4fRead->points, lz4fRead->cmem);
@@ -374,7 +379,18 @@ static LZ4F_errorCode_t restartFrom(LZ4_readFile_t* lz4fRead, const LZ4F_resumeP
 {
   unsigned long long const cPos = p ? p->cPos : 0;
   unsigned long long const filePos = lz4fRead->srcBufPos + lz4fRead->srcBufSize;
-  if (!lz4fRead->seekable || fseekRelative(lz4fRead->fp, (long long)cPos - (long long)filePos))
+  unsigned long long const maxDelta = ((unsigned long long)-1) >> 1;
+  long long delta;
+  if (!lz4fRead->seekable)
+    RETURN_ERROR(io_read);
+  if (cPos >= filePos) {
+    if (cPos - filePos > maxDelta) RETURN_ERROR(io_read);
+    delta = (long long)(cPos - filePos);
+  } else {
+    if (filePos - cPos > maxDelta) RETURN_ERROR(io_read);
+    delta = -(long long)(filePos - cPos);
+  }
+  if (fseekRelative(lz4fRead->fp, delta))
     RETURN_ERROR(io_read);
   lz4fRead->srcBufPos = cPos;
   lz4fRead->srcBufSize = 0;
@@ -407,8 +423,12 @@ LZ4F_errorCode_t LZ4F_seek(LZ4_readFile_t* lz4fRead, long long offset, int origi
     target = (unsigned long long)offset;
     break;
   case SEEK_CUR:
-    if (offset < 0 && (unsigned long long)-(offset + 1) >= lz4fRead->decodedPos)
-      RETURN_ERROR(parameter_invalid);   /* before start */
+    if (offset < 0) {
+      if ((unsigned long long)-(offset + 1) >= lz4fRead->decodedPos)
+        RETURN_ERROR(parameter_invalid);   /* before start */
+    } else if ((unsigned long long)offset > ((unsigned long long)-1) - lz4fRead->decodedPos) {
+      RETURN_ERROR(parameter_invalid);   /* overflow */
+    }
     target = lz4fRead->decodedPos + (unsigned long long)offset;
     break;
   default:   /* SEEK_END is not supported */
