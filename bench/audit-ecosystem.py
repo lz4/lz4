@@ -4,7 +4,7 @@
 # usage : audit-ecosystem.py index.html audit.csv
 # Needs curl and gh (GitHub CLI, logged in). A proxy, if any, comes from the environment (https_proxy).
 # 403 / 429 are often anti-bot answers : check those links in a browser.
-import concurrent.futures, csv, json, os, re, subprocess, sys, tempfile, urllib.parse
+import concurrent.futures, csv, html as html_lib, json, os, re, subprocess, sys, tempfile, urllib.parse
 
 ENV = os.environ
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
@@ -23,9 +23,12 @@ for line in xmp.splitlines():
         url = re.search(r"https?://\S+", f[3]).group(0)
         entries.append(dict(section=section, name=f[1].replace("__", ""), author=f[2], url=url, logo=""))
         continue
-    m = re.search(r'<li><a href="([^"]+)"\s*>\s*<img alt="" src="([^"]+)"\s*/>\s*<span>\s*([^<]+)</span>', line)
+    m = re.match(r"<h3>(.*)</h3>", line)
     if m:
-        entries.append(dict(section=section, name=m.group(3).strip(), author="", url=m.group(1), logo=m.group(2)))
+        section = m.group(1).strip(); continue
+    m = re.search(r'<div class="usedby-entry"><img alt="" src="([^"]+)"><div><a class="usedby-name" href="([^"]+)">([^<]+)</a>', line)
+    if m:
+        entries.append(dict(section=section, name=m.group(3), author="", url=html_lib.unescape(m.group(2)), logo=m.group(1)))
 
 def fetch(url):
     with tempfile.NamedTemporaryFile() as body:
