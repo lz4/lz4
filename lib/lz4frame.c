@@ -435,11 +435,30 @@ static BYTE LZ4F_headerChecksum (const void* header, size_t length)
 /*-************************************
 *  Simple-pass compression functions
 **************************************/
+/* Largest non-error size_t result: values strictly above this are interpreted as LZ4F_isError() */
+#define LZ4F_BOUND_MAX ((size_t)(-LZ4F_ERROR_maxCode))
+
+static int LZ4F_checkedAdd(size_t a, size_t b, size_t* out)
+{
+    if (a > LZ4F_BOUND_MAX || b > LZ4F_BOUND_MAX - a) return 0;
+    *out = a + b;
+    return 1;
+}
+
+static int LZ4F_checkedMul(size_t a, size_t b, size_t* out)
+{
+    if (a != 0 && b > LZ4F_BOUND_MAX / a) return 0;
+    *out = a * b;
+    return 1;
+}
+
 static LZ4F_blockSizeID_t LZ4F_optimalBSID(const LZ4F_blockSizeID_t requestedBSID,
                                            const size_t srcSize)
 {
     LZ4F_blockSizeID_t proposedBSID = LZ4F_max64KB;
     size_t maxBlockSize = 64 KB;
+    if (requestedBSID < LZ4F_max64KB || requestedBSID > LZ4F_max4MB)
+        return requestedBSID;
     while (requestedBSID > proposedBSID) {
         if (srcSize <= maxBlockSize)
             return proposedBSID;
@@ -456,27 +475,37 @@ static LZ4F_blockSizeID_t LZ4F_optimalBSID(const LZ4F_blockSizeID_t requestedBSI
  */
 static size_t LZ4F_compressBound_autoFlush(size_t srcSize, const LZ4F_preferences_t* prefsPtr)
 {
-    size_t const blockSize = LZ4F_getBlockSize(prefsPtr->frameInfo.blockSizeID);
+    size_t const bs = LZ4F_getBlockSize(prefsPtr->frameInfo.blockSizeID);
+    size_t const blockSize = LZ4F_isError(bs) ? (64 KB) : bs;
     size_t const nbFullBlocks = srcSize / blockSize;
     size_t const lastBlockSize = srcSize & (blockSize-1);
     size_t const nbBlocks = nbFullBlocks + (lastBlockSize>0);
-    size_t const blockCRCSize = BFSize * prefsPtr->frameInfo.blockChecksumFlag;
-    size_t const frameEnd = BHSize + (prefsPtr->frameInfo.contentChecksumFlag*BFSize);
+    size_t const blockCRCSize = prefsPtr->frameInfo.blockChecksumFlag ? BFSize : 0;
+    size_t const frameEnd = BHSize + (prefsPtr->frameInfo.contentChecksumFlag ? BFSize : 0);
+    size_t overhead, total;
     assert(prefsPtr->autoFlush);
-    return ((BHSize + blockCRCSize) * nbBlocks) +
-           (blockSize * nbFullBlocks) + lastBlockSize + frameEnd;
+    if (!LZ4F_checkedMul(BHSize + blockCRCSize, nbBlocks, &overhead)
+     || !LZ4F_checkedAdd(srcSize, overhead, &total)
+     || !LZ4F_checkedAdd(total, frameEnd, &total))
+        RETURN_ERROR(srcSize_tooLarge);
+    return total;
 }
 
 size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
     LZ4F_preferences_t prefs;
     size_t const headerSize = maxFHSize;      /* max header size, including optional fields */
+    size_t bodyBound, total;
 
     if (preferencesPtr!=NULL) prefs = *preferencesPtr;
     else MEM_INIT(&prefs, 0, sizeof(prefs));
     prefs.autoFlush = 1;
 
-    return headerSize + LZ4F_compressBound_autoFlush(srcSize, &prefs);
+    bodyBound = LZ4F_compressBound_autoFlush(srcSize, &prefs);
+    FORWARD_IF_ERROR(bodyBound);
+    if (!LZ4F_checkedAdd(headerSize, bodyBound, &total))
+        RETURN_ERROR(srcSize_tooLarge);
+    return total;
 }
 
 
@@ -546,8 +575,13 @@ static int LZ4F_mtEligible(const LZ4F_preferences_t* prefs)
  * @return worst case size of LZ4F_compressBlocks_internal() output */
 static size_t LZ4F_blocksBound(size_t srcSize, size_t blockSize, LZ4F_blockChecksum_t crcFlag)
 {
-    size_t const nbBlocks = (srcSize + blockSize - 1) / blockSize;
-    return srcSize + nbBlocks * (BHSize + (size_t)crcFlag * BFSize);
+    size_t const nbBlocks = (srcSize / blockSize) + ((srcSize % blockSize) != 0);
+    size_t const blockOverhead = BHSize + (crcFlag ? BFSize : 0);
+    size_t overhead, total;
+    if (!LZ4F_checkedMul(nbBlocks, blockOverhead, &overhead)
+     || !LZ4F_checkedAdd(srcSize, overhead, &total))
+        RETURN_ERROR(srcSize_tooLarge);
+    return total;
 }
 
 /*! LZ4F_mtCompressBound() :
@@ -563,8 +597,14 @@ static size_t LZ4F_mtCompressBound(size_t srcSize, const LZ4F_preferences_t* pre
     size_t const blockSize = LZ4F_isError(bs) ? 4 MB : bs;
     size_t const jobSize = LZ4F_mtJobSize(blockSize);
     size_t const nbJobs = srcSize ? (srcSize / jobSize) + ((srcSize % jobSize) != 0) : 1;
-    size_t const frameEnd = BHSize + (prefs->frameInfo.contentChecksumFlag*BFSize);
-    return nbJobs * LZ4F_blocksBound(jobSize, blockSize, prefs->frameInfo.blockChecksumFlag) + frameEnd;
+    size_t const jobBound = LZ4F_blocksBound(jobSize, blockSize, prefs->frameInfo.blockChecksumFlag);
+    size_t const frameEnd = BHSize + (prefs->frameInfo.contentChecksumFlag ? BFSize : 0);
+    size_t jobsTotal, total;
+    FORWARD_IF_ERROR(jobBound);
+    if (!LZ4F_checkedMul(nbJobs, jobBound, &jobsTotal)
+     || !LZ4F_checkedAdd(jobsTotal, frameEnd, &total))
+        RETURN_ERROR(srcSize_tooLarge);
+    return total;
 }
 
 /*! LZ4F_compressFrame_usingCDict() :
@@ -599,8 +639,10 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
 
     prefs.frameInfo.blockSizeID = LZ4F_optimalBSID(prefs.frameInfo.blockSizeID, srcSize);
     prefs.autoFlush = 1;
-    if (srcSize <= LZ4F_getBlockSize(prefs.frameInfo.blockSizeID))
-        prefs.frameInfo.blockMode = LZ4F_blockIndependent;   /* only one block => no need for inter-block link */
+    {   size_t const blockSize = LZ4F_getBlockSize(prefs.frameInfo.blockSizeID);
+        if (!LZ4F_isError(blockSize) && srcSize <= blockSize)
+            prefs.frameInfo.blockMode = LZ4F_blockIndependent;   /* only one block => no need for inter-block link */
+    }
 
     if (LZ4F_mtEligible(&prefs)) {
         /* a single job produces the same output as single-threaded compression, without the setup cost */
@@ -1128,9 +1170,9 @@ size_t LZ4F_compressBegin_usingCDict(LZ4F_cctx* cctx,
 size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
     size_t bound;
-    size_t const blockCRCSize = preferencesPtr
-                             ? BFSize * preferencesPtr->frameInfo.blockChecksumFlag
-                             : BFSize;
+    size_t const blockCRCSize = (preferencesPtr == NULL || preferencesPtr->frameInfo.blockChecksumFlag)
+                             ? BFSize
+                             : 0;
     if (preferencesPtr && !preferencesPtr->autoFlush && LZ4F_mtEligible(preferencesPtr)) {
         /* frame cut into jobs : output can lag behind input */
         return LZ4F_mtCompressBound(srcSize, preferencesPtr);
@@ -1138,7 +1180,11 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
     if (preferencesPtr && preferencesPtr->autoFlush) {
         /* + 1 : output of LZ4F_flush() and LZ4F_compressEnd() remains strictly below LZ4F_compressBound(0),
          * since a filled dstBuffer means more output may remain */
-        return LZ4F_compressBound_autoFlush(srcSize, preferencesPtr) + (srcSize == 0);
+        size_t const autoBound = LZ4F_compressBound_autoFlush(srcSize, preferencesPtr);
+        FORWARD_IF_ERROR(autoBound);
+        if (!LZ4F_checkedAdd(autoBound, (size_t)(srcSize == 0), &bound))
+            RETURN_ERROR(srcSize_tooLarge);
+        return bound;
     }
     /* single-threaded : full blocks only, each one stored uncompressed in worst case.
      * Up to (blockSize-1) bytes can already be buffered : srcSize completes at most srcSize/blockSize + 1 blocks.
@@ -1149,11 +1195,15 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
      * The frame footer is always included, so that the bound grows with @srcSize. */
     {   size_t const bs = LZ4F_getBlockSize(preferencesPtr ? preferencesPtr->frameInfo.blockSizeID : LZ4F_default);
         size_t const blockSize = LZ4F_isError(bs) ? 4 MB : bs;
-        size_t const contentCRCSize = preferencesPtr
-                                    ? BFSize * preferencesPtr->frameInfo.contentChecksumFlag
-                                    : BFSize;
+        size_t const contentCRCSize = (preferencesPtr == NULL || preferencesPtr->frameInfo.contentChecksumFlag)
+                                    ? BFSize
+                                    : 0;
         size_t const nbBlocks = srcSize / blockSize + 1;
-        bound = nbBlocks * (blockSize + BHSize + blockCRCSize) + BHSize + contentCRCSize;
+        size_t const blockUnit = blockSize + BHSize + blockCRCSize;
+        size_t blocksTotal;
+        if (!LZ4F_checkedMul(nbBlocks, blockUnit, &blocksTotal)
+         || !LZ4F_checkedAdd(blocksTotal, BHSize + contentCRCSize, &bound))
+            RETURN_ERROR(srcSize_tooLarge);
     }
     return bound;
 }
@@ -3768,6 +3818,7 @@ size_t LZ4F_resumeFrame(LZ4F_dctx* dctx, const LZ4F_frameInfo_t* frameInfo,
                         const void* dict, size_t dictSize)
 {
     assert(dctx != NULL);
+    RETURN_ERROR_IF(dctx == NULL, parameter_null);
     RETURN_ERROR_IF(frameInfo == NULL, parameter_null);
     RETURN_ERROR_IF(dict == NULL && dictSize > 0, parameter_null);
     RETURN_ERROR_IF(frameInfo->frameType != LZ4F_frame, frameType_unknown);
