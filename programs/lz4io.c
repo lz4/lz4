@@ -249,6 +249,7 @@ struct LZ4IO_prefs_s {
     size_t blockSize;
     int blockChecksum;
     int streamChecksum;
+    LZ4F_skipChecksums_t skipChecksums;   /* decompression : checksums not verified (--no-frame-crc, --no-crc) */
     int blockIndependence;
     int sparseFileSupport;
     int contentSizeFlag;
@@ -278,6 +279,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     LZ4IO_setBlockSizeID(prefs, LZ4IO_BLOCKSIZEID_DEFAULT);
     prefs->blockChecksum = 0;
     prefs->streamChecksum = 1;
+    prefs->skipChecksums = LZ4F_verifyChecksums;
     prefs->blockIndependence = 1;
     prefs->sparseFileSupport = 1;
     prefs->contentSizeFlag = 0;
@@ -389,6 +391,12 @@ int LZ4IO_setStreamChecksumMode(LZ4IO_prefs_t* const prefs, int enable)
 {
     prefs->streamChecksum = (enable != 0);
     return prefs->streamChecksum;
+}
+
+/* Default setting : LZ4F_verifyChecksums */
+void LZ4IO_skipChecksums(LZ4IO_prefs_t* const prefs, LZ4F_skipChecksums_t skip)
+{
+    prefs->skipChecksums = skip;
 }
 
 /* Default setting : 0 (no notification) */
@@ -2418,7 +2426,8 @@ static void LZ4IO_hashDecodedLZ4FChunk(void* arg)
  * An invocation never goes beyond the end of a frame : each output buffer belongs to a single frame.
  * State of the decoding thread, kept from one input buffer to the next. */
 typedef struct {
-    int hashAllowed;        /* 0 : checksums skipped (--no-crc) */
+    int hashAllowed;        /* 0 : content checksums skipped (--no-frame-crc, --no-crc) */
+    int skipBlockChecksums; /* --no-crc */
     int frameKnown;         /* header of current frame decoded */
     int hashing;            /* current frame is hashed by lz4 */
     int hashStart;          /* next hashed buffer is the first one of the frame */
@@ -2478,8 +2487,8 @@ static void LZ4IO_decompressLZ4FChunk(void* arg)
         b.size = b.capacity;
         memset(&dOpt, 0, sizeof(dOpt));
         /* liblz4 forgets it at each new frame : set it at every invocation */
-        dOpt.skipChecksums = fc->hashAllowed ? LZ4F_skipContentChecksum   /* verified by lz4 : see LZ4IO_frameCheck_t */
-                                             : LZ4F_skipAllChecksums;    /* --no-crc */
+        dOpt.skipChecksums = fc->skipBlockChecksums ? LZ4F_skipAllChecksums   /* --no-crc */
+                                                    : LZ4F_skipContentChecksum;  /* verified by lz4 (see LZ4IO_frameCheck_t), or not at all */
         {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
                                 b.ptr, &b.size,
                                 inPtr + pos, &remainingInSize,
@@ -2558,10 +2567,6 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     LZ4F_errorCode_t nextToLoad;
     LZ4F_errorCode_t lastStatus = 1;
     unsigned storedSkips = 0;
-    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, LZ4F_skipAllChecksums, 0, 0 };
-    const LZ4F_decompressOptions_t* const dOptPtr =
-        ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
-        &dOpt_skipCrc : NULL;
     TPool* const tPool = TPool_create(1, 1);
     TPool* const wPool = TPool_create(1, OUTBUFF_QUEUE);
     BufferPool* const bp = LZ4IO_createBufferPool(OUTBUFF_SIZE);
@@ -2576,7 +2581,8 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         END_PROCESS(22, "threadpool creation error ");
 
     memset(&fc, 0, sizeof(fc));
-    fc.hashAllowed = (dOptPtr == NULL);
+    fc.hashAllowed = (prefs->skipChecksums == LZ4F_verifyChecksums) || (prefs->skipChecksums == LZ4F_skipBlockChecksums);
+    fc.skipBlockChecksums = (prefs->skipChecksums == LZ4F_skipAllChecksums) || (prefs->skipChecksums == LZ4F_skipBlockChecksums);
     if (fc.hashAllowed) {
         fc.xxh = XXH32_createState();
         if (fc.xxh == NULL) END_PROCESS(23, "Allocation error : can't allocate checksum state");
@@ -2597,7 +2603,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
                             ress.dstBuffer, &outSize,
                             ress.srcBuffer, &inSize,
                             ress.dictBuffer, ress.dictBufferSize,
-                            dOptPtr);  /* also set at every invocation, see LZ4IO_decompressLZ4FChunk() */
+                            NULL);  /* options set at every invocation : see LZ4IO_decompressLZ4FChunk() */
         if (LZ4F_isError(nextToLoad))
             END_PROCESS(23, "Header error : %s", LZ4F_getErrorName(nextToLoad));
     }
@@ -2673,10 +2679,9 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     unsigned long long filesize = 0;
     LZ4F_errorCode_t nextToLoad;
     unsigned storedSkips = 0;
-    LZ4F_decompressOptions_t const dOpt_skipCrc = { 0, LZ4F_skipAllChecksums, 0, 0 };
-    const LZ4F_decompressOptions_t* const dOptPtr =
-        ((prefs->blockChecksum==0) && (prefs->streamChecksum==0)) ?
-        &dOpt_skipCrc : NULL;
+    LZ4F_decompressOptions_t dOpt;
+    memset(&dOpt, 0, sizeof(dOpt));
+    dOpt.skipChecksums = prefs->skipChecksums;   /* --no-frame-crc, --no-crc */
 
     /* Init feed with magic number (already consumed from FILE* sFile) */
     {   size_t inSize = MAGICNUMBER_SIZE;
@@ -2686,7 +2691,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
                             ress.dstBuffer, &outSize,
                             ress.srcBuffer, &inSize,
                             ress.dictBuffer, ress.dictBufferSize,
-                            dOptPtr);  /* set it once, it's enough */
+                            &dOpt);  /* set it once, it's enough : this function decodes a single frame */
         if (LZ4F_isError(nextToLoad))
             END_PROCESS(62, "Header error : %s", LZ4F_getErrorName(nextToLoad));
     }
@@ -2971,9 +2976,8 @@ int LZ4IO_decompressMultipleFilenames(
     TIME_t timeStart = TIME_getTime();
     double const cpuStart = cpuTime_sec();
 
-    if (prefs->blockChecksum==0 && prefs->streamChecksum==0) {
-        DISPLAYLEVEL(4, "disabling checksum validation during decoding \n");
-    }
+    if (prefs->skipChecksums == LZ4F_skipContentChecksum) DISPLAYLEVEL(4, "disabling content checksum validation during decoding \n");
+    if (prefs->skipChecksums == LZ4F_skipAllChecksums) DISPLAYLEVEL(4, "disabling checksum validation during decoding \n");
     /* stdout and /dev/null (test mode) are destinations shared by all input files */
     if (LZ4IO_isStdout(suffix) || LZ4IO_isDevNull(suffix)) {
         ress.dstFile = LZ4IO_openDstFile(suffix, prefs, NULL);
