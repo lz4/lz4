@@ -262,22 +262,17 @@
 
 
 
-<xmp style="display:none;">
-<a name="benchmarks"></a>
-Benchmarks
-----------
-
-The library, in memory, measured by [lzbench](https://github.com/inikep/lzbench) from @inikep,
-with other compressors, at their levels.
-
+    <div class="container" id="content">
+<p><a name="benchmarks"></a></p>
+<h2>Benchmarks</h2>
+<p>The library, in memory, measured by <a href="https://github.com/inikep/lzbench">lzbench</a> from @inikep,
+with other compressors, at their levels.</p>
 <div id="lzbench-charts" class="bench-section"></div>
 
-<a name="pipelines"></a>
-### Command line pipelines
-
-These benchmarks measure the command lines themselves, on the same system,
-in pipelines where a link of limited speed, a storage device or a network, separates stages running at the same time.
-
+<p><a name="pipelines"></a></p>
+<h3>Command line pipelines</h3>
+<p>These benchmarks measure the command lines themselves, on the same system,
+in pipelines where a link of limited speed, a storage device or a network, separates stages running at the same time.</p>
 <div class="bench-section">
 <ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
   <li class="active"><a href="#tab-1" data-toggle="tab">Reading static content<br/>from storage</a></li>
@@ -342,105 +337,104 @@ lz4 -d -c &gt; /dev/null</pre>
 </div>
 
 
-## Documentation
-
-The LZ4 block compression format is detailed within [lz4_Block_format](https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md).
-
-For streaming arbitrarily large amount of data, or compress files of any size,
-a frame format has been established, detailed within the file [lz4_Frame_format](https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md).
-
-
-
-<br/>
-<a name="interoperable-lz4"></a>
-## Interoperable LZ4 ports and bindings
-The following versions are provided for languages beyond the C reference version.
-They are in conformance with the LZ4 [block] and [frame] specifications, and are therefore interoperable.
-
-|Language                 |Author               |URL           |
-|----                     |----                 |----          |
-|__C#__                   | Milosz Krajewski    | https://github.com/MiloszKrajewski/K4os.Compression.LZ4
-|__Dart__                 | Instantiations      | https://pub.dev/documentation/es_compression/latest/lz4/
-|__Dart__ (port)          | jxoesneon           | https://pub.dev/packages/dart_lz4
-|__Delphi__               | Hanno Hugenberg     | https://github.com/Hugie/lz4-delphi
-|__Delphi__               | Xelitan             | https://github.com/Xelitan/LZ4-Compression-Decompression-for-Delphi-Lazarus
-|__Go__ (port)            | Pierre Curto        | https://github.com/pierrec/lz4
-|__Go__ (cgo)             | Sean Cunningham     | https://github.com/prequel-dev/plz4
-|__Haskell__              | Niklas Hambüchen    | https://hackage.haskell.org/package/lz4-frame-conduit
-|__Java__                 | Jonas Konrad        | https://github.com/yawkat/lz4-java
-|__Java__                 | Apache Commons      | https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/lz4/package-summary.html
-|__JavaScript__ (Node.js) | Antonio Musolino    | https://github.com/antoniomuso/lz4-napi
-|__JavaScript__ (port)    | Benzinga            | https://github.com/Benzinga/lz4js
-|__Lua__                  | Witchu Promjunyakul | https://github.com/witchu/lua-lz4
-|__Perl__                 | Felix Bytow         | https://metacpan.org/release/Compress-LZ4Frame
-|__Python__               | Jonathan Underwood  | https://pypi.org/project/lz4/
-|__Rust__ (port)          | Pascal Seitz        | https://github.com/PSeitz/lz4_flex
-|__Rust__ (binding)       | 10x Genomics        | https://github.com/10xGenomics/lz4-rs
-|__Rust__ (binding)       | picoHz              | https://github.com/picoHz/lzzzz
-|__VA Smalltalk__         | Instantiations      | https://www.instantiations.com/vast-support/documentation/91/pr/compression2.html#pID0E0LB0FA
-
-[block]:https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md
-[frame]:https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md
-
-
-<br/>
-<a name="lz4-clis"></a>
-## Compatible CLI versions
-Here are a few compatible alternatives to lz4 command line utility :
-
-|Name                    |Author               |URL  |
-|----                    |----                 |---- |
-|__smalLZ4__             | Stephan Brumme      |https://create.stephan-brumme.com/smallz4/ |
-|__briefLZ4__            | Jørgen Ibsen        |https://github.com/jibsen/blz4 |
-|__7Zip with LZ4__       | Tino Reichardt      |https://github.com/mcmilk/7-Zip-zstd |
-|__lz4ultra__            | Emmanuel Marty      |https://github.com/emmanuel-marty/lz4ultra |
-
-
-<br/>
-<a name="customs-lz4"></a>
-## Custom LZ4 implementations
-The following versions compress data blocks with the LZ4 compression algorithm in various programming languages.
-They use the [block] compression format, and deal with metadata (like `compressed_size`) in various custom ways (or none at all, letting the caller deal with it).
-Consequently, they are not interoperable with LZ4 command line utility, nor (generally) between themselves.
-
-|Language             |Author               |URL                              |
-|--                   |--                   |--                               |
-|__C#__ streaming     | Phill Djonov        | https://github.com/pdjonov/Lz4Stream
-|__Cuda__             | NVidia              | https://docs.nvidia.com/cuda/nvcomp/lz4.html
-|__PHP__              | Kamijo              | https://github.com/kjdev/php-ext-lz4
-
-
-<br/>
-<a name="decoders"></a>
-## Compact decoders
-Decoders only, often written in assembly, for small or old processors and other environments.
-
-|Target               |Author               |URL                              |
-|--                   |--                   |--                               |
-|__6502 & 65C02__ assembly | Peter Ferrie   | https://github.com/pararaum/lz4-6502
-|__Atari XL/XE__ assembly | xxl             | http://xxl.atari.pl/lz4-decompressor/
-|__65c816__ assembly  | Olivier Zardini     | http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html
-|__Z80__ assembly     | Piotr Drapich       | https://web.archive.org/web/20260815055553/http://www.union.org.pl/download/z80/LZ4_Z80.asm
-|__Z80__ assembly     | Edouard Berge       | https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8
-|__8086__ assembly    | E. C. Masloch       | https://hg.pushbx.org/ecm/inicomp/
-|__8088__ assembly    | Jim Leonard         | http://www.oldskool.org/pc/lz4_8088
-|__68k__ assembly     | Arnaud Carre        | https://github.com/arnaud-carre/lz4-68k
-|__v810__ assembly    | Martin Wendt        | https://github.com/enthusi/lz4_v810_decode
-|__ARM Cortex__ assembly | Jens Bauer       | https://developer.arm.com/community/developer/ip-products/processors/b/processors-ip-blog/posts/lz4-decompression-routine-for-cortex-m0-and-later
-|__arm64__ assembly   | Siguza              | https://github.com/Siguza/lz4dec
-|__Risc-V__ assembly  | Martin Wendt        | https://github.com/enthusi/lz4_rv32i_decode
-|__C__ (tiny)         | Justine Tunney      | https://github.com/jart/cosmopolitan/blob/467504308a103865c058f9a0ac858cc22e72240e/libc/nexgen32e/lz4cpy.c
-|__Lua__              | Scott Lembcke       | https://github.com/slembcke/mini-lz4
-|__PHP__ (port)       | Stephan J. Müller   | https://heap.ch/blog/2019/05/18/lz4-decompression/
-|__Tcl__              | D. Bohdan           | https://wiki.tcl-lang.org/page/LZ4
-|__jsonlz4__          | Avi Halachmi        | https://github.com/avih/dejsonlz4 : custom Mozilla LZ4 format
-
-
-<br/>
-<a name="references"></a>
-## LZ4 is used by
-A sample : each entry links to a source showing how LZ4 is used.
-
+<h2>Documentation</h2>
+<p>The LZ4 block compression format is detailed within <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md">lz4_Block_format</a>.</p>
+<p>For streaming arbitrarily large amount of data, or compress files of any size,
+a frame format has been established, detailed within the file <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md">lz4_Frame_format</a>.</p>
+<p><br/>
+<a name="interoperable-lz4"></a></p>
+<h2>Interoperable LZ4 ports and bindings</h2>
+<p>The following versions are provided for languages beyond the C reference version.
+They are in conformance with the LZ4 <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md">block</a> and <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md">frame</a> specifications, and are therefore interoperable.</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr><th>Language</th><th>Author</th><th>URL</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>C#</strong></td><td>Milosz Krajewski</td><td><a href="https://github.com/MiloszKrajewski/K4os.Compression.LZ4">https://github.com/MiloszKrajewski/K4os.Compression.LZ4</a></td></tr>
+<tr><td><strong>Dart</strong></td><td>Instantiations</td><td><a href="https://pub.dev/documentation/es_compression/latest/lz4/">https://pub.dev/documentation/es_compression/latest/lz4/</a></td></tr>
+<tr><td><strong>Dart</strong> (port)</td><td>jxoesneon</td><td><a href="https://pub.dev/packages/dart_lz4">https://pub.dev/packages/dart_lz4</a></td></tr>
+<tr><td><strong>Delphi</strong></td><td>Hanno Hugenberg</td><td><a href="https://github.com/Hugie/lz4-delphi">https://github.com/Hugie/lz4-delphi</a></td></tr>
+<tr><td><strong>Delphi</strong></td><td>Xelitan</td><td><a href="https://github.com/Xelitan/LZ4-Compression-Decompression-for-Delphi-Lazarus">https://github.com/Xelitan/LZ4-Compression-Decompression-for-Delphi-Lazarus</a></td></tr>
+<tr><td><strong>Go</strong> (port)</td><td>Pierre Curto</td><td><a href="https://github.com/pierrec/lz4">https://github.com/pierrec/lz4</a></td></tr>
+<tr><td><strong>Go</strong> (cgo)</td><td>Sean Cunningham</td><td><a href="https://github.com/prequel-dev/plz4">https://github.com/prequel-dev/plz4</a></td></tr>
+<tr><td><strong>Haskell</strong></td><td>Niklas Hambüchen</td><td><a href="https://hackage.haskell.org/package/lz4-frame-conduit">https://hackage.haskell.org/package/lz4-frame-conduit</a></td></tr>
+<tr><td><strong>Java</strong></td><td>Jonas Konrad</td><td><a href="https://github.com/yawkat/lz4-java">https://github.com/yawkat/lz4-java</a></td></tr>
+<tr><td><strong>Java</strong></td><td>Apache Commons</td><td><a href="https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/lz4/package-summary.html">https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/lz4/package-summary.html</a></td></tr>
+<tr><td><strong>JavaScript</strong> (Node.js)</td><td>Antonio Musolino</td><td><a href="https://github.com/antoniomuso/lz4-napi">https://github.com/antoniomuso/lz4-napi</a></td></tr>
+<tr><td><strong>JavaScript</strong> (port)</td><td>Benzinga</td><td><a href="https://github.com/Benzinga/lz4js">https://github.com/Benzinga/lz4js</a></td></tr>
+<tr><td><strong>Lua</strong></td><td>Witchu Promjunyakul</td><td><a href="https://github.com/witchu/lua-lz4">https://github.com/witchu/lua-lz4</a></td></tr>
+<tr><td><strong>Perl</strong></td><td>Felix Bytow</td><td><a href="https://metacpan.org/release/Compress-LZ4Frame">https://metacpan.org/release/Compress-LZ4Frame</a></td></tr>
+<tr><td><strong>Python</strong></td><td>Jonathan Underwood</td><td><a href="https://pypi.org/project/lz4/">https://pypi.org/project/lz4/</a></td></tr>
+<tr><td><strong>Rust</strong> (port)</td><td>Pascal Seitz</td><td><a href="https://github.com/PSeitz/lz4_flex">https://github.com/PSeitz/lz4_flex</a></td></tr>
+<tr><td><strong>Rust</strong> (binding)</td><td>10x Genomics</td><td><a href="https://github.com/10xGenomics/lz4-rs">https://github.com/10xGenomics/lz4-rs</a></td></tr>
+<tr><td><strong>Rust</strong> (binding)</td><td>picoHz</td><td><a href="https://github.com/picoHz/lzzzz">https://github.com/picoHz/lzzzz</a></td></tr>
+<tr><td><strong>VA Smalltalk</strong></td><td>Instantiations</td><td><a href="https://www.instantiations.com/vast-support/documentation/91/pr/compression2.html#pID0E0LB0FA">https://www.instantiations.com/vast-support/documentation/91/pr/compression2.html#pID0E0LB0FA</a></td></tr>
+</tbody>
+</table>
+<p><br/>
+<a name="lz4-clis"></a></p>
+<h2>Compatible CLI versions</h2>
+<p>Here are a few compatible alternatives to lz4 command line utility :</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr><th>Name</th><th>Author</th><th>URL</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>smalLZ4</strong></td><td>Stephan Brumme</td><td><a href="https://create.stephan-brumme.com/smallz4/">https://create.stephan-brumme.com/smallz4/</a></td></tr>
+<tr><td><strong>briefLZ4</strong></td><td>Jørgen Ibsen</td><td><a href="https://github.com/jibsen/blz4">https://github.com/jibsen/blz4</a></td></tr>
+<tr><td><strong>7Zip with LZ4</strong></td><td>Tino Reichardt</td><td><a href="https://github.com/mcmilk/7-Zip-zstd">https://github.com/mcmilk/7-Zip-zstd</a></td></tr>
+<tr><td><strong>lz4ultra</strong></td><td>Emmanuel Marty</td><td><a href="https://github.com/emmanuel-marty/lz4ultra">https://github.com/emmanuel-marty/lz4ultra</a></td></tr>
+</tbody>
+</table>
+<p><br/>
+<a name="customs-lz4"></a></p>
+<h2>Custom LZ4 implementations</h2>
+<p>The following versions compress data blocks with the LZ4 compression algorithm in various programming languages.
+They use the <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md">block</a> compression format, and deal with metadata (like <code>compressed_size</code>) in various custom ways (or none at all, letting the caller deal with it).
+Consequently, they are not interoperable with LZ4 command line utility, nor (generally) between themselves.</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr><th>Language</th><th>Author</th><th>URL</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>C#</strong> streaming</td><td>Phill Djonov</td><td><a href="https://github.com/pdjonov/Lz4Stream">https://github.com/pdjonov/Lz4Stream</a></td></tr>
+<tr><td><strong>Cuda</strong></td><td>NVidia</td><td><a href="https://docs.nvidia.com/cuda/nvcomp/lz4.html">https://docs.nvidia.com/cuda/nvcomp/lz4.html</a></td></tr>
+<tr><td><strong>PHP</strong></td><td>Kamijo</td><td><a href="https://github.com/kjdev/php-ext-lz4">https://github.com/kjdev/php-ext-lz4</a></td></tr>
+</tbody>
+</table>
+<p><br/>
+<a name="decoders"></a></p>
+<h2>Compact decoders</h2>
+<p>Decoders only, often written in assembly, for small or old processors and other environments.</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr><th>Target</th><th>Author</th><th>URL</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>6502 &amp; 65C02</strong> assembly</td><td>Peter Ferrie</td><td><a href="https://github.com/pararaum/lz4-6502">https://github.com/pararaum/lz4-6502</a></td></tr>
+<tr><td><strong>Atari XL/XE</strong> assembly</td><td>xxl</td><td><a href="http://xxl.atari.pl/lz4-decompressor/">http://xxl.atari.pl/lz4-decompressor/</a></td></tr>
+<tr><td><strong>65c816</strong> assembly</td><td>Olivier Zardini</td><td><a href="http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html">http://www.brutaldeluxe.fr/products/crossdevtools/lz4/index.html</a></td></tr>
+<tr><td><strong>Z80</strong> assembly</td><td>Piotr Drapich</td><td><a href="https://web.archive.org/web/20260815055553/http://www.union.org.pl/download/z80/LZ4_Z80.asm">https://web.archive.org/web/20260815055553/http://www.union.org.pl/download/z80/LZ4_Z80.asm</a></td></tr>
+<tr><td><strong>Z80</strong> assembly</td><td>Edouard Berge</td><td><a href="https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8">https://groups.google.com/forum/#!topic/lz4c/A6TLHThL0c8</a></td></tr>
+<tr><td><strong>8086</strong> assembly</td><td>E. C. Masloch</td><td><a href="https://hg.pushbx.org/ecm/inicomp/">https://hg.pushbx.org/ecm/inicomp/</a></td></tr>
+<tr><td><strong>8088</strong> assembly</td><td>Jim Leonard</td><td><a href="http://www.oldskool.org/pc/lz4_8088">http://www.oldskool.org/pc/lz4_8088</a></td></tr>
+<tr><td><strong>68k</strong> assembly</td><td>Arnaud Carre</td><td><a href="https://github.com/arnaud-carre/lz4-68k">https://github.com/arnaud-carre/lz4-68k</a></td></tr>
+<tr><td><strong>v810</strong> assembly</td><td>Martin Wendt</td><td><a href="https://github.com/enthusi/lz4_v810_decode">https://github.com/enthusi/lz4_v810_decode</a></td></tr>
+<tr><td><strong>ARM Cortex</strong> assembly</td><td>Jens Bauer</td><td><a href="https://developer.arm.com/community/developer/ip-products/processors/b/processors-ip-blog/posts/lz4-decompression-routine-for-cortex-m0-and-later">https://developer.arm.com/community/developer/ip-products/processors/b/processors-ip-blog/posts/lz4-decompression-routine-for-cortex-m0-and-later</a></td></tr>
+<tr><td><strong>arm64</strong> assembly</td><td>Siguza</td><td><a href="https://github.com/Siguza/lz4dec">https://github.com/Siguza/lz4dec</a></td></tr>
+<tr><td><strong>Risc-V</strong> assembly</td><td>Martin Wendt</td><td><a href="https://github.com/enthusi/lz4_rv32i_decode">https://github.com/enthusi/lz4_rv32i_decode</a></td></tr>
+<tr><td><strong>C</strong> (tiny)</td><td>Justine Tunney</td><td><a href="https://github.com/jart/cosmopolitan/blob/467504308a103865c058f9a0ac858cc22e72240e/libc/nexgen32e/lz4cpy.c">https://github.com/jart/cosmopolitan/blob/467504308a103865c058f9a0ac858cc22e72240e/libc/nexgen32e/lz4cpy.c</a></td></tr>
+<tr><td><strong>Lua</strong></td><td>Scott Lembcke</td><td><a href="https://github.com/slembcke/mini-lz4">https://github.com/slembcke/mini-lz4</a></td></tr>
+<tr><td><strong>PHP</strong> (port)</td><td>Stephan J. Müller</td><td><a href="https://heap.ch/blog/2019/05/18/lz4-decompression/">https://heap.ch/blog/2019/05/18/lz4-decompression/</a></td></tr>
+<tr><td><strong>Tcl</strong></td><td>D. Bohdan</td><td><a href="https://wiki.tcl-lang.org/page/LZ4">https://wiki.tcl-lang.org/page/LZ4</a></td></tr>
+<tr><td><strong>jsonlz4</strong></td><td>Avi Halachmi</td><td><a href="https://github.com/avih/dejsonlz4">https://github.com/avih/dejsonlz4</a> : custom Mozilla LZ4 format</td></tr>
+</tbody>
+</table>
+<p><br/>
+<a name="references"></a></p>
+<h2>LZ4 is used by</h2>
+<p>A sample : each entry links to a source showing how LZ4 is used.</p>
 <div class="usedby">
 <div class="usedby-card">
 <h3>Operating systems</h3>
@@ -513,28 +507,11 @@ A sample : each entry links to a source showing how LZ4 is used.
 <p class="usedby-note">The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</p>
 
 
-### Special Thanks to
-
-[Takayuki Matsuoka](https://github.com/t-mat/)
-who greatly contributed to the creation of this LZ4 webpage
-
----
-</xmp>
-
-    <!-- Markdown : the <xmp> block, converted by marked -->
-    <script src="js/marked.js"></script>
-    <script>
-    (function () {
-      var xmp = document.getElementsByTagName("xmp")[0];
-      var content = document.createElement("div");
-      content.className = "container";
-      content.id = "content";
-      content.innerHTML = marked(xmp.textContent);
-      xmp.parentNode.replaceChild(content, xmp);
-      var tables = content.getElementsByTagName("table");
-      for (var i = 0; i < tables.length; i++) tables[i].className = "table table-striped table-bordered";
-    })();
-    </script>
+<h3>Special Thanks to</h3>
+<p><a href="https://github.com/t-mat/">Takayuki Matsuoka</a>
+who greatly contributed to the creation of this LZ4 webpage</p>
+<hr>
+    </div>
 
     <!-- Mobile menu, Index menu and tabs : Bootstrap's classes, set by our own code (data-toggle attributes) -->
     <script>

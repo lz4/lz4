@@ -10,22 +10,22 @@ ENV = os.environ
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 
 html = open(sys.argv[1], encoding="utf-8").read()
-xmp = html[html.index("<a name=\"interoperable-lz4\">"):html.index("### Special Thanks")]
+part = html[html.index("<a name=\"interoperable-lz4\">"):html.index("<h3>Special Thanks")]
+
+def text(cell):
+    return html_lib.unescape(re.sub(r"<[^>]+>", "", cell)).strip()
 
 entries = []
 section = ""
-for line in xmp.splitlines():
-    m = re.match(r"#{2,4}\s+(.*)", line)
+for line in part.splitlines():
+    m = re.match(r"<h[234]>(.*)</h[234]>", line)
     if m:
         section = m.group(1).strip(); continue
-    if line.startswith("|__"):
-        f = [x.strip() for x in line.split("|")]
-        url = re.search(r"https?://\S+", f[3]).group(0)
-        entries.append(dict(section=section, name=f[1].replace("__", ""), author=f[2], url=url, logo=""))
+    if line.startswith("<tr><td>"):
+        f = re.findall(r"<td>(.*?)</td>", line)
+        url = html_lib.unescape(re.search(r'href="([^"]+)"', f[2]).group(1))
+        entries.append(dict(section=section, name=text(f[0]), author=text(f[1]), url=url, logo=""))
         continue
-    m = re.match(r"<h3>(.*)</h3>", line)
-    if m:
-        section = m.group(1).strip(); continue
     m = re.search(r'<div class="usedby-entry"><img alt="" src="([^"]+)"><div><a class="usedby-name" href="([^"]+)">([^<]+)</a>', line)
     if m:
         entries.append(dict(section=section, name=m.group(3), author="", url=html_lib.unescape(m.group(2)), logo=m.group(1)))
