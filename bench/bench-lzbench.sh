@@ -4,8 +4,8 @@
 # (at least 1 s of compression and 2 s of decompression, see -t).
 # Speeds are in MB/s of original data, 1 MB = 1000000 bytes. Ratio = original size / compressed size.
 #
-# lzbench is downloaded at a fixed commit, and built with its own copies of the compressors.
-# On x86, all of them get the JCC erratum mitigation that lz4's own build uses (-J to disable).
+# lzbench is downloaded at a fixed commit, and built with its own copies of the compressors, and its own options.
+# On x86, lz4 also gets the JCC erratum mitigation of its own build (-J for all compressors or none).
 # -l measures the lz4 library of a lz4 source tree, instead of lzbench's copy.
 # Results : directory given by -o : lzbench.csv, env.txt (system, versions, options), readme-table.md, log.txt.
 # Meant for Linux and macOS (bash 3.2) ; needs curl or wget, make (GNU), a C and a C++ compiler.
@@ -25,7 +25,7 @@ LZ4_DIR=""
 LZBENCH_DIR=""
 MACHINE=""
 TIMES="1,2"
-JCC=1
+JCC=lz4
 OUTDIR=""
 CC=${CC:-cc}
 CXX=${CXX:-c++}
@@ -38,7 +38,7 @@ usage : $0 [options]
   -l DIR    lz4 source tree whose library is measured (default : lzbench's copy of lz4)
   -L DIR    lzbench source tree to use (default : lzbench at commit ${LZBENCH_COMMIT:0:12}, downloaded once)
   -t C,D    minimum seconds of compression and decompression per measurement (default : $TIMES)
-  -J        no JCC erratum mitigation
+  -J MODE   JCC erratum mitigation (x86) : lz4 (as lz4's own build), all (all compressors), none (default : $JCC)
   -o DIR    output directory (default : ./bench-lzbench-HOST-DATE)
   -h        this help
 Compilers : CC and CXX from the environment (default : cc and c++).
@@ -49,20 +49,21 @@ msg()  { printf '%s\n' "$*" >&2; }
 warn() { printf 'warning : %s\n' "$*" >&2; }
 die()  { printf 'error : %s\n' "$*" >&2; exit 1; }
 
-while getopts "i:m:l:L:t:Jo:h" opt; do
+while getopts "i:m:l:L:t:J:o:h" opt; do
     case $opt in
         i) INPUT=$OPTARG ;;
         m) MACHINE=$OPTARG ;;
         l) LZ4_DIR=$OPTARG ;;
         L) LZBENCH_DIR=$OPTARG ;;
         t) TIMES=$OPTARG ;;
-        J) JCC=0 ;;
+        J) JCC=$OPTARG ;;
         o) OUTDIR=$OPTARG ;;
         h) usage; exit 0 ;;
         *) usage; exit 1 ;;
     esac
 done
 case $TIMES in [0-9]*,[0-9]*) ;; *) die "-t expects C,D, for instance 1,2" ;; esac
+case $JCC in lz4|all|none) ;; *) die "-J expects lz4, all or none" ;; esac
 [ -z "$LZ4_DIR" ] || [ -f "$LZ4_DIR/lib/lz4.h" ] || die "-l $LZ4_DIR : no lib/lz4.h, not a lz4 source tree"
 [ -z "$LZBENCH_DIR" ] || [ -f "$LZBENCH_DIR/bench/lzbench.h" ] || die "-L $LZBENCH_DIR : not a lzbench source tree"
 
@@ -155,11 +156,17 @@ jcc_flag() {   # jcc_flag COMPILER LANGUAGE : option keeping branches within 32-
         "$1" -x "$2" $f -Werror -c "$WORK/jcc.c" -o "$WORK/jcc.o" 2>/dev/null && { echo "$f"; return 0; }
     done
 }
-JCC_C=""; JCC_CXX=""
-if [ "$JCC" = 1 ]; then
-    JCC_C=$(jcc_flag "$CC" c)
-    JCC_CXX=$(jcc_flag "$CXX" c++)
-fi
+JCC_C=""; JCC_CXX=""; JCC_LZ4=""
+case $JCC in
+    all) JCC_C=$(jcc_flag "$CC" c); JCC_CXX=$(jcc_flag "$CXX" c++) ;;
+    lz4) JCC_LZ4=$(jcc_flag "$CC" c)
+         [ -z "$JCC_LZ4" ] || echo "LZ4_FLAGS += $JCC_LZ4" >> "$SRC/mk/lz4.mk" ;;   # lz4 objects only
+esac
+case $JCC in
+    all) JCC_INFO="all compressors : ${JCC_C:-none} (C), ${JCC_CXX:-none} (C++)" ;;
+    lz4) JCC_INFO="lz4 only : ${JCC_LZ4:-none}" ;;
+    *)   JCC_INFO="none" ;;
+esac
 
 msg "building lzbench ..."
 "$MAKE" -C "$SRC" -j"$JOBS" CC="$CC" CXX="$CXX" BUILD_ONLY="$CODECS" \
@@ -215,7 +222,7 @@ DATE=$(date -u '+%Y-%m-%d')
     echo "system    : $SYSTEM"
     [ -n "$GOVERNOR" ] && echo "governor  : $GOVERNOR"
     echo "compilers : $("$CC" --version 2>&1 | head -1) ; $("$CXX" --version 2>&1 | head -1)"
-    echo "jcc flags : ${JCC_C:-none} ; ${JCC_CXX:-none}"
+    echo "jcc       : $JCC_INFO"
     echo "lzbench   : $("$LZBENCH" -V 2>&1 | head -1), $LZBENCH_SOURCE"
     echo "lz4       : $LZ4_VERSION, $LZ4_SOURCE"
     echo "input     : ${INPUT##*/}, $SIZE bytes"
