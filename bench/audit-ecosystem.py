@@ -10,7 +10,7 @@ ENV = os.environ
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 
 html = open(sys.argv[1], encoding="utf-8").read()
-part = html[html.index("<a name=\"interoperable-lz4\">"):html.index("<h3>Special Thanks")]
+part = html[html.index("<a name=\"interoperable-lz4\">"):]
 
 def text(cell):
     return html_lib.unescape(re.sub(r"<[^>]+>", "", cell)).strip()
