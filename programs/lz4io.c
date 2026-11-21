@@ -2572,13 +2572,21 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     BufferPool* const bp = LZ4IO_createBufferPool(OUTBUFF_SIZE);
     LZ4IO_frameCheck_t fc;
 #define NB_BUFFSETS 4 /* 1 being read, 1 being processed, 1 being written, 1 being queued */
-    void* inBuffs[NB_BUFFSETS];
+#define INBUFF_ALIGN 4096
+    /* Each byte of input is stored at an address equal to its input position, modulo INBUFF_ALIGN (a page),
+     * and reads end at multiples of their size : stdio reads straight into the input buffers,
+     * and the kernel copies input from page cache (or pipe) pages to the same offsets in memory
+     * (copies to 1 to 15 bytes after their source, modulo 4096, are slow on Zen 3 and Zen 4) */
+    void* const inBuffsMem = malloc((size_t)NB_BUFFSETS * INBUFF_SIZE + INBUFF_ALIGN);
+    char* inBuffs[NB_BUFFSETS];   /* in inBuffsMem, at page boundaries */
     int bSetNb;
-    size_t firstReads = 0;   /* input read so far, up to INBUFF_SIZE : see INBUFF_FIRST_READS */
+    size_t firstReads = MAGICNUMBER_SIZE;   /* input read so far, magic number included, up to INBUFF_SIZE : see INBUFF_FIRST_READS */
 
     /* checks */
     if (tPool == NULL || wPool == NULL || bp==NULL)
         END_PROCESS(22, "threadpool creation error ");
+    if (inBuffsMem == NULL)
+        END_PROCESS(23, "Allocation error : can't allocate input buffers");
 
     memset(&fc, 0, sizeof(fc));
     fc.hashAllowed = (prefs->skipChecksums == LZ4F_verifyChecksums) || (prefs->skipChecksums == LZ4F_skipBlockChecksums);
@@ -2588,11 +2596,9 @@ LZ4IO_decompressLZ4F(dRess_t ress,
         if (fc.xxh == NULL) END_PROCESS(23, "Allocation error : can't allocate checksum state");
     }
 
-    /* allocate buffers up front */
-    for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
-        inBuffs[bSetNb] = malloc((size_t)INBUFF_SIZE);
-        if (!inBuffs[bSetNb])
-            END_PROCESS(23, "Allocation error : can't allocate buffer for legacy decoding");
+    {   char* const start = (char*)inBuffsMem + (INBUFF_ALIGN - ((size_t)inBuffsMem % INBUFF_ALIGN));
+        for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++)
+            inBuffs[bSetNb] = start + (size_t)bSetNb * INBUFF_SIZE;
     }
 
     /* Init feed with magic number (already consumed from FILE* sFile) */
@@ -2611,13 +2617,14 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     /* Main Loop */
     assert(nextToLoad);
     for (bSetNb = 0; ; bSetNb = (bSetNb+1) % NB_BUFFSETS) {
-        size_t const toRead = (firstReads < INBUFF_SIZE) ? INBUFF_FIRST_READS : INBUFF_SIZE;
+        size_t const toRead = (firstReads < INBUFF_SIZE) ? INBUFF_FIRST_READS - (firstReads % INBUFF_FIRST_READS) : INBUFF_SIZE;   /* reads end at multiples of their size */
+        char* const inBuff = inBuffs[bSetNb] + (firstReads % INBUFF_ALIGN);   /* offset of the input position : the first read follows the magic number */
         size_t readSize;
 
         if (TPool_jobError()) break;
 
         /* Read input */
-        readSize = fread(inBuffs[bSetNb], 1, toRead, srcFile);
+        readSize = fread(inBuff, 1, toRead, srcFile);
         if (firstReads < INBUFF_SIZE) firstReads += readSize;
         if (ferror(srcFile)) {
             LZ4IO_waitLZ4FJobs(tPool, &fc, wPool);
@@ -2631,7 +2638,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
                 END_PROCESS(25, "Allocation error : not enough memory to allocate job descriptor");
             }
             lbi->dctx = ress.dCtx;
-            lbi->inBuffer = inBuffs[bSetNb];
+            lbi->inBuffer = inBuff;
             lbi->inSize = readSize;
             lbi->dictBuffer = ress.dictBuffer;
             lbi->dictBufferSize = ress.dictBufferSize;
@@ -2657,9 +2664,7 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
     /* Clean */
-    for (bSetNb=0; bSetNb<NB_BUFFSETS; bSetNb++) {
-        free(inBuffs[bSetNb]);
-    }
+    free(inBuffsMem);
     LZ4IO_freeBufferPool(bp);
     TPool_free(fc.hPool);
     XXH32_freeState(fc.xxh);
