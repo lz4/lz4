@@ -242,9 +242,9 @@
     var cpu = (env.cpu || "").replace(/\((R|TM)\)/g, "").replace(/ CPU @ [\d.]+GHz/, "").replace(/, \d+ threads$/, "");
     var system = (env.system || "").split(", kernel")[0];
     var lzb = (env.lzbench || "").split(",")[0];
-    var jcc = /^lz4 only : (\S+)/.exec(env.jcc || "");
+    var ownBuild = /^lz4 only : \S/.test(env.jcc || "");   /* lz4 with the options of its own build */
     return "Measured on " + env.date + ", on " + cpu + ", " + system + ", with " + lzb + " compiled by " + compiler +
-           (jcc ? " (lz4 with <code>" + jcc[1] + "</code>, as its own build)" : "") +
+           (ownBuild ? " (lz4 with the options of its own build)" : "") +
            ". Single thread, Silesia corpus as a tar, fastest of iterations lasting at least 1 s (compression) and 2 s (decompression)." +
            " Script : <a href=\"https://github.com/lz4/lz4/blob/gh-pages/bench/bench-lzbench.sh\">bench-lzbench.sh</a>.";
   };
