@@ -10,6 +10,7 @@
 
 #include "fuzz_helpers.h"
 #include "fuzz_data_producer.h"
+#define LZ4_STATIC_LINKING_ONLY   /* LZ4_decompress_incomplete */
 #include "lz4.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
@@ -70,6 +71,29 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     /* Partial decompression with large prefix. */
     LZ4_decompress_safe_partial_usingDict((char const*)dataAfterDict, dst, size,
                                   dstCapacity, dstCapacity, largeDict, largeDictSize);
+    /* Beginning of the block (as if incomplete), then the rest :
+     * same result as the whole block at once, with the same history (prefix of 64 KB of zeros) */
+    {   size_t const histSize = 64 * 1024;
+        char* const hist = (char*)calloc(histSize + dstCapacity, 1);   /* history, then output */
+        char* const out = hist + histSize;
+        int consumed = (int)size;
+        int whole, r, rest;
+        FUZZ_ASSERT(hist);
+        whole = LZ4_decompress_safe_usingDict((char const*)data, out, size,
+                                  dstCapacity, hist, histSize);
+        if (whole > 0) memcpy(dst, out, whole);
+        r = LZ4_decompress_incomplete((char const*)data, out, &consumed,
+                                  dstCapacity, hist, histSize);
+        FUZZ_ASSERT(r >= 0 && (size_t)r <= dstCapacity && consumed >= 0 && (size_t)consumed <= size);
+        rest = LZ4_decompress_safe_usingDict((char const*)data + consumed, out + r, size - consumed,
+                                  dstCapacity - r, hist, histSize + r);
+        FUZZ_ASSERT((whole < 0) == (rest < 0));
+        if (whole >= 0) {
+            FUZZ_ASSERT(r + rest == whole);
+            FUZZ_ASSERT(!memcmp(out, dst, whole));
+        }
+        free(hist);
+    }
     free(dst);
     free(dict);
     FUZZ_dataProducer_free(producer);

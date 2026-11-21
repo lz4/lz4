@@ -633,6 +633,23 @@ LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const c
  */
 int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
 
+/*! LZ4_decompress_incomplete() : v1.11.2+ (experimental)
+ *  Decompresses the beginning of a block, while the rest is not available yet :
+ *  `*srcSizePtr` bytes at `src`, into `dst` of size `dstCapacity`.
+ *  Decoding stops before the first sequence it can't decode : not entirely within input,
+ *  not fitting into `dstCapacity`, or invalid (left to the regular decoder, which reports the error).
+ *  The block's last literals are never decoded, even when input contains the whole block :
+ *  decoding resumes from the updated `*srcSizePtr` (this function again, then a regular decoder),
+ *  with history extended by the decoded bytes (see LZ4_decompress_safe_continue()).
+ *  `dictStart`, `dictSize` : history, as for LZ4_decompress_safe_usingDict() (can be NULL, 0).
+ * @return : the number of bytes decoded into `dst` (0 : more input is needed),
+ *           `*srcSizePtr` being updated to the size of their compressed sequences ;
+ *           or -1 (invalid parameters).
+ *  Note : bytes of `dst` beyond the decoded size can be modified.
+ */
+LZ4LIB_STATIC_API int LZ4_decompress_incomplete(const char* src, char* dst, int* srcSizePtr, int dstCapacity,
+                                                const char* dictStart, int dictSize);
+
 /*! In-place compression and decompression
  *
  * It's possible to have input and output sharing the same buffer,

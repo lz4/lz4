@@ -45,6 +45,7 @@
 #ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
 #  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_decompress_fast */
 #endif
+#define LZ4_STATIC_LINKING_ONLY   /* LZ4_decompress_incomplete */
 #include "lz4.h"
 #include "lz4hc.h"
 #include "lz4frame.h"
@@ -384,6 +385,15 @@ static int local_LZ4_decompress_safe_partial_forceExtDict(const char* in, char* 
 }
 #endif
 
+#ifndef LZ4_DLL_IMPORT
+static int local_LZ4_decompress_incomplete(const char* in, char* out, int inSize, int outSize)
+{
+    int result = LZ4_decompress_incomplete(in, out, &inSize, outSize, NULL, 0);   /* all but the block's end */
+    if (result < 0) return result;
+    return outSize;
+}
+#endif
+
 static int local_LZ4_decompress_safe_partial(const char* in, char* out, int inSize, int outSize)
 {
     int result = LZ4_decompress_safe_partial(in, out, inSize, outSize - 5, outSize);
@@ -564,6 +574,9 @@ static const DecompressionDesc decDescArray[] = {
     { "LZ4F_decompress", local_LZ4F_decompress, 1, 1 },
     { "LZ4F_decompress_followHint", local_LZ4F_decompress_followHint, 1, 1 },
     { "LZ4F_decompress_noHint", local_LZ4F_decompress_noHint, 1, 1 },
+#ifndef LZ4_DLL_IMPORT
+    { "LZ4_decompress_incomplete", local_LZ4_decompress_incomplete, 0, 0 },
+#endif
 };
 
 #define ARRAY_SIZE(a) (sizeof(a) / (sizeof((a)[0])))
