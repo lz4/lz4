@@ -798,14 +798,14 @@ int LZ4_sizeofState(void) { return sizeof(LZ4_stream_t); }
 extern "C" {
 #endif
 
-int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int srcSize);
+LZ4LIB_STATIC_API int LZ4_compress_forceExtDict (LZ4_stream_t* LZ4_dict, const char* source, char* dest, int srcSize);
 
-int LZ4_decompress_safe_forceExtDict(const char* source, char* dest,
-                                     int compressedSize, int maxOutputSize,
-                                     const void* dictStart, size_t dictSize);
-int LZ4_decompress_safe_partial_forceExtDict(const char* source, char* dest,
-                                     int compressedSize, int targetOutputSize, int dstCapacity,
-                                     const void* dictStart, size_t dictSize);
+LZ4LIB_STATIC_API int LZ4_decompress_safe_forceExtDict(const char* source, char* dest,
+                                                       int compressedSize, int maxOutputSize,
+                                                       const void* dictStart, size_t dictSize);
+LZ4LIB_STATIC_API int LZ4_decompress_safe_partial_forceExtDict(const char* source, char* dest,
+                                                       int compressedSize, int targetOutputSize, int dstCapacity,
+                                                       const void* dictStart, size_t dictSize);
 #if defined (__cplusplus)
 }
 #endif
