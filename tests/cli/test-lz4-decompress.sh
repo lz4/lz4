@@ -109,9 +109,9 @@ fails "lz4 -t $FPREFIX-bad.lz4" "Magic Number unreadable"
 fails "lz4 -t $FPREFIX-bad.lz4" "cannot read block size"
 { printf 'mozLz40\000'; le32 4294967295; printf '\000'; } > $FPREFIX-bad.lz4
 fails "lz4 -t $FPREFIX-bad.lz4" "too large"
-# undecodable data after a frame : position reported with -v (test mode processes files like --list)
+# undecodable data after a frame : position reported, except with -q
 { skip 4; printf 'garbage!'; } > $FPREFIX-bad.lz4
-fails "lz4 -tv $FPREFIX-bad.lz4" "undecodable data at position [0-9]* *$"
+fails "lz4 -t $FPREFIX-bad.lz4" "undecodable data at position [0-9]* *$"
 fails "lz4 -q -t $FPREFIX-bad.lz4" ""
 # input read errors (stdin opened for writing) : not an empty input
 if [ "$(uname)" = Linux ]; then
