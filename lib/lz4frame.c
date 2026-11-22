@@ -3174,6 +3174,28 @@ static int LZ4F_endMarkFollows(const BYTE* srcPtr, const BYTE* srcEnd, size_t sk
  *                      decode its complete sequences, *seqSizePtr = their size (see LZ4_decompress_incomplete()).
  * @return : decoded size, or an error code (testable with LZ4F_isError())
  */
+/* LZ4F_decodeDetached() :
+ * History detached from @dst (not just before it) : beyond the block's first 64 KB, no match can reach it.
+ * So the first LZ4F_DETACHED_PART bytes are decoded with it (LZ4_decompress_incomplete() stops before the first
+ * sequence which doesn't fit), then the rest with them as a prefix, which is faster. Rarely, the sequence after
+ * the stop reaches the history (a long match crossing the limit) : the block is decoded again, as on any error.
+ * Not in place (input within @dst) : the first decoding would overwrite it.
+ * @return : decoded size, or < 0 (error) */
+#define LZ4F_DETACHED_PART (64 KB + 512)
+static int LZ4F_decodeDetached(const char* src, int srcSize, char* dst, int dstCapacity, const char* dict, int dictSize)
+{
+    if ( (dstCapacity > LZ4F_DETACHED_PART) && (dictSize > 0) && (dict + dictSize != dst)
+      && (((size_t)(src + srcSize) <= (size_t)dst) || ((size_t)src >= (size_t)(dst + dstCapacity))) ) {
+        int partSrcSize = srcSize;
+        int const partSize = LZ4_decompress_incomplete(src, dst, &partSrcSize, LZ4F_DETACHED_PART, dict, dictSize);
+        if (partSize >= 0) {
+            int const r = LZ4_decompress_safe_usingDict(src + partSrcSize, dst + partSize,
+                                    srcSize - partSrcSize, dstCapacity - partSize, dst, partSize);
+            if (r >= 0) return partSize + r;
+    }   }
+    return LZ4_decompress_safe_usingDict(src, dst, srcSize, dstCapacity, dict, dictSize);
+}
+
 static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
                                BYTE* dst, size_t dstCapacity, size_t* seqSizePtr)
 {
@@ -3194,9 +3216,9 @@ static size_t LZ4F_decodeBlock(LZ4F_dctx* dctx, const BYTE* src, size_t srcSize,
                 dict, (int)dictSize);
         *seqSizePtr = (size_t)seqSize;
     } else {
-        decodedSize = LZ4_decompress_safe_usingDict(
-                (const char*)src, (char*)dst,
-                (int)srcSize, (int)dstCapacity,
+        decodedSize = LZ4F_decodeDetached(
+                (const char*)src, (int)srcSize,
+                (char*)dst, (int)dstCapacity,
                 dict, (int)dictSize);
     }
     RETURN_ERROR_IF(decodedSize < 0, decompressionFailed);
