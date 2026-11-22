@@ -2,216 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <title>LZ4 - Extremely fast compression</title>
     <meta name="description" content="LZ4 is a lossless compression algorithm, with compression speed &gt; 500 MB/s per core and a decoder at multiple GB/s per core. Open source library, BSD license.">
-
-    <!-- Bootstrap 3, sandstone theme -->
-    <link rel="stylesheet" href="css/sandstone.min.css">
-
-    <link rel="stylesheet" href="js/bootstrap-patch.css">
-    <style>
-      /* markdown output (formerly strapdown.css) */
-      body {
-        font-size: 15px;
-        line-height: 150%;
-      }
-      h1, h2, h3, h4 {
-        margin: 15px 0;
-      }
-      pre {
-        margin: 20px 0;
-      }
-      img {
-        margin: 10px 0;
-      }
-      .navbar {
-        z-index: 1;
-      }
-      .table {
-        width: auto;
-      }
-      .bench-section code {
-        white-space: nowrap;
-      }
-      .bench-section h2 {
-        text-align: left;
-      }
-      .gh-icon {
-        width: 1.15em;
-        height: 1.15em;
-        fill: currentColor;
-        vertical-align: -0.2em;
-      }
-      /* GitHub star button, styled like the former ghbtns.com widget ;
-         the count is added by the script at the end of the page, only once known */
-      .star-btn {
-        display: inline-block;
-        overflow: hidden; /* baseline at the bottom edge, like the former iframe */
-        font-size: 16px;
-        font-weight: 700;
-        line-height: 22px;
-        white-space: nowrap;
-      }
-      .star-btn:hover, .star-btn:focus {
-        text-decoration: none;
-      }
-      .star-btn > span {
-        display: inline-block;
-        padding: 3px 10px 3px 8px;
-        color: #333;
-        border-radius: 4px;
-      }
-      .star-face {
-        background: linear-gradient(#fcfcfc, #eee);
-        border: 1px solid #d5d5d5;
-      }
-      .star-btn:hover .star-face {
-        background: linear-gradient(#eee, #ddd);
-        border-color: #ccc;
-      }
-      .star-face svg {
-        width: 20px;
-        height: 20px;
-        margin-right: 4px;
-        fill: #333;
-        vertical-align: top;
-      }
-      .star-count {
-        position: relative;
-        margin-left: 6px;
-        background: #fafafa;
-        border: 1px solid #d4d4d4;
-      }
-      .star-count::before, .star-count::after {
-        position: absolute;
-        top: 50%;
-        content: "";
-        border-style: solid;
-        border-color: transparent;
-      }
-      .star-count::before {
-        left: -6px;
-        margin-top: -7px;
-        border-width: 7px 7px 7px 0;
-        border-right-color: #d4d4d4;
-      }
-      .star-count::after {
-        left: -5px;
-        margin-top: -6px;
-        border-width: 6px 6px 6px 0;
-        border-right-color: #fafafa;
-      }
-      /* charts (js/charts.js) */
-      .chart-box, .benchmark-chart {
-        position: relative;
-        margin-bottom: 10px;
-      }
-      .chart-box svg, .benchmark-chart svg {
-        display: block;
-        font-size: 12px;
-      }
-      .chart-title {
-        margin: 18px 0 6px;
-        font-size: 16px;
-      }
-      .chart-title small {
-        display: inline-block;
-        font-size: 13px;
-      }
-      .chart-grid line { stroke: #e1e0d9; stroke-width: 1; }
-      .chart-axis { stroke: #c3c2b7; stroke-width: 1; }
-      .chart-tick { fill: #6b6a65; }
-      .chart-axis-title, .chart-label, .chart-value { fill: #3e3f3a; }
-      .chart-axis-title { font-size: 13px; }
-      .chart-label, .chart-value { font-size: 13px; }
-      .chart-ref { stroke: #898781; stroke-width: 1; stroke-dasharray: 4 3; }
-      .chart-ref-label { fill: #6b6a65; }
-      .chart-ring { fill: none; stroke: #3e3f3a; stroke-width: 1.5; pointer-events: none; }
-      .chart-tip {
-        display: none;
-        position: absolute;
-        z-index: 2;
-        padding: 6px 9px;
-        font-size: 13px;
-        line-height: 1.45;
-        white-space: nowrap;
-        background: #fff;
-        border: 1px solid rgba(11, 11, 11, 0.15);
-        border-radius: 4px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-        pointer-events: none;
-      }
-      .chart-tip-version { color: #6b6a65; }
-      .chart-controls {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 14px;
-        margin-top: 10px;
-      }
-      .chart-machine select { width: auto; }
-      .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 6px; }
-      .chart-legend-item {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 2px 8px 2px 4px;
-        font-size: 13px;
-        color: #3e3f3a;
-        background: none;
-        border: 1px solid transparent;
-        border-radius: 4px;
-      }
-      .chart-legend-item:hover { border-color: #dfd7ca; }
-      .chart-legend-item.off { color: #b0aea6; text-decoration: line-through; }
-      .chart-legend-item.off svg { opacity: 0.3; }
-      .chart-env { font-size: 13px; color: #6b6a65; }
-      .chart-table-lz4 td { font-weight: 700; }
-      .chart-table { font-size: 13px; }
-      .chart-table td:nth-child(n+3), .chart-table th:nth-child(n+3) { text-align: right; }
-      /* "LZ4 is used by" cards */
-      .usedby {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-        gap: 16px;
-        margin: 10px 0;
-      }
-      .usedby-card {
-        padding: 12px 14px;
-        background: #fff;
-        border: 1px solid #dfd7ca;
-        border-radius: 6px;
-      }
-      .usedby-card h3 { margin: 0 0 4px; font-size: 18px; }
-      .usedby-why, .usedby-note { margin: 0 0 10px; font-size: 14px; color: #6b6a65; }
-      .usedby-entry { display: flex; align-items: flex-start; padding: 5px 0; }
-      .usedby-entry img { flex: none; width: 28px; height: 28px; margin: 0 10px 0 0; object-fit: contain; }
-      .usedby-name { font-weight: 700; }
-      .usedby-entry small { display: block; font-size: 13px; line-height: 140%; color: #6b6a65; }
-      /* small screens */
-      @media (max-width: 767px) {
-        #content td a {
-          overflow-wrap: anywhere;
-        }
-        .jumbotron.text-justify {
-          text-align: left;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="css/site.css">
   </head>
   <body>
     <svg style="display:none">
       <!-- @primer/octicons, MIT -->
       <symbol id="gh" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></symbol>
     </svg>
-    <nav class="navbar navbar-default">
+    <nav class="navbar">
       <div class="container-fluid">
-        <!-- Brand and toggle get grouped for better mobile display -->
         <div class="navbar-header">
-          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-menu">
             <span class="sr-only">Toggle navigation</span>
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
@@ -220,9 +24,8 @@
           <a class="navbar-brand" href="/">LZ4</a>
         </div>
 
-        <!-- Collect the nav links, forms, and other content for toggling -->
-        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-          <ul class="nav navbar-nav navbar-nav">
+        <div class="collapse navbar-collapse" id="navbar-menu">
+          <ul class="nav navbar-nav">
             <li><a href="#interoperable-lz4">Versions</a></li>
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Index<span class="caret"></span></a>
@@ -243,13 +46,13 @@
             <li><a href="https://github.com/lz4/lz4/issues">Issue Tracker</a></li>
             <li><a href="https://github.com/lz4/lz4"><svg class="gh-icon" aria-hidden="true"><use href="#gh"/></svg> GitHub</a></li>
           </ul>
-        </div><!-- /.navbar-collapse -->
-      </div><!-- /.container-fluid -->
+        </div>
+      </div>
     </nav>
 
     <a name="summary"></a>
     <div class="container">
-      <div class="page-header jumbotron text-justify" style="padding-top:1em;padding-bottom:2em;">
+      <div class="page-header text-justify">
         <h1>LZ4</h1>
         <a class="star-btn" href="https://github.com/lz4/lz4"><span class="star-face"><svg aria-hidden="true"><use href="#gh"/></svg>Star</span></a>
         <p>
@@ -274,11 +77,11 @@ with other compressors, at their levels.</p>
 <p>These benchmarks measure the command lines themselves, on the same system,
 in pipelines where a link of limited speed, a storage device or a network, separates stages running at the same time.</p>
 <div class="bench-section">
-<ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
+<ul class="nav nav-tabs">
   <li class="active"><a href="#tab-1" data-toggle="tab">Reading static content<br/>from storage</a></li>
   <li               ><a href="#tab-2" data-toggle="tab">Transferring dynamic content<br/>over the network</a></li>
 </ul>
-<div id="my-tab-content" class="tab-content">
+<div class="tab-content">
   <div id="tab-1" class="tab-pane container-fluid active">
     <div class="row">
       <div class="col-md-4 text-justify">
@@ -507,7 +310,7 @@ Consequently, they are not interoperable with LZ4 command line utility, nor (gen
 <p class="usedby-note">The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</p>
     </div>
 
-    <!-- Mobile menu, Index menu and tabs : Bootstrap's classes, set by our own code (data-toggle attributes) -->
+    <!-- Mobile menu, Index menu and tabs (data-toggle attributes) -->
     <script>
     (function () {
       var closeMenus = function () {
