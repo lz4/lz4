@@ -110,9 +110,10 @@ extern "C" {
  *  - It requires the following macros to be defined:
  *    LZ4_memcpy, LZ4_memmove, LZ4_memset.
  *  - It implies LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION (see lz4.c) : there is no default allocator.
- *    Functions which allocate employ the user's allocator (LZ4_USER_MEMORY_FUNCTIONS), and fail without it.
- *    All LZ4F_* functions are not supported.
- *  - See tests/compat/freestanding.c to check its basic setup.
+ *    Functions which allocate employ the user's allocator (LZ4_USER_MEMORY_FUNCTIONS,
+ *    or LZ4F_CustomMem for LZ4F_* functions), and fail without it.
+ *  - See tests/compat/freestanding.c to check its basic setup,
+ *    and tests/compat/freestanding_frame.c for a frame decoder.
  */
 #if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
 #  define LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
