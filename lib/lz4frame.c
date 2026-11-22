@@ -597,6 +597,7 @@ size_t LZ4F_compressFrame_usingCDict(LZ4F_cctx* cctx,
     if (prefs.frameInfo.contentSize != 0)
         prefs.frameInfo.contentSize = (U64)srcSize;   /* auto-correct content size if selected (!=0) */
 
+    FORWARD_IF_ERROR(LZ4F_getBlockSize(prefs.frameInfo.blockSizeID));   /* invalid blockSizeID */
     prefs.frameInfo.blockSizeID = LZ4F_optimalBSID(prefs.frameInfo.blockSizeID, srcSize);
     prefs.autoFlush = 1;
     if (srcSize <= LZ4F_getBlockSize(prefs.frameInfo.blockSizeID))
