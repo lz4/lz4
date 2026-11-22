@@ -1537,6 +1537,75 @@ TEST(decompress_historyIntoSmallOutputs)
     }
 }
 
+/* writes a sequence : @ll literals, then a match of @ml bytes at @offset (none when @ml == 0)
+ * @return : its size */
+static size_t writeSequence(unsigned char* op, const unsigned char* literals, size_t ll, unsigned offset, size_t ml)
+{
+    unsigned char* const ostart = op;
+    size_t const mlCode = ml ? ml - 4 : 0;   /* minimum match length is 4 */
+    size_t len;
+    *op++ = (unsigned char)(((ll < 15 ? ll : 15) << 4) | (mlCode < 15 ? mlCode : 15));
+    if (ll >= 15) {
+        for (len = ll - 15; len >= 255; len -= 255) *op++ = 255;
+        *op++ = (unsigned char)len;
+    }
+    memcpy(op, literals, ll); op += ll;
+    if (ml == 0) return (size_t)(op - ostart);
+    *op++ = (unsigned char)offset; *op++ = (unsigned char)(offset >> 8);
+    if (mlCode >= 15) {
+        for (len = mlCode - 15; len >= 255; len -= 255) *op++ = 255;
+        *op++ = (unsigned char)len;
+    }
+    return (size_t)(op - ostart);
+}
+
+/* dictionary detached from the output, block beyond 64 KB : the first 64 KB are decoded with the dictionary,
+ * the rest as with a prefix. A long match crossing the limit, reaching the dictionary's last byte or not :
+ * when it does, the block is decoded again with the dictionary. Also a regular frame, 1 MB in 4 MB blocks */
+TEST(decompress_usingDict_detachedBeyond64KB)
+{
+    const char* const dict = (const char*)UT_fixedSample(64 KB);
+    const unsigned char* const literals = (const unsigned char*)UT_fixedNoise(80 KB);
+    size_t const capacity = 4 MB;   /* blocks are decoded directly into the output */
+    unsigned char* const frame = (unsigned char*)UT_malloc(LZ4F_compressBound(1 MB, NULL) + LZ4F_HEADER_SIZE_MAX);
+    char* const buffer = (char*)UT_malloc(64 KB + 100 KB);   /* dictionary, then decoded data : reference, as a prefix */
+    char* const decoded = (char*)UT_malloc(capacity);
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_dctx* const dctx = newDctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    int pos, delta;
+    prefs.frameInfo.blockSizeID = LZ4F_max4MB;
+    memcpy(buffer, dict, 64 KB);
+    for (pos = (int)(64 KB) - 300; pos <= (int)(64 KB) + 300; pos += 37)
+    for (delta = 0; delta <= 1; delta++) {
+        unsigned const offset = (unsigned)MIN(pos + delta, 65535);   /* delta 1 : the dictionary's last byte */
+        int const outSize = pos + 2000 + 100;
+        size_t const blockStart = LZ4F_OK(LZ4F_compressBegin(cctx, frame, LZ4F_HEADER_SIZE_MAX, &prefs)) + 4;
+        size_t n = blockStart, blockSize, dSize = capacity, cSize;
+        n += writeSequence(frame + n, literals, (size_t)pos - 4, 4, 4);   /* ends at pos */
+        n += writeSequence(frame + n, literals + 70 KB, 0, offset, 2000);   /* crosses 64 KB + 512 */
+        n += writeSequence(frame + n, literals + 72 KB, 100, 0, 0);
+        blockSize = n - blockStart;
+        frame[blockStart - 4] = (unsigned char)blockSize; frame[blockStart - 3] = (unsigned char)(blockSize >> 8);
+        frame[blockStart - 2] = (unsigned char)(blockSize >> 16); frame[blockStart - 1] = 0;
+        memset(frame + n, 0, 4); n += 4;   /* endMark */
+        ASSERT_EQ(LZ4_decompress_safe_usingDict((const char*)frame + blockStart, buffer + 64 KB, (int)blockSize, outSize, buffer, 64 KB),
+                  outSize);
+        cSize = n;
+        ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, dict, 64 KB, NULL)), 0);
+        ASSERT_MSG(dSize == (size_t)outSize && cSize == n && !memcmp(decoded, buffer + 64 KB, (size_t)outSize),
+                   "position %i, offset %u : decoding failed or corrupted", pos, offset);
+    }
+    {   const char* const src = (const char*)UT_fixedSample(1 MB);   /* references the dictionary */
+        size_t const frameSize = LZ4F_OK(streamFrame(cctx, frame, LZ4F_compressBound(1 MB, NULL) + LZ4F_HEADER_SIZE_MAX,
+                                                     src, 1 MB, dict, 64 KB, NULL, &prefs));
+        size_t dSize = capacity, cSize = frameSize;
+        ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, dict, 64 KB, NULL)), 0);
+        ASSERT_EQ(dSize, 1 MB);
+        ASSERT_MEMEQ(decoded, src, 1 MB);
+    }
+}
+
 /* linked blocks with a dictionary : the history isn't saved after the last block, when the endMark follows it within input,
  * but it must be whenever a block follows : compressed, or stored uncompressed (containing zeros, like an endMark),
  * with or without block checksums, decoded directly into the output, into outputs smaller than a block,
