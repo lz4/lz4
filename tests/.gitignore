@@ -19,6 +19,7 @@ checkFrame
 abiTest
 freestanding
 freestanding-usermem
+freestanding_frame
 
 # test artefacts
 tmp*

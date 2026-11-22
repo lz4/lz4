@@ -129,6 +129,7 @@ The following build macro can be selected to adjust source code behavior at comp
   and `memmove()`, `memcpy()`, and `memset()`.
   This build macro is designed to help use LZ4/HC in restricted environments
   (embedded, bootloader, etc).
+  `lz4frame.c` can then decode frames (see "Frame decoder without the C standard library").
   For more details, see description of this macro in `lib/lz4.h`.
 
 - `LZ4_HEAPMODE` : Select how stateless compression functions like `LZ4_compress_default()`
@@ -187,6 +188,45 @@ cat lz4.c lz4hc.c lz4frame.c > lz4_all.c
 ```
 (`cat` file order is important) then compile `lz4_all.c`.
 All `*.h` files present in `/lib` remain necessary to compile `lz4_all.c`.
+
+
+#### Frame decoder without the C standard library
+
+With `LZ4_FREESTANDING`, `lz4frame.c` can decode frames in a freestanding environment, such as the Linux kernel.
+Compile `lz4.c`, `lz4hc.c` and `lz4frame.c` as a single translation unit, with all their functions `static` :
+the compiler then keeps only the functions invoked, such as the decoder.
+```c
+#define LZ4_FREESTANDING 1
+#define LZ4_memcpy(d, s, n)  __builtin_memcpy((d), (s), (n))   /* or the environment's own */
+#define LZ4_memmove(d, s, n) __builtin_memmove((d), (s), (n))
+#define LZ4_memset(p, v, n)  __builtin_memset((p), (v), (n))
+#define LZ4LIB_VISIBILITY  static __attribute__((unused))
+#define LZ4FLIB_VISIBILITY static __attribute__((unused))
+#define LZ4_PUBLISH_STATIC_FUNCTIONS
+#define LZ4F_PUBLISH_STATIC_FUNCTIONS
+#include "lz4.c"
+#include "lz4hc.c"   /* referenced by lz4frame.c */
+#include "lz4frame.c"
+/* entry points of this translation unit, creating their context with
+ * LZ4F_createDecompressionContext_advanced(), then invoking LZ4F_decompress() */
+```
+The code only employs types and constants of `<limits.h>`, `<stddef.h>` and `<stdint.h>`,
+the headers of any freestanding environment. The environment provides :
+- an allocator, as there is no default one : `LZ4F_CustomMem`,
+  or `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()` with `LZ4_USER_MEMORY_FUNCTIONS`
+- `XXH32()`, `XXH32_reset()`, `XXH32_update()` and `XXH32_digest()` : from `xxhash.c`,
+  or from another implementation, behind a replacement `xxhash.h` which also defines `XXH32_state_t`
+- `memcpy()`, `memmove()` and `memset()`, which compilers may invoke anyway
+
+`LZ4F_decompress()` accepts any output size, such as one page at a time.
+At the start of a frame, it allocates 2 buffers, sized from the frame's maximum block size :
+one gathers a block whose input arrives in pieces, the other receives a block which doesn't fit into the output
+(such as a page), preceded by up to 128 KB of history for linked blocks.
+This memory depends on the frame, hence on its producer : about 256 KB for linked blocks of 64 KB
+(default of `lz4frame`), 8 MB for independent blocks of 4 MB (default of the `lz4` command line).
+`LZ4F_getFrameInfo()` reads the header without allocating : the caller can refuse block sizes it doesn't accept,
+before decoding.
+`tests/compat/freestanding_frame.c` checks this build (`make -C tests test-freestanding-frame`).
 
 
 #### Windows : using MinGW+MSYS to create DLL
