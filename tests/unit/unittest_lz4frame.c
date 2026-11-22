@@ -476,6 +476,19 @@ TEST(compressFrame_validBlockSizeIDs)
     }
 }
 
+/* an invalid blockSizeID fails, whatever srcSize : inputs up to 4 MB used to get a valid block size */
+TEST(compressFrame_invalidBlockSizeIDs)
+{
+    char const src[100] = { 0 };
+    char frame[256];
+    size_t n;
+    for (n = 0; n < ARRAY_SIZE(g_invalidBlockSizeIDs); n++) {
+        LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+        prefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_invalidBlockSizeIDs[n];
+        ASSERT_LZ4F_ERROR(LZ4F_compressFrame(frame, sizeof(frame), src, sizeof(src), &prefs), LZ4F_ERROR_maxBlockSize_invalid);
+    }
+}
+
 TEST(compressBegin_invalidBlockSizeIDs)
 {
     LZ4F_cctx* const cctx = newCctx();
