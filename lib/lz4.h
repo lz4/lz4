@@ -665,7 +665,7 @@ LZ4LIB_STATIC_API int LZ4_compress_fast_extState_fastReset (void* state, const c
  *  Same as LZ4_compress_destSize(), but using an externally allocated state.
  *  Also: exposes @acceleration
  */
-int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
+LZ4LIB_STATIC_API int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
 
 /*! LZ4_decompress_incomplete() : v1.11.2+ (experimental)
  *  Decompresses the beginning of a block, while the rest is not available yet :
