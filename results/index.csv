@@ -1,2 +1,3 @@
 benchmark,machine,date,dir
-lzbench,i7-9700K,2026-11-21,i7-9700K/2026-11-21
+lzbench,i7-9700K,2026-11-21,lzbench/i7-9700K/2026-11-21
+pipeline,i7-9700K,2026-11-17,pipeline/i7-9700K/2026-11-17

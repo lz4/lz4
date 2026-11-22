@@ -1,9 +1,9 @@
 /* Benchmark charts, drawn in SVG by this script, without library
  * lzbench   : compression ratio vs speed, one curve per compressor across its levels.
- *             results/index.csv lists the runs of bench/bench-lzbench.sh : results/<machine>/<date>/lzbench.csv and env.txt ;
- *             its first lzbench run is shown first.
+ *             measured by bench/bench-lzbench.sh : results/lzbench/<machine>/<date>/lzbench.csv and env.txt.
  * pipelines : effective speeds of command lines through a link of limited speed,
- *             measured by bench/bench-pipeline.sh (csv/pipeline-i7-9700k.csv)
+ *             measured by bench/bench-pipeline.sh : results/pipeline/<machine>/<date>/pipeline.csv and env.txt.
+ * results/index.csv lists the runs of each benchmark : its first run is shown first, the others in a menu.
  */
 (function () {
   "use strict";
@@ -62,6 +62,21 @@
   var logScale = function (d0, d1, r0, r1) {
     var l0 = Math.log(d0), l1 = Math.log(d1);
     return function (v) { return r0 + (Math.log(v) - l0) / (l1 - l0) * (r1 - r0); };
+  };
+
+  /* a menu of the runs of a benchmark, when there are several : onSelect(run) is called when one is chosen */
+  var machineMenu = function (place, runs, onSelect) {
+    if (runs.length < 2) return;
+    var select = html("select", { "class": "form-control input-sm", "aria-label": "machine" }, place);
+    runs.forEach(function (run, i) {
+      html("option", { value: i }, select).textContent = run.machine + " (" + run.date + ")";
+    });
+    select.addEventListener("change", function () { onSelect(runs[select.value]); });
+  };
+
+  /* processor name, from the cpu line of env.txt */
+  var cpuName = function (env) {
+    return (env.cpu || "").replace(/\((R|TM)\)/g, "").replace(/ CPU @ [\d.]+GHz/, "").replace(/, \d+ threads$/, "");
   };
 
   /* a group of buttons, one selected : onSelect(i) is called when button i is clicked */
@@ -239,7 +254,7 @@
     var compiler = (env.compilers || "").split(" ; ")[0];
     compiler = /clang/.test(compiler) ? "clang " + (/clang version ([\d.]+)/.exec(compiler) || [ "", "" ])[1]
                                       : "gcc " + (/\) (\d+(\.\d+)*)/.exec(compiler) || [ "", "" ])[1];
-    var cpu = (env.cpu || "").replace(/\((R|TM)\)/g, "").replace(/ CPU @ [\d.]+GHz/, "").replace(/, \d+ threads$/, "");
+    var cpu = cpuName(env);
     var system = (env.system || "").split(", kernel")[0];
     var lzb = (env.lzbench || "").split(",")[0];
     var ownBuild = /^lz4 only : \S/.test(env.jcc || "");   /* lz4 with the options of its own build */
@@ -291,7 +306,7 @@
     drawTable(root.querySelector(".chart-table-place"), run);
   };
 
-  var setupLzbench = function (root) {
+  var setupLzbench = function (root, runs) {
     root.innerHTML =
       "<div class=\"chart-controls\"><div class=\"chart-machine\"></div><div class=\"chart-legend\"></div></div>" +
       "<div class=\"row\">" +
@@ -308,25 +323,16 @@
     Array.prototype.forEach.call(root.querySelectorAll(".chart-box"), function (box) {
       lzbench.charts.push(new ScatterChart(box, box.getAttribute("data-metric"), onHover));
     });
-    return getText("results/index.csv").then(function (str) {
-      lzbench.runs = parseCsv(str).filter(function (r) { return r.benchmark === "lzbench"; })
-                                  .map(function (r) { return { machine: r.machine, date: r.date, dir: "results/" + r.dir }; });
-      if (lzbench.runs.length > 1) {
-        var select = html("select", { "class": "form-control input-sm", "aria-label": "machine" }, root.querySelector(".chart-machine"));
-        lzbench.runs.forEach(function (run, i) {
-          html("option", { value: i }, select).textContent = run.machine + " (" + run.date + ")";
-        });
-        select.addEventListener("change", function () { showRun(lzbench.runs[select.value], root); });
-      }
-      return Promise.all(lzbench.runs.map(loadRun));
-    }).then(function () { showRun(lzbench.runs[0], root); });
+    lzbench.runs = runs;
+    machineMenu(root.querySelector(".chart-machine"), runs, function (run) { showRun(run, root); });
+    return Promise.all(runs.map(loadRun)).then(function () { showRun(runs[0], root); });
   };
 
 
   /* ===== pipelines : measured effective speeds, for a selected link =====
    * Transfers : default settings, or a single compression thread, whose command lines end with -T1 or -p 1 */
 
-  var pipeline = [];   /* { scenario, link, linkSpeed, compressor, speed, version } */
+  var pipeline = [];   /* rows of the run shown : { scenario, link, linkSpeed, compressor, speed, version } */
   var scenarios = { read: { defaultLink: "SATA SSD" }, transfer: { defaultLink: "5 GbE", singleThread: false } };
 
   var isSingleThreadVariant = function (command) { return / (-T1|-p 1)$/.test(command); };
@@ -382,42 +388,71 @@
     el("line", { "class": "chart-axis", x1: left, x2: left, y1: m.top, y2: height - m.bottom }, svg);
   };
 
-  /* versions of the programs, as measured : "lz4 1.11.1, zstd 1.5.7, ..." */
-  var showVersions = function (scenarioName) {
-    var versions = {}, list = [];
-    pipeline.forEach(function (p) {
+  /* the run : date, system, versions of the programs as measured ("lz4 1.11.1, zstd 1.5.7, ..."), files */
+  var describePipelineRun = function (run, scenarioName) {
+    var env = run.env || {}, versions = {}, list = [];
+    run.rows.forEach(function (p) {
       if (p.scenario === scenarioName && p.version) versions[p.compressor.split(" ")[0]] = p.version.replace(/^v/, "");
     });
     Object.keys(versions).forEach(function (prog) { list.push(prog + " " + versions[prog]); });
-    if (list.length) document.querySelector(".benchmark-versions[data-scenario=" + scenarioName + "]").innerHTML = "Versions : " + list.join(", ") + ".";
+    var where = [ cpuName(env), (env.system || "").split(", kernel")[0] ].filter(Boolean).join(", ");
+    return (env.date ? "Measured on " + env.date + (where ? ", on " + where : "") + ". " : "") +
+           (list.length ? "Versions : " + list.join(", ") + ". " : "") +
+           "All measurements : <a href=\"" + run.dir + "/pipeline.csv\">pipeline.csv</a>, system : <a href=\"" + run.dir + "/env.txt\">env.txt</a>.";
   };
 
-  var setupPipeline = function () {
-    return getText("csv/pipeline-i7-9700k.csv").then(function (str) {
-      pipeline = parseCsv(str).map(function (r) {
-        return { scenario: r.scenario, link: r.link, linkSpeed: Number(r.link_MBps), compressor: r.compressor,
-                 speed: Number(r.effective_MBps), version: r.version || "" };
-      });
-      Object.keys(scenarios).forEach(function (scenarioName) {
-        var scenario = scenarios[scenarioName];
-        var place = document.querySelector(".benchmark-links[data-scenario=" + scenarioName + "]");
-        showVersions(scenarioName);
-        var links = pipeline.filter(function (p) { return p.scenario === scenarioName && p.compressor === "no compression"; });
-        scenario.selected = scenario.defaultLink;
-        place.appendChild(buttonGroup(
-          links.map(function (link) { return link.link + "<br/><small>" + formatSpeed(link.linkSpeed, true) + "</small>"; }),
-          links.map(function (link) { return link.link; }).indexOf(scenario.selected),
-          function (i) { scenario.selected = links[i].link; drawPipeline(scenarioName); }));
-        if (scenario.singleThread !== undefined) {
-          var modes = buttonGroup([ "Default settings<br/><small>compression</small>", "Single thread<br/><small>compression</small>" ],
-                                  scenario.singleThread ? 1 : 0,
-                                  function (i) { scenario.singleThread = i === 1; drawPipeline(scenarioName); });
-          modes.style.marginLeft = "1em";
-          place.appendChild(modes);
-        }
-        drawPipeline(scenarioName);
-      });
+  /* default compression threads of the run, from env.txt ("threads : lz4 6, zstd 2, pigz 8 ...") */
+  var describeThreads = function (env) {
+    var parts = [];
+    [ "lz4", "pigz", "zstd" ].forEach(function (prog) {
+      var m = new RegExp("\\b" + prog + " (\\d+)").exec((env && env.threads) || "");
+      if (!m) return;
+      parts.push("<code>" + prog + "</code> " + (parts.length ? "with " + m[1] : "compresses with " + m[1] + (m[1] === "1" ? " thread" : " threads")));
     });
+    return parts.length ? "By default, on this system, " + parts.join(", ") + ", <code>gzip</code> and <code>lzop</code> with 1." : "";
+  };
+
+  var loadPipelineRun = function (run) {
+    return Promise.all([ getText(run.dir + "/pipeline.csv"), getText(run.dir + "/env.txt").catch(function () { return ""; }) ])
+      .then(function (replies) {
+        run.rows = parseCsv(replies[0]).map(function (r) {
+          return { scenario: r.scenario, link: r.link, linkSpeed: Number(r.link_MBps), compressor: r.compressor,
+                   speed: Number(r.effective_MBps), version: r.version || "" };
+        });
+        run.env = replies[1] ? parseEnv(replies[1]) : null;
+      });
+  };
+
+  /* the link selected stays selected when the run changes, if the run has it */
+  var showPipelineRun = function (run) {
+    pipeline = run.rows;
+    Array.prototype.forEach.call(document.querySelectorAll(".pipeline-threads"), function (e) { e.innerHTML = describeThreads(run.env); });
+    Object.keys(scenarios).forEach(function (scenarioName) {
+      var scenario = scenarios[scenarioName];
+      document.querySelector(".benchmark-versions[data-scenario=" + scenarioName + "]").innerHTML = describePipelineRun(run, scenarioName);
+      var place = document.querySelector(".benchmark-links[data-scenario=" + scenarioName + "]");
+      place.innerHTML = "";
+      var links = pipeline.filter(function (p) { return p.scenario === scenarioName && p.compressor === "no compression"; });
+      var names = links.map(function (link) { return link.link; });
+      if (names.indexOf(scenario.selected) < 0) scenario.selected = names.indexOf(scenario.defaultLink) >= 0 ? scenario.defaultLink : names[0];
+      place.appendChild(buttonGroup(
+        links.map(function (link) { return link.link + "<br/><small>" + formatSpeed(link.linkSpeed, true) + "</small>"; }),
+        names.indexOf(scenario.selected),
+        function (i) { scenario.selected = names[i]; drawPipeline(scenarioName); }));
+      if (scenario.singleThread !== undefined) {
+        var modes = buttonGroup([ "Default settings<br/><small>compression</small>", "Single thread<br/><small>compression</small>" ],
+                                scenario.singleThread ? 1 : 0,
+                                function (i) { scenario.singleThread = i === 1; drawPipeline(scenarioName); });
+        modes.style.marginLeft = "1em";
+        place.appendChild(modes);
+      }
+      drawPipeline(scenarioName);
+    });
+  };
+
+  var setupPipeline = function (runs) {
+    machineMenu(document.querySelector(".pipeline-machine"), runs, showPipelineRun);
+    return Promise.all(runs.map(loadPipelineRun)).then(function () { if (runs.length) showPipelineRun(runs[0]); });
   };
 
 
@@ -443,6 +478,10 @@
     });
   };
 
-  var root = document.getElementById("lzbench-charts");
-  Promise.all([ root ? setupLzbench(root) : null, setupPipeline() ]).then(redrawOnResize);
+  getText("results/index.csv").then(function (str) {
+    var runs = parseCsv(str).map(function (r) { return { benchmark: r.benchmark, machine: r.machine, date: r.date, dir: "results/" + r.dir }; });
+    var runsOf = function (benchmark) { return runs.filter(function (r) { return r.benchmark === benchmark; }); };
+    var root = document.getElementById("lzbench-charts");
+    return Promise.all([ root ? setupLzbench(root, runsOf("lzbench")) : null, setupPipeline(runsOf("pipeline")) ]);
+  }).then(redrawOnResize);
 })();

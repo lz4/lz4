@@ -362,6 +362,7 @@ th { text-align: left; }
   margin-top: 10px;
 }
 .chart-machine select { width: auto; }
+.pipeline-machine select { margin-bottom: 10px; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 6px; }
 .chart-legend-item {
   display: inline-flex;

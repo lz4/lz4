@@ -204,12 +204,15 @@ case $(uname -s) in
         CPU=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
         MEMORY="$(( $(sysctl -n hw.memsize) / 1073741824 )) GB"
         SYSTEM="macOS $(sw_vers -productVersion 2>/dev/null), $(uname -m)"
-        GOVERNOR="" ;;
+        GOVERNOR="" ; POWER="" ;;
     *)
         CPU=$( (lscpu 2>/dev/null | sed -n 's/^Model name: *//p'; sed -n 's/^model name[^:]*: //p' /proc/cpuinfo 2>/dev/null) | head -1)
         MEMORY=$(awk '/^MemTotal:/ { printf "%d GB", $2 / 1048576 + 0.5 }' /proc/meminfo 2>/dev/null)
         SYSTEM="$( (. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME") || uname -s), kernel $(uname -r), $(uname -m)"
-        GOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null) ;;
+        GOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
+        # power profile : sustained clocks depend on it, on laptops and mobile processors
+        POWER=$(for f in /sys/firmware/acpi/platform_profile /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference; do
+                    [ -r "$f" ] && printf '%s %s, ' "${f##*/}" "$(cat "$f")"; done | sed 's/, $//') ;;
 esac
 [ -n "$MACHINE" ] || MACHINE=${CPU:-unknown}
 DATE=$(date -u '+%Y-%m-%d')
@@ -221,6 +224,7 @@ DATE=$(date -u '+%Y-%m-%d')
     echo "memory    : ${MEMORY:-unknown}"
     echo "system    : $SYSTEM"
     [ -n "$GOVERNOR" ] && echo "governor  : $GOVERNOR"
+    [ -n "$POWER" ] && echo "power     : $POWER"
     echo "compilers : $("$CC" --version 2>&1 | head -1) ; $("$CXX" --version 2>&1 | head -1)"
     echo "jcc       : $JCC_INFO"
     echo "lzbench   : $("$LZBENCH" -V 2>&1 | head -1), $LZBENCH_SOURCE"

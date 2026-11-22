@@ -21,6 +21,7 @@ MAX_TIME=20   # seconds of runs per measurement : fewer runs when they are long
 READ_LINKS="HDD:200 SATA_SSD:550 NVMe_PCIe_3.0_x4:3500"
 TRANSFER_LINKS="Internet_100_Mbit/s:11.7 1_GbE:117 2.5_GbE:295 5_GbE:590 10_GbE:1170"
 INPUT=""
+MACHINE=""
 declare -A BIN=()   # programs given by -b NAME=PATH
 OUTDIR=""
 KEEP=0
@@ -37,6 +38,7 @@ usage : $0 [options]
   -t LIST   transfer scenario links, name:MB/s (default : "$TRANSFER_LINKS")
   -b N=PATH program N to use, for instance -b zstd=\$HOME/zstd/zstd (default : from the PATH)
   -l PATH   lz4 program to use, same as -b lz4=PATH
+  -m NAME   machine name, for the results (default : the cpu model)
   -o DIR    output directory (default : ./bench-pipeline-HOST-DATE)
   -k        keep compressed files
   -h        this help
@@ -47,7 +49,7 @@ msg()  { printf '%s\n' "$*" >&2; }
 warn() { printf 'warning : %s\n' "$*" >&2; }
 die()  { printf 'error : %s\n' "$*" >&2; exit 1; }
 
-while getopts "i:n:r:t:b:l:o:kh" opt; do
+while getopts "i:n:r:t:b:l:m:o:kh" opt; do
     case $opt in
         i) INPUT=$OPTARG ;;
         n) RUNS=$OPTARG ;;
@@ -55,6 +57,7 @@ while getopts "i:n:r:t:b:l:o:kh" opt; do
         t) TRANSFER_LINKS=$OPTARG ;;
         b) case $OPTARG in *=?*) BIN[${OPTARG%%=*}]=${OPTARG#*=} ;; *) die "-b expects NAME=PATH" ;; esac ;;
         l) BIN[lz4]=$OPTARG ;;
+        m) MACHINE=$OPTARG ;;
         o) OUTDIR=$OPTARG ;;
         k) KEEP=1 ;;
         h) usage; exit 0 ;;
@@ -208,14 +211,22 @@ mkdir -p "$OUTDIR" || die "cannot create $OUTDIR"
 
 # default compression threads, used by the transfers with default settings
 LZ4_THREADS=$("$LZ4" -v -1 -c </dev/null 2>&1 >/dev/null | tr '\r' '\n' | sed -n 's/.*Using up to \([0-9]*\) threads.*/\1/p' | head -1)
+[ "$LZ4_MT" = 1 ] || LZ4_THREADS=1
 ZSTD_THREADS=$("$(bin zstd)" -H 2>&1 | sed -n 's/.*-T#.*\[Default: \([0-9]*\).*/\1/p' | head -1)
 PIGZ_THREADS=$(nproc 2>/dev/null)
 
+CPU=$( (lscpu 2>/dev/null | sed -n 's/^Model name: *//p'; grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/.*: //') | head -1)
+# power profile : sustained clocks depend on it, on laptops and mobile processors
+POWER=$(for f in /sys/firmware/acpi/platform_profile /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference; do
+            [ -r "$f" ] && printf '%s %s, ' "${f##*/}" "$(cat "$f")"; done | sed 's/, $//')
 {
-    echo "date      : $(date -u '+%Y-%m-%d %H:%M UTC')"
-    echo "system    : ${PRETTY_NAME:-unknown}, kernel $(uname -r)"
-    echo "cpu       : $( (lscpu 2>/dev/null | sed -n 's/^Model name: *//p'; grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/.*: //') | head -1), $(nproc 2>/dev/null) threads"
+    echo "machine   : ${MACHINE:-${CPU:-unknown}}"
+    echo "date      : $(date -u '+%Y-%m-%d')"
+    echo "cpu       : ${CPU:-unknown}, $(nproc 2>/dev/null) threads"
+    echo "memory    : $(awk '/^MemTotal:/ { printf "%d GB", $2 / 1048576 + 0.5 }' /proc/meminfo 2>/dev/null)"
+    echo "system    : ${PRETTY_NAME:-unknown}, kernel $(uname -r), $(uname -m)"
     echo "governor  : $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo unknown)"
+    [ -n "$POWER" ] && echo "power     : $POWER"
     echo "input     : $INPUT, $SIZE bytes"
     echo "lz4       : $LZ4"
     echo "threads   : lz4 $LZ4_THREADS, zstd $ZSTD_THREADS, pigz $PIGZ_THREADS (default compression threads)"

@@ -77,6 +77,7 @@ with other compressors, at their levels.</p>
 <p>These benchmarks measure the command lines themselves, on the same system,
 in pipelines where a link of limited speed, a storage device or a network, separates stages running at the same time.</p>
 <div class="bench-section">
+<div class="chart-machine pipeline-machine"></div>
 <ul class="nav nav-tabs">
   <li class="active"><a href="#tab-1" data-toggle="tab">Reading static content<br/>from storage</a></li>
   <li               ><a href="#tab-2" data-toggle="tab">Transferring dynamic content<br/>over the network</a></li>
@@ -116,8 +117,7 @@ LINK &lt; f.lz4 | lz4 -d -c &gt; /dev/null</pre>
         </p>
         <p>
         <strong>Default settings, or a single compression thread.</strong>
-        By default, on this system, <code>lz4</code> compresses with 6 threads, <code>pigz</code> with 8, <code>zstd</code> with 2,
-        <code>gzip</code> and <code>lzop</code> with 1.
+        <span class="pipeline-threads"></span>
         A single thread : <code>lz4 -T1</code>, <code>zstd -T1</code>, <code>pigz -p 1</code>.
         </p>
         <p>Each bar measures, for instance for <code>lz4 -1</code> :</p>
