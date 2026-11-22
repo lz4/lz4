@@ -1,3 +1,4 @@
 benchmark,machine,date,dir
 lzbench,i7-9700K,2026-11-21,lzbench/i7-9700K/2026-11-21
+lzbench,Ryzen AI Max+ 395,2026-11-22,lzbench/Ryzen-AI-Max-395/2026-11-22
 pipeline,i7-9700K,2026-11-17,pipeline/i7-9700K/2026-11-17

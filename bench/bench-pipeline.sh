@@ -212,7 +212,9 @@ mkdir -p "$OUTDIR" || die "cannot create $OUTDIR"
 # default compression threads, used by the transfers with default settings
 LZ4_THREADS=$("$LZ4" -v -1 -c </dev/null 2>&1 >/dev/null | tr '\r' '\n' | sed -n 's/.*Using up to \([0-9]*\) threads.*/\1/p' | head -1)
 [ "$LZ4_MT" = 1 ] || LZ4_THREADS=1
-ZSTD_THREADS=$("$(bin zstd)" -H 2>&1 | sed -n 's/.*-T#.*\[Default: \([0-9]*\).*/\1/p' | head -1)
+# zstd -H always claims 1 (v1.5.7 changed the default, not the help) : read the setting zstd -vv reports
+ZSTD_THREADS=$("$(bin zstd)" -vv -1 -c </dev/null 2>&1 >/dev/null | tr '\r' '\n' | sed -n 's/.* --threads=\([0-9]*\).*/\1/p' | head -1)
+[ "${ZSTD_THREADS:-0}" -gt 0 ] || ZSTD_THREADS=1   # zstd before v1.5.1 doesn't report it : 1 thread by default
 PIGZ_THREADS=$(nproc 2>/dev/null)
 
 CPU=$( (lscpu 2>/dev/null | sed -n 's/^Model name: *//p'; grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/.*: //') | head -1)
