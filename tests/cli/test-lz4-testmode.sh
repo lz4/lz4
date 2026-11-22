@@ -36,7 +36,8 @@ datagen -s1 > ${FPREFIX}1; datagen -s2 > ${FPREFIX}2
 lz4 -qf ${FPREFIX}1 ${FPREFIX}1.lz4
 lz4 -qf ${FPREFIX}2 ${FPREFIX}2.lz4
 head -c 30 ${FPREFIX}2.lz4 > ${FPREFIX}trunc.lz4   # truncated : invalid
-lz4 -t ${FPREFIX}1.lz4 ${FPREFIX}2.lz4             # both valid
+lz4 -t ${FPREFIX}1.lz4 ${FPREFIX}2.lz4 2> $FPREFIX-out   # both valid
+test "$(grep -c decoded $FPREFIX-out)" -eq 2            # each file reported
 lz4 -t ${FPREFIX}1.lz4 ${FPREFIX}trunc.lz4 && exit 1   # 2nd invalid : must fail
 lz4 -t ${FPREFIX}1.lz4 file-does-not-exist.lz4 && exit 1   # 2nd missing : must fail
 echo "---- pass-through mode ----"

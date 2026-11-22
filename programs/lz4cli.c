@@ -899,10 +899,9 @@ int main(int argCount, const char** argv)
         goto _cleanup;
     }
 
-    if (mode == om_test) {
+    if (mode == om_test) {   /* decompression to nul */
         LZ4IO_setTestMode(prefs, 1);
         output_filename = nulmark;
-        mode = om_decompress;   /* defer to decompress */
     }
 
     /* No input provided => use stdin */
@@ -969,9 +968,9 @@ int main(int argCount, const char** argv)
         DISPLAYLEVEL(1, "refusing to write to console without -c \n");
         exit(1);
     }
-    /* Downgrade notification level in stdout and multiple file mode */
+    /* Downgrade notification level in stdout and multiple file mode (not in test mode : it reports each file) */
     if (!strcmp(output_filename,stdoutmark) && (displayLevel==2)) displayLevel=1;
-    if ((multiple_inputs) && (displayLevel==2)) displayLevel=1;
+    if ((multiple_inputs) && (mode != om_test) && (displayLevel==2)) displayLevel=1;
 
     /* Auto-determine compression or decompression, based on file extension */
     if (mode == om_auto) {
@@ -981,7 +980,7 @@ int main(int argCount, const char** argv)
     /* IO Stream/File */
     LZ4IO_setNotificationLevel((int)displayLevel);
     if (ifnIdx == 0) multiple_inputs = 0;
-    if (mode == om_decompress) {
+    if ((mode == om_decompress) || (mode == om_test)) {
         if (multiple_inputs) {
             const char* dec_extension = LZ4_EXTENSION;
             if (!strcmp(output_filename, stdoutmark)) dec_extension = stdoutmark;

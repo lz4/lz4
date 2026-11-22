@@ -109,6 +109,7 @@ only the latest one will be applied.
   Test the integrity of compressed `.lz4` files.
   The decompressed data is discarded.
   No files are created nor removed.
+  `-t` automatically triggers `-m` modifier : each file argument is tested.
 
 * `-b#`:
   Benchmark mode, using `#` compression level.
