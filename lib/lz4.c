@@ -1135,9 +1135,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
             int searchMatchNb = acceleration << LZ4_skipTrigger;
             do {
                 U32 const h = forwardH;
-                U32 const current = (U32)(forwardIp - base);
+                U32 const curIndex = (U32)(forwardIp - base);
                 U32 matchIndex = LZ4_getIndexOnHash(h, cctx->hashTable, tableType);
-                assert(matchIndex <= current);
+                assert(matchIndex <= curIndex);
                 assert(forwardIp - base < (ptrdiff_t)(2 GB - 1));
                 ip = forwardIp;
                 forwardIp += step;
@@ -1167,28 +1167,28 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
                     match = base + matchIndex;
                 }
                 forwardH = LZ4_hashPosition(forwardIp, tableType);
-                LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
+                LZ4_putIndexOnHash(curIndex, h, cctx->hashTable, tableType);
 
-                DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, current - matchIndex);
+                DEBUGLOG(7, "candidate at pos=%u  (offset=%u \n", matchIndex, curIndex - matchIndex);
                 if ((dictIssue == dictSmall) && (matchIndex < prefixIdxLimit)) { continue; }    /* match outside of valid area */
-                assert(matchIndex < current);
+                assert(matchIndex < curIndex);
                 /* noDict : the candidate is within input, so it is compared before checking its distance :
                  * this order is faster (better branch prediction) */
                 assert((dictDirective != noDict) || (match >= (const BYTE*)source));
                 if ( (dictDirective != noDict)
                   && ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
-                  && (matchIndex+LZ4_DISTANCE_MAX < current)) {
+                  && (matchIndex+LZ4_DISTANCE_MAX < curIndex)) {
                     continue;
                 } /* too far */
 
                 if (LZ4_read32(match) == LZ4_read32(ip)) {
                     if ( (dictDirective == noDict)
                       && ((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX))
-                      && (matchIndex+LZ4_DISTANCE_MAX < current)) {
+                      && (matchIndex+LZ4_DISTANCE_MAX < curIndex)) {
                         continue;
                     } /* too far */
-                    assert((current - matchIndex) <= LZ4_DISTANCE_MAX);  /* match now expected within distance */
-                    if (maybe_extMem) offset = current - matchIndex;
+                    assert((curIndex - matchIndex) <= LZ4_DISTANCE_MAX);  /* match now expected within distance */
+                    if (maybe_extMem) offset = curIndex - matchIndex;
                     if (dictDirective == usingExtDict)   /* lowLimit : only needed once a match is found */
                         lowLimit = (matchIndex < startIndex) ? dictionary : (const BYTE*)source;
                     break;   /* match found */
@@ -1356,11 +1356,11 @@ _resume:
         } else {   /* byU32, byU16 */
 
             U32 const h = LZ4_hashPosition(ip, tableType);
-            U32 const current = (U32)(ip-base);
+            U32 const curIndex = (U32)(ip-base);
             U32 const hPrev = LZ4_hashPosition(ip-1, tableType);
             U32 prevIndex = LZ4_getIndexOnHash(hPrev, cctx->hashTable, tableType);
             U32 matchIndex;
-            LZ4_putIndexOnHash(current-1, hPrev, cctx->hashTable, tableType);
+            LZ4_putIndexOnHash(curIndex-1, hPrev, cctx->hashTable, tableType);
             if ((dictDirective == usingDictCtx) && (prevIndex < startIndex)) {
                 /* no occurrence in the current context : try the dictionary */
                 prevIndex = LZ4_getIndexOnHash(hPrev, dictCtx->hashTable, byU32) + dictDelta;
@@ -1371,7 +1371,7 @@ _resume:
                 U32 const ctxIndex = ((usedTable && (prevIndex < startIndex)) ? startIndex : prevIndex) + 1;
                 int const inDict = (dictDirective == usingExtDict || dictDirective == usingDictCtx) && (ctxIndex < startIndex);
                 if ( ((dictIssue==dictSmall) ? (ctxIndex >= prefixIdxLimit) : 1)
-                  && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (ctxIndex+LZ4_DISTANCE_MAX >= current))
+                  && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (ctxIndex+LZ4_DISTANCE_MAX >= curIndex))
                   && (!inDict || (ctxIndex + 8 <= startIndex))   /* the 8 compared bytes are within the dictionary */
                   && LZ4_match8(inDict ? dictBase + (ctxIndex - dictDelta) : base + ctxIndex, ip) ) {
                     matchIndex = ctxIndex;
@@ -1381,7 +1381,7 @@ _resume:
                         matchIndex = LZ4_getIndexOnHash(h, dictCtx->hashTable, byU32) + dictDelta;
                 }
             }
-            assert(matchIndex < current);
+            assert(matchIndex < curIndex);
             if (dictDirective == usingExtDict) {   /* select without branch */
                 ptrdiff_t const relIdx = (ptrdiff_t)matchIndex - (ptrdiff_t)startIndex;   /* < 0 : within dictionary */
                 match = ((relIdx < 0) ? dictEnd : (const BYTE*)source) + relIdx;
@@ -1393,14 +1393,14 @@ _resume:
                 if (dictDirective == usingDictCtx)
                     lowLimit = (const BYTE*)source;   /* required for match length counter */
             }
-            LZ4_putIndexOnHash(current, h, cctx->hashTable, tableType);
-            assert(matchIndex < current);
+            LZ4_putIndexOnHash(curIndex, h, cctx->hashTable, tableType);
+            assert(matchIndex < curIndex);
             if ( ((dictIssue==dictSmall) ? (matchIndex >= prefixIdxLimit) : 1)
-              && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= current))
+              && (((tableType==byU16) && (LZ4_DISTANCE_MAX == LZ4_DISTANCE_ABSOLUTE_MAX)) ? 1 : (matchIndex+LZ4_DISTANCE_MAX >= curIndex))
               && (LZ4_read32(match) == LZ4_read32(ip)) ) {
                 token=op++;
                 *token=0;
-                if (maybe_extMem) offset = current - matchIndex;
+                if (maybe_extMem) offset = curIndex - matchIndex;
                 if (dictDirective == usingExtDict)
                     lowLimit = (matchIndex < startIndex) ? dictionary : (const BYTE*)source;   /* required for match length counter */
                 DEBUGLOG(6, "seq.start:%i, literals=%u, match.start:%i",
