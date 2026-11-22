@@ -56,6 +56,9 @@
 
 
 /*===    Dependency    ===*/
+#ifndef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DISABLE_DEPRECATE_WARNINGS   /* LZ4_createHC() invokes LZ4_createStreamHC() */
+#endif
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 #include <limits.h>

@@ -109,7 +109,7 @@ LZ4LIB_API int LZ4_compress_HC_destSize(void* stateHC,
  *  A same state can be used multiple times consecutively,
  *  starting with LZ4_resetStreamHC_fast() to start a new stream of blocks.
  */
-LZ4LIB_API LZ4_streamHC_t* LZ4_createStreamHC(void);
+LZ4_NOALLOC_WARNING LZ4LIB_API LZ4_streamHC_t* LZ4_createStreamHC(void);
 LZ4LIB_API int             LZ4_freeStreamHC (LZ4_streamHC_t* streamHCPtr);
 
 /*
