@@ -400,9 +400,12 @@ th { text-align: left; }
 .usedby-entry small { display: block; font-size: 13px; line-height: 140%; color: #6b6a65; }
 
 /* small screens */
-@media (max-width: 767px) {
+@media (max-width: 991px) {
   #content td a { overflow-wrap: anywhere; }
-  .page-header.text-justify { text-align: left; }
+}
+@media (max-width: 767px) {
+  .text-justify { text-align: left; }
+  .chart-table th:nth-child(2), .chart-table td:nth-child(2) { display: none; }   /* library and version */
   /* tabs side by side ; buttons of the pipeline charts in full rows */
   .nav-tabs { display: flex; }
   .nav-tabs > li { float: none; flex: 1 1 0; }

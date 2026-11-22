@@ -26,7 +26,6 @@
 
         <div class="collapse navbar-collapse" id="navbar-menu">
           <ul class="nav navbar-nav">
-            <li><a href="#interoperable-lz4">Versions</a></li>
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Index<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
@@ -142,8 +141,7 @@ lz4 -d -c &gt; /dev/null</pre>
 
 <h2>Documentation</h2>
 <p>The LZ4 block compression format is detailed within <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Block_format.md">lz4_Block_format</a>.</p>
-<p>For streaming arbitrarily large amount of data, or compress files of any size,
-a frame format has been established, detailed within the file <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md">lz4_Frame_format</a>.</p>
+<p>To stream data of any size, or to compress files, use the frame format, detailed in <a href="https://github.com/lz4/lz4/blob/release/doc/lz4_Frame_format.md">lz4_Frame_format</a>.</p>
 <p><br/>
 <a name="interoperable-lz4"></a></p>
 <h2>Interoperable LZ4 ports and bindings</h2>
@@ -202,7 +200,7 @@ Consequently, they are not interoperable with LZ4 command line utility, nor (gen
 </thead>
 <tbody>
 <tr><td><strong>C#</strong> streaming</td><td>Phill Djonov</td><td><a href="https://github.com/pdjonov/Lz4Stream">https://github.com/pdjonov/Lz4Stream</a></td></tr>
-<tr><td><strong>Cuda</strong></td><td>NVidia</td><td><a href="https://docs.nvidia.com/cuda/nvcomp/lz4.html">https://docs.nvidia.com/cuda/nvcomp/lz4.html</a></td></tr>
+<tr><td><strong>Cuda</strong></td><td>NVIDIA</td><td><a href="https://docs.nvidia.com/cuda/nvcomp/lz4.html">https://docs.nvidia.com/cuda/nvcomp/lz4.html</a></td></tr>
 <tr><td><strong>PHP</strong></td><td>Kamijo</td><td><a href="https://github.com/kjdev/php-ext-lz4">https://github.com/kjdev/php-ext-lz4</a></td></tr>
 </tbody>
 </table>
@@ -285,7 +283,7 @@ Consequently, they are not interoperable with LZ4 command line utility, nor (gen
 </div>
 <div class="usedby-card">
 <h3>File formats</h3>
-<p class="usedby-why">Compressed blocks read back fast.</p>
+<p class="usedby-why">Stored compressed, decoded on read.</p>
 <div class="usedby-entry"><img alt="" src="images/logo50/parquet.png"><div><a class="usedby-name" href="https://github.com/apache/parquet-format/blob/master/Compression.md">Parquet</a><small><code>LZ4_RAW</code> codec</small></div></div>
 <div class="usedby-entry"><img alt="" src="images/logo50/arrow.png"><div><a class="usedby-name" href="https://arrow.apache.org/docs/format/Columnar.html">Arrow</a><small>IPC buffers in LZ4 frames</small></div></div>
 <div class="usedby-entry"><img alt="" src="images/logo50/lucene.png"><div><a class="usedby-name" href="https://lucene.apache.org/core/10_5_0/core/org/apache/lucene/codecs/lucene90/Lucene90StoredFieldsFormat.html">Lucene</a><small>stored fields LZ4-compressed by default</small></div></div>
