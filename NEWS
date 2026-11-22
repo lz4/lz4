@@ -15,6 +15,7 @@ api  : `LZ4_decompress_incomplete()` (static) : decodes the beginning of a block
 api  : `LZ4F_decompressOptions_t.skipChecksums` can skip only block checksums, or only the content checksum (`LZ4F_skipChecksums_t`)
 api  : `LZ4F_getFrameInfo()` invoked without input after the end of a frame provides the parameters of this frame
 build: `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` (implied by `LZ4_FREESTANDING`) : functions which would allocate return `NULL` (with a compile-time warning) instead of being removed, `LZ4_USER_MEMORY_FUNCTIONS` can provide an allocator, and `lz4frame.c`, `lz4file.c` no longer call `malloc()`
+build: frame decoder in freestanding mode (`LZ4_FREESTANDING`), for environments such as the Linux kernel (see `lib/README.md`), requested by @paulmenzel
 build: OS400 builds (since v1.11.0), reported by @jonrumsey
 build: cmake 3.10 or later (was 3.5)
 

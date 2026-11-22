@@ -113,6 +113,15 @@ jobs:
     - name: No allocation by the library (LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
       run: make -C tests test-disable-memory-allocation V=1
 
+    - name: Freestanding frame decoder test (imported as by the Linux kernel)
+      run: make -C tests test-freestanding-frame V=1
+
+    - name: Freestanding frame decoder test, 32-bit
+      if: ${{ matrix.x86 }}
+      run: |
+        make -C tests clean
+        make -C tests test-freestanding-frame V=1 CC="$CC -m32"
+
     - name: Fortified build test
       run: |
         make clean

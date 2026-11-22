@@ -509,5 +509,32 @@ test-disable-memory-allocation:
 	   $(CC) -fsyntax-only $(NOALLOC_FLAGS) -I$(LIBDIR) -DLZ4_USER_MEMORY_FUNCTIONS -DCALL=$$n compat/noalloc_warning.c || exit 1; \
 	 done
 
+#-----------------------------------------------------------------------------
+# lz4frame decoder in freestanding mode (see compat/freestanding_frame.c) :
+# its own flags, not CFLAGS, so that sanitizers or stack protection add no symbol to check
+#-----------------------------------------------------------------------------
+FREESTANDING_FRAME_CFLAGS := -ffreestanding -nostdinc -isystem compat/freestanding_include -DXXH_NAMESPACE=LZ4_ -DDECODER \
+                             -O2 -fno-stack-protector $(WFLAGS) -Wmissing-prototypes -Wframe-larger-than=1024 -Werror
+# undefined symbols of the decoder : memcpy(), memmove() and memset(), which compilers may invoke anyway, XXH32,
+# and _GLOBAL_OFFSET_TABLE_, from the linker, for position independent code (default of some distributions)
+FREESTANDING_FRAME_SYMBOLS := memcpy|memmove|memset|LZ4_XXH32(_reset|_update|_digest)?
+
+CLEAN += freestanding_frame freestanding_frame_decoder.o
+freestanding_frame_decoder.o: compat/freestanding_frame.c $(wildcard compat/freestanding_include/*.h) \
+                              $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c
+	$(CC) $(FREESTANDING_FRAME_CFLAGS) -c $< -o $@
+
+freestanding_frame: compat/freestanding_frame.c freestanding_frame_decoder.o \
+                    $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c $(LIBDIR)/xxhash.c
+	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+
+.PHONY: test-freestanding-frame
+test-freestanding-frame: freestanding_frame
+	@echo "\n ---- test lz4frame decoder in a freestanding build ----"
+	@unexpected=$$(nm -u freestanding_frame_decoder.o | awk '{print $$NF}' \
+	               | grep -vxE '_?($(FREESTANDING_FRAME_SYMBOLS)|_GLOBAL_OFFSET_TABLE_)'); \
+	 if [ -n "$$unexpected" ]; then echo "unexpected undefined symbols :" $$unexpected; exit 1; fi
+	./freestanding_frame$(EXT)
+
 
 endif
