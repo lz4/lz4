@@ -327,6 +327,7 @@ th { text-align: left; }
 
 /* charts (js/charts.js) */
 .chart-box, .benchmark-chart { position: relative; margin-bottom: 10px; }
+@media (min-width: 768px) { .benchmark-links .btn-group + .btn-group { margin-left: 1em; } }
 .chart-box svg, .benchmark-chart svg { display: block; font-size: 12px; }
 .chart-title { margin: 18px 0 6px; font-size: 16px; }
 .chart-title small { display: inline-block; font-size: 13px; }
@@ -402,4 +403,10 @@ th { text-align: left; }
 @media (max-width: 767px) {
   #content td a { overflow-wrap: anywhere; }
   .page-header.text-justify { text-align: left; }
+  /* tabs side by side ; buttons of the pipeline charts in full rows */
+  .nav-tabs { display: flex; }
+  .nav-tabs > li { float: none; flex: 1 1 0; }
+  .nav-tabs > li > a { height: 100%; padding: 10px 8px; }
+  .benchmark-links .btn-group { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; }
+  .benchmark-links .btn { flex: 1 1 auto; margin: 0; border-radius: 3px; }
 }

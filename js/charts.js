@@ -443,7 +443,6 @@
         var modes = buttonGroup([ "Default settings<br/><small>compression</small>", "Single thread<br/><small>compression</small>" ],
                                 scenario.singleThread ? 1 : 0,
                                 function (i) { scenario.singleThread = i === 1; drawPipeline(scenarioName); });
-        modes.style.marginLeft = "1em";
         place.appendChild(modes);
       }
       drawPipeline(scenarioName);
