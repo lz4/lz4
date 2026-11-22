@@ -102,12 +102,24 @@
  * Default allocation functions, employed when LZ4F_CustomMem doesn't define them :
  * malloc(), calloc() and free(), or LZ4_malloc(), LZ4_calloc() and LZ4_free()
  * when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS (see lz4.c).
- * None with LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION : allocation then fails without LZ4F_CustomMem.
+ * None with LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION (implied by LZ4_FREESTANDING) : allocation then fails without LZ4F_CustomMem.
 **/
 
-#include <string.h>   /* memset, memcpy, memmove */
+#if !LZ4_FREESTANDING
+#  include <string.h>   /* memset, memcpy, memmove */
+#endif
+/* defined by the user with LZ4_FREESTANDING, or by lz4.c when sources are coalesced */
+#ifndef LZ4_memcpy
+#  define LZ4_memcpy(d,s,n)  memcpy((d),(s),(n))
+#endif
+#ifndef LZ4_memmove
+#  define LZ4_memmove(d,s,n) memmove((d),(s),(n))
+#endif
+#ifndef LZ4_memset
+#  define LZ4_memset(p,v,n)  memset((p),(v),(n))
+#endif
 #ifndef LZ4_SRC_INCLUDED  /* avoid redefinition when sources are coalesced */
-#  define MEM_INIT(p,v,s)   memset((p),(v),(s))
+#  define MEM_INIT(p,v,s)   LZ4_memset((p),(v),(s))
 #endif
 
 #ifndef LZ4_SRC_INCLUDED   /* avoid redefinition when sources are coalesced */
@@ -140,7 +152,7 @@ static void* LZ4F_calloc(size_t s, LZ4F_CustomMem cmem)
     if (cmem.customAlloc == NULL) {
         return ALLOC_AND_ZERO(s);
     }
-    /* only custom alloc defined : use it, and combine it with memset() */
+    /* only custom alloc defined : use it, and combine it with LZ4_memset() */
     {   void* const p = cmem.customAlloc(cmem.opaqueState, s);
         if (p != NULL) MEM_INIT(p, 0, s);
         return p;
@@ -727,7 +739,7 @@ LZ4F_createCDict_advanced(LZ4F_CustomMem cmem, const void* dictBuffer, size_t di
         LZ4F_freeCDict(cdict);
         return NULL;
     }
-    memcpy(cdict->dictContent, dictStart, dictSize);
+    LZ4_memcpy(cdict->dictContent, dictStart, dictSize);
     LZ4_initStream(cdict->fastCtx, sizeof(LZ4_stream_t));
     LZ4_loadDictSlow(cdict->fastCtx, (const char*)cdict->dictContent, (int)dictSize);
     LZ4_initStreamHC(cdict->HCCtx, sizeof(LZ4_streamHC_t));
@@ -1043,7 +1055,7 @@ static size_t LZ4F_compressBegin_internal(LZ4F_cctx* cctx,
             dictSize = 64 KB;
         }
         assert(cctx->tmpBuffCapacity >= 128 KB);
-        memcpy(cctx->tmpBuff, dictBuffer, dictSize);
+        LZ4_memcpy(cctx->tmpBuff, dictBuffer, dictSize);
         dictBuffer = cctx->tmpBuff;
         cctx->tmpIn = cctx->tmpBuff + dictSize;
     }
@@ -1197,7 +1209,7 @@ static size_t LZ4F_makeBlock(void* dst, size_t dstCapacity,
         RETURN_ERROR_IF(dstCapacity - overhead < srcSize, dstCapacity_tooSmall);
         cSize = (U32)srcSize;
         LZ4F_writeLE32(cSizePtr, cSize | LZ4F_BLOCKUNCOMPRESSED_FLAG);
-        memcpy(cSizePtr+BHSize, src, srcSize);
+        LZ4_memcpy(cSizePtr+BHSize, src, srcSize);
     } else {
         LZ4F_writeLE32(cSizePtr, cSize);
     }
@@ -1344,7 +1356,7 @@ static size_t LZ4F_copyPending(LZ4F_cctx_t* cctx, BYTE* dst, size_t dstCapacity,
     size_t const n = MIN(cctx->pendingSize, dstCapacity - pos);
     assert(pos <= dstCapacity);
     if (n) {
-        memcpy(dst + pos, cctx->pending, n);
+        LZ4_memcpy(dst + pos, cctx->pending, n);
         cctx->pending += n;
     }
     cctx->pendingSize -= n;
@@ -1955,12 +1967,12 @@ static LZ4F_mtJob_t* LZ4F_mt_fillingSlot(LZ4F_mtCtx_t* mt)
 static void LZ4F_mt_addHistory(LZ4F_mtCtx_t* mt, const BYTE* content, size_t size)
 {
     if (size >= LZ4F_MT_PREFIX_SIZE) {
-        memcpy(mt->history, content + size - LZ4F_MT_PREFIX_SIZE, LZ4F_MT_PREFIX_SIZE);
+        LZ4_memcpy(mt->history, content + size - LZ4F_MT_PREFIX_SIZE, LZ4F_MT_PREFIX_SIZE);
         mt->historySize = LZ4F_MT_PREFIX_SIZE;
     } else {
         size_t const kept = MIN(mt->historySize, LZ4F_MT_PREFIX_SIZE - size);
-        memmove(mt->history, mt->history + mt->historySize - kept, kept);
-        memcpy(mt->history + kept, content, size);
+        LZ4_memmove(mt->history, mt->history + mt->historySize - kept, kept);
+        LZ4_memcpy(mt->history + kept, content, size);
         mt->historySize = kept + size;
     }
 }
@@ -2053,7 +2065,7 @@ static size_t LZ4F_mt_emitOldest(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacity
     FORWARD_IF_ERROR(job->cSize);
     toEmit = job->cSize - mt->emitted;   /* part already emitted by an incomplete LZ4F_flush() */
     RETURN_ERROR_IF(toEmit > dstCapacity - pos, dstCapacity_tooSmall);
-    memcpy(dst + pos, job->outBuff + mt->emitted, toEmit);
+    LZ4_memcpy(dst + pos, job->outBuff + mt->emitted, toEmit);
     LZ4F_mt_retireOldest(mt);
     return toEmit;
 }
@@ -2295,7 +2307,7 @@ static size_t LZ4F_mt_emitPartial(LZ4F_mtCtx_t* mt, BYTE* dst, size_t dstCapacit
         assert(LZ4F_pool_isDone(mt->pool, &job->pending));
         FORWARD_IF_ERROR(job->cSize);
         n = MIN(job->cSize - mt->emitted, dstCapacity - pos);
-        if (n) memcpy(dst + pos, job->outBuff + mt->emitted, n);
+        if (n) LZ4_memcpy(dst + pos, job->outBuff + mt->emitted, n);
         pos += n;
         mt->emitted += n;
         if (mt->emitted < job->cSize) break;   /* dst is full */
@@ -2387,11 +2399,11 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
             }
             job->src = job->inBuff + LZ4F_MT_PREFIX_SIZE;
             job->srcSize = 0;
-            memcpy(job->inBuff + LZ4F_MT_PREFIX_SIZE - prefixSize, mt->history + mt->historySize - prefixSize, prefixSize);
+            LZ4_memcpy(job->inBuff + LZ4F_MT_PREFIX_SIZE - prefixSize, mt->history + mt->historySize - prefixSize, prefixSize);
         }
         {   size_t const toCopy = MIN(mt->jobSize - job->srcSize, (size_t)(iend - ip));
             assert(job->src == job->inBuff + LZ4F_MT_PREFIX_SIZE);
-            memcpy(job->inBuff + LZ4F_MT_PREFIX_SIZE + job->srcSize, ip, toCopy);
+            LZ4_memcpy(job->inBuff + LZ4F_MT_PREFIX_SIZE + job->srcSize, ip, toCopy);
             job->srcSize += toCopy;
             if (job->srcSize == mt->jobSize) LZ4F_mt_submit(mt);
             ip += toCopy;
@@ -2461,14 +2473,14 @@ static size_t LZ4F_st_update(LZ4F_cctx* cctxPtr,
         assert(blockSize > cctxPtr->tmpInSize);
         if (sizeToCopy > srcSize) {
             /* add src to tmpIn buffer */
-            memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, srcSize);
+            LZ4_memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, srcSize);
             srcPtr = srcEnd;
             cctxPtr->tmpInSize += srcSize;
             /* still needs some CRC */
         } else {
             /* complete tmpIn block and then compress it */
             lastBlockCompressed = fromTmpBuffer;
-            memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, sizeToCopy);
+            LZ4_memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, sizeToCopy);
             srcPtr += sizeToCopy;
 
             bytesWritten = LZ4F_makeBlock(dstPtr, (size_t)(dstEnd - dstPtr),
@@ -2496,7 +2508,7 @@ static size_t LZ4F_st_update(LZ4F_cctx* cctxPtr,
         if (viaTmp) {
             if (cctxPtr->tmpIn + toCompress > cctxPtr->tmpBuff + cctxPtr->tmpBuffCapacity)
                 LZ4F_localSaveDict(cctxPtr);   /* tmpBuff >= 128 KB : room after the history */
-            memcpy(cctxPtr->tmpIn, srcPtr, toCompress);
+            LZ4_memcpy(cctxPtr->tmpIn, srcPtr, toCompress);
             lastBlockCompressed = fromTmpBuffer;
             bytesWritten = LZ4F_makeBlock(dstPtr, (size_t)(dstEnd - dstPtr),
                                           cctxPtr->tmpIn, toCompress,
@@ -2543,7 +2555,7 @@ static size_t LZ4F_st_update(LZ4F_cctx* cctxPtr,
     if (srcPtr < srcEnd) {
         /* fill tmp buffer */
         size_t const sizeToCopy = (size_t)(srcEnd - srcPtr);
-        memcpy(cctxPtr->tmpIn, srcPtr, sizeToCopy);
+        LZ4_memcpy(cctxPtr->tmpIn, srcPtr, sizeToCopy);
         cctxPtr->tmpInSize = sizeToCopy;
     }
 
@@ -3077,7 +3089,7 @@ static void LZ4F_moveDictBeforeTmpOut(LZ4F_dctx* dctx, size_t flushSize)
     if (copySize > preserveSize) copySize = preserveSize;
     assert(dctx->tmpOutBuffer != NULL);
 
-    memcpy(dctx->tmpOutBuffer + preserveSize - copySize, oldDictEnd - copySize, copySize);
+    LZ4_memcpy(dctx->tmpOutBuffer + preserveSize - copySize, oldDictEnd - copySize, copySize);
 
     dctx->dict = dctx->tmpOutBuffer;
     dctx->dictSize = preserveSize + dctx->tmpOutStart + flushSize;
@@ -3127,10 +3139,10 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     if (dctx->dict == dctx->tmpOutBuffer) {    /* copy dst into tmp to complete dict */
         if (dctx->dictSize + dstSize > dctx->tmpOutBufferCapacity) {  /* tmp buffer not large enough */
             size_t const preserveSize = 64 KB - dstSize;
-            memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
+            LZ4_memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
             dctx->dictSize = preserveSize;
         }
-        memcpy(dctx->tmpOutBuffer + dctx->dictSize, dstPtr, dstSize);
+        LZ4_memcpy(dctx->tmpOutBuffer + dctx->dictSize, dstPtr, dstSize);
         dctx->dictSize += dstSize;
         return;
     }
@@ -3138,8 +3150,8 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     /* join dict & dest into tmp */
     {   size_t preserveSize = 64 KB - dstSize;
         if (preserveSize > dctx->dictSize) preserveSize = dctx->dictSize;
-        memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
-        memcpy(dctx->tmpOutBuffer + preserveSize, dstPtr, dstSize);
+        LZ4_memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
+        LZ4_memcpy(dctx->tmpOutBuffer + preserveSize, dstPtr, dstSize);
         dctx->dict = dctx->tmpOutBuffer;
         dctx->dictSize = preserveSize + dstSize;
     }
@@ -3250,7 +3262,7 @@ LZ4F_gatherInput(LZ4F_dctx* dctx, BYTE* buffer, size_t wanted,
         return srcPtr;
     }
     {   size_t const sizeToCopy = MIN(wanted - dctx->tmpInSize, available);
-        memcpy(buffer + dctx->tmpInSize, srcPtr, sizeToCopy);
+        LZ4_memcpy(buffer + dctx->tmpInSize, srcPtr, sizeToCopy);
         dctx->tmpInSize += sizeToCopy;
         *srcPtrPtr = srcPtr + sizeToCopy;
     }
@@ -3284,7 +3296,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                        const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
     static const BYTE emptySrc = 0;   /* NULL srcBuffer (no input, used by LZ4F_getFrameInfo()) points here instead :
-                                       * NULL+0 and memcpy(dst, NULL, 0) are UB */
+                                       * NULL+0 and LZ4_memcpy(dst, NULL, 0) are UB */
     LZ4F_decompressOptions_t optionsNull;
     const BYTE* const srcStart = srcBuffer ? (const BYTE*)srcBuffer : &emptySrc;
     const BYTE* const srcEnd = srcBuffer ? srcStart + *srcSizePtr : srcStart;
@@ -3338,7 +3350,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
         case dstage_storeFrameHeader:
             DEBUGLOG(6, "dstage_storeFrameHeader");
             {   size_t const sizeToCopy = MIN(dctx->tmpInTarget - dctx->tmpInSize, (size_t)(srcEnd - srcPtr));
-                memcpy(dctx->header + dctx->tmpInSize, srcPtr, sizeToCopy);
+                LZ4_memcpy(dctx->header + dctx->tmpInSize, srcPtr, sizeToCopy);
                 dctx->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
             }
@@ -3448,7 +3460,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 } else {
                     size_t const minBuffSize = MIN((size_t)(srcEnd-srcPtr), (size_t)(dstEnd-dstPtr));
                     sizeToCopy = MIN(dctx->tmpInTarget, minBuffSize);
-                    memcpy(dstPtr, srcPtr, sizeToCopy);
+                    LZ4_memcpy(dstPtr, srcPtr, sizeToCopy);
                     if (dctx->frameInfo.blockChecksumFlag && !dctx->skipBlockChecksum)
                         (void)XXH32_update(&dctx->blockChecksum, srcPtr, sizeToCopy);
                     if (dctx->frameInfo.contentChecksumFlag && !dctx->skipContentChecksum)
@@ -3580,7 +3592,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
                 if (dctx->dict == dctx->tmpOutBuffer) {
                     /* truncate dictionary to 64 KB if too big */
                     if (dctx->dictSize > 128 KB) {
-                        memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - 64 KB, 64 KB);
+                        LZ4_memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - 64 KB, 64 KB);
                         dctx->dictSize = 64 KB;
                     }
                     dctx->tmpOut = dctx->tmpOutBuffer + dctx->dictSize;
@@ -3605,7 +3617,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             DEBUGLOG(6, "dstage_flushOut");
             if (dstPtr != NULL) {
                 size_t const sizeToCopy = MIN(dctx->tmpOutSize - dctx->tmpOutStart, (size_t)(dstEnd-dstPtr));
-                memcpy(dstPtr, dctx->tmpOut + dctx->tmpOutStart, sizeToCopy);
+                LZ4_memcpy(dstPtr, dctx->tmpOut + dctx->tmpOutStart, sizeToCopy);
 
                 /* dictionary management, unless the frame ends with this block */
                 if ( (dctx->frameInfo.blockMode == LZ4F_blockLinked)
@@ -3704,7 +3716,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             const BYTE* const oldDictEnd = dctx->dict + dctx->dictSize;
             size_t const newDictSize = MIN(dctx->dictSize, 64 KB);
 
-            memcpy(dctx->tmpOutBuffer, oldDictEnd - newDictSize, newDictSize);
+            LZ4_memcpy(dctx->tmpOutBuffer, oldDictEnd - newDictSize, newDictSize);
 
             dctx->dict = dctx->tmpOutBuffer;
             dctx->dictSize = newDictSize;
