@@ -129,6 +129,45 @@ extern "C" {
 #  define LZ4_FREESTANDING 0
 #endif
 
+/*! Deprecation warnings
+ *
+ *  Deprecated functions make the compiler generate a warning when invoked.
+ *  This is meant to invite users to update their source code.
+ *  Should deprecation warnings be a problem, it is generally possible to disable them,
+ *  typically with -Wno-deprecated-declarations for gcc
+ *  or _CRT_SECURE_NO_WARNINGS in Visual.
+ *
+ *  Another method is to define LZ4_DISABLE_DEPRECATE_WARNINGS
+ *  before including the header file.
+ */
+#ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DEPRECATED(message)   /* disable deprecation warnings */
+#else
+#  if defined (__cplusplus) && (__cplusplus >= 201402) /* C++14 or greater */
+#    define LZ4_DEPRECATED(message) [[deprecated(message)]]
+#  elif defined(_MSC_VER)
+#    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
+#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 45))
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
+#  elif defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 31)
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
+#  else
+#    pragma message("WARNING: LZ4_DEPRECATED needs custom implementation for this compiler")
+#    define LZ4_DEPRECATED(message)   /* disabled */
+#  endif
+#endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */
+
+/*! LZ4_NOALLOC_WARNING :
+ *  precedes functions which allocate memory by themselves.
+ *  Without allocator (LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION, see lz4.c), they always fail :
+ *  invoking them generates a deprecation warning.
+ */
+#if defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) && !defined(LZ4_USER_MEMORY_FUNCTIONS)
+#  define LZ4_NOALLOC_WARNING LZ4_DEPRECATED("always fails : LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION without LZ4_USER_MEMORY_FUNCTIONS")
+#else
+#  define LZ4_NOALLOC_WARNING
+#endif
+
 
 /*------   Version   ------*/
 #define LZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
@@ -335,7 +374,7 @@ typedef union LZ4_stream_u LZ4_stream_t;  /* incomplete type (defined later) */
    "skip this block when rc.exe is trying to read it".
 */
 #if !defined(RC_INVOKED) /* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */
-LZ4LIB_API LZ4_stream_t* LZ4_createStream(void);
+LZ4_NOALLOC_WARNING LZ4LIB_API LZ4_stream_t* LZ4_createStream(void);
 LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
 #endif
 
@@ -467,7 +506,7 @@ typedef union LZ4_streamDecode_u LZ4_streamDecode_t;   /* tracking context */
  *  A tracking context can be re-used multiple times.
  */
 #if !defined(RC_INVOKED) /* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */
-LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
+LZ4_NOALLOC_WARNING LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
 #endif
 
@@ -803,34 +842,6 @@ union LZ4_streamDecode_u {
 /*-************************************
 *  Obsolete Functions
 **************************************/
-
-/*! Deprecation warnings
- *
- *  Deprecated functions make the compiler generate a warning when invoked.
- *  This is meant to invite users to update their source code.
- *  Should deprecation warnings be a problem, it is generally possible to disable them,
- *  typically with -Wno-deprecated-declarations for gcc
- *  or _CRT_SECURE_NO_WARNINGS in Visual.
- *
- *  Another method is to define LZ4_DISABLE_DEPRECATE_WARNINGS
- *  before including the header file.
- */
-#ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
-#  define LZ4_DEPRECATED(message)   /* disable deprecation warnings */
-#else
-#  if defined (__cplusplus) && (__cplusplus >= 201402) /* C++14 or greater */
-#    define LZ4_DEPRECATED(message) [[deprecated(message)]]
-#  elif defined(_MSC_VER)
-#    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
-#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 45))
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 31)
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
-#  else
-#    pragma message("WARNING: LZ4_DEPRECATED needs custom implementation for this compiler")
-#    define LZ4_DEPRECATED(message)   /* disabled */
-#  endif
-#endif /* LZ4_DISABLE_DEPRECATE_WARNINGS */
 
 /*! Removed in v1.11.0, deprecated since v1.7.x - v1.8.0 (liblz4 still exports them, for linked programs) :
  *  LZ4_compress*(), LZ4_uncompress*(), LZ4_create(), LZ4_sizeofStreamState(), LZ4_resetStreamState(),

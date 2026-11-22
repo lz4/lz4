@@ -488,17 +488,26 @@ else
 	-ltrace ./freestanding$(EXT)
 endif
 
-# LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION : the library never allocates by itself
-NOALLOC_SRCS := $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4file.c
+# LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION : the library never allocates by itself,
+# and invoking a function which would allocate warns, unless LZ4_USER_MEMORY_FUNCTIONS provides an allocator
+NOALLOC_FLAGS := $(WFLAGS) -Werror -DLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION
+NOALLOC_SRCS  := $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4file.c
 .PHONY: test-disable-memory-allocation
 test-disable-memory-allocation:
 	@echo "\n ---- test LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION ----"
 	@for f in $(NOALLOC_SRCS); do \
-	   $(CC) -O2 $(WFLAGS) -Werror -DLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION -c $$f -o tmp-noalloc.o || exit 1; \
+	   $(CC) -O2 $(NOALLOC_FLAGS) -c $$f -o tmp-noalloc.o || exit 1; \
 	   if nm -u tmp-noalloc.o | awk '{print $$NF}' | grep -xE '_?(malloc|calloc|realloc|free)'; then \
 	     echo "$$f allocates"; exit 1; fi; \
 	 done
 	$(RM) tmp-noalloc.o
+	$(CC) -fsyntax-only $(NOALLOC_FLAGS) -I$(LIBDIR) -DLZ4F_HEAPMODE=1 $(LIBDIR)/lz4frame.c
+	$(CC) -fsyntax-only $(NOALLOC_FLAGS) -I$(LIBDIR) -DCALL=0 compat/noalloc_warning.c
+	@for n in 1 2 3 4 5 6 7 8; do \
+	   if $(CC) -fsyntax-only $(NOALLOC_FLAGS) -I$(LIBDIR) -DCALL=$$n compat/noalloc_warning.c 2> $(VOID); then \
+	     echo "invocation $$n of compat/noalloc_warning.c : no warning"; exit 1; fi; \
+	   $(CC) -fsyntax-only $(NOALLOC_FLAGS) -I$(LIBDIR) -DLZ4_USER_MEMORY_FUNCTIONS -DCALL=$$n compat/noalloc_warning.c || exit 1; \
+	 done
 
 
 endif

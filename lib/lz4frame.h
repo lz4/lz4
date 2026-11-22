@@ -110,6 +110,16 @@ extern "C" {
 #  endif
 #endif
 
+/* LZ4F_NOALLOC_WARNING : precedes functions which allocate memory by themselves.
+ * Without allocator (LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION, see lz4.c), they always fail :
+ * invoking them generates a deprecation warning. Their _advanced() variants employ LZ4F_CustomMem. */
+#if (defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) || (defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1))) \
+    && !defined(LZ4_USER_MEMORY_FUNCTIONS)
+#  define LZ4F_NOALLOC_WARNING LZ4F_DEPRECATED("always fails without allocator : use the _advanced() variant, with LZ4F_CustomMem")
+#else
+#  define LZ4F_NOALLOC_WARNING
+#endif
+
 
 /*-************************************
  *  Error management
@@ -352,7 +362,7 @@ LZ4FLIB_API unsigned LZ4F_getVersion(void);
  *  Note1 : LZ4F_freeCompressionContext() is always successful. Its return value can be ignored.
  *  Note2 : LZ4F_freeCompressionContext() works fine with NULL input pointers (do nothing).
 **/
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
+LZ4F_NOALLOC_WARNING LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 
@@ -508,7 +518,7 @@ typedef struct {
  *  Result of LZ4F_freeDecompressionContext() indicates current state of decompressionContext when being released.
  *  That is, it should be == 0 if decompression has been completed fully and correctly.
  */
-LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
+LZ4F_NOALLOC_WARNING LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
 LZ4FLIB_API LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 
 
@@ -723,7 +733,7 @@ typedef struct LZ4F_CDict_s LZ4F_CDict;
  *  LZ4_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
  *  LZ4_CDict can be created once and shared by multiple threads concurrently, since its usage is read-only.
  * @dictBuffer can be released after LZ4_CDict creation, since its content is copied within CDict. */
-LZ4FLIB_API LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
+LZ4F_NOALLOC_WARNING LZ4FLIB_API LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
 LZ4FLIB_API void        LZ4F_freeCDict(LZ4F_CDict* CDict);
 
 /*! LZ4_compressFrame_usingCDict() : stable since v1.10

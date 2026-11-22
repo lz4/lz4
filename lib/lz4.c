@@ -199,6 +199,7 @@
  *  Without them, functions which would allocate fail, as on allocation failure :
  *  LZ4_createStream(), LZ4_createStreamDecode() and LZ4_createStreamHC() return NULL,
  *  and LZ4F_* functions creating a context without LZ4F_CustomMem return an error.
+ *  Invoking them generates a deprecation warning (LZ4_NOALLOC_WARNING, LZ4F_NOALLOC_WARNING).
  *  Stateless compression functions keep their state on stack by default (LZ4_HEAPMODE, LZ4HC_HEAPMODE).
  *
  *  Note that this is a compile-time switch, which changes the behavior of public/stable LZ4 v1 API functions :

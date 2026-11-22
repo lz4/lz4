@@ -113,7 +113,8 @@ The following build macro can be selected to adjust source code behavior at comp
 - `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` : lz4 never allocates memory by itself.
   There is no default allocator : memory only comes from allocators given by the user
   (`LZ4_USER_MEMORY_FUNCTIONS`, or `LZ4F_CustomMem` for `LZ4F_*` functions).
-  Without them, functions which would allocate fail, as on allocation failure (ex: `LZ4_createStream()` returns `NULL`).
+  Without them, functions which would allocate fail, as on allocation failure (ex: `LZ4_createStream()` returns `NULL`),
+  and invoking them generates a deprecation warning.
   For more details, see description of this macro in `lib/lz4.c`.
 
 - `LZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT` : experimental feature aimed at producing the same
