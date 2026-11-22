@@ -2725,21 +2725,42 @@ int LZ4_decompress_safe_doubleDict(const char* source, char* dest, int compresse
                                   complete_input, NULL);
 }
 
-/* incomplete block : a single instantiation, history being a prefix or an external dictionary */
+/* incomplete block : history as a prefix (or none), or as an external dictionary,
+ * specialized as in LZ4_decompress_safe_usingDict() */
 LZ4_FORCE_O2
+static int LZ4_decompress_incomplete_withPrefix(const char* src, char* dst, int srcSize, int dstCapacity,
+                                                size_t prefixSize, const char** srcEndPtr)
+{
+    return LZ4_decompress_generic(src, dst, srcSize, dstCapacity,
+                                  decode_full_block, noDict,
+                                  (BYTE*)dst - prefixSize, NULL, 0,
+                                  incomplete_input, srcEndPtr);
+}
+
+LZ4_FORCE_O2
+static int LZ4_decompress_incomplete_extDict(const char* src, char* dst, int srcSize, int dstCapacity,
+                                             const char* dictStart, size_t dictSize, const char** srcEndPtr)
+{
+    return LZ4_decompress_generic(src, dst, srcSize, dstCapacity,
+                                  decode_full_block, usingExtDict,
+                                  (BYTE*)dst, (const BYTE*)dictStart, dictSize,
+                                  incomplete_input, srcEndPtr);
+}
+
 int LZ4_decompress_incomplete(const char* src, char* dst, int* srcSizePtr, int dstCapacity,
                               const char* dictStart, int dictSize)
 {
     const char* srcEnd = src;
-    int const isPrefix = (dictSize > 0) && (dictStart + dictSize == dst);
     int decodedSize;
     if ((srcSizePtr == NULL) || (*srcSizePtr < 0) || (dictSize < 0)) return -1;
     if ((*srcSizePtr == 0) || (dstCapacity == 0)) { *srcSizePtr = 0; return 0; }   /* nothing to decode yet */
-    decodedSize = LZ4_decompress_generic(src, dst, *srcSizePtr, dstCapacity,
-                                  decode_full_block, usingExtDict,
-                                  (BYTE*)dst - (isPrefix ? dictSize : 0),
-                                  isPrefix ? NULL : (const BYTE*)dictStart, isPrefix ? 0 : (size_t)dictSize,
-                                  incomplete_input, &srcEnd);
+    if ((dictSize == 0) || (dictStart + dictSize == dst)) {
+        decodedSize = LZ4_decompress_incomplete_withPrefix(src, dst, *srcSizePtr, dstCapacity,
+                                                           (size_t)dictSize, &srcEnd);
+    } else {
+        decodedSize = LZ4_decompress_incomplete_extDict(src, dst, *srcSizePtr, dstCapacity,
+                                                        dictStart, (size_t)dictSize, &srcEnd);
+    }
     if (decodedSize >= 0) *srcSizePtr = (int)(srcEnd - src);
     return decodedSize;
 }
