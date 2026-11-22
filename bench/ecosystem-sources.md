@@ -110,3 +110,11 @@ Verdict : S = strong (official doc/code, active), W = weak, D = discontinued/dor
 | ClickHouse | DB | S | https://clickhouse.com/docs/sql-reference/statements/create/table | "By default, ClickHouse applies lz4 compression in the self-managed version" | zstd in ClickHouse Cloud |
 | BorgBackup | Backup | S | https://borgbackup.readthedocs.io/en/stable/usage/help.html | "Compression is lz4 by default." | |
 | Hugging Face Xet | AI | S | https://huggingface.co/docs/xet/xorb | chunks as LZ4 frame, or ByteGrouping4LZ4 for floating-point data | model / dataset storage |
+
+## Packet capture (checked 2026-11-22)
+
+| Entry | Cat. | V | Source | Evidence | Notes |
+|---|---|---|---|---|---|
+| Suricata | Network | S | https://docs.suricata.io/en/latest/configuration/suricata-yaml.html#packet-log-pcap-log | pcap-log : "The pcap files can be compressed before being written to disk by setting the compression option to lz4" | lz4-level 0-16, lz4-checksum |
+| Wireshark | Network | S | https://www.wireshark.org/docs/relnotes/wireshark-4.4.0.html#_new_and_updated_features | "Capture files can be saved with LZ4 compression" ; fast random access with independent blocks (default) | tshark, editcap, mergecap, text2pcap --compress lz4 |
+| Arkime | Network | X | https://arkime.com/settings | simpleCompression : none, gzip, zstd | no lz4 |
