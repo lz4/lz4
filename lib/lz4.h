@@ -109,13 +109,12 @@ extern "C" {
  *  - LZ4_FREESTANDING is a compile-time switch.
  *  - It requires the following macros to be defined:
  *    LZ4_memcpy, LZ4_memmove, LZ4_memset.
- *  - It only enables LZ4/HC functions which don't use heap.
+ *  - It implies LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION (see lz4.c) : there is no default allocator.
+ *    Functions which allocate employ the user's allocator (LZ4_USER_MEMORY_FUNCTIONS), and fail without it.
  *    All LZ4F_* functions are not supported.
  *  - See tests/compat/freestanding.c to check its basic setup.
  */
 #if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
-#  define LZ4_HEAPMODE 0
-#  define LZ4HC_HEAPMODE 0
 #  define LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
 #  if !defined(LZ4_memcpy)
 #    error "LZ4_FREESTANDING requires macro 'LZ4_memcpy'."
@@ -336,10 +335,8 @@ typedef union LZ4_stream_u LZ4_stream_t;  /* incomplete type (defined later) */
    "skip this block when rc.exe is trying to read it".
 */
 #if !defined(RC_INVOKED) /* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4LIB_API LZ4_stream_t* LZ4_createStream(void);
 LZ4LIB_API int           LZ4_freeStream (LZ4_stream_t* streamPtr);
-#endif /* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */
 #endif
 
 /*! LZ4_resetStream_fast() : v1.9.0+
@@ -470,10 +467,8 @@ typedef union LZ4_streamDecode_u LZ4_streamDecode_t;   /* tracking context */
  *  A tracking context can be re-used multiple times.
  */
 #if !defined(RC_INVOKED) /* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 LZ4LIB_API int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
-#endif /* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */
 #endif
 
 /*! LZ4_setStreamDecode() :

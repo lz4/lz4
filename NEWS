@@ -14,6 +14,7 @@ api  : `LZ4F_setProgressiveDecoding()` (static) : `LZ4F_decompress()` outputs th
 api  : `LZ4_decompress_incomplete()` (static) : decodes the beginning of a block, before the rest is available
 api  : `LZ4F_decompressOptions_t.skipChecksums` can skip only block checksums, or only the content checksum (`LZ4F_skipChecksums_t`)
 api  : `LZ4F_getFrameInfo()` invoked without input after the end of a frame provides the parameters of this frame
+build: `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` (implied by `LZ4_FREESTANDING`) : functions which would allocate return `NULL` instead of being removed, `LZ4_USER_MEMORY_FUNCTIONS` can provide an allocator, and `lz4frame.c`, `lz4file.c` no longer call `malloc()`
 build: OS400 builds (since v1.11.0), reported by @jonrumsey
 build: cmake 3.10 or later (was 3.5)
 

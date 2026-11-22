@@ -108,9 +108,12 @@ The following build macro can be selected to adjust source code behavior at comp
 - `LZ4_USER_MEMORY_FUNCTIONS` : replace calls to `<stdlib.h>`'s `malloc()`, `calloc()` and `free()`
   by user-defined functions, which must be named `LZ4_malloc()`, `LZ4_calloc()` and `LZ4_free()`.
   User functions must be available at link time.
+  They are employed even with `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` or `LZ4_FREESTANDING`.
 
-- `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` :
-  Remove support of dynamic memory allocation.
+- `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION` : lz4 never allocates memory by itself.
+  There is no default allocator : memory only comes from allocators given by the user
+  (`LZ4_USER_MEMORY_FUNCTIONS`, or `LZ4F_CustomMem` for `LZ4F_*` functions).
+  Without them, functions which would allocate fail, as on allocation failure (ex: `LZ4_createStream()` returns `NULL`).
   For more details, see description of this macro in `lib/lz4.c`.
 
 - `LZ4_STATIC_LINKING_ONLY_ENDIANNESS_INDEPENDENT_OUTPUT` : experimental feature aimed at producing the same
@@ -121,7 +124,8 @@ The following build macro can be selected to adjust source code behavior at comp
 
 - `LZ4_FREESTANDING` : by setting this build macro to 1,
   LZ4/HC removes dependencies on the C standard library,
-  including allocation functions and `memmove()`, `memcpy()`, and `memset()`.
+  including allocation functions (it implies `LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION`)
+  and `memmove()`, `memcpy()`, and `memset()`.
   This build macro is designed to help use LZ4/HC in restricted environments
   (embedded, bootloader, etc).
   For more details, see description of this macro in `lib/lz4.h`.

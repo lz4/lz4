@@ -192,25 +192,19 @@
 **************************************/
 
 /*! LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION :
- *  Disable relatively high-level LZ4/HC functions that use dynamic memory
- *  allocation functions (malloc(), calloc(), free()).
+ *  lz4 never allocates memory by itself : there is no default allocator (malloc(), calloc(), free()).
+ *  Memory only comes from allocators given by the user :
+ *  LZ4_malloc(), LZ4_calloc() and LZ4_free() with LZ4_USER_MEMORY_FUNCTIONS (below),
+ *  or LZ4F_CustomMem for LZ4F_* functions.
+ *  Without them, functions which would allocate fail, as on allocation failure :
+ *  LZ4_createStream(), LZ4_createStreamDecode() and LZ4_createStreamHC() return NULL,
+ *  and LZ4F_* functions creating a context without LZ4F_CustomMem return an error.
+ *  Stateless compression functions keep their state on stack by default (LZ4_HEAPMODE, LZ4HC_HEAPMODE).
  *
- *  Note that this is a compile-time switch. And since it disables
- *  public/stable LZ4 v1 API functions, we don't recommend using this
- *  symbol to generate a library for distribution.
- *
- *  The following public functions are removed when this symbol is defined.
- *  - lz4   : LZ4_createStream, LZ4_freeStream,
- *            LZ4_createStreamDecode, LZ4_freeStreamDecode, LZ4_create (deprecated)
- *  - lz4hc : LZ4_createStreamHC, LZ4_freeStreamHC,
- *            LZ4_createHC (deprecated), LZ4_freeHC  (deprecated)
- *  - lz4frame, lz4file : All LZ4F_* functions
+ *  Note that this is a compile-time switch, which changes the behavior of public/stable LZ4 v1 API functions :
+ *  we don't recommend using it to generate a library for distribution.
  */
-#if defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
-#  define ALLOC(s)          lz4_error_memory_allocation_is_disabled
-#  define ALLOC_AND_ZERO(s) lz4_error_memory_allocation_is_disabled
-#  define FREEMEM(p)        lz4_error_memory_allocation_is_disabled
-#elif defined(LZ4_USER_MEMORY_FUNCTIONS)
+#if defined(LZ4_USER_MEMORY_FUNCTIONS)
 /* memory management functions can be customized by user project.
  * Below functions must exist somewhere in the Project
  * and be available at link time. */
@@ -220,6 +214,10 @@ void  LZ4_free(void* p);
 # define ALLOC(s)          LZ4_malloc(s)
 # define ALLOC_AND_ZERO(s) LZ4_calloc(1,s)
 # define FREEMEM(p)        LZ4_free(p)
+#elif defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+# define ALLOC(s)          NULL   /* no default allocator */
+# define ALLOC_AND_ZERO(s) NULL
+# define FREEMEM(p)        ((void)(p))
 #else
 # include <stdlib.h>   /* malloc, calloc, free */
 # define ALLOC(s)          malloc(s)
@@ -1669,7 +1667,6 @@ int LZ4_compress_destSize(const char* src, char* dst, int* srcSizePtr, int targe
 *  Streaming functions
 ********************************/
 
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4_stream_t* LZ4_createStream(void)
 {
     LZ4_stream_t* const lz4s = (LZ4_stream_t*)ALLOC(sizeof(LZ4_stream_t));
@@ -1679,7 +1676,6 @@ LZ4_stream_t* LZ4_createStream(void)
     LZ4_initStream(lz4s, sizeof(*lz4s));
     return lz4s;
 }
-#endif
 
 static size_t LZ4_stream_t_alignment(void)
 {
@@ -1713,7 +1709,6 @@ void LZ4_resetStream_fast(LZ4_stream_t* ctx) {
     LZ4_prepareTable(&(ctx->internal_donotuse), 0, byU32);
 }
 
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
     if (!LZ4_stream) return 0;   /* support free on NULL */
@@ -1721,7 +1716,6 @@ int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
     FREEMEM(LZ4_stream);
     return (0);
 }
-#endif
 
 
 typedef enum { _ld_fast, _ld_slow } LoadDict_mode_e;
@@ -2751,7 +2745,6 @@ int LZ4_decompress_incomplete(const char* src, char* dst, int* srcSizePtr, int d
 
 /*===== streaming decompression functions =====*/
 
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_STATIC_ASSERT(sizeof(LZ4_streamDecode_t) >= sizeof(LZ4_streamDecode_t_internal));
@@ -2764,7 +2757,6 @@ int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
     FREEMEM(LZ4_stream);
     return 0;
 }
-#endif
 
 /*! LZ4_setStreamDecode() :
  *  Use this function to instruct where to find the dictionary.
@@ -3006,13 +2998,11 @@ int LZ4_resetStreamState(void* state, char* inputBuffer)
     return 0;
 }
 
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 void* LZ4_create (char* inputBuffer)
 {
     (void)inputBuffer;
     return LZ4_createStream();
 }
-#endif
 
 char* LZ4_slideInputBuffer (void* state)
 {

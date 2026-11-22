@@ -49,6 +49,43 @@ EXTERN_C int memcmp(const void *s1, const void *s2, size_t n);
 #include "../../lib/lz4.c"
 #include "../../lib/lz4hc.c"
 
+#ifdef LZ4_USER_MEMORY_FUNCTIONS
+// allocator of the environment : a static arena, never released
+static uint64_t g_arena[(2 << 20) / sizeof(uint64_t)];
+static size_t g_arenaPos = 0;
+EXTERN_C void* LZ4_malloc(size_t s) {
+    void* p;
+    s = (s + 15) & ~(size_t)15;
+    if (s > sizeof(g_arena) - g_arenaPos) return NULL;
+    p = (uint8_t*)g_arena + g_arenaPos;
+    g_arenaPos += s;
+    return p;
+}
+EXTERN_C void* LZ4_calloc(size_t n, size_t s) {
+    void* const p = LZ4_malloc(n * s);
+    if (p != NULL) memset(p, 0, n * s);
+    return p;
+}
+EXTERN_C void LZ4_free(void* p) { (void)p; }
+#endif
+
+// allocation : with the environment's allocator (LZ4_USER_MEMORY_FUNCTIONS), otherwise none
+static void test_allocation(void) {
+    LZ4_stream_t* const stream = LZ4_createStream();
+    LZ4_streamDecode_t* const streamDecode = LZ4_createStreamDecode();
+    LZ4_streamHC_t* const streamHC = LZ4_createStreamHC();
+#ifdef LZ4_USER_MEMORY_FUNCTIONS
+    if (stream == NULL || streamDecode == NULL || streamHC == NULL) {
+#else
+    if (stream != NULL || streamDecode != NULL || streamHC != NULL) {
+#endif
+        MY_exit(__LINE__);
+    }
+    LZ4_freeStream(stream);
+    LZ4_freeStreamDecode(streamDecode);
+    LZ4_freeStreamHC(streamHC);
+}
+
 // Test for LZ4
 static void test_lz4(const uint8_t* srcData, int srcSize) {
     // Compress
@@ -147,6 +184,7 @@ static void test(void) {
     static const int      srcSize = (int) sizeof(README_md);
     test_lz4  (srcData, srcSize);
     test_lz4hc(srcData, srcSize);
+    test_allocation();
 }
 
 

@@ -18,6 +18,7 @@ checkTag
 checkFrame
 abiTest
 freestanding
+freestanding-usermem
 
 # test artefacts
 tmp*
