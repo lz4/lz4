@@ -102,6 +102,7 @@
  * Default allocation functions, employed when LZ4F_CustomMem doesn't define them :
  * malloc(), calloc() and free(), or LZ4_malloc(), LZ4_calloc() and LZ4_free()
  * when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS (see lz4.c).
+ * None with LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION : allocation then fails without LZ4F_CustomMem.
 **/
 
 #include <string.h>   /* memset, memcpy, memmove */
@@ -117,6 +118,10 @@
 #    define ALLOC(s)          LZ4_malloc(s)
 #    define ALLOC_AND_ZERO(s) LZ4_calloc(1,(s))
 #    define FREEMEM(p)        LZ4_free(p)
+#  elif defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+#    define ALLOC(s)          NULL   /* no default allocator */
+#    define ALLOC_AND_ZERO(s) NULL
+#    define FREEMEM(p)        ((void)(p))
 #  else
 #    include <stdlib.h>   /* malloc, calloc, free */
 #    define ALLOC(s)          malloc(s)
@@ -131,7 +136,7 @@ static void* LZ4F_calloc(size_t s, LZ4F_CustomMem cmem)
     if (cmem.customCalloc != NULL) {
         return cmem.customCalloc(cmem.opaqueState, s);
     }
-    /* nothing defined : use default <stdlib.h>'s calloc() */
+    /* nothing defined : use default calloc(), if any */
     if (cmem.customAlloc == NULL) {
         return ALLOC_AND_ZERO(s);
     }
@@ -147,7 +152,7 @@ static void* LZ4F_malloc(size_t s, LZ4F_CustomMem cmem)
     if (cmem.customAlloc != NULL) {
         return cmem.customAlloc(cmem.opaqueState, s);
     }
-    /* nothing defined : use default <stdlib.h>'s malloc() */
+    /* nothing defined : use default malloc(), if any */
     return ALLOC(s);
 }
 
@@ -159,7 +164,7 @@ static void LZ4F_free(void* p, LZ4F_CustomMem cmem)
         cmem.customFree(cmem.opaqueState, p);
         return;
     }
-    /* nothing defined : use default <stdlib.h>'s free() */
+    /* nothing defined : use default free(), if any */
     FREEMEM(p);
 }
 

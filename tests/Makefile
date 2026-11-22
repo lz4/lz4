@@ -469,19 +469,36 @@ ifeq ($(FREESTANDING_TARGET), yes)
   FREESTANDING_CFLAGS := -ffreestanding -nostdlib
 endif
 
-CLEAN += freestanding
+CLEAN += freestanding freestanding-usermem
 freestanding: compat/freestanding.c
 	$(CC) $(FREESTANDING_CFLAGS) $^ -o $@$(EXT)
 
-test-freestanding: freestanding
+# with an allocator from the environment
+freestanding-usermem: compat/freestanding.c
+	$(CC) $(FREESTANDING_CFLAGS) -DLZ4_USER_MEMORY_FUNCTIONS $^ -o $@$(EXT)
+
+test-freestanding: freestanding freestanding-usermem
 	@echo "\n ---- test freestanding ----"
 ifeq ($(FREESTANDING_CFLAGS),)
 	@echo "\n (skip)"
 else
 	./freestanding$(EXT)
+	./freestanding-usermem$(EXT)
 	-strace ./freestanding$(EXT)
 	-ltrace ./freestanding$(EXT)
 endif
+
+# LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION : the library never allocates by itself
+NOALLOC_SRCS := $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4file.c
+.PHONY: test-disable-memory-allocation
+test-disable-memory-allocation:
+	@echo "\n ---- test LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION ----"
+	@for f in $(NOALLOC_SRCS); do \
+	   $(CC) -O2 $(WFLAGS) -Werror -DLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION -c $$f -o tmp-noalloc.o || exit 1; \
+	   if nm -u tmp-noalloc.o | awk '{print $$NF}' | grep -xE '_?(malloc|calloc|realloc|free)'; then \
+	     echo "$$f allocates"; exit 1; fi; \
+	 done
+	$(RM) tmp-noalloc.o
 
 
 endif

@@ -39,12 +39,16 @@
 /* =====   Memory routines   ===== */
 /* custom functions if provided (LZ4F_readOpen_advanced(), LZ4F_writeOpen_advanced()),
  * otherwise malloc() and free(), or LZ4_malloc() and LZ4_free()
- * when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS (see lz4.c) */
+ * when lz4 is compiled with LZ4_USER_MEMORY_FUNCTIONS (see lz4.c),
+ * and none with LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION */
 #if defined(LZ4_USER_MEMORY_FUNCTIONS)
 void* LZ4_malloc(size_t s);
 void  LZ4_free(void* p);
 #  define LZ4FILE_MALLOC(s)    LZ4_malloc(s)
 #  define LZ4FILE_FREE(p)      LZ4_free(p)
+#elif defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
+#  define LZ4FILE_MALLOC(s)    NULL   /* no default allocator */
+#  define LZ4FILE_FREE(p)      ((void)(p))
 #else
 #  include <stdlib.h>   /* malloc, free */
 #  define LZ4FILE_MALLOC(s)    malloc(s)
