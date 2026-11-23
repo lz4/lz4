@@ -537,7 +537,9 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, con
             FILE* const testf = fopen( dstFileName, "rb" );
             if (testf != NULL) {  /* dest exists, prompt for overwrite authorization */
                 fclose(testf);
-                if (g_displayLevel <= 1) {  /* No interaction possible */
+                if (g_displayLevel <= 1
+                 || (srcFileName != NULL && LZ4IO_isStdin(srcFileName))) {
+                    /* no interaction possible : stdin is the input stream, not a console answer */
                     DISPLAY("%s already exists; not overwritten  \n", dstFileName);
                     return NULL;
                 }

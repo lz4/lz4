@@ -96,6 +96,14 @@ case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
     cmp $FPREFIX-writeonly $FPREFIX-writeonly.orig
     printf 'y\n' | lz4 $FPREFIX-same $FPREFIX-writeonly
     lz4 -d -c $FPREFIX-writeonly | cmp $FPREFIX-same -
+    # the overwrite confirmation can't be read from stdin when stdin is the input : refuse, don't consume the data
+    printf 'yes\nsecond line\n' > $FPREFIX-pipesrc
+    echo "keep this output" > $FPREFIX-pipeout
+    cp $FPREFIX-pipeout $FPREFIX-pipeout.orig
+    lz4 - $FPREFIX-pipeout < $FPREFIX-pipesrc && exit 1   # refused : the 'y' is data, not an answer
+    cmp $FPREFIX-pipeout $FPREFIX-pipeout.orig            # destination untouched
+    lz4 -f - $FPREFIX-pipeout < $FPREFIX-pipesrc          # -f still overwrites
+    lz4 -d -c $FPREFIX-pipeout | cmp $FPREFIX-pipesrc -   # whole input preserved, nothing eaten
     # idem through a link
     ln $FPREFIX-same $FPREFIX-same.hard
     lz4 -f $FPREFIX-same $FPREFIX-same.hard && exit 1
