@@ -77,13 +77,10 @@ Alternative build systems (CMake, Meson, Visual Studio) are provided in [build/]
 
 ### Building LZ4 - Using vcpkg
 
-You can download and install LZ4 using the [vcpkg](https://github.com/Microsoft/vcpkg) dependency manager:
+You can download and install LZ4 using the [vcpkg](https://github.com/Microsoft/vcpkg) dependency manager,
+once vcpkg itself is installed (see its documentation):
 
-    git clone https://github.com/Microsoft/vcpkg.git
-    cd vcpkg
-    ./bootstrap-vcpkg.sh
-    ./vcpkg integrate install
-    ./vcpkg install lz4
+    vcpkg install lz4
 
 The LZ4 port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg repository.
 

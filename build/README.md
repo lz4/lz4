@@ -5,9 +5,23 @@ Projects for various integrated development environments (IDE)
 
 The following projects are included with the lz4 distribution:
 - `cmake` - CMake project
-- `meson` - Meson project
+- `meson` - Meson project (see [meson/README.md](meson/README.md))
 - `visual` - scripts to generate Visual Studio solutions from `cmake` script
 - `VS2022` - Visual Studio 2022 solution - will soon be deprecated, prefer `visual` generators
+
+
+#### Building with CMake
+
+From the root of the repository :
+
+```
+cmake -S build/cmake -B build/cmake/build -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake/build
+cmake --install build/cmake/build    # this command may require root permissions
+```
+
+Once installed, CMake projects can use `find_package(lz4)` and link target `lz4::lz4`.
+`liblz4.pc` is also installed, for `pkg-config`.
 
 
 #### Projects available within VS2022\lz4.sln
