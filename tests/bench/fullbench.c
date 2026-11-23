@@ -388,9 +388,10 @@ static int local_LZ4_decompress_safe_partial_forceExtDict(const char* in, char* 
 #ifndef LZ4_DLL_IMPORT
 static int local_LZ4_decompress_incomplete(const char* in, char* out, int inSize, int outSize)
 {
-    int result = LZ4_decompress_incomplete(in, out, &inSize, outSize, NULL, 0);   /* all but the block's end */
+    int srcSize = inSize;
+    int const result = LZ4_decompress_incomplete(in, out, &srcSize, outSize, NULL, 0);   /* all but the block's end */
     if (result < 0) return result;
-    return outSize;
+    return result + LZ4_decompress_safe_usingDict(in + srcSize, out + result, inSize - srcSize, outSize - result, out, result);
 }
 #endif
 
@@ -570,13 +571,12 @@ static const DecompressionDesc decDescArray[] = {
 #ifndef LZ4_DLL_IMPORT
     { "LZ4_decompress_safe_partial_forceExtDict", local_LZ4_decompress_safe_partial_forceExtDict, 0, 0 },
     { "LZ4_decompress_safe_forceExtDict", local_LZ4_decompress_safe_forceExtDict, 1, 0 },
+    { "LZ4_decompress_incomplete", local_LZ4_decompress_incomplete, 1, 0 },
 #endif
+    /* frame tests last : they replace the blocks by a frame */
     { "LZ4F_decompress", local_LZ4F_decompress, 1, 1 },
     { "LZ4F_decompress_followHint", local_LZ4F_decompress_followHint, 1, 1 },
     { "LZ4F_decompress_noHint", local_LZ4F_decompress_noHint, 1, 1 },
-#ifndef LZ4_DLL_IMPORT
-    { "LZ4_decompress_incomplete", local_LZ4_decompress_incomplete, 0, 0 },
-#endif
 };
 
 #define ARRAY_SIZE(a) (sizeof(a) / (sizeof((a)[0])))
