@@ -27,11 +27,15 @@ The `lz4` command line utility is provided under the GPL-2.0-or-later license.
 Benchmarks
 -------------------------
 
-The benchmark uses [lzbench] v2.4.2, from @inikep
-compiled with GCC v13.3.0 on Linux 64-bits (Ubuntu 24.04).
-The reference system uses a Core i7-9700K CPU.
-Benchmark evaluates the compression of reference [Silesia Corpus]
+**Historical reference results (v1.11.1): these numbers are dated.**
+They were measured with [lzbench] v2.4.2, from @inikep,
+compiled with GCC v13.3.0 on Linux 64-bits (Ubuntu 24.04),
+on a Core i7-9700K CPU, compressing the reference [Silesia Corpus]
 in single-thread mode.
+Neither lzbench nor Silesia was available in the environment where
+this documentation was last updated, so the figures were **not**
+remeasured. Treat them as a historical comparison, not as a
+current-machine baseline.
 
 [lzbench]: https://github.com/inikep/lzbench
 [Silesia Corpus]: https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
@@ -59,6 +63,8 @@ All levels of these compressors, and the `lz4` command line in pipelines, are ch
 Installation
 -------------------------
 
+### Using make
+
 ```
 make
 make install     # this command may require root permissions
@@ -73,19 +79,73 @@ It is compatible with parallel builds (`-j#`).
 [redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
 [command redefinition]: https://www.gnu.org/prep/standards/html_node/Utilities-in-Makefiles.html
 
+### Using CMake
+
+```
+cmake -S build/cmake -B build/cmake/build -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake/build
+cmake --install build/cmake/build    # this command may require root permissions
+```
+
+After installation, `find_package(lz4)` works from CMake,
+and `pkg-config --cflags --libs liblz4` provides the compile and link flags.
+
+### Using Meson
+
+```
+meson setup build/meson mesonBuildDir --buildtype=release
+ninja -C mesonBuildDir
+meson install -C mesonBuildDir       # this command may require root permissions
+```
+
 Alternative build systems (CMake, Meson, Visual Studio) are provided in [build/](build/).
+
+### Block API example
+
+```c
+#include <stdio.h>
+#include "lz4.h"
+
+int main(void) {
+    const char src[] = "hello lz4";
+    char compressed[64];  /* enough for this input; use LZ4_compressBound() generally */
+    char decoded[sizeof(src) - 1];
+    int const srcSize = (int)sizeof(src) - 1;
+    int const cSize = LZ4_compress_default(src, compressed, srcSize, (int)sizeof(compressed));
+    int const dSize = LZ4_decompress_safe(compressed, decoded, cSize, srcSize);
+    if (cSize <= 0 || dSize != srcSize) return 1;
+    printf("%.*s\n", dSize, decoded);
+    return 0;
+}
+```
+
+Compile it after installation with `cc example.c -o example -llz4`.
 
 ### Building LZ4 - Using vcpkg
 
-You can download and install LZ4 using the [vcpkg](https://github.com/Microsoft/vcpkg) dependency manager:
+You can download and install LZ4 using the [vcpkg](https://github.com/microsoft/vcpkg) dependency manager.
 
-    git clone https://github.com/Microsoft/vcpkg.git
-    cd vcpkg
-    ./bootstrap-vcpkg.sh
-    ./vcpkg integrate install
-    ./vcpkg install lz4
+#### Windows (PowerShell)
 
-The LZ4 port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg repository.
+```powershell
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+.\bootstrap-vcpkg.bat
+.\vcpkg.exe integrate install
+.\vcpkg.exe install lz4
+```
+
+#### Linux and macOS
+
+```sh
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+./bootstrap-vcpkg.sh
+./vcpkg integrate install
+./vcpkg install lz4
+```
+
+The LZ4 port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/microsoft/vcpkg) on the vcpkg repository.
 
 Documentation
 -------------------------

@@ -1,10 +1,10 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.11.1 Manual</title>
+<title>1.11.2 Manual</title>
 </head>
 <body>
-<h1>1.11.1 Manual</h1>
+<h1>1.11.2 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
@@ -49,8 +49,6 @@
 <BR></pre>
 
 <pre><b>#if defined(LZ4_FREESTANDING) && (LZ4_FREESTANDING == 1)
-#  define LZ4_HEAPMODE 0
-#  define LZ4HC_HEAPMODE 0
 #  define LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
 #  if !defined(LZ4_memcpy)
 #    error "LZ4_FREESTANDING requires macro 'LZ4_memcpy'."
@@ -71,9 +69,50 @@
   - LZ4_FREESTANDING is a compile-time switch.
   - It requires the following macros to be defined:
     LZ4_memcpy, LZ4_memmove, LZ4_memset.
-  - It only enables LZ4/HC functions which don't use heap.
-    All LZ4F_* functions are not supported.
-  - See tests/compat/freestanding.c to check its basic setup.
+  - It implies LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION (see lz4.c) : there is no default allocator.
+    Functions which allocate employ the user's allocator (LZ4_USER_MEMORY_FUNCTIONS,
+    or LZ4F_CustomMem for LZ4F_* functions), and fail without it.
+  - See tests/compat/freestanding.c to check its basic setup,
+    and tests/compat/freestanding_frame.c for a frame decoder.
+ 
+</p></pre><BR>
+
+<pre><b>#ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
+#  define LZ4_DEPRECATED(message)   </b>/* disable deprecation warnings */<b>
+#else
+#  if defined (__cplusplus) && (__cplusplus >= 201402) </b>/* C++14 or greater */<b>
+#    define LZ4_DEPRECATED(message) [[deprecated(message)]]
+#  elif defined(_MSC_VER)
+#    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
+#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 45))
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
+#  elif defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 31)
+#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
+#  else
+#    pragma message("WARNING: LZ4_DEPRECATED needs custom implementation for this compiler")
+#    define LZ4_DEPRECATED(message)   </b>/* disabled */<b>
+#  endif
+#endif </b>/* LZ4_DISABLE_DEPRECATE_WARNINGS */<b>
+</b><p>
+  Deprecated functions make the compiler generate a warning when invoked.
+  This is meant to invite users to update their source code.
+  Should deprecation warnings be a problem, it is generally possible to disable them,
+  typically with -Wno-deprecated-declarations for gcc
+  or _CRT_SECURE_NO_WARNINGS in Visual.
+
+  Another method is to define LZ4_DISABLE_DEPRECATE_WARNINGS
+  before including the header file.
+ 
+</p></pre><BR>
+
+<pre><b>#if defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) && !defined(LZ4_USER_MEMORY_FUNCTIONS)
+#  define LZ4_NOALLOC_WARNING LZ4_DEPRECATED("always fails : LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION without LZ4_USER_MEMORY_FUNCTIONS")
+#else
+#  define LZ4_NOALLOC_WARNING
+#endif
+</b><p>  precedes functions which allocate memory by themselves.
+  Without allocator (LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION, see lz4.c), they always fail :
+  invoking them generates a deprecation warning.
  
 </p></pre><BR>
 
@@ -231,10 +270,8 @@ int LZ4_compress_fast_extState (void* state, const char* src, char* dst, int src
 <a name="Chapter6"></a><h2>Streaming Compression Functions</h2><pre></pre>
 
 <pre><b>#if !defined(RC_INVOKED) </b>/* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */<b>
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
-LZ4_stream_t* LZ4_createStream(void);
+LZ4_NOALLOC_WARNING LZ4LIB_API LZ4_stream_t* LZ4_createStream(void);
 int           LZ4_freeStream (LZ4_stream_t* streamPtr);
-#endif </b>/* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */<b>
 #endif
 </b><p>
  - RC_INVOKED is predefined symbol of rc.exe (the resource compiler which is part of MSVC/Visual Studio).
@@ -368,10 +405,8 @@ LZ4_attach_dictionary(LZ4_stream_t* workingStream,
 <BR></pre>
 
 <pre><b>#if !defined(RC_INVOKED) </b>/* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */<b>
-#if !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
-LZ4_streamDecode_t* LZ4_createStreamDecode(void);
+LZ4_NOALLOC_WARNING LZ4LIB_API LZ4_streamDecode_t* LZ4_createStreamDecode(void);
 int                 LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream);
-#endif </b>/* !defined(LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */<b>
 #endif
 </b><p>  creation / destruction of streaming decompression tracking context.
   A tracking context can be re-used multiple times.
@@ -506,9 +541,26 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
  
 </p></pre><BR>
 
-<pre><b>int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
+<pre><b>LZ4LIB_STATIC_API int LZ4_compress_destSize_extState(void* state, const char* src, char* dst, int* srcSizePtr, int targetDstSize, int acceleration);
 </b><p>  Same as LZ4_compress_destSize(), but using an externally allocated state.
   Also: exposes @acceleration
+ 
+</p></pre><BR>
+
+<pre><b>LZ4LIB_STATIC_API int LZ4_decompress_incomplete(const char* src, char* dst, int* srcSizePtr, int dstCapacity,
+                                                const char* dictStart, int dictSize);
+</b><p>  Decompresses the beginning of a block, while the rest is not available yet :
+  `*srcSizePtr` bytes at `src`, into `dst` of size `dstCapacity`.
+  Decoding stops before the first sequence it can't decode : not entirely within input,
+  not fitting into `dstCapacity`, or invalid (left to the regular decoder, which reports the error).
+  The block's last literals are never decoded, even when input contains the whole block :
+  decoding resumes from the updated `*srcSizePtr` (this function again, then a regular decoder),
+  with history extended by the decoded bytes (see LZ4_decompress_safe_continue()).
+  `dictStart`, `dictSize` : history, as for LZ4_decompress_safe_usingDict() (can be NULL, 0).
+ @return : the number of bytes decoded into `dst` (0 : more input is needed),
+           `*srcSizePtr` being updated to the size of their compressed sequences ;
+           or -1 (invalid parameters).
+  Note : bytes of `dst` beyond the decoded size can be modified.
  
 </p></pre><BR>
 
@@ -605,34 +657,6 @@ LZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
 </p></pre><BR>
 
 <a name="Chapter10"></a><h2>Obsolete Functions</h2><pre></pre>
-
-<pre><b>#ifdef LZ4_DISABLE_DEPRECATE_WARNINGS
-#  define LZ4_DEPRECATED(message)   </b>/* disable deprecation warnings */<b>
-#else
-#  if defined (__cplusplus) && (__cplusplus >= 201402) </b>/* C++14 or greater */<b>
-#    define LZ4_DEPRECATED(message) [[deprecated(message)]]
-#  elif defined(_MSC_VER)
-#    define LZ4_DEPRECATED(message) __declspec(deprecated(message))
-#  elif defined(__clang__) || (defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 45))
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated(message)))
-#  elif defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ >= 31)
-#    define LZ4_DEPRECATED(message) __attribute__((deprecated))
-#  else
-#    pragma message("WARNING: LZ4_DEPRECATED needs custom implementation for this compiler")
-#    define LZ4_DEPRECATED(message)   </b>/* disabled */<b>
-#  endif
-#endif </b>/* LZ4_DISABLE_DEPRECATE_WARNINGS */<b>
-</b><p>
-  Deprecated functions make the compiler generate a warning when invoked.
-  This is meant to invite users to update their source code.
-  Should deprecation warnings be a problem, it is generally possible to disable them,
-  typically with -Wno-deprecated-declarations for gcc
-  or _CRT_SECURE_NO_WARNINGS in Visual.
-
-  Another method is to define LZ4_DISABLE_DEPRECATE_WARNINGS
-  before including the header file.
- 
-</p></pre><BR>
 
 <pre><b></b><p>  LZ4_compress*(), LZ4_uncompress*(), LZ4_create(), LZ4_sizeofStreamState(), LZ4_resetStreamState(),
   LZ4_slideInputBuffer(), LZ4_decompress_safe_withPrefix64k(), LZ4_decompress_fast_withPrefix64k() 

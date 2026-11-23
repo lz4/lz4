@@ -14,3 +14,24 @@ It is compatible with parallel builds (`-j#`).
 [staged installs]: https://www.gnu.org/prep/standards/html_node/DESTDIR.html
 [redirection]: https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
 [command redefinition]: https://www.gnu.org/prep/standards/html_node/Utilities-in-Makefiles.html
+
+CMake
+-----
+
+```
+cmake -S build/cmake -B build/cmake/build -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake/build
+cmake --install build/cmake/build    # this command may require root access
+```
+
+After installation, `find_package(lz4)` works from CMake,
+and `pkg-config --cflags --libs liblz4` provides the compile and link flags.
+
+Meson
+-----
+
+```
+meson setup build/meson mesonBuildDir --buildtype=release
+ninja -C mesonBuildDir
+meson install -C mesonBuildDir       # this command may require root access
+```

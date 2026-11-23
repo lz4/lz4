@@ -1,10 +1,10 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>1.11.1 Manual</title>
+<title>1.11.2 Manual</title>
 </head>
 <body>
-<h1>1.11.1 Manual</h1>
+<h1>1.11.2 Manual</h1>
 <hr>
 <a name="Contents"></a><h2>Contents</h2>
 <ol>
@@ -179,7 +179,7 @@
 
 <a name="Chapter7"></a><h2>Resource Management</h2><pre></pre>
 
-<pre><b>LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
+<pre><b>LZ4F_NOALLOC_WARNING LZ4FLIB_API LZ4F_errorCode_t LZ4F_createCompressionContext(LZ4F_cctx** cctxPtr, unsigned version);
 LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 </b><p>  The first thing to do is to create a compressionContext object,
   which will keep track of operation state during streaming compression.
@@ -295,17 +295,25 @@ LZ4F_errorCode_t LZ4F_freeCompressionContext(LZ4F_cctx* cctx);
 
 <a name="Chapter9"></a><h2>Decompression functions</h2><pre></pre>
 
+<pre><b>typedef enum {
+    LZ4F_verifyChecksums = 0,      </b>/* default : verify all checksums present in the frame */<b>
+    LZ4F_skipAllChecksums = 1,     </b>/* skip block checksums and content checksum */<b>
+    LZ4F_skipContentChecksum = 2,  </b>/* v1.11.2+ : skip only the content checksum, still verify block checksums */<b>
+    LZ4F_skipBlockChecksums = 3    </b>/* v1.11.2+ : skip only block checksums, still verify the content checksum */<b>
+} LZ4F_skipChecksums_t;
+</b></pre><BR>
 <pre><b>typedef struct {
   unsigned stableDst;     /* pledges that the last 64 KB of decompressed data remain present and unmodified where they were decoded,
                            * whether @dstBuffer follows them or not. This optimization skips internal storage operations.
                            * Once set, this pledge must remain valid up to the end of current frame. */
-  unsigned skipChecksums; /* disable checksum calculation and verification, even when one is present in frame, to save CPU time.
-                           * Setting this option to 1 once disables all checksums for the rest of the frame. */
+  unsigned skipChecksums; /* a value of LZ4F_skipChecksums_t : disables calculation and verification of checksums present in frame, to save CPU time.
+                           * Once set, a checksum remains skipped for the rest of the frame : successive values add up.
+                           * Any other value is an error (parameter_invalid). */
   unsigned reserved1;     </b>/* must be set to zero for forward compatibility */<b>
   unsigned reserved0;     </b>/* idem */<b>
 } LZ4F_decompressOptions_t;
 </b></pre><BR>
-<pre><b>LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
+<pre><b>LZ4F_NOALLOC_WARNING LZ4FLIB_API LZ4F_errorCode_t LZ4F_createDecompressionContext(LZ4F_dctx** dctxPtr, unsigned version);
 LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx);
 </b><p>  Create an LZ4F_dctx object, to track all decompression operations.
   @version provided MUST be LZ4F_VERSION.
@@ -367,12 +375,19 @@ LZ4F_getFrameInfo(LZ4F_dctx* dctx,
      and not yet read enough information to decode the header,
      LZ4F_getFrameInfo() will fail.
 
+  3) After a frame has ended, with no input (*srcSizePtr == 0) (v1.11.2+) :
+     it provides the parameters of the frame that just ended, and returns 0.
+     This lasts until LZ4F_decompress() starts reading the next frame,
+     or until LZ4F_resetDecompressionContext().
+     With input, it decodes the header of the next frame, as in 1).
+
   The number of bytes consumed from srcBuffer will be updated in *srcSizePtr (necessarily <= original value).
   LZ4F_getFrameInfo() only consumes bytes when decoding has not yet started,
   and when decoding the header has been successful.
   Decompression must then resume from (srcBuffer + *srcSizePtr).
 
  @return : a hint about how many srcSize bytes LZ4F_decompress() expects for next call,
+           0 after the end of a frame (situation 3),
            or an error code which can be tested using LZ4F_isError().
   note 1 : in case of error, dctx is not modified. Decoding operation can resume from beginning safely.
   note 2 : frame parameters are *copied into* an already allocated LZ4F_frameInfo_t structure.
@@ -475,7 +490,7 @@ LZ4F_decompress_usingDict(LZ4F_dctx* dctxPtr,
 
 <a name="Chapter13"></a><h2>Bulk processing dictionary compression</h2><pre></pre>
 
-<pre><b>LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
+<pre><b>LZ4F_NOALLOC_WARNING LZ4FLIB_API LZ4F_CDict* LZ4F_createCDict(const void* dictBuffer, size_t dictSize);
 void        LZ4F_freeCDict(LZ4F_CDict* CDict);
 </b><p>  When compressing multiple messages / blocks using the same dictionary, it's recommended to initialize it just once.
   LZ4_createCDict() will create a digested dictionary, ready to start future compression operations without startup delay.
@@ -568,6 +583,16 @@ LZ4F_resumeFrame(LZ4F_dctx* dctx, const LZ4F_frameInfo_t* frameInfo,
   but the content checksum, which covers the whole frame, is skipped.
   Any decoding in progress within @dctx is abandoned.
  @return : 0, or an error code (can be tested using LZ4F_isError())
+ 
+</p></pre><BR>
+
+<pre><b>LZ4FLIB_STATIC_API void LZ4F_setProgressiveDecoding(LZ4F_dctx* dctx, unsigned enable);
+</b><p>  @enable != 0 : LZ4F_decompress() outputs the first block of each frame as it arrives,
+  instead of once received entirely : lower latency when input arrives slowly by segments (pipe, network).
+  Next blocks, and blocks with a checksum (verified before output), are output once received entirely.
+  Cost : about 5% more instructions to decode the first block, when it arrives by segments ;
+         128 KB more memory with independent blocks.
+  Default : disabled. The setting remains for next frames ; it takes effect at the start of a frame.
  
 </p></pre><BR>
 
