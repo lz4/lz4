@@ -814,8 +814,9 @@ int main(int argCount, const char** argv)
             continue;
         }
 
-        /* Store in *inFileNames[] if -m is used. */
-        if (multiple_inputs) { inFileNames[ifnIdx++] = argument; continue; }
+        /* Keep operands for modes enabled after the first file name too. */
+        inFileNames[ifnIdx++] = argument;
+        if (multiple_inputs) continue;
 
         /* original cli logic : lz4 input output */
         /* First non-option arg is input_filename. */
