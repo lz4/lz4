@@ -451,6 +451,8 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
 
     if (!(dir = opendir(dirName))) {
         fprintf(stderr, "Cannot open directory '%s': %s\n", dirName, strerror(errno));
+        free(*bufStart);
+        *bufStart = NULL;
         return 0;
     }
 
