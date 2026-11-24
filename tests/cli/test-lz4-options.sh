@@ -183,6 +183,14 @@ cp $SRC $FPREFIX-m2
 lz4 -q -f --multiple $FPREFIX-m1 $FPREFIX-m2
 cmp $FPREFIX-m1.lz4 $REF
 cmp $FPREFIX-m2.lz4 $REF
+# A mode selected after an operand must not silently drop that operand.
+rm $FPREFIX-m1.lz4 $FPREFIX-m2.lz4
+lz4 -q -f $FPREFIX-m1 --multiple $FPREFIX-m2
+cmp $FPREFIX-m1.lz4 $REF
+cmp $FPREFIX-m2.lz4 $REF
+lz4 $BAD -t < /dev/null && exit 1
+lz4 $FPREFIX-m1.lz4 --list > $FPREFIX-list
+grep -q $FPREFIX-m1.lz4 $FPREFIX-list
 lz4 --list $FPREFIX-m1.lz4 $FPREFIX-m2.lz4 > $FPREFIX-list
 grep -q $FPREFIX-m1.lz4 $FPREFIX-list
 grep -q $FPREFIX-m2.lz4 $FPREFIX-list
