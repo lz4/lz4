@@ -1,4 +1,5 @@
 v1.11.2
+fix  : CLI refuses to overwrite a regular file redirected to standard input (POSIX)
 cli  : `lz4 -t` tests every file argument, not only the first, by @immanuwell
 cli  : decompression keeps an existing output file when the source can't be opened, by @immanuwell
 cli  : `lz4 - file` no longer consumes a line of piped input as the overwrite confirmation, by @immanuwell
