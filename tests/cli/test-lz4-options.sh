@@ -229,3 +229,22 @@ results 2 -b1 -S $SRC $HDR
 results 1 -b1 $SRC $HDR
 warns "Decompression" "lz4 -b -d -i0 $REF"
 warns "Decompression" "lz4 -b --decompress -i0 $REF"
+
+# Redirecting stdout does not select it as the output for a named input.
+cp $SRC $FPREFIX-default
+lz4 $FPREFIX-default > $FPREFIX-stdout
+test ! -s $FPREFIX-stdout
+lz4 -dc $FPREFIX-default.lz4 | cmp - $SRC
+rm $FPREFIX-default
+lz4 $FPREFIX-default.lz4 > $FPREFIX-stdout
+test ! -s $FPREFIX-stdout
+cmp $FPREFIX-default $SRC
+# The documented concatenation example needs explicit stdout for each source.
+lz4 -c $SRC > $FPREFIX-example.lz4
+lz4 -c $HDR >> $FPREFIX-example.lz4
+cat $SRC $HDR > $FPREFIX-example
+lz4 -dc $FPREFIX-example.lz4 | cmp - $FPREFIX-example
+# Long help describes the same named-input/stdin distinction.
+lz4 -H > $FPREFIX-help
+grep -q "with stdin input, output to stdout" $FPREFIX-help
+grep -q "redirecting stdout does not change the output filename" $FPREFIX-help
