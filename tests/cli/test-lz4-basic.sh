@@ -54,6 +54,23 @@ if [ "$(uname)" = Linux ]; then   # sub-second precision
     test "$(stat -c %y $FPREFIX-hw.lz4)" = "$(stat -c %y $FPREFIX-hw)"
 fi
 rm $FPREFIX-hw.lz4
+# An unreadable subdirectory must not turn a partial recursive scan into success.
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
+    mkdir -p $FPREFIX-scan/blocked
+    echo "visible" > $FPREFIX-scan/file
+    echo "hidden" > $FPREFIX-scan/blocked/file
+    chmod 000 $FPREFIX-scan/blocked
+    if [ ! -r $FPREFIX-scan/blocked ]; then
+        rc=0; lz4 -q -r $FPREFIX-scan 2> $FPREFIX-scan.err || rc=$?
+        chmod 700 $FPREFIX-scan/blocked
+        test "$rc" -gt 0
+        test "$rc" -lt 128
+        grep -q "Cannot open directory" $FPREFIX-scan.err
+    else
+        chmod 700 $FPREFIX-scan/blocked
+    fi
+    ;;
+esac
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
     # output of a private source stays private while it is written :
     # a stream interrupted by truncated input leaves it before its permissions are copied
