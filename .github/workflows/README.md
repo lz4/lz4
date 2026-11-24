@@ -21,8 +21,8 @@ The CI/CD workflows are organized into focused, maintainable files:
 - **`oss-fuzz.yml`** - OSS-Fuzz integration for continuous fuzzing
 
 ## Utilities & Environment
-- **`release-environment.yml`** - Release validation and environment information gathering
-- **`release-assets.yml`** - Files attached to each release (Windows packages, source tarball, attestation)
+- **`release-environment.yml`** - Environment information gathering
+- **`release-assets.yml`** - Release tag validation and files attached to each release (Windows packages, source tarball, attestation)
 - **`scorecard.yml`** - Security scorecard analysis
 
 This organization provides:
