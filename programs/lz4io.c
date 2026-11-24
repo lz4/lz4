@@ -2843,8 +2843,11 @@ selectDecoder(dRess_t ress,
         size_t const nbReadBytes = fread(MNstore, 1, MAGICNUMBER_SIZE, finput);
         if (ferror(finput)) END_PROCESS(41, "Read error : ferror");
         if (nbReadBytes==0) return ENDOFSTREAM;   /* EOF */
-        if (nbReadBytes != MAGICNUMBER_SIZE)
-          END_PROCESS(40, "Unrecognized header : Magic Number unreadable");
+        if (nbReadBytes != MAGICNUMBER_SIZE) {
+            if (firstFrame && !prefs->testMode && prefs->overwrite && prefs->passThrough)
+                return LZ4IO_passThrough(finput, foutput, MNstore, nbReadBytes, prefs->sparseFileSupport);
+            END_PROCESS(40, "Unrecognized header : Magic Number unreadable");
+        }
         magicNumber = LZ4IO_readLE32(MNstore);   /* Little Endian format */
     }
     if (LZ4IO_isSkippableMagicNumber(magicNumber))
