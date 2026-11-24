@@ -562,6 +562,8 @@ int main(int argCount, const char** argv)
         if (!all_arguments_are_files && argument[0]=='-') {
             /* '-' means stdin/stdout */
             if (argument[1]==0) {
+                inFileNames[ifnIdx++] = stdinmark;
+                if (multiple_inputs) continue;
                 if (!input_filename) input_filename=stdinmark;
                 else output_filename=stdoutmark;
                 continue;
@@ -885,6 +887,11 @@ int main(int argCount, const char** argv)
          * one worker thread (-T1) unless -T# (or LZ4_NBWORKERS), or --single-thread */
         LZ4F_preferences_t framePrefs;
         size_t const customBlockSize = LZ4IO_framePreferences(prefs, &framePrefs);
+        unsigned u;
+        for (u=0; u<ifnIdx; u++) {
+            if (!strcmp(inFileNames[u], stdinmark))
+                errorOut("error: benchmark mode requires named files, not standard input");
+        }
         if (!frameCrcRequested) framePrefs.frameInfo.contentChecksumFlag = LZ4F_noContentChecksum;
         framePrefs.nbWorkers = singleThread ? 0 : 1;
         if (nbWorkersRequested && !singleThread) {
