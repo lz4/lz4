@@ -248,7 +248,8 @@ only the latest one will be applied.
 
 * `-l`:
   Use Legacy format (typically for Linux Kernel compression)<br/>
-  Note : `-l` is not compatible with `-m` (`--multiple`) nor `-r`
+  With `-m` (`--multiple`) or `-r`, each input is compressed into its own legacy-format file.
+  With `-c`, the legacy streams are concatenated on standard output.
 
 ### Other options
 
