@@ -237,3 +237,15 @@ results 2 -b1 -S $SRC $HDR
 results 1 -b1 $SRC $HDR
 warns "Decompression" "lz4 -b -d -i0 $REF"
 warns "Decompression" "lz4 -b --decompress -i0 $REF"
+
+# Explicit stdin is an input operand in multiple-input mode, including a late mode.
+cat $SRC $HDR > $FPREFIX-stdin-first
+cat $HDR $SRC > $FPREFIX-stdin-last
+lz4 -m -c - $HDR < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-first
+lz4 -m -c $HDR - < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-last
+lz4 -c - --multiple $HDR < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-first
+lz4 -c $HDR - --multiple < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-last
+# Benchmarks require named files; an explicit stdin must not silently select other data.
+fails "lz4 -b -i0 - < $SRC"
+fails "lz4 -b -i0 $HDR - < $SRC"
+fails "lz4 - -b -i0 < $SRC"
