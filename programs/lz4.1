@@ -38,12 +38,10 @@ When writing scripts that need to decompress files, it is recommended to always 
 \fBlz4\fR shows real\-time notification statistics during compression or decompression of a single file (use \fB\-q\fR to silence them)
 .
 .IP "\(bu" 4
-When no destination is specified, result is sent on implicit output, which depends on \fBstdout\fR status\. When \fBstdout\fR \fIis Not the console\fR, it becomes the implicit output\. Otherwise, if \fBstdout\fR is the console, the implicit output is \fBfilename\.lz4\fR\.
+With a named input and no destination, compression writes \fBfilename\.lz4\fR\. Decompression removes the \fB\.lz4\fR suffix to select its output filename\. Redirecting standard output does not change this behavior\. When reading standard input, output defaults to standard output\.
 .
 .IP "\(bu" 4
-It is considered bad practice to rely on implicit output in scripts\. because the script\'s environment may change\. Always use explicit output in scripts\. \fB\-c\fR ensures that output will be \fBstdout\fR\. Conversely, providing a destination name, or using \fB\-m\fR ensures that the output will be either the specified name, or \fBfilename\.lz4\fR respectively\.
-.
-.IP "" 0
+Use \fB\-c\fR to send a named input's result to standard output, or provide an explicit destination filename\.
 .
 .P
 Default behaviors can be modified by opt\-in commands, detailed below\.
@@ -69,8 +67,8 @@ It is possible to concatenate \fB\.lz4\fR files as is\. \fBlz4\fR will decompres
 .
 .nf
 
-lz4 file1  > foo\.lz4
-lz4 file2 >> foo\.lz4
+lz4 \-c file1  > foo\.lz4
+lz4 \-c file2 >> foo\.lz4
 .
 .fi
 .
