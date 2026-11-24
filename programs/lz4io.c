@@ -3376,5 +3376,9 @@ int LZ4IO_displayCompressedFilesInfo(const char** inFileNames, size_t ifnIdx)
         }   }  /* if (g_displayLevel < 3) */
     }  /* for (; idx < ifnIdx; idx++) */
 
+    if (fflush(stdout) != 0 || ferror(stdout)) {
+        DISPLAYLEVEL(1, "Write error : cannot write file information\n");
+        return 1;
+    }
     return result;
 }
