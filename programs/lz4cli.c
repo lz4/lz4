@@ -219,11 +219,13 @@ static int usage_longhelp(const char* exeName)
     DISPLAYOUT( "          '%s', or '-' for standard output (pipe mode)\n", stdoutmark);
     DISPLAYOUT( "          '%s' to discard output (test mode) \n", NULL_OUTPUT);
     DISPLAYOUT( "[output] can be left empty. In this case, it receives the following value :\n");
-    DISPLAYOUT( "          - if stdout is not the console, then [output] = stdout \n");
-    DISPLAYOUT( "          - if stdout is console : \n");
+    DISPLAYOUT( "          - with stdin input, output to stdout \n");
+    DISPLAYOUT( "          - with a named input : \n");
     DISPLAYOUT( "               + for compression, output to filename%s \n", LZ4_EXTENSION);
     DISPLAYOUT( "               + for decompression, output to filename without '%s'\n", LZ4_EXTENSION);
     DISPLAYOUT( "                    > if input filename has no '%s' extension : error \n", LZ4_EXTENSION);
+    DISPLAYOUT( "          - redirecting stdout does not change the output filename \n");
+    DISPLAYOUT( "          - use -c to send a named input's result to stdout \n");
     DISPLAYOUT( "\n");
     DISPLAYOUT( "Compression levels : \n");
     DISPLAYOUT( "---------------------\n");
