@@ -497,11 +497,13 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
 static int LZ4IO_isSameFile(const char* srcFileName, const char* dstFileName)
 {
 #if defined(_WIN32)
-    return UTIL_sameString(srcFileName, dstFileName);   /* no inode numbers */
+    return !LZ4IO_isStdin(srcFileName) && UTIL_sameString(srcFileName, dstFileName);   /* no inode numbers */
 #else
     stat_t srcStat, dstStat;
-    return UTIL_getFileStat(srcFileName, &srcStat)
-        && UTIL_getFileStat(dstFileName, &dstStat)
+    int const srcIsFile = LZ4IO_isStdin(srcFileName)
+        ? (UTIL_fstat(UTIL_fileno(stdin), &srcStat) == 0 && UTIL_STAT_MODE_ISREG(srcStat.st_mode))
+        : UTIL_getFileStat(srcFileName, &srcStat);
+    return srcIsFile && UTIL_getFileStat(dstFileName, &dstStat)
         && (srcStat.st_dev == dstStat.st_dev) && (srcStat.st_ino == dstStat.st_ino);
 #endif
 }
@@ -528,7 +530,7 @@ LZ4IO_openDstFile(const char* dstFileName, const LZ4IO_prefs_t* const prefs, con
                             " to force-enable it, add --sparse command \n");
         }
     } else {
-        if (srcFileName != NULL && !LZ4IO_isStdin(srcFileName) && LZ4IO_isSameFile(srcFileName, dstFileName)) {
+        if (srcFileName != NULL && LZ4IO_isSameFile(srcFileName, dstFileName)) {
             DISPLAYLEVEL(1, "%s: input and output are the same file; not overwritten \n", dstFileName);
             return NULL;
         }
