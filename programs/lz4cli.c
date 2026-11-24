@@ -917,7 +917,7 @@ int main(int argCount, const char** argv)
     if (!strcmp(input_filename, stdinmark)) {
         /* if input==stdin and no output defined, stdout becomes default output */
         if (!output_filename) output_filename = stdoutmark;
-        if (contentSizeFlag){
+        if (contentSizeFlag && UTIL_getOpenFileSize(stdin) == 0) {
             DISPLAYLEVEL(2, "warning : --content-size cannot determine size when used with stdin\n");
         }
     }
