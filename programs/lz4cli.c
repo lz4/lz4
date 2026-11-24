@@ -550,7 +550,9 @@ int main(int argCount, const char** argv)
         multiple_inputs=1;
     }
     if (exeNameMatch(exeName, UNLZ4)) { mode = om_decompress; }
-    if (exeNameMatch(exeName, LZ4_LEGACY)) { g_lz4c_legacy_commands=1; }
+    if (exeNameMatch(exeName, LZ4_LEGACY) || exeNameMatch(exeName, "lz4c32")) {
+        g_lz4c_legacy_commands=1;
+    }
 
     /* command switches */
     for(argNb=1; argNb<argCount; argNb++) {
