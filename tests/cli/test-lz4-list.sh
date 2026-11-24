@@ -148,7 +148,8 @@ fails "lz4 -v --list $FPREFIX-bad.lz4" "undecodable data at position [0-9]* *$"
 fails "lz4 --list $FPREFIX-bad.lz4" "Magic Number unreadable"
 
 # Buffered list output errors must not be reported as success.
-if [ -c /dev/full ]; then
+# Restrict this device-specific assertion to Linux, where it is verified.
+if [ "$(uname)" = Linux ] && [ -c /dev/full ]; then
     fails "lz4 --list $FPREFIX-f.lz4 > /dev/full" "Write error"
     fails "lz4 -v --list $FPREFIX-f.lz4 > /dev/full" "Write error"
 fi
