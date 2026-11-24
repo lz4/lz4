@@ -89,7 +89,7 @@ jobs:
       if: matrix.test_type == 'static_lib'
       run: |
         # Build and install static library
-        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -DBUILD_STATIC_LIBS=ON -DCMAKE_INSTALL_PREFIX=$PWD/install
+        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_INSTALL_PREFIX=$PWD/install
         cmake --build build --target install
         
         # Test find_package with static library
