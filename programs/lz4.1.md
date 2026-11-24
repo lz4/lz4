@@ -226,8 +226,8 @@ only the latest one will be applied.
 * `--[no-]content-size`:
   Header includes original size (default:not present)<br/>
   Note : this option can only be activated when the original size can be
-  determined, hence for a file. It won't work with unknown source size,
-  such as stdin or pipe.
+  determined, including standard input redirected from a regular file.
+  It won't work with unknown source size, such as a pipe.
 
 * `--[no-]sparse`:
   Sparse mode support (default:enabled on file, disabled on stdout)
