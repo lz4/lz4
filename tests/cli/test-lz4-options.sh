@@ -28,6 +28,8 @@ mkdir $FPREFIX-bin   # lz4c : legacy commands, selected by the name of the teste
 LZ4=$(command -v lz4)
 cp "$LZ4" "$FPREFIX-bin/lz4c${LZ4##*/lz4}"
 LZ4C=$FPREFIX-bin/lz4c
+cp "$LZ4" "$FPREFIX-bin/lz4c32${LZ4##*/lz4}"
+LZ4C32=$FPREFIX-bin/lz4c32
 MT=0; if lz4 -V 2>&1 | grep -q "multithread"; then MT=1; fi   # otherwise, threads and memory budget are ignored
 OUT=$FPREFIX.lz4
 ERR=$FPREFIX-err
@@ -141,6 +143,10 @@ same $BIG "lz4 -0" "$LZ4C -c0"
 same $BIG "lz4 -9" "$LZ4C -c1"
 same $BIG "lz4 -12" "$LZ4C -c2" "$LZ4C -hc" "lz4 --best"
 accepted "-12 --favor-decSpeed"
+# lz4c32 selects the same legacy commands as lz4c, independently of architecture.
+same $SRC "lz4 -9" "$LZ4C32 -c1"
+same $SRC "lz4 -12" "$LZ4C32 -c2" "$LZ4C32 -hc"
+same $SRC "lz4 -0" "$LZ4C32 -c0"
 
 # existing output : overwritten only with -f, --force, lz4c's -y, or an interactive 'y'
 cp $SRC $FPREFIX-out
