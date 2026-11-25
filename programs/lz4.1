@@ -151,7 +151,7 @@ This option has several effects:
 If the target file already exists, overwrite it without prompting\.
 .
 .IP
-When writing a file, read a source which is a symbolic link, instead of refusing it (as \fBgzip\fR and \fBxz\fR do)\.
+When writing a file, read a source which is a symbolic link, instead of refusing it, as \fBgzip\fR does\.
 .
 .IP
 When used with \fB\-\-decompress\fR and \fBlz4\fR cannot recognize the type of the source file, copy the source file as is to standard output\. This allows \fBlz4cat \-\-force\fR to be used like \fBcat (1)\fR for files that have not been compressed with \fBlz4\fR\.
@@ -166,7 +166,7 @@ Multiple input files\. Compressed file names will be appended a \fB\.lz4\fR suff
 .
 .TP
 \fB\-r\fR
-operate recursively on directories\. This mode also sets \fB\-m\fR (multiple input files)\. Symbolic links found within them are not followed, even with \fB\-f\fR\.
+operate recursively on directories\. This mode also sets \fB\-m\fR (multiple input files)\. Symbolic links found within them are not followed, as \fBgzip\fR does without \fB\-f\fR, and even with \fB\-f\fR\.
 .
 .TP
 \fB\-B#\fR

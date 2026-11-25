@@ -269,7 +269,7 @@ if ln -s . $FPREFIX-rdir/loop 2>/dev/null && test -L $FPREFIX-rdir/loop && ln -s
     grep "flink is a symbolic link" $FPREFIX-rdir.err
     lz4 -t $FPREFIX-rdir/file.lz4
     test ! -f $FPREFIX-rdir/flink.lz4
-    # a source which is a symbolic link isn't read to write a file, unless -f : as gzip and xz
+    # a source which is a symbolic link isn't read to write a file, unless -f : as gzip
     lz4 $FPREFIX-rdir/flink && exit 1
     test ! -f $FPREFIX-rdir/flink.lz4
     lz4 -m $FPREFIX-rdir/flink && exit 1
