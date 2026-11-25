@@ -1634,6 +1634,11 @@ LZ4IO_compressFrame(unsigned long long* srcSizePtr, unsigned char frameTail[4],
     const size_t blockSize = io_prefs->blockSize;
     /* custom block sizes : one block per invocation (see LZ4IO_createCResources()) */
     const size_t chunkSize = LZ4IO_customBlockSize(io_prefs) ? blockSize : ress->srcBufferSize;
+    /* multi-threaded : the first chunk is read by pieces of one job, so that output starts sooner (latency in pipelines).
+     * A job starts once full, and remains read in place when memory-mapped ; output doesn't depend on it.
+     * A job holds at least one block : single-block input is still detected.
+     * Not in single-threaded mode, where output of linked blocks depends on the size of each invocation (see BMK_compressFrame()) */
+    const size_t firstPiece = prefs.nbWorkers ? MIN(chunkSize, LZ4IO_jobSize(&prefs)) : chunkSize;
     /* memory-mapped input is released (only a memory hint) behind input still read by liblz4 :
      * up to 2*nbWorkers+1 jobs in flight (see LZ4F_MT_NBSLOTS() in lz4frame.c), and the 64 KB of history before them */
     size_t const releaseLag = (2 * (size_t)prefs.nbWorkers + 1) * LZ4IO_jobSize(&prefs) + 64 KB;
@@ -1648,7 +1653,7 @@ LZ4IO_compressFrame(unsigned long long* srcSizePtr, unsigned char frameTail[4],
     cOpts.stableSrc = (input->map && prefs.nbWorkers) ? LZ4F_srcStableUntilFlush : LZ4F_srcUnstable;
 
     /* read first chunk */
-    readSize  = LZ4IO_readInput(input, chunkSize, &chunk);
+    readSize  = LZ4IO_readInput(input, firstPiece, &chunk);
     if (ferror(input->file)) END_PROCESS(40, "Error reading %s ", srcFileName);
     filesize += readSize;
 
@@ -1696,7 +1701,7 @@ LZ4IO_compressFrame(unsigned long long* srcSizePtr, unsigned char frameTail[4],
 
             /* Read next chunk */
             LZ4IO_releaseInput(input, releaseLag);
-            readSize  = LZ4IO_readInput(input, chunkSize, &chunk);
+            readSize  = LZ4IO_readInput(input, (filesize < chunkSize) ? firstPiece : chunkSize, &chunk);
             filesize += readSize;
         }
         if (ferror(input->file)) END_PROCESS(47, "Error reading %s ", srcFileName);
