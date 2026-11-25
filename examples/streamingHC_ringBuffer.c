@@ -226,6 +226,7 @@ int main(int argc, const char** argv)
 
         fclose(decFp);
         fclose(inpFp);
+        if (cmp != 0) return 1;
     }
 
     if (pause) {
