@@ -946,6 +946,62 @@ static void ao_free(void* p)
     free(b);
 }
 
+/* The length extension fits, but adding MINMATCH changes the end address.
+ * Exercise both decoding loops, with and without an external dictionary. */
+TEST(decompress_safe_matchLengthEnd)
+{
+    int const capacities[] = { 32, 256 };
+    char const dict[64] = { 0 };
+    unsigned char sentinel[16];
+    char* allocation;
+    char* dst;
+    unsigned char* block;
+    uintptr_t maxLength;
+    unsigned endpoint, c;
+    if (sizeof(void*) != 4) return;
+
+    /* A large allocation is more likely to reach the upper address range.
+     * Some 32-bit address-space layouts cannot reach it. */
+    allocation = (char*)UT_defer(free, malloc(AO_BUFFER_SIZE));
+    if (allocation == NULL) return;
+    dst = allocation + AO_BUFFER_SIZE - 256 - sizeof(sentinel);
+    maxLength = (uintptr_t)-1 - (uintptr_t)(dst + 8);
+    if (maxLength < 18 || maxLength - 15 > (uintptr_t)INT_MAX) return;
+    block = (unsigned char*)UT_malloc(18 + (size_t)(maxLength - 15) / 255);
+    memset(sentinel, 0xA5, sizeof(sentinel));
+
+    for (endpoint = 0; endpoint < 4; endpoint++) {
+        size_t const extension = (size_t)(maxLength - endpoint - 15);
+        size_t const nb255 = extension / 255;
+        int const cSize = (int)(18 + nb255);
+        block[0] = 0x8F;
+        memcpy(block + 1, "ABCDEFGH", 8);
+        block[10] = 0;
+        memset(block + 11, 255, nb255);
+        block[11 + nb255] = (unsigned char)(extension % 255);
+        block[12 + nb255] = 0x50;
+        memcpy(block + 13 + nb255, "12345", 5);
+
+        for (c = 0; c < ARRAY_SIZE(capacities); c++) {
+            int const capacity = capacities[c];
+            LZ4_streamDecode_t stream;
+            int consumed = cSize;
+            memset(dst, 0xA5, (size_t)capacity + sizeof(sentinel));
+            block[9] = 8;
+            ASSERT_EQ(LZ4_decompress_safe((const char*)block, dst, cSize, capacity), -1);
+            ASSERT_EQ(LZ4_decompress_safe_partial((const char*)block, dst, cSize, capacity, capacity), -1);
+            block[9] = 32;   /* the match starts in the external dictionary */
+            ASSERT_EQ(LZ4_decompress_safe_usingDict((const char*)block, dst, cSize, capacity, dict, sizeof(dict)), -1);
+            ASSERT_EQ(LZ4_decompress_safe_partial_usingDict((const char*)block, dst, cSize, capacity, capacity, dict, sizeof(dict)), -1);
+            ASSERT(LZ4_setStreamDecode(&stream, dict, sizeof(dict)));
+            ASSERT_EQ(LZ4_decompress_safe_continue(&stream, (const char*)block, dst, cSize, capacity), -1);
+            ASSERT_EQ(LZ4_decompress_incomplete((const char*)block, dst, &consumed, capacity, dict, sizeof(dict)), 0);
+            ASSERT_EQ(consumed, 0);
+            ASSERT_MEMEQ(dst + capacity, sentinel, sizeof(sentinel));
+        }
+    }
+}
+
 /* Aggressively pushes memory allocation limits,
  * and generates patterns which create address space overflow.
  * Only possible in 32-bit mode */
