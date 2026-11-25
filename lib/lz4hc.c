@@ -1857,15 +1857,15 @@ int LZ4_compress_HC_continue_destSize (LZ4_streamHC_t* LZ4_streamHCPtr, const ch
 int LZ4_saveDictHC (LZ4_streamHC_t* LZ4_streamHCPtr, char* safeBuffer, int dictSize)
 {
     LZ4HC_CCtx_internal* const streamPtr = &LZ4_streamHCPtr->internal_donotuse;
-    int const prefixSize = (int)(streamPtr->end - streamPtr->prefixStart);
+    size_t const prefixSize = (size_t)(streamPtr->end - streamPtr->prefixStart);   /* can exceed INT_MAX */
     DEBUGLOG(5, "LZ4_saveDictHC(%p, %p, %d)", LZ4_streamHCPtr, safeBuffer, dictSize);
     /* nothing compressed yet (new or reset stream) : nothing to save,
      * the stream remains to be initialized by next compression (attached dictionary included) */
     if (streamPtr->prefixStart == NULL) return 0;
-    assert(prefixSize >= 0);
+    assert(streamPtr->end >= streamPtr->prefixStart);
     if (dictSize > 64 KB) dictSize = 64 KB;
     if (dictSize < 4) dictSize = 0;
-    if (dictSize > prefixSize) dictSize = prefixSize;
+    if ((size_t)dictSize > prefixSize) dictSize = (int)prefixSize;   /* 0 <= dictSize <= 64 KB : prefixSize fits */
     if (safeBuffer == NULL) assert(dictSize == 0); /* a NULL buffer with !0 size is invalid */
     if (dictSize > 0)
         LZ4_memmove(safeBuffer, streamPtr->end - dictSize, (size_t)dictSize);
