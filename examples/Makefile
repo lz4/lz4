@@ -87,6 +87,9 @@ test : all $(LZ4)
 	./streamingHC_ringBuffer$(EXT) $(TESTFILE)
 	@echo "\n=== Compress line by line ==="
 	./blockStreaming_lineByLine$(EXT) $(TESTFILE)
+	printf 'prefix\000suffix\n' > tmp-line-verification
+	rc=0; ./blockStreaming_lineByLine$(EXT) tmp-line-verification || rc=$$?; test $$rc -eq 1
+	$(RM) tmp-line-verification tmp-line-verification.lz4s tmp-line-verification.lz4s.dec
 	@echo "\n=== Dictionary Random Access ==="
 	./dictionaryRandomAccess$(EXT) $(TESTFILE) $(TESTFILE) 1100 1400
 	./dictionaryRandomAccess$(EXT) $(TESTFILE_SMALL) $(TESTFILE_SMALL) 0 32
