@@ -521,6 +521,7 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
  *                       and returns a new list of files (params: return value, allocatedBuffer, allocatedNamesNb).
  * After finishing usage of the list the structures should be freed with UTIL_freeFileList(params: return value, allocatedBuffer)
  * In case of error UTIL_createFileList returns NULL and UTIL_freeFileList should not be called.
+ * A successful scan that finds no file returns an empty list, with *allocatedNamesNb == 0.
  */
 UTIL_STATIC const char**
 UTIL_createFileList(const char** inputNames, unsigned inputNamesNb,
@@ -553,8 +554,6 @@ UTIL_createFileList(const char** inputNames, unsigned inputNamesNb,
             assert(bufend > buf);
             bufSize = (size_t)(bufend - buf);
     }   }
-
-    if (nbFiles == 0) { free(buf); return NULL; }
 
     fileTable = (const char**)malloc(((size_t)nbFiles+1) * sizeof(const char*));
     if (!fileTable) { free(buf); return NULL; }

@@ -260,6 +260,11 @@ case "$(uname)" in MINGW*|MSYS*|CYGWIN*)
     lz4 -q -t -m $FPREFIX-rattr/fR.lz4 $FPREFIX-rattr/fH.lz4 $FPREFIX-rattr/fS.lz4
     ;;
 esac
+# -r : a directory without any file is not an error
+mkdir $FPREFIX-rempty
+lz4 -q -r $FPREFIX-rempty
+mkdir -p $FPREFIX-rempty/sub
+lz4 -q -r $FPREFIX-rempty
 # -r doesn't follow symbolic links to directories : this one leads back to the listed directory
 mkdir $FPREFIX-rdir
 echo "hello world" > $FPREFIX-rdir/file
