@@ -2364,7 +2364,7 @@ LZ4_decompress_generic(
                 }
                 ml += addl;
                 DEBUGLOG(7, "  long match length == %u", (unsigned)ml + MINMATCH);
-                if (unlikely((uptrval)(op)+ml<(uptrval)op)) { goto _output_error; } /* overflow detection */
+                if (unlikely((uptrval)(op)+ml+MINMATCH<(uptrval)op)) { goto _output_error; } /* overflow detection */
             }
             ml += MINMATCH;
 
@@ -2534,7 +2534,7 @@ LZ4_decompress_generic(
                 size_t const addl = read_variable_length(&ip, iend - (1 + LASTLITERALS));
                 if (addl == rvl_error) { goto _output_error; }
                 ml += addl;
-                if (unlikely((uptrval)(op)+ml<(uptrval)op)) goto _output_error;   /* overflow detection */
+                if (unlikely((uptrval)(op)+ml+MINMATCH<(uptrval)op)) goto _output_error;   /* overflow detection */
             }
             ml += MINMATCH;
 
