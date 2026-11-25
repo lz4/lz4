@@ -181,7 +181,7 @@ only the latest one will be applied.
   If the target file already exists, overwrite it without prompting.
 
   When writing a file, read a source which is a symbolic link,
-  instead of refusing it (as `gzip` and `xz` do).
+  instead of refusing it, as `gzip` does.
 
   When used with `--decompress` and `lz4` cannot recognize the type of
   the source file, copy the source file as is to standard output.
@@ -202,7 +202,8 @@ only the latest one will be applied.
 * `-r` :
   operate recursively on directories.
   This mode also sets `-m` (multiple input files).
-  Symbolic links found within them are not followed, even with `-f`.
+  Symbolic links found within them are not followed, as `gzip` does without `-f`,
+  and even with `-f`.
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>

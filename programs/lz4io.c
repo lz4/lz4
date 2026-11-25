@@ -478,7 +478,7 @@ static int LZ4IO_isSkippableMagicNumber(unsigned int magic) {
 
 
 /* @return : 1 if a source reached through a symbolic link can be read to produce @dstFileName :
- * when no file is written (stdout, /dev/null), or with --force, as gzip and xz do */
+ * when no file is written (stdout, /dev/null), or with --force, as gzip does */
 static int LZ4IO_followSrcLink(const char* dstFileName, const LZ4IO_prefs_t* prefs)
 {
     return prefs->followLinks || LZ4IO_isStdout(dstFileName) || LZ4IO_isDevNull(dstFileName);
