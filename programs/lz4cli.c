@@ -866,7 +866,10 @@ int main(int argCount, const char** argv)
                 free((void*)inFileNames);
                 inFileNames = extendedFileList;
                 ifnIdx = fileNamesNb;
-        }   }
+                if (ifnIdx == 0) {  /* only empty directories : nothing to do */
+                    operationResult = 0;
+                    goto _cleanup;
+        }   }   }
 #endif
     }
 
