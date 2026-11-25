@@ -144,7 +144,7 @@ static int usage(FILE* f, const char* exeName)
     fprintf(f, " -T#    : use # worker threads for compression (default:%i==auto) \n", LZ4_NBWORKERS_DEFAULT);
 #endif
     fprintf(f, " -d     : decompression (default for %s extension)\n", LZ4_EXTENSION);
-    fprintf(f, " -f     : overwrite output without prompting \n");
+    fprintf(f, " -f     : overwrite output without prompting, follow input links \n");
     fprintf(f, " -k     : preserve source files(s)  (default) \n");
     fprintf(f, "--rm    : remove source file(s) after successful de/compression \n");
     fprintf(f, " -h/-H  : display help/long help and exit \n");
@@ -579,8 +579,8 @@ int main(int argCount, const char** argv)
                   }
                 if (!strcmp(argument,  "--multiple")) { multiple_inputs = 1; continue; }
                 if (!strcmp(argument,  "--test")) { mode = om_test; multiple_inputs = 1; continue; }
-                if (!strcmp(argument,  "--force")) { forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); continue; }
-                if (!strcmp(argument,  "--no-force")) { forceOverwrite=0; LZ4IO_setOverwrite(prefs, 0); continue; }
+                if (!strcmp(argument,  "--force")) { forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); LZ4IO_setFollowLinks(prefs, 1); continue; }
+                if (!strcmp(argument,  "--no-force")) { forceOverwrite=0; LZ4IO_setOverwrite(prefs, 0); LZ4IO_setFollowLinks(prefs, 0); continue; }
                 if ((!strcmp(argument, "--stdout"))
                     || (!strcmp(argument, "--to-stdout"))) {
                     forceStdout=1;
@@ -727,7 +727,7 @@ int main(int argCount, const char** argv)
                 case 't': mode = om_test; multiple_inputs=1; break;
 
                     /* Overwrite */
-                case 'f': forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); break;
+                case 'f': forceOverwrite=1; LZ4IO_setOverwrite(prefs, 1); LZ4IO_setFollowLinks(prefs, 1); break;
 
                     /* Verbose mode */
                 case 'v': displayLevel++; break;

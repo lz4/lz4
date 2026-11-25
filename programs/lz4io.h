@@ -104,6 +104,10 @@ int LZ4IO_setPassThrough(LZ4IO_prefs_t* const prefs, int yes);
    return : overwrite mode (0/1) */
 int LZ4IO_setOverwrite(LZ4IO_prefs_t* const prefs, int yes);
 
+/* Default setting : followLinks = 0 : when writing a file, a source which is a symbolic link is refused ;
+   return : followLinks mode (0/1) */
+int LZ4IO_setFollowLinks(LZ4IO_prefs_t* const prefs, int yes);
+
 /* Default setting : testMode = 0;
    return : testMode (0/1) */
 int LZ4IO_setTestMode(LZ4IO_prefs_t* const prefs, int yes);

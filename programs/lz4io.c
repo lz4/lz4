@@ -244,6 +244,7 @@ int LZ4IO_defaultNbWorkers(void)
 struct LZ4IO_prefs_s {
     int passThrough;
     int overwrite;
+    int followLinks;   /* --force : a source reached through a symbolic link is read even when writing a file */
     int testMode;
     int blockSizeId;
     size_t blockSize;
@@ -275,6 +276,7 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     if (!prefs) END_PROCESS(11, "Can't even allocate LZ4IO preferences");
     prefs->passThrough = 0;
     prefs->overwrite = 1;
+    prefs->followLinks = 0;
     prefs->testMode = 0;
     LZ4IO_setBlockSizeID(prefs, LZ4IO_BLOCKSIZEID_DEFAULT);
     prefs->blockChecksum = 0;
@@ -334,6 +336,13 @@ int LZ4IO_setOverwrite(LZ4IO_prefs_t* const prefs, int yes)
 {
    prefs->overwrite = (yes!=0);
    return prefs->overwrite;
+}
+
+/* Default setting : followLinks = 0; return : followLinks mode (0/1) */
+int LZ4IO_setFollowLinks(LZ4IO_prefs_t* const prefs, int yes)
+{
+   prefs->followLinks = (yes!=0);
+   return prefs->followLinks;
 }
 
 /* Default setting : testMode = 0; return : testMode (0/1) */
@@ -468,10 +477,18 @@ static int LZ4IO_isSkippableMagicNumber(unsigned int magic) {
 }
 
 
+/* @return : 1 if a source reached through a symbolic link can be read to produce @dstFileName :
+ * when no file is written (stdout, /dev/null), or with --force, as gzip and xz do */
+static int LZ4IO_followSrcLink(const char* dstFileName, const LZ4IO_prefs_t* prefs)
+{
+    return prefs->followLinks || LZ4IO_isStdout(dstFileName) || LZ4IO_isDevNull(dstFileName);
+}
+
 /** LZ4IO_openSrcFile() :
  * condition : `srcFileName` must be non-NULL.
- * @result : FILE* to `dstFileName`, or NULL if it fails */
-static FILE* LZ4IO_openSrcFile(const char* srcFileName)
+ * @followLink : 0 refuses a `srcFileName` which is a symbolic link
+ * @result : FILE* to `srcFileName`, or NULL if it fails */
+static FILE* LZ4IO_openSrcFile(const char* srcFileName, int followLink)
 {
     FILE* f;
 
@@ -487,6 +504,23 @@ static FILE* LZ4IO_openSrcFile(const char* srcFileName)
         return NULL;
     }
 
+#if (PLATFORM_POSIX_VERSION >= 1) && defined(O_NOFOLLOW)
+    if (!followLink) {   /* checked by open() itself : the file can't be replaced by a link in between */
+        int const fd = open(srcFileName, O_RDONLY | O_NOFOLLOW);
+        f = (fd < 0) ? NULL : fdopen(fd, "rb");
+        if (f == NULL) {
+            int const err = errno;
+            if (fd >= 0) close(fd);
+            if (UTIL_isLink(srcFileName)) {
+                DISPLAYLEVEL(1, "lz4: %s is a symbolic link -- ignored (-f to follow it) \n", srcFileName);
+            } else {
+                DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(err));
+        }   }
+        return f;
+    }
+#else
+    (void)followLink;
+#endif
     f = fopen(srcFileName, "rb");
     if (f==NULL) DISPLAYLEVEL(1, "%s: %s \n", srcFileName, strerror(errno));
     return f;
@@ -1073,7 +1107,7 @@ static int LZ4IO_compressLegacy_internal(unsigned long long* readSize,
 {
     int clResult = 0;
     compress_f const compressionFunction = (compressionlevel < LZ4HC_CLEVEL_MIN) ? LZ4IO_compressBlockLegacy_fast : LZ4IO_compressBlockLegacy_HC;
-    FILE* const finput = LZ4IO_openSrcFile(input_filename);
+    FILE* const finput = LZ4IO_openSrcFile(input_filename, LZ4IO_followSrcLink(output_filename, prefs));
     FILE* foutput = NULL;
     TPool* tPool = NULL;
     TPool* const wPool = TPool_create(1, 4);
@@ -1272,7 +1306,7 @@ static void* LZ4IO_createDict(size_t* dictSize, const char* dictFilename)
     if (!circularBuf)
         END_PROCESS(25, "Allocation error : not enough memory for circular buffer");
 
-    dictFile = LZ4IO_openSrcFile(dictFilename);
+    dictFile = LZ4IO_openSrcFile(dictFilename, 1);
     if (!dictFile)
         END_PROCESS(27, "Dictionary error : could not open dictionary file");
 
@@ -1742,7 +1776,7 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
     LZ4IO_srcState_t srcState;
     unsigned char frameTail[4];    /* last bytes of the frame (content checksum) */
     FILE* dstFile;
-    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName);
+    FILE* const srcFile = LZ4IO_openSrcFile(srcFileName, LZ4IO_followSrcLink(dstFileName, io_prefs));
     *inStreamSize = 0;
     if (srcFile == NULL) return 1;
     srcState = LZ4IO_getSrcState(srcFile);
@@ -2922,7 +2956,7 @@ LZ4IO_decompressSrcFile(unsigned long long* outGenSize,
 
     /* Open the source first : a source that can't be opened must leave the
      * destination untouched, as compression does (LZ4IO_compressFilename_extRess) */
-    FILE* const finput = LZ4IO_openSrcFile(input_filename);
+    FILE* const finput = LZ4IO_openSrcFile(input_filename, LZ4IO_followSrcLink(output_filename, prefs));
     if (finput==NULL) return 1;
     if (dstShared) {
         foutput = ress.dstFile;   /* shared destination (stdout, /dev/null) : already open */
@@ -3195,7 +3229,7 @@ LZ4IO_getCompressedFileInfo(LZ4IO_cFileInfo_t* cfinfo, const char* input_filenam
 {
     LZ4IO_infoResult result = LZ4IO_format_not_known;  /* default result (error) */
     unsigned char buffer[LZ4F_HEADER_SIZE_MAX];
-    FILE* const finput = LZ4IO_openSrcFile(input_filename);
+    FILE* const finput = LZ4IO_openSrcFile(input_filename, 1);
 
     if (finput == NULL) return LZ4IO_not_a_file;
     cfinfo->fileSize = UTIL_getOpenFileSize(finput);

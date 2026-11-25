@@ -180,6 +180,9 @@ only the latest one will be applied.
 
   If the target file already exists, overwrite it without prompting.
 
+  When writing a file, read a source which is a symbolic link,
+  instead of refusing it (as `gzip` and `xz` do).
+
   When used with `--decompress` and `lz4` cannot recognize the type of
   the source file, copy the source file as is to standard output.
   This allows `lz4cat --force` to be used like `cat (1)` for files
@@ -199,7 +202,7 @@ only the latest one will be applied.
 * `-r` :
   operate recursively on directories.
   This mode also sets `-m` (multiple input files).
-  Symbolic links to directories found within them are not followed.
+  Symbolic links found within them are not followed, even with `-f`.
 
 * `-B#`:
   Block size \[4-7\](default : 7)<br/>

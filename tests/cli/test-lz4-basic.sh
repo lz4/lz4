@@ -260,11 +260,31 @@ case "$(uname)" in MINGW*|MSYS*|CYGWIN*)
     lz4 -q -t -m $FPREFIX-rattr/fR.lz4 $FPREFIX-rattr/fH.lz4 $FPREFIX-rattr/fS.lz4
     ;;
 esac
-# -r doesn't follow symbolic links to directories : this one leads back to the listed directory
+# -r doesn't follow symbolic links : one leads back to the listed directory, the other to a file
 mkdir $FPREFIX-rdir
 echo "hello world" > $FPREFIX-rdir/file
-if ln -s . $FPREFIX-rdir/loop 2>/dev/null && test -L $FPREFIX-rdir/loop; then
+if ln -s . $FPREFIX-rdir/loop 2>/dev/null && test -L $FPREFIX-rdir/loop && ln -s file $FPREFIX-rdir/flink; then
     lz4 -r $FPREFIX-rdir 2> $FPREFIX-rdir.err
-    grep "symbolic link" $FPREFIX-rdir.err
+    grep "loop is a symbolic link" $FPREFIX-rdir.err
+    grep "flink is a symbolic link" $FPREFIX-rdir.err
     lz4 -t $FPREFIX-rdir/file.lz4
+    test ! -f $FPREFIX-rdir/flink.lz4
+    # a source which is a symbolic link isn't read to write a file, unless -f : as gzip and xz
+    lz4 $FPREFIX-rdir/flink && exit 1
+    test ! -f $FPREFIX-rdir/flink.lz4
+    lz4 -m $FPREFIX-rdir/flink && exit 1
+    lz4 $FPREFIX-rdir/flink $FPREFIX-rdir.out.lz4 && exit 1
+    test ! -f $FPREFIX-rdir.out.lz4
+    lz4 -c $FPREFIX-rdir/flink | lz4 -d -c | cmp $FPREFIX-rdir/file -
+    lz4 -f --rm $FPREFIX-rdir/flink
+    test ! -e $FPREFIX-rdir/flink    # the link is removed
+    lz4 -d -c $FPREFIX-rdir/flink.lz4 | cmp $FPREFIX-rdir/file -
+    ln -s file.lz4 $FPREFIX-rdir/clink.lz4
+    lz4 -d $FPREFIX-rdir/clink.lz4 && exit 1
+    test ! -f $FPREFIX-rdir/clink
+    lz4cat $FPREFIX-rdir/clink.lz4 | cmp $FPREFIX-rdir/file -
+    lz4 -t $FPREFIX-rdir/clink.lz4
+    lz4 --list $FPREFIX-rdir/clink.lz4
+    lz4 -d -f $FPREFIX-rdir/clink.lz4
+    cmp $FPREFIX-rdir/clink $FPREFIX-rdir/file
 fi

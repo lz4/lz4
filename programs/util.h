@@ -334,6 +334,18 @@ UTIL_STATIC int UTIL_isDirectory(const char* infilename)
 #endif
 }
 
+/* @return : 1 if @path is a symbolic link (not followed), 0 otherwise or if unknown */
+UTIL_STATIC int UTIL_isLink(const char* path)
+{
+#if PLATFORM_POSIX_VERSION >= 1
+    struct stat linkStat;
+    return (lstat(path, &linkStat) == 0) && S_ISLNK(linkStat.st_mode);
+#else
+    (void)path;
+    return 0;
+#endif
+}
+
 
 UTIL_STATIC U64 UTIL_getOpenFileSize(FILE* file)
 {
@@ -470,15 +482,12 @@ UTIL_STATIC int UTIL_prepareFileList(const char* dirName, char** bufStart, size_
         pathLength = dirLength+1+fnameLength;
         path[pathLength] = 0;
 
-        if (UTIL_isDirectory(path)) {
-            struct stat linkStat;
-            if (lstat(path, &linkStat) == 0 && S_ISLNK(linkStat.st_mode)) {
-                /* not followed : it may lead back to a directory being listed */
-                fprintf(stderr, "Warning : %s is a symbolic link to a directory, ignoring\n", path);
-            } else {
-                nbFiles += UTIL_prepareFileList(path, bufStart, pos, bufEnd);  /* Recursively call "UTIL_prepareFileList" with the new path. */
-                if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
-            }
+        if (UTIL_isLink(path)) {
+            /* not followed : it may lead outside of the listed directory, or back to one being listed */
+            fprintf(stderr, "Warning : %s is a symbolic link, ignoring\n", path);
+        } else if (UTIL_isDirectory(path)) {
+            nbFiles += UTIL_prepareFileList(path, bufStart, pos, bufEnd);  /* Recursively call "UTIL_prepareFileList" with the new path. */
+            if (*bufStart == NULL) { free(path); closedir(dir); return 0; }
         } else {
             if (*bufStart + *pos + pathLength >= *bufEnd) {
                 size_t const newListSize = (size_t)(*bufEnd - *bufStart) + LIST_SIZE_INCREASE;
