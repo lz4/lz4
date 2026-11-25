@@ -377,6 +377,9 @@ int compareFiles(FILE* fp0, FILE* fp1, FILE* fpUnc, long uncOffset)
         bytesRead += r1;
     }
 
+    /* The decoded file must end with the expected content, not just share its prefix. */
+    if (result == 0 && fgetc(fp1) != EOF) result = 1;
+
     return result;
 }
 
