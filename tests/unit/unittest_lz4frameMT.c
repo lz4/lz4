@@ -63,7 +63,7 @@ TEST(getMaxNbWorkers)
 TEST(compressBound_jobs)
 {
     static const unsigned nbWorkersList[] = { 1, 8 };
-    size_t const jobSize = 1 MB;   /* 64 KB blocks */
+    size_t const jobSize = 512 KB;   /* 64 KB blocks */
     size_t wi;
     for (wi = 0; wi < ARRAY_SIZE(nbWorkersList); wi++) {
         LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
@@ -90,7 +90,7 @@ TEST(autoFlush_emitsAllInput)
 {
     static const unsigned nbWorkersList[] = { 0, 2 };
     size_t const srcSize = 3 MB + 77;
-    size_t const sliceSize = 300 KB + 5;   /* jobs (1 MB) are not completed by a single invocation */
+    size_t const sliceSize = 300 KB + 5;   /* jobs (512 KB) are not completed by a single invocation */
     const char* const src = (const char*)UT_sample(srcSize);
     char* const decoded = (char*)UT_malloc(srcSize);
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(srcSize, NULL);
@@ -697,7 +697,7 @@ TEST(flush_partial)
 TEST(compressUpdate_deferredEmission)
 {
     static const unsigned nbWorkersList[] = { 1, 3 };
-    size_t const jobSize = 1 MB;   /* a single job (64 KB blocks), submitted once full */
+    size_t const jobSize = 512 KB;   /* a single job (64 KB blocks), submitted once full */
     size_t const smallCapacity = 1 KB;
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(jobSize, NULL);
     const char* const src = (const char*)UT_sample(jobSize);
