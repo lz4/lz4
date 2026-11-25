@@ -758,5 +758,9 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
     }
 
     free(dictBuf);
+    if (fflush(stdout) != 0 || ferror(stdout)) {
+        DISPLAYLEVEL(1, "Error writing benchmark output\n");
+        benchError = 1;
+    }
     return benchError;
 }
