@@ -212,7 +212,8 @@ decompress_file_internal(FILE* f_in, FILE* f_out,
 
     assert(f_in != NULL); assert(f_out != NULL);
     assert(dctx != NULL);
-    assert(src != NULL); assert(srcCapacity > 0); assert(filled <= srcCapacity); assert(alreadyConsumed <= filled);
+    assert(src != NULL); assert(srcCapacity > 0);
+    assert(alreadyConsumed <= srcCapacity); assert(filled <= srcCapacity - alreadyConsumed);
     assert(dst != NULL); assert(dstCapacity > 0);
 
     /* Decompression */
