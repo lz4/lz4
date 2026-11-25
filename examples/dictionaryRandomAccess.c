@@ -287,6 +287,7 @@ int main(int argc, char* argv[])
 
         fclose(decFp);
         fclose(inpFp);
+        if (cmp != 0) return 1;
     }
 
     return 0;
