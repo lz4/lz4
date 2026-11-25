@@ -235,7 +235,7 @@ typedef struct {
  *  - Output only depends on content, parameters and flush points :
  *    never on nbWorkers value (>= 1), scheduling, input slicing, nor stableSrc.
  *  - With independent blocks, output is identical to nbWorkers == 0.
- *  - Jobs are 1 MB (whole nb of blocks), or a single block when larger.
+ *  - Jobs are 512 KB (whole nb of blocks), or a single block when larger.
  *    With linked blocks, each job restarts with previous 64 KB as dictionary :
  *    output can differ (slightly) from nbWorkers == 0.
  *  - Streaming (LZ4F_compressUpdate()) : output lags behind input,

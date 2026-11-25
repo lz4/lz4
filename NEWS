@@ -12,6 +12,7 @@ perf : faster content checksums in gcc builds for x86-64 without SSE4.1, the def
 perf : faster `lz4 -d` and `lz4 -t` on frames with a content checksum (the default) : verified by a dedicated thread, up to +39% on silesia
 perf : lower latency of `lz4 -d` on slow inputs : the first block of a frame is decoded as it arrives (first byte at 1 Gb/s : 40 ms -> 3 ms)
 perf : faster multi-threaded compression with a content checksum (the default) : hashed by a dedicated thread, up to +40% at fast levels
+perf : multi-threaded compression with 64 KB and 256 KB blocks : jobs of 512 KB (was 1 MB) : inputs of 0.5 to 1 MB up to x1.9 faster, earlier output, half the memory (linked blocks : output changes)
 api  : `LZ4F_setProgressiveDecoding()` (static) : `LZ4F_decompress()` outputs the first block of each frame as it arrives
 api  : `LZ4_decompress_incomplete()` (static) : decodes the beginning of a block, before the rest is available
 api  : `LZ4F_decompressOptions_t.skipChecksums` can skip only block checksums, or only the content checksum (`LZ4F_skipChecksums_t`)
