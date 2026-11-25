@@ -2379,6 +2379,7 @@ typedef struct {
     int sparseEnable;
     unsigned* storedSkips;
     unsigned long long* totalSize;
+    int ownsBuffer;   /* bufOut.ptr is not from the pool */
 } LZ4FChunkToWrite;
 
 static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
@@ -2394,7 +2395,8 @@ static void LZ4IO_writeDecodedLZ4FChunk(void* arg)
     }
 
     /* clean up */
-    BufPool_releaseBuffer(ctw->bp, ctw->bufOut);
+    if (ctw->ownsBuffer) free(ctw->bufOut.ptr);
+    else BufPool_releaseBuffer(ctw->bp, ctw->bufOut);
     free(ctw);
 }
 
@@ -2441,6 +2443,15 @@ typedef struct {
     unsigned char tail[4];  /* last 4 bytes consumed : content checksum, at end of frame */
     TPool* hPool;           /* hashing thread, created for the first hashed frame of more than 1 buffer, then receives every buffer */
     XXH32_state_t* xxh;     /* employed by the hashing thread, or by the decoding thread while there is none */
+    /* concatenated streams: a legacy stream can follow an LZ4 frame */
+    int betweenStreams;             /* the next bytes are a stream magic number */
+    int legacy;                     /* decoding a legacy stream */
+    unsigned char magic[4];         /* stream magic number collected so far */
+    size_t magicSize;
+    unsigned char legacyHeader[4];  /* legacy block size collected so far */
+    size_t legacyFill;              /* bytes collected for the header, or for the block payload */
+    unsigned char* legacyBlock;     /* compressed legacy block being assembled */
+    size_t legacyBlockSize;         /* 0 : the block header is expected */
 } LZ4IO_frameCheck_t;
 
 /* once the header of current frame is decoded : is the frame hashed ? */
@@ -2474,82 +2485,231 @@ typedef struct {
     LZ4IO_frameCheck_t* fc;
 } LZ4FChunk;
 
+/* A legacy block is decoded into its own buffer, which the writing thread frees. */
+static int
+LZ4IO_submitLegacyBlock(LZ4FChunk* const lz4fc, const unsigned char* const block,
+                        size_t const blockSize)
+{
+    LZ4FChunkToWrite* ctw;
+    unsigned char* const out = (unsigned char*)malloc(LEGACY_BLOCKSIZE);
+    int const decodedSize = out == NULL ? -1 :
+        LZ4_decompress_safe((const char*)block, (char*)out, (int)blockSize, LEGACY_BLOCKSIZE);
+    if (decodedSize < 0) {
+        free(out);
+        JOB_ERROR(64, "Decoding Failed ! Corrupted input detected !");
+        return 0;
+    }
+
+    ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
+    if (ctw == NULL) {
+        free(out);
+        JOB_ERROR(33, "Allocation error : can't describe new write job");
+        return 0;
+    }
+    memset(ctw, 0, sizeof(*ctw));
+    ctw->bufOut.ptr = out;
+    ctw->bufOut.capacity = LEGACY_BLOCKSIZE;
+    ctw->bufOut.size = (size_t)decodedSize;
+    ctw->fOut = lz4fc->foutput;
+    ctw->sparseEnable = lz4fc->sparseEnable;
+    ctw->storedSkips = lz4fc->storedSkips;
+    ctw->totalSize = lz4fc->totalSize;
+    ctw->ownsBuffer = 1;
+    TPool_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
+    return 1;
+}
+
+/* Feed a stream magic number to LZ4F, as done for the first frame when the decoder is set up. */
+static int
+LZ4IO_feedLZ4FMagic(LZ4FChunk* const lz4fc, unsigned const magic)
+{
+    unsigned char m[4];
+    unsigned char dummy[1];
+    size_t inSize = sizeof(m);
+    size_t outSize = 0;
+    size_t status;
+
+    LZ4IO_writeLE32(m, magic);
+    status = LZ4F_decompress_usingDict(lz4fc->dctx, dummy, &outSize, m, &inSize,
+                                       lz4fc->dictBuffer, lz4fc->dictBufferSize, NULL);
+    if (LZ4F_isError(status)) {
+        JOB_ERROR(34, "Decompression error : %s", LZ4F_getErrorName(status));
+        return 0;
+    }
+    if (inSize != sizeof(m) || outSize != 0) {
+        JOB_ERROR(34, "Decompression error : unexpected frame header");
+        return 0;
+    }
+    *lz4fc->lastStatus = status;
+    return 1;
+}
+
+/* Decode the legacy stream which follows the last LZ4 frame.
+ * The block header and payload can be split between input buffers. */
+static int
+LZ4IO_decodeLegacyChunk(LZ4FChunk* const lz4fc, size_t* const posPtr)
+{
+    LZ4IO_frameCheck_t* const fc = lz4fc->fc;
+    const char* const inPtr = (const char*)lz4fc->inBuffer;
+    size_t const inSize = lz4fc->inSize;
+    size_t pos = *posPtr;
+
+    while (pos < inSize) {
+        size_t const avail = inSize - pos;
+
+        if (fc->legacyBlockSize == 0) {   /* block header */
+            size_t const need = 4 - fc->legacyFill;
+            size_t const take = need < avail ? need : avail;
+            memcpy(fc->legacyHeader + fc->legacyFill, inPtr + pos, take);
+            fc->legacyFill += take;
+            pos += take;
+            if (fc->legacyFill < 4) break;
+            {   unsigned const blockSize = LZ4IO_readLE32(fc->legacyHeader);
+                fc->legacyFill = 0;
+                if (blockSize == 0 || blockSize > LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE)) {
+                    /* end of the legacy stream : a new stream magic number follows */
+                    fc->legacy = 0;
+                    fc->betweenStreams = 1;
+                    if (blockSize != 0) {   /* the four bytes already read are the magic number */
+                        memcpy(fc->magic, fc->legacyHeader, 4);
+                        fc->magicSize = 4;
+                    }
+                    break;
+                }
+                if (fc->legacyBlock == NULL) {
+                    fc->legacyBlock = (unsigned char*)malloc((size_t)LZ4_COMPRESSBOUND(LEGACY_BLOCKSIZE));
+                    if (fc->legacyBlock == NULL) {
+                        JOB_ERROR(33, "Allocation error : can't allocate legacy block buffer");
+                        break;
+                    }
+                }
+                fc->legacyBlockSize = blockSize;
+            }
+        } else {   /* block payload */
+            size_t const need = fc->legacyBlockSize - fc->legacyFill;
+            size_t const take = need < avail ? need : avail;
+            memcpy(fc->legacyBlock + fc->legacyFill, inPtr + pos, take);
+            fc->legacyFill += take;
+            pos += take;
+            if (fc->legacyFill < fc->legacyBlockSize) break;
+            if (!LZ4IO_submitLegacyBlock(lz4fc, fc->legacyBlock, fc->legacyBlockSize)) break;
+            fc->legacyFill = 0;
+            fc->legacyBlockSize = 0;
+        }
+    }
+
+    *posPtr = pos;
+    return !TPool_jobError();
+}
+
 static void LZ4IO_decompressLZ4FChunk(void* arg)
 {
     LZ4FChunk* const lz4fc = (LZ4FChunk*)arg;
     LZ4IO_frameCheck_t* const fc = lz4fc->fc;
     const char* inPtr = (const char*)lz4fc->inBuffer;
+
     size_t pos = 0;
 
-    while ((pos < lz4fc->inSize) && !TPool_jobError()) {  /* still to read */
-        size_t remainingInSize = lz4fc->inSize - pos;
-        Buffer b = BufPool_getBuffer(lz4fc->bp);
-        LZ4F_decompressOptions_t dOpt;
-        int frameEnd;
-        if (b.capacity != OUTBUFF_SIZE) {
-            JOB_ERROR(33, "Could not allocate output buffer!");
-            break;
-        }
-        assert(b.size == 0);
-        b.size = b.capacity;
-        memset(&dOpt, 0, sizeof(dOpt));
-        /* liblz4 forgets it at each new frame : set it at every invocation */
-        dOpt.skipChecksums = fc->skipBlockChecksums ? LZ4F_skipAllChecksums   /* --no-crc */
-                                                    : LZ4F_skipContentChecksum;  /* verified by lz4 (see LZ4IO_frameCheck_t), or not at all */
-        {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
-                                b.ptr, &b.size,
-                                inPtr + pos, &remainingInSize,
-                                lz4fc->dictBuffer, lz4fc->dictBufferSize,
-                                &dOpt);
-            if (LZ4F_isError(nextToLoad)) {
-                JOB_ERROR(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
-                break;
+    while (!TPool_jobError()) {
+        if (fc->betweenStreams) {
+            size_t const avail = lz4fc->inSize - pos;
+            size_t const need = 4 - fc->magicSize;
+            size_t const take = need < avail ? need : avail;
+            unsigned magic;
+            if (take) {
+                memcpy(fc->magic + fc->magicSize, inPtr + pos, take);
+                fc->magicSize += take;
+                pos += take;
             }
-            *lz4fc->lastStatus = nextToLoad;
-            frameEnd = (nextToLoad == 0);
-        }
-        assert(remainingInSize <= lz4fc->inSize - pos);
-        LZ4IO_keepFrameTail(fc->tail, inPtr + pos, remainingInSize);
-        pos += remainingInSize;
-        assert(b.size <= b.capacity);
-        if (!fc->frameKnown) LZ4IO_checkFrame(fc, lz4fc->dctx);
-        assert(fc->frameKnown || b.size == 0);   /* no output before the header is decoded */
+            if (fc->magicSize < 4) break;   /* the rest of the magic number is in the next buffer */
+            magic = LZ4IO_readLE32(fc->magic);
+            fc->magicSize = 0;
+            fc->betweenStreams = 0;
+            if (magic == LEGACY_MAGICNUMBER) {
+                fc->legacy = 1;
+                fc->legacyFill = 0;
+                fc->legacyBlockSize = 0;
+                continue;
+            }
+            if (!LZ4IO_feedLZ4FMagic(lz4fc, magic)) break;
+        } else if (fc->legacy) {
+            if (!LZ4IO_decodeLegacyChunk(lz4fc, &pos)) break;
+            if (pos >= lz4fc->inSize && fc->legacy) break;   /* rest of the block is in the next buffer */
+        } else {
+            size_t remainingInSize = lz4fc->inSize - pos;
+            Buffer b;
+            LZ4F_decompressOptions_t dOpt;
+            int frameEnd;
 
-        /* push to hashing and write threads */
-        {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
-            LZ4FChunkToHash* const cth = fc->hashing ? (LZ4FChunkToHash*)malloc(sizeof(*cth)) : NULL;
-            if (ctw==NULL || (fc->hashing && cth==NULL)) {
-                free(ctw); free(cth);
-                JOB_ERROR(35, "Allocation error : can't describe new write job");
+            if (remainingInSize == 0) break;
+            b = BufPool_getBuffer(lz4fc->bp);
+            if (b.capacity != OUTBUFF_SIZE) {
+                JOB_ERROR(33, "Could not allocate output buffer!");
                 break;
             }
-            if (cth) {
-                cth->ptr = b.ptr;
-                cth->size = b.size;
-                cth->frameStart = fc->hashStart;
-                cth->frameEnd = frameEnd;
-                cth->storedChecksum = frameEnd ? LZ4IO_readLE32(fc->tail) : 0;
-                cth->xxh = fc->xxh;
+            assert(b.size == 0);
+            b.size = b.capacity;
+            memset(&dOpt, 0, sizeof(dOpt));
+            /* liblz4 forgets it at each new frame : set it at every invocation */
+            dOpt.skipChecksums = fc->skipBlockChecksums ? LZ4F_skipAllChecksums   /* --no-crc */
+                                                        : LZ4F_skipContentChecksum;  /* verified by lz4 (see LZ4IO_frameCheck_t), or not at all */
+            {   size_t nextToLoad = LZ4F_decompress_usingDict(lz4fc->dctx,
+                                    b.ptr, &b.size,
+                                    inPtr + pos, &remainingInSize,
+                                    lz4fc->dictBuffer, lz4fc->dictBufferSize,
+                                    &dOpt);
+                if (LZ4F_isError(nextToLoad)) {
+                    JOB_ERROR(34, "Decompression error : %s", LZ4F_getErrorName(nextToLoad));
+                    break;
+                }
+                *lz4fc->lastStatus = nextToLoad;
+                frameEnd = (nextToLoad == 0);
             }
-            if (cth && (fc->hPool == NULL) && !(cth->frameStart && cth->frameEnd))
-                fc->hPool = TPool_create(1, OUTBUFF_QUEUE);   /* if it fails : hashed by the decoding thread */
-            if (fc->hPool) {
-                TPool_submitJob(fc->hPool, LZ4IO_hashDecodedLZ4FChunk, cth);   /* every buffer : see PBUFFERS_NB */
-            } else {
-                LZ4IO_hashDecodedLZ4FChunk(cth);
+            assert(remainingInSize <= lz4fc->inSize - pos);
+            LZ4IO_keepFrameTail(fc->tail, inPtr + pos, remainingInSize);
+            pos += remainingInSize;
+            assert(b.size <= b.capacity);
+            if (!fc->frameKnown) LZ4IO_checkFrame(fc, lz4fc->dctx);
+            assert(fc->frameKnown || b.size == 0);   /* no output before the header is decoded */
+
+            /* push to hashing and write threads */
+            {   LZ4FChunkToWrite* const ctw = (LZ4FChunkToWrite*)malloc(sizeof(*ctw));
+                LZ4FChunkToHash* const cth = fc->hashing ? (LZ4FChunkToHash*)malloc(sizeof(*cth)) : NULL;
+                if (ctw==NULL || (fc->hashing && cth==NULL)) {
+                    free(ctw); free(cth);
+                    JOB_ERROR(35, "Allocation error : can't describe new write job");
+                    break;
+                }
+                if (cth) {
+                    cth->ptr = b.ptr;
+                    cth->size = b.size;
+                    cth->frameStart = fc->hashStart;
+                    cth->frameEnd = frameEnd;
+                    cth->storedChecksum = frameEnd ? LZ4IO_readLE32(fc->tail) : 0;
+                    cth->xxh = fc->xxh;
+                }
+                if (cth && (fc->hPool == NULL) && !(cth->frameStart && cth->frameEnd))
+                    fc->hPool = TPool_create(1, OUTBUFF_QUEUE);   /* if it fails : hashed by the decoding thread */
+                if (fc->hPool) {
+                    TPool_submitJob(fc->hPool, LZ4IO_hashDecodedLZ4FChunk, cth);   /* every buffer : see PBUFFERS_NB */
+                } else {
+                    LZ4IO_hashDecodedLZ4FChunk(cth);
+                }
+                memset(ctw, 0, sizeof(*ctw));
+                ctw->bufOut = b;
+                ctw->fOut = lz4fc->foutput;
+                ctw->bp = lz4fc->bp;
+                ctw->sparseEnable = lz4fc->sparseEnable;
+                ctw->storedSkips = lz4fc->storedSkips;
+                ctw->totalSize = lz4fc->totalSize;
+                TPool_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
             }
-            ctw->bufOut = b;
-            ctw->fOut = lz4fc->foutput;
-            ctw->bp = lz4fc->bp;
-            ctw->sparseEnable = lz4fc->sparseEnable;
-            ctw->storedSkips = lz4fc->storedSkips;
-            ctw->totalSize = lz4fc->totalSize;
-            TPool_submitJob(lz4fc->wPool, LZ4IO_writeDecodedLZ4FChunk, ctw);
-        }
-        fc->hashStart = 0;
-        if (frameEnd) {
-            fc->frameKnown = 0;
-            fc->hashing = 0;
+            fc->hashStart = 0;
+            if (frameEnd) {
+                fc->frameKnown = 0;
+                fc->hashing = 0;
+                fc->betweenStreams = 1;
+            }
         }
     }
 
@@ -2668,6 +2828,11 @@ LZ4IO_decompressLZ4F(dRess_t ress,
     if (lastStatus != 0) {
         END_PROCESS(26, "LZ4F frame decoding could not complete: invalid frame");
     }
+    if (fc.legacy ? (fc.legacyFill != 0 || fc.legacyBlockSize != 0)
+                  : (fc.betweenStreams && fc.magicSize != 0)) {
+        END_PROCESS(26, "Unfinished stream");
+    }
+    free(fc.legacyBlock);
     if (!prefs->testMode) LZ4IO_fwriteSparseEnd(dstFile, storedSkips);
 
     /* Clean */
