@@ -233,6 +233,10 @@ test-install: lz4 lib liblz4.pc
 test-build-options:
 	lz4_root=.. ./compat/test_build_options.sh
 
+.PHONY: test-uninstall-paths
+test-uninstall-paths:
+	+lz4_root=.. sh ./compat/test_uninstall_paths.sh
+
 # unit tests in non-default configurations
 .PHONY: test-unittest-configs
 test-unittest-configs:
