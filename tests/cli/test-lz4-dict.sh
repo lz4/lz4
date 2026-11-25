@@ -34,6 +34,8 @@ touch $FPREFIX-sample-0
 < $FPREFIX-sample-32k lz4 -D $FPREFIX-sample-0 | lz4 -dD $FPREFIX-sample-0 | diff - $FPREFIX-sample-32k
 < $FPREFIX-sample-0 lz4 -D $FPREFIX-sample-0 | lz4 -dD $FPREFIX-sample-0 | diff - $FPREFIX-sample-0
 lz4 -bi0 -D $FPREFIX $FPREFIX-sample-32k $FPREFIX-sample-32k
+# Benchmarking accepts the empty dictionary, like regular compression.
+lz4 -bi0 -D $FPREFIX-sample-0 $FPREFIX-sample-32k
 
 echo "---- test lz4 dictionary loading ----"
 datagen -g128KB > $FPREFIX-data-128KB
