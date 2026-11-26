@@ -331,7 +331,7 @@ install:
 .PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(pkgconfigdir)/liblz4.pc
-  ifeq (WINBASED,yes)
+  ifeq ($(WINBASED),yes)
 	$(RM) $(DESTDIR)$(bindir)/$(LIBLZ4)
 	$(RM) $(DESTDIR)$(libdir)/$(LIBLZ4_EXP)
   else
