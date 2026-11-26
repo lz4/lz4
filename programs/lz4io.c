@@ -1809,10 +1809,10 @@ LZ4IO_compressFilename_extRess(unsigned long long* inStreamSize,
             if (nbJobs < prefs.nbWorkers) prefs.nbWorkers = (unsigned)nbJobs;
             ress->nbWorkers = prefs.nbWorkers;
     }   }
-    /* with independent blocks, a file fitting into a single job is compressed by the calling thread,
-     * without job buffers : same output, and worker threads remain available for next files.
-     * Not with linked blocks : single-threaded output can then depend on stableSrc (memory-mapped input) */
-    if (prefs.nbWorkers && (prefs.frameInfo.blockMode == LZ4F_blockIndependent)) {
+    /* a file fitting into a single job is compressed by the calling thread, without job buffers :
+     * same output, also with linked blocks (single-threaded input is never stableSrc, see LZ4IO_compressFrame()),
+     * and worker threads remain available for next files */
+    if (prefs.nbWorkers) {
         U64 const fileSize = UTIL_getOpenFileSize(srcFile);   /* 0 : unknown (ex: stdin) */
         if (fileSize && (fileSize <= LZ4IO_jobSize(&prefs))) prefs.nbWorkers = 0;
     }
