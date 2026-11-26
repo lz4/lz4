@@ -860,6 +860,15 @@ LZ4FLIB_STATIC_API size_t LZ4F_getBlockSize(LZ4F_blockSizeID_t blockSizeID);
 **/
 LZ4FLIB_STATIC_API unsigned LZ4F_getMaxNbWorkers(void);
 
+/*! LZ4F_MT_JOBSIZE : v1.11.2+ (experimental, see LZ4F_preferences_t.nbWorkers)
+ *  Multi-threaded compression cuts input into jobs of a whole nb of blocks, up to LZ4F_MT_JOBSIZE,
+ *  or a single block when larger. With linked blocks, job boundaries are part of the output.
+ *  Defining another value when compiling the library is meant for tests only : it changes output of linked blocks.
+**/
+#ifndef LZ4F_MT_JOBSIZE
+#  define LZ4F_MT_JOBSIZE (512 << 10)
+#endif
+
 /*! LZ4F_uncompressedUpdate() : deprecated (v1.11.0)
  *  Same as LZ4F_compressUpdate() with LZ4F_compressOptions_t.uncompressed == 1 : prefer this option.
  * `cOptPtr` is optional : NULL can be provided, in which case all other options are set to default.

@@ -1390,13 +1390,13 @@ size_t LZ4IO_framePreferences(const LZ4IO_prefs_t* io_prefs, LZ4F_preferences_t*
 #  define LZ4IO_MEMORY_BUDGET ((sizeof(size_t) < 8) ? ((U64)1 << 30) : ((U64)4 << 30))
 #endif
 
-/* size of liblz4 compression jobs (see LZ4F_mtJobSize()) : 512 KB, or a single block when larger */
+/* size of liblz4 compression jobs (see LZ4F_MT_JOBSIZE) : a whole nb of blocks, or a single block when larger */
 static size_t LZ4IO_jobSize(const LZ4F_preferences_t* prefs)
 {
     size_t const bs = LZ4F_getBlockSize(prefs->frameInfo.blockSizeID);
     size_t const blockSize = LZ4F_isError(bs) ? 4 MB : bs;
-    if (blockSize >= 512 KB) return blockSize;
-    return ((512 KB) / blockSize) * blockSize;
+    if (blockSize >= LZ4F_MT_JOBSIZE) return blockSize;
+    return (LZ4F_MT_JOBSIZE / blockSize) * blockSize;
 }
 
 /* estimated memory of frame compression with @nbWorkers :

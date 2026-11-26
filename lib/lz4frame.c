@@ -509,15 +509,11 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* prefere
 
 /* Job size :
  * Input is cut into jobs at fixed positions of the frame's content (restarting after each flush) :
- * a whole nb of blocks, up to LZ4F_MT_JOBSIZE, or a single block when larger.
+ * a whole nb of blocks, up to LZ4F_MT_JOBSIZE (lz4frame.h), or a single block when larger.
  * With linked blocks, each job restarts the stream, using previous 64 KB as dictionary.
  * Job boundaries are therefore part of the output definition : changing this size changes output of linked blocks.
  * With independent blocks, output only depends on block boundaries, not on job boundaries.
  * Small jobs balance load among threads, engage multi-threading on smaller inputs, and lower latency. */
-#ifndef LZ4F_MT_JOBSIZE   /* override for testing only : changes output of linked blocks */
-#  define LZ4F_MT_JOBSIZE (512 KB)
-#endif
-
 static size_t LZ4F_mtJobSize(size_t blockSize)
 {
     if (blockSize >= LZ4F_MT_JOBSIZE) return blockSize;
