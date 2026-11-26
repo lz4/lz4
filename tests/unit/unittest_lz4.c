@@ -348,6 +348,27 @@ TEST(compress_smallCapacity)
     ASSERT_EQ(LZ4_compress_destSize(src, dst, &srcSize, 0), 0);
 }
 
+/* a negative capacity is rejected, and nothing is written.
+ * With 32-bit addresses, a heap buffer is usually below 2 GB : dst + INT_MIN wraps above dst */
+TEST(compress_negativeCapacity)
+{
+    static const int capacities[] = { -1, -1000, INT_MIN };
+    int const srcSize = 1 KB;
+    const char* const src = (const char*)UT_fixedNoise((size_t)srcSize);
+    char* const dst = (char*)UT_malloc(64);
+    char ref[64];
+    LZ4_stream_t* const stream = newStream();
+    size_t i;
+    memset(ref, 0x5A, sizeof(ref));
+    memcpy(dst, ref, sizeof(ref));
+    for (i = 0; i < ARRAY_SIZE(capacities); i++) {
+        ASSERT_EQ(LZ4_compress_default(src, dst, srcSize, capacities[i]), 0);
+        ASSERT_EQ(LZ4_compress_fast_extState(stream, src, dst, srcSize, capacities[i], 1), 0);
+        ASSERT_EQ(LZ4_compress_fast_continue(stream, src, dst, srcSize, capacities[i], 1), 0);
+        ASSERT_MEMEQ(dst, ref, sizeof(ref));
+    }
+}
+
 /* LZ4_compress_destSize_extState() initializes its state */
 TEST(compress_destSize_extState_dirtyState)
 {
