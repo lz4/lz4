@@ -74,3 +74,7 @@ manuals: $(LZ4MANUAL) $(LZ4FMANUAL)
 clean:
 	@$(RM) gen_manual$(EXT)
 	@echo Cleaning completed
+
+.PHONY: test
+test: gen_manual
+	sh test.sh ./gen_manual$(EXT) $(LZ4API)

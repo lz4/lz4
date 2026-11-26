@@ -243,6 +243,11 @@ int main(int argc, char *argv[]) {
 
     ostream << sout.str();
     ostream << "</html>" << endl << "</body>" << endl;
+    ostream.close();
+    if (!ostream) {
+        cout << "Error writing file " << argv[3] << endl;
+        return 1;
+    }
 
     return 0;
 }
