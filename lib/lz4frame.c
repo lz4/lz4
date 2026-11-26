@@ -1243,9 +1243,9 @@ static size_t LZ4F_compressBlocks_internal(void* dst, size_t dstCapacity,
     BYTE* op = ostart;
     BYTE* const oend = dstCapacity ? ostart + dstCapacity : ostart;
 
-    while (ip < iend) {
+    while (ip != iend) {
         size_t const bSize = MIN(blockSize, (size_t)(iend - ip));
-        size_t const cSize = LZ4F_makeBlock(op, (size_t)(oend - op),
+        size_t const cSize = LZ4F_makeBlock(op, ostart ? (size_t)(oend - op) : 0,
                                             ip, bSize,
                                             compress, lz4ctx, level,
                                             cdict, crcFlag);
@@ -1253,7 +1253,7 @@ static size_t LZ4F_compressBlocks_internal(void* dst, size_t dstCapacity,
         ip += bSize;
         op += cSize;
     }
-    return (size_t)(op - ostart);
+    return ostart ? (size_t)(op - ostart) : 0;
 }
 
 
@@ -2354,7 +2354,7 @@ static size_t LZ4F_mt_update(LZ4F_cctx_t* cctx,
     if (mt->filling && (LZ4F_mt_fillingSlot(mt)->mode != mode))
         LZ4F_mt_submit(mt);   /* mode switch */
 
-    while (ip < iend) {
+    while (ip != iend) {
         LZ4F_mtJob_t* const job = LZ4F_mt_fillingSlot(mt);
         if (!mt->filling) {
             /* new job */
@@ -3586,7 +3586,7 @@ size_t LZ4F_decompress(LZ4F_dctx* dctx,
             }   }
 
             /* decode directly into destination buffer if there is enough room */
-            if ( ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize - dctx->blockDecoded)
+            if ( (dstPtr != NULL) && ((size_t)(dstEnd-dstPtr) >= dctx->maxBlockSize - dctx->blockDecoded)
                  /* unless the dictionary is stored in tmpOut:
                   * in which case it's faster to decode within tmpOut
                   * to benefit from prefix speedup (but the rest of a block decoded progressively would be copied) */

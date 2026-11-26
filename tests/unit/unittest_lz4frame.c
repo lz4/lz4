@@ -285,23 +285,33 @@ TEST(compressUpdate_nullZeroBuffers)
     char header[LZ4F_HEADER_SIZE_MAX];
     char dst[64];
     LZ4F_cctx* const cctx = newCctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
     LZ4F_compressOptions_t cOpts;
     size_t pos;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
     memset(&cOpts, 0, sizeof(cOpts));
     cOpts.uncompressed = 1;
     ASSERT_LZ4F_ERROR(LZ4F_compressFrame(NULL, 0, NULL, 0, NULL), LZ4F_ERROR_dstCapacity_tooSmall);
     ASSERT_LZ4F_ERROR(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 10, NULL),
                       LZ4F_ERROR_parameter_null);
-    pos = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 0, NULL));
+    pos = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 0, &prefs));
     ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
     ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), NULL)), 0);
     ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, NULL, 0, NULL)), 0);
+    /* failed LZ4F_compressBegin_usingDict() with NULL dict preserves the frame in progress */
+    ASSERT_LZ4F_ERROR(LZ4F_compressBegin_usingDict(cctx, dst, sizeof(dst), NULL, 10, NULL),
+                      LZ4F_ERROR_parameter_null);
     ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
     /* mode switch with empty tmp buffer and NULL/0 output */
     pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
     ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
     ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), &cOpts)), 0);
     ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
+    /* full-block update into NULL/0 dst exercises LZ4F_compressBlocks_internal() with NULL dst */
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
+    ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
+    ASSERT_LZ4F_ERROR(LZ4F_compressUpdate(cctx, NULL, 0, UT_sample(64 KB), 64 KB, NULL),
+                      LZ4F_ERROR_dstCapacity_tooSmall);
 }
 
 /* LZ4F_decompress_usingDict() rejects a NULL dictionary with non-zero size, matching LZ4F_resumeFrame() */
