@@ -722,7 +722,7 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
     if (dictFileName) {
         FILE* dictFile = NULL;
         U64 const dictFileSize = UTIL_getFileSize(dictFileName);
-        if (!dictFileSize)
+        if (!UTIL_isRegFile(dictFileName))
             END_PROCESS(25, "Dictionary error : could not stat dictionary file");
         if (g_decodeOnly)
             END_PROCESS(26, "Error : LZ4 Frame decoder mode not compatible with dictionary yet");
@@ -739,7 +739,7 @@ int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
             dictSize = (size_t)dictFileSize;
         }
 
-        dictBuf = (char*)malloc(dictSize);
+        dictBuf = (char*)malloc(dictSize + !dictSize);
         if (!dictBuf) END_PROCESS(25, "Allocation error : not enough memory");
 
         if (fread(dictBuf, 1, dictSize, dictFile) != dictSize)
