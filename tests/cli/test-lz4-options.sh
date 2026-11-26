@@ -85,6 +85,9 @@ same $SRC "lz4 -B65536" "lz4 -B64K" "lz4 -B64KB" "lz4 -B64KiB"
 same $BIG "lz4 -B1048576" "lz4 -B1M" "lz4 -B1MB" "lz4 -B1MiB"
 accepted "-T4294967295" "-T4194303K" "-T4095M" "--threads=1KiB" "--threads=1KB"   # capped
 rejected "-T4294967296" "-T4194304K" "-T4096M"
+rejected "--threads=" "--threads=K" "--threads=KiB" "--threads=MB" "--threads=MiB"
+fails "lz4 --threads '' -q -f $SRC $OUT"
+accepted "--threads=0" "--threads 0"
 accepted "--memory=18446744073709551615" "--memory=18014398509481983K" "--memory=17179869183G" "--memory=1GiB" "--memory 1GB"
 rejected "--memory=18446744073709551616" "--memory=18014398509481984K" "--memory=17179869184G"
 rejected "--memory=0" "--memory=10Q" "--memory" "--memory -q"   # no argument : a file name, or another command

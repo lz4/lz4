@@ -408,6 +408,9 @@ static int readSizeFromCharChecked(const char** stringPtr, U64* value)
 #define NEXT_UINT32(val32) {      \
     const char* __nb;             \
     NEXT_FIELD(__nb);             \
+    if (*__nb < '0' || *__nb > '9') { \
+        errorOut("error: a numeric value is required"); \
+    }                            \
     val32 = readU32FromChar(&__nb); \
     if(*__nb != 0) {              \
         errorOut("error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed"); \
