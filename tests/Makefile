@@ -282,6 +282,10 @@ test-lz4-mozlz4: lz4 datagen lz4cat
 test-datagen-invalid-input: datagen
 	@echo "\n ---- test datagen fails correctly on invalid input ----"
 	$(DATAGEN) -g1234l && exit 1 || true
+	@for size in 18014398509481984K 17592186044416M 17179869184G; do \
+	    rc=0; $(DATAGEN) -g$$size > $(VOID) 2>&1 || rc=$$?; \
+	    test "$$rc" -eq 1 || exit 1; \
+	done
 
 test-lz4-basic: lz4 datagen unlz4 lz4cat
 	@echo "\n ---- test lz4 basic compression/decompression ----"

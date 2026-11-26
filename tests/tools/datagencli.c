@@ -30,6 +30,7 @@
 **************************************/
 #include "util.h"      /* U32 */
 #include <stdio.h>     /* fprintf, stderr */
+#include <errno.h>     /* errno, ERANGE */
 #include "datagen.h"   /* RDG_generate */
 #include "loremOut.h"  /* LOREM_genOut */
 #include "lz4.h"       /* LZ4_VERSION_STRING */
@@ -110,10 +111,22 @@ int main(int argc, char** argv)
                     return usage(programName);
                 case 'g':
                     argument++;
+                    errno = 0;
                     size = strtoull(argument, &argument, 10);
-                    if (*argument=='K') { size <<= 10; argument++; }
-                    if (*argument=='M') { size <<= 20; argument++; }
-                    if (*argument=='G') { size <<= 30; argument++; }
+                    if (errno == ERANGE) {
+                        DISPLAY("Data size is too large\n");
+                        return 1;
+                    }
+                    {   unsigned shift = 0;
+                        if (*argument=='K') { shift += 10; argument++; }
+                        if (*argument=='M') { shift += 20; argument++; }
+                        if (*argument=='G') { shift += 30; argument++; }
+                        if (size > ((U64)-1 >> shift)) {
+                            DISPLAY("Data size is too large\n");
+                            return 1;
+                        }
+                        size <<= shift;
+                    }
                     if (*argument=='B') { argument++; }
                     break;
                 case 's':
