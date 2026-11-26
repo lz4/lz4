@@ -62,6 +62,7 @@ typedef struct LZ4_writeFile_s LZ4_writeFile_t;
  *         Can be tested with LZ4F_isError().
  *
  * @note Must be closed with LZ4F_readClose() when done.
+ *       The caller keeps ownership of fp and must close it separately.
  */
 LZ4F_NOALLOC_WARNING LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp);
 
@@ -102,8 +103,8 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_seek(LZ4_readFile_t* lz4fRead, long lon
 LZ4FLIB_STATIC_API unsigned long long LZ4F_tell(const LZ4_readFile_t* lz4fRead);
 
 /*! LZ4F_readClose() :
- * Close lz4file handle.
- * `lz4f` must use LZ4_readOpen to set first.
+ * Release the read handle and its resources. Does not close the underlying FILE*.
+ * `lz4fRead` must have been initialized with LZ4F_readOpen().
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead);
 
@@ -123,6 +124,7 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead);
  *         Can be tested with LZ4F_isError().
  *
  * @note Must be closed with LZ4F_writeClose() when done.
+ *       The caller keeps ownership of fp and must close it separately.
  */
 LZ4F_NOALLOC_WARNING LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeOpen(LZ4_writeFile_t** lz4fWrite, FILE* fp, const LZ4F_preferences_t* prefsPtr);
 
@@ -134,16 +136,18 @@ LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_writeOpen_advanced(LZ4_writeFile_t** lz
                                                             LZ4F_CustomMem customMem);
 
 /*! LZ4F_write() :
- * Write buffer to lz4file.
- * `lz4f` must use LZ4F_writeOpen to set first.
- * `buf` write data buffer.
- * `size` write data buffer size.
+ * Write size bytes from buf to the file initialized with LZ4F_writeOpen().
+ * @return : size on success, or an error code (test with LZ4F_isError()).
+ *  Data may still be buffered in the FILE*; successful writes do not guarantee
+ *  that flushing or closing that FILE* will succeed.
  */
 LZ4FLIB_STATIC_API size_t LZ4F_write(LZ4_writeFile_t* lz4fWrite, const void* buf, size_t size);
 
 /*! LZ4F_writeClose() :
- * Close lz4file handle.
- * `lz4f` must use LZ4F_writeOpen to set first.
+ * Finish the frame and release the write handle and its resources.
+ * `lz4fWrite` must have been initialized with LZ4F_writeOpen().
+ * Does not flush or close the underlying FILE*. The caller must check the
+ * result of fflush() or fclose() separately to detect buffered write errors.
  * @return LZ4F_OK_NoError on success, or error code on failure,
  *         including one from a previous LZ4F_write() : the frame is then incomplete.
  *  Resources are released in all cases.
