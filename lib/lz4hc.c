@@ -417,7 +417,8 @@ static int LZ4HC_encodeLastLiterals (
     size_t lastRunSize = (size_t)(iend - anchor);  /* literals */
     size_t llAdd = (lastRunSize + 255 - RUN_MASK) / 255;
     size_t const totalSize = 1 + llAdd + lastRunSize;
-    if (limit && (op + totalSize > dstEnd)) {
+    assert(!limit || op <= dstEnd);
+    if (limit && ((size_t)(dstEnd - op) < totalSize)) {   /* compares sizes, as op + totalSize could exceed the address space */
         if (limit == limitedOutput) return 1;  /* not enough space in dst */
         /* adapt lastRunSize to fill dst */
         lastRunSize  = (size_t)(dstEnd - op) - 1 /*token*/;
@@ -470,7 +471,7 @@ static void LZ4HC_encodeLastSequence_fillOutput (
     BYTE* const maxLitPos = oend - 3; /* 2 for offset, 1 for token */
     DEBUGLOG(6, "Last sequence is overflowing : %u literals, %u remaining space",
                 (unsigned)ll, (unsigned)(oend - op));
-    if (op + ll_totalCost <= maxLitPos) {
+    if ((op <= maxLitPos) && (ll_totalCost <= (size_t)(maxLitPos - op))) {   /* compares sizes, as op + ll_totalCost could exceed the address space */
         /* ll validated; now adjust match length */
         size_t const bytesLeftForMl = (size_t)(maxLitPos - (op+ll_totalCost));
         size_t const maxMlSize = MINMATCH + (ML_MASK-1) + (bytesLeftForMl * 255);
