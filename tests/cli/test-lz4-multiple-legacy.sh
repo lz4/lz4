@@ -5,7 +5,8 @@ FPREFIX="tmp-lml"
 set -e
 
 remove () {
-    rm -rf $FPREFIX*
+    rm -rf "$FPREFIX-dir"
+    rm $FPREFIX*
 }
 
 trap remove EXIT
