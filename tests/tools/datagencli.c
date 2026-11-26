@@ -151,6 +151,10 @@ int main(int argc, char** argv)
         LOREM_genOut(size, seed);
     }
     DISPLAYLEVEL(1, "\n");
+    if (fflush(stdout) != 0 || ferror(stdout)) {
+        DISPLAY("Error writing generated data\n");
+        return 1;
+    }
 
     return 0;
 }

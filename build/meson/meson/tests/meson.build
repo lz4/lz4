@@ -169,6 +169,16 @@ test_scripts = {
   },
 }
 
+datagen_output_script = find_program(lz4_source_root / 'tests/cli/test-datagen-output.sh')
+test(
+  'datagen-output',
+  find_program('sh'),
+  args: [datagen_output_script.full_path()],
+  depends: [targets['datagen']],
+  workdir: fs.parent(fs.parent(datagen_output_script.full_path())),
+  env: run_env
+)
+
 foreach s, attrs : test_scripts
   script = find_program(lz4_source_root / 'tests/cli/test-@0@.sh'.format(s))
 
