@@ -1066,9 +1066,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
     assert(ip != NULL);
     if (tableType == byU16) assert(inputSize<LZ4_64Klimit);  /* Size too large (not within 64K limit) */
     if (tableType == byPtr) assert(dictDirective==noDict);   /* only supported use case with byPtr */
-    /* If init conditions are not met, we don't have to mark stream
-     * as having dirty context, since no action was taken yet */
-    if (outputDirective == fillOutput && maxOutputSize < 1) { return 0; } /* Impossible to store anything */
+    assert(outputDirective == notLimited || maxOutputSize >= 1);   /* checked by LZ4_compress_generic() */
     assert(acceleration >= 1);
 
     /* resume : candidates are within source (see LZ4_compress_generic()) */
@@ -1482,10 +1480,9 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
                 srcSize, dstCapacity);
 
     if ((U32)srcSize > (U32)LZ4_MAX_INPUT_SIZE) { return 0; }  /* Unsupported srcSize, too large (or negative) */
+    if (outputDirective != notLimited && dstCapacity <= 0) return 0;  /* no room, or negative capacity : nothing can be written */
     if (srcSize == 0) {   /* src == NULL supported if srcSize == 0 */
-        if (outputDirective != notLimited && dstCapacity <= 0) return 0;  /* no output, can't write anything */
         DEBUGLOG(5, "Generating an empty block");
-        assert(outputDirective == notLimited || dstCapacity >= 1);
         assert(dst != NULL);
         dst[0] = 0;
         if (outputDirective == fillOutput) {
