@@ -204,6 +204,13 @@ silent "cat $SRC | lz4 > $OUT"
 silent "lz4 -f -m $SRC $HDR"
 warns  "Compressed" "lz4 -v -f -m $SRC $HDR"
 warns  "content-size" "cat $SRC | lz4 --content-size > $OUT"   # size unknown
+case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
+    # Redirected regular stdin has a known size, unlike a pipe.
+    warnsNot "content-size" "lz4 --content-size < $SRC > $OUT"
+    test "$(od -An -tx1 -j4 -N1 $OUT | tr -d ' \n')" = 6c
+    lz4 -dc $OUT | cmp - $SRC
+    ;;
+esac
 warns  "Legacy" "lz4 -v -l -f $SRC $OUT"   # deprecated format
 warnsNot "Legacy" "lz4 -l -f $SRC $OUT"
 # sizes OPTIONS INPUT : the summary displays the sizes of INPUT and of its compressed output
