@@ -36,6 +36,7 @@ static int compress_file(FILE* f_in, FILE* f_out)
     assert(f_in != NULL); assert(f_out != NULL);
 
     LZ4F_errorCode_t ret = LZ4F_OK_NoError;
+    int result = 1;
     LZ4_writeFile_t* lz4fWrite;
     void* const buf = malloc(CHUNK_SIZE);
     if (!buf) {
@@ -64,6 +65,7 @@ static int compress_file(FILE* f_in, FILE* f_out)
 
         /* nothing to read */
         if (len == 0) {
+            result = 0;
             break;
         }
 
@@ -82,7 +84,7 @@ out:
         return 1;
     }
 
-    return 0;
+    return result;
 }
 
 static int decompress_file(FILE* f_in, FILE* f_out)
