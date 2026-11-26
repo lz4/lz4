@@ -11,7 +11,7 @@ for target in Windows_NT MINGW64_NT MSYS_NT CYGWIN_NT; do
         MSYS*) dll=msys-lz4-123.dll; implib=liblz4.dll.a ;;
         CYGWIN*) dll=cyglz4-123.dll; implib=liblz4.dll.a ;;
     esac
-    commands=$($make -s -n -C "$root/lib" uninstall TARGET_OS="$target" PREFIX=/lz4-test LIBVER_MAJOR=123)
+    commands=$($make -s -n -C "$root/lib" uninstall TARGET_OS="$target" PREFIX=/lz4-test DESTDIR= LIBVER_MAJOR=123)
     printf '%s\n' "$commands" | grep -Fx "rm -f /lz4-test/bin/$dll"
     printf '%s\n' "$commands" | grep -Fx "rm -f /lz4-test/lib/$implib"
 done
