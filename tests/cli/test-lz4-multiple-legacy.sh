@@ -5,6 +5,7 @@ FPREFIX="tmp-lml"
 set -e
 
 remove () {
+    rm -rf "$FPREFIX-dir"
     rm $FPREFIX*
 }
 
@@ -73,6 +74,20 @@ lz4 -t $FPREFIX-empty.lz4
 lz4 -t $FPREFIX-empty2.lz4
 lz4 --list $FPREFIX-empty.lz4
 lz4 --list $FPREFIX-empty2.lz4
+# Recursive legacy compression includes files in nested directories.
+mkdir -p $FPREFIX-dir/sub
+cp ${FPREFIX}1-orig $FPREFIX-dir/first
+cp ${FPREFIX}2-orig $FPREFIX-dir/sub/second
+lz4 -l -r $FPREFIX-dir
+lz4 -dc $FPREFIX-dir/first.lz4 | cmp - ${FPREFIX}1-orig
+lz4 -dc $FPREFIX-dir/sub/second.lz4 | cmp - ${FPREFIX}2-orig
+rm $FPREFIX-dir/first.lz4 $FPREFIX-dir/sub/second.lz4
+lz4 -l -r -c $FPREFIX-dir > $FPREFIX-recursive.lz4
+# Directory enumeration order is unspecified; both inputs must occur once.
+lz4 -dc $FPREFIX-recursive.lz4 > $FPREFIX-recursive
+cat ${FPREFIX}1-orig ${FPREFIX}2-orig > $FPREFIX-forward
+cat ${FPREFIX}2-orig ${FPREFIX}1-orig > $FPREFIX-reverse
+cmp -s $FPREFIX-recursive $FPREFIX-forward || cmp $FPREFIX-recursive $FPREFIX-reverse
 # input read errors must fail, rather than being treated as EOF
 if [ "$(uname)" = Linux ]; then
     rc=0
