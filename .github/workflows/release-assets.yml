@@ -12,7 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag or commit to package (default : the branch selected above)'
+        description: >-
+          Tag or commit to package (defaults to the selected workflow ref).
+          For an attestation, leave this blank or enter the selected ref's full commit SHA.
         required: false
 
 permissions:
@@ -100,7 +102,11 @@ jobs:
 
   attestation:
     name: Attestation
-    if: github.event_name != 'pull_request'
+    # GitHub records the workflow run's commit in its build provenance.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.ref == '' || inputs.ref == github.sha))
     needs: [windows-package, source-tarball]
     runs-on: ubuntu-latest
     # only this job can sign : the build jobs above stay read-only
