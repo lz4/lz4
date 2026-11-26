@@ -644,6 +644,46 @@ TEST(attach_dictionary_smallBlocks)
     }
 }
 
+/* the attached dictionary replaces the stream history (see lz4.h) : a history shorter than 64 KB,
+ * followed by the next block (prefix mode) or not : the output matches a new stream's,
+ * and decodes with the dictionary alone */
+TEST(attach_dictionary_afterHistory)
+{
+    enum { historySize = 1000, blockSize = 1 KB };   /* block < LZ4_DICTCTX_COPY_THRESHOLD by default : dictionary's tables in place */
+    const char* const dict = (const char*)UT_fixedSample(64 KB);
+    char* const src = (char*)UT_malloc(historySize + blockSize);   /* history, then the contiguous block */
+    char* const block = src + historySize;
+    char* const separate = (char*)UT_malloc(blockSize);
+    int const capacity = LZ4_COMPRESSBOUND(blockSize);
+    char* const ref = (char*)UT_malloc((size_t)capacity);
+    char* const dst = (char*)UT_malloc((size_t)capacity);
+    char* const decoded = (char*)UT_malloc(blockSize);
+    LZ4_stream_t* const stream = newStream();
+    LZ4_stream_t* const dictStream = newStream();
+    int refSize, contiguous;
+    memcpy(src, UT_fixedNoise(historySize), historySize);
+    memcpy(block, src + historySize - 500, 500);            /* matches the history */
+    memcpy(block + 500, dict + 40 KB, blockSize - 500);     /* matches the dictionary */
+    memcpy(separate, block, blockSize);
+    LZ4_loadDict(dictStream, dict, 64 KB);
+
+    LZ4_attach_dictionary(stream, dictStream);   /* new stream */
+    refSize = LZ4_compress_fast_continue(stream, block, ref, blockSize, capacity, 1);
+    ASSERT(refSize > 0);
+
+    for (contiguous = 0; contiguous < 2; contiguous++) {
+        int cSize;
+        LZ4_initStream(stream, sizeof(*stream));
+        ASSERT(LZ4_compress_fast_continue(stream, src, dst, historySize, capacity, 1) > 0);
+        LZ4_attach_dictionary(stream, dictStream);
+        cSize = LZ4_compress_fast_continue(stream, contiguous ? block : separate, dst, blockSize, capacity, 1);
+        ASSERT_MSG(cSize == refSize && !memcmp(dst, ref, (size_t)refSize),
+                   "%s block : output differs from a new stream", contiguous ? "contiguous" : "separate");
+        ASSERT_EQ(LZ4_decompress_safe_usingDict(dst, decoded, cSize, blockSize, dict, 64 KB), blockSize);
+        ASSERT_MEMEQ(decoded, block, blockSize);
+    }
+}
+
 /* a small block (< LZ4_HASHTABLESIZE / 16) reuses the table of a used state : the output must not depend on it
  * (ex: lz4frame : a frame must not depend on previous frames, nor on which worker compressed previous blocks).
  * After a match, the position following the previous occurrence of ip-1 is tested first :
