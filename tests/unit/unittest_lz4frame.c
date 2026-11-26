@@ -256,6 +256,67 @@ TEST(compressBound_nullPreferences)
         ASSERT_MSG(LZ4F_compressBound(srcSizes[i], NULL) >= LZ4F_compressBound(srcSizes[i], &prefs), "srcSize %u", (unsigned)srcSizes[i]);
 }
 
+/* invalid blockSizeID falls back to 4 MB in all LZ4F_compressBound*() variants, including autoFlush and one-shot */
+TEST(compressBound_invalidBlockSizeID)
+{
+    static const size_t srcSizes[] = { 0, 2, 7, 103, 64 KB + 3 };
+    size_t n, i;
+    for (n = 0; n < ARRAY_SIZE(g_invalidBlockSizeIDs); n++) {
+        LZ4F_preferences_t invalidPrefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_preferences_t refPrefs = LZ4F_INIT_PREFERENCES;
+        invalidPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_invalidBlockSizeIDs[n];
+        refPrefs.frameInfo.blockSizeID = LZ4F_max4MB;
+        for (i = 0; i < ARRAY_SIZE(srcSizes); i++) {
+            invalidPrefs.autoFlush = 0;
+            refPrefs.autoFlush = 0;
+            ASSERT_EQ(LZ4F_compressBound(srcSizes[i], &invalidPrefs), LZ4F_compressBound(srcSizes[i], &refPrefs));
+            invalidPrefs.autoFlush = 1;
+            refPrefs.autoFlush = 1;
+            ASSERT_EQ(LZ4F_compressBound(srcSizes[i], &invalidPrefs), LZ4F_compressBound(srcSizes[i], &refPrefs));
+            ASSERT_EQ(LZ4F_compressFrameBound(srcSizes[i], &invalidPrefs), LZ4F_compressFrameBound(srcSizes[i], &refPrefs));
+        }
+    }
+}
+
+/* NULL zero-capacity output and NULL zero-size input must not trigger pointer arithmetic or memcpy UB */
+TEST(compressUpdate_nullZeroBuffers)
+{
+    static const char data[] = "hello";
+    char header[LZ4F_HEADER_SIZE_MAX];
+    char dst[64];
+    LZ4F_cctx* const cctx = newCctx();
+    size_t pos;
+    ASSERT_LZ4F_ERROR(LZ4F_compressFrame(NULL, 0, NULL, 0, NULL), LZ4F_ERROR_dstCapacity_tooSmall);
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
+    ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), NULL)), 0);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, NULL, 0, NULL)), 0);
+    ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
+}
+
+/* LZ4F_decompress_usingDict() rejects a NULL dictionary with non-zero size, matching LZ4F_resumeFrame() */
+TEST(decompress_usingDict_nullDict)
+{
+    size_t const srcSize = 70 KB;
+    const void* const src = UT_sample(srcSize);
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    void* const frame = UT_malloc(capacity);
+    void* const decoded = UT_malloc(srcSize);
+    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, NULL));
+    LZ4F_dctx* const dctx = newDctx();
+    size_t dSize = 1000, cSize = frameSize;
+    ASSERT_LZ4F_ERROR(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, NULL, 10, NULL),
+                      LZ4F_ERROR_parameter_null);
+    ASSERT_EQ(dSize, 0);
+    ASSERT_EQ(cSize, 0);
+    /* NULL dictionary with dictSize == 0 remains valid */
+    dSize = srcSize;
+    cSize = frameSize;
+    ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, NULL, 0, NULL)), 0);
+    ASSERT_EQ(dSize, srcSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
+}
+
 TEST(getBlockSize)
 {
     unsigned id;
