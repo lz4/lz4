@@ -77,6 +77,19 @@ cp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
 lz4 -d -f $FPREFIX-same.lz4 $FPREFIX-same.lz4 && exit 1
 cmp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*) ;; *)
+    # A regular file redirected to stdin must not be truncated through its output name.
+    lz4 -f - $FPREFIX-same < $FPREFIX-same && exit 1
+    cmp $FPREFIX-same $FPREFIX-same.orig
+    lz4 -l -f - $FPREFIX-same < $FPREFIX-same && exit 1
+    cmp $FPREFIX-same $FPREFIX-same.orig
+    lz4 -d -f - $FPREFIX-same.lz4 < $FPREFIX-same.lz4 && exit 1
+    cmp $FPREFIX-same.lz4 $FPREFIX-same.lz4.orig
+    ln $FPREFIX-same $FPREFIX-stdin-hard
+    lz4 -f - $FPREFIX-stdin-hard < $FPREFIX-same && exit 1
+    cmp $FPREFIX-same $FPREFIX-same.orig
+    ln -s $FPREFIX-same $FPREFIX-stdin-sym
+    lz4 -f - $FPREFIX-stdin-sym < $FPREFIX-same && exit 1
+    cmp $FPREFIX-same $FPREFIX-same.orig
     # An unreadable destination still exists; checking by opening it for reading misses it.
     echo "keep this output" > $FPREFIX-writeonly
     cp $FPREFIX-writeonly $FPREFIX-writeonly.orig
