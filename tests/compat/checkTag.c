@@ -53,6 +53,8 @@ static int validate(const char* const tag)
     if (tagLength <= verLength) return 0;
 
     if (strncmp(LZ4_VERSION_STRING, tag+1, verLength)) return 0;
+    /* A following digit belongs to the patch version, not the tag suffix. */
+    if (tag[verLength+1] >= '0' && tag[verLength+1] <= '9') return 0;
 
     return 1;
 }

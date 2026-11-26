@@ -21,6 +21,7 @@ permissions:
 jobs:
   windows-package:
     name: Windows package (${{ matrix.arch }})
+    needs: source-tarball
     runs-on: windows-latest
     strategy:
       matrix:
@@ -85,7 +86,14 @@ jobs:
       with:
         ref: ${{ inputs.ref }}
 
+    - name: Validate release tag
+      if: github.event_name == 'push'
+      run: |
+        make -C tests checkTag
+        tests/checkTag "$GITHUB_REF_NAME"
+
     - name: Tarball and checksum
+      shell: bash
       run: |
         v=$(awk '/#define LZ4_VERSION_(MAJOR|MINOR|RELEASE) /{printf "%s%s", s, $3; s="."}' lib/lz4.h)
         git archive --format=tar --prefix=lz4-$v/ HEAD | gzip -cn > lz4-$v.tar.gz
