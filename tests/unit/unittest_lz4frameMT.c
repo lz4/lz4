@@ -63,7 +63,7 @@ TEST(getMaxNbWorkers)
 TEST(compressBound_jobs)
 {
     static const unsigned nbWorkersList[] = { 1, 8 };
-    size_t const jobSize = 512 KB;   /* 64 KB blocks */
+    size_t const jobSize = LZ4F_MT_JOBSIZE;   /* 64 KB blocks */
     size_t wi;
     for (wi = 0; wi < ARRAY_SIZE(nbWorkersList); wi++) {
         LZ4F_preferences_t p = LZ4F_INIT_PREFERENCES;
@@ -697,7 +697,7 @@ TEST(flush_partial)
 TEST(compressUpdate_deferredEmission)
 {
     static const unsigned nbWorkersList[] = { 1, 3 };
-    size_t const jobSize = 512 KB;   /* a single job (64 KB blocks), submitted once full */
+    size_t const jobSize = LZ4F_MT_JOBSIZE;   /* a single job (64 KB blocks), submitted once full */
     size_t const smallCapacity = 1 KB;
     size_t const dstCapacity = 2 * LZ4F_compressFrameBound(jobSize, NULL);
     const char* const src = (const char*)UT_sample(jobSize);
