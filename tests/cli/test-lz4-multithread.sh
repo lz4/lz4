@@ -16,7 +16,7 @@ datagen -g13M > $FPREFIX-src   # several jobs, last one incomplete
 
 # standard block sizes : frames are cut into jobs (custom block sizes : see test-lz4-blocksize.sh)
 # same output whatever the nb of threads, memory-mapped input or not, file or stdin, memory budget
-for opts in "-1" "-1 -BD" "-9 -BD -BX" "-3 -B4 -BD" "-1 -B5" "--fast=3 -BD --no-frame-crc"
+for opts in "-1" "-1 -B7 -BI" "-9 -B7 -BD -BX" "-3 -B4 -BD" "-1 -B5 -BI" "--fast=3 -BD --no-frame-crc"
 do
     lz4 -f -T1 $opts $FPREFIX-src $FPREFIX-T1.lz4
     lz4 -f -T4 $opts $FPREFIX-src $FPREFIX.lz4
@@ -36,7 +36,7 @@ done
 # and files of different sizes (-m : the same nb of threads for all) : same output
 head -c 1300000 $FPREFIX-src > $FPREFIX-s1   # 3 jobs with 64 KB blocks
 head -c 300000 $FPREFIX-src > $FPREFIX-s2    # 1 job
-for opts in "-1 -B4" "-1 -B4 -BD" "-9 -B4 -BD" "-1 -B5"
+for opts in "-1" "-1 -B4 -BI" "-1 -B4 -BD" "-9 -B4 -BD" "-1 -B5 -BI"
 do
     for f in $FPREFIX-s1 $FPREFIX-s2 $FPREFIX-src
     do
@@ -94,8 +94,9 @@ LZ4_MEMORY=50MB lz4 -f -T64 $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err
 if [ $MT = 1 ]; then grep "Warning : memory budget (50 MB)" $FPREFIX.err; fi
 LZ4_MEMORY=2GiB lz4 -f -T64 --memory 50M $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # command line wins
 if [ $MT = 1 ]; then grep "Warning : memory budget (50 MB)" $FPREFIX.err; fi
-lz4 -f -T99999 $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # within liblz4 maximum and default budget
-cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
+lz4 -f -1 -B7 $FPREFIX-src $FPREFIX-ref7.lz4
+lz4 -f -B7 -T99999 $FPREFIX-src $FPREFIX.lz4 2> $FPREFIX.err   # within liblz4 maximum ; with 4 MB blocks : beyond the default budget
+cmp $FPREFIX-ref7.lz4 $FPREFIX.lz4
 if [ $MT = 1 ]; then grep "Warning : requested 99999 threads too large" $FPREFIX.err; grep "Warning : memory budget (" $FPREFIX.err; fi
 LZ4_MEMORY=abc lz4 -f $FPREFIX-src $FPREFIX.lz4 2>&1 | grep "LZ4_MEMORY=abc"   # ignored, with a warning
 cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
@@ -105,7 +106,7 @@ if [ $MT = 1 ]; then grep "too small" $FPREFIX.err; fi
 
 # --single-thread : liblz4's single-threaded mode, same output whatever the input (memory-mapped, read, stdin) ;
 # can differ from -T1 with linked blocks ; -T# after it restores multi-threaded compression
-for opts in "-1" "-1 -BD" "-9 -B5 -BD"
+for opts in "-1 -B7 -BI" "-1 -B7 -BD" "-9 -B5 -BD"
 do
     lz4 -f --single-thread $opts $FPREFIX-src $FPREFIX-st.lz4
     lz4 -f --single-thread --no-mmap $opts $FPREFIX-src $FPREFIX.lz4
@@ -117,8 +118,9 @@ do
     lz4 -f --single-thread -T1 $opts $FPREFIX-src $FPREFIX.lz4
     cmp $FPREFIX-T1.lz4 $FPREFIX.lz4
 done
-lz4 -f --single-thread -1 $FPREFIX-src $FPREFIX.lz4   # independent blocks : same output as multi-threaded
-cmp $FPREFIX-ref.lz4 $FPREFIX.lz4
+lz4 -f -1 -BI $FPREFIX-src $FPREFIX-refI.lz4
+lz4 -f --single-thread -1 -BI $FPREFIX-src $FPREFIX.lz4   # independent blocks : same output as multi-threaded
+cmp $FPREFIX-refI.lz4 $FPREFIX.lz4
 
 
 # errors met while jobs are running : reported once all jobs are done, not from a job
@@ -164,7 +166,7 @@ fi
 
 # Source modified during its compression (see --[no-]mmap) :
 # output goes into a fifo, read only once the source is modified :
-# lz4 is then blocked writing its first output, after reading its first 4 MB chunk.
+# lz4 is then blocked writing its first output, after reading its first chunk.
 # -T1 : 3 job slots, so lz4 is blocked before reaching the end of the source.
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 command -v mkfifo > /dev/null || exit 0

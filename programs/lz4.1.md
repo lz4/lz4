@@ -161,7 +161,7 @@ only the latest one will be applied.
 * `--memory=#`:
   Memory budget of multi-threaded compression, in bytes, with optional suffixes `K`, `M`, `G` (powers of 1024)
   (default: 4 GB, 1 GB on 32-bit systems). It limits the number of worker threads.
-  Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller blocks.
+  Each worker employs ~20 MB with 4 MB blocks, ~5 MB with smaller blocks (default : 256 KB).
 
 * `--favor-decSpeed`:
   Generate compressed data optimized for decompression speed.
@@ -206,16 +206,16 @@ only the latest one will be applied.
   and even with `-f`.
 
 * `-B#`:
-  Block size \[4-7\](default : 7)<br/>
+  Block size \[4-7\](default : 5)<br/>
   `-B4`= 64KB ; `-B5`= 256KB ; `-B6`= 1MB ; `-B7`= 4MB<br/>
   `-B#` with `#` >= 32 : block size in bytes.
   Sizes other than 64KB, 256KB, 1MB and 4MB are compressed single-threaded (`-T#` is ignored).
 
 * `-BI`:
-  Produce independent blocks (default)
+  Produce independent blocks
 
 * `-BD`:
-  Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
+  Blocks depend on predecessors (default) (improves compression ratio, more noticeable on small blocks)
 
 * `-BX`:
   Generate block checksums (default:disabled)

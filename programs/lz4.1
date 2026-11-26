@@ -133,7 +133,7 @@ Compress frames with the main thread alone, without cutting them into jobs (libl
 .
 .TP
 \fB\-\-memory=#\fR
-Memory budget of multi\-threaded compression, in bytes, with optional suffixes \fBK\fR, \fBM\fR, \fBG\fR (powers of 1024) (default: 4 GB, 1 GB on 32\-bit systems)\. It limits the number of worker threads\. Each worker employs ~20 MB with 4 MB blocks (default), ~5 MB with smaller blocks\.
+Memory budget of multi\-threaded compression, in bytes, with optional suffixes \fBK\fR, \fBM\fR, \fBG\fR (powers of 1024) (default: 4 GB, 1 GB on 32\-bit systems)\. It limits the number of worker threads\. Each worker employs ~20 MB with 4 MB blocks, ~5 MB with smaller blocks (default : 256 KB)\.
 .
 .TP
 \fB\-\-favor\-decSpeed\fR
@@ -170,7 +170,7 @@ operate recursively on directories\. This mode also sets \fB\-m\fR (multiple inp
 .
 .TP
 \fB\-B#\fR
-Block size [4\-7](default : 7)
+Block size [4\-7](default : 5)
 .
 .br
 \fB\-B4\fR= 64KB ; \fB\-B5\fR= 256KB ; \fB\-B6\fR= 1MB ; \fB\-B7\fR= 4MB
@@ -180,11 +180,11 @@ Block size [4\-7](default : 7)
 .
 .TP
 \fB\-BI\fR
-Produce independent blocks (default)
+Produce independent blocks
 .
 .TP
 \fB\-BD\fR
-Blocks depend on predecessors (improves compression ratio, more noticeable on small blocks)
+Blocks depend on predecessors (default) (improves compression ratio, more noticeable on small blocks)
 .
 .TP
 \fB\-BX\fR

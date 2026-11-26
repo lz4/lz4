@@ -110,7 +110,6 @@
 #define CACHELINE 64
 #define LEGACY_BLOCKSIZE   (8 MB)
 #define MIN_STREAM_BUFSIZE (192 KB)
-#define LZ4IO_BLOCKSIZEID_DEFAULT 7
 #define LZ4_MAX_DICT_SIZE (64 KB)
 
 #undef MIN
@@ -278,11 +277,11 @@ LZ4IO_prefs_t* LZ4IO_defaultPreferences(void)
     prefs->overwrite = 1;
     prefs->followLinks = 0;
     prefs->testMode = 0;
-    LZ4IO_setBlockSizeID(prefs, LZ4IO_BLOCKSIZEID_DEFAULT);
+    LZ4IO_setBlockSizeID(prefs, LZ4_BLOCKSIZEID_DEFAULT);
     prefs->blockChecksum = 0;
     prefs->streamChecksum = 1;
     prefs->skipChecksums = LZ4F_verifyChecksums;
-    prefs->blockIndependence = 1;
+    prefs->blockIndependence = 0;
     prefs->sparseFileSupport = 1;
     prefs->contentSizeFlag = 0;
     prefs->useDictionary = 0;

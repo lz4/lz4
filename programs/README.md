@@ -33,7 +33,7 @@ On a typical `posix` + `gcc` + `make` setup, they can be defined with `CPPFLAGS=
    Default is `0`, which means "auto-determine" based on local cpu.
    The nb of workers is limited by liblz4 (`LZ4F_getMaxNbWorkers()` : 1024, 128 on 32-bit systems, 1 without its multithreading support),
    and, for the frame format, by a memory budget (see `--memory`, `LZ4_MEMORY`).
-- `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 7, corresponding to 4 MB block size.
+- `LZ4_BLOCKSIZEID_DEFAULT`: default `lz4` block size code. Valid values are [4-7], corresponding to 64 KB, 256 KB, 1 MB and 4 MB. At the time of this writing, default is 5, corresponding to 256 KB block size.
 
 #### Environment Variables
 It's possible to pass some parameters to `lz4` via environment variables.
@@ -93,8 +93,9 @@ Advanced arguments :
  -r     : operate recursively on directories (sets also -m)
  -l     : compress using Legacy format (Linux kernel compression)
  -B#    : cut file into blocks of size # bytes [32+]
-                     or predefined block size [4-7] (default: 7)
- -BD    : Block dependency (improve compression ratio)
+                     or predefined block size [4-7] (default: 5)
+ -BI    : Block Independence
+ -BD    : Block dependency (default, improves compression ratio)
  -BX    : enable block checksum (default:disabled)
 --no-frame-crc : disable stream checksum (default:enabled)
 --content-size : compressed frame includes original size (default:not present)
