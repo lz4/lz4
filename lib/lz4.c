@@ -1801,6 +1801,13 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
              dictCtx != NULL ? dictCtx->dictSize : 0);
 
     if (dictCtx != NULL) {
+        /* The dictionary replaces the stream history (see lz4.h) : drop it, as LZ4F_initStream() does.
+         * The reset also adds a 64 KB gap to the indexes, which keeps them at or above the dictionary's :
+         * dictDelta = startIndex - dictCtx->currentOffset (see LZ4_compress_generic_validated()) must not wrap.
+         */
+        if ((dictCtx->dictSize != 0) && (workingStream->internal_donotuse.currentOffset != 0)) {
+            LZ4_resetStream_fast(workingStream);
+        }
         /* If the current offset is zero, we will never look in the
          * external dictionary context, since there is no value a table
          * entry can take that indicate a miss. In that case, we need
@@ -1811,6 +1818,7 @@ void LZ4_attach_dictionary(LZ4_stream_t* workingStream, const LZ4_stream_t* dict
             /* no longer a cleared table : LZ4_prepareTable() must check it */
             workingStream->internal_donotuse.tableType = (U32)byU32;
         }
+        assert(dictCtx->dictSize == 0 || workingStream->internal_donotuse.currentOffset >= dictCtx->currentOffset);
 
         /* Don't actually attach an empty dictionary.
          */
