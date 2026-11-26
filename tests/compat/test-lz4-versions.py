@@ -148,7 +148,7 @@ if __name__ == '__main__':
             lz4t = lz4s[j]
             if not os.path.isfile(lz4t):
                 continue
-            if filecmp.cmp(lz4, lz4t):
+            if filecmp.cmp(lz4, lz4t, shallow=False):
                 os.remove(lz4t)
                 print('{} == {}'.format(lz4, lz4t))
 
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # Compare all '.dec' files with test_dat
     decs = glob.glob('*.dec')
     for dec in decs:
-        if not filecmp.cmp(dec, test_dat):
+        if not filecmp.cmp(dec, test_dat, shallow=False):
             print('ERR : ' + dec)
             error_code = 1
         else:
