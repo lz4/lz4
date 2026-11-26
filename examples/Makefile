@@ -93,6 +93,11 @@ test : all $(LZ4)
 	@echo "\n=== Frame compression ==="
 	./frameCompress$(EXT) $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
+	: > tmp-frame-small
+	./frameCompress$(EXT) tmp-frame-small
+	printf abc > tmp-frame-small
+	./frameCompress$(EXT) tmp-frame-small
+	$(RM) tmp-frame-small tmp-frame-small.lz4 tmp-frame-small.lz4.dec
 	@echo "\n=== file compression ==="
 	./fileCompress$(EXT) $(TESTFILE)
 	$(LZ4) -vt $(TESTFILE).lz4
