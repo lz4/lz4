@@ -183,6 +183,14 @@ cp $SRC $FPREFIX-m2
 lz4 -q -f --multiple $FPREFIX-m1 $FPREFIX-m2
 cmp $FPREFIX-m1.lz4 $REF
 cmp $FPREFIX-m2.lz4 $REF
+# A mode selected after an operand must not silently drop that operand.
+rm $FPREFIX-m1.lz4 $FPREFIX-m2.lz4
+lz4 -q -f $FPREFIX-m1 --multiple $FPREFIX-m2
+cmp $FPREFIX-m1.lz4 $REF
+cmp $FPREFIX-m2.lz4 $REF
+lz4 $BAD -t < /dev/null && exit 1
+lz4 $FPREFIX-m1.lz4 --list > $FPREFIX-list
+grep -q $FPREFIX-m1.lz4 $FPREFIX-list
 lz4 --list $FPREFIX-m1.lz4 $FPREFIX-m2.lz4 > $FPREFIX-list
 grep -q $FPREFIX-m1.lz4 $FPREFIX-list
 grep -q $FPREFIX-m2.lz4 $FPREFIX-list
@@ -229,3 +237,15 @@ results 2 -b1 -S $SRC $HDR
 results 1 -b1 $SRC $HDR
 warns "Decompression" "lz4 -b -d -i0 $REF"
 warns "Decompression" "lz4 -b --decompress -i0 $REF"
+
+# Explicit stdin is an input operand in multiple-input mode, including a late mode.
+cat $SRC $HDR > $FPREFIX-stdin-first
+cat $HDR $SRC > $FPREFIX-stdin-last
+lz4 -m -c - $HDR < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-first
+lz4 -m -c $HDR - < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-last
+lz4 -c - --multiple $HDR < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-first
+lz4 -c $HDR - --multiple < $SRC | lz4 -dc | cmp - $FPREFIX-stdin-last
+# Benchmarks require named files; an explicit stdin must not silently select other data.
+fails "lz4 -b -i0 - < $SRC"
+fails "lz4 -b -i0 $HDR - < $SRC"
+fails "lz4 - -b -i0 < $SRC"
