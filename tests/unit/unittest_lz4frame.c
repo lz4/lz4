@@ -256,6 +256,88 @@ TEST(compressBound_nullPreferences)
         ASSERT_MSG(LZ4F_compressBound(srcSizes[i], NULL) >= LZ4F_compressBound(srcSizes[i], &prefs), "srcSize %u", (unsigned)srcSizes[i]);
 }
 
+/* invalid blockSizeID falls back to 4 MB in all LZ4F_compressBound*() variants, including autoFlush and one-shot */
+TEST(compressBound_invalidBlockSizeID)
+{
+    static const size_t srcSizes[] = { 0, 2, 7, 103, 64 KB + 3 };
+    size_t n, i;
+    for (n = 0; n < ARRAY_SIZE(g_invalidBlockSizeIDs); n++) {
+        LZ4F_preferences_t invalidPrefs = LZ4F_INIT_PREFERENCES;
+        LZ4F_preferences_t refPrefs = LZ4F_INIT_PREFERENCES;
+        invalidPrefs.frameInfo.blockSizeID = (LZ4F_blockSizeID_t)g_invalidBlockSizeIDs[n];
+        refPrefs.frameInfo.blockSizeID = LZ4F_max4MB;
+        for (i = 0; i < ARRAY_SIZE(srcSizes); i++) {
+            invalidPrefs.autoFlush = 0;
+            refPrefs.autoFlush = 0;
+            ASSERT_EQ(LZ4F_compressBound(srcSizes[i], &invalidPrefs), LZ4F_compressBound(srcSizes[i], &refPrefs));
+            invalidPrefs.autoFlush = 1;
+            refPrefs.autoFlush = 1;
+            ASSERT_EQ(LZ4F_compressBound(srcSizes[i], &invalidPrefs), LZ4F_compressBound(srcSizes[i], &refPrefs));
+            ASSERT_EQ(LZ4F_compressFrameBound(srcSizes[i], &invalidPrefs), LZ4F_compressFrameBound(srcSizes[i], &refPrefs));
+        }
+    }
+}
+
+/* NULL zero-capacity output and NULL zero-size input must not trigger pointer arithmetic or memcpy UB */
+TEST(compressUpdate_nullZeroBuffers)
+{
+    static const char data[] = "hello";
+    char header[LZ4F_HEADER_SIZE_MAX];
+    char dst[64];
+    LZ4F_cctx* const cctx = newCctx();
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;
+    LZ4F_compressOptions_t cOpts;
+    size_t pos;
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled;
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.uncompressed = 1;
+    ASSERT_LZ4F_ERROR(LZ4F_compressFrame(NULL, 0, NULL, 0, NULL), LZ4F_ERROR_dstCapacity_tooSmall);
+    ASSERT_LZ4F_ERROR(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 10, NULL),
+                      LZ4F_ERROR_parameter_null);
+    pos = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 0, &prefs));
+    ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), NULL)), 0);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, NULL, 0, NULL)), 0);
+    /* failed LZ4F_compressBegin_usingDict() with NULL dict preserves the frame in progress */
+    ASSERT_LZ4F_ERROR(LZ4F_compressBegin_usingDict(cctx, dst, sizeof(dst), NULL, 10, NULL),
+                      LZ4F_ERROR_parameter_null);
+    ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
+    /* mode switch with empty tmp buffer and NULL/0 output */
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
+    ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), &cOpts)), 0);
+    ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
+    /* full-block update into NULL/0 dst exercises LZ4F_compressBlocks_internal() with NULL dst */
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
+    ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
+    ASSERT_LZ4F_ERROR(LZ4F_compressUpdate(cctx, NULL, 0, UT_sample(64 KB), 64 KB, NULL),
+                      LZ4F_ERROR_dstCapacity_tooSmall);
+}
+
+/* LZ4F_decompress_usingDict() rejects a NULL dictionary with non-zero size, matching LZ4F_resumeFrame() */
+TEST(decompress_usingDict_nullDict)
+{
+    size_t const srcSize = 2000;
+    const void* const src = UT_sample(srcSize);
+    LZ4F_preferences_t const prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, &prefs);
+    void* const frame = UT_malloc(capacity);
+    void* const decoded = UT_malloc(srcSize);
+    size_t const frameSize = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, NULL, &prefs));
+    LZ4F_dctx* const dctx = newDctx();
+    size_t dSize = 1000, cSize = frameSize;
+    ASSERT_LZ4F_ERROR(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, NULL, 10, NULL),
+                      LZ4F_ERROR_parameter_null);
+    ASSERT_EQ(dSize, 0);
+    ASSERT_EQ(cSize, 0);
+    /* NULL dictionary with dictSize == 0 remains valid */
+    dSize = srcSize;
+    cSize = frameSize;
+    ASSERT_EQ(LZ4F_OK(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, NULL, 0, NULL)), 0);
+    ASSERT_EQ(dSize, srcSize);
+    ASSERT_MEMEQ(decoded, src, srcSize);
+}
+
 TEST(getBlockSize)
 {
     unsigned id;
