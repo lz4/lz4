@@ -249,6 +249,17 @@ echo "one" > $FPREFIX-rtree/f1
 echo "two" > $FPREFIX-rtree/sub/f2
 lz4 -q -r $FPREFIX-rtree
 lz4 -q -t -m $FPREFIX-rtree/f1.lz4 $FPREFIX-rtree/sub/f2.lz4
+# -r : exceed initial 8 KB file-list buffer (LIST_SIZE_INCREASE) across nested subdirectories
+mkdir -p $FPREFIX-rmany/subdir_alpha_0123456789/subdir_beta_0123456789
+i=0
+while [ $i -lt 200 ]; do
+    echo "data_$i" > "$FPREFIX-rmany/subdir_alpha_0123456789/subdir_beta_0123456789/entry_name_padding_${i}.txt"
+    i=$((i + 1))
+done
+lz4 -q -r $FPREFIX-rmany
+test $(find $FPREFIX-rmany -name "*.lz4" | wc -l) -eq 200
+lz4 -q -t -m $FPREFIX-rmany/subdir_alpha_0123456789/subdir_beta_0123456789/entry_name_padding_0.txt.lz4 \
+             $FPREFIX-rmany/subdir_alpha_0123456789/subdir_beta_0123456789/entry_name_padding_199.txt.lz4
 # Windows : also read-only, hidden and system files without the archive attribute
 case "$(uname)" in MINGW*|MSYS*|CYGWIN*)
     mkdir $FPREFIX-rattr
