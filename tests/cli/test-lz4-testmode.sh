@@ -28,6 +28,14 @@ do
     lsize=$(lz4 -c $crc $opts $FPREFIX-bench | wc -c)
     test "$bsize" -eq "$lsize"
 done
+# Benchmark results may be buffered until the final flush.
+if [ "$(uname)" = Linux ] && [ -w /dev/full ]; then
+    for quiet in "" "-q"; do
+        rc=0
+        lz4 -bi0 $quiet $FPREFIX > /dev/full 2> $FPREFIX-output-error || rc=$?
+        test "$rc" -eq 1
+    done
+fi
 echo "---- test mode ----"
 datagen | lz4 -t && exit 1
 datagen | lz4 -tf && exit 1
