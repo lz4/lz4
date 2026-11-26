@@ -285,24 +285,35 @@ TEST(compressUpdate_nullZeroBuffers)
     char header[LZ4F_HEADER_SIZE_MAX];
     char dst[64];
     LZ4F_cctx* const cctx = newCctx();
+    LZ4F_compressOptions_t cOpts;
     size_t pos;
+    memset(&cOpts, 0, sizeof(cOpts));
+    cOpts.uncompressed = 1;
     ASSERT_LZ4F_ERROR(LZ4F_compressFrame(NULL, 0, NULL, 0, NULL), LZ4F_ERROR_dstCapacity_tooSmall);
-    pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
+    ASSERT_LZ4F_ERROR(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 10, NULL),
+                      LZ4F_ERROR_parameter_null);
+    pos = LZ4F_OK(LZ4F_compressBegin_usingDict(cctx, header, sizeof(header), NULL, 0, NULL));
     ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
     ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), NULL)), 0);
     ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, NULL, 0, NULL)), 0);
+    ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
+    /* mode switch with empty tmp buffer and NULL/0 output */
+    pos = LZ4F_OK(LZ4F_compressBegin(cctx, header, sizeof(header), NULL));
+    ASSERT(pos >= LZ4F_HEADER_SIZE_MIN);
+    ASSERT_EQ(LZ4F_OK(LZ4F_compressUpdate(cctx, NULL, 0, data, sizeof(data), &cOpts)), 0);
     ASSERT(LZ4F_OK(LZ4F_compressEnd(cctx, dst, sizeof(dst), NULL)) > 0);
 }
 
 /* LZ4F_decompress_usingDict() rejects a NULL dictionary with non-zero size, matching LZ4F_resumeFrame() */
 TEST(decompress_usingDict_nullDict)
 {
-    size_t const srcSize = 70 KB;
+    size_t const srcSize = 2000;
     const void* const src = UT_sample(srcSize);
-    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    LZ4F_preferences_t const prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, &prefs);
     void* const frame = UT_malloc(capacity);
     void* const decoded = UT_malloc(srcSize);
-    size_t const frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, NULL));
+    size_t const frameSize = LZ4F_OK(streamFrame(newCctx(), frame, capacity, src, srcSize, NULL, 0, NULL, &prefs));
     LZ4F_dctx* const dctx = newDctx();
     size_t dSize = 1000, cSize = frameSize;
     ASSERT_LZ4F_ERROR(LZ4F_decompress_usingDict(dctx, decoded, &dSize, frame, &cSize, NULL, 10, NULL),
