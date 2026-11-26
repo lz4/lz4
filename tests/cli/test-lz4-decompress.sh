@@ -68,6 +68,16 @@ for z in $FPREFIX-z1 $FPREFIX-z2; do
     lz4 -q -d -c -f --sparse $z > $OUT;  cmp $z $OUT   # not lz4 : pass-through (-c -f)
 done
 
+# pass-through also accepts files shorter than the four-byte magic number
+for n in 1 2 3; do
+    head -c $n $SRC > $FPREFIX-short
+    lz4 -dcf $FPREFIX-short > $OUT;  cmp $FPREFIX-short $OUT
+    cat $FPREFIX-short | lz4 -dcf > $OUT;  cmp $FPREFIX-short $OUT
+    lz4cat $FPREFIX-short > $OUT;  cmp $FPREFIX-short $OUT
+    fails "lz4 -dc $FPREFIX-short" "Magic Number unreadable"
+    fails "lz4 -tf $FPREFIX-short" "Magic Number unreadable"
+done
+
 # checksums : content checksums verified by lz4 itself in multi-threaded decompression (see LZ4IO_frameCheck_t),
 # by liblz4 otherwise ; block checksums verified by liblz4 ; frames of each kind, one after the other
 B=$FPREFIX-big;  datagen -g9MB > $B   # several 4 MB blocks
