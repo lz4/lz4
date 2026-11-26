@@ -36,16 +36,12 @@ Differences are :
   * `lz4` shows real-time notification statistics
      during compression or decompression of a single file
      (use `-q` to silence them)
-  * When no destination is specified, result is sent on implicit output,
-    which depends on `stdout` status.
-    When `stdout` _is Not the console_, it becomes the implicit output.
-    Otherwise, if `stdout` is the console, the implicit output is `filename.lz4`.
-  * It is considered bad practice to rely on implicit output in scripts.
-    because the script's environment may change.
-    Always use explicit output in scripts.
-    `-c` ensures that output will be `stdout`.
-    Conversely, providing a destination name, or using `-m`
-    ensures that the output will be either the specified name, or `filename.lz4` respectively.
+  * With a named input and no destination, compression writes `filename.lz4`.
+    Decompression removes the `.lz4` suffix to select its output filename.
+    Redirecting standard output does not change this behavior.
+    When reading standard input, output defaults to standard output.
+  * Use `-c` to send a named input's result to standard output,
+    or provide an explicit destination filename.
 
 Default behaviors can be modified by opt-in commands, detailed below.
 
@@ -65,8 +61,8 @@ It is possible to concatenate `.lz4` files as is.
 `lz4` will decompress such files as if they were a single `.lz4` file.
 For example:
 
-    lz4 file1  > foo.lz4
-    lz4 file2 >> foo.lz4
+    lz4 -c file1  > foo.lz4
+    lz4 -c file2 >> foo.lz4
 
 Then `lz4cat foo.lz4` is equivalent to `cat file1 file2`.
 
