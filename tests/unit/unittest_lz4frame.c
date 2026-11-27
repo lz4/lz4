@@ -1537,6 +1537,83 @@ TEST(decompress_historyIntoSmallOutputs)
     }
 }
 
+/* allocator serving the decoder's history buffer (tmpOutBuffer) from the start of @arena :
+ * the rest of the arena, right after it, can serve as output, as allocators without headers can do */
+typedef struct { BYTE* arena; size_t historyBufferSize; int served; } arenaState_t;
+static void* arenaMalloc(void* state, size_t s)
+{
+    arenaState_t* const a = (arenaState_t*)state;
+    if (s != a->historyBufferSize) return malloc(s);
+    a->served++;
+    return a->arena;
+}
+static void* arenaCalloc(void* state, size_t s)
+{
+    void* const p = arenaMalloc(state, s);
+    if (p != NULL) memset(p, 0, s);
+    return p;
+}
+static void arenaFree(void* state, void* p)
+{
+    if (p != ((arenaState_t*)state)->arena) free(p);
+}
+
+/* linked blocks, decoded into an output smaller than a block (stableDst == 0), reused for each invocation,
+ * and starting right after the decoder's history buffer :
+ * this adjacency doesn't continue the history, which must still be saved at the end of each invocation */
+TEST(decompress_outputAfterHistoryBuffer)
+{
+    static const size_t outSizes[] = { 4 KB, 8 KB, 32 KB };
+    size_t const blockSize = 64 KB;
+    size_t const srcSize = 24 * blockSize;
+    BYTE* const src = (BYTE*)UT_fixedNoise(srcSize);
+    BYTE* const decoded = (BYTE*)UT_malloc(srcSize);
+    size_t const capacity = LZ4F_compressFrameBound(srcSize, NULL);
+    BYTE* const frame = (BYTE*)UT_malloc(capacity);
+    LZ4F_preferences_t prefs = LZ4F_INIT_PREFERENCES;   /* linked blocks */
+    size_t frameSize, oi, i;
+    /* incompressible blocks, stored as is, and copied directly into the output ;
+     * every 5th block repeats earlier content : decoded with matches into the history */
+    for (i = 4 * blockSize; i < srcSize; i += 5 * blockSize) {
+        size_t j;
+        for (j = i; j < i + blockSize; j++) src[j] = src[j - LZ4_DISTANCE_MAX];
+    }
+    prefs.frameInfo.blockSizeID = LZ4F_max64KB;
+    frameSize = LZ4F_OK(LZ4F_compressFrame(frame, capacity, src, srcSize, &prefs));
+    for (oi = 0; oi < ARRAY_SIZE(outSizes); oi++) {
+        arenaState_t* const a = (arenaState_t*)UT_malloc(sizeof(*a));   /* released after the decoder */
+        LZ4F_CustomMem mem;
+        LZ4F_dctx* dctx;
+        BYTE* out;
+        size_t pos = 0, dPos = 0, r = 1;
+        a->historyBufferSize = blockSize + 128 KB;   /* linked blocks : a block, and history */
+        a->arena = (BYTE*)UT_malloc(a->historyBufferSize + outSizes[oi]);
+        a->served = 0;
+        mem.customAlloc = arenaMalloc;
+        mem.customCalloc = arenaCalloc;
+        mem.customFree = arenaFree;
+        mem.opaqueState = a;
+        dctx = (LZ4F_dctx*)UT_defer(freeDctx, LZ4F_createDecompressionContext_advanced(mem, LZ4F_VERSION));
+        ASSERT(dctx != NULL);
+        out = a->arena + a->historyBufferSize;
+        while (r != 0) {
+            size_t cSize = frameSize - pos;
+            size_t dSize = MIN(outSizes[oi], srcSize - dPos);
+            r = LZ4F_OK(LZ4F_decompress(dctx, out, &dSize, frame + pos, &cSize, NULL));
+            ASSERT_MSG(cSize > 0 || dSize > 0 || r == 0, "no progress at position %u", (unsigned)pos);
+            memcpy(decoded + dPos, out, dSize);
+            pos += cSize;
+            dPos += dSize;
+        }
+        ASSERT_EQ(a->served, 1);   /* the output follows the history buffer */
+        ASSERT_EQ(dPos, srcSize);
+        ASSERT_MSG(!memcmp(decoded, src, srcSize), "outputs of %u bytes : corrupted", (unsigned)outSizes[oi]);
+        UT_release(dctx);
+        UT_release(a->arena);
+        UT_release(a);
+    }
+}
+
 /* writes a sequence : @ll literals, then a match of @ml bytes at @offset (none when @ml == 0)
  * @return : its size */
 static size_t writeSequence(unsigned char* op, const unsigned char* literals, size_t ll, unsigned offset, size_t ml)
