@@ -43,7 +43,7 @@ do
         lz4 -f -T1 --no-mmap $opts $f $f-ref.lz4
         lz4 -f $opts $f $f.lz4
         cmp $f-ref.lz4 $f.lz4
-        lz4 $opts < $f > $f.lz4   # size unknown : worker threads
+        cat $f | lz4 $opts > $f.lz4   # size unknown : worker threads
         cmp $f-ref.lz4 $f.lz4
     done
     lz4 -f -m $opts $FPREFIX-s1 $FPREFIX-s2 $FPREFIX-src
