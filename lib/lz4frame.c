@@ -3093,33 +3093,33 @@ static void LZ4F_moveDictBeforeTmpOut(LZ4F_dctx* dctx, size_t flushSize)
 
 /* LZ4F_updateDict() :
  * A linked block references the previous 64 KB of output.
- * After each output [dst, dst+dstSize) (a block, or a part of it),
+ * After each output [dstPtr, dstPtr+dstSize) (a block, or a part of it),
  * records where this history is, for the next block :
- * [dict, dict+dictSize) is contiguous, and ends with dst+dstSize.
- * It stays within dstBuffer when possible, otherwise it's copied into tmpOutBuffer.
- * Condition : @dst != NULL
+ * [dict, dict+dictSize) is contiguous, and ends with dstPtr+dstSize.
+ * It stays within dstBuffer (from @dstBufferStart) when possible, otherwise it's copied into tmpOutBuffer.
+ * Condition : @dstPtr != NULL
  */
 static void LZ4F_updateDict(LZ4F_dctx* dctx,
-                      const BYTE* dst, size_t dstSize, const BYTE* dstBufferStart,
+                      const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
                       unsigned withinTmp)
 {
     assert(dctx != NULL);
-    assert(dst != NULL);
-    if (dctx->dictSize==0) dctx->dict = (const BYTE*)dst;  /* will lead to prefix mode */
+    assert(dstPtr != NULL);
+    if (dctx->dictSize==0) dctx->dict = (const BYTE*)dstPtr;  /* will lead to prefix mode */
     assert(dctx->dict != NULL);
 
     /* prefix mode : the output follows the history within the same buffer : dstBuffer, or a previous one (stableDst).
      * The output is never within tmpOutBuffer (history there continues through tmpOut : see withinTmp below) :
      * a history within tmpOutBuffer ending where the output starts only means both buffers are adjacent allocations. */
-    if ((dctx->dict + dctx->dictSize == dst) && (dctx->dict != dctx->tmpOutBuffer)) {
+    if ((dctx->dict + dctx->dictSize == dstPtr) && (dctx->dict != dctx->tmpOutBuffer)) {
         dctx->dictSize += dstSize;
         return;
     }
 
-    assert(dst >= dstBufferStart);
-    if ((size_t)(dst - dstBufferStart) + dstSize >= 64 KB) {  /* history in dstBuffer becomes large enough to become dictionary */
+    assert(dstPtr >= dstBufferStart);
+    if ((size_t)(dstPtr - dstBufferStart) + dstSize >= 64 KB) {  /* history in dstBuffer becomes large enough to become dictionary */
         dctx->dict = (const BYTE*)dstBufferStart;
-        dctx->dictSize = (size_t)(dst - dstBufferStart) + dstSize;
+        dctx->dictSize = (size_t)(dstPtr - dstBufferStart) + dstSize;
         return;
     }
 
@@ -3129,7 +3129,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     assert(dctx->tmpOutBuffer != NULL);
 
     if (withinTmp && (dctx->dict == dctx->tmpOutBuffer)) {   /* continue history within tmpOutBuffer */
-        /* withinTmp expectation : content of [dst,dstSize] is same as [dict+dictSize,dstSize], so we just extend it */
+        /* withinTmp expectation : content of [dstPtr,dstSize] is same as [dict+dictSize,dstSize], so we just extend it */
         assert(dctx->dict + dctx->dictSize == dctx->tmpOut + dctx->tmpOutStart);
         dctx->dictSize += dstSize;
         return;
@@ -3146,7 +3146,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
             LZ4_memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
             dctx->dictSize = preserveSize;
         }
-        LZ4_memcpy(dctx->tmpOutBuffer + dctx->dictSize, dst, dstSize);
+        LZ4_memcpy(dctx->tmpOutBuffer + dctx->dictSize, dstPtr, dstSize);
         dctx->dictSize += dstSize;
         return;
     }
@@ -3155,7 +3155,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     {   size_t preserveSize = 64 KB - dstSize;
         if (preserveSize > dctx->dictSize) preserveSize = dctx->dictSize;
         LZ4_memcpy(dctx->tmpOutBuffer, dctx->dict + dctx->dictSize - preserveSize, preserveSize);
-        LZ4_memcpy(dctx->tmpOutBuffer + preserveSize, dst, dstSize);
+        LZ4_memcpy(dctx->tmpOutBuffer + preserveSize, dstPtr, dstSize);
         dctx->dict = dctx->tmpOutBuffer;
         dctx->dictSize = preserveSize + dstSize;
     }
