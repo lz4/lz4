@@ -57,10 +57,10 @@
 #endif
 
 /* Determines default lz4 block size when none provided.
- * Default value is 7, which represents 4 MB.
+ * Default value is 5, which represents 256 KB.
  * Can be overridden at runtime using -B# command */
 #ifndef LZ4_BLOCKSIZEID_DEFAULT
-# define LZ4_BLOCKSIZEID_DEFAULT 7
+# define LZ4_BLOCKSIZEID_DEFAULT 5
 #endif
 
 

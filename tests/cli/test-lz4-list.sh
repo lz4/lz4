@@ -20,12 +20,12 @@ set -x
 datagen -g300KB > $FPREFIX-src
 datagen -g100KB -P0 > $FPREFIX-noise
 datagen -g5M > $FPREFIX-big
-C=$FPREFIX-c.lz4;  lz4 -q -B4 -BD --content-size $FPREFIX-src $C   # linked 64 KB blocks, content size
-X=$FPREFIX-x.lz4;  lz4 -q -B4 -BX --no-frame-crc $FPREFIX-src $X   # block checksums, no content checksum
-F=$FPREFIX-f.lz4;  lz4 -q -B5 $FPREFIX-src $F                      # 256 KB blocks
-N=$FPREFIX-n.lz4;  lz4 -q -B4 $FPREFIX-noise $N                    # incompressible : 64 KB stored block
-B=$FPREFIX-b.lz4;  lz4 -q --content-size $FPREFIX-big $B           # 4 MB blocks
-L=$FPREFIX-l.lz4;  lz4 -q -l $FPREFIX-src $L                       # legacy frame
+C=$FPREFIX-c.lz4;  lz4 -q -B4 -BD --content-size $FPREFIX-src $C       # linked 64 KB blocks, content size
+X=$FPREFIX-x.lz4;  lz4 -q -B4 -BI -BX --no-frame-crc $FPREFIX-src $X   # block checksums, no content checksum
+F=$FPREFIX-f.lz4;  lz4 -q -B5 -BI $FPREFIX-src $F                      # 256 KB blocks
+N=$FPREFIX-n.lz4;  lz4 -q -B4 -BI $FPREFIX-noise $N                    # incompressible : 64 KB stored block
+B=$FPREFIX-b.lz4;  lz4 -q -B7 -BI --content-size $FPREFIX-big $B       # 4 MB blocks
+L=$FPREFIX-l.lz4;  lz4 -q -l $FPREFIX-src $L                           # legacy frame
 S=$FPREFIX-s.lz4;  printf '\137\052\115\030\004\000\000\000skip' > $S   # skippable frame (magic 0x184D2A5F)
 ERR=$FPREFIX-err
 

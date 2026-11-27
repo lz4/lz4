@@ -174,8 +174,8 @@ static int usage_advanced(const char* exeName)
 #if LZ4IO_MULTITHREAD
     DISPLAYOUT( "                     (custom sizes : single-threaded compression) \n");
 #endif
-    DISPLAYOUT( " -BI    : Block Independence (default) \n");
-    DISPLAYOUT( " -BD    : Block dependency (improves compression ratio) \n");
+    DISPLAYOUT( " -BI    : Block Independence \n");
+    DISPLAYOUT( " -BD    : Block dependency (default, improves compression ratio) \n");
     DISPLAYOUT( " -BX    : enable block checksum (default:disabled) \n");
     DISPLAYOUT( "--no-frame-crc : disable stream checksum (default:enabled) \n");
     DISPLAYOUT( "--content-size : compressed frame includes original size (default:not present)\n");

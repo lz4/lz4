@@ -59,18 +59,19 @@ silent()   { sh -c "$1" 2> $ERR; if grep -v "runtime error:\|SUMMARY: UndefinedB
 
 
 # frame header
-header "" 64
-header "--no-frame-crc" 60
-header "--no-frame-crc --frame-crc" 64
-header "-BX" 74
-header "-BX --no-crc" 60
-header "-B4 -BD" 44   # linked blocks : needs several blocks
+header "" 44   # linked blocks (default) : needs several blocks
+header "-BI" 64
+header "--no-frame-crc" 40
+header "--no-frame-crc --frame-crc" 44
+header "-BX" 54
+header "-BX --no-crc" 40
+header "-B4 -BD" 44
 header "-B4DX" 54
 header "-B4 -BD -BI" 64
-header "--content-size" 6c
-header "--content-size --no-content-size" 64
+header "--content-size" 4c
+header "--content-size --no-content-size" 44
 blockSizeID "" 40 $SRC   # small input : 64 KB blocks
-blockSizeID "" 70
+blockSizeID "" 50
 for B in 4 5 6 7; do blockSizeID -B$B ${B}0; done
 blockSizeID "-B4v" 40    # block properties end at another command
 rejected "-B0" "-B3" "-B8" "-B9"   # block size IDs : 4 to 7 ; custom block sizes : 32 bytes or more
