@@ -3103,8 +3103,9 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
     if (dctx->dictSize==0) dctx->dict = (const BYTE*)dstPtr;  /* will lead to prefix mode */
     assert(dctx->dict != NULL);
 
-    /* prefix mode : the output continues the history, within dstBuffer (or a previous one, when stableDst).
-     * History within tmpOutBuffer is never continued this way : an output starting right after it is another allocation. */
+    /* prefix mode : the output follows the history within the same buffer : dstBuffer, or a previous one (stableDst).
+     * The output is never within tmpOutBuffer (history there continues through tmpOut : see withinTmp below) :
+     * a history within tmpOutBuffer ending where the output starts only means both buffers are adjacent allocations. */
     if ((dctx->dict + dctx->dictSize == dstPtr) && (dctx->dict != dctx->tmpOutBuffer)) {
         dctx->dictSize += dstSize;
         return;
