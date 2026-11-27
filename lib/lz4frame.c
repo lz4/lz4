@@ -3102,6 +3102,7 @@ static void LZ4F_updateDict(LZ4F_dctx* dctx,
                       const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
                       unsigned withinTmp)
 {
+    assert(dctx != NULL);
     assert(dstPtr != NULL);
     if (dctx->dictSize==0) dctx->dict = (const BYTE*)dstPtr;  /* will lead to prefix mode */
     assert(dctx->dict != NULL);
