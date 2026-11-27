@@ -3092,7 +3092,10 @@ static void LZ4F_moveDictBeforeTmpOut(LZ4F_dctx* dctx, size_t flushSize)
 }
 
 /* LZ4F_updateDict() :
- * only used for LZ4F_blockLinked mode, and for the first block decoded progressively (see LZ4F_decodeProgressive())
+ * A linked block references the previous 64 KB of output.
+ * After each output, records where this history is, for the next block :
+ * [dict, dict+dictSize) is contiguous, and ends with the last output byte.
+ * It stays within dstBuffer when possible, otherwise it's copied into tmpOutBuffer.
  * Condition : @dstPtr != NULL
  */
 static void LZ4F_updateDict(LZ4F_dctx* dctx,
