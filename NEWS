@@ -7,6 +7,7 @@ cli  : `--no-frame-crc` no longer skips block checksums on decompression (`--no-
 cli  : like `gzip`, a source which is a symbolic link is refused when writing a file, unless `-f` ; `-r` ignores symbolic links, even with `-f`
 fix  : in-place decompression: wrong margin since v1.11.0 due to larger stripes: recompile with the enlarged `LZ4_DECOMPRESS_INPLACE_MARGIN()`, reported by @arshsmith1
 fix  : `lz4 -l` started a thread per core at once, and could fail under a limit of processes, notably from standard input (since v1.10.0)
+fix  : `LZ4F_decompress()` could corrupt linked blocks decoded into outputs smaller than a block, when an output starts right after the decoder's internal buffer (allocators without headers, like jemalloc), reported by @othmanekn
 perf : faster decompression with a dictionary (up to +38% on small blocks)
 perf : faster content checksums in gcc builds for x86-64 without SSE4.1, the default of most distributions (compression and decompression up to +133%)
 perf : faster `lz4 -d` and `lz4 -t` on frames with a content checksum (the default) : verified by a dedicated thread, up to +39% on silesia

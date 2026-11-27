@@ -3092,18 +3092,26 @@ static void LZ4F_moveDictBeforeTmpOut(LZ4F_dctx* dctx, size_t flushSize)
 }
 
 /* LZ4F_updateDict() :
- * only used for LZ4F_blockLinked mode, and for the first block decoded progressively (see LZ4F_decodeProgressive())
+ * A linked block references the previous 64 KB of output.
+ * After each output [dstPtr, dstPtr+dstSize) (a block, or a part of it),
+ * records where this history is, for the next block :
+ * [dict, dict+dictSize) is contiguous, and ends with dstPtr+dstSize.
+ * It stays within dstBuffer (from @dstBufferStart) when possible, otherwise it's copied into tmpOutBuffer.
  * Condition : @dstPtr != NULL
  */
 static void LZ4F_updateDict(LZ4F_dctx* dctx,
                       const BYTE* dstPtr, size_t dstSize, const BYTE* dstBufferStart,
                       unsigned withinTmp)
 {
+    assert(dctx != NULL);
     assert(dstPtr != NULL);
     if (dctx->dictSize==0) dctx->dict = (const BYTE*)dstPtr;  /* will lead to prefix mode */
     assert(dctx->dict != NULL);
 
-    if (dctx->dict + dctx->dictSize == dstPtr) {  /* prefix mode, everything within dstBuffer */
+    /* prefix mode : the output follows the history within the same buffer : dstBuffer, or a previous one (stableDst).
+     * The output is never within tmpOutBuffer (history there continues through tmpOut : see withinTmp below) :
+     * a history within tmpOutBuffer ending where the output starts only means both buffers are adjacent allocations. */
+    if ((dctx->dict + dctx->dictSize == dstPtr) && (dctx->dict != dctx->tmpOutBuffer)) {
         dctx->dictSize += dstSize;
         return;
     }
